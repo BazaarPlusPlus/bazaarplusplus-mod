@@ -28,8 +28,6 @@ internal class DebugOverlay : MonoBehaviour
     private static bool _stylesInitialized = false;
 
     private readonly List<Line> _lines = new List<Line>();
-    private readonly List<RunInfo.CardInfo> _showcaseCards = new List<RunInfo.CardInfo>();
-    private readonly List<Card> _handCardsForLayout = new List<Card>();
     private readonly List<GameObject> _showcaseEntities = new List<GameObject>();
     private readonly List<GameObject> _showcaseAnchors = new List<GameObject>();
     private readonly List<ShowcaseCardJson> _showcaseInputCards = new List<ShowcaseCardJson>();
@@ -42,6 +40,7 @@ internal class DebugOverlay : MonoBehaviour
     private string _showcaseStatus = "idle";
 
     private MethodInfo _instantiateCardMethod;
+    private MethodInfo _itemControllerOnDisable;
     private object _spawnSection;
 
     private float _nextRefreshTime;
@@ -189,8 +188,6 @@ internal class DebugOverlay : MonoBehaviour
     private void RebuildLines()
     {
         _lines.Clear();
-        _showcaseCards.Clear();
-        _handCardsForLayout.Clear();
 
         Header("BazaarPlusPlus  [F2 toggle]");
 
@@ -208,9 +205,6 @@ internal class DebugOverlay : MonoBehaviour
                 Row("Encounter", Data.CurrentEncounterId?.ToString() ?? "-");
 
                 var handCards = GameDataReader.GetItemsAsCards(run.Player?.Hand);
-                _showcaseCards.AddRange(GameDataReader.GetCardInfo(handCards));
-                _handCardsForLayout.AddRange(handCards);
-
                 _showcaseJsonInput = BuildMinimalJsonFromCards(handCards);
                 _showcaseInputCards.Clear();
                 _showcaseInputCards.AddRange(ParseMinimalJson(_showcaseJsonInput));
@@ -485,12 +479,22 @@ internal class DebugOverlay : MonoBehaviour
 
                 if (version != _showcaseSyncVersion)
                 {
-                    Destroy(spawned);
+                    spawned.PoolObject();
                     return;
                 }
 
                 spawned.AddComponent<ShowcaseCardMarker>();
-                if (spawned.TryGetComponent<CardController>(out var cardController))
+                if (spawned.TryGetComponent<ItemController>(out var itemController))
+                {
+                    itemController.ShowCard(true);
+                    itemController.EnableMovement(false);
+                    // Invoke OnDisable via reflection to remove all Events.* and BazaarVFXManager
+                    // subscriptions without disabling the component — keeping pointer/tooltip events alive.
+                    _itemControllerOnDisable ??= typeof(ItemController).GetMethod(
+                        "OnDisable", BindingFlags.Instance | BindingFlags.NonPublic);
+                    _itemControllerOnDisable?.Invoke(itemController, null);
+                }
+                else if (spawned.TryGetComponent<CardController>(out var cardController))
                 {
                     cardController.EnableMovement(false);
                     cardController.ShowCard(true);
@@ -651,7 +655,6 @@ internal class DebugOverlay : MonoBehaviour
             return;
 
         var right = (rotation * Vector3.right).normalized;
-        var gap = 0.0f;
         var edge = 0f;
 
         foreach (var anchor in _showcaseAnchors)
@@ -659,42 +662,64 @@ internal class DebugOverlay : MonoBehaviour
             if (anchor == null || anchor.transform.childCount == 0)
                 continue;
 
-            var cardObj = anchor.transform.GetChild(0).gameObject;
-            var half = GetCardHalfWidth(cardObj, right);
-            if (half <= 0.001f)
-                half = 0.18f;
-
-            var center = edge + half;
-            anchor.transform.position = leftEdge + right * center;
+            // Place at origin first so we can measure the card's projection
+            // onto 'right' without any positional bias.
             anchor.transform.rotation = rotation;
+            anchor.transform.position = Vector3.zero;
 
-            edge = center + half + gap;
+            var cardObj = anchor.transform.GetChild(0).gameObject;
+            GetCardProjectionAlongRight(cardObj, right, out var cardLeft, out var cardWidth);
+
+            if (cardWidth <= 0.001f)
+            {
+                cardLeft  = -0.18f;
+                cardWidth =  0.36f;
+            }
+
+            // Shift anchor so the card's measured left edge lands at (leftEdge + right * edge).
+            anchor.transform.position = leftEdge + right * (edge - cardLeft);
+            edge += cardWidth;
         }
     }
 
     private bool TryGetShowcaseRegion(out Vector3 leftEdge, out Quaternion rotation)
     {
-
-        var handControllers = new List<CardController>();
-        foreach (var handCard in _handCardsForLayout)
-        {
-            var ctrl = handCard == null ? null : Data.CardAndSkillLookup.GetCardController(handCard);
-            if (ctrl != null)
-                handControllers.Add(ctrl);
-        }
-
-        if (handControllers.Count > 0)
-        {
-            handControllers.Sort((a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
-            var rightMost = handControllers[handControllers.Count - 1];
-            leftEdge = rightMost.transform.position + rightMost.transform.right * 0.42f;
-            rotation = rightMost.transform.rotation;
-            return true;
-        }
-
         leftEdge = Vector3.zero;
         rotation = Quaternion.identity;
 
+        var boardManager = Singleton<BoardManager>.Instance;
+        if (boardManager != null)
+        {
+            var sockets = boardManager.playerStorageSockets;
+            if (sockets != null && sockets.Length > 0)
+            {
+                // Use the first valid socket to establish the board's right direction
+                ItemSocketController reference = null;
+                foreach (var s in sockets)
+                    if (s != null) { reference = s; break; }
+
+                if (reference != null)
+                {
+                    var boardRight = reference.transform.right;
+
+                    // Find the rightmost socket by projection onto that axis
+                    ItemSocketController rightmost = null;
+                    float maxProj = float.MinValue;
+                    foreach (var s in sockets)
+                    {
+                        if (s == null) continue;
+                        var proj = Vector3.Dot(s.transform.position, boardRight);
+                        if (proj > maxProj) { maxProj = proj; rightmost = s; }
+                    }
+
+                    rotation = rightmost.transform.rotation;
+                    leftEdge = rightmost.transform.position + boardRight * 0.42f;
+                    return true;
+                }
+            }
+        }
+
+        // Camera-based fallback
         var cam = Camera.main;
         if (cam == null)
             return false;
@@ -705,42 +730,54 @@ internal class DebugOverlay : MonoBehaviour
         return true;
     }
 
-    private static float GetCardHalfWidth(GameObject obj, Vector3 axis)
+    // Measure where the card's BoxCollider starts and how wide it is along 'right',
+    // using an OBB projection so rotation doesn't inflate the result.
+    // Called with the anchor placed at world origin, so all measurements are
+    // relative to the anchor position (= 0).
+    private static void GetCardProjectionAlongRight(
+        GameObject cardObj, Vector3 right,
+        out float cardLeft, out float cardWidth)
     {
-        if (obj == null)
-            return 0f;
+        cardLeft  = 0f;
+        cardWidth = 0f;
 
-        var n = axis.normalized;
-        var cardController = obj.GetComponent<CardController>();
-        var box = cardController?.BoxCollider != null
-            ? cardController.BoxCollider
-            : obj.GetComponentInChildren<BoxCollider>(includeInactive: true);
+        if (cardObj == null)
+            return;
 
-        if (box != null)
-        {
-            var b = box.bounds;
-            var e = b.extents;
-            return Mathf.Abs(n.x) * e.x + Mathf.Abs(n.y) * e.y + Mathf.Abs(n.z) * e.z;
-        }
+        var box = cardObj.GetComponentInChildren<BoxCollider>(includeInactive: true);
+        if (box == null)
+            return;
 
-        var renderers = obj.GetComponentsInChildren<Renderer>(includeInactive: true);
-        if (renderers == null || renderers.Length == 0)
-            return 0f;
+        var t  = box.transform;
+        var hs = box.size * 0.5f;
 
-        var bounds = renderers[0].bounds;
-        for (var i = 1; i < renderers.Length; i++)
-            bounds.Encapsulate(renderers[i].bounds);
+        // OBB half-extent projected onto 'right' — exact, no AABB inflation.
+        var halfProj = Mathf.Abs(Vector3.Dot(right, t.right))   * hs.x * t.lossyScale.x
+                     + Mathf.Abs(Vector3.Dot(right, t.up))      * hs.y * t.lossyScale.y
+                     + Mathf.Abs(Vector3.Dot(right, t.forward)) * hs.z * t.lossyScale.z;
 
-        var ext = bounds.extents;
-        return Mathf.Abs(n.x) * ext.x + Mathf.Abs(n.y) * ext.y + Mathf.Abs(n.z) * ext.z;
+        // Center of the BoxCollider in world space (anchor is at 0, so this equals
+        // the offset from the anchor to the box center).
+        var centerProj = Vector3.Dot(t.TransformPoint(box.center), right);
+
+        cardLeft  = centerProj - halfProj;
+        cardWidth = halfProj * 2f;
     }
 
     private void HideShowcaseEntities()
     {
         foreach (var entity in _showcaseEntities)
         {
-            if (entity != null)
-                Destroy(entity);
+            if (entity == null)
+                continue;
+
+            // Remove the marker so it doesn't persist in the pool
+            var marker = entity.GetComponent<ShowcaseCardMarker>();
+            if (marker != null)
+                Destroy(marker);
+
+            entity.transform.SetParent(null);
+            entity.PoolObject();
         }
         _showcaseEntities.Clear();
 
