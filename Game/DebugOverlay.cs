@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus;
 
@@ -13,9 +14,21 @@ internal class DebugOverlay : MonoBehaviour
     private static readonly GUIStyle _labelStyle = new GUIStyle();
     private static bool _stylesInitialized = false;
 
+    // Cached lines snapshot
+    private readonly List<Line> _lines = new List<Line>();
+    private float _nextRefreshTime;
+    private const float RefreshInterval = 0.1f;
+
+    private struct Line
+    {
+        public string Text;
+        public bool IsHeader;
+    }
+
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F2))
+        var keyboard = Keyboard.current;
+        if (keyboard != null && keyboard.f2Key.wasPressedThisFrame)
             _visible = !_visible;
     }
 
@@ -25,6 +38,13 @@ internal class DebugOverlay : MonoBehaviour
             return;
 
         InitStyles();
+
+        // Refresh data snapshot at a lower frequency to avoid heavy per-frame work
+        if (Time.unscaledTime >= _nextRefreshTime)
+        {
+            _nextRefreshTime = Time.unscaledTime + RefreshInterval;
+            RebuildLines();
+        }
 
         var windowRect = new Rect(10, 10, 420, Screen.height - 20);
         GUI.Box(windowRect, "");
@@ -37,6 +57,28 @@ internal class DebugOverlay : MonoBehaviour
             )
         );
         _scroll = GUILayout.BeginScrollView(_scroll);
+
+        foreach (var line in _lines)
+        {
+            if (line.IsHeader)
+            {
+                GUILayout.Space(4);
+                GUILayout.Label(line.Text, _headerStyle);
+                GUILayout.Space(2);
+            }
+            else
+            {
+                GUILayout.Label(line.Text, _labelStyle);
+            }
+        }
+
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+    }
+
+    private void RebuildLines()
+    {
+        _lines.Clear();
 
         Header("BazaarPlusPlus  [F2 toggle]");
 
@@ -66,12 +108,9 @@ internal class DebugOverlay : MonoBehaviour
 
         // Current encounter choices (inside encounter)
         DrawCardList("Current Encounter Choices", ModState.CurrentEncounterChoices);
-
-        GUILayout.EndScrollView();
-        GUILayout.EndArea();
     }
 
-    private static void DrawEncounterList(
+    private void DrawEncounterList(
         string title,
         List<RunInfo.CardInfo> cards,
         List<RunInfo.MonsterPreview> monsterPreviews
@@ -80,7 +119,7 @@ internal class DebugOverlay : MonoBehaviour
         Header(title);
         if (cards == null || cards.Count == 0)
         {
-            GUILayout.Label("  (none)", _labelStyle);
+            Label("  (none)");
             return;
         }
 
@@ -99,38 +138,32 @@ internal class DebugOverlay : MonoBehaviour
                 string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None"
                     ? ""
                     : $" [{card.Enchant}]";
-            GUILayout.Label($"  • {name}  T{tier}{enchant}", _labelStyle);
+            Label($"  • {name}  T{tier}{enchant}");
 
             // If this is a combat encounter with monster data, show inline
             if (card.Name != null && previewMap.TryGetValue(card.Name, out var preview))
             {
                 if (preview.Items == null && preview.Skills == null)
                 {
-                    GUILayout.Label("      [no-data-now]", _labelStyle);
+                    Label("      [no-data-now]");
                 }
                 else
                 {
                     if (preview.Items != null && preview.Items.Count > 0)
-                        GUILayout.Label(
-                            "      items: " + string.Join(", ", preview.Items),
-                            _labelStyle
-                        );
+                        Label("      items: " + string.Join(", ", preview.Items));
                     if (preview.Skills != null && preview.Skills.Count > 0)
-                        GUILayout.Label(
-                            "      skills: " + string.Join(", ", preview.Skills),
-                            _labelStyle
-                        );
+                        Label("      skills: " + string.Join(", ", preview.Skills));
                 }
             }
         }
     }
 
-    private static void DrawCardList(string title, List<RunInfo.CardInfo> cards)
+    private void DrawCardList(string title, List<RunInfo.CardInfo> cards)
     {
         Header(title);
         if (cards == null || cards.Count == 0)
         {
-            GUILayout.Label("  (none)", _labelStyle);
+            Label("  (none)");
             return;
         }
         foreach (var card in cards)
@@ -141,20 +174,35 @@ internal class DebugOverlay : MonoBehaviour
                 string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None"
                     ? ""
                     : $" [{card.Enchant}]";
-            GUILayout.Label($"  • {name}  T{tier}{enchant}", _labelStyle);
+            Label($"  • {name}  T{tier}{enchant}");
         }
     }
 
-    private static void Header(string text)
+    private void Header(string text)
     {
-        GUILayout.Space(4);
-        GUILayout.Label(text, _headerStyle);
-        GUILayout.Space(2);
+        _lines.Add(
+            new Line
+            {
+                Text = text,
+                IsHeader = true,
+            }
+        );
     }
 
-    private static void Row(string key, string value)
+    private void Row(string key, string value)
     {
-        GUILayout.Label($"  {key}: {value ?? "-"}", _labelStyle);
+        Label($"  {key}: {value ?? "-"}");
+    }
+
+    private void Label(string text)
+    {
+        _lines.Add(
+            new Line
+            {
+                Text = text,
+                IsHeader = false,
+            }
+        );
     }
 
     private static void InitStyles()
