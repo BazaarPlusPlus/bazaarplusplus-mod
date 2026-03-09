@@ -1,41 +1,63 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- Embedded resources -->
   <ItemGroup>
     <EmbeddedResource Include="Data\items.js" />
   </ItemGroup>
-  <PropertyGroup>
-    <!-- Correct TFM spelling -->
-    <TargetFramework>netstandard2.1</TargetFramework>
+  <!-- Remove decompiled files -->
+  <ItemGroup>
+    <Compile Remove="decompiled/**" />
+    <EmbeddedResource Remove="decompiled/**" />
+    <None Remove="decompiled/**" />
+  </ItemGroup>
 
+  <!-- Build properties -->
+  <PropertyGroup>
     <AssemblyName>BazaarPlusPlus</AssemblyName>
     <Description>BazaarPlusPlus - Game Enhancement Mod</Description>
+    <RootNamespace>BazaarPlusPlus</RootNamespace>
+
     <Version>1.0.0</Version>
+    <LangVersion>12</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <LangVersion>latest</LangVersion>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <RestoreAdditionalProjectSources>
       https://api.nuget.org/v3/index.json;
       https://nuget.bepinex.dev/v3/index.json;
     </RestoreAdditionalProjectSources>
-    <RootNamespace>BazaarPlusPlus</RootNamespace>
     <NoWarn>CS0436</NoWarn>
   </PropertyGroup>
-  <!-- Set ManagedPath based on which installation exists -->
+
+  <!-- Candidate install paths for common Steam locations -->
   <PropertyGroup>
-    <WinSteamManaged>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed</WinSteamManaged>
-    <MacSteamManaged>/Users/yxinyu/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManaged>
+    <!-- macOS -->
+    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
+    <MacGamePathDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data</MacGamePathDefault>
+    <!-- Windows -->
+    <WinSteamManagedC>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed</WinSteamManagedC>
+    <WinGamePathC>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar</WinGamePathC>
+    <WinSteamManagedD>D:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed</WinSteamManagedD>
+    <WinGamePathD>D:\Program Files (x86)\Steam\steamapps\common\The Bazaar</WinGamePathD>
+    <WinSteamManagedE>E:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed</WinSteamManagedE>
+    <WinGamePathE>E:\Program Files (x86)\Steam\steamapps\common\The Bazaar</WinGamePathE>
   </PropertyGroup>
-  <PropertyGroup Condition="Exists('$(WinSteamManaged)\Assembly-CSharp.dll')">
-    <ManagedPath>$(WinSteamManaged)</ManagedPath>
-    <GamePath>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar</GamePath>
+  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(WinSteamManagedC)\Assembly-CSharp.dll')">
+    <ManagedPath>$(WinSteamManagedC)</ManagedPath>
+    <GamePath>$(WinGamePathC)</GamePath>
   </PropertyGroup>
-  <PropertyGroup Condition="Exists('$(MacSteamManaged)/Assembly-CSharp.dll')">
-    <ManagedPath>$(MacSteamManaged)</ManagedPath>
-    <GamePath>/Users/yxinyu/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data</GamePath>
+  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(WinSteamManagedD)\Assembly-CSharp.dll')">
+    <ManagedPath>$(WinSteamManagedD)</ManagedPath>
+    <GamePath>$(WinGamePathD)</GamePath>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Remove="BazaarPlusPlusInstaller/**" />
-    <EmbeddedResource Remove="BazaarPlusPlusInstaller/**" />
-    <None Remove="BazaarPlusPlusInstaller/**" />
-  </ItemGroup>
+  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(WinSteamManagedE)\Assembly-CSharp.dll')">
+    <ManagedPath>$(WinSteamManagedE)</ManagedPath>
+    <GamePath>$(WinGamePathE)</GamePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/Assembly-CSharp.dll')">
+    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
+    <GamePath>$(MacGamePathDefault)</GamePath>
+  </PropertyGroup>
+
+  <!-- Package references -->
   <ItemGroup>
     <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
     <PackageReference Include="BepInEx.Core" Version="5.*" />
@@ -83,6 +105,8 @@
       <HintPath>$(ManagedPath)\Unity.InputSystem.dll</HintPath>
     </Reference>
   </ItemGroup>
+
+  <!-- Publicize all assemblies -->
   <PropertyGroup>
     <PublicizeAll>true</PublicizeAll>
   </PropertyGroup>
