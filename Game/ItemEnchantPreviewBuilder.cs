@@ -111,7 +111,7 @@ public static class ItemEnchantPreviewBuilder
                 continue;
 
             yield return new TooltipSegment(
-                $"<size=75%> · <color=#{colorHex}>{enchantmentLabel}</color>: {renderedText}</size>",
+                $"<size=75%>\u00A0\u00A0· <color=#{colorHex}>{enchantmentLabel}</color>: {renderedText}</size>",
                 null,
                 null,
                 -1
@@ -191,7 +191,7 @@ public static class ItemEnchantPreviewBuilder
                 },
                 localized
             );
-            return RenderTooltipBuilder(builder).RemoveExtraSpaces();
+            return RenderTooltipBuilder(builder).TrimEnd();
         }
         catch
         {
