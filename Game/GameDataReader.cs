@@ -13,6 +13,17 @@ internal static class GameDataReader
 {
     public static RunInfo GetRunInfo()
     {
+        if (string.IsNullOrEmpty(ModState.RunId))
+        {
+            var displayName =
+                ModState.DisplayNameConfig?.Value
+                ?? Data.Profile?.Username
+                ?? "anonymous";
+
+            var rawRunId = $"{Data.Run.Player.Hero}-{Data.Run.Day}-{DateTime.UtcNow.Ticks}";
+            ModState.RunId = GetHashedRunId(rawRunId, displayName);
+        }
+
         return new RunInfo
         {
             Wins = Data.Run.Victories,
