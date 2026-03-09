@@ -22,5 +22,7 @@ public class Plugin : BaseUnityPlugin
         ModState.Initialize(configFile);
 
         ItemDatabase.Load();
+        EncounterTracker.Subscribe();
+        gameObject.AddComponent<DebugOverlay>();
     }
 }

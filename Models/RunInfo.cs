@@ -37,6 +37,8 @@ public class RunInfo
     public int? Prestige;
     public int? OppPrestige;
     public bool PlayMode;
+    public List<CardInfo> AvailableEncounters;
+    public List<CardInfo> CurrentEncounterChoices;
 
     public class SkillInfo
     {

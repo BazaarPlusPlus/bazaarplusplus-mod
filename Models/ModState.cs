@@ -22,6 +22,10 @@ internal static class ModState
     public static DateTime LastSentTime = DateTime.MinValue;
     public static readonly TimeSpan SendInterval = TimeSpan.FromSeconds(2);
 
+    // Encounter selection tracking
+    public static List<RunInfo.CardInfo> AvailableEncounters;    // map path options (ERunState.Encounter)
+    public static List<RunInfo.CardInfo> CurrentEncounterChoices; // choices inside an encounter (Choice/Loot/Pedestal)
+
     // Item tag data
     public static Dictionary<string, List<string>> BaseItemTags;
 

@@ -55,6 +55,8 @@ internal static class GameDataReader
             OppPrestige = Data.Run.Opponent?.GetAttributeValue(EPlayerAttributeType.Prestige),
             RunId = ModState.RunId,
             PlayMode = Data.SelectedPlayMode == EPlayMode.Ranked,
+            AvailableEncounters = ModState.AvailableEncounters,
+            CurrentEncounterChoices = ModState.CurrentEncounterChoices,
         };
     }
 
