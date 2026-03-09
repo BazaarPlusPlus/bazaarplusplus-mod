@@ -11,6 +11,7 @@ decompiled/
 .vs/
 *.user
 *.suo
+.dotnet-home/
 
 # OS
 .DS_Store
