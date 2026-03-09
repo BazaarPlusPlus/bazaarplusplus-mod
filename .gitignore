@@ -4,6 +4,7 @@ obj/
 
 # Dependencies
 libs/
+decompiled/
 
 # IDE
 .idea/
