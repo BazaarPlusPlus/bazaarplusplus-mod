@@ -41,6 +41,10 @@ public static class ItemEnchantPreviewBuilder
         if (!IsEligible(itemCard))
             return empty;
 
+        // Defensive guard: even if caller forgets to gate by state, never render in combat.
+        if (Data.IsInCombat)
+            return empty;
+
         var enchantments = itemCard.GetEnchantments();
         if (enchantments == null || enchantments.Count == 0)
             return empty;
@@ -166,8 +170,7 @@ public static class ItemEnchantPreviewBuilder
         var originalAttributes = new Dictionary<ECardAttributeType, int?>();
         try
         {
-            // Temporarily switch to preview enchantment so placeholders
-            // like {ability.e1.targets} resolve against the correct data.
+            // Temporarily switch to preview enchantment so placeholders resolve against preview values.
             itemCard.Enchantment = previewEnchantment;
             if (previewEnchantmentTemplate?.Attributes != null)
             {

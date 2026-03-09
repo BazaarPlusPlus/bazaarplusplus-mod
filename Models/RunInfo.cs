@@ -50,7 +50,13 @@ public class RunInfo
 
     public class MonsterPreview
     {
+        public Guid EncounterTemplateId;
         public string EncounterName;
+        public string MonsterTemplateId;
+        public int? CombatLevel;
+        public int? RewardGold;
+        public int? RewardXp;
+        public bool? SandstormEnabled;
         public List<string> Items; // null = no local data
         public List<string> Skills; // null = no local data
     }

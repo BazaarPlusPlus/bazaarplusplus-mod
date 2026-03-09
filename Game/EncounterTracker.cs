@@ -1,4 +1,4 @@
-#pragma warning disable CS0436
+﻿#pragma warning disable CS0436
 using System.Collections.Generic;
 using System.Linq;
 using BazaarGameClient.Domain.Models.Cards;
@@ -27,7 +27,7 @@ internal static class EncounterTracker
             return;
         }
 
-        // Skip combat states — card dealt events also fire during combat for spawned cards
+        // Skip combat states - card dealt events also fire during combat for spawned cards
         var stateName = state.StateName;
         if (stateName == ERunState.Combat || stateName == ERunState.PVPCombat)
         {
@@ -55,11 +55,12 @@ internal static class EncounterTracker
         }
 
         var cardInfos = GameDataReader.GetCardInfo(cards);
+        var monsterPreviews = BuildMonsterPreviews(cards);
 
         if (stateName == ERunState.Encounter)
         {
             ModState.AvailableEncounters = cardInfos;
-            ModState.EncounterMonsterPreviews = BuildMonsterPreviews(cards);
+            ModState.EncounterMonsterPreviews = monsterPreviews.Count > 0 ? monsterPreviews : null;
             ModState.CurrentEncounterChoices = null;
             ModState.Logger.LogInfo(
                 $"[EncounterTracker] Updated map encounters: count={cardInfos.Count}, monsterPreviews={ModState.EncounterMonsterPreviews?.Count ?? 0}"
@@ -69,9 +70,9 @@ internal static class EncounterTracker
         {
             ModState.CurrentEncounterChoices = cardInfos;
             ModState.AvailableEncounters = null;
-            ModState.EncounterMonsterPreviews = null;
+            ModState.EncounterMonsterPreviews = monsterPreviews.Count > 0 ? monsterPreviews : null;
             ModState.Logger.LogInfo(
-                $"[EncounterTracker] Updated encounter choices: state={stateName}, count={cardInfos.Count}"
+                $"[EncounterTracker] Updated encounter choices: state={stateName}, count={cardInfos.Count}, monsterPreviews={ModState.EncounterMonsterPreviews?.Count ?? 0}"
             );
         }
 
@@ -97,11 +98,18 @@ internal static class EncounterTracker
 
             var encounterName = card.Template.InternalName;
             var entry = MonsterDatabase.TryGet(encounterName);
+            var monster = combat.CombatantType as TCombatantMonster;
 
             previews.Add(
                 new RunInfo.MonsterPreview
                 {
+                    EncounterTemplateId = card.TemplateId,
                     EncounterName = encounterName,
+                    MonsterTemplateId = monster?.MonsterTemplateId.ToString(),
+                    CombatLevel = monster == null ? null : (int?)monster.Level,
+                    RewardGold = combat.RewardCombatGold,
+                    RewardXp = combat.RewardCombatXp,
+                    SandstormEnabled = combat.SandstormEnabled,
                     Items = entry?.Items,
                     Skills = entry?.Skills,
                 }

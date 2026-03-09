@@ -1,4 +1,5 @@
-#pragma warning disable CS0436
+﻿#pragma warning disable CS0436
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -107,7 +108,11 @@ internal class DebugOverlay : MonoBehaviour
         );
 
         // Current encounter choices (inside encounter)
-        DrawCardList("Current Encounter Choices", ModState.CurrentEncounterChoices);
+        DrawEncounterList(
+            "Current Encounter Choices",
+            ModState.CurrentEncounterChoices,
+            ModState.EncounterMonsterPreviews
+        );
     }
 
     private void DrawEncounterList(
@@ -123,59 +128,97 @@ internal class DebugOverlay : MonoBehaviour
             return;
         }
 
-        // Build a lookup by EncounterName for quick access
-        var previewMap = new Dictionary<string, RunInfo.MonsterPreview>();
+        // Build lookups for quick access.
+        var previewByTemplateId = new Dictionary<Guid, RunInfo.MonsterPreview>();
+        var previewByName = new Dictionary<string, RunInfo.MonsterPreview>();
         if (monsterPreviews != null)
+        {
             foreach (var mp in monsterPreviews)
+            {
+                if (mp.EncounterTemplateId != Guid.Empty)
+                    previewByTemplateId[mp.EncounterTemplateId] = mp;
                 if (!string.IsNullOrEmpty(mp.EncounterName))
-                    previewMap[mp.EncounterName] = mp;
+                    previewByName[mp.EncounterName] = mp;
+            }
+        }
+
+        var matchedMonsterRows = 0;
 
         foreach (var card in cards)
         {
             var name = card.Name ?? card.TemplateId.ToString("N")[..8];
             var tier = card.Tier.ToString();
+            var cardId = card.TemplateId.ToString("N")[..8];
             var enchant =
-                string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None"
-                    ? ""
-                    : $" [{card.Enchant}]";
-            Label($"  • {name}  T{tier}{enchant}");
+                string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None" ? "-" : card.Enchant;
 
-            // If this is a combat encounter with monster data, show inline
-            if (card.Name != null && previewMap.TryGetValue(card.Name, out var preview))
+            Label($"  - Name: {name}");
+            Label($"    Tier: {tier}");
+            Label($"    Enchant: {enchant}");
+            Label($"    CardID: {cardId}");
+
+            RunInfo.MonsterPreview preview = null;
+            if (!previewByTemplateId.TryGetValue(card.TemplateId, out preview))
+                previewByName.TryGetValue(name, out preview);
+
+            if (preview == null)
+                continue;
+
+            matchedMonsterRows++;
+
+            if (!string.IsNullOrEmpty(preview.EncounterName))
+                Label($"      id: {preview.EncounterName}");
+
+            var levelText = preview.CombatLevel.HasValue
+                ? preview.CombatLevel.Value.ToString()
+                : "?";
+            var goldText = preview.RewardGold.HasValue ? preview.RewardGold.Value.ToString() : "?";
+            var xpText = preview.RewardXp.HasValue ? preview.RewardXp.Value.ToString() : "?";
+            var sandText = !preview.SandstormEnabled.HasValue
+                ? "?"
+                : (preview.SandstormEnabled.Value ? "on" : "off");
+            Label($"      combat: lvl={levelText}, reward={goldText}g/{xpText}xp, sand={sandText}");
+
+            if (!string.IsNullOrEmpty(preview.MonsterTemplateId))
+                Label($"      monsterTpl: {preview.MonsterTemplateId}");
+
+            if (preview.Items == null && preview.Skills == null)
             {
-                if (preview.Items == null && preview.Skills == null)
+                Label("      db: missing (BazaarPlusPlus_monsters.json)");
+                continue;
+            }
+
+            if (preview.Items != null)
+            {
+                Label($"      items ({preview.Items.Count}):");
+                if (preview.Items.Count == 0)
                 {
-                    Label("      [no-data-now]");
+                    Label("        - (none)");
                 }
                 else
                 {
-                    if (preview.Items != null && preview.Items.Count > 0)
-                        Label("      items: " + string.Join(", ", preview.Items));
-                    if (preview.Skills != null && preview.Skills.Count > 0)
-                        Label("      skills: " + string.Join(", ", preview.Skills));
+                    foreach (var item in preview.Items)
+                        Label($"        - {item}");
+                }
+            }
+
+            if (preview.Skills != null)
+            {
+                Label($"      skills ({preview.Skills.Count}):");
+                if (preview.Skills.Count == 0)
+                {
+                    Label("        - (none)");
+                }
+                else
+                {
+                    foreach (var skill in preview.Skills)
+                        Label($"        - {skill}");
                 }
             }
         }
-    }
 
-    private void DrawCardList(string title, List<RunInfo.CardInfo> cards)
-    {
-        Header(title);
-        if (cards == null || cards.Count == 0)
-        {
-            Label("  (none)");
-            return;
-        }
-        foreach (var card in cards)
-        {
-            var name = card.Name ?? card.TemplateId.ToString("N")[..8];
-            var tier = card.Tier.ToString();
-            var enchant =
-                string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None"
-                    ? ""
-                    : $" [{card.Enchant}]";
-            Label($"  • {name}  T{tier}{enchant}");
-        }
+        if (matchedMonsterRows > 0)
+            Label($"  monster preview matched: {matchedMonsterRows}/{cards.Count}");
     }
 
     private void Header(string text)
