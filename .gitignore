@@ -12,6 +12,7 @@ decompiled/
 *.user
 *.suo
 .dotnet-home/
+.nuget-packages/
 
 # OS
 .DS_Store

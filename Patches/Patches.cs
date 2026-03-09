@@ -47,13 +47,18 @@ public static class CardTooltipDataPassivePatch
             if (previewSegments.Count == 0)
                 return;
 
-            if (__result.Item1.Length > 0)
-                __result.Item1.AppendLine();
+            var passiveBuilder = __result.Item1;
+            if (passiveBuilder.Length > 0 && passiveBuilder[passiveBuilder.Length - 1] != '\n')
+            {
+                passiveBuilder.AppendLine();
+            }
+
+            passiveBuilder.AppendLine("Bazaar++");
 
             foreach (var segment in previewSegments)
             {
                 if (!string.IsNullOrWhiteSpace(segment.Text))
-                    __result.Item1.AppendLine(segment.Text);
+                    passiveBuilder.AppendLine(segment.Text);
             }
         }
         catch (System.Exception ex)

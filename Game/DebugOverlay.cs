@@ -180,13 +180,7 @@ internal class DebugOverlay : MonoBehaviour
 
     private void Header(string text)
     {
-        _lines.Add(
-            new Line
-            {
-                Text = text,
-                IsHeader = true,
-            }
-        );
+        _lines.Add(new Line { Text = text, IsHeader = true });
     }
 
     private void Row(string key, string value)
@@ -196,13 +190,7 @@ internal class DebugOverlay : MonoBehaviour
 
     private void Label(string text)
     {
-        _lines.Add(
-            new Line
-            {
-                Text = text,
-                IsHeader = false,
-            }
-        );
+        _lines.Add(new Line { Text = text, IsHeader = false });
     }
 
     private static void InitStyles()
