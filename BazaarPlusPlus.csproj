@@ -1,41 +1,41 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <EmbeddedResource Include="items.js" />
+    <EmbeddedResource Include="Data\items.js" />
   </ItemGroup>
   <PropertyGroup>
     <!-- Correct TFM spelling -->
     <TargetFramework>netstandard2.1</TargetFramework>
 
-    <AssemblyName>BazaarPlannerMod</AssemblyName>
-    <Description>Bazaar Planner Integration Mod</Description>
-    <Version>1.1.2</Version>
+    <AssemblyName>BazaarPlusPlus</AssemblyName>
+    <Description>BazaarPlusPlus - Game Enhancement Mod</Description>
+    <Version>1.0.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <RestoreAdditionalProjectSources>
       https://api.nuget.org/v3/index.json;
       https://nuget.bepinex.dev/v3/index.json;
     </RestoreAdditionalProjectSources>
-    <RootNamespace>BazaarPlannerMod</RootNamespace>
+    <RootNamespace>BazaarPlusPlus</RootNamespace>
     <NoWarn>CS0436</NoWarn>
   </PropertyGroup>
-  <!-- Set GamePath based on which installation exists -->
+  <!-- Set ManagedPath based on which installation exists -->
   <PropertyGroup>
-    <SteamPath>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar</SteamPath>
-    <TempoPath>C:\Users\PC\AppData\Roaming\Tempo Launcher - Beta\game\buildx64</TempoPath>
+    <WinSteamManaged>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed</WinSteamManaged>
+    <MacSteamManaged>/Users/yxinyu/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManaged>
   </PropertyGroup>
-  <!-- Check Steam path first -->
-  <PropertyGroup Condition="Exists('$(SteamPath)\TheBazaar_Data\Managed\Assembly-CSharp.dll')">
-    <GamePath>$(SteamPath)</GamePath>
+  <PropertyGroup Condition="Exists('$(WinSteamManaged)\Assembly-CSharp.dll')">
+    <ManagedPath>$(WinSteamManaged)</ManagedPath>
+    <GamePath>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar</GamePath>
   </PropertyGroup>
-  <!-- Fall back to Tempo Launcher path if Steam path doesn't exist -->
-  <PropertyGroup Condition="!Exists('$(SteamPath)\TheBazaar_Data\Managed\Assembly-CSharp.dll')">
-    <GamePath>$(TempoPath)</GamePath>
+  <PropertyGroup Condition="Exists('$(MacSteamManaged)/Assembly-CSharp.dll')">
+    <ManagedPath>$(MacSteamManaged)</ManagedPath>
+    <GamePath>/Users/yxinyu/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data</GamePath>
   </PropertyGroup>
   <ItemGroup>
-  <Compile Remove="BazaarPlannerModInstaller/**" />
-  <EmbeddedResource Remove="BazaarPlannerModInstaller/**" />
-  <None Remove="BazaarPlannerModInstaller/**" />
-</ItemGroup>
+    <Compile Remove="BazaarPlusPlusInstaller/**" />
+    <EmbeddedResource Remove="BazaarPlusPlusInstaller/**" />
+    <None Remove="BazaarPlusPlusInstaller/**" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
     <PackageReference Include="BepInEx.Core" Version="5.*" />
@@ -50,39 +50,43 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework.TrimEnd(`0123456789`))' == 'net'">
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.2" PrivateAssets="all" />
+    <PackageReference
+      Include="Microsoft.NETFramework.ReferenceAssemblies"
+      Version="1.0.2"
+      PrivateAssets="all"
+    />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>$(GamePath)\TheBazaar_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(ManagedPath)\Assembly-CSharp.dll</HintPath>
     </Reference>
     <Reference Include="BazaarBattleService">
-      <HintPath>$(GamePath)\TheBazaar_Data\Managed\BazaarBattleService.dll</HintPath>
+      <HintPath>$(ManagedPath)\BazaarBattleService.dll</HintPath>
     </Reference>
     <Reference Include="BazaarGameClient">
-      <HintPath>$(GamePath)\TheBazaar_Data\Managed\BazaarGameClient.dll</HintPath>
+      <HintPath>$(ManagedPath)\BazaarGameClient.dll</HintPath>
     </Reference>
     <Reference Include="BazaarGameShared">
-      <HintPath>$(GamePath)\TheBazaar_Data\Managed\BazaarGameShared.dll</HintPath>
+      <HintPath>$(ManagedPath)\BazaarGameShared.dll</HintPath>
     </Reference>
     <Reference Include="TheBazaarRuntime">
-      <HintPath>$(GamePath)\TheBazaar_Data\Managed\TheBazaarRuntime.dll</HintPath>
+      <HintPath>$(ManagedPath)\TheBazaarRuntime.dll</HintPath>
     </Reference>
     <Reference Include="Addressables">
-      <HintPath>$(GamePath)\TheBazaar_Data\Managed\Unity.Addressables.dll</HintPath>
+      <HintPath>$(ManagedPath)\Unity.Addressables.dll</HintPath>
     </Reference>
     <Reference Include="ResourceManager">
-      <HintPath>$(GamePath)\TheBazaar_Data\Managed\Unity.ResourceManager.dll</HintPath>
+      <HintPath>$(ManagedPath)\Unity.ResourceManager.dll</HintPath>
     </Reference>
     <Reference Include="Unity.InputSystem">
-      <HintPath>$(GamePath)\TheBazaar_Data\Managed\Unity.InputSystem.dll</HintPath>
+      <HintPath>$(ManagedPath)\Unity.InputSystem.dll</HintPath>
     </Reference>
   </ItemGroup>
   <PropertyGroup>
     <PublicizeAll>true</PublicizeAll>
   </PropertyGroup>
-<!--
+  <!-- Notice From Origin Project BazaarPlannerMod by oceanseth.
     If you are compliling this, it will generate a random dll name and copy it to the plugins folder.
     
     At some point in the future, they might just not run the game if Bepinx mods are present,
@@ -95,36 +99,24 @@
     and manually enter a random filename unique to you.
 -->
   <Target Name="CopyToBepInExPlugins" AfterTargets="Build">
-   <ItemGroup>
-        <FilesToDelete Include="$(GamePath)\BepInEx\plugins\*.dll"/>
-    </ItemGroup>   
+    <ItemGroup>
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\*.dll" />
+    </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
 
-   <PropertyGroup>
+    <PropertyGroup>
       <RandomGuid>$([System.Guid]::NewGuid())</RandomGuid>
       <RandomName>$([System.String]::Copy('$(RandomGuid)').Substring(0,8))</RandomName>
     </PropertyGroup>
 
-    <Message Text="Copying $(TargetName).dll to $(GamePath)\BepInEx\plugins" Importance="high" />  
+    <Message Text="Copying $(TargetName).dll to $(GamePath)\BepInEx\plugins" Importance="high" />
     <Copy
-            SourceFiles="$(TargetDir)$(TargetName).dll"
-            DestinationFiles="$(GamePath)\BepInEx\plugins\$(RandomName).dll"
-     />
-    <Warning Text="[BazaarPlannerMod] Successfully copied DLL as $(RandomName).dll to $(GamePath)\BepInEx\plugins\$(RandomName).dll" />
+      SourceFiles="$(TargetDir)$(TargetName).dll"
+      DestinationFiles="$(GamePath)\BepInEx\plugins\$(RandomName).dll"
+    />
+    <Message
+      Text="[BazaarPlusPlus] Successfully copied DLL as $(RandomName).dll to $(GamePath)\BepInEx\plugins\$(RandomName).dll"
+      Importance="high"
+    />
   </Target>
-  <Target Name="CopyToBazaarPlannerModInstaller" AfterTargets="Build">
-    <Message Text="Copying $(TargetName).dll to ./BazaarPlannerModInstaller" Importance="high" />
-    <Copy
-            SourceFiles="$(TargetDir)$(TargetName).dll"
-            DestinationFolder="./BazaarPlannerModInstaller"
-            SkipUnchangedFiles="true" />
-  </Target>
-  <Target Name="CopyCustomLauncher" AfterTargets="Build">
-    <Message Text="Copying customlauncher.bat to $(OutputPath)" Importance="high" />
-    <Copy
-            SourceFiles="customlauncher.bat"
-            DestinationFolder="$(OutputPath)"
-            SkipUnchangedFiles="true" />
-  </Target>
-  
 </Project>

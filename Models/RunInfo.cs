@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlannerMod;
+namespace BazaarPlusPlus;
 
 public class RunInfo
 {
-    public String Hero; 
+    public String Hero;
     public List<SkillInfo> Skills;
     public List<SkillInfo> OppSkills;
-    public List<CardInfo> Cards; 
-    public List<CardInfo> Stash; 
+    public List<CardInfo> Cards;
+    public List<CardInfo> Stash;
     public List<CardInfo> OppCards;
     public List<CardInfo> OppStash;
     public int? OppHealth;
@@ -43,8 +43,10 @@ public class RunInfo
         public ETier Tier;
         public Guid TemplateId;
         public string Name;
-        public Dictionary<ECardAttributeType, int> Attributes { get; set; } = new Dictionary<ECardAttributeType, int>();
+        public Dictionary<ECardAttributeType, int> Attributes { get; set; } =
+            new Dictionary<ECardAttributeType, int>();
     }
+
     public class CardInfo
     {
         public ETier Tier;
@@ -53,8 +55,8 @@ public class RunInfo
         public EContainerSocketId? Left;
         public InstanceId Instance;
         public HashSet<ECardTag> Tags;
-        public Dictionary<ECardAttributeType, int> Attributes { get; set; } = new Dictionary<ECardAttributeType, int>();
+        public Dictionary<ECardAttributeType, int> Attributes { get; set; } =
+            new Dictionary<ECardAttributeType, int>();
         public string Enchant;
     }
-    
 }
