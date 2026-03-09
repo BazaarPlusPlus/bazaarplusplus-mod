@@ -31,7 +31,7 @@
   <PropertyGroup>
     <!-- macOS -->
     <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
-    <MacGamePathDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data</MacGamePathDefault>
+    <MacGamePathDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar</MacGamePathDefault>
     <!-- Windows -->
     <WinSteamManagedC>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed</WinSteamManagedC>
     <WinGamePathC>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar</WinGamePathC>
