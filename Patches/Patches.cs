@@ -1,4 +1,5 @@
 #pragma warning disable CS0436
+using System.Text;
 using System.Threading;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
@@ -25,19 +26,19 @@ class CombatSimPatch
     }
 }
 
-// Item enchant preview: append BazaarPlusPlus-generated tooltip segments
-[HarmonyPatch(typeof(CardTooltipData), nameof(CardTooltipData.GetActiveAbilityTooltipBlock))]
-public static class CardTooltipDataActiveAbilityPatch
+// Item enchant preview: append BazaarPlusPlus-generated text into passive tooltip block
+[HarmonyPatch(typeof(CardTooltipData), nameof(CardTooltipData.GetPassiveTooltipBlock))]
+public static class CardTooltipDataPassivePatch
 {
     [HarmonyPostfix]
     static void Postfix(
         CardTooltipData __instance,
-        ref System.Collections.Generic.List<TooltipSegment> __result
+        ref System.ValueTuple<StringBuilder, TooltipSegment?> __result
     )
     {
         try
         {
-            if (__result == null)
+            if (__result.Item1 == null)
                 return;
 
             var previewSegments = ItemEnchantPreviewBuilder.BuildPreviewSegments(
@@ -46,12 +47,19 @@ public static class CardTooltipDataActiveAbilityPatch
             if (previewSegments.Count == 0)
                 return;
 
-            __result.AddRange(previewSegments);
+            if (__result.Item1.Length > 0)
+                __result.Item1.AppendLine();
+
+            foreach (var segment in previewSegments)
+            {
+                if (!string.IsNullOrWhiteSpace(segment.Text))
+                    __result.Item1.AppendLine(segment.Text);
+            }
         }
         catch (System.Exception ex)
         {
             ModState.Logger?.LogError(
-                $"[ItemEnchantPreview] Failed to build tooltip previews: {ex.Message}"
+                $"[ItemEnchantPreview] Failed to append passive tooltip previews: {ex.Message}"
             );
         }
     }
