@@ -30,13 +30,30 @@ public static class ItemEnchantPreviewBuilder
         if (!IsEligible(itemCard))
             return segments;
 
-        var candidates = availableEnchantments?.Distinct().ToList();
-        if (candidates == null || candidates.Count == 0)
-            return segments;
-
         var enchantments = itemCard.GetEnchantments();
         if (enchantments == null || enchantments.Count == 0)
+        {
+            ModState.Logger?.LogDebug(
+                $"[ItemEnchantPreview] No enchantments available for {itemCard.Template?.InternalName ?? itemCard.TemplateId.ToString()}"
+            );
             return segments;
+        }
+        ModState.Logger?.LogDebug(
+            $"[ItemEnchantPreview] Enchantments: {string.Join(", ", enchantments.Keys)}"
+        );
+
+        var candidates = availableEnchantments
+            ?.Distinct()
+            .Where(enchantment => enchantments.ContainsKey(enchantment))
+            .ToList();
+
+        if (candidates == null || candidates.Count == 0)
+        {
+            candidates = enchantments.Keys.Distinct().ToList();
+            ModState.Logger?.LogInfo(
+                $"[ItemEnchantPreview] Using fallback enchantment set for {itemCard.Template?.InternalName ?? itemCard.TemplateId.ToString()}: count={candidates.Count}"
+            );
+        }
 
         foreach (var enchantmentType in candidates)
         {
@@ -51,6 +68,10 @@ public static class ItemEnchantPreviewBuilder
             )
                 segments.Add(segment);
         }
+
+        ModState.Logger?.LogDebug(
+            $"[ItemEnchantPreview] Built {segments.Count} preview segments for {itemCard.Template?.InternalName ?? itemCard.TemplateId.ToString()}"
+        );
 
         return segments;
     }

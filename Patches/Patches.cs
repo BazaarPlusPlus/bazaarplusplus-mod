@@ -25,48 +25,7 @@ class CombatSimPatch
     }
 }
 
-// Streamer mode: replace in-game username with display name
-[HarmonyPatch(typeof(HeroBannerController), "UpdatePlayer")]
-public static class UpdatePlayerPatch
-{
-    [HarmonyPrefix]
-    static bool Prefix(
-        HeroBannerController __instance,
-        ref string userName,
-        ref int nameId,
-        ref string titlePrefix,
-        TheBazaar.ProfileData.ISeasonRank currentSeasonRank,
-        int? leaderboardPosition
-    )
-    {
-        if (userName != Data.Profile?.Username)
-            return true;
-        if (string.IsNullOrEmpty(ModState.UidConfig.Value))
-            return true;
-
-        userName = ModState.DisplayNameConfig.Value;
-        nameId = 0;
-        return true;
-    }
-}
-
-[HarmonyPatch(typeof(HeroBannerController), "SetHeroName")]
-public static class SetHeroNamePatch
-{
-    [HarmonyPrefix]
-    static bool Prefix(ref string newName, ref int usernameId)
-    {
-        if (newName != Data.Profile?.Username)
-            return true;
-        if (string.IsNullOrEmpty(ModState.UidConfig.Value))
-            return true;
-
-        newName = ModState.DisplayNameConfig.Value;
-        usernameId = 0;
-        return true;
-    }
-}
-
+// Item enchant preview: append BazaarPlusPlus-generated tooltip segments
 [HarmonyPatch(typeof(CardTooltipData), nameof(CardTooltipData.GetActiveAbilityTooltipBlock))]
 public static class CardTooltipDataActiveAbilityPatch
 {

@@ -22,17 +22,26 @@ internal static class EncounterTracker
     {
         var state = Data.CurrentState;
         if (state == null)
+        {
+            ClearEncounterState("CurrentState is null");
             return;
+        }
 
         // Skip combat states — card dealt events also fire during combat for spawned cards
         var stateName = state.StateName;
         if (stateName == ERunState.Combat || stateName == ERunState.PVPCombat)
+        {
+            ClearEncounterState($"Ignoring combat state {stateName}");
             return;
+        }
 
         // Use SelectionSet as the authoritative list of what's shown to the player.
         var selectionSet = state.SelectionSet;
         if (selectionSet == null || selectionSet.Count == 0)
+        {
+            ClearEncounterState($"SelectionSet empty in state {stateName}");
             return;
+        }
 
         var cards = selectionSet
             .Select(id => Data.Entities.GetValueOrDefault(new InstanceId(id)))
@@ -40,7 +49,10 @@ internal static class EncounterTracker
             .ToList();
 
         if (cards.Count == 0)
+        {
+            ClearEncounterState($"SelectionSet resolved to zero cards in state {stateName}");
             return;
+        }
 
         var cardInfos = GameDataReader.GetCardInfo(cards);
 
@@ -48,10 +60,19 @@ internal static class EncounterTracker
         {
             ModState.AvailableEncounters = cardInfos;
             ModState.EncounterMonsterPreviews = BuildMonsterPreviews(cards);
+            ModState.CurrentEncounterChoices = null;
+            ModState.Logger.LogInfo(
+                $"[EncounterTracker] Updated map encounters: count={cardInfos.Count}, monsterPreviews={ModState.EncounterMonsterPreviews?.Count ?? 0}"
+            );
         }
         else
         {
             ModState.CurrentEncounterChoices = cardInfos;
+            ModState.AvailableEncounters = null;
+            ModState.EncounterMonsterPreviews = null;
+            ModState.Logger.LogInfo(
+                $"[EncounterTracker] Updated encounter choices: state={stateName}, count={cardInfos.Count}"
+            );
         }
 
         ModState.Logger.LogInfo(
@@ -88,5 +109,24 @@ internal static class EncounterTracker
         }
 
         return previews;
+    }
+
+    private static void ClearEncounterState(string reason)
+    {
+        var hadState =
+            ModState.AvailableEncounters != null
+            || ModState.CurrentEncounterChoices != null
+            || ModState.EncounterMonsterPreviews != null;
+
+        ModState.AvailableEncounters = null;
+        ModState.CurrentEncounterChoices = null;
+        ModState.EncounterMonsterPreviews = null;
+
+        if (hadState)
+            ModState.Logger?.LogInfo($"[EncounterTracker] Cleared encounter state: {reason}");
+        else
+            ModState.Logger?.LogDebug(
+                $"[EncounterTracker] Encounter state already empty: {reason}"
+            );
     }
 }

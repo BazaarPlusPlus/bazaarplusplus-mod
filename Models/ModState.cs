@@ -12,11 +12,9 @@ internal static class ModState
     public static ManualLogSource Logger;
 
     // Config entries
-    public static ConfigEntry<string> UidConfig;
-    public static ConfigEntry<string> DisplayNameConfig;
+    public static ConfigEntry<bool> EnableNameOverrideConfig;
 
     // Runtime state
-    public static string RunId;
     public static EVictoryCondition LastVictoryCondition;
     public static string LastMessageId = "";
     public static DateTime LastSentTime = DateTime.MinValue;
@@ -33,7 +31,14 @@ internal static class ModState
 
     public static void Initialize(ConfigFile config)
     {
-        UidConfig = config.Bind("Authentication", "Uid", "", "Firebase User ID");
-        DisplayNameConfig = config.Bind("Authentication", "DisplayName", "", "Display Name");
+        EnableNameOverrideConfig = config.Bind(
+            "StreamerMode",
+            "EnableNameOverride",
+            false,
+            "Whether to replace the local player's displayed username"
+        );
+        Logger?.LogInfo(
+            $"[ModState] Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, replacementName=Anonymous"
+        );
     }
 }

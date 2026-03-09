@@ -32,7 +32,6 @@ public class RunInfo
     public int? Gold { get; set; }
     public int? Income { get; set; }
     public string Name;
-    public string RunId;
     public string OppHero;
     public int? Prestige;
     public int? OppPrestige;

@@ -13,14 +13,24 @@ internal static class GameDataReader
 {
     public static RunInfo GetRunInfo()
     {
-        if (string.IsNullOrEmpty(ModState.RunId))
+        if (Data.Run == null)
         {
-            var displayName =
-                ModState.DisplayNameConfig?.Value ?? Data.Profile?.Username ?? "anonymous";
-
-            var rawRunId = $"{Data.Run.Player.Hero}-{Data.Run.Day}-{DateTime.UtcNow.Ticks}";
-            ModState.RunId = GetHashedRunId(rawRunId, displayName);
+            ModState.Logger?.LogWarning(
+                "[GameDataReader] GetRunInfo requested while Data.Run is null"
+            );
+            return new RunInfo
+            {
+                Name = Data.Profile?.Username,
+                AvailableEncounters = ModState.AvailableEncounters ?? new List<RunInfo.CardInfo>(),
+                CurrentEncounterChoices =
+                    ModState.CurrentEncounterChoices ?? new List<RunInfo.CardInfo>(),
+            };
         }
+
+        var opponent = Data.Run.Opponent;
+        ModState.Logger?.LogDebug(
+            $"[GameDataReader] Building run snapshot: hero={Data.Run.Player?.Hero}, day={Data.Run.Day}, opponent={(opponent == null ? "none" : opponent.Hero.ToString())}"
+        );
 
         return new RunInfo
         {
@@ -51,39 +61,37 @@ internal static class GameDataReader
             OppIncome = Data.Run.Opponent?.GetAttributeValue(EPlayerAttributeType.Income),
             OppLevel = Data.Run.Opponent?.GetAttributeValue(EPlayerAttributeType.Level),
             OppPrestige = Data.Run.Opponent?.GetAttributeValue(EPlayerAttributeType.Prestige),
-            RunId = ModState.RunId,
             PlayMode = Data.SelectedPlayMode == EPlayMode.Ranked,
-            AvailableEncounters = ModState.AvailableEncounters,
-            CurrentEncounterChoices = ModState.CurrentEncounterChoices,
+            AvailableEncounters = ModState.AvailableEncounters ?? new List<RunInfo.CardInfo>(),
+            CurrentEncounterChoices =
+                ModState.CurrentEncounterChoices ?? new List<RunInfo.CardInfo>(),
         };
-    }
-
-    public static string GetHashedRunId(string runId, string displayName)
-    {
-        using (
-            var hmac = new System.Security.Cryptography.HMACSHA256(
-                System.Text.Encoding.UTF8.GetBytes(displayName)
-            )
-        )
-        {
-            byte[] hashBytes = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(runId));
-            return Convert
-                .ToBase64String(hashBytes)
-                .Replace('+', '-')
-                .Replace('/', '_')
-                .Replace("=", "")
-                .Substring(0, 20);
-        }
     }
 
     public static List<Card> GetItemsAsCards(IPlayerInventory container)
     {
+        if (container?.Container == null)
+        {
+            ModState.Logger?.LogDebug(
+                "[GameDataReader] Inventory container missing, returning empty card list"
+            );
+            return new List<Card>();
+        }
+
         return container.Container.GetSocketables().Cast<Card>().ToList();
     }
 
     public static List<RunInfo.SkillInfo> GetSkillInfo(IEnumerable<SkillCard> skills)
     {
         var skillInfos = new List<RunInfo.SkillInfo>();
+        if (skills == null)
+        {
+            ModState.Logger?.LogDebug(
+                "[GameDataReader] Skill collection missing, returning empty skill list"
+            );
+            return skillInfos;
+        }
+
         foreach (var skill in skills)
         {
             if (skill.Template != null)
@@ -103,6 +111,9 @@ internal static class GameDataReader
     public static List<RunInfo.CardInfo> GetCardInfo(List<Card> cards)
     {
         var cardInfos = new List<RunInfo.CardInfo>();
+        if (cards == null || cards.Count == 0)
+            return cardInfos;
+
         foreach (var card in cards)
         {
             cardInfos.Add(
