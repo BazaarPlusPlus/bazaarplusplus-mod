@@ -1,15 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Embedded resources -->
-  <ItemGroup>
-    <EmbeddedResource Include="Data\items.js" />
-  </ItemGroup>
-  <!-- Remove decompiled files -->
-  <ItemGroup>
-    <Compile Remove="decompiled/**" />
-    <EmbeddedResource Remove="decompiled/**" />
-    <None Remove="decompiled/**" />
-  </ItemGroup>
-
   <!-- Build properties -->
   <PropertyGroup>
     <AssemblyName>BazaarPlusPlus</AssemblyName>
@@ -26,6 +15,17 @@
     </RestoreAdditionalProjectSources>
     <NoWarn>CS0436</NoWarn>
   </PropertyGroup>
+
+  <!-- Embedded resources -->
+  <ItemGroup>
+    <EmbeddedResource Include="Data\items.js" />
+  </ItemGroup>
+  <!-- Remove decompiled files -->
+  <ItemGroup>
+    <Compile Remove="decompiled/**" />
+    <EmbeddedResource Remove="decompiled/**" />
+    <None Remove="decompiled/**" />
+  </ItemGroup>
 
   <!-- Candidate install paths for common Steam locations -->
   <PropertyGroup>
