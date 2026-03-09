@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Cards.Encounter.Combat;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
@@ -29,8 +30,6 @@ internal static class EncounterTracker
             return;
 
         // Use SelectionSet as the authoritative list of what's shown to the player.
-        // It's already updated by UpdateFromGameSimAsync before ProcessEvents runs,
-        // and Data.Entities has all the cards by the time this event fires.
         var selectionSet = state.SelectionSet;
         if (selectionSet == null || selectionSet.Count == 0)
             return;
@@ -44,15 +43,50 @@ internal static class EncounterTracker
             return;
 
         var cardInfos = GameDataReader.GetCardInfo(cards);
+
         if (stateName == ERunState.Encounter)
+        {
             ModState.AvailableEncounters = cardInfos;
+            ModState.EncounterMonsterPreviews = BuildMonsterPreviews(cards);
+        }
         else
+        {
             ModState.CurrentEncounterChoices = cardInfos;
+        }
 
         ModState.Logger.LogInfo(
             $"[EncounterTracker] State={stateName}, choices=["
-            + string.Join(", ", cards.Select(c => c.Template?.InternalName ?? c.TemplateId.ToString()))
-            + "]"
+                + string.Join(
+                    ", ",
+                    cards.Select(c => c.Template?.InternalName ?? c.TemplateId.ToString())
+                )
+                + "]"
         );
+    }
+
+    private static List<RunInfo.MonsterPreview> BuildMonsterPreviews(List<Card> cards)
+    {
+        var previews = new List<RunInfo.MonsterPreview>();
+
+        foreach (var card in cards)
+        {
+            // Only care about combat encounters
+            if (!(card.Template is TCardEncounterCombat combat))
+                continue;
+
+            var encounterName = card.Template.InternalName;
+            var entry = MonsterDatabase.TryGet(encounterName);
+
+            previews.Add(
+                new RunInfo.MonsterPreview
+                {
+                    EncounterName = encounterName,
+                    Items = entry?.Items,
+                    Skills = entry?.Skills,
+                }
+            );
+        }
+
+        return previews;
     }
 }

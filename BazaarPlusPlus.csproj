@@ -25,6 +25,9 @@
     <Compile Remove="decompiled/**" />
     <EmbeddedResource Remove="decompiled/**" />
     <None Remove="decompiled/**" />
+    <Compile Remove="BazaarPlusPlus.Tests/**" />
+    <EmbeddedResource Remove="BazaarPlusPlus.Tests/**" />
+    <None Remove="BazaarPlusPlus.Tests/**" />
   </ItemGroup>
 
   <!-- Candidate install paths for common Steam locations -->

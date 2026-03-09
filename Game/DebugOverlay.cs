@@ -28,7 +28,14 @@ internal class DebugOverlay : MonoBehaviour
 
         var windowRect = new Rect(10, 10, 420, Screen.height - 20);
         GUI.Box(windowRect, "");
-        GUILayout.BeginArea(new Rect(windowRect.x + 8, windowRect.y + 8, windowRect.width - 16, windowRect.height - 16));
+        GUILayout.BeginArea(
+            new Rect(
+                windowRect.x + 8,
+                windowRect.y + 8,
+                windowRect.width - 16,
+                windowRect.height - 16
+            )
+        );
         _scroll = GUILayout.BeginScrollView(_scroll);
 
         Header("BazaarPlusPlus  [F2 toggle]");
@@ -50,14 +57,72 @@ internal class DebugOverlay : MonoBehaviour
         }
         catch { }
 
-        // Available encounters (map path)
-        DrawCardList("Available Encounters (map)", ModState.AvailableEncounters);
+        // Available encounters (map path) with monster preview
+        DrawEncounterList(
+            "Available Encounters (map)",
+            ModState.AvailableEncounters,
+            ModState.EncounterMonsterPreviews
+        );
 
         // Current encounter choices (inside encounter)
         DrawCardList("Current Encounter Choices", ModState.CurrentEncounterChoices);
 
         GUILayout.EndScrollView();
         GUILayout.EndArea();
+    }
+
+    private static void DrawEncounterList(
+        string title,
+        List<RunInfo.CardInfo> cards,
+        List<RunInfo.MonsterPreview> monsterPreviews
+    )
+    {
+        Header(title);
+        if (cards == null || cards.Count == 0)
+        {
+            GUILayout.Label("  (none)", _labelStyle);
+            return;
+        }
+
+        // Build a lookup by EncounterName for quick access
+        var previewMap = new Dictionary<string, RunInfo.MonsterPreview>();
+        if (monsterPreviews != null)
+            foreach (var mp in monsterPreviews)
+                if (!string.IsNullOrEmpty(mp.EncounterName))
+                    previewMap[mp.EncounterName] = mp;
+
+        foreach (var card in cards)
+        {
+            var name = card.Name ?? card.TemplateId.ToString("N")[..8];
+            var tier = card.Tier.ToString();
+            var enchant =
+                string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None"
+                    ? ""
+                    : $" [{card.Enchant}]";
+            GUILayout.Label($"  • {name}  T{tier}{enchant}", _labelStyle);
+
+            // If this is a combat encounter with monster data, show inline
+            if (card.Name != null && previewMap.TryGetValue(card.Name, out var preview))
+            {
+                if (preview.Items == null && preview.Skills == null)
+                {
+                    GUILayout.Label("      [no-data-now]", _labelStyle);
+                }
+                else
+                {
+                    if (preview.Items != null && preview.Items.Count > 0)
+                        GUILayout.Label(
+                            "      items: " + string.Join(", ", preview.Items),
+                            _labelStyle
+                        );
+                    if (preview.Skills != null && preview.Skills.Count > 0)
+                        GUILayout.Label(
+                            "      skills: " + string.Join(", ", preview.Skills),
+                            _labelStyle
+                        );
+                }
+            }
+        }
     }
 
     private static void DrawCardList(string title, List<RunInfo.CardInfo> cards)
@@ -72,7 +137,10 @@ internal class DebugOverlay : MonoBehaviour
         {
             var name = card.Name ?? card.TemplateId.ToString("N")[..8];
             var tier = card.Tier.ToString();
-            var enchant = string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None" ? "" : $" [{card.Enchant}]";
+            var enchant =
+                string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None"
+                    ? ""
+                    : $" [{card.Enchant}]";
             GUILayout.Label($"  • {name}  T{tier}{enchant}", _labelStyle);
         }
     }

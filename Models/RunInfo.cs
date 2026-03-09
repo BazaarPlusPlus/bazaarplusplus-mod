@@ -49,6 +49,13 @@ public class RunInfo
             new Dictionary<ECardAttributeType, int>();
     }
 
+    public class MonsterPreview
+    {
+        public string EncounterName;
+        public List<string> Items; // null = no local data
+        public List<string> Skills; // null = no local data
+    }
+
     public class CardInfo
     {
         public ETier Tier;

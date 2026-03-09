@@ -16,9 +16,7 @@ internal static class GameDataReader
         if (string.IsNullOrEmpty(ModState.RunId))
         {
             var displayName =
-                ModState.DisplayNameConfig?.Value
-                ?? Data.Profile?.Username
-                ?? "anonymous";
+                ModState.DisplayNameConfig?.Value ?? Data.Profile?.Username ?? "anonymous";
 
             var rawRunId = $"{Data.Run.Player.Hero}-{Data.Run.Day}-{DateTime.UtcNow.Ticks}";
             ModState.RunId = GetHashedRunId(rawRunId, displayName);
