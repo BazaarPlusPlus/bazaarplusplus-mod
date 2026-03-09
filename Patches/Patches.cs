@@ -1,4 +1,4 @@
-#pragma warning disable CS0436
+﻿#pragma warning disable CS0436
 using System.Text;
 using System.Threading;
 using BazaarGameShared.Domain.Core.Types;
@@ -39,6 +39,9 @@ public static class CardTooltipDataPassivePatch
         try
         {
             if (__result.Item1 == null)
+                return;
+
+            if (Data.IsInCombat)
                 return;
 
             var previewSegments = ItemEnchantPreviewBuilder.BuildPreviewSegments(

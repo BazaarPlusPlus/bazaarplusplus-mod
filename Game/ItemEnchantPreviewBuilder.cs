@@ -41,9 +41,6 @@ public static class ItemEnchantPreviewBuilder
         if (!IsEligible(itemCard))
             return empty;
 
-        if (Data.IsInCombat)
-            return empty;
-
         var enchantments = itemCard.GetEnchantments();
         if (enchantments == null || enchantments.Count == 0)
             return empty;
