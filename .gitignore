@@ -14,6 +14,11 @@ decompiled/
 .dotnet-home/
 .nuget-packages/
 
+# Generated mod files
+**/plugins/BazaarPlusPlus.dll
+**/plugins/BazaarPlusPlus.version
+**/BepInEx.zip
+
 # OS
 .DS_Store
 Thumbs.db
