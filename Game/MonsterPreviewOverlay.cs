@@ -21,8 +21,12 @@ namespace BazaarPlusPlus;
 /// Input format: [{"t":"templateGuid","r":tier,"e":"enchant","a":{attrId:val}}]
 /// Toggle visibility with F3.
 /// </summary>
+
 internal class MonsterPreviewOverlay : MonoBehaviour
 {
+    private const string OpponentDeckName = "Opponent_Deck";
+    private const string OpponentDeckCloneName = "Opponent_Deck_clone";
+
     // How far "forward" (toward opponent) from the leftmost storage socket to place cards.
     // Positive = toward opponent, negative = toward player. Tune this value in-game.
     private const float ForwardOffset = 2.0f;
@@ -39,6 +43,8 @@ internal class MonsterPreviewOverlay : MonoBehaviour
     private MethodInfo _instantiateCardMethod;
     private MethodInfo _itemControllerOnDisable;
     private object _spawnSection;
+    private Transform _opponentDeckClone;
+    private bool _ownsOpponentDeckClone;
 
     private sealed class CardEntry
     {
@@ -54,7 +60,6 @@ internal class MonsterPreviewOverlay : MonoBehaviour
         [JsonProperty("a")]
         public Dictionary<int, int> Attributes { get; set; } = new Dictionary<int, int>();
     }
-
     /// <summary>
     /// Feed a JSON array of card descriptors to render.
     /// </summary>
@@ -68,9 +73,13 @@ internal class MonsterPreviewOverlay : MonoBehaviour
         if (Keyboard.current?.f3Key.wasPressedThisFrame == true)
         {
             _visible = !_visible;
-            if (!_visible)
-                HideAll();
+            SetOverlayVisible(_visible);
+            if (_visible)
+                ApplyLayout();
         }
+
+        if (_visible)
+            EnsureOpponentDeckCloneExists();
 
         if (
             _visible
@@ -141,6 +150,9 @@ internal class MonsterPreviewOverlay : MonoBehaviour
                 }
 
                 var anchor = new GameObject($"BPP_MonsterPreview_{i}");
+                var overlayParent = EnsureOpponentDeckCloneExists();
+                if (overlayParent != null)
+                    anchor.transform.SetParent(overlayParent, worldPositionStays: false);
                 anchor.transform.localScale = Vector3.one * 0.6f;
                 _anchors.Add(anchor);
 
@@ -347,6 +359,54 @@ internal class MonsterPreviewOverlay : MonoBehaviour
 
     #endregion
 
+
+    #region Opponent Deck Clone
+
+    private Transform EnsureOpponentDeckCloneExists()
+    {
+        if (_opponentDeckClone != null)
+            return _opponentDeckClone;
+
+        var original = FindOpponentDeckTransform();
+        if (original == null || original.parent == null)
+            return null;
+
+        var parent = original.parent;
+        var existing = parent.Find(OpponentDeckCloneName);
+        if (existing != null)
+        {
+            _opponentDeckClone = existing;
+            _ownsOpponentDeckClone = false;
+            return _opponentDeckClone;
+        }
+
+        var clone = new GameObject(OpponentDeckCloneName);
+        clone.transform.SetParent(parent, worldPositionStays: false);
+        clone.transform.SetLocalPositionAndRotation(original.localPosition, original.localRotation);
+        clone.transform.localScale = original.localScale;
+        clone.SetActive(original.gameObject.activeSelf);
+
+        _opponentDeckClone = clone.transform;
+        _ownsOpponentDeckClone = true;
+
+        ModState.Logger?.LogInfo(
+            $"[MonsterPreviewOverlay] Created {OpponentDeckCloneName} under parent={parent.name}"
+        );
+        return _opponentDeckClone;
+    }
+
+    private static Transform FindOpponentDeckTransform()
+    {
+        var board = Singleton<BoardManager>.Instance;
+        if (board == null)
+            return null;
+
+        return board
+            .GetComponentsInChildren<Transform>(includeInactive: true)
+            .FirstOrDefault(t => string.Equals(t.name, OpponentDeckName, StringComparison.Ordinal));
+    }
+
+    #endregion
     #region Layout
 
     private void ApplyLayout()
@@ -354,7 +414,7 @@ internal class MonsterPreviewOverlay : MonoBehaviour
         if (_anchors.Count == 0)
             return;
 
-        if (!TryGetTopRegion(out var leftEdge, out var rotation))
+        if (!TryGetDeckRegion(out var leftEdge, out var rotation) && !TryGetTopRegion(out leftEdge, out rotation))
         {
             ModState.Logger?.LogWarning(
                 "[MonsterPreviewOverlay] TryGetTopRegion failed - board sockets not available"
@@ -391,7 +451,45 @@ internal class MonsterPreviewOverlay : MonoBehaviour
             edge += cardWidth;
         }
     }
+    private bool TryGetDeckRegion(out Vector3 leftEdge, out Quaternion rotation)
+    {
+        leftEdge = Vector3.zero;
+        rotation = Quaternion.identity;
 
+        var overlay = EnsureOpponentDeckCloneExists();
+        if (overlay == null)
+            return false;
+
+        rotation = overlay.rotation;
+        var right = (rotation * Vector3.right).normalized;
+
+        var originalDeck = FindOpponentDeckTransform();
+        if (originalDeck == null)
+        {
+            leftEdge = overlay.position;
+            return true;
+        }
+
+        var renderers = originalDeck.GetComponentsInChildren<Renderer>(includeInactive: true);
+        if (renderers == null || renderers.Length == 0)
+        {
+            leftEdge = overlay.position;
+            return true;
+        }
+
+        var bounds = renderers[0].bounds;
+        for (var i = 1; i < renderers.Length; i++)
+            bounds.Encapsulate(renderers[i].bounds);
+
+        var ext = bounds.extents;
+        var halfProj =
+            Mathf.Abs(Vector3.Dot(right, Vector3.right)) * ext.x
+            + Mathf.Abs(Vector3.Dot(right, Vector3.up)) * ext.y
+            + Mathf.Abs(Vector3.Dot(right, Vector3.forward)) * ext.z;
+
+        leftEdge = bounds.center - right * halfProj;
+        return true;
+    }
     /// <summary>
     /// Coordinate system: x=horizontal, y=camera distance, z=screen up/down.
     /// Offset Z from leftmost storage socket to move cards up on screen.
@@ -486,8 +584,20 @@ internal class MonsterPreviewOverlay : MonoBehaviour
         _anchors.Clear();
     }
 
+
+    private void SetOverlayVisible(bool visible)
+    {
+        foreach (var anchor in _anchors)
+        {
+            if (anchor != null)
+                anchor.SetActive(visible);
+        }
+    }
     private void OnDestroy()
     {
         HideAll();
+
+        if (_ownsOpponentDeckClone && _opponentDeckClone != null)
+            Destroy(_opponentDeckClone.gameObject);
     }
 }
