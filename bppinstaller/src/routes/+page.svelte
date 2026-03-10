@@ -1,18 +1,21 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { open } from '@tauri-apps/plugin-dialog';
-  import type { EnvironmentInfo } from '$lib/types';
+  import { onMount } from 'svelte';
+  import type { EnvironmentInfo, UpdateInfo } from '$lib/types';
 
   type StepState = 'idle' | 'detecting' | 'found' | 'not_found';
 
   let env: EnvironmentInfo | null = null;
+  let updateInfo: UpdateInfo | null = null;
   let dotnetState: StepState = 'idle';
   let bazaarFound = false;
   let bazaarChecking = false;
   let bazaarInvalid = false;
   let gameVersion = '';
   let customGamePath = '';
-  let installing = false;
+  let actionBusy: 'idle' | 'detect' | 'install' | 'check-update' | 'update' | 'uninstall' = 'idle';
+  let actionMenuOpen = false;
 
   function effectiveGamePath(): string {
     return customGamePath || env?.game_path || '';
@@ -22,8 +25,9 @@
     return invoke<string | null>('verify_game_path', { path });
   }
 
-  async function detectDotnet() {
-    if (dotnetState === 'detecting') return;
+  async function detectEnvironment() {
+    if (actionBusy !== 'idle') return;
+    actionBusy = 'detect';
     dotnetState = 'detecting';
     try {
       env = await invoke<EnvironmentInfo>('detect_environment');
@@ -38,8 +42,26 @@
         bazaarInvalid = false;
         gameVersion = '';
       }
+      updateInfo = env.bpp_version
+        ? await invoke<UpdateInfo>('check_bpp_update', { currentVersion: env.bpp_version })
+        : null;
     } catch {
       dotnetState = 'idle';
+      updateInfo = null;
+    } finally {
+      actionBusy = 'idle';
+    }
+  }
+
+  async function checkForUpdates() {
+    if (!env?.bpp_version || actionBusy !== 'idle') return;
+    actionBusy = 'check-update';
+    try {
+      updateInfo = await invoke<UpdateInfo>('check_bpp_update', { currentVersion: env.bpp_version });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      actionBusy = 'idle';
     }
   }
 
@@ -77,39 +99,83 @@
     customGamePath = '';
   }
 
-  async function install() {
+  async function refreshAfterAction() {
+    actionBusy = 'idle';
+    await detectEnvironment();
+  }
+
+  async function installBundled() {
     if (!canInstall) return;
-    installing = true;
+    actionBusy = 'install';
     try {
       await invoke('install_bepinex', { gamePath: effectiveGamePath() });
       await invoke('patch_launch_options', {
         steamPath: env!.steam_path,
         gamePath: effectiveGamePath()
       });
-      env = await invoke<EnvironmentInfo>('detect_environment');
+      await refreshAfterAction();
     } catch (e) {
       console.error(e);
-    } finally {
-      installing = false;
+      actionBusy = 'idle';
+    }
+  }
+
+  async function updateBpp() {
+    if (!effectiveGamePath() || actionBusy !== 'idle') return;
+    actionBusy = 'update';
+    try {
+      await invoke('update_bpp', { gamePath: effectiveGamePath() });
+      await refreshAfterAction();
+    } catch (e) {
+      console.error(e);
+      actionBusy = 'idle';
+    }
+  }
+
+  async function handleBppAction() {
+    if (updateAvailable) {
+      await updateBpp();
+      return;
+    }
+
+    await checkForUpdates();
+  }
+
+  async function uninstallBpp() {
+    if (!effectiveGamePath() || actionBusy !== 'idle') return;
+    actionBusy = 'uninstall';
+    actionMenuOpen = false;
+    try {
+      await invoke('uninstall_bpp', {
+        steamPath: env?.steam_path ?? '',
+        gamePath: effectiveGamePath()
+      });
+      await refreshAfterAction();
+    } catch (e) {
+      console.error(e);
+      actionBusy = 'idle';
     }
   }
 
   $: hasPath = Boolean(customGamePath || env?.game_path);
-  $: steamFound = Boolean(env?.steam_path);
   $: modInstalled = Boolean(env?.bpp_version);
+  $: updateAvailable = Boolean(updateInfo?.update_available && updateInfo.latest_version);
+  $: isBusy = actionBusy !== 'idle';
 
   $: canInstall =
-    !installing &&
+    !isBusy &&
     dotnetState !== 'idle' &&
     bazaarFound &&
     hasPath;
+
+  onMount(() => {
+    void detectEnvironment();
+  });
 </script>
 
 <svelte:head>
   <title>BazaarPlusPlus Installer</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@400;600&family=IM+Fell+English:ital@0;1&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
 </svelte:head>
 
 <div class="grain" aria-hidden="true"></div>
@@ -118,20 +184,20 @@
   <!-- Header -->
   <header class="header" data-tauri-drag-region>
     <div class="corner tl" aria-hidden="true">
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+      <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
         <path d="M2 2L2 16M2 2L16 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
         <circle cx="2" cy="2" r="1.5" fill="currentColor"/>
       </svg>
     </div>
     <div class="corner tr" aria-hidden="true">
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+      <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
         <path d="M38 2L38 16M38 2L24 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
         <circle cx="38" cy="2" r="1.5" fill="currentColor"/>
       </svg>
     </div>
 
     <div class="sigil" aria-hidden="true">
-      <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+      <svg width="32" height="32" viewBox="0 0 44 44" fill="none">
         <polygon points="22,3 41,34 3,34" stroke="currentColor" stroke-width="1" fill="none" opacity="0.55"/>
         <polygon points="22,11 35,31 9,31" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.3"/>
         <circle cx="22" cy="22" r="5" stroke="currentColor" stroke-width="0.8" fill="none"/>
@@ -150,37 +216,48 @@
 
   <!-- Steps -->
   <div class="steps">
-    <!-- Step 1: Steam -->
-    <div class="step" class:step-found={steamFound}>
+    <!-- Step 1: BazaarPlusPlus -->
+    <div class="step" class:step-found={modInstalled} class:step-warn={updateAvailable}>
       <div class="step-index" aria-hidden="true">I</div>
       <div class="step-body">
         <span class="step-title">
-          Steam
-          {#if steamFound}
-            <span class="tag tag-ok">Found</span>
+          BazaarPlusPlus
+          {#if modInstalled}
+            <span class="tag tag-ok">Installed{env?.bpp_version ? ` · v${env.bpp_version}` : ''}</span>
+          {:else if actionBusy === 'detect'}
+            <span class="tag">Checking…</span>
+          {:else}
+            <span class="tag tag-warn">Not installed</span>
           {/if}
         </span>
 
-        {#if dotnetState === 'idle' || dotnetState === 'detecting'}
-          <button
-            class="bar-btn"
-            class:bar-btn-loading={dotnetState === 'detecting'}
-            onclick={detectDotnet}
-            type="button"
-            disabled={dotnetState === 'detecting'}
-          >
-            {#if dotnetState === 'detecting'}
-              <span class="spinner" aria-hidden="true"></span>
-              Divining…
-            {:else}
-              <span class="bar-dash" aria-hidden="true">—</span>
-              Click to detect
-            {/if}
-          </button>
-        {:else if env?.steam_path}
-          <p class="detail-line detail-path" title={env.steam_path}>{env.steam_path}</p>
+        {#if modInstalled && env?.bpp_version}
+          <p class="detail-line detail-muted">Installed version: {env.bpp_version}</p>
         {:else}
-          <p class="detail-line detail-muted">Steam path not found</p>
+          <p class="detail-line detail-muted">Detect to inspect the installed BazaarPlusPlus payload.</p>
+        {/if}
+
+        {#if modInstalled}
+          <div class="card-inline-actions">
+            <p class="detail-line detail-muted">
+              {#if updateAvailable}
+                Update available: {updateInfo?.latest_version}
+              {:else}
+                Check the latest remote version for BazaarPlusPlus.
+              {/if}
+            </p>
+            <button class="card-action-btn" onclick={handleBppAction} type="button" disabled={isBusy}>
+              {#if actionBusy === 'check-update'}
+                <span class="spinner" aria-hidden="true"></span>
+                Checking…
+              {:else if actionBusy === 'update'}
+                <span class="spinner" aria-hidden="true"></span>
+                Updating…
+              {:else}
+                {updateAvailable ? '更新' : '检查更新'}
+              {/if}
+            </button>
+          </div>
         {/if}
       </div>
     </div>
@@ -256,34 +333,69 @@
       </div>
     </div>
 
-    <!-- Step 4: Install -->
+    <!-- Step 4: Actions -->
     <div class="step step-install">
       <div class="step-index" aria-hidden="true">IV</div>
       <div class="step-body">
         <span class="step-title">
-          BepInEx
-          {#if modInstalled}
-            <span class="tag tag-ok">
-              Installed{env?.bpp_version ? ` · v${env.bpp_version}` : ''}
-            </span>
-          {/if}
+          Actions
         </span>
-        <button
-          class="install-btn"
-          class:installing
-          disabled={!canInstall}
-          onclick={install}
-          type="button"
-        >
-          {#if installing}
-            <span class="spinner dark" aria-hidden="true"></span>
-            Binding the Sigil…
-          {:else if modInstalled}
-            ✦ Rebind the Rite
-          {:else}
-            ✦ Begin the Rite
-          {/if}
-        </button>
+        <div class="action-row">
+          <button
+            class="secondary-btn detect-btn"
+            onclick={detectEnvironment}
+            type="button"
+            disabled={isBusy}
+          >
+            {#if actionBusy === 'detect'}
+              <span class="spinner" aria-hidden="true"></span>
+              Detecting
+            {:else}
+              Detect
+            {/if}
+          </button>
+
+          <div class="action-primary">
+            <button
+              class="install-btn"
+              disabled={!canInstall}
+              onclick={installBundled}
+              type="button"
+            >
+              {#if actionBusy === 'install'}
+                <span class="spinner dark" aria-hidden="true"></span>
+                Installing…
+              {:else if modInstalled}
+                ✦ Reinstall
+              {:else}
+                ✦ Install
+              {/if}
+            </button>
+
+            <div class="menu-wrap">
+              <button
+                class="secondary-btn menu-trigger"
+                type="button"
+                onclick={() => { actionMenuOpen = !actionMenuOpen; }}
+                disabled={isBusy}
+                aria-expanded={actionMenuOpen}
+              >
+                ▾
+              </button>
+              {#if actionMenuOpen}
+                <div class="action-menu">
+                  <button class="menu-item" type="button" onclick={uninstallBpp} disabled={isBusy}>
+                    {#if actionBusy === 'uninstall'}
+                      Uninstalling…
+                    {:else}
+                      Uninstall
+                    {/if}
+                  </button>
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -330,11 +442,11 @@
 
   .shell {
     width: 100%;
-    max-width: 620px;
+    max-width: 560px;
     margin: 0 auto;
-    padding: 2rem 1.5rem 2.5rem;
+    padding: 1.25rem 1rem 1.75rem;
     display: grid;
-    gap: 1.25rem;
+    gap: 0.85rem;
     animation: fade-up 0.5s ease both;
   }
 
@@ -347,23 +459,23 @@
   .header {
     position: relative;
     text-align: center;
-    padding: 2.25rem 2.5rem 1.75rem;
+    padding: 1.45rem 1.75rem 1.15rem;
     background: linear-gradient(175deg, rgba(38, 23, 9, 0.92), rgba(16, 10, 5, 0.88));
     border: 1px solid rgba(200, 148, 55, 0.18);
     border-radius: 3px;
     box-shadow: 0 0 0 1px rgba(200, 148, 55, 0.06) inset, 0 24px 64px rgba(0,0,0,0.5);
     display: grid;
-    gap: 0.25rem;
+    gap: 0.15rem;
     justify-items: center;
   }
 
   .corner { position: absolute; color: rgba(200, 148, 55, 0.42); }
-  .tl { top: 10px; left: 10px; }
-  .tr { top: 10px; right: 10px; }
+  .tl { top: 8px; left: 8px; }
+  .tr { top: 8px; right: 8px; }
 
   .sigil {
     color: rgba(205, 150, 60, 0.65);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.2rem;
     animation: slow-spin 45s linear infinite;
     filter: drop-shadow(0 0 7px rgba(205, 150, 60, 0.22));
   }
@@ -375,16 +487,16 @@
   .kicker {
     margin: 0;
     font-family: 'Cinzel', serif;
-    font-size: 0.56rem;
+    font-size: 0.5rem;
     letter-spacing: 0.38em;
     text-transform: uppercase;
     color: rgba(205, 150, 60, 0.55);
   }
 
   h1 {
-    margin: 0.2rem 0 0;
+    margin: 0.1rem 0 0;
     font-family: 'Cinzel Decorative', serif;
-    font-size: clamp(1.5rem, 5vw, 2.5rem);
+    font-size: clamp(1.35rem, 4.2vw, 2.1rem);
     font-weight: 700;
     line-height: 1;
     background: linear-gradient(155deg, #e8c87a 0%, #bf852e 55%, #e8c87a 100%);
@@ -395,10 +507,10 @@
   }
 
   .subtitle {
-    margin: 0.4rem 0 0.75rem;
+    margin: 0.22rem 0 0.5rem;
     font-family: 'IM Fell English', serif;
     font-style: italic;
-    font-size: 0.88rem;
+    font-size: 0.78rem;
     color: rgba(200, 170, 120, 0.55);
   }
 
@@ -421,14 +533,14 @@
   /* ── Steps ───────────────────────────────────────────────── */
   .steps {
     display: grid;
-    gap: 0.6rem;
+    gap: 0.5rem;
   }
 
   .step {
     display: flex;
     gap: 1rem;
     align-items: flex-start;
-    padding: 1.1rem 1.3rem;
+    padding: 0.95rem 1.05rem;
     background: rgba(18, 11, 5, 0.88);
     border: 1px solid rgba(180, 130, 48, 0.13);
     border-radius: 3px;
@@ -446,7 +558,7 @@
   }
 
   .step-install {
-    margin-top: 0.4rem;
+    margin-top: 0.2rem;
   }
 
   .step-index {
@@ -465,7 +577,7 @@
     display: grid;
     gap: 0.7rem;
     min-width: 0;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .step-title {
@@ -516,53 +628,42 @@
     color: rgba(200, 170, 120, 0.6);
   }
 
-  /* ── Bar Button ──────────────────────────────────────────── */
-  .bar-btn {
-    width: 100%;
+  .card-inline-actions {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.72rem 1rem;
-    background: rgba(200, 148, 55, 0.04);
-    border: 1px dashed rgba(200, 148, 55, 0.25);
+    justify-content: space-between;
+    gap: 0.9rem;
+  }
+
+  .card-action-btn {
+    flex-shrink: 0;
+    padding: 0.42rem 0.8rem;
+    border: 1px solid rgba(90, 200, 130, 0.26);
+    background: rgba(90, 200, 130, 0.12);
+    color: #79dba6;
     border-radius: 2px;
-    color: rgba(200, 165, 100, 0.55);
-    font-family: 'IM Fell English', serif;
-    font-style: italic;
-    font-size: 0.88rem;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    text-align: left;
+    font-family: 'Cinzel', serif;
+    font-size: 0.56rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
   }
 
-  .bar-btn:hover:not(:disabled) {
-    background: rgba(200, 148, 55, 0.08);
-    border-color: rgba(200, 148, 55, 0.45);
-    color: rgba(220, 185, 120, 0.85);
-    border-style: solid;
+  .card-action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
-  .bar-btn:disabled {
-    cursor: default;
-  }
-
-  .bar-btn.bar-btn-loading {
-    border-style: solid;
-    border-color: rgba(200, 148, 55, 0.3);
-    color: rgba(200, 165, 100, 0.65);
-  }
-
-  .bar-dash {
-    font-style: normal;
-    font-size: 1.1rem;
-    line-height: 1;
-    color: rgba(200, 148, 55, 0.45);
-    letter-spacing: -0.05em;
+  .card-action-btn:hover:not(:disabled) {
+    background: rgba(90, 200, 130, 0.18);
   }
 
   /* ── Locate Bar ──────────────────────────────────────────── */
   .locate-bar {
     display: flex;
+    align-items: center;
     align-items: stretch;
     border: 1px solid rgba(180, 130, 48, 0.2);
     border-radius: 2px;
@@ -662,6 +763,101 @@
   /* ── Buttons ─────────────────────────────────────────────── */
   button { cursor: pointer; border: none; outline: none; font: inherit; }
 
+  .secondary-btn {
+    padding: 0.68rem 0.9rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(200, 155, 72, 0.78);
+    background: rgba(200, 148, 55, 0.06);
+    border: 1px solid rgba(180, 130, 48, 0.18);
+    border-radius: 2px;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+  }
+
+  .secondary-btn:hover:not(:disabled) {
+    background: rgba(200, 148, 55, 0.12);
+    color: rgba(220, 180, 100, 0.95);
+    border-color: rgba(200, 148, 55, 0.34);
+  }
+
+  .secondary-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .action-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .detect-btn {
+    flex: 0 0 auto;
+    min-width: 96px;
+  }
+
+  .action-primary {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: 0.5rem;
+    position: relative;
+  }
+
+  .menu-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .menu-trigger {
+    min-width: 42px;
+    height: 100%;
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+  }
+
+  .action-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.35rem);
+    min-width: 140px;
+    padding: 0.35rem;
+    border: 1px solid rgba(180, 130, 48, 0.18);
+    border-radius: 3px;
+    background: rgba(18, 11, 5, 0.96);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    z-index: 20;
+  }
+
+  .menu-item {
+    width: 100%;
+    text-align: left;
+    padding: 0.62rem 0.7rem;
+    border-radius: 2px;
+    background: transparent;
+    color: rgba(228, 216, 191, 0.82);
+    font-family: 'Cinzel', serif;
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .menu-item:hover:not(:disabled) {
+    background: rgba(200, 148, 55, 0.1);
+  }
+
+  .menu-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
   .redetect-btn {
     align-self: start;
     padding: 0.38rem 0.8rem;
@@ -724,12 +920,6 @@
     cursor: not-allowed;
   }
 
-  .install-btn.installing {
-    background-position: 100% 0;
-    animation: shimmer 1.8s ease-in-out infinite;
-    pointer-events: none;
-  }
-
   @keyframes shimmer {
     0%, 100% { background-position: 0% 0; }
     50%       { background-position: 100% 0; }
@@ -756,7 +946,7 @@
   .footer {
     text-align: center;
     display: grid;
-    gap: 0.6rem;
+    gap: 0.4rem;
   }
   .footer p {
     margin: 0;
@@ -769,7 +959,16 @@
 
   /* ── Responsive ──────────────────────────────────────────── */
   @media (max-width: 520px) {
-    .shell { padding: 1.25rem 1rem 2rem; }
-    .header { padding: 1.75rem 1.25rem 1.5rem; }
+    .shell { padding: 1rem 0.85rem 1.5rem; }
+    .header { padding: 1.2rem 1rem 1rem; }
+    .card-inline-actions,
+    .action-row,
+    .action-primary {
+      flex-direction: column;
+    }
+    .detect-btn,
+    .menu-trigger {
+      width: 100%;
+    }
   }
 </style>

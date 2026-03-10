@@ -1,7 +1,7 @@
 mod commands;
 
 use commands::{
-    bepinex::install_bepinex,
+    bepinex::{check_bpp_update, install_bepinex, uninstall_bpp, update_bpp},
     detect::{detect_environment, verify_game_path},
     vdf::patch_launch_options,
 };
@@ -15,6 +15,9 @@ pub fn run() {
             detect_environment,
             verify_game_path,
             install_bepinex,
+            check_bpp_update,
+            update_bpp,
+            uninstall_bpp,
             patch_launch_options,
         ])
         .run(tauri::generate_context!())
