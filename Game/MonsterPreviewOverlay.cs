@@ -1,4 +1,4 @@
-#pragma warning disable CS0436
+﻿#pragma warning disable CS0436
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,8 +24,9 @@ namespace BazaarPlusPlus;
 
 internal class MonsterPreviewOverlay : MonoBehaviour
 {
-    private const string OpponentDeckName = "Opponent_Deck";
-    private const string OpponentDeckCloneName = "Opponent_Deck_clone";
+    private const string OpponentDeckName = "Player_Deck";
+    private const string OpponentDeckCloneName = "Player_Deck_clone";
+    private const string PlayerDeckPath = "Game/=== BoardAnchor ===/BoardBase(Clone)/Board_Common_CenterPanels/Player_Deck";
 
     // How far "forward" (toward opponent) from the leftmost storage socket to place cards.
     // Positive = toward opponent, negative = toward player. Tune this value in-game.
@@ -45,6 +46,10 @@ internal class MonsterPreviewOverlay : MonoBehaviour
     private object _spawnSection;
     private Transform _opponentDeckClone;
     private bool _ownsOpponentDeckClone;
+    private bool _deckLayoutLocked;
+    private int _lockedDeckInstanceId;
+    private Vector3 _lockedDeckLeftEdgeLocal;
+    private Quaternion _lockedDeckLocalRotation;
 
     private sealed class CardEntry
     {
@@ -362,10 +367,13 @@ internal class MonsterPreviewOverlay : MonoBehaviour
 
     #region Opponent Deck Clone
 
-    private Transform EnsureOpponentDeckCloneExists()
+        private Transform EnsureOpponentDeckCloneExists()
     {
         if (_opponentDeckClone != null)
+        {
+            _opponentDeckClone.gameObject.SetActive(true);
             return _opponentDeckClone;
+        }
 
         var original = FindOpponentDeckTransform();
         if (original == null || original.parent == null)
@@ -376,6 +384,7 @@ internal class MonsterPreviewOverlay : MonoBehaviour
         if (existing != null)
         {
             _opponentDeckClone = existing;
+            _opponentDeckClone.gameObject.SetActive(true);
             _ownsOpponentDeckClone = false;
             return _opponentDeckClone;
         }
@@ -384,19 +393,22 @@ internal class MonsterPreviewOverlay : MonoBehaviour
         clone.transform.SetParent(parent, worldPositionStays: false);
         clone.transform.SetLocalPositionAndRotation(original.localPosition, original.localRotation);
         clone.transform.localScale = original.localScale;
-        clone.SetActive(original.gameObject.activeSelf);
+        clone.SetActive(true);
 
         _opponentDeckClone = clone.transform;
         _ownsOpponentDeckClone = true;
 
         ModState.Logger?.LogInfo(
-            $"[MonsterPreviewOverlay] Created {OpponentDeckCloneName} under parent={parent.name}"
+            $"[MonsterPreviewOverlay] Created {OpponentDeckCloneName} (from Player_Deck) under parent={parent.name}"
         );
         return _opponentDeckClone;
     }
-
-    private static Transform FindOpponentDeckTransform()
+        private static Transform FindOpponentDeckTransform()
     {
+        var byPath = GameObject.Find(PlayerDeckPath);
+        if (byPath != null)
+            return byPath.transform;
+
         var board = Singleton<BoardManager>.Instance;
         if (board == null)
             return null;
@@ -405,11 +417,10 @@ internal class MonsterPreviewOverlay : MonoBehaviour
             .GetComponentsInChildren<Transform>(includeInactive: true)
             .FirstOrDefault(t => string.Equals(t.name, OpponentDeckName, StringComparison.Ordinal));
     }
-
     #endregion
     #region Layout
 
-    private void ApplyLayout()
+        private void ApplyLayout()
     {
         if (_anchors.Count == 0)
             return;
@@ -427,6 +438,17 @@ internal class MonsterPreviewOverlay : MonoBehaviour
         );
 
         var right = (rotation * Vector3.right).normalized;
+        var overlayParent = EnsureOpponentDeckCloneExists();
+        var useLocalLayout = overlayParent != null;
+        var leftEdgeLocal = useLocalLayout
+            ? overlayParent.InverseTransformPoint(leftEdge)
+            : Vector3.zero;
+        var rightLocal = useLocalLayout
+            ? overlayParent.InverseTransformDirection(right).normalized
+            : Vector3.right;
+        var localRotation = useLocalLayout
+            ? Quaternion.Inverse(overlayParent.rotation) * rotation
+            : rotation;
         var edge = 0f;
 
         foreach (var anchor in _anchors)
@@ -434,12 +456,13 @@ internal class MonsterPreviewOverlay : MonoBehaviour
             if (anchor == null || anchor.transform.childCount == 0)
                 continue;
 
-            // Place at origin for unbiased measurement
-            anchor.transform.rotation = rotation;
-            anchor.transform.position = Vector3.zero;
+            if (useLocalLayout && anchor.transform.parent == overlayParent)
+                anchor.transform.localRotation = localRotation;
+            else
+                anchor.transform.rotation = rotation;
 
             var cardObj = anchor.transform.GetChild(0).gameObject;
-            GetCardProjection(cardObj, right, out var cardLeft, out var cardWidth);
+            GetCardProjection(cardObj, right, anchor.transform.position, out var cardLeft, out var cardWidth);
 
             if (cardWidth <= 0.001f)
             {
@@ -447,10 +470,27 @@ internal class MonsterPreviewOverlay : MonoBehaviour
                 cardWidth = 0.36f;
             }
 
-            anchor.transform.position = leftEdge + right * (edge - cardLeft);
+            if (useLocalLayout && anchor.transform.parent == overlayParent)
+                anchor.transform.localPosition = leftEdgeLocal + rightLocal * (edge - cardLeft);
+            else
+                anchor.transform.position = leftEdge + right * (edge - cardLeft);
+
             edge += cardWidth;
         }
     }
+        private void LockDeckLayout(
+        Transform overlay,
+        int deckInstanceId,
+        Vector3 leftEdgeWorld,
+        Quaternion rotationWorld
+    )
+    {
+        _deckLayoutLocked = true;
+        _lockedDeckInstanceId = deckInstanceId;
+        _lockedDeckLeftEdgeLocal = overlay.InverseTransformPoint(leftEdgeWorld);
+        _lockedDeckLocalRotation = Quaternion.Inverse(overlay.rotation) * rotationWorld;
+    }
+
     private bool TryGetDeckRegion(out Vector3 leftEdge, out Quaternion rotation)
     {
         leftEdge = Vector3.zero;
@@ -460,20 +500,26 @@ internal class MonsterPreviewOverlay : MonoBehaviour
         if (overlay == null)
             return false;
 
-        rotation = overlay.rotation;
-        var right = (rotation * Vector3.right).normalized;
-
         var originalDeck = FindOpponentDeckTransform();
         if (originalDeck == null)
+            return false;
+
+        var deckInstanceId = originalDeck.GetInstanceID();
+        if (_deckLayoutLocked && deckInstanceId == _lockedDeckInstanceId)
         {
-            leftEdge = overlay.position;
+            leftEdge = overlay.TransformPoint(_lockedDeckLeftEdgeLocal);
+            rotation = overlay.rotation * _lockedDeckLocalRotation;
             return true;
         }
+
+        rotation = overlay.rotation;
+        var right = (rotation * Vector3.right).normalized;
 
         var renderers = originalDeck.GetComponentsInChildren<Renderer>(includeInactive: true);
         if (renderers == null || renderers.Length == 0)
         {
             leftEdge = overlay.position;
+            LockDeckLayout(overlay, deckInstanceId, leftEdge, rotation);
             return true;
         }
 
@@ -488,6 +534,7 @@ internal class MonsterPreviewOverlay : MonoBehaviour
             + Mathf.Abs(Vector3.Dot(right, Vector3.forward)) * ext.z;
 
         leftEdge = bounds.center - right * halfProj;
+        LockDeckLayout(overlay, deckInstanceId, leftEdge, rotation);
         return true;
     }
     /// <summary>
@@ -527,9 +574,10 @@ internal class MonsterPreviewOverlay : MonoBehaviour
         return true;
     }
 
-    private static void GetCardProjection(
+        private static void GetCardProjection(
         GameObject cardObj,
         Vector3 right,
+        Vector3 originWorld,
         out float cardLeft,
         out float cardWidth
     )
@@ -552,12 +600,11 @@ internal class MonsterPreviewOverlay : MonoBehaviour
             + Mathf.Abs(Vector3.Dot(right, t.up)) * hs.y * t.lossyScale.y
             + Mathf.Abs(Vector3.Dot(right, t.forward)) * hs.z * t.lossyScale.z;
 
-        var centerProj = Vector3.Dot(t.TransformPoint(box.center), right);
+        var centerProj = Vector3.Dot(t.TransformPoint(box.center) - originWorld, right);
 
         cardLeft = centerProj - halfProj;
         cardWidth = halfProj * 2f;
     }
-
     #endregion
 
     private void HideAll()
@@ -585,8 +632,11 @@ internal class MonsterPreviewOverlay : MonoBehaviour
     }
 
 
-    private void SetOverlayVisible(bool visible)
+        private void SetOverlayVisible(bool visible)
     {
+        if (_opponentDeckClone != null)
+            _opponentDeckClone.gameObject.SetActive(visible);
+
         foreach (var anchor in _anchors)
         {
             if (anchor != null)
@@ -601,3 +651,17 @@ internal class MonsterPreviewOverlay : MonoBehaviour
             Destroy(_opponentDeckClone.gameObject);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
