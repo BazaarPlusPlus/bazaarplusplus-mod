@@ -138,6 +138,44 @@ fn detect_dotnet() -> (Option<String>, bool) {
     (None, false)
 }
 
+/// Returns the game version string if found, or None if the path is invalid.
+#[tauri::command]
+pub fn verify_game_path(path: String) -> Option<String> {
+    let base = PathBuf::from(&path);
+
+    #[cfg(target_os = "macos")]
+    {
+        let app = base.join("TheBazaar.app");
+        if !app.exists() {
+            return None;
+        }
+        let plist = std::fs::read_to_string(app.join("Contents/Info.plist")).ok()?;
+        Some(read_plist_string(&plist, "CFBundleShortVersionString").unwrap_or_default())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        base.join("TheBazaar.exe").exists().then(|| "windows".to_string())
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        base.join("TheBazaar").exists().then(|| String::new())
+    }
+}
+
+/// Reads a string value from an Apple XML plist by key name.
+fn read_plist_string(plist: &str, key: &str) -> Option<String> {
+    let key_tag = format!("<key>{key}</key>");
+    let after_key = plist.split_once(&key_tag)?.1;
+    let value = after_key
+        .split_once("<string>")?
+        .1
+        .split_once("</string>")?
+        .0;
+    Some(value.trim().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
