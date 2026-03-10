@@ -13,6 +13,7 @@ decompiled/
 *.suo
 .dotnet-home/
 .nuget-packages/
+.npm-cache/
 
 # Generated mod files
 **/plugins/BazaarPlusPlus.dll
