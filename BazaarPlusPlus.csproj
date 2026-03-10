@@ -131,18 +131,13 @@
     </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
 
-    <PropertyGroup>
-      <RandomGuid>$([System.Guid]::NewGuid())</RandomGuid>
-      <RandomName>$([System.String]::Copy('$(RandomGuid)').Substring(0,8))</RandomName>
-    </PropertyGroup>
-
     <Message Text="Copying $(TargetName).dll to $(GamePath)\BepInEx\plugins" Importance="high" />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
-      DestinationFiles="$(GamePath)\BepInEx\plugins\$(RandomName).dll"
+      DestinationFiles="$(GamePath)\BepInEx\plugins\$(TargetName).dll"
     />
     <Message
-      Text="[BazaarPlusPlus] Successfully copied DLL as $(RandomName).dll to $(GamePath)\BepInEx\plugins\$(RandomName).dll"
+      Text="[BazaarPlusPlus] Successfully copied DLL as $(TargetName).dll to $(GamePath)\BepInEx\plugins\$(TargetName).dll"
       Importance="high"
     />
   </Target>
