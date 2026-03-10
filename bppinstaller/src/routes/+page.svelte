@@ -1,11 +1,9 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
-  import { listen } from '@tauri-apps/api/event';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { onMount, tick } from 'svelte';
   import type { EnvironmentInfo } from '$lib/types';
 
-  type StepState = 'idle' | 'detecting' | 'found';
+  type StepState = 'idle' | 'detecting' | 'found' | 'not_found';
 
   let env: EnvironmentInfo | null = null;
   let dotnetState: StepState = 'idle';
@@ -20,14 +18,25 @@
     return customGamePath || env?.game_path || '';
   }
 
+  async function verifyGamePath(path: string) {
+    return invoke<string | null>('verify_game_path', { path });
+  }
+
   async function detectDotnet() {
     if (dotnetState === 'detecting') return;
     dotnetState = 'detecting';
     try {
       env = await invoke<EnvironmentInfo>('detect_environment');
-      dotnetState = env.dotnet_ok ? 'found' : 'idle'; // idle = not_found but still shows bar
+      dotnetState = env.dotnet_ok ? 'found' : 'not_found';
       if (env.game_path && !customGamePath) {
-        bazaarFound = true;
+        const version = await verifyGamePath(env.game_path);
+        gameVersion = version ?? '';
+        bazaarFound = version !== null;
+        bazaarInvalid = version === null;
+      } else if (!customGamePath) {
+        bazaarFound = false;
+        bazaarInvalid = false;
+        gameVersion = '';
       }
     } catch {
       dotnetState = 'idle';
@@ -47,7 +56,7 @@
     bazaarChecking = true;
     bazaarInvalid = false;
     try {
-      const version = await invoke<string | null>('verify_game_path', { path });
+      const version = await verifyGamePath(path);
       if (version !== null) {
         gameVersion = version;
         bazaarFound = true;
@@ -86,17 +95,14 @@
   }
 
   $: hasPath = Boolean(customGamePath || env?.game_path);
+  $: steamFound = Boolean(env?.steam_path);
+  $: modInstalled = Boolean(env?.bpp_version);
 
   $: canInstall =
     !installing &&
     dotnetState !== 'idle' &&
     bazaarFound &&
     hasPath;
-
-  onMount(() => {
-    const unlisten = listen<string>('bppinstaller://log', () => {});
-    return () => { unlisten.then(fn => fn()); };
-  });
 </script>
 
 <svelte:head>
@@ -144,16 +150,14 @@
 
   <!-- Steps -->
   <div class="steps">
-    <!-- Step 1: .NET Runtime -->
-    <div class="step" class:step-found={dotnetState === 'found'} class:step-warn={dotnetState === 'not_found'}>
+    <!-- Step 1: Steam -->
+    <div class="step" class:step-found={steamFound}>
       <div class="step-index" aria-hidden="true">I</div>
       <div class="step-body">
         <span class="step-title">
-          .NET Runtime
-          {#if dotnetState === 'found'}
-            <span class="tag tag-ok">{env?.dotnet_version ?? 'OK'}</span>
-          {:else if dotnetState === 'not_found'}
-            <span class="tag tag-warn">Optional — not found</span>
+          Steam
+          {#if steamFound}
+            <span class="tag tag-ok">Found</span>
           {/if}
         </span>
 
@@ -173,22 +177,50 @@
               Click to detect
             {/if}
           </button>
+        {:else if env?.steam_path}
+          <p class="detail-line detail-path" title={env.steam_path}>{env.steam_path}</p>
+        {:else}
+          <p class="detail-line detail-muted">Steam path not found</p>
         {/if}
       </div>
     </div>
 
-    <!-- Step 2: The Bazaar -->
-    <div class="step" class:step-found={bazaarFound}>
+    <!-- Step 2: .NET Runtime -->
+    <div class="step" class:step-found={dotnetState === 'found'} class:step-warn={dotnetState === 'not_found'}>
       <div class="step-index" aria-hidden="true">II</div>
+      <div class="step-body">
+        <span class="step-title">
+          .NET Runtime
+          {#if dotnetState === 'found'}
+            <span class="tag tag-ok">{env?.dotnet_version ?? 'OK'}</span>
+          {:else if dotnetState === 'not_found'}
+            <span class="tag tag-warn">Optional — not found</span>
+          {/if}
+        </span>
+
+        {#if dotnetState === 'found' && env?.dotnet_version}
+          <p class="detail-line detail-muted">Runtime: {env.dotnet_version}</p>
+        {:else if dotnetState === 'not_found'}
+          <p class="detail-line detail-muted">No compatible .NET runtime was detected</p>
+        {:else if dotnetState === 'idle'}
+          <p class="detail-line detail-muted">Run detection to inspect the local runtime</p>
+        {/if}
+      </div>
+    </div>
+
+    <!-- Step 3: The Bazaar -->
+    <div class="step" class:step-found={bazaarFound}>
+      <div class="step-index" aria-hidden="true">III</div>
       <div class="step-body">
         <span class="step-title">
           The Bazaar
           {#if bazaarFound}
-            <span class="tag tag-ok">{effectiveGamePath()}{gameVersion ? ` · v${gameVersion}` : ''}</span>
+            <span class="tag tag-ok">{gameVersion ? `v${gameVersion}` : 'Found'}</span>
           {/if}
         </span>
 
         {#if bazaarFound}
+          <p class="detail-line detail-path" title={effectiveGamePath()}>{effectiveGamePath()}</p>
           <button class="redetect-btn" onclick={resetBazaar} type="button">Re-enter</button>
         {:else}
           <div class="locate-bar" class:locate-bar-invalid={bazaarInvalid}>
@@ -224,14 +256,16 @@
       </div>
     </div>
 
-    <!-- Step 3: Install -->
+    <!-- Step 4: Install -->
     <div class="step step-install">
-      <div class="step-index" aria-hidden="true">III</div>
+      <div class="step-index" aria-hidden="true">IV</div>
       <div class="step-body">
         <span class="step-title">
           BepInEx
-          {#if env?.bepinex_installed}
-            <span class="tag tag-ok">Installed</span>
+          {#if modInstalled}
+            <span class="tag tag-ok">
+              Installed{env?.bpp_version ? ` · v${env.bpp_version}` : ''}
+            </span>
           {/if}
         </span>
         <button
@@ -244,7 +278,7 @@
           {#if installing}
             <span class="spinner dark" aria-hidden="true"></span>
             Binding the Sigil…
-          {:else if env?.bepinex_installed}
+          {:else if modInstalled}
             ✦ Rebind the Rite
           {:else}
             ✦ Begin the Rite
@@ -462,6 +496,26 @@
   .tag-ok   { background: rgba(80, 180, 120, 0.15); color: #6dd9a0; border: 1px solid rgba(80, 180, 120, 0.25); }
   .tag-warn { background: rgba(200, 140, 50, 0.12); color: #c4923a; border: 1px solid rgba(200, 140, 50, 0.22); }
 
+  .detail-line {
+    margin: 0;
+    min-width: 0;
+  }
+
+  .detail-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: text;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.73rem;
+    color: rgba(228, 216, 191, 0.82);
+  }
+
+  .detail-muted {
+    font-size: 0.8rem;
+    color: rgba(200, 170, 120, 0.6);
+  }
+
   /* ── Bar Button ──────────────────────────────────────────── */
   .bar-btn {
     width: 100%;
@@ -608,27 +662,6 @@
   /* ── Buttons ─────────────────────────────────────────────── */
   button { cursor: pointer; border: none; outline: none; font: inherit; }
 
-  .ghost-btn {
-    flex-shrink: 0;
-    padding: 0.68rem 0.9rem;
-    font-family: 'Cinzel', serif;
-    font-size: 0.58rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: rgba(200, 155, 72, 0.7);
-    border: 1px solid rgba(200, 148, 55, 0.2);
-    border-radius: 2px;
-    background: rgba(200, 148, 55, 0.04);
-    transition: all 0.15s ease;
-    white-space: nowrap;
-  }
-
-  .ghost-btn:hover {
-    border-color: rgba(200, 148, 55, 0.42);
-    background: rgba(200, 148, 55, 0.09);
-    color: rgba(220, 180, 100, 0.9);
-  }
-
   .redetect-btn {
     align-self: start;
     padding: 0.38rem 0.8rem;
@@ -738,7 +771,5 @@
   @media (max-width: 520px) {
     .shell { padding: 1.25rem 1rem 2rem; }
     .header { padding: 1.75rem 1.25rem 1.5rem; }
-    .manual-row { flex-direction: column; }
-    .ghost-btn { width: 100%; justify-content: center; }
   }
 </style>

@@ -151,7 +151,7 @@
   <Target Name="CopyToInstallerSource" AfterTargets="CopyToBepInExPlugins" Condition="Exists('$(BPPInstallerSourcePath)')">
     <WriteLinesToFile
       File="$(TargetDir)$(TargetName).version"
-      Lines="$(Version)+$([System.DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))"
+      Lines="$(Version).t$([System.DateTime]::Now.ToString('yyyyMMdd.HHmmss'))"
       Overwrite="true"
     />
 

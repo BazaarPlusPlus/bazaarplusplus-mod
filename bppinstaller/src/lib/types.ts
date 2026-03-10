@@ -4,4 +4,5 @@ export interface EnvironmentInfo {
   dotnet_version: string | null;
   dotnet_ok: boolean;
   bepinex_installed: boolean;
+  bpp_version: string | null;
 }

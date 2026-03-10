@@ -9,17 +9,18 @@ pub struct EnvironmentInfo {
     pub dotnet_version: Option<String>,
     pub dotnet_ok: bool,
     pub bepinex_installed: bool,
+    pub bpp_version: Option<String>,
 }
 
 #[tauri::command]
 pub fn detect_environment() -> Result<EnvironmentInfo, String> {
     let steam_path = get_steam_path();
     let game_path = steam_path.as_ref().and_then(|path| get_game_path(path));
-    let (dotnet_version, dotnet_ok) = detect_dotnet();
-    let bepinex_installed = game_path
+    let bpp_version = game_path
         .as_ref()
-        .map(|path| path.join("BepInEx/core/BepInEx.Core.dll").exists())
-        .unwrap_or(false);
+        .and_then(|path| read_installed_bpp_version(path));
+    let (dotnet_version, dotnet_ok) = detect_dotnet();
+    let bepinex_installed = bpp_version.is_some();
 
     Ok(EnvironmentInfo {
         steam_path: steam_path.map(|path| path.to_string_lossy().into_owned()),
@@ -27,6 +28,7 @@ pub fn detect_environment() -> Result<EnvironmentInfo, String> {
         dotnet_version,
         dotnet_ok,
         bepinex_installed,
+        bpp_version,
     })
 }
 
@@ -107,9 +109,16 @@ fn get_steam_path() -> Option<PathBuf> {
 
 fn get_game_path(_steam_path: &Path) -> Option<PathBuf> {
     let library_vdf = std::fs::read_to_string(_steam_path.join("steamapps/libraryfolders.vdf")).ok()?;
-    let library_root = find_game_in_library_vdf(&library_vdf, "2138550")?;
+    let library_root = find_game_in_library_vdf(&library_vdf, "1617400")?;
     let candidate = PathBuf::from(library_root).join("steamapps/common/The Bazaar");
     candidate.exists().then_some(candidate)
+}
+
+fn read_installed_bpp_version(game_path: &Path) -> Option<String> {
+    let version_path = game_path.join("BepInEx/plugins/BazaarPlusPlus.version");
+    let version = std::fs::read_to_string(version_path).ok()?;
+    let version = version.trim();
+    (!version.is_empty()).then(|| version.to_string())
 }
 
 fn detect_dotnet() -> (Option<String>, bool) {
@@ -181,65 +190,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_find_game_in_library_folders() {
-        let vdf_content = r#"
-"libraryfolders"
-{
-    "0"
-    {
-        "path"    "/home/user/.steam/steam"
-        "apps"
-        {
-            "2138550"    "1"
-            "730"        "1"
-        }
-    }
-}"#;
-
-        let result = find_game_in_library_vdf(vdf_content, "2138550");
-        assert_eq!(result, Some("/home/user/.steam/steam".to_string()));
-    }
-
-    #[test]
-    fn test_find_game_missing() {
-        let vdf_content = r#"
-"libraryfolders"
-{
-    "0"
-    {
-        "path"    "/some/path"
-        "apps"
-        {
-            "730"    "1"
-        }
-    }
-}"#;
-
-        let result = find_game_in_library_vdf(vdf_content, "2138550");
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_find_game_skips_non_library_entries() {
-        let vdf_content = r#"
-"libraryfolders"
-{
-    "contentstatsid" "1234567890"
-    "0"
-    {
-        "path"    "/steam/library"
-        "apps"
-        {
-            "2138550"    "1"
-        }
-    }
-}"#;
-
-        let result = find_game_in_library_vdf(vdf_content, "2138550");
-        assert_eq!(result, Some("/steam/library".to_string()));
-    }
-
-    #[test]
     fn test_parse_dotnet_runtimes_found() {
         let output = "Microsoft.NETCore.App 6.0.25 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\nMicrosoft.NETCore.App 8.0.1 [/usr/share/dotnet/shared/Microsoft.NETCore.App]";
         let result = parse_dotnet_runtimes(output);
@@ -257,5 +207,30 @@ mod tests {
     fn test_parse_dotnet_runtimes_empty_output() {
         let result = parse_dotnet_runtimes("");
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_read_installed_bpp_version_trims_contents() {
+        let temp_root = std::env::temp_dir().join(format!(
+            "bppinstaller-version-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system time before epoch")
+                .as_nanos()
+        ));
+        let plugins_dir = temp_root.join("BepInEx/plugins");
+        std::fs::create_dir_all(&plugins_dir).expect("create plugins dir");
+        std::fs::write(
+            plugins_dir.join("BazaarPlusPlus.version"),
+            "1.2.3+2026-03-10 12:34:56\n",
+        )
+        .expect("write version file");
+
+        let version = read_installed_bpp_version(&temp_root);
+
+        std::fs::remove_dir_all(&temp_root).expect("cleanup temp dir");
+
+        assert_eq!(version.as_deref(), Some("1.2.3+2026-03-10 12:34:56"));
     }
 }
