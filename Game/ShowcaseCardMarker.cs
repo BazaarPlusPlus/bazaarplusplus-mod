@@ -3,6 +3,4 @@ using UnityEngine;
 
 namespace BazaarPlusPlus;
 
-internal class ShowcaseCardMarker : MonoBehaviour
-{
-}
+internal class ShowcaseCardMarker : MonoBehaviour { }

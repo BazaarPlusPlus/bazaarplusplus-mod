@@ -25,8 +25,6 @@ internal static class ModState
     public static List<RunInfo.CardInfo> CurrentEncounterChoices; // choices inside an encounter (Choice/Loot/Pedestal)
     public static List<RunInfo.MonsterPreview> EncounterMonsterPreviews; // combat encounter monster info from local DB
 
-    // Item tag data
-    public static Dictionary<string, List<string>> BaseItemTags;
     public static List<EEnchantmentType> AvailableEnchantments = new List<EEnchantmentType>();
 
     public static void Initialize(ConfigFile config)

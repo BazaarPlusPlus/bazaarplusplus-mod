@@ -251,7 +251,9 @@ internal class DebugOverlay : MonoBehaviour
                         TemplateId = card.TemplateId.ToString(),
                         Tier = (int)card.Tier,
                         Enchant = (card as ItemCard)?.Enchantment?.ToString() ?? "None",
-                        Attributes = card.Attributes?.ToDictionary(kv => (int)kv.Key, kv => kv.Value) ?? new Dictionary<int, int>(),
+                        Attributes =
+                            card.Attributes?.ToDictionary(kv => (int)kv.Key, kv => kv.Value)
+                            ?? new Dictionary<int, int>(),
                     }
                 );
             }
@@ -464,7 +466,11 @@ internal class DebugOverlay : MonoBehaviour
                 GameObject spawned = null;
                 try
                 {
-                    spawned = await InstantiateCardForShowcaseAsync(assetLoader, runtimeCard, anchor);
+                    spawned = await InstantiateCardForShowcaseAsync(
+                        assetLoader,
+                        runtimeCard,
+                        anchor
+                    );
                 }
                 catch (Exception ex)
                 {
@@ -491,7 +497,9 @@ internal class DebugOverlay : MonoBehaviour
                     // Invoke OnDisable via reflection to remove all Events.* and BazaarVFXManager
                     // subscriptions without disabling the component — keeping pointer/tooltip events alive.
                     _itemControllerOnDisable ??= typeof(ItemController).GetMethod(
-                        "OnDisable", BindingFlags.Instance | BindingFlags.NonPublic);
+                        "OnDisable",
+                        BindingFlags.Instance | BindingFlags.NonPublic
+                    );
                     _itemControllerOnDisable?.Invoke(itemController, null);
                 }
                 else if (spawned.TryGetComponent<CardController>(out var cardController))
@@ -553,7 +561,6 @@ internal class DebugOverlay : MonoBehaviour
             card.Enchantment = enchantType;
         }
 
-
         if (input.Attributes != null)
         {
             foreach (var kv in input.Attributes)
@@ -565,6 +572,7 @@ internal class DebugOverlay : MonoBehaviour
 
         return card;
     }
+
     private static object GetTemplateById(object staticData, Guid templateId)
     {
         if (staticData == null)
@@ -572,12 +580,19 @@ internal class DebugOverlay : MonoBehaviour
 
         var method = staticData
             .GetType()
-            .GetMethod("GetCardById", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(Guid) }, null);
+            .GetMethod(
+                "GetCardById",
+                BindingFlags.Public | BindingFlags.Instance,
+                null,
+                new[] { typeof(Guid) },
+                null
+            );
         if (method == null)
             return null;
 
         return method.Invoke(staticData, new object[] { templateId });
     }
+
     private bool EnsureInstantiateApi(AssetLoader loader)
     {
         if (_instantiateCardMethod != null && _spawnSection != null)
@@ -624,7 +639,10 @@ internal class DebugOverlay : MonoBehaviour
         if (_instantiateCardMethod == null || _spawnSection == null)
             return null;
 
-        var taskObj = _instantiateCardMethod.Invoke(loader, new object[] { card, parent, _spawnSection });
+        var taskObj = _instantiateCardMethod.Invoke(
+            loader,
+            new object[] { card, parent, _spawnSection }
+        );
         if (taskObj is Task<GameObject> task)
             return await task;
 
@@ -672,8 +690,8 @@ internal class DebugOverlay : MonoBehaviour
 
             if (cardWidth <= 0.001f)
             {
-                cardLeft  = -0.18f;
-                cardWidth =  0.36f;
+                cardLeft = -0.18f;
+                cardWidth = 0.36f;
             }
 
             // Shift anchor so the card's measured left edge lands at (leftEdge + right * edge).
@@ -696,7 +714,11 @@ internal class DebugOverlay : MonoBehaviour
                 // Use the first valid socket to establish the board's right direction
                 ItemSocketController reference = null;
                 foreach (var s in sockets)
-                    if (s != null) { reference = s; break; }
+                    if (s != null)
+                    {
+                        reference = s;
+                        break;
+                    }
 
                 if (reference != null)
                 {
@@ -707,9 +729,14 @@ internal class DebugOverlay : MonoBehaviour
                     float maxProj = float.MinValue;
                     foreach (var s in sockets)
                     {
-                        if (s == null) continue;
+                        if (s == null)
+                            continue;
                         var proj = Vector3.Dot(s.transform.position, boardRight);
-                        if (proj > maxProj) { maxProj = proj; rightmost = s; }
+                        if (proj > maxProj)
+                        {
+                            maxProj = proj;
+                            rightmost = s;
+                        }
                     }
 
                     rotation = rightmost.transform.rotation;
@@ -725,7 +752,8 @@ internal class DebugOverlay : MonoBehaviour
             return false;
 
         leftEdge = cam.ViewportToWorldPoint(new Vector3(0.70f, 0.22f, 7.2f));
-        rotation = Quaternion.LookRotation((cam.transform.position - leftEdge).normalized, Vector3.up)
+        rotation =
+            Quaternion.LookRotation((cam.transform.position - leftEdge).normalized, Vector3.up)
             * Quaternion.Euler(0f, 180f, 0f);
         return true;
     }
@@ -735,10 +763,13 @@ internal class DebugOverlay : MonoBehaviour
     // Called with the anchor placed at world origin, so all measurements are
     // relative to the anchor position (= 0).
     private static void GetCardProjectionAlongRight(
-        GameObject cardObj, Vector3 right,
-        out float cardLeft, out float cardWidth)
+        GameObject cardObj,
+        Vector3 right,
+        out float cardLeft,
+        out float cardWidth
+    )
     {
-        cardLeft  = 0f;
+        cardLeft = 0f;
         cardWidth = 0f;
 
         if (cardObj == null)
@@ -748,19 +779,20 @@ internal class DebugOverlay : MonoBehaviour
         if (box == null)
             return;
 
-        var t  = box.transform;
+        var t = box.transform;
         var hs = box.size * 0.5f;
 
         // OBB half-extent projected onto 'right' — exact, no AABB inflation.
-        var halfProj = Mathf.Abs(Vector3.Dot(right, t.right))   * hs.x * t.lossyScale.x
-                     + Mathf.Abs(Vector3.Dot(right, t.up))      * hs.y * t.lossyScale.y
-                     + Mathf.Abs(Vector3.Dot(right, t.forward)) * hs.z * t.lossyScale.z;
+        var halfProj =
+            Mathf.Abs(Vector3.Dot(right, t.right)) * hs.x * t.lossyScale.x
+            + Mathf.Abs(Vector3.Dot(right, t.up)) * hs.y * t.lossyScale.y
+            + Mathf.Abs(Vector3.Dot(right, t.forward)) * hs.z * t.lossyScale.z;
 
         // Center of the BoxCollider in world space (anchor is at 0, so this equals
         // the offset from the anchor to the box center).
         var centerProj = Vector3.Dot(t.TransformPoint(box.center), right);
 
-        cardLeft  = centerProj - halfProj;
+        cardLeft = centerProj - halfProj;
         cardWidth = halfProj * 2f;
     }
 
@@ -794,13 +826,3 @@ internal class DebugOverlay : MonoBehaviour
         HideShowcaseEntities();
     }
 }
-
-
-
-
-
-
-
-
-
-
