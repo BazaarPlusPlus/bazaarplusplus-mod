@@ -20,7 +20,7 @@ export type MessageKey =
   | 'actionUpdating'
   | 'actionCheckUpdates'
   | 'actionUpdate'
-  | 'statusOptionalNotFound'
+  | 'statusRuntimeMissing'
   | 'runtimeVersion'
   | 'runtimeCompatible'
   | 'runtimeNotFound'
@@ -78,10 +78,10 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     actionUpdating: 'Updating...',
     actionCheckUpdates: 'Check updates',
     actionUpdate: 'Update',
-    statusOptionalNotFound: 'Not found (optional)',
+    statusRuntimeMissing: 'Required component missing',
     runtimeVersion: 'Runtime: {version}',
     runtimeCompatible: 'Compatible .NET runtime detected',
-    runtimeNotFound: 'No compatible .NET runtime was detected',
+    runtimeNotFound: 'A compatible .NET runtime is required before installation.',
     runtimeIdle: 'Run detection to inspect the local .NET environment',
     statusFound: 'Found',
     actionReenter: 'Choose again',
@@ -133,10 +133,10 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     actionUpdating: '更新中...',
     actionCheckUpdates: '检查更新',
     actionUpdate: '更新',
-    statusOptionalNotFound: '未检测到（可选）',
+    statusRuntimeMissing: '缺少必需组件',
     runtimeVersion: '运行时：{version}',
     runtimeCompatible: '已检测到兼容的 .NET 运行时',
-    runtimeNotFound: '未检测到兼容的 .NET 运行时',
+    runtimeNotFound: '需要先安装兼容的 .NET 运行时，才能继续安装。',
     runtimeIdle: '运行检测以检查本机 .NET 环境',
     statusFound: '已找到',
     actionReenter: '重新选择',

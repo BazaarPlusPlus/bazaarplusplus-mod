@@ -299,6 +299,11 @@
     border-color: rgba(200, 148, 55, 0.4);
   }
 
+  .back-btn:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
+  }
+
   .back-icon {
     width: 0.9rem;
     height: 0.9rem;
@@ -329,13 +334,17 @@
     z-index: 2;
     cursor: pointer;
     border-style: solid;
-    outline: none;
     font: inherit;
   }
 
   .locale-toggle:hover {
     background: linear-gradient(180deg, rgba(200, 148, 55, 0.2), rgba(200, 148, 55, 0.1));
     border-color: rgba(200, 148, 55, 0.4);
+  }
+
+  .locale-toggle:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
   }
 
   .locale-icon {
@@ -547,7 +556,14 @@
     color: rgba(140, 110, 60, 0.35);
   }
 
-  button { cursor: pointer; border: none; outline: none; font: inherit; }
+  button { cursor: pointer; border: none; font: inherit; }
+
+  button:focus-visible,
+  .dep-item-link:focus-visible,
+  .dep-link:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
+  }
 
   @media (max-width: 520px) {
     .shell { padding: 1rem 0.85rem 1.5rem; }

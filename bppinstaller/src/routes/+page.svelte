@@ -4,18 +4,17 @@
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { onMount } from 'svelte';
   import { formatMessage, messages, resolveInitialLocale, type Locale } from '$lib/i18n';
-  import type { DotnetInfo, EnvironmentInfo, UpdateInfo } from '$lib/types';
+  import type { DotnetInfo, EnvironmentInfo } from '$lib/types';
 
   type StepState = 'idle' | 'detecting' | 'found' | 'not_found';
 
   let env: EnvironmentInfo | null = null;
-  let updateInfo: UpdateInfo | null = null;
   let dotnetState: StepState = 'idle';
   let bazaarFound = false;
   let bazaarChecking = false;
   let bazaarInvalid = false;
   let customGamePath = '';
-  let actionBusy: 'idle' | 'detect' | 'install' | 'check-update' | 'update' | 'uninstall' = 'idle';
+  let actionBusy: 'idle' | 'detect' | 'install' | 'uninstall' = 'idle';
   let actionMenuOpen = false;
   let locale: Locale = 'zh';
 
@@ -88,27 +87,9 @@
         bazaarInvalid = false;
       }
 
-      updateInfo = env.bpp_version
-        ? await invoke<UpdateInfo>('check_bpp_update', { currentVersion: env.bpp_version })
-        : null;
-
       await dotnetPromise;
     } catch {
       dotnetState = 'idle';
-      updateInfo = null;
-    } finally {
-      actionBusy = 'idle';
-    }
-  }
-
-  async function checkForUpdates() {
-    if (!env?.bpp_version || actionBusy !== 'idle') return;
-
-    actionBusy = 'check-update';
-    try {
-      updateInfo = await invoke<UpdateInfo>('check_bpp_update', { currentVersion: env.bpp_version });
-    } catch (e) {
-      console.error(e);
     } finally {
       actionBusy = 'idle';
     }
@@ -167,28 +148,6 @@
     }
   }
 
-  async function updateBpp() {
-    if (!effectiveGamePath() || actionBusy !== 'idle') return;
-
-    actionBusy = 'update';
-    try {
-      await invoke('update_bpp', { gamePath: effectiveGamePath() });
-      await refreshAfterAction();
-    } catch (e) {
-      console.error(e);
-      actionBusy = 'idle';
-    }
-  }
-
-  async function handleBppAction() {
-    if (updateAvailable) {
-      await updateBpp();
-      return;
-    }
-
-    await checkForUpdates();
-  }
-
   async function uninstallBpp() {
     if (!effectiveGamePath() || actionBusy !== 'idle') return;
 
@@ -208,7 +167,6 @@
 
   $: hasPath = Boolean(customGamePath || env?.game_path);
   $: modInstalled = Boolean(env?.bpp_version);
-  $: updateAvailable = Boolean(updateInfo?.update_available && updateInfo.latest_version);
   $: isBusy = actionBusy !== 'idle';
   $: canInstall = !isBusy && dotnetState !== 'idle' && bazaarFound && hasPath;
   $: dotnetDownloadUrl = locale === 'zh'
@@ -284,7 +242,7 @@
   </header>
 
   <div class="steps">
-    <div class="step" class:step-found={modInstalled} class:step-warn={updateAvailable}>
+    <div class="step" class:step-found={modInstalled}>
       <div class="step-index" aria-hidden="true">I</div>
       <div class="step-body">
         <span class="step-title">
@@ -301,29 +259,6 @@
         {#if !modInstalled}
           <p class="detail-line detail-muted">{t('detectInstalledHint')}</p>
         {/if}
-
-        {#if modInstalled}
-          <div class="card-inline-actions">
-            <p class="detail-line detail-muted">
-              {#if updateAvailable}
-                {t('updateAvailable', { version: updateInfo?.latest_version ?? '' })}
-              {:else}
-                {t('updateHint')}
-              {/if}
-            </p>
-            <button class="card-action-btn" onclick={handleBppAction} type="button" disabled={isBusy}>
-              {#if actionBusy === 'check-update'}
-                <span class="spinner" aria-hidden="true"></span>
-                {t('actionCheckingUpdates')}
-              {:else if actionBusy === 'update'}
-                <span class="spinner" aria-hidden="true"></span>
-                {t('actionUpdating')}
-              {:else}
-                {updateAvailable ? t('actionUpdate') : t('actionCheckUpdates')}
-              {/if}
-            </button>
-          </div>
-        {/if}
       </div>
     </div>
 
@@ -335,7 +270,7 @@
           {#if dotnetState === 'found'}
             <span class="tag tag-ok">{env?.dotnet_version ?? 'OK'}</span>
           {:else if dotnetState === 'not_found'}
-            <span class="tag tag-warn">{t('statusOptionalNotFound')}</span>
+            <span class="tag tag-warn">{t('statusRuntimeMissing')}</span>
           {/if}
         </span>
 
@@ -522,6 +457,11 @@
     border-color: rgba(200, 148, 55, 0.4);
   }
 
+  .about-toggle:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
+  }
+
   .about-icon {
     width: 1rem;
     height: 1rem;
@@ -554,6 +494,11 @@
   .locale-toggle:hover {
     background: linear-gradient(180deg, rgba(200, 148, 55, 0.2), rgba(200, 148, 55, 0.1));
     border-color: rgba(200, 148, 55, 0.4);
+  }
+
+  .locale-toggle:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
   }
 
   .locale-icon {
@@ -729,38 +674,6 @@
     color: rgba(200, 170, 120, 0.6);
   }
 
-  .card-inline-actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.9rem;
-  }
-
-  .card-action-btn {
-    flex-shrink: 0;
-    padding: 0.42rem 0.8rem;
-    border: 1px solid rgba(90, 200, 130, 0.26);
-    background: rgba(90, 200, 130, 0.12);
-    color: #79dba6;
-    border-radius: 2px;
-    font-family: 'Cinzel', serif;
-    font-size: 0.56rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-  }
-
-  .card-action-btn:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-
-  .card-action-btn:hover:not(:disabled) {
-    background: rgba(90, 200, 130, 0.18);
-  }
-
   .locate-bar {
     display: flex;
     align-items: center;
@@ -809,7 +722,6 @@
     width: 100%;
     background: none;
     border: none;
-    outline: none;
     color: rgba(225, 210, 185, 0.88);
     font-family: 'Fira Code', monospace;
     font-size: 0.78rem;
@@ -860,7 +772,13 @@
     animation: fade-up 0.2s ease both;
   }
 
-  button { cursor: pointer; border: none; outline: none; font: inherit; }
+  button { cursor: pointer; border: none; font: inherit; }
+
+  button:focus-visible,
+  .path-input:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
+  }
 
   .secondary-btn {
     padding: 0.68rem 0.9rem;
@@ -1075,7 +993,6 @@
   @media (max-width: 520px) {
     .shell { padding: 1rem 0.85rem 1.5rem; }
     .header { padding: 1.2rem 1rem 1rem; }
-    .card-inline-actions,
     .action-row,
     .action-primary {
       flex-direction: column;
