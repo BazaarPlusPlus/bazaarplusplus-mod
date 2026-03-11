@@ -147,75 +147,20 @@ fn detect_dotnet() -> (Option<String>, bool) {
     (None, false)
 }
 
-fn normalize_version_text(raw: &str) -> Option<String> {
-    let normalized = raw.trim().trim_matches('\0').to_string();
-    (!normalized.is_empty()).then_some(normalized)
-}
 
-#[cfg(target_os = "windows")]
-fn read_windows_exe_version(exe_path: &Path) -> Option<String> {
-    for shell in ["powershell.exe", "powershell", "pwsh.exe", "pwsh"] {
-        let output = Command::new(shell)
-            .arg("-NoProfile")
-            .arg("-Command")
-            .arg(
-                "$ErrorActionPreference='Stop'; $v=(Get-Item -LiteralPath $args[0]).VersionInfo.ProductVersion; if ($null -ne $v) { $v }",
-            )
-            .arg(exe_path)
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            continue;
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if let Some(version) = normalize_version_text(&stdout) {
-            return Some(version);
-        }
-    }
-
-    None
-}
-/// Returns the game version string if found, or None if the path is invalid.
+/// Returns true if the game installation is found at the given path.
 #[tauri::command]
-pub fn verify_game_path(path: String) -> Option<String> {
+pub fn verify_game_path(path: String) -> bool {
     let base = PathBuf::from(&path);
 
     #[cfg(target_os = "macos")]
-    {
-        let app = base.join("TheBazaar.app");
-        if !app.exists() {
-            return None;
-        }
-        let plist = std::fs::read_to_string(app.join("Contents/Info.plist")).ok()?;
-        Some(read_plist_string(&plist, "CFBundleShortVersionString").unwrap_or_default())
-    }
+    return base.join("TheBazaar.app").exists();
 
     #[cfg(target_os = "windows")]
-    {
-        let exe_path = base.join("TheBazaar.exe");
-        if !exe_path.exists() {
-            return None;
-        }
-        read_windows_exe_version(&exe_path).or_else(|| Some(String::new()))
-    }
+    return base.join("TheBazaar.exe").exists();
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    {
-        base.join("TheBazaar").exists().then(|| String::new())
-    }
-}
-
-/// Reads a string value from an Apple XML plist by key name.
-fn read_plist_string(plist: &str, key: &str) -> Option<String> {
-    let key_tag = format!("<key>{key}</key>");
-    let after_key = plist.split_once(&key_tag)?.1;
-    let value = after_key
-        .split_once("<string>")?
-        .1
-        .split_once("</string>")?
-        .0;
-    Some(value.trim().to_string())
+    return base.join("TheBazaar").exists();
 }
 
 #[cfg(test)]
@@ -267,9 +212,4 @@ mod tests {
         assert_eq!(version.as_deref(), Some("1.2.3+2026-03-10 12:34:56"));
     }
 
-    #[test]
-    fn test_normalize_version_text_trims_whitespace() {
-        let version = normalize_version_text("  1.2.3.4  \r\n");
-        assert_eq!(version.as_deref(), Some("1.2.3.4"));
-    }
 }

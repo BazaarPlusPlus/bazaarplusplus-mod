@@ -1,12 +1,6 @@
 #pragma warning disable CS0436
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using BazaarGameClient.Domain.Models.Cards;
-using BazaarGameShared.Domain.Cards;
-using BazaarGameShared.Domain.Core;
-using BazaarGameShared.Domain.Core.Types;
-using Newtonsoft.Json;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -27,27 +21,10 @@ internal class DebugOverlay : MonoBehaviour
     private float _nextRefreshTime;
     private const float RefreshInterval = 0.1f;
 
-    private MonsterPreviewOverlay _monsterPreview;
-
     private struct Line
     {
         public string Text;
         public bool IsHeader;
-    }
-
-    private sealed class MinimalCardJson
-    {
-        [JsonProperty("t")]
-        public string TemplateId { get; set; } = string.Empty;
-
-        [JsonProperty("r")]
-        public int Tier { get; set; }
-
-        [JsonProperty("e")]
-        public string Enchant { get; set; } = "None";
-
-        [JsonProperty("a")]
-        public Dictionary<int, int> Attributes { get; set; } = new Dictionary<int, int>();
     }
 
     private void Update()
@@ -110,9 +87,13 @@ internal class DebugOverlay : MonoBehaviour
         _lines.Clear();
 
         Header("BazaarPlusPlus  [F2 toggle]");
+        Label("Preview: [F3] toggle, [F4] source, arrows move X/Z, PgUp/PgDn move Y, </> rotate, R reset");
+        Label("Layout: 1/2 width, 3/4 depth, 5/6 spacing, -/= scale, K/L plate, ;/' border, N/M border height");
 
         try
         {
+            DrawPreviewDebugState();
+
             var run = Data.Run;
             var state = Data.CurrentState;
             if (run != null)
@@ -123,14 +104,6 @@ internal class DebugOverlay : MonoBehaviour
                 Row("W/L", $"{run.Victories} / {run.Losses}");
                 Row("State", state?.StateName.ToString());
                 Row("Encounter", Data.CurrentEncounterId?.ToString() ?? "-");
-
-                // Feed MonsterPreviewOverlay with hand cards
-                _monsterPreview ??= GetComponent<MonsterPreviewOverlay>();
-                if (_monsterPreview != null)
-                {
-                    var handCards = GameDataReader.GetItemsAsCards(run.Player?.Hand);
-                    _monsterPreview.SetJson(BuildMinimalJson(handCards));
-                }
             }
         }
         catch (Exception ex)
@@ -151,31 +124,26 @@ internal class DebugOverlay : MonoBehaviour
         );
     }
 
-    private static string BuildMinimalJson(List<Card> cards)
+    private void DrawPreviewDebugState()
     {
-        var list = new List<MinimalCardJson>();
-        if (cards != null)
-        {
-            foreach (var card in cards)
-            {
-                if (card == null || card.Type != ECardType.Item)
-                    continue;
+        var previewDebug = GetComponent<OverlayDebugController>();
+        if (previewDebug == null || !previewDebug.TryGetDebugState(out var state))
+            return;
 
-                list.Add(
-                    new MinimalCardJson
-                    {
-                        TemplateId = card.TemplateId.ToString(),
-                        Tier = (int)card.Tier,
-                        Enchant = (card as ItemCard)?.Enchantment?.ToString() ?? "None",
-                        Attributes =
-                            card.Attributes?.ToDictionary(kv => (int)kv.Key, kv => kv.Value)
-                            ?? new Dictionary<int, int>(),
-                    }
-                );
-            }
-        }
-
-        return JsonConvert.SerializeObject(list, Formatting.None);
+        Header("Preview Debug");
+        Row("Data Source", state.DataSource);
+        Row("Encounter ID", state.EncounterId);
+        Row("Monster Title", state.MonsterTitle);
+        Row("Visible", state.Visible ? "on" : "off");
+        Row("World Pos", FormatVector3(state.AnchorPosition));
+        Row("World Rot", FormatVector3(state.AnchorRotationEuler));
+        Row("Local Offset", FormatVector3(state.LocalOffset));
+        Row("Board Size", $"{state.BoardSize.x:F2} x {state.BoardSize.y:F2}");
+        Row("Card Spacing X", state.CardSpacingX.ToString("F2"));
+        Row("Card Scale", state.CardScale.ToString("F2"));
+        Row("Plate Thickness", state.BoardThickness.ToString("F2"));
+        Row("Border Thickness", state.BorderThickness.ToString("F2"));
+        Row("Border Height", state.BorderHeight.ToString("F2"));
     }
 
     private void DrawEncounterList(
@@ -246,7 +214,7 @@ internal class DebugOverlay : MonoBehaviour
 
             if (preview.Items == null && preview.Skills == null)
             {
-                Label("      db: missing (BazaarPlusPlus_monsters.json)");
+                Label("      db: unavailable (encounter preview not migrated to monsters_bazaardb yet)");
                 continue;
             }
 
@@ -296,6 +264,11 @@ internal class DebugOverlay : MonoBehaviour
     private void Label(string text)
     {
         _lines.Add(new Line { Text = text, IsHeader = false });
+    }
+
+    private static string FormatVector3(Vector3 value)
+    {
+        return $"({value.x:F2}, {value.y:F2}, {value.z:F2})";
     }
 
     private static void InitStyles()

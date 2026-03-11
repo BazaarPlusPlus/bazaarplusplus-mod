@@ -12,7 +12,6 @@
   let bazaarFound = false;
   let bazaarChecking = false;
   let bazaarInvalid = false;
-  let gameVersion = '';
   let customGamePath = '';
   let actionBusy: 'idle' | 'detect' | 'install' | 'check-update' | 'update' | 'uninstall' = 'idle';
   let actionMenuOpen = false;
@@ -22,7 +21,7 @@
   }
 
   async function verifyGamePath(path: string) {
-    return invoke<string | null>('verify_game_path', { path });
+    return invoke<boolean>('verify_game_path', { path });
   }
 
   async function detectEnvironment() {
@@ -33,14 +32,11 @@
       env = await invoke<EnvironmentInfo>('detect_environment');
       dotnetState = env.dotnet_ok ? 'found' : 'not_found';
       if (env.game_path && !customGamePath) {
-        const version = await verifyGamePath(env.game_path);
-        gameVersion = version ?? '';
-        bazaarFound = version !== null;
-        bazaarInvalid = version === null;
+        bazaarFound = await verifyGamePath(env.game_path);
+        bazaarInvalid = !bazaarFound;
       } else if (!customGamePath) {
         bazaarFound = false;
         bazaarInvalid = false;
-        gameVersion = '';
       }
       updateInfo = env.bpp_version
         ? await invoke<UpdateInfo>('check_bpp_update', { currentVersion: env.bpp_version })
@@ -78,11 +74,8 @@
     bazaarChecking = true;
     bazaarInvalid = false;
     try {
-      const version = await verifyGamePath(path);
-      if (version !== null) {
-        gameVersion = version;
-        bazaarFound = true;
-      } else {
+      bazaarFound = await verifyGamePath(path);
+      if (!bazaarFound) {
         bazaarInvalid = true;
       }
     } catch {
@@ -95,7 +88,6 @@
   function resetBazaar() {
     bazaarFound = false;
     bazaarInvalid = false;
-    gameVersion = '';
     customGamePath = '';
   }
 
@@ -292,7 +284,7 @@
         <span class="step-title">
           The Bazaar
           {#if bazaarFound}
-            <span class="tag tag-ok">{gameVersion ? `v${gameVersion}` : 'Found'}</span>
+            <span class="tag tag-ok">Found</span>
           {/if}
         </span>
 
