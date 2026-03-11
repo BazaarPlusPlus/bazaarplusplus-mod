@@ -11,17 +11,24 @@ namespace BazaarPlusPlus;
 
 internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
 {
+    private static readonly Vector3 FixedPreviewPosition = new Vector3(4f, 1f, -5f);
+    private static readonly Quaternion FixedPreviewRotation = Quaternion.identity;
+
     private static readonly System.Reflection.PropertyInfo CurrentTooltipControllerProperty =
         AccessTools.Property(typeof(TooltipParentComponent), "CardTooltipController");
 
     private MonsterPreviewOverlayController _overlayController;
-    private TrackedObjectAnchorSource _anchorSource;
+    private FixedWorldAnchorSource _anchorSource;
     private Card _lockedCard;
 
     private void Awake()
     {
         _overlayController = GetComponent<MonsterPreviewOverlayController>();
-        _anchorSource = new TrackedObjectAnchorSource(ResolveAnchorTransform);
+        _anchorSource = new FixedWorldAnchorSource
+        {
+            Position = FixedPreviewPosition,
+            Rotation = FixedPreviewRotation,
+        };
     }
 
     private void OnEnable()
@@ -58,6 +65,9 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
         }
 
         _lockedCard = card;
+
+        ApplyFixedLayout();
+
         _overlayController.SetAnchorSource(_anchorSource);
         _overlayController.SetCards(cards);
         _overlayController.SetSkillCards(skillCards);
@@ -69,7 +79,26 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
 
     private void OnTooltipUnlock()
     {
+        if (_lockedCard == null)
+            return;
+
+        var tooltipController = GetCurrentTooltipController();
+        var currentCard = tooltipController?.CurrentCard;
+        if (currentCard != null && IsShowcaseCard(currentCard))
+        {
+            ModState.Logger?.LogDebug(
+                "[EncounterTooltipPreviewBridge] Ignoring unlock caused by showcase card hover"
+            );
+            return;
+        }
+
         HideOverlay("tooltip unlocked");
+    }
+
+    private static bool IsShowcaseCard(Card card)
+    {
+        var controller = Data.CardAndSkillLookup?.GetCardController(card);
+        return controller != null && controller.GetComponent<ShowcaseCardMarker>() != null;
     }
 
     private void HideOverlay(string reason)
@@ -83,13 +112,23 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
         ModState.Logger?.LogDebug($"[EncounterTooltipPreviewBridge] Hiding preview: {reason}");
     }
 
-    private Transform ResolveAnchorTransform()
+    private void ApplyFixedLayout()
     {
-        if (_lockedCard == null)
-            return null;
+        var layout = new PreviewBoardLayout
+        {
+            BoardSize = new Vector2(8.25f, 2.75f),
+            LocalOffset = new Vector3(0f, 0.1f, 0f),
+            CardSpacing = new Vector3(1.1f, 0f, 0f),
+            CardScale = Vector3.one * 0.5f,
+            BoardThickness = 0.02f,
+            BorderThickness = 0.04f,
+            BorderHeight = 0.04f,
+        };
 
-        var cardController = Data.CardAndSkillLookup?.GetCardController(_lockedCard);
-        return cardController?.GetTransformToMove();
+        _overlayController.SetLayout(layout);
+        ModState.Logger?.LogInfo(
+            $"[EncounterTooltipPreviewBridge] Applied fixed layout: anchor={FixedPreviewPosition} rotation={FixedPreviewRotation.eulerAngles} size={layout.BoardSize}"
+        );
     }
 
     private static CardTooltipController GetCurrentTooltipController()

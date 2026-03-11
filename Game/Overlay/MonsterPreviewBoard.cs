@@ -16,7 +16,8 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private const float SkillSlotMarkerSize = 0.09f;
     private const float SkillSlotMarkerHeight = 0.14f;
     private const float SkillRegionYOffset = 1.15f;
-    private const float SkillCardScaleFactor = 0.58f;
+    private const float SkillRegionZOffset = 1.5f;
+    private const float SkillCardScaleFactor = 1f;
 
     private readonly IPreviewCardFactory _factory;
     private readonly IPreviewCardFactory _skillFactory;
@@ -235,7 +236,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
         _itemContentRoot.transform.localScale = Vector3.one;
 
         _skillContentRoot.transform.localPosition =
-            _layout.LocalOffset + new Vector3(0f, SkillRegionYOffset, 0f);
+            _layout.LocalOffset + new Vector3(0f, SkillRegionYOffset, SkillRegionZOffset);
         _skillContentRoot.transform.localRotation = Quaternion.identity;
         _skillContentRoot.transform.localScale = Vector3.one;
 
@@ -507,7 +508,8 @@ internal sealed class MonsterPreviewBoard : IDisposable
     {
         var blocker = new GameObject(name);
         blocker.layer = LayerMask.NameToLayer("Input");
-        blocker.AddComponent<BoxCollider>();
+        // No BoxCollider – preview cards need to receive hover raycasts for tooltips.
+        // The game's lock-mode CanvasGroup already blocks interaction with the main board.
         return blocker;
     }
 
