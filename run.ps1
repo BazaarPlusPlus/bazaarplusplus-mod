@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $Managed = "C:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed"
 
 function Build-Project {
-    dotnet build
+    dotnet build -verbosity detailed
 }
 
 function Format-Project {

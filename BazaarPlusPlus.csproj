@@ -137,13 +137,12 @@
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\*.dll" />
     </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
-    <Message Text="Copying $(TargetName).dll to $(GamePath)\BepInEx\plugins" Importance="high" />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
       DestinationFiles="$(GamePath)\BepInEx\plugins\$(TargetName).dll"
     />
     <Message
-      Text="[BazaarPlusPlus] Successfully copied DLL as $(TargetName).dll to $(GamePath)\BepInEx\plugins\$(TargetName).dll"
+      Text="[BazaarPlusPlus] Successfully copied DLL to BepInEx plugins folder!!!"
       Importance="high"
     />
   </Target>
@@ -161,7 +160,7 @@
     <Copy SourceFiles="$(TargetDir)$(TargetName).version" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).version" />
     <ZipDirectory SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos"   DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/macos/BepInEx.zip"   Overwrite="true" />
     <ZipDirectory SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/windows" DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/windows/BepInEx.zip" Overwrite="true" />
-    <Message Text="Successfully built BazaarPlusPlus mod and copied to installer source!!!" Importance="high" />
+    <Message Text="[BazaarPlusPlus] Successfully built mod zip and copied to installer source folder!!!" Importance="high" />
   </Target>
 
 </Project>

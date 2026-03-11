@@ -4,7 +4,7 @@ set -e
 MANAGED="$HOME/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed"
 
 build() {
-    dotnet build
+    dotnet build -verbosity detailed
 }
 
 format() {
