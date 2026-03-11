@@ -9,14 +9,21 @@ namespace BazaarPlusPlus;
 internal sealed class MonsterPreviewBoard : IDisposable
 {
     private const int BoardSlotCount = 10;
+    private const int SkillSlotCount = 5;
     private const float BoardCenterMarkerSize = 0.16f;
     private const float SlotMarkerSize = 0.08f;
     private const float CardCenterMarkerSize = 0.12f;
+    private const float SkillSlotMarkerSize = 0.09f;
+    private const float SkillSlotMarkerHeight = 0.14f;
+    private const float SkillRegionYOffset = 1.15f;
+    private const float SkillCardScaleFactor = 0.58f;
 
     private readonly IPreviewCardFactory _factory;
+    private readonly IPreviewCardFactory _skillFactory;
     private readonly GameObject _boardRoot;
     private readonly GameObject _visualRoot;
-    private readonly GameObject _contentRoot;
+    private readonly GameObject _itemContentRoot;
+    private readonly GameObject _skillContentRoot;
     private readonly List<GameObject> _boardSlots = new List<GameObject>();
     private readonly List<GameObject> _boardSlotMarkers = new List<GameObject>();
     private readonly List<GameObject> _cardAnchors = new List<GameObject>();
@@ -24,23 +31,32 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private readonly List<GameObject> _cardCenterMarkers = new List<GameObject>();
     private readonly List<GameObject> _borderSegments = new List<GameObject>();
     private readonly List<int> _cardSizes = new List<int>();
+    private readonly List<GameObject> _skillSlots = new List<GameObject>();
+    private readonly List<GameObject> _skillSlotMarkers = new List<GameObject>();
+    private readonly List<GameObject> _skillCards = new List<GameObject>();
 
     private GameObject _boardPlate;
+    private GameObject _itemInputBlocker;
+    private GameObject _skillInputBlocker;
     private GameObject _boardCenterMarker;
     private PreviewBoardLayout _layout = new PreviewBoardLayout();
 
     public bool IsAlive => _boardRoot != null;
 
-    public MonsterPreviewBoard(string name, IPreviewCardFactory factory)
+    public MonsterPreviewBoard(string name, IPreviewCardFactory factory, IPreviewCardFactory skillFactory)
     {
         _factory = factory;
+        _skillFactory = skillFactory;
         _boardRoot = new GameObject(name);
         _visualRoot = new GameObject(name + "_Visual");
-        _contentRoot = new GameObject(name + "_Content");
+        _itemContentRoot = new GameObject(name + "_ItemContent");
+        _skillContentRoot = new GameObject(name + "_SkillContent");
         _visualRoot.transform.SetParent(_boardRoot.transform, false);
-        _contentRoot.transform.SetParent(_boardRoot.transform, false);
+        _itemContentRoot.transform.SetParent(_boardRoot.transform, false);
+        _skillContentRoot.transform.SetParent(_boardRoot.transform, false);
         BuildVisuals();
         BuildBoardSlots();
+        BuildSkillSlots();
         RefreshLayout();
         SetVisible(false);
     }
@@ -69,50 +85,29 @@ internal sealed class MonsterPreviewBoard : IDisposable
         RefreshLayout();
     }
 
-    public async Task RebuildAsync(IReadOnlyList<PreviewCardSpec> cards, Func<bool> isCancelled)
+    public async Task RebuildAsync(
+        IReadOnlyList<PreviewCardSpec> cards,
+        IReadOnlyList<PreviewCardSpec> skillCards,
+        Func<bool> isCancelled
+    )
     {
         if (!IsAlive)
             return;
 
         Clear();
 
-        if (cards == null || cards.Count == 0)
-            return;
-
-        for (var index = 0; index < cards.Count; index++)
+        await RebuildItemsAsync(cards, isCancelled);
+        if (isCancelled())
         {
-            if (isCancelled())
-            {
-                Clear();
-                return;
-            }
+            Clear();
+            return;
+        }
 
-            var anchor = new GameObject($"CardAnchor_{index}");
-            anchor.transform.SetParent(_contentRoot.transform, false);
-            _cardAnchors.Add(anchor);
-            _cardSizes.Add(GetCardSize(cards[index]));
-
-            var marker = CreateMarker($"CardCenter_{index}", CardCenterMarkerSize);
-            marker.transform.SetParent(anchor.transform, false);
-            _cardCenterMarkers.Add(marker);
-
-            RefreshCardAnchor(index);
-
-            var cardObject = await _factory.CreateCardAsync(cards[index], anchor.transform);
-            if (isCancelled())
-            {
-                if (cardObject != null)
-                    _factory.DestroyCard(cardObject);
-                Clear();
-                return;
-            }
-
-            if (cardObject == null)
-                continue;
-
-            cardObject.transform.SetParent(anchor.transform, false);
-            _cards.Add(cardObject);
-            RefreshCard(index);
+        await RebuildSkillsAsync(skillCards, isCancelled);
+        if (isCancelled())
+        {
+            Clear();
+            return;
         }
 
         RefreshLayout();
@@ -144,6 +139,13 @@ internal sealed class MonsterPreviewBoard : IDisposable
                 UnityEngine.Object.Destroy(anchor);
         }
         _cardAnchors.Clear();
+
+        foreach (var skillObject in _skillCards)
+        {
+            if (skillObject != null)
+                _skillFactory.DestroyCard(skillObject);
+        }
+        _skillCards.Clear();
     }
 
     public void Dispose()
@@ -153,6 +155,74 @@ internal sealed class MonsterPreviewBoard : IDisposable
             UnityEngine.Object.Destroy(_boardRoot);
     }
 
+    private async Task RebuildItemsAsync(IReadOnlyList<PreviewCardSpec> cards, Func<bool> isCancelled)
+    {
+        if (cards == null || cards.Count == 0)
+            return;
+
+        for (var index = 0; index < cards.Count; index++)
+        {
+            if (isCancelled())
+                return;
+
+            var anchor = new GameObject($"CardAnchor_{index}");
+            anchor.transform.SetParent(_itemContentRoot.transform, false);
+            _cardAnchors.Add(anchor);
+            _cardSizes.Add(GetCardSize(cards[index]));
+
+            var marker = CreateMarker($"CardCenter_{index}", CardCenterMarkerSize, false);
+            marker.transform.SetParent(anchor.transform, false);
+            _cardCenterMarkers.Add(marker);
+
+            RefreshCardAnchor(index);
+
+            var cardObject = await _factory.CreateCardAsync(cards[index], anchor.transform);
+            if (isCancelled())
+            {
+                if (cardObject != null)
+                    _factory.DestroyCard(cardObject);
+                return;
+            }
+
+            if (cardObject == null)
+                continue;
+
+            cardObject.transform.SetParent(anchor.transform, false);
+            _cards.Add(cardObject);
+            RefreshCard(index);
+        }
+    }
+
+    private async Task RebuildSkillsAsync(IReadOnlyList<PreviewCardSpec> skillCards, Func<bool> isCancelled)
+    {
+        if (skillCards == null || skillCards.Count == 0)
+            return;
+
+        var count = Mathf.Min(skillCards.Count, _skillSlots.Count);
+        for (var index = 0; index < count; index++)
+        {
+            if (isCancelled())
+                return;
+
+            var cardObject = await _skillFactory.CreateCardAsync(skillCards[index], _skillSlots[index].transform);
+            if (isCancelled())
+            {
+                if (cardObject != null)
+                    _skillFactory.DestroyCard(cardObject);
+                return;
+            }
+
+            if (cardObject == null)
+                continue;
+
+            cardObject.transform.SetParent(_skillSlots[index].transform, false);
+            cardObject.transform.localPosition = Vector3.zero;
+            cardObject.transform.localRotation = Quaternion.identity;
+            cardObject.transform.localScale = _layout.CardScale * SkillCardScaleFactor;
+            _skillCards.Add(cardObject);
+        }
+    }
+
     private void RefreshLayout()
     {
         if (!IsAlive)
@@ -160,11 +230,17 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         RefreshVisuals();
 
-        _contentRoot.transform.localPosition = _layout.LocalOffset;
-        _contentRoot.transform.localRotation = Quaternion.identity;
-        _contentRoot.transform.localScale = Vector3.one;
+        _itemContentRoot.transform.localPosition = _layout.LocalOffset;
+        _itemContentRoot.transform.localRotation = Quaternion.identity;
+        _itemContentRoot.transform.localScale = Vector3.one;
+
+        _skillContentRoot.transform.localPosition =
+            _layout.LocalOffset + new Vector3(0f, SkillRegionYOffset, 0f);
+        _skillContentRoot.transform.localRotation = Quaternion.identity;
+        _skillContentRoot.transform.localScale = Vector3.one;
 
         RefreshBoardSlots();
+        RefreshSkillSlots();
 
         for (var index = 0; index < _cardAnchors.Count; index++)
         {
@@ -175,15 +251,21 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     private void BuildVisuals()
     {
-        _boardPlate = CreatePrimitive("BoardPlate");
+        _boardPlate = CreatePrimitive("BoardPlate", false);
         _boardPlate.transform.SetParent(_visualRoot.transform, false);
 
-        _boardCenterMarker = CreateMarker("BoardCenter", BoardCenterMarkerSize);
+        _itemInputBlocker = CreateInputBlocker("ItemInputBlocker");
+        _itemInputBlocker.transform.SetParent(_visualRoot.transform, false);
+
+        _skillInputBlocker = CreateInputBlocker("SkillInputBlocker");
+        _skillInputBlocker.transform.SetParent(_visualRoot.transform, false);
+
+        _boardCenterMarker = CreateMarker("BoardCenter", BoardCenterMarkerSize, false);
         _boardCenterMarker.transform.SetParent(_visualRoot.transform, false);
 
         for (var index = 0; index < 4; index++)
         {
-            var border = CreatePrimitive($"BoardBorder_{index}");
+            var border = CreatePrimitive($"BoardBorder_{index}", false);
             border.transform.SetParent(_visualRoot.transform, false);
             _borderSegments.Add(border);
         }
@@ -194,12 +276,26 @@ internal sealed class MonsterPreviewBoard : IDisposable
         for (var index = 0; index < BoardSlotCount; index++)
         {
             var slot = new GameObject($"BoardSlot_{index}");
-            slot.transform.SetParent(_contentRoot.transform, false);
+            slot.transform.SetParent(_itemContentRoot.transform, false);
             _boardSlots.Add(slot);
 
-            var marker = CreateMarker($"BoardSlotMarker_{index}", SlotMarkerSize);
+            var marker = CreateMarker($"BoardSlotMarker_{index}", SlotMarkerSize, false);
             marker.transform.SetParent(slot.transform, false);
             _boardSlotMarkers.Add(marker);
+        }
+    }
+
+    private void BuildSkillSlots()
+    {
+        for (var index = 0; index < SkillSlotCount; index++)
+        {
+            var slot = new GameObject($"SkillSlot_{index}");
+            slot.transform.SetParent(_skillContentRoot.transform, false);
+            _skillSlots.Add(slot);
+
+            var marker = CreateMarker($"SkillSlotMarker_{index}", SkillSlotMarkerSize, true);
+            marker.transform.SetParent(slot.transform, false);
+            _skillSlotMarkers.Add(marker);
         }
     }
 
@@ -211,13 +307,38 @@ internal sealed class MonsterPreviewBoard : IDisposable
             if (slot == null)
                 continue;
 
-            slot.transform.localPosition = new Vector3(
-                GetBoardSlotCenterX(index),
-                0f,
-                0f
-            );
+            slot.transform.localPosition = new Vector3(GetBoardSlotCenterX(index), 0f, 0f);
             slot.transform.localRotation = Quaternion.identity;
             slot.transform.localScale = Vector3.one;
+        }
+    }
+
+    private void RefreshSkillSlots()
+    {
+        var totalWidth = Mathf.Max(0.01f, _layout.BoardSize.x);
+        var slotSpacing = totalWidth / SkillSlotCount;
+        var startX = -totalWidth * 0.5f + slotSpacing * 0.5f;
+        for (var index = 0; index < _skillSlots.Count; index++)
+        {
+            var slot = _skillSlots[index];
+            if (slot == null)
+                continue;
+
+            slot.transform.localPosition = new Vector3(startX + index * slotSpacing, 0f, 0f);
+            slot.transform.localRotation = Quaternion.identity;
+            slot.transform.localScale = Vector3.one;
+
+            if (index < _skillSlotMarkers.Count && _skillSlotMarkers[index] != null)
+            {
+                _skillSlotMarkers[index].transform.localPosition = new Vector3(
+                    0f,
+                    SkillSlotMarkerHeight,
+                    0f
+                );
+                _skillSlotMarkers[index].transform.localRotation = Quaternion.identity;
+                _skillSlotMarkers[index].transform.localScale =
+                    Vector3.one * SkillSlotMarkerSize;
+            }
         }
     }
 
@@ -236,11 +357,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
         var centerX = (GetBoardSlotCenterX(startSlot) + GetBoardSlotCenterX(endSlot)) * 0.5f;
         var spacing = _layout.CardSpacing;
 
-        anchor.transform.localPosition = new Vector3(
-            centerX,
-            spacing.y * index,
-            spacing.z * index
-        );
+        anchor.transform.localPosition = new Vector3(centerX, spacing.y * index, spacing.z * index);
         anchor.transform.localRotation = Quaternion.identity;
         anchor.transform.localScale = Vector3.one;
     }
@@ -276,17 +393,27 @@ internal sealed class MonsterPreviewBoard : IDisposable
         _visualRoot.transform.localRotation = Quaternion.identity;
         _visualRoot.transform.localScale = Vector3.one;
 
-        _boardPlate.transform.localPosition = Vector3.zero;
+        var combinedDepth = size.y;
+        var combinedCenterZ = 0f;
+
+        _boardPlate.transform.localPosition = new Vector3(0f, 0f, combinedCenterZ);
         _boardPlate.transform.localRotation = Quaternion.identity;
-        _boardPlate.transform.localScale = new Vector3(boardWidth, boardThickness, size.y);
+        _boardPlate.transform.localScale = new Vector3(boardWidth, boardThickness, combinedDepth);
+
+        RefreshInputBlocker(
+            _itemInputBlocker,
+            _layout.LocalOffset + new Vector3(0f, borderHeight * 0.5f, combinedCenterZ),
+            new Vector3(boardWidth, Mathf.Max(borderHeight, 0.2f), combinedDepth)
+        );
+        RefreshInputBlocker(
+            _skillInputBlocker,
+            _layout.LocalOffset + new Vector3(0f, SkillRegionYOffset + SkillSlotMarkerHeight, 0f),
+            new Vector3(boardWidth, 0.35f, 0.8f)
+        );
 
         if (_boardCenterMarker != null)
         {
-            _boardCenterMarker.transform.localPosition = new Vector3(
-                0f,
-                borderHeight + BoardCenterMarkerSize * 0.5f,
-                0f
-            );
+            _boardCenterMarker.transform.localPosition = new Vector3(0f, borderHeight + BoardCenterMarkerSize * 0.5f, 0f);
             _boardCenterMarker.transform.localRotation = Quaternion.identity;
             _boardCenterMarker.transform.localScale = Vector3.one * BoardCenterMarkerSize;
         }
@@ -303,13 +430,13 @@ internal sealed class MonsterPreviewBoard : IDisposable
         );
         UpdateBorder(
             _borderSegments[2],
-            new Vector3(-halfWidth, borderHeight * 0.5f, 0f),
-            new Vector3(borderThickness, borderHeight, size.y + borderThickness)
+            new Vector3(-halfWidth, borderHeight * 0.5f, combinedCenterZ),
+            new Vector3(borderThickness, borderHeight, combinedDepth + borderThickness)
         );
         UpdateBorder(
             _borderSegments[3],
-            new Vector3(halfWidth, borderHeight * 0.5f, 0f),
-            new Vector3(borderThickness, borderHeight, size.y + borderThickness)
+            new Vector3(halfWidth, borderHeight * 0.5f, combinedCenterZ),
+            new Vector3(borderThickness, borderHeight, combinedDepth + borderThickness)
         );
     }
 
@@ -363,7 +490,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
         border.transform.localScale = scale;
     }
 
-    private static GameObject CreatePrimitive(string name)
+    private static GameObject CreatePrimitive(string name, bool isSkill)
     {
         var primitive = GameObject.CreatePrimitive(PrimitiveType.Cube);
         primitive.name = name;
@@ -372,11 +499,36 @@ internal sealed class MonsterPreviewBoard : IDisposable
         if (collider != null)
             UnityEngine.Object.Destroy(collider);
 
-        ApplyDebugMaterial(primitive);
+        ApplyDebugMaterial(primitive, name.Contains("Border"), isSkill);
         return primitive;
     }
 
-    private static GameObject CreateMarker(string name, float size)
+    private static GameObject CreateInputBlocker(string name)
+    {
+        var blocker = new GameObject(name);
+        blocker.layer = LayerMask.NameToLayer("Input");
+        blocker.AddComponent<BoxCollider>();
+        return blocker;
+    }
+
+    private static void RefreshInputBlocker(GameObject blocker, Vector3 position, Vector3 scale)
+    {
+        if (blocker == null)
+            return;
+
+        blocker.transform.localPosition = position;
+        blocker.transform.localRotation = Quaternion.identity;
+        blocker.transform.localScale = Vector3.one;
+
+        if (blocker.TryGetComponent<BoxCollider>(out var collider))
+        {
+            collider.center = Vector3.zero;
+            collider.size = scale;
+            collider.isTrigger = false;
+        }
+    }
+
+    private static GameObject CreateMarker(string name, float size, bool isSkill)
     {
         var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         marker.name = name;
@@ -385,35 +537,12 @@ internal sealed class MonsterPreviewBoard : IDisposable
         if (collider != null)
             UnityEngine.Object.Destroy(collider);
 
-        ApplyMarkerMaterial(marker);
+        ApplyMarkerMaterial(marker, isSkill);
         marker.transform.localScale = Vector3.one * size;
         return marker;
     }
 
-    private static void ApplyDebugMaterial(GameObject target)
-    {
-        if (!target.TryGetComponent<Renderer>(out var renderer))
-            return;
-
-        var material = CreateDebugMaterial(target.name.Contains("Border"));
-        if (material != null)
-            renderer.sharedMaterial = material;
-    }
-
-    private static Material CreateDebugMaterial(bool isBorder)
-    {
-        var shader = Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color");
-        if (shader == null)
-            return null;
-
-        var material = new Material(shader);
-        material.color = isBorder
-            ? new Color(1f, 0.2f, 0.2f, 0.95f)
-            : new Color(1f, 0.1f, 0.1f, 0.18f);
-        return material;
-    }
-
-    private static void ApplyMarkerMaterial(GameObject target)
+    private static void ApplyDebugMaterial(GameObject target, bool isBorder, bool isSkill)
     {
         if (!target.TryGetComponent<Renderer>(out var renderer))
             return;
@@ -423,7 +552,23 @@ internal sealed class MonsterPreviewBoard : IDisposable
             return;
 
         var material = new Material(shader);
-        material.color = new Color(1f, 0f, 0f, 0.95f);
+        material.color = isSkill
+            ? (isBorder ? new Color(0.25f, 0.7f, 1f, 0.95f) : new Color(0.25f, 0.4f, 1f, 0.18f))
+            : (isBorder ? new Color(1f, 0.2f, 0.2f, 0.95f) : new Color(1f, 0.1f, 0.1f, 0.18f));
+        renderer.sharedMaterial = material;
+    }
+
+    private static void ApplyMarkerMaterial(GameObject target, bool isSkill)
+    {
+        if (!target.TryGetComponent<Renderer>(out var renderer))
+            return;
+
+        var shader = Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color");
+        if (shader == null)
+            return;
+
+        var material = new Material(shader);
+        material.color = isSkill ? new Color(0.25f, 0.75f, 1f, 0.95f) : new Color(1f, 0f, 0f, 0.95f);
         renderer.sharedMaterial = material;
     }
 }

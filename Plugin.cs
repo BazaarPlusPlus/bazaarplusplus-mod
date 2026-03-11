@@ -27,5 +27,6 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewOverlayController>();
         gameObject.AddComponent<OverlayDebugController>();
+        gameObject.AddComponent<EncounterTooltipPreviewBridge>();
     }
 }

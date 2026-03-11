@@ -70,3 +70,10 @@ for dll in Assembly-CSharp BazaarGameClient BazaarGameShared BazaarBattleService
     ilspycmd -p -o "./decompiled/$dll" "$MANAGED/$dll.dll"
 done
 ```
+
+
+Inspired By：
+
+https://github.com/Duangi/BazaarHelper
+
+https://github.com/oceanseth/BazaarPlannerMod

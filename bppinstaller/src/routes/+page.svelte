@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { open } from '@tauri-apps/plugin-dialog';
+  import { openUrl } from '@tauri-apps/plugin-opener';
   import { onMount } from 'svelte';
   import { formatMessage, messages, resolveInitialLocale, type Locale } from '$lib/i18n';
   import type { DotnetInfo, EnvironmentInfo, UpdateInfo } from '$lib/types';
@@ -18,9 +19,8 @@
   let actionMenuOpen = false;
   let locale: Locale = 'zh';
 
-  function t(key: keyof typeof messages.en, params?: Record<string, string | number>): string {
-    return formatMessage(locale, key, params);
-  }
+  $: t = (key: keyof typeof messages.en, params?: Record<string, string | number>): string =>
+    formatMessage(locale, key, params);
 
   function effectiveGamePath(): string {
     return customGamePath || env?.game_path || '';
@@ -40,6 +40,12 @@
 
   function toggleLocale() {
     applyLocale(locale === 'zh' ? 'en' : 'zh');
+  }
+
+  function handleLocaleToggle(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleLocale();
   }
 
   async function verifyGamePath(path: string) {
@@ -205,6 +211,11 @@
   $: updateAvailable = Boolean(updateInfo?.update_available && updateInfo.latest_version);
   $: isBusy = actionBusy !== 'idle';
   $: canInstall = !isBusy && dotnetState !== 'idle' && bazaarFound && hasPath;
+  $: dotnetDownloadUrl = locale === 'zh'
+    ? 'https://dotnet.microsoft.com/zh-cn/download'
+    : 'https://dotnet.microsoft.com/en-us/download';
+  $: localeBadge = locale === 'zh' ? '中' : 'EN';
+  $: localeButtonLabel = locale === 'zh' ? 'Switch to English' : '切换到中文';
 
   onMount(() => {
     applyLocale(resolveInitialLocale());
@@ -214,10 +225,7 @@
 
 <svelte:head>
   <title>{t('pageTitle')}</title>
-  <link rel="stylesheet" href="/fonts/fonts.css" />
 </svelte:head>
-
-<div class="grain" aria-hidden="true"></div>
 
 <main class="shell">
   <header class="header">
@@ -234,7 +242,28 @@
       </svg>
     </div>
 
-    <button class="locale-toggle" onclick={toggleLocale} type="button">{t('localeSwitch')}</button>
+    <a class="about-toggle" href="/about" title={t('aboutLabel')}>
+      <svg class="about-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none" />
+        <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      </svg>
+    </a>
+
+    <button
+      class="locale-toggle"
+      onclick={handleLocaleToggle}
+      type="button"
+      aria-label={localeButtonLabel}
+      title={localeButtonLabel}
+    >
+      <svg class="locale-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 3a9 9 0 1 0 9 9a9 9 0 0 0-9-9Zm5.9 8h-2.2a14.3 14.3 0 0 0-1.2-4A7.1 7.1 0 0 1 17.9 11Zm-5.9-5.8c.7.9 1.7 2.9 2.1 5.8H9.9c.4-2.9 1.4-4.9 2.1-5.8ZM6.5 7a14.3 14.3 0 0 0-1.2 4H3.1A7.1 7.1 0 0 1 6.5 7ZM3.1 13h2.2a14.3 14.3 0 0 0 1.2 4A7.1 7.1 0 0 1 3.1 13Zm8.9 5.8c-.7-.9-1.7-2.9-2.1-5.8h4.2c-.4 2.9-1.4 4.9-2.1 5.8Zm2.5-1.8a14.3 14.3 0 0 0 1.2-4h2.2a7.1 7.1 0 0 1-3.4 4Zm-8.1-4c.1 1.4.4 2.7.9 4A12.4 12.4 0 0 1 5.9 13Zm.8-2a12.4 12.4 0 0 1 1.4-4c-.5 1.3-.8 2.6-.9 4Zm8.8 0c-.1-1.4-.4-2.7-.9-4a12.4 12.4 0 0 1 1.4 4Zm-1.4 2c.5-1.3.8-2.6.9-4a12.4 12.4 0 0 1-1.4 4Z"
+          fill="currentColor"
+        />
+      </svg>
+      <span class="locale-badge">{localeBadge}</span>
+    </button>
 
     <div class="sigil" aria-hidden="true">
       <svg width="32" height="32" viewBox="0 0 44 44" fill="none">
@@ -269,9 +298,7 @@
           {/if}
         </span>
 
-        {#if modInstalled && env?.bpp_version}
-          <p class="detail-line detail-muted">{t('installedVersion', { version: env.bpp_version })}</p>
-        {:else}
+        {#if !modInstalled}
           <p class="detail-line detail-muted">{t('detectInstalledHint')}</p>
         {/if}
 
@@ -312,10 +339,13 @@
           {/if}
         </span>
 
-        {#if dotnetState === 'found' && env?.dotnet_version}
-          <p class="detail-line detail-muted">{t('runtimeVersion', { version: env.dotnet_version })}</p>
+        {#if dotnetState === 'found'}
+          <p class="detail-line detail-muted">{t('runtimeCompatible')}</p>
         {:else if dotnetState === 'not_found'}
           <p class="detail-line detail-muted">{t('runtimeNotFound')}</p>
+          <button class="dotnet-download-btn" onclick={() => openUrl(dotnetDownloadUrl)} type="button">
+            {t('runtimeDownload')}
+          </button>
         {:else if dotnetState === 'idle'}
           <p class="detail-line detail-muted">{t('runtimeIdle')}</p>
         {/if}
@@ -436,39 +466,6 @@
 </main>
 
 <style>
-  :global(*, *::before, *::after) { box-sizing: border-box; }
-
-  :global(html) {
-    height: 100%;
-    overflow: hidden;
-    overscroll-behavior: none;
-  }
-
-  :global(body) {
-    margin: 0;
-    height: 100%;
-    overflow-y: auto;
-    overscroll-behavior: none;
-    background-color: #0b0906;
-    background-image:
-      radial-gradient(ellipse 70% 42% at 50% -4%, rgba(200, 130, 40, 0.18) 0%, transparent 70%),
-      radial-gradient(ellipse 40% 28% at 80% 85%, rgba(120, 60, 20, 0.1) 0%, transparent 60%);
-    color: #e8dcc8;
-    font-family: 'IM Fell English', Georgia, serif;
-    -webkit-font-smoothing: antialiased;
-    user-select: none;
-  }
-
-  .grain {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 100;
-    opacity: 0.025;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-  }
-
   .shell {
     width: 100%;
     max-width: 560px;
@@ -501,23 +498,77 @@
   .tl { top: 8px; left: 8px; }
   .tr { top: 8px; right: 8px; }
 
+  .about-toggle {
+    position: absolute;
+    top: 0.9rem;
+    left: 0.9rem;
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(200, 148, 55, 0.24);
+    border-radius: 2px;
+    background: linear-gradient(180deg, rgba(200, 148, 55, 0.12), rgba(200, 148, 55, 0.06));
+    color: rgba(228, 216, 191, 0.82);
+    box-shadow: 0 0 0 1px rgba(255, 198, 98, 0.08) inset;
+    z-index: 2;
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .about-toggle:hover {
+    background: linear-gradient(180deg, rgba(200, 148, 55, 0.2), rgba(200, 148, 55, 0.1));
+    border-color: rgba(200, 148, 55, 0.4);
+  }
+
+  .about-icon {
+    width: 1rem;
+    height: 1rem;
+    opacity: 0.9;
+  }
+
   .locale-toggle {
     position: absolute;
     top: 0.9rem;
     right: 0.9rem;
+    min-width: 3.2rem;
+    height: 2rem;
     padding: 0.3rem 0.55rem;
     border: 1px solid rgba(200, 148, 55, 0.24);
     border-radius: 2px;
-    background: rgba(200, 148, 55, 0.08);
+    background: linear-gradient(180deg, rgba(200, 148, 55, 0.12), rgba(200, 148, 55, 0.06));
     color: rgba(228, 216, 191, 0.82);
     font-family: 'Cinzel', serif;
     font-size: 0.54rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    box-shadow: 0 0 0 1px rgba(255, 198, 98, 0.08) inset;
+    z-index: 2;
   }
 
   .locale-toggle:hover {
-    background: rgba(200, 148, 55, 0.16);
+    background: linear-gradient(180deg, rgba(200, 148, 55, 0.2), rgba(200, 148, 55, 0.1));
+    border-color: rgba(200, 148, 55, 0.4);
+  }
+
+  .locale-icon {
+    width: 0.9rem;
+    height: 0.9rem;
+    flex-shrink: 0;
+    opacity: 0.9;
+  }
+
+  .locale-badge {
+    min-width: 1.1rem;
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
   }
 
   .sigil {
@@ -925,6 +976,27 @@
     border-color: rgba(200, 148, 55, 0.35);
   }
 
+  .dotnet-download-btn {
+    align-self: start;
+    margin-top: 0.25rem;
+    padding: 0.38rem 0.8rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.54rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(100, 160, 220, 0.78);
+    border: 1px solid rgba(100, 160, 220, 0.22);
+    border-radius: 2px;
+    background: rgba(100, 160, 220, 0.08);
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .dotnet-download-btn:hover {
+    color: rgba(130, 190, 240, 0.95);
+    background: rgba(100, 160, 220, 0.14);
+    border-color: rgba(100, 160, 220, 0.38);
+  }
+
   .install-btn {
     width: 100%;
     padding: 0.95rem 1rem;
@@ -1017,6 +1089,11 @@
     .locale-toggle {
       top: 0.7rem;
       right: 0.7rem;
+    }
+
+    .about-toggle {
+      top: 0.7rem;
+      left: 0.7rem;
     }
   }
 </style>

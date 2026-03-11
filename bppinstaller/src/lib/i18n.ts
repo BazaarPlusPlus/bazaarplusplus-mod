@@ -23,6 +23,7 @@ export type MessageKey =
   | 'actionUpdate'
   | 'statusOptionalNotFound'
   | 'runtimeVersion'
+  | 'runtimeCompatible'
   | 'runtimeNotFound'
   | 'runtimeIdle'
   | 'statusFound'
@@ -38,9 +39,24 @@ export type MessageKey =
   | 'actionInstall'
   | 'actionUninstalling'
   | 'actionUninstall'
-  | 'footer';
+  | 'footer'
+  | 'aboutLabel'
+  | 'aboutTitle'
+  | 'aboutBack'
+  | 'aboutOpenSource'
+  | 'aboutInspiredBy'
+  | 'aboutDependencies'
+  | 'aboutDataSources'
+  | 'aboutInfo'
+  | 'aboutAuthors'
+  | 'aboutAuthorRole'
+  | 'aboutCocreatorRole'
+  | 'aboutSupport'
+  | 'aboutFrontendVersion'
+  | 'aboutBackendVersion'
+  | 'runtimeDownload';
 
-export const defaultLocale: Locale = 'zh';
+export const defaultLocale: Locale = 'en';
 
 export const messages: Record<Locale, Record<MessageKey, string>> = {
   en: {
@@ -66,6 +82,7 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     actionUpdate: 'Update',
     statusOptionalNotFound: 'Optional - not found',
     runtimeVersion: 'Runtime: {version}',
+    runtimeCompatible: 'Compatible .NET runtime detected',
     runtimeNotFound: 'No compatible .NET runtime was detected',
     runtimeIdle: 'Run detection to inspect the local runtime',
     statusFound: 'Found',
@@ -81,7 +98,22 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     actionInstall: 'Install',
     actionUninstalling: 'Uninstalling...',
     actionUninstall: 'Uninstall',
-    footer: 'BazaarPlusPlus · Arcane Foundry'
+    footer: 'BazaarPlusPlus · Arcane Foundry',
+    aboutLabel: 'About',
+    aboutTitle: 'About',
+    aboutBack: 'Back',
+    aboutOpenSource: 'Open Source Software',
+    aboutInspiredBy: 'Inspired By',
+    aboutDependencies: 'Dependencies',
+    aboutDataSources: 'Data Sources',
+    aboutInfo: 'Information',
+    aboutAuthors: 'Authors',
+    aboutAuthorRole: 'Author',
+    aboutCocreatorRole: 'Co-creator',
+    aboutSupport: 'Support',
+    aboutFrontendVersion: 'Frontend',
+    aboutBackendVersion: 'Backend',
+    runtimeDownload: 'Download .NET'
   },
   zh: {
     htmlLang: 'zh-CN',
@@ -106,6 +138,7 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     actionUpdate: '更新',
     statusOptionalNotFound: '可选 - 未找到',
     runtimeVersion: '运行时：{version}',
+    runtimeCompatible: '已检测到兼容的 .NET 运行时',
     runtimeNotFound: '未检测到兼容的 .NET 运行时',
     runtimeIdle: '运行检测以检查本机 .NET 运行时',
     statusFound: '已找到',
@@ -121,7 +154,22 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     actionInstall: '安装',
     actionUninstalling: '卸载中...',
     actionUninstall: '卸载',
-    footer: 'BazaarPlusPlus · 奥术工坊'
+    footer: 'BazaarPlusPlus · 奥术工坊',
+    aboutLabel: '关于',
+    aboutTitle: '关于',
+    aboutBack: '返回',
+    aboutOpenSource: '开源软件',
+    aboutInspiredBy: '灵感来源',
+    aboutDependencies: '依赖项目',
+    aboutDataSources: '数据来源',
+    aboutInfo: '信息',
+    aboutAuthors: '作者',
+    aboutAuthorRole: '作者',
+    aboutCocreatorRole: '联创',
+    aboutSupport: '支持我们',
+    aboutFrontendVersion: '前端',
+    aboutBackendVersion: '后端',
+    runtimeDownload: '下载 .NET'
   }
 };
 

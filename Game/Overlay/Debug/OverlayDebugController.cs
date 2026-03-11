@@ -43,6 +43,7 @@ internal sealed class OverlayDebugController : MonoBehaviour
     private FixedWorldAnchorSource _anchorSource;
     private PreviewBoardLayout _layout;
     private string _lastCardSignature = string.Empty;
+    private string _lastSkillSignature = string.Empty;
     private float _nextRefreshTime;
     private bool _anchorSeeded;
     private bool _useMonsterDatabase = true;
@@ -89,6 +90,7 @@ internal sealed class OverlayDebugController : MonoBehaviour
         {
             _useMonsterDatabase = !_useMonsterDatabase;
             _lastCardSignature = string.Empty;
+            _lastSkillSignature = string.Empty;
             SyncPreviewData();
             ModState.Logger?.LogInfo(
                 $"[OverlayDebugController] Preview data source={(_useMonsterDatabase ? "monster_db" : "player_hand")}"
@@ -311,25 +313,33 @@ internal sealed class OverlayDebugController : MonoBehaviour
                 $"[OverlayDebugController] Monster DB miss encounterId={DefaultEncounterId}"
             );
             _overlayController.SetCards(new List<PreviewCardSpec>());
+            _overlayController.SetSkillCards(new List<PreviewCardSpec>());
             return;
         }
 
         _activeMonsterTitle = monster.Title;
         var specs = MonsterPreviewSpecBuilder.Build(monster);
+        var skillSpecs = SkillPreviewSpecBuilder.Build(monster);
         ModState.Logger?.LogInfo(
-            $"[OverlayDebugController] Monster DB hit encounterId={DefaultEncounterId} key={monster.EncounterKey} shortId={monster.EncounterShortId} title={monster.Title} boardCards={monster.BoardCards.Count} previewCards={specs.Count}"
+            $"[OverlayDebugController] Monster DB hit encounterId={DefaultEncounterId} key={monster.EncounterKey} shortId={monster.EncounterShortId} title={monster.Title} boardCards={monster.BoardCards.Count} skillCards={monster.Skills.Count} previewCards={specs.Count}"
         );
         var signature = BuildSignature(specs);
+        var skillSignature = BuildSignature(skillSpecs);
         if (signature == _lastCardSignature)
         {
-            ModState.Logger?.LogDebug(
-                $"[OverlayDebugController] Monster preview signature unchanged encounterId={DefaultEncounterId}"
-            );
-            return;
+            if (skillSignature == _lastSkillSignature)
+            {
+                ModState.Logger?.LogDebug(
+                    $"[OverlayDebugController] Monster preview signature unchanged encounterId={DefaultEncounterId}"
+                );
+                return;
+            }
         }
 
         _lastCardSignature = signature;
+        _lastSkillSignature = skillSignature;
         _overlayController.SetCards(specs);
+        _overlayController.SetSkillCards(skillSpecs);
     }
 
     private void SyncCardsFromHand()
@@ -339,18 +349,25 @@ internal sealed class OverlayDebugController : MonoBehaviour
 
         var handCards = GameDataReader.GetItemsAsCards(Data.Run?.Player?.Hand);
         var specs = BuildCardSpecs(handCards);
+        var skillSpecs = BuildSkillSpecs(Data.Run?.Player?.Skills);
         var signature = BuildSignature(specs);
+        var skillSignature = BuildSignature(skillSpecs);
         if (signature == _lastCardSignature)
         {
-            ModState.Logger?.LogDebug("[OverlayDebugController] Player hand preview signature unchanged");
-            return;
+            if (skillSignature == _lastSkillSignature)
+            {
+                ModState.Logger?.LogDebug("[OverlayDebugController] Player hand preview signature unchanged");
+                return;
+            }
         }
 
         _lastCardSignature = signature;
+        _lastSkillSignature = skillSignature;
         ModState.Logger?.LogInfo(
-            $"[OverlayDebugController] Player hand preview cards={specs.Count}"
+            $"[OverlayDebugController] Player hand preview cards={specs.Count} skills={skillSpecs.Count}"
         );
         _overlayController.SetCards(specs);
+        _overlayController.SetSkillCards(skillSpecs);
     }
 
     private void SeedAnchorFromBoardPortrait()
@@ -409,6 +426,34 @@ internal sealed class OverlayDebugController : MonoBehaviour
                     Enchant = (card as ItemCard)?.Enchantment?.ToString() ?? "None",
                     Size = Math.Max(1, (int)card.Size),
                     Attributes = card.Attributes?.ToDictionary(kv => (int)kv.Key, kv => kv.Value)
+                        ?? new Dictionary<int, int>(),
+                }
+            );
+        }
+
+        return specs;
+    }
+
+    private static List<PreviewCardSpec> BuildSkillSpecs(IEnumerable<SkillCard> skills)
+    {
+        var specs = new List<PreviewCardSpec>();
+        if (skills == null)
+            return specs;
+
+        foreach (var skill in skills)
+        {
+            if (skill == null || skill.Type != ECardType.Skill)
+                continue;
+
+            specs.Add(
+                new PreviewCardSpec
+                {
+                    TemplateId = skill.TemplateId.ToString(),
+                    Tier = (int)skill.Tier,
+                    SourceName = skill.Template?.InternalName ?? string.Empty,
+                    Size = 1,
+                    Enchant = "None",
+                    Attributes = skill.Attributes?.ToDictionary(kv => (int)kv.Key, kv => kv.Value)
                         ?? new Dictionary<int, int>(),
                 }
             );
