@@ -8,16 +8,21 @@ namespace BazaarPlusPlus;
 
 internal sealed class MonsterPreviewBoard : IDisposable
 {
+    private const float BoardCenterMarkerSize = 0.16f;
+    private const float CardCenterMarkerSize = 0.12f;
+
     private readonly IPreviewCardFactory _factory;
     private readonly GameObject _boardRoot;
     private readonly GameObject _visualRoot;
     private readonly GameObject _contentRoot;
     private readonly List<GameObject> _slots = new List<GameObject>();
     private readonly List<GameObject> _cards = new List<GameObject>();
+    private readonly List<GameObject> _cardCenterMarkers = new List<GameObject>();
     private readonly List<GameObject> _borderSegments = new List<GameObject>();
     private readonly List<int> _cardSizes = new List<int>();
 
     private GameObject _boardPlate;
+    private GameObject _boardCenterMarker;
     private PreviewBoardLayout _layout = new PreviewBoardLayout();
 
     public bool IsAlive => _boardRoot != null;
@@ -81,6 +86,11 @@ internal sealed class MonsterPreviewBoard : IDisposable
             slot.transform.SetParent(_contentRoot.transform, false);
             _slots.Add(slot);
             _cardSizes.Add(GetCardSize(cards[index]));
+
+            var marker = CreateMarker($"CardCenter_{index}", CardCenterMarkerSize);
+            marker.transform.SetParent(slot.transform, false);
+            _cardCenterMarkers.Add(marker);
+
             RefreshSlot(index);
 
             var cardObject = await _factory.CreateCardAsync(cards[index], slot.transform);
@@ -115,6 +125,13 @@ internal sealed class MonsterPreviewBoard : IDisposable
         }
         _cards.Clear();
         _cardSizes.Clear();
+
+        foreach (var marker in _cardCenterMarkers)
+        {
+            if (marker != null)
+                UnityEngine.Object.Destroy(marker);
+        }
+        _cardCenterMarkers.Clear();
 
         foreach (var slot in _slots)
         {
@@ -155,7 +172,6 @@ internal sealed class MonsterPreviewBoard : IDisposable
             return;
 
         var spacing = _layout.CardSpacing;
-        var size = GetCardSize(index);
         var x = GetSlotX(index, spacing.x);
         slot.transform.localPosition = new Vector3(
             x,
@@ -185,6 +201,9 @@ internal sealed class MonsterPreviewBoard : IDisposable
         _boardPlate = CreatePrimitive("BoardPlate");
         _boardPlate.transform.SetParent(_visualRoot.transform, false);
 
+        _boardCenterMarker = CreateMarker("BoardCenter", BoardCenterMarkerSize);
+        _boardCenterMarker.transform.SetParent(_visualRoot.transform, false);
+
         for (var index = 0; index < 4; index++)
         {
             var border = CreatePrimitive($"BoardBorder_{index}");
@@ -211,35 +230,46 @@ internal sealed class MonsterPreviewBoard : IDisposable
         _visualRoot.transform.localRotation = Quaternion.identity;
         _visualRoot.transform.localScale = Vector3.one;
 
-        _boardPlate.transform.localPosition = new Vector3(halfWidth, 0f, halfDepth);
+        _boardPlate.transform.localPosition = new Vector3(0f, 0f, 0f);
         _boardPlate.transform.localRotation = Quaternion.identity;
         _boardPlate.transform.localScale = new Vector3(boardWidth, boardThickness, size.y);
+        if (_boardCenterMarker != null)
+        {
+            _boardCenterMarker.transform.localPosition = new Vector3(
+                0f,
+                borderHeight + BoardCenterMarkerSize * 0.5f,
+                0f
+            );
+            _boardCenterMarker.transform.localRotation = Quaternion.identity;
+            _boardCenterMarker.transform.localScale = Vector3.one * BoardCenterMarkerSize;
+        }
 
         UpdateBorder(
             _borderSegments[0],
-            new Vector3(halfWidth, borderHeight * 0.5f, 0f),
+            new Vector3(0f, borderHeight * 0.5f, -halfDepth),
             new Vector3(boardWidth + borderThickness, borderHeight, borderThickness)
         );
         UpdateBorder(
             _borderSegments[1],
-            new Vector3(halfWidth, borderHeight * 0.5f, size.y),
+            new Vector3(0f, borderHeight * 0.5f, halfDepth),
             new Vector3(boardWidth + borderThickness, borderHeight, borderThickness)
         );
         UpdateBorder(
             _borderSegments[2],
-            new Vector3(0f, borderHeight * 0.5f, halfDepth),
+            new Vector3(-halfWidth, borderHeight * 0.5f, 0f),
             new Vector3(borderThickness, borderHeight, size.y + borderThickness)
         );
         UpdateBorder(
             _borderSegments[3],
-            new Vector3(boardWidth, borderHeight * 0.5f, halfDepth),
+            new Vector3(halfWidth, borderHeight * 0.5f, 0f),
             new Vector3(borderThickness, borderHeight, size.y + borderThickness)
         );
     }
 
     private float GetSlotX(int index, float unitWidth)
     {
-        var left = 0f;
+        var contentWidth = GetContentWidth(unitWidth);
+        var left = -contentWidth * 0.5f;
         for (var i = 0; i < index; i++)
             left += GetCardSize(i) * unitWidth;
 
@@ -294,6 +324,20 @@ internal sealed class MonsterPreviewBoard : IDisposable
         return primitive;
     }
 
+    private static GameObject CreateMarker(string name, float size)
+    {
+        var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        marker.name = name;
+
+        var collider = marker.GetComponent<Collider>();
+        if (collider != null)
+            UnityEngine.Object.Destroy(collider);
+
+        ApplyMarkerMaterial(marker);
+        marker.transform.localScale = Vector3.one * size;
+        return marker;
+    }
+
     private static void ApplyDebugMaterial(GameObject target)
     {
         if (!target.TryGetComponent<Renderer>(out var renderer))
@@ -315,5 +359,19 @@ internal sealed class MonsterPreviewBoard : IDisposable
             ? new Color(1f, 0.2f, 0.2f, 0.95f)
             : new Color(1f, 0.1f, 0.1f, 0.18f);
         return material;
+    }
+
+    private static void ApplyMarkerMaterial(GameObject target)
+    {
+        if (!target.TryGetComponent<Renderer>(out var renderer))
+            return;
+
+        var shader = Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color");
+        if (shader == null)
+            return;
+
+        var material = new Material(shader);
+        material.color = new Color(1f, 0f, 0f, 0.95f);
+        renderer.sharedMaterial = material;
     }
 }
