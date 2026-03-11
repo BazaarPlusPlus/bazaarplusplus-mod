@@ -8,6 +8,10 @@ internal sealed class MonsterInfo
 {
     public Guid EncounterId { get; set; }
 
+    public string EncounterKey { get; set; } = string.Empty;
+
+    public string EncounterShortId { get; set; } = string.Empty;
+
     public string Title { get; set; } = string.Empty;
 
     public string BaseTier { get; set; } = string.Empty;

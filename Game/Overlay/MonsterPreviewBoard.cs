@@ -15,10 +15,12 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private readonly List<GameObject> _slots = new List<GameObject>();
     private readonly List<GameObject> _cards = new List<GameObject>();
     private readonly List<GameObject> _borderSegments = new List<GameObject>();
+    private readonly List<int> _cardSizes = new List<int>();
 
     private GameObject _boardPlate;
-
     private PreviewBoardLayout _layout = new PreviewBoardLayout();
+
+    public bool IsAlive => _boardRoot != null;
 
     public MonsterPreviewBoard(string name, IPreviewCardFactory factory)
     {
@@ -35,6 +37,9 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     public void SetLayout(PreviewBoardLayout layout)
     {
+        if (!IsAlive)
+            return;
+
         _layout = layout ?? new PreviewBoardLayout();
         RefreshLayout();
     }
@@ -47,12 +52,18 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     public void UpdateAnchor(Vector3 position, Quaternion rotation)
     {
+        if (!IsAlive)
+            return;
+
         _boardRoot.transform.SetPositionAndRotation(position, rotation);
         RefreshLayout();
     }
 
     public async Task RebuildAsync(IReadOnlyList<PreviewCardSpec> cards, Func<bool> isCancelled)
     {
+        if (!IsAlive)
+            return;
+
         Clear();
 
         if (cards == null || cards.Count == 0)
@@ -69,7 +80,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
             var slot = new GameObject($"CardSlot_{index}");
             slot.transform.SetParent(_contentRoot.transform, false);
             _slots.Add(slot);
-
+            _cardSizes.Add(GetCardSize(cards[index]));
             RefreshSlot(index);
 
             var cardObject = await _factory.CreateCardAsync(cards[index], slot.transform);
@@ -84,7 +95,9 @@ internal sealed class MonsterPreviewBoard : IDisposable
             if (cardObject == null)
                 continue;
 
+            cardObject.transform.SetParent(slot.transform, false);
             _cards.Add(cardObject);
+            RefreshCard(index);
         }
 
         RefreshLayout();
@@ -92,12 +105,16 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     public void Clear()
     {
+        if (!IsAlive)
+            return;
+
         foreach (var cardObject in _cards)
         {
             if (cardObject != null)
                 _factory.DestroyCard(cardObject);
         }
         _cards.Clear();
+        _cardSizes.Clear();
 
         foreach (var slot in _slots)
         {
@@ -116,26 +133,51 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     private void RefreshLayout()
     {
+        if (!IsAlive)
+            return;
+
         RefreshVisuals();
         _contentRoot.transform.localPosition = _layout.LocalOffset;
         _contentRoot.transform.localRotation = Quaternion.identity;
         _contentRoot.transform.localScale = Vector3.one;
 
         for (var index = 0; index < _slots.Count; index++)
+        {
             RefreshSlot(index);
+            RefreshCard(index);
+        }
     }
 
     private void RefreshSlot(int index)
     {
         var slot = _slots[index];
+        if (slot == null)
+            return;
+
         var spacing = _layout.CardSpacing;
+        var size = GetCardSize(index);
+        var x = GetSlotX(index, spacing.x);
         slot.transform.localPosition = new Vector3(
-            spacing.x * index,
+            x,
             spacing.y * index,
             spacing.z * index
         );
         slot.transform.localRotation = Quaternion.identity;
-        slot.transform.localScale = _layout.CardScale;
+        slot.transform.localScale = Vector3.one;
+    }
+
+    private void RefreshCard(int index)
+    {
+        if (index < 0 || index >= _cards.Count)
+            return;
+
+        var cardObject = _cards[index];
+        if (cardObject == null)
+            return;
+
+        cardObject.transform.localPosition = Vector3.zero;
+        cardObject.transform.localRotation = Quaternion.identity;
+        cardObject.transform.localScale = _layout.CardScale;
     }
 
     private void BuildVisuals()
@@ -153,8 +195,13 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     private void RefreshVisuals()
     {
+        if (_visualRoot == null || _boardPlate == null || _borderSegments.Count < 4)
+            return;
+
         var size = _layout.BoardSize;
-        var halfWidth = size.x * 0.5f;
+        var contentWidth = GetContentWidth(_layout.CardSpacing.x);
+        var boardWidth = Mathf.Max(size.x, contentWidth);
+        var halfWidth = boardWidth * 0.5f;
         var halfDepth = size.y * 0.5f;
         var boardThickness = Mathf.Max(0.01f, _layout.BoardThickness);
         var borderThickness = Mathf.Max(0.01f, _layout.BorderThickness);
@@ -166,17 +213,17 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         _boardPlate.transform.localPosition = new Vector3(halfWidth, 0f, halfDepth);
         _boardPlate.transform.localRotation = Quaternion.identity;
-        _boardPlate.transform.localScale = new Vector3(size.x, boardThickness, size.y);
+        _boardPlate.transform.localScale = new Vector3(boardWidth, boardThickness, size.y);
 
         UpdateBorder(
             _borderSegments[0],
             new Vector3(halfWidth, borderHeight * 0.5f, 0f),
-            new Vector3(size.x + borderThickness, borderHeight, borderThickness)
+            new Vector3(boardWidth + borderThickness, borderHeight, borderThickness)
         );
         UpdateBorder(
             _borderSegments[1],
             new Vector3(halfWidth, borderHeight * 0.5f, size.y),
-            new Vector3(size.x + borderThickness, borderHeight, borderThickness)
+            new Vector3(boardWidth + borderThickness, borderHeight, borderThickness)
         );
         UpdateBorder(
             _borderSegments[2],
@@ -185,13 +232,50 @@ internal sealed class MonsterPreviewBoard : IDisposable
         );
         UpdateBorder(
             _borderSegments[3],
-            new Vector3(size.x, borderHeight * 0.5f, halfDepth),
+            new Vector3(boardWidth, borderHeight * 0.5f, halfDepth),
             new Vector3(borderThickness, borderHeight, size.y + borderThickness)
         );
     }
 
+    private float GetSlotX(int index, float unitWidth)
+    {
+        var left = 0f;
+        for (var i = 0; i < index; i++)
+            left += GetCardSize(i) * unitWidth;
+
+        return left + (GetCardSize(index) - 1) * unitWidth * 0.5f;
+    }
+
+    private float GetContentWidth(float unitWidth)
+    {
+        if (_cardSizes.Count == 0)
+            return 0f;
+
+        var width = 0f;
+        for (var i = 0; i < _cardSizes.Count; i++)
+            width += GetCardSize(i) * unitWidth;
+
+        return width;
+    }
+
+    private int GetCardSize(int index)
+    {
+        if (index < 0 || index >= _cardSizes.Count)
+            return 1;
+
+        return Mathf.Clamp(_cardSizes[index], 1, 3);
+    }
+
+    private static int GetCardSize(PreviewCardSpec spec)
+    {
+        return Mathf.Clamp(spec?.Size ?? 1, 1, 3);
+    }
+
     private static void UpdateBorder(GameObject border, Vector3 position, Vector3 scale)
     {
+        if (border == null)
+            return;
+
         border.transform.localPosition = position;
         border.transform.localRotation = Quaternion.identity;
         border.transform.localScale = scale;
@@ -228,8 +312,8 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         var material = new Material(shader);
         material.color = isBorder
-            ? new Color(0.45f, 0.95f, 1f, 0.95f)
-            : new Color(0.2f, 0.65f, 0.8f, 0.18f);
+            ? new Color(1f, 0.2f, 0.2f, 0.95f)
+            : new Color(1f, 0.1f, 0.1f, 0.18f);
         return material;
     }
 }

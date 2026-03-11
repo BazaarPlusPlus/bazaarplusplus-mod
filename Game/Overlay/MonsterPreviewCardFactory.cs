@@ -122,7 +122,7 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
             TemplateId = templateId,
             Template = template,
             Tier = (ETier)Mathf.Clamp(entry.Tier, 0, 5),
-            Size = template.Size,
+            Size = ParseSize(entry.Size, template.Size),
             Type = ECardType.Item,
             Attributes = new Dictionary<ECardAttributeType, int>(),
             Tags = new HashSet<ECardTag>(),
@@ -151,10 +151,27 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
             }
         }
 
+        ModState.Logger?.LogInfo(
+            $"[MonsterPreviewCardFactory] BuildCard result template={entry.TemplateId} tier={card.Tier} size={card.Size} type={card.Type} enchant={card.Enchantment} attrs={card.Attributes.Count} templateName={template.InternalName}"
+        );
         return card;
     }
 
-    private static object GetTemplate(object staticData, Guid templateId)
+
+    private static ECardSize ParseSize(int size, ECardSize fallback)
+    {
+        switch (size)
+        {
+            case 1:
+                return ECardSize.Small;
+            case 2:
+                return ECardSize.Medium;
+            case 3:
+                return ECardSize.Large;
+            default:
+                return fallback;
+        }
+    }    private static object GetTemplate(object staticData, Guid templateId)
     {
         if (staticData == null)
             return null;
@@ -221,13 +238,14 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         }
 
         var sectionNames = Enum.GetNames(sectionType);
-        if (sectionNames.Contains("Storage"))
-            _spawnSection = Enum.Parse(sectionType, "Storage");
-        else if (sectionNames.Contains("Opponent"))
+        if (sectionNames.Contains("Opponent"))
             _spawnSection = Enum.Parse(sectionType, "Opponent");
+        else if (sectionNames.Contains("Board"))
+            _spawnSection = Enum.Parse(sectionType, "Board");
+        else if (sectionNames.Contains("Storage"))
+            _spawnSection = Enum.Parse(sectionType, "Storage");
         else
             _spawnSection = Enum.ToObject(sectionType, 0);
-
         ModState.Logger?.LogDebug(
             $"[MonsterPreviewCardFactory] Resolved instantiate API with spawnSection={_spawnSection}"
         );
@@ -259,3 +277,4 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         return null;
     }
 }
+

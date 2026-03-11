@@ -7,7 +7,11 @@ internal sealed class PreviewCardSpec
 {
     public string TemplateId { get; set; } = string.Empty;
 
+    public string SourceName { get; set; } = string.Empty;
+
     public int Tier { get; set; }
+
+    public int Size { get; set; } = 1;
 
     public string Enchant { get; set; } = "None";
 

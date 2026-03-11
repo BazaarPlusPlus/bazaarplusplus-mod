@@ -26,12 +26,12 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     {
         _factory = new MonsterPreviewCardFactory();
         _layout = new PreviewBoardLayout();
-        _board = new MonsterPreviewBoard("MonsterPreviewBoard", _factory);
-        _board.SetLayout(_layout);
+        EnsureBoard();
     }
 
     private void LateUpdate()
     {
+        EnsureBoard();
         if (_board == null)
             return;
 
@@ -132,10 +132,14 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     {
         try
         {
+            EnsureBoard();
+            if (_board == null)
+                return;
+
             ModState.Logger?.LogInfo(
                 $"[MonsterPreviewOverlayController] Sync start: version={version}, cards={snapshot.Count}, visible={_visible}"
             );
-            await _board.RebuildAsync(snapshot, () => version != _syncVersion || !_visible);
+            await _board.RebuildAsync(snapshot, () => version != _syncVersion || !_visible || _board == null || !_board.IsAlive);
 
             if (version == _syncVersion && _visible)
             {
@@ -161,6 +165,18 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         }
     }
 
+    private void EnsureBoard()
+    {
+        if (_board != null && _board.IsAlive)
+            return;
+
+        _board?.Dispose();
+        _board = new MonsterPreviewBoard("MonsterPreviewBoard", _factory);
+        _board.SetLayout(_layout ?? new PreviewBoardLayout());
+        _syncPending = true;
+        ModState.Logger?.LogInfo("[MonsterPreviewOverlayController] Recreated preview board");
+    }
+
     private void QueueSync()
     {
         _syncVersion++;
@@ -183,7 +199,9 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
             {
                 TemplateId = card.TemplateId,
                 Tier = card.Tier,
+                SourceName = card.SourceName,
                 Enchant = card.Enchant,
+                Size = card.Size,
                 Attributes = card.Attributes != null
                     ? new Dictionary<int, int>(card.Attributes)
                     : new Dictionary<int, int>(),

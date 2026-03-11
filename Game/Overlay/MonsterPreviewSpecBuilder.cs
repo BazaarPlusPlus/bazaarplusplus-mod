@@ -22,6 +22,7 @@ internal static class MonsterPreviewSpecBuilder
                 {
                     TemplateId = card.CardId.ToString(),
                     Tier = ParseTier(card.Tier),
+                    Size = ParseSize(card.Size),
                     Enchant = "None",
                 }
             );
@@ -49,6 +50,24 @@ internal static class MonsterPreviewSpecBuilder
                 return 4;
             default:
                 return 0;
+        }
+    }
+
+    private static int ParseSize(string size)
+    {
+        if (string.IsNullOrWhiteSpace(size))
+            return 1;
+
+        switch (size.Trim().ToLowerInvariant())
+        {
+            case "small":
+                return 1;
+            case "medium":
+                return 2;
+            case "large":
+                return 3;
+            default:
+                return 1;
         }
     }
 }
