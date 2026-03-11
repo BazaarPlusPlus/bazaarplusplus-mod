@@ -87,7 +87,13 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         if (marker != null)
             UnityEngine.Object.Destroy(marker);
 
+        if (cardObject.TryGetComponent<ItemController>(out var itemController))
+            itemController.EnableMovement(true);
+        else if (cardObject.TryGetComponent<CardController>(out var cardController))
+            cardController.EnableMovement(true);
+
         cardObject.transform.SetParent(null);
+        cardObject.transform.localScale = Vector3.one;
         cardObject.PoolObject();
     }
 

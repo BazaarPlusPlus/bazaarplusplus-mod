@@ -59,7 +59,13 @@ internal sealed class SkillPreviewCardFactory : IPreviewCardFactory
         if (marker != null)
             UnityEngine.Object.Destroy(marker);
 
+        if (cardObject.TryGetComponent<SkillController>(out var skillController))
+            skillController.EnableMovement(true);
+        else if (cardObject.TryGetComponent<CardController>(out var cardController))
+            cardController.EnableMovement(true);
+
         cardObject.transform.SetParent(null);
+        cardObject.transform.localScale = Vector3.one;
         cardObject.PoolObject();
     }
 
