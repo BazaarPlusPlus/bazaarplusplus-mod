@@ -1,9 +1,11 @@
+<script context="module" lang="ts">
+  declare const __FRONTEND_VERSION__: string;
+</script>
+
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
   import { formatMessage, messages, resolveInitialLocale, type Locale } from '$lib/i18n';
-
-  declare const __FRONTEND_VERSION__: string;
 
   let locale: Locale = 'zh';
   let frontendVersion = __FRONTEND_VERSION__;
@@ -134,32 +136,42 @@
   <section class="card">
     <h2 class="section-title">{t('aboutAuthors')}</h2>
     <ul class="dep-list">
-      <a class="dep-item dep-item-link" href="https://github.com/cauyxy" target="_blank" rel="noopener noreferrer">
-        <span class="dep-name">cauyxy</span>
-        <span class="dep-role">{t('aboutAuthorRole')}</span>
-      </a>
-      <a class="dep-item dep-item-link" href="https://openai.com/codex" target="_blank" rel="noopener noreferrer">
-        <span class="dep-name">Codex</span>
-        <span class="dep-role">{t('aboutCocreatorRole')}</span>
-      </a>
-      <a class="dep-item dep-item-link" href="https://claude.com/product/claude-code" target="_blank" rel="noopener noreferrer">
-        <span class="dep-name">Claude Code</span>
-        <span class="dep-role">{t('aboutCocreatorRole')}</span>
-      </a>
+      <li>
+        <a class="dep-item dep-item-link" href="https://github.com/cauyxy" target="_blank" rel="noopener noreferrer">
+          <span class="dep-name">cauyxy</span>
+          <span class="dep-role">{t('aboutAuthorRole')}</span>
+        </a>
+      </li>
+      <li>
+        <a class="dep-item dep-item-link" href="https://openai.com/codex" target="_blank" rel="noopener noreferrer">
+          <span class="dep-name">Codex</span>
+          <span class="dep-role">{t('aboutCocreatorRole')}</span>
+        </a>
+      </li>
+      <li>
+        <a class="dep-item dep-item-link" href="https://claude.com/product/claude-code" target="_blank" rel="noopener noreferrer">
+          <span class="dep-name">Claude Code</span>
+          <span class="dep-role">{t('aboutCocreatorRole')}</span>
+        </a>
+      </li>
     </ul>
   </section>
 
   <section class="card">
     <h2 class="section-title">{t('aboutSupport')}</h2>
     <ul class="dep-list">
-      <a class="dep-item dep-item-link" href="https://afdian.com/a/cauyxy" target="_blank" rel="noopener noreferrer">
-        <span class="dep-name">爱发电</span>
-        <span class="dep-link-label">afdian.com/a/cauyxy</span>
-      </a>
-      <a class="dep-item dep-item-link" href="https://ko-fi.com/cauyxy" target="_blank" rel="noopener noreferrer">
-        <span class="dep-name">Ko-fi</span>
-        <span class="dep-link-label">ko-fi.com/cauyxy</span>
-      </a>
+      <li>
+        <a class="dep-item dep-item-link" href="https://afdian.com/a/cauyxy" target="_blank" rel="noopener noreferrer">
+          <span class="dep-name">爱发电</span>
+          <span class="dep-link-label">afdian.com/a/cauyxy</span>
+        </a>
+      </li>
+      <li>
+        <a class="dep-item dep-item-link" href="https://ko-fi.com/cauyxy" target="_blank" rel="noopener noreferrer">
+          <span class="dep-name">Ko-fi</span>
+          <span class="dep-link-label">ko-fi.com/cauyxy</span>
+        </a>
+      </li>
     </ul>
   </section>
 
