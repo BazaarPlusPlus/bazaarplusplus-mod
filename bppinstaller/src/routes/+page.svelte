@@ -2,7 +2,8 @@
   import { invoke } from '@tauri-apps/api/core';
   import { open } from '@tauri-apps/plugin-dialog';
   import { onMount } from 'svelte';
-  import type { EnvironmentInfo, UpdateInfo } from '$lib/types';
+  import { formatMessage, messages, resolveInitialLocale, type Locale } from '$lib/i18n';
+  import type { DotnetInfo, EnvironmentInfo, UpdateInfo } from '$lib/types';
 
   type StepState = 'idle' | 'detecting' | 'found' | 'not_found';
 
@@ -15,22 +16,64 @@
   let customGamePath = '';
   let actionBusy: 'idle' | 'detect' | 'install' | 'check-update' | 'update' | 'uninstall' = 'idle';
   let actionMenuOpen = false;
+  let locale: Locale = 'zh';
+
+  function t(key: keyof typeof messages.en, params?: Record<string, string | number>): string {
+    return formatMessage(locale, key, params);
+  }
 
   function effectiveGamePath(): string {
     return customGamePath || env?.game_path || '';
+  }
+
+  function applyLocale(nextLocale: Locale) {
+    locale = nextLocale;
+
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = messages[nextLocale].htmlLang;
+    }
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('locale', nextLocale);
+    }
+  }
+
+  function toggleLocale() {
+    applyLocale(locale === 'zh' ? 'en' : 'zh');
   }
 
   async function verifyGamePath(path: string) {
     return invoke<boolean>('verify_game_path', { path });
   }
 
+  async function detectDotnetRuntime() {
+    try {
+      const result = await invoke<DotnetInfo>('detect_dotnet_runtime');
+      env = env
+        ? { ...env, ...result }
+        : {
+            steam_path: null,
+            game_path: null,
+            bpp_version: null,
+            bepinex_installed: false,
+            ...result
+          };
+      dotnetState = result.dotnet_ok ? 'found' : 'not_found';
+    } catch {
+      dotnetState = 'idle';
+    }
+  }
+
   async function detectEnvironment() {
     if (actionBusy !== 'idle') return;
+
     actionBusy = 'detect';
     dotnetState = 'detecting';
+    const dotnetPromise = detectDotnetRuntime();
+
     try {
       env = await invoke<EnvironmentInfo>('detect_environment');
-      dotnetState = env.dotnet_ok ? 'found' : 'not_found';
+
       if (env.game_path && !customGamePath) {
         bazaarFound = await verifyGamePath(env.game_path);
         bazaarInvalid = !bazaarFound;
@@ -38,9 +81,12 @@
         bazaarFound = false;
         bazaarInvalid = false;
       }
+
       updateInfo = env.bpp_version
         ? await invoke<UpdateInfo>('check_bpp_update', { currentVersion: env.bpp_version })
         : null;
+
+      await dotnetPromise;
     } catch {
       dotnetState = 'idle';
       updateInfo = null;
@@ -51,6 +97,7 @@
 
   async function checkForUpdates() {
     if (!env?.bpp_version || actionBusy !== 'idle') return;
+
     actionBusy = 'check-update';
     try {
       updateInfo = await invoke<UpdateInfo>('check_bpp_update', { currentVersion: env.bpp_version });
@@ -71,6 +118,7 @@
   async function checkPath() {
     const path = effectiveGamePath();
     if (!path) return;
+
     bazaarChecking = true;
     bazaarInvalid = false;
     try {
@@ -98,6 +146,7 @@
 
   async function installBundled() {
     if (!canInstall) return;
+
     actionBusy = 'install';
     try {
       await invoke('install_bepinex', { gamePath: effectiveGamePath() });
@@ -114,6 +163,7 @@
 
   async function updateBpp() {
     if (!effectiveGamePath() || actionBusy !== 'idle') return;
+
     actionBusy = 'update';
     try {
       await invoke('update_bpp', { gamePath: effectiveGamePath() });
@@ -135,6 +185,7 @@
 
   async function uninstallBpp() {
     if (!effectiveGamePath() || actionBusy !== 'idle') return;
+
     actionBusy = 'uninstall';
     actionMenuOpen = false;
     try {
@@ -153,100 +204,95 @@
   $: modInstalled = Boolean(env?.bpp_version);
   $: updateAvailable = Boolean(updateInfo?.update_available && updateInfo.latest_version);
   $: isBusy = actionBusy !== 'idle';
-
-  $: canInstall =
-    !isBusy &&
-    dotnetState !== 'idle' &&
-    bazaarFound &&
-    hasPath;
+  $: canInstall = !isBusy && dotnetState !== 'idle' && bazaarFound && hasPath;
 
   onMount(() => {
+    applyLocale(resolveInitialLocale());
     void detectEnvironment();
   });
 </script>
 
 <svelte:head>
-  <title>BazaarPlusPlus Installer</title>
+  <title>{t('pageTitle')}</title>
   <link rel="stylesheet" href="/fonts/fonts.css" />
 </svelte:head>
 
 <div class="grain" aria-hidden="true"></div>
 
 <main class="shell">
-  <!-- Header -->
-  <header class="header" data-tauri-drag-region>
+  <header class="header">
     <div class="corner tl" aria-hidden="true">
       <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
-        <path d="M2 2L2 16M2 2L16 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
-        <circle cx="2" cy="2" r="1.5" fill="currentColor"/>
+        <path d="M2 2L2 16M2 2L16 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" />
+        <circle cx="2" cy="2" r="1.5" fill="currentColor" />
       </svg>
     </div>
     <div class="corner tr" aria-hidden="true">
       <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
-        <path d="M38 2L38 16M38 2L24 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
-        <circle cx="38" cy="2" r="1.5" fill="currentColor"/>
+        <path d="M38 2L38 16M38 2L24 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" />
+        <circle cx="38" cy="2" r="1.5" fill="currentColor" />
       </svg>
     </div>
+
+    <button class="locale-toggle" onclick={toggleLocale} type="button">{t('localeSwitch')}</button>
 
     <div class="sigil" aria-hidden="true">
       <svg width="32" height="32" viewBox="0 0 44 44" fill="none">
-        <polygon points="22,3 41,34 3,34" stroke="currentColor" stroke-width="1" fill="none" opacity="0.55"/>
-        <polygon points="22,11 35,31 9,31" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.3"/>
-        <circle cx="22" cy="22" r="5" stroke="currentColor" stroke-width="0.8" fill="none"/>
-        <circle cx="22" cy="22" r="2" fill="currentColor" opacity="0.75"/>
+        <polygon points="22,3 41,34 3,34" stroke="currentColor" stroke-width="1" fill="none" opacity="0.55" />
+        <polygon points="22,11 35,31 9,31" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.3" />
+        <circle cx="22" cy="22" r="5" stroke="currentColor" stroke-width="0.8" fill="none" />
+        <circle cx="22" cy="22" r="2" fill="currentColor" opacity="0.75" />
       </svg>
     </div>
 
-    <p class="kicker">Arcane Foundry</p>
+    <p class="kicker">{t('kicker')}</p>
     <h1>BazaarPlusPlus</h1>
-    <p class="subtitle"><em>Mod Installation Rite</em></p>
+    <p class="subtitle"><em>{t('subtitle')}</em></p>
 
     <div class="rule" aria-hidden="true">
-      <span></span><span class="diamond">◆</span><span></span>
+      <span></span><span class="diamond">+</span><span></span>
     </div>
   </header>
 
-  <!-- Steps -->
   <div class="steps">
-    <!-- Step 1: BazaarPlusPlus -->
     <div class="step" class:step-found={modInstalled} class:step-warn={updateAvailable}>
       <div class="step-index" aria-hidden="true">I</div>
       <div class="step-body">
         <span class="step-title">
-          BazaarPlusPlus
+          {t('stepBpp')}
           {#if modInstalled}
-            <span class="tag tag-ok">Installed{env?.bpp_version ? ` · v${env.bpp_version}` : ''}</span>
+            <span class="tag tag-ok">{t('statusInstalled')}{env?.bpp_version ? ` · v${env.bpp_version}` : ''}</span>
           {:else if actionBusy === 'detect'}
-            <span class="tag">Checking…</span>
+            <span class="tag">{t('statusChecking')}</span>
           {:else}
-            <span class="tag tag-warn">Not installed</span>
+            <span class="tag tag-warn">{t('statusNotInstalled')}</span>
           {/if}
         </span>
 
         {#if modInstalled && env?.bpp_version}
-          <p class="detail-line detail-muted">Installed version: {env.bpp_version}</p>
+          <p class="detail-line detail-muted">{t('installedVersion', { version: env.bpp_version })}</p>
         {:else}
-          <p class="detail-line detail-muted">Detect to inspect the installed BazaarPlusPlus payload.</p>
+          <p class="detail-line detail-muted">{t('detectInstalledHint')}</p>
         {/if}
 
         {#if modInstalled}
           <div class="card-inline-actions">
             <p class="detail-line detail-muted">
               {#if updateAvailable}
-                Update available: {updateInfo?.latest_version}
+                {t('updateAvailable', { version: updateInfo?.latest_version ?? '' })}
               {:else}
-                Check the latest remote version for BazaarPlusPlus.
+                {t('updateHint')}
               {/if}
             </p>
             <button class="card-action-btn" onclick={handleBppAction} type="button" disabled={isBusy}>
               {#if actionBusy === 'check-update'}
                 <span class="spinner" aria-hidden="true"></span>
-                Checking…
+                {t('actionCheckingUpdates')}
               {:else if actionBusy === 'update'}
                 <span class="spinner" aria-hidden="true"></span>
-                Updating…
+                {t('actionUpdating')}
               {:else}
-                {updateAvailable ? '更新' : '检查更新'}
+                {updateAvailable ? t('actionUpdate') : t('actionCheckUpdates')}
               {/if}
             </button>
           </div>
@@ -254,55 +300,57 @@
       </div>
     </div>
 
-    <!-- Step 2: .NET Runtime -->
     <div class="step" class:step-found={dotnetState === 'found'} class:step-warn={dotnetState === 'not_found'}>
       <div class="step-index" aria-hidden="true">II</div>
       <div class="step-body">
         <span class="step-title">
-          .NET Runtime
+          {t('stepDotnet')}
           {#if dotnetState === 'found'}
             <span class="tag tag-ok">{env?.dotnet_version ?? 'OK'}</span>
           {:else if dotnetState === 'not_found'}
-            <span class="tag tag-warn">Optional — not found</span>
+            <span class="tag tag-warn">{t('statusOptionalNotFound')}</span>
           {/if}
         </span>
 
         {#if dotnetState === 'found' && env?.dotnet_version}
-          <p class="detail-line detail-muted">Runtime: {env.dotnet_version}</p>
+          <p class="detail-line detail-muted">{t('runtimeVersion', { version: env.dotnet_version })}</p>
         {:else if dotnetState === 'not_found'}
-          <p class="detail-line detail-muted">No compatible .NET runtime was detected</p>
+          <p class="detail-line detail-muted">{t('runtimeNotFound')}</p>
         {:else if dotnetState === 'idle'}
-          <p class="detail-line detail-muted">Run detection to inspect the local runtime</p>
+          <p class="detail-line detail-muted">{t('runtimeIdle')}</p>
         {/if}
       </div>
     </div>
 
-    <!-- Step 3: The Bazaar -->
     <div class="step" class:step-found={bazaarFound}>
       <div class="step-index" aria-hidden="true">III</div>
       <div class="step-body">
         <span class="step-title">
-          The Bazaar
+          {t('stepBazaar')}
           {#if bazaarFound}
-            <span class="tag tag-ok">Found</span>
+            <span class="tag tag-ok">{t('statusFound')}</span>
           {/if}
         </span>
 
         {#if bazaarFound}
           <p class="detail-line detail-path" title={effectiveGamePath()}>{effectiveGamePath()}</p>
-          <button class="redetect-btn" onclick={resetBazaar} type="button">Re-enter</button>
+          <button class="redetect-btn" onclick={resetBazaar} type="button">{t('actionReenter')}</button>
         {:else}
           <div class="locate-bar" class:locate-bar-invalid={bazaarInvalid}>
-            <button class="locate-browse" onclick={pickGamePath} type="button" disabled={bazaarChecking}>Browse</button>
+            <button class="locate-browse" onclick={pickGamePath} type="button" disabled={bazaarChecking}>
+              {t('actionBrowse')}
+            </button>
             <div class="locate-input-wrap">
               <input
                 bind:value={customGamePath}
                 class="path-input"
-                placeholder="Game install path…"
+                placeholder={t('placeholderGamePath')}
                 type="text"
                 spellcheck="false"
                 onkeydown={(e) => e.key === 'Enter' && checkPath()}
-                oninput={() => { bazaarInvalid = false; }}
+                oninput={() => {
+                  bazaarInvalid = false;
+                }}
               />
             </div>
             <button
@@ -314,53 +362,40 @@
               {#if bazaarChecking}
                 <span class="spinner" aria-hidden="true"></span>
               {:else}
-                检查
+                {t('actionCheck')}
               {/if}
             </button>
           </div>
           {#if bazaarInvalid}
-            <p class="locate-error">未在该目录中找到 TheBazaar — 请确认路径是否正确</p>
+            <p class="locate-error">{t('errorGamePath')}</p>
           {/if}
         {/if}
       </div>
     </div>
 
-    <!-- Step 4: Actions -->
     <div class="step step-install">
       <div class="step-index" aria-hidden="true">IV</div>
       <div class="step-body">
-        <span class="step-title">
-          Actions
-        </span>
+        <span class="step-title">{t('stepActions')}</span>
         <div class="action-row">
-          <button
-            class="secondary-btn detect-btn"
-            onclick={detectEnvironment}
-            type="button"
-            disabled={isBusy}
-          >
+          <button class="secondary-btn detect-btn" onclick={detectEnvironment} type="button" disabled={isBusy}>
             {#if actionBusy === 'detect'}
               <span class="spinner" aria-hidden="true"></span>
-              Detecting
+              {t('actionDetecting')}
             {:else}
-              Detect
+              {t('actionDetect')}
             {/if}
           </button>
 
           <div class="action-primary">
-            <button
-              class="install-btn"
-              disabled={!canInstall}
-              onclick={installBundled}
-              type="button"
-            >
+            <button class="install-btn" disabled={!canInstall} onclick={installBundled} type="button">
               {#if actionBusy === 'install'}
                 <span class="spinner dark" aria-hidden="true"></span>
-                Installing…
+                {t('actionInstalling')}
               {:else if modInstalled}
-                ✦ Reinstall
+                ✦ {t('actionReinstall')}
               {:else}
-                ✦ Install
+                ✦ {t('actionInstall')}
               {/if}
             </button>
 
@@ -368,19 +403,21 @@
               <button
                 class="secondary-btn menu-trigger"
                 type="button"
-                onclick={() => { actionMenuOpen = !actionMenuOpen; }}
+                onclick={() => {
+                  actionMenuOpen = !actionMenuOpen;
+                }}
                 disabled={isBusy}
                 aria-expanded={actionMenuOpen}
               >
-                ▾
+                ...
               </button>
               {#if actionMenuOpen}
                 <div class="action-menu">
                   <button class="menu-item" type="button" onclick={uninstallBpp} disabled={isBusy}>
                     {#if actionBusy === 'uninstall'}
-                      Uninstalling…
+                      {t('actionUninstalling')}
                     {:else}
-                      Uninstall
+                      {t('actionUninstall')}
                     {/if}
                   </button>
                 </div>
@@ -393,8 +430,8 @@
   </div>
 
   <footer class="footer" aria-hidden="true">
-    <div class="rule"><span></span><span class="diamond small">◇</span><span></span></div>
-    <p>BazaarPlusPlus · Arcane Foundry</p>
+    <div class="rule"><span></span><span class="diamond small">+</span><span></span></div>
+    <p>{t('footer')}</p>
   </footer>
 </main>
 
@@ -447,7 +484,6 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* ── Header ──────────────────────────────────────────────── */
   .header {
     position: relative;
     text-align: center;
@@ -465,12 +501,32 @@
   .tl { top: 8px; left: 8px; }
   .tr { top: 8px; right: 8px; }
 
+  .locale-toggle {
+    position: absolute;
+    top: 0.9rem;
+    right: 0.9rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid rgba(200, 148, 55, 0.24);
+    border-radius: 2px;
+    background: rgba(200, 148, 55, 0.08);
+    color: rgba(228, 216, 191, 0.82);
+    font-family: 'Cinzel', serif;
+    font-size: 0.54rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .locale-toggle:hover {
+    background: rgba(200, 148, 55, 0.16);
+  }
+
   .sigil {
     color: rgba(205, 150, 60, 0.65);
     margin-bottom: 0.2rem;
     animation: slow-spin 45s linear infinite;
     filter: drop-shadow(0 0 7px rgba(205, 150, 60, 0.22));
   }
+
   @keyframes slow-spin {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
@@ -513,16 +569,17 @@
     gap: 0.65rem;
     color: rgba(200, 148, 55, 0.35);
   }
+
   .rule span:first-child,
   .rule span:last-child {
     flex: 1;
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(200, 148, 55, 0.3) 40%, rgba(200, 148, 55, 0.3) 60%, transparent);
   }
+
   .diamond { font-size: 0.55rem; color: rgba(205, 150, 60, 0.55); }
   .diamond.small { font-size: 0.42rem; }
 
-  /* ── Steps ───────────────────────────────────────────────── */
   .steps {
     display: grid;
     gap: 0.5rem;
@@ -597,6 +654,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
   .tag-ok   { background: rgba(80, 180, 120, 0.15); color: #6dd9a0; border: 1px solid rgba(80, 180, 120, 0.25); }
   .tag-warn { background: rgba(200, 140, 50, 0.12); color: #c4923a; border: 1px solid rgba(200, 140, 50, 0.22); }
 
@@ -652,7 +710,6 @@
     background: rgba(90, 200, 130, 0.18);
   }
 
-  /* ── Locate Bar ──────────────────────────────────────────── */
   .locate-bar {
     display: flex;
     align-items: center;
@@ -752,7 +809,6 @@
     animation: fade-up 0.2s ease both;
   }
 
-  /* ── Buttons ─────────────────────────────────────────────── */
   button { cursor: pointer; border: none; outline: none; font: inherit; }
 
   .secondary-btn {
@@ -877,7 +933,7 @@
     font-weight: 600;
     letter-spacing: 0.24em;
     text-transform: uppercase;
-    color: #18100400;
+    color: #1c0e03;
     background: linear-gradient(135deg, #d4a040 0%, #9e5c1e 50%, #d4a040 100%);
     background-size: 200% 100%;
     border: 1px solid rgba(210, 158, 60, 0.45);
@@ -890,7 +946,6 @@
     position: relative;
     overflow: hidden;
     transition: all 0.22s ease;
-    color: #1c0e03;
   }
 
   .install-btn::before {
@@ -912,12 +967,6 @@
     cursor: not-allowed;
   }
 
-  @keyframes shimmer {
-    0%, 100% { background-position: 0% 0; }
-    50%       { background-position: 100% 0; }
-  }
-
-  /* ── Spinner ─────────────────────────────────────────────── */
   .spinner {
     display: inline-block;
     width: 11px;
@@ -928,18 +977,20 @@
     animation: spin 0.75s linear infinite;
     flex-shrink: 0;
   }
+
   .spinner.dark {
     border-color: rgba(30, 15, 4, 0.25);
     border-top-color: rgba(30, 15, 4, 0.7);
   }
+
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Footer ──────────────────────────────────────────────── */
   .footer {
     text-align: center;
     display: grid;
     gap: 0.4rem;
   }
+
   .footer p {
     margin: 0;
     font-family: 'Cinzel', serif;
@@ -949,7 +1000,6 @@
     color: rgba(140, 110, 60, 0.35);
   }
 
-  /* ── Responsive ──────────────────────────────────────────── */
   @media (max-width: 520px) {
     .shell { padding: 1rem 0.85rem 1.5rem; }
     .header { padding: 1.2rem 1rem 1rem; }
@@ -958,9 +1008,15 @@
     .action-primary {
       flex-direction: column;
     }
+
     .detect-btn,
     .menu-trigger {
       width: 100%;
+    }
+
+    .locale-toggle {
+      top: 0.7rem;
+      right: 0.7rem;
     }
   }
 </style>

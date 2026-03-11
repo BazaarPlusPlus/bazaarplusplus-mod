@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "bppinstaller",
+        "title": "BazaarPlusPlus Installer",
         "width": 640,
         "height": 760
       }
