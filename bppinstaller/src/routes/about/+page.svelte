@@ -45,7 +45,7 @@
   ];
 
   const dataSources = [
-    { name: 'BazaarDB', url: 'https://bazaardb.gg/' },
+    { name: 'BazaarDB', url: 'https://bazaardb.gg' },
   ];
 
   const projectDeps = [
