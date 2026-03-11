@@ -63,12 +63,18 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     public void SetAnchorSource(IOverlayAnchorSource anchorSource)
     {
         _anchorSource = anchorSource;
+        ModState.Logger?.LogInfo(
+            $"[MonsterPreviewOverlayController] Anchor source set: {anchorSource?.GetType().Name ?? "null"}"
+        );
     }
 
     public void SetLayout(PreviewBoardLayout layout)
     {
         _layout = layout ?? new PreviewBoardLayout();
         _board?.SetLayout(_layout);
+        ModState.Logger?.LogDebug(
+            $"[MonsterPreviewOverlayController] Layout updated: size={_layout.BoardSize}, offset={_layout.LocalOffset}, spacing={_layout.CardSpacing}, scale={_layout.CardScale}"
+        );
     }
 
     public void SetCards(IReadOnlyList<PreviewCardSpec> cards)
@@ -77,22 +83,34 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         if (cards != null)
             _cards.AddRange(CloneCards(cards));
 
+        ModState.Logger?.LogInfo(
+            $"[MonsterPreviewOverlayController] SetCards count={_cards.Count}, visible={_visible}"
+        );
         QueueSync();
     }
 
     public void ClearCards()
     {
         _cards.Clear();
+        ModState.Logger?.LogInfo("[MonsterPreviewOverlayController] ClearCards");
         QueueSync();
     }
 
     public void SetVisible(bool visible)
     {
         if (_visible == visible)
+        {
+            ModState.Logger?.LogDebug(
+                $"[MonsterPreviewOverlayController] SetVisible ignored: already {visible}"
+            );
             return;
+        }
 
         _visible = visible;
         _syncVersion++;
+        ModState.Logger?.LogInfo(
+            $"[MonsterPreviewOverlayController] Visible={_visible}, syncVersion={_syncVersion}"
+        );
 
         if (!_visible)
         {
@@ -114,10 +132,24 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     {
         try
         {
+            ModState.Logger?.LogInfo(
+                $"[MonsterPreviewOverlayController] Sync start: version={version}, cards={snapshot.Count}, visible={_visible}"
+            );
             await _board.RebuildAsync(snapshot, () => version != _syncVersion || !_visible);
 
             if (version == _syncVersion && _visible)
+            {
                 _syncPending = false;
+                ModState.Logger?.LogInfo(
+                    $"[MonsterPreviewOverlayController] Sync complete: version={version}, cards={snapshot.Count}"
+                );
+            }
+            else
+            {
+                ModState.Logger?.LogDebug(
+                    $"[MonsterPreviewOverlayController] Sync skipped completion: requestedVersion={version}, currentVersion={_syncVersion}, visible={_visible}"
+                );
+            }
         }
         catch (Exception ex)
         {
@@ -133,6 +165,9 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     {
         _syncVersion++;
         _syncPending = true;
+        ModState.Logger?.LogDebug(
+            $"[MonsterPreviewOverlayController] QueueSync version={_syncVersion}, pending={_syncPending}"
+        );
     }
 
     private void OnDestroy()

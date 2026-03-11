@@ -24,21 +24,52 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
     {
         Services.TryGet<AssetLoader>(out var loader);
         if (loader == null || !EnsureApi(loader))
+        {
+            ModState.Logger?.LogWarning(
+                $"[MonsterPreviewCardFactory] API unavailable for template={spec?.TemplateId ?? "null"} loader={(loader == null ? "null" : "ok")}"
+            );
             return null;
+        }
 
         if (_staticData == null)
+        {
             _staticData = await Data.GetStatic();
+            ModState.Logger?.LogDebug(
+                $"[MonsterPreviewCardFactory] Static data loaded={(_staticData != null)}"
+            );
+        }
+
+        if (_staticData == null)
+        {
+            ModState.Logger?.LogWarning(
+                $"[MonsterPreviewCardFactory] Static data unavailable for template={spec?.TemplateId ?? "null"}"
+            );
+            return null;
+        }
 
         var card = BuildCard(spec, _staticData);
         if (card == null)
+        {
+            ModState.Logger?.LogWarning(
+                $"[MonsterPreviewCardFactory] BuildCard failed for template={spec?.TemplateId ?? "null"}"
+            );
             return null;
+        }
 
         var cardObject = await InstantiateAsync(loader, card, parent.gameObject);
         if (cardObject == null)
+        {
+            ModState.Logger?.LogWarning(
+                $"[MonsterPreviewCardFactory] Instantiate returned null for template={spec?.TemplateId ?? "null"}"
+            );
             return null;
+        }
 
         cardObject.AddComponent<ShowcaseCardMarker>();
         ConfigureSpawned(cardObject);
+        ModState.Logger?.LogDebug(
+            $"[MonsterPreviewCardFactory] Created card template={spec?.TemplateId ?? "null"} object={cardObject.name}"
+        );
         return cardObject;
     }
 
@@ -63,14 +94,27 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
     private static ItemCard BuildCard(PreviewCardSpec entry, object staticData)
     {
         if (entry == null || string.IsNullOrWhiteSpace(entry.TemplateId))
+        {
+            ModState.Logger?.LogWarning("[MonsterPreviewCardFactory] Empty preview card spec");
             return null;
+        }
 
         if (!Guid.TryParse(entry.TemplateId, out var templateId))
+        {
+            ModState.Logger?.LogWarning(
+                $"[MonsterPreviewCardFactory] Invalid template id: {entry.TemplateId}"
+            );
             return null;
+        }
 
         var template = GetTemplate(staticData, templateId) as ITCard;
         if (template == null)
+        {
+            ModState.Logger?.LogWarning(
+                $"[MonsterPreviewCardFactory] Template not found: {entry.TemplateId}"
+            );
             return null;
+        }
 
         var card = new ItemCard
         {
@@ -164,11 +208,17 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
             });
 
         if (_instantiateCardMethod == null)
+        {
+            ModState.Logger?.LogWarning("[MonsterPreviewCardFactory] InstantiateCardAsync API not found");
             return false;
+        }
 
         var sectionType = _instantiateCardMethod.GetParameters()[2].ParameterType;
         if (!sectionType.IsEnum)
+        {
+            ModState.Logger?.LogWarning("[MonsterPreviewCardFactory] Spawn section parameter is not enum");
             return false;
+        }
 
         var sectionNames = Enum.GetNames(sectionType);
         if (sectionNames.Contains("Storage"))
@@ -178,6 +228,9 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         else
             _spawnSection = Enum.ToObject(sectionType, 0);
 
+        ModState.Logger?.LogDebug(
+            $"[MonsterPreviewCardFactory] Resolved instantiate API with spawnSection={_spawnSection}"
+        );
         return _spawnSection != null;
     }
 

@@ -304,15 +304,26 @@ internal sealed class OverlayDebugController : MonoBehaviour
         if (!MonsterDatabase.TryGetByEncounterId(_defaultEncounterId, out var monster))
         {
             _activeMonsterTitle = string.Empty;
+            ModState.Logger?.LogWarning(
+                $"[OverlayDebugController] Monster DB miss encounterId={_defaultEncounterId}"
+            );
             _overlayController.SetCards(new List<PreviewCardSpec>());
             return;
         }
 
         _activeMonsterTitle = monster.Title;
         var specs = MonsterPreviewSpecBuilder.Build(monster);
+        ModState.Logger?.LogInfo(
+            $"[OverlayDebugController] Monster DB hit encounterId={_defaultEncounterId} title={monster.Title} boardCards={monster.BoardCards.Count} previewCards={specs.Count}"
+        );
         var signature = BuildSignature(specs);
         if (signature == _lastCardSignature)
+        {
+            ModState.Logger?.LogDebug(
+                $"[OverlayDebugController] Monster preview signature unchanged encounterId={_defaultEncounterId}"
+            );
             return;
+        }
 
         _lastCardSignature = signature;
         _overlayController.SetCards(specs);
@@ -327,9 +338,15 @@ internal sealed class OverlayDebugController : MonoBehaviour
         var specs = BuildCardSpecs(handCards);
         var signature = BuildSignature(specs);
         if (signature == _lastCardSignature)
+        {
+            ModState.Logger?.LogDebug("[OverlayDebugController] Player hand preview signature unchanged");
             return;
+        }
 
         _lastCardSignature = signature;
+        ModState.Logger?.LogInfo(
+            $"[OverlayDebugController] Player hand preview cards={specs.Count}"
+        );
         _overlayController.SetCards(specs);
     }
 

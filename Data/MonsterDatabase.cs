@@ -118,10 +118,14 @@ internal static class MonsterDatabase
                 ?? new Dictionary<string, MonsterRecordDto>();
 
             _db.Clear();
+            var invalidEncounterIds = 0;
             foreach (var pair in raw)
             {
                 if (!Guid.TryParse(pair.Key, out var encounterId))
+                {
+                    invalidEncounterIds++;
                     continue;
+                }
 
                 var monster = MapMonster(encounterId, pair.Value);
                 if (monster != null)
@@ -129,7 +133,7 @@ internal static class MonsterDatabase
             }
 
             ModState.Logger.LogInfo(
-                $"[MonsterDatabase] Loaded {_db.Count} entries from monsters_bazaardb.json"
+                $"[MonsterDatabase] Loaded {_db.Count} entries from monsters_bazaardb.json path={path} invalidEncounterIds={invalidEncounterIds}"
             );
         }
         catch (Exception ex)
@@ -141,7 +145,11 @@ internal static class MonsterDatabase
 
     public static bool TryGetByEncounterId(Guid encounterId, out MonsterInfo monster)
     {
-        return _db.TryGetValue(encounterId, out monster);
+        var found = _db.TryGetValue(encounterId, out monster);
+        ModState.Logger?.LogDebug(
+            $"[MonsterDatabase] Lookup encounterId={encounterId} found={found}"
+        );
+        return found;
     }
 
     public static LegacyMonsterEntry TryGet(string encounterInternalName)
@@ -166,6 +174,11 @@ internal static class MonsterDatabase
         if (dto == null)
             return null;
 
+        var boardCards = dto.MonsterMetadata?.Board?.Select(MapBoardCard).Where(card => card != null).ToList()
+            ?? new List<MonsterBoardCardInfo>();
+        var skills = dto.MonsterMetadata?.Skills?.Select(MapSkill).Where(skill => skill != null).ToList()
+            ?? new List<MonsterSkillInfo>();
+
         return new MonsterInfo
         {
             EncounterId = encounterId,
@@ -175,17 +188,20 @@ internal static class MonsterDatabase
             Health = dto.MonsterMetadata?.Health,
             RewardGold = dto.Rewards?.Gold,
             RewardXp = dto.Rewards?.Xp,
-            BoardCards = dto.MonsterMetadata?.Board?.Select(MapBoardCard).Where(card => card != null).ToList()
-                ?? new List<MonsterBoardCardInfo>(),
-            Skills = dto.MonsterMetadata?.Skills?.Select(MapSkill).Where(skill => skill != null).ToList()
-                ?? new List<MonsterSkillInfo>(),
+            BoardCards = boardCards,
+            Skills = skills,
         };
     }
 
     private static MonsterBoardCardInfo MapBoardCard(MonsterBoardCardDto dto)
     {
         if (dto == null || !Guid.TryParse(dto.CardId, out var cardId))
+        {
+            ModState.Logger?.LogDebug(
+                $"[MonsterDatabase] Dropping invalid board card id={dto?.CardId ?? "null"}"
+            );
             return null;
+        }
 
         return new MonsterBoardCardInfo
         {
@@ -200,7 +216,12 @@ internal static class MonsterDatabase
     private static MonsterSkillInfo MapSkill(MonsterSkillDto dto)
     {
         if (dto == null || !Guid.TryParse(dto.SkillId, out var skillId))
+        {
+            ModState.Logger?.LogDebug(
+                $"[MonsterDatabase] Dropping invalid skill id={dto?.SkillId ?? "null"}"
+            );
             return null;
+        }
 
         return new MonsterSkillInfo
         {
