@@ -19,10 +19,35 @@ class CombatSimPatch
         if (ModState.LastMessageId == message.MessageId)
             return;
         ModState.LastMessageId = message.MessageId;
+        ModState.SetCombatFrameTotal(message.Data?.Frames?.Count ?? 0);
         ModState.LastVictoryCondition =
             message.Data.Winner == ECombatantId.Player
                 ? EVictoryCondition.Win
                 : EVictoryCondition.Lose;
+    }
+}
+
+// Combat speed: set speed to the combat speed multiplier
+[HarmonyPatch(typeof(CombatSimHandler), "SetSpeed")]
+class CombatSpeedPatch
+{
+    [HarmonyPrefix]
+    static void Prefix(ref float speed)
+    {
+        if (!ModState.CombatPlaybackActive)
+            return;
+
+        speed = ModState.CombatSpeedMultiplier;
+    }
+}
+
+[HarmonyPatch(typeof(FinalBlowSlowDownController), nameof(FinalBlowSlowDownController.Process))]
+class CombatFrameAdvancePatch
+{
+    [HarmonyPostfix]
+    static void Postfix()
+    {
+        ModState.AdvanceCombatFrame();
     }
 }
 
