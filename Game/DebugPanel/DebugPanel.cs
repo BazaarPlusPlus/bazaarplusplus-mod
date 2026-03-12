@@ -34,7 +34,7 @@ internal sealed class DebugPanel : MonoBehaviour
     {
         public static readonly PanelSnapshot Empty = new PanelSnapshot();
 
-        public OverlayDebugController.DebugState? Preview;
+        public MonsterPreviewDebugController.DebugState? Preview;
         public RunSummary Run;
         public List<EncounterSection> EncounterSections = new List<EncounterSection>();
     }
@@ -432,9 +432,9 @@ internal sealed class DebugPanel : MonoBehaviour
         };
     }
 
-    private OverlayDebugController.DebugState? BuildPreviewState()
+    private MonsterPreviewDebugController.DebugState? BuildPreviewState()
     {
-        var previewDebug = GetComponent<OverlayDebugController>();
+        var previewDebug = GetComponent<MonsterPreviewDebugController>();
         if (previewDebug == null || !previewDebug.TryGetDebugState(out var state))
             return null;
 

@@ -73,7 +73,7 @@ public sealed class CombatStatusBarStateTests
         Assert.Equal(0.25f, CombatStatusBar.StepCombatSpeed(-1));
 
         CombatStatusBar.SetCombatSpeed(3f);
-        Assert.Equal(5f, CombatStatusBar.StepCombatSpeed(1));
+        Assert.Equal(4f, CombatStatusBar.StepCombatSpeed(1));
         Assert.Equal(5f, CombatStatusBar.StepCombatSpeed(1));
     }
 

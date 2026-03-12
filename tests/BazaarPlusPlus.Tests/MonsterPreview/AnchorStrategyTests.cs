@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using Xunit;
 
-namespace BazaarPlusPlus.Tests.Overlay;
+namespace BazaarPlusPlus.Tests.MonsterPreview;
 
 public sealed class AnchorStrategyTests
 {

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Xunit;
 
-namespace BazaarPlusPlus.Tests.Overlay;
+namespace BazaarPlusPlus.Tests.MonsterPreview;
 
 public sealed class PreviewDataSourceTests
 {

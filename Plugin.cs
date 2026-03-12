@@ -27,7 +27,7 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<DebugPanel>();
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewOverlayController>();
-        gameObject.AddComponent<OverlayDebugController>();
+        gameObject.AddComponent<MonsterPreviewDebugController>();
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
     }
 }
