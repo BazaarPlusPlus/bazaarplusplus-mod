@@ -23,7 +23,7 @@ public class Plugin : BaseUnityPlugin
 
         MonsterDatabase.Load();
         EncounterTracker.Subscribe();
-        gameObject.AddComponent<DebugOverlay>();
+        gameObject.AddComponent<DebugPanel>();
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewOverlayController>();
         gameObject.AddComponent<OverlayDebugController>();

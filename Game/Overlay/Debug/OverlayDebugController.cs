@@ -224,23 +224,35 @@ internal sealed class OverlayDebugController : MonoBehaviour
 
         if (keyboard.digit1Key.wasPressedThisFrame)
         {
-            boardSize.x = Mathf.Max(1f, boardSize.x - SizeStep);
-            layoutChanged = true;
+            if (!DebugPanel.IsVisible)
+            {
+                boardSize.x = Mathf.Max(1f, boardSize.x - SizeStep);
+                layoutChanged = true;
+            }
         }
         if (keyboard.digit2Key.wasPressedThisFrame)
         {
-            boardSize.x += SizeStep;
-            layoutChanged = true;
+            if (!DebugPanel.IsVisible)
+            {
+                boardSize.x += SizeStep;
+                layoutChanged = true;
+            }
         }
         if (keyboard.digit3Key.wasPressedThisFrame)
         {
-            boardSize.y = Mathf.Max(1f, boardSize.y - SizeStep);
-            layoutChanged = true;
+            if (!DebugPanel.IsVisible)
+            {
+                boardSize.y = Mathf.Max(1f, boardSize.y - SizeStep);
+                layoutChanged = true;
+            }
         }
         if (keyboard.digit4Key.wasPressedThisFrame)
         {
-            boardSize.y += SizeStep;
-            layoutChanged = true;
+            if (!DebugPanel.IsVisible)
+            {
+                boardSize.y += SizeStep;
+                layoutChanged = true;
+            }
         }
         if (keyboard.digit5Key.wasPressedThisFrame)
         {
