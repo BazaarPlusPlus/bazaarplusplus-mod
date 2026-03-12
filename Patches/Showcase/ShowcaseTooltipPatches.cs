@@ -91,14 +91,15 @@ public static class CardTooltipControllerLockTogglePatch
     static bool Prefix(CardTooltipController __instance)
     {
         var currentCard = __instance?.CurrentCard;
+        var runtime = MonsterLockShowcaseRuntime.Instance;
+        if (runtime != null && runtime.HandleLockToggle(currentCard))
+            return false;
+
         if (currentCard == null)
             return true;
 
         var controller = Data.CardAndSkillLookup?.GetCardController(currentCard);
-        if (controller == null)
-            return true;
-
-        if (controller.GetComponent<ShowcaseCardMarker>() == null)
+        if (controller == null || controller.GetComponent<ShowcaseCardMarker>() == null)
             return true;
 
         BppLog.Debug(

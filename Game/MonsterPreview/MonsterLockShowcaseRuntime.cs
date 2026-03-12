@@ -2,27 +2,14 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
-using HarmonyLib;
 using TheBazaar;
-using TheBazaar.UI.Tooltips;
 using UnityEngine;
 
 namespace BazaarPlusPlus;
 
 internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 {
-    private static readonly Rect FallbackHole = new Rect(0.52f, 0.18f, 0.40f, 0.22f);
-    private const float SkillRegionYOffset = 1.15f;
-    private const float SkillRegionZOffset = 1.15f;
-    private const float HorizontalPadding = 0.03f;
-    private const float VerticalPaddingTop = 0.04f;
-    private const float VerticalPaddingBottom = 0.03f;
-
-    private static readonly System.Reflection.PropertyInfo CurrentTooltipControllerProperty =
-        AccessTools.Property(typeof(TooltipParentComponent), "CardTooltipController");
-
     private readonly MonsterLockShowcaseController _controller = new MonsterLockShowcaseController();
-    private readonly LockCanvasHoleOverlay _holeOverlay = new LockCanvasHoleOverlay();
     private readonly FixedAnchorStrategy _anchorStrategy = new FixedAnchorStrategy(
         MonsterPreviewDefaults.DefaultAnchorPose
     );
@@ -32,6 +19,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     private MonsterPreviewController _overlayController;
     private Card _lockedCard;
+    public static MonsterLockShowcaseRuntime Instance { get; private set; }
 
     public bool IsPreviewActive => _lockedCard != null;
 
@@ -48,6 +36,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     private void Awake()
     {
+        Instance = this;
         _overlayController = GetComponent<MonsterPreviewController>();
         BppLog.Info(
             "MonsterLockShowcaseRuntime",
@@ -55,62 +44,28 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         );
     }
 
-    private void OnEnable()
+    private void OnDestroy()
     {
-        Events.TooltipLock.AddListener(OnTooltipLock, this);
-        Events.TooltipUnlock.AddListener(OnTooltipUnlock, this);
+        if (ReferenceEquals(Instance, this))
+            Instance = null;
     }
 
-    private void OnDisable()
+    public bool HandleLockToggle(Card card)
     {
-        Events.TooltipLock.RemoveListener(OnTooltipLock);
-        Events.TooltipUnlock.RemoveListener(OnTooltipUnlock);
-    }
-
-    private void Update()
-    {
-        if (!IsPreviewActive)
-            return;
-
-        var tooltipController = GetCurrentTooltipController();
-        if (tooltipController != null)
-            _holeOverlay.Apply(tooltipController, CalculatePreviewHole(_anchorStrategy, _presentation));
-    }
-
-    private void OnTooltipLock()
-    {
-        BppLog.Info("MonsterLockShowcaseRuntime", "OnTooltipLock fired");
         if (_overlayController == null)
+            return false;
+
+        if (IsPreviewActive)
         {
-            BppLog.Info("MonsterLockShowcaseRuntime", "OnTooltipLock aborted because overlay controller is null");
-            return;
+            HideOverlay("right click toggle");
+            return true;
         }
 
-        if (!ModState.IsInGameRun)
-        {
-            HideOverlay("ignoring tooltip lock outside of an active run");
-            return;
-        }
-
-        var tooltipController = GetCurrentTooltipController();
-        var card = tooltipController?.CurrentCard;
-        BppLog.Info(
-            "MonsterLockShowcaseRuntime",
-            $"Tooltip current card templateId={card?.TemplateId} name={card?.Template?.InternalName ?? "null"} tooltipControllerFound={tooltipController != null}"
-        );
         if (!_controller.ShouldShowForLock(card?.TemplateId, card != null && IsShowcaseCard(card)))
-        {
-            HideOverlay("locked tooltip had no supported current card");
-            return;
-        }
+            return false;
 
         if (!TryBuildPreview(card, out var cards, out var skillCards, out var source))
-        {
-            HideOverlay(
-                $"no encounter preview data for card={card?.Template?.InternalName ?? card?.TemplateId.ToString() ?? "null"}"
-            );
-            return;
-        }
+            return false;
 
         _lockedCard = card;
         _anchorStrategy.SetPose(MonsterPreviewDefaults.DefaultAnchorPose);
@@ -123,53 +78,22 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
                 source
             )
         );
-        _holeOverlay.Apply(tooltipController, CalculatePreviewHole(_anchorStrategy, _presentation));
-        BppLog.Debug(
+        BppLog.Info(
             "MonsterLockShowcaseRuntime",
-            $"Showing preview source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={cards.Count} skills={skillCards.Count}"
+            $"Activated BPP showcase mode source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={cards.Count} skills={skillCards.Count}"
         );
-    }
-
-    private void OnTooltipUnlock()
-    {
-        BppLog.Info("MonsterLockShowcaseRuntime", "OnTooltipUnlock fired");
-        if (_lockedCard == null)
-            return;
-
-        var tooltipController = GetCurrentTooltipController();
-        var currentCard = tooltipController?.CurrentCard;
-        var shouldHide = _controller.ShouldHideForUnlock(
-            currentCard?.TemplateId,
-            currentCard != null && IsShowcaseCard(currentCard)
-        );
-        if (!shouldHide)
-        {
-            BppLog.Debug("MonsterLockShowcaseRuntime", "Ignoring unlock caused by showcase card hover");
-            return;
-        }
-
-        HideOverlay("tooltip unlocked");
+        return true;
     }
 
     private void HideOverlay(string reason)
     {
         _lockedCard = null;
-        _holeOverlay.Clear();
         if (_overlayController == null)
             return;
 
         _overlayController.ClearCards();
         _overlayController.HidePreview();
         BppLog.Info("MonsterLockShowcaseRuntime", $"Hiding preview: {reason}");
-    }
-
-    private static CardTooltipController GetCurrentTooltipController()
-    {
-        var tooltipParent = Data.TooltipParentComponent;
-        if (tooltipParent == null || CurrentTooltipControllerProperty == null)
-            return null;
-
-        return CurrentTooltipControllerProperty.GetValue(tooltipParent) as CardTooltipController;
     }
 
     private static bool IsShowcaseCard(Card card)
@@ -287,83 +211,6 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         };
     }
 
-    private static Rect CalculatePreviewHole(
-        FixedAnchorStrategy anchorStrategy,
-        PreviewBoardPresentation presentation
-    )
-    {
-        var camera = Camera.main;
-        if (camera == null)
-            return FallbackHole;
-
-        if (!anchorStrategy.TryResolve(out var pose) || pose == null)
-            pose = MonsterPreviewDefaults.DefaultAnchorPose;
-
-        var boardCenter = pose.Position + pose.Rotation * presentation.LocalOffset;
-        var halfBoardWidth = presentation.BoardSize.x * 0.5f;
-        var halfBoardDepth = presentation.BoardSize.y * 0.5f;
-        var boardTopY = boardCenter.y + 0.8f;
-        var boardBottomY = boardCenter.y - 0.35f;
-
-        var skillCenter =
-            pose.Position
-            + pose.Rotation
-                * (presentation.LocalOffset + new Vector3(0f, SkillRegionYOffset, SkillRegionZOffset));
-        var halfSkillWidth = presentation.BoardSize.x * 0.25f;
-        var skillTopY = skillCenter.y + 0.65f;
-        var skillBottomY = skillCenter.y - 0.45f;
-
-        var worldPoints = new[]
-        {
-            new Vector3(boardCenter.x - halfBoardWidth, boardTopY, boardCenter.z - halfBoardDepth),
-            new Vector3(boardCenter.x + halfBoardWidth, boardTopY, boardCenter.z - halfBoardDepth),
-            new Vector3(boardCenter.x - halfBoardWidth, boardBottomY, boardCenter.z + halfBoardDepth),
-            new Vector3(boardCenter.x + halfBoardWidth, boardBottomY, boardCenter.z + halfBoardDepth),
-            new Vector3(skillCenter.x - halfSkillWidth, skillTopY, skillCenter.z),
-            new Vector3(skillCenter.x + halfSkillWidth, skillTopY, skillCenter.z),
-            new Vector3(skillCenter.x - halfSkillWidth, skillBottomY, skillCenter.z),
-            new Vector3(skillCenter.x + halfSkillWidth, skillBottomY, skillCenter.z),
-        };
-
-        var minX = 1f;
-        var maxX = 0f;
-        var minY = 1f;
-        var maxY = 0f;
-        var hasPoint = false;
-
-        foreach (var worldPoint in worldPoints)
-        {
-            var viewportPoint = camera.WorldToViewportPoint(worldPoint);
-            if (viewportPoint.z <= 0f)
-                continue;
-
-            hasPoint = true;
-            minX = Mathf.Min(minX, viewportPoint.x);
-            maxX = Mathf.Max(maxX, viewportPoint.x);
-            minY = Mathf.Min(minY, viewportPoint.y);
-            maxY = Mathf.Max(maxY, viewportPoint.y);
-        }
-
-        if (!hasPoint)
-            return FallbackHole;
-
-        var left = Mathf.Clamp01(minX - HorizontalPadding);
-        var right = Mathf.Clamp01(maxX + HorizontalPadding);
-        var top = Mathf.Clamp01(1f - maxY - VerticalPaddingTop);
-        var bottom = Mathf.Clamp01(1f - minY + VerticalPaddingBottom);
-        var width = Mathf.Clamp01(right - left);
-        var height = Mathf.Clamp01(bottom - top);
-
-        if (width <= 0.01f || height <= 0.01f)
-            return FallbackHole;
-
-        var computedHole = new Rect(left, top, width, height);
-        BppLog.Info(
-            "MonsterLockShowcaseRuntime",
-            $"Computed preview hole=({computedHole.xMin:0.###},{computedHole.yMin:0.###},{computedHole.width:0.###},{computedHole.height:0.###}) from active showcase state"
-        );
-        return computedHole;
-    }
 
     private static void CopyPresentation(
         PreviewBoardPresentation source,
@@ -376,6 +223,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         destination.CardScale = source.CardScale;
         destination.CardSpacing = source.CardSpacing;
         destination.BoardSize = source.BoardSize;
+        destination.SkillBoardWidth = source.SkillBoardWidth;
         destination.BoardThickness = source.BoardThickness;
         destination.BorderThickness = source.BorderThickness;
         destination.BorderHeight = source.BorderHeight;

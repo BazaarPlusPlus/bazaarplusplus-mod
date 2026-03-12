@@ -1,5 +1,6 @@
 #pragma warning disable CS0436
 using HarmonyLib;
+using UnityEngine.EventSystems;
 
 namespace BazaarPlusPlus;
 
@@ -7,18 +8,11 @@ namespace BazaarPlusPlus;
 internal static class ShowcaseCardClickPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(CardController __instance)
+    private static bool Prefix(CardController __instance, PointerEventData eventData)
     {
-        return __instance == null || __instance.GetComponent<ShowcaseCardMarker>() == null;
-    }
-}
+        if (__instance == null || __instance.GetComponent<ShowcaseCardMarker>() == null)
+            return true;
 
-[HarmonyPatch(typeof(ItemController), nameof(ItemController.OnBeginDrag))]
-internal static class ShowcaseCardDragPatch
-{
-    [HarmonyPrefix]
-    private static bool Prefix(ItemController __instance)
-    {
-        return __instance == null || __instance.GetComponent<ShowcaseCardMarker>() == null;
+        return eventData != null && eventData.button == PointerEventData.InputButton.Right;
     }
 }

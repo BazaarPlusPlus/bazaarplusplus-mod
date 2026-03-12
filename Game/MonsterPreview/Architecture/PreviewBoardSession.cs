@@ -136,6 +136,7 @@ internal sealed class PreviewBoardSession
             presentation.CardSpacing.z,
             presentation.BoardSize.x,
             presentation.BoardSize.y,
+            presentation.SkillBoardWidth,
             presentation.BoardThickness,
             presentation.BorderThickness,
             presentation.BorderHeight

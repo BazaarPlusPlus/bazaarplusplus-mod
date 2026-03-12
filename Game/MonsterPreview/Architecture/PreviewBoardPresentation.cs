@@ -17,6 +17,8 @@ internal sealed class PreviewBoardPresentation
 
     public Vector2 BoardSize { get; set; } = new Vector2(8.25f, 2.75f);
 
+    public float SkillBoardWidth { get; set; } = 2.4f;
+
     public float BoardThickness { get; set; } = 0.04f;
 
     public float BorderThickness { get; set; } = 0.08f;

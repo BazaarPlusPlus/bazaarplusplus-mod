@@ -637,6 +637,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
             CardSpacing = presentation.CardSpacing,
             CardScale = presentation.CardScale,
             BoardSize = presentation.BoardSize,
+            SkillBoardWidth = presentation.SkillBoardWidth,
             BoardThickness = presentation.BoardThickness,
             BorderThickness = presentation.BorderThickness,
             BorderHeight = presentation.BorderHeight,
