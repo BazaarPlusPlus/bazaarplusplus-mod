@@ -5,9 +5,45 @@ using BazaarGameShared.Domain.Core.Types;
 
 namespace BazaarPlusPlus;
 
-internal static class MonsterPreviewSpecBuilder
+internal sealed class MonsterDatabasePreviewDataSource : IPreviewDataSource
 {
-    public static List<PreviewCardSpec> Build(MonsterInfo monster)
+    private readonly string _encounterId;
+
+    public MonsterDatabasePreviewDataSource(string encounterId)
+    {
+        _encounterId = encounterId ?? string.Empty;
+    }
+
+    public bool TryBuild(out PreviewBoardModel model)
+    {
+        model = null;
+        if (!MonsterDatabase.TryGetByEncounterId(_encounterId, out var monster))
+            return false;
+
+        model = BuildModel(monster, "monster_db");
+        return model.ItemCards.Count > 0 || model.SkillCards.Count > 0;
+    }
+
+    public static PreviewBoardModel BuildModel(MonsterInfo monster, string source)
+    {
+        var itemCards = BuildItemCards(monster);
+        var skillCards = BuildSkillCards(monster);
+        var model = new PreviewBoardModel
+        {
+            Title = monster?.Title ?? string.Empty,
+            ItemCards = itemCards,
+            SkillCards = skillCards,
+            Metadata = new Dictionary<string, string>
+            {
+                ["source"] = source ?? "monster_db",
+                ["encounter"] = monster?.EncounterShortId ?? string.Empty,
+            },
+        };
+        model.Signature = PreviewBoardSignature.Build(model);
+        return model;
+    }
+
+    private static List<PreviewCardSpec> BuildItemCards(MonsterInfo monster)
     {
         var specs = new List<PreviewCardSpec>();
         if (monster?.BoardCards == null)
@@ -26,6 +62,33 @@ internal static class MonsterPreviewSpecBuilder
                     Size = ParseSize(card.Size),
                     Enchant = "None",
                     Attributes = BuildAttributes(card.CardId, card.Tier),
+                }
+            );
+        }
+
+        return specs;
+    }
+
+    private static List<PreviewCardSpec> BuildSkillCards(MonsterInfo monster)
+    {
+        var specs = new List<PreviewCardSpec>();
+        if (monster?.Skills == null)
+            return specs;
+
+        foreach (var skill in monster.Skills)
+        {
+            if (skill == null || skill.SkillId == Guid.Empty)
+                continue;
+
+            specs.Add(
+                new PreviewCardSpec
+                {
+                    TemplateId = skill.SkillId.ToString(),
+                    Tier = ParseTier(skill.Tier),
+                    SourceName = skill.Title ?? string.Empty,
+                    Size = 1,
+                    Enchant = "None",
+                    Attributes = BuildAttributes(skill.SkillId, skill.Tier),
                 }
             );
         }

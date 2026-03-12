@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace BazaarPlusPlus;
 
-internal sealed class SkillPreviewCardFactory : IPreviewCardFactory
+internal sealed class MonsterPreviewSkillCardFactory : IPreviewCardFactory
 {
     private MethodInfo _instantiateCardMethod;
     private object _spawnSection;

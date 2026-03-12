@@ -1,8 +1,6 @@
 #pragma warning disable CS0436
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace BazaarPlusPlus;
@@ -12,74 +10,50 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     private readonly List<PreviewCardSpec> _cards = new List<PreviewCardSpec>();
     private readonly List<PreviewCardSpec> _skillCards = new List<PreviewCardSpec>();
 
-    private MonsterPreviewBoard _board;
-    private IPreviewCardFactory _factory;
-    private IPreviewCardFactory _skillFactory;
-    private IOverlayAnchorSource _anchorSource;
-    private PreviewBoardLayout _layout;
+    private MonsterPreviewOverlayCoordinator _coordinator;
+    private MonsterPreviewBoardRenderTarget _renderTarget;
+    private IBoardAnchorStrategy _anchorStrategy;
+    private PreviewBoardPresentation _presentation;
     private bool _visible;
-    private bool _syncInFlight;
-    private bool _syncPending;
-    private int _syncVersion;
 
     public bool Visible => _visible;
 
     private void Awake()
     {
-        _factory = new MonsterPreviewCardFactory();
-        _skillFactory = new SkillPreviewCardFactory();
-        _layout = new PreviewBoardLayout();
-        EnsureBoard();
+        _presentation = new PreviewBoardPresentation();
+        _renderTarget = new MonsterPreviewBoardRenderTarget();
+        _coordinator = new MonsterPreviewOverlayCoordinator(_renderTarget);
+        _coordinator.SetPresentation(_presentation);
     }
 
     private void LateUpdate()
     {
-        EnsureBoard();
-        if (_board == null)
-            return;
-
         if (!_visible)
         {
-            _board.SetVisible(false);
+            _coordinator?.SetVisible(false);
             return;
         }
 
-        if (_anchorSource != null && _anchorSource.TryGetAnchor(out var position, out var rotation))
-        {
-            _board.UpdateAnchor(position, rotation);
-            _board.SetVisible(true);
-        }
-        else
-        {
-            _board.SetVisible(false);
-        }
-
-        if (_syncPending && !_syncInFlight)
-        {
-            _syncInFlight = true;
-            var version = _syncVersion;
-            var snapshot = CloneCards(_cards);
-            var skillSnapshot = CloneCards(_skillCards);
-            _ = SyncCardsAsync(version, snapshot, skillSnapshot);
-        }
+        _coordinator?.Tick();
     }
 
-    public void SetAnchorSource(IOverlayAnchorSource anchorSource)
+    public void SetAnchorStrategy(IBoardAnchorStrategy anchorStrategy)
     {
-        _anchorSource = anchorSource;
+        _anchorStrategy = anchorStrategy;
+        _coordinator?.SetAnchorStrategy(anchorStrategy);
         BppLog.Debug(
             "MonsterPreviewOverlayController",
-            $"Anchor source set: {anchorSource?.GetType().Name ?? "null"}"
+            $"Anchor strategy set: {anchorStrategy?.GetType().Name ?? "null"}"
         );
     }
 
-    public void SetLayout(PreviewBoardLayout layout)
+    public void SetPresentation(PreviewBoardPresentation presentation)
     {
-        _layout = layout ?? new PreviewBoardLayout();
-        _board?.SetLayout(_layout);
+        _presentation = presentation ?? new PreviewBoardPresentation();
+        _coordinator?.SetPresentation(_presentation);
         BppLog.Debug(
             "MonsterPreviewOverlayController",
-            $"Layout updated: size={_layout.BoardSize}, offset={_layout.LocalOffset}, spacing={_layout.CardSpacing}, scale={_layout.CardScale}"
+            $"Presentation updated: size={_presentation.BoardSize}, offset={_presentation.LocalOffset}, spacing={_presentation.CardSpacing}, scale={_presentation.CardScale}"
         );
     }
 
@@ -90,7 +64,7 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
             _cards.AddRange(CloneCards(cards));
 
         BppLog.Debug("MonsterPreviewOverlayController", $"SetCards count={_cards.Count}, visible={_visible}");
-        QueueSync();
+        _coordinator?.SetCards(_cards);
     }
 
     public void SetSkillCards(IReadOnlyList<PreviewCardSpec> cards)
@@ -103,7 +77,23 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
             "MonsterPreviewOverlayController",
             $"SetSkillCards count={_skillCards.Count}, visible={_visible}"
         );
-        QueueSync();
+        _coordinator?.SetSkillCards(_skillCards);
+    }
+
+    public void SetDebugOptions(PreviewBoardDebugOptions debugOptions)
+    {
+        _coordinator?.SetDebugOptions(debugOptions);
+    }
+
+    public void ShowRequest(PreviewBoardRequest request)
+    {
+        _visible = request?.Presentation?.Visible ?? false;
+        _coordinator?.ShowRequest(request);
+    }
+
+    public void HidePreview()
+    {
+        SetVisible(false);
     }
 
     public void ClearCards()
@@ -111,7 +101,7 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         _cards.Clear();
         _skillCards.Clear();
         BppLog.Debug("MonsterPreviewOverlayController", "ClearCards");
-        QueueSync();
+        _coordinator?.ClearCards();
     }
 
     public void SetVisible(bool visible)
@@ -123,99 +113,32 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         }
 
         _visible = visible;
-        _syncVersion++;
-        BppLog.Debug("MonsterPreviewOverlayController", $"Visible={_visible}, syncVersion={_syncVersion}");
+        BppLog.Debug("MonsterPreviewOverlayController", $"Visible={_visible}");
 
         if (!_visible)
         {
-            _board?.Clear();
-            _board?.SetVisible(false);
-            _syncPending = false;
+            _coordinator?.SetVisible(false);
             return;
         }
 
-        _syncPending = true;
+        _coordinator?.SetVisible(true);
+        if (_anchorStrategy != null)
+            _coordinator?.SetAnchorStrategy(_anchorStrategy);
+        _coordinator?.SetPresentation(_presentation);
+        _coordinator?.SetCards(_cards);
+        _coordinator?.SetSkillCards(_skillCards);
     }
 
     public void Refresh()
     {
-        QueueSync();
-    }
-
-    private async Task SyncCardsAsync(
-        int version,
-        IReadOnlyList<PreviewCardSpec> snapshot,
-        IReadOnlyList<PreviewCardSpec> skillSnapshot
-    )
-    {
-        try
-        {
-            EnsureBoard();
-            if (_board == null)
-                return;
-
-            BppLog.Debug(
-                "MonsterPreviewOverlayController",
-                $"Sync start: version={version}, cards={snapshot.Count}, skills={skillSnapshot.Count}, visible={_visible}"
-            );
-            await _board.RebuildAsync(
-                snapshot,
-                skillSnapshot,
-                () => version != _syncVersion || !_visible || _board == null || !_board.IsAlive
-            );
-
-            if (version == _syncVersion && _visible)
-            {
-                _syncPending = false;
-                BppLog.Debug(
-                    "MonsterPreviewOverlayController",
-                    $"Sync complete: version={version}, cards={snapshot.Count}, skills={skillSnapshot.Count}"
-                );
-            }
-            else
-            {
-                BppLog.Debug(
-                    "MonsterPreviewOverlayController",
-                    $"Sync skipped completion: requestedVersion={version}, currentVersion={_syncVersion}, visible={_visible}"
-                );
-            }
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("MonsterPreviewOverlayController", "Sync failed", ex);
-        }
-        finally
-        {
-            _syncInFlight = false;
-        }
-    }
-
-    private void EnsureBoard()
-    {
-        if (_board != null && _board.IsAlive)
-            return;
-
-        _board?.Dispose();
-        _board = new MonsterPreviewBoard("MonsterPreviewBoard", _factory, _skillFactory);
-        _board.SetLayout(_layout ?? new PreviewBoardLayout());
-        _syncPending = true;
-        BppLog.Info("MonsterPreviewOverlayController", "Recreated preview board");
-    }
-
-    private void QueueSync()
-    {
-        _syncVersion++;
-        _syncPending = true;
-        BppLog.Debug(
-            "MonsterPreviewOverlayController",
-            $"QueueSync version={_syncVersion}, pending={_syncPending}"
-        );
+        _coordinator?.Refresh();
     }
 
     private void OnDestroy()
     {
-        _board?.Dispose();
-        _board = null;
+        _renderTarget?.Dispose();
+        _renderTarget = null;
+        _coordinator = null;
     }
 
     private static List<PreviewCardSpec> CloneCards(IReadOnlyList<PreviewCardSpec> cards)

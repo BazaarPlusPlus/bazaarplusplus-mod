@@ -18,17 +18,11 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
         AccessTools.Property(typeof(TooltipParentComponent), "CardTooltipController");
 
     private MonsterPreviewOverlayController _overlayController;
-    private FixedWorldAnchorSource _anchorSource;
     private Card _lockedCard;
 
     private void Awake()
     {
         _overlayController = GetComponent<MonsterPreviewOverlayController>();
-        _anchorSource = new FixedWorldAnchorSource
-        {
-            Position = FixedPreviewPosition,
-            Rotation = FixedPreviewRotation,
-        };
     }
 
     private void OnEnable()
@@ -65,13 +59,15 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
         }
 
         _lockedCard = card;
-
-        ApplyFixedLayout();
-
-        _overlayController.SetAnchorSource(_anchorSource);
-        _overlayController.SetCards(cards);
-        _overlayController.SetSkillCards(skillCards);
-        _overlayController.SetVisible(true);
+        _overlayController.ShowRequest(
+            PreviewBoardRequestFactory.CreateFixed(
+                cards,
+                skillCards,
+                new BoardPose { Position = FixedPreviewPosition, Rotation = FixedPreviewRotation },
+                title: card.Template?.InternalName ?? source,
+                metadata: new Dictionary<string, string> { ["source"] = source }
+            )
+        );
         BppLog.Debug(
             "EncounterTooltipPreviewBridge",
             $"Showing preview source={source} card={card.Template?.InternalName ?? "-"} templateId={card.TemplateId} items={cards.Count} skills={skillCards.Count}"
@@ -107,28 +103,8 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
             return;
 
         _overlayController.ClearCards();
-        _overlayController.SetVisible(false);
+        _overlayController.HidePreview();
         BppLog.Debug("EncounterTooltipPreviewBridge", $"Hiding preview: {reason}");
-    }
-
-    private void ApplyFixedLayout()
-    {
-        var layout = new PreviewBoardLayout
-        {
-            BoardSize = new Vector2(8.25f, 2.75f),
-            LocalOffset = new Vector3(0f, 0.1f, 0f),
-            CardSpacing = new Vector3(1.1f, 0f, 0f),
-            CardScale = Vector3.one * 0.5f,
-            BoardThickness = 0.02f,
-            BorderThickness = 0.04f,
-            BorderHeight = 0.04f,
-        };
-
-        _overlayController.SetLayout(layout);
-        BppLog.Debug(
-            "EncounterTooltipPreviewBridge",
-            $"Applied fixed layout: anchor={FixedPreviewPosition} rotation={FixedPreviewRotation.eulerAngles} size={layout.BoardSize}"
-        );
     }
 
     private static CardTooltipController GetCurrentTooltipController()
@@ -153,8 +129,9 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
 
         if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out var monster))
         {
-            cards = MonsterPreviewSpecBuilder.Build(monster);
-            skillCards = SkillPreviewSpecBuilder.Build(monster);
+            var previewModel = MonsterDatabasePreviewDataSource.BuildModel(monster, "monster_db");
+            cards = new List<PreviewCardSpec>(previewModel.ItemCards);
+            skillCards = new List<PreviewCardSpec>(previewModel.SkillCards);
             source = $"monster_db:{monster.EncounterShortId}";
             return cards.Count > 0 || skillCards.Count > 0;
         }

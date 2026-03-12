@@ -38,7 +38,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     private GameObject _boardPlate;
     private GameObject _boardCenterMarker;
-    private PreviewBoardLayout _layout = new PreviewBoardLayout();
+    private PreviewBoardPresentation _presentation = new PreviewBoardPresentation();
 
     public bool IsAlive => _boardRoot != null;
 
@@ -60,12 +60,12 @@ internal sealed class MonsterPreviewBoard : IDisposable
         SetVisible(false);
     }
 
-    public void SetLayout(PreviewBoardLayout layout)
+    public void SetPresentation(PreviewBoardPresentation presentation)
     {
         if (!IsAlive)
             return;
 
-        _layout = layout ?? new PreviewBoardLayout();
+        _presentation = presentation ?? new PreviewBoardPresentation();
         RefreshLayout();
     }
 
@@ -224,7 +224,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
             cardObject.transform.SetParent(slot.transform, false);
             cardObject.transform.localPosition = Vector3.zero;
             cardObject.transform.localRotation = Quaternion.identity;
-            cardObject.transform.localScale = _layout.CardScale * SkillCardScaleFactor;
+            cardObject.transform.localScale = _presentation.CardScale * SkillCardScaleFactor;
             _skillCards.Add(cardObject);
         }
     }
@@ -236,12 +236,12 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         RefreshVisuals();
 
-        _itemContentRoot.transform.localPosition = _layout.LocalOffset;
+        _itemContentRoot.transform.localPosition = _presentation.LocalOffset;
         _itemContentRoot.transform.localRotation = Quaternion.identity;
         _itemContentRoot.transform.localScale = Vector3.one;
 
         _skillContentRoot.transform.localPosition =
-            _layout.LocalOffset + new Vector3(0f, SkillRegionYOffset, SkillRegionZOffset);
+            _presentation.LocalOffset + new Vector3(0f, SkillRegionYOffset, SkillRegionZOffset);
         _skillContentRoot.transform.localRotation = Quaternion.identity;
         _skillContentRoot.transform.localScale = Vector3.one;
 
@@ -352,7 +352,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
         var startSlot = GetCardStartSlot(index);
         var endSlot = Mathf.Min(BoardSlotCount - 1, startSlot + span - 1);
         var centerX = (GetBoardSlotCenterX(startSlot) + GetBoardSlotCenterX(endSlot)) * 0.5f;
-        var spacing = _layout.CardSpacing;
+        var spacing = _presentation.CardSpacing;
 
         anchor.transform.localPosition = new Vector3(centerX, spacing.y * index, spacing.z * index);
         anchor.transform.localRotation = Quaternion.identity;
@@ -370,7 +370,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         cardObject.transform.localPosition = Vector3.zero;
         cardObject.transform.localRotation = Quaternion.identity;
-        cardObject.transform.localScale = _layout.CardScale;
+        cardObject.transform.localScale = _presentation.CardScale;
     }
 
     private void RefreshVisuals()
@@ -378,13 +378,13 @@ internal sealed class MonsterPreviewBoard : IDisposable
         if (_visualRoot == null || _boardPlate == null || _borderSegments.Count < 4)
             return;
 
-        var size = _layout.BoardSize;
+        var size = _presentation.BoardSize;
         var boardWidth = Mathf.Max(0.01f, size.x);
         var halfWidth = boardWidth * 0.5f;
         var halfDepth = size.y * 0.5f;
-        var boardThickness = Mathf.Max(0.01f, _layout.BoardThickness);
-        var borderThickness = Mathf.Max(0.01f, _layout.BorderThickness);
-        var borderHeight = Mathf.Max(boardThickness, _layout.BorderHeight);
+        var boardThickness = Mathf.Max(0.01f, _presentation.BoardThickness);
+        var borderThickness = Mathf.Max(0.01f, _presentation.BorderThickness);
+        var borderHeight = Mathf.Max(boardThickness, _presentation.BorderHeight);
 
         _visualRoot.transform.localPosition = Vector3.zero;
         _visualRoot.transform.localRotation = Quaternion.identity;
@@ -428,14 +428,14 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     private float GetBoardSlotCenterX(int slotIndex)
     {
-        var boardWidth = Mathf.Max(0.01f, _layout.BoardSize.x);
+        var boardWidth = Mathf.Max(0.01f, _presentation.BoardSize.x);
         var slotWidth = boardWidth / BoardSlotCount;
         return -boardWidth * 0.5f + slotWidth * (slotIndex + 0.5f);
     }
 
     private float GetSkillSlotCenterX(int slotIndex)
     {
-        var totalWidth = Mathf.Max(0.01f, _layout.BoardSize.x) / 2f;
+        var totalWidth = Mathf.Max(0.01f, _presentation.BoardSize.x) / 2f;
         var slotWidth = totalWidth / SkillSlotCount;
         return -totalWidth * 0.5f + slotWidth * (slotIndex + 0.5f);
     }

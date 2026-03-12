@@ -30,9 +30,30 @@
     <Compile Include="../../Data/CardJsonPathResolver.cs" Link="Data/CardJsonPathResolver.cs" />
     <Compile Include="../../Infrastructure/BppLog.cs" Link="Infrastructure/BppLog.cs" />
     <Compile Include="../../Data/ItemAttr.cs" Link="Data/ItemAttr.cs" />
-    <Compile Include="../../Game/Overlay/LockCanvasHoleLayout.cs" Link="Game/Overlay/LockCanvasHoleLayout.cs" />
-    <Compile Include="../../Game/Overlay/MonsterLockShowcaseController.cs" Link="Game/Overlay/MonsterLockShowcaseController.cs" />
-    <Compile Include="../../Game/Overlay/MonsterLockShowcaseRoot.cs" Link="Game/Overlay/MonsterLockShowcaseRoot.cs" />
-    <Compile Include="../../Game/Overlay/PreviewCardLifecyclePolicy.cs" Link="Game/Overlay/PreviewCardLifecyclePolicy.cs" />
+    <Compile Include="../../Game/Overlay/Showcase/LockCanvasHoleLayout.cs" Link="Game/Overlay/Showcase/LockCanvasHoleLayout.cs" />
+    <Compile Include="../../Game/Overlay/Showcase/MonsterLockShowcaseController.cs" Link="Game/Overlay/Showcase/MonsterLockShowcaseController.cs" />
+    <Compile Include="../../Game/Overlay/GameObjectFactory/PreviewCardLifecyclePolicy.cs" Link="Game/Overlay/GameObjectFactory/PreviewCardLifecyclePolicy.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/PreviewCardSpec.cs" Link="Game/Overlay/Architecture/PreviewCardSpec.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/PreviewBoardRequest.cs" Link="Game/Overlay/Architecture/PreviewBoardRequest.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/PreviewBoardModel.cs" Link="Game/Overlay/Architecture/PreviewBoardModel.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/BoardPose.cs" Link="Game/Overlay/Architecture/BoardPose.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/BoardRenderModel.cs" Link="Game/Overlay/Architecture/BoardRenderModel.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/PreviewBoardDebugOptions.cs" Link="Game/Overlay/Architecture/PreviewBoardDebugOptions.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/PreviewBoardPresentation.cs" Link="Game/Overlay/Architecture/PreviewBoardPresentation.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/IPreviewDataSource.cs" Link="Game/Overlay/Architecture/IPreviewDataSource.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/CompositePreviewDataSource.cs" Link="Game/Overlay/Architecture/CompositePreviewDataSource.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/PreviewBoardSignature.cs" Link="Game/Overlay/Architecture/PreviewBoardSignature.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/IBoardAnchorStrategy.cs" Link="Game/Overlay/Architecture/IBoardAnchorStrategy.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/IBoardRenderTarget.cs" Link="Game/Overlay/Architecture/IBoardRenderTarget.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/PreviewBoardSession.cs" Link="Game/Overlay/Architecture/PreviewBoardSession.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/InMemoryPreviewDataSource.cs" Link="Game/Overlay/Architecture/InMemoryPreviewDataSource.cs" />
+    <Compile Include="../../Game/Overlay/Architecture/MonsterPreviewOverlayCoordinator.cs" Link="Game/Overlay/Architecture/MonsterPreviewOverlayCoordinator.cs" />
+    <Compile Include="../../Game/Overlay/View/BoardDebugOverlay.cs" Link="Game/Overlay/View/BoardDebugOverlay.cs" />
+    <Compile Include="../../Game/Overlay/View/BoardLayoutSnapshot.cs" Link="Game/Overlay/View/BoardLayoutSnapshot.cs" />
+    <Compile Include="../../Game/Overlay/View/BoardView.cs" Link="Game/Overlay/View/BoardView.cs" />
+    <Compile Include="../../Game/Overlay/Anchor/AnchorAdjustment.cs" Link="Game/Overlay/Anchor/AnchorAdjustment.cs" />
+    <Compile Include="../../Game/Overlay/Anchor/FixedAnchorStrategy.cs" Link="Game/Overlay/Anchor/FixedAnchorStrategy.cs" />
+    <Compile Include="../../Game/Overlay/Anchor/TrackedTransformAnchorStrategy.cs" Link="Game/Overlay/Anchor/TrackedTransformAnchorStrategy.cs" />
+    <Compile Include="../../Game/Overlay/Anchor/AdjustableAnchorStrategy.cs" Link="Game/Overlay/Anchor/AdjustableAnchorStrategy.cs" />
   </ItemGroup>
 </Project>

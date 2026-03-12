@@ -40,8 +40,8 @@ internal sealed class OverlayDebugController : MonoBehaviour
     }
 
     private MonsterPreviewOverlayController _overlayController;
-    private FixedWorldAnchorSource _anchorSource;
-    private PreviewBoardLayout _layout;
+    private FixedAnchorStrategy _anchorStrategy;
+    private PreviewBoardPresentation _presentation;
     private string _lastCardSignature = string.Empty;
     private string _lastSkillSignature = string.Empty;
     private float _nextRefreshTime;
@@ -50,17 +50,27 @@ internal sealed class OverlayDebugController : MonoBehaviour
     private const string DefaultEncounterId = "4a4542cd";
     private string _activeEncounterId = string.Empty;
     private string _activeMonsterTitle = string.Empty;
+    private readonly PreviewBoardDebugOptions _debugOptions = new PreviewBoardDebugOptions
+    {
+        Enabled = true,
+        ShowAnchorPoint = true,
+        ShowItemSlots = true,
+        ShowSkillSlots = true,
+        ShowCardBounds = true,
+        ShowLabels = true,
+    };
 
     private void Awake()
     {
         _overlayController = GetComponent<MonsterPreviewOverlayController>();
-        _anchorSource = new FixedWorldAnchorSource();
-        _layout = new PreviewBoardLayout();
+        _anchorStrategy = new FixedAnchorStrategy();
+        _presentation = new PreviewBoardPresentation();
 
         if (_overlayController != null)
         {
-            _overlayController.SetAnchorSource(_anchorSource);
-            _overlayController.SetLayout(CloneLayout(_layout));
+            _overlayController.SetAnchorStrategy(_anchorStrategy);
+            _overlayController.SetPresentation(ClonePresentation(_presentation));
+            _overlayController.SetDebugOptions(_debugOptions);
             _overlayController.SetVisible(false);
         }
 
@@ -111,7 +121,7 @@ internal sealed class OverlayDebugController : MonoBehaviour
 
     public bool TryGetDebugState(out DebugState state)
     {
-        if (_overlayController == null || _anchorSource == null || _layout == null)
+        if (_overlayController == null || _anchorStrategy == null || _presentation == null)
         {
             state = default;
             return false;
@@ -123,15 +133,15 @@ internal sealed class OverlayDebugController : MonoBehaviour
             EncounterId = string.IsNullOrEmpty(_activeEncounterId) ? "-" : _activeEncounterId,
             MonsterTitle = string.IsNullOrEmpty(_activeMonsterTitle) ? "-" : _activeMonsterTitle,
             Visible = _overlayController.Visible,
-            AnchorPosition = _anchorSource.Position,
-            AnchorRotationEuler = _anchorSource.Rotation.eulerAngles,
-            LocalOffset = _layout.LocalOffset,
-            BoardSize = _layout.BoardSize,
-            CardSpacingX = _layout.CardSpacing.x,
-            CardScale = _layout.CardScale.x,
-            BoardThickness = _layout.BoardThickness,
-            BorderThickness = _layout.BorderThickness,
-            BorderHeight = _layout.BorderHeight,
+            AnchorPosition = _anchorStrategy.Position,
+            AnchorRotationEuler = _anchorStrategy.Rotation.eulerAngles,
+            LocalOffset = _presentation.LocalOffset,
+            BoardSize = _presentation.BoardSize,
+            CardSpacingX = _presentation.CardSpacing.x,
+            CardScale = _presentation.CardScale.x,
+            BoardThickness = _presentation.BoardThickness,
+            BorderThickness = _presentation.BorderThickness,
+            BorderHeight = _presentation.BorderHeight,
         };
         return true;
     }
@@ -143,7 +153,7 @@ internal sealed class OverlayDebugController : MonoBehaviour
             ? FineMoveStep
             : DefaultMoveStep;
 
-        var position = _anchorSource.Position;
+        var position = _anchorStrategy.Position;
         if (keyboard.leftArrowKey.wasPressedThisFrame)
         {
             position.x -= moveStep;
@@ -175,9 +185,9 @@ internal sealed class OverlayDebugController : MonoBehaviour
             moved = true;
         }
         if (moved)
-            _anchorSource.Position = position;
+            _anchorStrategy.Position = position;
 
-        var rotation = _anchorSource.Rotation;
+        var rotation = _anchorStrategy.Rotation;
         if (keyboard.commaKey.wasPressedThisFrame)
         {
             rotation = Quaternion.Euler(0f, -RotationStep, 0f) * rotation;
@@ -188,8 +198,8 @@ internal sealed class OverlayDebugController : MonoBehaviour
             rotation = Quaternion.Euler(0f, RotationStep, 0f) * rotation;
             moved = true;
         }
-        if (rotation != _anchorSource.Rotation)
-            _anchorSource.Rotation = rotation;
+        if (rotation != _anchorStrategy.Rotation)
+            _anchorStrategy.Rotation = rotation;
 
         if (keyboard.rKey.wasPressedThisFrame)
         {
@@ -201,7 +211,7 @@ internal sealed class OverlayDebugController : MonoBehaviour
         {
             BppLog.Debug(
                 "OverlayDebugController",
-                $"Anchor pos={_anchorSource.Position} rot={_anchorSource.Rotation.eulerAngles}"
+                $"Anchor pos={_anchorStrategy.Position} rot={_anchorStrategy.Rotation.eulerAngles}"
             );
         }
     }
@@ -209,86 +219,90 @@ internal sealed class OverlayDebugController : MonoBehaviour
     private void HandleLayoutControls(Keyboard keyboard)
     {
         var layoutChanged = false;
+        var boardSize = _presentation.BoardSize;
+        var cardSpacing = _presentation.CardSpacing;
 
         if (keyboard.digit1Key.wasPressedThisFrame)
         {
-            _layout.BoardSize.x = Mathf.Max(1f, _layout.BoardSize.x - SizeStep);
+            boardSize.x = Mathf.Max(1f, boardSize.x - SizeStep);
             layoutChanged = true;
         }
         if (keyboard.digit2Key.wasPressedThisFrame)
         {
-            _layout.BoardSize.x += SizeStep;
+            boardSize.x += SizeStep;
             layoutChanged = true;
         }
         if (keyboard.digit3Key.wasPressedThisFrame)
         {
-            _layout.BoardSize.y = Mathf.Max(1f, _layout.BoardSize.y - SizeStep);
+            boardSize.y = Mathf.Max(1f, boardSize.y - SizeStep);
             layoutChanged = true;
         }
         if (keyboard.digit4Key.wasPressedThisFrame)
         {
-            _layout.BoardSize.y += SizeStep;
+            boardSize.y += SizeStep;
             layoutChanged = true;
         }
         if (keyboard.digit5Key.wasPressedThisFrame)
         {
-            _layout.CardSpacing.x = Mathf.Max(0.2f, _layout.CardSpacing.x - SizeStep);
+            cardSpacing.x = Mathf.Max(0.2f, cardSpacing.x - SizeStep);
             layoutChanged = true;
         }
         if (keyboard.digit6Key.wasPressedThisFrame)
         {
-            _layout.CardSpacing.x += SizeStep;
+            cardSpacing.x += SizeStep;
             layoutChanged = true;
         }
         if (keyboard.minusKey.wasPressedThisFrame)
         {
-            _layout.CardScale = Vector3.one
-                * Mathf.Max(0.1f, _layout.CardScale.x - ScaleStep);
+            _presentation.CardScale = Vector3.one
+                * Mathf.Max(0.1f, _presentation.CardScale.x - ScaleStep);
             layoutChanged = true;
         }
         if (keyboard.equalsKey.wasPressedThisFrame)
         {
-            _layout.CardScale = Vector3.one * (_layout.CardScale.x + ScaleStep);
+            _presentation.CardScale = Vector3.one * (_presentation.CardScale.x + ScaleStep);
             layoutChanged = true;
         }
         if (keyboard.kKey.wasPressedThisFrame)
         {
-            _layout.BoardThickness = Mathf.Max(0.01f, _layout.BoardThickness - ThicknessStep);
+            _presentation.BoardThickness = Mathf.Max(0.01f, _presentation.BoardThickness - ThicknessStep);
             layoutChanged = true;
         }
         if (keyboard.lKey.wasPressedThisFrame)
         {
-            _layout.BoardThickness += ThicknessStep;
+            _presentation.BoardThickness += ThicknessStep;
             layoutChanged = true;
         }
         if (keyboard.semicolonKey.wasPressedThisFrame)
         {
-            _layout.BorderThickness = Mathf.Max(0.01f, _layout.BorderThickness - ThicknessStep);
+            _presentation.BorderThickness = Mathf.Max(0.01f, _presentation.BorderThickness - ThicknessStep);
             layoutChanged = true;
         }
         if (keyboard.quoteKey.wasPressedThisFrame)
         {
-            _layout.BorderThickness += ThicknessStep;
+            _presentation.BorderThickness += ThicknessStep;
             layoutChanged = true;
         }
         if (keyboard.nKey.wasPressedThisFrame)
         {
-            _layout.BorderHeight = Mathf.Max(0.01f, _layout.BorderHeight - ThicknessStep);
+            _presentation.BorderHeight = Mathf.Max(0.01f, _presentation.BorderHeight - ThicknessStep);
             layoutChanged = true;
         }
         if (keyboard.mKey.wasPressedThisFrame)
         {
-            _layout.BorderHeight += ThicknessStep;
+            _presentation.BorderHeight += ThicknessStep;
             layoutChanged = true;
         }
 
         if (!layoutChanged)
             return;
 
+        _presentation.BoardSize = boardSize;
+        _presentation.CardSpacing = cardSpacing;
         ApplyLayout();
         BppLog.Debug(
             "OverlayDebugController",
-            $"Layout size={_layout.BoardSize} offset={_layout.LocalOffset} spacingX={_layout.CardSpacing.x:F2} scale={_layout.CardScale.x:F2} boardT={_layout.BoardThickness:F2} borderT={_layout.BorderThickness:F2} borderH={_layout.BorderHeight:F2}"
+            $"Layout size={_presentation.BoardSize} offset={_presentation.LocalOffset} spacingX={_presentation.CardSpacing.x:F2} scale={_presentation.CardScale.x:F2} boardT={_presentation.BoardThickness:F2} borderT={_presentation.BorderThickness:F2} borderH={_presentation.BorderHeight:F2}"
         );
     }
 
@@ -317,8 +331,9 @@ internal sealed class OverlayDebugController : MonoBehaviour
         }
 
         _activeMonsterTitle = monster.Title;
-        var specs = MonsterPreviewSpecBuilder.Build(monster);
-        var skillSpecs = SkillPreviewSpecBuilder.Build(monster);
+        var previewModel = MonsterDatabasePreviewDataSource.BuildModel(monster, "monster_db");
+        var specs = previewModel.ItemCards.ToList();
+        var skillSpecs = previewModel.SkillCards.ToList();
         BppLog.Debug(
             "OverlayDebugController",
             $"Monster DB hit encounterId={DefaultEncounterId} key={monster.EncounterKey} shortId={monster.EncounterShortId} title={monster.Title} boardCards={monster.BoardCards.Count} skillCards={monster.Skills.Count} previewCards={specs.Count}"
@@ -377,12 +392,12 @@ internal sealed class OverlayDebugController : MonoBehaviour
         var anchorTransform = FindDefaultAnchorTransform();
         if (anchorTransform != null)
         {
-            _anchorSource.Position = anchorTransform.position;
-            _anchorSource.Rotation = anchorTransform.rotation;
+            _anchorStrategy.Position = anchorTransform.position;
+            _anchorStrategy.Rotation = anchorTransform.rotation;
             _anchorSeeded = true;
             BppLog.Debug(
                 "OverlayDebugController",
-                $"Seeded anchor from {DefaultAnchorPath}: {_anchorSource.Position}"
+                $"Seeded anchor from {DefaultAnchorPath}: {_anchorStrategy.Position}"
             );
             return;
         }
@@ -391,12 +406,12 @@ internal sealed class OverlayDebugController : MonoBehaviour
         if (camera == null)
             return;
 
-        _anchorSource.Position = camera.transform.position + camera.transform.forward * 12f;
-        _anchorSource.Rotation = Quaternion.identity;
+        _anchorStrategy.Position = camera.transform.position + camera.transform.forward * 12f;
+        _anchorStrategy.Rotation = Quaternion.identity;
         _anchorSeeded = true;
         BppLog.Warn(
             "OverlayDebugController",
-            $"Default anchor '{DefaultAnchorPath}' not found, fell back to camera seed: {_anchorSource.Position}"
+            $"Default anchor '{DefaultAnchorPath}' not found, fell back to camera seed: {_anchorStrategy.Position}"
         );
     }
 
@@ -407,7 +422,7 @@ internal sealed class OverlayDebugController : MonoBehaviour
 
     private void ApplyLayout()
     {
-        _overlayController?.SetLayout(CloneLayout(_layout));
+        _overlayController?.SetPresentation(ClonePresentation(_presentation));
     }
 
     private static List<PreviewCardSpec> BuildCardSpecs(List<Card> cards)
@@ -489,17 +504,19 @@ internal sealed class OverlayDebugController : MonoBehaviour
         );
     }
 
-    private static PreviewBoardLayout CloneLayout(PreviewBoardLayout layout)
+    private static PreviewBoardPresentation ClonePresentation(PreviewBoardPresentation presentation)
     {
-        return new PreviewBoardLayout
+        return new PreviewBoardPresentation
         {
-            LocalOffset = layout.LocalOffset,
-            CardSpacing = layout.CardSpacing,
-            CardScale = layout.CardScale,
-            BoardSize = layout.BoardSize,
-            BoardThickness = layout.BoardThickness,
-            BorderThickness = layout.BorderThickness,
-            BorderHeight = layout.BorderHeight,
+            Visible = presentation.Visible,
+            DebugEnabled = presentation.DebugEnabled,
+            LocalOffset = presentation.LocalOffset,
+            CardSpacing = presentation.CardSpacing,
+            CardScale = presentation.CardScale,
+            BoardSize = presentation.BoardSize,
+            BoardThickness = presentation.BoardThickness,
+            BorderThickness = presentation.BorderThickness,
+            BorderHeight = presentation.BorderHeight,
         };
     }
 }
