@@ -40,6 +40,9 @@ internal sealed class SkillPreviewCardFactory : IPreviewCardFactory
         if (cardObject == null)
             return null;
 
+        if (PreviewCardLifecyclePolicy.ShouldRefreshAfterInstantiate(PreviewCardKind.Skill))
+            await RefreshSpawnedSkillAsync(cardObject, card);
+
         cardObject.AddComponent<ShowcaseCardMarker>();
         ConfigureSpawned(cardObject);
         return cardObject;
@@ -140,6 +143,20 @@ internal sealed class SkillPreviewCardFactory : IPreviewCardFactory
             cardController.ShowCard(true);
             cardController.EnableMovement(false);
         }
+    }
+
+    private static async Task RefreshSpawnedSkillAsync(GameObject cardObject, SkillCard card)
+    {
+        if (cardObject == null || card == null)
+            return;
+
+        if (!cardObject.TryGetComponent<SkillController>(out var skillController))
+            return;
+
+        // Pooled skill cards can retain the previous frame/icon visuals.
+        // Reset then re-run setup so the visible art matches the current CardData.
+        skillController.Cleanup();
+        await skillController.Setup(card.Template?.ArtKey ?? "Invalid", card, false);
     }
 
     private bool EnsureApi(AssetLoader loader)
