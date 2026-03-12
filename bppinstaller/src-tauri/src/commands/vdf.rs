@@ -1,20 +1,8 @@
 use std::path::{Path, PathBuf};
 
+use super::{debug_error, debug_log};
+
 const THE_BAZAAR_APP_ID: &str = "1617400";
-
-macro_rules! debug_log {
-    ($($arg:tt)*) => {
-        #[cfg(debug_assertions)]
-        println!($($arg)*);
-    };
-}
-
-macro_rules! debug_error {
-    ($($arg:tt)*) => {
-        #[cfg(debug_assertions)]
-        eprintln!($($arg)*);
-    };
-}
 
 pub fn inject_launch_options(vdf_content: &str, args: &str) -> Result<String, String> {
     let marker = format!("\"{THE_BAZAAR_APP_ID}\"");
@@ -34,7 +22,7 @@ pub fn inject_launch_options(vdf_content: &str, args: &str) -> Result<String, St
         match ch {
             '{' => depth += 1,
             '}' => {
-                depth -= 1;
+                depth = depth.saturating_sub(1);
                 if depth == 0 {
                     brace_end = Some(brace_start + offset);
                     break;
@@ -88,7 +76,7 @@ pub fn clear_launch_options(vdf_content: &str) -> Result<String, String> {
         match ch {
             '{' => depth += 1,
             '}' => {
-                depth -= 1;
+                depth = depth.saturating_sub(1);
                 if depth == 0 {
                     brace_end = Some(brace_start + offset);
                     break;

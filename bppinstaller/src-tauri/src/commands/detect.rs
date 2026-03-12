@@ -93,7 +93,12 @@ pub fn parse_dotnet_runtimes(output: &str) -> Option<String> {
         .filter_map(|line| line.split_whitespace().nth(1))
         .filter(|version| is_supported_dotnet_version(version))
         .map(str::to_string)
-        .max()
+        .max_by(|a, b| parse_version_tuple(a).cmp(&parse_version_tuple(b)))
+}
+
+fn parse_version_tuple(v: &str) -> (u32, u32, u32) {
+    let mut parts = v.split('.').filter_map(|p| p.parse::<u32>().ok());
+    (parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0))
 }
 
 fn is_supported_dotnet_version(version: &str) -> bool {

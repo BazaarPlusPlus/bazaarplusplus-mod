@@ -3,8 +3,9 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { onMount } from 'svelte';
-  import { formatMessage, messages, resolveInitialLocale, type Locale } from '$lib/i18n';
   import type { DotnetInfo, EnvironmentInfo } from '$lib/types';
+  import { locale, handleLocaleToggle } from '$lib/locale';
+  import { formatMessage, messages } from '$lib/i18n';
 
   type StepState = 'idle' | 'detecting' | 'found' | 'not_found';
 
@@ -16,35 +17,12 @@
   let customGamePath = '';
   let actionBusy: 'idle' | 'detect' | 'install' | 'uninstall' = 'idle';
   let actionMenuOpen = false;
-  let locale: Locale = 'zh';
 
   $: t = (key: keyof typeof messages.en, params?: Record<string, string | number>): string =>
-    formatMessage(locale, key, params);
+    formatMessage($locale, key, params);
 
   function effectiveGamePath(): string {
     return customGamePath || env?.game_path || '';
-  }
-
-  function applyLocale(nextLocale: Locale) {
-    locale = nextLocale;
-
-    if (typeof document !== 'undefined') {
-      document.documentElement.lang = messages[nextLocale].htmlLang;
-    }
-
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('locale', nextLocale);
-    }
-  }
-
-  function toggleLocale() {
-    applyLocale(locale === 'zh' ? 'en' : 'zh');
-  }
-
-  function handleLocaleToggle(event: MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    toggleLocale();
   }
 
   async function verifyGamePath(path: string) {
@@ -138,7 +116,7 @@
     try {
       await invoke('install_bepinex', { gamePath: effectiveGamePath() });
       await invoke('patch_launch_options', {
-        steamPath: env!.steam_path,
+        steamPath: env?.steam_path ?? '',
         gamePath: effectiveGamePath()
       });
       await refreshAfterAction();
@@ -169,14 +147,14 @@
   $: modInstalled = Boolean(env?.bpp_version);
   $: isBusy = actionBusy !== 'idle';
   $: canInstall = !isBusy && dotnetState !== 'idle' && bazaarFound && hasPath;
-  $: dotnetDownloadUrl = locale === 'zh'
+  $: dotnetDownloadUrl = $locale === 'zh'
     ? 'https://dotnet.microsoft.com/zh-cn/download'
     : 'https://dotnet.microsoft.com/en-us/download';
-  $: localeBadge = locale === 'zh' ? '中' : 'EN';
-  $: localeButtonLabel = locale === 'zh' ? 'Switch to English' : '切换到中文';
+  $: localeBadge = $locale === 'zh' ? '中' : 'EN';
+  $: localeButtonLabel = $locale === 'zh' ? 'Switch to English' : '切换到中文';
 
   onMount(() => {
-    applyLocale(resolveInitialLocale());
+    locale.init();
     void detectEnvironment();
   });
 </script>

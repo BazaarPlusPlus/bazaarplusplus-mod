@@ -5,39 +5,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
-  import { formatMessage, messages, resolveInitialLocale, type Locale } from '$lib/i18n';
+  import { formatMessage, messages } from '$lib/i18n';
+  import { locale, handleLocaleToggle } from '$lib/locale';
 
-  let locale: Locale = 'zh';
   let frontendVersion = __FRONTEND_VERSION__;
   let backendVersion = '...';
 
   $: t = (key: keyof typeof messages.en, params?: Record<string, string | number>): string =>
-    formatMessage(locale, key, params);
+    formatMessage($locale, key, params);
 
-  function applyLocale(nextLocale: Locale) {
-    locale = nextLocale;
-
-    if (typeof document !== 'undefined') {
-      document.documentElement.lang = messages[nextLocale].htmlLang;
-    }
-
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('locale', nextLocale);
-    }
-  }
-
-  function toggleLocale() {
-    applyLocale(locale === 'zh' ? 'en' : 'zh');
-  }
-
-  function handleLocaleToggle(event: MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    toggleLocale();
-  }
-
-  $: localeBadge = locale === 'zh' ? '中' : 'EN';
-  $: localeButtonLabel = locale === 'zh' ? 'Switch to English' : '切换到中文';
+  $: localeBadge = $locale === 'zh' ? '中' : 'EN';
+  $: localeButtonLabel = $locale === 'zh' ? 'Switch to English' : '切换到中文';
 
   const inspiredBy = [
     { name: 'BazaarHelper', url: 'https://github.com/Duangi/BazaarHelper' },
@@ -69,7 +47,7 @@
   ];
 
   onMount(async () => {
-    applyLocale(resolveInitialLocale());
+    locale.init();
     try {
       backendVersion = await getVersion();
     } catch {}
