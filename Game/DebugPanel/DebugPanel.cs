@@ -19,8 +19,8 @@ internal sealed class DebugPanel : MonoBehaviour
     private static readonly GUIStyle LabelStyle = new GUIStyle();
     private static readonly GUIStyle ValueStyle = new GUIStyle();
     private static readonly GUIStyle MutedStyle = new GUIStyle();
-    private static readonly GUIStyle ToolbarButtonStyle = new GUIStyle(GUI.skin.button);
-    private static readonly GUIStyle EntryStyle = new GUIStyle(GUI.skin.button);
+    private static readonly GUIStyle ToolbarButtonStyle = new GUIStyle();
+    private static readonly GUIStyle EntryStyle = new GUIStyle();
     private static bool _stylesInitialized;
 
     private readonly DebugPanelState _panelState = new DebugPanelState();
@@ -280,9 +280,10 @@ internal sealed class DebugPanel : MonoBehaviour
     {
         var expanded = _panelState.IsEncounterExpanded(entry.Key);
         var matched = entry.Preview != null ? "matched" : "unmatched";
+        var toggleLabel = expanded ? "[-]" : "[+]";
         if (
             GUILayout.Button(
-                $"{(expanded ? "▼" : "▶")} {entry.Name}  T{entry.Tier}  {entry.Enchant}  {entry.CardId}  {matched}",
+                $"{toggleLabel} {entry.Name}  T{entry.Tier}  {entry.Enchant}  {entry.CardId}  {matched}",
                 EntryStyle
             )
         )
@@ -528,15 +529,34 @@ internal sealed class DebugPanel : MonoBehaviour
         MutedStyle.fontSize = 12;
         MutedStyle.wordWrap = true;
 
+        CopyButtonStyle(ToolbarButtonStyle);
         ToolbarButtonStyle.alignment = TextAnchor.MiddleLeft;
         ToolbarButtonStyle.fontSize = 13;
         ToolbarButtonStyle.padding = new RectOffset(8, 8, 6, 6);
 
+        CopyButtonStyle(EntryStyle);
         EntryStyle.alignment = TextAnchor.MiddleLeft;
         EntryStyle.fontSize = 14;
         EntryStyle.padding = new RectOffset(10, 8, 8, 8);
         EntryStyle.wordWrap = true;
 
         _stylesInitialized = true;
+    }
+
+    private static void CopyButtonStyle(GUIStyle target)
+    {
+        var buttonStyle = GUI.skin.button;
+        target.normal = buttonStyle.normal;
+        target.hover = buttonStyle.hover;
+        target.active = buttonStyle.active;
+        target.focused = buttonStyle.focused;
+        target.onNormal = buttonStyle.onNormal;
+        target.onHover = buttonStyle.onHover;
+        target.onActive = buttonStyle.onActive;
+        target.onFocused = buttonStyle.onFocused;
+        target.border = buttonStyle.border;
+        target.margin = buttonStyle.margin;
+        target.overflow = buttonStyle.overflow;
+        target.padding = buttonStyle.padding;
     }
 }
