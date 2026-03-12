@@ -1,3 +1,5 @@
+#nullable enable
+
 using BepInEx.Configuration;
 
 namespace BazaarPlusPlus;
