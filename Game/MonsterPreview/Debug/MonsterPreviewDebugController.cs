@@ -12,7 +12,6 @@ namespace BazaarPlusPlus;
 
 internal sealed class MonsterPreviewDebugController : MonoBehaviour
 {
-    private const string DefaultAnchorPath = "Game/=== BoardAnchor ===/BoardBase(Clone)/PlayerPortrait";
     private const float RefreshInterval = 0.2f;
     private const float MoveStep = 0.5f;
     private const float RotationStep = 5f;
@@ -84,7 +83,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
     {
         _overlayController = GetComponent<MonsterPreviewController>();
         _anchorStrategy = new FixedAnchorStrategy();
-        _presentation = new PreviewBoardPresentation();
+        _presentation = MonsterPreviewDefaults.CreateDebugPresentation();
         _tuner = new MonsterPreviewDebugTuner(_anchorStrategy, _presentation);
 
         if (_overlayController != null)
@@ -95,7 +94,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
             _overlayController.SetVisible(false);
         }
 
-        SeedAnchorFromBoardPortrait();
+        SeedAnchorToDefaultPose();
     }
 
     private void Update()
@@ -348,7 +347,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
     private void TogglePreview()
     {
         if (!_anchorSeeded)
-            SeedAnchorFromBoardPortrait();
+            SeedAnchorToDefaultPose();
 
         _overlayController.SetVisible(!_overlayController.Visible);
         if (_overlayController.Visible)
@@ -375,7 +374,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
 
     private void ResetAnchor()
     {
-        SeedAnchorFromBoardPortrait();
+        SeedAnchorToDefaultPose();
         BppLog.Debug(
             "MonsterPreviewDebugController",
             $"Anchor pos={_anchorStrategy.Position} rot={_anchorStrategy.Rotation.eulerAngles}"
@@ -491,37 +490,15 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         _overlayController.SetSkillCards(skillSpecs);
     }
 
-    private void SeedAnchorFromBoardPortrait()
+    private void SeedAnchorToDefaultPose()
     {
-        var anchorTransform = FindDefaultAnchorTransform();
-        if (anchorTransform != null)
-        {
-            _anchorStrategy.Position = anchorTransform.position;
-            _anchorStrategy.Rotation = anchorTransform.rotation;
-            _anchorSeeded = true;
-            BppLog.Debug(
-                "MonsterPreviewDebugController",
-                $"Seeded anchor from {DefaultAnchorPath}: {_anchorStrategy.Position}"
-            );
-            return;
-        }
-
-        var camera = Camera.main;
-        if (camera == null)
-            return;
-
-        _anchorStrategy.Position = camera.transform.position + camera.transform.forward * 12f;
-        _anchorStrategy.Rotation = Quaternion.identity;
+        _anchorStrategy.Position = MonsterPreviewDefaults.DefaultAnchorPose.Position;
+        _anchorStrategy.Rotation = MonsterPreviewDefaults.DefaultAnchorPose.Rotation;
         _anchorSeeded = true;
-        BppLog.Warn(
+        BppLog.Debug(
             "MonsterPreviewDebugController",
-            $"Default anchor '{DefaultAnchorPath}' not found, fell back to camera seed: {_anchorStrategy.Position}"
+            $"Seeded anchor to fixed preview pose: {_anchorStrategy.Position}"
         );
-    }
-
-    private static Transform FindDefaultAnchorTransform()
-    {
-        return GameObject.Find(DefaultAnchorPath)?.transform;
     }
 
     private void ApplyLayout()

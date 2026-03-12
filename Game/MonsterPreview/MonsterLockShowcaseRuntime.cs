@@ -11,8 +11,6 @@ namespace BazaarPlusPlus;
 
 internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 {
-    private static readonly Vector3 FixedPreviewPosition = new Vector3(4f, 1f, -5f);
-    private static readonly Quaternion FixedPreviewRotation = Quaternion.identity;
     private static readonly Rect FixedHole = new Rect(0.52f, 0.18f, 0.40f, 0.22f);
 
     private static readonly System.Reflection.PropertyInfo CurrentTooltipControllerProperty =
@@ -67,7 +65,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             PreviewBoardRequestFactory.CreateFixed(
                 cards,
                 skillCards,
-                new BoardPose { Position = FixedPreviewPosition, Rotation = FixedPreviewRotation },
+                MonsterPreviewDefaults.DefaultAnchorPose,
                 title: card?.Template?.InternalName ?? source,
                 metadata: new Dictionary<string, string> { ["source"] = source }
             )

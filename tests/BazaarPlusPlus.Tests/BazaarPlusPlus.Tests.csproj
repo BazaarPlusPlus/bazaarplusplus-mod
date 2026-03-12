@@ -42,6 +42,7 @@
     <Compile Include="../../Game/MonsterPreview/Architecture/BoardRenderModel.cs" Link="Game/MonsterPreview/Architecture/BoardRenderModel.cs" />
     <Compile Include="../../Game/MonsterPreview/Architecture/PreviewBoardDebugOptions.cs" Link="Game/MonsterPreview/Architecture/PreviewBoardDebugOptions.cs" />
     <Compile Include="../../Game/MonsterPreview/Architecture/PreviewBoardPresentation.cs" Link="Game/MonsterPreview/Architecture/PreviewBoardPresentation.cs" />
+    <Compile Include="../../Game/MonsterPreview/Architecture/MonsterPreviewDefaults.cs" Link="Game/MonsterPreview/Architecture/MonsterPreviewDefaults.cs" />
     <Compile Include="../../Game/MonsterPreview/Architecture/IPreviewDataSource.cs" Link="Game/MonsterPreview/Architecture/IPreviewDataSource.cs" />
     <Compile Include="../../Game/MonsterPreview/Architecture/CompositePreviewDataSource.cs" Link="Game/MonsterPreview/Architecture/CompositePreviewDataSource.cs" />
     <Compile Include="../../Game/MonsterPreview/Architecture/PreviewBoardSignature.cs" Link="Game/MonsterPreview/Architecture/PreviewBoardSignature.cs" />
@@ -56,7 +57,6 @@
     <Compile Include="../../Game/MonsterPreview/View/BoardView.cs" Link="Game/MonsterPreview/View/BoardView.cs" />
     <Compile Include="../../Game/MonsterPreview/Anchor/AnchorAdjustment.cs" Link="Game/MonsterPreview/Anchor/AnchorAdjustment.cs" />
     <Compile Include="../../Game/MonsterPreview/Anchor/FixedAnchorStrategy.cs" Link="Game/MonsterPreview/Anchor/FixedAnchorStrategy.cs" />
-    <Compile Include="../../Game/MonsterPreview/Anchor/TrackedTransformAnchorStrategy.cs" Link="Game/MonsterPreview/Anchor/TrackedTransformAnchorStrategy.cs" />
     <Compile Include="../../Game/MonsterPreview/Anchor/AdjustableAnchorStrategy.cs" Link="Game/MonsterPreview/Anchor/AdjustableAnchorStrategy.cs" />
   </ItemGroup>
 </Project>

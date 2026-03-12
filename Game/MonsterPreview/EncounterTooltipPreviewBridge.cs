@@ -11,9 +11,6 @@ namespace BazaarPlusPlus;
 
 internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
 {
-    private static readonly Vector3 FixedPreviewPosition = new Vector3(4f, 1f, -5f);
-    private static readonly Quaternion FixedPreviewRotation = Quaternion.identity;
-
     private static readonly System.Reflection.PropertyInfo CurrentTooltipControllerProperty =
         AccessTools.Property(typeof(TooltipParentComponent), "CardTooltipController");
 
@@ -63,7 +60,7 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
             PreviewBoardRequestFactory.CreateFixed(
                 cards,
                 skillCards,
-                new BoardPose { Position = FixedPreviewPosition, Rotation = FixedPreviewRotation },
+                MonsterPreviewDefaults.DefaultAnchorPose,
                 title: card.Template?.InternalName ?? source,
                 metadata: new Dictionary<string, string> { ["source"] = source }
             )

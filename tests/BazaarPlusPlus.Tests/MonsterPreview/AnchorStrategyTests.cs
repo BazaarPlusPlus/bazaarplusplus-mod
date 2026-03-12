@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using Xunit;
 
@@ -46,34 +45,5 @@ public sealed class AnchorStrategyTests
         Assert.NotNull(pose);
         Assert.Equal(new Vector3(5f, 3f, 9f), pose!.Position);
         Assert.Equal(Quaternion.Euler(0f, 25f, 0f), pose.Rotation);
-    }
-
-    [Fact]
-    public void TrackedTransformAnchorStrategy_returns_false_when_resolver_has_no_target()
-    {
-        var strategy = new TrackedTransformAnchorStrategy(() => null);
-
-        var resolved = strategy.TryResolve(out var pose);
-
-        Assert.False(resolved);
-        Assert.Null(pose);
-    }
-
-    [Fact]
-    public void TrackedTransformAnchorStrategy_uses_transform_pose()
-    {
-        var transform = new Transform
-        {
-            position = new Vector3(7f, 8f, 9f),
-            rotation = Quaternion.Euler(0f, 90f, 0f),
-        };
-        var strategy = new TrackedTransformAnchorStrategy(() => transform);
-
-        var resolved = strategy.TryResolve(out var pose);
-
-        Assert.True(resolved);
-        Assert.NotNull(pose);
-        Assert.Equal(new Vector3(7f, 8f, 9f), pose!.Position);
-        Assert.Equal(Quaternion.Euler(0f, 90f, 0f), pose.Rotation);
     }
 }

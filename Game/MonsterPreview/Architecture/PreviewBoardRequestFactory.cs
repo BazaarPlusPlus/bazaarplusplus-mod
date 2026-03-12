@@ -23,23 +23,8 @@ internal static class PreviewBoardRequestFactory
         {
             DataSource = dataSource,
             AnchorStrategy = new FixedAnchorStrategy(pose),
-            Presentation = presentation ?? CreateShowcasePresentation(),
+            Presentation = presentation ?? MonsterPreviewDefaults.CreateShowcasePresentation(),
             Debug = debug ?? new PreviewBoardDebugOptions(),
-        };
-    }
-
-    public static PreviewBoardPresentation CreateShowcasePresentation()
-    {
-        return new PreviewBoardPresentation
-        {
-            Visible = true,
-            LocalOffset = new UnityEngine.Vector3(0f, 0.1f, 0f),
-            CardSpacing = new UnityEngine.Vector3(1.1f, 0f, 0f),
-            CardScale = UnityEngine.Vector3.one * 0.5f,
-            BoardSize = new UnityEngine.Vector2(8.25f, 2.75f),
-            BoardThickness = 0.02f,
-            BorderThickness = 0.04f,
-            BorderHeight = 0.04f,
         };
     }
 }
