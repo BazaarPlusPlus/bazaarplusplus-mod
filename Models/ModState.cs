@@ -33,6 +33,7 @@ internal static class ModState
     public static List<RunInfo.MonsterPreview> EncounterMonsterPreviews; // combat encounter monster info from local DB
 
     public static List<EEnchantmentType> AvailableEnchantments = new List<EEnchantmentType>();
+    public static string CardsJsonPath;
 
     public static void Initialize(ConfigFile config)
     {
@@ -57,6 +58,10 @@ internal static class ModState
         CombatSpeedMultiplier = ClampSpeed(DefaultCombatSpeedConfig.Value);
         Logger?.LogInfo(
             $"[ModState] Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, combatStatusBar={EnableCombatStatusBarConfig.Value}, combatSpeed={CombatSpeedMultiplier:F2}x"
+        );
+        CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
+        Logger?.LogInfo(
+            $"[ModState] cards.json path initialized: {CardsJsonPath ?? "<null>"}"
         );
     }
 

@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 using System;
 using System.Collections.Generic;
+using BazaarGameShared.Domain.Core.Types;
 
 namespace BazaarPlusPlus;
 
@@ -25,6 +26,7 @@ internal static class SkillPreviewSpecBuilder
                     SourceName = skill.Title ?? string.Empty,
                     Size = 1,
                     Enchant = "None",
+                    Attributes = BuildAttributes(skill.SkillId, skill.Tier),
                 }
             );
         }
@@ -52,5 +54,19 @@ internal static class SkillPreviewSpecBuilder
             default:
                 return 0;
         }
+    }
+
+    private static Dictionary<int, int> BuildAttributes(Guid templateId, string tier)
+    {
+        var result = new Dictionary<int, int>();
+        foreach (var pair in ItemAttr.GetAttributes(templateId, tier))
+        {
+            if (!Enum.TryParse<ECardAttributeType>(pair.Key, out var attributeType))
+                continue;
+
+            result[(int)attributeType] = pair.Value;
+        }
+
+        return result;
     }
 }

@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 using System;
 using System.Collections.Generic;
+using BazaarGameShared.Domain.Core.Types;
 
 namespace BazaarPlusPlus;
 
@@ -24,6 +25,7 @@ internal static class MonsterPreviewSpecBuilder
                     Tier = ParseTier(card.Tier),
                     Size = ParseSize(card.Size),
                     Enchant = "None",
+                    Attributes = BuildAttributes(card.CardId, card.Tier),
                 }
             );
         }
@@ -69,5 +71,19 @@ internal static class MonsterPreviewSpecBuilder
             default:
                 return 1;
         }
+    }
+
+    private static Dictionary<int, int> BuildAttributes(Guid templateId, string tier)
+    {
+        var result = new Dictionary<int, int>();
+        foreach (var pair in ItemAttr.GetAttributes(templateId, tier))
+        {
+            if (!Enum.TryParse<ECardAttributeType>(pair.Key, out var attributeType))
+                continue;
+
+            result[(int)attributeType] = pair.Value;
+        }
+
+        return result;
     }
 }
