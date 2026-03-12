@@ -1,6 +1,8 @@
 #nullable enable
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
+using BepInEx;
 
 namespace BazaarPlusPlus;
 
@@ -9,21 +11,42 @@ internal static class CardJsonPathResolver
     public static string? GetCardsJsonPath()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            return GetCardsJsonPath("mac");
+            return GetCardsJsonPath("mac", Paths.GameRootPath);
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return GetCardsJsonPath("windows");
+            return GetCardsJsonPath("windows", Paths.GameRootPath);
 
         return null;
     }
 
     internal static string? GetCardsJsonPath(string platform)
     {
+        return GetCardsJsonPath(platform, null);
+    }
+
+    internal static string? GetCardsJsonPath(string platform, string? gameRootPath)
+    {
+        if (string.IsNullOrWhiteSpace(gameRootPath))
+            return null;
+
         if (string.Equals(platform, "mac", StringComparison.OrdinalIgnoreCase))
-            return "/Users/yxinyu/codes/BazaarPlusPlus/cards.json";
+            return Path.Combine(
+                gameRootPath,
+                "TheBazaar.app",
+                "Contents",
+                "Resources",
+                "Data",
+                "StreamingAssets",
+                "cards.json"
+            );
 
         if (string.Equals(platform, "windows", StringComparison.OrdinalIgnoreCase))
-            return @"C:\Users\yxinyu\codes\BazaarPlusPlus\cards.json";
+            return Path.Combine(
+                gameRootPath,
+                "TheBazaar_Data",
+                "StreamingAssets",
+                "cards.json"
+            );
 
         return null;
     }

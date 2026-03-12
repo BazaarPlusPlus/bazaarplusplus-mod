@@ -61,7 +61,17 @@ internal static class ModState
             $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, combatStatusBar={EnableCombatStatusBarConfig.Value}, combatSpeed={CombatSpeedMultiplier:F2}x"
         );
         CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
-        BppLog.Debug("ModState", $"cards.json path initialized: {CardsJsonPath ?? "<null>"}");
+        if (string.IsNullOrWhiteSpace(CardsJsonPath))
+        {
+            BppLog.Error(
+                "ModState",
+                "Failed to resolve cards.json path from BepInEx game root; cards.json will be unavailable"
+            );
+        }
+        else
+        {
+            BppLog.Debug("ModState", $"cards.json path initialized: {CardsJsonPath}");
+        }
     }
 
     public static void BeginCombatPlayback()

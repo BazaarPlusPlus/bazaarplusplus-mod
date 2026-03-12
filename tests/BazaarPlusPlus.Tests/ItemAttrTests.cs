@@ -1,4 +1,5 @@
 using BazaarPlusPlus;
+using System.IO;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests;
@@ -13,17 +14,44 @@ public sealed class ItemAttrTests
     [Fact]
     public void GetCardsJsonPath_ReturnsConfiguredPathForMac()
     {
-        var path = CardJsonPathResolver.GetCardsJsonPath("mac");
+        var path = CardJsonPathResolver.GetCardsJsonPath(
+            "mac",
+            "/Users/yxinyu/Library/Application Support/Steam/steamapps/common/The Bazaar"
+        );
 
-        Assert.Equal("/Users/yxinyu/codes/BazaarPlusPlus/cards.json", path);
+        Assert.Equal(
+            "/Users/yxinyu/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/StreamingAssets/cards.json",
+            path
+        );
     }
 
     [Fact]
     public void GetCardsJsonPath_ReturnsConfiguredPathForWindows()
     {
-        var path = CardJsonPathResolver.GetCardsJsonPath("windows");
+        var path = CardJsonPathResolver.GetCardsJsonPath(
+            "windows",
+            @"C:\Program Files (x86)\Steam\steamapps\common\The Bazaar"
+        );
 
-        Assert.Equal(@"C:\Users\yxinyu\codes\BazaarPlusPlus\cards.json", path);
+        Assert.Equal(
+            Path.Combine(
+                @"C:\Program Files (x86)\Steam\steamapps\common\The Bazaar",
+                "TheBazaar_Data",
+                "StreamingAssets",
+                "cards.json"
+            ),
+            path
+        );
+    }
+
+    [Fact]
+    public void GetCardsJsonPath_ReturnsNullWhenGameRootPathIsMissing()
+    {
+        var macPath = CardJsonPathResolver.GetCardsJsonPath("mac", null);
+        var windowsPath = CardJsonPathResolver.GetCardsJsonPath("windows", "");
+
+        Assert.Null(macPath);
+        Assert.Null(windowsPath);
     }
 
     [Fact]
