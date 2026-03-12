@@ -20,6 +20,7 @@ public class Plugin : BaseUnityPlugin
 
         var configFile = new ConfigFile(Path.Combine(Paths.ConfigPath, "BazaarPlusPlus.cfg"), true);
         ModState.Initialize(configFile);
+        CombatStatusBar.InitializeConfig(configFile);
 
         MonsterDatabase.Load();
         EncounterTracker.Subscribe();

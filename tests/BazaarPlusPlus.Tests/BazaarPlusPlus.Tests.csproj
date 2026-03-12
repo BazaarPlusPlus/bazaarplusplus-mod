@@ -31,6 +31,7 @@
     <Compile Include="../../Infrastructure/BppLog.cs" Link="Infrastructure/BppLog.cs" />
     <Compile Include="../../Data/ItemAttr.cs" Link="Data/ItemAttr.cs" />
     <Compile Include="../../Game/DebugPanel/DebugPanelState.cs" Link="Game/DebugPanel/DebugPanelState.cs" />
+    <Compile Include="../../Game/CombatStatusBar/CombatStatusBar.State.cs" Link="Game/CombatStatusBar/CombatStatusBar.State.cs" />
     <Compile Include="../../Game/Overlay/Showcase/LockCanvasHoleLayout.cs" Link="Game/Overlay/Showcase/LockCanvasHoleLayout.cs" />
     <Compile Include="../../Game/Overlay/Showcase/MonsterLockShowcaseController.cs" Link="Game/Overlay/Showcase/MonsterLockShowcaseController.cs" />
     <Compile Include="../../Game/Overlay/GameObjectFactory/PreviewCardLifecyclePolicy.cs" Link="Game/Overlay/GameObjectFactory/PreviewCardLifecyclePolicy.cs" />

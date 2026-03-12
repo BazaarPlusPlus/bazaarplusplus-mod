@@ -1,0 +1,154 @@
+using System;
+
+namespace BazaarPlusPlus;
+
+internal sealed partial class CombatStatusBar
+{
+    private static readonly float[] SpeedSteps = { 0.25f, 0.5f, 1f, 2f, 3f, 5f, };
+
+    internal static bool IsCombatPlaybackActive { get; private set; }
+    internal static bool HasUnlockedStandbyDisplay { get; private set; }
+    internal static float CombatSpeedMultiplier { get; private set; } = 1f;
+    internal static int ProcessedCombatFrames { get; private set; }
+    internal static int TotalCombatFrames { get; private set; }
+    internal static ReadOnlySpan<float> CombatSpeedSteps => SpeedSteps;
+
+    internal static void BeginCombatPlayback()
+    {
+        IsCombatPlaybackActive = true;
+        HasUnlockedStandbyDisplay = true;
+        ProcessedCombatFrames = 0;
+    }
+
+    internal static void EndCombatPlayback()
+    {
+        IsCombatPlaybackActive = false;
+    }
+
+    internal static void SetCombatFrameTotal(int totalFrames)
+    {
+        TotalCombatFrames = Math.Max(totalFrames, 0);
+        ProcessedCombatFrames = 0;
+    }
+
+    internal static void AdvanceCombatFrame()
+    {
+        if (!IsCombatPlaybackActive)
+            return;
+
+        ProcessedCombatFrames++;
+        if (TotalCombatFrames > 0 && ProcessedCombatFrames > TotalCombatFrames)
+            ProcessedCombatFrames = TotalCombatFrames;
+    }
+
+    internal static TimeSpan GetCombatLogicalElapsed()
+    {
+        return TimeSpan.FromMilliseconds(ProcessedCombatFrames * 50d);
+    }
+
+    internal static float StepCombatSpeed(int direction)
+    {
+        var currentIndex = GetCurrentSpeedStepIndex();
+        currentIndex = Math.Clamp(currentIndex + direction, 0, SpeedSteps.Length - 1);
+        return SetCombatSpeed(SpeedSteps[currentIndex]);
+    }
+
+    internal static float SetCombatSpeed(float speed)
+    {
+        if (!IsSupportedSpeedStep(speed))
+            return CombatSpeedMultiplier;
+
+        CombatSpeedMultiplier = speed;
+        PersistCombatSpeed(CombatSpeedMultiplier);
+        return CombatSpeedMultiplier;
+    }
+
+    internal static bool ShouldRenderForState(bool overlayVisible, bool enabled)
+    {
+        return overlayVisible && enabled && HasUnlockedStandbyDisplay;
+    }
+
+    internal static bool CanStepCombatSpeed(int direction)
+    {
+        var currentIndex = GetCurrentSpeedStepIndex();
+        var nextIndex = currentIndex + direction;
+        return nextIndex >= 0 && nextIndex < SpeedSteps.Length;
+    }
+
+    internal static string FormatCombatSpeedLabel()
+    {
+        return $"{CombatSpeedMultiplier:0.00}x";
+    }
+
+    internal static string GetDisplayedTimeText()
+    {
+        return IsCombatPlaybackActive
+            ? FormatElapsed(GetCombatLogicalElapsed())
+            : "-:--:--";
+    }
+
+    internal static string GetDisplayedFrameText()
+    {
+        return IsCombatPlaybackActive
+            ? ProcessedCombatFrames.ToString()
+            : "Standby";
+    }
+
+    internal static float AdvanceVisualBlend(float current, bool active, float deltaTime)
+    {
+        var target = active ? 1f : 0f;
+        var maxStep = Math.Max(deltaTime, 0f) * 5f;
+        if (current < target)
+            return Math.Min(current + maxStep, target);
+
+        if (current > target)
+            return Math.Max(current - maxStep, target);
+
+        return current;
+    }
+
+    internal static void ResetStateForTests()
+    {
+        IsCombatPlaybackActive = false;
+        HasUnlockedStandbyDisplay = false;
+        CombatSpeedMultiplier = 1f;
+        ProcessedCombatFrames = 0;
+        TotalCombatFrames = 0;
+    }
+
+    private static int GetCurrentSpeedStepIndex()
+    {
+        var currentIndex = 0;
+        var smallestDelta = float.MaxValue;
+        for (var i = 0; i < SpeedSteps.Length; i++)
+        {
+            var delta = Math.Abs(SpeedSteps[i] - CombatSpeedMultiplier);
+            if (delta < smallestDelta)
+            {
+                smallestDelta = delta;
+                currentIndex = i;
+            }
+        }
+
+        return currentIndex;
+    }
+
+    private static bool IsSupportedSpeedStep(float speed)
+    {
+        for (var i = 0; i < SpeedSteps.Length; i++)
+        {
+            if (Math.Abs(SpeedSteps[i] - speed) < 0.0001f)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string FormatElapsed(TimeSpan elapsed)
+    {
+        var minutes = (int)elapsed.TotalMinutes;
+        return $"{minutes}:{elapsed.Seconds:00}:{elapsed.Milliseconds / 10:00}";
+    }
+
+    static partial void PersistCombatSpeed(float speed);
+}

@@ -17,7 +17,7 @@ class CombatSimPatch
         if (ModState.LastMessageId == message.MessageId)
             return;
         ModState.LastMessageId = message.MessageId;
-        ModState.SetCombatFrameTotal(message.Data?.Frames?.Count ?? 0);
+        CombatStatusBar.SetCombatFrameTotal(message.Data?.Frames?.Count ?? 0);
         ModState.LastVictoryCondition =
             message.Data.Winner == ECombatantId.Player
                 ? EVictoryCondition.Win
@@ -31,6 +31,6 @@ class CombatFrameAdvancePatch
     [HarmonyPostfix]
     static void Postfix()
     {
-        ModState.AdvanceCombatFrame();
+        CombatStatusBar.AdvanceCombatFrame();
     }
 }

@@ -2,27 +2,30 @@
 
 ## Goal
 
-Add a lightweight combat status bar that appears during combat playback and shows:
+Add a lightweight combat playback controller that stays visible in both standby and combat states and shows:
 
 - logical combat time
-- current processed frame and total frame count
+- current processed frame count without exposing total frame count
 - current playback speed
-- preset speed buttons
+- step-based speed controls
+- a disabled pause segment for future expansion
 
-This intentionally does not implement frame stepping, rewind, or a custom replay controller.
+This intentionally does not implement pause behavior, frame stepping, rewind, or a custom replay controller.
 
 ## Scope
 
 Implemented behavior:
 
-- show a bottom status bar only while combat playback is active
+- show the same bottom-centered controller in standby and combat
+- display standby content outside combat and active content during combat
 - display logical combat time based on processed combat frames
-- display frame progress as `processed/total`
-- allow playback speed changes through preset buttons only
+- display frame progress as processed count only
+- allow playback speed changes through discrete step buttons only
 - keep the original game combat simulation loop intact
 
 Explicitly out of scope:
 
+- pause / resume implementation
 - rewind one frame
 - fast-forward one frame
 - exposing or patching the local `watch` variable inside `CombatSimHandler.Simulate`
@@ -30,10 +33,13 @@ Explicitly out of scope:
 
 ## Files
 
-- [Plugin.cs](/C:/Users/cauyx/Desktop/codes/BazaarPlannerMod/Plugin.cs)
-- [Game/CombatStatusBar.cs](/C:/Users/cauyx/Desktop/codes/BazaarPlannerMod/Game/CombatStatusBar.cs)
-- [Models/ModState.cs](/C:/Users/cauyx/Desktop/codes/BazaarPlannerMod/Models/ModState.cs)
-- [Patches/Patches.cs](/C:/Users/cauyx/Desktop/codes/BazaarPlannerMod/Patches/Patches.cs)
+- [Plugin.cs](/Users/yxinyu/codes/BazaarPlusPlus/Plugin.cs)
+- [Game/CombatStatusBar/CombatStatusBar.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/CombatStatusBar/CombatStatusBar.cs)
+- [Game/CombatStatusBar/CombatStatusBar.State.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/CombatStatusBar/CombatStatusBar.State.cs)
+- [Game/CombatStatusBar/CombatStatusBar.Config.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/CombatStatusBar/CombatStatusBar.Config.cs)
+- [Models/ModState.cs](/Users/yxinyu/codes/BazaarPlusPlus/Models/ModState.cs)
+- [Patches/Combat/CombatSimulationPatches.cs](/Users/yxinyu/codes/BazaarPlusPlus/Patches/Combat/CombatSimulationPatches.cs)
+- [Patches/Combat/CombatSpeedPatch.cs](/Users/yxinyu/codes/BazaarPlusPlus/Patches/Combat/CombatSpeedPatch.cs)
 
 ## Runtime Model
 
@@ -44,13 +50,15 @@ Explicitly out of scope:
 Responsibilities:
 
 - subscribe to combat start/end events
-- show and hide the bottom overlay
+- show and hide the bottom controller
+- render standby and active content states
 - render current logical time, frame progress, and speed
-- allow the user to select from predefined speed presets
+- expose combat playback state to Harmony patches
+- allow the user to move between predefined speed steps
 
 ### Shared runtime state
 
-`ModState` stores the combat playback state needed by both the overlay and Harmony patches:
+`CombatStatusBar` stores the combat playback state needed by both the overlay and Harmony patches:
 
 - `CombatPlaybackActive`
 - `CombatSpeedMultiplier`
@@ -78,8 +86,8 @@ Source:
 Mod flow:
 
 1. `CombatStatusBar` listens to `Events.CombatStarted`
-2. `CombatStatusBar.OnCombatStarted()` calls `ModState.BeginCombatPlayback()`
-3. the status bar becomes visible if enabled
+2. `CombatStatusBar.OnCombatStarted()` calls `CombatStatusBar.BeginCombatPlayback()`
+3. the controller transitions from standby visuals to active visuals
 
 ### Combat end
 
@@ -90,8 +98,8 @@ Source:
 Mod flow:
 
 1. `CombatStatusBar` listens to `Events.CombatEnded`
-2. `CombatStatusBar.OnCombatEnded()` calls `ModState.EndCombatPlayback()`
-3. the status bar stops rendering
+2. `CombatStatusBar.OnCombatEnded()` calls `CombatStatusBar.EndCombatPlayback()`
+3. the controller transitions back to standby visuals
 
 ## Logical Time Design
 
@@ -114,7 +122,7 @@ From the decompiled runtime:
 - each frame is scheduled at a base interval of `50ms`
 - that means the simulation runs at a base rate of `20 frames/second`
 
-The status bar therefore defines logical combat time as:
+The controller therefore defines logical combat time as:
 
 `logical time = processed frame count * 50ms`
 
@@ -122,6 +130,7 @@ This means:
 
 - changing playback speed does not change the logical time shown
 - the displayed time reflects progress on the combat simulation timeline
+- outside combat, the controller shows `--:--`
 
 ### How processed frames are counted
 
@@ -134,28 +143,34 @@ Instead:
 
 This works because `FinalBlowSlowDownController.Process(...)` is invoked once per simulation frame inside the main combat loop.
 
+Default UI behavior:
+
+- during combat, show processed frame count only
+- do not show total frame count in the default UI, to avoid telegraphing combat length
+- outside combat, show `Standby`
+
 ## Speed Control Design
 
-### Preset-only speeds
+### Step-based speeds
 
-The status bar allows only preset speeds.
+The controller allows only discrete speed steps.
 
-Current preset list is stored in `ModState.CombatSpeedSteps`.
+Current step list is stored in `CombatStatusBar.CombatSpeedSteps`.
 
 At the moment the list is:
 
 - `0.25x`
-- `0.5x`
-- `1x`
-- `2x`
-- `3x`
-- `4x`
+- `0.50x`
+- `1.00x`
+- `2.00x`
+- `3.00x`
+- `5.00x`
 
-### Why preset-only
+### Why step-based
 
-Preset-only speeds keep the behavior predictable:
+Discrete speeds keep the behavior predictable:
 
-- fewer UI controls
+- one compact multiplier control instead of a row of buttons
 - fewer edge cases
 - no arbitrary user-entered values
 - easier balancing against the game’s own final-blow slowdown logic
@@ -166,7 +181,7 @@ The mod patches `CombatSimHandler.SetSpeed(float speed)` with a Harmony prefix.
 
 When combat playback is active:
 
-- the incoming speed argument is replaced with `ModState.CombatSpeedMultiplier`
+- the incoming speed argument is replaced with `CombatStatusBar.CombatSpeedMultiplier`
 
 This means the game still uses its normal simulation loop, but speed selection is overridden by the mod’s chosen preset.
 
@@ -174,13 +189,13 @@ This means the game still uses its normal simulation loop, but speed selection i
 
 Current config entries:
 
-- `Combat.EnableStatusBar`
+- `Combat.EnableCombatStatusBar`
 - `Combat.DefaultSpeedMultiplier`
 
 Behavior:
 
 - the default speed is loaded at startup
-- selecting a preset in the UI updates the active speed
+- selecting a step in the UI updates the active speed
 - the selected speed is also written back to the config entry
 
 ## UI Behavior
@@ -189,15 +204,25 @@ Location:
 
 - bottom center of the screen
 
-Displayed values:
+Layout:
 
-- `Sim`: logical combat time
-- `Frame`: processed frame progress
-- `Speed`: current active multiplier
+- four fixed segments: `Time | Frame | Multiplier | Pause`
+
+State content:
+
+- standby: `Time=--:--`, `Frame=Standby`, `Multiplier=current preset`, `Pause=disabled`
+- combat: `Time=logical elapsed`, `Frame=processed only`, `Multiplier=current speed`, `Pause=disabled`
+
+Visual transition:
+
+- standby uses a darker, lower-contrast palette
+- combat uses a brighter warm palette
+- the controller blends between those palettes when combat starts or ends
 
 Controls:
 
-- preset buttons only
+- left/right multiplier step buttons
+- disabled pause button placeholder
 - `F6` toggles the visibility of the bar
 
 ## Tradeoffs
@@ -228,9 +253,8 @@ Reason:
 
 ## Known Limitations
 
-- the implementation has not been compiled in this environment because no usable .NET SDK is available here
 - frame counting assumes `FinalBlowSlowDownController.Process(...)` remains one call per processed combat frame
-- the bar tracks combat playback time only, not recap browsing or board transition time
+- the controller tracks combat playback time only, not recap browsing or board transition time
 - this is not a full replay controller and does not support frame stepping or rewind
 
 ## Future Extensions
