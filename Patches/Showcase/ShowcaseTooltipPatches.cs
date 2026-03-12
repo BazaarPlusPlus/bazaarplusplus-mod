@@ -1,28 +1,9 @@
 #pragma warning disable CS0436
 using HarmonyLib;
+using TheBazaar;
 using TheBazaar.UI.Tooltips;
 
 namespace BazaarPlusPlus;
-
-[HarmonyPatch(typeof(CardController), "ProceedClick")]
-internal static class ShowcaseCardClickPatch
-{
-    [HarmonyPrefix]
-    private static bool Prefix(CardController __instance)
-    {
-        return __instance == null || __instance.GetComponent<ShowcaseCardMarker>() == null;
-    }
-}
-
-[HarmonyPatch(typeof(ItemController), nameof(ItemController.OnBeginDrag))]
-internal static class ShowcaseCardDragPatch
-{
-    [HarmonyPrefix]
-    private static bool Prefix(ItemController __instance)
-    {
-        return __instance == null || __instance.GetComponent<ShowcaseCardMarker>() == null;
-    }
-}
 
 /// <summary>
 /// When ShowTooltips runs on a showcase card, set a bypass flag so the
@@ -100,6 +81,31 @@ internal static class ShowcaseDisableLockCanvasPatch
     private static bool Prefix()
     {
         return !ShowcaseTooltipBypass.ShowingTooltip;
+    }
+}
+
+[HarmonyPatch(typeof(CardTooltipController), nameof(CardTooltipController.LockTooltipToggle))]
+public static class CardTooltipControllerLockTogglePatch
+{
+    [HarmonyPrefix]
+    static bool Prefix(CardTooltipController __instance)
+    {
+        var currentCard = __instance?.CurrentCard;
+        if (currentCard == null)
+            return true;
+
+        var controller = Data.CardAndSkillLookup?.GetCardController(currentCard);
+        if (controller == null)
+            return true;
+
+        if (controller.GetComponent<ShowcaseCardMarker>() == null)
+            return true;
+
+        BppLog.Debug(
+            "EncounterTooltipPreview",
+            $"Suppressed lock toggle for showcase card {currentCard.Template?.InternalName ?? currentCard.TemplateId.ToString()}"
+        );
+        return false;
     }
 }
 
