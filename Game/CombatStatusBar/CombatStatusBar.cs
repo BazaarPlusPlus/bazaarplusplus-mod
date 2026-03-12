@@ -172,8 +172,9 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
         GUI.Label(new Rect(rect.x, rect.y + 10f, rect.width, 16f), "Pause", LabelStyle);
         var previousColor = GUI.color;
         GUI.color = Color.Lerp(new Color(0.38f, 0.40f, 0.45f, 0.55f), new Color(0.52f, 0.44f, 0.30f, 0.70f), visualBlend);
-        GUI.enabled = false;
-        GUI.Button(new Rect(rect.x + 18f, rect.y + 26f, rect.width - 36f, 36f), "||", PauseButtonStyle);
+        GUI.enabled = CanToggleCombatPause();
+        if (GUI.Button(new Rect(rect.x + 18f, rect.y + 26f, rect.width - 36f, 36f), IsCombatPaused ? ">" : "||", PauseButtonStyle))
+            ToggleCombatPause();
         GUI.enabled = true;
         GUI.color = previousColor;
     }

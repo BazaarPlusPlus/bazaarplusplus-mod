@@ -1,4 +1,5 @@
 using System;
+using TheBazaar;
 
 namespace BazaarPlusPlus;
 
@@ -7,6 +8,7 @@ internal sealed partial class CombatStatusBar
     private static readonly float[] SpeedSteps = { 0.25f, 0.5f, 1f, 2f, 3f, 4f, 5f, };
 
     internal static bool IsCombatPlaybackActive { get; private set; }
+    internal static bool IsCombatPaused { get; private set; }
     internal static float CombatSpeedMultiplier { get; private set; } = 1f;
     internal static int ProcessedCombatFrames { get; private set; }
     internal static int TotalCombatFrames { get; private set; }
@@ -20,6 +22,7 @@ internal sealed partial class CombatStatusBar
 
     internal static void EndCombatPlayback()
     {
+        SetCombatPaused(false);
         IsCombatPlaybackActive = false;
     }
 
@@ -113,9 +116,31 @@ internal sealed partial class CombatStatusBar
     internal static void ResetStateForTests()
     {
         IsCombatPlaybackActive = false;
+        IsCombatPaused = false;
         CombatSpeedMultiplier = 1f;
         ProcessedCombatFrames = 0;
         TotalCombatFrames = 0;
+    }
+
+    internal static bool CanToggleCombatPause()
+    {
+        return IsCombatPlaybackActive && Singleton<GameServiceManager>.Instance != null;
+    }
+
+    internal static bool ToggleCombatPause()
+    {
+        return SetCombatPaused(!IsCombatPaused);
+    }
+
+    internal static bool SetCombatPaused(bool paused)
+    {
+        var gameServiceManager = Singleton<GameServiceManager>.Instance;
+        if (gameServiceManager == null)
+            return IsCombatPaused;
+
+        gameServiceManager.PauseOrUnpauseGame(paused);
+        IsCombatPaused = gameServiceManager.GamePaused;
+        return IsCombatPaused;
     }
 
     private static int GetCurrentSpeedStepIndex()
