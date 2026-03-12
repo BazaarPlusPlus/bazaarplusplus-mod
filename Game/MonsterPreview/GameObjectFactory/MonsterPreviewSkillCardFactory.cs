@@ -67,7 +67,6 @@ internal sealed class MonsterPreviewSkillCardFactory : IPreviewCardFactory
         else if (cardObject.TryGetComponent<CardController>(out var cardController))
             cardController.EnableMovement(true);
 
-        cardObject.transform.SetParent(null);
         cardObject.transform.localScale = Vector3.one;
         cardObject.PoolObject();
     }
