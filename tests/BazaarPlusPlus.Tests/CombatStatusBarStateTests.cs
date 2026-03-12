@@ -140,6 +140,19 @@ public sealed class CombatStatusBarStateTests
     }
 
     [Theory]
+    [InlineData(0.25f, 0.25f)]
+    [InlineData(1f, 1f)]
+    [InlineData(5f, 5f)]
+    [InlineData(4.2f, 1f)]
+    [InlineData(8f, 1f)]
+    public void Configured_default_speed_is_normalized_to_supported_steps_or_falls_back_to_one(float configured, float expected)
+    {
+        var actual = CombatStatusBar.NormalizeConfiguredDefaultSpeed(configured);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
     [InlineData(0f, true, 0.10f, 0.5f)]
     [InlineData(1f, false, 0.10f, 0.5f)]
     [InlineData(0.8f, true, 0.10f, 1f)]

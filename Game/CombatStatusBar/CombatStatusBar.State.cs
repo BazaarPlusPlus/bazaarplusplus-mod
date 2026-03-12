@@ -75,6 +75,11 @@ internal sealed partial class CombatStatusBar
         return nextIndex >= 0 && nextIndex < SpeedSteps.Length;
     }
 
+    internal static float NormalizeConfiguredDefaultSpeed(float configuredSpeed)
+    {
+        return IsSupportedSpeedStep(configuredSpeed) ? configuredSpeed : 1f;
+    }
+
     internal static string FormatCombatSpeedLabel()
     {
         return $"{CombatSpeedMultiplier:0.00}x";

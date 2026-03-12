@@ -195,6 +195,7 @@ Current config entries:
 Behavior:
 
 - the default speed is loaded at startup
+- invalid configured default speeds are reset to `1.00`
 - selecting a step in the UI updates the active speed
 - the selected speed is also written back to the config entry
 

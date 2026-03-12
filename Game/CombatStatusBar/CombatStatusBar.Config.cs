@@ -16,10 +16,13 @@ internal sealed partial class CombatStatusBar
             "Whether to show the combat status bar with elapsed time and speed controls"
         );
         _defaultCombatSpeedConfig = config.Bind(
-            "Combat",
-            "DefaultSpeedMultiplier",
-            1f,
-            new ConfigDescription("Default combat playback speed multiplier", new AcceptableValueRange<float>(0.25f, 8f))
+                "Combat",
+                "DefaultSpeedMultiplier",
+                1f,
+                new ConfigDescription(
+                "Default combat playback speed multiplier. Supported values: 0.25, 0.50, 1.00, 2.00, 3.00, 5.00",
+                new AcceptableValueRange<float>(0.25f, 5f)
+            )
         );
         CombatSpeedMultiplier = SetConfiguredDefaultSpeed(_defaultCombatSpeedConfig.Value);
         BppLog.Info(
@@ -41,11 +44,12 @@ internal sealed partial class CombatStatusBar
 
     private static float SetConfiguredDefaultSpeed(float configuredSpeed)
     {
-        if (IsSupportedSpeedStep(configuredSpeed))
+        var normalizedSpeed = NormalizeConfiguredDefaultSpeed(configuredSpeed);
+        if (normalizedSpeed == configuredSpeed)
             return SetCombatSpeed(configuredSpeed);
 
-        CombatSpeedMultiplier = 1f;
-        _defaultCombatSpeedConfig!.Value = CombatSpeedMultiplier;
+        CombatSpeedMultiplier = normalizedSpeed;
+        _defaultCombatSpeedConfig!.Value = normalizedSpeed;
         return CombatSpeedMultiplier;
     }
 }
