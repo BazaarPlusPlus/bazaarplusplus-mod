@@ -113,7 +113,7 @@ internal static class MonsterDatabase
             var json = ReadDatabaseJson(out var source);
             if (string.IsNullOrWhiteSpace(json))
             {
-                ModState.Logger.LogWarning("[MonsterDatabase] Monster database JSON was empty");
+                BppLog.Warn("MonsterDatabase", "Monster database JSON was empty");
                 _db.Clear();
                 _dbByShortEncounterId.Clear();
                 return;
@@ -142,13 +142,14 @@ internal static class MonsterDatabase
                 _dbByShortEncounterId[GetShortEncounterId(pair.Key)] = monster;
             }
 
-            ModState.Logger.LogInfo(
-                $"[MonsterDatabase] Loaded {_db.Count} entries from {source} invalidEncounterIds={invalidEncounterIds} shortKeys={_dbByShortEncounterId.Count}"
+            BppLog.Info(
+                "MonsterDatabase",
+                $"Loaded {_db.Count} entries from {source} invalidEncounterIds={invalidEncounterIds} shortKeys={_dbByShortEncounterId.Count}"
             );
         }
         catch (Exception ex)
         {
-            ModState.Logger.LogError($"[MonsterDatabase] Failed to load: {ex.Message}");
+            BppLog.Error("MonsterDatabase", "Failed to load monster database", ex);
             _db.Clear();
             _dbByShortEncounterId.Clear();
         }
@@ -157,9 +158,7 @@ internal static class MonsterDatabase
     public static bool TryGetByEncounterId(Guid encounterId, out MonsterInfo monster)
     {
         var found = _db.TryGetValue(encounterId, out monster);
-        ModState.Logger?.LogDebug(
-            $"[MonsterDatabase] Lookup encounterId={encounterId} found={found}"
-        );
+        BppLog.Debug("MonsterDatabase", $"Lookup encounterId={encounterId} found={found}");
         return found;
     }
 
@@ -168,7 +167,7 @@ internal static class MonsterDatabase
         monster = null;
         if (string.IsNullOrWhiteSpace(encounterId))
         {
-            ModState.Logger?.LogDebug("[MonsterDatabase] Lookup encounterId=<empty> found=False");
+            BppLog.Debug("MonsterDatabase", "Lookup encounterId=<empty> found=False");
             return false;
         }
 
@@ -183,8 +182,9 @@ internal static class MonsterDatabase
         monster = null;
         var key = GetShortEncounterId(encounterIdPrefix);
         var found = !string.IsNullOrWhiteSpace(key) && _dbByShortEncounterId.TryGetValue(key, out monster);
-        ModState.Logger?.LogDebug(
-            $"[MonsterDatabase] Lookup encounterIdPrefix={encounterIdPrefix} normalized={key} found={found}"
+        BppLog.Debug(
+            "MonsterDatabase",
+            $"Lookup encounterIdPrefix={encounterIdPrefix} normalized={key} found={found}"
         );
         return found;
     }
@@ -263,9 +263,7 @@ internal static class MonsterDatabase
     {
         if (dto == null || !Guid.TryParse(dto.CardId, out var cardId))
         {
-            ModState.Logger?.LogDebug(
-                $"[MonsterDatabase] Dropping invalid board card id={dto?.CardId ?? "null"}"
-            );
+            BppLog.Debug("MonsterDatabase", $"Dropping invalid board card id={dto?.CardId ?? "null"}");
             return null;
         }
 
@@ -283,9 +281,7 @@ internal static class MonsterDatabase
     {
         if (dto == null || !Guid.TryParse(dto.SkillId, out var skillId))
         {
-            ModState.Logger?.LogDebug(
-                $"[MonsterDatabase] Dropping invalid skill id={dto?.SkillId ?? "null"}"
-            );
+            BppLog.Debug("MonsterDatabase", $"Dropping invalid skill id={dto?.SkillId ?? "null"}");
             return null;
         }
 

@@ -18,9 +18,7 @@ internal static class NameOverrideHelper
         var profileName = Data.Profile?.Username;
         if (string.IsNullOrEmpty(profileName))
         {
-            ModState.Logger?.LogDebug(
-                "[NameOverride] Skipping replacement because profile username is unavailable"
-            );
+            BppLog.Debug("NameOverride", "Skipping replacement because profile username is unavailable");
             return false;
         }
 
@@ -50,9 +48,7 @@ public static class UpdatePlayerPatch
 
         userName = replacementName;
         nameId = 0;
-        ModState.Logger?.LogInfo(
-            $"[NameOverride] UpdatePlayer replaced username with {replacementName}"
-        );
+        BppLog.Debug("NameOverride", $"UpdatePlayer replaced username with {replacementName}");
         return true;
     }
 }
@@ -68,9 +64,7 @@ public static class SetHeroNamePatch
 
         newName = replacementName;
         usernameId = 0;
-        ModState.Logger?.LogInfo(
-            $"[NameOverride] SetHeroName replaced username with {replacementName}"
-        );
+        BppLog.Debug("NameOverride", $"SetHeroName replaced username with {replacementName}");
         return true;
     }
 }

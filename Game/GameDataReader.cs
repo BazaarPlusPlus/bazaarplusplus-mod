@@ -15,9 +15,7 @@ internal static class GameDataReader
     {
         if (Data.Run == null)
         {
-            ModState.Logger?.LogWarning(
-                "[GameDataReader] GetRunInfo requested while Data.Run is null"
-            );
+            BppLog.Warn("GameDataReader", "GetRunInfo requested while Data.Run is null");
             return new RunInfo
             {
                 Name = Data.Profile?.Username,
@@ -28,8 +26,9 @@ internal static class GameDataReader
         }
 
         var opponent = Data.Run.Opponent;
-        ModState.Logger?.LogDebug(
-            $"[GameDataReader] Building run snapshot: hero={Data.Run.Player?.Hero}, day={Data.Run.Day}, opponent={(opponent == null ? "none" : opponent.Hero.ToString())}"
+        BppLog.Debug(
+            "GameDataReader",
+            $"Building run snapshot: hero={Data.Run.Player?.Hero}, day={Data.Run.Day}, opponent={(opponent == null ? "none" : opponent.Hero.ToString())}"
         );
 
         return new RunInfo
@@ -72,9 +71,7 @@ internal static class GameDataReader
     {
         if (container?.Container == null)
         {
-            ModState.Logger?.LogDebug(
-                "[GameDataReader] Inventory container missing, returning empty card list"
-            );
+            BppLog.Debug("GameDataReader", "Inventory container missing, returning empty card list");
             return new List<Card>();
         }
 
@@ -86,9 +83,7 @@ internal static class GameDataReader
         var skillInfos = new List<RunInfo.SkillInfo>();
         if (skills == null)
         {
-            ModState.Logger?.LogDebug(
-                "[GameDataReader] Skill collection missing, returning empty skill list"
-            );
+            BppLog.Debug("GameDataReader", "Skill collection missing, returning empty skill list");
             return skillInfos;
         }
 

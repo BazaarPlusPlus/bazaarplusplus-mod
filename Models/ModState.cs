@@ -56,13 +56,12 @@ internal static class ModState
             new ConfigDescription("Default combat playback speed multiplier", new AcceptableValueRange<float>(0.25f, 8f))
         );
         CombatSpeedMultiplier = ClampSpeed(DefaultCombatSpeedConfig.Value);
-        Logger?.LogInfo(
-            $"[ModState] Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, combatStatusBar={EnableCombatStatusBarConfig.Value}, combatSpeed={CombatSpeedMultiplier:F2}x"
+        BppLog.Info(
+            "ModState",
+            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, combatStatusBar={EnableCombatStatusBarConfig.Value}, combatSpeed={CombatSpeedMultiplier:F2}x"
         );
         CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
-        Logger?.LogInfo(
-            $"[ModState] cards.json path initialized: {CardsJsonPath ?? "<null>"}"
-        );
+        BppLog.Debug("ModState", $"cards.json path initialized: {CardsJsonPath ?? "<null>"}");
     }
 
     public static void BeginCombatPlayback()

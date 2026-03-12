@@ -14,7 +14,7 @@ public class Plugin : BaseUnityPlugin
     protected virtual void Awake()
     {
         ModState.Logger = Logger;
-        Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
+        BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
 
         _harmony.PatchAll();
 

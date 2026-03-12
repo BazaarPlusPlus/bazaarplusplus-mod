@@ -15,7 +15,7 @@ internal static class EncounterTracker
     public static void Subscribe()
     {
         Events.CardDealtSimEvent.AddListener(OnCardDealt, null);
-        ModState.Logger.LogInfo("[EncounterTracker] Subscribed to CardDealtSimEvent");
+        BppLog.Info("EncounterTracker", "Subscribed to CardDealtSimEvent");
     }
 
     private static void OnCardDealt(List<Card> dealtCards)
@@ -62,8 +62,9 @@ internal static class EncounterTracker
             ModState.AvailableEncounters = cardInfos;
             ModState.EncounterMonsterPreviews = monsterPreviews.Count > 0 ? monsterPreviews : null;
             ModState.CurrentEncounterChoices = null;
-            ModState.Logger.LogInfo(
-                $"[EncounterTracker] Updated map encounters: count={cardInfos.Count}, monsterPreviews={ModState.EncounterMonsterPreviews?.Count ?? 0}"
+            BppLog.Debug(
+                "EncounterTracker",
+                $"Updated map encounters: count={cardInfos.Count}, monsterPreviews={ModState.EncounterMonsterPreviews?.Count ?? 0}"
             );
         }
         else
@@ -71,18 +72,15 @@ internal static class EncounterTracker
             ModState.CurrentEncounterChoices = cardInfos;
             ModState.AvailableEncounters = null;
             ModState.EncounterMonsterPreviews = monsterPreviews.Count > 0 ? monsterPreviews : null;
-            ModState.Logger.LogInfo(
-                $"[EncounterTracker] Updated encounter choices: state={stateName}, count={cardInfos.Count}, monsterPreviews={ModState.EncounterMonsterPreviews?.Count ?? 0}"
+            BppLog.Debug(
+                "EncounterTracker",
+                $"Updated encounter choices: state={stateName}, count={cardInfos.Count}, monsterPreviews={ModState.EncounterMonsterPreviews?.Count ?? 0}"
             );
         }
 
-        ModState.Logger.LogInfo(
-            $"[EncounterTracker] State={stateName}, choices=["
-                + string.Join(
-                    ", ",
-                    cards.Select(c => c.Template?.InternalName ?? c.TemplateId.ToString())
-                )
-                + "]"
+        BppLog.Debug(
+            "EncounterTracker",
+            $"State={stateName}, choiceCount={cards.Count}"
         );
     }
 
@@ -131,10 +129,8 @@ internal static class EncounterTracker
         ModState.EncounterMonsterPreviews = null;
 
         if (hadState)
-            ModState.Logger?.LogInfo($"[EncounterTracker] Cleared encounter state: {reason}");
+            BppLog.Debug("EncounterTracker", $"Cleared encounter state: {reason}");
         else
-            ModState.Logger?.LogDebug(
-                $"[EncounterTracker] Encounter state already empty: {reason}"
-            );
+            BppLog.Debug("EncounterTracker", $"Encounter state already empty: {reason}");
     }
 }

@@ -25,8 +25,9 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         Services.TryGet<AssetLoader>(out var loader);
         if (loader == null || !EnsureApi(loader))
         {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] API unavailable for template={spec?.TemplateId ?? "null"} loader={(loader == null ? "null" : "ok")}"
+            BppLog.Warn(
+                "MonsterPreviewCardFactory",
+                $"API unavailable for template={spec?.TemplateId ?? "null"} loader={(loader == null ? "null" : "ok")}"
             );
             return null;
         }
@@ -34,15 +35,14 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         if (_staticData == null)
         {
             _staticData = await Data.GetStatic();
-            ModState.Logger?.LogDebug(
-                $"[MonsterPreviewCardFactory] Static data loaded={(_staticData != null)}"
-            );
+            BppLog.Debug("MonsterPreviewCardFactory", $"Static data loaded={(_staticData != null)}");
         }
 
         if (_staticData == null)
         {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] Static data unavailable for template={spec?.TemplateId ?? "null"}"
+            BppLog.Warn(
+                "MonsterPreviewCardFactory",
+                $"Static data unavailable for template={spec?.TemplateId ?? "null"}"
             );
             return null;
         }
@@ -50,25 +50,25 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         var card = BuildCard(spec, _staticData);
         if (card == null)
         {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] BuildCard failed for template={spec?.TemplateId ?? "null"}"
-            );
+            BppLog.Warn("MonsterPreviewCardFactory", $"BuildCard failed for template={spec?.TemplateId ?? "null"}");
             return null;
         }
 
         var cardObject = await InstantiateAsync(loader, card, parent.gameObject);
         if (cardObject == null)
         {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] Instantiate returned null for template={spec?.TemplateId ?? "null"}"
+            BppLog.Warn(
+                "MonsterPreviewCardFactory",
+                $"Instantiate returned null for template={spec?.TemplateId ?? "null"}"
             );
             return null;
         }
 
         cardObject.AddComponent<ShowcaseCardMarker>();
         ConfigureSpawned(cardObject);
-        ModState.Logger?.LogDebug(
-            $"[MonsterPreviewCardFactory] Created card template={spec?.TemplateId ?? "null"} object={cardObject.name}"
+        BppLog.Debug(
+            "MonsterPreviewCardFactory",
+            $"Created card template={spec?.TemplateId ?? "null"} object={cardObject.name}"
         );
         return cardObject;
     }
@@ -101,24 +101,20 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
     {
         if (entry == null || string.IsNullOrWhiteSpace(entry.TemplateId))
         {
-            ModState.Logger?.LogWarning("[MonsterPreviewCardFactory] Empty preview card spec");
+            BppLog.Warn("MonsterPreviewCardFactory", "Empty preview card spec");
             return null;
         }
 
         if (!Guid.TryParse(entry.TemplateId, out var templateId))
         {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] Invalid template id: {entry.TemplateId}"
-            );
+            BppLog.Warn("MonsterPreviewCardFactory", $"Invalid template id: {entry.TemplateId}");
             return null;
         }
 
         var template = GetTemplate(staticData, templateId) as ITCard;
         if (template == null)
         {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] Template not found: {entry.TemplateId}"
-            );
+            BppLog.Warn("MonsterPreviewCardFactory", $"Template not found: {entry.TemplateId}");
             return null;
         }
 
@@ -157,8 +153,9 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
             }
         }
 
-        ModState.Logger?.LogInfo(
-            $"[MonsterPreviewCardFactory] BuildCard result template={entry.TemplateId} tier={card.Tier} size={card.Size} type={card.Type} enchant={card.Enchantment} attrs={card.Attributes.Count} templateName={template.InternalName}"
+        BppLog.Debug(
+            "MonsterPreviewCardFactory",
+            $"BuildCard result template={entry.TemplateId} tier={card.Tier} size={card.Size} type={card.Type} enchant={card.Enchantment} attrs={card.Attributes.Count} templateName={template.InternalName}"
         );
         return card;
     }
@@ -232,14 +229,14 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
 
         if (_instantiateCardMethod == null)
         {
-            ModState.Logger?.LogWarning("[MonsterPreviewCardFactory] InstantiateCardAsync API not found");
+            BppLog.Warn("MonsterPreviewCardFactory", "InstantiateCardAsync API not found");
             return false;
         }
 
         var sectionType = _instantiateCardMethod.GetParameters()[2].ParameterType;
         if (!sectionType.IsEnum)
         {
-            ModState.Logger?.LogWarning("[MonsterPreviewCardFactory] Spawn section parameter is not enum");
+            BppLog.Warn("MonsterPreviewCardFactory", "Spawn section parameter is not enum");
             return false;
         }
 
@@ -252,8 +249,9 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
             _spawnSection = Enum.Parse(sectionType, "Storage");
         else
             _spawnSection = Enum.ToObject(sectionType, 0);
-        ModState.Logger?.LogDebug(
-            $"[MonsterPreviewCardFactory] Resolved instantiate API with spawnSection={_spawnSection}"
+        BppLog.Debug(
+            "MonsterPreviewCardFactory",
+            $"Resolved instantiate API with spawnSection={_spawnSection}"
         );
         return _spawnSection != null;
     }
@@ -283,4 +281,3 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         return null;
     }
 }
-

@@ -67,8 +67,9 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     public void SetAnchorSource(IOverlayAnchorSource anchorSource)
     {
         _anchorSource = anchorSource;
-        ModState.Logger?.LogInfo(
-            $"[MonsterPreviewOverlayController] Anchor source set: {anchorSource?.GetType().Name ?? "null"}"
+        BppLog.Debug(
+            "MonsterPreviewOverlayController",
+            $"Anchor source set: {anchorSource?.GetType().Name ?? "null"}"
         );
     }
 
@@ -76,8 +77,9 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     {
         _layout = layout ?? new PreviewBoardLayout();
         _board?.SetLayout(_layout);
-        ModState.Logger?.LogDebug(
-            $"[MonsterPreviewOverlayController] Layout updated: size={_layout.BoardSize}, offset={_layout.LocalOffset}, spacing={_layout.CardSpacing}, scale={_layout.CardScale}"
+        BppLog.Debug(
+            "MonsterPreviewOverlayController",
+            $"Layout updated: size={_layout.BoardSize}, offset={_layout.LocalOffset}, spacing={_layout.CardSpacing}, scale={_layout.CardScale}"
         );
     }
 
@@ -87,9 +89,7 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         if (cards != null)
             _cards.AddRange(CloneCards(cards));
 
-        ModState.Logger?.LogInfo(
-            $"[MonsterPreviewOverlayController] SetCards count={_cards.Count}, visible={_visible}"
-        );
+        BppLog.Debug("MonsterPreviewOverlayController", $"SetCards count={_cards.Count}, visible={_visible}");
         QueueSync();
     }
 
@@ -99,8 +99,9 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         if (cards != null)
             _skillCards.AddRange(CloneCards(cards));
 
-        ModState.Logger?.LogInfo(
-            $"[MonsterPreviewOverlayController] SetSkillCards count={_skillCards.Count}, visible={_visible}"
+        BppLog.Debug(
+            "MonsterPreviewOverlayController",
+            $"SetSkillCards count={_skillCards.Count}, visible={_visible}"
         );
         QueueSync();
     }
@@ -109,7 +110,7 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     {
         _cards.Clear();
         _skillCards.Clear();
-        ModState.Logger?.LogInfo("[MonsterPreviewOverlayController] ClearCards");
+        BppLog.Debug("MonsterPreviewOverlayController", "ClearCards");
         QueueSync();
     }
 
@@ -117,17 +118,13 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     {
         if (_visible == visible)
         {
-            ModState.Logger?.LogDebug(
-                $"[MonsterPreviewOverlayController] SetVisible ignored: already {visible}"
-            );
+            BppLog.Debug("MonsterPreviewOverlayController", $"SetVisible ignored: already {visible}");
             return;
         }
 
         _visible = visible;
         _syncVersion++;
-        ModState.Logger?.LogInfo(
-            $"[MonsterPreviewOverlayController] Visible={_visible}, syncVersion={_syncVersion}"
-        );
+        BppLog.Debug("MonsterPreviewOverlayController", $"Visible={_visible}, syncVersion={_syncVersion}");
 
         if (!_visible)
         {
@@ -157,8 +154,9 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
             if (_board == null)
                 return;
 
-            ModState.Logger?.LogInfo(
-                $"[MonsterPreviewOverlayController] Sync start: version={version}, cards={snapshot.Count}, skills={skillSnapshot.Count}, visible={_visible}"
+            BppLog.Debug(
+                "MonsterPreviewOverlayController",
+                $"Sync start: version={version}, cards={snapshot.Count}, skills={skillSnapshot.Count}, visible={_visible}"
             );
             await _board.RebuildAsync(
                 snapshot,
@@ -169,20 +167,22 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
             if (version == _syncVersion && _visible)
             {
                 _syncPending = false;
-                ModState.Logger?.LogInfo(
-                    $"[MonsterPreviewOverlayController] Sync complete: version={version}, cards={snapshot.Count}, skills={skillSnapshot.Count}"
+                BppLog.Debug(
+                    "MonsterPreviewOverlayController",
+                    $"Sync complete: version={version}, cards={snapshot.Count}, skills={skillSnapshot.Count}"
                 );
             }
             else
             {
-                ModState.Logger?.LogDebug(
-                    $"[MonsterPreviewOverlayController] Sync skipped completion: requestedVersion={version}, currentVersion={_syncVersion}, visible={_visible}"
+                BppLog.Debug(
+                    "MonsterPreviewOverlayController",
+                    $"Sync skipped completion: requestedVersion={version}, currentVersion={_syncVersion}, visible={_visible}"
                 );
             }
         }
         catch (Exception ex)
         {
-            ModState.Logger?.LogWarning($"[MonsterPreviewOverlayController] Sync failed: {ex}");
+            BppLog.Error("MonsterPreviewOverlayController", "Sync failed", ex);
         }
         finally
         {
@@ -199,15 +199,16 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         _board = new MonsterPreviewBoard("MonsterPreviewBoard", _factory, _skillFactory);
         _board.SetLayout(_layout ?? new PreviewBoardLayout());
         _syncPending = true;
-        ModState.Logger?.LogInfo("[MonsterPreviewOverlayController] Recreated preview board");
+        BppLog.Info("MonsterPreviewOverlayController", "Recreated preview board");
     }
 
     private void QueueSync()
     {
         _syncVersion++;
         _syncPending = true;
-        ModState.Logger?.LogDebug(
-            $"[MonsterPreviewOverlayController] QueueSync version={_syncVersion}, pending={_syncPending}"
+        BppLog.Debug(
+            "MonsterPreviewOverlayController",
+            $"QueueSync version={_syncVersion}, pending={_syncPending}"
         );
     }
 

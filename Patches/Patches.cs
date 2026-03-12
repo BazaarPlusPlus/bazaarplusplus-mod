@@ -92,9 +92,7 @@ public static class CardTooltipDataPassivePatch
         }
         catch (System.Exception ex)
         {
-            ModState.Logger?.LogError(
-                $"[ItemEnchantPreview] Failed to append passive tooltip previews: {ex.Message}"
-            );
+            BppLog.Error("ItemEnchantPreview", "Failed to append passive tooltip previews", ex);
         }
     }
 }
@@ -116,8 +114,9 @@ public static class CardTooltipControllerLockTogglePatch
         if (controller.GetComponent<ShowcaseCardMarker>() == null)
             return true;
 
-        ModState.Logger?.LogDebug(
-            $"[EncounterTooltipPreview] Suppressed lock toggle for showcase card {currentCard.Template?.InternalName ?? currentCard.TemplateId.ToString()}"
+        BppLog.Debug(
+            "EncounterTooltipPreview",
+            $"Suppressed lock toggle for showcase card {currentCard.Template?.InternalName ?? currentCard.TemplateId.ToString()}"
         );
         return false;
     }

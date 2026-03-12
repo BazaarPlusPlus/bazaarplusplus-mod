@@ -81,9 +81,7 @@ internal sealed class OverlayDebugController : MonoBehaviour
             _overlayController.SetVisible(!_overlayController.Visible);
             if (_overlayController.Visible)
                 SyncPreviewData();
-            ModState.Logger?.LogInfo(
-                $"[OverlayDebugController] Preview visible={_overlayController.Visible}"
-            );
+            BppLog.Debug("OverlayDebugController", $"Preview visible={_overlayController.Visible}");
         }
 
         if (keyboard.f4Key.wasPressedThisFrame)
@@ -92,8 +90,9 @@ internal sealed class OverlayDebugController : MonoBehaviour
             _lastCardSignature = string.Empty;
             _lastSkillSignature = string.Empty;
             SyncPreviewData();
-            ModState.Logger?.LogInfo(
-                $"[OverlayDebugController] Preview data source={(_useMonsterDatabase ? "monster_db" : "player_hand")}"
+            BppLog.Debug(
+                "OverlayDebugController",
+                $"Preview data source={(_useMonsterDatabase ? "monster_db" : "player_hand")}"
             );
         }
 
@@ -200,8 +199,9 @@ internal sealed class OverlayDebugController : MonoBehaviour
 
         if (moved)
         {
-            ModState.Logger?.LogInfo(
-                $"[OverlayDebugController] Anchor pos={_anchorSource.Position} rot={_anchorSource.Rotation.eulerAngles}"
+            BppLog.Debug(
+                "OverlayDebugController",
+                $"Anchor pos={_anchorSource.Position} rot={_anchorSource.Rotation.eulerAngles}"
             );
         }
     }
@@ -286,8 +286,9 @@ internal sealed class OverlayDebugController : MonoBehaviour
             return;
 
         ApplyLayout();
-        ModState.Logger?.LogInfo(
-            $"[OverlayDebugController] Layout size={_layout.BoardSize} offset={_layout.LocalOffset} spacingX={_layout.CardSpacing.x:F2} scale={_layout.CardScale.x:F2} boardT={_layout.BoardThickness:F2} borderT={_layout.BorderThickness:F2} borderH={_layout.BorderHeight:F2}"
+        BppLog.Debug(
+            "OverlayDebugController",
+            $"Layout size={_layout.BoardSize} offset={_layout.LocalOffset} spacingX={_layout.CardSpacing.x:F2} scale={_layout.CardScale.x:F2} boardT={_layout.BoardThickness:F2} borderT={_layout.BorderThickness:F2} borderH={_layout.BorderHeight:F2}"
         );
     }
 
@@ -309,9 +310,7 @@ internal sealed class OverlayDebugController : MonoBehaviour
         if (!MonsterDatabase.TryGetByEncounterId(DefaultEncounterId, out var monster))
         {
             _activeMonsterTitle = string.Empty;
-            ModState.Logger?.LogWarning(
-                $"[OverlayDebugController] Monster DB miss encounterId={DefaultEncounterId}"
-            );
+            BppLog.Warn("OverlayDebugController", $"Monster DB miss encounterId={DefaultEncounterId}");
             _overlayController.SetCards(new List<PreviewCardSpec>());
             _overlayController.SetSkillCards(new List<PreviewCardSpec>());
             return;
@@ -320,8 +319,9 @@ internal sealed class OverlayDebugController : MonoBehaviour
         _activeMonsterTitle = monster.Title;
         var specs = MonsterPreviewSpecBuilder.Build(monster);
         var skillSpecs = SkillPreviewSpecBuilder.Build(monster);
-        ModState.Logger?.LogInfo(
-            $"[OverlayDebugController] Monster DB hit encounterId={DefaultEncounterId} key={monster.EncounterKey} shortId={monster.EncounterShortId} title={monster.Title} boardCards={monster.BoardCards.Count} skillCards={monster.Skills.Count} previewCards={specs.Count}"
+        BppLog.Debug(
+            "OverlayDebugController",
+            $"Monster DB hit encounterId={DefaultEncounterId} key={monster.EncounterKey} shortId={monster.EncounterShortId} title={monster.Title} boardCards={monster.BoardCards.Count} skillCards={monster.Skills.Count} previewCards={specs.Count}"
         );
         var signature = BuildSignature(specs);
         var skillSignature = BuildSignature(skillSpecs);
@@ -329,8 +329,9 @@ internal sealed class OverlayDebugController : MonoBehaviour
         {
             if (skillSignature == _lastSkillSignature)
             {
-                ModState.Logger?.LogDebug(
-                    $"[OverlayDebugController] Monster preview signature unchanged encounterId={DefaultEncounterId}"
+                BppLog.Debug(
+                    "OverlayDebugController",
+                    $"Monster preview signature unchanged encounterId={DefaultEncounterId}"
                 );
                 return;
             }
@@ -356,15 +357,16 @@ internal sealed class OverlayDebugController : MonoBehaviour
         {
             if (skillSignature == _lastSkillSignature)
             {
-                ModState.Logger?.LogDebug("[OverlayDebugController] Player hand preview signature unchanged");
+                BppLog.Debug("OverlayDebugController", "Player hand preview signature unchanged");
                 return;
             }
         }
 
         _lastCardSignature = signature;
         _lastSkillSignature = skillSignature;
-        ModState.Logger?.LogInfo(
-            $"[OverlayDebugController] Player hand preview cards={specs.Count} skills={skillSpecs.Count}"
+        BppLog.Debug(
+            "OverlayDebugController",
+            $"Player hand preview cards={specs.Count} skills={skillSpecs.Count}"
         );
         _overlayController.SetCards(specs);
         _overlayController.SetSkillCards(skillSpecs);
@@ -378,8 +380,9 @@ internal sealed class OverlayDebugController : MonoBehaviour
             _anchorSource.Position = anchorTransform.position;
             _anchorSource.Rotation = anchorTransform.rotation;
             _anchorSeeded = true;
-            ModState.Logger?.LogInfo(
-                $"[OverlayDebugController] Seeded anchor from {DefaultAnchorPath}: {_anchorSource.Position}"
+            BppLog.Debug(
+                "OverlayDebugController",
+                $"Seeded anchor from {DefaultAnchorPath}: {_anchorSource.Position}"
             );
             return;
         }
@@ -391,8 +394,9 @@ internal sealed class OverlayDebugController : MonoBehaviour
         _anchorSource.Position = camera.transform.position + camera.transform.forward * 12f;
         _anchorSource.Rotation = Quaternion.identity;
         _anchorSeeded = true;
-        ModState.Logger?.LogWarning(
-            $"[OverlayDebugController] Default anchor '{DefaultAnchorPath}' not found, fell back to camera seed: {_anchorSource.Position}"
+        BppLog.Warn(
+            "OverlayDebugController",
+            $"Default anchor '{DefaultAnchorPath}' not found, fell back to camera seed: {_anchorSource.Position}"
         );
     }
 

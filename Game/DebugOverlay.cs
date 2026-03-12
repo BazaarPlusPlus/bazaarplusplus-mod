@@ -108,7 +108,7 @@ internal class DebugOverlay : MonoBehaviour
         }
         catch (Exception ex)
         {
-            ModState.Logger?.LogWarning($"[DebugOverlay] Rebuild failed: {ex.Message}");
+            BppLog.Warn("DebugOverlay", $"Rebuild failed: {ex.Message}");
         }
 
         DrawEncounterList(

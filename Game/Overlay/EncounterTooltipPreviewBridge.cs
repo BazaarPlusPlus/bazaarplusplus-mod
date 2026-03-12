@@ -72,8 +72,9 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
         _overlayController.SetCards(cards);
         _overlayController.SetSkillCards(skillCards);
         _overlayController.SetVisible(true);
-        ModState.Logger?.LogInfo(
-            $"[EncounterTooltipPreviewBridge] Showing preview source={source} card={card.Template?.InternalName ?? "-"} templateId={card.TemplateId} items={cards.Count} skills={skillCards.Count}"
+        BppLog.Debug(
+            "EncounterTooltipPreviewBridge",
+            $"Showing preview source={source} card={card.Template?.InternalName ?? "-"} templateId={card.TemplateId} items={cards.Count} skills={skillCards.Count}"
         );
     }
 
@@ -86,9 +87,7 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
         var currentCard = tooltipController?.CurrentCard;
         if (currentCard != null && IsShowcaseCard(currentCard))
         {
-            ModState.Logger?.LogDebug(
-                "[EncounterTooltipPreviewBridge] Ignoring unlock caused by showcase card hover"
-            );
+            BppLog.Debug("EncounterTooltipPreviewBridge", "Ignoring unlock caused by showcase card hover");
             return;
         }
 
@@ -109,7 +108,7 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
 
         _overlayController.ClearCards();
         _overlayController.SetVisible(false);
-        ModState.Logger?.LogDebug($"[EncounterTooltipPreviewBridge] Hiding preview: {reason}");
+        BppLog.Debug("EncounterTooltipPreviewBridge", $"Hiding preview: {reason}");
     }
 
     private void ApplyFixedLayout()
@@ -126,8 +125,9 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
         };
 
         _overlayController.SetLayout(layout);
-        ModState.Logger?.LogInfo(
-            $"[EncounterTooltipPreviewBridge] Applied fixed layout: anchor={FixedPreviewPosition} rotation={FixedPreviewRotation.eulerAngles} size={layout.BoardSize}"
+        BppLog.Debug(
+            "EncounterTooltipPreviewBridge",
+            $"Applied fixed layout: anchor={FixedPreviewPosition} rotation={FixedPreviewRotation.eulerAngles} size={layout.BoardSize}"
         );
     }
 
