@@ -142,8 +142,8 @@ pub fn install_bepinex(app: tauri::AppHandle, game_path: String) -> Result<(), S
     })?;
 
     debug_log!("Extracting BepInEx...");
-    let extracted = extract_zip(&zip_bytes, Path::new(&game_path))?;
-    debug_log!("Extracted {} files.", extracted.len());
+    let _extracted = extract_zip(&zip_bytes, Path::new(&game_path))?;
+    debug_log!("Extracted {} files.", _extracted.len());
 
     Ok(())
 }
@@ -159,8 +159,8 @@ pub fn update_bpp(_app: tauri::AppHandle, game_path: String) -> Result<(), Strin
     let zip_bytes = response
         .bytes()
         .map_err(|err| format!("Cannot read BazaarPlusPlus update zip: {err}"))?;
-    let extracted = extract_zip(zip_bytes.as_ref(), Path::new(&game_path))?;
-    debug_log!("Updated BazaarPlusPlus with {} extracted files.", extracted.len());
+    let _extracted = extract_zip(zip_bytes.as_ref(), Path::new(&game_path))?;
+    debug_log!("Updated BazaarPlusPlus with {} extracted files.", _extracted.len());
     Ok(())
 }
 

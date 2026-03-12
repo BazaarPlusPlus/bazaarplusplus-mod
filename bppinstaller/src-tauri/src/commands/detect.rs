@@ -133,8 +133,8 @@ fn get_steam_path() -> Option<PathBuf> {
     None
 }
 
-fn get_game_path(_steam_path: &Path) -> Option<PathBuf> {
-    let library_vdf = std::fs::read_to_string(_steam_path.join("steamapps/libraryfolders.vdf")).ok()?;
+fn get_game_path(steam_path: &Path) -> Option<PathBuf> {
+    let library_vdf = std::fs::read_to_string(steam_path.join("steamapps/libraryfolders.vdf")).ok()?;
     let library_root = find_game_in_library_vdf(&library_vdf, "1617400")?;
     let candidate = PathBuf::from(library_root).join("steamapps/common/The Bazaar");
     candidate.exists().then_some(candidate)
@@ -158,7 +158,18 @@ fn detect_dotnet() -> (Option<String>, bool) {
     };
 
     #[cfg(not(target_os = "windows"))]
-    let candidates = vec!["dotnet".to_string()];
+    let candidates = {
+        let mut candidates = vec![
+            "dotnet".to_string(),
+            "/usr/local/bin/dotnet".to_string(),
+            "/usr/local/share/dotnet/dotnet".to_string(),
+            "/opt/homebrew/bin/dotnet".to_string(),
+        ];
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(home.join(".dotnet/dotnet").to_string_lossy().into_owned());
+        }
+        candidates
+    };
 
     for candidate in candidates {
         let mut command = Command::new(&candidate);
