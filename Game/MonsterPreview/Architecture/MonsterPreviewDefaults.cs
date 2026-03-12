@@ -13,7 +13,7 @@ internal static class MonsterPreviewDefaults
 
     public static PreviewBoardPresentation CreateDebugPresentation()
     {
-        return new PreviewBoardPresentation();
+        return CreateShowcasePresentation();
     }
 
     public static PreviewBoardPresentation CreateShowcasePresentation()

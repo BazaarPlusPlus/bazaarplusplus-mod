@@ -5,6 +5,7 @@ namespace BazaarPlusPlus;
 
 internal sealed class MonsterPreviewOverlayCoordinator
 {
+    private readonly IBoardRenderTarget _renderTarget;
     private readonly PreviewBoardSession _session;
     private readonly InMemoryPreviewDataSource _dataSource = new InMemoryPreviewDataSource();
 
@@ -16,6 +17,7 @@ internal sealed class MonsterPreviewOverlayCoordinator
 
     public MonsterPreviewOverlayCoordinator(IBoardRenderTarget renderTarget)
     {
+        _renderTarget = renderTarget;
         _session = new PreviewBoardSession(renderTarget);
     }
 
@@ -63,6 +65,16 @@ internal sealed class MonsterPreviewOverlayCoordinator
     {
         _externalRequest = request;
         _visible = request?.Presentation?.Visible ?? false;
+        if (_visible)
+            _session.Show(request);
+        else
+            _session.Hide();
+
+        _renderTarget.SetVisible(_visible);
+        BppLog.Info(
+            "MonsterPreviewOverlayCoordinator",
+            $"ShowRequest visible={_visible} hasExternalRequest={_externalRequest != null}"
+        );
     }
 
     public void SetVisible(bool visible)

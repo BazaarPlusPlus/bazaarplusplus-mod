@@ -58,6 +58,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
         BuildSkillSlots();
         RefreshLayout();
         SetVisible(false);
+        BppLog.Info("MonsterPreviewBoard", $"Created board root='{_boardRoot.name}'");
     }
 
     public void SetPresentation(PreviewBoardPresentation presentation)
@@ -72,7 +73,10 @@ internal sealed class MonsterPreviewBoard : IDisposable
     public void SetVisible(bool visible)
     {
         if (_boardRoot != null && _boardRoot.activeSelf != visible)
+        {
             _boardRoot.SetActive(visible);
+            BppLog.Info("MonsterPreviewBoard", $"SetVisible root='{_boardRoot.name}' visible={visible}");
+        }
     }
 
     public void UpdateAnchor(Vector3 position, Quaternion rotation)

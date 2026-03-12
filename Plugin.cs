@@ -20,6 +20,7 @@ public class Plugin : BaseUnityPlugin
 
         var configFile = new ConfigFile(Path.Combine(Paths.ConfigPath, "BazaarPlusPlus.cfg"), true);
         ModState.Initialize(configFile);
+        ModState.Subscribe();
         CombatStatusBar.InitializeConfig(configFile);
 
         MonsterDatabase.Load();
@@ -29,5 +30,11 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<MonsterPreviewController>();
         gameObject.AddComponent<MonsterPreviewDebugController>();
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
+        BppLog.Info("Plugin", "MonsterPreview components attached");
+    }
+
+    protected virtual void OnDestroy()
+    {
+        BppLog.Flush();
     }
 }

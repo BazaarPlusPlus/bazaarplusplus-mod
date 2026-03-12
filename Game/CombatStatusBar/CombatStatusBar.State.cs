@@ -7,7 +7,6 @@ internal sealed partial class CombatStatusBar
     private static readonly float[] SpeedSteps = { 0.25f, 0.5f, 1f, 2f, 3f, 4f, 5f, };
 
     internal static bool IsCombatPlaybackActive { get; private set; }
-    internal static bool HasUnlockedStandbyDisplay { get; private set; }
     internal static float CombatSpeedMultiplier { get; private set; } = 1f;
     internal static int ProcessedCombatFrames { get; private set; }
     internal static int TotalCombatFrames { get; private set; }
@@ -16,7 +15,6 @@ internal sealed partial class CombatStatusBar
     internal static void BeginCombatPlayback()
     {
         IsCombatPlaybackActive = true;
-        HasUnlockedStandbyDisplay = true;
         ProcessedCombatFrames = 0;
     }
 
@@ -65,7 +63,7 @@ internal sealed partial class CombatStatusBar
 
     internal static bool ShouldRenderForState(bool overlayVisible, bool enabled)
     {
-        return overlayVisible && enabled && HasUnlockedStandbyDisplay;
+        return overlayVisible && enabled && ModState.IsInGameRun;
     }
 
     internal static bool CanStepCombatSpeed(int direction)
@@ -115,7 +113,6 @@ internal sealed partial class CombatStatusBar
     internal static void ResetStateForTests()
     {
         IsCombatPlaybackActive = false;
-        HasUnlockedStandbyDisplay = false;
         CombatSpeedMultiplier = 1f;
         ProcessedCombatFrames = 0;
         TotalCombatFrames = 0;

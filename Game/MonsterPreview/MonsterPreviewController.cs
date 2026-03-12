@@ -24,6 +24,7 @@ internal sealed class MonsterPreviewController : MonoBehaviour
         _renderTarget = new MonsterPreviewBoardRenderTarget();
         _coordinator = new MonsterPreviewOverlayCoordinator(_renderTarget);
         _coordinator.SetPresentation(_presentation);
+        BppLog.Info("MonsterPreviewController", "Awake completed; render target and coordinator created");
     }
 
     private void LateUpdate()
@@ -88,11 +89,16 @@ internal sealed class MonsterPreviewController : MonoBehaviour
     public void ShowRequest(PreviewBoardRequest request)
     {
         _visible = request?.Presentation?.Visible ?? false;
+        BppLog.Info(
+            "MonsterPreviewController",
+            $"ShowRequest visible={_visible} items={request?.InitialModel?.ItemCards?.Count ?? -1} skills={request?.InitialModel?.SkillCards?.Count ?? -1} hasDataSource={request?.DataSource != null} hasAnchor={request?.AnchorStrategy != null}"
+        );
         _coordinator?.ShowRequest(request);
     }
 
     public void HidePreview()
     {
+        BppLog.Info("MonsterPreviewController", "HidePreview called");
         SetVisible(false);
     }
 
@@ -113,7 +119,7 @@ internal sealed class MonsterPreviewController : MonoBehaviour
         }
 
         _visible = visible;
-        BppLog.Debug("MonsterPreviewController", $"Visible={_visible}");
+        BppLog.Info("MonsterPreviewController", $"SetVisible visible={_visible}");
 
         if (!_visible)
         {

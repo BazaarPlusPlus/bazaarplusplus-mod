@@ -11,7 +11,12 @@ namespace BazaarPlusPlus;
 
 internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 {
-    private static readonly Rect FixedHole = new Rect(0.52f, 0.18f, 0.40f, 0.22f);
+    private static readonly Rect FallbackHole = new Rect(0.52f, 0.18f, 0.40f, 0.22f);
+    private const float SkillRegionYOffset = 1.15f;
+    private const float SkillRegionZOffset = 1.5f;
+    private const float HorizontalPadding = 0.03f;
+    private const float VerticalPaddingTop = 0.04f;
+    private const float VerticalPaddingBottom = 0.03f;
 
     private static readonly System.Reflection.PropertyInfo CurrentTooltipControllerProperty =
         AccessTools.Property(typeof(TooltipParentComponent), "CardTooltipController");
@@ -25,6 +30,10 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
     private void Awake()
     {
         _overlayController = GetComponent<MonsterPreviewController>();
+        BppLog.Info(
+            "MonsterLockShowcaseRuntime",
+            $"Awake overlayControllerFound={_overlayController != null}"
+        );
     }
 
     private void OnEnable()
@@ -41,11 +50,25 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     private void OnTooltipLock()
     {
+        BppLog.Info("MonsterLockShowcaseRuntime", "OnTooltipLock fired");
         if (_overlayController == null)
+        {
+            BppLog.Info("MonsterLockShowcaseRuntime", "OnTooltipLock aborted because overlay controller is null");
             return;
+        }
+
+        if (!ModState.IsInGameRun)
+        {
+            HideOverlay("ignoring tooltip lock outside of an active run");
+            return;
+        }
 
         var tooltipController = GetCurrentTooltipController();
         var card = tooltipController?.CurrentCard;
+        BppLog.Info(
+            "MonsterLockShowcaseRuntime",
+            $"Tooltip current card templateId={card?.TemplateId} name={card?.Template?.InternalName ?? "null"} tooltipControllerFound={tooltipController != null}"
+        );
         if (!_controller.ShouldShowForLock(card?.TemplateId, card != null && IsShowcaseCard(card)))
         {
             HideOverlay("locked tooltip had no supported current card");
@@ -70,7 +93,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
                 metadata: new Dictionary<string, string> { ["source"] = source }
             )
         );
-        _holeOverlay.Apply(tooltipController, FixedHole);
+        _holeOverlay.Apply(tooltipController, CalculatePreviewHole());
         BppLog.Debug(
             "MonsterLockShowcaseRuntime",
             $"Showing preview source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={cards.Count} skills={skillCards.Count}"
@@ -79,6 +102,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     private void OnTooltipUnlock()
     {
+        BppLog.Info("MonsterLockShowcaseRuntime", "OnTooltipUnlock fired");
         if (_lockedCard == null)
             return;
 
@@ -106,7 +130,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
         _overlayController.ClearCards();
         _overlayController.HidePreview();
-        BppLog.Debug("MonsterLockShowcaseRuntime", $"Hiding preview: {reason}");
+        BppLog.Info("MonsterLockShowcaseRuntime", $"Hiding preview: {reason}");
     }
 
     private static CardTooltipController GetCurrentTooltipController()
@@ -135,7 +159,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         skillCards = new List<PreviewCardSpec>();
         source = string.Empty;
 
-        if (card == null)
+        if (card == null || !ModState.IsInGameRun)
             return false;
 
         if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out var monster))
@@ -211,5 +235,80 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         }
 
         return specs;
+    }
+
+    private static Rect CalculatePreviewHole()
+    {
+        var camera = Camera.main;
+        if (camera == null)
+            return FallbackHole;
+
+        var pose = MonsterPreviewDefaults.DefaultAnchorPose;
+        var presentation = MonsterPreviewDefaults.CreateShowcasePresentation();
+
+        var boardCenter = pose.Position + pose.Rotation * presentation.LocalOffset;
+        var halfBoardWidth = presentation.BoardSize.x * 0.5f;
+        var halfBoardDepth = presentation.BoardSize.y * 0.5f;
+        var boardTopY = boardCenter.y + 0.8f;
+        var boardBottomY = boardCenter.y - 0.35f;
+
+        var skillCenter =
+            pose.Position
+            + pose.Rotation
+                * (presentation.LocalOffset + new Vector3(0f, SkillRegionYOffset, SkillRegionZOffset));
+        var halfSkillWidth = presentation.BoardSize.x * 0.25f;
+        var skillTopY = skillCenter.y + 0.65f;
+        var skillBottomY = skillCenter.y - 0.45f;
+
+        var worldPoints = new[]
+        {
+            new Vector3(boardCenter.x - halfBoardWidth, boardTopY, boardCenter.z - halfBoardDepth),
+            new Vector3(boardCenter.x + halfBoardWidth, boardTopY, boardCenter.z - halfBoardDepth),
+            new Vector3(boardCenter.x - halfBoardWidth, boardBottomY, boardCenter.z + halfBoardDepth),
+            new Vector3(boardCenter.x + halfBoardWidth, boardBottomY, boardCenter.z + halfBoardDepth),
+            new Vector3(skillCenter.x - halfSkillWidth, skillTopY, skillCenter.z),
+            new Vector3(skillCenter.x + halfSkillWidth, skillTopY, skillCenter.z),
+            new Vector3(skillCenter.x - halfSkillWidth, skillBottomY, skillCenter.z),
+            new Vector3(skillCenter.x + halfSkillWidth, skillBottomY, skillCenter.z),
+        };
+
+        var minX = 1f;
+        var maxX = 0f;
+        var minY = 1f;
+        var maxY = 0f;
+        var hasPoint = false;
+
+        foreach (var worldPoint in worldPoints)
+        {
+            var viewportPoint = camera.WorldToViewportPoint(worldPoint);
+            if (viewportPoint.z <= 0f)
+                continue;
+
+            hasPoint = true;
+            minX = Mathf.Min(minX, viewportPoint.x);
+            maxX = Mathf.Max(maxX, viewportPoint.x);
+            minY = Mathf.Min(minY, viewportPoint.y);
+            maxY = Mathf.Max(maxY, viewportPoint.y);
+        }
+
+        if (!hasPoint)
+            return FallbackHole;
+
+        var left = Mathf.Clamp01(minX - HorizontalPadding);
+        var right = Mathf.Clamp01(maxX + HorizontalPadding);
+        var top = Mathf.Clamp01(1f - maxY - VerticalPaddingTop);
+        var bottom = Mathf.Clamp01(1f - minY + VerticalPaddingBottom);
+        var width = Mathf.Clamp01(right - left);
+        var height = Mathf.Clamp01(bottom - top);
+
+        if (width <= 0.01f || height <= 0.01f)
+            return FallbackHole;
+
+        var computedHole = new Rect(left, top, width, height);
+        BppLog.Info(
+            "MonsterLockShowcaseRuntime",
+            $"Computed preview hole=({computedHole.xMin:0.###},{computedHole.yMin:0.###},{computedHole.width:0.###},{computedHole.height:0.###}) from defaults"
+        );
+        return computedHole;
     }
 }

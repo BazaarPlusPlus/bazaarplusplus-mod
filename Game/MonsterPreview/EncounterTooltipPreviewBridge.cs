@@ -39,6 +39,12 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
         if (_overlayController == null)
             return;
 
+        if (!ModState.IsInGameRun)
+        {
+            HideOverlay("ignoring tooltip lock outside of an active run");
+            return;
+        }
+
         var tooltipController = GetCurrentTooltipController();
         var card = tooltipController?.CurrentCard;
         if (card == null)
@@ -123,6 +129,9 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
         cards = new List<PreviewCardSpec>();
         skillCards = new List<PreviewCardSpec>();
         source = string.Empty;
+
+        if (!ModState.IsInGameRun || card == null)
+            return false;
 
         if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out var monster))
         {

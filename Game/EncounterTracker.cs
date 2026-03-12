@@ -20,6 +20,12 @@ internal static class EncounterTracker
 
     private static void OnCardDealt(List<Card> dealtCards)
     {
+        if (!ModState.IsInGameRun)
+        {
+            ClearEncounterState("Ignoring card dealt outside of an active run");
+            return;
+        }
+
         var state = Data.CurrentState;
         if (state == null)
         {

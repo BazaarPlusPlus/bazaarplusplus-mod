@@ -17,12 +17,19 @@ internal sealed class PreviewBoardSession
     public void Show(PreviewBoardRequest request)
     {
         _request = request;
+        BppLog.Info(
+            "PreviewBoardSession",
+            $"Show request received hasDataSource={request?.DataSource != null} hasAnchor={request?.AnchorStrategy != null} visible={request?.Presentation?.Visible ?? false}"
+        );
     }
 
     public void Hide()
     {
         _renderTarget.SetVisible(false);
         _request = null;
+        _lastSignature = string.Empty;
+        _lastPose = null;
+        BppLog.Info("PreviewBoardSession", "Hide called; cleared cached signature and pose");
     }
 
     public void Tick()
@@ -33,13 +40,22 @@ internal sealed class PreviewBoardSession
         var model = ResolveModel(_request);
         var pose = ResolvePose(_request);
         if (model == null || pose == null)
+        {
+            BppLog.Info(
+                "PreviewBoardSession",
+                $"Tick skipped modelNull={model == null} poseNull={pose == null}"
+            );
             return;
+        }
 
         var signature = string.IsNullOrWhiteSpace(model.Signature)
             ? PreviewBoardSignature.Build(model)
             : model.Signature;
         if (!ShouldRender(signature, pose))
+        {
+            BppLog.Info("PreviewBoardSession", "Tick skipped because signature and pose are unchanged");
             return;
+        }
 
         model.Signature = signature;
         var renderModel = new BoardRenderModel
@@ -52,6 +68,10 @@ internal sealed class PreviewBoardSession
         _renderTarget.Render(renderModel);
         _lastSignature = signature;
         _lastPose = ClonePose(pose);
+        BppLog.Info(
+            "PreviewBoardSession",
+            $"Rendered signature={signature} pose={pose.Position} items={model.ItemCards?.Count ?? 0} skills={model.SkillCards?.Count ?? 0}"
+        );
     }
 
     private static PreviewBoardModel ResolveModel(PreviewBoardRequest request)
