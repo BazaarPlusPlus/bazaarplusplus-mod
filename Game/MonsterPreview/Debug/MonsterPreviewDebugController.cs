@@ -57,6 +57,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
     }
 
     private MonsterPreviewController _overlayController;
+    private MonsterLockShowcaseRuntime _showcaseRuntime;
     private FixedAnchorStrategy _anchorStrategy;
     private PreviewBoardPresentation _presentation;
     private string _lastCardSignature = string.Empty;
@@ -82,6 +83,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
     private void Awake()
     {
         _overlayController = GetComponent<MonsterPreviewController>();
+        _showcaseRuntime = GetComponent<MonsterLockShowcaseRuntime>();
         _anchorStrategy = new FixedAnchorStrategy();
         _presentation = MonsterPreviewDefaults.CreateDebugPresentation();
         _tuner = new MonsterPreviewDebugTuner(_anchorStrategy, _presentation);
@@ -173,19 +175,21 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
 
         state = new DebugState
         {
-            DataSource = _useMonsterDatabase ? "monster_db" : "player_hand",
+            DataSource = UsingShowcaseTargets
+                ? "locked_showcase"
+                : (_useMonsterDatabase ? "monster_db" : "player_hand"),
             EncounterId = string.IsNullOrEmpty(_activeEncounterId) ? "-" : _activeEncounterId,
             MonsterTitle = string.IsNullOrEmpty(_activeMonsterTitle) ? "-" : _activeMonsterTitle,
             Visible = _overlayController.Visible,
-            AnchorPosition = _anchorStrategy.Position,
-            AnchorRotationEuler = _anchorStrategy.Rotation.eulerAngles,
-            LocalOffset = _presentation.LocalOffset,
-            BoardSize = _presentation.BoardSize,
-            CardSpacingX = _presentation.CardSpacing.x,
-            CardScale = _presentation.CardScale.x,
-            BoardThickness = _presentation.BoardThickness,
-            BorderThickness = _presentation.BorderThickness,
-            BorderHeight = _presentation.BorderHeight,
+            AnchorPosition = ActiveAnchorStrategy.Position,
+            AnchorRotationEuler = ActiveAnchorStrategy.Rotation.eulerAngles,
+            LocalOffset = ActivePresentation.LocalOffset,
+            BoardSize = ActivePresentation.BoardSize,
+            CardSpacingX = ActivePresentation.CardSpacing.x,
+            CardScale = ActivePresentation.CardScale.x,
+            BoardThickness = ActivePresentation.BoardThickness,
+            BorderThickness = ActivePresentation.BorderThickness,
+            BorderHeight = ActivePresentation.BorderHeight,
         };
         return true;
     }
@@ -208,17 +212,31 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         GUILayout.EndHorizontal();
 
         GUILayout.Label(
-            $"{(_overlayController.Visible ? "Visible" : "Hidden")}  |  {(_useMonsterDatabase ? "Monster DB" : "Player Hand")}",
+            UsingShowcaseTargets
+                ? "Visible  |  Locked Showcase Target"
+                : $"{(_overlayController.Visible ? "Visible" : "Hidden")}  |  {(_useMonsterDatabase ? "Monster DB" : "Player Hand")}",
             SubtitleStyle
         );
         GUILayout.Label(
-            $"{(string.IsNullOrEmpty(_activeMonsterTitle) ? "No target" : _activeMonsterTitle)}",
+            UsingShowcaseTargets
+                ? "Adjusting right-click preview"
+                : $"{(string.IsNullOrEmpty(_activeMonsterTitle) ? "No target" : _activeMonsterTitle)}",
             SubtitleStyle
         );
     }
 
     private void DrawActionButtons()
     {
+        if (UsingShowcaseTargets)
+        {
+            GUILayout.Label("Locked showcase is using live tuning targets.", SubtitleStyle);
+            GUILayout.BeginHorizontal();
+            if (DrawTintedButton("Reset Anchor", ActionButtonStyle, ActionButtonColor))
+                ResetAnchor();
+            GUILayout.EndHorizontal();
+            return;
+        }
+
         GUILayout.BeginHorizontal();
         if (
             DrawTintedButton(
@@ -245,25 +263,25 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         GUILayout.Label("ANCHOR", SectionStyle);
         DrawStepperRow(
             "X",
-            _anchorStrategy.Position.x.ToString("F1"),
+            ActiveAnchorStrategy.Position.x.ToString("F1"),
             () => MoveAnchor(new Vector3(-MoveStep, 0f, 0f)),
             () => MoveAnchor(new Vector3(MoveStep, 0f, 0f))
         );
         DrawStepperRow(
             "Y",
-            _anchorStrategy.Position.y.ToString("F1"),
+            ActiveAnchorStrategy.Position.y.ToString("F1"),
             () => MoveAnchor(new Vector3(0f, -MoveStep, 0f)),
             () => MoveAnchor(new Vector3(0f, MoveStep, 0f))
         );
         DrawStepperRow(
             "Z",
-            _anchorStrategy.Position.z.ToString("F1"),
+            ActiveAnchorStrategy.Position.z.ToString("F1"),
             () => MoveAnchor(new Vector3(0f, 0f, -MoveStep)),
             () => MoveAnchor(new Vector3(0f, 0f, MoveStep))
         );
         DrawStepperRow(
             "Yaw",
-            _anchorStrategy.Rotation.eulerAngles.y.ToString("F0"),
+            ActiveAnchorStrategy.Rotation.eulerAngles.y.ToString("F0"),
             () => RotateAnchor(-RotationStep),
             () => RotateAnchor(RotationStep)
         );
@@ -274,45 +292,45 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         GUILayout.Label("LAYOUT", SectionStyle);
         DrawStepperRow(
             "Width",
-            _presentation.BoardSize.x.ToString("F2"),
-            () => AdjustLayout(() => _tuner.AdjustBoardWidth(-SizeStep)),
-            () => AdjustLayout(() => _tuner.AdjustBoardWidth(SizeStep))
+            ActivePresentation.BoardSize.x.ToString("F2"),
+            () => AdjustLayout(() => ActiveTuner.AdjustBoardWidth(-SizeStep)),
+            () => AdjustLayout(() => ActiveTuner.AdjustBoardWidth(SizeStep))
         );
         DrawStepperRow(
             "Height",
-            _presentation.BoardSize.y.ToString("F2"),
-            () => AdjustLayout(() => _tuner.AdjustBoardHeight(-SizeStep)),
-            () => AdjustLayout(() => _tuner.AdjustBoardHeight(SizeStep))
+            ActivePresentation.BoardSize.y.ToString("F2"),
+            () => AdjustLayout(() => ActiveTuner.AdjustBoardHeight(-SizeStep)),
+            () => AdjustLayout(() => ActiveTuner.AdjustBoardHeight(SizeStep))
         );
         DrawStepperRow(
             "Gap",
-            _presentation.CardSpacing.x.ToString("F2"),
-            () => AdjustLayout(() => _tuner.AdjustSpacingX(-SizeStep)),
-            () => AdjustLayout(() => _tuner.AdjustSpacingX(SizeStep))
+            ActivePresentation.CardSpacing.x.ToString("F2"),
+            () => AdjustLayout(() => ActiveTuner.AdjustSpacingX(-SizeStep)),
+            () => AdjustLayout(() => ActiveTuner.AdjustSpacingX(SizeStep))
         );
         DrawStepperRow(
             "Scale",
-            _presentation.CardScale.x.ToString("F2"),
-            () => AdjustLayout(() => _tuner.AdjustCardScale(-ScaleStep)),
-            () => AdjustLayout(() => _tuner.AdjustCardScale(ScaleStep))
+            ActivePresentation.CardScale.x.ToString("F2"),
+            () => AdjustLayout(() => ActiveTuner.AdjustCardScale(-ScaleStep)),
+            () => AdjustLayout(() => ActiveTuner.AdjustCardScale(ScaleStep))
         );
         DrawStepperRow(
             "Plate",
-            _presentation.BoardThickness.ToString("F2"),
-            () => AdjustLayout(() => _tuner.AdjustBoardThickness(-ThicknessStep)),
-            () => AdjustLayout(() => _tuner.AdjustBoardThickness(ThicknessStep))
+            ActivePresentation.BoardThickness.ToString("F2"),
+            () => AdjustLayout(() => ActiveTuner.AdjustBoardThickness(-ThicknessStep)),
+            () => AdjustLayout(() => ActiveTuner.AdjustBoardThickness(ThicknessStep))
         );
         DrawStepperRow(
             "Border",
-            _presentation.BorderThickness.ToString("F2"),
-            () => AdjustLayout(() => _tuner.AdjustBorderThickness(-ThicknessStep)),
-            () => AdjustLayout(() => _tuner.AdjustBorderThickness(ThicknessStep))
+            ActivePresentation.BorderThickness.ToString("F2"),
+            () => AdjustLayout(() => ActiveTuner.AdjustBorderThickness(-ThicknessStep)),
+            () => AdjustLayout(() => ActiveTuner.AdjustBorderThickness(ThicknessStep))
         );
         DrawStepperRow(
             "Lip",
-            _presentation.BorderHeight.ToString("F2"),
-            () => AdjustLayout(() => _tuner.AdjustBorderHeight(-ThicknessStep)),
-            () => AdjustLayout(() => _tuner.AdjustBorderHeight(ThicknessStep))
+            ActivePresentation.BorderHeight.ToString("F2"),
+            () => AdjustLayout(() => ActiveTuner.AdjustBorderHeight(-ThicknessStep)),
+            () => AdjustLayout(() => ActiveTuner.AdjustBorderHeight(ThicknessStep))
         );
     }
 
@@ -374,28 +392,35 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
 
     private void ResetAnchor()
     {
-        SeedAnchorToDefaultPose();
+        if (UsingShowcaseTargets)
+            ActiveTuner.ResetAnchor(MonsterPreviewDefaults.DefaultAnchorPose);
+        else
+            SeedAnchorToDefaultPose();
+
+        ApplyLayout();
         BppLog.Debug(
             "MonsterPreviewDebugController",
-            $"Anchor pos={_anchorStrategy.Position} rot={_anchorStrategy.Rotation.eulerAngles}"
+            $"Anchor pos={ActiveAnchorStrategy.Position} rot={ActiveAnchorStrategy.Rotation.eulerAngles}"
         );
     }
 
     private void MoveAnchor(Vector3 delta)
     {
-        _tuner.MoveAnchor(delta);
+        ActiveTuner.MoveAnchor(delta);
+        ApplyLayout();
         BppLog.Debug(
             "MonsterPreviewDebugController",
-            $"Anchor pos={_anchorStrategy.Position} rot={_anchorStrategy.Rotation.eulerAngles}"
+            $"Anchor pos={ActiveAnchorStrategy.Position} rot={ActiveAnchorStrategy.Rotation.eulerAngles}"
         );
     }
 
     private void RotateAnchor(float delta)
     {
-        _tuner.RotateAnchorY(delta);
+        ActiveTuner.RotateAnchorY(delta);
+        ApplyLayout();
         BppLog.Debug(
             "MonsterPreviewDebugController",
-            $"Anchor pos={_anchorStrategy.Position} rot={_anchorStrategy.Rotation.eulerAngles}"
+            $"Anchor pos={ActiveAnchorStrategy.Position} rot={ActiveAnchorStrategy.Rotation.eulerAngles}"
         );
     }
 
@@ -405,7 +430,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         ApplyLayout();
         BppLog.Debug(
             "MonsterPreviewDebugController",
-            $"Layout size={_presentation.BoardSize} offset={_presentation.LocalOffset} spacingX={_presentation.CardSpacing.x:F2} scale={_presentation.CardScale.x:F2} boardT={_presentation.BoardThickness:F2} borderT={_presentation.BorderThickness:F2} borderH={_presentation.BorderHeight:F2}"
+            $"Layout size={ActivePresentation.BoardSize} offset={ActivePresentation.LocalOffset} spacingX={ActivePresentation.CardSpacing.x:F2} scale={ActivePresentation.CardScale.x:F2} boardT={ActivePresentation.BoardThickness:F2} borderT={ActivePresentation.BorderThickness:F2} borderH={ActivePresentation.BorderHeight:F2}"
         );
     }
 
@@ -503,8 +528,25 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
 
     private void ApplyLayout()
     {
+        if (UsingShowcaseTargets)
+        {
+            _overlayController?.Refresh();
+            return;
+        }
+
         _overlayController?.SetPresentation(ClonePresentation(_presentation));
     }
+
+    private bool UsingShowcaseTargets => _showcaseRuntime != null && _showcaseRuntime.IsPreviewActive;
+
+    private FixedAnchorStrategy ActiveAnchorStrategy =>
+        UsingShowcaseTargets ? _showcaseRuntime.AnchorStrategy : _anchorStrategy;
+
+    private PreviewBoardPresentation ActivePresentation =>
+        UsingShowcaseTargets ? _showcaseRuntime.Presentation : _presentation;
+
+    private MonsterPreviewDebugTuner ActiveTuner =>
+        UsingShowcaseTargets ? _showcaseRuntime.DebugTuner : _tuner;
 
     private static List<PreviewCardSpec> BuildCardSpecs(List<Card> cards)
     {

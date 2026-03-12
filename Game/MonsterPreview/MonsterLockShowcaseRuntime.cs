@@ -13,7 +13,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 {
     private static readonly Rect FallbackHole = new Rect(0.52f, 0.18f, 0.40f, 0.22f);
     private const float SkillRegionYOffset = 1.15f;
-    private const float SkillRegionZOffset = 1.5f;
+    private const float SkillRegionZOffset = 1.15f;
     private const float HorizontalPadding = 0.03f;
     private const float VerticalPaddingTop = 0.04f;
     private const float VerticalPaddingBottom = 0.03f;
@@ -23,9 +23,28 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     private readonly MonsterLockShowcaseController _controller = new MonsterLockShowcaseController();
     private readonly LockCanvasHoleOverlay _holeOverlay = new LockCanvasHoleOverlay();
+    private readonly FixedAnchorStrategy _anchorStrategy = new FixedAnchorStrategy(
+        MonsterPreviewDefaults.DefaultAnchorPose
+    );
+    private readonly PreviewBoardPresentation _presentation =
+        MonsterPreviewDefaults.CreateShowcasePresentation();
+    private readonly MonsterPreviewDebugTuner _tuner;
 
     private MonsterPreviewController _overlayController;
     private Card _lockedCard;
+
+    public bool IsPreviewActive => _lockedCard != null;
+
+    public FixedAnchorStrategy AnchorStrategy => _anchorStrategy;
+
+    public PreviewBoardPresentation Presentation => _presentation;
+
+    public MonsterPreviewDebugTuner DebugTuner => _tuner;
+
+    public MonsterLockShowcaseRuntime()
+    {
+        _tuner = new MonsterPreviewDebugTuner(_anchorStrategy, _presentation);
+    }
 
     private void Awake()
     {
@@ -46,6 +65,16 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
     {
         Events.TooltipLock.RemoveListener(OnTooltipLock);
         Events.TooltipUnlock.RemoveListener(OnTooltipUnlock);
+    }
+
+    private void Update()
+    {
+        if (!IsPreviewActive)
+            return;
+
+        var tooltipController = GetCurrentTooltipController();
+        if (tooltipController != null)
+            _holeOverlay.Apply(tooltipController, CalculatePreviewHole(_anchorStrategy, _presentation));
     }
 
     private void OnTooltipLock()
@@ -84,16 +113,17 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         }
 
         _lockedCard = card;
+        _anchorStrategy.SetPose(MonsterPreviewDefaults.DefaultAnchorPose);
+        CopyPresentation(MonsterPreviewDefaults.CreateShowcasePresentation(), _presentation);
         _overlayController.ShowRequest(
-            PreviewBoardRequestFactory.CreateFixed(
+            CreateShowcaseRequest(
                 cards,
                 skillCards,
-                MonsterPreviewDefaults.DefaultAnchorPose,
-                title: card?.Template?.InternalName ?? source,
-                metadata: new Dictionary<string, string> { ["source"] = source }
+                card?.Template?.InternalName ?? source,
+                source
             )
         );
-        _holeOverlay.Apply(tooltipController, CalculatePreviewHole());
+        _holeOverlay.Apply(tooltipController, CalculatePreviewHole(_anchorStrategy, _presentation));
         BppLog.Debug(
             "MonsterLockShowcaseRuntime",
             $"Showing preview source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={cards.Count} skills={skillCards.Count}"
@@ -237,14 +267,37 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         return specs;
     }
 
-    private static Rect CalculatePreviewHole()
+    private PreviewBoardRequest CreateShowcaseRequest(
+        IReadOnlyList<PreviewCardSpec> cards,
+        IReadOnlyList<PreviewCardSpec> skillCards,
+        string title,
+        string source
+    )
+    {
+        var dataSource = new InMemoryPreviewDataSource();
+        dataSource.SetCards(cards, skillCards);
+        dataSource.SetMetadata(title, new Dictionary<string, string> { ["source"] = source });
+
+        return new PreviewBoardRequest
+        {
+            DataSource = dataSource,
+            AnchorStrategy = _anchorStrategy,
+            Presentation = _presentation,
+            Debug = new PreviewBoardDebugOptions(),
+        };
+    }
+
+    private static Rect CalculatePreviewHole(
+        FixedAnchorStrategy anchorStrategy,
+        PreviewBoardPresentation presentation
+    )
     {
         var camera = Camera.main;
         if (camera == null)
             return FallbackHole;
 
-        var pose = MonsterPreviewDefaults.DefaultAnchorPose;
-        var presentation = MonsterPreviewDefaults.CreateShowcasePresentation();
+        if (!anchorStrategy.TryResolve(out var pose) || pose == null)
+            pose = MonsterPreviewDefaults.DefaultAnchorPose;
 
         var boardCenter = pose.Position + pose.Rotation * presentation.LocalOffset;
         var halfBoardWidth = presentation.BoardSize.x * 0.5f;
@@ -307,8 +360,24 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         var computedHole = new Rect(left, top, width, height);
         BppLog.Info(
             "MonsterLockShowcaseRuntime",
-            $"Computed preview hole=({computedHole.xMin:0.###},{computedHole.yMin:0.###},{computedHole.width:0.###},{computedHole.height:0.###}) from defaults"
+            $"Computed preview hole=({computedHole.xMin:0.###},{computedHole.yMin:0.###},{computedHole.width:0.###},{computedHole.height:0.###}) from active showcase state"
         );
         return computedHole;
+    }
+
+    private static void CopyPresentation(
+        PreviewBoardPresentation source,
+        PreviewBoardPresentation destination
+    )
+    {
+        destination.Visible = source.Visible;
+        destination.DebugEnabled = source.DebugEnabled;
+        destination.LocalOffset = source.LocalOffset;
+        destination.CardScale = source.CardScale;
+        destination.CardSpacing = source.CardSpacing;
+        destination.BoardSize = source.BoardSize;
+        destination.BoardThickness = source.BoardThickness;
+        destination.BorderThickness = source.BorderThickness;
+        destination.BorderHeight = source.BorderHeight;
     }
 }

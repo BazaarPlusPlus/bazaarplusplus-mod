@@ -37,7 +37,7 @@ internal sealed class LockCanvasHoleOverlay
         );
         var layout = LockCanvasHoleLayout.Calculate(canvas, hole);
 
-        DisableBackgroundRaycasts(tooltipController, root.transform);
+        DisableCanvasRaycasts(tooltipController, root.transform);
         ApplyBlocker((RectTransform)root.transform.GetChild(0), layout.Top, "Top");
         ApplyBlocker((RectTransform)root.transform.GetChild(1), layout.Bottom, "Bottom");
         ApplyBlocker((RectTransform)root.transform.GetChild(2), layout.Left, "Left");
@@ -73,7 +73,7 @@ internal sealed class LockCanvasHoleOverlay
         );
     }
 
-    private void DisableBackgroundRaycasts(CardTooltipController tooltipController, Transform blockerRoot)
+    private void DisableCanvasRaycasts(CardTooltipController tooltipController, Transform blockerRoot)
     {
         foreach (var graphic in tooltipController.LockModeContainer.GetComponentsInChildren<Graphic>(true))
         {
@@ -83,7 +83,7 @@ internal sealed class LockCanvasHoleOverlay
             if (tooltipController.lockModeExitButton != null && graphic.transform.IsChildOf(tooltipController.lockModeExitButton.transform))
                 continue;
 
-            if (!graphic.raycastTarget || !LooksLikeBackground(graphic, tooltipController.LockModeCanvas.transform as RectTransform))
+            if (!graphic.raycastTarget)
                 continue;
 
             if (!_raycastTargets.ContainsKey(graphic))
@@ -91,23 +91,12 @@ internal sealed class LockCanvasHoleOverlay
                 _raycastTargets[graphic] = graphic.raycastTarget;
                 BppLog.Debug(
                     "LockCanvasHoleOverlay",
-                    $"Disabled raycast on background graphic={graphic.name}, type={graphic.GetType().Name}, path={BuildPath(graphic.transform)}"
+                    $"Disabled raycast on lock canvas graphic={graphic.name}, type={graphic.GetType().Name}, path={BuildPath(graphic.transform)}"
                 );
             }
 
             graphic.raycastTarget = false;
         }
-    }
-
-    private static bool LooksLikeBackground(Graphic graphic, RectTransform canvasRect)
-    {
-        var rectTransform = graphic.transform as RectTransform;
-        if (rectTransform == null || canvasRect == null)
-            return false;
-
-        var rect = rectTransform.rect;
-        var canvas = canvasRect.rect;
-        return rect.width >= canvas.width * 0.9f && rect.height >= canvas.height * 0.9f;
     }
 
     private GameObject EnsureBlockerRoot(RectTransform canvasRect)

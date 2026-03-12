@@ -7,6 +7,7 @@ internal sealed class PreviewBoardSession
 
     private PreviewBoardRequest _request;
     private string _lastSignature = string.Empty;
+    private string _lastPresentationSignature = string.Empty;
     private BoardPose _lastPose;
 
     public PreviewBoardSession(IBoardRenderTarget renderTarget)
@@ -28,6 +29,7 @@ internal sealed class PreviewBoardSession
         _renderTarget.SetVisible(false);
         _request = null;
         _lastSignature = string.Empty;
+        _lastPresentationSignature = string.Empty;
         _lastPose = null;
         BppLog.Info("PreviewBoardSession", "Hide called; cleared cached signature and pose");
     }
@@ -51,7 +53,8 @@ internal sealed class PreviewBoardSession
         var signature = string.IsNullOrWhiteSpace(model.Signature)
             ? PreviewBoardSignature.Build(model)
             : model.Signature;
-        if (!ShouldRender(signature, pose))
+        var presentationSignature = BuildPresentationSignature(_request.Presentation);
+        if (!ShouldRender(signature, presentationSignature, pose))
         {
             BppLog.Info("PreviewBoardSession", "Tick skipped because signature and pose are unchanged");
             return;
@@ -67,6 +70,7 @@ internal sealed class PreviewBoardSession
         };
         _renderTarget.Render(renderModel);
         _lastSignature = signature;
+        _lastPresentationSignature = presentationSignature;
         _lastPose = ClonePose(pose);
         BppLog.Info(
             "PreviewBoardSession",
@@ -90,9 +94,11 @@ internal sealed class PreviewBoardSession
         return request.Pose;
     }
 
-    private bool ShouldRender(string signature, BoardPose pose)
+    private bool ShouldRender(string signature, string presentationSignature, BoardPose pose)
     {
-        return signature != _lastSignature || !SamePose(_lastPose, pose);
+        return signature != _lastSignature
+            || presentationSignature != _lastPresentationSignature
+            || !SamePose(_lastPose, pose);
     }
 
     private static bool SamePose(BoardPose left, BoardPose right)
@@ -110,5 +116,29 @@ internal sealed class PreviewBoardSession
             Position = pose.Position,
             Rotation = pose.Rotation,
         };
+    }
+
+    private static string BuildPresentationSignature(PreviewBoardPresentation presentation)
+    {
+        presentation ??= new PreviewBoardPresentation();
+        return string.Join(
+            "|",
+            presentation.Visible,
+            presentation.DebugEnabled,
+            presentation.LocalOffset.x,
+            presentation.LocalOffset.y,
+            presentation.LocalOffset.z,
+            presentation.CardScale.x,
+            presentation.CardScale.y,
+            presentation.CardScale.z,
+            presentation.CardSpacing.x,
+            presentation.CardSpacing.y,
+            presentation.CardSpacing.z,
+            presentation.BoardSize.x,
+            presentation.BoardSize.y,
+            presentation.BoardThickness,
+            presentation.BorderThickness,
+            presentation.BorderHeight
+        );
     }
 }

@@ -16,7 +16,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private const float SkillSlotMarkerSize = 0.09f;
     private const float SkillSlotMarkerHeight = 0.14f;
     private const float SkillRegionYOffset = 1.15f;
-    private const float SkillRegionZOffset = 1.5f;
+    private const float SkillRegionZOffset = 1.15f;
     private const float SkillCardScaleFactor = 1f;
 
     private readonly IPreviewCardFactory _factory;

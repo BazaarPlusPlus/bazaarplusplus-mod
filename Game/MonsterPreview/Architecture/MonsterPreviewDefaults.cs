@@ -7,7 +7,7 @@ internal static class MonsterPreviewDefaults
 {
     public static readonly BoardPose DefaultAnchorPose = new BoardPose
     {
-        Position = new Vector3(4f, 1f, -5f),
+        Position = new Vector3(5.5f, 8f, -2.5f),
         Rotation = Quaternion.identity,
     };
 
@@ -23,8 +23,8 @@ internal static class MonsterPreviewDefaults
             Visible = true,
             LocalOffset = new Vector3(0f, 0.1f, 0f),
             CardSpacing = new Vector3(1.1f, 0f, 0f),
-            CardScale = Vector3.one * 0.5f,
-            BoardSize = new Vector2(8.25f, 2.75f),
+            CardScale = Vector3.one * 0.45f,
+            BoardSize = new Vector2(7f, 2.75f),
             BoardThickness = 0.02f,
             BorderThickness = 0.04f,
             BorderHeight = 0.04f,
