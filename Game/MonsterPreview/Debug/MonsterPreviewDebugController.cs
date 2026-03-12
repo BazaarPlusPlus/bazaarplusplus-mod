@@ -7,7 +7,6 @@ using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using TheBazaar;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus;
 
@@ -15,12 +14,31 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
 {
     private const string DefaultAnchorPath = "Game/=== BoardAnchor ===/BoardBase(Clone)/PlayerPortrait";
     private const float RefreshInterval = 0.2f;
-    private const float DefaultMoveStep = 0.5f;
-    private const float FineMoveStep = 0.1f;
+    private const float MoveStep = 0.5f;
     private const float RotationStep = 5f;
     private const float SizeStep = 0.25f;
     private const float ThicknessStep = 0.02f;
     private const float ScaleStep = 0.05f;
+    private const float WidgetWidth = 92f;
+    private const float WidgetButtonHeight = 30f;
+    private const float PanelWidth = 260f;
+    private const float PanelPadding = 12f;
+    private static readonly Color WidgetButtonColor = new Color(0.10f, 0.13f, 0.18f, 0.96f);
+    private static readonly Color WidgetButtonActiveColor = new Color(0.16f, 0.34f, 0.29f, 0.98f);
+    private static readonly Color PanelColor = new Color(0.07f, 0.09f, 0.13f, 0.96f);
+    private static readonly Color ActionButtonColor = new Color(0.15f, 0.20f, 0.28f, 1f);
+    private static readonly Color StepperButtonColor = new Color(0.18f, 0.24f, 0.32f, 1f);
+
+    private static readonly GUIStyle WidgetButtonStyle = new GUIStyle();
+    private static readonly GUIStyle PanelStyle = new GUIStyle();
+    private static readonly GUIStyle TitleStyle = new GUIStyle();
+    private static readonly GUIStyle SubtitleStyle = new GUIStyle();
+    private static readonly GUIStyle SectionStyle = new GUIStyle();
+    private static readonly GUIStyle StepperButtonStyle = new GUIStyle();
+    private static readonly GUIStyle ActionButtonStyle = new GUIStyle();
+    private static readonly GUIStyle RowLabelStyle = new GUIStyle();
+    private static readonly GUIStyle ValueStyle = new GUIStyle();
+    private static bool _stylesInitialized;
 
     internal struct DebugState
     {
@@ -50,6 +68,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
     private const string DefaultEncounterId = "4a4542cd";
     private string _activeEncounterId = string.Empty;
     private string _activeMonsterTitle = string.Empty;
+    private bool _widgetExpanded;
     private readonly PreviewBoardDebugOptions _debugOptions = new PreviewBoardDebugOptions
     {
         Enabled = true,
@@ -59,12 +78,14 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         ShowCardBounds = true,
         ShowLabels = true,
     };
+    private MonsterPreviewDebugTuner _tuner;
 
     private void Awake()
     {
         _overlayController = GetComponent<MonsterPreviewController>();
         _anchorStrategy = new FixedAnchorStrategy();
         _presentation = new PreviewBoardPresentation();
+        _tuner = new MonsterPreviewDebugTuner(_anchorStrategy, _presentation);
 
         if (_overlayController != null)
         {
@@ -79,44 +100,68 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
 
     private void Update()
     {
-        var keyboard = Keyboard.current;
-        if (keyboard == null || _overlayController == null)
+        if (_overlayController == null || !_overlayController.Visible)
             return;
-
-        if (keyboard.f3Key.wasPressedThisFrame)
-        {
-            if (!_anchorSeeded)
-                SeedAnchorFromBoardPortrait();
-
-            _overlayController.SetVisible(!_overlayController.Visible);
-            if (_overlayController.Visible)
-                SyncPreviewData();
-            BppLog.Debug("MonsterPreviewDebugController", $"Preview visible={_overlayController.Visible}");
-        }
-
-        if (keyboard.f4Key.wasPressedThisFrame)
-        {
-            _useMonsterDatabase = !_useMonsterDatabase;
-            _lastCardSignature = string.Empty;
-            _lastSkillSignature = string.Empty;
-            SyncPreviewData();
-            BppLog.Debug(
-                "MonsterPreviewDebugController",
-                $"Preview data source={(_useMonsterDatabase ? "monster_db" : "player_hand")}"
-            );
-        }
-
-        if (!_overlayController.Visible)
-            return;
-
-        HandleAnchorControls(keyboard);
-        HandleLayoutControls(keyboard);
 
         if (Time.unscaledTime >= _nextRefreshTime)
         {
             _nextRefreshTime = Time.unscaledTime + RefreshInterval;
             SyncPreviewData();
         }
+    }
+
+    private void OnGUI()
+    {
+        if (_overlayController == null)
+            return;
+
+        InitStyles();
+
+        var buttonRect = new Rect(
+            Screen.width - WidgetWidth - 16f,
+            16f,
+            WidgetWidth,
+            WidgetButtonHeight
+        );
+        var buttonLabel = _overlayController.Visible ? "Preview ON" : "Preview";
+        if (
+            DrawTintedButton(
+                buttonRect,
+                buttonLabel,
+                WidgetButtonStyle,
+                _overlayController.Visible ? WidgetButtonActiveColor : WidgetButtonColor
+            )
+        )
+            _widgetExpanded = !_widgetExpanded;
+
+        if (!_widgetExpanded)
+            return;
+
+        var panelRect = new Rect(
+            Screen.width - PanelWidth - 16f,
+            buttonRect.yMax + 8f,
+            PanelWidth,
+            376f
+        );
+        DrawTintedBox(panelRect, PanelStyle, PanelColor);
+
+        GUILayout.BeginArea(
+            new Rect(
+                panelRect.x + PanelPadding,
+                panelRect.y + PanelPadding,
+                panelRect.width - (PanelPadding * 2f),
+                panelRect.height - (PanelPadding * 2f)
+            )
+        );
+
+        DrawWidgetHeader();
+        GUILayout.Space(10f);
+        DrawActionButtons();
+        GUILayout.Space(10f);
+        DrawAnchorSection();
+        GUILayout.Space(10f);
+        DrawLayoutSection();
+        GUILayout.EndArea();
     }
 
     public bool TryGetDebugState(out DebugState state)
@@ -146,171 +191,218 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         return true;
     }
 
-    private void HandleAnchorControls(Keyboard keyboard)
+    private void DrawWidgetHeader()
     {
-        var moved = false;
-        var moveStep = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed
-            ? FineMoveStep
-            : DefaultMoveStep;
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Monster Preview", TitleStyle);
+        GUILayout.FlexibleSpace();
+        if (
+            DrawTintedButton(
+                "x",
+                StepperButtonStyle,
+                StepperButtonColor,
+                GUILayout.Width(26f),
+                GUILayout.Height(22f)
+            )
+        )
+            _widgetExpanded = false;
+        GUILayout.EndHorizontal();
 
-        var position = _anchorStrategy.Position;
-        if (keyboard.leftArrowKey.wasPressedThisFrame)
-        {
-            position.x -= moveStep;
-            moved = true;
-        }
-        if (keyboard.rightArrowKey.wasPressedThisFrame)
-        {
-            position.x += moveStep;
-            moved = true;
-        }
-        if (keyboard.upArrowKey.wasPressedThisFrame)
-        {
-            position.z += moveStep;
-            moved = true;
-        }
-        if (keyboard.downArrowKey.wasPressedThisFrame)
-        {
-            position.z -= moveStep;
-            moved = true;
-        }
-        if (keyboard.pageUpKey.wasPressedThisFrame)
-        {
-            position.y += moveStep;
-            moved = true;
-        }
-        if (keyboard.pageDownKey.wasPressedThisFrame)
-        {
-            position.y -= moveStep;
-            moved = true;
-        }
-        if (moved)
-            _anchorStrategy.Position = position;
-
-        var rotation = _anchorStrategy.Rotation;
-        if (keyboard.commaKey.wasPressedThisFrame)
-        {
-            rotation = Quaternion.Euler(0f, -RotationStep, 0f) * rotation;
-            moved = true;
-        }
-        if (keyboard.periodKey.wasPressedThisFrame)
-        {
-            rotation = Quaternion.Euler(0f, RotationStep, 0f) * rotation;
-            moved = true;
-        }
-        if (rotation != _anchorStrategy.Rotation)
-            _anchorStrategy.Rotation = rotation;
-
-        if (keyboard.rKey.wasPressedThisFrame)
-        {
-            SeedAnchorFromBoardPortrait();
-            moved = true;
-        }
-
-        if (moved)
-        {
-            BppLog.Debug(
-                "MonsterPreviewDebugController",
-                $"Anchor pos={_anchorStrategy.Position} rot={_anchorStrategy.Rotation.eulerAngles}"
-            );
-        }
+        GUILayout.Label(
+            $"{(_overlayController.Visible ? "Visible" : "Hidden")}  |  {(_useMonsterDatabase ? "Monster DB" : "Player Hand")}",
+            SubtitleStyle
+        );
+        GUILayout.Label(
+            $"{(string.IsNullOrEmpty(_activeMonsterTitle) ? "No target" : _activeMonsterTitle)}",
+            SubtitleStyle
+        );
     }
 
-    private void HandleLayoutControls(Keyboard keyboard)
+    private void DrawActionButtons()
     {
-        var layoutChanged = false;
-        var boardSize = _presentation.BoardSize;
-        var cardSpacing = _presentation.CardSpacing;
+        GUILayout.BeginHorizontal();
+        if (
+            DrawTintedButton(
+                _overlayController.Visible ? "Hide" : "Show",
+                ActionButtonStyle,
+                ActionButtonColor
+            )
+        )
+            TogglePreview();
+        if (DrawTintedButton("Source", ActionButtonStyle, ActionButtonColor))
+            ToggleDataSource();
+        if (DrawTintedButton("Sync", ActionButtonStyle, ActionButtonColor))
+            SyncPreviewData();
+        GUILayout.EndHorizontal();
 
-        if (keyboard.digit1Key.wasPressedThisFrame)
+        GUILayout.BeginHorizontal();
+        if (DrawTintedButton("Reset Anchor", ActionButtonStyle, ActionButtonColor))
+            ResetAnchor();
+        GUILayout.EndHorizontal();
+    }
+
+    private void DrawAnchorSection()
+    {
+        GUILayout.Label("ANCHOR", SectionStyle);
+        DrawStepperRow(
+            "X",
+            _anchorStrategy.Position.x.ToString("F1"),
+            () => MoveAnchor(new Vector3(-MoveStep, 0f, 0f)),
+            () => MoveAnchor(new Vector3(MoveStep, 0f, 0f))
+        );
+        DrawStepperRow(
+            "Y",
+            _anchorStrategy.Position.y.ToString("F1"),
+            () => MoveAnchor(new Vector3(0f, -MoveStep, 0f)),
+            () => MoveAnchor(new Vector3(0f, MoveStep, 0f))
+        );
+        DrawStepperRow(
+            "Z",
+            _anchorStrategy.Position.z.ToString("F1"),
+            () => MoveAnchor(new Vector3(0f, 0f, -MoveStep)),
+            () => MoveAnchor(new Vector3(0f, 0f, MoveStep))
+        );
+        DrawStepperRow(
+            "Yaw",
+            _anchorStrategy.Rotation.eulerAngles.y.ToString("F0"),
+            () => RotateAnchor(-RotationStep),
+            () => RotateAnchor(RotationStep)
+        );
+    }
+
+    private void DrawLayoutSection()
+    {
+        GUILayout.Label("LAYOUT", SectionStyle);
+        DrawStepperRow(
+            "Width",
+            _presentation.BoardSize.x.ToString("F2"),
+            () => AdjustLayout(() => _tuner.AdjustBoardWidth(-SizeStep)),
+            () => AdjustLayout(() => _tuner.AdjustBoardWidth(SizeStep))
+        );
+        DrawStepperRow(
+            "Height",
+            _presentation.BoardSize.y.ToString("F2"),
+            () => AdjustLayout(() => _tuner.AdjustBoardHeight(-SizeStep)),
+            () => AdjustLayout(() => _tuner.AdjustBoardHeight(SizeStep))
+        );
+        DrawStepperRow(
+            "Gap",
+            _presentation.CardSpacing.x.ToString("F2"),
+            () => AdjustLayout(() => _tuner.AdjustSpacingX(-SizeStep)),
+            () => AdjustLayout(() => _tuner.AdjustSpacingX(SizeStep))
+        );
+        DrawStepperRow(
+            "Scale",
+            _presentation.CardScale.x.ToString("F2"),
+            () => AdjustLayout(() => _tuner.AdjustCardScale(-ScaleStep)),
+            () => AdjustLayout(() => _tuner.AdjustCardScale(ScaleStep))
+        );
+        DrawStepperRow(
+            "Plate",
+            _presentation.BoardThickness.ToString("F2"),
+            () => AdjustLayout(() => _tuner.AdjustBoardThickness(-ThicknessStep)),
+            () => AdjustLayout(() => _tuner.AdjustBoardThickness(ThicknessStep))
+        );
+        DrawStepperRow(
+            "Border",
+            _presentation.BorderThickness.ToString("F2"),
+            () => AdjustLayout(() => _tuner.AdjustBorderThickness(-ThicknessStep)),
+            () => AdjustLayout(() => _tuner.AdjustBorderThickness(ThicknessStep))
+        );
+        DrawStepperRow(
+            "Lip",
+            _presentation.BorderHeight.ToString("F2"),
+            () => AdjustLayout(() => _tuner.AdjustBorderHeight(-ThicknessStep)),
+            () => AdjustLayout(() => _tuner.AdjustBorderHeight(ThicknessStep))
+        );
+    }
+
+    private void DrawStepperRow(string label, string value, Action decrement, Action increment)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Label(label, RowLabelStyle, GUILayout.Width(50f));
+        if (
+            DrawTintedButton(
+                "-",
+                StepperButtonStyle,
+                StepperButtonColor,
+                GUILayout.Width(28f),
+                GUILayout.Height(24f)
+            )
+        )
+            decrement();
+        GUILayout.Label(value, ValueStyle, GUILayout.Width(58f));
+        if (
+            DrawTintedButton(
+                "+",
+                StepperButtonStyle,
+                StepperButtonColor,
+                GUILayout.Width(28f),
+                GUILayout.Height(24f)
+            )
+        )
+            increment();
+        GUILayout.EndHorizontal();
+    }
+
+    private void TogglePreview()
+    {
+        if (!_anchorSeeded)
+            SeedAnchorFromBoardPortrait();
+
+        _overlayController.SetVisible(!_overlayController.Visible);
+        if (_overlayController.Visible)
         {
-            if (!DebugPanel.IsVisible)
-            {
-                boardSize.x = Mathf.Max(1f, boardSize.x - SizeStep);
-                layoutChanged = true;
-            }
-        }
-        if (keyboard.digit2Key.wasPressedThisFrame)
-        {
-            if (!DebugPanel.IsVisible)
-            {
-                boardSize.x += SizeStep;
-                layoutChanged = true;
-            }
-        }
-        if (keyboard.digit3Key.wasPressedThisFrame)
-        {
-            if (!DebugPanel.IsVisible)
-            {
-                boardSize.y = Mathf.Max(1f, boardSize.y - SizeStep);
-                layoutChanged = true;
-            }
-        }
-        if (keyboard.digit4Key.wasPressedThisFrame)
-        {
-            if (!DebugPanel.IsVisible)
-            {
-                boardSize.y += SizeStep;
-                layoutChanged = true;
-            }
-        }
-        if (keyboard.digit5Key.wasPressedThisFrame)
-        {
-            cardSpacing.x = Mathf.Max(0.2f, cardSpacing.x - SizeStep);
-            layoutChanged = true;
-        }
-        if (keyboard.digit6Key.wasPressedThisFrame)
-        {
-            cardSpacing.x += SizeStep;
-            layoutChanged = true;
-        }
-        if (keyboard.minusKey.wasPressedThisFrame)
-        {
-            _presentation.CardScale = Vector3.one
-                * Mathf.Max(0.1f, _presentation.CardScale.x - ScaleStep);
-            layoutChanged = true;
-        }
-        if (keyboard.equalsKey.wasPressedThisFrame)
-        {
-            _presentation.CardScale = Vector3.one * (_presentation.CardScale.x + ScaleStep);
-            layoutChanged = true;
-        }
-        if (keyboard.kKey.wasPressedThisFrame)
-        {
-            _presentation.BoardThickness = Mathf.Max(0.01f, _presentation.BoardThickness - ThicknessStep);
-            layoutChanged = true;
-        }
-        if (keyboard.lKey.wasPressedThisFrame)
-        {
-            _presentation.BoardThickness += ThicknessStep;
-            layoutChanged = true;
-        }
-        if (keyboard.semicolonKey.wasPressedThisFrame)
-        {
-            _presentation.BorderThickness = Mathf.Max(0.01f, _presentation.BorderThickness - ThicknessStep);
-            layoutChanged = true;
-        }
-        if (keyboard.quoteKey.wasPressedThisFrame)
-        {
-            _presentation.BorderThickness += ThicknessStep;
-            layoutChanged = true;
-        }
-        if (keyboard.nKey.wasPressedThisFrame)
-        {
-            _presentation.BorderHeight = Mathf.Max(0.01f, _presentation.BorderHeight - ThicknessStep);
-            layoutChanged = true;
-        }
-        if (keyboard.mKey.wasPressedThisFrame)
-        {
-            _presentation.BorderHeight += ThicknessStep;
-            layoutChanged = true;
+            _nextRefreshTime = Time.unscaledTime + RefreshInterval;
+            SyncPreviewData();
         }
 
-        if (!layoutChanged)
-            return;
+        BppLog.Debug("MonsterPreviewDebugController", $"Preview visible={_overlayController.Visible}");
+    }
 
-        _presentation.BoardSize = boardSize;
-        _presentation.CardSpacing = cardSpacing;
+    private void ToggleDataSource()
+    {
+        _useMonsterDatabase = !_useMonsterDatabase;
+        _lastCardSignature = string.Empty;
+        _lastSkillSignature = string.Empty;
+        if (_overlayController.Visible)
+            SyncPreviewData();
+        BppLog.Debug(
+            "MonsterPreviewDebugController",
+            $"Preview data source={(_useMonsterDatabase ? "monster_db" : "player_hand")}"
+        );
+    }
+
+    private void ResetAnchor()
+    {
+        SeedAnchorFromBoardPortrait();
+        BppLog.Debug(
+            "MonsterPreviewDebugController",
+            $"Anchor pos={_anchorStrategy.Position} rot={_anchorStrategy.Rotation.eulerAngles}"
+        );
+    }
+
+    private void MoveAnchor(Vector3 delta)
+    {
+        _tuner.MoveAnchor(delta);
+        BppLog.Debug(
+            "MonsterPreviewDebugController",
+            $"Anchor pos={_anchorStrategy.Position} rot={_anchorStrategy.Rotation.eulerAngles}"
+        );
+    }
+
+    private void RotateAnchor(float delta)
+    {
+        _tuner.RotateAnchorY(delta);
+        BppLog.Debug(
+            "MonsterPreviewDebugController",
+            $"Anchor pos={_anchorStrategy.Position} rot={_anchorStrategy.Rotation.eulerAngles}"
+        );
+    }
+
+    private void AdjustLayout(Action adjustment)
+    {
+        adjustment();
         ApplyLayout();
         BppLog.Debug(
             "MonsterPreviewDebugController",
@@ -530,5 +622,94 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
             BorderThickness = presentation.BorderThickness,
             BorderHeight = presentation.BorderHeight,
         };
+    }
+
+    private static void InitStyles()
+    {
+        if (_stylesInitialized)
+            return;
+
+        WidgetButtonStyle.normal.background = Texture2D.whiteTexture;
+        WidgetButtonStyle.normal.textColor = new Color(0.95f, 0.97f, 1f);
+        WidgetButtonStyle.fontSize = 12;
+        WidgetButtonStyle.fontStyle = FontStyle.Bold;
+        WidgetButtonStyle.alignment = TextAnchor.MiddleCenter;
+        WidgetButtonStyle.padding = new RectOffset(10, 10, 6, 6);
+        WidgetButtonStyle.border = new RectOffset(10, 10, 10, 10);
+
+        PanelStyle.normal.background = Texture2D.whiteTexture;
+        PanelStyle.border = new RectOffset(14, 14, 14, 14);
+
+        TitleStyle.normal.textColor = new Color(0.96f, 0.97f, 0.99f);
+        TitleStyle.fontSize = 14;
+        TitleStyle.fontStyle = FontStyle.Bold;
+
+        SubtitleStyle.normal.textColor = new Color(0.70f, 0.76f, 0.84f);
+        SubtitleStyle.fontSize = 11;
+
+        SectionStyle.normal.textColor = new Color(0.82f, 0.87f, 0.94f);
+        SectionStyle.fontSize = 11;
+        SectionStyle.fontStyle = FontStyle.Bold;
+
+        StepperButtonStyle.normal.background = Texture2D.whiteTexture;
+        StepperButtonStyle.normal.textColor = new Color(0.94f, 0.96f, 0.99f);
+        StepperButtonStyle.fontSize = 12;
+        StepperButtonStyle.fontStyle = FontStyle.Bold;
+        StepperButtonStyle.alignment = TextAnchor.MiddleCenter;
+        StepperButtonStyle.margin = new RectOffset(0, 4, 2, 2);
+
+        ActionButtonStyle.normal.background = Texture2D.whiteTexture;
+        ActionButtonStyle.normal.textColor = new Color(0.94f, 0.96f, 0.99f);
+        ActionButtonStyle.fontSize = 11;
+        ActionButtonStyle.fontStyle = FontStyle.Bold;
+        ActionButtonStyle.alignment = TextAnchor.MiddleCenter;
+        ActionButtonStyle.padding = new RectOffset(8, 8, 6, 6);
+        ActionButtonStyle.margin = new RectOffset(0, 6, 0, 4);
+
+        RowLabelStyle.normal.textColor = new Color(0.84f, 0.89f, 0.96f);
+        RowLabelStyle.fontSize = 11;
+        RowLabelStyle.alignment = TextAnchor.MiddleLeft;
+
+        ValueStyle.normal.textColor = new Color(0.98f, 0.98f, 0.99f);
+        ValueStyle.fontSize = 11;
+        ValueStyle.alignment = TextAnchor.MiddleCenter;
+
+        _stylesInitialized = true;
+    }
+
+    private static void DrawTintedBox(Rect rect, GUIStyle style, Color color)
+    {
+        var previousColor = GUI.color;
+        GUI.color = color;
+        GUI.Box(rect, GUIContent.none, style);
+        GUI.color = previousColor;
+    }
+
+    private static bool DrawTintedButton(
+        Rect rect,
+        string label,
+        GUIStyle style,
+        Color color
+    )
+    {
+        var previousBackground = GUI.backgroundColor;
+        GUI.backgroundColor = color;
+        var clicked = GUI.Button(rect, label, style);
+        GUI.backgroundColor = previousBackground;
+        return clicked;
+    }
+
+    private static bool DrawTintedButton(
+        string label,
+        GUIStyle style,
+        Color color,
+        params GUILayoutOption[] options
+    )
+    {
+        var previousBackground = GUI.backgroundColor;
+        GUI.backgroundColor = color;
+        var clicked = GUILayout.Button(label, style, options);
+        GUI.backgroundColor = previousBackground;
+        return clicked;
     }
 }

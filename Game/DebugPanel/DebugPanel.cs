@@ -236,11 +236,7 @@ internal sealed class DebugPanel : MonoBehaviour
         DrawRow("Border Height", state.BorderHeight.ToString("F2"));
         GUILayout.Space(8);
         GUILayout.Label(
-            "Preview Controls: [F3] toggle, [F4] source, arrows move X/Z, PgUp/PgDn move Y, </> rotate, R reset",
-            MutedStyle
-        );
-        GUILayout.Label(
-            "Layout Controls: [5/6] spacing, [-/=] scale, [K/L] plate, [;/' ] border, [N/M] border height",
+            "Preview controls moved to the compact Preview widget in the top-right corner.",
             MutedStyle
         );
     }

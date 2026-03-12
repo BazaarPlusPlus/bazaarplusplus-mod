@@ -50,6 +50,7 @@
     <Compile Include="../../Game/MonsterPreview/Architecture/PreviewBoardSession.cs" Link="Game/MonsterPreview/Architecture/PreviewBoardSession.cs" />
     <Compile Include="../../Game/MonsterPreview/Architecture/InMemoryPreviewDataSource.cs" Link="Game/MonsterPreview/Architecture/InMemoryPreviewDataSource.cs" />
     <Compile Include="../../Game/MonsterPreview/Architecture/MonsterPreviewOverlayCoordinator.cs" Link="Game/MonsterPreview/Architecture/MonsterPreviewOverlayCoordinator.cs" />
+    <Compile Include="../../Game/MonsterPreview/Debug/MonsterPreviewDebugTuner.cs" Link="Game/MonsterPreview/Debug/MonsterPreviewDebugTuner.cs" />
     <Compile Include="../../Game/MonsterPreview/View/BoardDebugOverlay.cs" Link="Game/MonsterPreview/View/BoardDebugOverlay.cs" />
     <Compile Include="../../Game/MonsterPreview/View/BoardLayoutSnapshot.cs" Link="Game/MonsterPreview/View/BoardLayoutSnapshot.cs" />
     <Compile Include="../../Game/MonsterPreview/View/BoardView.cs" Link="Game/MonsterPreview/View/BoardView.cs" />
