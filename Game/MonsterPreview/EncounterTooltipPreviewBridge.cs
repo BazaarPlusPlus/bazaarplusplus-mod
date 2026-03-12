@@ -17,12 +17,12 @@ internal sealed class EncounterTooltipPreviewBridge : MonoBehaviour
     private static readonly System.Reflection.PropertyInfo CurrentTooltipControllerProperty =
         AccessTools.Property(typeof(TooltipParentComponent), "CardTooltipController");
 
-    private MonsterPreviewOverlayController _overlayController;
+    private MonsterPreviewController _overlayController;
     private Card _lockedCard;
 
     private void Awake()
     {
-        _overlayController = GetComponent<MonsterPreviewOverlayController>();
+        _overlayController = GetComponent<MonsterPreviewController>();
     }
 
     private void OnEnable()

@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace BazaarPlusPlus;
 
-internal sealed class MonsterPreviewOverlayController : MonoBehaviour
+internal sealed class MonsterPreviewController : MonoBehaviour
 {
     private readonly List<PreviewCardSpec> _cards = new List<PreviewCardSpec>();
     private readonly List<PreviewCardSpec> _skillCards = new List<PreviewCardSpec>();
@@ -42,7 +42,7 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         _anchorStrategy = anchorStrategy;
         _coordinator?.SetAnchorStrategy(anchorStrategy);
         BppLog.Debug(
-            "MonsterPreviewOverlayController",
+            "MonsterPreviewController",
             $"Anchor strategy set: {anchorStrategy?.GetType().Name ?? "null"}"
         );
     }
@@ -52,7 +52,7 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         _presentation = presentation ?? new PreviewBoardPresentation();
         _coordinator?.SetPresentation(_presentation);
         BppLog.Debug(
-            "MonsterPreviewOverlayController",
+            "MonsterPreviewController",
             $"Presentation updated: size={_presentation.BoardSize}, offset={_presentation.LocalOffset}, spacing={_presentation.CardSpacing}, scale={_presentation.CardScale}"
         );
     }
@@ -63,7 +63,7 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
         if (cards != null)
             _cards.AddRange(CloneCards(cards));
 
-        BppLog.Debug("MonsterPreviewOverlayController", $"SetCards count={_cards.Count}, visible={_visible}");
+        BppLog.Debug("MonsterPreviewController", $"SetCards count={_cards.Count}, visible={_visible}");
         _coordinator?.SetCards(_cards);
     }
 
@@ -74,7 +74,7 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
             _skillCards.AddRange(CloneCards(cards));
 
         BppLog.Debug(
-            "MonsterPreviewOverlayController",
+            "MonsterPreviewController",
             $"SetSkillCards count={_skillCards.Count}, visible={_visible}"
         );
         _coordinator?.SetSkillCards(_skillCards);
@@ -100,7 +100,7 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     {
         _cards.Clear();
         _skillCards.Clear();
-        BppLog.Debug("MonsterPreviewOverlayController", "ClearCards");
+        BppLog.Debug("MonsterPreviewController", "ClearCards");
         _coordinator?.ClearCards();
     }
 
@@ -108,12 +108,12 @@ internal sealed class MonsterPreviewOverlayController : MonoBehaviour
     {
         if (_visible == visible)
         {
-            BppLog.Debug("MonsterPreviewOverlayController", $"SetVisible ignored: already {visible}");
+            BppLog.Debug("MonsterPreviewController", $"SetVisible ignored: already {visible}");
             return;
         }
 
         _visible = visible;
-        BppLog.Debug("MonsterPreviewOverlayController", $"Visible={_visible}");
+        BppLog.Debug("MonsterPreviewController", $"Visible={_visible}");
 
         if (!_visible)
         {

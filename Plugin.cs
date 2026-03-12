@@ -26,7 +26,7 @@ public class Plugin : BaseUnityPlugin
         EncounterTracker.Subscribe();
         gameObject.AddComponent<DebugPanel>();
         gameObject.AddComponent<CombatStatusBar>();
-        gameObject.AddComponent<MonsterPreviewOverlayController>();
+        gameObject.AddComponent<MonsterPreviewController>();
         gameObject.AddComponent<MonsterPreviewDebugController>();
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
     }

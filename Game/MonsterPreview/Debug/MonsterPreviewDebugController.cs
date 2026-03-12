@@ -39,7 +39,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         public float BorderHeight;
     }
 
-    private MonsterPreviewOverlayController _overlayController;
+    private MonsterPreviewController _overlayController;
     private FixedAnchorStrategy _anchorStrategy;
     private PreviewBoardPresentation _presentation;
     private string _lastCardSignature = string.Empty;
@@ -62,7 +62,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
 
     private void Awake()
     {
-        _overlayController = GetComponent<MonsterPreviewOverlayController>();
+        _overlayController = GetComponent<MonsterPreviewController>();
         _anchorStrategy = new FixedAnchorStrategy();
         _presentation = new PreviewBoardPresentation();
 
