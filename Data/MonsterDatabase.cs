@@ -3,13 +3,18 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using BepInEx;
 using Newtonsoft.Json;
 
 namespace BazaarPlusPlus;
 
 internal static class MonsterDatabase
 {
+    private const string EmbeddedResourceName = "BazaarPlusPlus.Data.monsters_bazaardb.json";
+
     private static readonly Dictionary<Guid, MonsterInfo> _db = new Dictionary<Guid, MonsterInfo>();
+    private static readonly Dictionary<string, MonsterInfo> _dbByShortEncounterId = new Dictionary<string, MonsterInfo>(StringComparer.OrdinalIgnoreCase);
 
     private sealed class MonsterRecordDto
     {
@@ -103,21 +108,23 @@ internal static class MonsterDatabase
 
     public static void Load()
     {
-        var path = GetPath();
         try
         {
-            if (!File.Exists(path))
+            var json = ReadDatabaseJson(out var source);
+            if (string.IsNullOrWhiteSpace(json))
             {
-                ModState.Logger.LogWarning("[MonsterDatabase] Missing monster database at " + path);
+                ModState.Logger.LogWarning("[MonsterDatabase] Monster database JSON was empty");
+                _db.Clear();
+                _dbByShortEncounterId.Clear();
                 return;
             }
 
-            var json = File.ReadAllText(path);
             var raw =
                 JsonConvert.DeserializeObject<Dictionary<string, MonsterRecordDto>>(json)
                 ?? new Dictionary<string, MonsterRecordDto>();
 
             _db.Clear();
+            _dbByShortEncounterId.Clear();
             var invalidEncounterIds = 0;
             foreach (var pair in raw)
             {
@@ -128,18 +135,22 @@ internal static class MonsterDatabase
                 }
 
                 var monster = MapMonster(encounterId, pair.Value);
-                if (monster != null)
-                    _db[encounterId] = monster;
+                if (monster == null)
+                    continue;
+
+                _db[encounterId] = monster;
+                _dbByShortEncounterId[GetShortEncounterId(pair.Key)] = monster;
             }
 
             ModState.Logger.LogInfo(
-                $"[MonsterDatabase] Loaded {_db.Count} entries from monsters_bazaardb.json path={path} invalidEncounterIds={invalidEncounterIds}"
+                $"[MonsterDatabase] Loaded {_db.Count} entries from {source} invalidEncounterIds={invalidEncounterIds} shortKeys={_dbByShortEncounterId.Count}"
             );
         }
         catch (Exception ex)
         {
             ModState.Logger.LogError($"[MonsterDatabase] Failed to load: {ex.Message}");
             _db.Clear();
+            _dbByShortEncounterId.Clear();
         }
     }
 
@@ -148,6 +159,32 @@ internal static class MonsterDatabase
         var found = _db.TryGetValue(encounterId, out monster);
         ModState.Logger?.LogDebug(
             $"[MonsterDatabase] Lookup encounterId={encounterId} found={found}"
+        );
+        return found;
+    }
+
+    public static bool TryGetByEncounterId(string encounterId, out MonsterInfo monster)
+    {
+        monster = null;
+        if (string.IsNullOrWhiteSpace(encounterId))
+        {
+            ModState.Logger?.LogDebug("[MonsterDatabase] Lookup encounterId=<empty> found=False");
+            return false;
+        }
+
+        if (Guid.TryParse(encounterId, out var encounterGuid) && TryGetByEncounterId(encounterGuid, out monster))
+            return true;
+
+        return TryGetByEncounterIdPrefix(encounterId, out monster);
+    }
+
+    public static bool TryGetByEncounterIdPrefix(string encounterIdPrefix, out MonsterInfo monster)
+    {
+        monster = null;
+        var key = GetShortEncounterId(encounterIdPrefix);
+        var found = !string.IsNullOrWhiteSpace(key) && _dbByShortEncounterId.TryGetValue(key, out monster);
+        ModState.Logger?.LogDebug(
+            $"[MonsterDatabase] Lookup encounterIdPrefix={encounterIdPrefix} normalized={key} found={found}"
         );
         return found;
     }
@@ -169,6 +206,33 @@ internal static class MonsterDatabase
         public List<string> Skills { get; set; }
     }
 
+    private static string ReadDatabaseJson(out string source)
+    {
+        var assembly = typeof(MonsterDatabase).Assembly;
+        using (var stream = assembly.GetManifestResourceStream(EmbeddedResourceName))
+        {
+            if (stream != null)
+            {
+                using (var reader = new StreamReader(stream))
+                {
+                    source = $"embedded:{EmbeddedResourceName}";
+                    return reader.ReadToEnd();
+                }
+            }
+        }
+
+        var pluginPath = Path.Combine(Paths.PluginPath, "monsters_bazaardb.json");
+        if (File.Exists(pluginPath))
+        {
+            source = pluginPath;
+            return File.ReadAllText(pluginPath);
+        }
+
+        throw new FileNotFoundException(
+            $"Monster database not found in embedded resource '{EmbeddedResourceName}' or plugin path '{pluginPath}'"
+        );
+    }
+
     private static MonsterInfo MapMonster(Guid encounterId, MonsterRecordDto dto)
     {
         if (dto == null)
@@ -182,6 +246,8 @@ internal static class MonsterDatabase
         return new MonsterInfo
         {
             EncounterId = encounterId,
+            EncounterKey = dto.EncounterId ?? encounterId.ToString(),
+            EncounterShortId = GetShortEncounterId(dto.EncounterId ?? encounterId.ToString()),
             Title = dto.Title ?? string.Empty,
             BaseTier = dto.BaseTier ?? string.Empty,
             CombatLevel = dto.Combatant?.Level,
@@ -232,9 +298,12 @@ internal static class MonsterDatabase
         };
     }
 
-    private static string GetPath()
+    private static string GetShortEncounterId(string encounterId)
     {
-        var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
-        return Path.Combine(projectRoot, "Data", "monsters_bazaardb.json");
+        if (string.IsNullOrWhiteSpace(encounterId))
+            return string.Empty;
+
+        var dashIndex = encounterId.IndexOf('-');
+        return dashIndex > 0 ? encounterId[..dashIndex] : encounterId;
     }
 }

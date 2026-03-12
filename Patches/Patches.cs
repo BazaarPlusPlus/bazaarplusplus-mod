@@ -6,6 +6,7 @@ using BazaarGameShared.Infra.Messages;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
+using TheBazaar.UI.Tooltips;
 
 namespace BazaarPlusPlus;
 
@@ -19,10 +20,35 @@ class CombatSimPatch
         if (ModState.LastMessageId == message.MessageId)
             return;
         ModState.LastMessageId = message.MessageId;
+        ModState.SetCombatFrameTotal(message.Data?.Frames?.Count ?? 0);
         ModState.LastVictoryCondition =
             message.Data.Winner == ECombatantId.Player
                 ? EVictoryCondition.Win
                 : EVictoryCondition.Lose;
+    }
+}
+
+// Combat speed: set speed to the combat speed multiplier
+[HarmonyPatch(typeof(CombatSimHandler), "SetSpeed")]
+class CombatSpeedPatch
+{
+    [HarmonyPrefix]
+    static void Prefix(ref float speed)
+    {
+        if (!ModState.CombatPlaybackActive)
+            return;
+
+        speed = ModState.CombatSpeedMultiplier;
+    }
+}
+
+[HarmonyPatch(typeof(FinalBlowSlowDownController), nameof(FinalBlowSlowDownController.Process))]
+class CombatFrameAdvancePatch
+{
+    [HarmonyPostfix]
+    static void Postfix()
+    {
+        ModState.AdvanceCombatFrame();
     }
 }
 
@@ -70,5 +96,29 @@ public static class CardTooltipDataPassivePatch
                 $"[ItemEnchantPreview] Failed to append passive tooltip previews: {ex.Message}"
             );
         }
+    }
+}
+
+[HarmonyPatch(typeof(CardTooltipController), nameof(CardTooltipController.LockTooltipToggle))]
+public static class CardTooltipControllerLockTogglePatch
+{
+    [HarmonyPrefix]
+    static bool Prefix(CardTooltipController __instance)
+    {
+        var currentCard = __instance?.CurrentCard;
+        if (currentCard == null)
+            return true;
+
+        var controller = Data.CardAndSkillLookup?.GetCardController(currentCard);
+        if (controller == null)
+            return true;
+
+        if (controller.GetComponent<ShowcaseCardMarker>() == null)
+            return true;
+
+        ModState.Logger?.LogDebug(
+            $"[EncounterTooltipPreview] Suppressed lock toggle for showcase card {currentCard.Template?.InternalName ?? currentCard.TemplateId.ToString()}"
+        );
+        return false;
     }
 }

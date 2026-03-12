@@ -17,7 +17,7 @@
 
   <!-- Embedded resources -->
   <ItemGroup>
-    <!-- <EmbeddedResource Include="Data\items.js" /> -->
+    <EmbeddedResource Include="Data\monsters_bazaardb.json" />
   </ItemGroup>
 
   <!-- Exclude decompiled and installer files -->
@@ -118,20 +118,6 @@
     <PublicizeAll>true</PublicizeAll>
   </PropertyGroup>
 
-  <!--
-    Notice From Origin Project BazaarPlannerMod by oceanseth.
-    If you are compiling this, it will generate a random dll name and copy it to the plugins folder.
-
-    At some point in the future, they might just not run the game if BepInEx mods are present,
-    but it is possible they could ban users who have BepInEx mods, or specifically, this one.
-    So compiling and randomizing the filename is potentially a good idea.
-
-    Afaik, they have only banned users who have streamed their use of the PVE simulator pre-combat.
-    If you are compiling this, all other dlls in the BepInEx folder will be deleted at compile time,
-    so if you are experimenting with other BepInEx mods, you might want to comment out the delete step,
-    and manually enter a random filename unique to you.
-  -->
-
   <Target Name="CopyToBepInExPlugins" AfterTargets="Build">
     <ItemGroup>
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\*.dll" />
@@ -154,11 +140,11 @@
       Overwrite="true"
     />
 
-    <Copy SourceFiles="$(TargetDir)$(TargetName).dll"     DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).dll" />
-    <Copy SourceFiles="$(TargetDir)$(TargetName).dll"     DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).dll" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).dll" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).dll" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).dll" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).dll" />
     <Copy SourceFiles="$(TargetDir)$(TargetName).version" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).version" />
     <Copy SourceFiles="$(TargetDir)$(TargetName).version" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).version" />
-    <ZipDirectory SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos"   DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/macos/BepInEx.zip"   Overwrite="true" />
+    <ZipDirectory SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos" DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/macos/BepInEx.zip" Overwrite="true" />
     <ZipDirectory SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/windows" DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/windows/BepInEx.zip" Overwrite="true" />
     <Message Text="[BazaarPlusPlus] Successfully built mod zip and copied to installer source folder!!!" Importance="high" />
   </Target>

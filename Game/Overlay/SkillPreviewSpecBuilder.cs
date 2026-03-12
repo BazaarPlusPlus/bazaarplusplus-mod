@@ -4,25 +4,26 @@ using System.Collections.Generic;
 
 namespace BazaarPlusPlus;
 
-internal static class MonsterPreviewSpecBuilder
+internal static class SkillPreviewSpecBuilder
 {
     public static List<PreviewCardSpec> Build(MonsterInfo monster)
     {
         var specs = new List<PreviewCardSpec>();
-        if (monster?.BoardCards == null)
+        if (monster?.Skills == null)
             return specs;
 
-        foreach (var card in monster.BoardCards)
+        foreach (var skill in monster.Skills)
         {
-            if (card == null || card.CardId == Guid.Empty)
+            if (skill == null || skill.SkillId == Guid.Empty)
                 continue;
 
             specs.Add(
                 new PreviewCardSpec
                 {
-                    TemplateId = card.CardId.ToString(),
-                    Tier = ParseTier(card.Tier),
-                    Size = ParseSize(card.Size),
+                    TemplateId = skill.SkillId.ToString(),
+                    Tier = ParseTier(skill.Tier),
+                    SourceName = skill.Title ?? string.Empty,
+                    Size = 1,
                     Enchant = "None",
                 }
             );
@@ -50,24 +51,6 @@ internal static class MonsterPreviewSpecBuilder
                 return 4;
             default:
                 return 0;
-        }
-    }
-
-    private static int ParseSize(string size)
-    {
-        if (string.IsNullOrWhiteSpace(size))
-            return 1;
-
-        switch (size.Trim().ToLowerInvariant())
-        {
-            case "small":
-                return 1;
-            case "medium":
-                return 2;
-            case "large":
-                return 3;
-            default:
-                return 1;
         }
     }
 }

@@ -2,7 +2,7 @@ mod commands;
 
 use commands::{
     bepinex::{check_bpp_update, install_bepinex, uninstall_bpp, update_bpp},
-    detect::{detect_environment, verify_game_path},
+    detect::{detect_dotnet_runtime, detect_environment, verify_game_path},
     vdf::patch_launch_options,
 };
 
@@ -13,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             detect_environment,
+            detect_dotnet_runtime,
             verify_game_path,
             install_bepinex,
             check_bpp_update,

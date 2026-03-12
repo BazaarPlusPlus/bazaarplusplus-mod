@@ -2,6 +2,12 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EnvironmentInfo {
     pub steam_path: Option<String>,
@@ -12,6 +18,12 @@ pub struct EnvironmentInfo {
     pub bpp_version: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DotnetInfo {
+    pub dotnet_version: Option<String>,
+    pub dotnet_ok: bool,
+}
+
 #[tauri::command]
 pub fn detect_environment() -> Result<EnvironmentInfo, String> {
     let steam_path = get_steam_path();
@@ -19,17 +31,29 @@ pub fn detect_environment() -> Result<EnvironmentInfo, String> {
     let bpp_version = game_path
         .as_ref()
         .and_then(|path| read_installed_bpp_version(path));
-    let (dotnet_version, dotnet_ok) = detect_dotnet();
     let bepinex_installed = bpp_version.is_some();
 
     Ok(EnvironmentInfo {
         steam_path: steam_path.map(|path| path.to_string_lossy().into_owned()),
         game_path: game_path.map(|path| path.to_string_lossy().into_owned()),
-        dotnet_version,
-        dotnet_ok,
+        dotnet_version: None,
+        dotnet_ok: false,
         bepinex_installed,
         bpp_version,
     })
+}
+
+#[tauri::command]
+pub async fn detect_dotnet_runtime() -> Result<DotnetInfo, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let (dotnet_version, dotnet_ok) = detect_dotnet();
+        DotnetInfo {
+            dotnet_version,
+            dotnet_ok,
+        }
+    })
+    .await
+    .map_err(|err| format!("failed to detect .NET runtime: {err}"))
 }
 
 pub fn find_game_in_library_vdf(vdf_content: &str, app_id: &str) -> Option<String> {
@@ -67,16 +91,18 @@ pub fn parse_dotnet_runtimes(output: &str) -> Option<String> {
         .lines()
         .filter(|line| line.starts_with("Microsoft.NETCore.App "))
         .filter_map(|line| line.split_whitespace().nth(1))
-        .filter(|version| {
-            version
-                .split('.')
-                .next()
-                .and_then(|major| major.parse::<u32>().ok())
-                .map(|major| major >= 6)
-                .unwrap_or(false)
-        })
+        .filter(|version| is_supported_dotnet_version(version))
         .map(str::to_string)
         .max()
+}
+
+fn is_supported_dotnet_version(version: &str) -> bool {
+    version
+        .split('.')
+        .next()
+        .and_then(|major| major.parse::<u32>().ok())
+        .map(|major| major >= 6)
+        .unwrap_or(false)
 }
 
 fn get_steam_path() -> Option<PathBuf> {
@@ -135,11 +161,19 @@ fn detect_dotnet() -> (Option<String>, bool) {
     let candidates = vec!["dotnet".to_string()];
 
     for candidate in candidates {
-        let Ok(output) = Command::new(&candidate).arg("--list-runtimes").output() else {
+        let mut command = Command::new(&candidate);
+        command.arg("--list-runtimes");
+
+        #[cfg(target_os = "windows")]
+        command.creation_flags(CREATE_NO_WINDOW);
+
+        let Ok(output) = command.output() else {
             continue;
         };
         let stdout = String::from_utf8_lossy(&output.stdout);
-        if let Some(version) = parse_dotnet_runtimes(&stdout) {
+        if let Some(version) = parse_dotnet_runtimes(&stdout)
+            .filter(|version| is_supported_dotnet_version(version))
+        {
             return (Some(version), true);
         }
     }
@@ -185,6 +219,13 @@ mod tests {
     fn test_parse_dotnet_runtimes_empty_output() {
         let result = parse_dotnet_runtimes("");
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_is_supported_dotnet_version_requires_major_6_or_higher() {
+        assert!(!is_supported_dotnet_version("5.0.17"));
+        assert!(is_supported_dotnet_version("6.0.0"));
+        assert!(is_supported_dotnet_version("8.0.1"));
     }
 
     #[test]

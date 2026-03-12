@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace BazaarPlusPlus;
 
-internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
+internal sealed class SkillPreviewCardFactory : IPreviewCardFactory
 {
     private MethodInfo _instantiateCardMethod;
     private object _spawnSection;
@@ -24,52 +24,24 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
     {
         Services.TryGet<AssetLoader>(out var loader);
         if (loader == null || !EnsureApi(loader))
-        {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] API unavailable for template={spec?.TemplateId ?? "null"} loader={(loader == null ? "null" : "ok")}"
-            );
             return null;
-        }
 
         if (_staticData == null)
-        {
             _staticData = await Data.GetStatic();
-            ModState.Logger?.LogDebug(
-                $"[MonsterPreviewCardFactory] Static data loaded={(_staticData != null)}"
-            );
-        }
 
         if (_staticData == null)
-        {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] Static data unavailable for template={spec?.TemplateId ?? "null"}"
-            );
             return null;
-        }
 
         var card = BuildCard(spec, _staticData);
         if (card == null)
-        {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] BuildCard failed for template={spec?.TemplateId ?? "null"}"
-            );
             return null;
-        }
 
         var cardObject = await InstantiateAsync(loader, card, parent.gameObject);
         if (cardObject == null)
-        {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] Instantiate returned null for template={spec?.TemplateId ?? "null"}"
-            );
             return null;
-        }
 
         cardObject.AddComponent<ShowcaseCardMarker>();
         ConfigureSpawned(cardObject);
-        ModState.Logger?.LogDebug(
-            $"[MonsterPreviewCardFactory] Created card template={spec?.TemplateId ?? "null"} object={cardObject.name}"
-        );
         return cardObject;
     }
 
@@ -87,8 +59,8 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         if (marker != null)
             UnityEngine.Object.Destroy(marker);
 
-        if (cardObject.TryGetComponent<ItemController>(out var itemController))
-            itemController.EnableMovement(true);
+        if (cardObject.TryGetComponent<SkillController>(out var skillController))
+            skillController.EnableMovement(true);
         else if (cardObject.TryGetComponent<CardController>(out var cardController))
             cardController.EnableMovement(true);
 
@@ -97,39 +69,25 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         cardObject.PoolObject();
     }
 
-    private static ItemCard BuildCard(PreviewCardSpec entry, object staticData)
+    private static SkillCard BuildCard(PreviewCardSpec spec, object staticData)
     {
-        if (entry == null || string.IsNullOrWhiteSpace(entry.TemplateId))
-        {
-            ModState.Logger?.LogWarning("[MonsterPreviewCardFactory] Empty preview card spec");
+        if (spec == null || string.IsNullOrWhiteSpace(spec.TemplateId))
             return null;
-        }
 
-        if (!Guid.TryParse(entry.TemplateId, out var templateId))
-        {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] Invalid template id: {entry.TemplateId}"
-            );
+        if (!Guid.TryParse(spec.TemplateId, out var templateId))
             return null;
-        }
 
         var template = GetTemplate(staticData, templateId) as ITCard;
         if (template == null)
-        {
-            ModState.Logger?.LogWarning(
-                $"[MonsterPreviewCardFactory] Template not found: {entry.TemplateId}"
-            );
             return null;
-        }
 
-        var card = new ItemCard
+        var card = new SkillCard
         {
-            InstanceId = InstanceId.New("ppmon"),
+            InstanceId = InstanceId.New("ppskill"),
             TemplateId = templateId,
             Template = template,
-            Tier = (ETier)Mathf.Clamp(entry.Tier, 0, 5),
-            Size = ParseSize(entry.Size, template.Size),
-            Type = ECardType.Item,
+            Tier = (ETier)Mathf.Clamp(spec.Tier, 0, 5),
+            Type = ECardType.Skill,
             Attributes = new Dictionary<ECardAttributeType, int>(),
             Tags = new HashSet<ECardTag>(),
             HiddenTags = new HashSet<EHiddenTag>(),
@@ -139,45 +97,19 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
             LeftSocketId = null,
         };
 
-        if (
-            !string.IsNullOrWhiteSpace(entry.Enchant)
-            && !string.Equals(entry.Enchant, "None", StringComparison.OrdinalIgnoreCase)
-            && Enum.TryParse(entry.Enchant, out EEnchantmentType enchantType)
-        )
+        if (spec.Attributes != null)
         {
-            card.Enchantment = enchantType;
-        }
-
-        if (entry.Attributes != null)
-        {
-            foreach (var kv in entry.Attributes)
+            foreach (var kv in spec.Attributes)
             {
                 if (Enum.IsDefined(typeof(ECardAttributeType), kv.Key))
                     card.Attributes[(ECardAttributeType)kv.Key] = kv.Value;
             }
         }
 
-        ModState.Logger?.LogInfo(
-            $"[MonsterPreviewCardFactory] BuildCard result template={entry.TemplateId} tier={card.Tier} size={card.Size} type={card.Type} enchant={card.Enchantment} attrs={card.Attributes.Count} templateName={template.InternalName}"
-        );
         return card;
     }
 
-
-    private static ECardSize ParseSize(int size, ECardSize fallback)
-    {
-        switch (size)
-        {
-            case 1:
-                return ECardSize.Small;
-            case 2:
-                return ECardSize.Medium;
-            case 3:
-                return ECardSize.Large;
-            default:
-                return fallback;
-        }
-    }    private static object GetTemplate(object staticData, Guid templateId)
+    private static object GetTemplate(object staticData, Guid templateId)
     {
         if (staticData == null)
             return null;
@@ -196,17 +128,17 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
 
     private void ConfigureSpawned(GameObject cardObject)
     {
-        if (cardObject.TryGetComponent<ItemController>(out var itemController))
+        if (cardObject.TryGetComponent<SkillController>(out var skillController))
         {
-            itemController.ShowCard(true);
-            itemController.EnableMovement(false);
+            skillController.ShowCard(true);
+            skillController.EnableMovement(false);
             return;
         }
 
         if (cardObject.TryGetComponent<CardController>(out var cardController))
         {
-            cardController.EnableMovement(false);
             cardController.ShowCard(true);
+            cardController.EnableMovement(false);
         }
     }
 
@@ -231,17 +163,11 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
             });
 
         if (_instantiateCardMethod == null)
-        {
-            ModState.Logger?.LogWarning("[MonsterPreviewCardFactory] InstantiateCardAsync API not found");
             return false;
-        }
 
         var sectionType = _instantiateCardMethod.GetParameters()[2].ParameterType;
         if (!sectionType.IsEnum)
-        {
-            ModState.Logger?.LogWarning("[MonsterPreviewCardFactory] Spawn section parameter is not enum");
             return false;
-        }
 
         var sectionNames = Enum.GetNames(sectionType);
         if (sectionNames.Contains("Opponent"))
@@ -249,12 +175,10 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         else if (sectionNames.Contains("Board"))
             _spawnSection = Enum.Parse(sectionType, "Board");
         else if (sectionNames.Contains("Storage"))
-            _spawnSection = Enum.Parse(sectionType, "Storage");
+            _spawnSection = Enum.ToObject(sectionType, 0);
         else
             _spawnSection = Enum.ToObject(sectionType, 0);
-        ModState.Logger?.LogDebug(
-            $"[MonsterPreviewCardFactory] Resolved instantiate API with spawnSection={_spawnSection}"
-        );
+
         return _spawnSection != null;
     }
 
@@ -283,4 +207,3 @@ internal sealed class MonsterPreviewCardFactory : IPreviewCardFactory
         return null;
     }
 }
-

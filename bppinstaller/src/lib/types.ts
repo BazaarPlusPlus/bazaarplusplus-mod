@@ -7,6 +7,11 @@ export interface EnvironmentInfo {
   bpp_version: string | null;
 }
 
+export interface DotnetInfo {
+  dotnet_version: string | null;
+  dotnet_ok: boolean;
+}
+
 export interface UpdateInfo {
   current_version: string | null;
   latest_version: string | null;
