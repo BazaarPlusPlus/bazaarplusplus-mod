@@ -5,9 +5,11 @@ namespace BazaarPlusPlus;
 
 internal static class BppLog
 {
+    private const string Prefix = "[BPP]";
+
     public static string Format(string component, string message)
     {
-        return $"[{component}] {message}";
+        return $"{Prefix}[{component}] {message}";
     }
 
     public static string FormatError(string component, string message, Exception ex)

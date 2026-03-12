@@ -10,7 +10,7 @@ public class BppLogTests
     {
         var message = BppLog.Format("EncounterTracker", "Updated map encounters");
 
-        Assert.Equal("[EncounterTracker] Updated map encounters", message);
+        Assert.Equal("[BPP][EncounterTracker] Updated map encounters", message);
     }
 
     [Fact]
@@ -20,7 +20,7 @@ public class BppLogTests
 
         var message = BppLog.FormatError("MonsterDatabase", "Load failed", ex);
 
-        Assert.Contains("[MonsterDatabase] Load failed", message);
+        Assert.Contains("[BPP][MonsterDatabase] Load failed", message);
         Assert.Contains("InvalidOperationException", message);
         Assert.Contains("boom", message);
     }
