@@ -2,6 +2,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import AppModal from '$lib/components/AppModal.svelte';
   import type { ModConfigReadResult } from '$lib/types';
   import { formatMessage, messages } from '$lib/i18n';
   import { locale, handleLocaleToggle } from '$lib/locale';
@@ -16,6 +17,7 @@
   let enchantPreviewAlwaysShow = true;
   let enableCombatStatusBar = false;
   let speedIdx = 2; // default: 1.00
+  let showCombatStatusBarRestartModal = false;
 
   $: t = (key: keyof typeof messages.en): string => formatMessage($locale, key);
   $: localeBadge = $locale === 'zh' ? '中' : 'EN';
@@ -55,12 +57,14 @@
     }
   }
 
-  async function writeValue(section: string, key: string, value: string) {
-    if (!gamePath) return;
+  async function writeValue(section: string, key: string, value: string): Promise<boolean> {
+    if (!gamePath) return false;
     try {
       await invoke('write_config_value', { gamePath, section, key, value });
+      return true;
     } catch (e) {
       console.error('write_config_value failed:', e);
+      return false;
     }
   }
 
@@ -75,8 +79,12 @@
   }
 
   async function toggleCombatStatusBar() {
-    enableCombatStatusBar = !enableCombatStatusBar;
-    await writeValue('CombatStatusBar', 'Enabled', String(enableCombatStatusBar));
+    const nextValue = !enableCombatStatusBar;
+    enableCombatStatusBar = nextValue;
+    const saved = await writeValue('CombatStatusBar', 'Enabled', String(nextValue));
+    if (saved && nextValue) {
+      showCombatStatusBarRestartModal = true;
+    }
   }
 
   async function stepSpeed(delta: number) {
@@ -96,6 +104,19 @@
 <svelte:head>
   <title>{t('settingsTitle')} - BazaarPlusPlus</title>
 </svelte:head>
+
+<AppModal
+  open={showCombatStatusBarRestartModal}
+  eyebrow="Combat Status Bar"
+  title={$locale === 'zh' ? '需要重启游戏' : 'Restart Required'}
+  body={$locale === 'zh'
+    ? '打开控制条后，需要重启游戏才能生效。'
+    : 'After enabling the combat status bar, restart the game for the change to take effect.'}
+  confirmText="OK"
+  onConfirm={() => {
+    showCombatStatusBarRestartModal = false;
+  }}
+/>
 
 <main class="shell">
   <header class="header">

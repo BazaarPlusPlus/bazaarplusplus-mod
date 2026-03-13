@@ -5,36 +5,47 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
+  import AppModal from '$lib/components/AppModal.svelte';
   import { formatMessage, messages } from '$lib/i18n';
   import { locale, handleLocaleToggle } from '$lib/locale';
 
   let frontendVersion = __FRONTEND_VERSION__;
   let backendVersion = '...';
+  let showPaymentCodes = false;
+  let hiddenPaymentImages: Record<string, boolean> = {};
 
   $: t = (key: keyof typeof messages.en, params?: Record<string, string | number>): string =>
     formatMessage($locale, key, params);
 
-  $: localeBadge = $locale === 'zh' ? '中' : 'EN';
-  $: localeButtonLabel = $locale === 'zh' ? 'Switch to English' : '切换到中文';
+  $: localeBadge = $locale === 'zh' ? '\u4e2d' : 'EN';
+  $: localeButtonLabel = $locale === 'zh' ? 'Switch to English' : '\u5207\u6362\u5230\u4e2d\u6587';
+
+  const paymentMethods = [
+    {
+      id: 'wechat',
+      zhName: '\u5fae\u4fe1\u6536\u6b3e\u7801',
+      enName: 'Wepay',
+      src: '/support/wechat-pay.svg',
+      accent: 'payment-card-wechat'
+    }
+  ];
 
   const inspiredBy = [
     { name: 'BazaarHelper', url: 'https://github.com/Duangi/BazaarHelper' },
-    { name: 'BazaarPlannerMod', url: 'https://github.com/oceanseth/BazaarPlannerMod' },
+    { name: 'BazaarPlannerMod', url: 'https://github.com/oceanseth/BazaarPlannerMod' }
   ];
 
-  const dataSources = [
-    { name: 'BazaarDB', url: 'https://bazaardb.gg' },
-  ];
+  const dataSources = [{ name: 'BazaarDB', url: 'https://bazaardb.gg' }];
 
   const projectDeps = [
-    { name: 'BepInEx', license: 'LGPL-2.1', url: 'https://github.com/BepInEx/BepInEx' },
+    { name: 'BepInEx', license: 'LGPL-2.1', url: 'https://github.com/BepInEx/BepInEx' }
   ];
 
   const frontendDeps = [
     { name: 'Svelte', license: 'MIT', url: 'https://svelte.dev' },
     { name: 'SvelteKit', license: 'MIT', url: 'https://kit.svelte.dev' },
     { name: 'Vite', license: 'MIT', url: 'https://vitejs.dev' },
-    { name: 'Tauri', license: 'MIT / Apache-2.0', url: 'https://tauri.app' },
+    { name: 'Tauri', license: 'MIT / Apache-2.0', url: 'https://tauri.app' }
   ];
 
   const rustDeps = [
@@ -43,7 +54,7 @@
     { name: 'zip', license: 'MIT', url: 'https://github.com/zip-rs/zip2' },
     { name: 'dirs', license: 'MIT / Apache-2.0', url: 'https://github.com/dirs-dev/dirs-rs' },
     { name: 'keyvalues-parser', license: 'MIT', url: 'https://github.com/CosmicHorrorDev/keyvalues-rs' },
-    { name: 'winreg', license: 'MIT', url: 'https://github.com/gentoo90/winreg-rs' },
+    { name: 'winreg', license: 'MIT', url: 'https://github.com/gentoo90/winreg-rs' }
   ];
 
   onMount(async () => {
@@ -52,6 +63,21 @@
       backendVersion = await getVersion();
     } catch {}
   });
+
+  function openPaymentCodes() {
+    showPaymentCodes = true;
+  }
+
+  function closePaymentCodes() {
+    showPaymentCodes = false;
+  }
+
+  function handlePaymentImageError(methodId: string) {
+    hiddenPaymentImages = {
+      ...hiddenPaymentImages,
+      [methodId]: true
+    };
+  }
 </script>
 
 <svelte:head>
@@ -59,10 +85,62 @@
 </svelte:head>
 
 <main class="shell">
+  <AppModal
+    open={showPaymentCodes}
+    eyebrow="BazaarPlusPlus"
+    title={$locale === 'zh' ? '\u611f\u8c22\u652f\u6301' : 'Thanks for Support'}
+    bodyClass="payment-modal-body"
+    confirmText={$locale === 'zh' ? '\u5173\u95ed' : 'Close'}
+    onConfirm={closePaymentCodes}
+  >
+    <section class="payment-modal-shell">
+      <div class="payment-grid">
+        {#each paymentMethods as method}
+          <article class={`payment-card ${method.accent}`}>
+            <div class="payment-frame">
+              {#if !hiddenPaymentImages[method.id]}
+                <img
+                  class="payment-image"
+                  src={method.src}
+                  alt={$locale === 'zh' ? method.zhName : method.enName}
+                  onerror={() => handlePaymentImageError(method.id)}
+                />
+              {:else}
+                <div class="payment-placeholder" aria-hidden="true"></div>
+              {/if}
+            </div>
+
+            <div class="payment-copy">
+              <h3>{$locale === 'zh' ? '\u5fae\u4fe1\u8d5e\u8d4f' : method.enName}</h3>
+              <p>
+                {$locale === 'zh'
+                  ? '\u8bf7 Bazaar++ \u559d\u4e00\u676f'
+                  : 'Buy Bazaar++ a drink.'}
+              </p>
+            </div>
+          </article>
+        {/each}
+      </div>
+
+      <p class="payment-support-note">
+        {$locale === 'zh'
+          ? '\u6709\u4f60\u652f\u6301\uff0cBazaar++ \u4f1a\u5192\u51fa\u66f4\u591a\u597d\u4e1c\u897f'
+          : 'With your support, Bazaar++ gets to grow more good stuff.'}
+      </p>
+    </section>
+  </AppModal>
+
   <header class="header">
     <a class="back-btn" href="/">
       <svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+        <path
+          d="M15 18l-6-6 6-6"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"
+        />
       </svg>
       {t('aboutBack')}
     </a>
@@ -85,8 +163,20 @@
 
     <div class="sigil" aria-hidden="true">
       <svg width="32" height="32" viewBox="0 0 44 44" fill="none">
-        <polygon points="22,3 41,34 3,34" stroke="currentColor" stroke-width="1" fill="none" opacity="0.55" />
-        <polygon points="22,11 35,31 9,31" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.3" />
+        <polygon
+          points="22,3 41,34 3,34"
+          stroke="currentColor"
+          stroke-width="1"
+          fill="none"
+          opacity="0.55"
+        />
+        <polygon
+          points="22,11 35,31 9,31"
+          stroke="currentColor"
+          stroke-width="0.5"
+          fill="none"
+          opacity="0.3"
+        />
         <circle cx="22" cy="22" r="5" stroke="currentColor" stroke-width="0.8" fill="none" />
         <circle cx="22" cy="22" r="2" fill="currentColor" opacity="0.75" />
       </svg>
@@ -115,19 +205,34 @@
     <h2 class="section-title">{t('aboutAuthors')}</h2>
     <ul class="dep-list">
       <li>
-        <a class="dep-item dep-item-link" href="https://github.com/cauyxy" target="_blank" rel="noopener noreferrer">
+        <a
+          class="dep-item dep-item-link"
+          href="https://github.com/cauyxy"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <span class="dep-name">cauyxy</span>
           <span class="dep-role">{t('aboutAuthorRole')}</span>
         </a>
       </li>
       <li>
-        <a class="dep-item dep-item-link" href="https://openai.com/codex" target="_blank" rel="noopener noreferrer">
+        <a
+          class="dep-item dep-item-link"
+          href="https://openai.com/codex"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <span class="dep-name">Codex</span>
           <span class="dep-role">{t('aboutCocreatorRole')}</span>
         </a>
       </li>
       <li>
-        <a class="dep-item dep-item-link" href="https://claude.com/product/claude-code" target="_blank" rel="noopener noreferrer">
+        <a
+          class="dep-item dep-item-link"
+          href="https://claude.com/product/claude-code"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <span class="dep-name">Claude Code</span>
           <span class="dep-role">{t('aboutCocreatorRole')}</span>
         </a>
@@ -139,13 +244,18 @@
     <h2 class="section-title">{t('aboutSupport')}</h2>
     <ul class="dep-list">
       <li>
-        <a class="dep-item dep-item-link" href="https://afdian.com/a/cauyxy" target="_blank" rel="noopener noreferrer">
-          <span class="dep-name">爱发电</span>
-          <span class="dep-link-label">afdian.com/a/cauyxy</span>
-        </a>
+        <button class="dep-item dep-item-link payment-launch" type="button" onclick={openPaymentCodes}>
+          <span class="dep-name">{$locale === 'zh' ? '\u5fae\u4fe1' : 'Wepay'}</span>
+          <span class="dep-link-label">{$locale === 'zh' ? '\u611f\u8c22\u652f\u6301' : 'Support'}</span>
+        </button>
       </li>
       <li>
-        <a class="dep-item dep-item-link" href="https://ko-fi.com/cauyxy" target="_blank" rel="noopener noreferrer">
+        <a
+          class="dep-item dep-item-link"
+          href="https://ko-fi.com/cauyxy"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <span class="dep-name">Ko-fi</span>
           <span class="dep-link-label">ko-fi.com/cauyxy</span>
         </a>
@@ -159,7 +269,9 @@
       {#each inspiredBy as item}
         <li class="dep-item">
           <span class="dep-name">{item.name}</span>
-          <a class="dep-link" href={item.url} target="_blank" rel="noopener noreferrer">{item.url.replace('https://github.com/', '')}</a>
+          <a class="dep-link" href={item.url} target="_blank" rel="noopener noreferrer">
+            {item.url.replace('https://github.com/', '')}
+          </a>
         </li>
       {/each}
     </ul>
@@ -171,7 +283,9 @@
       {#each dataSources as src}
         <li class="dep-item">
           <span class="dep-name">{src.name}</span>
-          <a class="dep-link" href={src.url} target="_blank" rel="noopener noreferrer">{src.url.replace('https://', '')}</a>
+          <a class="dep-link" href={src.url} target="_blank" rel="noopener noreferrer">
+            {src.url.replace('https://', '')}
+          </a>
         </li>
       {/each}
     </ul>
@@ -232,7 +346,7 @@
 
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(14px); }
-    to   { opacity: 1; transform: translateY(0); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   .header {
@@ -242,7 +356,7 @@
     background: linear-gradient(175deg, rgba(38, 23, 9, 0.92), rgba(16, 10, 5, 0.88));
     border: 1px solid rgba(200, 148, 55, 0.18);
     border-radius: 3px;
-    box-shadow: 0 0 0 1px rgba(200, 148, 55, 0.06) inset, 0 24px 64px rgba(0,0,0,0.5);
+    box-shadow: 0 0 0 1px rgba(200, 148, 55, 0.06) inset, 0 24px 64px rgba(0, 0, 0, 0.5);
     display: grid;
     gap: 0.15rem;
     justify-items: center;
@@ -349,7 +463,7 @@
 
   @keyframes slow-spin {
     from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    to { transform: rotate(360deg); }
   }
 
   h1 {
@@ -377,7 +491,14 @@
   .rule span:last-child {
     flex: 1;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(200, 148, 55, 0.3) 40%, rgba(200, 148, 55, 0.3) 60%, transparent);
+    background:
+      linear-gradient(
+        90deg,
+        transparent,
+        rgba(200, 148, 55, 0.3) 40%,
+        rgba(200, 148, 55, 0.3) 60%,
+        transparent
+      );
   }
 
   .diamond { font-size: 0.55rem; color: rgba(205, 150, 60, 0.55); }
@@ -388,7 +509,7 @@
     background: rgba(18, 11, 5, 0.88);
     border: 1px solid rgba(180, 130, 48, 0.13);
     border-radius: 3px;
-    box-shadow: 0 6px 28px rgba(0,0,0,0.35);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
     display: grid;
     gap: 0.6rem;
   }
@@ -486,6 +607,11 @@
     cursor: pointer;
   }
 
+  .payment-launch {
+    width: 100%;
+    text-align: left;
+  }
+
   .dep-item-link:hover .dep-name {
     color: rgba(220, 180, 100, 0.95);
   }
@@ -519,6 +645,112 @@
     color: rgba(220, 180, 100, 0.85);
   }
 
+  .payment-modal-body {
+    padding-top: 0.1rem;
+  }
+
+  .payment-modal-shell {
+    display: grid;
+    gap: 0.9rem;
+    text-align: left;
+  }
+
+  .payment-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 260px);
+    justify-content: center;
+    gap: 0.8rem;
+  }
+
+  .payment-support-note {
+    margin: -0.1rem 0 0;
+    text-align: center;
+    font-size: 0.76rem;
+    line-height: 1.6;
+    color: rgba(214, 190, 146, 0.76);
+  }
+
+  .payment-card {
+    position: relative;
+    padding: 0.75rem;
+    background:
+      radial-gradient(circle at top, rgba(255, 232, 174, 0.08), transparent 54%),
+      linear-gradient(180deg, rgba(34, 20, 8, 0.96), rgba(16, 9, 4, 0.98));
+    border: 1px solid rgba(200, 148, 55, 0.16);
+    border-radius: 4px;
+    display: grid;
+    gap: 0.65rem;
+    box-shadow: inset 0 0 0 1px rgba(255, 198, 98, 0.05);
+  }
+
+  .payment-card::after {
+    content: '';
+    position: absolute;
+    inset: 0.45rem;
+    border: 1px solid rgba(255, 220, 155, 0.05);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .payment-card-wechat {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 198, 98, 0.05),
+      0 10px 32px rgba(42, 110, 78, 0.14);
+  }
+
+  .payment-frame {
+    aspect-ratio: 1 / 1;
+    padding: 0.8rem;
+    background: linear-gradient(135deg, rgba(255, 248, 231, 0.98), rgba(245, 238, 220, 0.98));
+    border-radius: 3px;
+    box-shadow:
+      inset 0 0 0 1px rgba(95, 65, 19, 0.08),
+      0 10px 24px rgba(0, 0, 0, 0.22);
+  }
+
+  .payment-image,
+  .payment-placeholder {
+    width: 100%;
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  .payment-image {
+    display: block;
+    object-fit: contain;
+    background: #fff;
+  }
+
+  .payment-placeholder {
+    background:
+      linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+      linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+      radial-gradient(circle at center, rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.94) 62%);
+    background-size: 16px 16px, 16px 16px, cover;
+    border: 1px dashed rgba(96, 74, 29, 0.28);
+  }
+
+  .payment-copy {
+    display: grid;
+    gap: 0.18rem;
+    text-align: center;
+  }
+
+  .payment-copy h3 {
+    margin: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    color: rgba(238, 220, 182, 0.94);
+  }
+
+  .payment-copy p {
+    margin: 0;
+    font-size: 0.66rem;
+    line-height: 1.45;
+    color: rgba(200, 170, 120, 0.8);
+  }
+
   .footer {
     text-align: center;
     display: grid;
@@ -534,7 +766,11 @@
     color: rgba(140, 110, 60, 0.35);
   }
 
-  button { cursor: pointer; border: none; font: inherit; }
+  button {
+    cursor: pointer;
+    border: none;
+    font: inherit;
+  }
 
   button:focus-visible,
   .dep-item-link:focus-visible,
@@ -555,6 +791,10 @@
     .locale-toggle {
       top: 0.7rem;
       right: 0.7rem;
+    }
+
+    .payment-grid {
+      grid-template-columns: 1fr;
     }
   }
 </style>
