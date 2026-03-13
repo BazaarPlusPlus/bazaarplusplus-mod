@@ -124,7 +124,7 @@
     <PublicizeAll>true</PublicizeAll>
   </PropertyGroup>
 
-  <Target Name="CopyToBepInExPlugins" AfterTargets="Build">
+  <Target Name="CopyToBepInExPlugins" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
     <ItemGroup>
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\$(TargetName).dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\$(TargetName).version" />
@@ -146,7 +146,7 @@
     />
   </Target>
 
-  <Target Name="CopyToInstallerSource" AfterTargets="CopyToBepInExPlugins" Condition="Exists('$(BPPInstallerSourcePath)')">
+  <Target Name="CopyToInstallerSource" AfterTargets="Build" Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)')">
     <WriteLinesToFile
       File="$(TargetDir)$(TargetName).version"
       Lines="$(Version).t$([System.DateTime]::Now.ToString('yyyyMMdd.HHmmss')).prod"
@@ -160,6 +160,11 @@
     <ZipDirectory SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos" DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/macos/BepInEx.zip" Overwrite="true" />
     <ZipDirectory SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/windows" DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/windows/BepInEx.zip" Overwrite="true" />
     <Message Text="[BazaarPlusPlus] Successfully built mod zip and copied to installer source folder!!!" Importance="high" />
+  </Target>
+
+  <Target Name="BuildAll">
+    <MSBuild Projects="$(MSBuildProjectFile)" Targets="Build" Properties="Configuration=Debug" />
+    <MSBuild Projects="$(MSBuildProjectFile)" Targets="Build" Properties="Configuration=Release" />
   </Target>
 
 </Project>

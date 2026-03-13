@@ -10,6 +10,12 @@ namespace BazaarPlusPlus;
 
 internal static class ModState
 {
+#if DEBUG
+    public const bool IsDebug = true;
+#else
+    public const bool IsDebug = false;
+#endif
+
     public static ManualLogSource Logger;
 
     // Config entries
