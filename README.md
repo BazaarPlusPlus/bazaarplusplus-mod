@@ -9,46 +9,40 @@ BazaarPlusPlus is a BepInEx enhancement mod for *The Bazaar*, focused on making 
 - 战斗状态条：提供更直观的战斗播放状态与节奏信息。  
 
 Combat status bar: adds clearer playback and combat pacing information.
-- 怪物预览：在合适的场景下展示更完整的怪物预览信息。  
+- 怪物预览优化：右键预览查看怪物的卡牌与技能信息。  
 
-Monster preview: shows richer enemy preview information in supported flows.
-- 遭遇信息补强：让遭遇相关的预览信息更连贯、更容易理解。  
-
-Encounter clarity improvements: keeps encounter-related preview data more consistent and readable.
-- 附魔与词条预览增强：补充部分物品与附魔相关的可见信息。  
+Monster preview improvements: right-click the preview to view enemy cards and skill information.
+- 附魔与词条预览增强：补充物品附魔相关的可见信息。  
 
 Enchant and item preview improvements: expands visible information for supported item and enchant views.
 
 ## Install / 安装
 
-普通玩家建议优先使用发布包内提供的安装器。当前 Windows 是更明确、体验更完整的安装路径；macOS 支持仍在持续完善中。  
+推荐优先使用发布包内附带的安装器。当前发布包主要提供 Windows 安装流程；macOS 仍在适配中。  
 
-For most players, the recommended path is the installer included with a release package. Windows is the clearest and most complete installation path today, while macOS support is still being improved.
+The recommended option is the installer included in the release package. The current release primarily supports installation on Windows; macOS support is still in progress, and the installer is not yet considered reliable there.
 
-基本流程如下：  
+Windows 推荐安装流程：  
 
-Recommended flow:
+Recommended Windows installation flow:
 
-1. 下载最新发布版本。  
-
-  Download the latest release package.
-2. 运行安装器，并选择你的《The Bazaar》安装目录。  
-
-  Run the installer and select your *The Bazaar* installation directory.
-3. 安装完成后，重新启动 Steam 与游戏。  
-
-  Restart Steam and the game after installation completes.
+1. 下载最新发布包。  
+   Download the latest release package.
+2. 运行安装器，并选择你的 *The Bazaar* 游戏目录。  
+   Run the installer and select your *The Bazaar* game directory.
+3. 安装完成后，重新启动 Steam 和游戏。  
+   After installation finishes, restart Steam and the game.
 4. 首次进入游戏后，BazaarPlusPlus 会自动生成配置文件。  
-
-  BazaarPlusPlus will generate its config file automatically after the first in-game launch.
+   BazaarPlusPlus will generate its configuration file automatically the first time you launch the game.
 
 ## FAQ / 常见问题
 
 **配置文件在哪里？ / Where is the config file?**  
 
-配置文件位于 `BepInEx/config/BazaarPlusPlus.cfg`。如果文件还不存在，请先启动一次游戏。  
+配置文件位于 `BepInEx/config/BazaarPlusPlus.cfg`。 
+如果文件还不存在，请先启动一次游戏。你也可以直接在 installer 的设置页中调整相关配置。  
 
-The config file is located at `BepInEx/config/BazaarPlusPlus.cfg`. If it does not exist yet, launch the game once first.
+The config file is located at `BepInEx/config/BazaarPlusPlus.cfg`. If it does not exist yet, launch the game once first. You can also adjust the relevant options directly from the installer's Settings page.
 
 **安装后没有生效怎么办？ / What if the mod does not seem active after install?**  
 
@@ -58,9 +52,9 @@ First verify that the selected game path is the correct *The Bazaar* directory, 
 
 ## For Developers / 开发者
 
-项目基于 C#、.NET 和 BepInEx 5。源码正在整理，将在不远的将来开放。  
+项目基于 C#、.NET 和 BepInEx 5。当前开发相关内容仍在整理中，后续会逐步补充更完整的源码与说明。  
   
-The project is built with C#, .NET, and BepInEx 5. The source tree is being cleaned up for open development, and this README intentionally keeps the developer entry point short.
+The project is built with C#, .NET, and BepInEx 5. Developer-facing source structure and documentation are still being organized, and more complete code and setup notes will be added over time.
 
 ## Credits / 致谢
 
@@ -88,4 +82,3 @@ BazaarPlusPlus 基于 BepInEx 运行。
 BazaarPlusPlus runs on top of BepInEx.
 
 - [BepInEx](https://github.com/BepInEx/BepInEx)
-
