@@ -1,50 +1,60 @@
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
 const CFG_RELATIVE: &str = "BepInEx/config/BazaarPlusPlus.cfg";
 
+#[derive(Serialize)]
+pub struct ModConfigReadResult {
+    config_exists: bool,
+    values: HashMap<String, String>,
+}
+
 fn default_config() -> HashMap<String, String> {
     let mut map = HashMap::new();
     map.insert("StreamerMode.EnableNameOverride".to_string(), "false".to_string());
-    map.insert("Combat.EnableCombatStatusBar".to_string(), "true".to_string());
-    map.insert("Combat.DefaultSpeedMultiplier".to_string(), "1".to_string());
+    map.insert("CombatStatusBar.Enabled".to_string(), "false".to_string());
+    map.insert("CombatStatusBar.SpeedMultiplier".to_string(), "1".to_string());
     map
 }
 
 fn build_cfg_content(values: &HashMap<String, String>) -> String {
     let name_override = values.get("StreamerMode.EnableNameOverride").map_or("false", |s| s);
-    let combat_bar = values.get("Combat.EnableCombatStatusBar").map_or("true", |s| s);
-    let speed = values.get("Combat.DefaultSpeedMultiplier").map_or("1", |s| s);
+    let combat_bar = values.get("CombatStatusBar.Enabled").map_or("false", |s| s);
+    let speed = values.get("CombatStatusBar.SpeedMultiplier").map_or("1", |s| s);
 
     format!(
-        "[StreamerMode]\n\
+         "[StreamerMode]\n\
          \n\
-         ## Whether to replace the local player's displayed username\n\
+         ## Whether to set the in-game display name to Anonymous\n\
          # Setting type: Boolean\n\
          # Default value: false\n\
          EnableNameOverride = {name_override}\n\
          \n\
-         [Combat]\n\
+         [CombatStatusBar]\n\
          \n\
          ## Whether to show the combat status bar with elapsed time and speed controls\n\
          # Setting type: Boolean\n\
-         # Default value: true\n\
-         EnableCombatStatusBar = {combat_bar}\n\
+         # Default value: false\n\
+         Enabled = {combat_bar}\n\
          \n\
          ## Default combat playback speed multiplier. Supported values: 0.25, 0.50, 1.00, 2.00, 3.00, 4.00, 5.00\n\
          # Setting type: Single\n\
          # Default value: 1\n\
-         DefaultSpeedMultiplier = {speed}\n"
+         SpeedMultiplier = {speed}\n"
     )
 }
 
 #[tauri::command]
-pub async fn read_mod_config(game_path: String) -> Result<HashMap<String, String>, String> {
+pub async fn read_mod_config(game_path: String) -> Result<ModConfigReadResult, String> {
     let cfg_path = PathBuf::from(&game_path).join(CFG_RELATIVE);
 
     if !cfg_path.exists() {
-        return Ok(default_config());
+        return Ok(ModConfigReadResult {
+            config_exists: false,
+            values: default_config(),
+        });
     }
 
     let content = fs::read_to_string(&cfg_path).map_err(|e| e.to_string())?;
@@ -67,7 +77,10 @@ pub async fn read_mod_config(game_path: String) -> Result<HashMap<String, String
         }
     }
 
-    Ok(config)
+    Ok(ModConfigReadResult {
+        config_exists: true,
+        values: config,
+    })
 }
 
 #[tauri::command]
@@ -139,4 +152,66 @@ pub async fn write_config_value(
 
     fs::write(&cfg_path, lines.join("\n")).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_mod_config_reports_missing_config_file() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        let result =
+            tauri::async_runtime::block_on(read_mod_config(tmp.path().display().to_string()))
+                .unwrap();
+
+        assert!(!result.config_exists);
+        assert_eq!(
+            result
+                .values
+                .get("CombatStatusBar.Enabled")
+                .map(String::as_str),
+            Some("false")
+        );
+        assert_eq!(
+            result
+                .values
+                .get("CombatStatusBar.SpeedMultiplier")
+                .map(String::as_str),
+            Some("1")
+        );
+    }
+
+    #[test]
+    fn read_mod_config_reports_existing_config_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cfg_path = tmp.path().join(CFG_RELATIVE);
+        fs::create_dir_all(cfg_path.parent().unwrap()).unwrap();
+        fs::write(
+            &cfg_path,
+            "[CombatStatusBar]\nSpeedMultiplier = 2.00\nEnabled = false\n",
+        )
+        .unwrap();
+
+        let result =
+            tauri::async_runtime::block_on(read_mod_config(tmp.path().display().to_string()))
+                .unwrap();
+
+        assert!(result.config_exists);
+        assert_eq!(
+            result
+                .values
+                .get("CombatStatusBar.SpeedMultiplier")
+                .map(String::as_str),
+            Some("2.00")
+        );
+        assert_eq!(
+            result
+                .values
+                .get("CombatStatusBar.Enabled")
+                .map(String::as_str),
+            Some("false")
+        );
+    }
 }

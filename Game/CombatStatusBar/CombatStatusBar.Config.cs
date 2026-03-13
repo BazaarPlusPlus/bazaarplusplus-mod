@@ -12,14 +12,14 @@ internal sealed partial class CombatStatusBar
     internal static void InitializeConfig(ConfigFile config)
     {
         _enableCombatStatusBarConfig = config.Bind(
-            "Combat",
-            "EnableCombatStatusBar",
-            true,
+            "CombatStatusBar",
+            "Enabled",
+            false,
             "Whether to show the combat status bar with elapsed time and speed controls"
         );
         _defaultCombatSpeedConfig = config.Bind(
-                "Combat",
-                "DefaultSpeedMultiplier",
+                "CombatStatusBar",
+                "SpeedMultiplier",
                 1f,
                 new ConfigDescription(
                 "Default combat playback speed multiplier. Supported values: 0.25, 0.50, 1.00, 2.00, 3.00, 4.00, 5.00",
@@ -35,7 +35,7 @@ internal sealed partial class CombatStatusBar
 
     internal static bool IsEnabled()
     {
-        return _enableCombatStatusBarConfig?.Value ?? true;
+        return _enableCombatStatusBarConfig?.Value ?? false;
     }
 
     static partial void PersistCombatSpeed(float speed)

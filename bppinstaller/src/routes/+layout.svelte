@@ -25,7 +25,7 @@
       radial-gradient(ellipse 70% 42% at 50% -4%, rgba(200, 130, 40, 0.18) 0%, transparent 70%),
       radial-gradient(ellipse 40% 28% at 80% 85%, rgba(120, 60, 20, 0.1) 0%, transparent 60%);
     color: #e8dcc8;
-    font-family: 'IM Fell English', Georgia, serif;
+    font-family: 'IM Fell English', 'Noto Serif SC', 'Songti SC', Georgia, serif;
     -webkit-font-smoothing: antialiased;
     user-select: none;
   }

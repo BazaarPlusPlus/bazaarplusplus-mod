@@ -59,14 +59,22 @@ export type MessageKey =
   | 'sectionStreamerMode'
   | 'keyEnableNameOverride'
   | 'descEnableNameOverride'
-  | 'sectionCombat'
-  | 'keyEnableCombatStatusBar'
-  | 'descEnableCombatStatusBar'
-  | 'keyDefaultSpeedMultiplier'
-  | 'descDefaultSpeedMultiplier'
+  | 'sectionCombatStatusBar'
+  | 'keyCombatStatusBarEnabled'
+  | 'descCombatStatusBarEnabled'
+  | 'keyCombatStatusBarSpeedMultiplier'
+  | 'descCombatStatusBarSpeedMultiplier'
   | 'toggleOn'
   | 'toggleOff'
-  | 'modInstalledHint';
+  | 'modInstalledHint'
+  | 'settingsMissingPathTitle'
+  | 'settingsMissingPathBody'
+  | 'settingsMissingConfigTitle'
+  | 'settingsMissingConfigBody'
+  | 'settingsLoadErrorTitle'
+  | 'settingsLoadErrorBody'
+  | 'settingsDecreaseSpeed'
+  | 'settingsIncreaseSpeed';
 
 export const defaultLocale: Locale = 'en';
 
@@ -128,16 +136,24 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     settingsTitle: 'Settings',
     settingsOpen: 'Settings',
     sectionStreamerMode: 'Streamer Mode',
-    keyEnableNameOverride: 'Enable Name Override',
-    descEnableNameOverride: "Replace the local player's displayed username",
-    sectionCombat: 'Combat',
-    keyEnableCombatStatusBar: 'Enable Combat Status Bar',
-    descEnableCombatStatusBar: 'Show elapsed time and speed controls during combat',
-    keyDefaultSpeedMultiplier: 'Default Speed Multiplier',
-    descDefaultSpeedMultiplier: 'Default playback speed for combat simulation',
+    keyEnableNameOverride: 'Anonymous Display',
+    descEnableNameOverride: "Set your in-game display name to Anonymous.",
+    sectionCombatStatusBar: 'Combat Status Bar',
+    keyCombatStatusBarEnabled: 'Enabled',
+    descCombatStatusBarEnabled: 'Show elapsed time and speed controls during combat',
+    keyCombatStatusBarSpeedMultiplier: 'Speed Multiplier',
+    descCombatStatusBarSpeedMultiplier: 'Default playback speed for combat simulation',
     toggleOn: 'ON',
     toggleOff: 'OFF',
     modInstalledHint: 'Open Settings to configure and customize BazaarPlusPlus',
+    settingsMissingPathTitle: 'Game Path Required',
+    settingsMissingPathBody: 'Return to the installer and run detection before opening Settings.',
+    settingsMissingConfigTitle: 'Config Not Generated Yet',
+    settingsMissingConfigBody: 'Run BazaarPlusPlus in-game once to generate the config file, then reopen Settings.',
+    settingsLoadErrorTitle: 'Unable to Read Settings',
+    settingsLoadErrorBody: 'Make sure BazaarPlusPlus is installed correctly, then try opening Settings again.',
+    settingsDecreaseSpeed: 'Decrease speed',
+    settingsIncreaseSpeed: 'Increase speed',
   },
   zh: {
     htmlLang: 'zh-CN',
@@ -196,16 +212,24 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     settingsTitle: '设置',
     settingsOpen: '设置',
     sectionStreamerMode: '主播模式',
-    keyEnableNameOverride: '启用用户名替换',
-    descEnableNameOverride: '将本地玩家显示名称替换为自定义名称',
-    sectionCombat: '战斗',
-    keyEnableCombatStatusBar: '启用战斗状态栏',
-    descEnableCombatStatusBar: '战斗中显示耗时与速度控制栏',
-    keyDefaultSpeedMultiplier: '默认速度倍率',
-    descDefaultSpeedMultiplier: '战斗回放的默认速度倍率',
+    keyEnableNameOverride: '匿名显示',
+    descEnableNameOverride: '将你的游戏内显示名称设为 Anonymous。',
+    sectionCombatStatusBar: '战斗状态栏',
+    keyCombatStatusBarEnabled: '启用',
+    descCombatStatusBarEnabled: '战斗中显示耗时与速度控制栏',
+    keyCombatStatusBarSpeedMultiplier: '速度倍率',
+    descCombatStatusBarSpeedMultiplier: '战斗回放的默认速度倍率',
     toggleOn: '开',
     toggleOff: '关',
     modInstalledHint: '打开设置以配置和自定义 BazaarPlusPlus',
+    settingsMissingPathTitle: '需要游戏路径',
+    settingsMissingPathBody: '请先返回安装器执行检测，再打开设置页面。',
+    settingsMissingConfigTitle: '配置尚未生成',
+    settingsMissingConfigBody: '请先进入游戏运行一次 BazaarPlusPlus，生成配置文件后再回来修改设置。',
+    settingsLoadErrorTitle: '无法读取设置',
+    settingsLoadErrorBody: '请确认 BazaarPlusPlus 已正确安装，然后重新打开设置页面。',
+    settingsDecreaseSpeed: '降低速度',
+    settingsIncreaseSpeed: '提高速度',
   }
 };
 

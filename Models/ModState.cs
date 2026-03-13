@@ -41,7 +41,7 @@ internal static class ModState
             "StreamerMode",
             "EnableNameOverride",
             false,
-            "Whether to replace the local player's displayed username"
+            "Whether to set the in-game display name to Anonymous"
         );
         BppLog.Info(
             "ModState",

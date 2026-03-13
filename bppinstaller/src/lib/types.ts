@@ -12,6 +12,11 @@ export interface DotnetInfo {
   dotnet_ok: boolean;
 }
 
+export interface ModConfigReadResult {
+  config_exists: boolean;
+  values: Record<string, string>;
+}
+
 export interface UpdateInfo {
   current_version: string | null;
   latest_version: string | null;

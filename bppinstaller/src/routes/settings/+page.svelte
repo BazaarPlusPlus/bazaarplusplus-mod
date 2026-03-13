@@ -2,16 +2,18 @@
   import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import type { ModConfigReadResult } from '$lib/types';
   import { formatMessage, messages } from '$lib/i18n';
   import { locale, handleLocaleToggle } from '$lib/locale';
 
   const SPEED_STEPS = [0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0];
+  type LoadState = 'loading' | 'ready' | 'missing-path' | 'missing-config' | 'error';
 
   let gamePath = '';
-  let loading = true;
+  let loadState: LoadState = 'loading';
 
   let enableNameOverride = false;
-  let enableCombatStatusBar = true;
+  let enableCombatStatusBar = false;
   let speedIdx = 2; // default: 1.00
 
   $: t = (key: keyof typeof messages.en): string => formatMessage($locale, key);
@@ -28,17 +30,26 @@
   }
 
   async function loadConfig() {
-    if (!gamePath) { loading = false; return; }
+    if (!gamePath) {
+      loadState = 'missing-path';
+      return;
+    }
+
     try {
-      const cfg = await invoke<Record<string, string>>('read_mod_config', { gamePath });
-      enableNameOverride = cfg['StreamerMode.EnableNameOverride']?.toLowerCase() === 'true';
-      enableCombatStatusBar = cfg['Combat.EnableCombatStatusBar']?.toLowerCase() !== 'false';
-      const raw = parseFloat(cfg['Combat.DefaultSpeedMultiplier'] ?? '1');
+      const result = await invoke<ModConfigReadResult>('read_mod_config', { gamePath });
+      if (!result.config_exists) {
+        loadState = 'missing-config';
+        return;
+      }
+
+      enableNameOverride = result.values['StreamerMode.EnableNameOverride']?.toLowerCase() === 'true';
+      enableCombatStatusBar = result.values['CombatStatusBar.Enabled']?.toLowerCase() !== 'false';
+      const raw = parseFloat(result.values['CombatStatusBar.SpeedMultiplier'] ?? '1');
       speedIdx = findSpeedIdx(isNaN(raw) ? 1 : raw);
+      loadState = 'ready';
     } catch (e) {
       console.error('read_mod_config failed:', e);
-    } finally {
-      loading = false;
+      loadState = 'error';
     }
   }
 
@@ -58,14 +69,14 @@
 
   async function toggleCombatStatusBar() {
     enableCombatStatusBar = !enableCombatStatusBar;
-    await writeValue('Combat', 'EnableCombatStatusBar', String(enableCombatStatusBar));
+    await writeValue('CombatStatusBar', 'Enabled', String(enableCombatStatusBar));
   }
 
   async function stepSpeed(delta: number) {
     const next = speedIdx + delta;
     if (next < 0 || next >= SPEED_STEPS.length) return;
     speedIdx = next;
-    await writeValue('Combat', 'DefaultSpeedMultiplier', SPEED_STEPS[next].toFixed(2));
+    await writeValue('CombatStatusBar', 'SpeedMultiplier', SPEED_STEPS[next].toFixed(2));
   }
 
   onMount(() => {
@@ -133,10 +144,31 @@
     </div>
   </header>
 
-  {#if loading}
+  {#if loadState === 'loading'}
     <div class="card loading-card">
       <span class="spinner" aria-hidden="true"></span>
     </div>
+  {:else if loadState !== 'ready'}
+    <section class="card state-card">
+      <h2 class="section-title">
+        {#if loadState === 'missing-path'}
+          {t('settingsMissingPathTitle')}
+        {:else if loadState === 'missing-config'}
+          {t('settingsMissingConfigTitle')}
+        {:else}
+          {t('settingsLoadErrorTitle')}
+        {/if}
+      </h2>
+      <p class="state-body">
+        {#if loadState === 'missing-path'}
+          {t('settingsMissingPathBody')}
+        {:else if loadState === 'missing-config'}
+          {t('settingsMissingConfigBody')}
+        {:else}
+          {t('settingsLoadErrorBody')}
+        {/if}
+      </p>
+    </section>
   {:else}
     <!-- StreamerMode -->
     <section class="card">
@@ -161,12 +193,12 @@
 
     <!-- Combat -->
     <section class="card">
-      <h2 class="section-title">{t('sectionCombat')}</h2>
+      <h2 class="section-title">{t('sectionCombatStatusBar')}</h2>
       <ul class="setting-list">
         <li class="setting-row">
           <div class="setting-info">
-            <span class="setting-label">{t('keyEnableCombatStatusBar')}</span>
-            <span class="setting-desc">{t('descEnableCombatStatusBar')}</span>
+            <span class="setting-label">{t('keyCombatStatusBarEnabled')}</span>
+            <span class="setting-desc">{t('descCombatStatusBarEnabled')}</span>
           </div>
           <button
             class="toggle-btn"
@@ -180,8 +212,8 @@
 
         <li class="setting-row setting-row-block">
           <div class="setting-info">
-            <span class="setting-label">{t('keyDefaultSpeedMultiplier')}</span>
-            <span class="setting-desc">{t('descDefaultSpeedMultiplier')}</span>
+            <span class="setting-label">{t('keyCombatStatusBarSpeedMultiplier')}</span>
+            <span class="setting-desc">{t('descCombatStatusBarSpeedMultiplier')}</span>
           </div>
           <div class="stepper">
             <button
@@ -189,7 +221,7 @@
               type="button"
               onclick={() => stepSpeed(-1)}
               disabled={!canStepDown}
-              aria-label="Decrease speed"
+              aria-label={t('settingsDecreaseSpeed')}
             >‹</button>
             <span class="stepper-value">{speedDisplay}</span>
             <button
@@ -197,7 +229,7 @@
               type="button"
               onclick={() => stepSpeed(1)}
               disabled={!canStepUp}
-              aria-label="Increase speed"
+              aria-label={t('settingsIncreaseSpeed')}
             >›</button>
           </div>
         </li>
@@ -207,7 +239,7 @@
 
   <footer class="footer" aria-hidden="true">
     <div class="rule"><span></span><span class="diamond small">+</span><span></span></div>
-    <p>BazaarPlusPlus · Born of Passion</p>
+    <p>{t('footer')}</p>
   </footer>
 </main>
 
@@ -254,7 +286,7 @@
     border-radius: 2px;
     background: linear-gradient(180deg, rgba(200, 148, 55, 0.12), rgba(200, 148, 55, 0.06));
     color: rgba(228, 216, 191, 0.82);
-    font-family: 'Cinzel', serif;
+    font-family: 'Cinzel', 'Songti SC', 'STSong', serif;
     font-size: 0.54rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -296,7 +328,7 @@
     border-radius: 2px;
     background: linear-gradient(180deg, rgba(200, 148, 55, 0.12), rgba(200, 148, 55, 0.06));
     color: rgba(228, 216, 191, 0.82);
-    font-family: 'Cinzel', serif;
+    font-family: 'Cinzel', 'Songti SC', 'STSong', serif;
     font-size: 0.54rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -350,7 +382,7 @@
 
   h1 {
     margin: 0.1rem 0 0;
-    font-family: 'Cinzel Decorative', serif;
+    font-family: 'Cinzel Decorative', 'Songti SC', 'STSong', serif;
     font-size: clamp(1.35rem, 4.2vw, 2.1rem);
     font-weight: 700;
     line-height: 1;
@@ -397,13 +429,25 @@
     min-height: 5rem;
   }
 
+  .state-card {
+    gap: 0.45rem;
+  }
+
   .section-title {
     margin: 0;
-    font-family: 'Cinzel', serif;
+    font-family: 'Cinzel', 'Songti SC', 'STSong', serif;
     font-size: 0.72rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: rgba(220, 195, 145, 0.8);
+  }
+
+  .state-body {
+    margin: 0;
+    font-family: 'IM Fell English', 'Noto Serif SC', 'Songti SC', Georgia, serif;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: rgba(228, 216, 191, 0.78);
   }
 
   /* Setting rows */
@@ -439,7 +483,7 @@
   }
 
   .setting-label {
-    font-family: 'Cinzel', serif;
+    font-family: 'Cinzel', 'Songti SC', 'STSong', serif;
     font-size: 0.66rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -447,7 +491,7 @@
   }
 
   .setting-desc {
-    font-family: 'IM Fell English', serif;
+    font-family: 'IM Fell English', 'Noto Serif SC', 'Songti SC', Georgia, serif;
     font-style: italic;
     font-size: 0.76rem;
     color: rgba(200, 170, 120, 0.5);
@@ -459,7 +503,7 @@
     flex-shrink: 0;
     width: 72px;
     padding: 0.38rem 0.5rem;
-    font-family: 'Cinzel', serif;
+    font-family: 'Cinzel', 'Songti SC', 'STSong', serif;
     font-size: 0.6rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -547,7 +591,7 @@
   .stepper-value {
     width: 54px;
     text-align: center;
-    font-family: 'Fira Code', monospace;
+    font-family: 'Fira Code', 'SF Mono', 'PingFang SC', monospace;
     font-size: 0.82rem;
     color: rgba(228, 216, 191, 0.88);
     user-select: none;
@@ -575,7 +619,7 @@
 
   .footer p {
     margin: 0;
-    font-family: 'Cinzel', serif;
+    font-family: 'Cinzel', 'Songti SC', 'STSong', serif;
     font-size: 0.5rem;
     letter-spacing: 0.3em;
     text-transform: uppercase;
