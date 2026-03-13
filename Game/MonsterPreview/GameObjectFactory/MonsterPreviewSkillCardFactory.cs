@@ -63,7 +63,13 @@ internal sealed class MonsterPreviewSkillCardFactory : IPreviewCardFactory
             UnityEngine.Object.Destroy(marker);
 
         if (cardObject.TryGetComponent<SkillController>(out var skillController))
+        {
+            // Preview skill cards reuse the same pooled token prefab as the main game UI.
+            // Always reset visuals before returning to the global pool so we do not leak
+            // preview frame/icon state into merchant or board skill renders.
+            skillController.Cleanup();
             skillController.EnableMovement(true);
+        }
         else if (cardObject.TryGetComponent<CardController>(out var cardController))
             cardController.EnableMovement(true);
 
