@@ -53,7 +53,20 @@ export type MessageKey =
   | 'aboutSupport'
   | 'aboutFrontendVersion'
   | 'aboutBackendVersion'
-  | 'runtimeDownload';
+  | 'runtimeDownload'
+  | 'settingsTitle'
+  | 'settingsOpen'
+  | 'sectionStreamerMode'
+  | 'keyEnableNameOverride'
+  | 'descEnableNameOverride'
+  | 'sectionCombat'
+  | 'keyEnableCombatStatusBar'
+  | 'descEnableCombatStatusBar'
+  | 'keyDefaultSpeedMultiplier'
+  | 'descDefaultSpeedMultiplier'
+  | 'toggleOn'
+  | 'toggleOff'
+  | 'modInstalledHint';
 
 export const defaultLocale: Locale = 'en';
 
@@ -111,7 +124,20 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     aboutSupport: 'Support',
     aboutFrontendVersion: 'Frontend',
     aboutBackendVersion: 'Backend',
-    runtimeDownload: 'Download .NET'
+    runtimeDownload: 'Download .NET',
+    settingsTitle: 'Settings',
+    settingsOpen: 'Settings',
+    sectionStreamerMode: 'Streamer Mode',
+    keyEnableNameOverride: 'Enable Name Override',
+    descEnableNameOverride: "Replace the local player's displayed username",
+    sectionCombat: 'Combat',
+    keyEnableCombatStatusBar: 'Enable Combat Status Bar',
+    descEnableCombatStatusBar: 'Show elapsed time and speed controls during combat',
+    keyDefaultSpeedMultiplier: 'Default Speed Multiplier',
+    descDefaultSpeedMultiplier: 'Default playback speed for combat simulation',
+    toggleOn: 'ON',
+    toggleOff: 'OFF',
+    modInstalledHint: 'Open Settings to configure and customize BazaarPlusPlus',
   },
   zh: {
     htmlLang: 'zh-CN',
@@ -166,7 +192,20 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     aboutSupport: '支持我们',
     aboutFrontendVersion: '前端',
     aboutBackendVersion: '后端',
-    runtimeDownload: '下载 .NET'
+    runtimeDownload: '下载 .NET',
+    settingsTitle: '设置',
+    settingsOpen: '设置',
+    sectionStreamerMode: '主播模式',
+    keyEnableNameOverride: '启用用户名替换',
+    descEnableNameOverride: '将本地玩家显示名称替换为自定义名称',
+    sectionCombat: '战斗',
+    keyEnableCombatStatusBar: '启用战斗状态栏',
+    descEnableCombatStatusBar: '战斗中显示耗时与速度控制栏',
+    keyDefaultSpeedMultiplier: '默认速度倍率',
+    descDefaultSpeedMultiplier: '战斗回放的默认速度倍率',
+    toggleOn: '开',
+    toggleOff: '关',
+    modInstalledHint: '打开设置以配置和自定义 BazaarPlusPlus',
   }
 };
 

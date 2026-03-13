@@ -1,4 +1,5 @@
 pub mod bepinex;
+pub mod config;
 pub mod detect;
 pub mod vdf;
 

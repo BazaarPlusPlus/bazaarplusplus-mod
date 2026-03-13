@@ -222,20 +222,28 @@
   <div class="steps">
     <div class="step" class:step-found={modInstalled}>
       <div class="step-index" aria-hidden="true">I</div>
-      <div class="step-body">
-        <span class="step-title">
-          {t('stepBpp')}
+      <div class="step-body step-body-bpp">
+        <div class="step-bpp-content">
+          <span class="step-title">
+            {t('stepBpp')}
+            {#if modInstalled}
+              <span class="tag tag-ok">{t('statusInstalled')}{env?.bpp_version ? ` · v${env.bpp_version}` : ''}</span>
+            {:else if actionBusy === 'detect'}
+              <span class="tag">{t('statusChecking')}</span>
+            {:else}
+              <span class="tag tag-warn">{t('statusNotInstalled')}</span>
+            {/if}
+          </span>
           {#if modInstalled}
-            <span class="tag tag-ok">{t('statusInstalled')}{env?.bpp_version ? ` · v${env.bpp_version}` : ''}</span>
-          {:else if actionBusy === 'detect'}
-            <span class="tag">{t('statusChecking')}</span>
+            <p class="detail-line detail-muted">{t('modInstalledHint')}</p>
           {:else}
-            <span class="tag tag-warn">{t('statusNotInstalled')}</span>
+            <p class="detail-line detail-muted">{t('detectInstalledHint')}</p>
           {/if}
-        </span>
-
-        {#if !modInstalled}
-          <p class="detail-line detail-muted">{t('detectInstalledHint')}</p>
+        </div>
+        {#if modInstalled}
+          <a class="settings-link" href="/settings?gamePath={encodeURIComponent(effectiveGamePath())}">
+            ✦ {t('settingsOpen')}
+          </a>
         {/if}
       </div>
     </div>
@@ -603,6 +611,19 @@
     overflow: visible;
   }
 
+  .step-body-bpp {
+    display: flex;
+    align-items: stretch;
+    gap: 1.1rem;
+  }
+
+  .step-bpp-content {
+    flex: 1;
+    display: grid;
+    gap: 0.7rem;
+    min-width: 0;
+  }
+
   .step-title {
     font-family: 'Cinzel', serif;
     font-size: 0.72rem;
@@ -612,7 +633,6 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    overflow: hidden;
   }
 
   .tag {
@@ -870,6 +890,35 @@
   .redetect-btn:hover {
     color: rgba(200, 160, 80, 0.8);
     border-color: rgba(200, 148, 55, 0.35);
+  }
+
+  .settings-link {
+    flex-shrink: 0;
+    padding: 0 0.9rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.54rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(200, 155, 72, 0.7);
+    border: 1px solid rgba(160, 120, 55, 0.22);
+    border-radius: 2px;
+    background: rgba(200, 148, 55, 0.04);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .settings-link:hover {
+    color: rgba(220, 175, 90, 0.9);
+    border-color: rgba(200, 148, 55, 0.38);
+    background: rgba(200, 148, 55, 0.09);
+  }
+
+  .settings-link:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
   }
 
   .dotnet-download-btn {
