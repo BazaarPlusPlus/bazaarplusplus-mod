@@ -20,7 +20,6 @@ internal static class ModState
 
     // Config entries
     public static ConfigEntry<bool> EnableNameOverrideConfig;
-    public static ConfigEntry<int> LogRepeatPatternMaxLengthConfig;
     public static bool IsInGameRun;
     public static EVictoryCondition LastVictoryCondition;
     public static string LastMessageId = "";
@@ -44,15 +43,9 @@ internal static class ModState
             false,
             "Whether to replace the local player's displayed username"
         );
-        LogRepeatPatternMaxLengthConfig = config.Bind(
-            "Logging",
-            "RepeatDetectionMaxLength",
-            3,
-            "Maximum repeated log sequence length to coalesce. 1 only coalesces identical consecutive lines; 2 or more also coalesces repeating blocks such as A B A B."
-        );
         BppLog.Info(
             "ModState",
-            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, repeatDetectionMaxLength={LogRepeatPatternMaxLengthConfig.Value}"
+            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}"
         );
         CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
         if (string.IsNullOrWhiteSpace(CardsJsonPath))
@@ -64,7 +57,7 @@ internal static class ModState
         }
         else
         {
-            BppLog.Debug("ModState", $"cards.json path initialized: {CardsJsonPath}");
+            BppLog.Info("ModState", $"cards.json path initialized: {CardsJsonPath}");
         }
     }
 

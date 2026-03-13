@@ -230,11 +230,7 @@ internal static class BppLog
         return _activeSequence[0].Level;
     }
 
-    private static int GetRepeatDetectionMaxLength()
-    {
-        var configuredValue = ModState.LogRepeatPatternMaxLengthConfig?.Value ?? 1;
-        return Math.Max(1, configuredValue);
-    }
+    private static int GetRepeatDetectionMaxLength() => 3;
 
     private static void RememberEntry(BufferedLogEntry entry)
     {
