@@ -84,52 +84,52 @@
   <title>{t('aboutTitle')} - BazaarPlusPlus</title>
 </svelte:head>
 
+<AppModal
+  open={showPaymentCodes}
+  eyebrow="BazaarPlusPlus"
+  title={$locale === 'zh' ? '\u611f\u8c22\u652f\u6301' : 'Thanks for Support'}
+  bodyClass="payment-modal-body"
+  confirmText={$locale === 'zh' ? '\u5173\u95ed' : 'Close'}
+  onConfirm={closePaymentCodes}
+>
+  <section class="payment-modal-shell">
+    <div class="payment-grid">
+      {#each paymentMethods as method}
+        <article class={`payment-card ${method.accent}`}>
+          <div class="payment-frame">
+            {#if !hiddenPaymentImages[method.id]}
+              <img
+                class="payment-image"
+                src={method.src}
+                alt={$locale === 'zh' ? method.zhName : method.enName}
+                onerror={() => handlePaymentImageError(method.id)}
+              />
+            {:else}
+              <div class="payment-placeholder" aria-hidden="true"></div>
+            {/if}
+          </div>
+
+          <div class="payment-copy">
+            <h3>{$locale === 'zh' ? '\u5fae\u4fe1\u8d5e\u8d4f' : method.enName}</h3>
+            <p>
+              {$locale === 'zh'
+                ? '\u8bf7 Bazaar++ \u559d\u4e00\u676f'
+                : 'Buy Bazaar++ a drink.'}
+            </p>
+          </div>
+        </article>
+      {/each}
+    </div>
+
+    <p class="payment-support-note">
+      {$locale === 'zh'
+        ? '\u6709\u4f60\u652f\u6301\uff0cBazaar++ \u4f1a\u5192\u51fa\u66f4\u591a\u597d\u4e1c\u897f'
+        : 'With your support, Bazaar++ gets to grow more good stuff.'}
+    </p>
+  </section>
+</AppModal>
+
 <main class="shell">
-  <AppModal
-    open={showPaymentCodes}
-    eyebrow="BazaarPlusPlus"
-    title={$locale === 'zh' ? '\u611f\u8c22\u652f\u6301' : 'Thanks for Support'}
-    bodyClass="payment-modal-body"
-    confirmText={$locale === 'zh' ? '\u5173\u95ed' : 'Close'}
-    onConfirm={closePaymentCodes}
-  >
-    <section class="payment-modal-shell">
-      <div class="payment-grid">
-        {#each paymentMethods as method}
-          <article class={`payment-card ${method.accent}`}>
-            <div class="payment-frame">
-              {#if !hiddenPaymentImages[method.id]}
-                <img
-                  class="payment-image"
-                  src={method.src}
-                  alt={$locale === 'zh' ? method.zhName : method.enName}
-                  onerror={() => handlePaymentImageError(method.id)}
-                />
-              {:else}
-                <div class="payment-placeholder" aria-hidden="true"></div>
-              {/if}
-            </div>
-
-            <div class="payment-copy">
-              <h3>{$locale === 'zh' ? '\u5fae\u4fe1\u8d5e\u8d4f' : method.enName}</h3>
-              <p>
-                {$locale === 'zh'
-                  ? '\u8bf7 Bazaar++ \u559d\u4e00\u676f'
-                  : 'Buy Bazaar++ a drink.'}
-              </p>
-            </div>
-          </article>
-        {/each}
-      </div>
-
-      <p class="payment-support-note">
-        {$locale === 'zh'
-          ? '\u6709\u4f60\u652f\u6301\uff0cBazaar++ \u4f1a\u5192\u51fa\u66f4\u591a\u597d\u4e1c\u897f'
-          : 'With your support, Bazaar++ gets to grow more good stuff.'}
-      </p>
-    </section>
-  </AppModal>
-
   <header class="header">
     <a class="back-btn" href="/">
       <svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true">
