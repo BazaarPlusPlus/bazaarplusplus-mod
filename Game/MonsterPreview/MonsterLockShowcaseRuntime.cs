@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
 using TheBazaar;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus;
 
@@ -19,6 +21,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     private MonsterPreviewController _overlayController;
     private Card _lockedCard;
+    private bool _closeOnNextClickArmed;
     public static MonsterLockShowcaseRuntime Instance { get; private set; }
 
     public bool IsPreviewActive => _lockedCard != null;
@@ -50,10 +53,50 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             Instance = null;
     }
 
+    private void Update()
+    {
+        if (!IsPreviewActive || !_closeOnNextClickArmed)
+            return;
+
+        var mouse = Mouse.current;
+        if (mouse == null)
+            return;
+
+        if (mouse.leftButton.wasPressedThisFrame)
+        {
+            TryConsumeNextClickToClosePreview(
+                isLeftClick: true,
+                isRightClick: false,
+                reason: "next global left click"
+            );
+            return;
+        }
+
+        if (mouse.rightButton.wasPressedThisFrame)
+        {
+            TryConsumeNextClickToClosePreview(
+                isLeftClick: false,
+                isRightClick: true,
+                reason: "next global right click"
+            );
+        }
+    }
+
     public bool HandleLockToggle(Card card)
     {
         if (_overlayController == null)
             return false;
+
+        if (
+            TryConsumeNextClickToClosePreview(
+                isLeftClick: false,
+                isRightClick: true,
+                reason: "next right click"
+            )
+        )
+        {
+            return true;
+        }
 
         if (IsPreviewActive)
         {
@@ -80,6 +123,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
                 source
             )
         );
+        _closeOnNextClickArmed = true;
         BppLog.Info(
             "MonsterLockShowcaseRuntime",
             $"Activated BPP showcase mode source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={cards.Count} skills={skillCards.Count}"
@@ -87,9 +131,19 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         return true;
     }
 
+    public bool TryConsumeNextClickToClosePreview(PointerEventData.InputButton? button, string reason)
+    {
+        return TryConsumeNextClickToClosePreview(
+            isLeftClick: button == PointerEventData.InputButton.Left,
+            isRightClick: button == PointerEventData.InputButton.Right,
+            reason: reason
+        );
+    }
+
     private void HideOverlay(string reason)
     {
         _lockedCard = null;
+        _closeOnNextClickArmed = false;
         if (_overlayController == null)
             return;
 
@@ -212,6 +266,24 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             Presentation = _presentation,
             Debug = new PreviewBoardDebugOptions(),
         };
+    }
+
+    private bool TryConsumeNextClickToClosePreview(bool isLeftClick, bool isRightClick, string reason)
+    {
+        if (
+            !_controller.ShouldConsumeNextClickToClosePreview(
+                IsPreviewActive,
+                _closeOnNextClickArmed,
+                isLeftClick,
+                isRightClick
+            )
+        )
+        {
+            return false;
+        }
+
+        HideOverlay(reason);
+        return true;
     }
 
 

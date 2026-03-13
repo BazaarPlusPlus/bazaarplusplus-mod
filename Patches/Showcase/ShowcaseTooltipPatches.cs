@@ -92,6 +92,17 @@ public static class CardTooltipControllerLockTogglePatch
     {
         var currentCard = __instance?.CurrentCard;
         var runtime = MonsterLockShowcaseRuntime.Instance;
+        if (
+            runtime != null
+            && runtime.TryConsumeNextClickToClosePreview(
+                UnityEngine.EventSystems.PointerEventData.InputButton.Right,
+                "next right click"
+            )
+        )
+        {
+            return false;
+        }
+
         if (runtime != null && runtime.ShouldInterceptLockToggle(currentCard) && runtime.HandleLockToggle(currentCard))
             return false;
 

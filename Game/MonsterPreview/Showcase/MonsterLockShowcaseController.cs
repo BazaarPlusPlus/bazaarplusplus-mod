@@ -5,6 +5,19 @@ namespace BazaarPlusPlus;
 
 internal sealed class MonsterLockShowcaseController
 {
+    public bool ShouldConsumeNextClickToClosePreview(
+        bool isPreviewActive,
+        bool closeOnNextClickArmed,
+        bool isLeftClick,
+        bool isRightClick
+    )
+    {
+        if (!isPreviewActive || !closeOnNextClickArmed)
+            return false;
+
+        return isLeftClick || isRightClick;
+    }
+
     public bool ShouldInterceptLockToggle(
         bool isPreviewActive,
         bool hasCurrentCard,
