@@ -8,9 +8,9 @@ Add a lightweight combat playback controller that stays visible in both standby 
 - current processed frame count without exposing total frame count
 - current playback speed
 - step-based speed controls
-- a disabled pause segment for future expansion
+- a live pause toggle during combat
 
-This intentionally does not implement pause behavior, frame stepping, rewind, or a custom replay controller.
+This intentionally does not implement frame stepping, rewind, or a custom replay controller.
 
 ## Scope
 
@@ -21,11 +21,11 @@ Implemented behavior:
 - display logical combat time based on processed combat frames
 - display frame progress as processed count only
 - allow playback speed changes through discrete step buttons only
+- allow pause toggling during active combat playback
 - keep the original game combat simulation loop intact
 
 Explicitly out of scope:
 
-- pause / resume implementation
 - rewind one frame
 - fast-forward one frame
 - exposing or patching the local `watch` variable inside `CombatSimHandler.Simulate`
@@ -51,10 +51,11 @@ Responsibilities:
 
 - subscribe to combat start/end events
 - show and hide the bottom controller
+- build and refresh a runtime `Canvas` HUD
 - render standby and active content states
 - render current logical time, frame progress, and speed
 - expose combat playback state to Harmony patches
-- allow the user to move between predefined speed steps
+- allow the user to move between predefined speed steps and pause combat playback
 
 ### Shared runtime state
 
@@ -130,7 +131,7 @@ This means:
 
 - changing playback speed does not change the logical time shown
 - the displayed time reflects progress on the combat simulation timeline
-- outside combat, the controller shows `--:--`
+- outside combat, the controller shows `-:--:--`
 
 ### How processed frames are counted
 
@@ -201,6 +202,12 @@ Behavior:
 
 ## UI Behavior
 
+Rendering:
+
+- runtime uGUI `Canvas`
+- `Screen Space - Overlay`
+- scaled with `CanvasScaler` against a `1920x1080` reference resolution
+
 Location:
 
 - bottom center of the screen
@@ -211,19 +218,21 @@ Layout:
 
 State content:
 
-- standby: `Time=--:--`, `Frame=Standby`, `Multiplier=current preset`, `Pause=disabled`
-- combat: `Time=logical elapsed`, `Frame=processed only`, `Multiplier=current speed`, `Pause=disabled`
+- standby: `Time=-:--:--`, `Frame=Standby`, `Multiplier=current preset`, `Pause=disabled`
+- combat: `Time=logical elapsed`, `Frame=processed only`, `Multiplier=current speed`, `Pause=enabled`
+- paused combat: `Pause` segment switches to a paused visual state and resume glyph
 
 Visual transition:
 
 - standby uses a darker, lower-contrast palette
 - combat uses a brighter warm palette
 - the controller blends between those palettes when combat starts or ends
+- the `CanvasScaler` keeps the bar at a more stable relative size across resolutions
 
 Controls:
 
 - left/right multiplier step buttons
-- disabled pause button placeholder
+- pause button is disabled outside combat and active during combat
 - `F6` toggles the visibility of the bar
 
 ## Tradeoffs
