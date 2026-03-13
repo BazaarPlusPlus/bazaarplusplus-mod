@@ -72,18 +72,21 @@ internal static class ModState
     private static void OnRunStarted()
     {
         IsInGameRun = true;
+        EncounterTracker.ResetEncounterState("Run started");
         BppLog.Debug("ModState", "Run started; IsInGameRun=true");
     }
 
     private static void OnRunEnded()
     {
         IsInGameRun = false;
+        EncounterTracker.ResetEncounterState("Run ended");
         BppLog.Debug("ModState", "Run ended; IsInGameRun=false");
     }
 
     private static void OnRunInterrupted()
     {
         IsInGameRun = false;
+        EncounterTracker.ResetEncounterState("Run interrupted");
         BppLog.Debug("ModState", "Run interrupted; IsInGameRun=false");
     }
 }

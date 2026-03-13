@@ -5,13 +5,24 @@ namespace BazaarPlusPlus;
 
 internal sealed class MonsterLockShowcaseController
 {
-    public bool ShouldShowForLock(Guid? lockedCardId, bool isShowcaseCard)
+    public bool ShouldInterceptLockToggle(
+        bool isPreviewActive,
+        bool hasCurrentCard,
+        bool isShowcaseCard,
+        bool isMonsterCard
+    )
     {
-        return lockedCardId.HasValue && !isShowcaseCard;
+        if (!hasCurrentCard)
+            return false;
+
+        if (isShowcaseCard)
+            return isPreviewActive;
+
+        return isMonsterCard;
     }
 
-    public bool ShouldHideForUnlock(Guid? currentCardId, bool isShowcaseCard)
+    public bool ShouldShowForLock(Guid? lockedCardId, bool isShowcaseCard, bool isMonsterCard)
     {
-        return !isShowcaseCard;
+        return lockedCardId.HasValue && !isShowcaseCard && isMonsterCard;
     }
 }

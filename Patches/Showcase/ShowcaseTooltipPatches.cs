@@ -92,7 +92,7 @@ public static class CardTooltipControllerLockTogglePatch
     {
         var currentCard = __instance?.CurrentCard;
         var runtime = MonsterLockShowcaseRuntime.Instance;
-        if (runtime != null && runtime.HandleLockToggle(currentCard))
+        if (runtime != null && runtime.ShouldInterceptLockToggle(currentCard) && runtime.HandleLockToggle(currentCard))
             return false;
 
         if (currentCard == null)

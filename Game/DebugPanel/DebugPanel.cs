@@ -303,6 +303,10 @@ internal sealed class DebugPanel : MonoBehaviour
 
         if (!string.IsNullOrEmpty(entry.Preview.EncounterName))
             DrawRow("Encounter Name", entry.Preview.EncounterName);
+        if (!string.IsNullOrEmpty(entry.Preview.Title))
+            DrawRow("Title", entry.Preview.Title);
+        if (entry.Preview.EncounterId != Guid.Empty)
+            DrawRow("Encounter Id", entry.Preview.EncounterShortId);
 
         var levelText = entry.Preview.CombatLevel.HasValue
             ? entry.Preview.CombatLevel.Value.ToString()
@@ -317,13 +321,13 @@ internal sealed class DebugPanel : MonoBehaviour
         if (!string.IsNullOrEmpty(entry.Preview.MonsterTemplateId))
             DrawRow("Monster Tpl", entry.Preview.MonsterTemplateId);
 
-        DrawStringList("Items", entry.Preview.Items);
-        DrawStringList("Skills", entry.Preview.Skills);
+        DrawPreviewCardList("Board", entry.Preview.BoardCards);
+        DrawPreviewCardList("Skills", entry.Preview.Skills);
         GUILayout.Space(2);
         GUILayout.EndVertical();
     }
 
-    private void DrawStringList(string title, List<string> values)
+    private void DrawPreviewCardList(string title, List<RunInfo.MonsterPreviewCard> values)
     {
         if (values == null)
         {
@@ -339,7 +343,18 @@ internal sealed class DebugPanel : MonoBehaviour
         }
 
         foreach (var value in values)
-            GUILayout.Label($"    - {value}", ValueStyle);
+        {
+            if (value == null)
+                continue;
+
+            var label = string.IsNullOrWhiteSpace(value.SourceName)
+                ? value.TemplateId
+                : $"{value.SourceName} ({value.TemplateId})";
+            GUILayout.Label(
+                $"    - {label}  T{value.Tier}  size={value.Size}  {value.Enchant}",
+                ValueStyle
+            );
+        }
     }
 
     private void DrawSectionHeader(string title)

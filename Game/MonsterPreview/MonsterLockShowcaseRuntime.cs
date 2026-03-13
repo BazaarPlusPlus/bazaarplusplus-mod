@@ -61,7 +61,9 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             return true;
         }
 
-        if (!_controller.ShouldShowForLock(card?.TemplateId, card != null && IsShowcaseCard(card)))
+        var isShowcaseCard = card != null && IsShowcaseCard(card);
+        var isMonsterCard = card != null && IsMonsterSourceCard(card);
+        if (!_controller.ShouldShowForLock(card?.TemplateId, isShowcaseCard, isMonsterCard))
             return false;
 
         if (!TryBuildPreview(card, out var cards, out var skillCards, out var source))
@@ -102,6 +104,32 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         return controller != null && controller.GetComponent<ShowcaseCardMarker>() != null;
     }
 
+    public bool ShouldInterceptLockToggle(Card card)
+    {
+        if (_overlayController == null)
+            return false;
+
+        var isShowcaseCard = card != null && IsShowcaseCard(card);
+        var isMonsterCard = card != null && IsMonsterSourceCard(card);
+        return _controller.ShouldInterceptLockToggle(
+            IsPreviewActive,
+            card != null,
+            isShowcaseCard,
+            isMonsterCard
+        );
+    }
+
+    private static bool IsMonsterSourceCard(Card card)
+    {
+        if (card == null || !ModState.IsInGameRun)
+            return false;
+
+        if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out _))
+            return true;
+
+        return FindEncounterPreview(card) != null;
+    }
+
     private static bool TryBuildPreview(
         Card card,
         out List<PreviewCardSpec> cards,
@@ -129,8 +157,8 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         if (preview == null)
             return false;
 
-        cards = BuildLegacySpecs(preview.Items);
-        skillCards = BuildLegacySpecs(preview.Skills);
+        cards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.BoardCards);
+        skillCards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.Skills);
         source = "encounter_tracker_cache";
         return cards.Count > 0 || skillCards.Count > 0;
     }
@@ -164,31 +192,6 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         }
 
         return null;
-    }
-
-    private static List<PreviewCardSpec> BuildLegacySpecs(List<string> templateIds)
-    {
-        var specs = new List<PreviewCardSpec>();
-        if (templateIds == null)
-            return specs;
-
-        foreach (var templateId in templateIds)
-        {
-            if (!Guid.TryParse(templateId, out var parsed))
-                continue;
-
-            specs.Add(
-                new PreviewCardSpec
-                {
-                    TemplateId = parsed.ToString(),
-                    Tier = 0,
-                    Size = 1,
-                    Enchant = "None",
-                }
-            );
-        }
-
-        return specs;
     }
 
     private PreviewBoardRequest CreateShowcaseRequest(

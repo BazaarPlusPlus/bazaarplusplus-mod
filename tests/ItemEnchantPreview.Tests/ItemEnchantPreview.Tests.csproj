@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json;
+    </RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
+    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/Assembly-CSharp.dll')">
+    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../BazaarPlusPlus.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BazaarGameClient">
+      <HintPath>$(ManagedPath)/BazaarGameClient.dll</HintPath>
+    </Reference>
+    <Reference Include="BazaarGameShared">
+      <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
+    </Reference>
+    <Reference Include="TheBazaarRuntime">
+      <HintPath>$(ManagedPath)/TheBazaarRuntime.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

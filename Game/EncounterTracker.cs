@@ -1,4 +1,5 @@
 ﻿#pragma warning disable CS0436
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarGameClient.Domain.Models.Cards;
@@ -22,22 +23,21 @@ internal static class EncounterTracker
     {
         if (!ModState.IsInGameRun)
         {
-            ClearEncounterState("Ignoring card dealt outside of an active run");
+            ResetEncounterState("Ignoring card dealt outside of an active run");
             return;
         }
 
         var state = Data.CurrentState;
         if (state == null)
         {
-            ClearEncounterState("CurrentState is null");
+            ResetEncounterState("CurrentState is null");
             return;
         }
 
-        // Skip combat states - card dealt events also fire during combat for spawned cards
         var stateName = state.StateName;
-        if (stateName == ERunState.Combat || stateName == ERunState.PVPCombat)
+        if (!IsSupportedSelectionState(stateName))
         {
-            ClearEncounterState($"Ignoring combat state {stateName}");
+            ResetEncounterState($"Ignoring unsupported state {stateName}");
             return;
         }
 
@@ -45,7 +45,7 @@ internal static class EncounterTracker
         var selectionSet = state.SelectionSet;
         if (selectionSet == null || selectionSet.Count == 0)
         {
-            ClearEncounterState($"SelectionSet empty in state {stateName}");
+            ResetEncounterState($"SelectionSet empty in state {stateName}");
             return;
         }
 
@@ -56,7 +56,7 @@ internal static class EncounterTracker
 
         if (cards.Count == 0)
         {
-            ClearEncounterState($"SelectionSet resolved to zero cards in state {stateName}");
+            ResetEncounterState($"SelectionSet resolved to zero cards in state {stateName}");
             return;
         }
 
@@ -101,21 +101,31 @@ internal static class EncounterTracker
                 continue;
 
             var encounterName = card.Template.InternalName;
-            var entry = MonsterDatabase.TryGet(encounterName);
             var monster = combat.CombatantType as TCombatantMonster;
+            MonsterDatabase.TryGetByEncounterId(card.TemplateId, out var monsterInfo);
+            var previewModel = monsterInfo != null
+                ? MonsterDatabasePreviewDataSource.BuildModel(monsterInfo, "encounter_tracker_cache")
+                : null;
 
             previews.Add(
                 new RunInfo.MonsterPreview
                 {
                     EncounterTemplateId = card.TemplateId,
+                    EncounterId = monsterInfo?.EncounterId ?? Guid.Empty,
+                    EncounterShortId = monsterInfo?.EncounterShortId ?? string.Empty,
                     EncounterName = encounterName,
+                    Title = monsterInfo?.Title ?? string.Empty,
                     MonsterTemplateId = monster?.MonsterTemplateId.ToString(),
                     CombatLevel = monster == null ? null : (int?)monster.Level,
                     RewardGold = combat.RewardCombatGold,
                     RewardXp = combat.RewardCombatXp,
                     SandstormEnabled = combat.SandstormEnabled,
-                    Items = entry?.Items,
-                    Skills = entry?.Skills,
+                    BoardCards = previewModel != null
+                        ? EncounterPreviewSpecConverter.ToCachedCards(previewModel.ItemCards)
+                        : null,
+                    Skills = previewModel != null
+                        ? EncounterPreviewSpecConverter.ToCachedCards(previewModel.SkillCards)
+                        : null,
                 }
             );
         }
@@ -123,7 +133,15 @@ internal static class EncounterTracker
         return previews;
     }
 
-    private static void ClearEncounterState(string reason)
+    internal static bool IsSupportedSelectionState(ERunState stateName)
+    {
+        return stateName == ERunState.Encounter
+            || stateName == ERunState.Choice
+            || stateName == ERunState.Loot
+            || stateName == ERunState.Pedestal;
+    }
+
+    internal static void ResetEncounterState(string reason)
     {
         var hadState =
             ModState.AvailableEncounters != null

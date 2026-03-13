@@ -51,14 +51,27 @@ public class RunInfo
     public class MonsterPreview
     {
         public Guid EncounterTemplateId;
+        public Guid EncounterId;
+        public string EncounterShortId;
         public string EncounterName;
+        public string Title;
         public string MonsterTemplateId;
         public int? CombatLevel;
         public int? RewardGold;
         public int? RewardXp;
         public bool? SandstormEnabled;
-        public List<string> Items; // null = no local data
-        public List<string> Skills; // null = no local data
+        public List<MonsterPreviewCard> BoardCards; // null = no local data
+        public List<MonsterPreviewCard> Skills; // null = no local data
+    }
+
+    public class MonsterPreviewCard
+    {
+        public string TemplateId { get; set; } = string.Empty;
+        public string SourceName { get; set; } = string.Empty;
+        public int Tier { get; set; }
+        public int Size { get; set; } = 1;
+        public string Enchant { get; set; } = "None";
+        public Dictionary<int, int> Attributes { get; set; } = new Dictionary<int, int>();
     }
 
     public class CardInfo

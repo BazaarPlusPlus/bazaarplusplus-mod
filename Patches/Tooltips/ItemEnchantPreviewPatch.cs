@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 using System.Text;
 using HarmonyLib;
+using BazaarPlusPlus.Game.ItemEnchantPreview;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
@@ -25,7 +26,7 @@ public static class CardTooltipDataPassivePatch
             if (Data.IsInCombat)
                 return;
 
-            var previewSegments = ItemEnchantPreviewBuilder.BuildPreviewSegments(
+            var previewSegments = ItemEnchantPreviewService.BuildPreviewSegments(
                 __instance.CardInstance
             );
             if (previewSegments.Count == 0)
