@@ -20,6 +20,7 @@ internal static class ModState
 
     // Config entries
     public static ConfigEntry<bool> EnableNameOverrideConfig;
+    public static ConfigEntry<bool> EnchantPreviewAlwaysShowConfig;
     public static bool IsInGameRun;
     public static EVictoryCondition LastVictoryCondition;
     public static string LastMessageId = "";
@@ -43,9 +44,15 @@ internal static class ModState
             false,
             "Whether to set the in-game display name to Anonymous"
         );
+        EnchantPreviewAlwaysShowConfig = config.Bind(
+            "EnchantPreview",
+            "AlwaysShow",
+            true,
+            "Whether to always show enchant preview text in item tooltips. If disabled, hold Ctrl to show it."
+        );
         BppLog.Info(
             "ModState",
-            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}"
+            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, enchantPreviewAlwaysShow={EnchantPreviewAlwaysShowConfig.Value}"
         );
         CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
         if (string.IsNullOrWhiteSpace(CardsJsonPath))

@@ -27,7 +27,8 @@ public static class CardTooltipDataPassivePatch
             if (Data.IsInCombat)
                 return;
 
-            if (!KeyBindings.Modifiers.IsCtrlPressed(Keyboard.current))
+            var alwaysShow = ModState.EnchantPreviewAlwaysShowConfig?.Value ?? true;
+            if (!alwaysShow && !KeyBindings.Modifiers.IsCtrlPressed(Keyboard.current))
                 return;
 
             var previewSegments = ItemEnchantPreviewService.BuildPreviewSegments(
