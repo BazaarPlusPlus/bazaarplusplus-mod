@@ -6,6 +6,11 @@
     ],
     "resources": {
       "resources/BepInExSource/windows/BepInEx.zip": "BepInExSource/BepInEx.zip"
+    },
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/installer.ico"
+      }
     }
   }
 }
