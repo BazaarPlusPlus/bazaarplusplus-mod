@@ -46,7 +46,8 @@ internal static class BppLog
 
     public static void Debug(string component, string message)
     {
-        Write(LogLevel.Debug, Format(component, message));
+        if (ModState.IsDebug)
+            Write(LogLevel.Debug, Format(component, message));
     }
 
     public static void Info(string component, string message)
@@ -117,9 +118,6 @@ internal static class BppLog
 
     private static LogLevel NormalizeLevel(LogLevel level)
     {
-        if (level == LogLevel.Debug && ModState.PromoteDebugLogsToInfoConfig?.Value == true)
-            return LogLevel.Info;
-
         return level;
     }
 

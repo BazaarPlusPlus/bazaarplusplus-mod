@@ -11,16 +11,15 @@ namespace BazaarPlusPlus;
 internal static class ModState
 {
 #if DEBUG
-    public const bool IsDebug = true;
+    public static readonly bool IsDebug = true;
 #else
-    public const bool IsDebug = false;
+    public static readonly bool IsDebug = false;
 #endif
 
     public static ManualLogSource Logger;
 
     // Config entries
     public static ConfigEntry<bool> EnableNameOverrideConfig;
-    public static ConfigEntry<bool> PromoteDebugLogsToInfoConfig;
     public static ConfigEntry<int> LogRepeatPatternMaxLengthConfig;
     public static bool IsInGameRun;
     public static EVictoryCondition LastVictoryCondition;
@@ -45,12 +44,6 @@ internal static class ModState
             false,
             "Whether to replace the local player's displayed username"
         );
-        PromoteDebugLogsToInfoConfig = config.Bind(
-            "Logging",
-            "PromoteDebugLogsToInfo",
-            false,
-            "When enabled, BppLog.Debug entries are emitted at Info level. Useful during development when Debug logs are filtered out."
-        );
         LogRepeatPatternMaxLengthConfig = config.Bind(
             "Logging",
             "RepeatDetectionMaxLength",
@@ -59,7 +52,7 @@ internal static class ModState
         );
         BppLog.Info(
             "ModState",
-            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, promoteDebugLogsToInfo={PromoteDebugLogsToInfoConfig.Value}, repeatDetectionMaxLength={LogRepeatPatternMaxLengthConfig.Value}"
+            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, repeatDetectionMaxLength={LogRepeatPatternMaxLengthConfig.Value}"
         );
         CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
         if (string.IsNullOrWhiteSpace(CardsJsonPath))
