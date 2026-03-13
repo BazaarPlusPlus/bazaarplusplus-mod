@@ -64,7 +64,7 @@ case "$1" in
     decompile)  decompile "$@" ;;
     decompile-all) decompile_all ;;
     *)
-        echo "Usage: $0 {build|format|decompile [DllName]|decompile-all}"
+        echo "Usage: $0 {all|build|format|decompile [DllName]|decompile-all}"
         exit 1
         ;;
 esac
