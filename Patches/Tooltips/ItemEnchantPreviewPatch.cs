@@ -5,6 +5,7 @@ using BazaarPlusPlus.Game.ItemEnchantPreview;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
+using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus;
 
@@ -24,6 +25,9 @@ public static class CardTooltipDataPassivePatch
                 return;
 
             if (Data.IsInCombat)
+                return;
+
+            if (!KeyBindings.Modifiers.IsCtrlPressed(Keyboard.current))
                 return;
 
             var previewSegments = ItemEnchantPreviewService.BuildPreviewSegments(

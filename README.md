@@ -2,20 +2,24 @@
 
 BazaarPlusPlus 是一个面向 **《The Bazaar》** 的 **BepInEx 增强模组**，专注于提供更清晰、更顺手的局内信息展示，提升游戏过程中信息获取与决策的效率。
 
-## 功能亮点
+## 功能
 
 **战斗状态条**
+
 提供更直观的战斗播放状态与节奏信息，帮助玩家更清楚地理解战斗节奏。
 
 **怪物预览优化**
+
 在怪物预览界面支持右键查看敌方卡牌与技能信息，补充游戏内默认未展示的内容。
 
 **附魔与词条预览增强**
+
 扩展物品附魔相关的可见信息，使部分原本隐藏或不完整的词条更加直观。
 
 ## 安装
 
 使用发布包内附带的 **安装器（Installer）**。
+
 当前仅发布了 **Windows 版本**，macOS 仍在适配中。
 
 ### Windows 安装步骤
@@ -25,11 +29,11 @@ BazaarPlusPlus 是一个面向 **《The Bazaar》** 的 **BepInEx 增强模组**
 3. 安装完成后重新启动 Steam 和游戏
 4. 首次进入游戏时，BazaarPlusPlus 会自动生成配置文件
 5. 如果需要倍速功能，请返回 Installer，在插件配置页开启。
-## 常见问题
 
 ## 开发者
 
 项目基于 **C#、.NET 和 BepInEx 5**。
+
 项目相关代码仍在整理中，后续会逐步补充源码，架构说明与开发指南。
 
 ## 致谢
@@ -62,17 +66,21 @@ BazaarPlusPlus is a **BepInEx enhancement mod for *The Bazaar*** focused on prov
 ## Features
 
 **Combat Status Bar**
+
 Provides more intuitive combat playback status and pacing information, helping players understand the flow of battle more clearly.
 
 **Monster Preview Improvements**
+
 Supports right-clicking in the monster preview interface to inspect enemy cards and skill information, supplementing content not shown by default in the game.
 
 **Enchant & Modifier Preview Enhancements**
+
 Expands the visible information related to item enchants, making some originally hidden or incomplete modifiers more intuitive.
 
 ## Installation
 
 Use the **installer included in the release package**.
+
 Currently, only the **Windows version** has been released, while macOS support is still being adapted.
 
 ### Windows Installation Steps
@@ -83,11 +91,10 @@ Currently, only the **Windows version** has been released, while macOS support i
 4. BazaarPlusPlus will automatically generate its configuration file the first time you enter the game
 5. If you need the speed-up feature, return to the Installer and enable it on the plugin settings page.
 
-## FAQ
-
 ## For Developers
 
 The project is built using **C#, .NET, and BepInEx 5**.
+
 The project code is still being organized, and the source code, architecture notes, and development guide will be added gradually.
 
 ## Credits

@@ -54,6 +54,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private TextMesh _brandingText;
     private GameObject _boardCenterMarker;
     private PreviewBoardPresentation _presentation = new PreviewBoardPresentation();
+    private PreviewBoardDebugOptions _debugOptions = new PreviewBoardDebugOptions();
 
     public bool IsAlive => _boardRoot != null;
 
@@ -83,6 +84,15 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         _presentation = presentation ?? new PreviewBoardPresentation();
         RefreshLayout();
+    }
+
+    public void SetDebugOptions(PreviewBoardDebugOptions debugOptions)
+    {
+        if (!IsAlive)
+            return;
+
+        _debugOptions = debugOptions ?? new PreviewBoardDebugOptions();
+        RefreshDebugVisuals();
     }
 
     public void SetVisible(bool visible)
@@ -254,6 +264,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
             return;
 
         RefreshVisuals();
+        RefreshDebugVisuals();
 
         _itemContentRoot.transform.localPosition =
             _presentation.LocalOffset + new Vector3(0f, ContentYOffset, 0f);
@@ -595,6 +606,23 @@ internal sealed class MonsterPreviewBoard : IDisposable
         }
     }
 
+    private void RefreshDebugVisuals()
+    {
+        var debugEnabled = IsDebugVisualEnabled();
+
+        SetActive(_boardCenterMarker, debugEnabled && _debugOptions.ShowAnchorPoint);
+        SetActive(_brandingText?.gameObject, debugEnabled && _debugOptions.ShowLabels);
+
+        for (var index = 0; index < _boardSlotMarkers.Count; index++)
+            SetActive(_boardSlotMarkers[index], debugEnabled && _debugOptions.ShowItemSlots);
+
+        for (var index = 0; index < _skillSlotMarkers.Count; index++)
+            SetActive(_skillSlotMarkers[index], debugEnabled && _debugOptions.ShowSkillSlots);
+
+        for (var index = 0; index < _cardCenterMarkers.Count; index++)
+            SetActive(_cardCenterMarkers[index], debugEnabled && _debugOptions.ShowCardBounds);
+    }
+
     private float GetBoardSlotCenterX(int slotIndex)
     {
         var boardWidth = Mathf.Max(0.01f, _presentation.BoardSize.x);
@@ -660,6 +688,17 @@ internal sealed class MonsterPreviewBoard : IDisposable
         border.transform.localPosition = position;
         border.transform.localRotation = Quaternion.identity;
         border.transform.localScale = scale;
+    }
+
+    private bool IsDebugVisualEnabled()
+    {
+        return _presentation.DebugEnabled && _debugOptions.Enabled;
+    }
+
+    private static void SetActive(GameObject target, bool active)
+    {
+        if (target != null && target.activeSelf != active)
+            target.SetActive(active);
     }
 
     private static GameObject CreatePrimitive(string name, bool isSkill, bool keepCollider = false)

@@ -4,6 +4,14 @@ namespace BazaarPlusPlus;
 
 internal static class KeyBindings
 {
+    internal static class Modifiers
+    {
+        public static bool IsCtrlPressed(Keyboard keyboard)
+        {
+            return keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
+        }
+    }
+
     internal static class Toggle
     {
         public static Key DebugPanel => Key.F2;
