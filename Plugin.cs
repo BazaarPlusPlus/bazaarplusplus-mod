@@ -25,11 +25,16 @@ public class Plugin : BaseUnityPlugin
 
         MonsterDatabase.Load();
         EncounterTracker.Subscribe();
-        gameObject.AddComponent<DebugPanel>();
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewController>();
-        gameObject.AddComponent<MonsterPreviewDebugController>();
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
+
+        if (ModState.IsDebug)
+        {
+            gameObject.AddComponent<DebugPanel>();
+            gameObject.AddComponent<MonsterPreviewDebugController>();
+        }
+
         BppLog.Info("Plugin", "MonsterPreview components attached");
     }
 

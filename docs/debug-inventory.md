@@ -2,13 +2,13 @@
 
 ## Goal
 
-Record the current debug-related pieces in the mod and highlight what is still inconsistent after binding `BppLog.Debug(...)` to `ModState.IsDebug`.
+Record the current debug-related pieces in the mod and track what still needs cleanup after binding `BppLog.Debug(...)` to `ModState.IsDebug`.
 
 ## Current State
 
 ### 0. Current keyboard bindings
 
-The mod currently listens to keyboard input in only two places.
+The mod currently listens to keyboard input in only two runtime UI places.
 
 #### Debug panel keys
 
@@ -20,7 +20,6 @@ The mod currently listens to keyboard input in only two places.
   - `3`: switch to Run section
   - `4`: switch to Encounters section
   - `Tab`: toggle single-section vs all-sections mode
-  - `R`: reset panel state
 
 #### Combat status bar key
 
@@ -30,10 +29,10 @@ The mod currently listens to keyboard input in only two places.
 
 #### Observations
 
-- Key handling is currently hard-coded inline at the call site.
-- There is no central inventory of hotkeys.
-- The code uses physical key names directly, not semantic action names.
-- The current number keys are ambiguous outside the panel context because they mean "select section", not generic number actions.
+- Key handling is no longer hard-coded inline at each call site.
+- A central binding definition already exists in [Game/Input/KeyBindings.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/Input/KeyBindings.cs).
+- `DebugPanel` and `CombatStatusBar` both read semantic bindings from `KeyBindings`.
+- The current number keys are still context-specific because they mean "select debug panel section", not generic number actions.
 
 ### 1. Build-time debug switch
 
@@ -43,40 +42,41 @@ The mod currently listens to keyboard input in only two places.
   - `Debug` build: debug logs are emitted.
   - `Release` build: debug logs are suppressed.
 
-### 2. Debug UI is still always mounted
+### 2. Debug UI mount point
 
-- [Plugin.cs](/Users/yxinyu/codes/BazaarPlusPlus/Plugin.cs) always adds:
+- [Plugin.cs](/Users/yxinyu/codes/BazaarPlusPlus/Plugin.cs) now gates these components behind `ModState.IsDebug`:
   - `DebugPanel`
   - `MonsterPreviewDebugController`
-- These components are not gated by `ModState.IsDebug`.
 
 Result:
-- `Release` build no longer prints debug logs.
-- But debug UI and debug controls still exist at runtime.
+- `Debug` build still gets debug UI and debug controls.
+- `Release` build no longer mounts these debug-only components.
 
 ### 3. Debug panel
 
 - [Game/DebugPanel/DebugPanel.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/DebugPanel/DebugPanel.cs)
 - Current behavior:
-  - Always attached by `Plugin`.
-  - Listens for `F2`, `1-4`, `Tab`, `R`.
+  - Attached by `Plugin` only in debug builds.
+  - Listens for `F2`, `1-4`, `Tab`.
   - Builds runtime snapshots for summary / preview / run / encounter sections.
 
-Problem:
-- This is still a developer-facing tool present in non-debug runtime.
+Notes:
+- This remains a developer-facing tool.
+- The current code path no longer shows a keyboard `R` reset shortcut. The panel still supports `F2`, `1-4`, and `Tab`.
 
 ### 4. Monster preview debug controller
 
 - [Game/MonsterPreview/Debug/MonsterPreviewDebugController.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/MonsterPreview/Debug/MonsterPreviewDebugController.cs)
 - Current behavior:
-  - Always attached by `Plugin`.
+  - Attached by `Plugin` only in debug builds.
   - Creates debug widget UI.
   - Enables preview debug options.
   - Supports anchor tuning and layout tuning.
   - Can switch preview source between monster DB and player hand.
 
-Problem:
-- This is still active debug-only functionality in `Release`.
+Assessment:
+- This is now correctly treated as debug-only at the runtime entry point.
+- The remaining question is architectural separation, not runtime exposure.
 
 ### 5. Preview-board debug model still exists
 
@@ -134,46 +134,23 @@ Assessment:
 
 ### Problem 1
 
-`Debug` logging is now build-gated, but debug UI is not.
-
-Impact:
-- Runtime behavior is inconsistent.
-- `Release` still contains interactive debug controls.
-
-### Problem 2
-
-Debug-only components are mounted unconditionally in `Plugin`.
-
-Impact:
-- Extra runtime surface area in `Release`.
-- Possible accidental exposure of developer tools.
-
-### Problem 3
-
 The monster preview architecture still exposes debug-specific types and flags.
 
 Impact:
 - Not an immediate bug.
 - But it keeps debug concepts mixed into production runtime structures.
 
-### Problem 4
+### Problem 2
 
-Keyboard bindings are scattered and encoded as raw key checks.
+The inventory document can drift from the real code if it is not updated with implementation changes.
 
 Impact:
-- Harder to audit the full mod input surface.
-- Harder to rename or remap shortcuts later.
-- UI code is coupled to specific keys instead of semantic actions.
+- Cleanup priorities become misleading.
+- Follow-up work can target already-solved issues.
 
 ## Recommended Cleanup Order
 
 ### Step 1
-
-Gate `DebugPanel` and `MonsterPreviewDebugController` in [Plugin.cs](/Users/yxinyu/codes/BazaarPlusPlus/Plugin.cs) with `ModState.IsDebug`.
-
-This gives the highest value with the smallest change.
-
-### Step 2
 
 Add defensive guards inside:
 
@@ -185,7 +162,7 @@ Example direction:
 
 This prevents accidental activation even if a component gets attached elsewhere later.
 
-### Step 3
+### Step 2
 
 Re-evaluate whether preview-board debug types should remain always compiled:
 
@@ -198,54 +175,19 @@ Decision options:
 - keep them as internal implementation details
 - or isolate them more clearly under debug-only entry points
 
-### Step 4
+### Step 3
 
-Extract a central `KeyBindings` definition and use semantic action names at call sites.
-
-Recommended direction:
-
-- create a small central type, for example `Game/Input/KeyBindings.cs`
-- define bindings by meaning, not by raw UI wording
-- let UI/controllers query semantic bindings instead of hard-coding `keyboard.f2Key`, `keyboard.f6Key`, etc.
-
-Example shape:
-
-```csharp
-internal static class KeyBindings
-{
-    public static Key ToggleDebugPanel => Key.F2;
-    public static Key SelectDebugSummary => Key.Digit1;
-    public static Key SelectDebugPreview => Key.Digit2;
-    public static Key SelectDebugRun => Key.Digit3;
-    public static Key SelectDebugEncounters => Key.Digit4;
-    public static Key ToggleDebugPanelViewMode => Key.Tab;
-    public static Key ResetDebugPanelState => Key.R;
-    public static Key ToggleCombatStatusBar => Key.F6;
-}
-```
-
-Then the usage sites become semantically clearer:
-
-- `ToggleDebugPanel`
-- `SelectDebugSummary`
-- `ToggleCombatStatusBar`
-
-This is worth doing.
-
-Reasoning:
-- the current key surface is still small, so extraction is cheap
-- the semantic names will make future cleanup easier
-- once debug UI is gated by `ModState.IsDebug`, all debug-only keybindings will also become easier to isolate
+Keep using the existing central key binding definition in [Game/Input/KeyBindings.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/Input/KeyBindings.cs), and update this inventory whenever bindings change.
 
 ## Suggested End State
 
 - `ModState.IsDebug` becomes the single source of truth for developer-facing debug behavior.
 - `BppLog.Debug(...)` stays gated by `ModState.IsDebug`.
-- `DebugPanel` is mounted only in debug builds.
-- `MonsterPreviewDebugController` is mounted only in debug builds.
+- `DebugPanel` is mounted only in debug builds from [Plugin.cs](/Users/yxinyu/codes/BazaarPlusPlus/Plugin.cs).
+- `MonsterPreviewDebugController` is mounted only in debug builds from [Plugin.cs](/Users/yxinyu/codes/BazaarPlusPlus/Plugin.cs).
 - Debug rendering options exist only when a debug controller explicitly enables them.
 - keyboard bindings are defined centrally and referenced by semantic action names instead of raw key fields
 
 ## Summary
 
-The biggest remaining issue is not logging anymore. It is that `Release` still mounts and exposes the debug panel and monster preview debug controller. After that, the next cleanup win is to centralize keyboard bindings behind a small `KeyBindings` abstraction with semantic names.
+The biggest remaining issue is no longer runtime exposure of debug UI. That part is now gated in [Plugin.cs](/Users/yxinyu/codes/BazaarPlusPlus/Plugin.cs). The next cleanup question is architectural: whether monster preview debug-specific types should remain mixed into the production preview pipeline, even though their runtime entry points are now debug-only.
