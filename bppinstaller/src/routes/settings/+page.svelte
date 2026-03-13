@@ -13,6 +13,7 @@
   let loadState: LoadState = 'loading';
 
   let enableNameOverride = false;
+  let enchantPreviewAlwaysShow = true;
   let enableCombatStatusBar = false;
   let speedIdx = 2; // default: 1.00
 
@@ -43,6 +44,7 @@
       }
 
       enableNameOverride = result.values['StreamerMode.EnableNameOverride']?.toLowerCase() === 'true';
+      enchantPreviewAlwaysShow = result.values['EnchantPreview.AlwaysShow']?.toLowerCase() !== 'false';
       enableCombatStatusBar = result.values['CombatStatusBar.Enabled']?.toLowerCase() !== 'false';
       const raw = parseFloat(result.values['CombatStatusBar.SpeedMultiplier'] ?? '1');
       speedIdx = findSpeedIdx(isNaN(raw) ? 1 : raw);
@@ -65,6 +67,11 @@
   async function toggleNameOverride() {
     enableNameOverride = !enableNameOverride;
     await writeValue('StreamerMode', 'EnableNameOverride', String(enableNameOverride));
+  }
+
+  async function toggleEnchantPreviewAlwaysShow() {
+    enchantPreviewAlwaysShow = !enchantPreviewAlwaysShow;
+    await writeValue('EnchantPreview', 'AlwaysShow', String(enchantPreviewAlwaysShow));
   }
 
   async function toggleCombatStatusBar() {
@@ -186,6 +193,26 @@
             onclick={toggleNameOverride}
           >
             {#if enableNameOverride}◆ {t('toggleOn')}{:else}◇ {t('toggleOff')}{/if}
+          </button>
+        </li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">{t('sectionEnchantPreview')}</h2>
+      <ul class="setting-list">
+        <li class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">{t('keyEnchantPreviewAlwaysShow')}</span>
+            <span class="setting-desc">{t('descEnchantPreviewAlwaysShow')}</span>
+          </div>
+          <button
+            class="toggle-btn"
+            class:toggle-on={enchantPreviewAlwaysShow}
+            type="button"
+            onclick={toggleEnchantPreviewAlwaysShow}
+          >
+            {#if enchantPreviewAlwaysShow}◆ {t('toggleOn')}{:else}◇ {t('toggleOff')}{/if}
           </button>
         </li>
       </ul>

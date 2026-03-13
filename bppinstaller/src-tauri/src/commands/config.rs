@@ -14,6 +14,7 @@ pub struct ModConfigReadResult {
 fn default_config() -> HashMap<String, String> {
     let mut map = HashMap::new();
     map.insert("StreamerMode.EnableNameOverride".to_string(), "false".to_string());
+    map.insert("EnchantPreview.AlwaysShow".to_string(), "true".to_string());
     map.insert("CombatStatusBar.Enabled".to_string(), "false".to_string());
     map.insert("CombatStatusBar.SpeedMultiplier".to_string(), "1".to_string());
     map
@@ -21,6 +22,7 @@ fn default_config() -> HashMap<String, String> {
 
 fn build_cfg_content(values: &HashMap<String, String>) -> String {
     let name_override = values.get("StreamerMode.EnableNameOverride").map_or("false", |s| s);
+    let enchant_preview_always_show = values.get("EnchantPreview.AlwaysShow").map_or("true", |s| s);
     let combat_bar = values.get("CombatStatusBar.Enabled").map_or("false", |s| s);
     let speed = values.get("CombatStatusBar.SpeedMultiplier").map_or("1", |s| s);
 
@@ -31,6 +33,13 @@ fn build_cfg_content(values: &HashMap<String, String>) -> String {
          # Setting type: Boolean\n\
          # Default value: false\n\
          EnableNameOverride = {name_override}\n\
+         \n\
+         [EnchantPreview]\n\
+         \n\
+         ## Whether to always show enchant preview text in item tooltips. If disabled, hold Ctrl to show it.\n\
+         # Setting type: Boolean\n\
+         # Default value: true\n\
+         AlwaysShow = {enchant_preview_always_show}\n\
          \n\
          [CombatStatusBar]\n\
          \n\
@@ -170,6 +179,13 @@ mod tests {
         assert_eq!(
             result
                 .values
+                .get("EnchantPreview.AlwaysShow")
+                .map(String::as_str),
+            Some("true")
+        );
+        assert_eq!(
+            result
+                .values
                 .get("CombatStatusBar.Enabled")
                 .map(String::as_str),
             Some("false")
@@ -190,7 +206,7 @@ mod tests {
         fs::create_dir_all(cfg_path.parent().unwrap()).unwrap();
         fs::write(
             &cfg_path,
-            "[CombatStatusBar]\nSpeedMultiplier = 2.00\nEnabled = false\n",
+            "[EnchantPreview]\nAlwaysShow = false\n[CombatStatusBar]\nSpeedMultiplier = 2.00\nEnabled = false\n",
         )
         .unwrap();
 
@@ -199,6 +215,13 @@ mod tests {
                 .unwrap();
 
         assert!(result.config_exists);
+        assert_eq!(
+            result
+                .values
+                .get("EnchantPreview.AlwaysShow")
+                .map(String::as_str),
+            Some("false")
+        );
         assert_eq!(
             result
                 .values

@@ -3,6 +3,7 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { onMount } from 'svelte';
+  import AppModal from '$lib/components/AppModal.svelte';
   import type { DotnetInfo, EnvironmentInfo } from '$lib/types';
   import { locale, handleLocaleToggle } from '$lib/locale';
   import { formatMessage, messages } from '$lib/i18n';
@@ -18,12 +19,23 @@
   let actionBusy: 'idle' | 'detect' | 'install' | 'uninstall' = 'idle';
   let actionMenuOpen = false;
   const STEAM_BAZAAR_URL = 'steam://rungameid/1617400';
+  let showInstallModal = false;
 
   $: t = (key: keyof typeof messages.en, params?: Record<string, string | number>): string =>
     formatMessage($locale, key, params);
 
   function effectiveGamePath(): string {
     return customGamePath || env?.game_path || '';
+  }
+
+  function requestInstall() {
+    if (!canInstall) return;
+    showInstallModal = true;
+  }
+
+  async function confirmInstall() {
+    showInstallModal = false;
+    await installBundled();
   }
 
   async function verifyGamePath(path: string) {
@@ -176,6 +188,53 @@
 </svelte:head>
 
 <main class="shell">
+  <AppModal
+    open={showInstallModal}
+    eyebrow="BazaarPlusPlus"
+    title={$locale === 'zh' ? '开始安装' : 'Install BazaarPlusPlus'}
+    bodyClass="install-preview"
+    confirmText={$locale === 'zh' ? '确认安装' : 'Install'}
+    onConfirm={confirmInstall}
+  >
+    <div class="feature-list">
+      <article class="feature-card">
+        <div class="feature-icon">I</div>
+        <div class="feature-copy">
+          <h3>{$locale === 'zh' ? '怪物预览增强' : 'Enhanced Monster Preview'}</h3>
+          <p>
+            {$locale === 'zh'
+              ? '右键点击查看怪物棋盘与技能信息。'
+              : 'Right-click to inspect the monster board and skill details.'}
+          </p>
+        </div>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">II</div>
+        <div class="feature-copy">
+          <h3>{$locale === 'zh' ? '附魔预览增强' : 'Enhanced Enchantment Preview'}</h3>
+          <p>
+            {$locale === 'zh'
+              ? '默认直接显示附魔效果预览，也可以在设置中调整为按住 Ctrl 时显示。'
+              : 'Enchantment effects are shown directly by default, and can be changed in Settings to only appear while holding Ctrl.'}
+          </p>
+        </div>
+      </article>
+
+      <article class="feature-card feature-card-wide">
+        <div class="feature-icon">III</div>
+        <div class="feature-copy">
+          <h3>{$locale === 'zh' ? '战斗状态条' : 'Combat Status Bar'}</h3>
+          <p>
+            {$locale === 'zh'
+              ? '可选功能，显示战斗时间、帧数和速度控制。\n需启动一次游戏，回到 BazaarPlusPlus 设置中开启，然后重启游戏生效；游戏内可按 F6 快速切换显示。'
+              : 'Optional feature showing battle time, frame count, and speed controls. Launch the game once first, then enable it in Settings and restart the game to apply. Press F6 in-game to toggle it quickly.'}
+          </p>
+        </div>
+      </article>
+    </div>
+  </AppModal>
+
   <header class="header">
     <div class="corner tl" aria-hidden="true">
       <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
@@ -351,7 +410,7 @@
           </button>
 
           <div class="action-primary">
-            <button class="install-btn" disabled={!canInstall} onclick={installBundled} type="button">
+            <button class="install-btn" disabled={!canInstall} onclick={requestInstall} type="button">
               {#if actionBusy === 'install'}
                 <span class="spinner dark" aria-hidden="true"></span>
                 {t('actionInstalling')}
@@ -403,6 +462,63 @@
 </main>
 
 <style>
+  .feature-list {
+    display: grid;
+    gap: 0.7rem;
+    text-align: left;
+  }
+
+  .feature-card {
+    display: grid;
+    grid-template-columns: 2.25rem 1fr;
+    gap: 0.8rem;
+    align-items: start;
+    padding: 0.9rem;
+    border: 1px solid rgba(200, 148, 55, 0.18);
+    border-radius: 3px;
+    background:
+      linear-gradient(180deg, rgba(200, 148, 55, 0.08), rgba(200, 148, 55, 0.02)),
+      rgba(12, 8, 4, 0.82);
+    box-shadow: inset 0 0 0 1px rgba(255, 198, 98, 0.04);
+  }
+
+  .feature-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(214, 169, 84, 0.28);
+    border-radius: 999px;
+    background: radial-gradient(circle at 30% 30%, rgba(232, 200, 122, 0.22), rgba(158, 92, 30, 0.14));
+    color: rgba(232, 200, 122, 0.92);
+    font-family: 'Cinzel', serif;
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+  }
+
+  .feature-copy {
+    display: grid;
+    gap: 0.28rem;
+    min-width: 0;
+  }
+
+  .feature-copy h3 {
+    margin: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(233, 215, 182, 0.92);
+  }
+
+  .feature-copy p {
+    margin: 0;
+    font-size: 0.84rem;
+    line-height: 1.55;
+    color: rgba(228, 216, 191, 0.72);
+    white-space: pre-line;
+  }
+
   .shell {
     width: 100%;
     max-width: 560px;

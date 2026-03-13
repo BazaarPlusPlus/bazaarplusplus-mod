@@ -59,6 +59,9 @@ export type MessageKey =
   | 'sectionStreamerMode'
   | 'keyEnableNameOverride'
   | 'descEnableNameOverride'
+  | 'sectionEnchantPreview'
+  | 'keyEnchantPreviewAlwaysShow'
+  | 'descEnchantPreviewAlwaysShow'
   | 'sectionCombatStatusBar'
   | 'keyCombatStatusBarEnabled'
   | 'descCombatStatusBarEnabled'
@@ -138,6 +141,9 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     sectionStreamerMode: 'Streamer Mode',
     keyEnableNameOverride: 'Anonymous Display',
     descEnableNameOverride: "Set your in-game display name to Anonymous.",
+    sectionEnchantPreview: 'Enchant Preview',
+    keyEnchantPreviewAlwaysShow: 'Always Show',
+    descEnchantPreviewAlwaysShow: 'Show enchant preview text by default. Turn this off to require holding Ctrl.',
     sectionCombatStatusBar: 'Combat Status Bar',
     keyCombatStatusBarEnabled: 'Enabled',
     descCombatStatusBarEnabled: 'Show elapsed time and speed controls during combat',
@@ -214,6 +220,9 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     sectionStreamerMode: '主播模式',
     keyEnableNameOverride: '匿名显示',
     descEnableNameOverride: '将你的游戏内显示名称设为 Anonymous。',
+    sectionEnchantPreview: '附魔预览',
+    keyEnchantPreviewAlwaysShow: '默认显示',
+    descEnchantPreviewAlwaysShow: '默认显示附魔预览文本。关闭后改为按住 Ctrl 才显示。',
     sectionCombatStatusBar: '战斗状态栏',
     keyCombatStatusBarEnabled: '启用',
     descCombatStatusBarEnabled: '战斗中显示耗时与速度控制栏',
