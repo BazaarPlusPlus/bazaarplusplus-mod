@@ -72,8 +72,8 @@ export type MessageKey =
   | 'modInstalledHint'
   | 'settingsMissingPathTitle'
   | 'settingsMissingPathBody'
-  | 'settingsMissingConfigTitle'
-  | 'settingsMissingConfigBody'
+  | 'settingsDefaultConfigTitle'
+  | 'settingsDefaultConfigBody'
   | 'settingsLoadErrorTitle'
   | 'settingsLoadErrorBody'
   | 'settingsDecreaseSpeed'
@@ -154,8 +154,8 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     modInstalledHint: 'Open Settings to configure and customize BazaarPlusPlus',
     settingsMissingPathTitle: 'Game Path Required',
     settingsMissingPathBody: 'Return to the installer and run detection before opening Settings.',
-    settingsMissingConfigTitle: 'Config Not Generated Yet',
-    settingsMissingConfigBody: 'Run BazaarPlusPlus in-game once to generate the config file, then reopen Settings.',
+    settingsDefaultConfigTitle: 'Using Default Settings',
+    settingsDefaultConfigBody: 'No config file was found yet. Any change you make here will create BazaarPlusPlus.cfg automatically.',
     settingsLoadErrorTitle: 'Unable to Read Settings',
     settingsLoadErrorBody: 'Make sure BazaarPlusPlus is installed correctly, then try opening Settings again.',
     settingsDecreaseSpeed: 'Decrease speed',
@@ -233,8 +233,8 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     modInstalledHint: '打开设置以配置和自定义 BazaarPlusPlus',
     settingsMissingPathTitle: '需要游戏路径',
     settingsMissingPathBody: '请先返回安装器执行检测，再打开设置页面。',
-    settingsMissingConfigTitle: '配置尚未生成',
-    settingsMissingConfigBody: '请先进入游戏运行一次 BazaarPlusPlus，生成配置文件后再回来修改设置。',
+    settingsDefaultConfigTitle: '\u4f7f\u7528\u9ed8\u8ba4\u8bbe\u7f6e',
+    settingsDefaultConfigBody: '\u5c1a\u672a\u68c0\u6d4b\u5230\u914d\u7f6e\u6587\u4ef6\u3002\u4f60\u5728\u8fd9\u91cc\u4f5c\u51fa\u7684\u4efb\u4f55\u4fee\u6539\u90fd\u4f1a\u81ea\u52a8\u521b\u5efa BazaarPlusPlus.cfg\u3002',
     settingsLoadErrorTitle: '无法读取设置',
     settingsLoadErrorBody: '请确认 BazaarPlusPlus 已正确安装，然后重新打开设置页面。',
     settingsDecreaseSpeed: '降低速度',
