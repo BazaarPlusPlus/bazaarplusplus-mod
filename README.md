@@ -1,84 +1,112 @@
 # BazaarPlusPlus
 
-BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 增强模组，专注于提供更清晰、更顺手的局内信息展示。  
+BazaarPlusPlus 是一个面向 **《The Bazaar》** 的 **BepInEx 增强模组**，专注于提供更清晰、更顺手的局内信息展示，提升游戏过程中信息获取与决策的效率。
 
-BazaarPlusPlus is a BepInEx enhancement mod for *The Bazaar*, focused on making in-game information easier to read and act on.
+## 功能亮点
 
-## Features / 功能亮点
+**战斗状态条**
+提供更直观的战斗播放状态与节奏信息，帮助玩家更清楚地理解战斗节奏。
 
-- 战斗状态条：提供更直观的战斗播放状态与节奏信息。  
+**怪物预览优化**
+在怪物预览界面支持右键查看敌方卡牌与技能信息，补充游戏内默认未展示的内容。
 
-Combat status bar: adds clearer playback and combat pacing information.
-- 怪物预览优化：右键预览查看怪物的卡牌与技能信息。  
+**附魔与词条预览增强**
+扩展物品附魔相关的可见信息，使部分原本隐藏或不完整的词条更加直观。
 
-Monster preview improvements: right-click the preview to view enemy cards and skill information.
-- 附魔与词条预览增强：补充物品附魔相关的可见信息。  
+## 安装
 
-Enchant and item preview improvements: expands visible information for supported item and enchant views.
+使用发布包内附带的 **安装器（Installer）**。
+当前仅发布了 **Windows 版本**，macOS 仍在适配中。
 
-## Install / 安装
+### Windows 安装步骤
 
-推荐优先使用发布包内附带的安装器。当前发布包主要提供 Windows 安装流程；macOS 仍在适配中。  
+1. 下载最新发布包
+2. 运行安装器并选择你的 **The Bazaar 游戏目录**
+3. 安装完成后重新启动 Steam 和游戏
+4. 首次进入游戏时，BazaarPlusPlus 会自动生成配置文件
+5. 如果需要倍速功能，请返回 Installer，在插件配置页开启。
+## 常见问题
 
-The recommended option is the installer included in the release package. The current release primarily supports installation on Windows; macOS support is still in progress, and the installer is not yet considered reliable there.
+## 开发者
 
-Windows 推荐安装流程：  
+项目基于 **C#、.NET 和 BepInEx 5**。
+项目相关代码仍在整理中，后续会逐步补充源码，架构说明与开发指南。
 
-Recommended Windows installation flow:
+## 致谢
 
-1. 下载最新发布包。  
-   Download the latest release package.
-2. 运行安装器，并选择你的 *The Bazaar* 游戏目录。  
-   Run the installer and select your *The Bazaar* game directory.
-3. 安装完成后，重新启动 Steam 和游戏。  
-   After installation finishes, restart Steam and the game.
-4. 首次进入游戏后，BazaarPlusPlus 会自动生成配置文件。  
-   BazaarPlusPlus will generate its configuration file automatically the first time you launch the game.
+### 灵感来源
 
-## FAQ / 常见问题
+以下项目为 BazaarPlusPlus 提供了重要的参考：
 
-**配置文件在哪里？ / Where is the config file?**  
+* [https://github.com/Duangi/BazaarHelper](https://github.com/Duangi/BazaarHelper)
+* [https://github.com/oceanseth/BazaarPlannerMod](https://github.com/oceanseth/BazaarPlannerMod)
 
-配置文件位于 `BepInEx/config/BazaarPlusPlus.cfg`。 
-如果文件还不存在，请先启动一次游戏。你也可以直接在 installer 的设置页中调整相关配置。  
+### 数据来源
 
-The config file is located at `BepInEx/config/BazaarPlusPlus.cfg`. If it does not exist yet, launch the game once first. You can also adjust the relevant options directly from the installer's Settings page.
+部分怪物与相关展示信息参考自：
 
-**安装后没有生效怎么办？ / What if the mod does not seem active after install?**  
+* [https://bazaardb.gg](https://bazaardb.gg)
 
-先确认安装目录是否指向正确的《The Bazaar》目录，然后检查 `BepInEx` 是否已正确放入游戏目录，再重新启动游戏。  
+### 核心依赖
 
-First verify that the selected game path is the correct *The Bazaar* directory, then check that `BepInEx` was placed into the game folder correctly, and restart the game.
+BazaarPlusPlus 基于以下项目运行：
 
-## For Developers / 开发者
+* [https://github.com/BepInEx/BepInEx](https://github.com/BepInEx/BepInEx)
 
-项目基于 C#、.NET 和 BepInEx 5。当前开发相关内容仍在整理中，后续会逐步补充更完整的源码与说明。  
-  
-The project is built with C#, .NET, and BepInEx 5. Developer-facing source structure and documentation are still being organized, and more complete code and setup notes will be added over time.
+---
 
-## Credits / 致谢
+# BazaarPlusPlus
 
-**Inspired By / 灵感来源**  
+BazaarPlusPlus is a **BepInEx enhancement mod for *The Bazaar*** focused on providing clearer, more convenient in-run information displays, improving the efficiency of information gathering and decision-making during gameplay.
 
-以下项目为 BazaarPlusPlus 提供了重要灵感与参考：  
+## Features
 
-These projects provided important inspiration and reference for BazaarPlusPlus:
+**Combat Status Bar**
+Provides more intuitive combat playback status and pacing information, helping players understand the flow of battle more clearly.
 
-- [Duangi/BazaarHelper](https://github.com/Duangi/BazaarHelper)
-- [oceanseth/BazaarPlannerMod](https://github.com/oceanseth/BazaarPlannerMod)
+**Monster Preview Improvements**
+Supports right-clicking in the monster preview interface to inspect enemy cards and skill information, supplementing content not shown by default in the game.
 
-**Data Source / 数据来源**  
+**Enchant & Modifier Preview Enhancements**
+Expands the visible information related to item enchants, making some originally hidden or incomplete modifiers more intuitive.
 
-部分怪物与相关展示信息整理参考了 BazaarDB。  
+## Installation
 
-Some monster and related display data is informed by BazaarDB.
+Use the **installer included in the release package**.
+Currently, only the **Windows version** has been released, while macOS support is still being adapted.
 
-- [BazaarDB](https://bazaardb.gg)
+### Windows Installation Steps
 
-**Core Dependency / 核心依赖**  
+1. Download the latest release package
+2. Run the installer and select your **The Bazaar game directory**
+3. Restart Steam and the game after installation
+4. BazaarPlusPlus will automatically generate its configuration file the first time you enter the game
+5. If you need the speed-up feature, return to the Installer and enable it on the plugin settings page.
 
-BazaarPlusPlus 基于 BepInEx 运行。  
+## FAQ
 
-BazaarPlusPlus runs on top of BepInEx.
+## For Developers
 
-- [BepInEx](https://github.com/BepInEx/BepInEx)
+The project is built using **C#, .NET, and BepInEx 5**.
+The project code is still being organized, and the source code, architecture notes, and development guide will be added gradually.
+
+## Credits
+
+### Inspiration
+
+These projects provided important inspiration and references:
+
+* [https://github.com/Duangi/BazaarHelper](https://github.com/Duangi/BazaarHelper)
+* [https://github.com/oceanseth/BazaarPlannerMod](https://github.com/oceanseth/BazaarPlannerMod)
+
+### Data Source
+
+Some monster and related display information references:
+
+* [https://bazaardb.gg](https://bazaardb.gg)
+
+### Core Dependency
+
+BazaarPlusPlus runs on top of:
+
+* [https://github.com/BepInEx/BepInEx](https://github.com/BepInEx/BepInEx)
