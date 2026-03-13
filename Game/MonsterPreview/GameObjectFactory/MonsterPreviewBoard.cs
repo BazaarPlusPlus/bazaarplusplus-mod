@@ -611,7 +611,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
         var debugEnabled = IsDebugVisualEnabled();
 
         SetActive(_boardCenterMarker, debugEnabled && _debugOptions.ShowAnchorPoint);
-        SetActive(_brandingText?.gameObject, debugEnabled && _debugOptions.ShowLabels);
+        SetActive(_brandingText?.gameObject, true);
 
         for (var index = 0; index < _boardSlotMarkers.Count; index++)
             SetActive(_boardSlotMarkers[index], debugEnabled && _debugOptions.ShowItemSlots);
