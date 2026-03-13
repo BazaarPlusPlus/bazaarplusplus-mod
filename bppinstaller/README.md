@@ -1,11 +1,37 @@
-# Tauri + SvelteKit + TypeScript
+# BazaarPlusPlus Installer
 
-This template should help get you started developing with Tauri, SvelteKit and TypeScript in Vite.
+Desktop installer for BazaarPlusPlus, built with Tauri, SvelteKit, and TypeScript.
+
+## Development
+
+Requirements:
+
+- Node.js and npm
+- Rust toolchain
+
+Start the desktop app in development mode:
+
+```bash
+./build.sh
+```
+
+Or run the underlying commands manually:
+
+```bash
+npm install
+npm run tauri dev
+```
+
+## Build
+
+Build the Windows executable and NSIS installer:
+
+```bash
+./build.sh --prod
+```
+
+Artifacts are written under `src-tauri/target/release/`.
 
 ## Known Limitations
 
-- macOS: if Steam is not auto-detected and the user manually selects the game directory, the installer can still copy or remove BazaarPlusPlus files, but it will not update Steam launch options automatically in this release.
-
-## Recommended IDE Setup
-
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+- On macOS, the current blocker is BepInEx not loading correctly, so the installer is not considered working there yet.
