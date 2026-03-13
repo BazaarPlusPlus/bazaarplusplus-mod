@@ -4,10 +4,13 @@
   export let title = '';
   export let body = '';
   export let confirmText = 'OK';
+  export let showConfirm = true;
+  export let confirmDisabled = false;
   export let onConfirm: () => void = () => {};
   export let bodyClass = '';
 
   function handleConfirm() {
+    if (confirmDisabled) return;
     onConfirm();
   }
 </script>
@@ -31,9 +34,16 @@
           <slot />
         </div>
       {/if}
-      <button class="modal-confirm" type="button" onclick={handleConfirm}>
-        {confirmText}
-      </button>
+      {#if showConfirm}
+        <button
+          class="modal-confirm"
+          type="button"
+          onclick={handleConfirm}
+          disabled={confirmDisabled}
+        >
+          {confirmText}
+        </button>
+      {/if}
     </div>
   </div>
 {/if}
@@ -111,6 +121,13 @@
   .modal-confirm:hover {
     transform: translateY(-1px);
     box-shadow: 0 0 0 1px rgba(255, 198, 98, 0.2) inset, 0 6px 30px rgba(170, 100, 25, 0.45);
+  }
+
+  .modal-confirm:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 0 0 1px rgba(255, 198, 98, 0.14) inset, 0 4px 22px rgba(170, 100, 25, 0.18);
   }
 
   .modal-confirm:focus-visible {

@@ -8,10 +8,11 @@
   import { locale, handleLocaleToggle } from '$lib/locale';
 
   const SPEED_STEPS = [0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0];
-  type LoadState = 'loading' | 'ready' | 'missing-path' | 'missing-config' | 'error';
+  type LoadState = 'loading' | 'ready' | 'missing-path' | 'error';
 
   let gamePath = '';
   let loadState: LoadState = 'loading';
+  let configExists = false;
 
   let enableNameOverride = false;
   let enchantPreviewAlwaysShow = true;
@@ -40,11 +41,7 @@
 
     try {
       const result = await invoke<ModConfigReadResult>('read_mod_config', { gamePath });
-      if (!result.config_exists) {
-        loadState = 'missing-config';
-        return;
-      }
-
+      configExists = result.config_exists;
       enableNameOverride = result.values['StreamerMode.EnableNameOverride']?.toLowerCase() === 'true';
       enchantPreviewAlwaysShow = result.values['EnchantPreview.AlwaysShow']?.toLowerCase() !== 'false';
       enableCombatStatusBar = result.values['CombatStatusBar.Enabled']?.toLowerCase() !== 'false';
@@ -87,6 +84,16 @@
     }
   }
 
+  function closeCombatStatusBarRestartModal() {
+    showCombatStatusBarRestartModal = false;
+  }
+
+  function handleRestartModalKeydown(event: KeyboardEvent) {
+    if (!showCombatStatusBarRestartModal || event.key !== 'F6') return;
+    event.preventDefault();
+    closeCombatStatusBarRestartModal();
+  }
+
   async function stepSpeed(delta: number) {
     const next = speedIdx + delta;
     if (next < 0 || next >= SPEED_STEPS.length) return;
@@ -110,13 +117,13 @@
   eyebrow="Combat Status Bar"
   title={$locale === 'zh' ? '需要重启游戏' : 'Restart Required'}
   body={$locale === 'zh'
-    ? '打开控制条后，需要重启游戏才能生效。'
-    : 'After enabling the combat status bar, restart the game for the change to take effect.'}
-  confirmText="OK"
-  onConfirm={() => {
-    showCombatStatusBarRestartModal = false;
-  }}
+    ? '启用战斗状态条后，需要重启游戏才能生效\n游戏内可按 F6 切换显示；请按 F6 关闭当前弹窗'
+    : 'After enabling the combat status bar, restart the game for the change to take effect.\nPress F6 in-game to toggle it; press F6 to close this dialog.'}
+  showConfirm={false}
+  onConfirm={closeCombatStatusBarRestartModal}
 />
+
+<svelte:window onkeydown={handleRestartModalKeydown} />
 
 <main class="shell">
   <header class="header">
@@ -181,8 +188,6 @@
       <h2 class="section-title">
         {#if loadState === 'missing-path'}
           {t('settingsMissingPathTitle')}
-        {:else if loadState === 'missing-config'}
-          {t('settingsMissingConfigTitle')}
         {:else}
           {t('settingsLoadErrorTitle')}
         {/if}
@@ -190,14 +195,19 @@
       <p class="state-body">
         {#if loadState === 'missing-path'}
           {t('settingsMissingPathBody')}
-        {:else if loadState === 'missing-config'}
-          {t('settingsMissingConfigBody')}
         {:else}
           {t('settingsLoadErrorBody')}
         {/if}
       </p>
     </section>
   {:else}
+    {#if !configExists}
+      <section class="card state-card">
+        <h2 class="section-title">{t('settingsDefaultConfigTitle')}</h2>
+        <p class="state-body">{t('settingsDefaultConfigBody')}</p>
+      </section>
+    {/if}
+
     <!-- StreamerMode -->
     <section class="card">
       <h2 class="section-title">{t('sectionStreamerMode')}</h2>

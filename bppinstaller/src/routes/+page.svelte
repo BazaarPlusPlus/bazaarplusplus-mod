@@ -20,9 +20,34 @@
   let actionMenuOpen = false;
   const STEAM_BAZAAR_URL = 'steam://rungameid/1617400';
   let showInstallModal = false;
+  let installAcknowledged = false;
+  const installDebugMode =
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('debug-install') === '1';
 
   $: t = (key: keyof typeof messages.en, params?: Record<string, string | number>): string =>
     formatMessage($locale, key, params);
+
+  function hasTauriRuntime(): boolean {
+    return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  }
+
+  const isDebugInstallPreview = installDebugMode && !hasTauriRuntime();
+
+  function applyInstallDebugState() {
+    env = {
+      steam_path: 'C:\\Program Files (x86)\\Steam',
+      game_path: 'C:\\Games\\The Bazaar',
+      dotnet_version: '9.0.0',
+      dotnet_ok: true,
+      bepinex_installed: false,
+      bpp_version: null
+    };
+    dotnetState = 'found';
+    bazaarFound = true;
+    bazaarInvalid = false;
+  }
 
   function effectiveGamePath(): string {
     return customGamePath || env?.game_path || '';
@@ -30,10 +55,12 @@
 
   function requestInstall() {
     if (!canInstall) return;
+    installAcknowledged = false;
     showInstallModal = true;
   }
 
   async function confirmInstall() {
+    if (!installAcknowledged) return;
     showInstallModal = false;
     await installBundled();
   }
@@ -62,6 +89,11 @@
 
   async function detectEnvironment() {
     if (actionBusy !== 'idle') return;
+
+    if (isDebugInstallPreview) {
+      applyInstallDebugState();
+      return;
+    }
 
     actionBusy = 'detect';
     dotnetState = 'detecting';
@@ -125,6 +157,14 @@
   async function installBundled() {
     if (!canInstall) return;
 
+    if (isDebugInstallPreview) {
+      actionBusy = 'install';
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+      env = env ? { ...env, bpp_version: 'debug-preview' } : env;
+      actionBusy = 'idle';
+      return;
+    }
+
     actionBusy = 'install';
     try {
       await invoke('install_bepinex', { gamePath: effectiveGamePath() });
@@ -169,7 +209,8 @@
   $: hasPath = Boolean(customGamePath || env?.game_path);
   $: modInstalled = Boolean(env?.bpp_version);
   $: isBusy = actionBusy !== 'idle';
-  $: canInstall = !isBusy && dotnetState !== 'idle' && bazaarFound && hasPath;
+  $: installPrereqsMet = dotnetState !== 'idle' && bazaarFound && hasPath;
+  $: canInstall = !isBusy && (installPrereqsMet || isDebugInstallPreview);
   $: canLaunchGame = !isBusy && bazaarFound;
   $: dotnetDownloadUrl = $locale === 'zh'
     ? 'https://dotnet.microsoft.com/zh-cn/download'
@@ -194,6 +235,7 @@
     title={$locale === 'zh' ? '开始安装' : 'Install BazaarPlusPlus'}
     bodyClass="install-preview"
     confirmText={$locale === 'zh' ? '确认安装' : 'Install'}
+    confirmDisabled={!installAcknowledged}
     onConfirm={confirmInstall}
   >
     <div class="feature-list">
@@ -203,7 +245,7 @@
           <h3>{$locale === 'zh' ? '怪物预览增强' : 'Enhanced Monster Preview'}</h3>
           <p>
             {$locale === 'zh'
-              ? '右键点击查看怪物棋盘与技能信息。'
+              ? '右键点击查看怪物棋盘与技能信息'
               : 'Right-click to inspect the monster board and skill details.'}
           </p>
         </div>
@@ -213,11 +255,20 @@
         <div class="feature-icon">II</div>
         <div class="feature-copy">
           <h3>{$locale === 'zh' ? '附魔预览增强' : 'Enhanced Enchantment Preview'}</h3>
-          <p>
-            {$locale === 'zh'
-              ? '默认直接显示附魔效果预览，也可以在设置中调整为按住 Ctrl 时显示。'
-              : 'Enchantment effects are shown directly by default, and can be changed in Settings to only appear while holding Ctrl.'}
-          </p>
+          {#if $locale === 'zh'}
+            <p>
+              默认直接显示附魔效果预览
+              <br />
+              可在设置中调整为按住 <span class="feature-hotkey feature-keycap">Ctrl</span> 时显示。
+            </p>
+          {:else}
+            <p>
+              Enchantment results are shown directly by default.
+              <br />
+              You can also switch to showing them only while holding
+              <span class="feature-hotkey feature-keycap">Ctrl</span>.
+            </p>
+          {/if}
         </div>
       </article>
 
@@ -225,14 +276,45 @@
         <div class="feature-icon">III</div>
         <div class="feature-copy">
           <h3>{$locale === 'zh' ? '战斗状态条' : 'Combat Status Bar'}</h3>
-          <p>
-            {$locale === 'zh'
-              ? '可选功能，显示战斗时间、帧数和速度控制。\n需启动一次游戏，回到 BazaarPlusPlus 设置中开启，然后重启游戏生效；游戏内可按 F6 快速切换显示。'
-              : 'Optional feature showing battle time, frame count, and speed controls. Launch the game once first, then enable it in Settings and restart the game to apply. Press F6 in-game to toggle it quickly.'}
-          </p>
+          {#if $locale === 'zh'}
+            <p>
+              可选功能，显示战斗时间、帧数和速度控制
+            </p>
+            <p class="feature-callout">
+              <span class="feature-callout-line">
+                首次使用需在 <span class="feature-emphasis">BazaarPlusPlus 设置中开启</span>
+              </span>
+              <span class="feature-callout-line">
+                游戏内可按 <span class="feature-hotkey">F6</span> 快速切换显示
+              </span>
+            </p>
+          {:else}
+            <p>
+              Optional feature showing battle time, frame count, and speed controls.
+              <br />
+              Launch the game once, enable it in BazaarPlusPlus Settings, then restart the game
+              to apply. Press <span class="feature-hotkey">F6</span> in-game to toggle it quickly.
+            </p>
+            <p class="feature-callout">
+              <span class="feature-callout-line">Enable it in BazaarPlusPlus Settings</span>
+              <span class="feature-callout-line">
+                Press <span class="feature-hotkey">F6</span> in-game to toggle it quickly
+              </span>
+            </p>
+          {/if}
         </div>
       </article>
     </div>
+
+    <label class="install-acknowledge">
+      <input class="install-acknowledge-input" bind:checked={installAcknowledged} type="checkbox" />
+      <span class="install-acknowledge-box" aria-hidden="true"></span>
+      <span>
+        {$locale === 'zh'
+          ? '我已了解部分功能需安装后在设置中手动开启'
+          : 'I understand that some features need to be enabled later in BazaarPlusPlus Settings after installation.'}
+      </span>
+    </label>
   </AppModal>
 
   <header class="header">
@@ -420,7 +502,6 @@
                 ✦ {t('actionInstall')}
               {/if}
             </button>
-
             <div class="menu-wrap">
               <button
                 class="secondary-btn menu-trigger"
@@ -449,7 +530,7 @@
         </div>
 
         <button class="secondary-btn launch-btn" type="button" onclick={launchGame} disabled={!canLaunchGame}>
-          {$locale === 'zh' ? '启动游戏' : 'Launch Game'}
+          {$locale === 'zh' ? '\u542f\u52a8\u6e38\u620f' : 'Launch Game'}
         </button>
       </div>
     </div>
@@ -517,6 +598,140 @@
     line-height: 1.55;
     color: rgba(228, 216, 191, 0.72);
     white-space: pre-line;
+  }
+
+  .feature-callout {
+    display: grid;
+    gap: 0.22rem;
+    margin-top: 0.08rem;
+    padding: 0.32rem 0.48rem;
+    border: 1px solid rgba(240, 201, 120, 0.1);
+    border-radius: 3px;
+    background: linear-gradient(180deg, rgba(240, 201, 120, 0.035), rgba(240, 201, 120, 0.01));
+    color: rgba(228, 216, 191, 0.56);
+    font-size: 0.72rem;
+    line-height: 1.4;
+  }
+
+  .feature-callout-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .feature-emphasis {
+    color: rgba(246, 216, 146, 0.88);
+    font-weight: 600;
+  }
+
+  .feature-hotkey {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    padding: 0.05rem 0.34rem;
+    border: 1px solid rgba(240, 201, 120, 0.36);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(240, 201, 120, 0.12), rgba(158, 92, 30, 0.1));
+    box-shadow: 0 0 0 1px rgba(255, 198, 98, 0.05) inset;
+    color: #f7d995;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.78em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  .feature-keycap {
+    padding: 0.1rem 0.46rem 0.14rem;
+    border-radius: 0.45rem;
+    background: linear-gradient(180deg, rgba(255, 227, 156, 0.22), rgba(122, 67, 16, 0.16));
+    box-shadow:
+      0 1px 0 rgba(255, 240, 196, 0.2) inset,
+      0 -1px 0 rgba(72, 37, 8, 0.34) inset,
+      0 2px 8px rgba(0, 0, 0, 0.22);
+    color: #ffe6af;
+    font-size: 0.82em;
+    letter-spacing: 0.05em;
+  }
+
+  .install-acknowledge {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 0.7rem;
+    align-items: start;
+    padding: 0.8rem 0.88rem;
+    border: 1px solid rgba(200, 148, 55, 0.18);
+    border-radius: 4px;
+    background:
+      linear-gradient(180deg, rgba(200, 148, 55, 0.055), rgba(200, 148, 55, 0.015)),
+      rgba(12, 8, 4, 0.78);
+    box-shadow: inset 0 0 0 1px rgba(255, 198, 98, 0.04);
+    text-align: left;
+    color: rgba(228, 216, 191, 0.78);
+    font-size: 0.77rem;
+    line-height: 1.45;
+    cursor: pointer;
+  }
+
+  .install-acknowledge-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .install-acknowledge-box {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin-top: 0.08rem;
+    border: 1px solid rgba(244, 227, 188, 0.58);
+    border-radius: 0.28rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+    box-shadow:
+      0 0 0 1px rgba(255, 198, 98, 0.05) inset,
+      0 2px 10px rgba(0, 0, 0, 0.16);
+    position: relative;
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease,
+      box-shadow 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  .install-acknowledge-box::after {
+    content: '';
+    position: absolute;
+    left: 0.33rem;
+    top: 0.14rem;
+    width: 0.32rem;
+    height: 0.62rem;
+    border-right: 2px solid transparent;
+    border-bottom: 2px solid transparent;
+    transform: rotate(45deg);
+    transition: border-color 0.15s ease;
+  }
+
+  .install-acknowledge-input:checked + .install-acknowledge-box {
+    border-color: rgba(240, 201, 120, 0.62);
+    background: linear-gradient(180deg, rgba(212, 160, 64, 0.28), rgba(158, 92, 30, 0.22));
+    box-shadow:
+      0 0 0 1px rgba(255, 198, 98, 0.12) inset,
+      0 4px 14px rgba(170, 100, 25, 0.24);
+  }
+
+  .install-acknowledge-input:checked + .install-acknowledge-box::after {
+    border-color: #fff2ca;
+  }
+
+  .install-acknowledge:hover .install-acknowledge-box {
+    border-color: rgba(255, 214, 140, 0.8);
+    transform: translateY(-1px);
+  }
+
+  .install-acknowledge-input:focus-visible + .install-acknowledge-box {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
   }
 
   .shell {
@@ -955,6 +1170,8 @@
     flex: 1;
     min-width: 0;
     display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
     gap: 0.5rem;
     position: relative;
   }
@@ -1080,7 +1297,9 @@
   }
 
   .install-btn {
-    width: 100%;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
     padding: 0.95rem 1rem;
     font-family: 'Cinzel', serif;
     font-size: 0.72rem;
@@ -1155,7 +1374,7 @@
   }
 
   @media (max-width: 520px) {
-    .shell { padding: 1rem 0.85rem 1.5rem; }
+.shell { padding: 1rem 0.85rem 1.5rem; }
     .header { padding: 1.2rem 1rem 1rem; }
     .action-row,
     .action-primary {
