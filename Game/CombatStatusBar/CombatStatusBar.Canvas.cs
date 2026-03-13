@@ -7,9 +7,9 @@ namespace BazaarPlusPlus;
 
 internal sealed partial class CombatStatusBar
 {
-    private const float BarHeight = 78f;
-    private const float BarBottomMargin = 16f;
-    private const float SegmentSpacing = 2f;
+    private const float BarHeight = 60f;
+    private const float BarBottomMargin = 0f;
+    private const float SegmentSpacing = 4f;
     private const int CanvasSortingOrder = 10;
 
     private static Sprite? _roundedSprite;
@@ -84,7 +84,7 @@ internal sealed partial class CombatStatusBar
         _barRoot.anchorMax = new Vector2(0.5f, 0f);
         _barRoot.pivot = new Vector2(0.5f, 0f);
         _barRoot.anchoredPosition = new Vector2(0f, BarBottomMargin);
-        _barRoot.sizeDelta = new Vector2(594f, BarHeight);
+        _barRoot.sizeDelta = new Vector2(561f, BarHeight);
 
         _barBackground = AddImage(_barRoot.gameObject, new Color(0.06f, 0.07f, 0.09f, 0.90f));
         _barGlow = AddChildImage("BarGlow", _barRoot, new Color(0.28f, 0.22f, 0.12f, 0.10f));
@@ -96,21 +96,21 @@ internal sealed partial class CombatStatusBar
         layout.padding = new RectOffset(4, 4, 4, 4);
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlHeight = true;
-        layout.childControlWidth = false;
+        layout.childControlWidth = true;
         layout.childForceExpandHeight = true;
         layout.childForceExpandWidth = false;
 
-        var timeSegment = CreateReadoutSegment("TimeSegment", _barRoot, 132f, out _timeBackground, out _timeLabel, out _timeValue);
+        var timeSegment = CreateReadoutSegment("TimeSegment", _barRoot, 116f, out _timeBackground, out _timeLabel, out _timeValue);
         SetLabel(_timeLabel, "Time");
 
         _timeDivider = CreateDivider(_barRoot);
 
-        var frameSegment = CreateReadoutSegment("FrameSegment", _barRoot, 132f, out _frameBackground, out _frameLabel, out _frameValue);
+        var frameSegment = CreateReadoutSegment("FrameSegment", _barRoot, 116f, out _frameBackground, out _frameLabel, out _frameValue);
         SetLabel(_frameLabel, "Frame");
 
         _frameDivider = CreateDivider(_barRoot);
 
-        var multiplierSegment = CreateInteractiveSegment("MultiplierSegment", _barRoot, 198f, out _multiplierBackground, out _multiplierLabel);
+        var multiplierSegment = CreateInteractiveSegment("MultiplierSegment", _barRoot, 168f, out _multiplierBackground, out _multiplierLabel);
         SetLabel(_multiplierLabel, "Multiplier");
         CreateMultiplierContent(multiplierSegment);
 
@@ -261,23 +261,24 @@ internal sealed partial class CombatStatusBar
         var row = CreateRect("MultiplierRow", parent);
         row.anchorMin = Vector2.zero;
         row.anchorMax = Vector2.one;
-        row.offsetMin = new Vector2(10f, 10f);
-        row.offsetMax = new Vector2(-10f, -28f);
+        row.offsetMin = new Vector2(10f, 6f);
+        row.offsetMax = new Vector2(-10f, -20f);
 
         var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 8f;
+        layout.spacing = 6f;
         layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = false;
+        layout.childControlWidth = true;
         layout.childControlHeight = true;
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = true;
 
-        (_decrementButton, _decrementButtonBackground, _decrementButtonText) = CreateButton("DecrementButton", row, "<", 40f);
-        _multiplierValue = CreateText("MultiplierValue", row, 17, FontStyle.Bold, TextAnchor.MiddleCenter);
+        (_decrementButton, _decrementButtonBackground, _decrementButtonText) = CreateButton("DecrementButton", row, "<", 34f);
+        _multiplierValue = CreateText("MultiplierValue", row, 15, FontStyle.Bold, TextAnchor.MiddleCenter);
         var valueLayout = _multiplierValue.gameObject.AddComponent<LayoutElement>();
-        valueLayout.preferredWidth = 84f;
+        valueLayout.minWidth = 52f;
+        valueLayout.preferredWidth = 64f;
         valueLayout.flexibleWidth = 1f;
-        (_incrementButton, _incrementButtonBackground, _incrementButtonText) = CreateButton("IncrementButton", row, ">", 40f);
+        (_incrementButton, _incrementButtonBackground, _incrementButtonText) = CreateButton("IncrementButton", row, ">", 34f);
 
         _decrementButton.onClick.AddListener(() => StepCombatSpeed(-1));
         _incrementButton.onClick.AddListener(() => StepCombatSpeed(1));
@@ -288,8 +289,8 @@ internal sealed partial class CombatStatusBar
         var buttonArea = CreateRect("PauseButtonArea", parent);
         buttonArea.anchorMin = Vector2.zero;
         buttonArea.anchorMax = Vector2.one;
-        buttonArea.offsetMin = new Vector2(16f, 10f);
-        buttonArea.offsetMax = new Vector2(-16f, -28f);
+        buttonArea.offsetMin = new Vector2(12f, 6f);
+        buttonArea.offsetMax = new Vector2(-12f, -20f);
 
         (_pauseButton, _pauseButtonBackground, _pauseButtonText) = CreateButton("PauseButton", buttonArea, "||", 0f);
         StretchToParent((RectTransform)_pauseButton.transform, 0f, 0f, 0f, 0f);
@@ -302,19 +303,20 @@ internal sealed partial class CombatStatusBar
     private RectTransform CreateReadoutSegment(string name, Transform parent, float width, out Image background, out Text label, out Text value)
     {
         var segment = CreateSegmentShell(name, parent, width, out background);
-        label = CreateText("Label", segment, 12, FontStyle.Normal, TextAnchor.MiddleCenter);
-        AnchorTopStretch(label.rectTransform, 10f, 16f);
+        label = CreateText("Label", segment, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
+        AnchorTopStretch(label.rectTransform, 6f, 12f);
 
-        value = CreateText("Value", segment, 19, FontStyle.Bold, TextAnchor.MiddleCenter);
-        StretchToParent(value.rectTransform, 8f, 8f, 28f, 10f);
+        value = CreateText("Value", segment, 15, FontStyle.Bold, TextAnchor.MiddleCenter);
+        value.verticalOverflow = VerticalWrapMode.Overflow;
+        StretchToParent(value.rectTransform, 8f, 8f, 18f, 6f);
         return segment;
     }
 
     private RectTransform CreateInteractiveSegment(string name, Transform parent, float width, out Image background, out Text label)
     {
         var segment = CreateSegmentShell(name, parent, width, out background);
-        label = CreateText("Label", segment, 12, FontStyle.Normal, TextAnchor.MiddleCenter);
-        AnchorTopStretch(label.rectTransform, 10f, 16f);
+        label = CreateText("Label", segment, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
+        AnchorTopStretch(label.rectTransform, 6f, 12f);
         return segment;
     }
 
@@ -337,8 +339,8 @@ internal sealed partial class CombatStatusBar
         layoutElement.minWidth = 1f;
         layoutElement.flexibleHeight = 1f;
         var image = AddImage(divider.gameObject, Color.white);
-        divider.offsetMin = new Vector2(0f, 10f);
-        divider.offsetMax = new Vector2(0f, -10f);
+        divider.offsetMin = new Vector2(0f, 8f);
+        divider.offsetMax = new Vector2(0f, -8f);
         return image;
     }
 
@@ -348,7 +350,9 @@ internal sealed partial class CombatStatusBar
         if (preferredWidth > 0f)
         {
             var layoutElement = buttonRect.gameObject.AddComponent<LayoutElement>();
+            layoutElement.minWidth = preferredWidth;
             layoutElement.preferredWidth = preferredWidth;
+            layoutElement.flexibleWidth = 0f;
         }
 
         var background = AddImage(buttonRect.gameObject, Color.white);
@@ -358,7 +362,7 @@ internal sealed partial class CombatStatusBar
         button.transition = Selectable.Transition.ColorTint;
         button.colors = BuildColorBlock(Color.white, Color.white, Color.white);
 
-        var label = CreateText("Label", buttonRect, 18, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var label = CreateText("Label", buttonRect, 16, FontStyle.Bold, TextAnchor.MiddleCenter);
         label.raycastTarget = false;
         StretchToParent(label.rectTransform, 0f, 0f, 0f, 0f);
         label.text = text;

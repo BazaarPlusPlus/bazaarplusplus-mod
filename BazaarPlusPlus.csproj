@@ -138,7 +138,7 @@
   <!-- Release build -->
   <Target Name="CopyToInstallerSource" AfterTargets="Build" Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)')">
     <Message Text="[BazaarPlusPlus] Building for Release" Importance="high"/>
-    <WriteLinesToFile File="$(TargetDir)$(TargetName).version" Lines="$(Version).t$([System.DateTime]::Now.ToString('yyyyMMdd.HHmmss')).prod" Overwrite="true"/>
+    <WriteLinesToFile File="$(TargetDir)$(TargetName).version" Lines="$(Version).t$([System.DateTime]::Now.ToString('yyyyMMdd.HHmmss')).canary" Overwrite="true"/>
     <Copy SourceFiles="$(TargetDir)$(TargetName).dll" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).dll"/>
     <Copy SourceFiles="$(TargetDir)$(TargetName).dll" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).dll"/>
     <Copy SourceFiles="$(TargetDir)$(TargetName).version" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).version"/>

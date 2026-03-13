@@ -17,6 +17,7 @@
   let customGamePath = '';
   let actionBusy: 'idle' | 'detect' | 'install' | 'uninstall' = 'idle';
   let actionMenuOpen = false;
+  const STEAM_BAZAAR_URL = 'steam://rungameid/1617400';
 
   $: t = (key: keyof typeof messages.en, params?: Record<string, string | number>): string =>
     formatMessage($locale, key, params);
@@ -143,10 +144,21 @@
     }
   }
 
+  async function launchGame() {
+    if (!canLaunchGame) return;
+
+    try {
+      await openUrl(STEAM_BAZAAR_URL);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   $: hasPath = Boolean(customGamePath || env?.game_path);
   $: modInstalled = Boolean(env?.bpp_version);
   $: isBusy = actionBusy !== 'idle';
   $: canInstall = !isBusy && dotnetState !== 'idle' && bazaarFound && hasPath;
+  $: canLaunchGame = !isBusy && bazaarFound;
   $: dotnetDownloadUrl = $locale === 'zh'
     ? 'https://dotnet.microsoft.com/zh-cn/download'
     : 'https://dotnet.microsoft.com/en-us/download';
@@ -376,6 +388,10 @@
             </div>
           </div>
         </div>
+
+        <button class="secondary-btn launch-btn" type="button" onclick={launchGame} disabled={!canLaunchGame}>
+          {$locale === 'zh' ? '启动游戏' : 'Launch Game'}
+        </button>
       </div>
     </div>
   </div>
@@ -633,6 +649,7 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
+    min-width: 0;
   }
 
   .tag {
@@ -824,6 +841,10 @@
     display: flex;
     gap: 0.5rem;
     position: relative;
+  }
+
+  .launch-btn {
+    width: 100%;
   }
 
   .menu-wrap {

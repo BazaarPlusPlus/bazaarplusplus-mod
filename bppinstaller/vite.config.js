@@ -1,3 +1,4 @@
+// @ts-expect-error checked in a non-Node tsconfig, but this runs in Node during Vite startup
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
