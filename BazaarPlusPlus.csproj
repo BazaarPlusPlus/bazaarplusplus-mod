@@ -126,13 +126,20 @@
 
   <Target Name="CopyToBepInExPlugins" AfterTargets="Build">
     <ItemGroup>
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\*.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\$(TargetName).dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\$(TargetName).version" />
     </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
       DestinationFiles="$(GamePath)\BepInEx\plugins\$(TargetName).dll"
     />
+    <WriteLinesToFile
+      File="$(GamePath)\BepInEx\plugins\$(TargetName).version"
+      Lines="$(Version).t$([System.DateTime]::Now.ToString('yyyyMMdd.HHmmss')).dev"
+      Overwrite="true"
+    />
+
     <Message
       Text="[BazaarPlusPlus] Successfully copied DLL to BepInEx plugins folder!!!"
       Importance="high"
@@ -142,7 +149,7 @@
   <Target Name="CopyToInstallerSource" AfterTargets="CopyToBepInExPlugins" Condition="Exists('$(BPPInstallerSourcePath)')">
     <WriteLinesToFile
       File="$(TargetDir)$(TargetName).version"
-      Lines="$(Version).t$([System.DateTime]::Now.ToString('yyyyMMdd.HHmmss'))"
+      Lines="$(Version).t$([System.DateTime]::Now.ToString('yyyyMMdd.HHmmss')).prod"
       Overwrite="true"
     />
 
