@@ -39,6 +39,14 @@ internal sealed class PreviewBoardSession
         if (_request == null)
             return;
 
+        var visible = _request.Presentation?.Visible ?? false;
+        _renderTarget.SetVisible(visible);
+        if (!visible)
+        {
+            BppLog.Info("PreviewBoardSession", "Tick skipped because request is hidden");
+            return;
+        }
+
         var model = ResolveModel(_request);
         var pose = ResolvePose(_request);
         if (model == null || pose == null)
