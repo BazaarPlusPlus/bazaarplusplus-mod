@@ -33,13 +33,6 @@ internal sealed class DebugPanelState
         ShowAllSections = false;
     }
 
-    public void Reset()
-    {
-        ActiveSection = DebugPanelSection.Summary;
-        ShowAllSections = false;
-        _expandedEncounterKeys.Clear();
-    }
-
     public void ToggleEncounter(string encounterKey)
     {
         if (string.IsNullOrEmpty(encounterKey))

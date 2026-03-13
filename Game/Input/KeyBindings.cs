@@ -1,0 +1,21 @@
+using UnityEngine.InputSystem;
+
+namespace BazaarPlusPlus;
+
+internal static class KeyBindings
+{
+    internal static class Toggle
+    {
+        public static Key DebugPanel => Key.F2;
+        public static Key CombatStatusBar => Key.F6;
+    }
+
+    internal static class DebugPanel
+    {
+        public static Key SelectSummary => Key.Digit1;
+        public static Key SelectPreview => Key.Digit2;
+        public static Key SelectRun => Key.Digit3;
+        public static Key SelectEncounters => Key.Digit4;
+        public static Key ToggleViewMode => Key.Tab;
+    }
+}

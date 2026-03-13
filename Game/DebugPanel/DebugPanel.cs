@@ -77,7 +77,7 @@ internal sealed class DebugPanel : MonoBehaviour
         if (keyboard == null)
             return;
 
-        if (keyboard.f2Key.wasPressedThisFrame)
+        if (keyboard[KeyBindings.Toggle.DebugPanel].wasPressedThisFrame)
         {
             IsVisible = !IsVisible;
             if (IsVisible)
@@ -87,23 +87,17 @@ internal sealed class DebugPanel : MonoBehaviour
         if (!IsVisible)
             return;
 
-        if (keyboard.digit1Key.wasPressedThisFrame)
+        if (keyboard[KeyBindings.DebugPanel.SelectSummary].wasPressedThisFrame)
             SelectSection(DebugPanelSection.Summary);
-        else if (keyboard.digit2Key.wasPressedThisFrame)
+        else if (keyboard[KeyBindings.DebugPanel.SelectPreview].wasPressedThisFrame)
             SelectSection(DebugPanelSection.Preview);
-        else if (keyboard.digit3Key.wasPressedThisFrame)
+        else if (keyboard[KeyBindings.DebugPanel.SelectRun].wasPressedThisFrame)
             SelectSection(DebugPanelSection.Run);
-        else if (keyboard.digit4Key.wasPressedThisFrame)
+        else if (keyboard[KeyBindings.DebugPanel.SelectEncounters].wasPressedThisFrame)
             SelectSection(DebugPanelSection.Encounters);
 
-        if (keyboard.tabKey.wasPressedThisFrame)
+        if (keyboard[KeyBindings.DebugPanel.ToggleViewMode].wasPressedThisFrame)
             _panelState.ToggleViewMode();
-
-        if (keyboard.rKey.wasPressedThisFrame)
-        {
-            _panelState.Reset();
-            _scroll = Vector2.zero;
-        }
 
         if (Time.unscaledTime >= _nextRefreshTime)
             RefreshSnapshot(force: false);
@@ -147,7 +141,7 @@ internal sealed class DebugPanel : MonoBehaviour
             StatusStyle
         );
         GUILayout.Label(
-            $"[F2] Toggle  [1-4] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}  [R] Reset",
+            $"[F2] Toggle  [1-4] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}",
             MutedStyle
         );
         GUILayout.Space(8);

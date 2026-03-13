@@ -31,7 +31,7 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
     private void Update()
     {
         var keyboard = Keyboard.current;
-        if (keyboard != null && keyboard.f6Key.wasPressedThisFrame)
+        if (keyboard != null && keyboard[KeyBindings.Toggle.CombatStatusBar].wasPressedThisFrame)
             _visible = !_visible;
 
         _visualBlend = AdvanceVisualBlend(_visualBlend, IsCombatPlaybackActive, Time.unscaledDeltaTime);
