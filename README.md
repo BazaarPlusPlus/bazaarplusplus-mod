@@ -1,79 +1,91 @@
 # BazaarPlusPlus
 
-A BepInEx mod for The Bazaar.
+BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 增强模组，专注于提供更清晰、更顺手的局内信息展示。  
 
-## Prerequisites
+BazaarPlusPlus is a BepInEx enhancement mod for *The Bazaar*, focused on making in-game information easier to read and act on.
 
-- [.NET SDK](https://dotnet.microsoft.com/download)
-- The Bazaar installed via Steam
+## Features / 功能亮点
 
-## Build
+- 战斗状态条：提供更直观的战斗播放状态与节奏信息。  
 
-```bash
-dotnet build
-```
+Combat status bar: adds clearer playback and combat pacing information.
+- 怪物预览：在合适的场景下展示更完整的怪物预览信息。  
 
-The compiled DLL is automatically copied to the BepInEx plugins folder.
+Monster preview: shows richer enemy preview information in supported flows.
+- 遭遇信息补强：让遭遇相关的预览信息更连贯、更容易理解。  
 
-## Format
+Encounter clarity improvements: keeps encounter-related preview data more consistent and readable.
+- 附魔与词条预览增强：补充部分物品与附魔相关的可见信息。  
 
-Install [CSharpier](https://csharpier.com) if not already installed:
+Enchant and item preview improvements: expands visible information for supported item and enchant views.
 
-```bash
-dotnet tool install -g csharpier
-```
+## Install / 安装
 
-Run formatter:
+普通玩家建议优先使用发布包内提供的安装器。当前 Windows 是更明确、体验更完整的安装路径；macOS 支持仍在持续完善中。  
 
-```bash
-csharpier format .
-```
+For most players, the recommended path is the installer included with a release package. Windows is the clearest and most complete installation path today, while macOS support is still being improved.
 
-## Decompiling Game DLLs
+基本流程如下：  
 
-Game DLLs are located at:
+Recommended flow:
 
-- **macOS**: `~/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed/`
-- **Windows**: `C:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed\`
+1. 下载最新发布版本。  
 
-Key DLLs:
+  Download the latest release package.
+2. 运行安装器，并选择你的《The Bazaar》安装目录。  
 
-| DLL | Description |
-|-----|-------------|
-| `Assembly-CSharp.dll` | Main game code |
-| `BazaarGameClient.dll` | Client-side game logic |
-| `BazaarGameShared.dll` | Shared types and models |
-| `BazaarBattleService.dll` | Battle simulation |
-| `TheBazaarRuntime.dll` | Runtime utilities |
+  Run the installer and select your *The Bazaar* installation directory.
+3. 安装完成后，重新启动 Steam 与游戏。  
 
-### Install ILSpy
+  Restart Steam and the game after installation completes.
+4. 首次进入游戏后，BazaarPlusPlus 会自动生成配置文件。  
 
-```bash
-dotnet tool install -g ilspycmd
-```
+  BazaarPlusPlus will generate its config file automatically after the first in-game launch.
 
-### Decompile a DLL
+## FAQ / 常见问题
 
-```bash
-ilspycmd -p -o ./decompiled/BazaarGameShared BazaarGameShared.dll
-```
+**配置文件在哪里？ / Where is the config file?**  
 
-- `-p` generates a full project structure
-- `-o` specifies the output directory
+配置文件位于 `BepInEx/config/BazaarPlusPlus.cfg`。如果文件还不存在，请先启动一次游戏。  
 
-Decompile all key DLLs at once (macOS):
+The config file is located at `BepInEx/config/BazaarPlusPlus.cfg`. If it does not exist yet, launch the game once first.
 
-```bash
-MANAGED="$HOME/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed"
+**安装后没有生效怎么办？ / What if the mod does not seem active after install?**  
 
-for dll in Assembly-CSharp BazaarGameClient BazaarGameShared BazaarBattleService TheBazaarRuntime; do
-    ilspycmd -p -o "./decompiled/$dll" "$MANAGED/$dll.dll"
-done
-```
+先确认安装目录是否指向正确的《The Bazaar》目录，然后检查 `BepInEx` 是否已正确放入游戏目录，再重新启动游戏。  
 
+First verify that the selected game path is the correct *The Bazaar* directory, then check that `BepInEx` was placed into the game folder correctly, and restart the game.
 
-Inspired By：
+## For Developers / 开发者
 
-https://github.com/Duangi/BazaarHelper
+项目基于 C#、.NET 和 BepInEx 5。源码正在整理，将在不远的将来开放。  
+  
+The project is built with C#, .NET, and BepInEx 5. The source tree is being cleaned up for open development, and this README intentionally keeps the developer entry point short.
 
-https://github.com/oceanseth/BazaarPlannerMod
+## Credits / 致谢
+
+**Inspired By / 灵感来源**  
+
+以下项目为 BazaarPlusPlus 提供了重要灵感与参考：  
+
+These projects provided important inspiration and reference for BazaarPlusPlus:
+
+- [Duangi/BazaarHelper](https://github.com/Duangi/BazaarHelper)
+- [oceanseth/BazaarPlannerMod](https://github.com/oceanseth/BazaarPlannerMod)
+
+**Data Source / 数据来源**  
+
+部分怪物与相关展示信息整理参考了 BazaarDB。  
+
+Some monster and related display data is informed by BazaarDB.
+
+- [BazaarDB](https://bazaardb.gg)
+
+**Core Dependency / 核心依赖**  
+
+BazaarPlusPlus 基于 BepInEx 运行。  
+
+BazaarPlusPlus runs on top of BepInEx.
+
+- [BepInEx](https://github.com/BepInEx/BepInEx)
+

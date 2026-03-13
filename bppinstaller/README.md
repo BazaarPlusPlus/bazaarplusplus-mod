@@ -24,7 +24,7 @@ npm run tauri dev
 
 ## Build
 
-Build the Windows executable and NSIS installer:
+Build the desktop bundle:
 
 ```bash
 ./build.sh --prod
@@ -32,6 +32,12 @@ Build the Windows executable and NSIS installer:
 
 Artifacts are written under `src-tauri/target/release/`.
 
-## Known Limitations
+## Structure
+
+- `src/`: SvelteKit frontend
+- `src-tauri/`: native Tauri commands and packaging
+- `scripts/prebuild-check.mjs`: build-time validation
+
+## Known Limitation
 
 - On macOS, the current blocker is BepInEx not loading correctly, so the installer is not considered working there yet.
