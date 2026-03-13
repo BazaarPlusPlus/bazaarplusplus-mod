@@ -506,6 +506,7 @@
     font-size: 0.88rem;
     line-height: 1.5;
     color: rgba(228, 216, 191, 0.78);
+    white-space: pre-line;
   }
 
   /* Setting rows */
