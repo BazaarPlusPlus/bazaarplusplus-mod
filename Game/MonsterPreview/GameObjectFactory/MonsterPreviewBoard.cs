@@ -18,12 +18,12 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private const float SkillBoardGap = 0.04f;
     private const float SkillSlotInset = 0.12f;
     private const float SkillCardScaleFactor = 0.8f;
-    private static readonly Color ItemBoardFillColor = new Color(0.78f, 0.52f, 0.34f, 0.14f);
+    private static readonly Color ItemBoardFillColor = new Color(0.34f, 0.29f, 0.24f, 0.12f);
     private static readonly Color ItemBoardBorderColor = new Color(1f, 0.2f, 0.2f, 0.95f);
     private static readonly Color ItemBoardAccentColor = new Color(1f, 0.1f, 0.1f, 0.18f);
-    private static readonly Color SkillBoardFillColor = new Color(0.25f, 0.4f, 1f, 0.18f);
+    private static readonly Color SkillBoardFillColor = new Color(0.24f, 0.29f, 0.33f, 0.16f);
     private static readonly Color SkillBoardBorderColor = new Color(0.25f, 0.7f, 1f, 0.95f);
-    private static readonly Color BrandingBoardFillColor = new Color(0.04f, 0.05f, 0.08f, 0.92f);
+    private static readonly Color BrandingBoardFillColor = new Color(0.17f, 0.20f, 0.23f, 0.62f);
     private static readonly Color BrandingBoardBorderColor = new Color(0.18f, 0.24f, 0.34f, 0.95f);
     private static readonly Color DebugItemMarkerColor = new Color(1f, 0f, 0f, 0.95f);
     private static readonly Color DebugSkillMarkerColor = new Color(0.25f, 0.75f, 1f, 0.95f);
