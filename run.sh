@@ -27,6 +27,10 @@ build() {
     dotnet build -verbosity detailed
 }
 
+build_all() {
+    dotnet build -t:BuildAll -verbosity detailed
+}
+
 format() {
     csharpier format .
 }
@@ -54,6 +58,7 @@ decompile_all() {
 }
 
 case "$1" in
+    all)  build_all ;;
     build)      build ;;
     format)     format ;;
     decompile)  decompile "$@" ;;
