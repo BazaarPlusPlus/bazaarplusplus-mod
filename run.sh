@@ -1,7 +1,27 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-MANAGED="$HOME/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed"
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+RESET='\033[0m'
+
+case "$(uname -s)" in
+    Darwin)
+        PLATFORM="macOS"
+        MANAGED="$HOME/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed"
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        PLATFORM="Windows (Git Bash)"
+        MANAGED="/c/Program Files (x86)/Steam/steamapps/common/The Bazaar/TheBazaar_Data/Managed"
+        ;;
+    *)
+        echo -e "${RED}Unsupported platform: $(uname -s)${RESET}" >&2
+        exit 1
+        ;;
+esac
+
+echo -e "${CYAN}== Building on ${GREEN}${PLATFORM}${CYAN} ==${RESET}"
 
 build() {
     dotnet build -verbosity detailed
