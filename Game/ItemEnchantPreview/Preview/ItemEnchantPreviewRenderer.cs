@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameClient.Domain.Tooltips;
@@ -14,6 +15,14 @@ namespace BazaarPlusPlus.Game.ItemEnchantPreview.Preview;
 
 public static class ItemEnchantPreviewRenderer
 {
+    private static readonly MethodInfo CardTooltipRenderMethod = typeof(CardTooltipData).GetMethod(
+        "RenderTooltip",
+        BindingFlags.Instance | BindingFlags.NonPublic,
+        null,
+        new[] { typeof(TooltipBuilder) },
+        null
+    );
+
     public static List<TooltipSegment> Render(ItemCard previewCard, TEnchantment enchantment)
     {
         var segments = new List<TooltipSegment>();
@@ -49,22 +58,49 @@ public static class ItemEnchantPreviewRenderer
 
         try
         {
-            var builder = TooltipBuilder.Create(
-                new TooltipContext
-                {
-                    Instance = previewCard,
-                    Template = previewCard.Template!,
-                    ValueContext = new ValueContext(Data.Run, previewCard),
-                },
-                localized
-            );
-
-            return RenderTooltipBuilder(builder).TrimEnd();
+            return RenderWithCardTooltipData(previewCard, localized).TrimEnd();
         }
         catch
         {
-            return localized;
+            try
+            {
+                var builder = TooltipBuilder.Create(
+                    new TooltipContext
+                    {
+                        Instance = previewCard,
+                        Template = previewCard.Template!,
+                        ValueContext = new ValueContext(Data.Run, previewCard),
+                    },
+                    localized
+                );
+
+                return RenderTooltipBuilder(builder).TrimEnd();
+            }
+            catch
+            {
+                return localized;
+            }
         }
+    }
+
+    private static string RenderWithCardTooltipData(ItemCard previewCard, string localized)
+    {
+        var builder = TooltipBuilder.Create(
+            new TooltipContext
+            {
+                Instance = previewCard,
+                Template = previewCard.Template!,
+                ValueContext = new ValueContext(Data.Run, previewCard),
+            },
+            localized
+        );
+
+        if (CardTooltipRenderMethod == null)
+            return RenderTooltipBuilder(builder);
+
+        var tooltipData = new CardTooltipData(previewCard, previewCard.Template!);
+        var rendered = CardTooltipRenderMethod.Invoke(tooltipData, new object[] { builder }) as string;
+        return string.IsNullOrWhiteSpace(rendered) ? RenderTooltipBuilder(builder) : rendered;
     }
 
     private static string GetLocalizedText(TLocalizableText content)
