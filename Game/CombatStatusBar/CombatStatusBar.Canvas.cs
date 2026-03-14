@@ -222,6 +222,7 @@ internal sealed partial class CombatStatusBar
         SetTextColor(_frameValue, valueColor);
         SetTextColor(_multiplierValue, valueColor);
 
+        SetLabel(_timeLabel, GetDisplayedTimeLabel());
         if (_timeValue != null)
             _timeValue.text = GetDisplayedTimeText();
         if (_frameValue != null)

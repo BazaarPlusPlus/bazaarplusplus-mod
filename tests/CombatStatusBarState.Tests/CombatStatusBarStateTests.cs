@@ -17,6 +17,8 @@ public sealed class CombatStatusBarStateTests : IDisposable
     [Fact]
     public void GetDisplayedTimeText_ReturnsStandbyPlaceholderOutsideCombat()
     {
+        Assert.Equal("LastCombat", CombatStatusBar.GetDisplayedTimeLabel());
+
         var result = CombatStatusBar.GetDisplayedTimeText();
 
         Assert.Equal("-:--:--", result);
@@ -29,9 +31,24 @@ public sealed class CombatStatusBarStateTests : IDisposable
         for (var i = 0; i < 25; i++)
             CombatStatusBar.AdvanceCombatFrame();
 
+        Assert.Equal("Time", CombatStatusBar.GetDisplayedTimeLabel());
+
         var result = CombatStatusBar.GetDisplayedTimeText();
 
         Assert.Equal("0:01:25", result);
+    }
+
+    [Fact]
+    public void GetDisplayedTimeText_ReturnsLastCombatTimeAfterCombatEnds()
+    {
+        CombatStatusBar.BeginCombatPlayback();
+        for (var i = 0; i < 25; i++)
+            CombatStatusBar.AdvanceCombatFrame();
+
+        CombatStatusBar.EndCombatPlayback();
+
+        Assert.Equal("LastCombat", CombatStatusBar.GetDisplayedTimeLabel());
+        Assert.Equal("0:01:25", CombatStatusBar.GetDisplayedTimeText());
     }
 
     [Fact]

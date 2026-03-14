@@ -12,6 +12,8 @@ internal sealed partial class CombatStatusBar
     internal static float CombatSpeedMultiplier { get; private set; } = 1f;
     internal static int ProcessedCombatFrames { get; private set; }
     internal static int TotalCombatFrames { get; private set; }
+    internal static TimeSpan LastCombatLogicalElapsed { get; private set; }
+    internal static bool HasCompletedCombatPlayback { get; private set; }
     internal static ReadOnlySpan<float> CombatSpeedSteps => SpeedSteps;
 
     internal static void BeginCombatPlayback()
@@ -22,6 +24,8 @@ internal sealed partial class CombatStatusBar
 
     internal static void EndCombatPlayback()
     {
+        LastCombatLogicalElapsed = GetCombatLogicalElapsed();
+        HasCompletedCombatPlayback = true;
         SetCombatPaused(false);
         IsCombatPlaybackActive = false;
     }
@@ -86,11 +90,18 @@ internal sealed partial class CombatStatusBar
         return $"{CombatSpeedMultiplier:0.00}x";
     }
 
+    internal static string GetDisplayedTimeLabel()
+    {
+        return IsCombatPlaybackActive ? "Time" : "LastCombat";
+    }
+
     internal static string GetDisplayedTimeText()
     {
         return IsCombatPlaybackActive
             ? FormatElapsed(GetCombatLogicalElapsed())
-            : "-:--:--";
+            : HasCompletedCombatPlayback
+                ? FormatElapsed(LastCombatLogicalElapsed)
+                : "-:--:--";
     }
 
     internal static string GetDisplayedFrameText()
@@ -120,6 +131,8 @@ internal sealed partial class CombatStatusBar
         CombatSpeedMultiplier = 1f;
         ProcessedCombatFrames = 0;
         TotalCombatFrames = 0;
+        LastCombatLogicalElapsed = TimeSpan.Zero;
+        HasCompletedCombatPlayback = false;
     }
 
     internal static bool CanToggleCombatPause()
