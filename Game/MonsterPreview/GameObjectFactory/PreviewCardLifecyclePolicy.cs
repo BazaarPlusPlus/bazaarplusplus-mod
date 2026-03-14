@@ -10,11 +10,11 @@ internal static class PreviewCardLifecyclePolicy
 {
     public static bool ShouldReturnToPool(PreviewCardKind kind)
     {
-        return true;
+        return false;
     }
 
     public static bool ShouldRefreshAfterInstantiate(PreviewCardKind kind)
     {
-        return kind == PreviewCardKind.Skill;
+        return kind == PreviewCardKind.Item || kind == PreviewCardKind.Skill;
     }
 }

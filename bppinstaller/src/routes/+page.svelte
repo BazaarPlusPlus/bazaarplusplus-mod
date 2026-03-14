@@ -5,6 +5,7 @@
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { onMount } from 'svelte';
   import AppModal from '$lib/components/AppModal.svelte';
+  import InstallerUpdateHighlights from '$lib/components/InstallerUpdateHighlights.svelte';
   import type { DotnetInfo, EnvironmentInfo } from '$lib/types';
   import { locale, handleLocaleToggle } from '$lib/locale';
   import { formatMessage, messages } from '$lib/i18n';
@@ -46,7 +47,8 @@
       dotnet_version: '9.0.0',
       dotnet_ok: true,
       bepinex_installed: false,
-      bpp_version: null
+      bpp_version: null,
+      bundled_bpp_version: 'debug-preview'
     };
     dotnetState = 'found';
     bazaarFound = true;
@@ -92,6 +94,7 @@
             steam_path: null,
             game_path: null,
             bpp_version: null,
+            bundled_bpp_version: null,
             bepinex_installed: false,
             ...result
           };
@@ -174,7 +177,7 @@
     if (isDebugInstallPreview) {
       actionBusy = 'install';
       await new Promise((resolve) => window.setTimeout(resolve, 450));
-      env = env ? { ...env, bpp_version: 'debug-preview' } : env;
+      env = env ? { ...env, bpp_version: env.bundled_bpp_version ?? 'debug-preview' } : env;
       actionBusy = 'idle';
       return;
     }
@@ -222,6 +225,10 @@
 
   $: hasPath = Boolean(customGamePath || env?.game_path);
   $: modInstalled = Boolean(env?.bpp_version);
+  $: bundledBppVersion = env?.bundled_bpp_version ?? null;
+  $: installedBppVersion = env?.bpp_version ?? null;
+  $: versionMismatch =
+    Boolean(modInstalled && bundledBppVersion && installedBppVersion && bundledBppVersion !== installedBppVersion);
   $: isBusy = actionBusy !== 'idle';
   $: installPrereqsMet = dotnetState !== 'idle' && bazaarFound && hasPath;
   $: canInstall = !isBusy && (installPrereqsMet || isDebugInstallPreview);
@@ -357,15 +364,18 @@
     open={showUpdatedInstallerModal}
     eyebrow="BazaarPlusPlus"
     title={$locale === 'zh' ? '安装器已更新' : 'Installer Updated'}
-    body={$locale === 'zh'
-      ? '这是更新后的首次启动。为了让最新文件重新写入游戏目录，建议再次执行安装。'
-      : 'This is the first launch after updating the installer. Run the install step again to refresh the game files with the latest bundle.'}
+    wide={true}
     confirmText={$locale === 'zh' ? '重新安装' : 'Reinstall'}
     showCancel={true}
     cancelText={$locale === 'zh' ? '稍后' : 'Later'}
     onConfirm={reopenInstallFlowAfterUpdate}
     onCancel={acknowledgeUpdatedInstallerPrompt}
-  />
+  >
+    <InstallerUpdateHighlights />
+    <a class="update-detail-link" href="/whats-new">
+      {$locale === 'zh' ? '在独立页面查看这部分内容' : 'Open this section on a dedicated page'}
+    </a>
+  </AppModal>
 
   <header class="header">
     <div class="corner tl" aria-hidden="true">
@@ -420,16 +430,41 @@
     <div class="rule" aria-hidden="true">
       <span></span><span class="diamond">+</span><span></span>
     </div>
+
+    <div class="header-links">
+      <a class="header-link header-link-featured" href="/whats-new">
+        <span class="header-link-kicker">{$locale === 'zh' ? '新版本' : 'Update'}</span>
+        <span class="header-link-title">{$locale === 'zh' ? '查看 WhatsNew' : "Open What's New"}</span>
+      </a>
+    </div>
+
+    {#if versionMismatch}
+      <a class="update-nudge" href="/whats-new">
+        <span class="update-nudge-badge">NEW</span>
+        <span class="update-nudge-copy">
+          <span class="update-nudge-title">
+            {$locale === 'zh' ? '检测到新版本内容' : 'New version content available'}
+          </span>
+          <span class="update-nudge-text">
+            {$locale === 'zh'
+              ? '当前已安装版本和安装器内置版本不一致，先看一下本次更新内容。'
+              : 'The installed BPP version does not match the current installer bundle. Review what changed first.'}
+          </span>
+        </span>
+      </a>
+    {/if}
   </header>
 
   <div class="steps">
-    <div class="step" class:step-found={modInstalled}>
+    <div class="step" class:step-found={modInstalled && !versionMismatch} class:step-error={versionMismatch}>
       <div class="step-index" aria-hidden="true">I</div>
       <div class="step-body step-body-bpp">
         <div class="step-bpp-content">
           <span class="step-title">
             {t('stepBpp')}
-            {#if modInstalled}
+            {#if versionMismatch}
+              <span class="tag tag-danger">{$locale === 'zh' ? '版本不一致' : 'Version Mismatch'}</span>
+            {:else if modInstalled}
               <span class="tag tag-ok">{t('statusInstalled')}{env?.bpp_version ? ` · v${env.bpp_version}` : ''}</span>
             {:else if actionBusy === 'detect'}
               <span class="tag">{t('statusChecking')}</span>
@@ -437,8 +472,25 @@
               <span class="tag tag-warn">{t('statusNotInstalled')}</span>
             {/if}
           </span>
-          {#if modInstalled}
+          {#if versionMismatch}
+            <p class="detail-line detail-alert">
+              {$locale === 'zh'
+                ? '当前已安装版本与安装器内置版本不一致，请点击下方重新安装。'
+                : 'The installed BazaarPlusPlus version does not match the installer bundle. Click Reinstall below.'}
+            </p>
+            <p class="detail-line detail-muted">
+              {$locale === 'zh' ? '已安装版本' : 'Installed'}: v{installedBppVersion}
+            </p>
+            <p class="detail-line detail-muted">
+              {$locale === 'zh' ? '安装器内置版本' : 'Installer bundle'}: v{bundledBppVersion}
+            </p>
+          {:else if modInstalled}
             <p class="detail-line detail-muted">{t('modInstalledHint')}</p>
+            {#if bundledBppVersion}
+              <p class="detail-line detail-faint">
+                {$locale === 'zh' ? '安装器内置版本' : 'Installer bundle'}: v{bundledBppVersion}
+              </p>
+            {/if}
           {:else}
             <p class="detail-line detail-muted">{t('detectInstalledHint')}</p>
           {/if}
@@ -542,10 +594,12 @@
           </button>
 
           <div class="action-primary">
-            <button class="install-btn" disabled={!canInstall} onclick={requestInstall} type="button">
+            <button class="install-btn" class:install-btn-danger={versionMismatch} disabled={!canInstall} onclick={requestInstall} type="button">
               {#if actionBusy === 'install'}
                 <span class="spinner dark" aria-hidden="true"></span>
                 {t('actionInstalling')}
+              {:else if versionMismatch}
+                {$locale === 'zh' ? '⚠ 需要重新安装' : '⚠ Reinstall Required'}
               {:else if modInstalled}
                 ✦ {t('actionReinstall')}
               {:else}
@@ -704,6 +758,29 @@
     color: #ffe6af;
     font-size: 0.82em;
     letter-spacing: 0.05em;
+  }
+
+  .update-detail-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.15rem;
+    padding: 0.62rem 0.85rem;
+    border: 1px solid rgba(180, 130, 48, 0.18);
+    border-radius: 999px;
+    background: rgba(200, 148, 55, 0.05);
+    color: rgba(228, 216, 191, 0.76);
+    font-family: 'Cinzel', serif;
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+
+  .update-detail-link:hover {
+    background: rgba(200, 148, 55, 0.12);
+    border-color: rgba(200, 148, 55, 0.34);
+    color: rgba(240, 222, 185, 0.92);
   }
 
   .install-acknowledge {
@@ -874,6 +951,150 @@
     z-index: 2;
   }
 
+  .header-links {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 0.55rem;
+  }
+
+  .header-link {
+    min-width: min(100%, 260px);
+    display: grid;
+    gap: 0.12rem;
+    justify-items: center;
+    padding: 0.72rem 0.95rem 0.78rem;
+    border: 1px solid rgba(200, 148, 55, 0.2);
+    border-radius: 3px;
+    text-decoration: none;
+    transition:
+      transform 0.15s ease,
+      background 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .header-link-featured {
+    background:
+      radial-gradient(circle at top, rgba(255, 214, 140, 0.08), transparent 58%),
+      linear-gradient(180deg, rgba(200, 148, 55, 0.09), rgba(200, 148, 55, 0.03));
+    box-shadow:
+      0 0 0 1px rgba(255, 198, 98, 0.05) inset,
+      0 10px 24px rgba(0, 0, 0, 0.22);
+  }
+
+  .header-link:hover {
+    transform: translateY(-1px);
+    border-color: rgba(220, 168, 76, 0.36);
+    background:
+      radial-gradient(circle at top, rgba(255, 214, 140, 0.12), transparent 58%),
+      linear-gradient(180deg, rgba(200, 148, 55, 0.14), rgba(200, 148, 55, 0.05));
+    box-shadow:
+      0 0 0 1px rgba(255, 198, 98, 0.09) inset,
+      0 14px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  .header-link:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
+  }
+
+  .header-link-kicker {
+    font-family: 'Cinzel', serif;
+    font-size: 0.52rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(214, 171, 96, 0.72);
+  }
+
+  .header-link-title {
+    font-family: 'Cinzel', serif;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(236, 224, 196, 0.9);
+  }
+
+  .update-nudge {
+    width: min(100%, 360px);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    align-items: center;
+    margin-top: 0.65rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid rgba(214, 109, 77, 0.34);
+    border-radius: 3px;
+    text-decoration: none;
+    background:
+      radial-gradient(circle at top left, rgba(255, 187, 146, 0.12), transparent 44%),
+      linear-gradient(180deg, rgba(191, 84, 66, 0.14), rgba(126, 37, 24, 0.08));
+    box-shadow:
+      0 0 0 1px rgba(255, 181, 166, 0.06) inset,
+      0 14px 32px rgba(0, 0, 0, 0.24);
+    transition:
+      transform 0.15s ease,
+      border-color 0.15s ease,
+      background 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .update-nudge:hover {
+    transform: translateY(-1px);
+    border-color: rgba(232, 131, 98, 0.5);
+    background:
+      radial-gradient(circle at top left, rgba(255, 202, 172, 0.16), transparent 44%),
+      linear-gradient(180deg, rgba(191, 84, 66, 0.2), rgba(126, 37, 24, 0.1));
+    box-shadow:
+      0 0 0 1px rgba(255, 181, 166, 0.1) inset,
+      0 18px 36px rgba(0, 0, 0, 0.28);
+  }
+
+  .update-nudge:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
+  }
+
+  .update-nudge-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3.35rem;
+    height: 1.9rem;
+    padding: 0 0.7rem;
+    border: 1px solid rgba(255, 181, 166, 0.34);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 214, 206, 0.2), rgba(191, 84, 66, 0.28));
+    color: rgba(255, 242, 231, 0.96);
+    font-family: 'Cinzel', serif;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    box-shadow: 0 0 18px rgba(191, 84, 66, 0.18);
+  }
+
+  .update-nudge-copy {
+    min-width: 0;
+    display: grid;
+    gap: 0.18rem;
+    text-align: left;
+  }
+
+  .update-nudge-title {
+    color: rgba(255, 233, 219, 0.92);
+    font-family: 'Cinzel', serif;
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .update-nudge-text {
+    color: rgba(243, 221, 209, 0.74);
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+
   .locale-toggle:hover {
     background: linear-gradient(180deg, rgba(200, 148, 55, 0.2), rgba(200, 148, 55, 0.1));
     border-color: rgba(200, 148, 55, 0.4);
@@ -985,6 +1206,11 @@
     border-color: rgba(205, 150, 60, 0.3);
   }
 
+  .step-error {
+    border-color: rgba(200, 82, 66, 0.42);
+    box-shadow: 0 6px 28px rgba(0,0,0,0.35), 0 0 22px rgba(200, 82, 66, 0.08);
+  }
+
   .step-install {
     margin-top: 0.2rem;
   }
@@ -1049,6 +1275,7 @@
 
   .tag-ok   { background: rgba(80, 180, 120, 0.15); color: #6dd9a0; border: 1px solid rgba(80, 180, 120, 0.25); }
   .tag-warn { background: rgba(200, 140, 50, 0.12); color: #c4923a; border: 1px solid rgba(200, 140, 50, 0.22); }
+  .tag-danger { background: rgba(200, 82, 66, 0.14); color: #ff9a8a; border: 1px solid rgba(200, 82, 66, 0.3); }
 
   .detail-line {
     margin: 0;
@@ -1068,6 +1295,16 @@
   .detail-muted {
     font-size: 0.8rem;
     color: rgba(200, 170, 120, 0.6);
+  }
+
+  .detail-faint {
+    font-size: 0.74rem;
+    color: rgba(180, 150, 110, 0.48);
+  }
+
+  .detail-alert {
+    font-size: 0.82rem;
+    color: rgba(255, 166, 150, 0.92);
   }
 
   .locate-bar {
@@ -1385,6 +1622,21 @@
     transform: translateY(-1px);
   }
 
+  .install-btn.install-btn-danger {
+    color: #fff3ee;
+    background: linear-gradient(135deg, #bf5442 0%, #842619 52%, #d46d5a 100%);
+    border-color: rgba(226, 128, 110, 0.52);
+    box-shadow: 0 0 0 1px rgba(255, 181, 166, 0.16) inset, 0 4px 22px rgba(132, 38, 25, 0.34);
+  }
+
+  .install-btn.install-btn-danger::before {
+    background: linear-gradient(180deg, rgba(255, 216, 208, 0.14) 0%, transparent 55%);
+  }
+
+  .install-btn.install-btn-danger:hover:not(:disabled) {
+    box-shadow: 0 0 0 1px rgba(255, 181, 166, 0.22) inset, 0 6px 30px rgba(132, 38, 25, 0.5), 0 0 40px rgba(191, 84, 66, 0.18);
+  }
+
   .install-btn:disabled {
     opacity: 0.32;
     cursor: not-allowed;
@@ -1424,11 +1676,33 @@
   }
 
   @media (max-width: 520px) {
-.shell { padding: 1rem 0.85rem 1.5rem; }
+    .shell { padding: 1rem 0.85rem 1.5rem; }
     .header { padding: 1.2rem 1rem 1rem; }
     .action-row,
     .action-primary {
       flex-direction: column;
+    }
+
+    .feature-card,
+    .install-acknowledge {
+      padding-left: 0.85rem;
+      padding-right: 0.85rem;
+    }
+
+    .header-link {
+      min-width: 0;
+      width: 100%;
+    }
+
+    .update-nudge {
+      width: 100%;
+      grid-template-columns: 1fr;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .update-nudge-copy {
+      text-align: center;
     }
 
     .detect-btn,

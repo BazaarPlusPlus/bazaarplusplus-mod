@@ -22,6 +22,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
     private MonsterPreviewController _overlayController;
     private Card _lockedCard;
     private bool _closeOnNextClickArmed;
+    private int _closeOnNextClickArmedFrame = -1;
     public static MonsterLockShowcaseRuntime Instance { get; private set; }
 
     public bool IsPreviewActive => _lockedCard != null;
@@ -124,9 +125,10 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             )
         );
         _closeOnNextClickArmed = true;
+        _closeOnNextClickArmedFrame = Time.frameCount;
         BppLog.Info(
             "MonsterLockShowcaseRuntime",
-            $"Activated BPP showcase mode source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={cards.Count} skills={skillCards.Count}"
+            $"Activated BPP showcase mode source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={cards.Count} skills={skillCards.Count} armedFrame={_closeOnNextClickArmedFrame}"
         );
         return true;
     }
@@ -144,6 +146,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
     {
         _lockedCard = null;
         _closeOnNextClickArmed = false;
+        _closeOnNextClickArmedFrame = -1;
         if (_overlayController == null)
             return;
 
@@ -291,12 +294,21 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         var dataSource = new InMemoryPreviewDataSource();
         dataSource.SetCards(cards, skillCards);
         dataSource.SetMetadata(title, new Dictionary<string, string> { ["source"] = source });
+        var presentation = ClonePresentation(_presentation);
+        if (!presentation.Visible)
+        {
+            BppLog.Warn(
+                "MonsterLockShowcaseRuntime",
+                $"Showcase presentation was hidden before request creation; forcing visible source={source} title={title}"
+            );
+            presentation.Visible = true;
+        }
 
         return new PreviewBoardRequest
         {
             DataSource = dataSource,
             AnchorStrategy = _anchorStrategy,
-            Presentation = _presentation,
+            Presentation = presentation,
             Debug = new PreviewBoardDebugOptions(),
         };
     }
@@ -312,6 +324,15 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             )
         )
         {
+            return false;
+        }
+
+        if (!NextClickCloseFrameGate.CanConsume(_closeOnNextClickArmedFrame, Time.frameCount))
+        {
+            BppLog.Debug(
+                "MonsterLockShowcaseRuntime",
+                $"Ignored close consume in armed frame reason={reason} armedFrame={_closeOnNextClickArmedFrame} currentFrame={Time.frameCount}"
+            );
             return false;
         }
 
@@ -335,5 +356,23 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         destination.BoardThickness = source.BoardThickness;
         destination.BorderThickness = source.BorderThickness;
         destination.BorderHeight = source.BorderHeight;
+    }
+
+    private static PreviewBoardPresentation ClonePresentation(PreviewBoardPresentation presentation)
+    {
+        presentation ??= new PreviewBoardPresentation();
+        return new PreviewBoardPresentation
+        {
+            Visible = presentation.Visible,
+            DebugEnabled = presentation.DebugEnabled,
+            LocalOffset = presentation.LocalOffset,
+            CardScale = presentation.CardScale,
+            CardSpacing = presentation.CardSpacing,
+            BoardSize = presentation.BoardSize,
+            SkillBoardWidth = presentation.SkillBoardWidth,
+            BoardThickness = presentation.BoardThickness,
+            BorderThickness = presentation.BorderThickness,
+            BorderHeight = presentation.BorderHeight,
+        };
     }
 }

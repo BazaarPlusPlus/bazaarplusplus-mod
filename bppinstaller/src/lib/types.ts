@@ -5,6 +5,7 @@ export interface EnvironmentInfo {
   dotnet_ok: boolean;
   bepinex_installed: boolean;
   bpp_version: string | null;
+  bundled_bpp_version: string | null;
 }
 
 export interface DotnetInfo {

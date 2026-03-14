@@ -64,6 +64,9 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
             return null;
         }
 
+        if (PreviewCardLifecyclePolicy.ShouldRefreshAfterInstantiate(PreviewCardKind.Item))
+            await RefreshSpawnedItemAsync(cardObject, card);
+
         cardObject.AddComponent<ShowcaseCardMarker>();
         ConfigureSpawned(cardObject);
         BppLog.Debug(
@@ -88,12 +91,21 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
             UnityEngine.Object.Destroy(marker);
 
         if (cardObject.TryGetComponent<ItemController>(out var itemController))
+        {
+            // Preview items reuse the main gameplay item pool. Always reset card visuals
+            // before disposal so stale frame/material state does not leak into future
+            // preview or board renders.
+            itemController.Cleanup();
             itemController.EnableMovement(true);
+        }
         else if (cardObject.TryGetComponent<CardController>(out var cardController))
             cardController.EnableMovement(true);
 
         cardObject.transform.localScale = Vector3.one;
-        cardObject.PoolObject();
+        if (PreviewCardLifecyclePolicy.ShouldReturnToPool(PreviewCardKind.Item))
+            cardObject.PoolObject();
+        else
+            UnityEngine.Object.Destroy(cardObject);
     }
 
     private static ItemCard BuildCard(PreviewCardSpec entry, object staticData)
@@ -204,6 +216,20 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
             cardController.EnableMovement(false);
             cardController.ShowCard(true);
         }
+    }
+
+    private static async Task RefreshSpawnedItemAsync(GameObject cardObject, ItemCard card)
+    {
+        if (cardObject == null || card == null)
+            return;
+
+        if (!cardObject.TryGetComponent<ItemController>(out var itemController))
+            return;
+
+        // Pooled item cards can retain stale frame/back/material state. Reset then rerun setup
+        // so the preview reflects the current CardData and does not poison the shared item pool.
+        itemController.Cleanup();
+        await itemController.Setup(card);
     }
 
     private bool EnsureApi(AssetLoader loader)

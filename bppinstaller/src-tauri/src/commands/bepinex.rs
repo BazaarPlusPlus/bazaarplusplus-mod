@@ -20,6 +20,32 @@ pub fn bundled_zip_relative_path() -> &'static str {
     "BepInExSource/BepInEx.zip"
 }
 
+pub fn read_bundled_bpp_version(app: &tauri::AppHandle) -> Result<Option<String>, String> {
+    let resource_path = app
+        .path()
+        .resource_dir()
+        .map_err(|err| err.to_string())?
+        .join(bundled_zip_relative_path());
+    let zip_bytes = std::fs::read(&resource_path)
+        .map_err(|err| format!("Cannot read bundled BepInEx.zip: {err}"))?;
+
+    let reader = Cursor::new(zip_bytes);
+    let mut archive = zip::ZipArchive::new(reader).map_err(|err| err.to_string())?;
+
+    for index in 0..archive.len() {
+        let mut file = archive.by_index(index).map_err(|err| err.to_string())?;
+        if file.name().ends_with("BazaarPlusPlus.version") {
+            let mut version = String::new();
+            file.read_to_string(&mut version)
+                .map_err(|err| err.to_string())?;
+            let version = version.trim();
+            return Ok((!version.is_empty()).then(|| version.to_string()));
+        }
+    }
+
+    Ok(None)
+}
+
 pub fn extract_zip(zip_bytes: &[u8], dest_dir: &Path) -> Result<Vec<String>, String> {
     let reader = Cursor::new(zip_bytes);
     let mut archive = zip::ZipArchive::new(reader).map_err(|err| err.to_string())?;

@@ -72,6 +72,16 @@ Assert(
     "The next right click should also close an active preview when the gate is armed."
 );
 
+Assert(
+    !NextClickCloseFrameGate.CanConsume(armedFrame: 42, currentFrame: 42),
+    "The opening frame should not be allowed to consume the close-on-next-click gate."
+);
+
+Assert(
+    NextClickCloseFrameGate.CanConsume(armedFrame: 42, currentFrame: 43),
+    "A later frame should be allowed to consume the close-on-next-click gate."
+);
+
 var armed = true;
 var firstConsume = controller.ShouldConsumeNextClickToClosePreview(
     isPreviewActive: true,

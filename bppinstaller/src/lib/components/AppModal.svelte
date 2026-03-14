@@ -11,6 +11,7 @@
   export let onConfirm: () => void = () => {};
   export let onCancel: () => void = () => {};
   export let bodyClass = '';
+  export let wide = false;
 
   function handleConfirm() {
     if (confirmDisabled) return;
@@ -26,6 +27,7 @@
   <div class="modal-backdrop" role="presentation">
     <div
       class="modal-card"
+      class:wide
       role="dialog"
       aria-modal="true"
       aria-labelledby="app-modal-title"
@@ -91,6 +93,10 @@
     gap: 0.85rem;
     text-align: center;
     animation: fade-up 0.2s ease both;
+  }
+
+  .modal-card.wide {
+    width: min(100%, 560px);
   }
 
   .modal-card :global(*) {

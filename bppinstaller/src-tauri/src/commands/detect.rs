@@ -1,6 +1,7 @@
 ﻿use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tauri::AppHandle;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -16,6 +17,7 @@ pub struct EnvironmentInfo {
     pub dotnet_ok: bool,
     pub bepinex_installed: bool,
     pub bpp_version: Option<String>,
+    pub bundled_bpp_version: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -25,12 +27,15 @@ pub struct DotnetInfo {
 }
 
 #[tauri::command]
-pub fn detect_environment() -> Result<EnvironmentInfo, String> {
+pub fn detect_environment(app: AppHandle) -> Result<EnvironmentInfo, String> {
     let steam_path = get_steam_path();
     let game_path = steam_path.as_ref().and_then(|path| get_game_path(path));
     let bpp_version = game_path
         .as_ref()
         .and_then(|path| read_installed_bpp_version(path));
+    let bundled_bpp_version = crate::commands::bepinex::read_bundled_bpp_version(&app)
+        .ok()
+        .flatten();
     let bepinex_installed = bpp_version.is_some();
 
     Ok(EnvironmentInfo {
@@ -40,6 +45,7 @@ pub fn detect_environment() -> Result<EnvironmentInfo, String> {
         dotnet_ok: false,
         bepinex_installed,
         bpp_version,
+        bundled_bpp_version,
     })
 }
 

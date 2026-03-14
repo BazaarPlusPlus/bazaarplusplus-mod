@@ -65,7 +65,7 @@ internal sealed class MonsterPreviewSkillCardFactory : IPreviewCardFactory
         if (cardObject.TryGetComponent<SkillController>(out var skillController))
         {
             // Preview skill cards reuse the same pooled token prefab as the main game UI.
-            // Always reset visuals before returning to the global pool so we do not leak
+            // Always reset visuals before disposal so we do not leak
             // preview frame/icon state into merchant or board skill renders.
             skillController.Cleanup();
             skillController.EnableMovement(true);
@@ -74,7 +74,10 @@ internal sealed class MonsterPreviewSkillCardFactory : IPreviewCardFactory
             cardController.EnableMovement(true);
 
         cardObject.transform.localScale = Vector3.one;
-        cardObject.PoolObject();
+        if (PreviewCardLifecyclePolicy.ShouldReturnToPool(PreviewCardKind.Skill))
+            cardObject.PoolObject();
+        else
+            UnityEngine.Object.Destroy(cardObject);
     }
 
     private static SkillCard BuildCard(PreviewCardSpec spec, object staticData)

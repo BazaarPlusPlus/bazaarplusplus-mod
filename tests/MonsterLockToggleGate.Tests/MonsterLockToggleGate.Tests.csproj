@@ -8,5 +8,6 @@
 
   <ItemGroup>
     <Compile Include="../../Game/MonsterPreview/Showcase/MonsterLockShowcaseController.cs" Link="MonsterLockShowcaseController.cs" />
+    <Compile Include="../../Game/MonsterPreview/Showcase/NextClickCloseFrameGate.cs" Link="NextClickCloseFrameGate.cs" />
   </ItemGroup>
 </Project>
