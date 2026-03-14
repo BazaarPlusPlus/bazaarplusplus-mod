@@ -138,6 +138,7 @@
   }
 
   function openPaymentCodes() {
+    hiddenPaymentImages = {};
     showPaymentCodes = true;
   }
 
