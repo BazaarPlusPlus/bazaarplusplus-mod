@@ -201,9 +201,17 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out var monster))
         {
             var previewModel = MonsterDatabasePreviewDataSource.BuildModel(monster, "monster_db");
-            cards = new List<PreviewCardSpec>(previewModel.ItemCards);
-            skillCards = new List<PreviewCardSpec>(previewModel.SkillCards);
+            cards = PreviewCardSpecFilter.FilterLocallyRenderable(previewModel.ItemCards);
+            skillCards = PreviewCardSpecFilter.FilterLocallyRenderable(previewModel.SkillCards);
             source = $"monster_db:{monster.EncounterShortId}";
+            LogFilteredPreviewCounts(
+                card,
+                source,
+                previewModel.ItemCards?.Count ?? 0,
+                cards.Count,
+                previewModel.SkillCards?.Count ?? 0,
+                skillCards.Count
+            );
             return cards.Count > 0 || skillCards.Count > 0;
         }
 
@@ -211,10 +219,35 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         if (preview == null)
             return false;
 
-        cards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.BoardCards);
-        skillCards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.Skills);
+        var cachedCards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.BoardCards);
+        var cachedSkillCards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.Skills);
+        cards = PreviewCardSpecFilter.FilterLocallyRenderable(cachedCards);
+        skillCards = PreviewCardSpecFilter.FilterLocallyRenderable(cachedSkillCards);
         source = "encounter_tracker_cache";
+        LogFilteredPreviewCounts(
+            card,
+            source,
+            cachedCards.Count,
+            cards.Count,
+            cachedSkillCards.Count,
+            skillCards.Count
+        );
         return cards.Count > 0 || skillCards.Count > 0;
+    }
+
+    private static void LogFilteredPreviewCounts(
+        Card card,
+        string source,
+        int originalItemCount,
+        int filteredItemCount,
+        int originalSkillCount,
+        int filteredSkillCount
+    )
+    {
+        BppLog.Info(
+            "MonsterLockShowcaseRuntime",
+            $"Preview filter source={source} encounter={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={filteredItemCount}/{originalItemCount} skills={filteredSkillCount}/{originalSkillCount}"
+        );
     }
 
     private static RunInfo.MonsterPreview FindEncounterPreview(Card card)

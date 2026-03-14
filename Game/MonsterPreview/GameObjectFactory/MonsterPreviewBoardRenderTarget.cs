@@ -6,6 +6,7 @@ namespace BazaarPlusPlus;
 internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
 {
     private MonsterPreviewBoard _board;
+    private readonly PreviewRenderGenerationGate _renderGate = new PreviewRenderGenerationGate();
 
     public MonsterPreviewBoardRenderTarget()
         : this(CreateBoard()) { }
@@ -21,6 +22,7 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
 
     public void Dispose()
     {
+        _renderGate.MarkDisposed();
         _board?.Dispose();
         _board = null;
     }
@@ -34,18 +36,20 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
         }
 
         renderModel ??= new BoardRenderModel();
+        var visible = renderModel.Presentation?.Visible ?? false;
+        var generation = _renderGate.BeginRender(visible);
         BppLog.Info(
             "MonsterPreviewBoardRenderTarget",
-            $"Render visible={renderModel.Presentation?.Visible ?? false} items={renderModel.Data?.ItemCards?.Count ?? 0} skills={renderModel.Data?.SkillCards?.Count ?? 0} pose={renderModel.Pose?.Position}"
+            $"Render visible={visible} generation={generation} items={renderModel.Data?.ItemCards?.Count ?? 0} skills={renderModel.Data?.SkillCards?.Count ?? 0} pose={renderModel.Pose?.Position}"
         );
         _board.SetPresentation(renderModel.Presentation ?? new PreviewBoardPresentation());
         _board.SetDebugOptions(renderModel.Debug ?? new PreviewBoardDebugOptions());
         _board.UpdateAnchor(renderModel.Pose.Position, renderModel.Pose.Rotation);
-        _board.SetVisible(renderModel.Presentation.Visible);
+        _board.SetVisible(visible);
         _ = _board.RebuildAsync(
             renderModel.Data?.ItemCards ?? new List<PreviewCardSpec>(),
             renderModel.Data?.SkillCards ?? new List<PreviewCardSpec>(),
-            () => false
+            () => _renderGate.ShouldCancel(generation)
         );
     }
 
@@ -58,7 +62,14 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
         }
 
         if (!visible)
+        {
+            _renderGate.InvalidateForHide();
             _board.Clear();
+        }
+        else
+        {
+            _renderGate.MarkVisible();
+        }
         _board.SetVisible(visible);
         BppLog.Info("MonsterPreviewBoardRenderTarget", $"SetVisible visible={visible}");
     }
