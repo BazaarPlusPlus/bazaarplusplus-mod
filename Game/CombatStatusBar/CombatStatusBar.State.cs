@@ -5,7 +5,7 @@ namespace BazaarPlusPlus;
 
 internal sealed partial class CombatStatusBar
 {
-    private static readonly float[] SpeedSteps = { 0.25f, 0.5f, 1f, 2f, 3f, 4f, 5f, };
+    private static readonly float[] SpeedSteps = { 0.25f, 0.5f, 1f, 1.5f, 2f, 3f, };
 
     internal static bool IsCombatPlaybackActive { get; private set; }
     internal static bool IsCombatPaused { get; private set; }

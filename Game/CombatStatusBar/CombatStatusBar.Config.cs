@@ -22,8 +22,8 @@ internal sealed partial class CombatStatusBar
                 "SpeedMultiplier",
                 1f,
                 new ConfigDescription(
-                "Default combat playback speed multiplier. Supported values: 0.25, 0.50, 1.00, 2.00, 3.00, 4.00, 5.00",
-                new AcceptableValueRange<float>(0.25f, 5f)
+                "Default combat playback speed multiplier. Supported values: 0.25, 0.50, 1.00, 1.50, 2.00, 3.00",
+                new AcceptableValueList<float>(0.25f, 0.5f, 1f, 1.5f, 2f, 3f)
             )
         );
         CombatSpeedMultiplier = SetConfiguredDefaultSpeed(_defaultCombatSpeedConfig.Value);

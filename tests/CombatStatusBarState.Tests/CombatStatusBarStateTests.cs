@@ -66,11 +66,27 @@ public sealed class CombatStatusBarStateTests : IDisposable
     [Fact]
     public void FormatCombatSpeedLabel_UsesTwoDecimalPlaces()
     {
-        CombatStatusBar.SetCombatSpeed(4f);
+        CombatStatusBar.SetCombatSpeed(1.5f);
 
         var result = CombatStatusBar.FormatCombatSpeedLabel();
 
-        Assert.Equal("4.00x", result);
+        Assert.Equal("1.50x", result);
+    }
+
+    [Fact]
+    public void NormalizeConfiguredDefaultSpeed_AcceptsNewSupportedStep()
+    {
+        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(1.5f);
+
+        Assert.Equal(1.5f, result);
+    }
+
+    [Fact]
+    public void NormalizeConfiguredDefaultSpeed_RejectsRemovedStep()
+    {
+        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(4f);
+
+        Assert.Equal(1f, result);
     }
 
     [Theory]

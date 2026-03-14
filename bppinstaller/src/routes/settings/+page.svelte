@@ -7,7 +7,7 @@
   import { formatMessage, messages } from '$lib/i18n';
   import { locale, handleLocaleToggle } from '$lib/locale';
 
-  const SPEED_STEPS = [0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0];
+  const SPEED_STEPS = [0.25, 0.5, 1.0, 1.5, 2.0, 3.0];
   type LoadState = 'loading' | 'ready' | 'missing-path' | 'error';
 
   let gamePath = '';
