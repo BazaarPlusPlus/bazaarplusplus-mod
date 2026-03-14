@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { getVersion } from '@tauri-apps/api/app';
   import { open } from '@tauri-apps/plugin-dialog';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { onMount } from 'svelte';
@@ -20,7 +21,10 @@
   let actionMenuOpen = false;
   const STEAM_BAZAAR_URL = 'steam://rungameid/1617400';
   let showInstallModal = false;
+  let showUpdatedInstallerModal = false;
+  let pendingReinstallAfterUpdate = false;
   let installAcknowledged = false;
+  const APP_VERSION_STORAGE_KEY = 'bppinstaller:last-seen-app-version';
   const installDebugMode =
     import.meta.env.DEV &&
     typeof window !== 'undefined' &&
@@ -63,6 +67,16 @@
     if (!installAcknowledged) return;
     showInstallModal = false;
     await installBundled();
+  }
+
+  function acknowledgeUpdatedInstallerPrompt() {
+    showUpdatedInstallerModal = false;
+  }
+
+  function reopenInstallFlowAfterUpdate() {
+    showUpdatedInstallerModal = false;
+    pendingReinstallAfterUpdate = true;
+    void detectEnvironment();
   }
 
   async function verifyGamePath(path: string) {
@@ -217,11 +231,33 @@
     : 'https://dotnet.microsoft.com/en-us/download';
   $: localeBadge = $locale === 'zh' ? '中' : 'EN';
   $: localeButtonLabel = $locale === 'zh' ? 'Switch to English' : '切换到中文';
+  $: if (pendingReinstallAfterUpdate && canInstall) {
+    pendingReinstallAfterUpdate = false;
+    requestInstall();
+  }
 
   onMount(() => {
     locale.init();
     void detectEnvironment();
+    void detectUpdatedInstaller();
   });
+
+  async function detectUpdatedInstaller() {
+    if (!hasTauriRuntime()) return;
+
+    try {
+      const currentVersion = await getVersion();
+      const lastSeenVersion = window.localStorage.getItem(APP_VERSION_STORAGE_KEY);
+
+      if (lastSeenVersion && lastSeenVersion !== currentVersion) {
+        showUpdatedInstallerModal = true;
+      }
+
+      window.localStorage.setItem(APP_VERSION_STORAGE_KEY, currentVersion);
+    } catch (e) {
+      console.error(e);
+    }
+  }
 </script>
 
 <svelte:head>
@@ -316,6 +352,20 @@
       </span>
     </label>
   </AppModal>
+
+  <AppModal
+    open={showUpdatedInstallerModal}
+    eyebrow="BazaarPlusPlus"
+    title={$locale === 'zh' ? '安装器已更新' : 'Installer Updated'}
+    body={$locale === 'zh'
+      ? '这是更新后的首次启动。为了让最新文件重新写入游戏目录，建议再次执行安装。'
+      : 'This is the first launch after updating the installer. Run the install step again to refresh the game files with the latest bundle.'}
+    confirmText={$locale === 'zh' ? '重新安装' : 'Reinstall'}
+    showCancel={true}
+    cancelText={$locale === 'zh' ? '稍后' : 'Later'}
+    onConfirm={reopenInstallFlowAfterUpdate}
+    onCancel={acknowledgeUpdatedInstallerPrompt}
+  />
 
   <header class="header">
     <div class="corner tl" aria-hidden="true">

@@ -17,8 +17,9 @@ export interface ModConfigReadResult {
   values: Record<string, string>;
 }
 
-export interface UpdateInfo {
-  current_version: string | null;
-  latest_version: string | null;
-  update_available: boolean;
+export interface AppUpdateInfo {
+  version: string;
+  currentVersion: string;
+  body: string | null;
+  date: string | null;
 }

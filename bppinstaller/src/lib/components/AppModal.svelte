@@ -4,14 +4,21 @@
   export let title = '';
   export let body = '';
   export let confirmText = 'OK';
+  export let cancelText = '';
   export let showConfirm = true;
+  export let showCancel = false;
   export let confirmDisabled = false;
   export let onConfirm: () => void = () => {};
+  export let onCancel: () => void = () => {};
   export let bodyClass = '';
 
   function handleConfirm() {
     if (confirmDisabled) return;
     onConfirm();
+  }
+
+  function handleCancel() {
+    onCancel();
   }
 </script>
 
@@ -34,15 +41,28 @@
           <slot />
         </div>
       {/if}
-      {#if showConfirm}
-        <button
-          class="modal-confirm"
-          type="button"
-          onclick={handleConfirm}
-          disabled={confirmDisabled}
-        >
-          {confirmText}
-        </button>
+      {#if showConfirm || showCancel}
+        <div class="modal-actions">
+          {#if showCancel}
+            <button
+              class="modal-cancel"
+              type="button"
+              onclick={handleCancel}
+            >
+              {cancelText}
+            </button>
+          {/if}
+          {#if showConfirm}
+            <button
+              class="modal-confirm"
+              type="button"
+              onclick={handleConfirm}
+              disabled={confirmDisabled}
+            >
+              {confirmText}
+            </button>
+          {/if}
+        </div>
       {/if}
     </div>
   </div>
@@ -103,7 +123,6 @@
   }
 
   .modal-confirm {
-    justify-self: center;
     min-width: 150px;
     padding: 0.72rem 1rem;
     font-family: 'Cinzel', serif;
@@ -116,6 +135,32 @@
     border-radius: 2px;
     box-shadow: 0 0 0 1px rgba(255, 198, 98, 0.14) inset, 0 4px 22px rgba(170, 100, 25, 0.3);
     cursor: pointer;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .modal-cancel {
+    min-width: 130px;
+    padding: 0.72rem 1rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.66rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(228, 216, 191, 0.82);
+    background: rgba(200, 148, 55, 0.06);
+    border: 1px solid rgba(180, 130, 48, 0.18);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+
+  .modal-cancel:hover {
+    background: rgba(200, 148, 55, 0.12);
+    border-color: rgba(200, 148, 55, 0.34);
   }
 
   .modal-confirm:hover {
@@ -131,6 +176,11 @@
   }
 
   .modal-confirm:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
+  }
+
+  .modal-cancel:focus-visible {
     outline: 2px solid rgba(255, 214, 140, 0.9);
     outline-offset: 2px;
   }

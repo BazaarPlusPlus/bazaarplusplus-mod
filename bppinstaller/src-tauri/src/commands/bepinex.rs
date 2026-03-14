@@ -2,8 +2,6 @@ use std::io::{Cursor, Read};
 use std::path::Path;
 use tauri::Manager;
 
-use crate::commands::vdf::clear_launch_options_for_steam;
-
 macro_rules! debug_log {
     ($($arg:tt)*) => {
         #[cfg(debug_assertions)]
@@ -16,16 +14,6 @@ macro_rules! debug_error {
         #[cfg(debug_assertions)]
         eprintln!($($arg)*);
     };
-}
-
-pub const BPP_VERSION_URL: &str = "";
-pub const BPP_DOWNLOAD_URL: &str = "";
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct UpdateInfo {
-    pub current_version: Option<String>,
-    pub latest_version: Option<String>,
-    pub update_available: bool,
 }
 
 pub fn bundled_zip_relative_path() -> &'static str {
@@ -63,11 +51,6 @@ pub fn extract_zip(zip_bytes: &[u8], dest_dir: &Path) -> Result<Vec<String>, Str
     Ok(extracted)
 }
 
-pub fn parse_latest_version_response(response: &str) -> Option<String> {
-    let version = response.trim();
-    (!version.is_empty()).then(|| version.to_string())
-}
-
 fn remove_path_if_exists(path: &Path) -> Result<(), String> {
     if !path.exists() {
         return Ok(());
@@ -100,34 +83,6 @@ fn uninstall_payload(game_path: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn check_bpp_update(current_version: Option<String>) -> Result<UpdateInfo, String> {
-    if BPP_VERSION_URL.is_empty() {
-        return Ok(UpdateInfo {
-            current_version,
-            latest_version: None,
-            update_available: false,
-        });
-    }
-
-    let response = reqwest::blocking::get(BPP_VERSION_URL)
-        .map_err(|err| format!("Cannot fetch latest BazaarPlusPlus version: {err}"))?;
-    let text = response
-        .text()
-        .map_err(|err| format!("Cannot read latest BazaarPlusPlus version response: {err}"))?;
-    let latest_version = parse_latest_version_response(&text);
-    let update_available = match (&current_version, &latest_version) {
-        (Some(current), Some(latest)) => current != latest,
-        _ => false,
-    };
-
-    Ok(UpdateInfo {
-        current_version,
-        latest_version,
-        update_available,
-    })
-}
-
-#[tauri::command]
 pub fn install_bepinex(app: tauri::AppHandle, game_path: String) -> Result<(), String> {
     debug_log!("Reading bundled BepInEx.zip...");
     let relative_zip_path = bundled_zip_relative_path();
@@ -149,29 +104,13 @@ pub fn install_bepinex(app: tauri::AppHandle, game_path: String) -> Result<(), S
 }
 
 #[tauri::command]
-pub fn update_bpp(_app: tauri::AppHandle, game_path: String) -> Result<(), String> {
-    if BPP_DOWNLOAD_URL.is_empty() {
-        return Err("BPP_DOWNLOAD_URL is not configured".to_string());
-    }
-
-    let response = reqwest::blocking::get(BPP_DOWNLOAD_URL)
-        .map_err(|err| format!("Cannot download BazaarPlusPlus update zip: {err}"))?;
-    let zip_bytes = response
-        .bytes()
-        .map_err(|err| format!("Cannot read BazaarPlusPlus update zip: {err}"))?;
-    let _extracted = extract_zip(zip_bytes.as_ref(), Path::new(&game_path))?;
-    debug_log!("Updated BazaarPlusPlus with {} extracted files.", _extracted.len());
-    Ok(())
-}
-
-#[tauri::command]
-pub fn uninstall_bpp(_app: tauri::AppHandle, steam_path: String, game_path: String) -> Result<(), String> {
+pub fn uninstall_bpp(_app: tauri::AppHandle, _steam_path: String, game_path: String) -> Result<(), String> {
     let game_path = Path::new(&game_path);
     uninstall_payload(game_path)?;
 
     #[cfg(target_os = "macos")]
     {
-        clear_launch_options_for_steam(Path::new(&steam_path))?;
+        crate::commands::vdf::clear_launch_options_for_steam(Path::new(&_steam_path))?;
     }
 
     debug_log!("Uninstalled BazaarPlusPlus payload from {}", game_path.display());
@@ -210,13 +149,6 @@ mod tests {
     fn test_bundled_zip_relative_path_matches_supported_targets() {
         assert_eq!(bundled_zip_relative_path(), "BepInExSource/BepInEx.zip");
     }
-
-    #[test]
-    fn test_parse_latest_version_response_trims_text() {
-        let version = parse_latest_version_response(" 1.2.3 \n");
-        assert_eq!(version.as_deref(), Some("1.2.3"));
-    }
-
     #[test]
     fn test_uninstall_payload_removes_platform_files() {
         let tmp = tempfile::tempdir().unwrap();

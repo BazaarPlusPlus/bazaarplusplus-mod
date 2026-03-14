@@ -1,3 +1,4 @@
+pub mod app_update;
 pub mod bepinex;
 pub mod config;
 pub mod detect;

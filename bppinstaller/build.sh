@@ -54,6 +54,20 @@ if [ "$PROD" = false ]; then
     exit 0
 fi
 
+if [ -z "${BPP_UPDATER_PUBKEY:-}" ] || { [ -z "${BPP_UPDATER_ENDPOINTS:-}" ] && [ -z "${BPP_UPDATER_ENDPOINT:-}" ]; }; then
+    echo "Warning: updater metadata is not configured." >&2
+    echo "Set BPP_UPDATER_PUBKEY and BPP_UPDATER_ENDPOINTS (or BPP_UPDATER_ENDPOINT) before building release artifacts." >&2
+fi
+
+if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+    echo "Warning: TAURI_SIGNING_PRIVATE_KEY is not set." >&2
+    echo "Updater artifacts will not be signed correctly without a signing key." >&2
+fi
+
+if [ -d "$BUNDLE_DIR/msi" ]; then
+    invoke_step "Removing stale MSI bundle artifacts" rm -rf "$BUNDLE_DIR/msi"
+fi
+
 invoke_step "Building Windows app binary" \
     npm run tauri build -- --no-bundle --config "$WINDOWS_CONFIG"
 
