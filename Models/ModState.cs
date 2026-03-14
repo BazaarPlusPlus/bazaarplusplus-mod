@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarGameShared.Domain.Runs;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using TheBazaar;
@@ -125,27 +124,8 @@ internal static class ModState
         if (currentAppState is ReplayState)
             return true;
 
-        if (currentAppState != null)
-            return false;
-
-        if (!Data.HasActiveRun)
-            return false;
-
-        var currentState = Data.CurrentState;
-        if (currentState == null)
-            return false;
-
-        return IsKnownActiveRunState(currentState.StateName);
-    }
-
-    private static bool IsKnownActiveRunState(ERunState stateName)
-    {
-        return stateName == ERunState.Choice
-            || stateName == ERunState.Combat
-            || stateName == ERunState.Encounter
-            || stateName == ERunState.LevelUp
-            || stateName == ERunState.Loot
-            || stateName == ERunState.Pedestal
-            || stateName == ERunState.PVPCombat;
+        // Do not fall back to Data.HasActiveRun/Data.CurrentState when there is no active app state.
+        // Those values can linger briefly after returning to the lobby and incorrectly mark menu screens as in-run.
+        return currentAppState is StartRunAppState;
     }
 }
