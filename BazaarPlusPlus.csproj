@@ -4,7 +4,7 @@
     <AssemblyName>BazaarPlusPlus</AssemblyName>
     <Description>BazaarPlusPlus - Game Enhancement Mod</Description>
     <RootNamespace>BazaarPlusPlus</RootNamespace>
-    <Version>1.0.4</Version>
+    <Version>1.1.0</Version>
     <LangVersion>12</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TargetFramework>netstandard2.1</TargetFramework>
@@ -138,7 +138,7 @@
   <!-- Release build -->
   <Target Name="CopyToInstallerSource" AfterTargets="Build" Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)')">
     <Message Text="[BazaarPlusPlus] Building for Release" Importance="high"/>
-    <WriteLinesToFile File="$(TargetDir)$(TargetName).version" Lines="$(Version).dogfood" Overwrite="true"/>
+    <WriteLinesToFile File="$(TargetDir)$(TargetName).version" Lines="$(Version).prod" Overwrite="true"/>
     <Copy SourceFiles="$(TargetDir)$(TargetName).dll" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).dll"/>
     <Copy SourceFiles="$(TargetDir)$(TargetName).dll" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).dll"/>
     <Copy SourceFiles="$(TargetDir)$(TargetName).version" DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).version"/>
