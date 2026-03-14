@@ -2,6 +2,7 @@ using BazaarPlusPlus;
 
 TestPreviewCardSpecFilter();
 TestPreviewRenderGenerationGate();
+TestMonsterPreviewBoardSupportsOverflowSkills();
 
 Console.WriteLine("MonsterPreviewResilience checks passed.");
 
@@ -41,6 +42,38 @@ static void TestPreviewRenderGenerationGate()
 
     gate.MarkDisposed();
     Assert(gate.ShouldCancel(thirdGeneration), "Dispose should cancel all generations.");
+}
+
+static void TestMonsterPreviewBoardSupportsOverflowSkills()
+{
+    var sourcePath = Path.GetFullPath(
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../../Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoard.cs"
+        )
+    );
+    var source = File.ReadAllText(sourcePath);
+
+    Assert(
+        source.Contains("private const int DefaultSkillSlotCount = 3;", StringComparison.Ordinal),
+        "MonsterPreviewBoard should keep a minimum skill slot baseline while allowing expansion."
+    );
+    Assert(
+        source.Contains("EnsureSkillSlots(skillCards.Count);", StringComparison.Ordinal),
+        "MonsterPreviewBoard should expand skill slots before rebuilding preview skills."
+    );
+    Assert(
+        source.Contains("private int _activeSkillSlotCount = DefaultSkillSlotCount;", StringComparison.Ordinal),
+        "MonsterPreviewBoard should track the active skill slot count separately from allocated slot objects."
+    );
+    Assert(
+        source.Contains("_activeSkillSlotCount = Mathf.Max(DefaultSkillSlotCount, skillCards.Count);", StringComparison.Ordinal),
+        "MonsterPreviewBoard should reset active skill slots to the current preview size."
+    );
+    Assert(
+        source.Contains("var slotCount = Mathf.Max(DefaultSkillSlotCount, _activeSkillSlotCount);", StringComparison.Ordinal),
+        "MonsterPreviewBoard should size skill layout from the active slot count instead of all allocated slots."
+    );
 }
 
 static void Assert(bool condition, string message)

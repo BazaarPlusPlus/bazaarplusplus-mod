@@ -9,7 +9,7 @@ namespace BazaarPlusPlus;
 internal sealed class MonsterPreviewBoard : IDisposable
 {
     private const int BoardSlotCount = 10;
-    private const int SkillSlotCount = 3;
+    private const int DefaultSkillSlotCount = 3;
     private const float ContentYOffset = 0.2f;
     private const float BrandingBoardWidth = 0.5f;
     private const float BoardCenterMarkerSize = 0.16f;
@@ -44,6 +44,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private readonly List<GameObject> _skillSlots = new List<GameObject>();
     private readonly List<GameObject> _skillSlotMarkers = new List<GameObject>();
     private readonly List<GameObject> _skillCards = new List<GameObject>();
+    private int _activeSkillSlotCount = DefaultSkillSlotCount;
 
     private GameObject _boardPlate;
     private GameObject _boardFill;
@@ -71,7 +72,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
         _skillContentRoot.transform.SetParent(_boardRoot.transform, false);
         BuildVisuals();
         BuildBoardSlots();
-        BuildSkillSlots();
+        EnsureSkillSlots(DefaultSkillSlotCount);
         RefreshLayout();
         SetVisible(false);
         BppLog.Info("MonsterPreviewBoard", $"Created board root='{_boardRoot.name}'");
@@ -223,10 +224,14 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     private async Task RebuildSkillsAsync(IReadOnlyList<PreviewCardSpec> skillCards, Func<bool> isCancelled)
     {
+        _activeSkillSlotCount = DefaultSkillSlotCount;
         if (skillCards == null || skillCards.Count == 0)
             return;
 
-        var count = Mathf.Min(skillCards.Count, _skillSlots.Count);
+        EnsureSkillSlots(skillCards.Count);
+        _activeSkillSlotCount = Mathf.Max(DefaultSkillSlotCount, skillCards.Count);
+
+        var count = Mathf.Min(skillCards.Count, _activeSkillSlotCount);
         var leadingEmpty = GetLeadingEmptySkillSlots(count);
 
         for (var index = 0; index < count; index++)
@@ -360,9 +365,10 @@ internal sealed class MonsterPreviewBoard : IDisposable
         }
     }
 
-    private void BuildSkillSlots()
+    private void EnsureSkillSlots(int requestedCount)
     {
-        for (var index = 0; index < SkillSlotCount; index++)
+        var targetCount = Mathf.Max(DefaultSkillSlotCount, requestedCount);
+        for (var index = _skillSlots.Count; index < targetCount; index++)
         {
             var slot = new GameObject($"SkillSlot_{index}");
             slot.transform.SetParent(_skillContentRoot.transform, false);
@@ -399,6 +405,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
             slot.transform.localPosition = new Vector3(0f, 0f, GetSkillSlotCenterZ(index));
             slot.transform.localRotation = Quaternion.identity;
             slot.transform.localScale = Vector3.one;
+            SetActive(slot, index < _activeSkillSlotCount);
 
             if (index < _skillSlotMarkers.Count && _skillSlotMarkers[index] != null)
             {
@@ -409,6 +416,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
                     0.03f,
                     Mathf.Max(0.01f, GetSkillSlotDepth() - SkillSlotInset)
                 );
+                SetActive(_skillSlotMarkers[index], index < _activeSkillSlotCount);
             }
         }
     }
@@ -638,12 +646,14 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     private float GetSkillSlotDepth()
     {
-        return Mathf.Max(0.01f, _presentation.BoardSize.y / SkillSlotCount);
+        var slotCount = Mathf.Max(DefaultSkillSlotCount, _activeSkillSlotCount);
+        return Mathf.Max(0.01f, _presentation.BoardSize.y / slotCount);
     }
 
     private int GetLeadingEmptySkillSlots(int filledCount)
     {
-        var freeSlots = Mathf.Max(0, SkillSlotCount - filledCount);
+        var slotCount = Mathf.Max(DefaultSkillSlotCount, _activeSkillSlotCount);
+        var freeSlots = Mathf.Max(0, slotCount - filledCount);
         return freeSlots / 2;
     }
 
