@@ -28,6 +28,7 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewController>();
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
+        gameObject.AddComponent<TooltipModifierRefreshController>();
 
         if (ModState.IsDebug)
         {

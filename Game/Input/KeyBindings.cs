@@ -10,6 +10,11 @@ internal static class KeyBindings
         {
             return keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
         }
+
+        public static bool IsShiftPressed(Keyboard keyboard)
+        {
+            return keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
+        }
     }
 
     internal static class Toggle
