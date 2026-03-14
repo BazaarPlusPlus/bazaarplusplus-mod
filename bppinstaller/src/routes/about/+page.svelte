@@ -37,7 +37,7 @@
     {
       id: 'wechat',
       zhName: '微信收款码',
-      enName: 'Wepay',
+      enName: 'WePay',
       src: '/support/wechat-pay.svg',
       accent: 'payment-card-wechat'
     }
@@ -280,7 +280,7 @@
 <AppModal
   open={showPaymentCodes}
   eyebrow="BazaarPlusPlus"
-  title={$locale === 'zh' ? '感谢支持' : 'Thanks for Support'}
+  title={$locale === 'zh' ? '支持项目' : 'Support the Project'}
   bodyClass="payment-modal-body"
   confirmText={$locale === 'zh' ? '关闭' : 'Close'}
   onConfirm={closePaymentCodes}
@@ -321,8 +321,8 @@
     </p>
     <p class="payment-support-tip">
       {$locale === 'zh'
-        ? '欢迎在收款备注里留一个 ID，下次更新支持者名单时会见到你'
-        : 'Thanks for the support. If you want, leave an ID in the payment message so it can appear in the next supporter list.'}
+        ? '如果愿意，也欢迎在备注里留一个 ID，期待在下次更新的支持者名单中见到你'
+        : 'If you want, you can leave an ID in the payment note and it may appear in the next supporter list update.'}
     </p>
   </section>
 </AppModal>
@@ -339,8 +339,8 @@
     <div class="supporter-hero">
       <p class="supporter-intro">
         {$locale === 'zh'
-          ? '感谢你们的支持，让 Bazaar++ 能够继续打磨和成长'
-          : 'Thank you for backing Bazaar++. \nYour support keeps the project moving.'}
+          ? '有你的支持，让 Bazaar++ 走的更远'
+          : 'Thank you for backing Bazaar++. \nYour support keeps the project moving further.'}
       </p>
     </div>
 
@@ -360,15 +360,15 @@
     {:else}
       <p class="support-tier-empty">
         {$locale === 'zh'
-          ? '暂时还没有填写支持者名单。'
-          : 'The supporter list is empty right now.'}
+          ? '暂时还没有整理支持者名单。'
+          : 'The supporter list has not been compiled yet.'}
       </p>
     {/if}
 
     <p class="supporter-unnamed-note">
       {$locale === 'zh'
-        ? '也感谢那些没有留名，依然在默默支持 Bazaar++ 的人'
-        : 'And thank you as well to everyone who supported Bazaar++ without leaving a name.'}
+        ? '也感谢所有未署名的支持者。'
+        : 'Thanks as well to everyone who supported Bazaar++ without leaving a name.'}
     </p>
   </section>
 </AppModal>
@@ -457,7 +457,7 @@
         </p>
       </div>
       <button class="supporter-entry" type="button" onclick={openSupporterList}>
-        <span class="supporter-entry-title">{$locale === 'zh' ? '感谢名单' : 'Supporters'}</span>
+        <span class="supporter-entry-title">{$locale === 'zh' ? '支持者名单' : 'Supporters'}</span>
         <span class="supporter-entry-subtitle">{$locale === 'zh' ? '查看名单' : 'Open list'}</span>
       </button>
     </div>
