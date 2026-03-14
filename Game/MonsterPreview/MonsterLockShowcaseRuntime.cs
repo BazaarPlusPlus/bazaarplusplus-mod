@@ -110,7 +110,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         if (!_controller.ShouldShowForLock(card?.TemplateId, isShowcaseCard, isMonsterCard))
             return false;
 
-        if (!TryBuildPreview(card, out var cards, out var skillCards, out var source))
+        if (!TryBuildPreview(card, out var previewModel, out var source))
             return false;
 
         _lockedCard = card;
@@ -118,8 +118,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         CopyPresentation(MonsterPreviewDefaults.CreateShowcasePresentation(), _presentation);
         _overlayController.ShowRequest(
             CreateShowcaseRequest(
-                cards,
-                skillCards,
+                previewModel,
                 card?.Template?.InternalName ?? source,
                 source
             )
@@ -128,7 +127,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         _closeOnNextClickArmedFrame = Time.frameCount;
         BppLog.Info(
             "MonsterLockShowcaseRuntime",
-            $"Activated BPP showcase mode source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={cards.Count} skills={skillCards.Count} armedFrame={_closeOnNextClickArmedFrame}"
+            $"Activated BPP showcase mode source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={previewModel?.ItemCards?.Count ?? 0} skills={previewModel?.SkillCards?.Count ?? 0} armedFrame={_closeOnNextClickArmedFrame}"
         );
         return true;
     }
@@ -189,13 +188,11 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     private static bool TryBuildPreview(
         Card card,
-        out List<PreviewCardSpec> cards,
-        out List<PreviewCardSpec> skillCards,
+        out PreviewBoardModel previewModel,
         out string source
     )
     {
-        cards = new List<PreviewCardSpec>();
-        skillCards = new List<PreviewCardSpec>();
+        previewModel = null;
         source = string.Empty;
 
         if (card == null || !ModState.IsInGameRun)
@@ -203,16 +200,17 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
         if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out var monster))
         {
-            var previewModel = MonsterDatabasePreviewDataSource.BuildModel(monster, "monster_db");
-            cards = PreviewCardSpecFilter.FilterLocallyRenderable(previewModel.ItemCards);
-            skillCards = PreviewCardSpecFilter.FilterLocallyRenderable(previewModel.SkillCards);
+            var sourceModel = MonsterDatabasePreviewDataSource.BuildModel(monster, "monster_db");
+            var cards = PreviewCardSpecFilter.FilterLocallyRenderable(sourceModel.ItemCards);
+            var skillCards = PreviewCardSpecFilter.FilterLocallyRenderable(sourceModel.SkillCards);
             source = $"monster_db:{monster.EncounterShortId}";
+            previewModel = CreateFilteredPreviewModel(sourceModel, cards, skillCards);
             LogFilteredPreviewCounts(
                 card,
                 source,
-                previewModel.ItemCards?.Count ?? 0,
+                sourceModel.ItemCards?.Count ?? 0,
                 cards.Count,
-                previewModel.SkillCards?.Count ?? 0,
+                sourceModel.SkillCards?.Count ?? 0,
                 skillCards.Count
             );
             return cards.Count > 0 || skillCards.Count > 0;
@@ -224,18 +222,28 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
         var cachedCards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.BoardCards);
         var cachedSkillCards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.Skills);
-        cards = PreviewCardSpecFilter.FilterLocallyRenderable(cachedCards);
-        skillCards = PreviewCardSpecFilter.FilterLocallyRenderable(cachedSkillCards);
+        var filteredCards = PreviewCardSpecFilter.FilterLocallyRenderable(cachedCards);
+        var filteredSkillCards = PreviewCardSpecFilter.FilterLocallyRenderable(cachedSkillCards);
         source = "encounter_tracker_cache";
+        previewModel = new PreviewBoardModel
+        {
+            Title = string.IsNullOrWhiteSpace(preview.Title)
+                ? card.Template?.InternalName ?? string.Empty
+                : preview.Title,
+            ItemCards = filteredCards,
+            SkillCards = filteredSkillCards,
+            Metadata = BuildEncounterPreviewMetadata(preview, source),
+        };
+        previewModel.Signature = PreviewBoardSignature.Build(previewModel);
         LogFilteredPreviewCounts(
             card,
             source,
             cachedCards.Count,
-            cards.Count,
+            filteredCards.Count,
             cachedSkillCards.Count,
-            skillCards.Count
+            filteredSkillCards.Count
         );
-        return cards.Count > 0 || skillCards.Count > 0;
+        return filteredCards.Count > 0 || filteredSkillCards.Count > 0;
     }
 
     private static void LogFilteredPreviewCounts(
@@ -285,15 +293,22 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
     }
 
     private PreviewBoardRequest CreateShowcaseRequest(
-        IReadOnlyList<PreviewCardSpec> cards,
-        IReadOnlyList<PreviewCardSpec> skillCards,
+        PreviewBoardModel previewModel,
         string title,
         string source
     )
     {
         var dataSource = new InMemoryPreviewDataSource();
-        dataSource.SetCards(cards, skillCards);
-        dataSource.SetMetadata(title, new Dictionary<string, string> { ["source"] = source });
+        previewModel ??= new PreviewBoardModel();
+        dataSource.SetCards(previewModel.ItemCards, previewModel.SkillCards);
+        var metadata = new Dictionary<string, string>(previewModel.Metadata ?? new Dictionary<string, string>())
+        {
+            ["source"] = source,
+        };
+        dataSource.SetMetadata(
+            string.IsNullOrWhiteSpace(previewModel.Title) ? title : previewModel.Title,
+            metadata
+        );
         var presentation = ClonePresentation(_presentation);
         if (!presentation.Visible)
         {
@@ -338,6 +353,40 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
         HideOverlay(reason);
         return true;
+    }
+
+    private static PreviewBoardModel CreateFilteredPreviewModel(
+        PreviewBoardModel sourceModel,
+        IReadOnlyList<PreviewCardSpec> cards,
+        IReadOnlyList<PreviewCardSpec> skillCards
+    )
+    {
+        var model = new PreviewBoardModel
+        {
+            Title = sourceModel?.Title ?? string.Empty,
+            ItemCards = cards ?? new List<PreviewCardSpec>(),
+            SkillCards = skillCards ?? new List<PreviewCardSpec>(),
+            Metadata = new Dictionary<string, string>(
+                sourceModel?.Metadata ?? new Dictionary<string, string>()
+            ),
+        };
+        model.Signature = PreviewBoardSignature.Build(model);
+        return model;
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildEncounterPreviewMetadata(
+        RunInfo.MonsterPreview preview,
+        string source
+    )
+    {
+        return new Dictionary<string, string>
+        {
+            ["source"] = source ?? string.Empty,
+            ["encounter"] = preview?.EncounterShortId ?? string.Empty,
+            ["health"] = preview?.Health?.ToString() ?? string.Empty,
+            ["reward_gold"] = preview?.RewardGold?.ToString() ?? string.Empty,
+            ["reward_xp"] = preview?.RewardXp?.ToString() ?? string.Empty,
+        };
     }
 
 

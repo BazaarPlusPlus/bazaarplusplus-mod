@@ -3,6 +3,10 @@ using BazaarPlusPlus;
 TestPreviewCardSpecFilter();
 TestPreviewRenderGenerationGate();
 TestMonsterPreviewBoardSupportsOverflowSkills();
+TestRecoverableLocalCatalogCache();
+TestRecoverableItemAttrCache();
+TestPreviewFactoriesCatchAsyncInitializationFailures();
+TestMonsterPreviewWarmupIsMounted();
 
 Console.WriteLine("MonsterPreviewResilience checks passed.");
 
@@ -74,6 +78,98 @@ static void TestMonsterPreviewBoardSupportsOverflowSkills()
         source.Contains("var slotCount = Mathf.Max(DefaultSkillSlotCount, _activeSkillSlotCount);", StringComparison.Ordinal),
         "MonsterPreviewBoard should size skill layout from the active slot count instead of all allocated slots."
     );
+}
+
+static void TestRecoverableLocalCatalogCache()
+{
+    var source = ReadRepoFile("Data/LocalCardTemplateCatalog.cs");
+
+    Assert(
+        !source.Contains("Lazy<HashSet<Guid>>", StringComparison.Ordinal),
+        "LocalCardTemplateCatalog should not permanently cache initialization state via Lazy<HashSet<Guid>>."
+    );
+    Assert(
+        source.Contains("internal static bool Warm()", StringComparison.Ordinal),
+        "LocalCardTemplateCatalog should expose a warmup entry point."
+    );
+    Assert(
+        source.Contains("internal static void ResetForTests()", StringComparison.Ordinal),
+        "LocalCardTemplateCatalog should support explicit cache reset for resilience tests."
+    );
+    Assert(
+        source.Contains("private static bool EnsureLoaded()", StringComparison.Ordinal),
+        "LocalCardTemplateCatalog should gate access through a reloadable EnsureLoaded path."
+    );
+    Assert(
+        source.Contains("catch (Exception ex)", StringComparison.Ordinal),
+        "LocalCardTemplateCatalog should catch file and parse failures instead of faulting permanently."
+    );
+}
+
+static void TestRecoverableItemAttrCache()
+{
+    var source = ReadRepoFile("Data/ItemAttr.cs");
+
+    Assert(
+        !source.Contains("Lazy<IReadOnlyDictionary<Guid, CardAttributes>>", StringComparison.Ordinal),
+        "ItemAttr should not permanently cache initialization state via Lazy<T>."
+    );
+    Assert(
+        source.Contains("internal static bool Warm()", StringComparison.Ordinal),
+        "ItemAttr should expose a warmup entry point."
+    );
+    Assert(
+        source.Contains("internal static void ResetForTests()", StringComparison.Ordinal),
+        "ItemAttr should support explicit cache reset for resilience tests."
+    );
+    Assert(
+        source.Contains("private static bool EnsureLoaded()", StringComparison.Ordinal),
+        "ItemAttr should gate access through a reloadable EnsureLoaded path."
+    );
+    Assert(
+        source.Contains("catch (Exception ex)", StringComparison.Ordinal),
+        "ItemAttr should catch file and parse failures instead of faulting permanently."
+    );
+}
+
+static void TestPreviewFactoriesCatchAsyncInitializationFailures()
+{
+    var itemFactorySource = ReadRepoFile("Game/MonsterPreview/GameObjectFactory/MonsterPreviewItemCardFactory.cs");
+    var skillFactorySource = ReadRepoFile("Game/MonsterPreview/GameObjectFactory/MonsterPreviewSkillCardFactory.cs");
+
+    Assert(
+        itemFactorySource.Contains("catch (Exception ex)", StringComparison.Ordinal)
+            && itemFactorySource.Contains("CreateCardAsync failed", StringComparison.Ordinal),
+        "MonsterPreviewItemCardFactory should catch async initialization failures and log them."
+    );
+    Assert(
+        skillFactorySource.Contains("catch (Exception ex)", StringComparison.Ordinal)
+            && skillFactorySource.Contains("CreateCardAsync failed", StringComparison.Ordinal),
+        "MonsterPreviewSkillCardFactory should catch async initialization failures and log them."
+    );
+}
+
+static void TestMonsterPreviewWarmupIsMounted()
+{
+    var pluginSource = ReadRepoFile("Plugin.cs");
+    var warmupSource = ReadRepoFile("Game/MonsterPreview/MonsterPreviewWarmupController.cs");
+
+    Assert(
+        pluginSource.Contains("gameObject.AddComponent<MonsterPreviewWarmupController>();", StringComparison.Ordinal),
+        "Plugin should mount MonsterPreviewWarmupController so first-open work can be prewarmed."
+    );
+    Assert(
+        warmupSource.Contains("LocalCardTemplateCatalog.Warm()", StringComparison.Ordinal)
+            && warmupSource.Contains("ItemAttr.Warm()", StringComparison.Ordinal)
+            && warmupSource.Contains("Data.GetStatic()", StringComparison.Ordinal),
+        "MonsterPreviewWarmupController should warm the local template catalog, attribute cache, and static data."
+    );
+}
+
+static string ReadRepoFile(string relativePath)
+{
+    var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../", relativePath));
+    return File.ReadAllText(path);
 }
 
 static void Assert(bool condition, string message)

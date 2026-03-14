@@ -57,6 +57,7 @@ public class RunInfo
         public string Title;
         public string MonsterTemplateId;
         public int? CombatLevel;
+        public int? Health;
         public int? RewardGold;
         public int? RewardXp;
         public bool? SandstormEnabled;

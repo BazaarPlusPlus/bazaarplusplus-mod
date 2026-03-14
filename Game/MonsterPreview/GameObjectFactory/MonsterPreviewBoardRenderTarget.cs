@@ -42,6 +42,7 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
             "MonsterPreviewBoardRenderTarget",
             $"Render visible={visible} generation={generation} items={renderModel.Data?.ItemCards?.Count ?? 0} skills={renderModel.Data?.SkillCards?.Count ?? 0} pose={renderModel.Pose?.Position}"
         );
+        _board.SetMonsterInfo(renderModel.Data ?? new PreviewBoardModel());
         _board.SetPresentation(renderModel.Presentation ?? new PreviewBoardPresentation());
         _board.SetDebugOptions(renderModel.Debug ?? new PreviewBoardDebugOptions());
         _board.UpdateAnchor(renderModel.Pose.Position, renderModel.Pose.Rotation);

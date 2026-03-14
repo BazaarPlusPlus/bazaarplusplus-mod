@@ -9,19 +9,63 @@ namespace BazaarPlusPlus;
 
 internal static class LocalCardTemplateCatalog
 {
-    private static readonly Lazy<HashSet<Guid>> TemplateIds = new(LoadTemplateIds);
+    private static readonly object SyncRoot = new();
+    private static HashSet<Guid> _templateIds = new();
+    private static string? _loadedPath;
 
     public static bool Contains(Guid templateId)
     {
-        return templateId != Guid.Empty && TemplateIds.Value.Contains(templateId);
+        return templateId != Guid.Empty && EnsureLoaded() && _templateIds.Contains(templateId);
     }
 
-    private static HashSet<Guid> LoadTemplateIds()
+    internal static bool Warm()
+    {
+        return EnsureLoaded();
+    }
+
+    internal static void ResetForTests()
+    {
+        lock (SyncRoot)
+        {
+            _templateIds = new HashSet<Guid>();
+            _loadedPath = null;
+        }
+    }
+
+    private static bool EnsureLoaded()
     {
         var path = ModState.CardsJsonPath;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-            return new HashSet<Guid>();
+            return false;
 
+        if (string.Equals(_loadedPath, path, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        lock (SyncRoot)
+        {
+            if (string.Equals(_loadedPath, path, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            try
+            {
+                _templateIds = LoadTemplateIds(path);
+                _loadedPath = path;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                BppLog.Error(
+                    "LocalCardTemplateCatalog",
+                    $"Failed to load local card template catalog from '{path}'",
+                    ex
+                );
+                return false;
+            }
+        }
+    }
+
+    private static HashSet<Guid> LoadTemplateIds(string path)
+    {
         var root = JObject.Parse(File.ReadAllText(path));
         var versionNode = root["5.0.0"] as JArray ?? root.Properties().FirstOrDefault()?.Value as JArray;
         if (versionNode == null)

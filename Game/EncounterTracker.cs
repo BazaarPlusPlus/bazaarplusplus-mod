@@ -117,6 +117,7 @@ internal static class EncounterTracker
                     Title = monsterInfo?.Title ?? string.Empty,
                     MonsterTemplateId = monster?.MonsterTemplateId.ToString(),
                     CombatLevel = monster == null ? null : (int?)monster.Level,
+                    Health = monsterInfo?.Health,
                     RewardGold = combat.RewardCombatGold,
                     RewardXp = combat.RewardCombatXp,
                     SandstormEnabled = combat.SandstormEnabled,

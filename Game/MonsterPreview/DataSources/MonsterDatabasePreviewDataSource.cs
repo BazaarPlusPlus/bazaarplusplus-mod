@@ -37,6 +37,9 @@ internal sealed class MonsterDatabasePreviewDataSource : IPreviewDataSource
             {
                 ["source"] = source ?? "monster_db",
                 ["encounter"] = monster?.EncounterShortId ?? string.Empty,
+                ["health"] = monster?.Health?.ToString() ?? string.Empty,
+                ["reward_gold"] = monster?.RewardGold?.ToString() ?? string.Empty,
+                ["reward_xp"] = monster?.RewardXp?.ToString() ?? string.Empty,
             },
         };
         model.Signature = PreviewBoardSignature.Build(model);

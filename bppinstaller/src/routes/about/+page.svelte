@@ -438,7 +438,15 @@
     <div class="info-card-row">
       <div class="info-summary">
         <p class="info-line info-line-compact">
-          <span>BazaarPlusPlus Installer</span>
+          <a
+            class="info-link"
+            href="https://github.com/cauyxy/BazaarPlusPlus"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            BazaarPlusPlus
+          </a>
+          <span>Installer</span>
         </p>
         <p class="info-meta-line">
           <span class="version-label">Version</span>
@@ -866,6 +874,21 @@
   .info-line-compact {
     flex-wrap: wrap;
     gap: 0.5rem;
+  }
+
+  .info-link {
+    color: rgba(232, 200, 122, 0.92);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .info-link:hover {
+    color: rgba(244, 220, 162, 0.98);
+  }
+
+  .info-link:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
   }
 
   .info-card-row {

@@ -28,6 +28,7 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<RunStateSyncController>();
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewController>();
+        gameObject.AddComponent<MonsterPreviewWarmupController>();
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
         gameObject.AddComponent<TooltipModifierRefreshController>();
 

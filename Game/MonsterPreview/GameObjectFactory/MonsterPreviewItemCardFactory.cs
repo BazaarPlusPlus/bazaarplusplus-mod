@@ -22,58 +22,70 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
 
     public async Task<GameObject> CreateCardAsync(PreviewCardSpec spec, Transform parent)
     {
-        Services.TryGet<AssetLoader>(out var loader);
-        if (loader == null || !EnsureApi(loader))
+        try
         {
-            BppLog.Warn(
+            Services.TryGet<AssetLoader>(out var loader);
+            if (loader == null || !EnsureApi(loader))
+            {
+                BppLog.Warn(
+                    "MonsterPreviewItemCardFactory",
+                    $"API unavailable for template={spec?.TemplateId ?? "null"} loader={(loader == null ? "null" : "ok")}"
+                );
+                return null;
+            }
+
+            if (_staticData == null)
+            {
+                _staticData = await Data.GetStatic();
+                BppLog.Debug("MonsterPreviewItemCardFactory", $"Static data loaded={(_staticData != null)}");
+            }
+
+            if (_staticData == null)
+            {
+                BppLog.Warn(
+                    "MonsterPreviewItemCardFactory",
+                    $"Static data unavailable for template={spec?.TemplateId ?? "null"}"
+                );
+                return null;
+            }
+
+            var card = BuildCard(spec, _staticData);
+            if (card == null)
+            {
+                BppLog.Warn("MonsterPreviewItemCardFactory", $"BuildCard failed for template={spec?.TemplateId ?? "null"}");
+                return null;
+            }
+
+            var cardObject = await InstantiateAsync(loader, card, parent.gameObject);
+            if (cardObject == null)
+            {
+                BppLog.Warn(
+                    "MonsterPreviewItemCardFactory",
+                    $"Instantiate returned null for template={spec?.TemplateId ?? "null"}"
+                );
+                return null;
+            }
+
+            if (PreviewCardLifecyclePolicy.ShouldRefreshAfterInstantiate(PreviewCardKind.Item))
+                await RefreshSpawnedItemAsync(cardObject, card);
+
+            cardObject.AddComponent<ShowcaseCardMarker>();
+            ConfigureSpawned(cardObject);
+            BppLog.Debug(
                 "MonsterPreviewItemCardFactory",
-                $"API unavailable for template={spec?.TemplateId ?? "null"} loader={(loader == null ? "null" : "ok")}"
+                $"Created card template={spec?.TemplateId ?? "null"} object={cardObject.name}"
+            );
+            return cardObject;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error(
+                "MonsterPreviewItemCardFactory",
+                $"CreateCardAsync failed for template={spec?.TemplateId ?? "null"}",
+                ex
             );
             return null;
         }
-
-        if (_staticData == null)
-        {
-            _staticData = await Data.GetStatic();
-            BppLog.Debug("MonsterPreviewItemCardFactory", $"Static data loaded={(_staticData != null)}");
-        }
-
-        if (_staticData == null)
-        {
-            BppLog.Warn(
-                "MonsterPreviewItemCardFactory",
-                $"Static data unavailable for template={spec?.TemplateId ?? "null"}"
-            );
-            return null;
-        }
-
-        var card = BuildCard(spec, _staticData);
-        if (card == null)
-        {
-            BppLog.Warn("MonsterPreviewItemCardFactory", $"BuildCard failed for template={spec?.TemplateId ?? "null"}");
-            return null;
-        }
-
-        var cardObject = await InstantiateAsync(loader, card, parent.gameObject);
-        if (cardObject == null)
-        {
-            BppLog.Warn(
-                "MonsterPreviewItemCardFactory",
-                $"Instantiate returned null for template={spec?.TemplateId ?? "null"}"
-            );
-            return null;
-        }
-
-        if (PreviewCardLifecyclePolicy.ShouldRefreshAfterInstantiate(PreviewCardKind.Item))
-            await RefreshSpawnedItemAsync(cardObject, card);
-
-        cardObject.AddComponent<ShowcaseCardMarker>();
-        ConfigureSpawned(cardObject);
-        BppLog.Debug(
-            "MonsterPreviewItemCardFactory",
-            $"Created card template={spec?.TemplateId ?? "null"} object={cardObject.name}"
-        );
-        return cardObject;
     }
 
     public Task UpdateCardAsync(GameObject cardObject, PreviewCardSpec spec)

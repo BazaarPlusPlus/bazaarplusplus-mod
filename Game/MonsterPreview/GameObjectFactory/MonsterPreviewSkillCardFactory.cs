@@ -22,30 +22,42 @@ internal sealed class MonsterPreviewSkillCardFactory : IPreviewCardFactory
 
     public async Task<GameObject> CreateCardAsync(PreviewCardSpec spec, Transform parent)
     {
-        Services.TryGet<AssetLoader>(out var loader);
-        if (loader == null || !EnsureApi(loader))
+        try
+        {
+            Services.TryGet<AssetLoader>(out var loader);
+            if (loader == null || !EnsureApi(loader))
+                return null;
+
+            if (_staticData == null)
+                _staticData = await Data.GetStatic();
+
+            if (_staticData == null)
+                return null;
+
+            var card = BuildCard(spec, _staticData);
+            if (card == null)
+                return null;
+
+            var cardObject = await InstantiateAsync(loader, card, parent.gameObject);
+            if (cardObject == null)
+                return null;
+
+            if (PreviewCardLifecyclePolicy.ShouldRefreshAfterInstantiate(PreviewCardKind.Skill))
+                await RefreshSpawnedSkillAsync(cardObject, card);
+
+            cardObject.AddComponent<ShowcaseCardMarker>();
+            ConfigureSpawned(cardObject);
+            return cardObject;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error(
+                "MonsterPreviewSkillCardFactory",
+                $"CreateCardAsync failed for template={spec?.TemplateId ?? "null"}",
+                ex
+            );
             return null;
-
-        if (_staticData == null)
-            _staticData = await Data.GetStatic();
-
-        if (_staticData == null)
-            return null;
-
-        var card = BuildCard(spec, _staticData);
-        if (card == null)
-            return null;
-
-        var cardObject = await InstantiateAsync(loader, card, parent.gameObject);
-        if (cardObject == null)
-            return null;
-
-        if (PreviewCardLifecyclePolicy.ShouldRefreshAfterInstantiate(PreviewCardKind.Skill))
-            await RefreshSpawnedSkillAsync(cardObject, card);
-
-        cardObject.AddComponent<ShowcaseCardMarker>();
-        ConfigureSpawned(cardObject);
-        return cardObject;
+        }
     }
 
     public Task UpdateCardAsync(GameObject cardObject, PreviewCardSpec spec)

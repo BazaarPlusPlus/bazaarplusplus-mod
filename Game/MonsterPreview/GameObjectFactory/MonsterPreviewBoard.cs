@@ -12,6 +12,13 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private const int DefaultSkillSlotCount = 3;
     private const float ContentYOffset = 0.2f;
     private const float BrandingBoardWidth = 0.5f;
+    private const float MonsterInfoBoardGap = 0.04f;
+    private const float MonsterInfoBoardDepthFactor = 0.5f;
+    private const float MonsterInfoTextStripWidthInset = 0.08f;
+    private const float MonsterInfoTextStripDepthFactor = 0.8f;
+    private const int MonsterInfoBoardSortOrder = 20;
+    private const int MonsterInfoTextStripSortOrder = 21;
+    private const int MonsterInfoTextSortOrder = 30;
     private const float BoardCenterMarkerSize = 0.16f;
     private const float SlotMarkerSize = 0.08f;
     private const float CardCenterMarkerSize = 0.12f;
@@ -25,8 +32,14 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private static readonly Color SkillBoardBorderColor = new Color(0.25f, 0.7f, 1f, 0.95f);
     private static readonly Color BrandingBoardFillColor = new Color(0.17f, 0.20f, 0.23f, 0.62f);
     private static readonly Color BrandingBoardBorderColor = new Color(0.18f, 0.24f, 0.34f, 0.95f);
+    private static readonly Color MonsterInfoBoardFillColor = new Color(0.16f, 0.22f, 0.18f, 0.72f);
+    private static readonly Color MonsterInfoBoardBorderColor = new Color(0.16f, 0.20f, 0.18f, 1f);
+    private static readonly Color MonsterInfoTextStripColor = new Color(0.03f, 0.04f, 0.04f, 0.98f);
+    private static readonly Color MonsterHealthTextColor = new Color(143f / 255f, 234f / 255f, 49f / 255f, 1f);
+    private static readonly Color MonsterDividerTextColor = new Color(1f, 1f, 1f, 0.8f);
     private static readonly Color DebugItemMarkerColor = new Color(1f, 0f, 0f, 0.95f);
     private static readonly Color DebugSkillMarkerColor = new Color(0.25f, 0.75f, 1f, 0.95f);
+    private static Font _boardTextFont;
 
     private readonly IPreviewCardFactory _factory;
     private readonly IPreviewCardFactory _skillFactory;
@@ -50,12 +63,19 @@ internal sealed class MonsterPreviewBoard : IDisposable
     private GameObject _boardFill;
     private GameObject _skillBoardFill;
     private GameObject _brandingBoardFill;
+    private GameObject _monsterInfoBoardFill;
+    private GameObject _monsterInfoTextStripFill;
     private readonly List<GameObject> _skillBoardBorders = new List<GameObject>();
     private readonly List<GameObject> _brandingBoardBorders = new List<GameObject>();
+    private readonly List<GameObject> _monsterInfoBoardBorders = new List<GameObject>();
     private TextMesh _brandingText;
+    private readonly List<TextMesh> _monsterInfoTexts = new List<TextMesh>();
     private GameObject _boardCenterMarker;
     private PreviewBoardPresentation _presentation = new PreviewBoardPresentation();
     private PreviewBoardDebugOptions _debugOptions = new PreviewBoardDebugOptions();
+    private string _monsterHealthText = "?";
+    private string _monsterXpText = "?";
+    private string _monsterGoldText = "?";
 
     public bool IsAlive => _boardRoot != null;
 
@@ -94,6 +114,18 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         _debugOptions = debugOptions ?? new PreviewBoardDebugOptions();
         RefreshDebugVisuals();
+    }
+
+    public void SetMonsterInfo(PreviewBoardModel model)
+    {
+        if (!IsAlive)
+            return;
+
+        var metadata = model?.Metadata;
+        _monsterHealthText = GetMetadataValue(metadata, "health", "hp");
+        _monsterXpText = GetMetadataValue(metadata, "reward_xp", "xp");
+        _monsterGoldText = GetMetadataValue(metadata, "reward_gold", "gold");
+        RefreshMonsterInfoTexts();
     }
 
     public void SetVisible(bool visible)
@@ -316,6 +348,14 @@ internal sealed class MonsterPreviewBoard : IDisposable
         _brandingBoardFill = CreatePrimitive("BrandingBoardFill", true);
         _brandingBoardFill.transform.SetParent(_visualRoot.transform, false);
 
+        _monsterInfoBoardFill = CreatePrimitive("MonsterInfoBoardFill", true);
+        _monsterInfoBoardFill.transform.SetParent(_visualRoot.transform, false);
+        SetRendererSorting(_monsterInfoBoardFill, MonsterInfoBoardSortOrder);
+
+        _monsterInfoTextStripFill = CreatePrimitive("MonsterInfoTextStripFill", true);
+        _monsterInfoTextStripFill.transform.SetParent(_visualRoot.transform, false);
+        SetRendererSorting(_monsterInfoTextStripFill, MonsterInfoTextStripSortOrder);
+
         _boardCenterMarker = CreateMarker("BoardCenter", BoardCenterMarkerSize, false);
         _boardCenterMarker.transform.SetParent(_visualRoot.transform, false);
 
@@ -340,6 +380,13 @@ internal sealed class MonsterPreviewBoard : IDisposable
             _brandingBoardBorders.Add(border);
         }
 
+        for (var index = 0; index < 4; index++)
+        {
+            var border = CreatePrimitive($"MonsterInfoBoardBorder_{index}", true);
+            border.transform.SetParent(_visualRoot.transform, false);
+            _monsterInfoBoardBorders.Add(border);
+        }
+
         var brandingTextObject = new GameObject("BrandingText");
         brandingTextObject.transform.SetParent(_visualRoot.transform, false);
         _brandingText = brandingTextObject.AddComponent<TextMesh>();
@@ -348,7 +395,14 @@ internal sealed class MonsterPreviewBoard : IDisposable
         _brandingText.alignment = TextAlignment.Center;
         _brandingText.characterSize = 0.24f;
         _brandingText.fontSize = 64;
+        _brandingText.font = GetBoardTextFont();
         _brandingText.color = new Color(0.82f, 0.93f, 1f, 1f);
+        SetRendererSorting(_brandingText.gameObject, MonsterInfoTextSortOrder);
+
+        CreateMonsterInfoText("MonsterInfoHealth", 0.22f, 80);
+        CreateMonsterInfoText("MonsterInfoDivider", 0.22f, 72);
+        CreateMonsterInfoText("MonsterInfoRewards", 0.17f, 60);
+        RefreshMonsterInfoTexts();
     }
 
     private void BuildBoardSlots()
@@ -471,6 +525,18 @@ internal sealed class MonsterPreviewBoard : IDisposable
         var skillBoardCenterX = halfWidth + SkillBoardGap + skillBoardWidth * 0.5f;
         var brandingBoardCenterX =
             halfWidth + SkillBoardGap * 2f + skillBoardWidth + BrandingBoardWidth * 0.5f;
+        var monsterInfoBoardWidth = skillBoardWidth + SkillBoardGap + BrandingBoardWidth;
+        var monsterInfoBoardDepth = Mathf.Max(0.01f, skillBoardWidth * MonsterInfoBoardDepthFactor);
+        var monsterInfoBoardCenterX = halfWidth + SkillBoardGap + monsterInfoBoardWidth * 0.5f;
+        var monsterInfoBoardCenterZ = halfDepth + MonsterInfoBoardGap + monsterInfoBoardDepth * 0.5f;
+        var monsterInfoTextStripWidth = Mathf.Max(
+            0.01f,
+            monsterInfoBoardWidth - MonsterInfoTextStripWidthInset * 2f
+        );
+        var monsterInfoTextStripDepth = Mathf.Max(
+            0.01f,
+            monsterInfoBoardDepth * MonsterInfoTextStripDepthFactor
+        );
 
         _visualRoot.transform.localPosition = Vector3.zero;
         _visualRoot.transform.localRotation = Quaternion.identity;
@@ -521,6 +587,36 @@ internal sealed class MonsterPreviewBoard : IDisposable
                 BrandingBoardWidth,
                 Mathf.Max(0.01f, boardThickness * 0.35f),
                 combinedDepth
+            );
+        }
+
+        if (_monsterInfoBoardFill != null)
+        {
+            _monsterInfoBoardFill.transform.localPosition = new Vector3(
+                monsterInfoBoardCenterX,
+                boardThickness * 0.2f,
+                monsterInfoBoardCenterZ
+            );
+            _monsterInfoBoardFill.transform.localRotation = Quaternion.identity;
+            _monsterInfoBoardFill.transform.localScale = new Vector3(
+                monsterInfoBoardWidth,
+                Mathf.Max(0.01f, boardThickness * 0.35f),
+                monsterInfoBoardDepth
+            );
+        }
+
+        if (_monsterInfoTextStripFill != null)
+        {
+            _monsterInfoTextStripFill.transform.localPosition = new Vector3(
+                monsterInfoBoardCenterX,
+                boardThickness * 0.3f,
+                monsterInfoBoardCenterZ
+            );
+            _monsterInfoTextStripFill.transform.localRotation = Quaternion.identity;
+            _monsterInfoTextStripFill.transform.localScale = new Vector3(
+                monsterInfoTextStripWidth,
+                Mathf.Max(0.01f, boardThickness * 0.45f),
+                monsterInfoTextStripDepth
             );
         }
 
@@ -602,6 +698,32 @@ internal sealed class MonsterPreviewBoard : IDisposable
             );
         }
 
+        if (_monsterInfoBoardBorders.Count >= 4)
+        {
+            var monsterInfoHalfWidth = monsterInfoBoardWidth * 0.5f;
+            var monsterInfoHalfDepth = monsterInfoBoardDepth * 0.5f;
+            UpdateBorder(
+                _monsterInfoBoardBorders[0],
+                new Vector3(monsterInfoBoardCenterX, borderHeight * 0.5f, monsterInfoBoardCenterZ - monsterInfoHalfDepth),
+                new Vector3(monsterInfoBoardWidth + borderThickness, borderHeight, borderThickness)
+            );
+            UpdateBorder(
+                _monsterInfoBoardBorders[1],
+                new Vector3(monsterInfoBoardCenterX, borderHeight * 0.5f, monsterInfoBoardCenterZ + monsterInfoHalfDepth),
+                new Vector3(monsterInfoBoardWidth + borderThickness, borderHeight, borderThickness)
+            );
+            UpdateBorder(
+                _monsterInfoBoardBorders[2],
+                new Vector3(monsterInfoBoardCenterX - monsterInfoHalfWidth, borderHeight * 0.5f, monsterInfoBoardCenterZ),
+                new Vector3(borderThickness, borderHeight, monsterInfoBoardDepth + borderThickness)
+            );
+            UpdateBorder(
+                _monsterInfoBoardBorders[3],
+                new Vector3(monsterInfoBoardCenterX + monsterInfoHalfWidth, borderHeight * 0.5f, monsterInfoBoardCenterZ),
+                new Vector3(borderThickness, borderHeight, monsterInfoBoardDepth + borderThickness)
+            );
+        }
+
         if (_brandingText != null)
         {
             _brandingText.transform.localPosition = new Vector3(
@@ -612,6 +734,13 @@ internal sealed class MonsterPreviewBoard : IDisposable
             _brandingText.transform.localRotation = Quaternion.Euler(90f, 90f, 0f);
             _brandingText.transform.localScale = Vector3.one * 0.2f;
         }
+
+        RefreshMonsterInfoTextLayout(
+            monsterInfoBoardCenterX,
+            monsterInfoBoardCenterZ,
+            monsterInfoBoardWidth,
+            borderHeight
+        );
     }
 
     private void RefreshDebugVisuals()
@@ -700,6 +829,130 @@ internal sealed class MonsterPreviewBoard : IDisposable
         border.transform.localScale = scale;
     }
 
+    private TextMesh CreateMonsterInfoText(string name, float characterSize, int fontSize)
+    {
+        var textObject = new GameObject(name);
+        textObject.transform.SetParent(_visualRoot.transform, false);
+        var text = textObject.AddComponent<TextMesh>();
+        text.anchor = TextAnchor.MiddleCenter;
+        text.alignment = TextAlignment.Center;
+        text.characterSize = characterSize;
+        text.fontSize = fontSize;
+        text.font = GetBoardTextFont();
+        text.richText = true;
+        text.color = new Color(0.90f, 0.98f, 0.92f, 1f);
+        SetRendererSorting(textObject, MonsterInfoTextSortOrder);
+        _monsterInfoTexts.Add(text);
+        return text;
+    }
+
+    private void RefreshMonsterInfoTexts()
+    {
+        if (_monsterInfoTexts.Count > 0 && _monsterInfoTexts[0] != null)
+        {
+            _monsterInfoTexts[0].text = _monsterHealthText;
+            _monsterInfoTexts[0].color = MonsterHealthTextColor;
+        }
+
+        if (_monsterInfoTexts.Count > 1 && _monsterInfoTexts[1] != null)
+        {
+            _monsterInfoTexts[1].text = "│";
+            _monsterInfoTexts[1].color = MonsterDividerTextColor;
+            _monsterInfoTexts[1].fontStyle = FontStyle.Normal;
+        }
+
+        if (_monsterInfoTexts.Count > 2 && _monsterInfoTexts[2] != null)
+        {
+            _monsterInfoTexts[2].text =
+                $"<color=#63CEEC>{_monsterXpText}</color> / <color=#FFCC1B>{_monsterGoldText}</color>";
+            _monsterInfoTexts[2].color = Color.white;
+            _monsterInfoTexts[2].fontStyle = FontStyle.Bold;
+        }
+    }
+
+    private void RefreshMonsterInfoTextLayout(
+        float boardCenterX,
+        float boardCenterZ,
+        float boardWidth,
+        float borderHeight
+    )
+    {
+        if (_monsterInfoTexts.Count == 0)
+            return;
+
+        var dividerX = boardCenterX + boardWidth * 0.02f;
+        var healthRightX = dividerX - boardWidth * 0.04f;
+        var rewardsX = dividerX + boardWidth * 0.15f;
+
+        for (var index = 0; index < _monsterInfoTexts.Count; index++)
+        {
+            var text = _monsterInfoTexts[index];
+            if (text == null)
+                continue;
+
+            float x = index switch
+            {
+                0 => healthRightX,
+                1 => dividerX,
+                _ => rewardsX,
+            };
+            text.anchor = index switch
+            {
+                0 => TextAnchor.MiddleRight,
+                1 => TextAnchor.MiddleCenter,
+                _ => TextAnchor.MiddleCenter,
+            };
+            text.alignment = index switch
+            {
+                0 => TextAlignment.Right,
+                1 => TextAlignment.Center,
+                _ => TextAlignment.Center,
+            };
+            text.transform.localPosition = new Vector3(x, borderHeight + 0.01f, boardCenterZ);
+            text.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            Vector3 textScale = index switch
+            {
+                0 => Vector3.one * 0.21f,
+                1 => Vector3.one * 0.24f,
+                _ => Vector3.one * 0.22f,
+            };
+            text.transform.localScale = textScale;
+        }
+    }
+
+    private static string GetMetadataValue(
+        IReadOnlyDictionary<string, string> metadata,
+        params string[] keys
+    )
+    {
+        if (metadata == null || keys == null)
+            return "?";
+
+        for (var index = 0; index < keys.Length; index++)
+        {
+            var key = keys[index];
+            if (string.IsNullOrWhiteSpace(key))
+                continue;
+
+            if (metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return "?";
+    }
+
+    private static Font GetBoardTextFont()
+    {
+        _boardTextFont ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        return _boardTextFont;
+    }
+
+    private static void SetRendererSorting(GameObject target, int sortingOrder)
+    {
+        if (target != null && target.TryGetComponent<Renderer>(out var renderer))
+            renderer.sortingOrder = sortingOrder;
+    }
+
     private bool IsDebugVisualEnabled()
     {
         return _presentation.DebugEnabled && _debugOptions.Enabled;
@@ -751,8 +1004,13 @@ internal sealed class MonsterPreviewBoard : IDisposable
         var material = new Material(shader);
         var isFill = target.name.Contains("Fill");
         var isBranding = target.name.Contains("Branding");
+        var isMonsterInfoTextStrip = target.name.Contains("MonsterInfoTextStrip");
         material.color = isBranding
             ? (isBorder ? BrandingBoardBorderColor : BrandingBoardFillColor)
+            : isMonsterInfoTextStrip
+                ? MonsterInfoTextStripColor
+            : target.name.Contains("MonsterInfo")
+                ? (isBorder ? MonsterInfoBoardBorderColor : MonsterInfoBoardFillColor)
             : isSkill
                 ? (isBorder ? SkillBoardBorderColor : SkillBoardFillColor)
             : isFill

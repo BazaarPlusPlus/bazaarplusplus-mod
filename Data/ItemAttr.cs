@@ -10,12 +10,17 @@ namespace BazaarPlusPlus;
 internal static class ItemAttr
 {
     private static readonly string[] TierOrder = ["Bronze", "Silver", "Gold", "Diamond", "Legendary"];
-    private static readonly Lazy<IReadOnlyDictionary<Guid, CardAttributes>> CardsByTemplateId =
-        new(LoadCards);
+    private static readonly object SyncRoot = new();
+    private static IReadOnlyDictionary<Guid, CardAttributes> _cardsByTemplateId =
+        new Dictionary<Guid, CardAttributes>();
+    private static string? _loadedPath;
 
     public static IReadOnlyDictionary<string, int> GetAttributes(Guid templateId, string tier)
     {
-        if (!CardsByTemplateId.Value.TryGetValue(templateId, out var card))
+        if (!EnsureLoaded())
+            return new Dictionary<string, int>();
+
+        if (!_cardsByTemplateId.TryGetValue(templateId, out var card))
             return new Dictionary<string, int>();
 
         var cappedTier = NormalizeTier(tier);
@@ -38,15 +43,50 @@ internal static class ItemAttr
         return result;
     }
 
-    private static IReadOnlyDictionary<Guid, CardAttributes> LoadCards()
+    internal static bool Warm()
+    {
+        return EnsureLoaded();
+    }
+
+    internal static void ResetForTests()
+    {
+        lock (SyncRoot)
+        {
+            _cardsByTemplateId = new Dictionary<Guid, CardAttributes>();
+            _loadedPath = null;
+        }
+    }
+
+    private static bool EnsureLoaded()
     {
         var path = ModState.CardsJsonPath;
-        if (string.IsNullOrWhiteSpace(path))
-            return new Dictionary<Guid, CardAttributes>();
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return false;
 
-        if (!File.Exists(path))
-            return new Dictionary<Guid, CardAttributes>();
+        if (string.Equals(_loadedPath, path, StringComparison.OrdinalIgnoreCase))
+            return true;
 
+        lock (SyncRoot)
+        {
+            if (string.Equals(_loadedPath, path, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            try
+            {
+                _cardsByTemplateId = LoadCards(path);
+                _loadedPath = path;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                BppLog.Error("ItemAttr", $"Failed to load card attributes from '{path}'", ex);
+                return false;
+            }
+        }
+    }
+
+    private static IReadOnlyDictionary<Guid, CardAttributes> LoadCards(string path)
+    {
         var root = JObject.Parse(File.ReadAllText(path));
         var versionNode = root["5.0.0"] as JArray ?? root.Properties().FirstOrDefault()?.Value as JArray;
         if (versionNode == null)
