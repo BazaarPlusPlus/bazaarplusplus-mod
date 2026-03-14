@@ -11,13 +11,34 @@
   import { formatMessage, messages } from '$lib/i18n';
 
   type StepState = 'idle' | 'detecting' | 'found' | 'not_found';
+  const CUSTOM_GAME_PATH_STORAGE_KEY = 'bppinstaller:custom-game-path';
+
+  function loadPersistedCustomGamePath(): string {
+    if (typeof window === 'undefined') return '';
+    return window.localStorage.getItem(CUSTOM_GAME_PATH_STORAGE_KEY)?.trim() ?? '';
+  }
+
+  function persistCustomGamePath(path: string) {
+    if (typeof window === 'undefined') return;
+    const normalizedPath = path.trim();
+    if (normalizedPath) {
+      window.localStorage.setItem(CUSTOM_GAME_PATH_STORAGE_KEY, normalizedPath);
+      return;
+    }
+    window.localStorage.removeItem(CUSTOM_GAME_PATH_STORAGE_KEY);
+  }
+
+  function selectedGamePath(): string | null {
+    const path = customGamePath.trim();
+    return path ? path : null;
+  }
 
   let env: EnvironmentInfo | null = null;
   let dotnetState: StepState = 'idle';
   let bazaarFound = false;
   let bazaarChecking = false;
   let bazaarInvalid = false;
-  let customGamePath = '';
+  let customGamePath = loadPersistedCustomGamePath();
   let actionBusy: 'idle' | 'detect' | 'install' | 'uninstall' = 'idle';
   let actionMenuOpen = false;
   const STEAM_BAZAAR_URL = 'steam://rungameid/1617400';
@@ -56,7 +77,7 @@
   }
 
   function effectiveGamePath(): string {
-    return customGamePath || env?.game_path || '';
+    return selectedGamePath() || env?.game_path || '';
   }
 
   function requestInstall() {
@@ -115,14 +136,20 @@
     actionBusy = 'detect';
     dotnetState = 'detecting';
     const dotnetPromise = detectDotnetRuntime();
+    const requestedGamePath = selectedGamePath();
 
     try {
-      env = await invoke<EnvironmentInfo>('detect_environment');
+      env = requestedGamePath
+        ? await invoke<EnvironmentInfo>('detect_environment', { gamePath: requestedGamePath })
+        : await invoke<EnvironmentInfo>('detect_environment');
 
-      if (env.game_path && !customGamePath) {
+      if (requestedGamePath) {
+        bazaarFound = await verifyGamePath(requestedGamePath);
+        bazaarInvalid = !bazaarFound;
+      } else if (env.game_path) {
         bazaarFound = await verifyGamePath(env.game_path);
         bazaarInvalid = !bazaarFound;
-      } else if (!customGamePath) {
+      } else {
         bazaarFound = false;
         bazaarInvalid = false;
       }
@@ -138,7 +165,7 @@
   async function pickGamePath() {
     const selected = await open({ directory: true, multiple: false });
     if (typeof selected === 'string') {
-      customGamePath = selected;
+      customGamePath = selected.trim();
     }
   }
 
@@ -223,7 +250,7 @@
     }
   }
 
-  $: hasPath = Boolean(customGamePath || env?.game_path);
+  $: hasPath = Boolean(selectedGamePath() || env?.game_path);
   $: modInstalled = Boolean(env?.bpp_version);
   $: bundledBppVersion = env?.bundled_bpp_version ?? null;
   $: installedBppVersion = env?.bpp_version ?? null;
@@ -242,6 +269,7 @@
     pendingReinstallAfterUpdate = false;
     requestInstall();
   }
+  $: persistCustomGamePath(customGamePath);
 
   onMount(() => {
     locale.init();

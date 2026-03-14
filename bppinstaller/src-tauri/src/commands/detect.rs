@@ -27,9 +27,10 @@ pub struct DotnetInfo {
 }
 
 #[tauri::command]
-pub fn detect_environment(app: AppHandle) -> Result<EnvironmentInfo, String> {
+pub fn detect_environment(app: AppHandle, game_path: Option<String>) -> Result<EnvironmentInfo, String> {
     let steam_path = get_steam_path();
-    let game_path = steam_path.as_ref().and_then(|path| get_game_path(path));
+    let requested_game_path = normalize_game_path(game_path);
+    let game_path = resolve_game_path(steam_path.as_deref(), requested_game_path.as_deref());
     let bpp_version = game_path
         .as_ref()
         .and_then(|path| read_installed_bpp_version(path));
@@ -47,6 +48,20 @@ pub fn detect_environment(app: AppHandle) -> Result<EnvironmentInfo, String> {
         bpp_version,
         bundled_bpp_version,
     })
+}
+
+fn normalize_game_path(game_path: Option<String>) -> Option<PathBuf> {
+    game_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+}
+
+fn resolve_game_path(steam_path: Option<&Path>, requested_game_path: Option<&Path>) -> Option<PathBuf> {
+    requested_game_path
+        .map(Path::to_path_buf)
+        .or_else(|| steam_path.and_then(get_game_path))
 }
 
 #[tauri::command]
@@ -273,6 +288,22 @@ mod tests {
         std::fs::remove_dir_all(&temp_root).expect("cleanup temp dir");
 
         assert_eq!(version.as_deref(), Some("1.2.3+2026-03-10 12:34:56"));
+    }
+
+    #[test]
+    fn test_normalize_game_path_trims_whitespace() {
+        let game_path = normalize_game_path(Some("  C:\\Games\\The Bazaar  ".to_string()));
+        assert_eq!(game_path, Some(PathBuf::from("C:\\Games\\The Bazaar")));
+    }
+
+    #[test]
+    fn test_resolve_game_path_prefers_requested_path() {
+        let requested = PathBuf::from("D:\\Games\\The Bazaar");
+        let steam_path = Path::new("C:\\Program Files (x86)\\Steam");
+
+        let game_path = resolve_game_path(Some(steam_path), Some(requested.as_path()));
+
+        assert_eq!(game_path, Some(requested));
     }
 
 }

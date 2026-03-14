@@ -1,0 +1,11 @@
+{
+  "version": "1.0.4",
+  "notes": "Native updater is now available.",
+  "pub_date": "2026-03-14T01:47:52.005Z",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "https://native-updater.bazaarplusplus.com/latest/nsis/BazaarPlusPlus-Installer_1.0.4_x64-setup.exe",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUTjZkUm1IS1JUUXFjMkoxMFVJN1RYVVdoUklkMHFKdmJEK0x1aUFScDhTOFdEKzJ4NkJWQmZCa3V4TGFnNi9EeFNqaWpLRTc0WHoxZVREN2VYKzQ5NnlmRWhKVHozdEFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNDUyODQwCWZpbGU6QmF6YWFyUGx1c1BsdXMgSW5zdGFsbGVyXzEuMC40X3g2NC1zZXR1cC5leGUKYThoSHJjWVhpcnVGQ2xaQlNldkRwL0V2MWo1bENZckxCd211UEpWdTQ2UWVsb1ZzR05PamtjQkMxc0tsUFpWN0kyK0R6NDBoZ3VWcE93TkJUQzNQQUE9PQo="
+    }
+  }
+}
