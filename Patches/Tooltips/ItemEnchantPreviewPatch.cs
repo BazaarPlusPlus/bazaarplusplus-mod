@@ -13,6 +13,26 @@ namespace BazaarPlusPlus;
 [HarmonyPatch(typeof(CardTooltipData), nameof(CardTooltipData.GetPassiveTooltipBlock))]
 public static class CardTooltipDataPassivePatch
 {
+    private static void AppendTooltipText(StringBuilder builder, string text)
+    {
+        if (builder == null || string.IsNullOrWhiteSpace(text))
+            return;
+
+        var normalized = text.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n');
+        if (normalized.Length == 0)
+            return;
+
+        var lines = normalized.Split('\n');
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+
+            builder.Append(line);
+            builder.Append('\n');
+        }
+    }
+
     [HarmonyPostfix]
     static void Postfix(
         CardTooltipData __instance,
@@ -43,15 +63,15 @@ public static class CardTooltipDataPassivePatch
             var passiveBuilder = __result.Item1;
             if (passiveBuilder.Length > 0 && passiveBuilder[passiveBuilder.Length - 1] != '\n')
             {
-                passiveBuilder.AppendLine();
+                passiveBuilder.Append('\n');
             }
 
-            passiveBuilder.AppendLine("Bazaar++");
+            passiveBuilder.Append("Bazaar++\n");
 
             foreach (var segment in previewSegments)
             {
                 if (!string.IsNullOrWhiteSpace(segment.Text))
-                    passiveBuilder.AppendLine(segment.Text);
+                    AppendTooltipText(passiveBuilder, segment.Text);
             }
         }
         catch (System.Exception ex)
