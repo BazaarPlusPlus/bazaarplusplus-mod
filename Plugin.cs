@@ -25,6 +25,7 @@ public class Plugin : BaseUnityPlugin
 
         MonsterDatabase.Load();
         EncounterTracker.Subscribe();
+        gameObject.AddComponent<RunStateSyncController>();
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewController>();
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();

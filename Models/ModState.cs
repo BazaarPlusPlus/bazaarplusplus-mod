@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Runs;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using TheBazaar;
@@ -76,24 +77,75 @@ internal static class ModState
         BppLog.Info("ModState", "Subscribed to run lifecycle events");
     }
 
+    public static void RefreshRunStateFromCurrentState()
+    {
+        SetInGameRun(ComputeIsInGameRun(), "Live run-state reconciliation");
+    }
+
     private static void OnRunStarted()
     {
-        IsInGameRun = true;
         EncounterTracker.ResetEncounterState("Run started");
-        BppLog.Debug("ModState", "Run started; IsInGameRun=true");
+        SetInGameRun(true, "Run started");
     }
 
     private static void OnRunEnded()
     {
-        IsInGameRun = false;
-        EncounterTracker.ResetEncounterState("Run ended");
-        BppLog.Debug("ModState", "Run ended; IsInGameRun=false");
+        SetInGameRun(false, "Run ended");
     }
 
     private static void OnRunInterrupted()
     {
-        IsInGameRun = false;
-        EncounterTracker.ResetEncounterState("Run interrupted");
-        BppLog.Debug("ModState", "Run interrupted; IsInGameRun=false");
+        SetInGameRun(false, "Run interrupted");
+    }
+
+    private static void SetInGameRun(bool inGameRun, string reason)
+    {
+        if (IsInGameRun == inGameRun)
+            return;
+
+        IsInGameRun = inGameRun;
+        if (!inGameRun)
+            EncounterTracker.ResetEncounterState(reason);
+
+        BppLog.Debug(
+            "ModState",
+            $"{reason}; IsInGameRun={IsInGameRun}, appState={AppState.CurrentState?.GetType().Name ?? "null"}, runState={Data.CurrentState?.StateName.ToString() ?? "null"}, hasActiveRun={Data.HasActiveRun}"
+        );
+    }
+
+    private static bool ComputeIsInGameRun()
+    {
+        if (Data.IsInCombat)
+            return true;
+
+        var currentAppState = AppState.CurrentState;
+        if (currentAppState is RunAppState)
+            return !currentAppState.IsEndOfRunState();
+
+        if (currentAppState is ReplayState)
+            return true;
+
+        if (currentAppState != null)
+            return false;
+
+        if (!Data.HasActiveRun)
+            return false;
+
+        var currentState = Data.CurrentState;
+        if (currentState == null)
+            return false;
+
+        return IsKnownActiveRunState(currentState.StateName);
+    }
+
+    private static bool IsKnownActiveRunState(ERunState stateName)
+    {
+        return stateName == ERunState.Choice
+            || stateName == ERunState.Combat
+            || stateName == ERunState.Encounter
+            || stateName == ERunState.LevelUp
+            || stateName == ERunState.Loot
+            || stateName == ERunState.Pedestal
+            || stateName == ERunState.PVPCombat;
     }
 }
