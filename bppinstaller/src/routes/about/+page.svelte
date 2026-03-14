@@ -7,17 +7,7 @@
   import { formatMessage, messages } from '$lib/i18n';
   import { locale, handleLocaleToggle } from '$lib/locale';
 
-  type SupporterTierId = 'kindling' | 'ember' | 'forge' | 'crown';
-
-  type SupporterTier = {
-    id: SupporterTierId;
-    zhName: string;
-    enName: string;
-    minAmount: number;
-    amountLabel: string;
-    zhDescription: string;
-    enDescription: string;
-  };
+  type SupporterTierId = 1 | 2 | 3 | 4;
 
   type SupporterEntry = {
     name: string;
@@ -53,56 +43,11 @@
     }
   ];
 
-  const defaultSupporterTier: SupporterTierId = 'ember';
+  const supporterTierIds: SupporterTierId[] = [1, 2, 3, 4];
 
-  const supporterTiers: SupporterTier[] = [
-    {
-      id: 'kindling',
-      zhName: '微光',
-      enName: 'Kindling',
-      minAmount: 6,
-      amountLabel: 'CNY 6+',
-      zhDescription: '轻轻点一盏灯，给 Bazaar++ 添一口热气。',
-      enDescription: 'A small spark to keep Bazaar++ warm and moving.'
-    },
-    {
-      id: 'ember',
-      zhName: '余烬',
-      enName: 'Ember',
-      minAmount: 18,
-      amountLabel: 'CNY 18+',
-      zhDescription: '支持一次完整打磨，让更新更稳更细。',
-      enDescription: 'Helps fund a full polish pass for the next update.'
-    },
-    {
-      id: 'forge',
-      zhName: '炉火',
-      enName: 'Forge',
-      minAmount: 45,
-      amountLabel: 'CNY 45+',
-      zhDescription: '给新功能添火，让想法更快落地。',
-      enDescription: 'Adds fuel for new features and stronger iteration.'
-    },
-    {
-      id: 'crown',
-      zhName: '冠冕',
-      enName: 'Crown',
-      minAmount: 98,
-      amountLabel: 'CNY 98+',
-      zhDescription: '把 Bazaar++ 推得更远，照亮更长线的维护。',
-      enDescription: 'Backs bigger leaps and long-tail maintenance work.'
-    }
-  ];
-
-  $: supporterGroups = supporterTiers.map((tier) => ({
-    ...tier,
-    supporters: supporters
-      .filter((supporter) => supporter.tier === tier.id)
-      .sort((left, right) => right.amount - left.amount || left.name.localeCompare(right.name))
-  }));
-  $: supporterTierCount = supporterTiers.length;
-  $: supporterTotalCount = supporters.length;
-  $: supporterTotalAmount = supporters.reduce((sum, supporter) => sum + supporter.amount, 0);
+  $: sortedSupporters = supporters
+    .slice()
+    .sort((left, right) => right.tier - left.tier || right.amount - left.amount || left.name.localeCompare(right.name));
 
   const inspiredBy = [
     { name: 'BazaarHelper', url: 'https://github.com/Duangi/BazaarHelper' },
@@ -200,24 +145,15 @@
     showPaymentCodes = false;
   }
 
-  function normalizeSupporterTier(value: unknown): SupporterTierId {
-    if (typeof value !== 'string') return defaultSupporterTier;
+  function normalizeSupporterTier(value: unknown): SupporterTierId | null {
+    if (typeof value !== 'number' || !Number.isInteger(value)) return null;
 
-    const normalized = value.trim().toLowerCase();
-    const matchedTier = supporterTiers.find((tier) => tier.id === normalized);
+    const matchedTier = supporterTierIds.find((tierId) => tierId === value);
 
-    return matchedTier?.id ?? defaultSupporterTier;
+    return matchedTier ?? null;
   }
 
-  function getSupporterTierMinAmount(tierId: SupporterTierId): number {
-    return supporterTiers.find((tier) => tier.id === tierId)?.minAmount ?? 0;
-  }
-
-  function normalizeSupporterAmount(value: unknown, fallbackTier: SupporterTierId): number | null {
-    if (value == null) {
-      return getSupporterTierMinAmount(fallbackTier);
-    }
-
+  function normalizeSupporterAmount(value: unknown): number | null {
     if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
       return null;
     }
@@ -236,7 +172,11 @@
     }
 
     const normalizedTier = normalizeSupporterTier(tier);
-    const normalizedAmount = normalizeSupporterAmount(amount, normalizedTier);
+    if (normalizedTier == null) {
+      return null;
+    }
+
+    const normalizedAmount = normalizeSupporterAmount(amount);
     if (normalizedAmount === null) {
       return null;
     }
@@ -373,23 +313,6 @@
       {/each}
     </div>
 
-    <section class="support-tier-board" aria-label={$locale === 'zh' ? '支持挡位' : 'Support tiers'}>
-      <p class="support-tier-kicker">{$locale === 'zh' ? '支持挡位' : 'Support Tiers'}</p>
-      <div class="support-tier-grid">
-        {#each supporterTiers as tier}
-          <article class={`support-tier-card supporter-tier-${tier.id}`}>
-            <div class="support-tier-head">
-              <span class="support-tier-name">{$locale === 'zh' ? tier.zhName : tier.enName}</span>
-              <span class="support-tier-price">{tier.amountLabel}</span>
-            </div>
-            <p class="support-tier-desc">
-              {$locale === 'zh' ? tier.zhDescription : tier.enDescription}
-            </p>
-          </article>
-        {/each}
-      </div>
-    </section>
-
     <p class="payment-support-note">
       {$locale === 'zh'
         ? '有你支持，Bazaar++ 会冒出更多好东西'
@@ -397,8 +320,8 @@
     </p>
     <p class="payment-support-tip">
       {$locale === 'zh'
-        ? '感谢你的支持。如果方便的话，欢迎在收款备注里留一个 ID 和想归属的挡位，下次更新感谢名单时会按分组展示'
-        : 'Thanks for the support. If you want, leave an ID and tier note in the payment message so the next supporter board can group it properly.'}
+        ? '欢迎在收款备注里留一个 ID，下次更新支持者名单时会见到你'
+        : 'Thanks for the support. If you want, leave an ID in the payment message so it can appear in the next supporter list.'}
     </p>
   </section>
 </AppModal>
@@ -418,17 +341,6 @@
           ? '感谢你们的支持，让 Bazaar++ 能够继续打磨和成长'
           : 'Thank you for backing Bazaar++. \nYour support keeps the project moving.'}
       </p>
-      <div class="supporter-hero-stats" aria-hidden="true">
-        <span class="supporter-hero-pill">
-          {$locale === 'zh' ? `${supporterTierCount} 个挡位` : `${supporterTierCount} tiers`}
-        </span>
-        <span class="supporter-hero-pill">
-          {$locale === 'zh' ? `${supporterTotalCount} 位署名支持者` : `${supporterTotalCount} named supporters`}
-        </span>
-        <span class="supporter-hero-pill">
-          {$locale === 'zh' ? `累计 CNY ${supporterTotalAmount}` : `Total CNY ${supporterTotalAmount}`}
-        </span>
-      </div>
     </div>
 
     {#if supportersLoadError}
@@ -438,49 +350,18 @@
           : 'Failed to load supporter list:'}
         {supportersLoadError}
       </p>
-    {:else}
-      <div class="supporter-tier-grid" aria-label={$locale === 'zh' ? '支持者挡位列表' : 'Supporter tiers'}>
-        {#each supporterGroups as tier}
-          <section class={`support-tier-card supporter-tier-panel supporter-tier-${tier.id}`}>
-            <div class="support-tier-head">
-              <div class="support-tier-heading">
-                <span class="support-tier-name">{$locale === 'zh' ? tier.zhName : tier.enName}</span>
-                <span class="support-tier-price">{tier.amountLabel}</span>
-              </div>
-              <span class="support-tier-count">
-                {$locale === 'zh'
-                  ? `${tier.supporters.length} 人`
-                  : `${tier.supporters.length} backers`}
-              </span>
-            </div>
-
-            <p class="support-tier-desc">
-              {$locale === 'zh' ? tier.zhDescription : tier.enDescription}
-            </p>
-
-            {#if tier.supporters.length > 0}
-              <ul class="supporter-list" aria-label={$locale === 'zh' ? `${tier.zhName} 挡支持者` : `${tier.enName} supporters`}>
-                {#each tier.supporters as supporter}
-                  <li class="supporter-item">
-                    <span class="supporter-item-name">{supporter.name}</span>
-                    <span class="supporter-item-amount">CNY {supporter.amount}</span>
-                  </li>
-                {/each}
-              </ul>
-            {:else if supporters.length > 0}
-              <p class="support-tier-empty">
-                {$locale === 'zh' ? '虚位以待' : 'Open slot'}
-              </p>
-            {:else}
-              <p class="support-tier-empty">
-                {$locale === 'zh'
-                  ? '暂时还没有填写支持者名单。'
-                  : 'The supporter list is empty right now.'}
-              </p>
-            {/if}
-          </section>
+    {:else if sortedSupporters.length > 0}
+      <ul class="supporter-list supporter-list-mixed" aria-label={$locale === 'zh' ? '支持者名单' : 'Supporter list'}>
+        {#each sortedSupporters as supporter}
+          <li class={`supporter-item supporter-item-tier-${supporter.tier}`}>{supporter.name}</li>
         {/each}
-      </div>
+      </ul>
+    {:else}
+      <p class="support-tier-empty">
+        {$locale === 'zh'
+          ? '暂时还没有填写支持者名单。'
+          : 'The supporter list is empty right now.'}
+      </p>
     {/if}
 
     <p class="supporter-unnamed-note">
@@ -568,9 +449,7 @@
       </div>
       <button class="supporter-entry" type="button" onclick={openSupporterList}>
         <span class="supporter-entry-title">{$locale === 'zh' ? '感谢名单' : 'Supporters'}</span>
-        <span class="supporter-entry-subtitle">
-          {$locale === 'zh' ? `按 ${supporterTierCount} 个挡位查看` : `View ${supporterTierCount} tiers`}
-        </span>
+        <span class="supporter-entry-subtitle">{$locale === 'zh' ? '查看名单' : 'Open list'}</span>
       </button>
     </div>
   </section>
@@ -1259,123 +1138,11 @@
     font-style: italic;
   }
 
-  .supporter-hero-stats {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.45rem;
-    margin-top: 0.65rem;
-  }
-
-  .supporter-hero-pill {
-    padding: 0.28rem 0.6rem;
-    border-radius: 999px;
-    border: 1px solid rgba(200, 148, 55, 0.18);
-    background: linear-gradient(180deg, rgba(200, 148, 55, 0.14), rgba(200, 148, 55, 0.06));
-    color: rgba(236, 224, 198, 0.84);
-    font-family: 'Fira Code', monospace;
-    font-size: 0.64rem;
-    line-height: 1.2;
-  }
-
   .payment-grid {
     display: grid;
     grid-template-columns: minmax(0, 260px);
     justify-content: center;
     gap: 0.8rem;
-  }
-
-  .support-tier-board {
-    display: grid;
-    gap: 0.55rem;
-  }
-
-  .support-tier-kicker {
-    margin: 0;
-    text-align: center;
-    font-family: 'Cinzel', serif;
-    font-size: 0.62rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgba(200, 170, 120, 0.76);
-  }
-
-  .support-tier-grid,
-  .supporter-tier-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.65rem;
-  }
-
-  .support-tier-card {
-    --tier-glow: rgba(255, 224, 150, 0.08);
-    --tier-border: rgba(200, 148, 55, 0.18);
-    --tier-shadow: rgba(255, 198, 98, 0.05);
-    --tier-ink: rgba(238, 220, 182, 0.92);
-    position: relative;
-    padding: 0.78rem 0.82rem;
-    border-radius: 4px;
-    border: 1px solid var(--tier-border);
-    background:
-      radial-gradient(circle at top left, var(--tier-glow), transparent 58%),
-      linear-gradient(180deg, rgba(34, 20, 8, 0.96), rgba(16, 9, 4, 0.98));
-    box-shadow:
-      inset 0 0 0 1px var(--tier-shadow),
-      0 10px 26px rgba(0, 0, 0, 0.16);
-    overflow: hidden;
-    min-width: 0;
-  }
-
-  .supporter-tier-panel {
-    display: grid;
-    gap: 0.55rem;
-    align-content: flex-start;
-    text-align: left;
-  }
-
-  .support-tier-head {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-
-  .support-tier-heading {
-    display: grid;
-    gap: 0.18rem;
-  }
-
-  .support-tier-name {
-    font-family: 'Cinzel', serif;
-    font-size: 0.8rem;
-    letter-spacing: 0.05em;
-    color: var(--tier-ink);
-  }
-
-  .support-tier-price {
-    font-family: 'Fira Code', monospace;
-    font-size: 0.62rem;
-    color: rgba(255, 236, 196, 0.78);
-  }
-
-  .support-tier-count {
-    flex-shrink: 0;
-    padding-top: 0.06rem;
-    font-family: 'Fira Code', monospace;
-    font-size: 0.6rem;
-    color: rgba(255, 236, 196, 0.66);
-  }
-
-  .support-tier-desc {
-    position: relative;
-    z-index: 1;
-    margin: 0;
-    font-size: 0.7rem;
-    line-height: 1.55;
-    color: rgba(228, 216, 191, 0.8);
-    text-align: left;
   }
 
   .support-tier-empty {
@@ -1400,58 +1167,61 @@
     align-content: flex-start;
   }
 
+  .supporter-list-mixed {
+    justify-content: center;
+  }
+
   .supporter-item {
+    --pill-border: rgba(255, 232, 174, 0.18);
+    --pill-top: rgba(255, 248, 231, 0.12);
+    --pill-bottom: rgba(200, 148, 55, 0.08);
+    --pill-shadow: rgba(255, 214, 140, 0.04);
+    --pill-glow: transparent;
     padding: 0.38rem 0.72rem;
     border-radius: 999px;
-    background: linear-gradient(180deg, rgba(255, 248, 231, 0.12), rgba(200, 148, 55, 0.08));
-    border: 1px solid rgba(255, 232, 174, 0.18);
+    background:
+      radial-gradient(circle at top, var(--pill-glow), transparent 70%),
+      linear-gradient(180deg, var(--pill-top), var(--pill-bottom));
+    border: 1px solid var(--pill-border);
     color: rgba(236, 224, 198, 0.9);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    line-height: 1.3;
-    box-shadow: inset 0 0 0 1px rgba(255, 214, 140, 0.04);
-  }
-
-  .supporter-item-name {
     font-family: 'Fira Code', monospace;
     font-size: 0.68rem;
+    line-height: 1.3;
+    box-shadow:
+      inset 0 0 0 1px var(--pill-shadow),
+      0 6px 16px rgba(0, 0, 0, 0.12);
   }
 
-  .supporter-item-amount {
-    padding-left: 0.5rem;
-    border-left: 1px solid rgba(255, 232, 174, 0.14);
-    font-family: 'Fira Code', monospace;
-    font-size: 0.62rem;
-    color: rgba(255, 236, 196, 0.68);
+  .supporter-item-tier-1 {
+    --pill-border: rgba(111, 166, 224, 0.3);
+    --pill-top: rgba(216, 235, 255, 0.12);
+    --pill-bottom: rgba(111, 166, 224, 0.08);
+    --pill-shadow: rgba(141, 198, 255, 0.06);
+    --pill-glow: rgba(141, 198, 255, 0.14);
   }
 
-  .supporter-tier-kindling {
-    --tier-glow: rgba(141, 198, 255, 0.16);
-    --tier-border: rgba(111, 166, 224, 0.28);
-    --tier-shadow: rgba(122, 174, 228, 0.08);
-    --tier-ink: rgba(210, 229, 255, 0.96);
+  .supporter-item-tier-2 {
+    --pill-border: rgba(220, 156, 76, 0.3);
+    --pill-top: rgba(255, 232, 178, 0.12);
+    --pill-bottom: rgba(220, 156, 76, 0.08);
+    --pill-shadow: rgba(255, 187, 104, 0.06);
+    --pill-glow: rgba(255, 187, 104, 0.14);
   }
 
-  .supporter-tier-ember {
-    --tier-glow: rgba(255, 187, 104, 0.18);
-    --tier-border: rgba(220, 156, 76, 0.28);
-    --tier-shadow: rgba(255, 187, 104, 0.08);
-    --tier-ink: rgba(255, 224, 178, 0.96);
+  .supporter-item-tier-3 {
+    --pill-border: rgba(219, 102, 86, 0.32);
+    --pill-top: rgba(255, 218, 208, 0.12);
+    --pill-bottom: rgba(219, 102, 86, 0.08);
+    --pill-shadow: rgba(255, 132, 118, 0.06);
+    --pill-glow: rgba(255, 110, 92, 0.14);
   }
 
-  .supporter-tier-forge {
-    --tier-glow: rgba(255, 110, 92, 0.18);
-    --tier-border: rgba(219, 102, 86, 0.28);
-    --tier-shadow: rgba(255, 132, 118, 0.08);
-    --tier-ink: rgba(255, 214, 198, 0.96);
-  }
-
-  .supporter-tier-crown {
-    --tier-glow: rgba(210, 177, 255, 0.18);
-    --tier-border: rgba(172, 138, 219, 0.28);
-    --tier-shadow: rgba(210, 177, 255, 0.08);
-    --tier-ink: rgba(237, 221, 255, 0.96);
+  .supporter-item-tier-4 {
+    --pill-border: rgba(172, 138, 219, 0.34);
+    --pill-top: rgba(240, 228, 255, 0.14);
+    --pill-bottom: rgba(172, 138, 219, 0.1);
+    --pill-shadow: rgba(210, 177, 255, 0.07);
+    --pill-glow: rgba(210, 177, 255, 0.16);
   }
 
   .payment-support-note {
@@ -1605,11 +1375,6 @@
     }
 
     .payment-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .support-tier-grid,
-    .supporter-tier-grid {
       grid-template-columns: 1fr;
     }
 

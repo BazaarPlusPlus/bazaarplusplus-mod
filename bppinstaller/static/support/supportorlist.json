@@ -1,42 +1,47 @@
 [
   {
     "name": "脑袋怎么扁扁的",
-    "tier": "ember",
-    "amount": 18
+    "tier": 2,
+    "amount": 0.01
   },
   {
     "name": "山那边有片海",
-    "tier": "ember",
-    "amount": 18
+    "tier": 3,
+    "amount": 0.30
   },
   {
     "name": "麦麦在逃脆薯",
-    "tier": "ember",
-    "amount": 18
-  },
-  {
-    "name": "空格",
-    "tier": "ember",
-    "amount": 18
+    "tier": 3,
+    "amount": 0.35
   },
   {
     "name": "凝日",
-    "tier": "ember",
-    "amount": 18
+    "tier": 3,
+    "amount": 0.15
   },
   {
     "name": "Tanyaa",
-    "tier": "ember",
-    "amount": 18
+    "tier": 3,
+    "amount": 0.15
   },
   {
     "name": "北洋|神之手贪狼",
-    "tier": "ember",
-    "amount": 18
+    "tier": 2,
+    "amount": 0.03
   },
   {
-    "name": "光速下分真上头",
-    "tier": "ember",
-    "amount": 18
+    "name": "FeiMary",
+    "tier": 4,
+    "amount": 1.49
+  },
+  {
+    "name": "EcitsujNT",
+    "tier": 4,
+    "amount": 1.49
+  },
+  {
+    "name": "小和尚济海",
+    "tier": 4,
+    "amount": 1.00
   }
 ]
