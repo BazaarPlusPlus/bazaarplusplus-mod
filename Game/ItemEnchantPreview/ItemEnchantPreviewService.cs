@@ -21,14 +21,7 @@ public static class ItemEnchantPreviewService
     )
     {
         var empty = new List<TooltipSegment>();
-        if (
-            itemCard == null
-            || !ItemEnchantPreviewEligibility.IsEligible(
-                itemCard.Type,
-                itemCard.Section,
-                Data.IsInCombat
-            )
-        )
+        if (itemCard == null || !ItemEnchantPreviewEligibility.IsEligible(itemCard, Data.IsInCombat))
             return empty;
 
         var enchantments = itemCard.GetEnchantments();

@@ -45,6 +45,17 @@ Assert(
     "Combat state should suppress enchant previews."
 );
 
+var opponentBoardItem = new ItemCard
+{
+    Type = ECardType.Item,
+    Section = null,
+};
+
+Assert(
+    ItemEnchantPreviewEligibility.IsEligible(opponentBoardItem, isInCombat: false),
+    "Opponent-board items without inventory ownership should still be eligible for enchant previews."
+);
+
 var itemCard = new ItemCard
 {
     Type = ECardType.Item,
