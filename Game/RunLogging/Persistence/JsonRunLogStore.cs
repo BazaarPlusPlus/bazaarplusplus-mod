@@ -37,7 +37,52 @@ public sealed class JsonRunLogStore : IRunLogStore
 
     public RunLogSessionState? TryResumeActiveRun()
     {
-        return null;
+        var activeRun = ReadActiveRun();
+        if (activeRun == null)
+            return null;
+
+        var runDirectoryPath = Path.Combine(_pathLayout.LogRootPath, activeRun.RunPath);
+        var location = new RunLogLocation(
+            activeRun.RunId,
+            activeRun.DatePartition,
+            runDirectoryPath,
+            Path.Combine(runDirectoryPath, RunLogJsonSchema.MetaFileName),
+            Path.Combine(runDirectoryPath, RunLogJsonSchema.EventsFileName),
+            Path.Combine(runDirectoryPath, RunLogJsonSchema.CheckpointFileName),
+            Path.Combine(runDirectoryPath, RunLogJsonSchema.StatusFileName)
+        );
+        _knownRunLocations[activeRun.RunId] = location;
+
+        if (File.Exists(location.StatusFilePath))
+        {
+            ClearActiveRun(activeRun.RunId);
+            return null;
+        }
+
+        var metadata = ReadJson<RunLogCreateRequest>(location.MetaFilePath);
+        if (metadata == null)
+            return null;
+
+        var checkpoint = ReadJson<RunLogCheckpoint>(location.CheckpointFilePath);
+        if (checkpoint?.Completed == true)
+            return null;
+
+        return new RunLogSessionState
+        {
+            RunId = activeRun.RunId,
+            SchemaVersion = checkpoint?.SchemaVersion ?? metadata.SchemaVersion,
+            StartedAtUtc = metadata.StartedAtUtc,
+            LastSeenAtUtc = checkpoint?.LastSeenAtUtc ?? activeRun.UpdatedAtUtc,
+            LastSeq = checkpoint?.LastSeq ?? activeRun.LastSeq,
+            Day = checkpoint?.Day ?? metadata.Day,
+            Hour = checkpoint?.Hour ?? metadata.Hour,
+            State = checkpoint?.State,
+            CurrentEncounterId = checkpoint?.CurrentEncounterId,
+            LastStateFingerprint = checkpoint?.LastStateFingerprint,
+            LastSelectionFingerprint = checkpoint?.LastSelectionFingerprint,
+            PendingSelectionSeq = checkpoint?.PendingSelectionSeq,
+            Completed = false,
+        };
     }
 
     public RunLogSessionState CreateRun(RunLogCreateRequest request)
@@ -117,12 +162,16 @@ public sealed class JsonRunLogStore : IRunLogStore
     {
         var location = ResolveLocation(runId);
         WriteJsonAtomic(location.StatusFilePath, completion);
+        UpdateCheckpointCompleted(location.CheckpointFilePath, completion.EndedAtUtc);
         ClearActiveRun(runId);
     }
 
     public void MarkRunAbandoned(string runId, RunLogAbandonment abandonment)
     {
-        throw new NotSupportedException("Abandonment handling is added in Task 5.");
+        var location = ResolveLocation(runId);
+        WriteJsonAtomic(location.StatusFilePath, abandonment);
+        UpdateCheckpointCompleted(location.CheckpointFilePath, abandonment.EndedAtUtc);
+        ClearActiveRun(runId);
     }
 
     private RunLogLocation CreateLocation(DateTimeOffset startedAtUtc, string runId)
@@ -206,6 +255,25 @@ public sealed class JsonRunLogStore : IRunLogStore
             File.Replace(tempPath, path, null, true);
         else
             File.Move(tempPath, path);
+    }
+
+    private static T? ReadJson<T>(string path)
+    {
+        if (!File.Exists(path))
+            return default;
+
+        return JsonConvert.DeserializeObject<T>(File.ReadAllText(path), SerializerSettings);
+    }
+
+    private void UpdateCheckpointCompleted(string checkpointPath, DateTimeOffset endedAtUtc)
+    {
+        var checkpoint = ReadJson<RunLogCheckpoint>(checkpointPath);
+        if (checkpoint == null)
+            return;
+
+        checkpoint.Completed = true;
+        checkpoint.LastSeenAtUtc = endedAtUtc;
+        WriteJsonAtomic(checkpointPath, checkpoint);
     }
 
     private sealed class RunLogLocation
