@@ -12,6 +12,13 @@ const platformAliases = new Map([
   ["windows", "windows"],
 ]);
 
+const managedPluginDependencies = [
+  "BepInEx/plugins/Microsoft.Data.Sqlite.dll",
+  "BepInEx/plugins/SQLitePCLRaw.batteries_v2.dll",
+  "BepInEx/plugins/SQLitePCLRaw.core.dll",
+  "BepInEx/plugins/SQLitePCLRaw.provider.e_sqlite3.dll",
+];
+
 export function resolveTargetPlatforms(platformEnv) {
   if (!platformEnv) {
     return ["macos", "windows"];
@@ -32,6 +39,8 @@ export function requiredEntriesForPlatform(platform) {
       "libdoorstop.dylib",
       "BepInEx/plugins/BazaarPlusPlus.dll",
       "BepInEx/plugins/BazaarPlusPlus.version",
+      ...managedPluginDependencies,
+      "BepInEx/plugins/libe_sqlite3.dylib",
     ];
   }
 
@@ -41,6 +50,8 @@ export function requiredEntriesForPlatform(platform) {
       "doorstop_config.ini",
       "BepInEx/plugins/BazaarPlusPlus.dll",
       "BepInEx/plugins/BazaarPlusPlus.version",
+      ...managedPluginDependencies,
+      "BepInEx/plugins/e_sqlite3.dll",
     ];
   }
 

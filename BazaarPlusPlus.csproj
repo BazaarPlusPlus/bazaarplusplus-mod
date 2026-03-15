@@ -8,6 +8,7 @@
     <LangVersion>12</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TargetFramework>netstandard2.1</TargetFramework>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <RestoreAdditionalProjectSources>
       https://api.nuget.org/v3/index.json;
       https://nuget.bepinex.dev/v3/index.json;
@@ -36,6 +37,9 @@
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
     <BPPInstallerSourcePath>$(ProjectRoot)bppinstaller/src-tauri/resources</BPPInstallerSourcePath>
+    <HostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant())</HostArchitecture>
+    <MacSqliteRuntimeRid Condition="'$(HostArchitecture)' == 'arm64'">osx-arm64</MacSqliteRuntimeRid>
+    <MacSqliteRuntimeRid Condition="'$(MacSqliteRuntimeRid)' == ''">osx-x64</MacSqliteRuntimeRid>
   </PropertyGroup>
   <!-- Candidate install paths for common Steam locations -->
   <PropertyGroup>
@@ -130,11 +134,35 @@
     <ItemGroup>
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\$(TargetName).dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\$(TargetName).version" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\Microsoft.Data.Sqlite.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.batteries_v2.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.core.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.provider.e_sqlite3.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\libe_sqlite3.dylib" />
+    </ItemGroup>
+    <ItemGroup>
+      <PluginManagedRuntimeFiles Include="$(TargetDir)Microsoft.Data.Sqlite.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.batteries_v2.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.core.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.provider.e_sqlite3.dll" />
+      <MacSqliteNativeFile Include="$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/*/runtimes/$(MacSqliteRuntimeRid)/native/libe_sqlite3.dylib" />
     </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
       DestinationFiles="$(GamePath)\BepInEx\plugins\$(TargetName).dll"
+    />
+    <Copy
+      SourceFiles="@(PluginManagedRuntimeFiles)"
+      DestinationFolder="$(GamePath)\BepInEx\plugins"
+      SkipUnchangedFiles="true"
+      Condition="'@(PluginManagedRuntimeFiles)' != ''"
+    />
+    <Copy
+      SourceFiles="@(MacSqliteNativeFile)"
+      DestinationFiles="$(GamePath)\BepInEx\plugins\libe_sqlite3.dylib"
+      SkipUnchangedFiles="true"
+      Condition="'@(MacSqliteNativeFile)' != ''"
     />
     <WriteLinesToFile
       File="$(GamePath)\BepInEx\plugins\$(TargetName).version"
@@ -159,6 +187,14 @@
       Lines="$(Version).prod"
       Overwrite="true"
     />
+    <ItemGroup>
+      <PluginManagedRuntimeFiles Include="$(TargetDir)Microsoft.Data.Sqlite.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.batteries_v2.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.core.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.provider.e_sqlite3.dll" />
+      <MacSqliteNativeFile Include="$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/*/runtimes/$(MacSqliteRuntimeRid)/native/libe_sqlite3.dylib" />
+      <WindowsSqliteNativeFile Include="$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/*/runtimes/win-x64/native/e_sqlite3.dll" />
+    </ItemGroup>
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
       DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).dll"
@@ -174,6 +210,30 @@
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).version"
       DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).version"
+    />
+    <Copy
+      SourceFiles="@(PluginManagedRuntimeFiles)"
+      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins"
+      SkipUnchangedFiles="true"
+      Condition="'@(PluginManagedRuntimeFiles)' != ''"
+    />
+    <Copy
+      SourceFiles="@(PluginManagedRuntimeFiles)"
+      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
+      SkipUnchangedFiles="true"
+      Condition="'@(PluginManagedRuntimeFiles)' != ''"
+    />
+    <Copy
+      SourceFiles="@(MacSqliteNativeFile)"
+      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/libe_sqlite3.dylib"
+      SkipUnchangedFiles="true"
+      Condition="'@(MacSqliteNativeFile)' != ''"
+    />
+    <Copy
+      SourceFiles="@(WindowsSqliteNativeFile)"
+      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/e_sqlite3.dll"
+      SkipUnchangedFiles="true"
+      Condition="'@(WindowsSqliteNativeFile)' != ''"
     />
     <ZipDirectory
       SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos"

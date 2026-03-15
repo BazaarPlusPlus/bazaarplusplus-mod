@@ -10,7 +10,7 @@ internal sealed class RunLoggingController : MonoBehaviour
 {
     public static RunLoggingController? Instance { get; private set; }
 
-    private JsonRunLogStore? _store;
+    private IRunLogStore? _store;
     private RunLogSessionManager? _sessionManager;
     private RunLogCaptureService? _captureService;
     private RunLogInferenceService? _inferenceService;
@@ -26,13 +26,16 @@ internal sealed class RunLoggingController : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        _store = new JsonRunLogStore(ModState.RunLogRootPath);
+        _store = new SqliteRunLogStore(ModState.RunLogDatabasePath);
         _sessionManager = new RunLogSessionManager(_store);
         _sessionManager.RestoreActiveSession();
         _captureService = new RunLogCaptureService();
         _inferenceService = new RunLogInferenceService();
         _core = new RunLoggingControllerCore(_sessionManager, _captureService);
-        BppLog.Info("RunLoggingController", $"Initialized run logging root: {ModState.RunLogRootPath}");
+        BppLog.Info(
+            "RunLoggingController",
+            $"Initialized run logging database: {ModState.RunLogDatabasePath}"
+        );
     }
 
     public RunLogSessionState EnsureActiveSession(RunLogCreateRequest request)
@@ -155,12 +158,13 @@ internal sealed class RunLoggingControllerCore
         if (_runStartedEventWritten)
             return session;
 
+        var eventKind = session.LastSeq > 0 ? "run_resumed" : "run_started";
         _sessionManager.AppendEvent(
             new RunLogEvent
             {
-                Kind = "run_started",
-                Day = request.Day,
-                Hour = request.Hour,
+                Kind = eventKind,
+                Day = session.Day ?? request.Day,
+                Hour = session.Hour ?? request.Hour,
                 Hero = request.Hero,
                 GameMode = request.GameMode,
             }

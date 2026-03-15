@@ -203,6 +203,53 @@ Assert(
 );
 Assert(seamStore.CompleteRunCalls == 1, "Controller seam should forward completion once.");
 
+var resumedStore = new ControllerSeamStore
+{
+    ResumeState = new RunLogSessionState
+    {
+        RunId = "run_20260315t131530z_vanessa_ranked_002b_feedface",
+        SchemaVersion = 1,
+        StartedAtUtc = new DateTimeOffset(2026, 3, 15, 13, 15, 30, TimeSpan.Zero),
+        LastSeenAtUtc = new DateTimeOffset(2026, 3, 15, 13, 20, 0, TimeSpan.Zero),
+        LastSeq = 3,
+        Day = 2,
+        Hour = 1,
+        State = "Encounter",
+    },
+};
+var resumedSessionManager = new RunLogSessionManager(
+    resumedStore,
+    () => new DateTimeOffset(2026, 3, 15, 13, 25, 0, TimeSpan.Zero)
+);
+resumedSessionManager.RestoreActiveSession();
+var resumedCore = coreCtor.Invoke([resumedSessionManager, seamCaptureService]);
+Invoke<object>(
+    coreType,
+    resumedCore,
+    "EnsureRunStarted",
+    [
+        new RunLogCreateRequest
+        {
+            SchemaVersion = 1,
+            RunId = "run_20260315t131530z_vanessa_ranked_002b_feedface",
+            StartedAtUtc = new DateTimeOffset(2026, 3, 15, 13, 15, 30, TimeSpan.Zero),
+            Hero = "Vanessa",
+            GameMode = "Ranked",
+            Day = 2,
+            Hour = 1,
+        },
+    ]
+);
+
+Assert(
+    resumedStore.AppendedEvents.Select(e => e.Kind).SequenceEqual(["run_resumed"]),
+    "Restored sessions should append a single run_resumed event instead of duplicating run_started."
+);
+Assert(
+    resumedStore.AppendedEvents[0].Seq == 4,
+    "Restored sessions should continue sequence numbers when appending run_resumed."
+);
+
 Console.WriteLine("RunLogging capture checks passed.");
 
 static object CreateOption(
