@@ -20,5 +20,6 @@ internal sealed class RunStateSyncController : MonoBehaviour
 
         _nextRefreshAt = Time.unscaledTime + RefreshIntervalSeconds;
         ModState.RefreshRunStateFromCurrentState();
+        Game.RunLogging.RunLoggingController.Instance?.PollRunState();
     }
 }

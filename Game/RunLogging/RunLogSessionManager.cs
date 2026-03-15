@@ -54,6 +54,19 @@ public sealed class RunLogSessionManager
             return null;
         }
 
+        if (
+            string.Equals(entry.Kind, "state_seen", StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(entry.StateFingerprint)
+            && string.Equals(
+                entry.StateFingerprint,
+                session.LastStateFingerprint,
+                StringComparison.Ordinal
+            )
+        )
+        {
+            return null;
+        }
+
         entry.SchemaVersion = entry.SchemaVersion == 0 ? session.SchemaVersion : entry.SchemaVersion;
         entry.RunId = session.RunId;
         entry.Seq = session.LastSeq + 1;

@@ -8,6 +8,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.RunLogging;
 using TheBazaar;
 
 namespace BazaarPlusPlus;
@@ -86,6 +87,7 @@ internal static class EncounterTracker
         }
 
         BppLog.Debug("EncounterTracker", $"State={stateName}, choiceCount={cards.Count}");
+        RunLoggingController.Instance?.CaptureSelectionFromCurrentState();
     }
 
     private static List<RunInfo.MonsterPreview> BuildMonsterPreviews(List<Card> cards)
