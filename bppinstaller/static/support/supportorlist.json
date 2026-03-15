@@ -25,6 +25,16 @@
     "amount": 0.30
   },
   {
+    "name": "UnknownWorld",
+    "tier": 3,
+    "amount": 0.29
+  },
+  {
+    "name": "鸽子积年不徙",
+    "tier": 3,
+    "amount": 0.29
+  },
+  {
     "name": "凝日",
     "tier": 3,
     "amount": 0.15
@@ -73,5 +83,20 @@
     "name": "脑袋怎么扁扁的",
     "tier": 2,
     "amount": 0.01
+  },
+  {
+    "name": "佩格peg51486",
+    "tier": 2,
+    "amount": 0.05
+  },
+  {
+    "name":"地上喧喧闹闹",
+    "tier": 2,
+    "amount": 0.04
+  },
+  {
+    "name":"斗腾",
+    "tier": 2,
+    "amount": 0.04
   }
 ]
