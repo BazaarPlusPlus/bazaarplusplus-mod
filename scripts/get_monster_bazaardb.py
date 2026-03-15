@@ -4,7 +4,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 DEFAULT_URL = "https://bazaardb.gg/search?c=monsters"
-DEFAULT_OUT = Path("/Users/yxinyu/codes/BazaarPlusPlus/Data/monsters_bazaardb.json")
+DEFAULT_OUT = Path("Data/monsters_bazaardb.json")
 
 
 def _extract_cards_array(text: str) -> list[dict]:
