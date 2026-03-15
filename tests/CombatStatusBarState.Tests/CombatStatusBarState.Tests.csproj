@@ -36,5 +36,13 @@
       Include="..\..\Game\CombatStatusBar\CombatStatusBar.State.cs"
       Link="CombatStatusBar.State.cs"
     />
+    <Compile
+      Include="..\..\Game\NameOverride\NameOverride.SettingsMenuBridge.cs"
+      Link="NameOverride.SettingsMenuBridge.cs"
+    />
+    <Compile
+      Include="..\..\Game\NameOverride\NameOverride.SettingsMenuLabel.cs"
+      Link="NameOverride.SettingsMenuLabel.cs"
+    />
   </ItemGroup>
 </Project>

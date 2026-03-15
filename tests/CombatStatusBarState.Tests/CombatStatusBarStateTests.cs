@@ -1,4 +1,5 @@
 using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.NameOverride;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests;
@@ -142,6 +143,40 @@ public sealed class CombatStatusBarStateTests : IDisposable
     )
     {
         var result = CombatStatusBarSettingsMenuLabel.Resolve(languageCode);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void NameOverrideSettingsMenuBridge_ReadsInitialValue_WritesBackChanges_AndRequestsRefresh()
+    {
+        var enabled = false;
+        var refreshCount = 0;
+        var bridge = new NameOverrideSettingsMenuBridge(
+            () => enabled,
+            value => enabled = value,
+            () => refreshCount++
+        );
+
+        Assert.False(bridge.GetInitialValue());
+
+        bridge.ApplyValue(true);
+
+        Assert.True(enabled);
+        Assert.Equal(1, refreshCount);
+    }
+
+    [Theory]
+    [InlineData("zh-Hans", "匿名模式")]
+    [InlineData("zh-CN", "匿名模式")]
+    [InlineData("en", "Anonymous Mode")]
+    [InlineData("", "Anonymous Mode")]
+    public void NameOverrideSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
+        string languageCode,
+        string expected
+    )
+    {
+        var result = NameOverrideSettingsMenuLabel.Resolve(languageCode);
 
         Assert.Equal(expected, result);
     }
