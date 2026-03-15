@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.RunLogging;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -34,6 +35,7 @@ public class Plugin : BaseUnityPlugin
         MonsterDatabase.Load();
         EncounterTracker.Subscribe();
         gameObject.AddComponent<RunStateSyncController>();
+        gameObject.AddComponent<RunLoggingController>();
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewController>();
         gameObject.AddComponent<MonsterPreviewWarmupController>();

@@ -37,6 +37,7 @@ internal static class ModState
 
     // Paths for local data
     public static string CardsJsonPath;
+    public static string RunLogRootPath;
 
     public static void Initialize(ConfigFile config)
     {
@@ -69,6 +70,12 @@ internal static class ModState
         {
             BppLog.Info("ModState", $"cards.json path initialized: {CardsJsonPath}");
         }
+
+        RunLogRootPath = System.IO.Path.Combine(
+            BepInEx.Paths.ConfigPath,
+            "BazaarPlusPlus",
+            "run-logs"
+        );
     }
 
     public static void Subscribe()

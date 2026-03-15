@@ -22,6 +22,27 @@ RequireProperty(eventType, "Seq");
 RequireProperty(eventType, "Ts");
 RequireProperty(eventType, "Kind");
 
+var controllerSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/RunLogging/RunLoggingController.cs")
+);
+Assert(File.Exists(controllerSourcePath), $"Controller source not found at {controllerSourcePath}");
+var controllerSource = File.ReadAllText(controllerSourcePath);
+Assert(
+    controllerSource.Contains(
+        "internal sealed class RunLoggingController : MonoBehaviour",
+        StringComparison.Ordinal
+    ),
+    "RunLoggingController should exist as a MonoBehaviour runtime entry point."
+);
+
+var pluginSourcePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Plugin.cs"));
+Assert(File.Exists(pluginSourcePath), $"Plugin source not found at {pluginSourcePath}");
+var pluginSource = File.ReadAllText(pluginSourcePath);
+Assert(
+    pluginSource.Contains("gameObject.AddComponent<RunLoggingController>();", StringComparison.Ordinal),
+    "Plugin.Awake should mount RunLoggingController."
+);
+
 Console.WriteLine("RunLogging model contract checks passed.");
 
 static Type RequireType(string fullName)
@@ -42,4 +63,10 @@ static void RequireProperty(Type type, string name)
     var property = type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
     if (property == null)
         throw new InvalidOperationException($"Property not found: {type.FullName}.{name}");
+}
+
+static void Assert(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
 }

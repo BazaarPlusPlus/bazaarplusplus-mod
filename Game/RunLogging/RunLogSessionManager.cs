@@ -20,12 +20,21 @@ public sealed class RunLogSessionManager
 
     public bool HasActiveSession => ActiveSession != null;
 
+    public RunLogSessionState? RestoreActiveSession()
+    {
+        if (ActiveSession != null)
+            return ActiveSession;
+
+        ActiveSession = _store.TryResumeActiveRun();
+        return ActiveSession;
+    }
+
     public RunLogSessionState EnsureActiveSession(RunLogCreateRequest request)
     {
         if (ActiveSession != null)
             return ActiveSession;
 
-        ActiveSession = _store.TryResumeActiveRun() ?? _store.CreateRun(request);
+        ActiveSession = RestoreActiveSession() ?? _store.CreateRun(request);
         return ActiveSession;
     }
 
