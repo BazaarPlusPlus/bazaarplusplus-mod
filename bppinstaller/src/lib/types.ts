@@ -17,10 +17,3 @@ export interface ModConfigReadResult {
   config_exists: boolean;
   values: Record<string, string>;
 }
-
-export interface AppUpdateInfo {
-  version: string;
-  currentVersion: string;
-  body: string | null;
-  date: string | null;
-}

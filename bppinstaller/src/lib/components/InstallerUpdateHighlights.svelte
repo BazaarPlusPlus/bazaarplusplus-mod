@@ -1,59 +1,171 @@
 <script lang="ts">
   import { locale } from '$lib/locale';
+
+  type LocalizedText = {
+    zh: string;
+    en: string;
+  };
+
+  type HighlightSection = {
+    icon: string;
+    title: LocalizedText;
+    bullets: LocalizedText[];
+    tone?: 'default' | 'support' | 'warning';
+  };
+
+  const sections: HighlightSection[] = [
+    {
+      icon: 'I',
+      title: {
+        zh: '野怪掉落预览',
+        en: 'Monster Preview'
+      },
+      bullets: [
+        {
+          zh: '修复了进入门票事件后，野怪预览可能失效的问题。',
+          en: 'Fixed an issue where monster previews might fail to display after entering a ticket event.'
+        },
+        {
+          zh: '新增野怪的血量、经验和金币展示，战斗收益信息更直观。',
+          en: 'Monster previews now show health, experience, and gold so combat rewards are easier to read.'
+        }
+      ]
+    },
+    {
+      icon: 'II',
+      title: {
+        zh: '附魔效果预览',
+        en: 'Enchant Preview'
+      },
+      bullets: [
+        {
+          zh: '优化了附魔效果预览的展示形式。',
+          en: 'The enchant preview layout has been refined.'
+        },
+        {
+          zh: '现在对手棋盘和商店中的物品也支持附魔预览。',
+          en: 'Items on the opponent board and in shops now support enchant previews as well.'
+        },
+        {
+          zh: '修复了关闭“总是显示附魔”后，悬停时再按 Ctrl 无法正常显示附魔预览的问题。',
+          en: 'Fixed an issue where enchant previews would not appear on hover with Ctrl after disabling Always Show.'
+        }
+      ]
+    },
+    {
+      icon: 'III',
+      title: {
+        zh: '升级效果预览',
+        en: 'Upgrade Preview'
+      },
+      bullets: [
+        {
+          zh: '鼠标悬停卡牌时，按住 Shift 即可查看升级后的效果变化。',
+          en: 'Hold Shift while hovering a card to inspect how its upgraded effect changes.'
+        }
+      ]
+    },
+    {
+      icon: 'IV',
+      title: {
+        zh: '战斗状态展示',
+        en: 'Combat Status Bar'
+      },
+      bullets: [
+        {
+          zh: '战斗状态条支持的最大倍速已从 5 降低到 3。',
+          en: 'The maximum speed multiplier supported by the combat status bar has been reduced from 5x to 3x.'
+        },
+        {
+          zh: '优化了战斗状态条的显示逻辑，现在可以显示上一场战斗的耗时。',
+          en: 'The display logic has been improved and can now show the duration of the previous combat.'
+        }
+      ]
+    },
+    {
+      icon: 'V',
+      title: {
+        zh: '安装器与设置',
+        en: 'Installer and Settings'
+      },
+      bullets: [
+        {
+          zh: '安装器现已加入可选的自动更新功能。',
+          en: 'The installer now includes optional automatic updates.'
+        },
+        {
+          zh: '修复了自定义游戏路径安装后，设置页面未能正确识别已安装 BPP 的问题。',
+          en: 'Fixed a bug where the Settings page could fail to detect BPP after installation through a custom game path.'
+        },
+        {
+          zh: '即使首次尚未启动游戏，现在也可以在修改设置时直接生成默认配置文件。',
+          en: 'Default config files can now be generated directly from Settings even before the game has been launched once.'
+        }
+      ]
+    },
+    {
+      icon: 'VI',
+      title: {
+        zh: '支持者',
+        en: 'Supporters'
+      },
+      bullets: [
+        {
+          zh: '信息页面增加了支持者名单，感谢大家的支持。',
+          en: 'The information page now includes a supporters list to thank everyone backing the project.'
+        }
+      ],
+      tone: 'support'
+    },
+    {
+      icon: 'VII',
+      title: {
+        zh: '已知问题',
+        en: 'Known Issues'
+      },
+      bullets: [
+        {
+          zh: '商店中的卡牌在预览升级效果时，文本可能会出现溢出。',
+          en: 'Upgrade preview text can still overflow for cards shown in shops.'
+        },
+        {
+          zh: '厨师职业的高温词条可能会影响 Bazaar++ Logo 的显示。',
+          en: 'The Chef class high-temperature affix can still affect Bazaar++ logo rendering.'
+        }
+      ],
+      tone: 'warning'
+    }
+  ];
 </script>
 
 <section class="update-hero">
   <p class="update-kicker">
-    {$locale === 'zh' ? '首次启动 · 新版本导览' : 'First launch · What is new'}
+    {$locale === 'zh' ? '当前版本 · 更新亮点' : 'Current build · What is new'}
   </p>
+  <h2 class="update-title">
+    {$locale === 'zh' ? 'BazaarPlusPlus' : "BazaarPlusPlus"}
+  </h2>
   <p class="update-summary">
     {$locale === 'zh'
-      ? '安装器已经更新。重新执行一次安装，可以把最新 bundle 重新写入游戏目录。下面这几项是这个版本里更值得先看到的内容。'
-      : 'The installer has been updated. Run the install step once more to refresh the game directory with the latest bundle. These are the highlights worth noticing first in this build.'}
+      ? '本次更新主要覆盖野怪掉落预览、附魔与升级预览、战斗状态展示、安装器体验，以及当前已知问题。'
+      : 'This update focuses on monster drop previews, enchant and upgrade previews, the combat status display, installer improvements, and current known issues.'}
   </p>
 </section>
 
 <div class="update-feature-list">
-  <article class="update-feature-card">
-    <div class="update-feature-icon">I</div>
-    <div class="update-feature-copy">
-      <h3>{$locale === 'zh' ? '首启展示更完整' : 'Better first-open overview'}</h3>
-      <p>
-        {$locale === 'zh'
-          ? '更新后的首次打开会直接展示重点内容，不必先去 About 页面翻纯文本。'
-          : 'The first launch after an update now surfaces the important changes directly instead of hiding them behind a plain text changelog.'}
-      </p>
-    </div>
-  </article>
-
-  <article class="update-feature-card">
-    <div class="update-feature-icon">II</div>
-    <div class="update-feature-copy">
-      <h3>{$locale === 'zh' ? '新功能更容易扫一眼' : 'New features are easier to scan'}</h3>
-      <p>
-        {$locale === 'zh'
-          ? '像怪物预览、设置项扩展、战斗状态条这类功能，可以在这里用更适合展示的卡片形式说明。'
-          : 'Feature highlights like monster preview, expanded settings, and the combat status bar can be presented here in a more visual card format.'}
-      </p>
-    </div>
-  </article>
-
-  <article class="update-feature-card">
-    <div class="update-feature-icon">III</div>
-    <div class="update-feature-copy">
-      <h3>{$locale === 'zh' ? 'Release Notes 保持简洁' : 'Release notes stay concise'}</h3>
-      <p>
-        {$locale === 'zh'
-          ? 'About 页面里的 release notes 可以继续保留为简单文本，而首页首启提示和独立页负责更完整的视觉化说明。'
-          : 'The About page can keep a simpler text changelog, while the first-launch prompt and dedicated page handle the richer visual summary.'}
-      </p>
-      <p class="update-feature-callout">
-        {$locale === 'zh'
-          ? '点击“重新安装”后会重新写入最新文件，现有设置不会因为这一步被重置。'
-          : 'Selecting Reinstall writes the latest files again without resetting the current settings.'}
-      </p>
-    </div>
-  </article>
+  {#each sections as section}
+    <article class={`update-feature-card ${section.tone ? `tone-${section.tone}` : ''}`}>
+      <div class="update-feature-icon">{section.icon}</div>
+      <div class="update-feature-copy">
+        <h3>{$locale === 'zh' ? section.title.zh : section.title.en}</h3>
+        <ul class="update-feature-points">
+          {#each section.bullets as bullet}
+            <li>{$locale === 'zh' ? bullet.zh : bullet.en}</li>
+          {/each}
+        </ul>
+      </div>
+    </article>
+  {/each}
 </div>
 
 <style>
@@ -78,6 +190,14 @@
     letter-spacing: 0.22em;
     text-transform: uppercase;
     color: rgba(232, 200, 122, 0.7);
+  }
+
+  .update-title {
+    margin: 0;
+    font-family: 'Cinzel', serif;
+    font-size: clamp(1rem, 2.6vw, 1.4rem);
+    letter-spacing: 0.06em;
+    color: rgba(239, 223, 188, 0.95);
   }
 
   .update-summary {
@@ -108,6 +228,20 @@
     box-shadow: inset 0 0 0 1px rgba(255, 198, 98, 0.04);
   }
 
+  .tone-support {
+    border-color: rgba(118, 174, 120, 0.24);
+    background:
+      linear-gradient(180deg, rgba(118, 174, 120, 0.1), rgba(118, 174, 120, 0.03)),
+      rgba(12, 8, 4, 0.82);
+  }
+
+  .tone-warning {
+    border-color: rgba(200, 104, 82, 0.26);
+    background:
+      linear-gradient(180deg, rgba(200, 104, 82, 0.11), rgba(200, 104, 82, 0.03)),
+      rgba(12, 8, 4, 0.82);
+  }
+
   .update-feature-icon {
     width: 2.25rem;
     height: 2.25rem;
@@ -122,9 +256,21 @@
     letter-spacing: 0.12em;
   }
 
+  .tone-support .update-feature-icon {
+    border-color: rgba(154, 201, 146, 0.3);
+    background: radial-gradient(circle at 30% 30%, rgba(154, 201, 146, 0.26), rgba(63, 105, 63, 0.18));
+    color: rgba(214, 241, 206, 0.92);
+  }
+
+  .tone-warning .update-feature-icon {
+    border-color: rgba(228, 150, 121, 0.3);
+    background: radial-gradient(circle at 30% 30%, rgba(228, 150, 121, 0.26), rgba(128, 45, 33, 0.2));
+    color: rgba(255, 222, 213, 0.94);
+  }
+
   .update-feature-copy {
     display: grid;
-    gap: 0.28rem;
+    gap: 0.35rem;
     min-width: 0;
   }
 
@@ -137,21 +283,17 @@
     color: rgba(233, 215, 182, 0.92);
   }
 
-  .update-feature-copy p {
+  .update-feature-points {
     margin: 0;
-    font-size: 0.84rem;
-    line-height: 1.55;
-    color: rgba(228, 216, 191, 0.72);
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.3rem;
+    color: rgba(228, 216, 191, 0.78);
   }
 
-  .update-feature-callout {
-    margin-top: 0.08rem;
-    padding: 0.38rem 0.48rem;
-    border: 1px solid rgba(240, 201, 120, 0.1);
-    border-radius: 3px;
-    background: linear-gradient(180deg, rgba(240, 201, 120, 0.035), rgba(240, 201, 120, 0.01));
-    color: rgba(228, 216, 191, 0.6);
-    font-size: 0.74rem;
+  .update-feature-points li {
+    font-size: 0.84rem;
+    line-height: 1.58;
   }
 
   @media (max-width: 520px) {

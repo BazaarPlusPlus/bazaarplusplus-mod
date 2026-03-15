@@ -42,6 +42,7 @@
   let actionBusy: 'idle' | 'detect' | 'install' | 'uninstall' = 'idle';
   let actionMenuOpen = false;
   const STEAM_BAZAAR_URL = 'steam://rungameid/1617400';
+  const BILIBILI_URL = 'https://space.bilibili.com/3546978457750467';
   let showInstallModal = false;
   let showUpdatedInstallerModal = false;
   let pendingReinstallAfterUpdate = false;
@@ -250,6 +251,23 @@
     }
   }
 
+  async function openBilibili(event?: MouseEvent) {
+    event?.preventDefault();
+
+    if (!hasTauriRuntime()) {
+      if (typeof window !== 'undefined') {
+        window.open(BILIBILI_URL, '_blank', 'noopener,noreferrer');
+      }
+      return;
+    }
+
+    try {
+      await openUrl(BILIBILI_URL);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   $: hasPath = Boolean(selectedGamePath() || env?.game_path);
   $: modInstalled = Boolean(env?.bpp_version);
   $: bundledBppVersion = env?.bundled_bpp_version ?? null;
@@ -419,12 +437,29 @@
       </svg>
     </div>
 
-    <a class="about-toggle" href="/about" title={t('aboutLabel')}>
-      <svg class="about-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none" />
-        <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-      </svg>
-    </a>
+    <div class="header-corner-links">
+      <a class="about-toggle" href="/about" title={t('aboutLabel')}>
+        <svg class="about-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none" />
+          <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+      </a>
+
+      <a
+        class="about-toggle social-toggle"
+        href={BILIBILI_URL}
+        rel="noreferrer"
+        target="_blank"
+        title={$locale === 'zh' ? '打开 Bilibili 主页' : 'Open Bilibili'}
+        aria-label={$locale === 'zh' ? '打开 Bilibili 主页' : 'Open Bilibili'}
+        onclick={openBilibili}
+      >
+        <svg class="about-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4.5" y="7.5" width="15" height="10" rx="2.2" stroke="currentColor" stroke-width="1.5" fill="none" />
+          <path d="M9 5.5L7.4 3.8M15 5.5l1.6-1.7M9 11.2h1.8M13.2 11.2H15M9.3 14.1c1 .7 4.4.7 5.4 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+        </svg>
+      </a>
+    </div>
 
     <button
       class="locale-toggle"
@@ -466,21 +501,6 @@
       </a>
     </div>
 
-    {#if versionMismatch}
-      <a class="update-nudge" href="/whats-new">
-        <span class="update-nudge-badge">NEW</span>
-        <span class="update-nudge-copy">
-          <span class="update-nudge-title">
-            {$locale === 'zh' ? '检测到新版本内容' : 'New version content available'}
-          </span>
-          <span class="update-nudge-text">
-            {$locale === 'zh'
-              ? '当前已安装版本和安装器内置版本不一致，先看一下本次更新内容。'
-              : 'The installed BPP version does not match the current installer bundle. Review what changed first.'}
-          </span>
-        </span>
-      </a>
-    {/if}
   </header>
 
   <div class="steps">
@@ -491,7 +511,7 @@
           <span class="step-title">
             {t('stepBpp')}
             {#if versionMismatch}
-              <span class="tag tag-danger">{$locale === 'zh' ? '版本不一致' : 'Version Mismatch'}</span>
+              <span class="tag tag-danger">{$locale === 'zh' ? '版本不一致' : 'Version mismatch'}</span>
             {:else if modInstalled}
               <span class="tag tag-ok">{t('statusInstalled')}{env?.bpp_version ? ` · v${env.bpp_version}` : ''}</span>
             {:else if actionBusy === 'detect'}
@@ -501,17 +521,26 @@
             {/if}
           </span>
           {#if versionMismatch}
-            <p class="detail-line detail-alert">
-              {$locale === 'zh'
-                ? '当前已安装版本与安装器内置版本不一致，请点击下方重新安装。'
-                : 'The installed BazaarPlusPlus version does not match the installer bundle. Click Reinstall below.'}
-            </p>
-            <p class="detail-line detail-muted">
-              {$locale === 'zh' ? '已安装版本' : 'Installed'}: v{installedBppVersion}
-            </p>
-            <p class="detail-line detail-muted">
-              {$locale === 'zh' ? '安装器内置版本' : 'Installer bundle'}: v{bundledBppVersion}
-            </p>
+            <div class="mismatch-summary">
+              <p class="detail-line detail-muted">
+                {$locale === 'zh'
+                  ? '已安装版本和安装器内置版本不同，建议重新安装前先看一下本次更新内容。'
+                  : 'The installed version differs from the bundled one. Check what changed before reinstalling.'}
+              </p>
+              <a class="mismatch-link" href="/whats-new">
+                {$locale === 'zh' ? '查看更新内容' : "View what's new"}
+              </a>
+            </div>
+            <div class="mismatch-versions">
+              <span class="mismatch-version">
+                <span class="mismatch-version-label">{$locale === 'zh' ? '已安装' : 'Installed'}</span>
+                <span class="mismatch-version-value">v{installedBppVersion}</span>
+              </span>
+              <span class="mismatch-version">
+                <span class="mismatch-version-label">{$locale === 'zh' ? '安装器内置' : 'Installer bundle'}</span>
+                <span class="mismatch-version-value">v{bundledBppVersion}</span>
+              </span>
+            </div>
           {:else if modInstalled}
             <p class="detail-line detail-muted">{t('modInstalledHint')}</p>
             {#if bundledBppVersion}
@@ -921,10 +950,16 @@
   .tl { top: 8px; left: 8px; }
   .tr { top: 8px; right: 8px; }
 
-  .about-toggle {
+  .header-corner-links {
     position: absolute;
     top: 0.9rem;
     left: 0.9rem;
+    display: flex;
+    gap: 0.45rem;
+    z-index: 2;
+  }
+
+  .about-toggle {
     width: 2rem;
     height: 2rem;
     display: inline-flex;
@@ -935,7 +970,6 @@
     background: linear-gradient(180deg, rgba(200, 148, 55, 0.12), rgba(200, 148, 55, 0.06));
     color: rgba(228, 216, 191, 0.82);
     box-shadow: 0 0 0 1px rgba(255, 198, 98, 0.08) inset;
-    z-index: 2;
     text-decoration: none;
     transition: background 0.15s ease, border-color 0.15s ease;
   }
@@ -954,6 +988,11 @@
     width: 1rem;
     height: 1rem;
     opacity: 0.9;
+  }
+
+  .social-toggle {
+    padding: 0;
+    cursor: pointer;
   }
 
   .locale-toggle {
@@ -1041,86 +1080,6 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: rgba(236, 224, 196, 0.9);
-  }
-
-  .update-nudge {
-    width: min(100%, 360px);
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.75rem;
-    align-items: center;
-    margin-top: 0.65rem;
-    padding: 0.8rem 0.9rem;
-    border: 1px solid rgba(214, 109, 77, 0.34);
-    border-radius: 3px;
-    text-decoration: none;
-    background:
-      radial-gradient(circle at top left, rgba(255, 187, 146, 0.12), transparent 44%),
-      linear-gradient(180deg, rgba(191, 84, 66, 0.14), rgba(126, 37, 24, 0.08));
-    box-shadow:
-      0 0 0 1px rgba(255, 181, 166, 0.06) inset,
-      0 14px 32px rgba(0, 0, 0, 0.24);
-    transition:
-      transform 0.15s ease,
-      border-color 0.15s ease,
-      background 0.15s ease,
-      box-shadow 0.15s ease;
-  }
-
-  .update-nudge:hover {
-    transform: translateY(-1px);
-    border-color: rgba(232, 131, 98, 0.5);
-    background:
-      radial-gradient(circle at top left, rgba(255, 202, 172, 0.16), transparent 44%),
-      linear-gradient(180deg, rgba(191, 84, 66, 0.2), rgba(126, 37, 24, 0.1));
-    box-shadow:
-      0 0 0 1px rgba(255, 181, 166, 0.1) inset,
-      0 18px 36px rgba(0, 0, 0, 0.28);
-  }
-
-  .update-nudge:focus-visible {
-    outline: 2px solid rgba(255, 214, 140, 0.9);
-    outline-offset: 2px;
-  }
-
-  .update-nudge-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 3.35rem;
-    height: 1.9rem;
-    padding: 0 0.7rem;
-    border: 1px solid rgba(255, 181, 166, 0.34);
-    border-radius: 999px;
-    background: linear-gradient(180deg, rgba(255, 214, 206, 0.2), rgba(191, 84, 66, 0.28));
-    color: rgba(255, 242, 231, 0.96);
-    font-family: 'Cinzel', serif;
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    box-shadow: 0 0 18px rgba(191, 84, 66, 0.18);
-  }
-
-  .update-nudge-copy {
-    min-width: 0;
-    display: grid;
-    gap: 0.18rem;
-    text-align: left;
-  }
-
-  .update-nudge-title {
-    color: rgba(255, 233, 219, 0.92);
-    font-family: 'Cinzel', serif;
-    font-size: 0.62rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-  }
-
-  .update-nudge-text {
-    color: rgba(243, 221, 209, 0.74);
-    font-size: 0.78rem;
-    line-height: 1.45;
   }
 
   .locale-toggle:hover {
@@ -1235,8 +1194,8 @@
   }
 
   .step-error {
-    border-color: rgba(200, 82, 66, 0.42);
-    box-shadow: 0 6px 28px rgba(0,0,0,0.35), 0 0 22px rgba(200, 82, 66, 0.08);
+    border-color: rgba(196, 98, 76, 0.28);
+    box-shadow: 0 6px 28px rgba(0,0,0,0.35), 0 0 14px rgba(196, 98, 76, 0.04);
   }
 
   .step-install {
@@ -1303,7 +1262,7 @@
 
   .tag-ok   { background: rgba(80, 180, 120, 0.15); color: #6dd9a0; border: 1px solid rgba(80, 180, 120, 0.25); }
   .tag-warn { background: rgba(200, 140, 50, 0.12); color: #c4923a; border: 1px solid rgba(200, 140, 50, 0.22); }
-  .tag-danger { background: rgba(200, 82, 66, 0.14); color: #ff9a8a; border: 1px solid rgba(200, 82, 66, 0.3); }
+  .tag-danger { background: rgba(191, 104, 81, 0.1); color: #f0b2a2; border: 1px solid rgba(191, 104, 81, 0.2); }
 
   .detail-line {
     margin: 0;
@@ -1330,9 +1289,62 @@
     color: rgba(180, 150, 110, 0.48);
   }
 
-  .detail-alert {
-    font-size: 0.82rem;
-    color: rgba(255, 166, 150, 0.92);
+  .mismatch-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem 0.85rem;
+  }
+
+  .mismatch-link {
+    flex-shrink: 0;
+    color: rgba(223, 184, 115, 0.86);
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .mismatch-link:hover {
+    color: rgba(240, 211, 152, 0.96);
+  }
+
+  .mismatch-link:focus-visible {
+    outline: 2px solid rgba(255, 214, 140, 0.9);
+    outline-offset: 2px;
+  }
+
+  .mismatch-versions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .mismatch-version {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0.32rem 0.52rem;
+    border: 1px solid rgba(191, 104, 81, 0.14);
+    border-radius: 999px;
+    background: rgba(191, 104, 81, 0.06);
+  }
+
+  .mismatch-version-label {
+    color: rgba(214, 182, 126, 0.62);
+    font-size: 0.68rem;
+    white-space: nowrap;
+  }
+
+  .mismatch-version-value {
+    color: rgba(235, 223, 198, 0.86);
+    font-family: 'Fira Code', monospace;
+    font-size: 0.72rem;
+    white-space: nowrap;
   }
 
   .locate-bar {
@@ -1722,15 +1734,9 @@
       width: 100%;
     }
 
-    .update-nudge {
-      width: 100%;
-      grid-template-columns: 1fr;
-      justify-items: center;
-      text-align: center;
-    }
-
-    .update-nudge-copy {
-      text-align: center;
+    .step-body-bpp {
+      flex-direction: column;
+      gap: 0.7rem;
     }
 
     .detect-btn,
@@ -1743,7 +1749,7 @@
       right: 0.7rem;
     }
 
-    .about-toggle {
+    .header-corner-links {
       top: 0.7rem;
       left: 0.7rem;
     }

@@ -1,9 +1,7 @@
 ﻿<script lang="ts">
   import { getVersion } from '@tauri-apps/api/app';
-  import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
   import AppModal from '$lib/components/AppModal.svelte';
-  import type { AppUpdateInfo } from '$lib/types';
   import { formatMessage, messages } from '$lib/i18n';
   import { locale, handleLocaleToggle } from '$lib/locale';
 
@@ -22,16 +20,12 @@
   let supporters: SupporterEntry[] = [];
   let supportersLoaded = false;
   let supportersLoadError = '';
-  let updateInfo: AppUpdateInfo | null = null;
-  let updateState: 'idle' | 'checking' | 'available' | 'up-to-date' | 'installing' | 'installed' | 'error' = 'idle';
-  let updateError = '';
 
   $: t = (key: keyof typeof messages.en, params?: Record<string, string | number>): string =>
     formatMessage($locale, key, params);
 
   $: localeBadge = $locale === 'zh' ? '中' : 'EN';
   $: localeButtonLabel = $locale === 'zh' ? 'Switch to English' : '切换到中文';
-  $: updateSupported = hasTauriRuntime();
 
   const paymentMethods = [
     {
@@ -81,52 +75,6 @@
   onMount(() => {
     void loadAppVersion();
   });
-
-  function hasTauriRuntime(): boolean {
-    return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-  }
-
-  function getUpdaterUnavailableMessage(): string {
-    return $locale === 'zh'
-      ? '浏览器预览不支持安装器更新。'
-      : 'Updater unavailable in browser preview.';
-  }
-
-  function getUpdateSourceUnavailableMessage(): string {
-    return $locale === 'zh' ? '未配置更新源。' : 'Updater not configured.';
-  }
-
-  function getUpdateCheckFailedMessage(): string {
-    return $locale === 'zh' ? '检查更新失败。' : 'Update check failed.';
-  }
-
-  function getUpdateInstallFailedMessage(): string {
-    return $locale === 'zh' ? '安装更新失败。' : 'Update install failed.';
-  }
-
-  function getNoPendingUpdateMessage(): string {
-    return $locale === 'zh' ? '请先检查更新。' : 'Check for updates first.';
-  }
-
-  function mapUpdateError(error: unknown): string {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!hasTauriRuntime() || /invoke/i.test(message) || /__TAURI_INTERNALS__/i.test(message)) {
-      return getUpdaterUnavailableMessage();
-    }
-    if (/Updater is not configured|Invalid updater endpoint URL|Cannot configure updater endpoints/i.test(message)) {
-      return getUpdateSourceUnavailableMessage();
-    }
-    if (/No pending update\. Check for updates first\./i.test(message)) {
-      return getNoPendingUpdateMessage();
-    }
-    if (/Cannot check for updates/i.test(message)) {
-      return getUpdateCheckFailedMessage();
-    }
-    if (/Cannot install update/i.test(message)) {
-      return getUpdateInstallFailedMessage();
-    }
-    return message;
-  }
 
   async function loadAppVersion() {
     try {
@@ -228,48 +176,6 @@
       ...hiddenPaymentImages,
       [methodId]: true
     };
-  }
-
-  async function checkForUpdates() {
-    if (!updateSupported) {
-      updateInfo = null;
-      updateState = 'error';
-      updateError = getUpdaterUnavailableMessage();
-      return;
-    }
-
-    updateState = 'checking';
-    updateError = '';
-
-    try {
-      const nextUpdate = await invoke<AppUpdateInfo | null>('fetch_app_update');
-      updateInfo = nextUpdate;
-      updateState = nextUpdate ? 'available' : 'up-to-date';
-    } catch (error) {
-      updateInfo = null;
-      updateState = 'error';
-      updateError = mapUpdateError(error);
-    }
-  }
-
-  async function installUpdate() {
-    if (!updateInfo || updateState === 'installing') return;
-    if (!updateSupported) {
-      updateState = 'error';
-      updateError = getUpdaterUnavailableMessage();
-      return;
-    }
-
-    updateState = 'installing';
-    updateError = '';
-
-    try {
-      await invoke('install_app_update');
-      updateState = 'installed';
-    } catch (error) {
-      updateState = 'error';
-      updateError = mapUpdateError(error);
-    }
   }
 </script>
 
@@ -523,73 +429,6 @@
         </a>
       </li>
     </ul>
-  </section>
-
-  <section class="card update-section">
-    <h2 class="section-title">{$locale === 'zh' ? '更新' : 'Updates'}</h2>
-    <p class="info-muted">
-      {$locale === 'zh'
-        ? '在这里检查安装器的新版本，并完成更新。'
-        : 'Check for a newer installer version and update it here.'}
-    </p>
-
-    {#if !updateSupported}
-      <p class="info-muted">
-        {getUpdaterUnavailableMessage()}
-      </p>
-    {/if}
-
-    {#if updateInfo}
-      <p class="info-line">
-        <span class="version-label">{$locale === 'zh' ? '当前' : 'Current'}</span>
-        <span class="tag-version">v{updateInfo.currentVersion}</span>
-        <span class="version-label">{$locale === 'zh' ? '最新' : 'Latest'}</span>
-        <span class="tag-version">v{updateInfo.version}</span>
-      </p>
-    {/if}
-
-    {#if updateState === 'up-to-date'}
-      <p class="info-muted">{$locale === 'zh' ? '当前已经是最新版本。' : 'This app is already up to date.'}</p>
-    {:else if updateState === 'available'}
-      <p class="info-muted">
-        {$locale === 'zh'
-          ? '检测到可用更新。安装后应用会重启。'
-          : 'An update is available. The app will restart after installation.'}
-      </p>
-    {:else if updateState === 'installed'}
-      <p class="info-muted">
-        {$locale === 'zh'
-          ? '更新已经安装，应用正在重启。'
-          : 'The update has been installed and the app is restarting.'}
-      </p>
-    {:else if updateState === 'error'}
-      <p class="state-body">{updateError}</p>
-    {/if}
-
-    {#if updateInfo?.body}
-      <pre class="release-notes">{updateInfo.body}</pre>
-    {/if}
-
-    <div class="update-actions">
-      <button class="dep-item dep-item-link update-action" type="button" onclick={checkForUpdates} disabled={!updateSupported || updateState === 'checking' || updateState === 'installing'}>
-        <span class="dep-name">
-          {#if updateState === 'checking'}
-            {$locale === 'zh' ? '检查中...' : 'Checking...'}
-          {:else}
-            {$locale === 'zh' ? '检查更新' : 'Check for Updates'}
-          {/if}
-        </span>
-      </button>
-      <button class="dep-item dep-item-link update-action" type="button" onclick={installUpdate} disabled={!updateSupported || !updateInfo || updateState === 'checking' || updateState === 'installing'}>
-        <span class="dep-name">
-          {#if updateState === 'installing'}
-            {$locale === 'zh' ? '安装中...' : 'Installing...'}
-          {:else}
-            {$locale === 'zh' ? '安装更新' : 'Install Update'}
-          {/if}
-        </span>
-      </button>
-    </div>
   </section>
 
   <section class="card">
@@ -1078,34 +917,6 @@
     color: rgba(220, 180, 100, 0.85);
   }
 
-  .update-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
-  }
-
-  .update-action {
-    justify-content: center;
-  }
-
-  .update-action:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-
-  .release-notes {
-    margin: 0;
-    padding: 0.75rem;
-    border-radius: 2px;
-    background: rgba(200, 148, 55, 0.04);
-    border: 1px solid rgba(180, 130, 48, 0.08);
-    color: rgba(228, 216, 191, 0.82);
-    font-family: 'Fira Code', monospace;
-    font-size: 0.68rem;
-    line-height: 1.55;
-    white-space: pre-wrap;
-  }
-
   .payment-modal-body {
     padding-top: 0.1rem;
   }
@@ -1402,8 +1213,5 @@
       grid-template-columns: 1fr;
     }
 
-    .update-actions {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

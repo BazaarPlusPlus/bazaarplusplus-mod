@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-  <title>{$locale === 'zh' ? '新版本导览' : "What's New"} - BazaarPlusPlus</title>
+  <title>{$locale === 'zh' ? '更新亮点' : "What's New"} - BazaarPlusPlus</title>
 </svelte:head>
 
 <main class="shell">
@@ -36,12 +36,7 @@
     </button>
 
     <p class="kicker">BazaarPlusPlus</p>
-    <h1>{$locale === 'zh' ? '新版本导览' : "What's New"}</h1>
-    <p class="subtitle">
-      {$locale === 'zh'
-        ? '把首启展示和版本说明独立出来，后续更新只改这一处。'
-        : 'A dedicated place for first-launch highlights so future updates only need one content edit.'}
-    </p>
+    <h1>{$locale === 'zh' ? '更新亮点' : "What's New"}</h1>
   </header>
 
   <section class="content-card">

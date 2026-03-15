@@ -14,12 +14,6 @@ export type MessageKey =
   | 'statusNotInstalled'
   | 'installedVersion'
   | 'detectInstalledHint'
-  | 'updateAvailable'
-  | 'updateHint'
-  | 'actionCheckingUpdates'
-  | 'actionUpdating'
-  | 'actionCheckUpdates'
-  | 'actionUpdate'
   | 'statusRuntimeMissing'
   | 'runtimeVersion'
   | 'runtimeCompatible'
@@ -79,7 +73,7 @@ export type MessageKey =
   | 'settingsDecreaseSpeed'
   | 'settingsIncreaseSpeed';
 
-export const defaultLocale: Locale = 'en';
+export const defaultLocale: Locale = 'zh';
 
 export const messages: Record<Locale, Record<MessageKey, string>> = {
   en: {
@@ -96,12 +90,6 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     statusNotInstalled: 'Not installed',
     installedVersion: 'Installed version: {version}',
     detectInstalledHint: 'Run detection to inspect the installed BazaarPlusPlus version.',
-    updateAvailable: 'Update available: {version}',
-    updateHint: 'Check whether a newer BazaarPlusPlus version is available.',
-    actionCheckingUpdates: 'Checking...',
-    actionUpdating: 'Updating...',
-    actionCheckUpdates: 'Check updates',
-    actionUpdate: 'Update',
     statusRuntimeMissing: 'Required component missing',
     runtimeVersion: 'Runtime: {version}',
     runtimeCompatible: 'Compatible .NET runtime detected',
@@ -175,12 +163,6 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     statusNotInstalled: '未安装',
     installedVersion: '已安装版本：{version}',
     detectInstalledHint: '点击检测以查看当前已安装的 BazaarPlusPlus 版本。',
-    updateAvailable: '发现新版本：{version}',
-    updateHint: '检查 BazaarPlusPlus 是否有可用更新。',
-    actionCheckingUpdates: '检查中...',
-    actionUpdating: '更新中...',
-    actionCheckUpdates: '检查更新',
-    actionUpdate: '更新',
     statusRuntimeMissing: '缺少必需组件',
     runtimeVersion: '运行时：{version}',
     runtimeCompatible: '已检测到兼容的 .NET 运行时',
@@ -252,7 +234,7 @@ export function resolveInitialLocale(): Locale {
     return saved;
   }
 
-  return window.navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+  return defaultLocale;
 }
 
 export function formatMessage(

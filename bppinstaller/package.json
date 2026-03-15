@@ -1,12 +1,11 @@
 {
   "name": "bppinstaller",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "BazaarPlusPlus Mod Installer",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
     "prebuild-check": "node scripts/prebuild-check.mjs",
-    "generate-updater-manifest": "node scripts/generate-updater-manifest.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
