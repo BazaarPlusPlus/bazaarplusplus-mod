@@ -104,7 +104,7 @@ Assert(
 
 fakeStore.ResumeState = new RunLogSessionState
 {
-    RunId = "run_existing",
+    RunId = request.RunId,
     SchemaVersion = 1,
     StartedAtUtc = now,
     LastSeenAtUtc = now.AddMinutes(5),
@@ -118,7 +118,7 @@ fakeStore.ResumeState = new RunLogSessionState
 
 var resumedManager = ctor.Invoke([fakeStore, new Func<DateTimeOffset>(() => now.AddMinutes(20))]);
 var resumedState = Invoke<RunLogSessionState>(managerType, resumedManager, "EnsureActiveSession", [request]);
-Assert(resumedState.RunId == "run_existing", "EnsureActiveSession should prefer the resumable run.");
+Assert(resumedState.RunId == request.RunId, "EnsureActiveSession should prefer the resumable run when the server run id matches.");
 Assert(fakeStore.CreateRunCalls == 1, "Resuming should not create a second run.");
 
 var resumedEvent = Invoke<RunLogEvent?>(
@@ -135,8 +135,43 @@ var resumedEvent = Invoke<RunLogEvent?>(
     ]
 );
 Assert(resumedEvent != null, "Resumed manager should accept events.");
-Assert(resumedEvent!.RunId == "run_existing", "Resumed events should target the restored run id.");
+Assert(resumedEvent!.RunId == request.RunId, "Resumed events should target the restored run id.");
 Assert(resumedEvent.Seq == 42, "Resumed sequencing should continue from the persisted last_seq.");
+
+fakeStore.ResumeState = new RunLogSessionState
+{
+    RunId = "server-run-old",
+    SchemaVersion = 1,
+    StartedAtUtc = now,
+    LastSeenAtUtc = now.AddMinutes(6),
+    LastSeq = 7,
+    Day = 3,
+    Hour = 2,
+};
+
+var replacementRequest = new RunLogCreateRequest
+{
+    SchemaVersion = 1,
+    RunId = "server-run-new",
+    StartedAtUtc = now.AddMinutes(30),
+    Hero = "Vanessa",
+    GameMode = "Ranked",
+    Day = 1,
+    Hour = 1,
+};
+var replacementManager = ctor.Invoke([fakeStore, new Func<DateTimeOffset>(() => now.AddMinutes(30))]);
+var replacementState = Invoke<RunLogSessionState>(
+    managerType,
+    replacementManager,
+    "EnsureActiveSession",
+    [replacementRequest]
+);
+Assert(
+    replacementState.RunId == "server-run-new",
+    "EnsureActiveSession should replace a restored session when the server run id changes."
+);
+Assert(fakeStore.MarkRunAbandonedCalls == 1, "A mismatched restored session should be abandoned.");
+Assert(fakeStore.CreateRunCalls == 2, "A mismatched restored session should create a fresh run.");
 
 Console.WriteLine("RunLogging session checks passed.");
 
@@ -184,6 +219,8 @@ file sealed class FakeRunLogStore : IRunLogStore
     public int CreateRunCalls { get; private set; }
 
     public int CompleteRunCalls { get; private set; }
+
+    public int MarkRunAbandonedCalls { get; private set; }
 
     public List<RunLogEvent> AppendedEvents { get; } = [];
 
@@ -251,6 +288,7 @@ file sealed class FakeRunLogStore : IRunLogStore
 
     public void MarkRunAbandoned(string runId, RunLogAbandonment abandonment)
     {
+        MarkRunAbandonedCalls++;
         ResumeState = null;
     }
 }

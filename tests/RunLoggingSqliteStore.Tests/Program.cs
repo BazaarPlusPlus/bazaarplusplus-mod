@@ -132,6 +132,47 @@ try
     Assert(GetInt64(connection, "SELECT MAX(seq) FROM run_events WHERE run_id = $runId;", runId) == 2, "run_events should persist seq=2.");
     Assert(GetInt64(connection, "SELECT last_seq FROM run_checkpoints WHERE run_id = $runId;", runId) == 2, "run_checkpoints should persist the checkpoint last_seq.");
     Assert(GetString(connection, "SELECT status FROM run_status WHERE run_id = $runId;", runId) == "completed", "run_status should persist terminal status.");
+
+    const string abandonedRunId = "server-run-456";
+    Invoke<RunLogSessionState>(
+        storeType,
+        store,
+        "CreateRun",
+        [
+            new RunLogCreateRequest
+            {
+                SchemaVersion = 1,
+                RunId = abandonedRunId,
+                StartedAtUtc = startedAt.AddHours(1),
+                Hero = "Pygmalien",
+                GameMode = "Unranked",
+                Day = 1,
+                Hour = 1,
+            },
+        ]
+    );
+    InvokeVoid(
+        storeType,
+        store,
+        "CompleteRun",
+        [
+            abandonedRunId,
+            new RunLogCompletion
+            {
+                SchemaVersion = 1,
+                RunId = abandonedRunId,
+                Status = "abandoned",
+                EndedAtUtc = startedAt.AddHours(1).AddMinutes(5),
+                FinalDay = 1,
+                FinalHour = 2,
+                Reason = "interrupted",
+            },
+        ]
+    );
+    Assert(
+        GetString(connection, "SELECT status FROM run_status WHERE run_id = $runId;", abandonedRunId) == "abandoned",
+        "run_status should preserve interrupted/abandoned terminal statuses."
+    );
 }
 finally
 {

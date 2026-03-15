@@ -31,10 +31,28 @@ public sealed class RunLogSessionManager
 
     public RunLogSessionState EnsureActiveSession(RunLogCreateRequest request)
     {
-        if (ActiveSession != null)
-            return ActiveSession;
+        ActiveSession ??= RestoreActiveSession();
 
-        ActiveSession = RestoreActiveSession() ?? _store.CreateRun(request);
+        if (
+            ActiveSession != null
+            && !string.Equals(ActiveSession.RunId, request.RunId, StringComparison.Ordinal)
+        )
+        {
+            _store.MarkRunAbandoned(
+                ActiveSession.RunId,
+                new RunLogAbandonment
+                {
+                    SchemaVersion = ActiveSession.SchemaVersion,
+                    EndedAtUtc = _utcNow(),
+                    FinalDay = ActiveSession.Day,
+                    FinalHour = ActiveSession.Hour,
+                    Reason = "session_mismatch",
+                }
+            );
+            ActiveSession = null;
+        }
+
+        ActiveSession ??= _store.CreateRun(request);
         return ActiveSession;
     }
 

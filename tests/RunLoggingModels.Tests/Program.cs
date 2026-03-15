@@ -39,6 +39,22 @@ Assert(
     "RunLoggingController should create SqliteRunLogStore."
 );
 Assert(
+    controllerSource.Contains("catch (Exception ex)", StringComparison.Ordinal),
+    "RunLoggingController should isolate polling failures behind exception guards."
+);
+Assert(
+    controllerSource.Contains("BppLog.Error", StringComparison.Ordinal),
+    "RunLoggingController should log polling failures instead of throwing through Update."
+);
+Assert(
+    controllerSource.Contains("completionAttempted", StringComparison.Ordinal),
+    "RunLoggingController should track whether leave-run completion was attempted before clearing the retry edge."
+);
+Assert(
+    controllerSource.Contains("completionSucceeded", StringComparison.Ordinal),
+    "RunLoggingController should only clear the leave-run retry edge after completion succeeds."
+);
+Assert(
     !controllerSource.Contains("JsonRunLogStore", StringComparison.Ordinal),
     "RunLoggingController should no longer reference JsonRunLogStore."
 );
@@ -61,8 +77,73 @@ Assert(
     "ModState should expose a SQLite database path."
 );
 Assert(
+    modStateSource.Contains("CurrentServerRunId", StringComparison.Ordinal),
+    "ModState should cache the authoritative server run id."
+);
+Assert(
+    modStateSource.Contains("LastRunExitKind", StringComparison.Ordinal),
+    "ModState should track how the active run exited."
+);
+Assert(
     !modStateSource.Contains("RunLogRootPath", StringComparison.Ordinal),
     "ModState should no longer expose a JSON run log root path."
+);
+
+var gameDataReaderSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/GameDataReader.cs")
+);
+Assert(
+    File.Exists(gameDataReaderSourcePath),
+    $"GameDataReader source not found at {gameDataReaderSourcePath}"
+);
+var gameDataReaderSource = File.ReadAllText(gameDataReaderSourcePath);
+Assert(
+    gameDataReaderSource.Contains("CurrentServerRunId", StringComparison.Ordinal),
+    "GameDataReader should require the server run id before building a run log create request."
+);
+Assert(
+    !gameDataReaderSource.Contains("RunIdFactory.Create(", StringComparison.Ordinal),
+    "GameDataReader should not synthesize run ids in the runtime logging path."
+);
+Assert(
+    !gameDataReaderSource.Contains("Status = \"completed\"", StringComparison.Ordinal),
+    "GameDataReader should not hard-code completed terminal status."
+);
+
+var sqliteStoreSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/RunLogging/Persistence/SqliteRunLogStore.cs")
+);
+Assert(File.Exists(sqliteStoreSourcePath), $"Sqlite store source not found at {sqliteStoreSourcePath}");
+var sqliteStoreSource = File.ReadAllText(sqliteStoreSourcePath);
+Assert(
+    sqliteStoreSource.Contains("var payloadJson = JsonConvert.SerializeObject", StringComparison.Ordinal),
+    "SqliteRunLogStore should serialize event payloads before opening the database connection."
+);
+Assert(
+    sqliteStoreSource.Contains("command.CommandTimeout = 2;", StringComparison.Ordinal),
+    "SqliteRunLogStore should apply a short command timeout to sqlite operations."
+);
+Assert(
+    sqliteStoreSource.Contains("connection.Dispose();", StringComparison.Ordinal),
+    "SqliteRunLogStore should dispose connections when OpenConnection initialization fails."
+);
+
+var csprojSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../BazaarPlusPlus.csproj")
+);
+Assert(File.Exists(csprojSourcePath), $"Project file not found at {csprojSourcePath}");
+var csprojSource = File.ReadAllText(csprojSourcePath);
+Assert(
+    csprojSource.Contains("FilesToDelete Include=\"$(GamePath)\\BepInEx\\plugins\\e_sqlite3.dll\"", StringComparison.Ordinal),
+    "Debug build should delete stale Windows sqlite native runtime files before copy."
+);
+Assert(
+    csprojSource.Contains("WindowsSqliteNativeFile Include=", StringComparison.Ordinal),
+    "Debug build should declare the Windows sqlite native runtime file."
+);
+Assert(
+    csprojSource.Contains("DestinationFiles=\"$(GamePath)\\BepInEx\\plugins\\e_sqlite3.dll\"", StringComparison.Ordinal),
+    "Debug build should copy e_sqlite3.dll into the BepInEx plugins folder."
 );
 
 AssertSourceMissing("Game/RunLogging/Persistence/JsonRunLogStore.cs");

@@ -8,7 +8,7 @@ var source = File.ReadAllText(sourcePath);
 
 AssertContains(
     source,
-    "private static readonly Color ItemBoardFillColor = new Color(0.34f, 0.29f, 0.24f, 0.12f);",
+    "private static readonly Color ItemBoardFillColor = new Color(0.34f, 0.29f, 0.24f, 0.88f);",
     "Item board background should use the agreed warm gray fill."
 );
 AssertContains(

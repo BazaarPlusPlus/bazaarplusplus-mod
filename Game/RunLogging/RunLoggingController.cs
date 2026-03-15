@@ -66,36 +66,63 @@ internal sealed class RunLoggingController : MonoBehaviour
     public void PollRunState()
     {
         var inRun = ModState.IsInGameRun;
-        if (inRun)
+        var completionAttempted = false;
+        var completionSucceeded = false;
+        try
         {
-            var session = EnsureActiveRunFromGame();
-            if (session != null)
+            if (inRun)
             {
-                if (GameDataReader.TryBuildRunLogRunProgressInput(out var progressInput))
-                    RequireCore().AcceptRunProgress(progressInput);
+                var session = EnsureActiveRunFromGame();
+                if (session != null)
+                {
+                    if (GameDataReader.TryBuildRunLogRunProgressInput(out var progressInput))
+                        RequireCore().AcceptRunProgress(progressInput);
 
-                if (GameDataReader.TryBuildRunLogStateSnapshot(out var stateInput))
-                    RequireCore().AcceptStateSnapshot(stateInput);
+                    if (GameDataReader.TryBuildRunLogStateSnapshot(out var stateInput))
+                        RequireCore().AcceptStateSnapshot(stateInput);
+                }
+            }
+            else if (_wasInRunLastTick && _sessionManager?.HasActiveSession == true)
+            {
+                completionAttempted = true;
+                RequireCore().CompleteRun(GameDataReader.BuildRunLogCompletion("run_state_exit"));
+                completionSucceeded = true;
             }
         }
-        else if (_wasInRunLastTick && _sessionManager?.HasActiveSession == true)
+        catch (Exception ex)
         {
-            RequireCore().CompleteRun(GameDataReader.BuildRunLogCompletion("run_state_exit"));
+            BppLog.Error("RunLoggingController", $"PollRunState failed: {ex}");
         }
-
-        _wasInRunLastTick = inRun;
+        finally
+        {
+            if (inRun)
+            {
+                _wasInRunLastTick = true;
+            }
+            else if (!completionAttempted || completionSucceeded || _sessionManager?.HasActiveSession != true)
+            {
+                _wasInRunLastTick = false;
+            }
+        }
     }
 
     public void CaptureSelectionFromCurrentState()
     {
-        if (!ModState.IsInGameRun)
-            return;
+        try
+        {
+            if (!ModState.IsInGameRun)
+                return;
 
-        if (EnsureActiveRunFromGame() == null)
-            return;
+            if (EnsureActiveRunFromGame() == null)
+                return;
 
-        if (GameDataReader.TryBuildRunLogSelectionSnapshot(out var selectionInput))
-            RequireCore().AcceptSelectionSnapshot(selectionInput);
+            if (GameDataReader.TryBuildRunLogSelectionSnapshot(out var selectionInput))
+                RequireCore().AcceptSelectionSnapshot(selectionInput);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("RunLoggingController", $"CaptureSelectionFromCurrentState failed: {ex}");
+        }
     }
 
     public RunLogEvent AcceptRunProgress(RunLogRunProgressInput input)
@@ -115,9 +142,6 @@ internal sealed class RunLoggingController : MonoBehaviour
 
     private RunLogSessionState? EnsureActiveRunFromGame()
     {
-        if (_sessionManager?.HasActiveSession == true)
-            return _sessionManager.ActiveSession;
-
         if (!GameDataReader.TryCreateRunLogCreateRequest(out var request))
             return null;
 
@@ -141,7 +165,7 @@ internal sealed class RunLoggingControllerCore
 {
     private readonly RunLogSessionManager _sessionManager;
     private readonly RunLogCaptureService _captureService;
-    private bool _runStartedEventWritten;
+    private string? _startedEventRunId;
 
     public RunLoggingControllerCore(
         RunLogSessionManager sessionManager,
@@ -155,7 +179,7 @@ internal sealed class RunLoggingControllerCore
     public RunLogSessionState EnsureRunStarted(RunLogCreateRequest request)
     {
         var session = _sessionManager.EnsureActiveSession(request);
-        if (_runStartedEventWritten)
+        if (string.Equals(_startedEventRunId, session.RunId, StringComparison.Ordinal))
             return session;
 
         var eventKind = session.LastSeq > 0 ? "run_resumed" : "run_started";
@@ -170,7 +194,7 @@ internal sealed class RunLoggingControllerCore
             }
         );
         _sessionManager.SaveCheckpoint();
-        _runStartedEventWritten = true;
+        _startedEventRunId = session.RunId;
         return session;
     }
 
@@ -202,6 +226,6 @@ internal sealed class RunLoggingControllerCore
     public void CompleteRun(RunLogCompletion completion)
     {
         _sessionManager.CompleteRun(completion);
-        _runStartedEventWritten = false;
+        _startedEventRunId = null;
     }
 }

@@ -36,7 +36,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
             Directory.CreateDirectory(directory);
 
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
+        using var command = CreateCommand(connection);
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
     }
@@ -44,7 +44,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
     public RunLogSessionState? TryResumeActiveRun()
     {
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
+        using var command = CreateCommand(connection);
         command.CommandText =
             $"""
             SELECT
@@ -111,8 +111,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
 
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
+        using var command = CreateCommand(connection, transaction);
         command.CommandText =
             $"""
             INSERT INTO {RunLogSqliteSchema.RunsTableName} (
@@ -165,8 +164,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
 
     public void AppendEvent(string runId, RunLogEvent entry)
     {
+        var payloadJson = JsonConvert.SerializeObject(entry, SerializerSettings);
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
+        using var command = CreateCommand(connection);
         command.CommandText =
             $"""
             INSERT INTO {RunLogSqliteSchema.RunEventsTableName} (
@@ -187,10 +187,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.Parameters.AddWithValue("$seq", entry.Seq);
         command.Parameters.AddWithValue("$tsUtc", entry.Ts.ToString("o"));
         command.Parameters.AddWithValue("$kind", entry.Kind);
-        command.Parameters.AddWithValue(
-            "$payloadJson",
-            JsonConvert.SerializeObject(entry, SerializerSettings)
-        );
+        command.Parameters.AddWithValue("$payloadJson", payloadJson);
         command.ExecuteNonQuery();
     }
 
@@ -199,8 +196,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
 
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
+        using var command = CreateCommand(connection, transaction);
         command.CommandText =
             $"""
             INSERT INTO {RunLogSqliteSchema.RunCheckpointsTableName} (
@@ -261,8 +257,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.Parameters.AddWithValue("$completed", checkpoint.Completed ? 1 : 0);
         command.ExecuteNonQuery();
 
-        using var updateRun = connection.CreateCommand();
-        updateRun.Transaction = transaction;
+        using var updateRun = CreateCommand(connection, transaction);
         updateRun.CommandText =
             $"""
             UPDATE {RunLogSqliteSchema.RunsTableName}
@@ -323,8 +318,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
 
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
+        using var command = CreateCommand(connection, transaction);
         command.CommandText =
             $"""
             INSERT INTO {RunLogSqliteSchema.RunStatusTableName} (
@@ -369,8 +363,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         AddNullableString(command, "$reason", reason);
         command.ExecuteNonQuery();
 
-        using var updateRun = connection.CreateCommand();
-        updateRun.Transaction = transaction;
+        using var updateRun = CreateCommand(connection, transaction);
         updateRun.CommandText =
             $"""
             UPDATE {RunLogSqliteSchema.RunsTableName}
@@ -385,8 +378,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         AddNullableInt32(updateRun, "$finalHour", finalHour);
         updateRun.ExecuteNonQuery();
 
-        using var completeCheckpoint = connection.CreateCommand();
-        completeCheckpoint.Transaction = transaction;
+        using var completeCheckpoint = CreateCommand(connection, transaction);
         completeCheckpoint.CommandText =
             $"""
             UPDATE {RunLogSqliteSchema.RunCheckpointsTableName}
@@ -402,13 +394,32 @@ public sealed class SqliteRunLogStore : IRunLogStore
     private SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection($"Data Source={_databasePath}");
-        connection.Open();
+        try
+        {
+            connection.Open();
 
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA foreign_keys = ON;";
-        command.ExecuteNonQuery();
+            using var command = CreateCommand(connection);
+            command.CommandText = "PRAGMA foreign_keys = ON;";
+            command.ExecuteNonQuery();
 
-        return connection;
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
+    }
+
+    private static SqliteCommand CreateCommand(
+        SqliteConnection connection,
+        SqliteTransaction? transaction = null
+    )
+    {
+        var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.Transaction = transaction;
+        return command;
     }
 
     private static void AddNullableInt32(SqliteCommand command, string name, int? value)

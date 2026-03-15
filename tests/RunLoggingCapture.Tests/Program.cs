@@ -11,6 +11,23 @@ var stateInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogStateSnap
 var selectionInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogSelectionSnapshotInput");
 var optionInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogSelectionOptionInput");
 
+var runInitializedPatchPath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Patches/RunLogging/RunInitializedPatch.cs")
+);
+Assert(
+    File.Exists(runInitializedPatchPath),
+    $"RunInitialized patch source not found at {runInitializedPatchPath}"
+);
+var runInitializedPatchSource = File.ReadAllText(runInitializedPatchPath);
+Assert(
+    runInitializedPatchSource.Contains("NetMessageRunInitialized", StringComparison.Ordinal),
+    "RunInitialized patch should intercept the server run initialization message."
+);
+Assert(
+    runInitializedPatchSource.Contains("CurrentServerRunId", StringComparison.Ordinal),
+    "RunInitialized patch should store the authoritative server run id."
+);
+
 var service = Activator.CreateInstance(captureServiceType)
     ?? throw new InvalidOperationException("RunLogCaptureService should be constructible.");
 
@@ -250,6 +267,51 @@ Assert(
     "Restored sessions should continue sequence numbers when appending run_resumed."
 );
 
+var mismatchStore = new ControllerSeamStore
+{
+    ResumeState = new RunLogSessionState
+    {
+        RunId = "server-run-old",
+        SchemaVersion = 1,
+        StartedAtUtc = new DateTimeOffset(2026, 3, 15, 14, 0, 0, TimeSpan.Zero),
+        LastSeenAtUtc = new DateTimeOffset(2026, 3, 15, 14, 5, 0, TimeSpan.Zero),
+        LastSeq = 5,
+        Day = 3,
+        Hour = 1,
+    },
+};
+var mismatchSessionManager = new RunLogSessionManager(
+    mismatchStore,
+    () => new DateTimeOffset(2026, 3, 15, 14, 10, 0, TimeSpan.Zero)
+);
+mismatchSessionManager.RestoreActiveSession();
+var mismatchCore = coreCtor.Invoke([mismatchSessionManager, seamCaptureService]);
+Invoke<object>(
+    coreType,
+    mismatchCore,
+    "EnsureRunStarted",
+    [
+        new RunLogCreateRequest
+        {
+            SchemaVersion = 1,
+            RunId = "server-run-new",
+            StartedAtUtc = new DateTimeOffset(2026, 3, 15, 14, 10, 0, TimeSpan.Zero),
+            Hero = "Vanessa",
+            GameMode = "Ranked",
+            Day = 1,
+            Hour = 1,
+        },
+    ]
+);
+Assert(
+    mismatchStore.MarkRunAbandonedCalls == 1,
+    "A mismatched restored session should be abandoned before the new run starts."
+);
+Assert(
+    mismatchStore.AppendedEvents.Select(e => e.Kind).SequenceEqual(["run_started"]),
+    "Switching to a new server run id should still emit run_started for the fresh run."
+);
+
 Console.WriteLine("RunLogging capture checks passed.");
 
 static object CreateOption(
@@ -288,7 +350,9 @@ static object CreateOptionList(Type optionInputType, params object[] options)
 
 static Type RequireType(string fullName)
 {
-    return Type.GetType($"{fullName}, BazaarPlusPlus")
+    var assembly = typeof(RunLogCaptureService).Assembly;
+    return assembly.GetType(fullName, throwOnError: false)
+        ?? assembly.GetTypes().FirstOrDefault(type => type.FullName == fullName || type.Name == fullName.Split('.').Last())
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 
@@ -323,6 +387,8 @@ file sealed class ControllerSeamStore : IRunLogStore
     public List<RunLogEvent> AppendedEvents { get; } = [];
 
     public int CompleteRunCalls { get; private set; }
+
+    public int MarkRunAbandonedCalls { get; private set; }
 
     public RunLogSessionState? ResumeState { get; set; }
 
@@ -385,6 +451,7 @@ file sealed class ControllerSeamStore : IRunLogStore
 
     public void MarkRunAbandoned(string runId, RunLogAbandonment abandonment)
     {
+        MarkRunAbandonedCalls++;
         ResumeState = null;
     }
 }

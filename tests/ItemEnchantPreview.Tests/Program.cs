@@ -7,14 +7,12 @@ using BazaarPlusPlus.Game.ItemEnchantPreview.Preview;
 
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
     currentEnchantment: EEnchantmentType.Heavy,
-    availableEnchantments:
+    allEnchantments:
     [
-        EEnchantmentType.Icy,
-        EEnchantmentType.Icy,
         EEnchantmentType.Heavy,
+        EEnchantmentType.Icy,
         EEnchantmentType.Turbo,
-    ],
-    allEnchantments: [EEnchantmentType.Heavy, EEnchantmentType.Icy, EEnchantmentType.Turbo]
+    ]
 );
 
 Assert(

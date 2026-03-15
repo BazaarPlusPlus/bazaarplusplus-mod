@@ -11,6 +11,12 @@ namespace BazaarPlusPlus;
 
 internal static class ModState
 {
+    internal enum RunExitKind
+    {
+        Completed,
+        Interrupted,
+    }
+
 #if DEBUG
     public static readonly bool IsDebug = true;
 #else
@@ -26,6 +32,8 @@ internal static class ModState
 
     // Game state
     public static bool IsInGameRun;
+    public static string CurrentServerRunId;
+    public static RunExitKind LastRunExitKind;
     public static EVictoryCondition LastVictoryCondition;
     public static string LastMessageId = "";
     public static DateTime LastSentTime = DateTime.MinValue;
@@ -43,6 +51,8 @@ internal static class ModState
     public static void Initialize(ConfigFile config)
     {
         IsInGameRun = false;
+        CurrentServerRunId = null;
+        LastRunExitKind = RunExitKind.Completed;
         EnableNameOverrideConfig = config.Bind(
             "StreamerMode",
             "EnableNameOverride",
@@ -95,16 +105,21 @@ internal static class ModState
     private static void OnRunStarted()
     {
         EncounterTracker.ResetEncounterState("Run started");
+        LastRunExitKind = RunExitKind.Completed;
         SetInGameRun(true, "Run started");
     }
 
     private static void OnRunEnded()
     {
+        CurrentServerRunId = null;
+        LastRunExitKind = RunExitKind.Completed;
         SetInGameRun(false, "Run ended");
     }
 
     private static void OnRunInterrupted()
     {
+        CurrentServerRunId = null;
+        LastRunExitKind = RunExitKind.Interrupted;
         SetInGameRun(false, "Run interrupted");
     }
 

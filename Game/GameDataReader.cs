@@ -141,16 +141,14 @@ internal static class GameDataReader
         if (Data.Run?.Player == null)
             return false;
 
+        var serverRunId = ModState.CurrentServerRunId;
+        if (string.IsNullOrWhiteSpace(serverRunId))
+            return false;
+
         request = new RunLogCreateRequest
         {
             SchemaVersion = 1,
-            RunId = RunIdFactory.Create(
-                DateTimeOffset.UtcNow,
-                Data.Run.Player.Hero.ToString(),
-                Data.SelectedPlayMode.ToString(),
-                (int?)Data.Run.Day,
-                null
-            ),
+            RunId = serverRunId,
             StartedAtUtc = DateTimeOffset.UtcNow,
             Hero = Data.Run.Player.Hero.ToString(),
             GameMode = Data.SelectedPlayMode.ToString(),
@@ -217,10 +215,13 @@ internal static class GameDataReader
 
     public static RunLogCompletion BuildRunLogCompletion(string reason)
     {
+        var status = ModState.LastRunExitKind == ModState.RunExitKind.Interrupted
+            ? "abandoned"
+            : "completed";
         return new RunLogCompletion
         {
             SchemaVersion = 1,
-            Status = "completed",
+            Status = status,
             EndedAtUtc = DateTimeOffset.UtcNow,
             FinalDay = Data.Run == null ? null : (int?)Data.Run.Day,
             FinalHour = Data.Run == null ? null : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
