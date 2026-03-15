@@ -1,21 +1,22 @@
 #nullable enable
 using System.Reflection;
-using System.Text.Json;
 using BazaarPlusPlus.Game.RunLogging.Models;
+using Microsoft.Data.Sqlite;
 
-var storeType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.JsonRunLogStore");
+var storeType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.SqliteRunLogStore");
 var ctor = storeType.GetConstructor([typeof(string)]);
-Assert(ctor != null, "JsonRunLogStore should expose a constructor taking the log root path.");
+Assert(ctor != null, "SqliteRunLogStore should expose a constructor taking the database path.");
 
-var tempRoot = Path.Combine(Path.GetTempPath(), "bpp-run-log-recovery-tests", Guid.NewGuid().ToString("N"));
+var tempRoot = Path.Combine(Path.GetTempPath(), "bpp-run-log-sqlite-recovery-tests", Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(tempRoot);
+var dbPath = Path.Combine(tempRoot, "run-logs.db");
 
 try
 {
     var startedAt = new DateTimeOffset(2026, 3, 15, 12, 15, 30, TimeSpan.Zero);
     const string runId = "run_20260315t121530z_vanessa_ranked_002a_deadbeef";
 
-    var firstStore = ctor!.Invoke([tempRoot]);
+    var firstStore = ctor!.Invoke([dbPath]);
     Invoke<RunLogSessionState>(
         storeType,
         firstStore,
@@ -34,6 +35,7 @@ try
             },
         ]
     );
+
     InvokeVoid(
         storeType,
         firstStore,
@@ -52,6 +54,7 @@ try
             },
         ]
     );
+
     InvokeVoid(
         storeType,
         firstStore,
@@ -76,7 +79,7 @@ try
         ]
     );
 
-    var resumedStore = ctor.Invoke([tempRoot]);
+    var resumedStore = ctor.Invoke([dbPath]);
     var resumed = Invoke<RunLogSessionState?>(storeType, resumedStore, "TryResumeActiveRun", []);
 
     Assert(resumed != null, "TryResumeActiveRun should restore an unfinished run.");
@@ -121,13 +124,25 @@ try
         ]
     );
 
-    var runDirectory = Path.Combine(tempRoot, "2026-03-15", runId);
-    var statusPath = Path.Combine(runDirectory, "status.json");
-    Assert(File.Exists(statusPath), "MarkRunAbandoned should persist status.json.");
-    Assert(ReadJsonString(statusPath, "status") == "abandoned", "status.json should mark the run abandoned.");
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
+        Assert(
+            GetString(connection, "SELECT status FROM run_status WHERE run_id = $runId;", runId)
+                == "abandoned",
+            "run_status should mark the run abandoned."
+        );
+    }
+
+    var resumedAfterAbandonment = Invoke<RunLogSessionState?>(
+        storeType,
+        resumedStore,
+        "TryResumeActiveRun",
+        []
+    );
     Assert(
-        !File.Exists(Path.Combine(tempRoot, "active-run.json")),
-        "MarkRunAbandoned should clear active-run tracking."
+        resumedAfterAbandonment == null,
+        "Abandoned runs should no longer be returned by TryResumeActiveRun."
     );
 }
 finally
@@ -136,7 +151,7 @@ finally
         Directory.Delete(tempRoot, recursive: true);
 }
 
-Console.WriteLine("RunLogging recovery checks passed.");
+Console.WriteLine("RunLogging SQLite recovery checks passed.");
 
 static Type RequireType(string fullName)
 {
@@ -162,11 +177,12 @@ static void InvokeVoid(Type type, object instance, string name, object?[] args)
     method.Invoke(instance, args);
 }
 
-static string ReadJsonString(string path, string propertyName)
+static string GetString(SqliteConnection connection, string sql, string runId)
 {
-    using var document = JsonDocument.Parse(File.ReadAllText(path));
-    return document.RootElement.GetProperty(propertyName).GetString()
-        ?? throw new InvalidOperationException($"Property {propertyName} was null in {path}");
+    using var command = connection.CreateCommand();
+    command.CommandText = sql;
+    command.Parameters.AddWithValue("$runId", runId);
+    return (string)(command.ExecuteScalar() ?? throw new InvalidOperationException($"Query returned null: {sql}"));
 }
 
 static void Assert(bool condition, string message)

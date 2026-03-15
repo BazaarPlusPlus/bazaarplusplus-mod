@@ -1,39 +1,42 @@
 #nullable enable
 using System.Reflection;
-using System.Text.Json;
 using BazaarPlusPlus.Game.RunLogging.Models;
+using Microsoft.Data.Sqlite;
 
-var storeType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.JsonRunLogStore");
+var storeType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.SqliteRunLogStore");
 var ctor = storeType.GetConstructor([typeof(string)]);
-Assert(ctor != null, "JsonRunLogStore should expose a constructor taking the log root path.");
+Assert(ctor != null, "SqliteRunLogStore should expose a constructor taking the database path.");
 
-var tempRoot = Path.Combine(Path.GetTempPath(), "bpp-run-log-store-tests", Guid.NewGuid().ToString("N"));
+var tempRoot = Path.Combine(Path.GetTempPath(), "bpp-run-log-sqlite-store-tests", Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(tempRoot);
+var dbPath = Path.Combine(tempRoot, "run-logs.db");
 
 try
 {
-    var store = ctor!.Invoke([tempRoot]);
+    var store = ctor!.Invoke([dbPath]);
     var startedAt = new DateTimeOffset(2026, 3, 15, 12, 15, 30, TimeSpan.Zero);
     const string runId = "run_20260315t121530z_vanessa_ranked_002a_deadbeef";
 
-    var createRequest = new RunLogCreateRequest
-    {
-        SchemaVersion = 1,
-        RunId = runId,
-        StartedAtUtc = startedAt,
-        Hero = "Vanessa",
-        GameMode = "Ranked",
-        Day = 1,
-        Hour = 1,
-        Seed = 42,
-    };
+    var sessionState = Invoke<RunLogSessionState>(
+        storeType,
+        store,
+        "CreateRun",
+        [
+            new RunLogCreateRequest
+            {
+                SchemaVersion = 1,
+                RunId = runId,
+                StartedAtUtc = startedAt,
+                Hero = "Vanessa",
+                GameMode = "Ranked",
+                Day = 1,
+                Hour = 1,
+                Seed = 42,
+            },
+        ]
+    );
 
-    var sessionState = Invoke<RunLogSessionState>(storeType, store, "CreateRun", [createRequest]);
-    Assert(sessionState.RunId == runId, "CreateRun should return the created run id.");
-
-    var activeRunPath = Path.Combine(tempRoot, "active-run.json");
-    Assert(File.Exists(activeRunPath), "CreateRun should create active-run.json.");
-    Assert(ReadJsonString(activeRunPath, "run_id") == runId, "active-run.json should reference the active run.");
+    Assert(sessionState.RunId == runId, "CreateRun should return the created run state.");
 
     InvokeVoid(
         storeType,
@@ -96,8 +99,6 @@ try
         ]
     );
 
-    Assert(ReadJsonInt32(activeRunPath, "last_seq") == 2, "active-run.json should track the latest sequence.");
-
     InvokeVoid(
         storeType,
         store,
@@ -119,26 +120,18 @@ try
         ]
     );
 
-    var runDirectory = Path.Combine(tempRoot, "2026-03-15", runId);
-    Assert(Directory.Exists(runDirectory), "Run directory should exist.");
+    Assert(File.Exists(dbPath), "CreateRun should initialize the SQLite database file.");
 
-    var metaPath = Path.Combine(runDirectory, "meta.json");
-    Assert(File.Exists(metaPath), "meta.json should exist.");
-    Assert(ReadJsonString(metaPath, "run_id") == runId, "meta.json should persist run_id.");
+    using var connection = new SqliteConnection($"Data Source={dbPath}");
+    connection.Open();
 
-    var eventsPath = Path.Combine(runDirectory, "events.ndjson");
-    Assert(File.Exists(eventsPath), "events.ndjson should exist.");
-    Assert(File.ReadAllLines(eventsPath).Length == 2, "events.ndjson should contain exactly two events.");
-
-    var checkpointPath = Path.Combine(runDirectory, "checkpoint.json");
-    Assert(File.Exists(checkpointPath), "checkpoint.json should exist.");
-    Assert(ReadJsonInt32(checkpointPath, "last_seq") == 2, "checkpoint.json should persist last_seq.");
-
-    var statusPath = Path.Combine(runDirectory, "status.json");
-    Assert(File.Exists(statusPath), "status.json should exist.");
-    Assert(ReadJsonString(statusPath, "status") == "completed", "status.json should persist terminal status.");
-
-    Assert(!File.Exists(activeRunPath), "CompleteRun should clear active-run tracking.");
+    Assert(CountRows(connection, "runs") == 1, "runs should contain exactly one row.");
+    Assert(GetString(connection, "SELECT run_id FROM runs WHERE run_id = $runId;", runId) == runId, "runs should contain the created run.");
+    Assert(CountRows(connection, "run_events") == 2, "run_events should contain exactly two rows.");
+    Assert(GetInt64(connection, "SELECT MIN(seq) FROM run_events WHERE run_id = $runId;", runId) == 1, "run_events should persist seq=1.");
+    Assert(GetInt64(connection, "SELECT MAX(seq) FROM run_events WHERE run_id = $runId;", runId) == 2, "run_events should persist seq=2.");
+    Assert(GetInt64(connection, "SELECT last_seq FROM run_checkpoints WHERE run_id = $runId;", runId) == 2, "run_checkpoints should persist the checkpoint last_seq.");
+    Assert(GetString(connection, "SELECT status FROM run_status WHERE run_id = $runId;", runId) == "completed", "run_status should persist terminal status.");
 }
 finally
 {
@@ -146,7 +139,7 @@ finally
         Directory.Delete(tempRoot, recursive: true);
 }
 
-Console.WriteLine("RunLogging JSON store checks passed.");
+Console.WriteLine("RunLogging SQLite store checks passed.");
 
 static Type RequireType(string fullName)
 {
@@ -172,17 +165,27 @@ static void InvokeVoid(Type type, object instance, string name, object?[] args)
     method.Invoke(instance, args);
 }
 
-static string ReadJsonString(string path, string propertyName)
+static long CountRows(SqliteConnection connection, string tableName)
 {
-    using var document = JsonDocument.Parse(File.ReadAllText(path));
-    return document.RootElement.GetProperty(propertyName).GetString()
-        ?? throw new InvalidOperationException($"Property {propertyName} was null in {path}");
+    using var command = connection.CreateCommand();
+    command.CommandText = $"SELECT COUNT(*) FROM {tableName};";
+    return (long)(command.ExecuteScalar() ?? 0L);
 }
 
-static int ReadJsonInt32(string path, string propertyName)
+static long GetInt64(SqliteConnection connection, string sql, string runId)
 {
-    using var document = JsonDocument.Parse(File.ReadAllText(path));
-    return document.RootElement.GetProperty(propertyName).GetInt32();
+    using var command = connection.CreateCommand();
+    command.CommandText = sql;
+    command.Parameters.AddWithValue("$runId", runId);
+    return (long)(command.ExecuteScalar() ?? throw new InvalidOperationException($"Query returned null: {sql}"));
+}
+
+static string GetString(SqliteConnection connection, string sql, string runId)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = sql;
+    command.Parameters.AddWithValue("$runId", runId);
+    return (string)(command.ExecuteScalar() ?? throw new InvalidOperationException($"Query returned null: {sql}"));
 }
 
 static void Assert(bool condition, string message)

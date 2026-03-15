@@ -1,4 +1,4 @@
-# 2026-03-13 NetMessage Data Reference
+# NetMessage Data Reference
 
 ## 范围
 

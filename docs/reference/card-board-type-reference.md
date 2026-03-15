@@ -1,4 +1,4 @@
-# 2026-03-14 Card / Board Type Reference
+# Card / Board Type Reference
 
 ## 范围
 
@@ -227,4 +227,3 @@
 - `Hand` / `Stash` 是“放在哪”
 - `Item` / `Skill` / `CombatEncounter` 等是“它是什么”
 - 商店不单独占一个 `section`，而是 `Opponent + MerchantCards`
-

@@ -34,6 +34,14 @@ Assert(
     ),
     "RunLoggingController should exist as a MonoBehaviour runtime entry point."
 );
+Assert(
+    controllerSource.Contains("new SqliteRunLogStore(", StringComparison.Ordinal),
+    "RunLoggingController should create SqliteRunLogStore."
+);
+Assert(
+    !controllerSource.Contains("JsonRunLogStore", StringComparison.Ordinal),
+    "RunLoggingController should no longer reference JsonRunLogStore."
+);
 
 var pluginSourcePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Plugin.cs"));
 Assert(File.Exists(pluginSourcePath), $"Plugin source not found at {pluginSourcePath}");
@@ -42,6 +50,32 @@ Assert(
     pluginSource.Contains("gameObject.AddComponent<RunLoggingController>();", StringComparison.Ordinal),
     "Plugin.Awake should mount RunLoggingController."
 );
+
+var modStateSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Models/ModState.cs")
+);
+Assert(File.Exists(modStateSourcePath), $"ModState source not found at {modStateSourcePath}");
+var modStateSource = File.ReadAllText(modStateSourcePath);
+Assert(
+    modStateSource.Contains("RunLogDatabasePath", StringComparison.Ordinal),
+    "ModState should expose a SQLite database path."
+);
+Assert(
+    !modStateSource.Contains("RunLogRootPath", StringComparison.Ordinal),
+    "ModState should no longer expose a JSON run log root path."
+);
+
+AssertSourceMissing("Game/RunLogging/Persistence/JsonRunLogStore.cs");
+AssertSourceMissing("Game/RunLogging/Json/RunLogJsonSchema.cs");
+AssertSourceMissing("Game/RunLogging/Json/RunLogPathLayout.cs");
+AssertSourceMissing("tests/RunLoggingJsonSchema.Tests/RunLoggingJsonSchema.Tests.csproj");
+AssertSourceMissing("tests/RunLoggingJsonSchema.Tests/Program.cs");
+AssertSourceMissing("tests/RunLoggingPathLayout.Tests/RunLoggingPathLayout.Tests.csproj");
+AssertSourceMissing("tests/RunLoggingPathLayout.Tests/Program.cs");
+AssertSourceMissing("tests/RunLoggingJsonStore.Tests/RunLoggingJsonStore.Tests.csproj");
+AssertSourceMissing("tests/RunLoggingJsonStore.Tests/Program.cs");
+AssertSourceMissing("tests/RunLoggingRecovery.Tests/RunLoggingRecovery.Tests.csproj");
+AssertSourceMissing("tests/RunLoggingRecovery.Tests/Program.cs");
 
 Console.WriteLine("RunLogging model contract checks passed.");
 
@@ -69,4 +103,11 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+static void AssertSourceMissing(string relativePath)
+{
+    var fullPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../", relativePath));
+    if (File.Exists(fullPath))
+        throw new InvalidOperationException($"File should have been deleted: {relativePath}");
 }

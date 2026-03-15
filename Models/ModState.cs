@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
 using BepInEx.Logging;
+using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using BazaarGameShared.Domain.Core.Types;
 using TheBazaar;
 
@@ -37,7 +38,7 @@ internal static class ModState
 
     // Paths for local data
     public static string CardsJsonPath;
-    public static string RunLogRootPath;
+    public static string RunLogDatabasePath;
 
     public static void Initialize(ConfigFile config)
     {
@@ -71,10 +72,10 @@ internal static class ModState
             BppLog.Info("ModState", $"cards.json path initialized: {CardsJsonPath}");
         }
 
-        RunLogRootPath = System.IO.Path.Combine(
+        RunLogDatabasePath = System.IO.Path.Combine(
             BepInEx.Paths.ConfigPath,
             "BazaarPlusPlus",
-            "run-logs"
+            RunLogSqliteSchema.DatabaseFileName
         );
     }
 
