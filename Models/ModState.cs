@@ -1,7 +1,6 @@
 #pragma warning disable CS0436
 using System;
 using System.Collections.Generic;
-using BazaarGameShared.Domain.Core.Types;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using TheBazaar;
@@ -16,11 +15,14 @@ internal static class ModState
     public static readonly bool IsDebug = false;
 #endif
 
+    // Logging
     public static ManualLogSource Logger;
 
     // Config entries
     public static ConfigEntry<bool> EnableNameOverrideConfig;
     public static ConfigEntry<bool> EnchantPreviewAlwaysShowConfig;
+
+    // Game state
     public static bool IsInGameRun;
     public static EVictoryCondition LastVictoryCondition;
     public static string LastMessageId = "";
@@ -32,7 +34,7 @@ internal static class ModState
     public static List<RunInfo.CardInfo> CurrentEncounterChoices; // choices inside an encounter (Choice/Loot/Pedestal)
     public static List<RunInfo.MonsterPreview> EncounterMonsterPreviews; // combat encounter monster info from local DB
 
-    public static List<EEnchantmentType> AvailableEnchantments = new List<EEnchantmentType>();
+    // Paths for local data
     public static string CardsJsonPath;
 
     public static void Initialize(ConfigFile config)

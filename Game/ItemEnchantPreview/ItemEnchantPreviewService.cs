@@ -1,7 +1,5 @@
 using System.Collections.Generic;
-using System.Linq;
 using BazaarGameClient.Domain.Models.Cards;
-using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.ItemEnchantPreview.Preview;
 using TheBazaar;
 using TheBazaar.Tooltips;
@@ -12,13 +10,10 @@ public static class ItemEnchantPreviewService
 {
     public static List<TooltipSegment> BuildPreviewSegments(Card card)
     {
-        return BuildPreviewSegments(card as ItemCard, ModState.AvailableEnchantments);
+        return BuildPreviewSegments(card as ItemCard);
     }
 
-    public static List<TooltipSegment> BuildPreviewSegments(
-        ItemCard itemCard,
-        IEnumerable<EEnchantmentType> availableEnchantments
-    )
+    public static List<TooltipSegment> BuildPreviewSegments(ItemCard itemCard)
     {
         var empty = new List<TooltipSegment>();
         if (
@@ -31,14 +26,8 @@ public static class ItemEnchantPreviewService
         if (enchantments == null || enchantments.Count == 0)
             return empty;
 
-        var preferredCandidates = availableEnchantments
-            ?.Distinct()
-            .Where(enchantment => enchantments.ContainsKey(enchantment))
-            .ToList();
-
         var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
             itemCard.Enchantment,
-            preferredCandidates,
             enchantments.Keys
         );
 
