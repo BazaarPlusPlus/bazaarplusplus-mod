@@ -48,30 +48,7 @@ export type MessageKey =
   | 'aboutFrontendVersion'
   | 'aboutBackendVersion'
   | 'runtimeDownload'
-  | 'settingsTitle'
-  | 'settingsOpen'
-  | 'sectionStreamerMode'
-  | 'keyEnableNameOverride'
-  | 'descEnableNameOverride'
-  | 'sectionEnchantPreview'
-  | 'keyEnchantPreviewAlwaysShow'
-  | 'descEnchantPreviewAlwaysShow'
-  | 'sectionCombatStatusBar'
-  | 'keyCombatStatusBarEnabled'
-  | 'descCombatStatusBarEnabled'
-  | 'keyCombatStatusBarSpeedMultiplier'
-  | 'descCombatStatusBarSpeedMultiplier'
-  | 'toggleOn'
-  | 'toggleOff'
-  | 'modInstalledHint'
-  | 'settingsMissingPathTitle'
-  | 'settingsMissingPathBody'
-  | 'settingsDefaultConfigTitle'
-  | 'settingsDefaultConfigBody'
-  | 'settingsLoadErrorTitle'
-  | 'settingsLoadErrorBody'
-  | 'settingsDecreaseSpeed'
-  | 'settingsIncreaseSpeed';
+  | 'modInstalledHint';
 
 export const defaultLocale: Locale = 'zh';
 
@@ -124,30 +101,7 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     aboutFrontendVersion: 'Frontend',
     aboutBackendVersion: 'Backend',
     runtimeDownload: 'Download .NET',
-    settingsTitle: 'Settings',
-    settingsOpen: 'Settings',
-    sectionStreamerMode: 'Streamer Mode',
-    keyEnableNameOverride: 'Anonymous Display',
-    descEnableNameOverride: "Set your in-game display name to Anonymous.",
-    sectionEnchantPreview: 'Enchant Preview',
-    keyEnchantPreviewAlwaysShow: 'Always Show',
-    descEnchantPreviewAlwaysShow: 'Show enchant preview text by default. Turn this off to require holding Ctrl.',
-    sectionCombatStatusBar: 'Combat Status Bar',
-    keyCombatStatusBarEnabled: 'Enabled',
-    descCombatStatusBarEnabled: 'Show elapsed time and speed controls during combat',
-    keyCombatStatusBarSpeedMultiplier: 'Speed Multiplier',
-    descCombatStatusBarSpeedMultiplier: 'Default playback speed for combat simulation',
-    toggleOn: 'ON',
-    toggleOff: 'OFF',
-    modInstalledHint: 'Open Settings to configure and customize BazaarPlusPlus',
-    settingsMissingPathTitle: 'Game Path Required',
-    settingsMissingPathBody: 'Return to the installer and run detection before opening Settings.',
-    settingsDefaultConfigTitle: 'Using Default Settings',
-    settingsDefaultConfigBody: 'No config file was found yet.\nAny change you make here will create a new config file.',
-    settingsLoadErrorTitle: 'Unable to Read Settings',
-    settingsLoadErrorBody: 'Make sure BazaarPlusPlus is installed correctly, then try opening Settings again.',
-    settingsDecreaseSpeed: 'Decrease speed',
-    settingsIncreaseSpeed: 'Increase speed',
+    modInstalledHint: 'BazaarPlusPlus is installed and ready to use.',
   },
   zh: {
     htmlLang: 'zh-CN',
@@ -197,30 +151,7 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     aboutFrontendVersion: '前端',
     aboutBackendVersion: '后端',
     runtimeDownload: '下载 .NET',
-    settingsTitle: '设置',
-    settingsOpen: '设置',
-    sectionStreamerMode: '主播模式',
-    keyEnableNameOverride: '匿名显示',
-    descEnableNameOverride: '将你的游戏内显示名称设为 Anonymous。',
-    sectionEnchantPreview: '附魔预览',
-    keyEnchantPreviewAlwaysShow: '默认显示',
-    descEnchantPreviewAlwaysShow: '默认显示附魔预览文本。关闭后改为按住 Ctrl 才显示。',
-    sectionCombatStatusBar: '战斗状态栏',
-    keyCombatStatusBarEnabled: '启用',
-    descCombatStatusBarEnabled: '战斗中显示耗时与速度控制栏',
-    keyCombatStatusBarSpeedMultiplier: '速度倍率',
-    descCombatStatusBarSpeedMultiplier: '战斗回放的默认速度倍率',
-    toggleOn: '开',
-    toggleOff: '关',
-    modInstalledHint: '打开设置以配置和自定义 BazaarPlusPlus',
-    settingsMissingPathTitle: '需要游戏路径',
-    settingsMissingPathBody: '请先返回安装器执行检测，再打开设置页面。',
-    settingsDefaultConfigTitle: '使用默认设置',
-    settingsDefaultConfigBody: '未检测到配置文件\n在这里作出修改将会自动创建新的配置文件',
-    settingsLoadErrorTitle: '无法读取设置',
-    settingsLoadErrorBody: '请确认 BazaarPlusPlus 已正确安装，然后重新打开设置页面。',
-    settingsDecreaseSpeed: '降低速度',
-    settingsIncreaseSpeed: '提高速度',
+    modInstalledHint: 'BazaarPlusPlus 已安装并可直接使用。',
   }
 };
 

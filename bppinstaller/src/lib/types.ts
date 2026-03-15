@@ -12,8 +12,3 @@ export interface DotnetInfo {
   dotnet_version: string | null;
   dotnet_ok: boolean;
 }
-
-export interface ModConfigReadResult {
-  config_exists: boolean;
-  values: Record<string, string>;
-}

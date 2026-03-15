@@ -2,7 +2,6 @@ mod commands;
 
 use commands::{
     bepinex::{install_bepinex, uninstall_bpp},
-    config::{read_mod_config, write_config_value},
     detect::{detect_dotnet_runtime, detect_environment, verify_game_path},
     vdf::patch_launch_options,
 };
@@ -19,8 +18,6 @@ pub fn run() {
             install_bepinex,
             uninstall_bpp,
             patch_launch_options,
-            read_mod_config,
-            write_config_value,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -85,8 +85,8 @@
     {
       icon: 'V',
       title: {
-        zh: '安装器与设置',
-        en: 'Installer and Settings'
+        zh: '安装器',
+        en: 'Installer'
       },
       bullets: [
         {
@@ -94,12 +94,12 @@
           en: 'The installer now includes optional automatic updates.'
         },
         {
-          zh: '修复了自定义游戏路径安装后，设置页面未能正确识别已安装 BPP 的问题。',
-          en: 'Fixed a bug where the Settings page could fail to detect BPP after installation through a custom game path.'
+          zh: '优化了自定义游戏路径下的安装检测与重装流程。',
+          en: 'Improved installation detection and reinstall flow for custom game paths.'
         },
         {
-          zh: '即使首次尚未启动游戏，现在也可以在修改设置时直接生成默认配置文件。',
-          en: 'Default config files can now be generated directly from Settings even before the game has been launched once.'
+          zh: '安装器现在更聚焦于检测、安装、更新和启动流程。',
+          en: 'The installer is now more focused on detection, installation, updates, and launch flow.'
         }
       ]
     },

@@ -27,8 +27,8 @@ BazaarPlusPlus 是一个面向 **《The Bazaar》** 的 **BepInEx 增强模组**
 1. 下载最新发布包
 2. 运行安装器并选择你的 **The Bazaar 游戏目录**
 3. 安装完成后重新启动 Steam 和游戏
-4. 首次进入游戏时，BazaarPlusPlus 会自动生成配置文件
-5. 如果需要倍速功能，请返回 Installer，在插件配置页开启。
+4. 首次进入游戏时，BazaarPlusPlus 会自动生成配置文件。
+5. 如果需要倍速功能，请在游戏内选项菜单中启用 Combat Status Bar，然后重启游戏。
 
 ## 开发者
 
@@ -88,8 +88,8 @@ Currently, only the **Windows version** has been released, while macOS support i
 1. Download the latest release package
 2. Run the installer and select your **The Bazaar game directory**
 3. Restart Steam and the game after installation
-4. BazaarPlusPlus will automatically generate its configuration file the first time you enter the game
-5. If you need the speed-up feature, return to the Installer and enable it on the plugin settings page.
+4. BazaarPlusPlus will automatically generate its configuration file the first time you enter the game.
+5. If you need the speed-up feature, enable Combat Status Bar from the in-game options menu, then restart the game.
 
 ## For Developers
 

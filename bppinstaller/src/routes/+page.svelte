@@ -347,15 +347,10 @@
           {#if $locale === 'zh'}
             <p>
               默认直接显示附魔效果预览
-              <br />
-              可在设置中调整为按住 <span class="feature-hotkey feature-keycap">Ctrl</span> 时显示。
             </p>
           {:else}
             <p>
               Enchantment results are shown directly by default.
-              <br />
-              You can also switch to showing them only while holding
-              <span class="feature-hotkey feature-keycap">Ctrl</span>.
             </p>
           {/if}
         </div>
@@ -371,7 +366,7 @@
             </p>
             <p class="feature-callout">
               <span class="feature-callout-line">
-                首次使用需在 <span class="feature-emphasis">BazaarPlusPlus 设置中开启</span>
+                首次使用可在 <span class="feature-emphasis">游戏内选项菜单中开启</span>
               </span>
               <span class="feature-callout-line">
                 游戏内可按 <span class="feature-hotkey">F6</span> 快速切换显示
@@ -381,11 +376,11 @@
             <p>
               Optional feature showing battle time, frame count, and speed controls.
               <br />
-              Launch the game once, enable it in BazaarPlusPlus Settings, then restart the game
+              Launch the game once, enable it from the in-game options menu, then restart the game
               to apply. Press <span class="feature-hotkey">F6</span> in-game to toggle it quickly.
             </p>
             <p class="feature-callout">
-              <span class="feature-callout-line">Enable it in BazaarPlusPlus Settings</span>
+              <span class="feature-callout-line">Enable it from the in-game options menu</span>
               <span class="feature-callout-line">
                 Press <span class="feature-hotkey">F6</span> in-game to toggle it quickly
               </span>
@@ -400,8 +395,8 @@
       <span class="install-acknowledge-box" aria-hidden="true"></span>
       <span>
         {$locale === 'zh'
-          ? '我已了解部分功能需安装后在设置中手动开启'
-          : 'I understand that some features need to be enabled later in BazaarPlusPlus Settings after installation.'}
+          ? '我已了解战斗状态条需在安装后前往游戏内选项菜单手动开启'
+          : 'I understand that the combat status bar must be enabled later from the in-game options menu after installation.'}
       </span>
     </label>
   </AppModal>
@@ -552,11 +547,6 @@
             <p class="detail-line detail-muted">{t('detectInstalledHint')}</p>
           {/if}
         </div>
-        {#if modInstalled}
-          <a class="settings-link" href="/settings?gamePath={encodeURIComponent(effectiveGamePath())}">
-            ✦ {t('settingsOpen')}
-          </a>
-        {/if}
       </div>
     </div>
 
@@ -802,19 +792,6 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     white-space: nowrap;
-  }
-
-  .feature-keycap {
-    padding: 0.1rem 0.46rem 0.14rem;
-    border-radius: 0.45rem;
-    background: linear-gradient(180deg, rgba(255, 227, 156, 0.22), rgba(122, 67, 16, 0.16));
-    box-shadow:
-      0 1px 0 rgba(255, 240, 196, 0.2) inset,
-      0 -1px 0 rgba(72, 37, 8, 0.34) inset,
-      0 2px 8px rgba(0, 0, 0, 0.22);
-    color: #ffe6af;
-    font-size: 0.82em;
-    letter-spacing: 0.05em;
   }
 
   .update-detail-link {
@@ -1571,35 +1548,6 @@
   .redetect-btn:hover {
     color: rgba(200, 160, 80, 0.8);
     border-color: rgba(200, 148, 55, 0.35);
-  }
-
-  .settings-link {
-    flex-shrink: 0;
-    padding: 0 0.9rem;
-    font-family: 'Cinzel', serif;
-    font-size: 0.54rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: rgba(200, 155, 72, 0.7);
-    border: 1px solid rgba(160, 120, 55, 0.22);
-    border-radius: 2px;
-    background: rgba(200, 148, 55, 0.04);
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-  }
-
-  .settings-link:hover {
-    color: rgba(220, 175, 90, 0.9);
-    border-color: rgba(200, 148, 55, 0.38);
-    background: rgba(200, 148, 55, 0.09);
-  }
-
-  .settings-link:focus-visible {
-    outline: 2px solid rgba(255, 214, 140, 0.9);
-    outline-offset: 2px;
   }
 
   .dotnet-download-btn {
