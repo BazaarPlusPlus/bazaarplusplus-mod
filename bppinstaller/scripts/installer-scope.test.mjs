@@ -22,6 +22,13 @@ const configCommandPath = path.join(
   "config.rs",
 );
 const readmePath = path.resolve(installerRoot, "..", "README.md");
+const whatsNewPagePath = path.join(
+  installerRoot,
+  "src",
+  "routes",
+  "whats-new",
+  "+page.svelte",
+);
 
 function readHomePage() {
   return fs.readFileSync(homePagePath, "utf8");
@@ -29,6 +36,10 @@ function readHomePage() {
 
 function readRootReadme() {
   return fs.readFileSync(readmePath, "utf8");
+}
+
+function readWhatsNewPage() {
+  return fs.readFileSync(whatsNewPagePath, "utf8");
 }
 
 test("installer no longer ships a settings route", () => {
@@ -55,4 +66,10 @@ test("installer copy points users to in-game settings", () => {
   assert.equal(readme.includes("plugin settings page"), false);
   assert.equal(readme.includes("返回 Installer"), false);
   assert.equal(readme.includes("游戏内的 BazaarPlusPlus 设置"), false);
+});
+
+test("whats-new page does not keep the removed subtitle style", () => {
+  const whatsNewPage = readWhatsNewPage();
+
+  assert.equal(whatsNewPage.includes(".subtitle {"), false);
 });

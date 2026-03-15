@@ -126,13 +126,6 @@
     color: #e8c87a;
   }
 
-  .subtitle {
-    margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.65;
-    color: rgba(228, 216, 191, 0.68);
-  }
-
   .content-card {
     width: min(100%, 760px);
     margin: 0 auto;
