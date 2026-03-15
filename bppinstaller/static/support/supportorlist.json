@@ -1,40 +1,5 @@
 [
   {
-    "name": "脑袋怎么扁扁的",
-    "tier": 2,
-    "amount": 0.01
-  },
-  {
-    "name": "山那边有片海",
-    "tier": 3,
-    "amount": 0.30
-  },
-  {
-    "name": "麦麦在逃脆薯",
-    "tier": 3,
-    "amount": 0.35
-  },
-  {
-    "name": "凝日",
-    "tier": 3,
-    "amount": 0.15
-  },
-  {
-    "name": "天真",
-    "tier": 3,
-    "amount": 0.148
-  },
-  {
-    "name": "Tanyaa",
-    "tier": 3,
-    "amount": 0.15
-  },
-  {
-    "name": "北洋|神之手贪狼",
-    "tier": 2,
-    "amount": 0.03
-  },
-  {
     "name": "FeiMary",
     "tier": 4,
     "amount": 1.49
@@ -50,8 +15,63 @@
     "amount": 1.00
   },
   {
+    "name": "麦麦在逃脆薯饼",
+    "tier": 3,
+    "amount": 0.35
+  },
+  {
+    "name": "山那边有片海",
+    "tier": 3,
+    "amount": 0.30
+  },
+  {
+    "name": "凝日",
+    "tier": 3,
+    "amount": 0.15
+  },
+  {
+    "name": "Tanyaa",
+    "tier": 3,
+    "amount": 0.15
+  },
+  {
+    "name": "天真",
+    "tier": 3,
+    "amount": 0.148
+  },
+  {
+    "name": "能年玲奈 Non",
+    "tier": 3,
+    "amount": 0.148
+  },
+  {
+    "name": "暴击符文剑",
+    "tier": 3,
+    "amount": 0.148
+  },
+  {
     "name": "wither2000",
     "tier": 2,
     "amount": 0.10
+  },
+  {
+    "name": "逃的河",
+    "tier": 2,
+    "amount": 0.10
+  },
+  {
+    "name": "洛夏昂",
+    "tier": 2,
+    "amount": 0.10
+  },
+  {
+    "name": "北洋|神之手贪狼",
+    "tier": 2,
+    "amount": 0.03
+  },
+  {
+    "name": "脑袋怎么扁扁的",
+    "tier": 2,
+    "amount": 0.01
   }
 ]
