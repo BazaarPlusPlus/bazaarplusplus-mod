@@ -12,7 +12,7 @@ using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterPreviewSkillCardFactory : IPreviewCardFactory
 {

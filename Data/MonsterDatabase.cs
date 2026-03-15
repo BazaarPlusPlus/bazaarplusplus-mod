@@ -14,7 +14,10 @@ internal static class MonsterDatabase
     private const string EmbeddedResourceName = "BazaarPlusPlus.Data.monsters_bazaardb.json";
 
     private static readonly Dictionary<Guid, MonsterInfo> _db = new Dictionary<Guid, MonsterInfo>();
-    private static readonly Dictionary<string, MonsterInfo> _dbByShortEncounterId = new Dictionary<string, MonsterInfo>(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, MonsterInfo> _dbByShortEncounterId = new Dictionary<
+        string,
+        MonsterInfo
+    >(StringComparer.OrdinalIgnoreCase);
 
     private sealed class MonsterRecordDto
     {
@@ -171,7 +174,10 @@ internal static class MonsterDatabase
             return false;
         }
 
-        if (Guid.TryParse(encounterId, out var encounterGuid) && TryGetByEncounterId(encounterGuid, out monster))
+        if (
+            Guid.TryParse(encounterId, out var encounterGuid)
+            && TryGetByEncounterId(encounterGuid, out monster)
+        )
             return true;
 
         return TryGetByEncounterIdPrefix(encounterId, out monster);
@@ -181,7 +187,8 @@ internal static class MonsterDatabase
     {
         monster = null;
         var key = GetShortEncounterId(encounterIdPrefix);
-        var found = !string.IsNullOrWhiteSpace(key) && _dbByShortEncounterId.TryGetValue(key, out monster);
+        var found =
+            !string.IsNullOrWhiteSpace(key) && _dbByShortEncounterId.TryGetValue(key, out monster);
         BppLog.Debug(
             "MonsterDatabase",
             $"Lookup encounterIdPrefix={encounterIdPrefix} normalized={key} found={found}"
@@ -238,9 +245,11 @@ internal static class MonsterDatabase
         if (dto == null)
             return null;
 
-        var boardCards = dto.MonsterMetadata?.Board?.Select(MapBoardCard).Where(card => card != null).ToList()
+        var boardCards =
+            dto.MonsterMetadata?.Board?.Select(MapBoardCard).Where(card => card != null).ToList()
             ?? new List<MonsterBoardCardInfo>();
-        var skills = dto.MonsterMetadata?.Skills?.Select(MapSkill).Where(skill => skill != null).ToList()
+        var skills =
+            dto.MonsterMetadata?.Skills?.Select(MapSkill).Where(skill => skill != null).ToList()
             ?? new List<MonsterSkillInfo>();
 
         return new MonsterInfo
@@ -263,7 +272,10 @@ internal static class MonsterDatabase
     {
         if (dto == null || !Guid.TryParse(dto.CardId, out var cardId))
         {
-            BppLog.Debug("MonsterDatabase", $"Dropping invalid board card id={dto?.CardId ?? "null"}");
+            BppLog.Debug(
+                "MonsterDatabase",
+                $"Dropping invalid board card id={dto?.CardId ?? "null"}"
+            );
             return null;
         }
 

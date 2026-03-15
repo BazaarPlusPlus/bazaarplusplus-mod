@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterPreviewController : MonoBehaviour
 {
@@ -24,7 +24,10 @@ internal sealed class MonsterPreviewController : MonoBehaviour
         _renderTarget = new MonsterPreviewBoardRenderTarget();
         _coordinator = new MonsterPreviewOverlayCoordinator(_renderTarget);
         _coordinator.SetPresentation(_presentation);
-        BppLog.Info("MonsterPreviewController", "Awake completed; render target and coordinator created");
+        BppLog.Info(
+            "MonsterPreviewController",
+            "Awake completed; render target and coordinator created"
+        );
     }
 
     private void LateUpdate()
@@ -64,7 +67,10 @@ internal sealed class MonsterPreviewController : MonoBehaviour
         if (cards != null)
             _cards.AddRange(CloneCards(cards));
 
-        BppLog.Debug("MonsterPreviewController", $"SetCards count={_cards.Count}, visible={_visible}");
+        BppLog.Debug(
+            "MonsterPreviewController",
+            $"SetCards count={_cards.Count}, visible={_visible}"
+        );
         _coordinator?.SetCards(_cards);
     }
 
@@ -157,9 +163,10 @@ internal sealed class MonsterPreviewController : MonoBehaviour
                 SourceName = card.SourceName,
                 Enchant = card.Enchant,
                 Size = card.Size,
-                Attributes = card.Attributes != null
-                    ? new Dictionary<int, int>(card.Attributes)
-                    : new Dictionary<int, int>(),
+                Attributes =
+                    card.Attributes != null
+                        ? new Dictionary<int, int>(card.Attributes)
+                        : new Dictionary<int, int>(),
             })
             .ToList();
     }

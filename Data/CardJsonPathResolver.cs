@@ -41,12 +41,7 @@ internal static class CardJsonPathResolver
             );
 
         if (string.Equals(platform, "windows", StringComparison.OrdinalIgnoreCase))
-            return Path.Combine(
-                gameRootPath,
-                "TheBazaar_Data",
-                "StreamingAssets",
-                "cards.json"
-            );
+            return Path.Combine(gameRootPath, "TheBazaar_Data", "StreamingAssets", "cards.json");
 
         return null;
     }

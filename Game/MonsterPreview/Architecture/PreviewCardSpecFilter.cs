@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal static class PreviewCardSpecFilter
 {
@@ -38,9 +38,10 @@ internal static class PreviewCardSpecFilter
                     Tier = spec.Tier,
                     Size = spec.Size <= 0 ? 1 : spec.Size,
                     Enchant = string.IsNullOrWhiteSpace(spec.Enchant) ? "None" : spec.Enchant,
-                    Attributes = spec.Attributes != null
-                        ? new Dictionary<int, int>(spec.Attributes)
-                        : new Dictionary<int, int>(),
+                    Attributes =
+                        spec.Attributes != null
+                            ? new Dictionary<int, int>(spec.Attributes)
+                            : new Dictionary<int, int>(),
                 }
             );
         }

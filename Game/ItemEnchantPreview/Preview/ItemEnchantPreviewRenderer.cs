@@ -26,7 +26,10 @@ public static class ItemEnchantPreviewRenderer
     public static List<TooltipSegment> Render(ItemCard previewCard, TEnchantment enchantment)
     {
         var segments = new List<TooltipSegment>();
-        if (enchantment.Localization?.Tooltips == null || enchantment.Localization.Tooltips.Count == 0)
+        if (
+            enchantment.Localization?.Tooltips == null
+            || enchantment.Localization.Tooltips.Count == 0
+        )
             return segments;
 
         foreach (var tooltip in enchantment.Localization.Tooltips)
@@ -99,7 +102,8 @@ public static class ItemEnchantPreviewRenderer
             return RenderTooltipBuilder(builder);
 
         var tooltipData = new CardTooltipData(previewCard, previewCard.Template!);
-        var rendered = CardTooltipRenderMethod.Invoke(tooltipData, new object[] { builder }) as string;
+        var rendered =
+            CardTooltipRenderMethod.Invoke(tooltipData, new object[] { builder }) as string;
         return string.IsNullOrWhiteSpace(rendered) ? RenderTooltipBuilder(builder) : rendered;
     }
 

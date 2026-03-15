@@ -1,4 +1,9 @@
-var sourcePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoard.cs"));
+var sourcePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoard.cs"
+    )
+);
 var source = File.ReadAllText(sourcePath);
 
 AssertContains(

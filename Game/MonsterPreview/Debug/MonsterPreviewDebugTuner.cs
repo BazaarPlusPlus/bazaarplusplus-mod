@@ -2,7 +2,7 @@
 using System;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterPreviewDebugTuner
 {
@@ -14,7 +14,10 @@ internal sealed class MonsterPreviewDebugTuner
     private readonly FixedAnchorStrategy _anchor;
     private readonly PreviewBoardPresentation _presentation;
 
-    public MonsterPreviewDebugTuner(FixedAnchorStrategy anchor, PreviewBoardPresentation presentation)
+    public MonsterPreviewDebugTuner(
+        FixedAnchorStrategy anchor,
+        PreviewBoardPresentation presentation
+    )
     {
         _anchor = anchor;
         _presentation = presentation;
@@ -66,7 +69,8 @@ internal sealed class MonsterPreviewDebugTuner
 
     public void AdjustCardScale(float delta)
     {
-        _presentation.CardScale = Vector3.one * Math.Max(MinScale, _presentation.CardScale.x + delta);
+        _presentation.CardScale =
+            Vector3.one * Math.Max(MinScale, _presentation.CardScale.x + delta);
     }
 
     public void AdjustBoardThickness(float delta)
@@ -76,7 +80,10 @@ internal sealed class MonsterPreviewDebugTuner
 
     public void AdjustBorderThickness(float delta)
     {
-        _presentation.BorderThickness = Math.Max(MinThickness, _presentation.BorderThickness + delta);
+        _presentation.BorderThickness = Math.Max(
+            MinThickness,
+            _presentation.BorderThickness + delta
+        );
     }
 
     public void AdjustBorderHeight(float delta)

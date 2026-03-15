@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class InMemoryPreviewDataSource : IPreviewDataSource
 {
@@ -11,7 +11,10 @@ internal sealed class InMemoryPreviewDataSource : IPreviewDataSource
     private IReadOnlyDictionary<string, string> _metadata = new Dictionary<string, string>();
     private string _title = string.Empty;
 
-    public void SetCards(IReadOnlyList<PreviewCardSpec> itemCards, IReadOnlyList<PreviewCardSpec> skillCards)
+    public void SetCards(
+        IReadOnlyList<PreviewCardSpec> itemCards,
+        IReadOnlyList<PreviewCardSpec> skillCards
+    )
     {
         _itemCards = CloneCards(itemCards);
         _skillCards = CloneCards(skillCards);
@@ -38,16 +41,20 @@ internal sealed class InMemoryPreviewDataSource : IPreviewDataSource
 
     private static IReadOnlyList<PreviewCardSpec> CloneCards(IReadOnlyList<PreviewCardSpec> cards)
     {
-        return cards?.Select(card => new PreviewCardSpec
-        {
-            TemplateId = card.TemplateId,
-            Tier = card.Tier,
-            SourceName = card.SourceName,
-            Enchant = card.Enchant,
-            Size = card.Size,
-            Attributes = card.Attributes != null
-                ? new Dictionary<int, int>(card.Attributes)
-                : new Dictionary<int, int>(),
-        }).ToList() ?? new List<PreviewCardSpec>();
+        return cards
+                ?.Select(card => new PreviewCardSpec
+                {
+                    TemplateId = card.TemplateId,
+                    Tier = card.Tier,
+                    SourceName = card.SourceName,
+                    Enchant = card.Enchant,
+                    Size = card.Size,
+                    Attributes =
+                        card.Attributes != null
+                            ? new Dictionary<int, int>(card.Attributes)
+                            : new Dictionary<int, int>(),
+                })
+                .ToList()
+            ?? new List<PreviewCardSpec>();
     }
 }

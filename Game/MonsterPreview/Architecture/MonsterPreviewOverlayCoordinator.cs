@@ -1,7 +1,7 @@
 #pragma warning disable CS0436
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterPreviewOverlayCoordinator
 {

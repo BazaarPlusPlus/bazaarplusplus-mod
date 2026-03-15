@@ -1,4 +1,4 @@
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal static class NextClickCloseFrameGate
 {

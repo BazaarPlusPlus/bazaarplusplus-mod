@@ -2,7 +2,7 @@ using TheBazaar;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal sealed partial class CombatStatusBar : MonoBehaviour
 {
@@ -35,7 +35,11 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
         if (keyboard != null && keyboard[KeyBindings.Toggle.CombatStatusBar].wasPressedThisFrame)
             _visible = !_visible;
 
-        _visualBlend = AdvanceVisualBlend(_visualBlend, IsCombatPlaybackActive, Time.unscaledDeltaTime);
+        _visualBlend = AdvanceVisualBlend(
+            _visualBlend,
+            IsCombatPlaybackActive,
+            Time.unscaledDeltaTime
+        );
 
         EnsureUi();
         RefreshUi();

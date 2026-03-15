@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using TheBazaar;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterPreviewWarmupController : MonoBehaviour
 {

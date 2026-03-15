@@ -2,6 +2,7 @@
 using System.Threading;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
+using BazaarPlusPlus.Game.CombatStatusBar;
 using HarmonyLib;
 using TheBazaar;
 

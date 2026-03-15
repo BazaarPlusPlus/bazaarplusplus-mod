@@ -1,7 +1,7 @@
 #pragma warning disable CS0436
 using System;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterLockShowcaseController
 {

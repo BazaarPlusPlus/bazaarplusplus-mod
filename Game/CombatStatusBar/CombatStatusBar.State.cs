@@ -1,11 +1,11 @@
 using System;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal sealed partial class CombatStatusBar
 {
-    private static readonly float[] SpeedSteps = { 0.25f, 0.5f, 1f, 1.5f, 2f, 3f, };
+    private static readonly float[] SpeedSteps = { 0.25f, 0.5f, 1f, 1.5f, 2f, 3f };
 
     internal static bool IsCombatPlaybackActive { get; private set; }
     internal static bool IsCombatPaused { get; private set; }
@@ -97,18 +97,14 @@ internal sealed partial class CombatStatusBar
 
     internal static string GetDisplayedTimeText()
     {
-        return IsCombatPlaybackActive
-            ? FormatElapsed(GetCombatLogicalElapsed())
-            : HasCompletedCombatPlayback
-                ? FormatElapsed(LastCombatLogicalElapsed)
-                : "-:--:--";
+        return IsCombatPlaybackActive ? FormatElapsed(GetCombatLogicalElapsed())
+            : HasCompletedCombatPlayback ? FormatElapsed(LastCombatLogicalElapsed)
+            : "-:--:--";
     }
 
     internal static string GetDisplayedFrameText()
     {
-        return IsCombatPlaybackActive
-            ? ProcessedCombatFrames.ToString()
-            : "Standby";
+        return IsCombatPlaybackActive ? ProcessedCombatFrames.ToString() : "Standby";
     }
 
     internal static float AdvanceVisualBlend(float current, bool active, float deltaTime)

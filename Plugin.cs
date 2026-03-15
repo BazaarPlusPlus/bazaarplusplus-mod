@@ -1,5 +1,11 @@
 #pragma warning disable CS0436
+using System;
 using System.IO;
+using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.MonsterPreview;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -15,6 +21,8 @@ public class Plugin : BaseUnityPlugin
     {
         ModState.Logger = Logger;
         BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            _ = CheckNetworkAsync();
 
         _harmony.PatchAll();
 
@@ -44,5 +52,54 @@ public class Plugin : BaseUnityPlugin
     protected virtual void OnDestroy()
     {
         BppLog.Flush();
+    }
+
+    private static async Task CheckNetworkAsync()
+    {
+        CheckWinhttpProxy();
+
+        // Test actual connectivity using the same HTTP stack the game uses
+        try
+        {
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+            var resp = await client.GetAsync("https://playthebazaar.com/");
+            BppLog.Info("Network", $"Network check passed ({(int)resp.StatusCode})");
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("Network", $"Network check FAILED: {ex.GetType().Name} — {ex.Message}");
+            BppLog.Error("Network", "This likely explains the login failure. Possible causes:");
+            BppLog.Error("Network", "  1. Antivirus blocked or quarantined BepInEx winhttp.dll");
+            BppLog.Error("Network", "  2. VPN or proxy software conflicts with winhttp.dll hook");
+            BppLog.Error("Network", "  3. Corporate/school network firewall");
+            BppLog.Error("Network", "Fix: temporarily disable antivirus, then reinstall BepInEx.");
+        }
+    }
+
+    private static void CheckWinhttpProxy()
+    {
+        var gameDir = AppDomain.CurrentDomain.BaseDirectory;
+        var proxyPath = Path.Combine(gameDir, "winhttp.dll");
+
+        if (!File.Exists(proxyPath))
+        {
+            BppLog.Warn(
+                "Network",
+                "winhttp.dll not found in game directory — BepInEx may not be installed correctly."
+            );
+            return;
+        }
+
+        var info = System.Diagnostics.FileVersionInfo.GetVersionInfo(proxyPath);
+        BppLog.Info(
+            "Network",
+            $"winhttp.dll: {info.FileDescription} v{info.FileVersion} by {info.CompanyName}"
+        );
+        if (info.CompanyName?.Contains("Microsoft") == true)
+            BppLog.Warn(
+                "Network",
+                "winhttp.dll appears to be the system DLL — BepInEx proxy may have been removed by antivirus."
+            );
     }
 }

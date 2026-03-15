@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 using System;
 using System.Collections.Generic;
+using BazaarPlusPlus.Game.MonsterPreview;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -311,8 +312,12 @@ internal sealed class DebugPanel : MonoBehaviour
         var levelText = entry.Preview.CombatLevel.HasValue
             ? entry.Preview.CombatLevel.Value.ToString()
             : "?";
-        var goldText = entry.Preview.RewardGold.HasValue ? entry.Preview.RewardGold.Value.ToString() : "?";
-        var xpText = entry.Preview.RewardXp.HasValue ? entry.Preview.RewardXp.Value.ToString() : "?";
+        var goldText = entry.Preview.RewardGold.HasValue
+            ? entry.Preview.RewardGold.Value.ToString()
+            : "?";
+        var xpText = entry.Preview.RewardXp.HasValue
+            ? entry.Preview.RewardXp.Value.ToString()
+            : "?";
         var sandText = !entry.Preview.SandstormEnabled.HasValue
             ? "?"
             : (entry.Preview.SandstormEnabled.Value ? "on" : "off");
@@ -399,11 +404,7 @@ internal sealed class DebugPanel : MonoBehaviour
 
     private PanelSnapshot BuildSnapshot()
     {
-        var snapshot = new PanelSnapshot
-        {
-            Run = BuildRunSummary(),
-            Preview = BuildPreviewState(),
-        };
+        var snapshot = new PanelSnapshot { Run = BuildRunSummary(), Preview = BuildPreviewState() };
 
         snapshot.EncounterSections.Add(
             BuildEncounterSection(
@@ -454,11 +455,7 @@ internal sealed class DebugPanel : MonoBehaviour
         List<RunInfo.MonsterPreview> monsterPreviews
     )
     {
-        var section = new EncounterSection
-        {
-            Key = sectionKey,
-            Title = title,
-        };
+        var section = new EncounterSection { Key = sectionKey, Title = title };
 
         if (cards == null || cards.Count == 0)
             return section;
@@ -484,9 +481,10 @@ internal sealed class DebugPanel : MonoBehaviour
                 Key = $"{sectionKey}:{card.TemplateId:N}",
                 Name = name,
                 Tier = card.Tier.ToString(),
-                Enchant = string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None"
-                    ? "-"
-                    : card.Enchant,
+                Enchant =
+                    string.IsNullOrEmpty(card.Enchant) || card.Enchant == "None"
+                        ? "-"
+                        : card.Enchant,
                 CardId = card.TemplateId.ToString("N")[..8],
             };
 

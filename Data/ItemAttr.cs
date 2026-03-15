@@ -9,7 +9,14 @@ namespace BazaarPlusPlus;
 
 internal static class ItemAttr
 {
-    private static readonly string[] TierOrder = ["Bronze", "Silver", "Gold", "Diamond", "Legendary"];
+    private static readonly string[] TierOrder =
+    [
+        "Bronze",
+        "Silver",
+        "Gold",
+        "Diamond",
+        "Legendary",
+    ];
     private static readonly object SyncRoot = new();
     private static IReadOnlyDictionary<Guid, CardAttributes> _cardsByTemplateId =
         new Dictionary<Guid, CardAttributes>();
@@ -88,7 +95,8 @@ internal static class ItemAttr
     private static IReadOnlyDictionary<Guid, CardAttributes> LoadCards(string path)
     {
         var root = JObject.Parse(File.ReadAllText(path));
-        var versionNode = root["5.0.0"] as JArray ?? root.Properties().FirstOrDefault()?.Value as JArray;
+        var versionNode =
+            root["5.0.0"] as JArray ?? root.Properties().FirstOrDefault()?.Value as JArray;
         if (versionNode == null)
             return new Dictionary<Guid, CardAttributes>();
 
@@ -156,7 +164,10 @@ internal static class ItemAttr
 
     private sealed class CardAttributes
     {
-        public IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>> AttributesByTier { get; set; } =
+        public IReadOnlyDictionary<
+            string,
+            IReadOnlyDictionary<string, int>
+        > AttributesByTier { get; set; } =
             new Dictionary<string, IReadOnlyDictionary<string, int>>(StringComparer.Ordinal);
     }
 }

@@ -14,20 +14,20 @@ public static class ItemEnchantPreviewCache
         public List<TooltipSegment> Segments = new List<TooltipSegment>();
     }
 
-    private static readonly Dictionary<string, CacheEntry> Cache = new Dictionary<string, CacheEntry>();
+    private static readonly Dictionary<string, CacheEntry> Cache =
+        new Dictionary<string, CacheEntry>();
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(2);
 
     public static string CreateKey(ItemEnchantPreviewSnapshot snapshot)
     {
         var attributes = string.Join(
             ",",
-            snapshot.PreviewAttributes
-                .OrderBy(pair => pair.Key)
+            snapshot
+                .PreviewAttributes.OrderBy(pair => pair.Key)
                 .Select(pair => $"{pair.Key}:{pair.Value}")
         );
 
-        return
-            $"{snapshot.InstanceId}|{snapshot.TemplateId}|{snapshot.Section}|{snapshot.CurrentEnchantment}|{snapshot.PreviewEnchantment}|{attributes}";
+        return $"{snapshot.InstanceId}|{snapshot.TemplateId}|{snapshot.Section}|{snapshot.CurrentEnchantment}|{snapshot.PreviewEnchantment}|{attributes}";
     }
 
     public static bool TryGet(

@@ -24,6 +24,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Game\CombatStatusBar\CombatStatusBar.State.cs" Link="CombatStatusBar.State.cs" />
+    <Compile
+      Include="..\..\Game\CombatStatusBar\CombatStatusBar.State.cs"
+      Link="CombatStatusBar.State.cs"
+    />
   </ItemGroup>
 </Project>

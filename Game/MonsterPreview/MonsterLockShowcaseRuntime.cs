@@ -7,11 +7,12 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 {
-    private readonly MonsterLockShowcaseController _controller = new MonsterLockShowcaseController();
+    private readonly MonsterLockShowcaseController _controller =
+        new MonsterLockShowcaseController();
     private readonly FixedAnchorStrategy _anchorStrategy = new FixedAnchorStrategy(
         MonsterPreviewDefaults.DefaultAnchorPose
     );
@@ -117,11 +118,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         _anchorStrategy.SetPose(MonsterPreviewDefaults.DefaultAnchorPose);
         CopyPresentation(MonsterPreviewDefaults.CreateShowcasePresentation(), _presentation);
         _overlayController.ShowRequest(
-            CreateShowcaseRequest(
-                previewModel,
-                card?.Template?.InternalName ?? source,
-                source
-            )
+            CreateShowcaseRequest(previewModel, card?.Template?.InternalName ?? source, source)
         );
         _closeOnNextClickArmed = true;
         _closeOnNextClickArmedFrame = Time.frameCount;
@@ -132,7 +129,10 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         return true;
     }
 
-    public bool TryConsumeNextClickToClosePreview(PointerEventData.InputButton? button, string reason)
+    public bool TryConsumeNextClickToClosePreview(
+        PointerEventData.InputButton? button,
+        string reason
+    )
     {
         return TryConsumeNextClickToClosePreview(
             isLeftClick: button == PointerEventData.InputButton.Left,
@@ -301,7 +301,9 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         var dataSource = new InMemoryPreviewDataSource();
         previewModel ??= new PreviewBoardModel();
         dataSource.SetCards(previewModel.ItemCards, previewModel.SkillCards);
-        var metadata = new Dictionary<string, string>(previewModel.Metadata ?? new Dictionary<string, string>())
+        var metadata = new Dictionary<string, string>(
+            previewModel.Metadata ?? new Dictionary<string, string>()
+        )
         {
             ["source"] = source,
         };
@@ -328,7 +330,11 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         };
     }
 
-    private bool TryConsumeNextClickToClosePreview(bool isLeftClick, bool isRightClick, string reason)
+    private bool TryConsumeNextClickToClosePreview(
+        bool isLeftClick,
+        bool isRightClick,
+        string reason
+    )
     {
         if (
             !_controller.ShouldConsumeNextClickToClosePreview(
@@ -388,7 +394,6 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             ["reward_xp"] = preview?.RewardXp?.ToString() ?? string.Empty,
         };
     }
-
 
     private static void CopyPresentation(
         PreviewBoardPresentation source,

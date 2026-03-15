@@ -1,4 +1,5 @@
 #pragma warning disable CS0436
+using BazaarPlusPlus.Game.MonsterPreview;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.Tooltips;
@@ -103,7 +104,11 @@ public static class CardTooltipControllerLockTogglePatch
             return false;
         }
 
-        if (runtime != null && runtime.ShouldInterceptLockToggle(currentCard) && runtime.HandleLockToggle(currentCard))
+        if (
+            runtime != null
+            && runtime.ShouldInterceptLockToggle(currentCard)
+            && runtime.HandleLockToggle(currentCard)
+        )
             return false;
 
         if (currentCard == null)

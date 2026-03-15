@@ -10,7 +10,8 @@ internal static class BppLog
     private const string Prefix = "[BPP]";
     private static readonly object SyncRoot = new object();
     private static readonly List<BufferedLogEntry> RecentEntries = new List<BufferedLogEntry>();
-    private static readonly List<BufferedLogEntry> ActiveSequenceBuffer = new List<BufferedLogEntry>();
+    private static readonly List<BufferedLogEntry> ActiveSequenceBuffer =
+        new List<BufferedLogEntry>();
 
     private static List<BufferedLogEntry> _activeSequence;
     private static int _activeSequenceIndex;

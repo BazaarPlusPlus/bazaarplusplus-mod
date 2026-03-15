@@ -1,7 +1,7 @@
 #pragma warning disable CS0436
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal static class MonsterPreviewDefaults
 {

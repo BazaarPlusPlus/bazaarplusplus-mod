@@ -67,7 +67,8 @@ internal static class LocalCardTemplateCatalog
     private static HashSet<Guid> LoadTemplateIds(string path)
     {
         var root = JObject.Parse(File.ReadAllText(path));
-        var versionNode = root["5.0.0"] as JArray ?? root.Properties().FirstOrDefault()?.Value as JArray;
+        var versionNode =
+            root["5.0.0"] as JArray ?? root.Properties().FirstOrDefault()?.Value as JArray;
         if (versionNode == null)
             return new HashSet<Guid>();
 

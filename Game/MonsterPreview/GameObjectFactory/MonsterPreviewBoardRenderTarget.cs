@@ -1,7 +1,7 @@
 #pragma warning disable CS0436
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
 {
@@ -31,7 +31,10 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
     {
         if (!EnsureBoard())
         {
-            BppLog.Info("MonsterPreviewBoardRenderTarget", "Render skipped because board could not be created");
+            BppLog.Info(
+                "MonsterPreviewBoardRenderTarget",
+                "Render skipped because board could not be created"
+            );
             return;
         }
 
@@ -58,7 +61,10 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
     {
         if (!EnsureBoard())
         {
-            BppLog.Info("MonsterPreviewBoardRenderTarget", $"SetVisible({visible}) skipped because board could not be created");
+            BppLog.Info(
+                "MonsterPreviewBoardRenderTarget",
+                $"SetVisible({visible}) skipped because board could not be created"
+            );
             return;
         }
 

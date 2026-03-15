@@ -71,7 +71,10 @@ internal static class GameDataReader
     {
         if (container?.Container == null)
         {
-            BppLog.Debug("GameDataReader", "Inventory container missing, returning empty card list");
+            BppLog.Debug(
+                "GameDataReader",
+                "Inventory container missing, returning empty card list"
+            );
             return new List<Card>();
         }
 

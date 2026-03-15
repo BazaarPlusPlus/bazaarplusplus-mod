@@ -1,7 +1,7 @@
 #pragma warning disable CS0436
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class FixedAnchorStrategy : IBoardAnchorStrategy
 {
@@ -31,11 +31,7 @@ internal sealed class FixedAnchorStrategy : IBoardAnchorStrategy
 
     public bool TryResolve(out BoardPose pose)
     {
-        pose = new BoardPose
-        {
-            Position = Position,
-            Rotation = Rotation,
-        };
+        pose = new BoardPose { Position = Position, Rotation = Rotation };
         return true;
     }
 }

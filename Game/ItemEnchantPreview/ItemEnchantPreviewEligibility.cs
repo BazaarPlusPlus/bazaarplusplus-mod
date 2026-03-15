@@ -19,11 +19,7 @@ public static class ItemEnchantPreviewEligibility
         return true;
     }
 
-    public static bool IsEligible(
-        ECardType cardType,
-        EInventorySection? section,
-        bool isInCombat
-    )
+    public static bool IsEligible(ECardType cardType, EInventorySection? section, bool isInCombat)
     {
         if (isInCombat || cardType != ECardType.Item)
             return false;

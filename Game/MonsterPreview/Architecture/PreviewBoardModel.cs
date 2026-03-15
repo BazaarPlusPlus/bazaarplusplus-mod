@@ -1,7 +1,7 @@
 #pragma warning disable CS0436
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class PreviewBoardModel
 {
@@ -13,5 +13,6 @@ internal sealed class PreviewBoardModel
 
     public string Signature { get; set; } = string.Empty;
 
-    public IReadOnlyDictionary<string, string> Metadata { get; set; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<string, string> Metadata { get; set; } =
+        new Dictionary<string, string>();
 }

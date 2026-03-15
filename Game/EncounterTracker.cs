@@ -7,6 +7,7 @@ using BazaarGameShared.Domain.Cards.Encounter.Combat;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
+using BazaarPlusPlus.Game.MonsterPreview;
 using TheBazaar;
 
 namespace BazaarPlusPlus;
@@ -84,10 +85,7 @@ internal static class EncounterTracker
             );
         }
 
-        BppLog.Debug(
-            "EncounterTracker",
-            $"State={stateName}, choiceCount={cards.Count}"
-        );
+        BppLog.Debug("EncounterTracker", $"State={stateName}, choiceCount={cards.Count}");
     }
 
     private static List<RunInfo.MonsterPreview> BuildMonsterPreviews(List<Card> cards)
@@ -103,9 +101,13 @@ internal static class EncounterTracker
             var encounterName = card.Template.InternalName;
             var monster = combat.CombatantType as TCombatantMonster;
             MonsterDatabase.TryGetByEncounterId(card.TemplateId, out var monsterInfo);
-            var previewModel = monsterInfo != null
-                ? MonsterDatabasePreviewDataSource.BuildModel(monsterInfo, "encounter_tracker_cache")
-                : null;
+            var previewModel =
+                monsterInfo != null
+                    ? MonsterDatabasePreviewDataSource.BuildModel(
+                        monsterInfo,
+                        "encounter_tracker_cache"
+                    )
+                    : null;
 
             previews.Add(
                 new RunInfo.MonsterPreview
@@ -121,12 +123,14 @@ internal static class EncounterTracker
                     RewardGold = combat.RewardCombatGold,
                     RewardXp = combat.RewardCombatXp,
                     SandstormEnabled = combat.SandstormEnabled,
-                    BoardCards = previewModel != null
-                        ? EncounterPreviewSpecConverter.ToCachedCards(previewModel.ItemCards)
-                        : null,
-                    Skills = previewModel != null
-                        ? EncounterPreviewSpecConverter.ToCachedCards(previewModel.SkillCards)
-                        : null,
+                    BoardCards =
+                        previewModel != null
+                            ? EncounterPreviewSpecConverter.ToCachedCards(previewModel.ItemCards)
+                            : null,
+                    Skills =
+                        previewModel != null
+                            ? EncounterPreviewSpecConverter.ToCachedCards(previewModel.SkillCards)
+                            : null,
                 }
             );
         }

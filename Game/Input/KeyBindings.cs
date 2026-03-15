@@ -8,12 +8,14 @@ internal static class KeyBindings
     {
         public static bool IsCtrlPressed(Keyboard keyboard)
         {
-            return keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
+            return keyboard != null
+                && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
         }
 
         public static bool IsShiftPressed(Keyboard keyboard)
         {
-            return keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
+            return keyboard != null
+                && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
         }
     }
 

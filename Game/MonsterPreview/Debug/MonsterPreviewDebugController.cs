@@ -8,7 +8,7 @@ using BazaarGameShared.Domain.Core.Types;
 using TheBazaar;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterPreviewDebugController : MonoBehaviour
 {
@@ -374,7 +374,10 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
             SyncPreviewData();
         }
 
-        BppLog.Debug("MonsterPreviewDebugController", $"Preview visible={_overlayController.Visible}");
+        BppLog.Debug(
+            "MonsterPreviewDebugController",
+            $"Preview visible={_overlayController.Visible}"
+        );
     }
 
     private void ToggleDataSource()
@@ -452,7 +455,10 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         if (!MonsterDatabase.TryGetByEncounterId(DefaultEncounterId, out var monster))
         {
             _activeMonsterTitle = string.Empty;
-            BppLog.Warn("MonsterPreviewDebugController", $"Monster DB miss encounterId={DefaultEncounterId}");
+            BppLog.Warn(
+                "MonsterPreviewDebugController",
+                $"Monster DB miss encounterId={DefaultEncounterId}"
+            );
             _overlayController.SetCards(new List<PreviewCardSpec>());
             _overlayController.SetSkillCards(new List<PreviewCardSpec>());
             return;
@@ -500,7 +506,10 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         {
             if (skillSignature == _lastSkillSignature)
             {
-                BppLog.Debug("MonsterPreviewDebugController", "Player hand preview signature unchanged");
+                BppLog.Debug(
+                    "MonsterPreviewDebugController",
+                    "Player hand preview signature unchanged"
+                );
                 return;
             }
         }
@@ -537,7 +546,8 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         _overlayController?.SetPresentation(ClonePresentation(_presentation));
     }
 
-    private bool UsingShowcaseTargets => _showcaseRuntime != null && _showcaseRuntime.IsPreviewActive;
+    private bool UsingShowcaseTargets =>
+        _showcaseRuntime != null && _showcaseRuntime.IsPreviewActive;
 
     private FixedAnchorStrategy ActiveAnchorStrategy =>
         UsingShowcaseTargets ? _showcaseRuntime.AnchorStrategy : _anchorStrategy;
@@ -567,7 +577,8 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
                     SourceName = card.Template?.InternalName ?? string.Empty,
                     Enchant = (card as ItemCard)?.Enchantment?.ToString() ?? "None",
                     Size = Math.Max(1, (int)card.Size),
-                    Attributes = card.Attributes?.ToDictionary(kv => (int)kv.Key, kv => kv.Value)
+                    Attributes =
+                        card.Attributes?.ToDictionary(kv => (int)kv.Key, kv => kv.Value)
                         ?? new Dictionary<int, int>(),
                 }
             );
@@ -595,7 +606,8 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
                     SourceName = skill.Template?.InternalName ?? string.Empty,
                     Size = 1,
                     Enchant = "None",
-                    Attributes = skill.Attributes?.ToDictionary(kv => (int)kv.Key, kv => kv.Value)
+                    Attributes =
+                        skill.Attributes?.ToDictionary(kv => (int)kv.Key, kv => kv.Value)
                         ?? new Dictionary<int, int>(),
                 }
             );
@@ -618,9 +630,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
                     card.Enchant ?? "None",
                     string.Join(
                         ",",
-                        card.Attributes
-                            .OrderBy(kv => kv.Key)
-                            .Select(kv => $"{kv.Key}:{kv.Value}")
+                        card.Attributes.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}:{kv.Value}")
                     )
                 )
             )
@@ -705,12 +715,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         GUI.color = previousColor;
     }
 
-    private static bool DrawTintedButton(
-        Rect rect,
-        string label,
-        GUIStyle style,
-        Color color
-    )
+    private static bool DrawTintedButton(Rect rect, string label, GUIStyle style, Color color)
     {
         var previousBackground = GUI.backgroundColor;
         GUI.backgroundColor = color;

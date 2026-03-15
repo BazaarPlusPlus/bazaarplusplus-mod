@@ -1,7 +1,7 @@
 #pragma warning disable CS0436
 using System.Text;
-using HarmonyLib;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
+using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;

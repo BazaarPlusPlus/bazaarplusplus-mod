@@ -1,5 +1,5 @@
 #pragma warning disable CS0436
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class PreviewBoardDebugOptions
 {

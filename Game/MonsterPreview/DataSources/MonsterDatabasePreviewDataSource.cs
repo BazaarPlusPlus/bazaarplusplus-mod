@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterDatabasePreviewDataSource : IPreviewDataSource
 {

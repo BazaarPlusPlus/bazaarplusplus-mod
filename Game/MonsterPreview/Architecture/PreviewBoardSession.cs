@@ -1,5 +1,5 @@
 #pragma warning disable CS0436
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class PreviewBoardSession
 {
@@ -64,7 +64,10 @@ internal sealed class PreviewBoardSession
         var presentationSignature = BuildPresentationSignature(_request.Presentation);
         if (!ShouldRender(signature, presentationSignature, pose))
         {
-            BppLog.Info("PreviewBoardSession", "Tick skipped because signature and pose are unchanged");
+            BppLog.Info(
+                "PreviewBoardSession",
+                "Tick skipped because signature and pose are unchanged"
+            );
             return;
         }
 
@@ -88,7 +91,11 @@ internal sealed class PreviewBoardSession
 
     private static PreviewBoardModel ResolveModel(PreviewBoardRequest request)
     {
-        if (request.DataSource != null && request.DataSource.TryBuild(out var model) && model != null)
+        if (
+            request.DataSource != null
+            && request.DataSource.TryBuild(out var model)
+            && model != null
+        )
             return model;
 
         return request.InitialModel;
@@ -96,7 +103,11 @@ internal sealed class PreviewBoardSession
 
     private static BoardPose ResolvePose(PreviewBoardRequest request)
     {
-        if (request.AnchorStrategy != null && request.AnchorStrategy.TryResolve(out var pose) && pose != null)
+        if (
+            request.AnchorStrategy != null
+            && request.AnchorStrategy.TryResolve(out var pose)
+            && pose != null
+        )
             return pose;
 
         return request.Pose;
@@ -119,11 +130,7 @@ internal sealed class PreviewBoardSession
 
     private static BoardPose ClonePose(BoardPose pose)
     {
-        return new BoardPose
-        {
-            Position = pose.Position,
-            Rotation = pose.Rotation,
-        };
+        return new BoardPose { Position = pose.Position, Rotation = pose.Rotation };
     }
 
     private static string BuildPresentationSignature(PreviewBoardPresentation presentation)

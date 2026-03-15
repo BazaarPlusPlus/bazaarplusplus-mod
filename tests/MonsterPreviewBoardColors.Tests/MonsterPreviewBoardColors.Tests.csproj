@@ -35,6 +35,7 @@
     <Copy
       SourceFiles="$(ManagedPath)/UnityEngine.CoreModule.dll"
       DestinationFolder="$(OutDir)"
-      SkipUnchangedFiles="true" />
+      SkipUnchangedFiles="true"
+    />
   </Target>
 </Project>

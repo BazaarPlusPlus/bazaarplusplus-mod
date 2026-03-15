@@ -1,5 +1,6 @@
 #pragma warning disable CS0436
 using System.Collections.Generic;
+using BazaarPlusPlus.Game.MonsterPreview;
 
 namespace BazaarPlusPlus;
 
@@ -24,9 +25,10 @@ internal static class EncounterPreviewSpecConverter
                     Tier = card.Tier,
                     Size = card.Size <= 0 ? 1 : card.Size,
                     Enchant = string.IsNullOrWhiteSpace(card.Enchant) ? "None" : card.Enchant,
-                    Attributes = card.Attributes != null
-                        ? new Dictionary<int, int>(card.Attributes)
-                        : new Dictionary<int, int>(),
+                    Attributes =
+                        card.Attributes != null
+                            ? new Dictionary<int, int>(card.Attributes)
+                            : new Dictionary<int, int>(),
                 }
             );
         }
@@ -34,7 +36,9 @@ internal static class EncounterPreviewSpecConverter
         return specs;
     }
 
-    internal static List<RunInfo.MonsterPreviewCard> ToCachedCards(IEnumerable<PreviewCardSpec> specs)
+    internal static List<RunInfo.MonsterPreviewCard> ToCachedCards(
+        IEnumerable<PreviewCardSpec> specs
+    )
     {
         var cards = new List<RunInfo.MonsterPreviewCard>();
         if (specs == null)
@@ -53,9 +57,10 @@ internal static class EncounterPreviewSpecConverter
                     Tier = spec.Tier,
                     Size = spec.Size <= 0 ? 1 : spec.Size,
                     Enchant = string.IsNullOrWhiteSpace(spec.Enchant) ? "None" : spec.Enchant,
-                    Attributes = spec.Attributes != null
-                        ? new Dictionary<int, int>(spec.Attributes)
-                        : new Dictionary<int, int>(),
+                    Attributes =
+                        spec.Attributes != null
+                            ? new Dictionary<int, int>(spec.Attributes)
+                            : new Dictionary<int, int>(),
                 }
             );
         }

@@ -1,7 +1,7 @@
 #pragma warning disable CS0436
 using System.Linq;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal static class PreviewBoardSignature
 {
@@ -27,7 +27,8 @@ internal static class PreviewBoardSignature
 
         var attributes = string.Join(
             ",",
-            card.Attributes.OrderBy(entry => entry.Key).Select(entry => $"{entry.Key}:{entry.Value}")
+            card.Attributes.OrderBy(entry => entry.Key)
+                .Select(entry => $"{entry.Key}:{entry.Value}")
         );
 
         return string.Join(

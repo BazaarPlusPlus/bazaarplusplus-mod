@@ -12,7 +12,7 @@ using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
 {
@@ -37,7 +37,10 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
             if (_staticData == null)
             {
                 _staticData = await Data.GetStatic();
-                BppLog.Debug("MonsterPreviewItemCardFactory", $"Static data loaded={(_staticData != null)}");
+                BppLog.Debug(
+                    "MonsterPreviewItemCardFactory",
+                    $"Static data loaded={(_staticData != null)}"
+                );
             }
 
             if (_staticData == null)
@@ -52,7 +55,10 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
             var card = BuildCard(spec, _staticData);
             if (card == null)
             {
-                BppLog.Warn("MonsterPreviewItemCardFactory", $"BuildCard failed for template={spec?.TemplateId ?? "null"}");
+                BppLog.Warn(
+                    "MonsterPreviewItemCardFactory",
+                    $"BuildCard failed for template={spec?.TemplateId ?? "null"}"
+                );
                 return null;
             }
 
@@ -130,7 +136,10 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
 
         if (!Guid.TryParse(entry.TemplateId, out var templateId))
         {
-            BppLog.Warn("MonsterPreviewItemCardFactory", $"Invalid template id: {entry.TemplateId}");
+            BppLog.Warn(
+                "MonsterPreviewItemCardFactory",
+                $"Invalid template id: {entry.TemplateId}"
+            );
             return null;
         }
 
@@ -183,7 +192,6 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
         return card;
     }
 
-
     private static ECardSize ParseSize(int size, ECardSize fallback)
     {
         switch (size)
@@ -197,7 +205,9 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
             default:
                 return fallback;
         }
-    }    private static object GetTemplate(object staticData, Guid templateId)
+    }
+
+    private static object GetTemplate(object staticData, Guid templateId)
     {
         if (staticData == null)
             return null;

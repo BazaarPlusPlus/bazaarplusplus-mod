@@ -3,7 +3,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal sealed partial class CombatStatusBar
 {
@@ -54,7 +54,13 @@ internal sealed partial class CombatStatusBar
         if (_canvasObject != null)
             return;
 
-        _canvasObject = new GameObject("CombatStatusBarCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        _canvasObject = new GameObject(
+            "CombatStatusBarCanvas",
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster)
+        );
         _canvasObject.transform.SetParent(transform, false);
 
         _canvas = _canvasObject.GetComponent<Canvas>();
@@ -100,23 +106,49 @@ internal sealed partial class CombatStatusBar
         layout.childForceExpandHeight = true;
         layout.childForceExpandWidth = false;
 
-        var timeSegment = CreateReadoutSegment("TimeSegment", _barRoot, 116f, out _timeBackground, out _timeLabel, out _timeValue);
+        var timeSegment = CreateReadoutSegment(
+            "TimeSegment",
+            _barRoot,
+            116f,
+            out _timeBackground,
+            out _timeLabel,
+            out _timeValue
+        );
         SetLabel(_timeLabel, "Time");
 
         _timeDivider = CreateDivider(_barRoot);
 
-        var frameSegment = CreateReadoutSegment("FrameSegment", _barRoot, 116f, out _frameBackground, out _frameLabel, out _frameValue);
+        var frameSegment = CreateReadoutSegment(
+            "FrameSegment",
+            _barRoot,
+            116f,
+            out _frameBackground,
+            out _frameLabel,
+            out _frameValue
+        );
         SetLabel(_frameLabel, "Frame");
 
         _frameDivider = CreateDivider(_barRoot);
 
-        var multiplierSegment = CreateInteractiveSegment("MultiplierSegment", _barRoot, 168f, out _multiplierBackground, out _multiplierLabel);
+        var multiplierSegment = CreateInteractiveSegment(
+            "MultiplierSegment",
+            _barRoot,
+            168f,
+            out _multiplierBackground,
+            out _multiplierLabel
+        );
         SetLabel(_multiplierLabel, "Multiplier");
         CreateMultiplierContent(multiplierSegment);
 
         _multiplierDivider = CreateDivider(_barRoot);
 
-        var pauseSegment = CreateInteractiveSegment("PauseSegment", _barRoot, 110f, out _pauseBackground, out _pauseLabel);
+        var pauseSegment = CreateInteractiveSegment(
+            "PauseSegment",
+            _barRoot,
+            110f,
+            out _pauseBackground,
+            out _pauseLabel
+        );
         SetLabel(_pauseLabel, "Pause");
         CreatePauseContent(pauseSegment);
     }
@@ -241,18 +273,61 @@ internal sealed partial class CombatStatusBar
             _visualBlend
         );
         var multiplierButtonDisabledColor = new Color(0.22f, 0.24f, 0.28f, 0.45f);
-        ApplyButtonColors(_decrementButton, _decrementButtonBackground, _decrementButtonText, CanStepCombatSpeed(-1), multiplierButtonColor, multiplierButtonPressedColor, multiplierButtonDisabledColor, valueColor);
-        ApplyButtonColors(_incrementButton, _incrementButtonBackground, _incrementButtonText, CanStepCombatSpeed(1), multiplierButtonColor, multiplierButtonPressedColor, multiplierButtonDisabledColor, valueColor);
+        ApplyButtonColors(
+            _decrementButton,
+            _decrementButtonBackground,
+            _decrementButtonText,
+            CanStepCombatSpeed(-1),
+            multiplierButtonColor,
+            multiplierButtonPressedColor,
+            multiplierButtonDisabledColor,
+            valueColor
+        );
+        ApplyButtonColors(
+            _incrementButton,
+            _incrementButtonBackground,
+            _incrementButtonText,
+            CanStepCombatSpeed(1),
+            multiplierButtonColor,
+            multiplierButtonPressedColor,
+            multiplierButtonDisabledColor,
+            valueColor
+        );
 
         var pauseInteractable = CanToggleCombatPause();
         var pauseBaseColor = IsCombatPaused
-            ? Color.Lerp(new Color(0.28f, 0.33f, 0.40f, 0.95f), new Color(0.54f, 0.40f, 0.16f, 0.96f), _visualBlend)
-            : Color.Lerp(new Color(0.24f, 0.27f, 0.33f, 0.90f), new Color(0.41f, 0.31f, 0.13f, 0.93f), _visualBlend);
+            ? Color.Lerp(
+                new Color(0.28f, 0.33f, 0.40f, 0.95f),
+                new Color(0.54f, 0.40f, 0.16f, 0.96f),
+                _visualBlend
+            )
+            : Color.Lerp(
+                new Color(0.24f, 0.27f, 0.33f, 0.90f),
+                new Color(0.41f, 0.31f, 0.13f, 0.93f),
+                _visualBlend
+            );
         var pausePressedColor = IsCombatPaused
-            ? Color.Lerp(new Color(0.36f, 0.42f, 0.50f, 1f), new Color(0.68f, 0.50f, 0.18f, 1f), _visualBlend)
-            : Color.Lerp(new Color(0.32f, 0.36f, 0.43f, 1f), new Color(0.56f, 0.41f, 0.15f, 1f), _visualBlend);
+            ? Color.Lerp(
+                new Color(0.36f, 0.42f, 0.50f, 1f),
+                new Color(0.68f, 0.50f, 0.18f, 1f),
+                _visualBlend
+            )
+            : Color.Lerp(
+                new Color(0.32f, 0.36f, 0.43f, 1f),
+                new Color(0.56f, 0.41f, 0.15f, 1f),
+                _visualBlend
+            );
         var pauseDisabledColor = new Color(0.22f, 0.24f, 0.28f, 0.45f);
-        ApplyButtonColors(_pauseButton, _pauseButtonBackground, _pauseButtonText, pauseInteractable, pauseBaseColor, pausePressedColor, pauseDisabledColor, valueColor);
+        ApplyButtonColors(
+            _pauseButton,
+            _pauseButtonBackground,
+            _pauseButtonText,
+            pauseInteractable,
+            pauseBaseColor,
+            pausePressedColor,
+            pauseDisabledColor,
+            valueColor
+        );
         if (_pauseButtonText != null)
             _pauseButtonText.text = IsCombatPaused ? ">" : "||";
     }
@@ -273,13 +348,29 @@ internal sealed partial class CombatStatusBar
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = true;
 
-        (_decrementButton, _decrementButtonBackground, _decrementButtonText) = CreateButton("DecrementButton", row, "<", 34f);
-        _multiplierValue = CreateText("MultiplierValue", row, 15, FontStyle.Bold, TextAnchor.MiddleCenter);
+        (_decrementButton, _decrementButtonBackground, _decrementButtonText) = CreateButton(
+            "DecrementButton",
+            row,
+            "<",
+            34f
+        );
+        _multiplierValue = CreateText(
+            "MultiplierValue",
+            row,
+            15,
+            FontStyle.Bold,
+            TextAnchor.MiddleCenter
+        );
         var valueLayout = _multiplierValue.gameObject.AddComponent<LayoutElement>();
         valueLayout.minWidth = 52f;
         valueLayout.preferredWidth = 64f;
         valueLayout.flexibleWidth = 1f;
-        (_incrementButton, _incrementButtonBackground, _incrementButtonText) = CreateButton("IncrementButton", row, ">", 34f);
+        (_incrementButton, _incrementButtonBackground, _incrementButtonText) = CreateButton(
+            "IncrementButton",
+            row,
+            ">",
+            34f
+        );
 
         _decrementButton.onClick.AddListener(() => StepCombatSpeed(-1));
         _incrementButton.onClick.AddListener(() => StepCombatSpeed(1));
@@ -293,7 +384,12 @@ internal sealed partial class CombatStatusBar
         buttonArea.offsetMin = new Vector2(12f, 6f);
         buttonArea.offsetMax = new Vector2(-12f, -20f);
 
-        (_pauseButton, _pauseButtonBackground, _pauseButtonText) = CreateButton("PauseButton", buttonArea, "||", 0f);
+        (_pauseButton, _pauseButtonBackground, _pauseButtonText) = CreateButton(
+            "PauseButton",
+            buttonArea,
+            "||",
+            0f
+        );
         StretchToParent((RectTransform)_pauseButton.transform, 0f, 0f, 0f, 0f);
         var pauseLayout = _pauseButton.gameObject.AddComponent<LayoutElement>();
         pauseLayout.preferredWidth = 0f;
@@ -301,7 +397,14 @@ internal sealed partial class CombatStatusBar
         _pauseButton.onClick.AddListener(() => ToggleCombatPause());
     }
 
-    private RectTransform CreateReadoutSegment(string name, Transform parent, float width, out Image background, out Text label, out Text value)
+    private RectTransform CreateReadoutSegment(
+        string name,
+        Transform parent,
+        float width,
+        out Image background,
+        out Text label,
+        out Text value
+    )
     {
         var segment = CreateSegmentShell(name, parent, width, out background);
         label = CreateText("Label", segment, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
@@ -313,7 +416,13 @@ internal sealed partial class CombatStatusBar
         return segment;
     }
 
-    private RectTransform CreateInteractiveSegment(string name, Transform parent, float width, out Image background, out Text label)
+    private RectTransform CreateInteractiveSegment(
+        string name,
+        Transform parent,
+        float width,
+        out Image background,
+        out Text label
+    )
     {
         var segment = CreateSegmentShell(name, parent, width, out background);
         label = CreateText("Label", segment, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
@@ -321,7 +430,12 @@ internal sealed partial class CombatStatusBar
         return segment;
     }
 
-    private RectTransform CreateSegmentShell(string name, Transform parent, float width, out Image background)
+    private RectTransform CreateSegmentShell(
+        string name,
+        Transform parent,
+        float width,
+        out Image background
+    )
     {
         var segment = CreateRect(name, parent);
         var layoutElement = segment.gameObject.AddComponent<LayoutElement>();
@@ -345,7 +459,12 @@ internal sealed partial class CombatStatusBar
         return image;
     }
 
-    private (Button button, Image background, Text label) CreateButton(string name, Transform parent, string text, float preferredWidth)
+    private (Button button, Image background, Text label) CreateButton(
+        string name,
+        Transform parent,
+        string text,
+        float preferredWidth
+    )
     {
         var buttonRect = CreateRect(name, parent);
         if (preferredWidth > 0f)
@@ -387,7 +506,13 @@ internal sealed partial class CombatStatusBar
         rect.sizeDelta = new Vector2(0f, height);
     }
 
-    private static void StretchToParent(RectTransform rect, float left, float right, float top, float bottom)
+    private static void StretchToParent(
+        RectTransform rect,
+        float left,
+        float right,
+        float top,
+        float bottom
+    )
     {
         rect.anchorMin = Vector2.zero;
         rect.anchorMax = Vector2.one;
@@ -413,7 +538,13 @@ internal sealed partial class CombatStatusBar
         return image;
     }
 
-    private static Text CreateText(string name, Transform parent, int fontSize, FontStyle fontStyle, TextAnchor alignment)
+    private static Text CreateText(
+        string name,
+        Transform parent,
+        int fontSize,
+        FontStyle fontStyle,
+        TextAnchor alignment
+    )
     {
         var rect = CreateRect(name, parent);
         var text = rect.gameObject.AddComponent<Text>();
@@ -449,7 +580,8 @@ internal sealed partial class CombatStatusBar
         Color normalColor,
         Color pressedColor,
         Color disabledColor,
-        Color textColor)
+        Color textColor
+    )
     {
         if (button == null || background == null || label == null)
             return;
@@ -457,7 +589,9 @@ internal sealed partial class CombatStatusBar
         button.interactable = interactable;
         button.colors = BuildColorBlock(normalColor, pressedColor, disabledColor);
         background.color = interactable ? normalColor : disabledColor;
-        label.color = interactable ? textColor : new Color(textColor.r, textColor.g, textColor.b, 0.45f);
+        label.color = interactable
+            ? textColor
+            : new Color(textColor.r, textColor.g, textColor.b, 0.45f);
     }
 
     private static void SetImageColor(Image? image, Color color)

@@ -18,7 +18,10 @@ internal static class NameOverrideHelper
         var profileName = Data.Profile?.Username;
         if (string.IsNullOrEmpty(profileName))
         {
-            BppLog.Debug("NameOverride", "Skipping replacement because profile username is unavailable");
+            BppLog.Debug(
+                "NameOverride",
+                "Skipping replacement because profile username is unavailable"
+            );
             return false;
         }
 

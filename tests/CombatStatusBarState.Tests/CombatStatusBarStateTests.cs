@@ -1,3 +1,4 @@
+using BazaarPlusPlus.Game.CombatStatusBar;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests;
@@ -97,7 +98,8 @@ public sealed class CombatStatusBarStateTests : IDisposable
         float current,
         bool active,
         float deltaTime,
-        float expected)
+        float expected
+    )
     {
         var result = CombatStatusBar.AdvanceVisualBlend(current, active, deltaTime);
 

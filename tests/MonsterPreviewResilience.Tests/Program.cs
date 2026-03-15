@@ -1,4 +1,4 @@
-using BazaarPlusPlus;
+using BazaarPlusPlus.Game.MonsterPreview;
 
 TestPreviewCardSpecFilter();
 TestPreviewRenderGenerationGate();
@@ -15,15 +15,36 @@ static void TestPreviewCardSpecFilter()
     var knownTemplate = Guid.Parse("11111111-1111-1111-1111-111111111111");
     var specs = new List<PreviewCardSpec>
     {
-        new() { TemplateId = knownTemplate.ToString(), Tier = 2, Size = 2, SourceName = "Known" },
-        new() { TemplateId = "not-a-guid", Tier = 1, Size = 1, SourceName = "BadGuid" },
-        new() { TemplateId = "22222222-2222-2222-2222-222222222222", Tier = 3, Size = 3, SourceName = "Missing" },
+        new()
+        {
+            TemplateId = knownTemplate.ToString(),
+            Tier = 2,
+            Size = 2,
+            SourceName = "Known",
+        },
+        new()
+        {
+            TemplateId = "not-a-guid",
+            Tier = 1,
+            Size = 1,
+            SourceName = "BadGuid",
+        },
+        new()
+        {
+            TemplateId = "22222222-2222-2222-2222-222222222222",
+            Tier = 3,
+            Size = 3,
+            SourceName = "Missing",
+        },
     };
 
     var filtered = PreviewCardSpecFilter.Filter(specs, templateId => templateId == knownTemplate);
 
     Assert(filtered.Count == 1, "Only locally renderable preview specs should remain.");
-    Assert(filtered[0].TemplateId == knownTemplate.ToString(), "Known template should be preserved.");
+    Assert(
+        filtered[0].TemplateId == knownTemplate.ToString(),
+        "Known template should be preserved."
+    );
     Assert(filtered[0].SourceName == "Known", "Known spec data should be preserved.");
 }
 
@@ -35,14 +56,20 @@ static void TestPreviewRenderGenerationGate()
     Assert(!gate.ShouldCancel(firstGeneration), "Active visible render should remain valid.");
 
     var secondGeneration = gate.BeginRender(visible: true);
-    Assert(gate.ShouldCancel(firstGeneration), "Older render generation should be cancelled by a newer render.");
+    Assert(
+        gate.ShouldCancel(firstGeneration),
+        "Older render generation should be cancelled by a newer render."
+    );
     Assert(!gate.ShouldCancel(secondGeneration), "Newest visible render should remain valid.");
 
     gate.InvalidateForHide();
     Assert(gate.ShouldCancel(secondGeneration), "Hide should cancel the active render generation.");
 
     var thirdGeneration = gate.BeginRender(visible: true);
-    Assert(!gate.ShouldCancel(thirdGeneration), "A new visible render after hide should become valid again.");
+    Assert(
+        !gate.ShouldCancel(thirdGeneration),
+        "A new visible render after hide should become valid again."
+    );
 
     gate.MarkDisposed();
     Assert(gate.ShouldCancel(thirdGeneration), "Dispose should cancel all generations.");
@@ -67,15 +94,24 @@ static void TestMonsterPreviewBoardSupportsOverflowSkills()
         "MonsterPreviewBoard should expand skill slots before rebuilding preview skills."
     );
     Assert(
-        source.Contains("private int _activeSkillSlotCount = DefaultSkillSlotCount;", StringComparison.Ordinal),
+        source.Contains(
+            "private int _activeSkillSlotCount = DefaultSkillSlotCount;",
+            StringComparison.Ordinal
+        ),
         "MonsterPreviewBoard should track the active skill slot count separately from allocated slot objects."
     );
     Assert(
-        source.Contains("_activeSkillSlotCount = Mathf.Max(DefaultSkillSlotCount, skillCards.Count);", StringComparison.Ordinal),
+        source.Contains(
+            "_activeSkillSlotCount = Mathf.Max(DefaultSkillSlotCount, skillCards.Count);",
+            StringComparison.Ordinal
+        ),
         "MonsterPreviewBoard should reset active skill slots to the current preview size."
     );
     Assert(
-        source.Contains("var slotCount = Mathf.Max(DefaultSkillSlotCount, _activeSkillSlotCount);", StringComparison.Ordinal),
+        source.Contains(
+            "var slotCount = Mathf.Max(DefaultSkillSlotCount, _activeSkillSlotCount);",
+            StringComparison.Ordinal
+        ),
         "MonsterPreviewBoard should size skill layout from the active slot count instead of all allocated slots."
     );
 }
@@ -111,7 +147,10 @@ static void TestRecoverableItemAttrCache()
     var source = ReadRepoFile("Data/ItemAttr.cs");
 
     Assert(
-        !source.Contains("Lazy<IReadOnlyDictionary<Guid, CardAttributes>>", StringComparison.Ordinal),
+        !source.Contains(
+            "Lazy<IReadOnlyDictionary<Guid, CardAttributes>>",
+            StringComparison.Ordinal
+        ),
         "ItemAttr should not permanently cache initialization state via Lazy<T>."
     );
     Assert(
@@ -134,8 +173,12 @@ static void TestRecoverableItemAttrCache()
 
 static void TestPreviewFactoriesCatchAsyncInitializationFailures()
 {
-    var itemFactorySource = ReadRepoFile("Game/MonsterPreview/GameObjectFactory/MonsterPreviewItemCardFactory.cs");
-    var skillFactorySource = ReadRepoFile("Game/MonsterPreview/GameObjectFactory/MonsterPreviewSkillCardFactory.cs");
+    var itemFactorySource = ReadRepoFile(
+        "Game/MonsterPreview/GameObjectFactory/MonsterPreviewItemCardFactory.cs"
+    );
+    var skillFactorySource = ReadRepoFile(
+        "Game/MonsterPreview/GameObjectFactory/MonsterPreviewSkillCardFactory.cs"
+    );
 
     Assert(
         itemFactorySource.Contains("catch (Exception ex)", StringComparison.Ordinal)
@@ -155,7 +198,10 @@ static void TestMonsterPreviewWarmupIsMounted()
     var warmupSource = ReadRepoFile("Game/MonsterPreview/MonsterPreviewWarmupController.cs");
 
     Assert(
-        pluginSource.Contains("gameObject.AddComponent<MonsterPreviewWarmupController>();", StringComparison.Ordinal),
+        pluginSource.Contains(
+            "gameObject.AddComponent<MonsterPreviewWarmupController>();",
+            StringComparison.Ordinal
+        ),
         "Plugin should mount MonsterPreviewWarmupController so first-open work can be prewarmed."
     );
     Assert(
@@ -168,7 +214,9 @@ static void TestMonsterPreviewWarmupIsMounted()
 
 static string ReadRepoFile(string relativePath)
 {
-    var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../", relativePath));
+    var path = Path.GetFullPath(
+        Path.Combine(AppContext.BaseDirectory, "../../../../../", relativePath)
+    );
     return File.ReadAllText(path);
 }
 

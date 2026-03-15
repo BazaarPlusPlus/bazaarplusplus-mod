@@ -1,4 +1,4 @@
-using BazaarPlusPlus;
+using BazaarPlusPlus.Game.MonsterPreview;
 
 var controller = new MonsterLockShowcaseController();
 

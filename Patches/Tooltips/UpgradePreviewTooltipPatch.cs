@@ -13,7 +13,8 @@ namespace BazaarPlusPlus;
 [HarmonyPatch(typeof(CardController), "ShowTooltips")]
 internal static class UpgradePreviewTooltipPatch
 {
-    private static readonly HashSet<CardController> PendingControllers = new HashSet<CardController>();
+    private static readonly HashSet<CardController> PendingControllers =
+        new HashSet<CardController>();
 
     [HarmonyPostfix]
     private static void Postfix(CardController __instance)
@@ -50,7 +51,9 @@ internal static class UpgradePreviewTooltipPatch
         if (!PendingControllers.Add(controller))
             return false;
 
-        controller.StartCoroutine(ShowUpgradeTooltipWhenReady(controller, card, resolvedTooltipData));
+        controller.StartCoroutine(
+            ShowUpgradeTooltipWhenReady(controller, card, resolvedTooltipData)
+        );
         return true;
     }
 

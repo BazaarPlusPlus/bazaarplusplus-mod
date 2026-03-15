@@ -23,16 +23,16 @@ Assert(
 );
 
 Assert(
-    ItemEnchantPreviewEligibility.IsEligible(ECardType.Item, EInventorySection.Hand, isInCombat: false),
+    ItemEnchantPreviewEligibility.IsEligible(
+        ECardType.Item,
+        EInventorySection.Hand,
+        isInCombat: false
+    ),
     "Items in hand should be eligible for enchant previews."
 );
 
 Assert(
-    !ItemEnchantPreviewEligibility.IsEligible(
-        ECardType.Item,
-        section: null,
-        isInCombat: false
-    ),
+    !ItemEnchantPreviewEligibility.IsEligible(ECardType.Item, section: null, isInCombat: false),
     "Items outside hand or stash should not be eligible."
 );
 
@@ -45,11 +45,7 @@ Assert(
     "Combat state should suppress enchant previews."
 );
 
-var opponentBoardItem = new ItemCard
-{
-    Type = ECardType.Item,
-    Section = null,
-};
+var opponentBoardItem = new ItemCard { Type = ECardType.Item, Section = null };
 
 Assert(
     ItemEnchantPreviewEligibility.IsEligible(opponentBoardItem, isInCombat: false),
@@ -61,11 +57,7 @@ var itemCard = new ItemCard
     Type = ECardType.Item,
     Section = EInventorySection.Hand,
     Enchantment = EEnchantmentType.Heavy,
-    Attributes =
-    {
-        [ECardAttributeType.DamageAmount] = 10,
-        [ECardAttributeType.Cooldown] = 4000,
-    },
+    Attributes = { [ECardAttributeType.DamageAmount] = 10, [ECardAttributeType.Cooldown] = 4000 },
 };
 
 var previewTemplate = new TEnchantment
@@ -131,7 +123,10 @@ Assert(
     "Formatting should expose the configured enchantment color."
 );
 
-var segment = ItemEnchantPreviewFormatting.CreateSegment(EEnchantmentType.Icy, "Freeze for 2 seconds");
+var segment = ItemEnchantPreviewFormatting.CreateSegment(
+    EEnchantmentType.Icy,
+    "Freeze for 2 seconds"
+);
 
 Assert(
     segment.Text.Contains("Icy") && segment.Text.Contains("Freeze for 2 seconds"),

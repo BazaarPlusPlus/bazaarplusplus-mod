@@ -1,5 +1,6 @@
 #pragma warning disable CS0436
 using System.Linq;
+using BazaarPlusPlus.Game.MonsterPreview;
 using HarmonyLib;
 using UnityEngine;
 
@@ -17,7 +18,8 @@ internal static class PreviewBoardSurfaceBlocksUnderlyingCardsPatch
         if (__instance.GetComponent<ShowcaseCardMarker>() != null)
             return;
 
-        var hits = Physics.RaycastAll(Camera.main.ScreenPointToRay(screenPos), float.MaxValue)
+        var hits = Physics
+            .RaycastAll(Camera.main.ScreenPointToRay(screenPos), float.MaxValue)
             .OrderBy(hit => hit.distance)
             .ToArray();
         if (hits.Length == 0)

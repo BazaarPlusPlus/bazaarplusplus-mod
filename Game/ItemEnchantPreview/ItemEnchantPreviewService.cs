@@ -21,7 +21,10 @@ public static class ItemEnchantPreviewService
     )
     {
         var empty = new List<TooltipSegment>();
-        if (itemCard == null || !ItemEnchantPreviewEligibility.IsEligible(itemCard, Data.IsInCombat))
+        if (
+            itemCard == null
+            || !ItemEnchantPreviewEligibility.IsEligible(itemCard, Data.IsInCombat)
+        )
             return empty;
 
         var enchantments = itemCard.GetEnchantments();
@@ -45,7 +48,11 @@ public static class ItemEnchantPreviewService
             if (!enchantments.TryGetValue(enchantmentType, out var enchantment))
                 continue;
 
-            var snapshot = ItemEnchantPreviewSnapshotFactory.Create(itemCard, enchantmentType, enchantment);
+            var snapshot = ItemEnchantPreviewSnapshotFactory.Create(
+                itemCard,
+                enchantmentType,
+                enchantment
+            );
             if (ItemEnchantPreviewCache.TryGet(snapshot, out var cachedSegments))
             {
                 segments.AddRange(cachedSegments);
