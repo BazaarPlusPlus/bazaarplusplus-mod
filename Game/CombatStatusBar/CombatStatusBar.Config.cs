@@ -7,6 +7,7 @@ namespace BazaarPlusPlus.Game.CombatStatusBar;
 internal sealed partial class CombatStatusBar
 {
     private static ConfigEntry<bool>? _enableCombatStatusBarConfig;
+    private static ConfigEntry<bool>? _visibleCombatStatusBarConfig;
     private static ConfigEntry<float>? _defaultCombatSpeedConfig;
 
     internal static void InitializeConfig(ConfigFile config)
@@ -17,6 +18,12 @@ internal sealed partial class CombatStatusBar
             false,
             "Whether to show the combat status bar with elapsed time and speed controls"
         );
+        _visibleCombatStatusBarConfig = config.Bind(
+            "CombatStatusBar",
+            "Visible",
+            true,
+            "Whether the combat status bar is currently visible when enabled. Toggled in game with F6."
+        );
         _defaultCombatSpeedConfig = config.Bind(
             "CombatStatusBar",
             "SpeedMultiplier",
@@ -26,16 +33,34 @@ internal sealed partial class CombatStatusBar
                 new AcceptableValueList<float>(0.25f, 0.5f, 1f, 1.5f, 2f, 3f)
             )
         );
+        IsOverlayVisible = _visibleCombatStatusBarConfig.Value;
         CombatSpeedMultiplier = SetConfiguredDefaultSpeed(_defaultCombatSpeedConfig.Value);
         BppLog.Info(
             "CombatStatusBar",
-            $"Combat config initialized: enabled={_enableCombatStatusBarConfig.Value}, speed={CombatSpeedMultiplier:F2}x"
+            $"Combat config initialized: enabled={_enableCombatStatusBarConfig.Value}, visible={IsOverlayVisible}, speed={CombatSpeedMultiplier:F2}x"
         );
     }
 
     internal static bool IsEnabled()
     {
         return _enableCombatStatusBarConfig?.Value ?? false;
+    }
+
+    internal static bool GetEnabledSettingValue()
+    {
+        return _enableCombatStatusBarConfig?.Value ?? false;
+    }
+
+    internal static void SetEnabledSettingValue(bool enabled)
+    {
+        if (_enableCombatStatusBarConfig != null)
+            _enableCombatStatusBarConfig.Value = enabled;
+    }
+
+    static partial void PersistOverlayVisibility(bool visible)
+    {
+        if (_visibleCombatStatusBarConfig != null)
+            _visibleCombatStatusBarConfig.Value = visible;
     }
 
     static partial void PersistCombatSpeed(float speed)

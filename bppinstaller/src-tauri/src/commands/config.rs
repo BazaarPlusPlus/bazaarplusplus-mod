@@ -16,6 +16,7 @@ fn default_config() -> HashMap<String, String> {
     map.insert("StreamerMode.EnableNameOverride".to_string(), "false".to_string());
     map.insert("EnchantPreview.AlwaysShow".to_string(), "true".to_string());
     map.insert("CombatStatusBar.Enabled".to_string(), "false".to_string());
+    map.insert("CombatStatusBar.Visible".to_string(), "true".to_string());
     map.insert("CombatStatusBar.SpeedMultiplier".to_string(), "1".to_string());
     map
 }
@@ -24,6 +25,7 @@ fn build_cfg_content(values: &HashMap<String, String>) -> String {
     let name_override = values.get("StreamerMode.EnableNameOverride").map_or("false", |s| s);
     let enchant_preview_always_show = values.get("EnchantPreview.AlwaysShow").map_or("true", |s| s);
     let combat_bar = values.get("CombatStatusBar.Enabled").map_or("false", |s| s);
+    let combat_bar_visible = values.get("CombatStatusBar.Visible").map_or("true", |s| s);
     let speed = values.get("CombatStatusBar.SpeedMultiplier").map_or("1", |s| s);
 
     format!(
@@ -47,6 +49,11 @@ fn build_cfg_content(values: &HashMap<String, String>) -> String {
          # Setting type: Boolean\n\
          # Default value: false\n\
          Enabled = {combat_bar}\n\
+         \n\
+         ## Whether the combat status bar is currently visible when enabled. Toggled in game with F6.\n\
+         # Setting type: Boolean\n\
+         # Default value: true\n\
+         Visible = {combat_bar_visible}\n\
          \n\
          ## Default combat playback speed multiplier. Supported values: 0.25, 0.50, 1.00, 2.00, 3.00, 4.00, 5.00\n\
          # Setting type: Single\n\
@@ -197,6 +204,13 @@ mod tests {
                 .map(String::as_str),
             Some("1")
         );
+        assert_eq!(
+            result
+                .values
+                .get("CombatStatusBar.Visible")
+                .map(String::as_str),
+            Some("true")
+        );
     }
 
     #[test]
@@ -206,7 +220,7 @@ mod tests {
         fs::create_dir_all(cfg_path.parent().unwrap()).unwrap();
         fs::write(
             &cfg_path,
-            "[EnchantPreview]\nAlwaysShow = false\n[CombatStatusBar]\nSpeedMultiplier = 2.00\nEnabled = false\n",
+            "[EnchantPreview]\nAlwaysShow = false\n[CombatStatusBar]\nSpeedMultiplier = 2.00\nEnabled = false\nVisible = false\n",
         )
         .unwrap();
 
@@ -233,6 +247,13 @@ mod tests {
             result
                 .values
                 .get("CombatStatusBar.Enabled")
+                .map(String::as_str),
+            Some("false")
+        );
+        assert_eq!(
+            result
+                .values
+                .get("CombatStatusBar.Visible")
                 .map(String::as_str),
             Some("false")
         );

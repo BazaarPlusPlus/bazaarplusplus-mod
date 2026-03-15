@@ -8,11 +8,39 @@ public sealed class CombatStatusBarStateTests : IDisposable
     public CombatStatusBarStateTests()
     {
         CombatStatusBar.ResetStateForTests();
+        CombatStatusBar.ClearPersistedOverlayVisibilityForTests();
     }
 
     public void Dispose()
     {
         CombatStatusBar.ResetStateForTests();
+        CombatStatusBar.ClearPersistedOverlayVisibilityForTests();
+    }
+
+    [Fact]
+    public void OverlayVisibility_DefaultsToVisible()
+    {
+        Assert.True(CombatStatusBar.IsOverlayVisible);
+    }
+
+    [Fact]
+    public void ToggleOverlayVisibility_FlipsVisibilityAndPersists()
+    {
+        var result = CombatStatusBar.ToggleOverlayVisibility();
+
+        Assert.False(result);
+        Assert.False(CombatStatusBar.IsOverlayVisible);
+        Assert.False(CombatStatusBar.GetPersistedOverlayVisibilityForTests());
+    }
+
+    [Fact]
+    public void SetOverlayVisibility_PersistsRequestedValue()
+    {
+        var result = CombatStatusBar.SetOverlayVisibility(false);
+
+        Assert.False(result);
+        Assert.False(CombatStatusBar.IsOverlayVisible);
+        Assert.False(CombatStatusBar.GetPersistedOverlayVisibilityForTests());
     }
 
     [Fact]
@@ -88,6 +116,34 @@ public sealed class CombatStatusBarStateTests : IDisposable
         var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(4f);
 
         Assert.Equal(1f, result);
+    }
+
+    [Fact]
+    public void SettingsMenuBridge_ReadsInitialValueAndWritesBackChanges()
+    {
+        var enabled = false;
+        var bridge = new CombatStatusBarSettingsMenuBridge(() => enabled, value => enabled = value);
+
+        Assert.False(bridge.GetInitialValue());
+
+        bridge.ApplyValue(true);
+
+        Assert.True(enabled);
+    }
+
+    [Theory]
+    [InlineData("zh-Hans", "战斗状态栏")]
+    [InlineData("zh-CN", "战斗状态栏")]
+    [InlineData("en", "Combat Status Bar")]
+    [InlineData("", "Combat Status Bar")]
+    public void SettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
+        string languageCode,
+        string expected
+    )
+    {
+        var result = CombatStatusBarSettingsMenuLabel.Resolve(languageCode);
+
+        Assert.Equal(expected, result);
     }
 
     [Theory]

@@ -7,6 +7,7 @@ internal sealed partial class CombatStatusBar
 {
     private static readonly float[] SpeedSteps = { 0.25f, 0.5f, 1f, 1.5f, 2f, 3f };
 
+    internal static bool IsOverlayVisible { get; private set; } = true;
     internal static bool IsCombatPlaybackActive { get; private set; }
     internal static bool IsCombatPaused { get; private set; }
     internal static float CombatSpeedMultiplier { get; private set; } = 1f;
@@ -68,6 +69,18 @@ internal sealed partial class CombatStatusBar
         return CombatSpeedMultiplier;
     }
 
+    internal static bool ToggleOverlayVisibility()
+    {
+        return SetOverlayVisibility(!IsOverlayVisible);
+    }
+
+    internal static bool SetOverlayVisibility(bool visible)
+    {
+        IsOverlayVisible = visible;
+        PersistOverlayVisibility(visible);
+        return IsOverlayVisible;
+    }
+
     internal static bool ShouldRenderForState(bool overlayVisible, bool enabled)
     {
         return overlayVisible && enabled && ModState.IsInGameRun;
@@ -122,6 +135,7 @@ internal sealed partial class CombatStatusBar
 
     internal static void ResetStateForTests()
     {
+        IsOverlayVisible = true;
         IsCombatPlaybackActive = false;
         IsCombatPaused = false;
         CombatSpeedMultiplier = 1f;
@@ -186,5 +200,6 @@ internal sealed partial class CombatStatusBar
         return $"{minutes}:{elapsed.Seconds:00}:{elapsed.Milliseconds / 10:00}";
     }
 
+    static partial void PersistOverlayVisibility(bool visible);
     static partial void PersistCombatSpeed(float speed);
 }

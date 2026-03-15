@@ -119,6 +119,9 @@
     <Reference Include="UnityEngine.UI">
       <HintPath>$(ManagedPath)\UnityEngine.UI.dll</HintPath>
     </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(ManagedPath)\Unity.TextMeshPro.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <!-- Publicize all game assemblies -->

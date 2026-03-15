@@ -6,7 +6,6 @@ namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal sealed partial class CombatStatusBar : MonoBehaviour
 {
-    private bool _visible = true;
     private float _visualBlend;
 
     private void OnEnable()
@@ -33,7 +32,7 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
     {
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard[KeyBindings.Toggle.CombatStatusBar].wasPressedThisFrame)
-            _visible = !_visible;
+            ToggleOverlayVisibility();
 
         _visualBlend = AdvanceVisualBlend(
             _visualBlend,
@@ -47,7 +46,7 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
 
     private bool ShouldDraw()
     {
-        return ShouldRenderForState(_visible, IsEnabled());
+        return ShouldRenderForState(IsOverlayVisible, IsEnabled());
     }
 
     private static void OnCombatStarted()

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
 using BepInEx.Logging;
+using BazaarGameShared.Domain.Core.Types;
 using TheBazaar;
 
 namespace BazaarPlusPlus;
