@@ -37,43 +37,70 @@ internal static class NameOverrideSettingsAwakePatch
     {
         var anchorToggle = GetAnchorToggle(instance);
         if (anchorToggle == null)
-            return;
-
-        var parent = anchorToggle.transform.parent;
-        if (parent == null)
-            return;
-
-        var existing = parent.Find(ToggleObjectName)?.GetComponent<Toggle>();
-        if (existing != null)
         {
-            SyncToggle(existing);
+            BppLog.Warn("NameOverride", "Could not find gameplay settings anchor toggle");
             return;
         }
 
-        var cloneObject = UnityEngine.Object.Instantiate(anchorToggle.gameObject, parent);
-        cloneObject.name = ToggleObjectName;
-        cloneObject.transform.SetSiblingIndex(anchorToggle.transform.GetSiblingIndex() + 1);
+        var anchorRow = anchorToggle.transform.parent;
+        if (anchorRow == null)
+            return;
 
-        var cloneToggle = cloneObject.GetComponent<Toggle>();
+        var container = anchorRow.parent;
+        if (container == null)
+            return;
+
+        var existing = container.Find(ToggleObjectName);
+        if (existing != null)
+        {
+            var existingToggle = existing.GetComponentInChildren<Toggle>(includeInactive: true);
+            if (existingToggle == null)
+                return;
+
+            ConfigureToggle(existing.gameObject, existingToggle);
+            SettingsMenuLayoutUtility.ArrangeRow(anchorRow, existing);
+            return;
+        }
+
+        var cloneObject = UnityEngine.Object.Instantiate(anchorRow.gameObject, container);
+        cloneObject.name = ToggleObjectName;
+
+        var cloneTransform = cloneObject.transform;
+        var cloneToggle = cloneObject.GetComponentInChildren<Toggle>(includeInactive: true);
         if (cloneToggle == null)
             return;
 
-        SetToggleLabel(cloneObject);
-        SyncToggle(cloneToggle);
-        cloneToggle.onValueChanged.RemoveAllListeners();
-        cloneToggle.onValueChanged.AddListener(Bridge.ApplyValue);
+        ConfigureToggle(cloneObject, cloneToggle);
+        SettingsMenuLayoutUtility.ArrangeRow(anchorRow, cloneTransform);
     }
 
-    internal static void SyncToggle(Toggle toggle)
+    internal static void SyncToggle(GameObject toggleObject, Toggle toggle)
     {
-        SetToggleLabel(toggle.gameObject);
+        SetToggleLabel(toggleObject);
         toggle.SetIsOnWithoutNotify(Bridge.GetInitialValue());
+    }
+
+    private static void ConfigureToggle(GameObject toggleObject, Toggle toggle)
+    {
+        SyncToggle(toggleObject, toggle);
+        toggle.onValueChanged.RemoveAllListeners();
+        toggle.onValueChanged.AddListener(Bridge.ApplyValue);
     }
 
     private static Toggle GetAnchorToggle(OptionsDialogController instance)
     {
         var field = AccessTools.Field(typeof(OptionsDialogController), "_fastForwardFirstFight");
-        return field?.GetValue(instance) as Toggle;
+        var toggle = field?.GetValue(instance) as Toggle;
+        if (toggle != null)
+            return toggle;
+
+        return instance
+            .GetComponentsInChildren<Toggle>(includeInactive: true)
+            .FirstOrDefault(candidate =>
+                candidate != null
+                && !string.IsNullOrWhiteSpace(candidate.name)
+                && candidate.name.IndexOf("FastForward", StringComparison.OrdinalIgnoreCase) >= 0
+            );
     }
 
     private static void SetToggleLabel(GameObject toggleObject)

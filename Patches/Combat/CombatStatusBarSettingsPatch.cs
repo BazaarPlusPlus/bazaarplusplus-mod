@@ -36,43 +36,75 @@ internal static class CombatStatusBarSettingsAwakePatch
     {
         var anchorToggle = GetAnchorToggle(instance);
         if (anchorToggle == null)
-            return;
-
-        var parent = anchorToggle.transform.parent;
-        if (parent == null)
-            return;
-
-        var existing = parent.Find(ToggleObjectName)?.GetComponent<Toggle>();
-        if (existing != null)
         {
-            SyncToggle(existing);
+            BppLog.Warn("CombatStatusBar", "Could not find gameplay settings anchor toggle");
             return;
         }
 
-        var cloneObject = UnityEngine.Object.Instantiate(anchorToggle.gameObject, parent);
-        cloneObject.name = ToggleObjectName;
-        cloneObject.transform.SetSiblingIndex(anchorToggle.transform.GetSiblingIndex() + 1);
+        var anchorRow = GetAnchorRow(anchorToggle);
+        if (anchorRow == null)
+            return;
 
-        var cloneToggle = cloneObject.GetComponent<Toggle>();
+        var container = anchorRow.parent;
+        if (container == null)
+            return;
+
+        var existing = container.Find(ToggleObjectName);
+        if (existing != null)
+        {
+            var existingToggle = existing.GetComponentInChildren<Toggle>(includeInactive: true);
+            if (existingToggle == null)
+                return;
+
+            ConfigureToggle(existing.gameObject, existingToggle);
+            SettingsMenuLayoutUtility.ArrangeRow(anchorRow, existing);
+            return;
+        }
+
+        var cloneObject = UnityEngine.Object.Instantiate(anchorRow.gameObject, container);
+        cloneObject.name = ToggleObjectName;
+
+        var cloneTransform = cloneObject.transform;
+        var cloneToggle = cloneObject.GetComponentInChildren<Toggle>(includeInactive: true);
         if (cloneToggle == null)
             return;
 
-        SetToggleLabel(cloneObject);
-        SyncToggle(cloneToggle);
-        cloneToggle.onValueChanged.RemoveAllListeners();
-        cloneToggle.onValueChanged.AddListener(Bridge.ApplyValue);
+        ConfigureToggle(cloneObject, cloneToggle);
+        SettingsMenuLayoutUtility.ArrangeRow(anchorRow, cloneTransform);
     }
 
-    internal static void SyncToggle(Toggle toggle)
+    internal static void SyncToggle(GameObject toggleObject, Toggle toggle)
     {
-        SetToggleLabel(toggle.gameObject);
+        SetToggleLabel(toggleObject);
         toggle.SetIsOnWithoutNotify(Bridge.GetInitialValue());
+    }
+
+    private static void ConfigureToggle(GameObject toggleObject, Toggle toggle)
+    {
+        SyncToggle(toggleObject, toggle);
+        toggle.onValueChanged.RemoveAllListeners();
+        toggle.onValueChanged.AddListener(Bridge.ApplyValue);
+    }
+
+    private static Transform GetAnchorRow(Toggle anchorToggle)
+    {
+        return anchorToggle.transform.parent;
     }
 
     private static Toggle GetAnchorToggle(OptionsDialogController instance)
     {
         var field = AccessTools.Field(typeof(OptionsDialogController), "_fastForwardFirstFight");
-        return field?.GetValue(instance) as Toggle;
+        var toggle = field?.GetValue(instance) as Toggle;
+        if (toggle != null)
+            return toggle;
+
+        return instance
+            .GetComponentsInChildren<Toggle>(includeInactive: true)
+            .FirstOrDefault(candidate =>
+                candidate != null
+                && !string.IsNullOrWhiteSpace(candidate.name)
+                && candidate.name.IndexOf("FastForward", StringComparison.OrdinalIgnoreCase) >= 0
+            );
     }
 
     private static void SetToggleLabel(GameObject toggleObject)
@@ -84,6 +116,7 @@ internal static class CombatStatusBarSettingsAwakePatch
         if (label != null)
             label.text = labelText;
     }
+
 }
 
 [HarmonyPatch(typeof(OptionsDialogController), "OnEnable")]
@@ -100,5 +133,123 @@ internal static class CombatStatusBarSettingsOnEnablePatch
         {
             BppLog.Error("CombatStatusBar", "Failed to sync settings toggle", ex);
         }
+    }
+}
+
+[HarmonyPatch(typeof(OptionsDialogController), "OnGameplayButtonClick")]
+internal static class CombatStatusBarSettingsGameplayOpenPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(OptionsDialogController __instance)
+    {
+        try
+        {
+            CombatStatusBarSettingsAwakePatch.EnsureToggleExists(__instance);
+            NameOverrideSettingsAwakePatch.EnsureToggleExists(__instance);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("CombatStatusBar", "Failed to refresh settings toggles after gameplay menu opened", ex);
+        }
+    }
+}
+
+internal static class SettingsMenuLayoutUtility
+{
+    private const float FallbackSpacing = 8f;
+
+    internal static void Rebuild(RectTransform rectTransform)
+    {
+        var current = rectTransform;
+        while (current != null)
+        {
+            LayoutRebuilder.ForceRebuildLayoutImmediate(current);
+            current = current.parent as RectTransform;
+        }
+    }
+
+    internal static void ArrangeRow(Transform anchorRow, Transform cloneRow)
+    {
+        if (anchorRow == null || cloneRow == null)
+            return;
+
+        cloneRow.SetSiblingIndex(anchorRow.GetSiblingIndex() + 1);
+
+        var parentRect = anchorRow.parent as RectTransform;
+        if (parentRect == null)
+            return;
+
+        if (HasAutomaticLayout(parentRect))
+        {
+            BppLog.Debug("SettingsMenu", $"Using automatic layout for {cloneRow.name}");
+            Rebuild(parentRect);
+            return;
+        }
+
+        var anchorRect = anchorRow as RectTransform;
+        var cloneRect = cloneRow as RectTransform;
+        if (anchorRect == null || cloneRect == null)
+        {
+            Rebuild(parentRect);
+            return;
+        }
+
+        var additionalIndex = parentRect
+            .Cast<Transform>()
+            .Where(child => child != null && child != anchorRow && child.name.StartsWith("BPP_"))
+            .OrderBy(child => child.GetSiblingIndex())
+            .ToList()
+            .FindIndex(child => child == cloneRow);
+
+        if (additionalIndex < 0)
+            additionalIndex = 0;
+
+        var step = GetVerticalStep(anchorRect, cloneRect);
+        cloneRect.anchorMin = anchorRect.anchorMin;
+        cloneRect.anchorMax = anchorRect.anchorMax;
+        cloneRect.pivot = anchorRect.pivot;
+        cloneRect.sizeDelta = anchorRect.sizeDelta;
+        cloneRect.anchoredPosition = anchorRect.anchoredPosition + new Vector2(0f, -step * (additionalIndex + 1));
+        cloneRect.localScale = anchorRect.localScale;
+        cloneRect.localRotation = anchorRect.localRotation;
+
+        BppLog.Info(
+            "SettingsMenu",
+            $"Positioned {cloneRow.name} below {anchorRow.name}: index={additionalIndex + 1}, step={step:F1}, position={cloneRect.anchoredPosition}"
+        );
+        ExpandParentIfNeeded(parentRect, anchorRect, step, additionalIndex + 1);
+        Rebuild(parentRect);
+    }
+
+    private static bool HasAutomaticLayout(RectTransform rectTransform)
+    {
+        return rectTransform.GetComponent<LayoutGroup>() != null
+            || rectTransform.GetComponent<ContentSizeFitter>() != null;
+    }
+
+    private static float GetVerticalStep(RectTransform anchorRect, RectTransform cloneRect)
+    {
+        var preferredAnchorHeight = LayoutUtility.GetPreferredHeight(anchorRect);
+        var preferredCloneHeight = LayoutUtility.GetPreferredHeight(cloneRect);
+        var height = Mathf.Max(anchorRect.rect.height, cloneRect.rect.height, preferredAnchorHeight, preferredCloneHeight);
+        if (height <= 0f)
+            height = 48f;
+
+        return height + FallbackSpacing;
+    }
+
+    private static void ExpandParentIfNeeded(RectTransform parentRect, RectTransform anchorRect, float step, int cloneCount)
+    {
+        var requiredBottom = Mathf.Abs(anchorRect.anchoredPosition.y) + step * cloneCount + anchorRect.rect.height;
+        if (requiredBottom <= parentRect.rect.height)
+            return;
+
+        var size = parentRect.sizeDelta;
+        size.y += requiredBottom - parentRect.rect.height;
+        parentRect.sizeDelta = size;
+        BppLog.Info(
+            "SettingsMenu",
+            $"Expanded parent {parentRect.name} height to {parentRect.sizeDelta.y:F1} for additional settings toggles"
+        );
     }
 }
