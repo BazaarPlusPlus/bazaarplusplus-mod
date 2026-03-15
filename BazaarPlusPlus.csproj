@@ -32,6 +32,9 @@
     <Compile Remove="bppinstaller/**" />
     <EmbeddedResource Remove="bppinstaller/**" />
     <None Remove="bppinstaller/**" />
+    <Compile Remove="bepinex-mac-patcher/**" />
+    <EmbeddedResource Remove="bepinex-mac-patcher/**" />
+    <None Remove="bepinex-mac-patcher/**" />
   </ItemGroup>
   <!-- Project paths -->
   <PropertyGroup>
