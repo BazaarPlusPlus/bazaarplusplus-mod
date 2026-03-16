@@ -169,7 +169,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void NameOverrideSettingsMenuBridge_ReadsInitialValue_WritesBackChanges_AndRequestsRefresh()
+    public void NameOverrideSettingsMenuBridge_ReadsInitialValue_WritesBackChanges_AndRequestsRefreshOnEveryChange()
     {
         var enabled = false;
         var refreshCount = 0;
@@ -182,9 +182,10 @@ public sealed class CombatStatusBarStateTests : IDisposable
         Assert.False(bridge.GetInitialValue());
 
         bridge.ApplyValue(true);
+        bridge.ApplyValue(false);
 
-        Assert.True(enabled);
-        Assert.Equal(1, refreshCount);
+        Assert.False(enabled);
+        Assert.Equal(2, refreshCount);
     }
 
     [Theory]

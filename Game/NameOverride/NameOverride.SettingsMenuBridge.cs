@@ -12,9 +12,5 @@ internal sealed class NameOverrideSettingsMenuBridge : SettingsMenuToggleBridge
         Action<bool> writeValue,
         Action? refreshUi = null
     )
-        : base(readValue, writeValue, value =>
-        {
-            if (value)
-                refreshUi?.Invoke();
-        }) { }
+        : base(readValue, writeValue, _ => refreshUi?.Invoke()) { }
 }
