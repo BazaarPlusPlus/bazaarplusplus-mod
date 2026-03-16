@@ -29,15 +29,6 @@
     <Compile Remove="decompiled/**" />
     <EmbeddedResource Remove="decompiled/**" />
     <None Remove="decompiled/**" />
-    <Compile Remove="bppinstaller/**" />
-    <EmbeddedResource Remove="bppinstaller/**" />
-    <None Remove="bppinstaller/**" />
-    <Compile Remove="bepinex-mac-patcher/**" />
-    <EmbeddedResource Remove="bepinex-mac-patcher/**" />
-    <None Remove="bepinex-mac-patcher/**" />
-    <Compile Remove="scripts/**" />
-    <EmbeddedResource Remove="scripts/**" />
-    <None Remove="scripts/**" />
   </ItemGroup>
   <!-- Project paths -->
   <PropertyGroup>
