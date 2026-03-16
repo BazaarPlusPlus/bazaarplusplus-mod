@@ -1,34 +1,20 @@
 #nullable enable
 
 using System;
+using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.NameOverride;
 
-internal sealed class NameOverrideSettingsMenuBridge
+internal sealed class NameOverrideSettingsMenuBridge : SettingsMenuToggleBridge
 {
-    private readonly Func<bool> _readValue;
-    private readonly Action<bool> _writeValue;
-    private readonly Action? _refreshUi;
-
     internal NameOverrideSettingsMenuBridge(
         Func<bool> readValue,
         Action<bool> writeValue,
         Action? refreshUi = null
     )
-    {
-        _readValue = readValue ?? throw new ArgumentNullException(nameof(readValue));
-        _writeValue = writeValue ?? throw new ArgumentNullException(nameof(writeValue));
-        _refreshUi = refreshUi;
-    }
-
-    internal bool GetInitialValue()
-    {
-        return _readValue();
-    }
-
-    internal void ApplyValue(bool value)
-    {
-        _writeValue(value);
-        _refreshUi?.Invoke();
-    }
+        : base(readValue, writeValue, value =>
+        {
+            if (value)
+                refreshUi?.Invoke();
+        }) { }
 }

@@ -35,6 +35,9 @@
     <Compile Remove="bepinex-mac-patcher/**" />
     <EmbeddedResource Remove="bepinex-mac-patcher/**" />
     <None Remove="bepinex-mac-patcher/**" />
+    <Compile Remove="scripts/**" />
+    <EmbeddedResource Remove="scripts/**" />
+    <None Remove="scripts/**" />
   </ItemGroup>
   <!-- Project paths -->
   <PropertyGroup>

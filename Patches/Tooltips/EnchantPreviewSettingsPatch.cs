@@ -1,23 +1,19 @@
 #pragma warning disable CS0436
 using System;
-using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.Settings;
 using HarmonyLib;
 
 namespace BazaarPlusPlus;
 
 [HarmonyPatch(typeof(OptionsDialogController), "Awake")]
-internal static class NameOverrideSettingsAwakePatch
+internal static class EnchantPreviewSettingsAwakePatch
 {
     private static readonly SettingsMenuToggleDefinition Definition = new(
-        "BPP_NameOverrideToggle",
-        "NameOverride",
-        NameOverrideSettingsMenuLabel.Resolve,
-        new NameOverrideSettingsMenuBridge(
-            ReadEnabledValue,
-            WriteEnabledValue,
-            NameOverrideUiRefresh.TryRefreshVisibleHeroBanners
-        )
+        "BPP_EnchantPreviewToggle",
+        "EnchantPreview",
+        EnchantPreviewSettingsMenuLabel.Resolve,
+        new SettingsMenuToggleBridge(ReadEnabledValue, WriteEnabledValue)
     );
 
     [HarmonyPostfix]
@@ -29,7 +25,7 @@ internal static class NameOverrideSettingsAwakePatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("NameOverride", "Failed to add settings toggle", ex);
+            BppLog.Error("EnchantPreview", "Failed to add settings toggle", ex);
         }
     }
 
@@ -40,31 +36,31 @@ internal static class NameOverrideSettingsAwakePatch
 
     private static bool ReadEnabledValue()
     {
-        var entry = ModState.EnableNameOverrideConfig;
+        var entry = ModState.EnchantPreviewAlwaysShowConfig;
         return entry != null && entry.Value;
     }
 
     private static void WriteEnabledValue(bool enabled)
     {
-        var entry = ModState.EnableNameOverrideConfig;
+        var entry = ModState.EnchantPreviewAlwaysShowConfig;
         if (entry != null)
             entry.Value = enabled;
     }
 }
 
 [HarmonyPatch(typeof(OptionsDialogController), "OnEnable")]
-internal static class NameOverrideSettingsOnEnablePatch
+internal static class EnchantPreviewSettingsOnEnablePatch
 {
     [HarmonyPostfix]
     private static void Postfix(OptionsDialogController __instance)
     {
         try
         {
-            NameOverrideSettingsAwakePatch.EnsureToggleExists(__instance);
+            EnchantPreviewSettingsAwakePatch.EnsureToggleExists(__instance);
         }
         catch (Exception ex)
         {
-            BppLog.Error("NameOverride", "Failed to sync settings toggle", ex);
+            BppLog.Error("EnchantPreview", "Failed to sync settings toggle", ex);
         }
     }
 }

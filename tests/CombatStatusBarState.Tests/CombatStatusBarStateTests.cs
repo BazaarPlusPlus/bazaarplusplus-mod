@@ -1,4 +1,6 @@
 using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.ItemEnchantPreview;
+using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.NameOverride;
 using Xunit;
 
@@ -132,6 +134,25 @@ public sealed class CombatStatusBarStateTests : IDisposable
         Assert.True(enabled);
     }
 
+    [Fact]
+    public void SharedSettingsMenuBridge_ReadsInitialValue_WritesBackChanges_AndInvokesOnChanged()
+    {
+        var enabled = false;
+        bool? changedValue = null;
+        var bridge = new SettingsMenuToggleBridge(
+            () => enabled,
+            value => enabled = value,
+            value => changedValue = value
+        );
+
+        Assert.False(bridge.GetInitialValue());
+
+        bridge.ApplyValue(true);
+
+        Assert.True(enabled);
+        Assert.True(changedValue);
+    }
+
     [Theory]
     [InlineData("zh-Hans", "战斗状态栏")]
     [InlineData("zh-CN", "战斗状态栏")]
@@ -179,6 +200,37 @@ public sealed class CombatStatusBarStateTests : IDisposable
         var result = NameOverrideSettingsMenuLabel.Resolve(languageCode);
 
         Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("zh-Hans", "附魔预览始终显示")]
+    [InlineData("zh-CN", "附魔预览始终显示")]
+    [InlineData("en", "Enchant Preview Always Show")]
+    [InlineData("", "Enchant Preview Always Show")]
+    public void EnchantPreviewSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
+        string languageCode,
+        string expected
+    )
+    {
+        var result = EnchantPreviewSettingsMenuLabel.Resolve(languageCode);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void EnchantPreviewSettingsPatch_Exists_And_BindsAlwaysShowConfig()
+    {
+        var sourcePath = Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "../../../../../Patches/Tooltips/EnchantPreviewSettingsPatch.cs"
+            )
+        );
+        Assert.True(File.Exists(sourcePath), $"Enchant preview settings patch not found at {sourcePath}");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("EnchantPreviewAlwaysShowConfig", source, StringComparison.Ordinal);
+        Assert.Contains("BPP_EnchantPreviewToggle", source, StringComparison.Ordinal);
     }
 
     [Theory]

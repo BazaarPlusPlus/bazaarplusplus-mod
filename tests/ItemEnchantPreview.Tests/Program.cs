@@ -5,6 +5,58 @@ using BazaarPlusPlus;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.ItemEnchantPreview.Preview;
 
+var labelSourcePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/ItemEnchantPreview/EnchantPreview.SettingsMenuLabel.cs"
+    )
+);
+Assert(File.Exists(labelSourcePath), $"Enchant preview label source not found at {labelSourcePath}");
+var labelSource = File.ReadAllText(labelSourcePath);
+Assert(
+    labelSource.Contains("Enchant Preview Always Show", StringComparison.Ordinal),
+    "Enchant preview settings label should expose the English label."
+);
+Assert(
+    labelSource.Contains("附魔预览始终显示", StringComparison.Ordinal),
+    "Enchant preview settings label should expose the Simplified Chinese label."
+);
+
+var settingsPatchSourcePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Patches/Tooltips/EnchantPreviewSettingsPatch.cs"
+    )
+);
+Assert(
+    File.Exists(settingsPatchSourcePath),
+    $"Enchant preview settings patch not found at {settingsPatchSourcePath}"
+);
+var settingsPatchSource = File.ReadAllText(settingsPatchSourcePath);
+Assert(
+    settingsPatchSource.Contains("EnchantPreviewAlwaysShowConfig", StringComparison.Ordinal),
+    "Enchant preview settings patch should bind the AlwaysShow config entry."
+);
+Assert(
+    settingsPatchSource.Contains("BPP_EnchantPreviewToggle", StringComparison.Ordinal),
+    "Enchant preview settings patch should install a dedicated gameplay toggle."
+);
+
+var combatSettingsPatchSourcePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Patches/Combat/CombatStatusBarSettingsPatch.cs"
+    )
+);
+var combatSettingsPatchSource = File.ReadAllText(combatSettingsPatchSourcePath);
+Assert(
+    combatSettingsPatchSource.Contains(
+        "EnchantPreviewSettingsAwakePatch.EnsureToggleExists(__instance);",
+        StringComparison.Ordinal
+    ),
+    "Gameplay settings refresh should install the enchant preview toggle alongside the other Bazaar++ toggles."
+);
+
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
     currentEnchantment: EEnchantmentType.Heavy,
     allEnchantments:

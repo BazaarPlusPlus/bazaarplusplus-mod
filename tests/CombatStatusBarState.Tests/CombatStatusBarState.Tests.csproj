@@ -25,6 +25,10 @@
 
   <ItemGroup>
     <Compile
+      Include="..\..\Game\Settings\SettingsMenuToggleBridge.cs"
+      Link="SettingsMenuToggleBridge.cs"
+    />
+    <Compile
       Include="..\..\Game\CombatStatusBar\CombatStatusBar.SettingsMenuBridge.cs"
       Link="CombatStatusBar.SettingsMenuBridge.cs"
     />
@@ -35,6 +39,10 @@
     <Compile
       Include="..\..\Game\CombatStatusBar\CombatStatusBar.State.cs"
       Link="CombatStatusBar.State.cs"
+    />
+    <Compile
+      Include="..\..\Game\ItemEnchantPreview\EnchantPreview.SettingsMenuLabel.cs"
+      Link="EnchantPreview.SettingsMenuLabel.cs"
     />
     <Compile
       Include="..\..\Game\NameOverride\NameOverride.SettingsMenuBridge.cs"
