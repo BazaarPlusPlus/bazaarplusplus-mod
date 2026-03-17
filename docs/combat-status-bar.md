@@ -33,13 +33,13 @@ Explicitly out of scope:
 
 ## Files
 
-- [Plugin.cs](/Users/yxinyu/codes/BazaarPlusPlus/Plugin.cs)
-- [Game/CombatStatusBar/CombatStatusBar.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/CombatStatusBar/CombatStatusBar.cs)
-- [Game/CombatStatusBar/CombatStatusBar.State.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/CombatStatusBar/CombatStatusBar.State.cs)
-- [Game/CombatStatusBar/CombatStatusBar.Config.cs](/Users/yxinyu/codes/BazaarPlusPlus/Game/CombatStatusBar/CombatStatusBar.Config.cs)
-- [Models/ModState.cs](/Users/yxinyu/codes/BazaarPlusPlus/Models/ModState.cs)
-- [Patches/Combat/CombatSimulationPatches.cs](/Users/yxinyu/codes/BazaarPlusPlus/Patches/Combat/CombatSimulationPatches.cs)
-- [Patches/Combat/CombatSpeedPatch.cs](/Users/yxinyu/codes/BazaarPlusPlus/Patches/Combat/CombatSpeedPatch.cs)
+- [Plugin.cs](../Plugin.cs)
+- [Game/CombatStatusBar/CombatStatusBar.cs](../Game/CombatStatusBar/CombatStatusBar.cs)
+- [Game/CombatStatusBar/CombatStatusBar.State.cs](../Game/CombatStatusBar/CombatStatusBar.State.cs)
+- [Game/CombatStatusBar/CombatStatusBar.Config.cs](../Game/CombatStatusBar/CombatStatusBar.Config.cs)
+- [Models/ModState.cs](../Models/ModState.cs)
+- [Patches/Combat/CombatSimulationPatches.cs](../Patches/Combat/CombatSimulationPatches.cs)
+- [Patches/Combat/CombatSpeedPatch.cs](../Patches/Combat/CombatSpeedPatch.cs)
 
 ## Runtime Model
 

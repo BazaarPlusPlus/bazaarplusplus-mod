@@ -88,13 +88,7 @@ InvokeVoid(
     managerType,
     manager,
     "CompleteRun",
-    [
-        new RunLogCompletion
-        {
-            Status = "completed",
-            EndedAtUtc = now.AddMinutes(10),
-        },
-    ]
+    [new RunLogCompletion { Status = "completed", EndedAtUtc = now.AddMinutes(10) }]
 );
 Assert(fakeStore.CompleteRunCalls == 1, "CompleteRun should call the store exactly once.");
 Assert(
@@ -117,8 +111,16 @@ fakeStore.ResumeState = new RunLogSessionState
 };
 
 var resumedManager = ctor.Invoke([fakeStore, new Func<DateTimeOffset>(() => now.AddMinutes(20))]);
-var resumedState = Invoke<RunLogSessionState>(managerType, resumedManager, "EnsureActiveSession", [request]);
-Assert(resumedState.RunId == request.RunId, "EnsureActiveSession should prefer the resumable run when the server run id matches.");
+var resumedState = Invoke<RunLogSessionState>(
+    managerType,
+    resumedManager,
+    "EnsureActiveSession",
+    [request]
+);
+Assert(
+    resumedState.RunId == request.RunId,
+    "EnsureActiveSession should prefer the resumable run when the server run id matches."
+);
 Assert(fakeStore.CreateRunCalls == 1, "Resuming should not create a second run.");
 
 var resumedEvent = Invoke<RunLogEvent?>(
@@ -159,7 +161,10 @@ var replacementRequest = new RunLogCreateRequest
     Day = 1,
     Hour = 1,
 };
-var replacementManager = ctor.Invoke([fakeStore, new Func<DateTimeOffset>(() => now.AddMinutes(30))]);
+var replacementManager = ctor.Invoke([
+    fakeStore,
+    new Func<DateTimeOffset>(() => now.AddMinutes(30)),
+]);
 var replacementState = Invoke<RunLogSessionState>(
     managerType,
     replacementManager,

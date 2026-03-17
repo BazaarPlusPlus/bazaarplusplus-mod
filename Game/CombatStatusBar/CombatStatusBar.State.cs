@@ -201,5 +201,6 @@ internal sealed partial class CombatStatusBar
     }
 
     static partial void PersistOverlayVisibility(bool visible);
+
     static partial void PersistCombatSpeed(float speed);
 }

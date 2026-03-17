@@ -1,7 +1,9 @@
 #nullable enable
 using System.Reflection;
 
-var schemaType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite.RunLogSqliteSchema");
+var schemaType = RequireType(
+    "BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite.RunLogSqliteSchema"
+);
 
 Assert(
     GetStaticValue<string>(schemaType, "DatabaseFileName") == "run-logs.db",
@@ -23,8 +25,14 @@ Assert(
 
 var bootstrapSql = GetStaticValue<string>(schemaType, "BootstrapSql");
 Assert(!string.IsNullOrWhiteSpace(bootstrapSql), "Bootstrap SQL should not be empty.");
-Assert(bootstrapSql.Contains("CREATE TABLE", StringComparison.Ordinal), "Bootstrap SQL should create tables.");
-Assert(bootstrapSql.Contains("runs", StringComparison.Ordinal), "Bootstrap SQL should define runs.");
+Assert(
+    bootstrapSql.Contains("CREATE TABLE", StringComparison.Ordinal),
+    "Bootstrap SQL should create tables."
+);
+Assert(
+    bootstrapSql.Contains("runs", StringComparison.Ordinal),
+    "Bootstrap SQL should define runs."
+);
 Assert(
     bootstrapSql.Contains("run_events", StringComparison.Ordinal),
     "Bootstrap SQL should define run_events."

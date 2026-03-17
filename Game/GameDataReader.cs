@@ -184,7 +184,10 @@ internal static class GameDataReader
         input = new RunLogStateSnapshotInput
         {
             Day = Data.Run == null ? null : (int?)Data.Run.Day,
-            Hour = Data.Run == null ? null : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
+            Hour =
+                Data.Run == null
+                    ? null
+                    : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
             State = state.StateName.ToString(),
             EncounterId = Data.CurrentEncounterId?.ToString(),
         };
@@ -205,7 +208,10 @@ internal static class GameDataReader
         input = new RunLogSelectionSnapshotInput
         {
             Day = Data.Run == null ? null : (int?)Data.Run.Day,
-            Hour = Data.Run == null ? null : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
+            Hour =
+                Data.Run == null
+                    ? null
+                    : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
             State = state.StateName.ToString(),
             EncounterId = Data.CurrentEncounterId?.ToString(),
             Options = source.Select(ToSelectionOption).ToList(),
@@ -215,16 +221,20 @@ internal static class GameDataReader
 
     public static RunLogCompletion BuildRunLogCompletion(string reason)
     {
-        var status = ModState.LastRunExitKind == ModState.RunExitKind.Interrupted
-            ? "abandoned"
-            : "completed";
+        var status =
+            ModState.LastRunExitKind == ModState.RunExitKind.Interrupted
+                ? "abandoned"
+                : "completed";
         return new RunLogCompletion
         {
             SchemaVersion = 1,
             Status = status,
             EndedAtUtc = DateTimeOffset.UtcNow,
             FinalDay = Data.Run == null ? null : (int?)Data.Run.Day,
-            FinalHour = Data.Run == null ? null : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
+            FinalHour =
+                Data.Run == null
+                    ? null
+                    : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
             Victories = Data.Run == null ? null : unchecked((int)Data.Run.Victories),
             Losses = Data.Run == null ? null : unchecked((int)Data.Run.Losses),
             Reason = reason,
@@ -245,7 +255,8 @@ internal static class GameDataReader
                 card.Attributes?.ToDictionary(
                     entry => entry.Key.ToString(),
                     entry => (object?)entry.Value
-                ) ?? new Dictionary<string, object?>(),
+                )
+                ?? new Dictionary<string, object?>(),
         };
     }
 

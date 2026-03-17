@@ -75,7 +75,10 @@ internal static class SettingsMenuToggleInstaller
         if (toggle != null)
             return toggle;
 
-        BppLog.Warn(logCategory, "Field _fastForwardFirstFight was unavailable; falling back to toggle scan");
+        BppLog.Warn(
+            logCategory,
+            "Field _fastForwardFirstFight was unavailable; falling back to toggle scan"
+        );
         return instance
             .GetComponentsInChildren<Toggle>(includeInactive: true)
             .FirstOrDefault(candidate =>
@@ -154,8 +157,8 @@ internal static class SettingsMenuLayoutUtility
         cloneRect.anchorMax = anchorRect.anchorMax;
         cloneRect.pivot = anchorRect.pivot;
         cloneRect.sizeDelta = anchorRect.sizeDelta;
-        cloneRect.anchoredPosition = anchorRect.anchoredPosition
-            + new Vector2(0f, -step * (additionalIndex + 1));
+        cloneRect.anchoredPosition =
+            anchorRect.anchoredPosition + new Vector2(0f, -step * (additionalIndex + 1));
         cloneRect.localScale = anchorRect.localScale;
         cloneRect.localRotation = anchorRect.localRotation;
 
@@ -208,7 +211,8 @@ internal static class SettingsMenuLayoutUtility
         int additionalRows
     )
     {
-        var bottomY = anchorRect.anchoredPosition.y - step * additionalRows - anchorRect.rect.height;
+        var bottomY =
+            anchorRect.anchoredPosition.y - step * additionalRows - anchorRect.rect.height;
         var requiredHeight = Math.Abs(Math.Min(0f, bottomY)) + anchorRect.rect.height;
         if (requiredHeight <= parentRect.rect.height)
             return;

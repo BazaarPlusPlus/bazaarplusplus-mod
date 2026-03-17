@@ -58,7 +58,8 @@ public sealed class RunLogSessionManager
 
     public RunLogEvent? AppendEvent(RunLogEvent entry)
     {
-        var session = ActiveSession ?? throw new InvalidOperationException("No active run session.");
+        var session =
+            ActiveSession ?? throw new InvalidOperationException("No active run session.");
         if (
             string.Equals(entry.Kind, "selection_seen", StringComparison.Ordinal)
             && !string.IsNullOrWhiteSpace(entry.SelectionFingerprint)
@@ -85,7 +86,8 @@ public sealed class RunLogSessionManager
             return null;
         }
 
-        entry.SchemaVersion = entry.SchemaVersion == 0 ? session.SchemaVersion : entry.SchemaVersion;
+        entry.SchemaVersion =
+            entry.SchemaVersion == 0 ? session.SchemaVersion : entry.SchemaVersion;
         entry.RunId = session.RunId;
         entry.Seq = session.LastSeq + 1;
         entry.Ts = entry.Ts == default ? _utcNow() : entry.Ts;
@@ -113,7 +115,8 @@ public sealed class RunLogSessionManager
 
     public RunLogCheckpoint SaveCheckpoint()
     {
-        var session = ActiveSession ?? throw new InvalidOperationException("No active run session.");
+        var session =
+            ActiveSession ?? throw new InvalidOperationException("No active run session.");
         var checkpoint = new RunLogCheckpoint
         {
             SchemaVersion = session.SchemaVersion,
@@ -136,10 +139,10 @@ public sealed class RunLogSessionManager
 
     public void CompleteRun(RunLogCompletion completion)
     {
-        var session = ActiveSession ?? throw new InvalidOperationException("No active run session.");
-        completion.SchemaVersion = completion.SchemaVersion == 0
-            ? session.SchemaVersion
-            : completion.SchemaVersion;
+        var session =
+            ActiveSession ?? throw new InvalidOperationException("No active run session.");
+        completion.SchemaVersion =
+            completion.SchemaVersion == 0 ? session.SchemaVersion : completion.SchemaVersion;
         completion.RunId = session.RunId;
         if (completion.EndedAtUtc == default)
             completion.EndedAtUtc = _utcNow();
@@ -151,10 +154,10 @@ public sealed class RunLogSessionManager
 
     public void MarkRunAbandoned(RunLogAbandonment abandonment)
     {
-        var session = ActiveSession ?? throw new InvalidOperationException("No active run session.");
-        abandonment.SchemaVersion = abandonment.SchemaVersion == 0
-            ? session.SchemaVersion
-            : abandonment.SchemaVersion;
+        var session =
+            ActiveSession ?? throw new InvalidOperationException("No active run session.");
+        abandonment.SchemaVersion =
+            abandonment.SchemaVersion == 0 ? session.SchemaVersion : abandonment.SchemaVersion;
         abandonment.RunId = session.RunId;
         if (abandonment.EndedAtUtc == default)
             abandonment.EndedAtUtc = _utcNow();

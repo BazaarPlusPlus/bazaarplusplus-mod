@@ -45,8 +45,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
     {
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
-        command.CommandText =
-            $"""
+        command.CommandText = $"""
             SELECT
                 r.run_id,
                 r.schema_version,
@@ -81,7 +80,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
         if (checkpointCompleted == 1)
             return null;
 
-        var startedAtUtc = DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("started_at_utc")));
+        var startedAtUtc = DateTimeOffset.Parse(
+            reader.GetString(reader.GetOrdinal("started_at_utc"))
+        );
         var lastSeenAtUtcText = GetNullableString(reader, "last_seen_at_utc");
         var lastSeenAtUtc = string.IsNullOrWhiteSpace(lastSeenAtUtcText)
             ? startedAtUtc
@@ -95,8 +96,8 @@ public sealed class SqliteRunLogStore : IRunLogStore
             LastSeenAtUtc = lastSeenAtUtc,
             LastSeq = GetNullableInt64(reader, "last_seq") ?? 0,
             Day = GetNullableInt32(reader, "checkpoint_day") ?? GetNullableInt32(reader, "run_day"),
-            Hour = GetNullableInt32(reader, "checkpoint_hour")
-                ?? GetNullableInt32(reader, "run_hour"),
+            Hour =
+                GetNullableInt32(reader, "checkpoint_hour") ?? GetNullableInt32(reader, "run_hour"),
             State = GetNullableString(reader, "state"),
             CurrentEncounterId = GetNullableString(reader, "current_encounter_id"),
             LastStateFingerprint = GetNullableString(reader, "last_state_fingerprint"),
@@ -112,8 +113,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var transaction = connection.BeginTransaction();
 
         using var command = CreateCommand(connection, transaction);
-        command.CommandText =
-            $"""
+        command.CommandText = $"""
             INSERT INTO {RunLogSqliteSchema.RunsTableName} (
                 run_id,
                 schema_version,
@@ -167,8 +167,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         var payloadJson = JsonConvert.SerializeObject(entry, SerializerSettings);
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
-        command.CommandText =
-            $"""
+        command.CommandText = $"""
             INSERT INTO {RunLogSqliteSchema.RunEventsTableName} (
                 run_id,
                 seq,
@@ -197,8 +196,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var transaction = connection.BeginTransaction();
 
         using var command = CreateCommand(connection, transaction);
-        command.CommandText =
-            $"""
+        command.CommandText = $"""
             INSERT INTO {RunLogSqliteSchema.RunCheckpointsTableName} (
                 run_id,
                 schema_version,
@@ -258,8 +256,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.ExecuteNonQuery();
 
         using var updateRun = CreateCommand(connection, transaction);
-        updateRun.CommandText =
-            $"""
+        updateRun.CommandText = $"""
             UPDATE {RunLogSqliteSchema.RunsTableName}
             SET day = $day,
                 hour = $hour
@@ -319,8 +316,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var transaction = connection.BeginTransaction();
 
         using var command = CreateCommand(connection, transaction);
-        command.CommandText =
-            $"""
+        command.CommandText = $"""
             INSERT INTO {RunLogSqliteSchema.RunStatusTableName} (
                 run_id,
                 schema_version,
@@ -364,8 +360,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.ExecuteNonQuery();
 
         using var updateRun = CreateCommand(connection, transaction);
-        updateRun.CommandText =
-            $"""
+        updateRun.CommandText = $"""
             UPDATE {RunLogSqliteSchema.RunsTableName}
             SET status = $status,
                 day = COALESCE($finalDay, day),
@@ -379,8 +374,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
         updateRun.ExecuteNonQuery();
 
         using var completeCheckpoint = CreateCommand(connection, transaction);
-        completeCheckpoint.CommandText =
-            $"""
+        completeCheckpoint.CommandText = $"""
             UPDATE {RunLogSqliteSchema.RunCheckpointsTableName}
             SET completed = 1
             WHERE run_id = $runId;

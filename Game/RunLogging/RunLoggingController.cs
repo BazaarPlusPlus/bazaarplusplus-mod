@@ -99,7 +99,11 @@ internal sealed class RunLoggingController : MonoBehaviour
             {
                 _wasInRunLastTick = true;
             }
-            else if (!completionAttempted || completionSucceeded || _sessionManager?.HasActiveSession != true)
+            else if (
+                !completionAttempted
+                || completionSucceeded
+                || _sessionManager?.HasActiveSession != true
+            )
             {
                 _wasInRunLastTick = false;
             }
@@ -157,7 +161,9 @@ internal sealed class RunLoggingController : MonoBehaviour
     private RunLoggingControllerCore RequireCore()
     {
         return _core
-            ?? throw new InvalidOperationException("Run logging controller core is not initialized.");
+            ?? throw new InvalidOperationException(
+                "Run logging controller core is not initialized."
+            );
     }
 }
 
@@ -200,15 +206,19 @@ internal sealed class RunLoggingControllerCore
 
     public RunLogEvent AcceptRunProgress(RunLogRunProgressInput input)
     {
-        var runEvent = _sessionManager.AppendEvent(_captureService.BuildRunProgressEvent(input))
-            ?? throw new InvalidOperationException("Run progress event was unexpectedly suppressed.");
+        var runEvent =
+            _sessionManager.AppendEvent(_captureService.BuildRunProgressEvent(input))
+            ?? throw new InvalidOperationException(
+                "Run progress event was unexpectedly suppressed."
+            );
         _sessionManager.SaveCheckpoint();
         return runEvent;
     }
 
     public RunLogEvent AcceptStateSnapshot(RunLogStateSnapshotInput input)
     {
-        var stateEvent = _sessionManager.AppendEvent(_captureService.BuildStateSeenEvent(input))
+        var stateEvent =
+            _sessionManager.AppendEvent(_captureService.BuildStateSeenEvent(input))
             ?? throw new InvalidOperationException("State event was unexpectedly suppressed.");
         _sessionManager.SaveCheckpoint();
         return stateEvent;
@@ -216,7 +226,9 @@ internal sealed class RunLoggingControllerCore
 
     public RunLogEvent? AcceptSelectionSnapshot(RunLogSelectionSnapshotInput input)
     {
-        var selectionEvent = _sessionManager.AppendEvent(_captureService.BuildSelectionSeenEvent(input));
+        var selectionEvent = _sessionManager.AppendEvent(
+            _captureService.BuildSelectionSeenEvent(input)
+        );
         if (selectionEvent != null)
             _sessionManager.SaveCheckpoint();
 

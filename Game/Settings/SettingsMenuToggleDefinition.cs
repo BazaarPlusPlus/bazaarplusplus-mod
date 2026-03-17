@@ -14,7 +14,10 @@ internal sealed class SettingsMenuToggleDefinition
     {
         ToggleObjectName = !string.IsNullOrWhiteSpace(toggleObjectName)
             ? toggleObjectName
-            : throw new ArgumentException("Toggle object name is required.", nameof(toggleObjectName));
+            : throw new ArgumentException(
+                "Toggle object name is required.",
+                nameof(toggleObjectName)
+            );
         LogCategory = !string.IsNullOrWhiteSpace(logCategory)
             ? logCategory
             : throw new ArgumentException("Log category is required.", nameof(logCategory));

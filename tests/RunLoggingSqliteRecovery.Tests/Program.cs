@@ -7,7 +7,11 @@ var storeType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.SqliteRu
 var ctor = storeType.GetConstructor([typeof(string)]);
 Assert(ctor != null, "SqliteRunLogStore should expose a constructor taking the database path.");
 
-var tempRoot = Path.Combine(Path.GetTempPath(), "bpp-run-log-sqlite-recovery-tests", Guid.NewGuid().ToString("N"));
+var tempRoot = Path.Combine(
+    Path.GetTempPath(),
+    "bpp-run-log-sqlite-recovery-tests",
+    Guid.NewGuid().ToString("N")
+);
 Directory.CreateDirectory(tempRoot);
 var dbPath = Path.Combine(tempRoot, "run-logs.db");
 
@@ -182,7 +186,10 @@ static string GetString(SqliteConnection connection, string sql, string runId)
     using var command = connection.CreateCommand();
     command.CommandText = sql;
     command.Parameters.AddWithValue("$runId", runId);
-    return (string)(command.ExecuteScalar() ?? throw new InvalidOperationException($"Query returned null: {sql}"));
+    return (string)(
+        command.ExecuteScalar()
+        ?? throw new InvalidOperationException($"Query returned null: {sql}")
+    );
 }
 
 static void Assert(bool condition, string message)

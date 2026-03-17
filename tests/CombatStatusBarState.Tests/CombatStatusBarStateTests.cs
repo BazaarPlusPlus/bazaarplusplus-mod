@@ -1,7 +1,7 @@
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
-using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.Settings;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests;
@@ -227,7 +227,10 @@ public sealed class CombatStatusBarStateTests : IDisposable
                 "../../../../../Patches/Tooltips/EnchantPreviewSettingsPatch.cs"
             )
         );
-        Assert.True(File.Exists(sourcePath), $"Enchant preview settings patch not found at {sourcePath}");
+        Assert.True(
+            File.Exists(sourcePath),
+            $"Enchant preview settings patch not found at {sourcePath}"
+        );
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("EnchantPreviewAlwaysShowConfig", source, StringComparison.Ordinal);

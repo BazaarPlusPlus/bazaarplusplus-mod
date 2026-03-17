@@ -33,7 +33,9 @@ public sealed class RunLogInferenceService
         if (string.IsNullOrWhiteSpace(option.InstanceId))
             return false;
 
-        return resultingInstanceIds.Any(id => string.Equals(id, option.InstanceId, StringComparison.Ordinal));
+        return resultingInstanceIds.Any(id =>
+            string.Equals(id, option.InstanceId, StringComparison.Ordinal)
+        );
     }
 
     private static RunLogEvent CreateChoiceEvent(

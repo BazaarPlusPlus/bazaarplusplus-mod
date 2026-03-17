@@ -4,13 +4,19 @@ using System.Text.Json;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
 
-var tempRoot = Path.Combine(Path.GetTempPath(), "bpp-run-log-export-tests", Guid.NewGuid().ToString("N"));
+var tempRoot = Path.Combine(
+    Path.GetTempPath(),
+    "bpp-run-log-export-tests",
+    Guid.NewGuid().ToString("N")
+);
 Directory.CreateDirectory(tempRoot);
 
 var dbPath = Path.Combine(tempRoot, "run-logs.db");
 var singleOutDir = Path.Combine(tempRoot, "single-export");
 var allOutDir = Path.Combine(tempRoot, "all-export");
-var scriptPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../scripts/export_run_log.py"));
+var scriptPath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../scripts/export_run_log.py")
+);
 
 try
 {
@@ -41,7 +47,11 @@ try
         "status.json should match the requested run."
     );
 
-    var exportedRunDirectories = Directory.GetDirectories(allOutDir, "run_*", SearchOption.AllDirectories);
+    var exportedRunDirectories = Directory.GetDirectories(
+        allOutDir,
+        "run_*",
+        SearchOption.AllDirectories
+    );
     Assert(exportedRunDirectories.Length == 2, "--all should write one export directory per run.");
     Assert(
         Directory.Exists(Path.Combine(allOutDir, "2026-03-15", runId1)),
@@ -157,8 +167,8 @@ static void RunPython(string scriptPath, IReadOnlyList<string> arguments)
     foreach (var argument in arguments)
         startInfo.ArgumentList.Add(argument);
 
-    using var process = Process.Start(startInfo)
-        ?? throw new InvalidOperationException("Failed to start python3.");
+    using var process =
+        Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start python3.");
     var stdout = process.StandardOutput.ReadToEnd();
     var stderr = process.StandardError.ReadToEnd();
     process.WaitForExit();

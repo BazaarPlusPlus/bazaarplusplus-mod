@@ -5,7 +5,8 @@ using BazaarPlusPlus.Game.RunLogging.Models;
 var inferenceServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogInferenceService");
 var inferenceInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogChoiceInferenceInput");
 
-var service = Activator.CreateInstance(inferenceServiceType)
+var service =
+    Activator.CreateInstance(inferenceServiceType)
     ?? throw new InvalidOperationException("RunLogInferenceService should be constructible.");
 
 var singleOptionInput = CreateInput(
@@ -96,8 +97,11 @@ static object CreateInput(
     string[] resultingInstanceIds
 )
 {
-    var input = Activator.CreateInstance(inputType)
-        ?? throw new InvalidOperationException("RunLogChoiceInferenceInput should be constructible.");
+    var input =
+        Activator.CreateInstance(inputType)
+        ?? throw new InvalidOperationException(
+            "RunLogChoiceInferenceInput should be constructible."
+        );
     SetProperty(inputType, input, "SelectionSeq", selectionSeq);
     SetProperty(inputType, input, "TransitionedAway", transitionedAway);
     SetProperty(inputType, input, "Options", options.ToList());

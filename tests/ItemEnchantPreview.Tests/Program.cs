@@ -11,7 +11,10 @@ var labelSourcePath = Path.GetFullPath(
         "../../../../../Game/ItemEnchantPreview/EnchantPreview.SettingsMenuLabel.cs"
     )
 );
-Assert(File.Exists(labelSourcePath), $"Enchant preview label source not found at {labelSourcePath}");
+Assert(
+    File.Exists(labelSourcePath),
+    $"Enchant preview label source not found at {labelSourcePath}"
+);
 var labelSource = File.ReadAllText(labelSourcePath);
 Assert(
     labelSource.Contains("Enchant Preview Always Show", StringComparison.Ordinal),
@@ -59,12 +62,7 @@ Assert(
 
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
     currentEnchantment: EEnchantmentType.Heavy,
-    allEnchantments:
-    [
-        EEnchantmentType.Heavy,
-        EEnchantmentType.Icy,
-        EEnchantmentType.Turbo,
-    ]
+    allEnchantments: [EEnchantmentType.Heavy, EEnchantmentType.Icy, EEnchantmentType.Turbo]
 );
 
 Assert(

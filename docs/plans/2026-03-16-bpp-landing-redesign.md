@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Redesign `bpp-landing` around a two-platform interactive row, a WeChat support modal, and a new `/faq` placeholder page while preserving the current bilingual Worker deployment.
+**Goal:** Redesign `../bazaarplusplus-site` around a two-platform interactive row, a WeChat support modal, and a new `/faq` placeholder page while preserving the current bilingual Worker deployment.
 
-**Architecture:** Keep the Cloudflare Worker as the rendering entrypoint in `bpp-landing/src/index.ts`, but split the implementation into a few targeted render helpers inside that module. Drive the redesign with tests first: homepage structure, platform drawer markup, support modal hooks, FAQ route rendering, and language behavior. Avoid a broad template-system refactor.
+**Architecture:** Keep the Cloudflare Worker as the rendering entrypoint in `../bazaarplusplus-site/src/index.ts`, but split the implementation into a few targeted render helpers inside that module. Drive the redesign with tests first: homepage structure, platform drawer markup, support modal hooks, FAQ route rendering, and language behavior. Avoid a broad template-system refactor.
 
 **Tech Stack:** TypeScript, Cloudflare Worker runtime, HTML/CSS/inline JS string rendering, Node test runner
 
@@ -13,7 +13,7 @@
 ### Task 1: Lock the redesigned homepage and FAQ requirements with failing tests
 
 **Files:**
-- Modify: `bpp-landing/test/homepage.test.mjs`
+- Modify: `../bazaarplusplus-site/test/homepage.test.mjs`
 
 **Step 1: Write the failing tests**
 
@@ -45,14 +45,14 @@ Expected: FAIL because the homepage and FAQ route do not yet match the new struc
 **Step 3: Commit the failing tests**
 
 ```bash
-git add bpp-landing/test/homepage.test.mjs
+git add ../bazaarplusplus-site/test/homepage.test.mjs
 git commit -m "test: cover landing redesign structure"
 ```
 
 ### Task 2: Refactor copy and route helpers to support homepage and FAQ content
 
 **Files:**
-- Modify: `bpp-landing/src/index.ts`
+- Modify: `../bazaarplusplus-site/src/index.ts`
 
 **Step 1: Write minimal implementation**
 
@@ -80,14 +80,14 @@ Expected: some tests still FAIL because the homepage and FAQ layout has not been
 **Step 3: Commit**
 
 ```bash
-git add bpp-landing/src/index.ts
+git add ../bazaarplusplus-site/src/index.ts
 git commit -m "refactor: add landing redesign copy and route helpers"
 ```
 
 ### Task 3: Rebuild the homepage around the platform cards and support cards
 
 **Files:**
-- Modify: `bpp-landing/src/index.ts`
+- Modify: `../bazaarplusplus-site/src/index.ts`
 
 **Step 1: Write minimal implementation**
 
@@ -123,14 +123,14 @@ Expected: homepage structure tests PASS; FAQ tests may still FAIL.
 **Step 4: Commit**
 
 ```bash
-git add bpp-landing/src/index.ts
+git add ../bazaarplusplus-site/src/index.ts
 git commit -m "feat: redesign landing platform row"
 ```
 
 ### Task 4: Add the WeChat modal and equalize support hierarchy
 
 **Files:**
-- Modify: `bpp-landing/src/index.ts`
+- Modify: `../bazaarplusplus-site/src/index.ts`
 
 **Step 1: Write the failing test**
 
@@ -171,15 +171,15 @@ Expected: PASS for modal coverage.
 **Step 5: Commit**
 
 ```bash
-git add bpp-landing/src/index.ts bpp-landing/test/homepage.test.mjs
+git add ../bazaarplusplus-site/src/index.ts ../bazaarplusplus-site/test/homepage.test.mjs
 git commit -m "feat: add wechat support modal"
 ```
 
 ### Task 5: Add the FAQ page with placeholder accordion items
 
 **Files:**
-- Modify: `bpp-landing/src/index.ts`
-- Modify: `bpp-landing/test/homepage.test.mjs`
+- Modify: `../bazaarplusplus-site/src/index.ts`
+- Modify: `../bazaarplusplus-site/test/homepage.test.mjs`
 
 **Step 1: Write the failing test**
 
@@ -223,15 +223,15 @@ Expected: PASS for FAQ route and placeholder rendering.
 **Step 5: Commit**
 
 ```bash
-git add bpp-landing/src/index.ts bpp-landing/test/homepage.test.mjs
+git add ../bazaarplusplus-site/src/index.ts ../bazaarplusplus-site/test/homepage.test.mjs
 git commit -m "feat: add landing faq page"
 ```
 
 ### Task 6: Fix locale-aware caching for negotiated HTML
 
 **Files:**
-- Modify: `bpp-landing/src/index.ts`
-- Modify: `bpp-landing/test/homepage.test.mjs`
+- Modify: `../bazaarplusplus-site/src/index.ts`
+- Modify: `../bazaarplusplus-site/test/homepage.test.mjs`
 
 **Step 1: Write the failing test**
 
@@ -265,7 +265,7 @@ Expected: PASS for locale-caching coverage.
 **Step 5: Commit**
 
 ```bash
-git add bpp-landing/src/index.ts bpp-landing/test/homepage.test.mjs
+git add ../bazaarplusplus-site/src/index.ts ../bazaarplusplus-site/test/homepage.test.mjs
 git commit -m "fix: vary landing html by accept-language"
 ```
 
@@ -279,7 +279,7 @@ git commit -m "fix: vary landing html by accept-language"
 Run:
 
 ```bash
-cd /Users/yxinyu/codes/BazaarPlusPlus/bpp-landing
+cd ../bazaarplusplus-site
 npm test
 npm run typecheck
 ```
@@ -291,7 +291,7 @@ Expected: PASS.
 Run:
 
 ```bash
-cd /Users/yxinyu/codes/BazaarPlusPlus/bpp-landing
+cd ../bazaarplusplus-site
 npm run dev -- --port 8791
 ```
 
@@ -320,6 +320,6 @@ Check:
 **Step 5: Commit**
 
 ```bash
-git add bpp-landing/src/index.ts bpp-landing/test/homepage.test.mjs docs/plans/2026-03-16-bpp-landing-redesign-design.md docs/plans/2026-03-16-bpp-landing-redesign.md
+git add ../bazaarplusplus-site/src/index.ts ../bazaarplusplus-site/test/homepage.test.mjs docs/plans/2026-03-16-bpp-landing-redesign-design.md docs/plans/2026-03-16-bpp-landing-redesign.md
 git commit -m "feat: redesign bpp landing experience"
 ```

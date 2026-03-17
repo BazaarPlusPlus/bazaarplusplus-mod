@@ -21,7 +21,9 @@ public static class RunIdFactory
             .ToLowerInvariant();
         var heroFragment = Normalize(hero);
         var modeFragment = Normalize(gameMode);
-        var seedFragment = seed.HasValue ? seed.Value.ToString("x4", CultureInfo.InvariantCulture) : "noseed";
+        var seedFragment = seed.HasValue
+            ? seed.Value.ToString("x4", CultureInfo.InvariantCulture)
+            : "noseed";
         var nonceFragment = NormalizeNonce(
             nonce,
             $"{timeFragment}|{heroFragment}|{modeFragment}|{seedFragment}"

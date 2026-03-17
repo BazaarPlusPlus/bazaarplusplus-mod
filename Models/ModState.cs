@@ -1,10 +1,10 @@
 #pragma warning disable CS0436
 using System;
 using System.Collections.Generic;
+using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using BepInEx.Configuration;
 using BepInEx.Logging;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
-using BazaarGameShared.Domain.Core.Types;
 using TheBazaar;
 
 namespace BazaarPlusPlus;
