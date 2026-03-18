@@ -118,6 +118,30 @@ Assert(
     "Enchant preview tooltip patch should query BPP hotkey service instead of hard-coded Ctrl."
 );
 
+var nativeKeybindLabelPatchSourcePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Patches/Settings/NativeKeybindLabelPatch.cs"
+    )
+);
+Assert(
+    File.Exists(nativeKeybindLabelPatchSourcePath),
+    $"Native keybind label patch source not found at {nativeKeybindLabelPatchSourcePath}"
+);
+var nativeKeybindLabelPatchSource = File.ReadAllText(nativeKeybindLabelPatchSourcePath);
+Assert(
+    nativeKeybindLabelPatchSource.Contains("Show Monster Preview", StringComparison.Ordinal),
+    "Native keybind label patch should expose the English monster preview label."
+);
+Assert(
+    nativeKeybindLabelPatchSource.Contains("展示野怪预览", StringComparison.Ordinal),
+    "Native keybind label patch should expose the Simplified Chinese monster preview label."
+);
+Assert(
+    nativeKeybindLabelPatchSource.Contains("Lock", StringComparison.Ordinal),
+    "Native keybind label patch should target the native Lock keybind action."
+);
+
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
     currentEnchantment: EEnchantmentType.Heavy,
     allEnchantments: [EEnchantmentType.Heavy, EEnchantmentType.Icy, EEnchantmentType.Turbo]
