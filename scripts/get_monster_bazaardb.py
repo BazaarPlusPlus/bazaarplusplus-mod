@@ -57,6 +57,7 @@ def _map_entry(card: dict) -> dict:
                 "title": item.get("title"),
                 "tier": item.get("tierOverride"),
                 "size": item.get("size"),
+                "enchant": item.get("enchantmentOverride"),
                 "type": item.get("type"),
             }
         )

@@ -42,6 +42,44 @@ Assert(
     "Source name should be preserved."
 );
 
+var previewDataSourceType = RequireType(
+    "BazaarPlusPlus.Game.MonsterPreview.MonsterDatabasePreviewDataSource"
+);
+var buildModelMethod = previewDataSourceType.GetMethod(
+    "BuildModel",
+    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+);
+Assert(
+    buildModelMethod != null,
+    "MonsterDatabasePreviewDataSource should expose BuildModel for monster preview projection."
+);
+
+var monsterInfoType = RequireType("BazaarPlusPlus.MonsterInfo");
+var monsterBoardCardType = RequireType("BazaarPlusPlus.MonsterBoardCardInfo");
+var monster = Activator.CreateInstance(monsterInfoType)!;
+SetProperty(monster, "Title", "Poison Peddler");
+
+var boardCards = CreateList(monsterBoardCardType);
+var boardCard = Activator.CreateInstance(monsterBoardCardType)!;
+SetProperty(boardCard, "CardId", Guid.Parse("33333333-3333-3333-3333-333333333333"));
+SetProperty(boardCard, "Tier", "Gold");
+SetProperty(boardCard, "Size", "Small");
+SetProperty(boardCard, "Type", "Item");
+SetProperty(boardCard, "Enchant", "Toxic");
+boardCards.Add(boardCard);
+SetProperty(monster, "BoardCards", boardCards);
+
+var previewModel = buildModelMethod!.Invoke(null, [monster, "monster_db"])!;
+var itemCards = (IEnumerable?)GetProperty(previewModel, "ItemCards");
+Assert(itemCards != null, "Monster preview model should expose item cards.");
+
+var projectedCards = itemCards!.Cast<object>().ToList();
+Assert(projectedCards.Count == 1, "Monster preview projection should preserve board cards.");
+Assert(
+    (string)GetProperty(projectedCards[0], "Enchant")! == "Toxic",
+    "Monster preview projection should preserve board enchant overrides."
+);
+
 Console.WriteLine("EncounterPreviewConversion checks passed.");
 
 static IList CreateList(Type itemType)

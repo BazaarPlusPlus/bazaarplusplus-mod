@@ -63,7 +63,7 @@ internal sealed class MonsterDatabasePreviewDataSource : IPreviewDataSource
                     TemplateId = card.CardId.ToString(),
                     Tier = ParseTier(card.Tier),
                     Size = ParseSize(card.Size),
-                    Enchant = "None",
+                    Enchant = string.IsNullOrWhiteSpace(card.Enchant) ? "None" : card.Enchant,
                     Attributes = BuildAttributes(card.CardId, card.Tier),
                 }
             );

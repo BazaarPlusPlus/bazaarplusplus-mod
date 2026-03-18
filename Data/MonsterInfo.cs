@@ -40,6 +40,8 @@ internal sealed class MonsterBoardCardInfo
 
     public string Size { get; set; } = string.Empty;
 
+    public string Enchant { get; set; } = string.Empty;
+
     public string Type { get; set; } = string.Empty;
 }
 

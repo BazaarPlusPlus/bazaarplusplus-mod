@@ -90,6 +90,9 @@ internal static class MonsterDatabase
         [JsonProperty("size")]
         public string Size { get; set; } = string.Empty;
 
+        [JsonProperty("enchant")]
+        public string Enchant { get; set; } = string.Empty;
+
         [JsonProperty("type")]
         public string Type { get; set; } = string.Empty;
     }
@@ -285,6 +288,7 @@ internal static class MonsterDatabase
             Title = dto.Title ?? string.Empty,
             Tier = dto.Tier ?? string.Empty,
             Size = dto.Size ?? string.Empty,
+            Enchant = dto.Enchant ?? string.Empty,
             Type = dto.Type ?? string.Empty,
         };
     }

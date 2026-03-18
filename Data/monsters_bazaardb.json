@@ -22,6 +22,7 @@
           "title": "Med Kit",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -29,6 +30,7 @@
           "title": "Bluenanas",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -36,6 +38,7 @@
           "title": "Duct Tape",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -76,6 +79,7 @@
           "title": "Crow's Nest",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -83,6 +87,7 @@
           "title": "Pesky Pete",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -90,6 +95,7 @@
           "title": "Captain's Wheel",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -97,6 +103,7 @@
           "title": "Pop Snappers",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -104,6 +111,7 @@
           "title": "Flagship",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -150,6 +158,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -157,6 +166,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -164,6 +174,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -171,6 +182,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -178,6 +190,7 @@
           "title": "Lockbox",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -185,6 +198,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -192,6 +206,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -199,6 +214,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -206,6 +222,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         }
       ],
@@ -239,6 +256,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -246,6 +264,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -253,6 +272,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -260,6 +280,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -267,6 +288,7 @@
           "title": "Lockbox",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -274,6 +296,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -281,6 +304,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -288,6 +312,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -295,6 +320,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         }
       ],
@@ -328,6 +354,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -335,6 +362,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -342,6 +370,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -349,6 +378,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -356,6 +386,7 @@
           "title": "Lockbox",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -363,6 +394,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -370,6 +402,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -377,6 +410,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -384,6 +418,7 @@
           "title": "Blowgun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         }
       ],
@@ -417,6 +452,7 @@
           "title": "Sharpening Stone",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -424,6 +460,7 @@
           "title": "Orbital Polisher",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -431,6 +468,7 @@
           "title": "Goggles",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -438,6 +476,7 @@
           "title": "Toolbox",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -445,6 +484,7 @@
           "title": "Multitool",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -452,6 +492,7 @@
           "title": "Energy Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -459,6 +500,7 @@
           "title": "Crash Site Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -505,6 +547,7 @@
           "title": "Weakpoint Detector",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -512,6 +555,7 @@
           "title": "Runic Double Bow",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -519,6 +563,7 @@
           "title": "Bayonet",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -526,6 +571,7 @@
           "title": "Grappling Hook",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -533,6 +579,7 @@
           "title": "Jitte",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -540,6 +587,7 @@
           "title": "Katana",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -547,6 +595,7 @@
           "title": "Bayonet",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -599,6 +648,7 @@
           "title": "Daggerwing",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -606,6 +656,7 @@
           "title": "Captain's Wheel",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -613,6 +664,7 @@
           "title": "Battle Balloon",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -620,6 +672,7 @@
           "title": "Marshalling Lights",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -627,6 +680,7 @@
           "title": "Admiral's Badge",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -634,6 +688,7 @@
           "title": "Flare Gun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -680,6 +735,7 @@
           "title": "Air-Pressure Rifle",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -687,6 +743,7 @@
           "title": "Altimeter",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -694,6 +751,7 @@
           "title": "Battle Balloon",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -701,6 +759,7 @@
           "title": "Propeller",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -708,6 +767,7 @@
           "title": "Tethers",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -715,6 +775,7 @@
           "title": "Flycycle",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -755,6 +816,7 @@
           "title": "Citrus",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -762,6 +824,7 @@
           "title": "Coconut",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -769,6 +832,7 @@
           "title": "Crusher Claw",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -776,6 +840,7 @@
           "title": "Sea Shell",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -783,6 +848,7 @@
           "title": "Coconut",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -823,6 +889,7 @@
           "title": "Tinfoil Hat",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -830,6 +897,7 @@
           "title": "Globe",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -837,6 +905,7 @@
           "title": "Sat-Comm",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -844,6 +913,7 @@
           "title": "Wallace",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -851,6 +921,7 @@
           "title": "Force Field",
           "tier": "Silver",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -897,6 +968,7 @@
           "title": "Feather",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -904,6 +976,7 @@
           "title": "Cosmic Amulet",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -911,6 +984,7 @@
           "title": "Cosmic Plumage",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -918,6 +992,7 @@
           "title": "Claws",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -925,6 +1000,7 @@
           "title": "Claws",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -932,6 +1008,7 @@
           "title": "Cosmic Plumage",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -939,6 +1016,7 @@
           "title": "Cosmic Amulet",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -946,6 +1024,7 @@
           "title": "Feather",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -992,6 +1071,7 @@
           "title": "Crash Site Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -999,6 +1079,7 @@
           "title": "Bottled Lightning",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1006,6 +1087,7 @@
           "title": "Tazidian Dagger",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1013,6 +1095,7 @@
           "title": "Fire Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1020,6 +1103,7 @@
           "title": "Catalyst",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1060,6 +1144,7 @@
           "title": "Pelt",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1067,6 +1152,7 @@
           "title": "Broken Shackles",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1074,6 +1160,7 @@
           "title": "Claws",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1081,6 +1168,7 @@
           "title": "Fang",
           "tier": "Silver",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -1088,6 +1176,7 @@
           "title": "Fang",
           "tier": "Silver",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -1095,6 +1184,7 @@
           "title": "Claws",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1102,6 +1192,7 @@
           "title": "Eagle Talisman",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1109,6 +1200,7 @@
           "title": "Pelt",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1149,6 +1241,7 @@
           "title": "Revolver",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1156,6 +1249,7 @@
           "title": "Powder Horn",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1163,6 +1257,7 @@
           "title": "Revolver",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1170,6 +1265,7 @@
           "title": "Shoe Blade",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1177,6 +1273,7 @@
           "title": "Butterfly Swords",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1184,6 +1281,7 @@
           "title": "Butterfly Swords",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1191,6 +1289,7 @@
           "title": "Spices",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1198,6 +1297,7 @@
           "title": "Holsters",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1205,6 +1305,7 @@
           "title": "Cutlass",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1251,6 +1352,7 @@
           "title": "Pelt",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1258,6 +1360,7 @@
           "title": "Fang",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1265,6 +1368,7 @@
           "title": "Fang",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1272,6 +1376,7 @@
           "title": "Pelt",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1312,6 +1417,7 @@
           "title": "Scrap",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1319,6 +1425,7 @@
           "title": "Multitool",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1326,6 +1433,7 @@
           "title": "Hands of Time",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1333,6 +1441,7 @@
           "title": "Rivet Gun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1340,6 +1449,7 @@
           "title": "Cog",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1347,6 +1457,7 @@
           "title": "Atomic Clock",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1354,6 +1465,7 @@
           "title": "Precision Calipers",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1361,6 +1473,7 @@
           "title": "Crash Site Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1407,6 +1520,7 @@
           "title": "Athanor",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1414,6 +1528,7 @@
           "title": "Bottled Lightning",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1421,6 +1536,7 @@
           "title": "Energy Potion",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1428,6 +1544,7 @@
           "title": "Fire Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1435,6 +1552,7 @@
           "title": "Rainbow Potion",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1442,6 +1560,7 @@
           "title": "Noxious Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1449,6 +1568,7 @@
           "title": "Noxious Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1456,6 +1576,7 @@
           "title": "Rainbow Potion",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1502,6 +1623,7 @@
           "title": "Extract",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1509,6 +1631,7 @@
           "title": "Black Rose",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1516,6 +1639,7 @@
           "title": "Poppy Field",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1523,6 +1647,7 @@
           "title": "Floor Spike",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1530,6 +1655,7 @@
           "title": "Bushel",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1537,6 +1663,7 @@
           "title": "Succulents",
           "tier": "Silver",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -1544,6 +1671,7 @@
           "title": "Extract",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1590,6 +1718,7 @@
           "title": "Insect Wing",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1597,6 +1726,7 @@
           "title": "Stinger",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1604,6 +1734,7 @@
           "title": "Langxian",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1611,6 +1742,7 @@
           "title": "Honeycomb",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1618,6 +1750,7 @@
           "title": "Insect Wing",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1658,6 +1791,7 @@
           "title": "Mortar & Pestle",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1665,6 +1799,7 @@
           "title": "Refractor",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1672,6 +1807,7 @@
           "title": "Rainbow Potion",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1679,6 +1815,7 @@
           "title": "Cauldron",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1686,6 +1823,7 @@
           "title": "Rainbow Potion",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1693,6 +1831,7 @@
           "title": "Weather Glass",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1733,6 +1872,7 @@
           "title": "Wand",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1740,6 +1880,7 @@
           "title": "Robe",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1747,6 +1888,7 @@
           "title": "Zoot Flute",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1754,6 +1896,7 @@
           "title": "Forgotten God",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1761,6 +1904,7 @@
           "title": "Incense",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1768,6 +1912,7 @@
           "title": "Ectoplasm",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Shielded",
           "type": "Item"
         },
         {
@@ -1775,6 +1920,7 @@
           "title": "Fungal Spores",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1782,6 +1928,7 @@
           "title": "Venomous Dose",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1822,6 +1969,7 @@
           "title": "Bar of Gold",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1829,6 +1977,7 @@
           "title": "Shoe Blade",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1836,6 +1985,7 @@
           "title": "Clockwork Blades",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1843,6 +1993,7 @@
           "title": "Clockwork Blades",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1850,6 +2001,7 @@
           "title": "Shoe Blade",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1857,6 +2009,7 @@
           "title": "Bar of Gold",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1897,6 +2050,7 @@
           "title": "Gunpowder",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1904,6 +2058,7 @@
           "title": "Powder Horn",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1911,6 +2066,7 @@
           "title": "Revolver",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1918,6 +2074,7 @@
           "title": "Cannonball",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1925,6 +2082,7 @@
           "title": "Pistol Sword",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1932,6 +2090,7 @@
           "title": "Throwing Knives",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1939,6 +2098,7 @@
           "title": "Gunpowder",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -1979,6 +2139,7 @@
           "title": "Cinders",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1986,6 +2147,7 @@
           "title": "Lighter",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -1993,6 +2155,7 @@
           "title": "Fire Bomb",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2000,6 +2163,7 @@
           "title": "Cinders",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2040,6 +2204,7 @@
           "title": "Scrap",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2047,6 +2212,7 @@
           "title": "Gearnola Bar",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2054,6 +2220,7 @@
           "title": "Junkyard Club",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2061,6 +2228,7 @@
           "title": "Junkyard Repairbot",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2068,6 +2236,7 @@
           "title": "Barbed Wire",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2075,6 +2244,7 @@
           "title": "Med Kit",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2115,6 +2285,7 @@
           "title": "Pelt",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2122,6 +2293,7 @@
           "title": "Pelt",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2129,6 +2301,7 @@
           "title": "Pelt",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2136,6 +2309,7 @@
           "title": "Pelt",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2143,6 +2317,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Shiny",
           "type": "Item"
         },
         {
@@ -2150,6 +2325,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Shiny",
           "type": "Item"
         },
         {
@@ -2157,6 +2333,7 @@
           "title": "Pelt",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2164,6 +2341,7 @@
           "title": "Pelt",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2171,6 +2349,7 @@
           "title": "Pelt",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2178,6 +2357,7 @@
           "title": "Pelt",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2218,6 +2398,7 @@
           "title": "Dishwasher",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2225,6 +2406,7 @@
           "title": "Hogwash",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2232,6 +2414,7 @@
           "title": "Rivet Gun",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2239,6 +2422,7 @@
           "title": "Hammer",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2246,6 +2430,7 @@
           "title": "Propeller",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2286,6 +2471,7 @@
           "title": "Curry",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2293,6 +2479,7 @@
           "title": "Black Pepper",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2300,6 +2487,7 @@
           "title": "Oven Mitts",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2307,6 +2495,7 @@
           "title": "Cauldron",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2314,6 +2503,7 @@
           "title": "Pickled Peppers",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2321,6 +2511,7 @@
           "title": "Hot Sauce",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2328,6 +2519,7 @@
           "title": "Scorchpepper",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2368,6 +2560,7 @@
           "title": "Cinders",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2375,6 +2568,7 @@
           "title": "Bar of Gold",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2382,6 +2576,7 @@
           "title": "Cutlass",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -2389,6 +2584,7 @@
           "title": "Cutlass",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -2396,6 +2592,7 @@
           "title": "Bar of Gold",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2403,6 +2600,7 @@
           "title": "Sharpening Stone",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2443,6 +2641,7 @@
           "title": "Unibou",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2450,6 +2649,7 @@
           "title": "Karst",
           "tier": "Silver",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2457,6 +2657,7 @@
           "title": "Succulents",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2464,6 +2665,7 @@
           "title": "Bushel",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2471,6 +2673,7 @@
           "title": "Honey Jar",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2478,6 +2681,7 @@
           "title": "Snow Wisp",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2518,6 +2722,7 @@
           "title": "Gland",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2525,6 +2730,7 @@
           "title": "Extract",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2532,6 +2738,7 @@
           "title": "Venom",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2539,6 +2746,7 @@
           "title": "Fang",
           "tier": "Silver",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -2546,6 +2754,7 @@
           "title": "Basilisk Fang",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2553,6 +2762,7 @@
           "title": "Venom",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2560,6 +2770,7 @@
           "title": "Copper Ed",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2567,6 +2778,7 @@
           "title": "Noxious Potion",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2574,6 +2786,7 @@
           "title": "Extract",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2581,6 +2794,7 @@
           "title": "Gland",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2621,6 +2835,7 @@
           "title": "Pelt",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2628,6 +2843,7 @@
           "title": "Dragon Whelp",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2635,6 +2851,7 @@
           "title": "Crook",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2642,6 +2859,7 @@
           "title": "Leeches",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2649,6 +2867,7 @@
           "title": "Salamander Pup",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2656,6 +2875,7 @@
           "title": "Trained Spider",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2663,6 +2883,7 @@
           "title": "Pelt",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2703,6 +2924,7 @@
           "title": "Anaconda",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2710,6 +2932,7 @@
           "title": "Hidden Lake",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2717,6 +2940,7 @@
           "title": "Fang",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Shiny",
           "type": "Item"
         },
         {
@@ -2724,6 +2948,7 @@
           "title": "Fang",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Shiny",
           "type": "Item"
         },
         {
@@ -2731,6 +2956,7 @@
           "title": "Assault Sigil",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2771,6 +2997,7 @@
           "title": "Pitchfork",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2778,6 +3005,7 @@
           "title": "Ganjo",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2785,6 +3013,7 @@
           "title": "Bionic Arm",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2792,6 +3021,7 @@
           "title": "Lens",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2799,6 +3029,7 @@
           "title": "Tesla Coil",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2806,6 +3037,7 @@
           "title": "Battery",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2852,6 +3084,7 @@
           "title": "Bar of Gold",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2859,6 +3092,7 @@
           "title": "Crow's Nest",
           "tier": "Silver",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2866,6 +3100,7 @@
           "title": "Powder Horn",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2873,6 +3108,7 @@
           "title": "Revolver",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2880,6 +3116,7 @@
           "title": "Cannonball",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2887,6 +3124,7 @@
           "title": "Invulnerability Potion",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -2927,6 +3165,7 @@
           "title": "Scrap",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2934,6 +3173,7 @@
           "title": "Tusked Helm",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2941,6 +3181,7 @@
           "title": "Old Sword",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2948,6 +3189,7 @@
           "title": "Hatchet",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2955,6 +3197,7 @@
           "title": "Lumboars",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2962,6 +3205,7 @@
           "title": "Crash Site Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -2969,6 +3213,7 @@
           "title": "Sharpening Stone",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3009,6 +3254,7 @@
           "title": "Cybersecurity",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3016,6 +3262,7 @@
           "title": "Pulse Rifle",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3023,6 +3270,7 @@
           "title": "Katana",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3030,6 +3278,7 @@
           "title": "Laser Pistol",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3037,6 +3286,7 @@
           "title": "Sunderer",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3044,6 +3294,7 @@
           "title": "Gatling Gun",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3084,6 +3335,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -3091,6 +3343,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -3098,6 +3351,7 @@
           "title": "Lockbox",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -3105,6 +3359,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -3112,6 +3367,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         }
       ],
@@ -3145,6 +3401,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -3152,6 +3409,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -3159,6 +3417,7 @@
           "title": "Lockbox",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -3166,6 +3425,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -3173,6 +3433,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Obsidian",
           "type": "Item"
         }
       ],
@@ -3206,6 +3467,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -3213,6 +3475,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -3220,6 +3483,7 @@
           "title": "Lockbox",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -3227,6 +3491,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -3234,6 +3499,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         }
       ],
@@ -3267,6 +3533,7 @@
           "title": "Goggles",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3274,6 +3541,7 @@
           "title": "Sirens",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3281,6 +3549,7 @@
           "title": "Race Carl",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3288,6 +3557,7 @@
           "title": "Captain's Wheel",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3295,6 +3565,7 @@
           "title": "Hydrogen Tank",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3302,6 +3573,7 @@
           "title": "Cog",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3348,6 +3620,7 @@
           "title": "Safe",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3355,6 +3628,7 @@
           "title": "Shadowed Cloak",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3362,6 +3636,7 @@
           "title": "Concealed Dagger",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3369,6 +3644,7 @@
           "title": "Covetous Raven",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3376,6 +3652,7 @@
           "title": "Sharpening Stone",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3422,6 +3699,7 @@
           "title": "Extract",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3429,6 +3707,7 @@
           "title": "Bandages",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3436,6 +3715,7 @@
           "title": "Ouroboros Statue",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3443,6 +3723,7 @@
           "title": "Death Caps",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3450,6 +3731,7 @@
           "title": "Thurible",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3457,6 +3739,7 @@
           "title": "Ectoplasm",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3464,6 +3747,7 @@
           "title": "Bandages",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3471,6 +3755,7 @@
           "title": "Temple Expedition Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3511,6 +3796,7 @@
           "title": "Icicle",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3518,6 +3804,7 @@
           "title": "Weights",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3525,6 +3812,7 @@
           "title": "Handaxe",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3532,6 +3820,7 @@
           "title": "Frozen Bludgeon",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3539,6 +3828,7 @@
           "title": "Snow Globe",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3579,6 +3869,7 @@
           "title": "Cinders",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3586,6 +3877,7 @@
           "title": "Nitro",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3593,6 +3885,7 @@
           "title": "Micro Dave",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3600,6 +3893,7 @@
           "title": "Bomb Squad",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3607,6 +3901,7 @@
           "title": "Char Cole",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3614,6 +3909,7 @@
           "title": "Curry",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3621,6 +3917,7 @@
           "title": "Hot Sauce",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3628,6 +3925,7 @@
           "title": "Black Pepper",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3635,6 +3933,7 @@
           "title": "Lighter",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3681,6 +3980,7 @@
           "title": "Fang",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -3688,6 +3988,7 @@
           "title": "Venom",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3695,6 +3996,7 @@
           "title": "Fang",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -3702,6 +4004,7 @@
           "title": "Venom",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3709,6 +4012,7 @@
           "title": "Poppy Field",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3716,6 +4020,7 @@
           "title": "Emerald",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3723,6 +4028,7 @@
           "title": "Guardian Shell",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3763,6 +4069,7 @@
           "title": "Eagle Talisman",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3770,6 +4077,7 @@
           "title": "Shadowed Cloak",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3777,6 +4085,7 @@
           "title": "Harkuvian Launcher",
           "tier": "Silver",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3784,6 +4093,7 @@
           "title": "Rocket Boots",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3791,6 +4101,7 @@
           "title": "Goggles",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3798,6 +4109,7 @@
           "title": "Gunpowder",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3850,6 +4162,7 @@
           "title": "Scrap",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3857,6 +4170,7 @@
           "title": "Silk Scarf",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3864,6 +4178,7 @@
           "title": "Scrap",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3904,6 +4219,7 @@
           "title": "Skyliner",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3911,6 +4227,7 @@
           "title": "Jetpack",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3918,6 +4235,7 @@
           "title": "Solar Drone",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3925,6 +4243,7 @@
           "title": "Balloon Engine",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3932,6 +4251,7 @@
           "title": "Launch Tower",
           "tier": "Silver",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -3972,6 +4292,7 @@
           "title": "Fire Claw",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Restorative",
           "type": "Item"
         },
         {
@@ -3979,6 +4300,7 @@
           "title": "Cinders",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3986,6 +4308,7 @@
           "title": "Sunlight Spear",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -3993,6 +4316,7 @@
           "title": "Cinders",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4000,6 +4324,7 @@
           "title": "Fire Claw",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Restorative",
           "type": "Item"
         }
       ],
@@ -4040,6 +4365,7 @@
           "title": "Trebuchet",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4047,6 +4373,7 @@
           "title": "Rocket Launcher",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4054,6 +4381,7 @@
           "title": "Pop Snappers",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4061,6 +4389,7 @@
           "title": "Incendiary Rounds",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4068,6 +4397,7 @@
           "title": "Pop Snappers",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4075,6 +4405,7 @@
           "title": "Thrusters",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4082,6 +4413,7 @@
           "title": "Temple Expedition Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4122,6 +4454,7 @@
           "title": "Extract",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4129,6 +4462,7 @@
           "title": "Black Rose",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4136,6 +4470,7 @@
           "title": "Poppy Field",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4143,6 +4478,7 @@
           "title": "Floor Spike",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4150,6 +4486,7 @@
           "title": "Bushel",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4157,6 +4494,7 @@
           "title": "Succulents",
           "tier": "Silver",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -4164,6 +4502,7 @@
           "title": "Extract",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4210,6 +4549,7 @@
           "title": "Insect Wing",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4217,6 +4557,7 @@
           "title": "Junkyard Lance",
           "tier": "Silver",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4224,6 +4565,7 @@
           "title": "Busy Bee",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -4231,6 +4573,7 @@
           "title": "Busy Bee",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Deadly",
           "type": "Item"
         },
         {
@@ -4238,6 +4581,7 @@
           "title": "Honeycomb",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4245,6 +4589,7 @@
           "title": "Insect Wing",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4285,6 +4630,7 @@
           "title": "Letter Opener",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -4292,6 +4638,7 @@
           "title": "Basilisk Fang",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4299,6 +4646,7 @@
           "title": "Sextant",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4306,6 +4654,7 @@
           "title": "Magic Carpet",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4313,6 +4662,7 @@
           "title": "Letter Opener",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -4320,6 +4670,7 @@
           "title": "Clockwork Blades",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4327,6 +4678,7 @@
           "title": "Energy Potion",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4367,6 +4719,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Heavy",
           "type": "Item"
         },
         {
@@ -4374,6 +4727,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Icy",
           "type": "Item"
         },
         {
@@ -4381,6 +4735,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -4388,6 +4743,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -4395,6 +4751,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Shiny",
           "type": "Item"
         },
         {
@@ -4402,6 +4759,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Shiny",
           "type": "Item"
         },
         {
@@ -4409,6 +4767,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -4416,6 +4775,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -4423,6 +4783,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Icy",
           "type": "Item"
         },
         {
@@ -4430,6 +4791,7 @@
           "title": "Fang",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Heavy",
           "type": "Item"
         }
       ],
@@ -4476,6 +4838,7 @@
           "title": "Ouroboros Statue",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4483,6 +4846,7 @@
           "title": "Venomander",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4490,6 +4854,7 @@
           "title": "Sleeping Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4497,6 +4862,7 @@
           "title": "Incense",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4504,6 +4870,7 @@
           "title": "Magnus' Femur",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4511,6 +4878,7 @@
           "title": "Nightshade",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4551,6 +4919,7 @@
           "title": "Cinders",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4558,6 +4927,7 @@
           "title": "Eject Button",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4565,6 +4935,7 @@
           "title": "Ice Bomb",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4572,6 +4943,7 @@
           "title": "Ornithopter",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4579,6 +4951,7 @@
           "title": "Rocket Drone",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4586,6 +4959,7 @@
           "title": "Fire Bomb",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4593,6 +4967,7 @@
           "title": "Recycler Bot",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4600,6 +4975,7 @@
           "title": "Gunpowder",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4640,6 +5016,7 @@
           "title": "Piggy Bank",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4647,6 +5024,7 @@
           "title": "Succulents",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4654,6 +5032,7 @@
           "title": "Golf Clubs",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4661,6 +5040,7 @@
           "title": "Bushel",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4668,6 +5048,7 @@
           "title": "Bandages",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4675,6 +5056,7 @@
           "title": "Med Kit",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4715,6 +5097,7 @@
           "title": "Tropical Island",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4722,6 +5105,7 @@
           "title": "Sea Shell",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4729,6 +5113,7 @@
           "title": "Pet Rock",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4736,6 +5121,7 @@
           "title": "Catfish",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4743,6 +5129,7 @@
           "title": "Jellyfish",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4750,6 +5137,7 @@
           "title": "Seaweed",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4757,6 +5145,7 @@
           "title": "Seaweed",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4764,6 +5153,7 @@
           "title": "Clamera",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4816,6 +5206,7 @@
           "title": "Bread",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4823,6 +5214,7 @@
           "title": "Salt",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4830,6 +5222,7 @@
           "title": "Butter",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4837,6 +5230,7 @@
           "title": "Giant Sub",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4844,6 +5238,7 @@
           "title": "Spice Rack",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4851,6 +5246,7 @@
           "title": "Baked Potato",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4891,6 +5287,7 @@
           "title": "Red Piggles R",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4898,6 +5295,7 @@
           "title": "Premium Red Piggles",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4905,6 +5303,7 @@
           "title": "Piggles",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4912,6 +5311,7 @@
           "title": "Piggles Protectors",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4919,6 +5319,7 @@
           "title": "Yellow Piggles L",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4926,6 +5327,7 @@
           "title": "Temple Expedition Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -4966,6 +5368,7 @@
           "title": "Torpedo",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4973,6 +5376,7 @@
           "title": "Piranha",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4980,6 +5384,7 @@
           "title": "Shot Glasses",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4987,6 +5392,7 @@
           "title": "Elemental Depth Charge",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -4994,6 +5400,7 @@
           "title": "Bottled Lightning",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5001,6 +5408,7 @@
           "title": "Mantis Shrimp",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5008,6 +5416,7 @@
           "title": "Biomerge Arm",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5054,6 +5463,7 @@
           "title": "Venomous Dose",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5061,6 +5471,7 @@
           "title": "Fungal Spores",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5068,6 +5479,7 @@
           "title": "Rapid Injection System",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5075,6 +5487,7 @@
           "title": "Barbed Claws",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5082,6 +5495,7 @@
           "title": "Test Subject Alpha",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5089,6 +5503,7 @@
           "title": "Infused Bracers",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5135,6 +5550,7 @@
           "title": "Tortuga",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5142,6 +5558,7 @@
           "title": "Pesky Pete",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5149,6 +5566,7 @@
           "title": "Zoarcid",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5156,6 +5574,7 @@
           "title": "Catfish",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5163,6 +5582,7 @@
           "title": "Pufferfish",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5170,6 +5590,7 @@
           "title": "Jellyfish",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5177,6 +5598,7 @@
           "title": "Old Saltclaw",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5223,6 +5645,7 @@
           "title": "Junkyard Catapult",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5230,6 +5653,7 @@
           "title": "Plasma Grenade",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5237,6 +5661,7 @@
           "title": "Grenade",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5244,6 +5669,7 @@
           "title": "Noxious Potion",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5251,6 +5677,7 @@
           "title": "Rainbow Potion",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5258,6 +5685,7 @@
           "title": "Grapeshot",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5265,6 +5693,7 @@
           "title": "Powder Keg",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5305,6 +5734,7 @@
           "title": "Venom",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5312,6 +5742,7 @@
           "title": "Emerald",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5319,6 +5750,7 @@
           "title": "Catalyst",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5326,6 +5758,7 @@
           "title": "Junkyard Lance",
           "tier": "Diamond",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5333,6 +5766,7 @@
           "title": "Hemlock",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5340,6 +5774,7 @@
           "title": "Ectoplasm",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5347,6 +5782,7 @@
           "title": "Ectoplasm",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5354,6 +5790,7 @@
           "title": "Venomander",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5394,6 +5831,7 @@
           "title": "Bag of Jewels",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5401,6 +5839,7 @@
           "title": "Seaweed",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5408,6 +5847,7 @@
           "title": "Sea Shell",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5415,6 +5855,7 @@
           "title": "Turtle Shell",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5422,6 +5863,7 @@
           "title": "Catfish",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5429,6 +5871,7 @@
           "title": "Pearl",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5436,6 +5879,7 @@
           "title": "Clamera",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5443,6 +5887,7 @@
           "title": "Temple Expedition Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5450,6 +5895,7 @@
           "title": "Bag of Jewels",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5496,6 +5942,7 @@
           "title": "Gland",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5503,6 +5950,7 @@
           "title": "Fang",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -5510,6 +5958,7 @@
           "title": "Fang",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5517,6 +5966,7 @@
           "title": "Extract",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5557,6 +6007,7 @@
           "title": "Wildroot Amulet",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5564,6 +6015,7 @@
           "title": "Blueberry Pie",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5571,6 +6023,7 @@
           "title": "Wild Boar",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5578,6 +6031,7 @@
           "title": "Basket",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5585,6 +6039,7 @@
           "title": "Truffles",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5625,6 +6080,7 @@
           "title": "Pelt",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5632,6 +6088,7 @@
           "title": "Battle Axe",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5639,6 +6096,7 @@
           "title": "Bear Mask",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5646,6 +6104,7 @@
           "title": "Hunting Knife",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5653,6 +6112,7 @@
           "title": "Bagpipes",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5660,6 +6120,7 @@
           "title": "Warpaint",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5667,6 +6128,7 @@
           "title": "Resistance Bands",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5707,6 +6169,7 @@
           "title": "Pelt",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5714,6 +6177,7 @@
           "title": "Eagle Sigil",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5721,6 +6185,7 @@
           "title": "Wolverine",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5728,6 +6193,7 @@
           "title": "Beast Call",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5735,6 +6201,7 @@
           "title": "Wolf",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5742,6 +6209,7 @@
           "title": "Fang",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Turbo",
           "type": "Item"
         },
         {
@@ -5749,6 +6217,7 @@
           "title": "Warpaint",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5756,6 +6225,7 @@
           "title": "Claws",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Turbo",
           "type": "Item"
         }
       ],
@@ -5796,6 +6266,7 @@
           "title": "Extract",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5803,6 +6274,7 @@
           "title": "Drowsdrop",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5810,6 +6282,7 @@
           "title": "Worry Wart",
           "tier": "Bronze",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5817,6 +6290,7 @@
           "title": "Warpaint",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5824,6 +6298,7 @@
           "title": "Frog Hollow",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5831,6 +6306,7 @@
           "title": "Extract",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5871,6 +6347,7 @@
           "title": "Crypto",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5878,6 +6355,7 @@
           "title": "Rapid Injection System",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5885,6 +6363,7 @@
           "title": "Solar Farm",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5892,6 +6371,7 @@
           "title": "Virus",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5899,6 +6379,7 @@
           "title": "Crypto",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -5932,6 +6413,7 @@
           "title": "Welding Helmet",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5939,6 +6421,7 @@
           "title": "Plasma Grenade",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5946,6 +6429,7 @@
           "title": "Nitro",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5953,6 +6437,7 @@
           "title": "Welding Torch",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5960,6 +6445,7 @@
           "title": "Plasma Rifle",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5967,6 +6453,7 @@
           "title": "Incendiary Rounds",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -5974,6 +6461,7 @@
           "title": "Induction Aegis",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6014,6 +6502,7 @@
           "title": "Elemental Depth Charge",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6021,6 +6510,7 @@
           "title": "Pufferfish",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6028,6 +6518,7 @@
           "title": "Dive Weights",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6035,6 +6526,7 @@
           "title": "Incendiary Rounds",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6042,6 +6534,7 @@
           "title": "Pearl",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -6049,6 +6542,7 @@
           "title": "Slumbering Primordial",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6095,6 +6589,7 @@
           "title": "The Boulder",
           "tier": "Gold",
           "size": "Large",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -6102,6 +6597,7 @@
           "title": "Tripwire",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -6109,6 +6605,7 @@
           "title": "Lockbox",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -6116,6 +6613,7 @@
           "title": "The Boulder",
           "tier": "Gold",
           "size": "Large",
+          "enchant": "Toxic",
           "type": "Item"
         }
       ],
@@ -6149,6 +6647,7 @@
           "title": "The Boulder",
           "tier": "Gold",
           "size": "Large",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -6156,6 +6655,7 @@
           "title": "Tripwire",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -6163,6 +6663,7 @@
           "title": "Lockbox",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Obsidian",
           "type": "Item"
         },
         {
@@ -6170,6 +6671,7 @@
           "title": "The Boulder",
           "tier": "Gold",
           "size": "Large",
+          "enchant": "Obsidian",
           "type": "Item"
         }
       ],
@@ -6203,6 +6705,7 @@
           "title": "The Boulder",
           "tier": "Gold",
           "size": "Large",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -6210,6 +6713,7 @@
           "title": "Tripwire",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -6217,6 +6721,7 @@
           "title": "Lockbox",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -6224,6 +6729,7 @@
           "title": "The Boulder",
           "tier": "Gold",
           "size": "Large",
+          "enchant": "Fiery",
           "type": "Item"
         }
       ],
@@ -6257,6 +6763,7 @@
           "title": "Induction Aegis",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6264,6 +6771,7 @@
           "title": "Weakpoint Detector",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6271,6 +6779,7 @@
           "title": "Pylon",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6278,6 +6787,7 @@
           "title": "Thermal Lance",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6285,6 +6795,7 @@
           "title": "Flamethrower",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6325,6 +6836,7 @@
           "title": "Slushee",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6332,6 +6844,7 @@
           "title": "Ice Cubes",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6339,6 +6852,7 @@
           "title": "Ice Cream Truck",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6346,6 +6860,7 @@
           "title": "Hammock",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6353,6 +6868,7 @@
           "title": "Igloo",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6393,6 +6909,7 @@
           "title": "Insect Wing",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6400,6 +6917,7 @@
           "title": "Ectoplasm",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6407,6 +6925,7 @@
           "title": "Proboscis",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6414,6 +6933,7 @@
           "title": "Amber",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6421,6 +6941,7 @@
           "title": "Stinger",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6428,6 +6949,7 @@
           "title": "Neural Toxin",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6435,6 +6957,7 @@
           "title": "Stinger",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6442,6 +6965,7 @@
           "title": "Venom",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6449,6 +6973,7 @@
           "title": "Incense",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6456,6 +6981,7 @@
           "title": "Insect Wing",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6502,6 +7028,7 @@
           "title": "BLU-B33TL3",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6509,6 +7036,7 @@
           "title": "GRN-W4SP",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6516,6 +7044,7 @@
           "title": "BLK-SP1D3R",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6523,6 +7052,7 @@
           "title": "RED-F1R3FLY",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6530,6 +7060,7 @@
           "title": "YLW-M4NT1S",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6537,6 +7068,7 @@
           "title": "Z-Sword",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6544,6 +7076,7 @@
           "title": "Dooltron",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6590,6 +7123,7 @@
           "title": "Lightning Rod",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6597,6 +7131,7 @@
           "title": "Lightbulb",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6604,6 +7139,7 @@
           "title": "Tesla Coil",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6611,6 +7147,7 @@
           "title": "Cog",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6618,6 +7155,7 @@
           "title": "Weather Machine",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6658,6 +7196,7 @@
           "title": "Temple Expedition Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6665,6 +7204,7 @@
           "title": "Scrap",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6672,6 +7212,7 @@
           "title": "Force Field",
           "tier": "Silver",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6679,6 +7220,7 @@
           "title": "Laser Pistol",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6686,6 +7228,7 @@
           "title": "Goggles",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6693,6 +7236,7 @@
           "title": "Barbed Wire",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6733,6 +7277,7 @@
           "title": "Shadowed Cloak",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6740,6 +7285,7 @@
           "title": "Sniper Rifle",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6747,6 +7293,7 @@
           "title": "Silencer",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6754,6 +7301,7 @@
           "title": "Barrel",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6761,6 +7309,7 @@
           "title": "Dock Lines",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6768,6 +7317,7 @@
           "title": "Energy Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6820,6 +7370,7 @@
           "title": "Insect Wing",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6827,6 +7378,7 @@
           "title": "Stinger",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6834,6 +7386,7 @@
           "title": "Venom",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6841,6 +7394,7 @@
           "title": "Proboscis",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6848,6 +7402,7 @@
           "title": "Amber",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6855,6 +7410,7 @@
           "title": "Mothmeal",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6862,6 +7418,7 @@
           "title": "Flying Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6869,6 +7426,7 @@
           "title": "Insect Wing",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -6921,6 +7479,7 @@
           "title": "Temple Expedition Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6928,6 +7487,7 @@
           "title": "Black Rose",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6935,6 +7495,7 @@
           "title": "Clockwork Blades",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -6942,6 +7503,7 @@
           "title": "Nightshade",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6949,6 +7511,7 @@
           "title": "Trained Spider",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -6956,6 +7519,7 @@
           "title": "Basilisk Fang",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7008,6 +7572,7 @@
           "title": "Med Kit",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7015,6 +7580,7 @@
           "title": "Haladie",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7022,6 +7588,7 @@
           "title": "Ganjo",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7029,6 +7596,7 @@
           "title": "Double Barrel",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7036,6 +7604,7 @@
           "title": "Scrap",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7043,6 +7612,7 @@
           "title": "Crash Site Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7083,6 +7653,7 @@
           "title": "Gunpowder",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7090,6 +7661,7 @@
           "title": "Laser Pistol",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7097,6 +7669,7 @@
           "title": "SMG",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7104,6 +7677,7 @@
           "title": "Bolas",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7111,6 +7685,7 @@
           "title": "Weakpoint Detector",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7118,6 +7693,7 @@
           "title": "Grappling Hook",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7125,6 +7701,7 @@
           "title": "Eagle Talisman",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7165,6 +7742,7 @@
           "title": "Sharkray",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7172,6 +7750,7 @@
           "title": "Sharkclaws",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7179,6 +7758,7 @@
           "title": "Sharkclaws",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7186,6 +7766,7 @@
           "title": "ATM",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7193,6 +7774,7 @@
           "title": "Cash Cannon",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7239,6 +7821,7 @@
           "title": "Crypto",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7246,6 +7829,7 @@
           "title": "First Aiden",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7253,6 +7837,7 @@
           "title": "Chris Army Knife",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7260,6 +7845,7 @@
           "title": "Bill Dozer",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7267,6 +7853,7 @@
           "title": "Bomb Squad",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7274,6 +7861,7 @@
           "title": "Char Cole",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7281,6 +7869,7 @@
           "title": "Crypto",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7321,6 +7910,7 @@
           "title": "Ouroboros Statue",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7328,6 +7918,7 @@
           "title": "Venomander",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7335,6 +7926,7 @@
           "title": "Sleeping Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7342,6 +7934,7 @@
           "title": "Incense",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7349,6 +7942,7 @@
           "title": "Magnus' Femur",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7356,6 +7950,7 @@
           "title": "Nightshade",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7396,6 +7991,7 @@
           "title": "Eagle Sigil",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7403,6 +7999,7 @@
           "title": "Claws",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7410,6 +8007,7 @@
           "title": "Bear Mask",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7417,6 +8015,7 @@
           "title": "Outlands Terror",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7424,6 +8023,7 @@
           "title": "Assault Sigil",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7431,6 +8031,7 @@
           "title": "Fang",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Shiny",
           "type": "Item"
         }
       ],
@@ -7471,6 +8072,7 @@
           "title": "Temple Expedition Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7478,6 +8080,7 @@
           "title": "Coconut",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7485,6 +8088,7 @@
           "title": "Chum",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7492,6 +8096,7 @@
           "title": "Piranha",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7499,6 +8104,7 @@
           "title": "IllusoRay",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7506,6 +8112,7 @@
           "title": "Narwhal",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7513,6 +8120,7 @@
           "title": "Electric Eels",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7520,6 +8128,7 @@
           "title": "Citrus",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7560,6 +8169,7 @@
           "title": "Cosmic Plumage",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7567,6 +8177,7 @@
           "title": "Claws",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -7574,6 +8185,7 @@
           "title": "Viper Cane",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": "Shielded",
           "type": "Item"
         },
         {
@@ -7581,6 +8193,7 @@
           "title": "Basilisk Fang",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Shielded",
           "type": "Item"
         },
         {
@@ -7588,6 +8201,7 @@
           "title": "Philosopher's Stone",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -7595,6 +8209,7 @@
           "title": "Ethergy Conduit",
           "tier": "Diamond",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7635,6 +8250,7 @@
           "title": "Dinosawer",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7642,6 +8258,7 @@
           "title": "Rex Spex",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7649,6 +8266,7 @@
           "title": "YLW-M4NT1S",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7656,6 +8274,7 @@
           "title": "Dino Disguise",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -7663,6 +8282,7 @@
           "title": "Zoarcid",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7670,6 +8290,7 @@
           "title": "Race Carl",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7716,6 +8337,7 @@
           "title": "Boosted Saucer",
           "tier": "Silver",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7723,6 +8345,7 @@
           "title": "Warp Drive",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7730,6 +8353,7 @@
           "title": "Tractor Beam",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7737,6 +8361,7 @@
           "title": "Abducted Cow",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7744,6 +8369,7 @@
           "title": "Learning Crystal",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7751,6 +8377,7 @@
           "title": "Galactic Translator",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7791,6 +8418,7 @@
           "title": "Crash Site Ticket",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7798,6 +8426,7 @@
           "title": "Sharpening Stone",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7805,6 +8434,7 @@
           "title": "Brass Knuckles",
           "tier": "Silver",
           "size": "Small",
+          "enchant": "Shielded",
           "type": "Item"
         },
         {
@@ -7812,6 +8442,7 @@
           "title": "Dog",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7819,6 +8450,7 @@
           "title": "Temporary Shelter",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7826,6 +8458,7 @@
           "title": "Pepper Spray",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7872,6 +8505,7 @@
           "title": "Eagle Talisman",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7879,6 +8513,7 @@
           "title": "Honing Steel",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7886,6 +8521,7 @@
           "title": "Friendly Doll",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7893,6 +8529,7 @@
           "title": "Switchblade",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7900,6 +8537,7 @@
           "title": "Butterfly Swords",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7907,6 +8545,7 @@
           "title": "Old Sword",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7914,6 +8553,7 @@
           "title": "Sharpening Stone",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7921,6 +8561,7 @@
           "title": "Broken Shackles",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -7961,6 +8602,7 @@
           "title": "Cryosphere",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7968,6 +8610,7 @@
           "title": "Cryosleeve",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7975,6 +8618,7 @@
           "title": "Stopwatch",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7982,6 +8626,7 @@
           "title": "Icebreaker",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7989,6 +8634,7 @@
           "title": "Ice Pick",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -7996,6 +8642,7 @@
           "title": "Frost Potion",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8003,6 +8650,7 @@
           "title": "Icicle",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8049,6 +8697,7 @@
           "title": "Electric Eels",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8056,6 +8705,7 @@
           "title": "Catfish",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8063,6 +8713,7 @@
           "title": "Jellyfish",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8070,6 +8721,7 @@
           "title": "Piranha",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8077,6 +8729,7 @@
           "title": "Amber",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8084,6 +8737,7 @@
           "title": "Seaweed",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8091,6 +8745,7 @@
           "title": "Pufferfish",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8137,6 +8792,7 @@
           "title": "Cog",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8144,6 +8800,7 @@
           "title": "Kinetic Cannon",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8151,6 +8808,7 @@
           "title": "Battery",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8158,6 +8816,7 @@
           "title": "Coolant",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8165,6 +8824,7 @@
           "title": "First Aiden",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8172,6 +8832,7 @@
           "title": "Laser Pistol",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8179,6 +8840,7 @@
           "title": "Power Sander",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8186,6 +8848,7 @@
           "title": "SMG",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8232,6 +8895,7 @@
           "title": "Tournament Arena",
           "tier": "Diamond",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8239,6 +8903,7 @@
           "title": "Piggles Board",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8246,6 +8911,7 @@
           "title": "Red Piggles R",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8253,6 +8919,7 @@
           "title": "Yo-Yo",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8260,6 +8927,7 @@
           "title": "Red Piggles A",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8267,6 +8935,7 @@
           "title": "Premium Red Piggles",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8274,6 +8943,7 @@
           "title": "Red Piggles L",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8320,6 +8990,7 @@
           "title": "Security Drone",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8327,6 +8998,7 @@
           "title": "Tantius Carrier",
           "tier": "Legendary",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8334,6 +9006,7 @@
           "title": "Rocket Drone",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8341,6 +9014,7 @@
           "title": "Caracara",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8348,6 +9022,7 @@
           "title": "Jetpack",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8355,6 +9030,7 @@
           "title": "Lightning Butterfly",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8395,6 +9071,7 @@
           "title": "Revolver",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8402,6 +9079,7 @@
           "title": "Thrown Net",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8409,6 +9087,7 @@
           "title": "Revolver",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8416,6 +9095,7 @@
           "title": "Cutlass",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8423,6 +9103,7 @@
           "title": "Wanted Poster",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8430,6 +9111,7 @@
           "title": "Flashbang",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8437,6 +9119,7 @@
           "title": "Broken Shackles",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8477,6 +9160,7 @@
           "title": "Lighter",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8484,6 +9168,7 @@
           "title": "Magma Core",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8491,6 +9176,7 @@
           "title": "Magma Core",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8498,6 +9184,7 @@
           "title": "Magma Core",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8505,6 +9192,7 @@
           "title": "Magma Core",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8512,6 +9200,7 @@
           "title": "Cinders",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8552,6 +9241,7 @@
           "title": "Scrap",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8559,6 +9249,7 @@
           "title": "Chris Army Knife",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8566,6 +9257,7 @@
           "title": "Power Sander",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8573,6 +9265,7 @@
           "title": "Crane",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8580,6 +9273,7 @@
           "title": "Forklift",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8587,6 +9281,7 @@
           "title": "Cog",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8627,6 +9322,7 @@
           "title": "Soul Ring",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8634,6 +9330,7 @@
           "title": "Emerald",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8641,6 +9338,7 @@
           "title": "Ouroboros Statue",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8648,6 +9346,7 @@
           "title": "Shadowed Cloak",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8655,6 +9354,7 @@
           "title": "Basilisk Fang",
           "tier": "Bronze",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8662,6 +9362,7 @@
           "title": "Ectoplasm",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8669,6 +9370,7 @@
           "title": "Thurible",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8676,6 +9378,7 @@
           "title": "Bandages",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8722,6 +9425,7 @@
           "title": "Iceberg",
           "tier": "Diamond",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8729,6 +9433,7 @@
           "title": "Nitrogen Hammer",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8736,6 +9441,7 @@
           "title": "Sapphire",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8743,6 +9449,7 @@
           "title": "Frozen Bludgeon",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8750,6 +9457,7 @@
           "title": "Frost Potion",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8757,6 +9465,7 @@
           "title": "Snowflake",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8803,6 +9512,7 @@
           "title": "Moon Orb",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8810,6 +9520,7 @@
           "title": "Shot Glasses",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8817,6 +9528,7 @@
           "title": "Earrings",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8824,6 +9536,7 @@
           "title": "Weather Machine",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8831,6 +9544,7 @@
           "title": "Solar Drone",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8838,6 +9552,7 @@
           "title": "Steam Hose",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8845,6 +9560,7 @@
           "title": "Thrusters",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8885,6 +9601,7 @@
           "title": "Cinders",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8892,6 +9609,7 @@
           "title": "Fire Claw",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8899,6 +9617,7 @@
           "title": "Magma Core",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8906,6 +9625,7 @@
           "title": "Infernal Greatsword",
           "tier": "Legendary",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8913,6 +9633,7 @@
           "title": "Magma Core",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8920,6 +9641,7 @@
           "title": "Ruby",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8927,6 +9649,7 @@
           "title": "Cinders",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -8979,6 +9702,7 @@
           "title": "Incendiary Rounds",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8986,6 +9710,7 @@
           "title": "Incendiary Rounds",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -8993,6 +9718,7 @@
           "title": "Incendiary Rounds",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9000,6 +9726,7 @@
           "title": "Tommoo Gun",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9007,6 +9734,7 @@
           "title": "Incendiary Rounds",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9014,6 +9742,7 @@
           "title": "Incendiary Rounds",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9021,6 +9750,7 @@
           "title": "Tommoo Gun",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9028,6 +9758,7 @@
           "title": "Incendiary Rounds",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9035,6 +9766,7 @@
           "title": "Incendiary Rounds",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9042,6 +9774,7 @@
           "title": "Incendiary Rounds",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9082,6 +9815,7 @@
           "title": "Venomous Dose",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9089,6 +9823,7 @@
           "title": "Butter",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9096,6 +9831,7 @@
           "title": "Bread Knife",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9103,6 +9839,7 @@
           "title": "Bread",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": "Toxic",
           "type": "Item"
         },
         {
@@ -9110,6 +9847,7 @@
           "title": "Knife Sharpener",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9117,6 +9855,7 @@
           "title": "Rolling Pin",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9157,6 +9896,7 @@
           "title": "Skyscraper",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9164,6 +9904,7 @@
           "title": "Subscraper",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9171,6 +9912,7 @@
           "title": "Billboard",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9178,6 +9920,7 @@
           "title": "Keychain",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9224,6 +9967,7 @@
           "title": "Cinders",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9231,6 +9975,7 @@
           "title": "Curry",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9238,6 +9983,7 @@
           "title": "Skillet",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9245,6 +9991,7 @@
           "title": "Black Pepper",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9252,6 +9999,7 @@
           "title": "Hot Sauce",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9259,6 +10007,7 @@
           "title": "Pickled Peppers",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9299,6 +10048,7 @@
           "title": "Bar of Gold",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9306,6 +10056,7 @@
           "title": "Double Whammy",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9313,6 +10064,7 @@
           "title": "Improvised Bludgeon",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9320,6 +10072,7 @@
           "title": "Pawn Shop",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9327,6 +10080,7 @@
           "title": "Brass Knuckles",
           "tier": "Gold",
           "size": "Small",
+          "enchant": "Toxic",
           "type": "Item"
         }
       ],
@@ -9385,6 +10139,7 @@
           "title": "Ruby",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9392,6 +10147,7 @@
           "title": "Void Ray",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9399,6 +10155,7 @@
           "title": "Eye of the Colossus",
           "tier": "Legendary",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9406,6 +10163,7 @@
           "title": "Void Ray",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9413,6 +10171,7 @@
           "title": "Void Shield",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9459,6 +10218,7 @@
           "title": "Landscraper",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9466,6 +10226,7 @@
           "title": "Soul of the District",
           "tier": "Legendary",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9473,6 +10234,7 @@
           "title": "Spacescraper",
           "tier": "Gold",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9480,6 +10242,7 @@
           "title": "Balcony",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9532,6 +10295,7 @@
           "title": "Dragon Wing",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9539,6 +10303,7 @@
           "title": "Fire Claw",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9546,6 +10311,7 @@
           "title": "Dragon Heart",
           "tier": "Legendary",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9553,6 +10319,7 @@
           "title": "Fire Claw",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9560,6 +10327,7 @@
           "title": "Dragon Wing",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9606,6 +10374,7 @@
           "title": "Tiny Cutlass",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9613,6 +10382,7 @@
           "title": "Tiny Cutlass",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9620,6 +10390,7 @@
           "title": "Tiny Cutlass",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9627,6 +10398,7 @@
           "title": "Tiny Cutlass",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9634,6 +10406,7 @@
           "title": "Octopus",
           "tier": "Legendary",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9641,6 +10414,7 @@
           "title": "Tiny Cutlass",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9648,6 +10422,7 @@
           "title": "Tiny Cutlass",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9655,6 +10430,7 @@
           "title": "Tiny Cutlass",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9662,6 +10438,7 @@
           "title": "Tiny Cutlass",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9714,6 +10491,7 @@
           "title": "Cauldron",
           "tier": "Silver",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9721,6 +10499,7 @@
           "title": "Ectoplasm",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9728,6 +10507,7 @@
           "title": "Icicle",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9735,6 +10515,7 @@
           "title": "Necronomicon",
           "tier": "Legendary",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9742,6 +10523,7 @@
           "title": "Icicle",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9749,6 +10531,7 @@
           "title": "Wand",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9756,6 +10539,7 @@
           "title": "Emerald",
           "tier": "Silver",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9763,6 +10547,7 @@
           "title": "Soul Ring",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9809,6 +10594,7 @@
           "title": "Vitality Potion",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9816,6 +10602,7 @@
           "title": "Gatling Gun",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9823,6 +10610,7 @@
           "title": "The Eclipse",
           "tier": "Legendary",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9830,6 +10618,7 @@
           "title": "Thrusters",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9837,6 +10626,7 @@
           "title": "Gatling Gun",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9844,6 +10634,7 @@
           "title": "Arken's Ring",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9896,6 +10687,7 @@
           "title": "Cleaver",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9903,6 +10695,7 @@
           "title": "Box Cutter",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9910,6 +10703,7 @@
           "title": "Handaxe",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9917,6 +10711,7 @@
           "title": "Haladie",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9924,6 +10719,7 @@
           "title": "Chris Army Knife",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9931,6 +10727,7 @@
           "title": "Ritual Dagger",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9938,6 +10735,7 @@
           "title": "Sword of Swords",
           "tier": "Legendary",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9945,6 +10743,7 @@
           "title": "Lockbox",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -9991,6 +10790,7 @@
           "title": "Grappling Hook",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -9998,6 +10798,7 @@
           "title": "Anchor",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10005,6 +10806,7 @@
           "title": "Dock Lines",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10012,6 +10814,7 @@
           "title": "Katana",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": "Fiery",
           "type": "Item"
         },
         {
@@ -10019,6 +10822,7 @@
           "title": "Lighthouse",
           "tier": "Diamond",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -10071,6 +10875,7 @@
           "title": "Singularity",
           "tier": "Legendary",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10078,6 +10883,7 @@
           "title": "Void Ray",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10085,6 +10891,7 @@
           "title": "Void Ray",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10092,6 +10899,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10099,6 +10907,7 @@
           "title": "Caltrops",
           "tier": "Diamond",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10106,6 +10915,7 @@
           "title": "Spices",
           "tier": "Diamond",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         }
       ],
@@ -10152,6 +10962,7 @@
           "title": "Sapphire",
           "tier": "Gold",
           "size": "Small",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10159,6 +10970,7 @@
           "title": "Shadowed Cloak",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10166,6 +10978,7 @@
           "title": "Scythe",
           "tier": "Legendary",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10173,6 +10986,7 @@
           "title": "Mortal Coil",
           "tier": "Gold",
           "size": "Medium",
+          "enchant": null,
           "type": "Item"
         },
         {
@@ -10180,6 +10994,7 @@
           "title": "Runic Great Axe",
           "tier": "Diamond",
           "size": "Large",
+          "enchant": null,
           "type": "Item"
         }
       ],
