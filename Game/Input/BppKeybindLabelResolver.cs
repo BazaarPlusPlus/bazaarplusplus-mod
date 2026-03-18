@@ -1,4 +1,5 @@
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus;
 
@@ -6,7 +7,7 @@ internal static class BppKeybindLabelResolver
 {
     internal static string ResolveActionLabel(BppHotkeyActionId actionId, string languageCode)
     {
-        var isChinese = languageCode == "zh-CN";
+        var isChinese = SimplifiedChineseLanguage.Matches(languageCode);
         return actionId switch
         {
             BppHotkeyActionId.HoldEnchantPreview => isChinese
@@ -21,11 +22,11 @@ internal static class BppKeybindLabelResolver
 
     internal static string ResolveRebindPrompt(string languageCode)
     {
-        return languageCode == "zh-CN" ? "按下一个按键" : "Press a key";
+        return SimplifiedChineseLanguage.Matches(languageCode) ? "按下一个按键" : "Press a key";
     }
 
     internal static string ResolveUnsupportedKey(string languageCode)
     {
-        return languageCode == "zh-CN" ? "不支持该按键" : "Unsupported key";
+        return SimplifiedChineseLanguage.Matches(languageCode) ? "不支持该按键" : "Unsupported key";
     }
 }

@@ -54,6 +54,8 @@ internal static class BppKeybindSettingsAwakePatch
         Transform anchorRow = templateRow;
         foreach (var definition in Definitions)
             anchorRow = EnsureKeybindRow(definition, templateRow, anchorRow) ?? anchorRow;
+
+        ArrangeRows(templateRow, Definitions.Select(definition => definition.ObjectName).ToArray());
     }
 
     private static Transform? EnsureKeybindRow(
@@ -101,6 +103,27 @@ internal static class BppKeybindSettingsAwakePatch
         return keybindRows
             .Where(candidate => candidate != null && candidate.GetComponent<KeyBindController>() != null)
             .LastOrDefault();
+    }
+
+    private static void ArrangeRows(Transform templateRow, params string[] rowObjectNames)
+    {
+        if (templateRow == null || rowObjectNames == null || rowObjectNames.Length == 0)
+            return;
+
+        var parent = templateRow.parent;
+        if (parent == null)
+            return;
+
+        var currentAnchor = templateRow;
+        foreach (var rowObjectName in rowObjectNames)
+        {
+            var row = parent.Find(rowObjectName);
+            if (row == null)
+                continue;
+
+            SettingsMenuLayoutUtility.ArrangeRow(currentAnchor, row);
+            currentAnchor = row;
+        }
     }
 
     private sealed class BppKeybindDefinition

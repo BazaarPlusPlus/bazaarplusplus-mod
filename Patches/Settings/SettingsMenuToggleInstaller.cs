@@ -12,21 +12,45 @@ namespace BazaarPlusPlus;
 
 internal static class SettingsMenuToggleInstaller
 {
+    internal static void ArrangeRows(
+        OptionsDialogController instance,
+        params string[] toggleObjectNames
+    )
+    {
+        if (instance == null || toggleObjectNames == null || toggleObjectNames.Length == 0)
+            return;
+
+        var baseAnchorToggle = GetBaseAnchorToggle(instance, "SettingsMenu");
+        var baseAnchorRow = baseAnchorToggle?.transform.parent;
+        if (baseAnchorRow == null)
+            return;
+
+        var currentAnchor = baseAnchorRow;
+        foreach (var toggleObjectName in toggleObjectNames)
+        {
+            if (string.IsNullOrWhiteSpace(toggleObjectName))
+                continue;
+
+            var row = GetRowByName(instance, toggleObjectName);
+            if (row == null)
+                continue;
+
+            SettingsMenuLayoutUtility.ArrangeRow(currentAnchor, row);
+            currentAnchor = row;
+        }
+    }
+
     internal static void EnsureToggleExists(
         OptionsDialogController instance,
         SettingsMenuToggleDefinition definition
     )
     {
-        var anchorToggle = GetAnchorToggle(instance, definition.LogCategory);
-        if (anchorToggle == null)
+        var anchorRow = GetAnchorRow(instance, definition);
+        if (anchorRow == null)
         {
             BppLog.Warn(definition.LogCategory, "Could not find gameplay settings anchor toggle");
             return;
         }
-
-        var anchorRow = anchorToggle.transform.parent;
-        if (anchorRow == null)
-            return;
 
         var container = anchorRow.parent;
         if (container == null)
@@ -68,7 +92,41 @@ internal static class SettingsMenuToggleInstaller
         toggle.onValueChanged.AddListener(definition.Bridge.ApplyValue);
     }
 
-    private static Toggle? GetAnchorToggle(OptionsDialogController instance, string logCategory)
+    private static Transform? GetAnchorRow(
+        OptionsDialogController instance,
+        SettingsMenuToggleDefinition definition
+    )
+    {
+        var preferredAnchor = GetPreferredAnchorRow(instance, definition.PreferredAnchorObjectName);
+        if (preferredAnchor != null)
+            return preferredAnchor;
+
+        var anchorToggle = GetBaseAnchorToggle(instance, definition.LogCategory);
+        return anchorToggle?.transform.parent;
+    }
+
+    private static Transform? GetPreferredAnchorRow(
+        OptionsDialogController instance,
+        string? preferredAnchorObjectName
+    )
+    {
+        if (string.IsNullOrWhiteSpace(preferredAnchorObjectName))
+            return null;
+
+        return instance.transform.Find($"**/{preferredAnchorObjectName}")
+            ?? instance
+                .GetComponentsInChildren<Transform>(includeInactive: true)
+                .FirstOrDefault(candidate => candidate != null && candidate.name == preferredAnchorObjectName);
+    }
+
+    private static Transform? GetRowByName(OptionsDialogController instance, string objectName)
+    {
+        return instance
+            .GetComponentsInChildren<Transform>(includeInactive: true)
+            .FirstOrDefault(candidate => candidate != null && candidate.name == objectName);
+    }
+
+    private static Toggle? GetBaseAnchorToggle(OptionsDialogController instance, string logCategory)
     {
         var field = AccessTools.Field(typeof(OptionsDialogController), "_fastForwardFirstFight");
         var toggle = field?.GetValue(instance) as Toggle;

@@ -29,6 +29,10 @@
       Link="SettingsMenuToggleBridge.cs"
     />
     <Compile
+      Include="..\..\Game\Settings\SimplifiedChineseLanguage.cs"
+      Link="SimplifiedChineseLanguage.cs"
+    />
+    <Compile
       Include="..\..\Game\CombatStatusBar\CombatStatusBar.SettingsMenuBridge.cs"
       Link="CombatStatusBar.SettingsMenuBridge.cs"
     />

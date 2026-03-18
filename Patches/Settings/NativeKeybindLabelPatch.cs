@@ -2,6 +2,7 @@
 #nullable enable
 using System;
 using System.Linq;
+using BazaarPlusPlus.Game.Settings;
 using HarmonyLib;
 using TMPro;
 using TheBazaar.UI;
@@ -65,7 +66,9 @@ internal static class NativeKeybindLabelAwakePatch
 
     private static string ResolveMonsterPreviewLabel(string languageCode)
     {
-        return languageCode == "zh-CN" ? "展示野怪预览" : "Show Monster Preview";
+        return SimplifiedChineseLanguage.Matches(languageCode)
+            ? "展示野怪预览"
+            : "Show Monster Preview";
     }
 }
 

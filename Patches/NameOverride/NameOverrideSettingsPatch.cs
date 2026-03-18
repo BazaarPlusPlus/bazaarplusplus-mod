@@ -25,7 +25,7 @@ internal static class NameOverrideSettingsAwakePatch
     {
         try
         {
-            EnsureToggleExists(__instance);
+            BppGameplaySettingsCoordinator.EnsureAll(__instance);
         }
         catch (Exception ex)
         {
@@ -60,7 +60,7 @@ internal static class NameOverrideSettingsOnEnablePatch
     {
         try
         {
-            NameOverrideSettingsAwakePatch.EnsureToggleExists(__instance);
+            BppGameplaySettingsCoordinator.EnsureAll(__instance);
         }
         catch (Exception ex)
         {

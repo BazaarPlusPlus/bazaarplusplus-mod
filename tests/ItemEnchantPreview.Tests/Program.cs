@@ -54,7 +54,7 @@ var combatSettingsPatchSourcePath = Path.GetFullPath(
 var combatSettingsPatchSource = File.ReadAllText(combatSettingsPatchSourcePath);
 Assert(
     combatSettingsPatchSource.Contains(
-        "EnchantPreviewSettingsAwakePatch.EnsureToggleExists(__instance);",
+        "BppGameplaySettingsCoordinator.EnsureAll(__instance);",
         StringComparison.Ordinal
     ),
     "Gameplay settings refresh should install the enchant preview toggle alongside the other Bazaar++ toggles."
@@ -86,6 +86,34 @@ Assert(
     keybindSettingsPatchSource.Contains("Show Enchant Preview", StringComparison.Ordinal)
         && keybindSettingsPatchSource.Contains("Show Upgrade Preview", StringComparison.Ordinal),
     "BPP keybind settings patch should inject dedicated settings rows for enchant and upgrade previews."
+);
+var enchantIndex = keybindSettingsPatchSource.IndexOf(
+    "BPP_Keybind_EnchantPreview",
+    StringComparison.Ordinal
+);
+var upgradeIndex = keybindSettingsPatchSource.IndexOf(
+    "BPP_Keybind_UpgradePreview",
+    StringComparison.Ordinal
+);
+Assert(
+    enchantIndex >= 0 && upgradeIndex > enchantIndex,
+    "BPP keybind settings patch should keep enchant preview before upgrade preview in the fixed row order."
+);
+Assert(
+    keybindSettingsPatchSource.Contains("ArrangeRows(", StringComparison.Ordinal),
+    "BPP keybind settings patch should explicitly reorder keybind rows after ensuring they exist."
+);
+var keybindLabelResolverSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/Input/BppKeybindLabelResolver.cs")
+);
+var keybindLabelResolverSource = File.ReadAllText(keybindLabelResolverSourcePath);
+Assert(
+    keybindLabelResolverSource.Contains("zh-Hans", StringComparison.Ordinal)
+        || keybindLabelResolverSource.Contains(
+            "SimplifiedChineseLanguage.Matches",
+            StringComparison.Ordinal
+        ),
+    "BPP keybind label resolver should recognize zh-Hans as Simplified Chinese, directly or through the shared helper."
 );
 
 var tooltipRefreshSourcePath = Path.GetFullPath(
@@ -140,6 +168,14 @@ Assert(
 Assert(
     nativeKeybindLabelPatchSource.Contains("Lock", StringComparison.Ordinal),
     "Native keybind label patch should target the native Lock keybind action."
+);
+Assert(
+    nativeKeybindLabelPatchSource.Contains("zh-Hans", StringComparison.Ordinal)
+        || nativeKeybindLabelPatchSource.Contains(
+            "SimplifiedChineseLanguage.Matches",
+            StringComparison.Ordinal
+        ),
+    "Native keybind label patch should recognize zh-Hans as Simplified Chinese, directly or through the shared helper."
 );
 
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(

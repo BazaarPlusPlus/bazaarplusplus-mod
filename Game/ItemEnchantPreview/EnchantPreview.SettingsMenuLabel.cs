@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
@@ -18,7 +19,6 @@ internal static class EnchantPreviewSettingsMenuLabel
 
     private static bool IsSimplifiedChinese(string languageCode)
     {
-        return string.Equals(languageCode, "zh-Hans", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(languageCode, "zh-CN", StringComparison.OrdinalIgnoreCase);
+        return SimplifiedChineseLanguage.Matches(languageCode);
     }
 }

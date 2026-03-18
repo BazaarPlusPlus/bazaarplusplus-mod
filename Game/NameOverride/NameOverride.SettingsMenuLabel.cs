@@ -1,4 +1,5 @@
 using System;
+using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.NameOverride;
 
@@ -17,7 +18,6 @@ internal static class NameOverrideSettingsMenuLabel
 
     private static bool IsSimplifiedChinese(string languageCode)
     {
-        return string.Equals(languageCode, "zh-Hans", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(languageCode, "zh-CN", StringComparison.OrdinalIgnoreCase);
+        return SimplifiedChineseLanguage.Matches(languageCode);
     }
 }

@@ -188,10 +188,10 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "战斗状态栏")]
-    [InlineData("zh-CN", "战斗状态栏")]
-    [InlineData("en", "Combat Status Bar")]
-    [InlineData("", "Combat Status Bar")]
+    [InlineData("zh-Hans", "战斗状态栏｜F6 显隐")]
+    [InlineData("zh-CN", "战斗状态栏｜F6 显隐")]
+    [InlineData("en", "Combat Status Bar | F6 Toggle")]
+    [InlineData("", "Combat Status Bar | F6 Toggle")]
     public void SettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
         string languageCode,
         string expected
@@ -269,6 +269,70 @@ public sealed class CombatStatusBarStateTests : IDisposable
 
         Assert.Contains("EnchantPreviewAlwaysShowConfig", source, StringComparison.Ordinal);
         Assert.Contains("BPP_EnchantPreviewToggle", source, StringComparison.Ordinal);
+        Assert.Contains("BPP_CombatStatusBarToggle", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "BppGameplaySettingsCoordinator.EnsureAll",
+            source,
+            StringComparison.Ordinal
+        );
+    }
+
+    [Fact]
+    public void SettingsMenuToggleInstaller_SupportsAnchoringBppRowsBelowOtherBppRows()
+    {
+        var sourcePath = Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "../../../../../Patches/Settings/SettingsMenuToggleInstaller.cs"
+            )
+        );
+        Assert.True(
+            File.Exists(sourcePath),
+            $"Settings menu toggle installer not found at {sourcePath}"
+        );
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("PreferredAnchorObjectName", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GameplaySettingsCoordinator_UsesStableToggleOrder()
+    {
+        var sourcePath = Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "../../../../../Patches/Settings/BppGameplaySettingsCoordinator.cs"
+            )
+        );
+        Assert.True(
+            File.Exists(sourcePath),
+            $"Gameplay settings coordinator not found at {sourcePath}"
+        );
+        var source = File.ReadAllText(sourcePath);
+
+        var nameIndex = source.IndexOf(
+            "NameOverrideSettingsAwakePatch.EnsureToggleExists",
+            StringComparison.Ordinal
+        );
+        var combatIndex = source.IndexOf(
+            "CombatStatusBarSettingsAwakePatch.EnsureToggleExists",
+            StringComparison.Ordinal
+        );
+        var enchantIndex = source.IndexOf(
+            "EnchantPreviewSettingsAwakePatch.EnsureToggleExists",
+            StringComparison.Ordinal
+        );
+        var arrangeIndex = source.IndexOf(
+            "SettingsMenuToggleInstaller.ArrangeRows",
+            StringComparison.Ordinal
+        );
+
+        Assert.True(
+            nameIndex >= 0
+                && enchantIndex > nameIndex
+                && combatIndex > enchantIndex
+                && arrangeIndex > enchantIndex
+        );
     }
 
     [Theory]

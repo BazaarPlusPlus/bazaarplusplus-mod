@@ -9,7 +9,8 @@ internal sealed class SettingsMenuToggleDefinition
         string toggleObjectName,
         string logCategory,
         Func<string, string> resolveLabel,
-        SettingsMenuToggleBridge bridge
+        SettingsMenuToggleBridge bridge,
+        string? preferredAnchorObjectName = null
     )
     {
         ToggleObjectName = !string.IsNullOrWhiteSpace(toggleObjectName)
@@ -23,6 +24,7 @@ internal sealed class SettingsMenuToggleDefinition
             : throw new ArgumentException("Log category is required.", nameof(logCategory));
         ResolveLabel = resolveLabel ?? throw new ArgumentNullException(nameof(resolveLabel));
         Bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
+        PreferredAnchorObjectName = preferredAnchorObjectName;
     }
 
     internal string ToggleObjectName { get; }
@@ -32,4 +34,6 @@ internal sealed class SettingsMenuToggleDefinition
     internal Func<string, string> ResolveLabel { get; }
 
     internal SettingsMenuToggleBridge Bridge { get; }
+
+    internal string? PreferredAnchorObjectName { get; }
 }

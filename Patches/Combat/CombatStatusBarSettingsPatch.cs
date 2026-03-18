@@ -24,7 +24,7 @@ internal static class CombatStatusBarSettingsAwakePatch
     {
         try
         {
-            EnsureToggleExists(__instance);
+            BppGameplaySettingsCoordinator.EnsureAll(__instance);
         }
         catch (Exception ex)
         {
@@ -46,7 +46,7 @@ internal static class CombatStatusBarSettingsOnEnablePatch
     {
         try
         {
-            CombatStatusBarSettingsAwakePatch.EnsureToggleExists(__instance);
+            BppGameplaySettingsCoordinator.EnsureAll(__instance);
         }
         catch (Exception ex)
         {
@@ -63,9 +63,7 @@ internal static class CombatStatusBarSettingsGameplayOpenPatch
     {
         try
         {
-            CombatStatusBarSettingsAwakePatch.EnsureToggleExists(__instance);
-            NameOverrideSettingsAwakePatch.EnsureToggleExists(__instance);
-            EnchantPreviewSettingsAwakePatch.EnsureToggleExists(__instance);
+            BppGameplaySettingsCoordinator.EnsureAll(__instance);
         }
         catch (Exception ex)
         {

@@ -1,11 +1,12 @@
 using System;
+using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal static class CombatStatusBarSettingsMenuLabel
 {
-    private const string EnglishLabel = "Combat Status Bar";
-    private const string SimplifiedChineseLabel = "战斗状态栏";
+    private const string EnglishLabel = "Combat Status Bar | F6 Toggle";
+    private const string SimplifiedChineseLabel = "战斗状态栏｜F6 显隐";
 
     internal static string Resolve(string languageCode)
     {
@@ -17,7 +18,6 @@ internal static class CombatStatusBarSettingsMenuLabel
 
     private static bool IsSimplifiedChinese(string languageCode)
     {
-        return string.Equals(languageCode, "zh-Hans", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(languageCode, "zh-CN", StringComparison.OrdinalIgnoreCase);
+        return SimplifiedChineseLanguage.Matches(languageCode);
     }
 }

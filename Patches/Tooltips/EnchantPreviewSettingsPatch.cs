@@ -13,7 +13,8 @@ internal static class EnchantPreviewSettingsAwakePatch
         "BPP_EnchantPreviewToggle",
         "EnchantPreview",
         EnchantPreviewSettingsMenuLabel.Resolve,
-        new SettingsMenuToggleBridge(ReadEnabledValue, WriteEnabledValue)
+        new SettingsMenuToggleBridge(ReadEnabledValue, WriteEnabledValue),
+        "BPP_CombatStatusBarToggle"
     );
 
     [HarmonyPostfix]
@@ -21,7 +22,7 @@ internal static class EnchantPreviewSettingsAwakePatch
     {
         try
         {
-            EnsureToggleExists(__instance);
+            BppGameplaySettingsCoordinator.EnsureAll(__instance);
         }
         catch (Exception ex)
         {
@@ -56,7 +57,7 @@ internal static class EnchantPreviewSettingsOnEnablePatch
     {
         try
         {
-            EnchantPreviewSettingsAwakePatch.EnsureToggleExists(__instance);
+            BppGameplaySettingsCoordinator.EnsureAll(__instance);
         }
         catch (Exception ex)
         {
