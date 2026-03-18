@@ -1,11 +1,11 @@
 #pragma warning disable CS0436
 using System.Text;
+using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
-using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus;
 
@@ -47,11 +47,11 @@ public static class CardTooltipDataPassivePatch
             if (Data.IsInCombat)
                 return;
 
-            if (KeyBindings.Modifiers.IsShiftPressed(Keyboard.current))
+            if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
                 return;
 
             var alwaysShow = ModState.EnchantPreviewAlwaysShowConfig?.Value ?? true;
-            if (!alwaysShow && !KeyBindings.Modifiers.IsCtrlPressed(Keyboard.current))
+            if (!alwaysShow && !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview))
                 return;
 
             var previewSegments = ItemEnchantPreviewService.BuildPreviewSegments(

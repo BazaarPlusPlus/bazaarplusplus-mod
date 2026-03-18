@@ -29,6 +29,8 @@ internal static class ModState
     // Config entries
     public static ConfigEntry<bool> EnableNameOverrideConfig;
     public static ConfigEntry<bool> EnchantPreviewAlwaysShowConfig;
+    public static ConfigEntry<string> EnchantPreviewHotkeyPathConfig;
+    public static ConfigEntry<string> UpgradePreviewHotkeyPathConfig;
 
     // Game state
     public static bool IsInGameRun;
@@ -65,9 +67,21 @@ internal static class ModState
             true,
             "Whether to always show enchant preview text in item tooltips. If disabled, hold Ctrl to show it."
         );
+        EnchantPreviewHotkeyPathConfig = config.Bind(
+            "Hotkeys",
+            "EnchantPreview",
+            "<Keyboard>/ctrl",
+            "Binding path for enchant preview tooltip mode."
+        );
+        UpgradePreviewHotkeyPathConfig = config.Bind(
+            "Hotkeys",
+            "UpgradePreview",
+            "<Keyboard>/shift",
+            "Binding path for upgrade preview tooltip mode."
+        );
         BppLog.Info(
             "ModState",
-            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, enchantPreviewAlwaysShow={EnchantPreviewAlwaysShowConfig.Value}"
+            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, enchantPreviewAlwaysShow={EnchantPreviewAlwaysShowConfig.Value}, enchantPreviewHotkey={EnchantPreviewHotkeyPathConfig.Value}, upgradePreviewHotkey={UpgradePreviewHotkeyPathConfig.Value}"
         );
         CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
         if (string.IsNullOrWhiteSpace(CardsJsonPath))

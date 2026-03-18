@@ -1,9 +1,9 @@
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarPlusPlus.Game.Input;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus;
 
@@ -30,12 +30,11 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
 
     private static TooltipModifierMode GetCurrentMode()
     {
-        var keyboard = Keyboard.current;
-        if (KeyBindings.Modifiers.IsShiftPressed(keyboard))
+        if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
             return TooltipModifierMode.Upgrade;
 
         var alwaysShowEnchant = ModState.EnchantPreviewAlwaysShowConfig?.Value ?? true;
-        if (alwaysShowEnchant || KeyBindings.Modifiers.IsCtrlPressed(keyboard))
+        if (alwaysShowEnchant || BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview))
             return TooltipModifierMode.Enchant;
 
         return TooltipModifierMode.Normal;

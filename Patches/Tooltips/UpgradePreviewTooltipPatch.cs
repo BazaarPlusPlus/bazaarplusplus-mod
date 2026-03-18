@@ -2,11 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarPlusPlus.Game.Input;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
-using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus;
 
@@ -30,8 +30,7 @@ internal static class UpgradePreviewTooltipPatch
         if (controller == null)
             return false;
 
-        var keyboard = Keyboard.current;
-        if (!KeyBindings.Modifiers.IsShiftPressed(keyboard))
+        if (!BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
             return false;
 
         var card = controller.CardData;
@@ -71,7 +70,7 @@ internal static class UpgradePreviewTooltipPatch
                 if (
                     controller == null
                     || controller.CardData != card
-                    || !KeyBindings.Modifiers.IsShiftPressed(Keyboard.current)
+                    || !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview)
                 )
                 {
                     yield break;

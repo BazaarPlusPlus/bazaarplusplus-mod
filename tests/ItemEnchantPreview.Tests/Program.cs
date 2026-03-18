@@ -60,6 +60,64 @@ Assert(
     "Gameplay settings refresh should install the enchant preview toggle alongside the other Bazaar++ toggles."
 );
 
+var hotkeyServiceSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/Input/BppHotkeyService.cs")
+);
+Assert(
+    File.Exists(hotkeyServiceSourcePath),
+    $"BPP hotkey service source not found at {hotkeyServiceSourcePath}"
+);
+var hotkeyServiceSource = File.ReadAllText(hotkeyServiceSourcePath);
+Assert(
+    hotkeyServiceSource.Contains("EnchantPreview", StringComparison.Ordinal)
+        && hotkeyServiceSource.Contains("UpgradePreview", StringComparison.Ordinal),
+    "BPP hotkey service should define dedicated enchant and upgrade preview actions."
+);
+
+var keybindSettingsPatchSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Patches/Settings/BppKeybindSettingsPatch.cs")
+);
+Assert(
+    File.Exists(keybindSettingsPatchSourcePath),
+    $"BPP keybind settings patch source not found at {keybindSettingsPatchSourcePath}"
+);
+var keybindSettingsPatchSource = File.ReadAllText(keybindSettingsPatchSourcePath);
+Assert(
+    keybindSettingsPatchSource.Contains("Show Enchant Preview", StringComparison.Ordinal)
+        && keybindSettingsPatchSource.Contains("Show Upgrade Preview", StringComparison.Ordinal),
+    "BPP keybind settings patch should inject dedicated settings rows for enchant and upgrade previews."
+);
+
+var tooltipRefreshSourcePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/Tooltips/TooltipModifierRefreshController.cs"
+    )
+);
+var tooltipRefreshSource = File.ReadAllText(tooltipRefreshSourcePath);
+Assert(
+    tooltipRefreshSource.Contains("BppHotkeyService", StringComparison.Ordinal),
+    "Tooltip refresh flow should query BPP hotkey service instead of hard-coded modifiers."
+);
+
+var upgradePatchSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Patches/Tooltips/UpgradePreviewTooltipPatch.cs")
+);
+var upgradePatchSource = File.ReadAllText(upgradePatchSourcePath);
+Assert(
+    upgradePatchSource.Contains("BppHotkeyService", StringComparison.Ordinal),
+    "Upgrade preview tooltip patch should query BPP hotkey service instead of hard-coded Shift."
+);
+
+var enchantPatchSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Patches/Tooltips/ItemEnchantPreviewPatch.cs")
+);
+var enchantPatchSource = File.ReadAllText(enchantPatchSourcePath);
+Assert(
+    enchantPatchSource.Contains("BppHotkeyService", StringComparison.Ordinal),
+    "Enchant preview tooltip patch should query BPP hotkey service instead of hard-coded Ctrl."
+);
+
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
     currentEnchantment: EEnchantmentType.Heavy,
     allEnchantments: [EEnchantmentType.Heavy, EEnchantmentType.Icy, EEnchantmentType.Turbo]
