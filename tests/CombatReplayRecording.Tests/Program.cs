@@ -59,6 +59,15 @@ Assert(
     "Combat replay runtime should centralize replay dependency resolution."
 );
 Assert(
+    runtimeSource.Contains("AppDomain.CurrentDomain.GetAssemblies()", StringComparison.Ordinal),
+    "Combat replay runtime should resolve replay types by scanning loaded assemblies instead of relying on a single assembly-qualified lookup."
+);
+Assert(
+    runtimeSource.Contains("FindObjectOfType<NetMessageProcessor>()", StringComparison.Ordinal)
+        && runtimeSource.Contains("AddComponent<NetMessageProcessor>()", StringComparison.Ordinal),
+    "Combat replay runtime should target the runtime NetMessageProcessor type directly."
+);
+Assert(
     runtimeSource.Contains("ReplayBootstrapContext", StringComparison.Ordinal),
     "Combat replay runtime should describe replay bootstrap dependencies with an explicit context type."
 );
@@ -99,6 +108,18 @@ Assert(
     runtimeSource.Contains("SceneID.GameScene", StringComparison.Ordinal)
         && runtimeSource.Contains("SceneID.GameplayLoading", StringComparison.Ordinal),
     "Combat replay runtime should know how to load gameplay scenes from the lobby."
+);
+Assert(
+    runtimeSource.Contains("AppState.Initialize(sharedVariables, processor);", StringComparison.Ordinal),
+    "Combat replay runtime should initialize AppState handlers when the lobby bootstrap path does not provide them."
+);
+Assert(
+    runtimeSource.Contains("processor.Handle(spawnMessage)", StringComparison.Ordinal),
+    "Combat replay runtime should inject the saved spawn snapshot through NetMessageProcessor instead of bypassing the native message pipeline."
+);
+Assert(
+    runtimeSource.Contains("TryGetAppStateField<GameSimHandler>(\"_gameSimHandler\") != null", StringComparison.Ordinal),
+    "Combat replay readiness should require GameSimHandler to exist before replay injection starts."
 );
 Assert(
     runtimeSource.Contains("SetUpBoard", StringComparison.Ordinal)
@@ -148,10 +169,10 @@ Assert(
 var injectReplayBody = ExtractMethodBody(runtimeSource, "private static async Task TryInjectSavedReplayAsync(");
 Assert(
     injectReplayBody.IndexOf("HandleSpawnMessageAsync", StringComparison.Ordinal)
-        < injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal)
-        && injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal)
-            < injectReplayBody.IndexOf("AppState.TryPushState<ReplayState>()", StringComparison.Ordinal),
-    "Combat replay runtime should apply the saved spawn snapshot before notifying ReplayState about the combat sequence."
+        < injectReplayBody.IndexOf("AppState.TryPushState<ReplayState>()", StringComparison.Ordinal)
+        && injectReplayBody.IndexOf("AppState.TryPushState<ReplayState>()", StringComparison.Ordinal)
+            < injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal),
+    "Combat replay runtime should enter ReplayState before notifying it that the combat sequence is ready."
 );
 
 var debugPanelStateSource = File.ReadAllText(
@@ -263,6 +284,79 @@ try
             StringComparison.Ordinal
         ),
         "Load should preserve the serialized combat payload."
+    );
+
+    var replayFilePath = Path.Combine(tempRoot, "replay-001.json");
+    File.WriteAllText(
+        replayFilePath,
+        File.ReadAllText(replayFilePath).Replace("Test Opponent", "Changed Opponent"),
+        System.Text.Encoding.UTF8
+    );
+    var cachedList = (
+        (System.Collections.IEnumerable)Invoke(storeType, store!, "List", Array.Empty<object?>())
+    )
+        .Cast<object>()
+        .ToList();
+    Assert(cachedList.Count == 1, "Cached list should still return the saved replay record.");
+    Assert(
+        string.Equals(
+            (string?)GetProperty(recordType, cachedList[0], "OpponentName"),
+            "Test Opponent",
+            StringComparison.Ordinal
+        ),
+        "Repeated List calls should reuse the in-memory replay cache until the store is mutated."
+    );
+
+    var secondRecord = Activator.CreateInstance(recordType);
+    Assert(secondRecord != null, "A second combat replay record should be constructible.");
+    SetProperty(recordType, secondRecord!, "ReplayId", "replay-002");
+    SetProperty(
+        recordType,
+        secondRecord!,
+        "SavedAtUtc",
+        new DateTimeOffset(2026, 3, 18, 1, 3, 3, TimeSpan.Zero)
+    );
+    SetProperty(recordType, secondRecord!, "RunId", "run-002");
+    SetProperty(recordType, secondRecord!, "Day", 3);
+    SetProperty(recordType, secondRecord!, "Hour", 6);
+    SetProperty(recordType, secondRecord!, "EncounterId", "encounter-def");
+    SetProperty(recordType, secondRecord!, "OpponentName", "Newest Opponent");
+    SetProperty(
+        recordType,
+        secondRecord!,
+        "SpawnMessageBase64",
+        Convert.ToBase64String(new byte[] { 10, 11, 12 })
+    );
+    SetProperty(
+        recordType,
+        secondRecord!,
+        "CombatMessageBase64",
+        Convert.ToBase64String(new byte[] { 13, 14, 15 })
+    );
+    SetProperty(
+        recordType,
+        secondRecord!,
+        "DespawnMessageBase64",
+        Convert.ToBase64String(new byte[] { 16, 17, 18 })
+    );
+    Invoke(storeType, store!, "Save", new object?[] { secondRecord! });
+
+    var refreshedList = (
+        (System.Collections.IEnumerable)Invoke(storeType, store!, "List", Array.Empty<object?>())
+    )
+        .Cast<object>()
+        .ToList();
+    Assert(refreshedList.Count == 2, "Saving a replay should invalidate the cached replay list.");
+    Assert(
+        refreshedList.Any(
+            entry =>
+                string.Equals(
+                    (string?)GetProperty(recordType, entry, "ReplayId"),
+                    "replay-002",
+                    StringComparison.Ordinal
+                )
+        ),
+        "List should include replays saved after the cache was created."
     );
 
     var captureService = Activator.CreateInstance(captureServiceType);
@@ -429,7 +523,7 @@ try
     )
         .Cast<object>()
         .ToList();
-    Assert(savedReplays.Count == 2, "Controller should expose the saved replay list.");
+    Assert(savedReplays.Count == 3, "Controller should expose the saved replay list.");
 
     var replayId = (string?)GetProperty(recordType, completedRecord!, "ReplayId");
     var loadedFromController = Invoke(
