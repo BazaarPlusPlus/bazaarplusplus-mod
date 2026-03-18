@@ -12,7 +12,7 @@ class CombatSpeedPatch
     [HarmonyPrefix]
     static void Prefix(ref float speed)
     {
-        if (!CombatStatusBar.IsCombatPlaybackActive)
+        if (!CombatStatusBar.ShouldOverrideCombatSpeed(speed))
             return;
 
         speed = CombatStatusBar.CombatSpeedMultiplier;

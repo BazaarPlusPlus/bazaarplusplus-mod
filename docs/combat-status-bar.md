@@ -161,11 +161,9 @@ Current step list is stored in `CombatStatusBar.CombatSpeedSteps`.
 At the moment the list is:
 
 - `0.25x`
+- `0.33x`
 - `0.50x`
 - `1.00x`
-- `2.00x`
-- `3.00x`
-- `5.00x`
 
 ### Why step-based
 
@@ -199,6 +197,7 @@ Behavior:
 - invalid configured default speeds are reset to `1.00`
 - selecting a step in the UI updates the active speed
 - the selected speed is also written back to the config entry
+- native first-fight fast-forward keeps its original game-selected speed
 
 ## UI Behavior
 

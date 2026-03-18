@@ -5,7 +5,7 @@ namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal sealed partial class CombatStatusBar
 {
-    private static readonly float[] SpeedSteps = { 0.25f, 0.5f, 1f, 1.5f, 2f, 3f };
+    private static readonly float[] SpeedSteps = { 0.25f, 0.33f, 0.5f, 1f };
 
     internal static bool IsOverlayVisible { get; private set; } = true;
     internal static bool IsCombatPlaybackActive { get; private set; }
@@ -67,6 +67,15 @@ internal sealed partial class CombatStatusBar
         CombatSpeedMultiplier = speed;
         PersistCombatSpeed(CombatSpeedMultiplier);
         return CombatSpeedMultiplier;
+    }
+
+    internal static bool ShouldOverrideCombatSpeed(float requestedSpeed)
+    {
+        if (!IsCombatPlaybackActive)
+            return false;
+
+        // Preserve the game's native fast-forward path such as first-fight acceleration.
+        return requestedSpeed <= 1f + 0.0001f;
     }
 
     internal static bool ToggleOverlayVisibility()

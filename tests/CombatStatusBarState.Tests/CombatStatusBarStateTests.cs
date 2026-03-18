@@ -98,27 +98,61 @@ public sealed class CombatStatusBarStateTests : IDisposable
     [Fact]
     public void FormatCombatSpeedLabel_UsesTwoDecimalPlaces()
     {
-        CombatStatusBar.SetCombatSpeed(1.5f);
+        CombatStatusBar.SetCombatSpeed(0.33f);
 
         var result = CombatStatusBar.FormatCombatSpeedLabel();
 
-        Assert.Equal("1.50x", result);
+        Assert.Equal("0.33x", result);
     }
 
     [Fact]
     public void NormalizeConfiguredDefaultSpeed_AcceptsNewSupportedStep()
     {
-        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(1.5f);
+        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(0.33f);
 
-        Assert.Equal(1.5f, result);
+        Assert.Equal(0.33f, result);
     }
 
     [Fact]
     public void NormalizeConfiguredDefaultSpeed_RejectsRemovedStep()
     {
-        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(4f);
+        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(1.5f);
 
         Assert.Equal(1f, result);
+    }
+
+    [Fact]
+    public void CombatSpeedSteps_ExposeExpectedOfflineSpeedPresets()
+    {
+        Assert.Equal(new[] { 0.25f, 0.33f, 0.5f, 1f }, CombatStatusBar.CombatSpeedSteps.ToArray());
+    }
+
+    [Fact]
+    public void ShouldOverrideCombatSpeed_RequestAtNormalSpeed_DuringCombat()
+    {
+        CombatStatusBar.BeginCombatPlayback();
+
+        var result = CombatStatusBar.ShouldOverrideCombatSpeed(1f);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void ShouldOverrideCombatSpeed_DoesNotOverrideFastForwardFirstFightSpeed()
+    {
+        CombatStatusBar.BeginCombatPlayback();
+
+        var result = CombatStatusBar.ShouldOverrideCombatSpeed(2f);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldOverrideCombatSpeed_DoesNotOverrideOutsideCombat()
+    {
+        var result = CombatStatusBar.ShouldOverrideCombatSpeed(1f);
+
+        Assert.False(result);
     }
 
     [Fact]
