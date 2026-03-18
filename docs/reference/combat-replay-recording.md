@@ -19,17 +19,20 @@ Replay files are stored under:
 Each replay is written as a JSON file containing:
 
 - metadata: replay id, run id, day, hour, encounter id, opponent name, save time
+- player hand snapshot data used to rebuild player cards for lobby-started replays
 - base64 MessagePack payloads for the opening game sim, combat sim, and closing game sim
 
 ## Replay Flow
 
-Saved replay loading uses the game's existing combat replay path:
+Saved replay loading uses the game's existing combat replay path, but now includes an extra rehydration step for player cards:
 
 1. load the saved triplet from disk
 2. deserialize it back into `CombatSequenceMessages`
-3. inject it as the current combat sequence source
-4. feed the saved opening `GameSim` through `GameSimHandler`
-5. enter `ReplayState`
+3. rebuild player hand cards into `Data.Entities`
+4. inject the saved sequence as the current combat sequence source
+5. sync the saved opening `GameSim`
+6. enter `ReplayState`
+7. start native replay playback
 
 This keeps combat playback aligned with the native replay implementation instead of rebuilding the fight from custom logs.
 
@@ -62,11 +65,13 @@ This allows saved combats to be replayed even after restarting the game.
 
 When a replay was bootstrapped from the lobby, exiting that replay returns the game to the main menu automatically.
 
-Verification for this flow is based on local runtime logs plus code-path review. The expected checkpoints are bootstrap start, scene readiness, dependency resolution, saved sequence injection, `ReplayState` entry, and rollback or menu-return handling when applicable.
+Verification for this flow is based on local runtime logs plus code-path review. The expected checkpoints are bootstrap start, scene readiness, dependency resolution, saved sequence injection, `ReplayState` entry, native replay start, and rollback or menu-return handling when applicable.
 
 ## Limitations
 
 - This feature records combat replay data only, not full run timeline playback.
 - Replays depend on the runtime being able to enter the native `ReplayState`.
 - Saved replay playback is blocked while an active run exists.
+- Older replay files created before player-card snapshot fields were added may still fail to show player cards correctly.
+- Current known blocker: player and hero state is still incomplete during replay playback, causing runtime errors around `HealthMax`, hero tooltip data, and replay-end UI reset.
 - If the underlying game changes message formats or replay initialization order, saved replays may stop loading until the mod is updated.

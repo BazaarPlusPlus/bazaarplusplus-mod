@@ -1,9 +1,14 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared;
+using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarGameShared.Infra.Messages;
 using MessagePack;
+using TheBazaar;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
@@ -45,6 +50,7 @@ internal sealed class CombatReplayCaptureService
                 _candidate = new CombatReplaySequenceCandidate
                 {
                     RunId = runId,
+                    PlayerHandCards = CapturePlayerHandCards(),
                     SpawnMessage = message,
                 };
             }
@@ -59,6 +65,7 @@ internal sealed class CombatReplayCaptureService
                 _candidate = new CombatReplaySequenceCandidate
                 {
                     RunId = runId,
+                    PlayerHandCards = CapturePlayerHandCards(),
                     SpawnMessage = message,
                 };
             }
@@ -113,10 +120,38 @@ internal sealed class CombatReplayCaptureService
             Hour = unchecked((int)spawnMessage.Data.Run.Hour),
             EncounterId = spawnMessage.Data.CurrentState?.CurrentEncounterId,
             OpponentName = spawnMessage.Data.CurrentState?.PvpOpponent?.Name,
+            PlayerHandCards = new List<CombatReplayCardSnapshot>(candidate.PlayerHandCards),
             SpawnMessageBase64 = SerializeMessage(spawnMessage),
             CombatMessageBase64 = SerializeMessage(combatMessage),
             DespawnMessageBase64 = SerializeMessage(despawnMessage),
         };
+    }
+
+    private static List<CombatReplayCardSnapshot> CapturePlayerHandCards()
+    {
+        try
+        {
+            return Data.GetCards<Card>(ECombatantId.Player, EInventorySection.Hand)
+                .Where(card => card != null)
+                .Select(card => new CombatReplayCardSnapshot
+                {
+                    InstanceId = card.InstanceId.ToString(),
+                    TemplateId = card.TemplateId.ToString(),
+                    Type = card.Type,
+                    Size = card.Size,
+                    Section = card.Section,
+                    Socket = card.LeftSocketId,
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayCaptureService",
+                $"Unable to snapshot player hand cards for combat replay capture: {ex.Message}"
+            );
+            return new List<CombatReplayCardSnapshot>();
+        }
     }
 
     private static bool IsCombatOpeningMessage(NetMessageGameSim message)

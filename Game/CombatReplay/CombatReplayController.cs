@@ -29,13 +29,21 @@ internal sealed class CombatReplayController
         return _store.List().FirstOrDefault();
     }
 
-    public CombatSequenceMessages? LoadReplay(string replayId)
+    public CombatReplayRecord? LoadReplayRecord(string replayId)
     {
         var record = _store.Load(replayId);
         if (record == null)
             return null;
 
         ActiveReplayId = record.ReplayId;
+        return record;
+    }
+
+    public CombatSequenceMessages LoadReplay(CombatReplayRecord record)
+    {
+        if (record == null)
+            throw new ArgumentNullException(nameof(record));
+
         return _loader.Load(record);
     }
 }

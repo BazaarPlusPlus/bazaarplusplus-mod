@@ -1,8 +1,10 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
 using TheBazaar;
 using TheBazaar.AppFramework;
@@ -20,10 +22,13 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private bool _returnToMenuAfterReplay;
     private bool _bootstrappedReplayActive;
     private bool _isReplayStartInProgress;
+    private bool _savedReplayPlaybackActive;
 
     public static CombatReplayRuntime? Instance { get; private set; }
 
     public string? ActiveReplayId => _controller?.ActiveReplayId;
+
+    public bool IsReplayPlaybackActive => _savedReplayPlaybackActive || AppState.CurrentState is ReplayState;
 
     private void Awake()
     {
@@ -61,9 +66,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        if (Data.HasActiveRun)
+        if (ModState.IsInGameRun)
         {
-            reason = "Saved replay playback is only available from the lobby with no active run.";
+            reason = "Saved replay playback is only available while you are outside an active gameplay session.";
             return false;
         }
 
@@ -119,15 +124,21 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        var sequence = _controller.LoadReplay(replayId);
-        if (sequence == null)
+        var record = _controller.LoadReplayRecord(replayId);
+        if (record == null)
             return false;
 
-        _ = StartReplayAsync(sequence, replayId);
+        var sequence = _controller.LoadReplay(record);
+        _savedReplayPlaybackActive = true;
+        _ = StartReplayAsync(record, sequence, replayId);
         return true;
     }
 
-    private async Task StartReplayAsync(CombatSequenceMessages sequence, string replayId)
+    private async Task StartReplayAsync(
+        CombatReplayRecord record,
+        CombatSequenceMessages sequence,
+        string replayId
+    )
     {
         var attemptedBootstrapFromLobby = false;
         _isReplayStartInProgress = true;
@@ -135,11 +146,13 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         {
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
+            Data.ResetRunData();
+            ModState.RefreshRunStateFromCurrentState();
             attemptedBootstrapFromLobby = !IsReplayBootstrapReady();
             var bootstrappedFromLobby = await EnsureReplayBootstrapReadyAsync();
             _returnToMenuAfterReplay = bootstrappedFromLobby;
             var bootstrapContext = ResolveReplayDependencies();
-            await TryInjectSavedReplayAsync(bootstrapContext, sequence, replayId);
+            await TryInjectSavedReplayAsync(bootstrapContext, record, sequence, replayId);
             _bootstrappedReplayActive = bootstrappedFromLobby;
             BppLog.Info("CombatReplayRuntime", $"Started replay for saved combat {replayId}");
         }
@@ -147,6 +160,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         {
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
+            _savedReplayPlaybackActive = false;
             BppLog.Error("CombatReplayRuntime", $"Failed to start replay {replayId}: {ex}");
             if (attemptedBootstrapFromLobby)
                 await RollbackReplayBootstrapAsync();
@@ -225,7 +239,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static ReplayBootstrapContext ResolveReplayDependencies()
     {
-        var socketBehavior = TryGetSocketBehavior();
+        var socketBehavior = EnsureSocketBehavior();
         var processor = GetProcessor(socketBehavior);
         EnsureReplayAppStateHandlersInitialized(processor);
 
@@ -235,7 +249,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             processor,
             gameSimHandler,
             CreateSetLastCombatSequence(processor),
-            CreateHandleSpawnMessageAsync(processor),
+            CreateHandleSpawnMessageAsync(processor, gameSimHandler),
             CreateTriggerCombatSequenceCreated(processor)
         );
         BppLog.Info("CombatReplayRuntime", "Replay bootstrap dependencies resolved.");
@@ -244,19 +258,54 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static async Task TryInjectSavedReplayAsync(
         ReplayBootstrapContext bootstrapContext,
+        CombatReplayRecord record,
         CombatSequenceMessages sequence,
         string replayId
     )
     {
         bootstrapContext.SetLastCombatSequence(sequence);
         await bootstrapContext.HandleSpawnMessageAsync(sequence.SpawnMessage);
-        await AppState.TryPushState<ReplayState>();
-        if (AppState.CurrentState is not ReplayState)
-            throw new InvalidOperationException("ReplayState did not become active.");
+        RehydrateSavedReplayPlayerCards(record, sequence.SpawnMessage);
         bootstrapContext.TriggerCombatSequenceCreated();
         await Task.Delay(50);
+        await AppState.TryPushState<ReplayState>();
+        if (AppState.CurrentState is not ReplayState replayState)
+            throw new InvalidOperationException("ReplayState did not become active.");
+        Singleton<BoardManager>.Instance.ToggleOpponentPortrait(isVisible: true);
+        replayState.Replay();
+        Singleton<BoardManager>.Instance.ShowReplayAndRecapButtons(show: false, deactivate: true);
 
         BppLog.Info("CombatReplayRuntime", $"Saved replay injection completed for {replayId}.");
+    }
+
+    private static void RehydrateSavedReplayPlayerCards(
+        CombatReplayRecord record,
+        NetMessageGameSim spawnMessage
+    )
+    {
+        if (record.PlayerHandCards.Count == 0)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay {record.ReplayId} does not contain player-hand snapshots; player cards may be missing. Re-capture this fight with the current mod build."
+            );
+            return;
+        }
+
+        foreach (var snapshot in record.PlayerHandCards.Where(snapshot => snapshot != null))
+        {
+            if (string.IsNullOrWhiteSpace(snapshot.InstanceId))
+                continue;
+
+            var card = Data.GetOrCreateCard(snapshot.InstanceId, snapshot.TemplateId, snapshot.Type);
+            if (spawnMessage.Data.Cards.TryGetValue(snapshot.InstanceId, out var simUpdate))
+                card.Update(simUpdate);
+
+            card.Size = snapshot.Size;
+            card.Owner = Data.Run.Player;
+            card.Section = snapshot.Section;
+            card.LeftSocketId = snapshot.Socket;
+        }
     }
 
     private static async Task RollbackReplayBootstrapAsync()
@@ -321,6 +370,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
         _returnToMenuAfterReplay = false;
         _bootstrappedReplayActive = false;
+        _savedReplayPlaybackActive = false;
 
         try
         {
@@ -339,20 +389,50 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
     }
 
+    private static object EnsureSocketBehavior()
+    {
+        var socketBehavior = TryGetSocketBehavior();
+        if (socketBehavior != null)
+            return socketBehavior;
+
+        throw new InvalidOperationException("SocketBehavior is unavailable.");
+    }
+
     private static object? TryGetSocketBehavior()
     {
-        var socketBehaviorType = FindType("Networking.SocketBehavior");
-        if (socketBehaviorType == null)
-            return null;
+        try
+        {
+            var replayHostType = ResolveReplayHostType();
+            if (replayHostType == null)
+                return null;
 
-        var getInstanceMethod = socketBehaviorType.GetMethod(
-            "GetInstance",
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-        );
-        if (getInstanceMethod == null)
-            return null;
+            var getInstanceMethod = replayHostType.GetMethod(
+                "GetInstance",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            );
+            if (getInstanceMethod == null)
+                return null;
 
-        return getInstanceMethod.Invoke(null, null);
+            return getInstanceMethod.Invoke(null, null);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Failed to resolve SocketBehavior via runtime API: {ex.Message}"
+            );
+            return null;
+        }
+    }
+
+    private static Type? ResolveReplayHostType()
+    {
+        return typeof(NetMessageProcessor).Assembly.GetType("Networking.NetworkManager", false)
+            ?? typeof(NetMessageProcessor).Assembly.GetType("Networking.SocketBehavior", false)
+            ?? FindType("Networking.NetworkManager")
+            ?? FindType("Networking.SocketBehavior")
+            ?? FindTypeByName("NetworkManager")
+            ?? FindTypeByName("SocketBehavior");
     }
 
     private static void DisposeSocketBehavior()
@@ -381,27 +461,19 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static NetMessageProcessor GetProcessor(object? socketBehavior)
     {
-        if (socketBehavior != null)
-        {
-            var method = socketBehavior
-                .GetType()
-                .GetMethod(
-                    "GetProcessor",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                );
-            var processor = method?.Invoke(socketBehavior, null) as NetMessageProcessor;
-            if (processor != null)
-                return processor;
-        }
+        socketBehavior ??= EnsureSocketBehavior();
 
-        var processorInstance = UnityEngine.Object.FindObjectOfType<NetMessageProcessor>();
-        if (processorInstance != null)
-            return processorInstance;
+        var method = socketBehavior
+            .GetType()
+            .GetMethod(
+                "GetProcessor",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
+        var processor = method?.Invoke(socketBehavior, null) as NetMessageProcessor;
+        if (processor != null)
+            return processor;
 
-        var gameObject = new GameObject("NetMessageProcessor");
-        processorInstance = gameObject.AddComponent<NetMessageProcessor>();
-        UnityEngine.Object.DontDestroyOnLoad(gameObject);
-        return processorInstance;
+        throw new InvalidOperationException("SocketBehavior did not expose a NetMessageProcessor.");
     }
 
     private static void EnsureReplayAppStateHandlersInitialized(NetMessageProcessor? processor = null)
@@ -450,29 +522,56 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static Action CreateTriggerCombatSequenceCreated(object processor)
     {
-        var field = processor
-            .GetType()
-            .GetField(
-                "CombatSequenceCreated",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        var action = field?.GetValue(processor) as Action;
-        return () => action?.Invoke();
+        return () =>
+        {
+            var field = processor
+                .GetType()
+                .GetField(
+                    "CombatSequenceCreated",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                );
+            var action = field?.GetValue(processor) as Action;
+            action?.Invoke();
+        };
     }
 
     private static Func<NetMessageGameSim, Task> CreateHandleSpawnMessageAsync(
-        NetMessageProcessor processor
+        NetMessageProcessor processor,
+        GameSimHandler gameSimHandler
     )
     {
-        return spawnMessage =>
+        return async spawnMessage =>
         {
             if (!processor.Handle(spawnMessage))
                 throw new InvalidOperationException(
                     "NetMessageProcessor rejected the replay spawn message."
                 );
 
-            return Task.CompletedTask;
+            Data.UpdateFromGameSimAsync(spawnMessage);
+            MarkGameSimMessageHandled(gameSimHandler, spawnMessage.MessageId);
+            await Task.CompletedTask;
         };
+    }
+
+    private static void MarkGameSimMessageHandled(GameSimHandler gameSimHandler, string messageId)
+    {
+        if (string.IsNullOrWhiteSpace(messageId))
+            return;
+
+        var handledMessagesField = gameSimHandler
+            .GetType()
+            .BaseType?.GetField(
+                "_handledMessages",
+                BindingFlags.Instance | BindingFlags.NonPublic
+            );
+        if (handledMessagesField?.GetValue(gameSimHandler) is not List<string> handledMessages)
+            throw new MissingFieldException(
+                gameSimHandler.GetType().BaseType?.FullName,
+                "_handledMessages"
+            );
+
+        if (!handledMessages.Contains(messageId))
+            handledMessages.Add(messageId);
     }
 
     private static Type? FindType(string fullName)
@@ -482,6 +581,34 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             var candidate = assembly.GetType(fullName, throwOnError: false);
             if (candidate != null)
                 return candidate;
+        }
+
+        return null;
+    }
+
+    private static Type? FindTypeByName(string typeName)
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            Type[] types;
+            try
+            {
+                types = assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                types = Array.FindAll(ex.Types, type => type != null)!;
+            }
+            catch
+            {
+                continue;
+            }
+
+            foreach (var candidate in types)
+            {
+                if (candidate != null && string.Equals(candidate.Name, typeName, StringComparison.Ordinal))
+                    return candidate;
+            }
         }
 
         return null;

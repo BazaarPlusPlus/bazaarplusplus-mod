@@ -63,9 +63,9 @@ Assert(
     "Combat replay runtime should resolve replay types by scanning loaded assemblies instead of relying on a single assembly-qualified lookup."
 );
 Assert(
-    runtimeSource.Contains("FindObjectOfType<NetMessageProcessor>()", StringComparison.Ordinal)
-        && runtimeSource.Contains("AddComponent<NetMessageProcessor>()", StringComparison.Ordinal),
-    "Combat replay runtime should target the runtime NetMessageProcessor type directly."
+    runtimeSource.Contains("EnsureSocketBehavior()", StringComparison.Ordinal)
+        && runtimeSource.Contains("ResolveReplayHostType", StringComparison.Ordinal),
+    "Combat replay runtime should resolve replay injection through the native replay host manager."
 );
 Assert(
     runtimeSource.Contains("ReplayBootstrapContext", StringComparison.Ordinal),
@@ -73,7 +73,7 @@ Assert(
 );
 Assert(
     runtimeSource.Contains(
-        "await TryInjectSavedReplayAsync(bootstrapContext, sequence, replayId);",
+        "await TryInjectSavedReplayAsync(bootstrapContext, record, sequence, replayId);",
         StringComparison.Ordinal
     ),
     "Combat replay runtime should delegate saved replay injection to a dedicated method."
@@ -86,6 +86,46 @@ Assert(
     runtimeSource.Contains("Processor", StringComparison.Ordinal)
         && runtimeSource.Contains("TriggerCombatSequenceCreated", StringComparison.Ordinal),
     "Replay bootstrap dependency resolution should expose both processor access and replay trigger access."
+);
+Assert(
+    runtimeSource.Contains("Data.UpdateFromGameSimAsync(spawnMessage);", StringComparison.Ordinal)
+        && runtimeSource.Contains("MarkGameSimMessageHandled(gameSimHandler, spawnMessage.MessageId);", StringComparison.Ordinal),
+    "Combat replay runtime should sync replay spawn data and mark it handled without entering the live GameSim pipeline."
+);
+Assert(
+    runtimeSource.Contains("RehydrateSavedReplayPlayerCards", StringComparison.Ordinal)
+        && runtimeSource.Contains("Data.GetOrCreateCard", StringComparison.Ordinal),
+    "Combat replay runtime should rehydrate saved player cards before entering ReplayState."
+);
+Assert(
+    runtimeSource.Contains("card.Size = snapshot.Size;", StringComparison.Ordinal),
+    "Combat replay runtime should restore player card size before native replay spawning."
+);
+Assert(
+    runtimeSource.Contains("replayState.Replay();", StringComparison.Ordinal)
+        && runtimeSource.Contains("ShowReplayAndRecapButtons(show: false, deactivate: true);", StringComparison.Ordinal),
+    "Combat replay runtime should auto-start replay playback after entering ReplayState."
+);
+Assert(
+    runtimeSource.Contains("private static void MarkGameSimMessageHandled", StringComparison.Ordinal)
+        && runtimeSource.Contains("\"_handledMessages\"", StringComparison.Ordinal),
+    "Combat replay runtime should be able to mark the replay spawn message as handled for ReplayState."
+);
+Assert(
+    runtimeSource.Contains("does not contain player-hand snapshots", StringComparison.Ordinal),
+    "Combat replay runtime should warn when an old replay does not contain player-hand snapshots."
+);
+var snapshotSource = File.ReadAllText(
+    Path.GetFullPath(
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../../Game/CombatReplay/CombatReplayCardSnapshot.cs"
+        )
+    )
+);
+Assert(
+    snapshotSource.Contains("public ECardSize Size", StringComparison.Ordinal),
+    "Combat replay card snapshots should preserve native card size."
 );
 Assert(
     runtimeSource.Contains("RollbackReplayBootstrapAsync", StringComparison.Ordinal),
@@ -101,8 +141,8 @@ Assert(
 );
 Assert(
     runtimeSource.Contains("CanReplaySavedCombats", StringComparison.Ordinal)
-        && runtimeSource.Contains("Data.HasActiveRun", StringComparison.Ordinal),
-    "Combat replay runtime should block saved replays while an active run is in progress."
+        && runtimeSource.Contains("ModState.IsInGameRun", StringComparison.Ordinal),
+    "Combat replay runtime should block saved replays only while local gameplay is active."
 );
 Assert(
     runtimeSource.Contains("SceneID.GameScene", StringComparison.Ordinal)
@@ -115,7 +155,7 @@ Assert(
 );
 Assert(
     runtimeSource.Contains("processor.Handle(spawnMessage)", StringComparison.Ordinal),
-    "Combat replay runtime should inject the saved spawn snapshot through NetMessageProcessor instead of bypassing the native message pipeline."
+    "Combat replay runtime should validate the saved spawn snapshot with NetMessageProcessor before replay injection."
 );
 Assert(
     runtimeSource.Contains("TryGetAppStateField<GameSimHandler>(\"_gameSimHandler\") != null", StringComparison.Ordinal),
@@ -169,10 +209,18 @@ Assert(
 var injectReplayBody = ExtractMethodBody(runtimeSource, "private static async Task TryInjectSavedReplayAsync(");
 Assert(
     injectReplayBody.IndexOf("HandleSpawnMessageAsync", StringComparison.Ordinal)
-        < injectReplayBody.IndexOf("AppState.TryPushState<ReplayState>()", StringComparison.Ordinal)
+        < injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal)
+        && injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal)
+            < injectReplayBody.IndexOf("AppState.TryPushState<ReplayState>()", StringComparison.Ordinal)
         && injectReplayBody.IndexOf("AppState.TryPushState<ReplayState>()", StringComparison.Ordinal)
-            < injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal),
-    "Combat replay runtime should enter ReplayState before notifying it that the combat sequence is ready."
+            < injectReplayBody.IndexOf("replayState.Replay()", StringComparison.Ordinal),
+    "Combat replay runtime should notify ReplayState's native sequence handler before entering ReplayState."
+);
+var triggerReplayBody = ExtractMethodBody(runtimeSource, "private static Action CreateTriggerCombatSequenceCreated(object processor)");
+Assert(
+    triggerReplayBody.Contains("return () =>", StringComparison.Ordinal)
+        && triggerReplayBody.Contains("field?.GetValue(processor) as Action", StringComparison.Ordinal),
+    "Combat replay runtime should resolve CombatSequenceCreated listeners at trigger time instead of capturing a stale delegate."
 );
 
 var debugPanelStateSource = File.ReadAllText(
@@ -511,8 +559,8 @@ try
         "Loaded replay sequences should include the closing GameSim."
     );
 
-    var controller = Activator.CreateInstance(controllerType, store, loader);
-    Assert(controller != null, "CombatReplayController should be constructible.");
+var controller = Activator.CreateInstance(controllerType, store, loader);
+Assert(controller != null, "CombatReplayController should be constructible.");
     var savedReplays = (
         (System.Collections.IEnumerable)Invoke(
             controllerType,
@@ -526,13 +574,20 @@ try
     Assert(savedReplays.Count == 3, "Controller should expose the saved replay list.");
 
     var replayId = (string?)GetProperty(recordType, completedRecord!, "ReplayId");
+    var loadedRecordFromController = Invoke(
+        controllerType,
+        controller!,
+        "LoadReplayRecord",
+        new object?[] { replayId! }
+    );
+    Assert(loadedRecordFromController != null, "Controller should load a saved replay record by id.");
     var loadedFromController = Invoke(
         controllerType,
         controller!,
         "LoadReplay",
-        new object?[] { replayId! }
+        new[] { loadedRecordFromController }
     );
-    Assert(loadedFromController != null, "Controller should load a saved replay by id.");
+    Assert(loadedFromController != null, "Controller should deserialize a loaded replay record.");
     Assert(
         string.Equals(
             (string?)GetProperty(controllerType, controller!, "ActiveReplayId"),

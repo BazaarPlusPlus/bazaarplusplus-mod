@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
@@ -18,6 +19,8 @@ internal sealed class CombatReplayRecord
     public string? EncounterId { get; set; }
 
     public string? OpponentName { get; set; }
+
+    public List<CombatReplayCardSnapshot> PlayerHandCards { get; set; } = new();
 
     public string SpawnMessageBase64 { get; set; } = string.Empty;
 
