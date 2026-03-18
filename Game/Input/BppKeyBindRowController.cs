@@ -55,6 +55,16 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
         EnterDefaultState();
     }
 
+    internal void RefreshLanguage()
+    {
+        if (!_initialized)
+            return;
+
+        UpdateTexts();
+        if (_isRebinding)
+            ShowWarning(BppKeybindLabelResolver.ResolveRebindPrompt(PlayerPreferences.Data.LanguageCode));
+    }
+
     private void Update()
     {
         if (!_initialized || !_isRebinding)

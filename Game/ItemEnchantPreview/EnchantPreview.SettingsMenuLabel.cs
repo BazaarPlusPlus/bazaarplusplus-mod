@@ -6,8 +6,8 @@ namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
 internal static class EnchantPreviewSettingsMenuLabel
 {
-    private const string EnglishLabel = "Enchant Preview Always Show";
-    private const string SimplifiedChineseLabel = "附魔预览始终显示";
+    private const string EnglishLabel = "Always Show Enchant Preview";
+    private const string SimplifiedChineseLabel = "始终显示附魔预览";
 
     internal static string Resolve(string languageCode)
     {

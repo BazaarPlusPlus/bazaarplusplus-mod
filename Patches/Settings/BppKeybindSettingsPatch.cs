@@ -58,6 +58,15 @@ internal static class BppKeybindSettingsAwakePatch
         ArrangeRows(templateRow, Definitions.Select(definition => definition.ObjectName).ToArray());
     }
 
+    internal static void RefreshLanguage(OptionsDialogController instance)
+    {
+        if (instance == null)
+            return;
+
+        foreach (var controller in instance.GetComponentsInChildren<BppKeyBindRowController>(true))
+            controller.RefreshLanguage();
+    }
+
     private static Transform? EnsureKeybindRow(
         BppKeybindDefinition definition,
         Transform templateRow,
