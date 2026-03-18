@@ -5,7 +5,7 @@ public static class RunLogSqliteSchema
 {
     public static int CurrentSchemaVersion => 1;
 
-    public static string DatabaseFileName => "run-logs.db";
+    public static string DatabaseFileName => "bazaarplusplus.db";
 
     public static string RunsTableName => "runs";
 

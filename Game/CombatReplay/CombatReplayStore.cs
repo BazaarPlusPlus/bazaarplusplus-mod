@@ -10,6 +10,8 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 internal sealed class CombatReplayStore
 {
     private readonly string _rootPath;
+    private IReadOnlyList<CombatReplayRecord>? _cachedRecords;
+    private bool _isCacheDirty = true;
 
     public CombatReplayStore(string rootPath)
     {
@@ -31,19 +33,25 @@ internal sealed class CombatReplayStore
         var filePath = GetFilePath(record.ReplayId);
         var json = JsonConvert.SerializeObject(record, Formatting.Indented);
         File.WriteAllText(filePath, json);
+        InvalidateCache();
     }
 
     public IReadOnlyList<CombatReplayRecord> List()
     {
         Directory.CreateDirectory(_rootPath);
 
-        return Directory
+        if (!_isCacheDirty && _cachedRecords != null)
+            return _cachedRecords;
+
+        _cachedRecords = Directory
             .EnumerateFiles(_rootPath, "*.json", SearchOption.TopDirectoryOnly)
             .Select(LoadFile)
             .Where(record => record != null)
             .OrderByDescending(record => record!.SavedAtUtc)
             .Cast<CombatReplayRecord>()
             .ToList();
+        _isCacheDirty = false;
+        return _cachedRecords;
     }
 
     public CombatReplayRecord? Load(string replayId)
@@ -61,6 +69,12 @@ internal sealed class CombatReplayStore
     private string GetFilePath(string replayId)
     {
         return Path.Combine(_rootPath, $"{replayId}.json");
+    }
+
+    private void InvalidateCache()
+    {
+        _cachedRecords = null;
+        _isCacheDirty = true;
     }
 
     private static CombatReplayRecord? LoadFile(string filePath)

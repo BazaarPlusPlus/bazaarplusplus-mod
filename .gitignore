@@ -1,4 +1,5 @@
 # Build output
+dist/
 bin/
 obj/
 
@@ -14,6 +15,7 @@ decompiled/
 .dotnet-home/
 .nuget-packages/
 .npm-cache/
+__pycache__/
 
 # Generated mod files
 **/plugins/BazaarPlusPlus.dll

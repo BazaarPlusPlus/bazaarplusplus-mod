@@ -1,6 +1,8 @@
 #pragma warning disable CS0436
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.MonsterPreview;
 using TheBazaar;
 using UnityEngine;
@@ -38,6 +40,8 @@ internal sealed class DebugPanel : MonoBehaviour
         public MonsterPreviewDebugController.DebugState? Preview;
         public RunSummary Run;
         public List<EncounterSection> EncounterSections = new List<EncounterSection>();
+        public List<ReplayEntry> Replays = new List<ReplayEntry>();
+        public string ActiveReplayId;
     }
 
     private sealed class RunSummary
@@ -65,6 +69,13 @@ internal sealed class DebugPanel : MonoBehaviour
         public string Enchant;
         public string CardId;
         public RunInfo.MonsterPreview Preview;
+    }
+
+    private sealed class ReplayEntry
+    {
+        public string ReplayId;
+        public string SavedAt;
+        public string Label;
     }
 
     private void OnDisable()
@@ -96,6 +107,8 @@ internal sealed class DebugPanel : MonoBehaviour
             SelectSection(DebugPanelSection.Run);
         else if (keyboard[KeyBindings.DebugPanel.SelectEncounters].wasPressedThisFrame)
             SelectSection(DebugPanelSection.Encounters);
+        else if (keyboard[KeyBindings.DebugPanel.SelectReplays].wasPressedThisFrame)
+            SelectSection(DebugPanelSection.Replays);
 
         if (keyboard[KeyBindings.DebugPanel.ToggleViewMode].wasPressedThisFrame)
             _panelState.ToggleViewMode();
@@ -142,7 +155,7 @@ internal sealed class DebugPanel : MonoBehaviour
             StatusStyle
         );
         GUILayout.Label(
-            $"[F2] Toggle  [1-4] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}",
+            $"[F2] Toggle  [1-5] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}",
             MutedStyle
         );
         GUILayout.Space(8);
@@ -151,6 +164,7 @@ internal sealed class DebugPanel : MonoBehaviour
         DrawSectionButton("2 Preview", DebugPanelSection.Preview);
         DrawSectionButton("3 Run", DebugPanelSection.Run);
         DrawSectionButton("4 Encounters", DebugPanelSection.Encounters);
+        DrawSectionButton("5 Replays", DebugPanelSection.Replays);
         GUILayout.EndHorizontal();
     }
 
@@ -169,6 +183,7 @@ internal sealed class DebugPanel : MonoBehaviour
         DrawSection(DebugPanelSection.Preview);
         DrawSection(DebugPanelSection.Run);
         DrawSection(DebugPanelSection.Encounters);
+        DrawSection(DebugPanelSection.Replays);
     }
 
     private void DrawSection(DebugPanelSection section)
@@ -186,6 +201,9 @@ internal sealed class DebugPanel : MonoBehaviour
                 break;
             case DebugPanelSection.Encounters:
                 DrawEncounterSections();
+                break;
+            case DebugPanelSection.Replays:
+                DrawReplaySection();
                 break;
         }
     }
@@ -244,6 +262,50 @@ internal sealed class DebugPanel : MonoBehaviour
         DrawRow("W/L", _snapshot.Run?.WinLoss ?? "-");
         DrawRow("State", _snapshot.Run?.State ?? "-");
         DrawRow("Encounter", _snapshot.Run?.EncounterId ?? "-");
+    }
+
+    private void DrawReplaySection()
+    {
+        DrawSectionHeader("REPLAYS");
+
+        var runtime = CombatReplayRuntime.Instance;
+        if (runtime == null)
+        {
+            GUILayout.Label("Combat replay runtime unavailable.", MutedStyle);
+            return;
+        }
+
+        var canReplaySavedCombats = runtime.CanReplaySavedCombats(out var replayRestrictionReason);
+        var previousEnabled = GUI.enabled;
+        GUI.enabled = canReplaySavedCombats;
+        if (GUILayout.Button("Replay Latest", ToolbarButtonStyle))
+            runtime.ReplayLatest();
+        GUI.enabled = previousEnabled;
+
+        DrawRow(
+            "Active Replay",
+            string.IsNullOrWhiteSpace(_snapshot.ActiveReplayId) ? "-" : _snapshot.ActiveReplayId
+        );
+
+        if (!canReplaySavedCombats)
+            GUILayout.Label(replayRestrictionReason, MutedStyle);
+
+        if (_snapshot.Replays.Count == 0)
+        {
+            GUILayout.Label("No saved combat replays.", MutedStyle);
+            return;
+        }
+
+        foreach (var replay in _snapshot.Replays)
+        {
+            previousEnabled = GUI.enabled;
+            GUI.enabled = canReplaySavedCombats;
+            if (GUILayout.Button($"Replay {replay.Label}", EntryStyle))
+                runtime.ReplaySaved(replay.ReplayId);
+            GUI.enabled = previousEnabled;
+
+            GUILayout.Label($"Saved {replay.SavedAt}", MutedStyle);
+        }
     }
 
     private void DrawEncounterSections()
@@ -404,7 +466,13 @@ internal sealed class DebugPanel : MonoBehaviour
 
     private PanelSnapshot BuildSnapshot()
     {
-        var snapshot = new PanelSnapshot { Run = BuildRunSummary(), Preview = BuildPreviewState() };
+        var snapshot = new PanelSnapshot
+        {
+            Run = BuildRunSummary(),
+            Preview = BuildPreviewState(),
+            Replays = BuildReplayEntries(),
+            ActiveReplayId = CombatReplayRuntime.Instance?.ActiveReplayId ?? string.Empty,
+        };
 
         snapshot.EncounterSections.Add(
             BuildEncounterSection(
@@ -423,6 +491,37 @@ internal sealed class DebugPanel : MonoBehaviour
             )
         );
         return snapshot;
+    }
+
+    private List<ReplayEntry> BuildReplayEntries()
+    {
+        var runtime = CombatReplayRuntime.Instance;
+        if (runtime == null)
+            return new List<ReplayEntry>();
+
+        return runtime
+            .ListSavedReplays()
+            .Take(10)
+            .Select(record => new ReplayEntry
+            {
+                ReplayId = record.ReplayId,
+                SavedAt = record.SavedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
+                Label = BuildReplayLabel(record),
+            })
+            .ToList();
+    }
+
+    private static string BuildReplayLabel(CombatReplayRecord record)
+    {
+        var runText = record.RunId ?? "unknown-run";
+        var dayHour =
+            record.Day.HasValue && record.Hour.HasValue
+                ? $"D{record.Day.Value} H{record.Hour.Value}"
+                : "D? H?";
+        var opponent = string.IsNullOrWhiteSpace(record.OpponentName)
+            ? "Unknown Opponent"
+            : record.OpponentName;
+        return $"{dayHour}  {opponent}  {runText}";
     }
 
     private RunSummary BuildRunSummary()

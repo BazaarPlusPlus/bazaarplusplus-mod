@@ -8,6 +8,7 @@ internal enum DebugPanelSection
     Preview,
     Run,
     Encounters,
+    Replays,
 }
 
 internal sealed class DebugPanelState

@@ -49,6 +49,7 @@ internal static class ModState
     // Paths for local data
     public static string CardsJsonPath;
     public static string RunLogDatabasePath;
+    public static string CombatReplayDirectoryPath;
 
     public static void Initialize(ConfigFile config)
     {
@@ -97,9 +98,14 @@ internal static class ModState
         }
 
         RunLogDatabasePath = System.IO.Path.Combine(
-            BepInEx.Paths.ConfigPath,
+            BepInEx.Paths.GameRootPath,
             "BazaarPlusPlus",
             RunLogSqliteSchema.DatabaseFileName
+        );
+        CombatReplayDirectoryPath = System.IO.Path.Combine(
+            BepInEx.Paths.GameRootPath,
+            "BazaarPlusPlus",
+            "CombatReplays"
         );
     }
 

@@ -31,6 +31,7 @@ internal static class KeyBindings
         public static Key SelectPreview => Key.Digit2;
         public static Key SelectRun => Key.Digit3;
         public static Key SelectEncounters => Key.Digit4;
+        public static Key SelectReplays => Key.Digit5;
         public static Key ToggleViewMode => Key.Tab;
     }
 }

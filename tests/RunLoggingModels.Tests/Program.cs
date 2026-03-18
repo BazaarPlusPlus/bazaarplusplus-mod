@@ -165,6 +165,17 @@ Assert(
     ),
     "Debug build should copy e_sqlite3.dll into the BepInEx plugins folder."
 );
+Assert(
+    csprojSource.Contains(
+        "<MacSqliteRuntimeRid>osx-arm64</MacSqliteRuntimeRid>",
+        StringComparison.Ordinal
+    ),
+    "Project file should pin the macOS sqlite runtime to osx-arm64."
+);
+Assert(
+    csprojSource.Contains("Apple Silicon", StringComparison.Ordinal),
+    "Project file should fail explicitly for unsupported Intel macOS builds."
+);
 
 AssertSourceMissing("Game/RunLogging/Persistence/JsonRunLogStore.cs");
 AssertSourceMissing("Game/RunLogging/Json/RunLogJsonSchema.cs");
