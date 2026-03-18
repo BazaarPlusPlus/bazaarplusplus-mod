@@ -66,9 +66,18 @@ internal static class NativeKeybindLabelAwakePatch
 
     private static string ResolveMonsterPreviewLabel(string languageCode)
     {
-        return SimplifiedChineseLanguage.Matches(languageCode)
-            ? "展示野怪预览"
-            : "Show Monster Preview";
+        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
+            return "显示怪物预览";
+        if (LanguageCodeMatcher.IsGerman(languageCode))
+            return "Monstervorschau anzeigen";
+        if (LanguageCodeMatcher.IsPortuguese(languageCode))
+            return "Mostrar previa de monstro";
+        if (LanguageCodeMatcher.IsKorean(languageCode))
+            return "몬스터 미리보기 표시";
+        if (LanguageCodeMatcher.IsItalian(languageCode))
+            return "Mostra anteprima mostro";
+
+        return "Show Monster Preview";
     }
 }
 
