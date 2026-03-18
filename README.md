@@ -16,11 +16,17 @@ BazaarPlusPlus 是一个面向 **《The Bazaar》** 的 **BepInEx 增强模组**
 
 扩展物品附魔相关的可见信息，使部分原本隐藏或不完整的词条更加直观。
 
+**战斗录像保存与回放（Debug）**
+
+在调试面板中保存并重放最近捕获到的战斗。录像基于原始 `GameSim -> CombatSim -> GameSim` 三件套消息保存，重启游戏后仍可从 Debug Panel 的 `Replays` 区域重新播放。已保存录像的 bootstrap 不依赖正常 run start，只允许在没有 active run 的 lobby 中启动，并通过本地日志与代码路径检查进行验证。
+
 ## 安装
 
 使用发布包内附带的 **安装器（Installer）**。
 
 当前仅发布了 **Windows 版本**，macOS 仍在适配中。
+
+对于本地开发构建，依赖 SQLite 的功能当前只支持 **macOS arm64 / Apple Silicon**；**Intel Mac (macOS x64)** 不在支持范围内。
 
 ### Windows 安装步骤
 
@@ -77,11 +83,17 @@ Supports right-clicking in the monster preview interface to inspect enemy cards 
 
 Expands the visible information related to item enchants, making some originally hidden or incomplete modifiers more intuitive.
 
+**Saved Combat Replay (Debug)**
+
+Captures and persists raw `GameSim -> CombatSim -> GameSim` combat triplets, then exposes them in the debug panel so a saved fight can be replayed after restarting the game. Saved replay bootstrap no longer depends on a normal run start, remains restricted to the lobby with no active run, and is verified through local logs plus code-path review.
+
 ## Installation
 
 Use the **installer included in the release package**.
 
 Currently, only the **Windows version** has been released, while macOS support is still being adapted.
+
+For local development builds, SQLite-backed features currently support only **macOS arm64 / Apple Silicon**. **Intel Mac (macOS x64)** is out of scope.
 
 ### Windows Installation Steps
 

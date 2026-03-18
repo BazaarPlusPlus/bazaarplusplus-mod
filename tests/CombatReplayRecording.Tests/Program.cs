@@ -1,0 +1,645 @@
+using System.Reflection;
+
+var recordType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayRecord");
+var storeType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayStore");
+var captureServiceType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayCaptureService");
+var loaderType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayLoader");
+var controllerType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayController");
+
+var modStateSource = File.ReadAllText(
+    Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Models/ModState.cs"))
+);
+Assert(
+    modStateSource.Contains("CombatReplayDirectoryPath", StringComparison.Ordinal),
+    "ModState should expose a combat replay storage path."
+);
+
+var pluginSource = File.ReadAllText(
+    Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Plugin.cs"))
+);
+Assert(
+    pluginSource.Contains("AddComponent<CombatReplayRuntime>()", StringComparison.Ordinal),
+    "Plugin should attach the combat replay runtime component."
+);
+
+var capturePatchPath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Patches/Combat/CombatReplayCapturePatch.cs"
+    )
+);
+Assert(File.Exists(capturePatchPath), "Combat replay capture patch should exist.");
+var capturePatchSource = File.ReadAllText(capturePatchPath);
+Assert(
+    capturePatchSource.Contains(
+        "HarmonyPatch(typeof(NetMessageProcessor), \"ReceiveOrQueue\")",
+        StringComparison.Ordinal
+    ),
+    "Combat replay capture should hook NetMessageProcessor.ReceiveOrQueue."
+);
+Assert(
+    capturePatchSource.Contains("ObserveMessage", StringComparison.Ordinal),
+    "Combat replay capture patch should forward messages into the runtime recorder."
+);
+
+var runtimeSource = File.ReadAllText(
+    Path.GetFullPath(
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../../Game/CombatReplay/CombatReplayRuntime.cs"
+        )
+    )
+);
+Assert(
+    runtimeSource.Contains("EnsureReplayBootstrapReadyAsync", StringComparison.Ordinal),
+    "Combat replay runtime should expose a dedicated saved replay bootstrap entrypoint."
+);
+Assert(
+    runtimeSource.Contains("ResolveReplayDependencies", StringComparison.Ordinal),
+    "Combat replay runtime should centralize replay dependency resolution."
+);
+Assert(
+    runtimeSource.Contains("ReplayBootstrapContext", StringComparison.Ordinal),
+    "Combat replay runtime should describe replay bootstrap dependencies with an explicit context type."
+);
+Assert(
+    runtimeSource.Contains(
+        "await TryInjectSavedReplayAsync(bootstrapContext, sequence, replayId);",
+        StringComparison.Ordinal
+    ),
+    "Combat replay runtime should delegate saved replay injection to a dedicated method."
+);
+Assert(
+    runtimeSource.Contains("new ReplayBootstrapContext", StringComparison.Ordinal),
+    "Combat replay runtime should materialize a replay bootstrap context from ResolveReplayDependencies."
+);
+Assert(
+    runtimeSource.Contains("Processor", StringComparison.Ordinal)
+        && runtimeSource.Contains("TriggerCombatSequenceCreated", StringComparison.Ordinal),
+    "Replay bootstrap dependency resolution should expose both processor access and replay trigger access."
+);
+Assert(
+    runtimeSource.Contains("RollbackReplayBootstrapAsync", StringComparison.Ordinal),
+    "Combat replay runtime should centralize replay bootstrap rollback."
+);
+Assert(
+    !runtimeSource.Contains("StartRun()", StringComparison.Ordinal),
+    "Combat replay runtime should not start a real run when bootstrapping a saved replay."
+);
+Assert(
+    !runtimeSource.Contains("Events.RunStarted.Trigger()", StringComparison.Ordinal),
+    "Combat replay runtime should not trigger run-start events for saved replay bootstrap."
+);
+Assert(
+    runtimeSource.Contains("CanReplaySavedCombats", StringComparison.Ordinal)
+        && runtimeSource.Contains("Data.HasActiveRun", StringComparison.Ordinal),
+    "Combat replay runtime should block saved replays while an active run is in progress."
+);
+Assert(
+    runtimeSource.Contains("SceneID.GameScene", StringComparison.Ordinal)
+        && runtimeSource.Contains("SceneID.GameplayLoading", StringComparison.Ordinal),
+    "Combat replay runtime should know how to load gameplay scenes from the lobby."
+);
+Assert(
+    runtimeSource.Contains("SetUpBoard", StringComparison.Ordinal)
+        && runtimeSource.Contains("Init(boardManager)", StringComparison.Ordinal),
+    "Combat replay runtime should bootstrap board and game services locally without RunManager.StartRun()."
+);
+Assert(
+    runtimeSource.Contains("Replay bootstrap scene environment is ready.", StringComparison.Ordinal),
+    "Combat replay runtime should mark when scene-only replay bootstrap becomes ready."
+);
+Assert(
+    runtimeSource.Contains("Replay bootstrap dependencies resolved.", StringComparison.Ordinal),
+    "Combat replay runtime should log when replay bootstrap dependencies are ready."
+);
+Assert(
+    runtimeSource.Contains("Saved replay injection completed", StringComparison.Ordinal),
+    "Combat replay runtime should log when the saved replay payload has been injected."
+);
+Assert(
+    runtimeSource.Contains("Returning to main menu after bootstrapped replay exit.", StringComparison.Ordinal),
+    "Combat replay runtime should log the menu-return path after a bootstrapped replay exits."
+);
+Assert(
+    runtimeSource.Contains("_returnToMenuAfterReplay", StringComparison.Ordinal),
+    "Combat replay runtime should track whether a replay should return to menu after exit."
+);
+Assert(
+    runtimeSource.Contains("_bootstrappedReplayActive", StringComparison.Ordinal),
+    "Combat replay runtime should scope menu-return behavior to the bootstrapped replay instance."
+);
+Assert(
+    runtimeSource.Contains("RollbackReplayBootstrapAsync", StringComparison.Ordinal)
+        && runtimeSource.Contains("ReturnToMainMenu()", StringComparison.Ordinal),
+    "Combat replay runtime should roll back to the main menu when lobby bootstrap fails."
+);
+Assert(
+    runtimeSource.Contains("AppState.Reset();", StringComparison.Ordinal)
+        && runtimeSource.Contains("Data.ResetRunData();", StringComparison.Ordinal)
+        && runtimeSource.Contains("SceneID.HeroSelectScene", StringComparison.Ordinal),
+    "Failed replay bootstrap should explicitly reset local run state and reload the lobby scene."
+);
+Assert(
+    runtimeSource.Contains("OnStateChanged", StringComparison.Ordinal)
+        && runtimeSource.Contains("ReturnToMainMenu()", StringComparison.Ordinal),
+    "Combat replay runtime should return to the main menu after a bootstrapped replay exits ReplayState."
+);
+var injectReplayBody = ExtractMethodBody(runtimeSource, "private static async Task TryInjectSavedReplayAsync(");
+Assert(
+    injectReplayBody.IndexOf("HandleSpawnMessageAsync", StringComparison.Ordinal)
+        < injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal)
+        && injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal)
+            < injectReplayBody.IndexOf("AppState.TryPushState<ReplayState>()", StringComparison.Ordinal),
+    "Combat replay runtime should apply the saved spawn snapshot before notifying ReplayState about the combat sequence."
+);
+
+var debugPanelStateSource = File.ReadAllText(
+    Path.GetFullPath(
+        Path.Combine(AppContext.BaseDirectory, "../../../../../Game/DebugPanel/DebugPanelState.cs")
+    )
+);
+Assert(
+    debugPanelStateSource.Contains("Replays", StringComparison.Ordinal),
+    "DebugPanel state should expose a Replays section."
+);
+
+var debugPanelSource = File.ReadAllText(
+    Path.GetFullPath(
+        Path.Combine(AppContext.BaseDirectory, "../../../../../Game/DebugPanel/DebugPanel.cs")
+    )
+);
+Assert(
+    debugPanelSource.Contains("Replay Latest", StringComparison.Ordinal),
+    "Debug panel should expose a replay-latest action."
+);
+Assert(
+    debugPanelSource.Contains("ListSavedReplays", StringComparison.Ordinal),
+    "Debug panel should read saved combat replays from the runtime."
+);
+Assert(
+    debugPanelSource.Contains("CanReplaySavedCombats", StringComparison.Ordinal),
+    "Debug panel should respect replay availability checks instead of always offering replay actions."
+);
+
+var tempRoot = Path.Combine(
+    Path.GetTempPath(),
+    "bpp-combat-replay-tests",
+    Guid.NewGuid().ToString("N")
+);
+Directory.CreateDirectory(tempRoot);
+
+try
+{
+    var store = Activator.CreateInstance(storeType, tempRoot);
+    Assert(store != null, "CombatReplayStore should be constructible with a root path.");
+
+    var record = Activator.CreateInstance(recordType);
+    Assert(record != null, "CombatReplayRecord should be constructible.");
+    SetProperty(recordType, record!, "ReplayId", "replay-001");
+    SetProperty(
+        recordType,
+        record!,
+        "SavedAtUtc",
+        new DateTimeOffset(2026, 3, 18, 1, 2, 3, TimeSpan.Zero)
+    );
+    SetProperty(recordType, record!, "RunId", "run-001");
+    SetProperty(recordType, record!, "Day", 3);
+    SetProperty(recordType, record!, "Hour", 5);
+    SetProperty(recordType, record!, "EncounterId", "encounter-abc");
+    SetProperty(recordType, record!, "OpponentName", "Test Opponent");
+    SetProperty(
+        recordType,
+        record!,
+        "SpawnMessageBase64",
+        Convert.ToBase64String(new byte[] { 1, 2, 3 })
+    );
+    SetProperty(
+        recordType,
+        record!,
+        "CombatMessageBase64",
+        Convert.ToBase64String(new byte[] { 4, 5, 6 })
+    );
+    SetProperty(
+        recordType,
+        record!,
+        "DespawnMessageBase64",
+        Convert.ToBase64String(new byte[] { 7, 8, 9 })
+    );
+
+    Invoke(storeType, store!, "Save", new object?[] { record! });
+
+    var listed = (
+        (System.Collections.IEnumerable)Invoke(storeType, store!, "List", Array.Empty<object?>())
+    )
+        .Cast<object>()
+        .ToList();
+    Assert(listed.Count == 1, "List should return the saved replay record.");
+
+    var listedRecord = listed[0];
+    Assert(
+        string.Equals(
+            (string?)GetProperty(recordType, listedRecord, "ReplayId"),
+            "replay-001",
+            StringComparison.Ordinal
+        ),
+        "List should preserve the replay id."
+    );
+
+    var loaded = Invoke(storeType, store!, "Load", new object?[] { "replay-001" });
+    Assert(loaded != null, "Load should return the saved record by replay id.");
+    Assert(
+        string.Equals(
+            (string?)GetProperty(recordType, loaded!, "OpponentName"),
+            "Test Opponent",
+            StringComparison.Ordinal
+        ),
+        "Load should preserve metadata fields."
+    );
+    Assert(
+        string.Equals(
+            (string?)GetProperty(recordType, loaded!, "CombatMessageBase64"),
+            Convert.ToBase64String(new byte[] { 4, 5, 6 }),
+            StringComparison.Ordinal
+        ),
+        "Load should preserve the serialized combat payload."
+    );
+
+    var captureService = Activator.CreateInstance(captureServiceType);
+    Assert(captureService != null, "CombatReplayCaptureService should be constructible.");
+
+    var nonCombatStart = CreateGameSimMessage(
+        "Encounter",
+        day: 1,
+        hour: 1,
+        encounterId: "encounter-ignore",
+        opponentName: "Ignored Opponent"
+    );
+    var combatMessage = CreateCombatSimMessage();
+    var combatStart = CreateGameSimMessage(
+        "Combat",
+        day: 3,
+        hour: 4,
+        encounterId: "encounter-live",
+        opponentName: "Rival"
+    );
+    var combatEnd = CreateGameSimMessage(
+        "Encounter",
+        day: 3,
+        hour: 5,
+        encounterId: null,
+        opponentName: null
+    );
+
+    var ignoredResult = Invoke(
+        captureServiceType,
+        captureService!,
+        "Accept",
+        new object?[] { nonCombatStart, "run-ignore" }
+    );
+    Assert(
+        ignoredResult == null,
+        "Non-combat opening GameSim should not immediately create a replay."
+    );
+    ignoredResult = Invoke(
+        captureServiceType,
+        captureService!,
+        "Accept",
+        new object?[] { combatMessage, "run-ignore" }
+    );
+    Assert(
+        ignoredResult == null,
+        "A CombatSim without a combat-opening GameSim should not create a replay."
+    );
+    ignoredResult = Invoke(
+        captureServiceType,
+        captureService!,
+        "Accept",
+        new object?[] { combatEnd, "run-ignore" }
+    );
+    Assert(
+        ignoredResult == null,
+        "An invalid GameSim/CombatSim/GameSim triplet should be ignored."
+    );
+
+    Assert(
+        Invoke(
+            captureServiceType,
+            captureService!,
+            "Accept",
+            new object?[] { combatStart, "run-42" }
+        ) == null,
+        "Combat opening GameSim should buffer until the sequence completes."
+    );
+    Assert(
+        Invoke(
+            captureServiceType,
+            captureService!,
+            "Accept",
+            new object?[] { combatMessage, "run-42" }
+        ) == null,
+        "CombatSim should buffer until the closing GameSim arrives."
+    );
+    var completedRecord = Invoke(
+        captureServiceType,
+        captureService!,
+        "Accept",
+        new object?[] { combatEnd, "run-42" }
+    );
+    Assert(completedRecord != null, "A combat triplet should produce a replay record.");
+    Assert(
+        string.Equals(
+            (string?)GetProperty(recordType, completedRecord!, "RunId"),
+            "run-42",
+            StringComparison.Ordinal
+        ),
+        "Completed replay records should preserve the run id."
+    );
+    Assert(
+        Equals(GetProperty(recordType, completedRecord!, "Day"), 3),
+        "Completed replay records should capture the combat day."
+    );
+    Assert(
+        Equals(GetProperty(recordType, completedRecord!, "Hour"), 4),
+        "Completed replay records should capture the combat hour from the opening snapshot."
+    );
+    Assert(
+        string.Equals(
+            (string?)GetProperty(recordType, completedRecord!, "EncounterId"),
+            "encounter-live",
+            StringComparison.Ordinal
+        ),
+        "Completed replay records should preserve the opening encounter id."
+    );
+    Assert(
+        string.Equals(
+            (string?)GetProperty(recordType, completedRecord!, "OpponentName"),
+            "Rival",
+            StringComparison.Ordinal
+        ),
+        "Completed replay records should preserve opponent metadata."
+    );
+    Assert(
+        !string.IsNullOrWhiteSpace(
+            (string?)GetProperty(recordType, completedRecord!, "SpawnMessageBase64")
+        ),
+        "Completed replay records should serialize the opening GameSim."
+    );
+    Assert(
+        !string.IsNullOrWhiteSpace(
+            (string?)GetProperty(recordType, completedRecord!, "CombatMessageBase64")
+        ),
+        "Completed replay records should serialize the CombatSim."
+    );
+    Assert(
+        !string.IsNullOrWhiteSpace(
+            (string?)GetProperty(recordType, completedRecord!, "DespawnMessageBase64")
+        ),
+        "Completed replay records should serialize the closing GameSim."
+    );
+
+    Invoke(storeType, store!, "Save", new object?[] { completedRecord! });
+
+    var loader = Activator.CreateInstance(loaderType);
+    Assert(loader != null, "CombatReplayLoader should be constructible.");
+    var loadedSequence = Invoke(loaderType, loader!, "Load", new object?[] { completedRecord! });
+    Assert(loadedSequence != null, "CombatReplayLoader should deserialize a saved replay record.");
+    Assert(
+        GetFieldValue(loadedSequence!.GetType(), loadedSequence, "SpawnMessage") != null,
+        "Loaded replay sequences should include the opening GameSim."
+    );
+    Assert(
+        GetFieldValue(loadedSequence!.GetType(), loadedSequence, "CombatMessage") != null,
+        "Loaded replay sequences should include the CombatSim."
+    );
+    Assert(
+        GetFieldValue(loadedSequence!.GetType(), loadedSequence, "DespawnMessage") != null,
+        "Loaded replay sequences should include the closing GameSim."
+    );
+
+    var controller = Activator.CreateInstance(controllerType, store, loader);
+    Assert(controller != null, "CombatReplayController should be constructible.");
+    var savedReplays = (
+        (System.Collections.IEnumerable)Invoke(
+            controllerType,
+            controller!,
+            "ListSavedReplays",
+            Array.Empty<object?>()
+        )
+    )
+        .Cast<object>()
+        .ToList();
+    Assert(savedReplays.Count == 2, "Controller should expose the saved replay list.");
+
+    var replayId = (string?)GetProperty(recordType, completedRecord!, "ReplayId");
+    var loadedFromController = Invoke(
+        controllerType,
+        controller!,
+        "LoadReplay",
+        new object?[] { replayId! }
+    );
+    Assert(loadedFromController != null, "Controller should load a saved replay by id.");
+    Assert(
+        string.Equals(
+            (string?)GetProperty(controllerType, controller!, "ActiveReplayId"),
+            replayId,
+            StringComparison.Ordinal
+        ),
+        "Controller should track the active saved replay id."
+    );
+
+    Console.WriteLine("CombatReplayRecording store checks passed.");
+}
+finally
+{
+    if (Directory.Exists(tempRoot))
+        Directory.Delete(tempRoot, recursive: true);
+}
+
+static Type RequireType(string fullName)
+{
+    return Type.GetType($"{fullName}, BazaarPlusPlus")
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static object? Invoke(Type type, object instance, string methodName, object?[] args)
+{
+    var method = type.GetMethod(
+        methodName,
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+    );
+    Assert(method != null, $"Method not found: {type.FullName}.{methodName}");
+    return method!.Invoke(instance, args);
+}
+
+static void SetProperty(Type type, object instance, string name, object? value)
+{
+    var property = type.GetProperty(
+        name,
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+    );
+    Assert(property != null, $"Property not found: {type.FullName}.{name}");
+    property!.SetValue(instance, value);
+}
+
+static object? GetProperty(Type type, object instance, string name)
+{
+    var property = type.GetProperty(
+        name,
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+    );
+    Assert(property != null, $"Property not found: {type.FullName}.{name}");
+    return property!.GetValue(instance);
+}
+
+static object? GetFieldValue(Type type, object instance, string name)
+{
+    var field = type.GetField(
+        name,
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+    );
+    Assert(field != null, $"Field not found: {type.FullName}.{name}");
+    return field!.GetValue(instance);
+}
+
+static void Assert(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}
+
+static string ExtractMethodBody(string source, string signature)
+{
+    var signatureIndex = source.IndexOf(signature, StringComparison.Ordinal);
+    Assert(signatureIndex >= 0, $"Method signature not found: {signature}");
+
+    var bodyStart = source.IndexOf('{', signatureIndex);
+    Assert(bodyStart >= 0, $"Method body start not found: {signature}");
+
+    var depth = 0;
+    for (var index = bodyStart; index < source.Length; index++)
+    {
+        if (source[index] == '{')
+            depth++;
+        else if (source[index] == '}')
+            depth--;
+
+        if (depth == 0)
+            return source.Substring(bodyStart + 1, index - bodyStart - 1);
+    }
+
+    throw new InvalidOperationException($"Method body end not found: {signature}");
+}
+
+static object CreateGameSimMessage(
+    string stateName,
+    uint day,
+    uint hour,
+    string? encounterId,
+    string? opponentName
+)
+{
+    var gameSimType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.GameSim",
+        "BazaarGameShared"
+    );
+    var simUpdateRunType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.SimUpdateRun",
+        "BazaarGameShared"
+    );
+    var simUpdateRunStateType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.SimUpdateRunState",
+        "BazaarGameShared"
+    );
+    var runStateType = RequireExternalType(
+        "BazaarGameShared.Domain.Runs.ERunState",
+        "BazaarGameShared"
+    );
+    var simPvpOpponentType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.SimPvpOpponent",
+        "BazaarGameShared"
+    );
+    var loadoutType = RequireExternalType(
+        "BazaarGameShared.TempoNet.Models.BazaarCollectionLoadout",
+        "BazaarGameShared"
+    );
+    var netMessageGameSimType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.NetMessageGameSim",
+        "BazaarGameShared"
+    );
+
+    var gameSim = Activator.CreateInstance(gameSimType)!;
+    var run = Activator.CreateInstance(simUpdateRunType)!;
+    SetField(simUpdateRunType, run, "Day", day);
+    SetField(simUpdateRunType, run, "Hour", hour);
+    SetField(gameSimType, gameSim, "Run", run);
+
+    var runState = Activator.CreateInstance(simUpdateRunStateType)!;
+    SetField(
+        simUpdateRunStateType,
+        runState,
+        "StateName",
+        Enum.Parse(runStateType, stateName, ignoreCase: false)
+    );
+    SetField(simUpdateRunStateType, runState, "CurrentEncounterId", encounterId);
+    SetField(
+        simUpdateRunStateType,
+        runState,
+        "PvpOpponent",
+        opponentName == null
+            ? null
+            : CreatePvpOpponent(simPvpOpponentType, loadoutType, opponentName)
+    );
+    SetField(gameSimType, gameSim, "CurrentState", runState);
+
+    return Activator.CreateInstance(netMessageGameSimType, gameSim)!;
+}
+
+static object CreateCombatSimMessage()
+{
+    var combatSimType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.CombatSimEvents.CombatSim",
+        "BazaarGameShared"
+    );
+    var netMessageCombatSimType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.NetMessageCombatSim",
+        "BazaarGameShared"
+    );
+    var combatSim = Activator.CreateInstance(combatSimType)!;
+    return Activator.CreateInstance(netMessageCombatSimType, combatSim)!;
+}
+
+static object CreatePvpOpponent(Type simPvpOpponentType, Type loadoutType, string opponentName)
+{
+    return Activator.CreateInstance(
+        simPvpOpponentType,
+        opponentName,
+        null,
+        null,
+        null,
+        0,
+        null,
+        null,
+        null,
+        null,
+        null,
+        Activator.CreateInstance(loadoutType),
+        null
+    )!;
+}
+
+static Type RequireExternalType(string fullName, string assemblyName)
+{
+    return Type.GetType($"{fullName}, {assemblyName}")
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static void SetField(Type type, object instance, string name, object? value)
+{
+    var field = type.GetField(
+        name,
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+    );
+    Assert(field != null, $"Field not found: {type.FullName}.{name}");
+    field!.SetValue(instance, value);
+}
