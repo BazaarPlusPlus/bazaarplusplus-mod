@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.CombatLog;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.RunLogging;
@@ -38,6 +39,7 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<RunStateSyncController>();
         gameObject.AddComponent<RunLoggingController>();
         gameObject.AddComponent<CombatReplayRuntime>();
+        gameObject.AddComponent<CombatLogController>();
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewController>();
         gameObject.AddComponent<MonsterPreviewWarmupController>();

@@ -76,6 +76,11 @@ It also exposes helper methods:
 - `SetCombatSpeed(float speed)`
 - `GetCombatLogicalElapsed()`
 
+Shared consumers:
+
+- `CombatStatusBar` uses this state for the bottom playback controller
+- `CombatLogPanel` uses the same processed-frame count to follow combat rows without deriving position from wall-clock time
+
 ## Event Flow
 
 ### Combat start
@@ -132,6 +137,7 @@ This means:
 - changing playback speed does not change the logical time shown
 - the displayed time reflects progress on the combat simulation timeline
 - outside combat, the controller shows `-:--:--`
+- the debug-only combat log panel can stay synchronized under speed changes, pause, and final-blow slowdown because it follows the same processed-frame model
 
 ### How processed frames are counted
 
@@ -149,6 +155,13 @@ Default UI behavior:
 - during combat, show processed frame count only
 - do not show total frame count in the default UI, to avoid telegraphing combat length
 - outside combat, show `Standby`
+
+The same processed-frame model now also drives the debug-only combat log panel:
+
+- the panel is runtime-only and does not persist combat history
+- future rows are hidden during first play
+- future rows are visible but dimmed during explicit replay playback
+- `F7` toggles the side panel independently from the `F2` debug panel toggle
 
 ## Speed Control Design
 

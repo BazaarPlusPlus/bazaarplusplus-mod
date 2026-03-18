@@ -1,4 +1,5 @@
 using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.CombatLog;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.Settings;
@@ -349,5 +350,41 @@ public sealed class CombatStatusBarStateTests : IDisposable
         var result = CombatStatusBar.AdvanceVisualBlend(current, active, deltaTime);
 
         Assert.Equal(expected, result, precision: 3);
+    }
+
+    [Fact]
+    public void CombatLogPlaybackState_MapsProcessedFrameCountToLastProcessedFrameIndex()
+    {
+        Assert.Equal(-1, CombatLogPlaybackState.GetLastProcessedFrameIndex(0));
+        Assert.Equal(0, CombatLogPlaybackState.GetLastProcessedFrameIndex(1));
+        Assert.Equal(4, CombatLogPlaybackState.GetLastProcessedFrameIndex(5));
+    }
+
+    [Fact]
+    public void CombatLogPlaybackState_ReportsNoCurrentFrameBeforePlaybackStarts()
+    {
+        Assert.False(CombatLogPlaybackState.TryGetCurrentFrameIndex(0, out var frameIndex));
+        Assert.Equal(-1, frameIndex);
+    }
+
+    [Fact]
+    public void CombatLogPlaybackState_MapsVisualStateFromProcessedFrameCount()
+    {
+        Assert.Equal(
+            CombatLogRowVisualState.Current,
+            CombatLogPlaybackState.GetVisualState(0, 1, CombatLogPlaybackPass.FirstPlay)
+        );
+        Assert.Equal(
+            CombatLogRowVisualState.Played,
+            CombatLogPlaybackState.GetVisualState(4, 10, CombatLogPlaybackPass.FirstPlay)
+        );
+        Assert.Equal(
+            CombatLogRowVisualState.FutureHidden,
+            CombatLogPlaybackState.GetVisualState(12, 10, CombatLogPlaybackPass.FirstPlay)
+        );
+        Assert.Equal(
+            CombatLogRowVisualState.FutureDimmed,
+            CombatLogPlaybackState.GetVisualState(12, 10, CombatLogPlaybackPass.Replay)
+        );
     }
 }
