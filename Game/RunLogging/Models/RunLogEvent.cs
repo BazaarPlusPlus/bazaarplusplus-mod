@@ -34,6 +34,12 @@ public sealed class RunLogEvent
 
     public string? EncounterId { get; set; }
 
+    public string? CombatKind { get; set; }
+
+    public string? ReplayId { get; set; }
+
+    public string? OpponentName { get; set; }
+
     public int? RerollCost { get; set; }
 
     public int? RerollsRemaining { get; set; }

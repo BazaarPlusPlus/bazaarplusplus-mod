@@ -26,6 +26,14 @@ def write_json(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=True, separators=(",", ":")) + "\n")
 
 
+def write_ndjson(path: Path, payloads: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for payload in payloads:
+            handle.write(json.dumps(payload, ensure_ascii=True, separators=(",", ":")))
+            handle.write("\n")
+
+
 def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.Row) -> None:
     run_id = run_row["run_id"]
     started_at_utc = run_row["started_at_utc"]
@@ -138,6 +146,66 @@ def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.
             ],
         )
         write_json(run_dir / "status.json", status)
+
+    pvp_battle_rows = connection.execute(
+        """
+        SELECT
+            battle_id,
+            replay_id,
+            run_id,
+            recorded_at_utc,
+            day,
+            hour,
+            encounter_id,
+            player_name,
+            player_account_id,
+            opponent_name,
+            opponent_account_id,
+            combat_kind,
+            result,
+            winner_combatant_id,
+            loser_combatant_id,
+            player_hand_json,
+            player_skills_json,
+            opponent_hand_json,
+            opponent_skills_json
+        FROM pvp_battles
+        WHERE run_id = ?
+        ORDER BY recorded_at_utc ASC, battle_id ASC
+        """,
+        (run_id,),
+    ).fetchall()
+    if pvp_battle_rows:
+        battles: list[dict[str, object]] = []
+        for battle_row in pvp_battle_rows:
+            battle: dict[str, object] = {
+                "battle_id": battle_row["battle_id"],
+                "replay_id": battle_row["replay_id"],
+                "recorded_at_utc": battle_row["recorded_at_utc"],
+                "player_name": battle_row["player_name"],
+                "player_account_id": battle_row["player_account_id"],
+                "opponent_name": battle_row["opponent_name"],
+                "opponent_account_id": battle_row["opponent_account_id"],
+                "combat_kind": battle_row["combat_kind"],
+                "result": battle_row["result"],
+                "winner_combatant_id": battle_row["winner_combatant_id"],
+                "loser_combatant_id": battle_row["loser_combatant_id"],
+            }
+            if battle_row["run_id"] is not None:
+                battle["run_id"] = battle_row["run_id"]
+            if battle_row["day"] is not None:
+                battle["day"] = battle_row["day"]
+            if battle_row["hour"] is not None:
+                battle["hour"] = battle_row["hour"]
+            if battle_row["encounter_id"] is not None:
+                battle["encounter_id"] = battle_row["encounter_id"]
+            battle["player_hand"] = json.loads(battle_row["player_hand_json"])
+            battle["player_skills"] = json.loads(battle_row["player_skills_json"])
+            battle["opponent_hand"] = json.loads(battle_row["opponent_hand_json"])
+            battle["opponent_skills"] = json.loads(battle_row["opponent_skills_json"])
+            battles.append(battle)
+
+        write_ndjson(run_dir / "pvp_battles.ndjson", battles)
 
 
 def main() -> int:

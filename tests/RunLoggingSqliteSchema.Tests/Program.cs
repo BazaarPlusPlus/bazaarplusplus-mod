@@ -6,7 +6,7 @@ var schemaType = RequireType(
 );
 
 Assert(
-    GetStaticValue<string>(schemaType, "DatabaseFileName") == "run-logs.db",
+    GetStaticValue<string>(schemaType, "DatabaseFileName") == "bazaarplusplus.db",
     "Database file name mismatch."
 );
 Assert(GetStaticValue<string>(schemaType, "RunsTableName") == "runs", "Runs table name mismatch.");
@@ -21,6 +21,10 @@ Assert(
 Assert(
     GetStaticValue<string>(schemaType, "RunStatusTableName") == "run_status",
     "Run status table name mismatch."
+);
+Assert(
+    GetStaticValue<string>(schemaType, "PvpBattlesTableName") == "pvp_battles",
+    "PVP battles table name mismatch."
 );
 
 var bootstrapSql = GetStaticValue<string>(schemaType, "BootstrapSql");
@@ -44,6 +48,20 @@ Assert(
 Assert(
     bootstrapSql.Contains("run_status", StringComparison.Ordinal),
     "Bootstrap SQL should define run_status."
+);
+Assert(
+    bootstrapSql.Contains("pvp_battles", StringComparison.Ordinal),
+    "Bootstrap SQL should define pvp_battles."
+);
+Assert(
+    bootstrapSql.Contains("player_name", StringComparison.Ordinal)
+        && bootstrapSql.Contains("player_account_id", StringComparison.Ordinal)
+        && bootstrapSql.Contains("opponent_name", StringComparison.Ordinal)
+        && bootstrapSql.Contains("opponent_account_id", StringComparison.Ordinal)
+        && bootstrapSql.Contains("winner_combatant_id", StringComparison.Ordinal)
+        && bootstrapSql.Contains("loser_combatant_id", StringComparison.Ordinal)
+        && bootstrapSql.Contains("result", StringComparison.Ordinal),
+    "Bootstrap SQL should define PVP battle player identity and outcome columns."
 );
 
 Console.WriteLine("RunLogging SQLite schema checks passed.");

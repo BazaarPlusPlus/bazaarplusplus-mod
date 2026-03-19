@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
 using UnityEngine;
@@ -144,6 +145,43 @@ internal sealed class RunLoggingController : MonoBehaviour
         return RequireCore().AcceptSelectionSnapshot(input);
     }
 
+    public RunLogEvent? CaptureCombatReplay(CombatReplayRecord record)
+    {
+        try
+        {
+            if (record == null)
+                throw new ArgumentNullException(nameof(record));
+
+            if (
+                !string.Equals(record.CombatKind, "PVPCombat", StringComparison.Ordinal)
+                || !ModState.IsInGameRun
+            )
+            {
+                return null;
+            }
+
+            if (EnsureActiveRunFromGame() == null)
+                return null;
+
+            return RequireCore().AcceptCombatReplay(
+                new RunLogCombatReplayInput
+                {
+                    Day = record.Day,
+                    Hour = record.Hour,
+                    EncounterId = record.EncounterId,
+                    CombatKind = record.CombatKind,
+                    ReplayId = record.ReplayId,
+                    OpponentName = record.OpponentName,
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("RunLoggingController", $"CaptureCombatReplay failed: {ex}");
+            return null;
+        }
+    }
+
     private RunLogSessionState? EnsureActiveRunFromGame()
     {
         if (!GameDataReader.TryCreateRunLogCreateRequest(out var request))
@@ -233,6 +271,15 @@ internal sealed class RunLoggingControllerCore
             _sessionManager.SaveCheckpoint();
 
         return selectionEvent;
+    }
+
+    public RunLogEvent AcceptCombatReplay(RunLogCombatReplayInput input)
+    {
+        var combatEvent =
+            _sessionManager.AppendEvent(_captureService.BuildCombatReplayRecordedEvent(input))
+            ?? throw new InvalidOperationException("Combat replay event was unexpectedly suppressed.");
+        _sessionManager.SaveCheckpoint();
+        return combatEvent;
     }
 
     public void CompleteRun(RunLogCompletion completion)

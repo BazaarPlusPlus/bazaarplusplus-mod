@@ -415,7 +415,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.Transaction = transaction;
         return command;
     }
-
     private static void AddNullableInt32(SqliteCommand command, string name, int? value)
     {
         command.Parameters.AddWithValue(name, value.HasValue ? value.Value : DBNull.Value);

@@ -1,7 +1,9 @@
 using System.Reflection;
+using Microsoft.Data.Sqlite;
 
 var recordType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayRecord");
 var storeType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayStore");
+var pvpBattleStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.PvpBattleSqliteStore");
 var captureServiceType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayCaptureService");
 var loaderType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayLoader");
 var controllerType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayController");
@@ -50,9 +52,50 @@ var runtimeSource = File.ReadAllText(
         )
     )
 );
+var captureServiceSource = File.ReadAllText(
+    Path.GetFullPath(
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../../Game/CombatReplay/CombatReplayCaptureService.cs"
+        )
+    )
+);
+Assert(
+    captureServiceSource.Contains("CaptureLiveSnapshots(_candidate);", StringComparison.Ordinal)
+        && captureServiceSource.Contains("CaptureLiveSnapshots(candidate);", StringComparison.Ordinal),
+    "Combat replay capture should refresh live card snapshots after the opening GameSim has had time to populate Data."
+);
+Assert(
+    captureServiceSource.Contains("CaptureCurrentHandCardsAtOpening(ECombatantId.Player)", StringComparison.Ordinal)
+        && captureServiceSource.Contains("CaptureCurrentSkillsAtOpening(ECombatantId.Player)", StringComparison.Ordinal)
+        && captureServiceSource.Contains("CaptureOpeningHandCards(message, ECombatantId.Opponent)", StringComparison.Ordinal)
+        && captureServiceSource.Contains("CaptureOpponentSkillsFromOpening(message)", StringComparison.Ordinal)
+        && captureServiceSource.Contains("GameSimEventCardSpawned", StringComparison.Ordinal)
+        && captureServiceSource.Contains("GameSimEventPlayerSkillEquipped", StringComparison.Ordinal),
+    "Combat replay capture should read player skills from current Data and opponent skills from opening GameSim events."
+);
+Assert(
+    captureServiceSource.Contains("return state == ERunState.PVPCombat;", StringComparison.Ordinal)
+        && captureServiceSource.Contains("IsAnyCombatOpeningMessage", StringComparison.Ordinal),
+    "Combat replay capture should only open new PVP candidates from PVPCombat states and reject other combat openings as closers."
+);
+Assert(
+    captureServiceSource.Contains("OpponentName = candidate.OpponentName", StringComparison.Ordinal)
+        && captureServiceSource.Contains("OpponentAccountId = candidate.OpponentAccountId", StringComparison.Ordinal),
+    "Combat replay capture should bind opponent identity to the opening candidate instead of reading it from global state during record creation."
+);
 Assert(
     runtimeSource.Contains("EnsureReplayBootstrapReadyAsync", StringComparison.Ordinal),
     "Combat replay runtime should expose a dedicated saved replay bootstrap entrypoint."
+);
+Assert(
+    runtimeSource.Contains("CaptureCombatReplay(record)", StringComparison.Ordinal),
+    "Combat replay runtime should forward saved combat metadata into run logging."
+);
+Assert(
+    runtimeSource.Contains("_pvpBattleStore = new PvpBattleSqliteStore", StringComparison.Ordinal)
+        && runtimeSource.Contains("_pvpBattleStore.Save(record);", StringComparison.Ordinal),
+    "Combat replay runtime should persist PVP battles into SQLite when replays are captured."
 );
 Assert(
     runtimeSource.Contains("ResolveReplayDependencies", StringComparison.Ordinal),
@@ -273,6 +316,7 @@ var tempRoot = Path.Combine(
     Guid.NewGuid().ToString("N")
 );
 Directory.CreateDirectory(tempRoot);
+var dbPath = Path.Combine(tempRoot, "run-logs.db");
 
 try
 {
@@ -289,10 +333,17 @@ try
         new DateTimeOffset(2026, 3, 18, 1, 2, 3, TimeSpan.Zero)
     );
     SetProperty(recordType, record!, "RunId", "run-001");
+    SetProperty(recordType, record!, "CombatKind", "PVPCombat");
     SetProperty(recordType, record!, "Day", 3);
     SetProperty(recordType, record!, "Hour", 5);
     SetProperty(recordType, record!, "EncounterId", "encounter-abc");
+    SetProperty(recordType, record!, "PlayerName", "Local Player");
+    SetProperty(recordType, record!, "PlayerAccountId", "player-account-001");
     SetProperty(recordType, record!, "OpponentName", "Test Opponent");
+    SetProperty(recordType, record!, "OpponentAccountId", "opponent-account-001");
+    SetProperty(recordType, record!, "Result", "win");
+    SetProperty(recordType, record!, "WinnerCombatantId", "Player");
+    SetProperty(recordType, record!, "LoserCombatantId", "Opponent");
     SetProperty(recordType, record!, "PlayerHandCards", CreateSnapshotList("p-hand-1", "tpl-p-hand"));
     SetProperty(recordType, record!, "PlayerSkills", CreateSnapshotList("p-skill-1", "tpl-p-skill"));
     SetProperty(recordType, record!, "OpponentHandCards", CreateSnapshotList("o-hand-1", "tpl-o-hand"));
@@ -317,6 +368,10 @@ try
     );
 
     Invoke(storeType, store!, "Save", new object?[] { record! });
+
+    var pvpBattleStore = Activator.CreateInstance(pvpBattleStoreType, dbPath);
+    Assert(pvpBattleStore != null, "PvpBattleSqliteStore should be constructible.");
+    Invoke(pvpBattleStoreType, pvpBattleStore!, "Save", new object?[] { record! });
 
     var listed = (
         (System.Collections.IEnumerable)Invoke(storeType, store!, "List", Array.Empty<object?>())
@@ -361,6 +416,85 @@ try
         "Load should preserve card and skill snapshots for both sides."
     );
 
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
+        Assert(
+            CountRows(connection, "pvp_battles") == 1,
+            "Saving a PVP replay should insert one row into pvp_battles."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT replay_id FROM pvp_battles WHERE battle_id = $battleId;",
+                "replay-001"
+            ) == "replay-001",
+            "pvp_battles should preserve the replay id."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT player_name FROM pvp_battles WHERE battle_id = $battleId;",
+                "replay-001"
+            ) == "Local Player",
+            "pvp_battles should persist the player name."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT player_account_id FROM pvp_battles WHERE battle_id = $battleId;",
+                "replay-001"
+            ) == "player-account-001",
+            "pvp_battles should persist the player account id."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT opponent_account_id FROM pvp_battles WHERE battle_id = $battleId;",
+                "replay-001"
+            ) == "opponent-account-001",
+            "pvp_battles should persist the opponent account id."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT result FROM pvp_battles WHERE battle_id = $battleId;",
+                "replay-001"
+            ) == "win",
+            "pvp_battles should persist the player's combat result."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT winner_combatant_id FROM pvp_battles WHERE battle_id = $battleId;",
+                "replay-001"
+            ) == "Player",
+            "pvp_battles should persist the winner combatant id."
+        );
+        var playerHandJson = GetString(
+            connection,
+            "SELECT player_hand_json FROM pvp_battles WHERE battle_id = $battleId;",
+            "replay-001"
+        );
+        Assert(
+            playerHandJson.Contains("p-hand-1", StringComparison.Ordinal)
+                && playerHandJson.Contains("Sparkblade", StringComparison.Ordinal)
+                && playerHandJson.Contains("Radiant", StringComparison.Ordinal)
+                && playerHandJson.Contains("Damage", StringComparison.Ordinal),
+            "pvp_battles should persist detailed hand-card metadata."
+        );
+        var playerSkillsJson = GetString(
+            connection,
+            "SELECT player_skills_json FROM pvp_battles WHERE battle_id = $battleId;",
+            "replay-001"
+        );
+        Assert(
+            playerSkillsJson.Contains("Arcane Mastery", StringComparison.Ordinal)
+                && playerSkillsJson.Contains("Cooldown", StringComparison.Ordinal),
+            "pvp_battles should persist detailed skill metadata."
+        );
+    }
+
     var replayFilePath = Path.Combine(tempRoot, "replay-001.json");
     File.WriteAllText(
         replayFilePath,
@@ -392,6 +526,7 @@ try
         new DateTimeOffset(2026, 3, 18, 1, 3, 3, TimeSpan.Zero)
     );
     SetProperty(recordType, secondRecord!, "RunId", "run-002");
+    SetProperty(recordType, secondRecord!, "CombatKind", "Combat");
     SetProperty(recordType, secondRecord!, "Day", 3);
     SetProperty(recordType, secondRecord!, "Hour", 6);
     SetProperty(recordType, secondRecord!, "EncounterId", "encounter-def");
@@ -445,8 +580,15 @@ try
         opponentName: "Ignored Opponent"
     );
     var combatMessage = CreateCombatSimMessage();
-    var combatStart = CreateGameSimMessage(
+    var pveCombatStart = CreateGameSimMessage(
         "Combat",
+        day: 2,
+        hour: 4,
+        encounterId: "encounter-pve",
+        opponentName: "PvE Opponent"
+    );
+    var combatStart = CreateGameSimMessage(
+        "PVPCombat",
         day: 3,
         hour: 4,
         encounterId: "encounter-live",
@@ -489,6 +631,26 @@ try
     Assert(
         ignoredResult == null,
         "An invalid GameSim/CombatSim/GameSim triplet should be ignored."
+    );
+    ignoredResult = Invoke(
+        captureServiceType,
+        captureService!,
+        "Accept",
+        new object?[] { pveCombatStart, "run-ignore" }
+    );
+    Assert(
+        ignoredResult == null,
+        "A non-PVP combat opening should not start replay capture."
+    );
+    ignoredResult = Invoke(
+        captureServiceType,
+        captureService!,
+        "Accept",
+        new object?[] { combatMessage, "run-ignore" }
+    );
+    Assert(
+        ignoredResult == null,
+        "A CombatSim after a non-PVP opening should still be ignored."
     );
 
     Assert(
@@ -534,6 +696,14 @@ try
     );
     Assert(
         string.Equals(
+            (string?)GetProperty(recordType, completedRecord!, "CombatKind"),
+            "PVPCombat",
+            StringComparison.Ordinal
+        ),
+        "Completed replay records should preserve the combat kind from the opening snapshot."
+    );
+    Assert(
+        string.Equals(
             (string?)GetProperty(recordType, completedRecord!, "EncounterId"),
             "encounter-live",
             StringComparison.Ordinal
@@ -541,12 +711,8 @@ try
         "Completed replay records should preserve the opening encounter id."
     );
     Assert(
-        string.Equals(
-            (string?)GetProperty(recordType, completedRecord!, "OpponentName"),
-            "Rival",
-            StringComparison.Ordinal
-        ),
-        "Completed replay records should preserve opponent metadata."
+        string.IsNullOrWhiteSpace((string?)GetProperty(recordType, completedRecord!, "OpponentName")),
+        "Completed replay records should leave opponent metadata empty when Data.SimPvpOpponent is unavailable."
     );
     Assert(
         !string.IsNullOrWhiteSpace(
@@ -636,7 +802,26 @@ Assert(controller != null, "CombatReplayController should be constructible.");
 finally
 {
     if (Directory.Exists(tempRoot))
-        Directory.Delete(tempRoot, recursive: true);
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        try
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+        catch (IOException)
+        {
+            try
+            {
+                System.Threading.Thread.Sleep(200);
+                Directory.Delete(tempRoot, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup on Windows when SQLite releases the file handle late.
+            }
+        }
+    }
 }
 
 static Type RequireType(string fullName)
@@ -701,6 +886,20 @@ static object CreateSnapshotList(string instanceId, string templateId)
         "Type",
         ParseEnum("BazaarGameShared.Domain.Core.Types.ECardType", "BazaarGameShared", "Skill")
     );
+    SetProperty(snapshotType, snapshot, "Name", instanceId.StartsWith("p-skill", StringComparison.Ordinal) ? "Arcane Mastery" : "Sparkblade");
+    SetProperty(snapshotType, snapshot, "Tier", "Gold");
+    SetProperty(snapshotType, snapshot, "Enchant", "Radiant");
+    SetProperty(snapshotType, snapshot, "Tags", new List<string> { "Weapon", "Burst" });
+    SetProperty(
+        snapshotType,
+        snapshot,
+        "Attributes",
+        new Dictionary<string, int>
+        {
+            ["Damage"] = 42,
+            ["Cooldown"] = 3,
+        }
+    );
     Invoke(listType, list, "Add", new[] { snapshot });
     return list;
 }
@@ -711,6 +910,24 @@ static int ReadSnapshotCount(Type recordType, object instance, string propertyNa
         ?.Cast<object>()
         .Count()
         ?? 0;
+}
+
+static long CountRows(SqliteConnection connection, string tableName)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = $"SELECT COUNT(*) FROM {tableName};";
+    return (long)(command.ExecuteScalar() ?? 0L);
+}
+
+static string GetString(SqliteConnection connection, string sql, string battleId)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = sql;
+    command.Parameters.AddWithValue("$battleId", battleId);
+    return (string)(
+        command.ExecuteScalar()
+        ?? throw new InvalidOperationException($"Query returned null: {sql}")
+    );
 }
 
 static void Assert(bool condition, string message)

@@ -58,6 +58,24 @@ public sealed class RunLogCaptureService
             Options = RunLogSnapshotBuilder.ProjectOptions(input.Options),
         };
     }
+
+    public RunLogEvent BuildCombatReplayRecordedEvent(RunLogCombatReplayInput input)
+    {
+        if (input == null)
+            throw new ArgumentNullException(nameof(input));
+
+        return new RunLogEvent
+        {
+            Kind = "pvp_combat_recorded",
+            Day = input.Day,
+            Hour = input.Hour,
+            State = input.CombatKind,
+            EncounterId = input.EncounterId,
+            CombatKind = input.CombatKind,
+            ReplayId = input.ReplayId,
+            OpponentName = input.OpponentName,
+        };
+    }
 }
 
 public sealed class RunLogRunProgressInput
@@ -123,4 +141,19 @@ public sealed class RunLogSelectionOptionInput
 
     public IDictionary<string, object?> Attributes { get; set; } =
         new Dictionary<string, object?>();
+}
+
+public sealed class RunLogCombatReplayInput
+{
+    public int? Day { get; set; }
+
+    public int? Hour { get; set; }
+
+    public string? EncounterId { get; set; }
+
+    public string? CombatKind { get; set; }
+
+    public string? ReplayId { get; set; }
+
+    public string? OpponentName { get; set; }
 }

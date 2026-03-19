@@ -15,6 +15,8 @@ public static class RunLogSqliteSchema
 
     public static string RunStatusTableName => "run_status";
 
+    public static string PvpBattlesTableName => "pvp_battles";
+
     public static string BootstrapSql =>
         $"""
             PRAGMA foreign_keys = ON;
@@ -70,10 +72,38 @@ public static class RunLogSqliteSchema
                 FOREIGN KEY (run_id) REFERENCES {RunsTableName}(run_id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS {PvpBattlesTableName} (
+                battle_id TEXT PRIMARY KEY,
+                replay_id TEXT NOT NULL,
+                run_id TEXT NULL,
+                recorded_at_utc TEXT NOT NULL,
+                day INTEGER NULL,
+                hour INTEGER NULL,
+                encounter_id TEXT NULL,
+                player_name TEXT NULL,
+                player_account_id TEXT NULL,
+                opponent_name TEXT NULL,
+                opponent_account_id TEXT NULL,
+                combat_kind TEXT NOT NULL,
+                result TEXT NULL,
+                winner_combatant_id TEXT NULL,
+                loser_combatant_id TEXT NULL,
+                player_hand_json TEXT NOT NULL,
+                player_skills_json TEXT NOT NULL,
+                opponent_hand_json TEXT NOT NULL,
+                opponent_skills_json TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_{RunEventsTableName}_ts_utc
                 ON {RunEventsTableName}(ts_utc);
 
             CREATE INDEX IF NOT EXISTS idx_{RunCheckpointsTableName}_last_seen_at_utc
                 ON {RunCheckpointsTableName}(last_seen_at_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_{PvpBattlesTableName}_run_id
+                ON {PvpBattlesTableName}(run_id);
+
+            CREATE INDEX IF NOT EXISTS idx_{PvpBattlesTableName}_recorded_at_utc
+                ON {PvpBattlesTableName}(recorded_at_utc);
             """;
 }

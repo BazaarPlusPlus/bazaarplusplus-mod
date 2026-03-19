@@ -10,6 +10,7 @@ var progressInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogRunPro
 var stateInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogStateSnapshotInput");
 var selectionInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogSelectionSnapshotInput");
 var optionInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogSelectionOptionInput");
+var combatReplayInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCombatReplayInput");
 
 var runInitializedPatchPath = Path.GetFullPath(
     Path.Combine(
@@ -155,6 +156,39 @@ Assert(selectionEvent.Options[0].Name == "Frost Street", "Option projection shou
 Assert(selectionEvent.Options[0].Tier == "Bronze", "Option projection should preserve tier.");
 Assert(selectionEvent.Options[0].Enchant == "None", "Option projection should preserve enchant.");
 
+var combatReplayInput =
+    Activator.CreateInstance(combatReplayInputType)
+    ?? throw new InvalidOperationException("RunLogCombatReplayInput should be constructible.");
+SetProperty(combatReplayInputType, combatReplayInput, "ReplayId", "replay-123");
+SetProperty(combatReplayInputType, combatReplayInput, "CombatKind", "PVPCombat");
+SetProperty(combatReplayInputType, combatReplayInput, "Day", 4);
+SetProperty(combatReplayInputType, combatReplayInput, "Hour", 6);
+SetProperty(combatReplayInputType, combatReplayInput, "EncounterId", "encounter-pvp-1");
+SetProperty(combatReplayInputType, combatReplayInput, "OpponentName", "Rival");
+
+var combatReplayEvent = Invoke<RunLogEvent>(
+    captureServiceType,
+    service,
+    "BuildCombatReplayRecordedEvent",
+    [combatReplayInput]
+);
+Assert(
+    combatReplayEvent.Kind == "pvp_combat_recorded",
+    "Combat replays should map to a pvp_combat_recorded event."
+);
+Assert(
+    combatReplayEvent.CombatKind == "PVPCombat",
+    "Combat replay events should preserve the combat kind."
+);
+Assert(
+    combatReplayEvent.ReplayId == "replay-123",
+    "Combat replay events should preserve the replay id."
+);
+Assert(
+    combatReplayEvent.OpponentName == "Rival",
+    "Combat replay events should preserve opponent metadata."
+);
+
 var seamStore = new ControllerSeamStore();
 var seamSessionManager = new RunLogSessionManager(
     seamStore,
@@ -246,6 +280,22 @@ Invoke<object>(
 Invoke<object>(
     coreType,
     core,
+    "AcceptCombatReplay",
+    [
+        new RunLogCombatReplayInput
+        {
+            ReplayId = "replay-123",
+            CombatKind = "PVPCombat",
+            Day = 1,
+            Hour = 2,
+            EncounterId = "encounter-pvp-1",
+            OpponentName = "Rival",
+        },
+    ]
+);
+Invoke<object>(
+    coreType,
+    core,
     "CompleteRun",
     [
         new RunLogCompletion
@@ -259,8 +309,10 @@ Invoke<object>(
 Assert(
     seamStore
         .AppendedEvents.Select(e => e.Kind)
-        .SequenceEqual(["run_started", "run_progress", "state_seen", "selection_seen"]),
-    "Controller seam should forward events in run-started to selection-seen order."
+        .SequenceEqual(
+            ["run_started", "run_progress", "state_seen", "selection_seen", "pvp_combat_recorded"]
+        ),
+    "Controller seam should forward events in run-started to pvp-combat-recorded order."
 );
 Assert(seamStore.CompleteRunCalls == 1, "Controller seam should forward completion once.");
 

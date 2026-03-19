@@ -8,6 +8,7 @@ using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
+using BazaarPlusPlus.Game.RunLogging;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;
@@ -18,6 +19,7 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 internal sealed class CombatReplayRuntime : MonoBehaviour
 {
     private CombatReplayStore? _store;
+    private PvpBattleSqliteStore? _pvpBattleStore;
     private CombatReplayCaptureService? _captureService;
     private CombatReplayLoader? _loader;
     private CombatReplayController? _controller;
@@ -36,6 +38,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         Instance = this;
         _store = new CombatReplayStore(ModState.CombatReplayDirectoryPath);
+        _pvpBattleStore = new PvpBattleSqliteStore(ModState.RunLogDatabasePath);
         _captureService = new CombatReplayCaptureService();
         _loader = new CombatReplayLoader();
         _controller = new CombatReplayController(_store, _loader);
@@ -86,7 +89,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public void ObserveMessage(INetMessage message)
     {
-        if (_captureService == null || _store == null)
+        if (_captureService == null || _store == null || _pvpBattleStore == null)
             return;
 
         try
@@ -96,6 +99,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 return;
 
             _store.Save(record);
+            _pvpBattleStore.Save(record);
+            RunLoggingController.Instance?.CaptureCombatReplay(record);
             BppLog.Info(
                 "CombatReplayRuntime",
                 $"Saved combat replay {record.ReplayId} for run={record.RunId ?? "unknown"}"

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
+using Microsoft.Data.Sqlite;
 
 var tempRoot = Path.Combine(
     Path.GetTempPath(),
@@ -27,6 +28,14 @@ try
     var store = new SqliteRunLogStore(dbPath);
     WriteCompletedRun(store, runId1, startedAt, "Vanessa", 42);
     WriteCompletedRun(store, runId2, startedAt.AddHours(1), "Dooly", 43);
+    WritePvpBattle(
+        dbPath,
+        runId1,
+        startedAt.AddMinutes(7),
+        "battle-001",
+        "replay-001",
+        "Test Rival"
+    );
 
     RunPython(scriptPath, ["--db", dbPath, "--run-id", runId1, "--out", singleOutDir]);
     RunPython(scriptPath, ["--db", dbPath, "--all", "--out", allOutDir]);
@@ -46,6 +55,51 @@ try
         ReadJsonString(Path.Combine(singleRunDir, "status.json"), "run_id") == runId1,
         "status.json should match the requested run."
     );
+    Assert(
+        File.Exists(Path.Combine(singleRunDir, "pvp_battles.ndjson")),
+        "pvp_battles.ndjson should exist when the run has recorded PVP battles."
+    );
+    var pvpBattleLines = File.ReadAllLines(Path.Combine(singleRunDir, "pvp_battles.ndjson"));
+    Assert(
+        pvpBattleLines.Length == 1,
+        "pvp_battles.ndjson should contain one line per exported PVP battle."
+    );
+    using (var pvpBattleDocument = JsonDocument.Parse(pvpBattleLines[0]))
+    {
+        var root = pvpBattleDocument.RootElement;
+        Assert(
+            root.GetProperty("battle_id").GetString() == "battle-001",
+            "pvp_battles.ndjson should preserve the battle id."
+        );
+        Assert(
+            root.GetProperty("player_name").GetString() == "Local Player"
+                && root.GetProperty("player_account_id").GetString() == "player-account-001"
+                && root.GetProperty("opponent_name").GetString() == "Test Rival"
+                && root.GetProperty("opponent_account_id").GetString() == "opponent-account-001",
+            "pvp_battles.ndjson should preserve both player names and account ids."
+        );
+        Assert(
+            root.GetProperty("result").GetString() == "win"
+                && root.GetProperty("winner_combatant_id").GetString() == "Player"
+                && root.GetProperty("loser_combatant_id").GetString() == "Opponent",
+            "pvp_battles.ndjson should preserve combat outcome metadata."
+        );
+        Assert(
+            root.GetProperty("player_hand")[0].GetProperty("name").GetString() == "Sparkblade",
+            "pvp_battles.ndjson should expand player_hand JSON content."
+        );
+        Assert(
+            root.GetProperty("player_hand")[0].GetProperty("enchant").GetString() == "Radiant",
+            "pvp_battles.ndjson should preserve hand-card enchantments."
+        );
+        Assert(
+            root.GetProperty("player_hand")[0]
+                .GetProperty("attributes")
+                .GetProperty("Damage")
+                .GetInt32() == 42,
+            "pvp_battles.ndjson should preserve hand-card attributes."
+        );
+    }
 
     var exportedRunDirectories = Directory.GetDirectories(
         allOutDir,
@@ -65,7 +119,117 @@ try
 finally
 {
     if (Directory.Exists(tempRoot))
-        Directory.Delete(tempRoot, recursive: true);
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        try
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+        catch (IOException)
+        {
+            try
+            {
+                System.Threading.Thread.Sleep(200);
+                Directory.Delete(tempRoot, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup on Windows when SQLite releases the file handle late.
+            }
+        }
+    }
+}
+
+static void WritePvpBattle(
+    string dbPath,
+    string runId,
+    DateTimeOffset recordedAtUtc,
+    string battleId,
+    string replayId,
+    string opponentName
+)
+{
+    using var connection = new SqliteConnection($"Data Source={dbPath}");
+    connection.Open();
+
+    using var command = connection.CreateCommand();
+    command.CommandText =
+        """
+        INSERT INTO pvp_battles (
+            battle_id,
+            replay_id,
+            run_id,
+            recorded_at_utc,
+            day,
+            hour,
+            encounter_id,
+            player_name,
+            player_account_id,
+            opponent_name,
+            opponent_account_id,
+            combat_kind,
+            result,
+            winner_combatant_id,
+            loser_combatant_id,
+            player_hand_json,
+            player_skills_json,
+            opponent_hand_json,
+            opponent_skills_json
+        ) VALUES (
+            $battleId,
+            $replayId,
+            $runId,
+            $recordedAtUtc,
+            $day,
+            $hour,
+            $encounterId,
+            $playerName,
+            $playerAccountId,
+            $opponentName,
+            $opponentAccountId,
+            $combatKind,
+            $result,
+            $winnerCombatantId,
+            $loserCombatantId,
+            $playerHandJson,
+            $playerSkillsJson,
+            $opponentHandJson,
+            $opponentSkillsJson
+        );
+        """;
+    command.Parameters.AddWithValue("$battleId", battleId);
+    command.Parameters.AddWithValue("$replayId", replayId);
+    command.Parameters.AddWithValue("$runId", runId);
+    command.Parameters.AddWithValue("$recordedAtUtc", recordedAtUtc.ToString("o"));
+    command.Parameters.AddWithValue("$day", 1);
+    command.Parameters.AddWithValue("$hour", 2);
+    command.Parameters.AddWithValue("$encounterId", "encounter-pvp-1");
+    command.Parameters.AddWithValue("$playerName", "Local Player");
+    command.Parameters.AddWithValue("$playerAccountId", "player-account-001");
+    command.Parameters.AddWithValue("$opponentName", opponentName);
+    command.Parameters.AddWithValue("$opponentAccountId", "opponent-account-001");
+    command.Parameters.AddWithValue("$combatKind", "PVPCombat");
+    command.Parameters.AddWithValue("$result", "win");
+    command.Parameters.AddWithValue("$winnerCombatantId", "Player");
+    command.Parameters.AddWithValue("$loserCombatantId", "Opponent");
+    command.Parameters.AddWithValue(
+        "$playerHandJson",
+        """[{"instance_id":"hand-1","name":"Sparkblade","enchant":"Radiant","attributes":{"Damage":42}}]"""
+    );
+    command.Parameters.AddWithValue(
+        "$playerSkillsJson",
+        """[{"instance_id":"skill-1","name":"Arcane Mastery","attributes":{"Cooldown":3}}]"""
+    );
+    command.Parameters.AddWithValue(
+        "$opponentHandJson",
+        """[{"instance_id":"opp-hand-1","name":"Frostbite","enchant":"None","attributes":{"Damage":30}}]"""
+    );
+    command.Parameters.AddWithValue(
+        "$opponentSkillsJson",
+        """[{"instance_id":"opp-skill-1","name":"Ice Wall","attributes":{"Shield":20}}]"""
+    );
+    command.ExecuteNonQuery();
 }
 
 Console.WriteLine("RunLogging export checks passed.");
