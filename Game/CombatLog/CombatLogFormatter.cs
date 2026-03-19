@@ -42,7 +42,15 @@ internal static class CombatLogFormatter
                 or "CardQuestUpdated" => CombatLogRowCategory.Event,
                 _ => CombatLogRowCategory.Unknown,
             };
-            rows.Add(new CombatLogRow(frame.FrameIndex, frame.LogicalTime, category, entry.Text));
+            rows.Add(
+                new CombatLogRow(
+                    frame.FrameIndex,
+                    frame.LogicalTime,
+                    category,
+                    entry.Text,
+                    BuildEventSecondaryText(entry)
+                )
+            );
         }
     }
 
@@ -95,7 +103,7 @@ internal static class CombatLogFormatter
 
     private static void AppendCardRows(List<CombatLogRow> rows, CombatLogFrame frame)
     {
-        foreach (var entry in frame.CardUpdates.OrderBy(item => item.CardInstanceId))
+        foreach (var entry in frame.CardUpdates.OrderBy(item => item.Card.DisplayName))
         {
             foreach (var attribute in entry.Attributes.OrderBy(item => item.AttributeKey))
             {
@@ -104,7 +112,8 @@ internal static class CombatLogFormatter
                         frame.FrameIndex,
                         frame.LogicalTime,
                         CombatLogRowCategory.CardAttribute,
-                        $"Card {entry.CardInstanceId} {attribute.AttributeKey} {attribute.PreviousValue} -> {attribute.CurrentValue}"
+                        $"{entry.Card.DisplayName} {attribute.AttributeKey} {attribute.PreviousValue} -> {attribute.CurrentValue}",
+                        BuildCardSecondaryText(entry.Card)
                     )
                 );
             }
@@ -116,10 +125,31 @@ internal static class CombatLogFormatter
                         frame.FrameIndex,
                         frame.LogicalTime,
                         CombatLogRowCategory.CardAttribute,
-                        $"Card {entry.CardInstanceId} {detail}"
+                        $"{entry.Card.DisplayName} {detail}",
+                        BuildCardSecondaryText(entry.Card)
                     )
                 );
             }
         }
+    }
+
+    private static string? BuildEventSecondaryText(CombatLogEventEntry entry)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(entry.SourceId))
+            parts.Add($"src: {entry.SourceId}");
+        if (!string.IsNullOrWhiteSpace(entry.TargetId))
+            parts.Add($"target: {entry.TargetId}");
+
+        return parts.Count == 0 ? null : string.Join(" | ", parts);
+    }
+
+    private static string BuildCardSecondaryText(CombatLogCardDisplayInfo card)
+    {
+        var parts = new List<string> { $"id: {card.InstanceId}" };
+        if (!string.IsNullOrWhiteSpace(card.TemplateId))
+            parts.Add($"tpl: {card.TemplateId}");
+
+        return string.Join(" | ", parts);
     }
 }

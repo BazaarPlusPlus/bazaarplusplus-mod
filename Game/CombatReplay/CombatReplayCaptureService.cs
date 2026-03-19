@@ -51,6 +51,9 @@ internal sealed class CombatReplayCaptureService
                 {
                     RunId = runId,
                     PlayerHandCards = CapturePlayerHandCards(),
+                    PlayerSkills = CaptureSkills(ECombatantId.Player),
+                    OpponentHandCards = CaptureOpponentHandCards(),
+                    OpponentSkills = CaptureSkills(ECombatantId.Opponent),
                     SpawnMessage = message,
                 };
             }
@@ -66,6 +69,9 @@ internal sealed class CombatReplayCaptureService
                 {
                     RunId = runId,
                     PlayerHandCards = CapturePlayerHandCards(),
+                    PlayerSkills = CaptureSkills(ECombatantId.Player),
+                    OpponentHandCards = CaptureOpponentHandCards(),
+                    OpponentSkills = CaptureSkills(ECombatantId.Opponent),
                     SpawnMessage = message,
                 };
             }
@@ -121,6 +127,9 @@ internal sealed class CombatReplayCaptureService
             EncounterId = spawnMessage.Data.CurrentState?.CurrentEncounterId,
             OpponentName = spawnMessage.Data.CurrentState?.PvpOpponent?.Name,
             PlayerHandCards = new List<CombatReplayCardSnapshot>(candidate.PlayerHandCards),
+            PlayerSkills = new List<CombatReplayCardSnapshot>(candidate.PlayerSkills),
+            OpponentHandCards = new List<CombatReplayCardSnapshot>(candidate.OpponentHandCards),
+            OpponentSkills = new List<CombatReplayCardSnapshot>(candidate.OpponentSkills),
             SpawnMessageBase64 = SerializeMessage(spawnMessage),
             CombatMessageBase64 = SerializeMessage(combatMessage),
             DespawnMessageBase64 = SerializeMessage(despawnMessage),
@@ -131,18 +140,7 @@ internal sealed class CombatReplayCaptureService
     {
         try
         {
-            return Data.GetCards<Card>(ECombatantId.Player, EInventorySection.Hand)
-                .Where(card => card != null)
-                .Select(card => new CombatReplayCardSnapshot
-                {
-                    InstanceId = card.InstanceId.ToString(),
-                    TemplateId = card.TemplateId.ToString(),
-                    Type = card.Type,
-                    Size = card.Size,
-                    Section = card.Section,
-                    Socket = card.LeftSocketId,
-                })
-                .ToList();
+            return CaptureCards(ECombatantId.Player, EInventorySection.Hand);
         }
         catch (Exception ex)
         {
@@ -152,6 +150,69 @@ internal sealed class CombatReplayCaptureService
             );
             return new List<CombatReplayCardSnapshot>();
         }
+    }
+
+    private static List<CombatReplayCardSnapshot> CaptureOpponentHandCards()
+    {
+        try
+        {
+            return CaptureCards(ECombatantId.Opponent, EInventorySection.Hand);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayCaptureService",
+                $"Unable to snapshot opponent hand cards for combat replay capture: {ex.Message}"
+            );
+            return new List<CombatReplayCardSnapshot>();
+        }
+    }
+
+    private static List<CombatReplayCardSnapshot> CaptureSkills(ECombatantId combatantId)
+    {
+        try
+        {
+            var skills = combatantId == ECombatantId.Player
+                ? Data.Run?.Player?.Skills
+                : Data.Run?.Opponent?.Skills;
+            return skills?
+                    .Where(skill => skill != null)
+                    .Select(CreateSnapshot)
+                    .ToList()
+                ?? new List<CombatReplayCardSnapshot>();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayCaptureService",
+                $"Unable to snapshot {combatantId} skills for combat replay capture: {ex.Message}"
+            );
+            return new List<CombatReplayCardSnapshot>();
+        }
+    }
+
+    private static List<CombatReplayCardSnapshot> CaptureCards(
+        ECombatantId combatantId,
+        EInventorySection section
+    )
+    {
+        return Data.GetCards<Card>(combatantId, section)
+            .Where(card => card != null)
+            .Select(CreateSnapshot)
+            .ToList();
+    }
+
+    private static CombatReplayCardSnapshot CreateSnapshot(Card card)
+    {
+        return new CombatReplayCardSnapshot
+        {
+            InstanceId = card.InstanceId.ToString(),
+            TemplateId = card.TemplateId.ToString(),
+            Type = card.Type,
+            Size = card.Size,
+            Section = card.Section,
+            Socket = card.LeftSocketId,
+        };
     }
 
     private static bool IsCombatOpeningMessage(NetMessageGameSim message)

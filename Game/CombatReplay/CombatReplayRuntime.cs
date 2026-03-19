@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
 using TheBazaar;
 using TheBazaar.AppFramework;
@@ -266,6 +268,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         bootstrapContext.SetLastCombatSequence(sequence);
         await bootstrapContext.HandleSpawnMessageAsync(sequence.SpawnMessage);
         RehydrateSavedReplayPlayerCards(record, sequence.SpawnMessage);
+        RehydrateSavedReplayOpponentCards(record, sequence.SpawnMessage);
+        RehydrateSavedReplayPlayerSkills(record, sequence.SpawnMessage);
+        RehydrateSavedReplayOpponentSkills(record, sequence.SpawnMessage);
         bootstrapContext.TriggerCombatSequenceCreated();
         await Task.Delay(50);
         await AppState.TryPushState<ReplayState>();
@@ -292,7 +297,69 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return;
         }
 
-        foreach (var snapshot in record.PlayerHandCards.Where(snapshot => snapshot != null))
+        RehydrateSavedReplayCards(record.PlayerHandCards, spawnMessage, Data.Run?.Player);
+    }
+
+    private static void RehydrateSavedReplayOpponentCards(
+        CombatReplayRecord record,
+        NetMessageGameSim spawnMessage
+    )
+    {
+        if (record.OpponentHandCards.Count == 0)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay {record.ReplayId} does not contain opponent-hand snapshots; opponent cards may be missing. Re-capture this fight with the current mod build."
+            );
+            return;
+        }
+
+        RehydrateSavedReplayCards(record.OpponentHandCards, spawnMessage, Data.Run?.Opponent);
+    }
+
+    private static void RehydrateSavedReplayPlayerSkills(
+        CombatReplayRecord record,
+        NetMessageGameSim spawnMessage
+    )
+    {
+        if (record.PlayerSkills.Count == 0)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay {record.ReplayId} does not contain player-skill snapshots; player skills may be missing. Re-capture this fight with the current mod build."
+            );
+            return;
+        }
+
+        var skills = RehydrateSavedReplaySkillCards(record.PlayerSkills, spawnMessage, Data.Run?.Player);
+        ReplaceSkillCollection(Data.Run?.Player, skills);
+    }
+
+    private static void RehydrateSavedReplayOpponentSkills(
+        CombatReplayRecord record,
+        NetMessageGameSim spawnMessage
+    )
+    {
+        if (record.OpponentSkills.Count == 0)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay {record.ReplayId} does not contain opponent-skill snapshots; opponent skills may be missing. Re-capture this fight with the current mod build."
+            );
+            return;
+        }
+
+        var skills = RehydrateSavedReplaySkillCards(record.OpponentSkills, spawnMessage, Data.Run?.Opponent);
+        ReplaceSkillCollection(Data.Run?.Opponent, skills);
+    }
+
+    private static void RehydrateSavedReplayCards(
+        IEnumerable<CombatReplayCardSnapshot> snapshots,
+        NetMessageGameSim spawnMessage,
+        IPlayer? owner
+    )
+    {
+        foreach (var snapshot in snapshots.Where(snapshot => snapshot != null))
         {
             if (string.IsNullOrWhiteSpace(snapshot.InstanceId))
                 continue;
@@ -302,9 +369,63 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 card.Update(simUpdate);
 
             card.Size = snapshot.Size;
-            card.Owner = Data.Run.Player;
+            card.Owner = owner;
             card.Section = snapshot.Section;
             card.LeftSocketId = snapshot.Socket;
+        }
+    }
+
+    private static List<SkillCard> RehydrateSavedReplaySkillCards(
+        IEnumerable<CombatReplayCardSnapshot> snapshots,
+        NetMessageGameSim spawnMessage,
+        IPlayer? owner
+    )
+    {
+        var skills = new List<SkillCard>();
+        foreach (var snapshot in snapshots.Where(snapshot => snapshot != null))
+        {
+            if (string.IsNullOrWhiteSpace(snapshot.InstanceId))
+                continue;
+
+            var card = Data.GetOrCreateCard(snapshot.InstanceId, snapshot.TemplateId, snapshot.Type);
+            if (spawnMessage.Data.Cards.TryGetValue(snapshot.InstanceId, out var simUpdate))
+                card.Update(simUpdate);
+
+            card.Size = snapshot.Size;
+            card.Owner = owner;
+            card.Section = snapshot.Section;
+            card.LeftSocketId = snapshot.Socket;
+
+            if (card is SkillCard skillCard)
+                skills.Add(skillCard);
+        }
+
+        return skills;
+    }
+
+    private static void ReplaceSkillCollection(object? combatant, IReadOnlyList<SkillCard> skills)
+    {
+        if (combatant == null)
+            return;
+
+        var skillsProperty = combatant.GetType().GetProperty(
+            "Skills",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+        if (skillsProperty == null)
+            return;
+
+        if (skillsProperty.CanWrite)
+        {
+            skillsProperty.SetValue(combatant, skills.ToList());
+            return;
+        }
+
+        if (skillsProperty.GetValue(combatant) is System.Collections.IList list)
+        {
+            list.Clear();
+            foreach (var skill in skills)
+                list.Add(skill);
         }
     }
 

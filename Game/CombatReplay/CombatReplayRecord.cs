@@ -22,6 +22,12 @@ internal sealed class CombatReplayRecord
 
     public List<CombatReplayCardSnapshot> PlayerHandCards { get; set; } = new();
 
+    public List<CombatReplayCardSnapshot> PlayerSkills { get; set; } = new();
+
+    public List<CombatReplayCardSnapshot> OpponentHandCards { get; set; } = new();
+
+    public List<CombatReplayCardSnapshot> OpponentSkills { get; set; } = new();
+
     public string SpawnMessageBase64 { get; set; } = string.Empty;
 
     public string CombatMessageBase64 { get; set; } = string.Empty;

@@ -11,7 +11,9 @@ internal sealed class CombatLogPanelState
 
     public bool ShowActions { get; private set; } = true;
 
-    public bool ShowStateChanges { get; private set; } = true;
+    public bool ShowCombatants { get; private set; } = true;
+
+    public bool ShowCards { get; private set; } = true;
 
     public bool ShowRewards { get; private set; } = true;
 
@@ -30,9 +32,14 @@ internal sealed class CombatLogPanelState
         ShowActions = !ShowActions;
     }
 
-    public void ToggleStateChanges()
+    public void ToggleCombatants()
     {
-        ShowStateChanges = !ShowStateChanges;
+        ShowCombatants = !ShowCombatants;
+    }
+
+    public void ToggleCards()
+    {
+        ShowCards = !ShowCards;
     }
 
     public void ToggleRewards()
@@ -79,9 +86,8 @@ internal sealed class CombatLogPanelState
         return category switch
         {
             CombatLogRowCategory.Event or CombatLogRowCategory.Death => ShowActions,
-            CombatLogRowCategory.Health
-            or CombatLogRowCategory.Attribute
-            or CombatLogRowCategory.CardAttribute => ShowStateChanges,
+            CombatLogRowCategory.Health or CombatLogRowCategory.Attribute => ShowCombatants,
+            CombatLogRowCategory.CardAttribute => ShowCards,
             CombatLogRowCategory.Reward => ShowRewards,
             CombatLogRowCategory.System => ShowSystem,
             CombatLogRowCategory.Unknown => ShowUnknown,

@@ -3,14 +3,23 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
+using TheBazaar;
 
 namespace BazaarPlusPlus.Game.CombatLog;
 
 internal sealed class CombatLogRuntime
 {
+    private readonly Func<string, CombatLogCardDisplayInfo?>? _displayInfoResolver;
+
     public CombatLogTimeline? CurrentTimeline { get; private set; }
+
+    public CombatLogRuntime(Func<string, CombatLogCardDisplayInfo?>? displayInfoResolver = null)
+    {
+        _displayInfoResolver = displayInfoResolver;
+    }
 
     public void ReplaceCombat(CombatSim combatSim, CombatLogPlaybackPass playbackPass)
     {
@@ -22,7 +31,7 @@ internal sealed class CombatLogRuntime
         CurrentTimeline = null;
     }
 
-    private static CombatLogTimeline BuildTimeline(
+    private CombatLogTimeline BuildTimeline(
         CombatSim combatSim,
         CombatLogPlaybackPass playbackPass
     )
@@ -36,7 +45,7 @@ internal sealed class CombatLogRuntime
         return new CombatLogTimeline(playbackPass, frames, rows);
     }
 
-    private static CombatLogFrame BuildFrame(CombatSimFrame simFrame, int frameIndex, int totalFrames)
+    private CombatLogFrame BuildFrame(CombatSimFrame simFrame, int frameIndex, int totalFrames)
     {
         return new CombatLogFrame(
             frameIndex,
@@ -54,7 +63,7 @@ internal sealed class CombatLogRuntime
         return TimeSpan.FromMilliseconds(frameIndex * CombatLogTiming.MillisecondsPerFrame);
     }
 
-    private static IReadOnlyList<CombatLogEventEntry> BuildEvents(
+    private IReadOnlyList<CombatLogEventEntry> BuildEvents(
         IReadOnlyList<ICombatSimEvent> simEvents
     )
     {
@@ -67,13 +76,19 @@ internal sealed class CombatLogRuntime
             switch (simEvent)
             {
                 case CombatSimEventEffectExecuted executed:
+                    var executedSourceId = FormatInstanceId(executed.Source);
+                    var executedSourceDisplay = ResolveCardDisplayName(executedSourceId);
+                    var executedTargetId = FormatTargetId(executed.Target);
+                    var executedTargetDisplay = FormatTargetDisplay(executed.Target);
                     results.Add(
                         new CombatLogEventEntry(
                             "EffectExecuted",
                             executed.ExecutionContextId,
-                            FormatInstanceId(executed.Source),
-                            FormatTarget(executed.Target),
-                            BuildEffectExecutedText(executed)
+                            executedSourceId,
+                            executedTargetId,
+                            executedSourceDisplay,
+                            executedTargetDisplay,
+                            BuildEffectExecutedText(executed, executedSourceDisplay, executedTargetDisplay)
                         )
                     );
                     break;
@@ -84,6 +99,8 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             died.CombatantId.ToString(),
+                            null,
+                            died.CombatantId.ToString(),
                             $"{died.CombatantId} died"
                         )
                     );
@@ -92,6 +109,8 @@ internal sealed class CombatLogRuntime
                     results.Add(
                         new CombatLogEventEntry(
                             "MonsterGoldReceived",
+                            null,
+                            null,
                             null,
                             null,
                             null,
@@ -106,51 +125,68 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             null,
+                            null,
+                            null,
                             $"Monster xp +{xp.HealthAmount:0.##}"
                         )
                     );
                     break;
                 case CombatSimEventEffectTriggered triggered:
+                    var triggeredSourceId = FormatInstanceId(triggered.Source);
+                    var triggeredSourceDisplay = ResolveCardDisplayName(triggeredSourceId);
+                    var triggeredTargets = JoinTargets(triggered.Targets);
                     results.Add(
                         new CombatLogEventEntry(
                             "EffectTriggered",
                             triggered.ExecutionContextId,
-                            FormatInstanceId(triggered.Source),
-                            JoinTargets(triggered.Targets),
-                            BuildEffectTriggeredText(triggered)
+                            triggeredSourceId,
+                            triggeredTargets.raw,
+                            triggeredSourceDisplay,
+                            triggeredTargets.display,
+                            BuildEffectTriggeredText(triggered, triggeredSourceDisplay, triggeredTargets.display)
                         )
                     );
                     break;
                 case CombatSimEventEffectAuraExecuted auraExecuted:
+                    var auraSourceId = FormatInstanceId(auraExecuted.Source);
+                    var auraSourceDisplay = ResolveCardDisplayName(auraSourceId);
                     results.Add(
                         new CombatLogEventEntry(
                             "EffectAuraExecuted",
                             auraExecuted.ExecutionContextId,
-                            FormatInstanceId(auraExecuted.Source),
+                            auraSourceId,
                             null,
-                            BuildEffectAuraExecutedText(auraExecuted)
+                            auraSourceDisplay,
+                            null,
+                            BuildEffectAuraExecutedText(auraExecuted, auraSourceDisplay)
                         )
                     );
                     break;
                 case CombatSimEventCardEnchanted enchanted:
+                    var enchantedDisplay = ResolveCardDisplayName(enchanted.InstanceId);
                     results.Add(
                         new CombatLogEventEntry(
                             "CardEnchanted",
                             null,
                             enchanted.InstanceId,
                             null,
-                            BuildCardEnchantedText(enchanted)
+                            enchantedDisplay,
+                            null,
+                            BuildCardEnchantedText(enchanted, enchantedDisplay)
                         )
                     );
                     break;
                 case CombatSimEventCardTransformed transformed:
+                    var transformedDisplay = ResolveCardDisplayName(transformed.OriginalInstanceId);
                     results.Add(
                         new CombatLogEventEntry(
                             "CardTransformed",
                             transformed.ExecutionContextId,
                             transformed.OriginalInstanceId,
                             null,
-                            BuildCardTransformedText(transformed)
+                            transformedDisplay,
+                            null,
+                            BuildCardTransformedText(transformed, transformedDisplay)
                         )
                     );
                     break;
@@ -161,29 +197,37 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             null,
+                            null,
+                            null,
                             BuildCardTransformRevertedText(reverted)
                         )
                     );
                     break;
                 case CombatSimEventCardQuestCompleted questCompleted:
+                    var questCompletedDisplay = ResolveCardDisplayName(questCompleted.InstanceId);
                     results.Add(
                         new CombatLogEventEntry(
                             "CardQuestCompleted",
                             null,
                             questCompleted.InstanceId,
                             null,
-                            $"Quest completed {questCompleted.InstanceId} group={questCompleted.QuestGroupIndex} entry={questCompleted.QuestEntryIndex}"
+                            questCompletedDisplay,
+                            null,
+                            $"Quest completed {questCompletedDisplay ?? questCompleted.InstanceId} group={questCompleted.QuestGroupIndex} entry={questCompleted.QuestEntryIndex}"
                         )
                     );
                     break;
                 case CombatSimEventCardQuestUpdated questUpdated:
+                    var questUpdatedDisplay = ResolveCardDisplayName(questUpdated.InstanceId);
                     results.Add(
                         new CombatLogEventEntry(
                             "CardQuestUpdated",
                             null,
                             questUpdated.InstanceId,
                             null,
-                            $"Quest updated {questUpdated.InstanceId} group={questUpdated.QuestGroupIndex} entry={questUpdated.QuestEntryIndex} {questUpdated.OldProgress} -> {questUpdated.NewProgress}"
+                            questUpdatedDisplay,
+                            null,
+                            $"Quest updated {questUpdatedDisplay ?? questUpdated.InstanceId} group={questUpdated.QuestGroupIndex} entry={questUpdated.QuestEntryIndex} {questUpdated.OldProgress} -> {questUpdated.NewProgress}"
                         )
                     );
                     break;
@@ -191,6 +235,8 @@ internal sealed class CombatLogRuntime
                     results.Add(
                         new CombatLogEventEntry(
                             "SandstormCountdownStarted",
+                            null,
+                            null,
                             null,
                             null,
                             null,
@@ -205,6 +251,8 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             null,
+                            null,
+                            null,
                             "Sandstorm started"
                         )
                     );
@@ -213,6 +261,8 @@ internal sealed class CombatLogRuntime
                     results.Add(
                         new CombatLogEventEntry(
                             simEvent.GetType().Name.Replace("CombatSimEvent", string.Empty),
+                            null,
+                            null,
                             null,
                             null,
                             null,
@@ -268,7 +318,7 @@ internal sealed class CombatLogRuntime
         return new CombatLogSideUpdate(side, update.IsPlayerDead, healthAdjustments, attributes, details);
     }
 
-    private static IReadOnlyList<CombatLogCardUpdateEntry> BuildCardUpdates(
+    private IReadOnlyList<CombatLogCardUpdateEntry> BuildCardUpdates(
         IReadOnlyDictionary<BazaarGameShared.Domain.Core.InstanceId, CombatSimCardUpdate> updates
     )
     {
@@ -307,7 +357,7 @@ internal sealed class CombatLogRuntime
                         details.Add($"Heroes -> {string.Join(", ", item.Value.Heroes.OrderBy(hero => hero.ToString()))}");
 
                     return new CombatLogCardUpdateEntry(
-                        item.Key.ToString(),
+                        ResolveCardDisplayInfo(item.Key.ToString()),
                         item.Value.Attributes
                             .OrderBy(attribute => attribute.Key.ToString())
                             .Select(
@@ -326,25 +376,36 @@ internal sealed class CombatLogRuntime
             .ToList();
     }
 
-    private static string BuildEffectExecutedText(CombatSimEventEffectExecuted executed)
+    private string BuildEffectExecutedText(
+        CombatSimEventEffectExecuted executed,
+        string? sourceDisplayName,
+        string? targetDisplayName
+    )
     {
-        var sourceText = FormatInstanceId(executed.Source) ?? "unknown-source";
-        var targetText = FormatTarget(executed.Target) ?? "unknown-target";
+        var sourceText = sourceDisplayName ?? FormatInstanceId(executed.Source) ?? "unknown-source";
+        var targetText = targetDisplayName ?? FormatTargetId(executed.Target) ?? "unknown-target";
         return $"{executed.ActionType} {executed.EffectId} {sourceText} -> {targetText}";
     }
 
-    private static string BuildEffectTriggeredText(CombatSimEventEffectTriggered triggered)
+    private string BuildEffectTriggeredText(
+        CombatSimEventEffectTriggered triggered,
+        string? sourceDisplayName,
+        string? targetDisplayName
+    )
     {
-        var sourceText = FormatInstanceId(triggered.Source) ?? "unknown-source";
-        var targetText = JoinTargets(triggered.Targets) ?? "unknown-target";
+        var sourceText = sourceDisplayName ?? FormatInstanceId(triggered.Source) ?? "unknown-source";
+        var targetText = targetDisplayName ?? JoinTargets(triggered.Targets).raw ?? "unknown-target";
         return $"Triggered {triggered.EffectId} {sourceText} -> {targetText}";
     }
 
-    private static string BuildEffectAuraExecutedText(CombatSimEventEffectAuraExecuted auraExecuted)
+    private string BuildEffectAuraExecutedText(
+        CombatSimEventEffectAuraExecuted auraExecuted,
+        string? sourceDisplayName
+    )
     {
-        var sourceText = FormatInstanceId(auraExecuted.Source) ?? "unknown-source";
-        var applied = JoinTargets(auraExecuted.AppliedTo);
-        var removed = JoinTargets(auraExecuted.RemovedFrom);
+        var sourceText = sourceDisplayName ?? FormatInstanceId(auraExecuted.Source) ?? "unknown-source";
+        var applied = JoinTargets(auraExecuted.AppliedTo).display;
+        var removed = JoinTargets(auraExecuted.RemovedFrom).display;
         if (!string.IsNullOrEmpty(applied) && !string.IsNullOrEmpty(removed))
             return $"Aura {auraExecuted.EffectId} {sourceText} applied [{applied}] removed [{removed}]";
         if (!string.IsNullOrEmpty(applied))
@@ -354,21 +415,27 @@ internal sealed class CombatLogRuntime
         return $"Aura {auraExecuted.EffectId} {sourceText}";
     }
 
-    private static string BuildCardEnchantedText(CombatSimEventCardEnchanted enchanted)
+    private static string BuildCardEnchantedText(
+        CombatSimEventCardEnchanted enchanted,
+        string? displayName
+    )
     {
         var state = enchanted.IsReverted ? "reverted" : "applied";
-        return $"Enchant {state} {enchanted.InstanceId} -> {enchanted.EnchantmentType?.ToString() ?? "none"}";
+        return $"Enchant {state} {displayName ?? enchanted.InstanceId} -> {enchanted.EnchantmentType?.ToString() ?? "none"}";
     }
 
-    private static string BuildCardTransformedText(CombatSimEventCardTransformed transformed)
+    private string BuildCardTransformedText(
+        CombatSimEventCardTransformed transformed,
+        string? displayName
+    )
     {
         var transformedCards = transformed.TransformedCards?.Count > 0
             ? string.Join(", ", transformed.TransformedCards.Select(FormatTransformation))
             : "none";
-        return $"Transform {transformed.OriginalInstanceId} -> [{transformedCards}]";
+        return $"Transform {displayName ?? transformed.OriginalInstanceId} -> [{transformedCards}]";
     }
 
-    private static string BuildCardTransformRevertedText(CombatSimEventCardTransformReverted reverted)
+    private string BuildCardTransformRevertedText(CombatSimEventCardTransformReverted reverted)
     {
         var original = FormatTransformation(reverted.OriginalCard);
         var revertedIds = reverted.TransformedCardInstanceIds?.Count > 0
@@ -377,11 +444,12 @@ internal sealed class CombatLogRuntime
         return $"Transform reverted {original} from [{revertedIds}]";
     }
 
-    private static string FormatTransformation(SimEventCardTransformation transformation)
+    private string FormatTransformation(SimEventCardTransformation transformation)
     {
         var section = transformation.Section?.ToString() ?? "?";
         var socket = transformation.Socket?.ToString() ?? "?";
-        return $"{transformation.InstanceId}/{transformation.TemplateId} {transformation.Type} {transformation.CombatantId} {section}:{socket}";
+        var displayName = ResolveCardDisplayName(transformation.InstanceId);
+        return $"{displayName ?? transformation.InstanceId}/{transformation.TemplateId} {transformation.Type} {transformation.CombatantId} {section}:{socket}";
     }
 
     private static string? FormatInstanceId(BazaarGameShared.Domain.Core.InstanceId? instanceId)
@@ -389,7 +457,7 @@ internal sealed class CombatLogRuntime
         return instanceId?.ToString();
     }
 
-    private static string? FormatTarget(IEffectTarget? target)
+    private static string? FormatTargetId(IEffectTarget? target)
     {
         return target switch
         {
@@ -400,16 +468,34 @@ internal sealed class CombatLogRuntime
         };
     }
 
-    private static string? JoinTargets(IEnumerable<IEffectTarget>? targets)
+    private string? FormatTargetDisplay(IEffectTarget? target)
+    {
+        return target switch
+        {
+            EffectTargetCard card => ResolveCardDisplayName(card.Target.ToString()) ?? BuildShortIdentifier(card.Target.ToString()),
+            EffectTargetPlayer player => player.Target.ToString(),
+            null => null,
+            _ => target.GetType().Name,
+        };
+    }
+
+    private (string? raw, string? display) JoinTargets(IEnumerable<IEffectTarget>? targets)
     {
         if (targets == null)
-            return null;
+            return (null, null);
 
-        var values = targets
-            .Select(FormatTarget)
+        var rawValues = targets
+            .Select(FormatTargetId)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToList();
-        return values.Count == 0 ? null : string.Join(", ", values);
+        var displayValues = targets
+            .Select(FormatTargetDisplay)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+        return (
+            rawValues.Count == 0 ? null : string.Join(", ", rawValues),
+            displayValues.Count == 0 ? null : string.Join(", ", displayValues)
+        );
     }
 
     private static string BuildFallbackEventText(ICombatSimEvent simEvent)
@@ -428,7 +514,7 @@ internal sealed class CombatLogRuntime
             return text;
 
         if (value is IEffectTarget effectTarget)
-            return FormatTarget(effectTarget) ?? effectTarget.GetType().Name;
+            return FormatTargetId(effectTarget) ?? effectTarget.GetType().Name;
 
         if (value is System.Collections.IEnumerable enumerable && value is not string)
         {
@@ -466,5 +552,114 @@ internal sealed class CombatLogRuntime
         }
 
         return string.Join(", ", partsFromProperties);
+    }
+
+    private CombatLogCardDisplayInfo ResolveCardDisplayInfo(string instanceId)
+    {
+        if (!string.IsNullOrWhiteSpace(instanceId))
+        {
+            var resolved = _displayInfoResolver?.Invoke(instanceId) ?? ResolveLiveCardDisplayInfo(instanceId);
+            if (resolved != null)
+                return resolved;
+        }
+
+        return CreateFallbackCardDisplayInfo(instanceId);
+    }
+
+    private string? ResolveCardDisplayName(string? instanceId)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId))
+            return null;
+
+        return ResolveCardDisplayInfo(instanceId).DisplayName;
+    }
+
+    private static CombatLogCardDisplayInfo? ResolveLiveCardDisplayInfo(string instanceId)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId))
+            return null;
+
+        foreach (var card in EnumerateCombatCards())
+        {
+            var cardInstanceId = card.GetInstanceId().ToString();
+            if (!string.Equals(cardInstanceId, instanceId, StringComparison.Ordinal))
+                continue;
+
+            return new CombatLogCardDisplayInfo(
+                cardInstanceId,
+                card.TemplateId.ToString(),
+                ResolveDisplayName(
+                    card.Template?.Localization?.Title?.Text,
+                    card.Template?.InternalName,
+                    card.TemplateId.ToString(),
+                    cardInstanceId
+                ),
+                card.Owner == Data.Run?.Player ? "Player" : card.Owner == Data.Run?.Opponent ? "Opponent" : null,
+                card.Type.ToString()
+            );
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Card> EnumerateCombatCards()
+    {
+        if (Data.Run?.Player?.Hand != null)
+        {
+            foreach (var card in GameDataReader.GetItemsAsCards(Data.Run.Player.Hand))
+                yield return card;
+        }
+
+        if (Data.Run?.Player?.Skills != null)
+        {
+            foreach (var skill in Data.Run.Player.Skills)
+                yield return skill;
+        }
+
+        if (Data.Run?.Opponent?.Hand != null)
+        {
+            foreach (var card in GameDataReader.GetItemsAsCards(Data.Run.Opponent.Hand))
+                yield return card;
+        }
+
+        if (Data.Run?.Opponent?.Skills != null)
+        {
+            foreach (var skill in Data.Run.Opponent.Skills)
+                yield return skill;
+        }
+    }
+
+    private static CombatLogCardDisplayInfo CreateFallbackCardDisplayInfo(string instanceId)
+    {
+        return new CombatLogCardDisplayInfo(
+            instanceId,
+            null,
+            BuildShortIdentifier(instanceId)
+        );
+    }
+
+    private static string ResolveDisplayName(
+        string? localizedTitle,
+        string? internalName,
+        string? templateId,
+        string instanceId
+    )
+    {
+        if (!string.IsNullOrWhiteSpace(localizedTitle))
+            return localizedTitle;
+        if (!string.IsNullOrWhiteSpace(internalName))
+            return internalName;
+        if (!string.IsNullOrWhiteSpace(templateId))
+            return BuildShortIdentifier(templateId);
+
+        return BuildShortIdentifier(instanceId);
+    }
+
+    private static string BuildShortIdentifier(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "unknown";
+
+        return value.Length <= 8 ? value : value[..8];
     }
 }

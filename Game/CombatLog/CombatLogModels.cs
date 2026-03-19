@@ -21,6 +21,34 @@ internal enum CombatLogRowCategory
     Unknown,
 }
 
+internal sealed class CombatLogCardDisplayInfo
+{
+    public CombatLogCardDisplayInfo(
+        string instanceId,
+        string? templateId,
+        string displayName,
+        string? ownerSide = null,
+        string? cardType = null
+    )
+    {
+        InstanceId = instanceId;
+        TemplateId = templateId;
+        DisplayName = displayName;
+        OwnerSide = ownerSide;
+        CardType = cardType;
+    }
+
+    public string InstanceId { get; }
+
+    public string? TemplateId { get; }
+
+    public string DisplayName { get; }
+
+    public string? OwnerSide { get; }
+
+    public string? CardType { get; }
+}
+
 internal sealed class CombatLogTimeline
 {
     public CombatLogTimeline(
@@ -84,6 +112,8 @@ internal sealed class CombatLogEventEntry
         string? executionContextId,
         string? sourceId,
         string? targetId,
+        string? sourceDisplayName,
+        string? targetDisplayName,
         string text
     )
     {
@@ -91,6 +121,8 @@ internal sealed class CombatLogEventEntry
         ExecutionContextId = executionContextId;
         SourceId = sourceId;
         TargetId = targetId;
+        SourceDisplayName = sourceDisplayName;
+        TargetDisplayName = targetDisplayName;
         Text = text;
     }
 
@@ -101,6 +133,10 @@ internal sealed class CombatLogEventEntry
     public string? SourceId { get; }
 
     public string? TargetId { get; }
+
+    public string? SourceDisplayName { get; }
+
+    public string? TargetDisplayName { get; }
 
     public string Text { get; }
 }
@@ -171,17 +207,17 @@ internal sealed class CombatLogAttributeChange
 internal sealed class CombatLogCardUpdateEntry
 {
     public CombatLogCardUpdateEntry(
-        string cardInstanceId,
+        CombatLogCardDisplayInfo card,
         IReadOnlyList<CombatLogAttributeChange> attributes,
         IReadOnlyList<string> details
     )
     {
-        CardInstanceId = cardInstanceId;
+        Card = card;
         Attributes = attributes;
         Details = details;
     }
 
-    public string CardInstanceId { get; }
+    public CombatLogCardDisplayInfo Card { get; }
 
     public IReadOnlyList<CombatLogAttributeChange> Attributes { get; }
 
@@ -194,13 +230,15 @@ internal sealed class CombatLogRow
         int frameIndex,
         TimeSpan logicalTime,
         CombatLogRowCategory category,
-        string text
+        string text,
+        string? secondaryText = null
     )
     {
         FrameIndex = frameIndex;
         LogicalTime = logicalTime;
         Category = category;
         Text = text;
+        SecondaryText = secondaryText;
     }
 
     public int FrameIndex { get; }
@@ -210,6 +248,8 @@ internal sealed class CombatLogRow
     public CombatLogRowCategory Category { get; }
 
     public string Text { get; }
+
+    public string? SecondaryText { get; }
 }
 
 internal sealed class CombatLogVisibleRow

@@ -98,6 +98,12 @@ Assert(
     "Combat replay runtime should rehydrate saved player cards before entering ReplayState."
 );
 Assert(
+    runtimeSource.Contains("RehydrateSavedReplayOpponentCards", StringComparison.Ordinal)
+        && runtimeSource.Contains("RehydrateSavedReplayPlayerSkills", StringComparison.Ordinal)
+        && runtimeSource.Contains("RehydrateSavedReplayOpponentSkills", StringComparison.Ordinal),
+    "Combat replay runtime should expose dedicated rehydration paths for both sides' cards and skills."
+);
+Assert(
     runtimeSource.Contains("card.Size = snapshot.Size;", StringComparison.Ordinal),
     "Combat replay runtime should restore player card size before native replay spawning."
 );
@@ -115,6 +121,12 @@ Assert(
     runtimeSource.Contains("does not contain player-hand snapshots", StringComparison.Ordinal),
     "Combat replay runtime should warn when an old replay does not contain player-hand snapshots."
 );
+Assert(
+    runtimeSource.Contains("does not contain opponent-hand snapshots", StringComparison.Ordinal)
+        && runtimeSource.Contains("does not contain player-skill snapshots", StringComparison.Ordinal)
+        && runtimeSource.Contains("does not contain opponent-skill snapshots", StringComparison.Ordinal),
+    "Combat replay runtime should warn when older replays are missing card or skill snapshots for either side."
+);
 var snapshotSource = File.ReadAllText(
     Path.GetFullPath(
         Path.Combine(
@@ -126,6 +138,10 @@ var snapshotSource = File.ReadAllText(
 Assert(
     snapshotSource.Contains("public ECardSize Size", StringComparison.Ordinal),
     "Combat replay card snapshots should preserve native card size."
+);
+Assert(
+    snapshotSource.Contains("public ECardType Type", StringComparison.Ordinal),
+    "Combat replay card snapshots should preserve card type for skill rehydration."
 );
 Assert(
     runtimeSource.Contains("RollbackReplayBootstrapAsync", StringComparison.Ordinal),
@@ -277,6 +293,10 @@ try
     SetProperty(recordType, record!, "Hour", 5);
     SetProperty(recordType, record!, "EncounterId", "encounter-abc");
     SetProperty(recordType, record!, "OpponentName", "Test Opponent");
+    SetProperty(recordType, record!, "PlayerHandCards", CreateSnapshotList("p-hand-1", "tpl-p-hand"));
+    SetProperty(recordType, record!, "PlayerSkills", CreateSnapshotList("p-skill-1", "tpl-p-skill"));
+    SetProperty(recordType, record!, "OpponentHandCards", CreateSnapshotList("o-hand-1", "tpl-o-hand"));
+    SetProperty(recordType, record!, "OpponentSkills", CreateSnapshotList("o-skill-1", "tpl-o-skill"));
     SetProperty(
         recordType,
         record!,
@@ -332,6 +352,13 @@ try
             StringComparison.Ordinal
         ),
         "Load should preserve the serialized combat payload."
+    );
+    Assert(
+        ReadSnapshotCount(recordType, loaded!, "PlayerHandCards") == 1
+            && ReadSnapshotCount(recordType, loaded!, "PlayerSkills") == 1
+            && ReadSnapshotCount(recordType, loaded!, "OpponentHandCards") == 1
+            && ReadSnapshotCount(recordType, loaded!, "OpponentSkills") == 1,
+        "Load should preserve card and skill snapshots for both sides."
     );
 
     var replayFilePath = Path.Combine(tempRoot, "replay-001.json");
@@ -539,6 +566,13 @@ try
         ),
         "Completed replay records should serialize the closing GameSim."
     );
+    Assert(
+        GetProperty(recordType, completedRecord!, "PlayerHandCards") != null
+            && GetProperty(recordType, completedRecord!, "PlayerSkills") != null
+            && GetProperty(recordType, completedRecord!, "OpponentHandCards") != null
+            && GetProperty(recordType, completedRecord!, "OpponentSkills") != null,
+        "Completed replay records should capture card and skill snapshot collections for both sides."
+    );
 
     Invoke(storeType, store!, "Save", new object?[] { completedRecord! });
 
@@ -649,6 +683,34 @@ static object? GetFieldValue(Type type, object instance, string name)
     );
     Assert(field != null, $"Field not found: {type.FullName}.{name}");
     return field!.GetValue(instance);
+}
+
+static object CreateSnapshotList(string instanceId, string templateId)
+{
+    var snapshotType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayCardSnapshot");
+    var listType = typeof(List<>).MakeGenericType(snapshotType);
+    var list = Activator.CreateInstance(listType)
+        ?? throw new InvalidOperationException("Snapshot list should be constructible.");
+    var snapshot = Activator.CreateInstance(snapshotType)
+        ?? throw new InvalidOperationException("Snapshot should be constructible.");
+    SetProperty(snapshotType, snapshot, "InstanceId", instanceId);
+    SetProperty(snapshotType, snapshot, "TemplateId", templateId);
+    SetProperty(
+        snapshotType,
+        snapshot,
+        "Type",
+        ParseEnum("BazaarGameShared.Domain.Core.Types.ECardType", "BazaarGameShared", "Skill")
+    );
+    Invoke(listType, list, "Add", new[] { snapshot });
+    return list;
+}
+
+static int ReadSnapshotCount(Type recordType, object instance, string propertyName)
+{
+    return ((System.Collections.IEnumerable?)GetProperty(recordType, instance, propertyName))
+        ?.Cast<object>()
+        .Count()
+        ?? 0;
 }
 
 static void Assert(bool condition, string message)
@@ -781,6 +843,12 @@ static Type RequireExternalType(string fullName, string assemblyName)
 {
     return Type.GetType($"{fullName}, {assemblyName}")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static object ParseEnum(string fullName, string assemblyName, string name)
+{
+    var enumType = RequireExternalType(fullName, assemblyName);
+    return Enum.Parse(enumType, name);
 }
 
 static void SetField(Type type, object instance, string name, object? value)

@@ -16,6 +16,9 @@ internal sealed class CombatLogPanel
     private static readonly GUIStyle CurrentRowStyle = new GUIStyle();
     private static readonly GUIStyle DimmedRowStyle = new GUIStyle();
     private static readonly GUIStyle MutedStyle = new GUIStyle();
+    private static readonly GUIStyle SecondaryRowStyle = new GUIStyle();
+    private static readonly GUIStyle SecondaryCurrentRowStyle = new GUIStyle();
+    private static readonly GUIStyle SecondaryDimmedRowStyle = new GUIStyle();
     private static readonly GUIStyle FilterButtonStyle = new GUIStyle();
     private static bool _stylesInitialized;
 
@@ -97,7 +100,8 @@ internal sealed class CombatLogPanel
         GUILayout.Space(6f);
         GUILayout.BeginHorizontal();
         DrawFilterButton("Actions", _state.ShowActions, _state.ToggleActions);
-        DrawFilterButton("State", _state.ShowStateChanges, _state.ToggleStateChanges);
+        DrawFilterButton("Combatants", _state.ShowCombatants, _state.ToggleCombatants);
+        DrawFilterButton("Cards", _state.ShowCards, _state.ToggleCards);
         DrawFilterButton("Rewards", _state.ShowRewards, _state.ToggleRewards);
         GUILayout.EndHorizontal();
 
@@ -120,16 +124,24 @@ internal sealed class CombatLogPanel
     {
         foreach (var row in rows)
         {
-            var style = row.VisualState switch
+            var primaryStyle = row.VisualState switch
             {
                 CombatLogRowVisualState.Current => CurrentRowStyle,
                 CombatLogRowVisualState.FutureDimmed => DimmedRowStyle,
                 _ => RowStyle,
             };
+            var secondaryStyle = row.VisualState switch
+            {
+                CombatLogRowVisualState.Current => SecondaryCurrentRowStyle,
+                CombatLogRowVisualState.FutureDimmed => SecondaryDimmedRowStyle,
+                _ => SecondaryRowStyle,
+            };
             GUILayout.Label(
                 $"[{row.Row.FrameIndex:000}] {row.Row.Text}",
-                style
+                primaryStyle
             );
+            if (!string.IsNullOrWhiteSpace(row.Row.SecondaryText))
+                GUILayout.Label($"      {row.Row.SecondaryText}", secondaryStyle);
             GUILayout.Space(2f);
         }
     }
@@ -162,6 +174,18 @@ internal sealed class CombatLogPanel
         MutedStyle.normal.textColor = new Color(0.75f, 0.75f, 0.75f);
         MutedStyle.fontSize = 12;
         MutedStyle.wordWrap = true;
+
+        SecondaryRowStyle.normal.textColor = new Color(0.72f, 0.76f, 0.82f);
+        SecondaryRowStyle.fontSize = 11;
+        SecondaryRowStyle.wordWrap = true;
+
+        SecondaryCurrentRowStyle.normal.textColor = new Color(0.93f, 0.86f, 0.60f);
+        SecondaryCurrentRowStyle.fontSize = 11;
+        SecondaryCurrentRowStyle.wordWrap = true;
+
+        SecondaryDimmedRowStyle.normal.textColor = new Color(0.55f, 0.55f, 0.55f);
+        SecondaryDimmedRowStyle.fontSize = 11;
+        SecondaryDimmedRowStyle.wordWrap = true;
 
         var buttonStyle = GUI.skin.button;
         FilterButtonStyle.normal = buttonStyle.normal;

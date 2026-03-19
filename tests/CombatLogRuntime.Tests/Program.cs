@@ -5,7 +5,7 @@ using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
 using BazaarPlusPlus.Game.CombatLog;
 
-var runtime = new CombatLogRuntime();
+var runtime = new CombatLogRuntime(ResolveCardDisplayInfo);
 var timeline = BuildTimeline(runtime);
 VerifyTimeline(timeline);
 VerifyPanelState(timeline);
@@ -136,23 +136,45 @@ static void VerifyTimeline(CombatLogTimeline timeline)
         "Player attribute updates should become display rows."
     );
     Assert(
-        timeline.Rows.Any(row => row.Category == CombatLogRowCategory.CardAttribute && row.Text.Contains("card-a", StringComparison.Ordinal)),
+        timeline.Rows.Any(row => row.Category == CombatLogRowCategory.CardAttribute),
         "Card attribute updates should become display rows."
+    );
+    Assert(
+        timeline.Rows.Any(
+            row =>
+                row.Category == CombatLogRowCategory.CardAttribute
+                && row.Text.Contains("Fiery Dagger", StringComparison.Ordinal)
+                && !row.Text.Contains("Card card-a", StringComparison.Ordinal)
+        ),
+        "Card attribute rows should prefer resolved display names over raw instance IDs."
+    );
+    Assert(
+        timeline.Rows.Any(
+            row =>
+                row.Category == CombatLogRowCategory.CardAttribute
+                && row.SecondaryText != null
+                && row.SecondaryText.Contains("card-a", StringComparison.Ordinal)
+        ),
+        "Card attribute rows should keep the raw instance ID as secondary debug context."
     );
     Assert(
         timeline.Rows.Any(row => row.Category == CombatLogRowCategory.Death && row.Text.Contains("Opponent died", StringComparison.Ordinal)),
         "CombatantDied should become a death row."
     );
     Assert(
-        timeline.Rows.Any(row => row.Text.Contains("Triggered poison", StringComparison.Ordinal)),
-        "EffectTriggered should become a display row."
+        timeline.Rows.Any(
+            row =>
+                row.Text.Contains("Triggered poison", StringComparison.Ordinal)
+                && row.Text.Contains("Fiery Dagger", StringComparison.Ordinal)
+        ),
+        "EffectTriggered should become a display row that uses the resolved source card name."
     );
     Assert(
         timeline.Rows.Any(row => row.Text.Contains("Quest updated", StringComparison.Ordinal)),
         "Quest updates should become display rows."
     );
     Assert(
-        timeline.Rows.Any(row => row.Text.Contains("Transform card-a", StringComparison.Ordinal)),
+        timeline.Rows.Any(row => row.Text.Contains("Transform Fiery Dagger", StringComparison.Ordinal)),
         "Transform events should become display rows."
     );
     Assert(
@@ -201,22 +223,32 @@ static void VerifyPanelFilters(CombatLogTimeline timeline)
     var defaultRows = state.BuildVisibleRows(timeline);
     Assert(defaultRows.Count > 0, "Default filters should keep combat rows visible.");
 
-    state.ToggleStateChanges();
-    var withoutStateRows = state.BuildVisibleRows(timeline);
+    state.ToggleCombatants();
+    var withoutCombatantRows = state.BuildVisibleRows(timeline);
     Assert(
-        withoutStateRows.All(
+        withoutCombatantRows.All(
             row =>
                 row.Row.Category != CombatLogRowCategory.Health
                 && row.Row.Category != CombatLogRowCategory.Attribute
-                && row.Row.Category != CombatLogRowCategory.CardAttribute
         ),
-        "State filter should hide health, attribute, and card-attribute rows."
+        "Combatant filter should hide health and combatant attribute rows."
+    );
+    Assert(
+        withoutCombatantRows.Any(row => row.Row.Category == CombatLogRowCategory.CardAttribute),
+        "Combatant filter should keep card attribute rows visible."
+    );
+
+    state.ToggleCards();
+    var withoutCombatantOrCardRows = state.BuildVisibleRows(timeline);
+    Assert(
+        withoutCombatantOrCardRows.All(row => row.Row.Category != CombatLogRowCategory.CardAttribute),
+        "Card filter should hide card attribute rows independently."
     );
 
     state.ToggleSystem();
-    var withoutStateOrSystemRows = state.BuildVisibleRows(timeline);
+    var withoutCombatantCardOrSystemRows = state.BuildVisibleRows(timeline);
     Assert(
-        withoutStateOrSystemRows.All(row => row.Row.Category != CombatLogRowCategory.System),
+        withoutCombatantCardOrSystemRows.All(row => row.Row.Category != CombatLogRowCategory.System),
         "System filter should hide system rows."
     );
 }
@@ -248,12 +280,30 @@ static void VerifySourceWiring()
         "Combat log controller should subscribe to CombatSimReceived."
     );
 
+    var runtimeSource = ReadSource("Game/CombatLog/CombatLogRuntime.cs");
+    Assert(
+        runtimeSource.Contains("Data.Run?.Player?.Skills", StringComparison.Ordinal)
+            && runtimeSource.Contains("Data.Run?.Opponent?.Skills", StringComparison.Ordinal),
+        "Combat log runtime should include player and opponent skills in live display-name resolution."
+    );
+
     var panelSource = ReadSource("Game/CombatLog/CombatLogPanel.cs");
     Assert(
         panelSource.Contains("DrawFilterButton", StringComparison.Ordinal)
-            && panelSource.Contains("ToggleStateChanges", StringComparison.Ordinal),
-        "Combat log panel should expose category filter toggles."
+            && panelSource.Contains("ToggleCombatants", StringComparison.Ordinal)
+            && panelSource.Contains("ToggleCards", StringComparison.Ordinal),
+        "Combat log panel should expose separate combatant and card filter toggles."
     );
+}
+
+static CombatLogCardDisplayInfo? ResolveCardDisplayInfo(string instanceId)
+{
+    return instanceId switch
+    {
+        "card-a" => new CombatLogCardDisplayInfo("card-a", "tpl-a", "Fiery Dagger"),
+        "card-b" => new CombatLogCardDisplayInfo("card-b", "tpl-b", "Ashen Echo"),
+        _ => null,
+    };
 }
 
 static string ReadSource(string relativePath)

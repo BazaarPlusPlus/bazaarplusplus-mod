@@ -10,6 +10,12 @@ internal sealed class CombatReplaySequenceCandidate
 
     public List<CombatReplayCardSnapshot> PlayerHandCards { get; set; } = new();
 
+    public List<CombatReplayCardSnapshot> PlayerSkills { get; set; } = new();
+
+    public List<CombatReplayCardSnapshot> OpponentHandCards { get; set; } = new();
+
+    public List<CombatReplayCardSnapshot> OpponentSkills { get; set; } = new();
+
     public NetMessageGameSim? SpawnMessage { get; set; }
 
     public NetMessageCombatSim? CombatMessage { get; set; }
