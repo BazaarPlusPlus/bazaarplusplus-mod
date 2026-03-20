@@ -22,9 +22,7 @@ internal sealed class CombatStatusBarModule
     public void Start()
     {
         _combatSimSubscription = _eventBus.Subscribe<CombatSimObserved>(OnCombatSimObserved);
-        _combatFrameSubscription = _eventBus.Subscribe<CombatFrameAdvanced>(
-            OnCombatFrameAdvanced
-        );
+        _combatFrameSubscription = _eventBus.Subscribe<CombatFrameAdvanced>(OnCombatFrameAdvanced);
     }
 
     public void Stop()
@@ -45,9 +43,7 @@ internal sealed class CombatStatusBarModule
         CombatStatusBar.SetCombatFrameTotal(message.Data?.Frames?.Count ?? 0);
         var winner = message.Data?.Winner;
         _runContext.LastVictoryCondition =
-            winner == ECombatantId.Player
-                ? EVictoryCondition.Win
-                : EVictoryCondition.Lose;
+            winner == ECombatantId.Player ? EVictoryCondition.Win : EVictoryCondition.Lose;
     }
 
     private static void OnCombatFrameAdvanced(CombatFrameAdvanced _)

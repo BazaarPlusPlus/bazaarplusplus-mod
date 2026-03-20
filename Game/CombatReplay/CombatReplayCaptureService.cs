@@ -1,7 +1,7 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Game.PvpBattles;
 using BazaarGameShared.Infra.Messages;
+using BazaarPlusPlus.Game.PvpBattles;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
@@ -135,11 +135,7 @@ internal sealed class CombatReplayCaptureService
         );
         var payload = _payloadFactory.Create(battleId, sequenceWindow);
 
-        return new PvpBattleCaptureArtifact
-        {
-            Manifest = manifest,
-            Payload = payload,
-        };
+        return new PvpBattleCaptureArtifact { Manifest = manifest, Payload = payload };
     }
 
     private CombatReplaySequenceCandidate CreateOpeningCandidate(

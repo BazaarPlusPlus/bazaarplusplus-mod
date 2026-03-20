@@ -2,12 +2,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Game.CombatReplay;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
+using BazaarPlusPlus.Game.CombatReplay;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.PvpBattles;
@@ -39,22 +39,14 @@ internal sealed class PvpBattleSnapshotCollector
             SpawnMessage = message,
         };
 
-        (
-            candidate.PlayerHandCardsCapturedFromOpening,
-            candidate.PlayerHandCards
-        ) = CaptureCurrentHandCardsAtOpening(ECombatantId.Player);
-        (
-            candidate.PlayerSkillsCapturedFromOpening,
-            candidate.PlayerSkills
-        ) = CaptureCurrentSkillsAtOpening(ECombatantId.Player);
-        (
-            candidate.OpponentHandCardsCapturedFromOpening,
-            candidate.OpponentHandCards
-        ) = CaptureOpeningHandCards(message, ECombatantId.Opponent);
-        (
-            candidate.OpponentSkillsCapturedFromOpening,
-            candidate.OpponentSkills
-        ) = CaptureOpponentSkillsFromOpening(message);
+        (candidate.PlayerHandCardsCapturedFromOpening, candidate.PlayerHandCards) =
+            CaptureCurrentHandCardsAtOpening(ECombatantId.Player);
+        (candidate.PlayerSkillsCapturedFromOpening, candidate.PlayerSkills) =
+            CaptureCurrentSkillsAtOpening(ECombatantId.Player);
+        (candidate.OpponentHandCardsCapturedFromOpening, candidate.OpponentHandCards) =
+            CaptureOpeningHandCards(message, ECombatantId.Opponent);
+        (candidate.OpponentSkillsCapturedFromOpening, candidate.OpponentSkills) =
+            CaptureOpponentSkillsFromOpening(message);
         return candidate;
     }
 
@@ -62,18 +54,13 @@ internal sealed class PvpBattleSnapshotCollector
     {
         if (!candidate.PlayerHandCardsCapturedFromOpening && candidate.PlayerHandCards.Count == 0)
         {
-            (
-                candidate.PlayerHandCardsCapturedLive,
-                candidate.PlayerHandCards
-            ) = CapturePlayerHandCards();
+            (candidate.PlayerHandCardsCapturedLive, candidate.PlayerHandCards) =
+                CapturePlayerHandCards();
         }
 
         if (!candidate.PlayerSkillsCapturedFromOpening && candidate.PlayerSkills.Count == 0)
         {
-            (
-                candidate.PlayerSkillsCapturedLive,
-                candidate.PlayerSkills
-            ) = CapturePlayerSkills();
+            (candidate.PlayerSkillsCapturedLive, candidate.PlayerSkills) = CapturePlayerSkills();
         }
     }
 
@@ -151,9 +138,10 @@ internal sealed class PvpBattleSnapshotCollector
             return new PvpBattleCardSetCapture
             {
                 Items = clonedItems,
-                Status = clonedItems.Count == 0
-                    ? PvpBattleCaptureStatus.CapturedEmpty
-                    : PvpBattleCaptureStatus.Captured,
+                Status =
+                    clonedItems.Count == 0
+                        ? PvpBattleCaptureStatus.CapturedEmpty
+                        : PvpBattleCaptureStatus.Captured,
                 Source = openingSource,
             };
         }
@@ -163,9 +151,10 @@ internal sealed class PvpBattleSnapshotCollector
             return new PvpBattleCardSetCapture
             {
                 Items = clonedItems,
-                Status = clonedItems.Count == 0
-                    ? PvpBattleCaptureStatus.CapturedEmpty
-                    : PvpBattleCaptureStatus.Captured,
+                Status =
+                    clonedItems.Count == 0
+                        ? PvpBattleCaptureStatus.CapturedEmpty
+                        : PvpBattleCaptureStatus.Captured,
                 Source = liveSource,
             };
         }
@@ -178,7 +167,10 @@ internal sealed class PvpBattleSnapshotCollector
         };
     }
 
-    private static (bool Captured, List<CombatReplayCardSnapshot> Snapshots) CapturePlayerHandCards()
+    private static (
+        bool Captured,
+        List<CombatReplayCardSnapshot> Snapshots
+    ) CapturePlayerHandCards()
     {
         try
         {
@@ -212,8 +204,7 @@ internal sealed class PvpBattleSnapshotCollector
 
     private static List<CombatReplayCardSnapshot> CapturePlayerSkillsUnsafe()
     {
-        return Data.Run?.Player?.Skills?
-                .Where(skill => skill != null)
+        return Data.Run?.Player?.Skills?.Where(skill => skill != null)
                 .Select(CreateSkillSnapshot)
                 .ToList()
             ?? new List<CombatReplayCardSnapshot>();
@@ -244,10 +235,9 @@ internal sealed class PvpBattleSnapshotCollector
             Tier = card.Tier.ToString(),
             Enchant = card.GetEnchantment().ToString(),
             Tags = card.Tags?.Select(tag => tag.ToString()).ToList() ?? new List<string>(),
-            Attributes = card.Attributes?.ToDictionary(
-                    entry => entry.Key.ToString(),
-                    entry => entry.Value
-                ) ?? new Dictionary<string, int>(),
+            Attributes =
+                card.Attributes?.ToDictionary(entry => entry.Key.ToString(), entry => entry.Value)
+                ?? new Dictionary<string, int>(),
         };
     }
 
@@ -258,10 +248,10 @@ internal sealed class PvpBattleSnapshotCollector
         return snapshot;
     }
 
-    private static (bool Captured, List<CombatReplayCardSnapshot> Snapshots) CaptureOpeningHandCards(
-        NetMessageGameSim message,
-        ECombatantId combatantId
-    )
+    private static (
+        bool Captured,
+        List<CombatReplayCardSnapshot> Snapshots
+    ) CaptureOpeningHandCards(NetMessageGameSim message, ECombatantId combatantId)
     {
         try
         {
@@ -294,9 +284,10 @@ internal sealed class PvpBattleSnapshotCollector
         }
     }
 
-    private static (bool Captured, List<CombatReplayCardSnapshot> Snapshots) CaptureCurrentHandCardsAtOpening(
-        ECombatantId combatantId
-    )
+    private static (
+        bool Captured,
+        List<CombatReplayCardSnapshot> Snapshots
+    ) CaptureCurrentHandCardsAtOpening(ECombatantId combatantId)
     {
         try
         {
@@ -312,9 +303,10 @@ internal sealed class PvpBattleSnapshotCollector
         }
     }
 
-    private static (bool Captured, List<CombatReplayCardSnapshot> Snapshots) CaptureCurrentSkillsAtOpening(
-        ECombatantId combatantId
-    )
+    private static (
+        bool Captured,
+        List<CombatReplayCardSnapshot> Snapshots
+    ) CaptureCurrentSkillsAtOpening(ECombatantId combatantId)
     {
         try
         {
@@ -332,9 +324,10 @@ internal sealed class PvpBattleSnapshotCollector
         }
     }
 
-    private static (bool Captured, List<CombatReplayCardSnapshot> Snapshots) CaptureOpponentSkillsFromOpening(
-        NetMessageGameSim message
-    )
+    private static (
+        bool Captured,
+        List<CombatReplayCardSnapshot> Snapshots
+    ) CaptureOpponentSkillsFromOpening(NetMessageGameSim message)
     {
         try
         {
@@ -384,32 +377,40 @@ internal sealed class PvpBattleSnapshotCollector
     {
         var existingCard = TryGetExistingCardSafe(instanceId);
         var existingSkill = existingCard as SkillCard;
-        var attributes = cardUpdate?.Attributes?.ToDictionary(
+        var attributes =
+            cardUpdate?.Attributes?.ToDictionary(
                 entry => entry.Key.ToString(),
                 entry => entry.Value.Value
-            ) ?? new Dictionary<string, int>();
+            )
+            ?? new Dictionary<string, int>();
 
         return new CombatReplayCardSnapshot
         {
             InstanceId = instanceId,
-            TemplateId = spawnedCard?.TemplateId ?? existingCard?.TemplateId.ToString() ?? string.Empty,
+            TemplateId =
+                spawnedCard?.TemplateId ?? existingCard?.TemplateId.ToString() ?? string.Empty,
             Type = spawnedCard?.Type ?? existingCard?.Type ?? fallbackType ?? default,
             Size = cardUpdate?.Size ?? existingCard?.Size ?? default,
             Section = cardUpdate?.Placement?.Section ?? existingCard?.Section,
             Socket = cardUpdate?.Placement?.Socket ?? existingCard?.LeftSocketId,
-            Name = existingSkill?.Template?.Localization?.Title?.Text
+            Name =
+                existingSkill?.Template?.Localization?.Title?.Text
                 ?? existingCard?.Template?.InternalName,
             Tier = cardUpdate?.Tier?.ToString() ?? existingCard?.Tier.ToString(),
-            Enchant = cardUpdate?.Enchantment?.ToString() ?? existingCard?.GetEnchantment().ToString(),
-            Tags = cardUpdate?.Tags?.Select(tag => tag.ToString()).ToList()
+            Enchant =
+                cardUpdate?.Enchantment?.ToString() ?? existingCard?.GetEnchantment().ToString(),
+            Tags =
+                cardUpdate?.Tags?.Select(tag => tag.ToString()).ToList()
                 ?? existingCard?.Tags?.Select(tag => tag.ToString()).ToList()
                 ?? new List<string>(),
-            Attributes = attributes.Count > 0
-                ? attributes
-                : existingCard?.Attributes?.ToDictionary(
+            Attributes =
+                attributes.Count > 0
+                    ? attributes
+                    : existingCard?.Attributes?.ToDictionary(
                         entry => entry.Key.ToString(),
                         entry => entry.Value
-                    ) ?? new Dictionary<string, int>(),
+                    )
+                        ?? new Dictionary<string, int>(),
         };
     }
 

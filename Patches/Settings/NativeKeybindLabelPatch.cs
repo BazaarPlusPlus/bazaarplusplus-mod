@@ -4,8 +4,8 @@ using System;
 using System.Linq;
 using BazaarPlusPlus.Game.Settings;
 using HarmonyLib;
-using TMPro;
 using TheBazaar.UI;
+using TMPro;
 using UnityEngine;
 
 namespace BazaarPlusPlus;
@@ -46,22 +46,29 @@ internal static class NativeKeybindLabelAwakePatch
 
     private static TextMeshProUGUI? FindLabel(KeyBindController controller)
     {
-        var keybindButton = AccessTools.Field(typeof(KeyBindController), "_keybindButton")
-            ?.GetValue(controller) as UnityEngine.UI.Button;
-        var resetButton = AccessTools.Field(typeof(KeyBindController), "_resetToDefaultButton")
-            ?.GetValue(controller) as UnityEngine.UI.Button;
-        var keybindText = AccessTools.Field(typeof(KeyBindController), "_keybindText")
-            ?.GetValue(controller) as TextMeshProUGUI;
-        var warningText = AccessTools.Field(typeof(KeyBindController), "_warningText")
-            ?.GetValue(controller) as TextMeshProUGUI;
+        var keybindButton =
+            AccessTools.Field(typeof(KeyBindController), "_keybindButton")?.GetValue(controller)
+            as UnityEngine.UI.Button;
+        var resetButton =
+            AccessTools
+                .Field(typeof(KeyBindController), "_resetToDefaultButton")
+                ?.GetValue(controller) as UnityEngine.UI.Button;
+        var keybindText =
+            AccessTools.Field(typeof(KeyBindController), "_keybindText")?.GetValue(controller)
+            as TextMeshProUGUI;
+        var warningText =
+            AccessTools.Field(typeof(KeyBindController), "_warningText")?.GetValue(controller)
+            as TextMeshProUGUI;
 
-        return controller.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault(text =>
-            text != null
-            && text != keybindText
-            && text != warningText
-            && (keybindButton == null || !text.transform.IsChildOf(keybindButton.transform))
-            && (resetButton == null || !text.transform.IsChildOf(resetButton.transform))
-        );
+        return controller
+            .GetComponentsInChildren<TextMeshProUGUI>(true)
+            .FirstOrDefault(text =>
+                text != null
+                && text != keybindText
+                && text != warningText
+                && (keybindButton == null || !text.transform.IsChildOf(keybindButton.transform))
+                && (resetButton == null || !text.transform.IsChildOf(resetButton.transform))
+            );
     }
 
     private static string ResolveMonsterPreviewLabel(string languageCode)

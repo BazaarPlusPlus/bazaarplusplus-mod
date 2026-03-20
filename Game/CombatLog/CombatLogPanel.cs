@@ -52,7 +52,12 @@ internal sealed class CombatLogPanel
 
         GUI.Box(windowRect, string.Empty);
         GUILayout.BeginArea(
-            new Rect(windowRect.x + 8f, windowRect.y + 8f, windowRect.width - 16f, windowRect.height - 16f)
+            new Rect(
+                windowRect.x + 8f,
+                windowRect.y + 8f,
+                windowRect.width - 16f,
+                windowRect.height - 16f
+            )
         );
         DrawWindowContents(timeline);
         GUILayout.EndArea();
@@ -72,7 +77,12 @@ internal sealed class CombatLogPanel
 
         GUI.Box(windowRect, string.Empty);
         GUILayout.BeginArea(
-            new Rect(windowRect.x + 8f, windowRect.y + 8f, windowRect.width - 16f, windowRect.height - 16f)
+            new Rect(
+                windowRect.x + 8f,
+                windowRect.y + 8f,
+                windowRect.width - 16f,
+                windowRect.height - 16f
+            )
         );
         DrawWindowContents(timeline);
         GUILayout.EndArea();
@@ -85,7 +95,12 @@ internal sealed class CombatLogPanel
             return Rect.zero;
 
         var width = Mathf.Min(WindowWidth, remainingWidth);
-        return new Rect(debugPanelRect.xMax + Spacing, debugPanelRect.y, width, debugPanelRect.height);
+        return new Rect(
+            debugPanelRect.xMax + Spacing,
+            debugPanelRect.y,
+            width,
+            debugPanelRect.height
+        );
     }
 
     private Rect GetStandaloneWindowRect()
@@ -168,10 +183,7 @@ internal sealed class CombatLogPanel
                 CombatLogRowVisualState.FutureDimmed => SecondaryDimmedRowStyle,
                 _ => SecondaryRowStyle,
             };
-            GUILayout.Label(
-                $"[{row.Row.FrameIndex:000}] {row.Row.Text}",
-                primaryStyle
-            );
+            GUILayout.Label($"[{row.Row.FrameIndex:000}] {row.Row.Text}", primaryStyle);
             if (!string.IsNullOrWhiteSpace(row.Row.SecondaryText))
                 GUILayout.Label($"      {row.Row.SecondaryText}", secondaryStyle);
             GUILayout.Space(2f);

@@ -32,15 +32,13 @@ Assert(
                     "../../../../../Game/RunLogging/RunLoggingController.cs"
                 )
             )
-        ).Contains("RunLoggingModule", StringComparison.Ordinal),
+        )
+        .Contains("RunLoggingModule", StringComparison.Ordinal),
     "RunLoggingController should compose the unified RunLoggingModule."
 );
 
 var runLoggingModulePath = Path.GetFullPath(
-    Path.Combine(
-        AppContext.BaseDirectory,
-        "../../../../../Game/RunLogging/RunLoggingModule.cs"
-    )
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/RunLogging/RunLoggingModule.cs")
 );
 Assert(
     File.Exists(runLoggingModulePath),
@@ -71,7 +69,10 @@ Assert(
 );
 Assert(
     runInitializedPatchSource.Contains("BppRuntimeHost.EventBus.Publish", StringComparison.Ordinal)
-        && runInitializedPatchSource.Contains("new RunInitializedObserved", StringComparison.Ordinal),
+        && runInitializedPatchSource.Contains(
+            "new RunInitializedObserved",
+            StringComparison.Ordinal
+        ),
     "RunInitialized patch should publish the authoritative server run id through the event bus."
 );
 
@@ -352,9 +353,13 @@ Invoke<object>(
 Assert(
     seamStore
         .AppendedEvents.Select(e => e.Kind)
-        .SequenceEqual(
-            ["run_started", "run_progress", "state_seen", "selection_seen", "pvp_combat_recorded"]
-        ),
+        .SequenceEqual([
+            "run_started",
+            "run_progress",
+            "state_seen",
+            "selection_seen",
+            "pvp_combat_recorded",
+        ]),
     "Controller seam should forward events in run-started to pvp-combat-recorded order."
 );
 Assert(seamStore.CompleteRunCalls == 1, "Controller seam should forward completion once.");

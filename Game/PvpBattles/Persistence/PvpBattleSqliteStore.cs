@@ -135,7 +135,10 @@ internal sealed class PvpBattleSqliteStore
         command.Parameters.AddWithValue("$recordedAtUtc", manifest.SavedAtUtc.ToString("o"));
         AddNullableInt32(command, "$day", manifest.Day);
         AddNullableInt32(command, "$hour", manifest.Hour);
-        command.Parameters.AddWithValue("$encounterId", (object?)manifest.EncounterId ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$encounterId",
+            (object?)manifest.EncounterId ?? DBNull.Value
+        );
         command.Parameters.AddWithValue(
             "$playerName",
             (object?)manifest.Participants.PlayerName ?? DBNull.Value
@@ -163,7 +166,10 @@ internal sealed class PvpBattleSqliteStore
             (object?)manifest.Participants.OpponentAccountId ?? DBNull.Value
         );
         command.Parameters.AddWithValue("$combatKind", manifest.CombatKind);
-        command.Parameters.AddWithValue("$result", (object?)manifest.Outcome.Result ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$result",
+            (object?)manifest.Outcome.Result ?? DBNull.Value
+        );
         command.Parameters.AddWithValue(
             "$winnerCombatantId",
             (object?)manifest.Outcome.WinnerCombatantId ?? DBNull.Value
@@ -397,7 +403,11 @@ internal sealed class PvpBattleSqliteStore
         );
     }
 
-    private static bool TableHasColumn(SqliteConnection connection, string tableName, string columnName)
+    private static bool TableHasColumn(
+        SqliteConnection connection,
+        string tableName,
+        string columnName
+    )
     {
         using var command = CreateCommand(connection);
         command.CommandText = $"PRAGMA table_info({tableName});";
@@ -473,7 +483,9 @@ internal sealed class PvpBattleSqliteStore
         {
             BattleId = reader.GetString(reader.GetOrdinal("battle_id")),
             RunId = GetNullableString(reader, "run_id"),
-            SavedAtUtc = DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
+            SavedAtUtc = DateTimeOffset.Parse(
+                reader.GetString(reader.GetOrdinal("recorded_at_utc"))
+            ),
             Day = GetNullableInt32(reader, "day"),
             Hour = GetNullableInt32(reader, "hour"),
             EncounterId = GetNullableString(reader, "encounter_id"),
@@ -497,9 +509,15 @@ internal sealed class PvpBattleSqliteStore
             },
             Snapshots = new PvpBattleSnapshots
             {
-                PlayerHand = DeserializeCapture(reader.GetString(reader.GetOrdinal("player_hand_json"))),
-                PlayerSkills = DeserializeCapture(reader.GetString(reader.GetOrdinal("player_skills_json"))),
-                OpponentHand = DeserializeCapture(reader.GetString(reader.GetOrdinal("opponent_hand_json"))),
+                PlayerHand = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("player_hand_json"))
+                ),
+                PlayerSkills = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("player_skills_json"))
+                ),
+                OpponentHand = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("opponent_hand_json"))
+                ),
                 OpponentSkills = DeserializeCapture(
                     reader.GetString(reader.GetOrdinal("opponent_skills_json"))
                 ),

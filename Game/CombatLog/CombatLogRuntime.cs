@@ -31,10 +31,7 @@ internal sealed class CombatLogRuntime
         CurrentTimeline = null;
     }
 
-    private CombatLogTimeline BuildTimeline(
-        CombatSim combatSim,
-        CombatLogPlaybackPass playbackPass
-    )
+    private CombatLogTimeline BuildTimeline(CombatSim combatSim, CombatLogPlaybackPass playbackPass)
     {
         var rawFrames = combatSim?.Frames ?? new List<CombatSimFrame>();
         var frames = new List<CombatLogFrame>(rawFrames.Count);
@@ -63,9 +60,7 @@ internal sealed class CombatLogRuntime
         return TimeSpan.FromMilliseconds(frameIndex * CombatLogTiming.MillisecondsPerFrame);
     }
 
-    private IReadOnlyList<CombatLogEventEntry> BuildEvents(
-        IReadOnlyList<ICombatSimEvent> simEvents
-    )
+    private IReadOnlyList<CombatLogEventEntry> BuildEvents(IReadOnlyList<ICombatSimEvent> simEvents)
     {
         var results = new List<CombatLogEventEntry>(simEvents?.Count ?? 0);
         if (simEvents == null)
@@ -88,7 +83,11 @@ internal sealed class CombatLogRuntime
                             executedTargetId,
                             executedSourceDisplay,
                             executedTargetDisplay,
-                            BuildEffectExecutedText(executed, executedSourceDisplay, executedTargetDisplay)
+                            BuildEffectExecutedText(
+                                executed,
+                                executedSourceDisplay,
+                                executedTargetDisplay
+                            )
                         )
                     );
                     break;
@@ -143,7 +142,11 @@ internal sealed class CombatLogRuntime
                             triggeredTargets.raw,
                             triggeredSourceDisplay,
                             triggeredTargets.display,
-                            BuildEffectTriggeredText(triggered, triggeredSourceDisplay, triggeredTargets.display)
+                            BuildEffectTriggeredText(
+                                triggered,
+                                triggeredSourceDisplay,
+                                triggeredTargets.display
+                            )
                         )
                     );
                     break;
@@ -281,33 +284,27 @@ internal sealed class CombatLogRuntime
         if (update == null)
             return null;
 
-        var healthAdjustments = (IReadOnlyList<CombatLogHealthAdjustment>)
-            update
-                .HealthAdjustments
-                .Select(
-                    adjustment =>
-                        new CombatLogHealthAdjustment(
-                            adjustment.AttributeChanged.ToString(),
-                            adjustment.Amount,
-                            adjustment.IsCrit,
-                            adjustment.IsDamageReduced
-                        )
-                )
-                .ToList();
+        var healthAdjustments =
+            (IReadOnlyList<CombatLogHealthAdjustment>)
+                update
+                    .HealthAdjustments.Select(adjustment => new CombatLogHealthAdjustment(
+                        adjustment.AttributeChanged.ToString(),
+                        adjustment.Amount,
+                        adjustment.IsCrit,
+                        adjustment.IsDamageReduced
+                    ))
+                    .ToList();
 
-        var attributes = (IReadOnlyList<CombatLogAttributeChange>)
-            update
-                .Attributes
-                .OrderBy(item => item.Key.ToString())
-                .Select(
-                    item =>
-                        new CombatLogAttributeChange(
-                            item.Key.ToString(),
-                            item.Value.PreviousValue,
-                            item.Value.CurrentValue
-                        )
-                )
-                .ToList();
+        var attributes =
+            (IReadOnlyList<CombatLogAttributeChange>)
+                update
+                    .Attributes.OrderBy(item => item.Key.ToString())
+                    .Select(item => new CombatLogAttributeChange(
+                        item.Key.ToString(),
+                        item.Value.PreviousValue,
+                        item.Value.CurrentValue
+                    ))
+                    .ToList();
 
         var details = new List<string>();
         if (update.Portrait?.Index.HasValue == true)
@@ -315,7 +312,13 @@ internal sealed class CombatLogRuntime
         if (update.IsPlayerDead)
             details.Add("Marked dead");
 
-        return new CombatLogSideUpdate(side, update.IsPlayerDead, healthAdjustments, attributes, details);
+        return new CombatLogSideUpdate(
+            side,
+            update.IsPlayerDead,
+            healthAdjustments,
+            attributes,
+            details
+        );
     }
 
     private IReadOnlyList<CombatLogCardUpdateEntry> BuildCardUpdates(
@@ -327,52 +330,50 @@ internal sealed class CombatLogRuntime
 
         return updates
             .OrderBy(item => item.Key.ToString())
-            .Select(
-                item =>
+            .Select(item =>
+            {
+                var details = new List<string>();
+                if (item.Value.Enchantment.HasValue)
+                    details.Add($"Enchantment -> {item.Value.Enchantment.Value}");
+                if (item.Value.Size.HasValue)
+                    details.Add($"Size -> {item.Value.Size.Value}");
+                if (item.Value.Tier.HasValue)
+                    details.Add($"Tier -> {item.Value.Tier.Value}");
+                if (item.Value.State != null)
                 {
-                    var details = new List<string>();
-                    if (item.Value.Enchantment.HasValue)
-                        details.Add($"Enchantment -> {item.Value.Enchantment.Value}");
-                    if (item.Value.Size.HasValue)
-                        details.Add($"Size -> {item.Value.Size.Value}");
-                    if (item.Value.Tier.HasValue)
-                        details.Add($"Tier -> {item.Value.Tier.Value}");
-                    if (item.Value.State != null)
-                    {
-                        details.Add(
-                            $"State {item.Value.State.PreviousValue} -> {item.Value.State.CurrentValue}"
-                        );
-                    }
-                    if (item.Value.Placement != null)
-                        details.Add($"Placement -> {FormatObject(item.Value.Placement)}");
-                    if (item.Value.Tags?.Count > 0)
-                        details.Add($"Tags -> {string.Join(", ", item.Value.Tags.OrderBy(tag => tag.ToString()))}");
-                    if (item.Value.HiddenTags?.Count > 0)
-                    {
-                        details.Add(
-                            $"HiddenTags -> {string.Join(", ", item.Value.HiddenTags.OrderBy(tag => tag.ToString()))}"
-                        );
-                    }
-                    if (item.Value.Heroes?.Count > 0)
-                        details.Add($"Heroes -> {string.Join(", ", item.Value.Heroes.OrderBy(hero => hero.ToString()))}");
-
-                    return new CombatLogCardUpdateEntry(
-                        ResolveCardDisplayInfo(item.Key.ToString()),
-                        item.Value.Attributes
-                            .OrderBy(attribute => attribute.Key.ToString())
-                            .Select(
-                                attribute =>
-                                    new CombatLogAttributeChange(
-                                        attribute.Key.ToString(),
-                                        attribute.Value.PreviousValue,
-                                        attribute.Value.CurrentValue
-                                    )
-                            )
-                            .ToList(),
-                        details
+                    details.Add(
+                        $"State {item.Value.State.PreviousValue} -> {item.Value.State.CurrentValue}"
                     );
                 }
-            )
+                if (item.Value.Placement != null)
+                    details.Add($"Placement -> {FormatObject(item.Value.Placement)}");
+                if (item.Value.Tags?.Count > 0)
+                    details.Add(
+                        $"Tags -> {string.Join(", ", item.Value.Tags.OrderBy(tag => tag.ToString()))}"
+                    );
+                if (item.Value.HiddenTags?.Count > 0)
+                {
+                    details.Add(
+                        $"HiddenTags -> {string.Join(", ", item.Value.HiddenTags.OrderBy(tag => tag.ToString()))}"
+                    );
+                }
+                if (item.Value.Heroes?.Count > 0)
+                    details.Add(
+                        $"Heroes -> {string.Join(", ", item.Value.Heroes.OrderBy(hero => hero.ToString()))}"
+                    );
+
+                return new CombatLogCardUpdateEntry(
+                    ResolveCardDisplayInfo(item.Key.ToString()),
+                    item.Value.Attributes.OrderBy(attribute => attribute.Key.ToString())
+                        .Select(attribute => new CombatLogAttributeChange(
+                            attribute.Key.ToString(),
+                            attribute.Value.PreviousValue,
+                            attribute.Value.CurrentValue
+                        ))
+                        .ToList(),
+                    details
+                );
+            })
             .ToList();
     }
 
@@ -393,8 +394,10 @@ internal sealed class CombatLogRuntime
         string? targetDisplayName
     )
     {
-        var sourceText = sourceDisplayName ?? FormatInstanceId(triggered.Source) ?? "unknown-source";
-        var targetText = targetDisplayName ?? JoinTargets(triggered.Targets).raw ?? "unknown-target";
+        var sourceText =
+            sourceDisplayName ?? FormatInstanceId(triggered.Source) ?? "unknown-source";
+        var targetText =
+            targetDisplayName ?? JoinTargets(triggered.Targets).raw ?? "unknown-target";
         return $"Triggered {triggered.EffectId} {sourceText} -> {targetText}";
     }
 
@@ -403,7 +406,8 @@ internal sealed class CombatLogRuntime
         string? sourceDisplayName
     )
     {
-        var sourceText = sourceDisplayName ?? FormatInstanceId(auraExecuted.Source) ?? "unknown-source";
+        var sourceText =
+            sourceDisplayName ?? FormatInstanceId(auraExecuted.Source) ?? "unknown-source";
         var applied = JoinTargets(auraExecuted.AppliedTo).display;
         var removed = JoinTargets(auraExecuted.RemovedFrom).display;
         if (!string.IsNullOrEmpty(applied) && !string.IsNullOrEmpty(removed))
@@ -429,18 +433,20 @@ internal sealed class CombatLogRuntime
         string? displayName
     )
     {
-        var transformedCards = transformed.TransformedCards?.Count > 0
-            ? string.Join(", ", transformed.TransformedCards.Select(FormatTransformation))
-            : "none";
+        var transformedCards =
+            transformed.TransformedCards?.Count > 0
+                ? string.Join(", ", transformed.TransformedCards.Select(FormatTransformation))
+                : "none";
         return $"Transform {displayName ?? transformed.OriginalInstanceId} -> [{transformedCards}]";
     }
 
     private string BuildCardTransformRevertedText(CombatSimEventCardTransformReverted reverted)
     {
         var original = FormatTransformation(reverted.OriginalCard);
-        var revertedIds = reverted.TransformedCardInstanceIds?.Count > 0
-            ? string.Join(", ", reverted.TransformedCardInstanceIds)
-            : "none";
+        var revertedIds =
+            reverted.TransformedCardInstanceIds?.Count > 0
+                ? string.Join(", ", reverted.TransformedCardInstanceIds)
+                : "none";
         return $"Transform reverted {original} from [{revertedIds}]";
     }
 
@@ -472,7 +478,8 @@ internal sealed class CombatLogRuntime
     {
         return target switch
         {
-            EffectTargetCard card => ResolveCardDisplayName(card.Target.ToString()) ?? BuildShortIdentifier(card.Target.ToString()),
+            EffectTargetCard card => ResolveCardDisplayName(card.Target.ToString())
+                ?? BuildShortIdentifier(card.Target.ToString()),
             EffectTargetPlayer player => player.Target.ToString(),
             null => null,
             _ => target.GetType().Name,
@@ -528,8 +535,7 @@ internal sealed class CombatLogRuntime
         if (type.IsPrimitive || type.IsEnum || value is decimal)
             return value.ToString() ?? string.Empty;
 
-        var properties = type
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+        var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
             .Where(property => property.GetIndexParameters().Length == 0)
             .ToArray();
         if (properties.Length == 0)
@@ -558,7 +564,8 @@ internal sealed class CombatLogRuntime
     {
         if (!string.IsNullOrWhiteSpace(instanceId))
         {
-            var resolved = _displayInfoResolver?.Invoke(instanceId) ?? ResolveLiveCardDisplayInfo(instanceId);
+            var resolved =
+                _displayInfoResolver?.Invoke(instanceId) ?? ResolveLiveCardDisplayInfo(instanceId);
             if (resolved != null)
                 return resolved;
         }
@@ -594,7 +601,9 @@ internal sealed class CombatLogRuntime
                     card.TemplateId.ToString(),
                     cardInstanceId
                 ),
-                card.Owner == Data.Run?.Player ? "Player" : card.Owner == Data.Run?.Opponent ? "Opponent" : null,
+                card.Owner == Data.Run?.Player ? "Player"
+                    : card.Owner == Data.Run?.Opponent ? "Opponent"
+                    : null,
                 card.Type.ToString()
             );
         }
@@ -631,11 +640,7 @@ internal sealed class CombatLogRuntime
 
     private static CombatLogCardDisplayInfo CreateFallbackCardDisplayInfo(string instanceId)
     {
-        return new CombatLogCardDisplayInfo(
-            instanceId,
-            null,
-            BuildShortIdentifier(instanceId)
-        );
+        return new CombatLogCardDisplayInfo(instanceId, null, BuildShortIdentifier(instanceId));
     }
 
     private static string ResolveDisplayName(

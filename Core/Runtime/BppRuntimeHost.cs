@@ -63,7 +63,8 @@ internal sealed class BppRuntimeHost
 
     public static IRunContext RunContext => Current?._runContext ?? DetachedRunContext;
 
-    public static IGameStateProbe GameStateProbe => Current?._gameStateProbe ?? DetachedGameStateProbe;
+    public static IGameStateProbe GameStateProbe =>
+        Current?._gameStateProbe ?? DetachedGameStateProbe;
 
     public static RunLifecycleModule RunLifecycle =>
         Current?._runLifecycle

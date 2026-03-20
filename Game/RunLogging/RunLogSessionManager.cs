@@ -88,7 +88,10 @@ public sealed class RunLogSessionManager
 
         if (RunLogEventKinds.IsChoiceMadeKind(entry.Kind))
         {
-            if (!session.PendingSelectionSeq.HasValue || entry.SelectionSeq != session.PendingSelectionSeq)
+            if (
+                !session.PendingSelectionSeq.HasValue
+                || entry.SelectionSeq != session.PendingSelectionSeq
+            )
                 return null;
         }
 
@@ -105,8 +108,7 @@ public sealed class RunLogSessionManager
         session.Day = entry.Day ?? session.Day;
         session.Hour = entry.Hour ?? session.Hour;
         session.State = entry.State ?? session.State;
-        session.CurrentEncounterId =
-            ResolveCurrentEncounterId(entry) ?? session.CurrentEncounterId;
+        session.CurrentEncounterId = ResolveCurrentEncounterId(entry) ?? session.CurrentEncounterId;
 
         if (!string.IsNullOrWhiteSpace(entry.StateFingerprint))
             session.LastStateFingerprint = entry.StateFingerprint;

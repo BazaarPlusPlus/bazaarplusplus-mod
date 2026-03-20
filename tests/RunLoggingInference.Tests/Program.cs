@@ -28,14 +28,23 @@ var singleOptionResult = Invoke<RunLogEvent?>(
     [singleOptionInput]
 );
 Assert(singleOptionResult != null, "A single-option transition should infer a choice.");
-Assert(singleOptionResult!.Kind == "encounter_selected", "Encounter state should infer encounter_selected.");
+Assert(
+    singleOptionResult!.Kind == "encounter_selected",
+    "Encounter state should infer encounter_selected."
+);
 Assert(singleOptionResult!.SelectionSeq == 12, "Inferred choice should preserve selection_seq.");
 Assert(
     singleOptionResult.SelectedInstanceId == "instance-a",
     "Inferred choice should select the only option."
 );
-Assert(singleOptionResult.SelectedName == "Frost Street", "Inferred choice should keep the option name.");
-Assert(singleOptionResult.Day == 6 && singleOptionResult.Hour == 2, "Inferred choice should preserve run position.");
+Assert(
+    singleOptionResult.SelectedName == "Frost Street",
+    "Inferred choice should keep the option name."
+);
+Assert(
+    singleOptionResult.Day == 6 && singleOptionResult.Hour == 2,
+    "Inferred choice should preserve run position."
+);
 Assert(
     singleOptionResult.State == "Encounter"
         && singleOptionResult.EncounterId == "enc-01"
@@ -74,7 +83,10 @@ var projectedStateResult = Invoke<RunLogEvent?>(
     [projectedStateInput]
 );
 Assert(projectedStateResult != null, "Projected player state should infer a matching option.");
-Assert(projectedStateResult!.Kind == "choice_selected", "Choice state should infer choice_selected.");
+Assert(
+    projectedStateResult!.Kind == "choice_selected",
+    "Choice state should infer choice_selected."
+);
 Assert(
     projectedStateResult!.SelectedInstanceId == "instance-b",
     "Projected player state should pick the matching option."

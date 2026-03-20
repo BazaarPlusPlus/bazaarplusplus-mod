@@ -1,5 +1,5 @@
-using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.CombatLog;
+using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.Settings;

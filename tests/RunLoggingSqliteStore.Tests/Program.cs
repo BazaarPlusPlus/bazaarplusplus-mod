@@ -152,26 +152,35 @@ try
             GetString(connection, "SELECT run_id FROM runs WHERE run_id = $runId;", runId) == runId,
             "runs should contain the created run."
         );
-        Assert(CountRows(connection, "run_events") == 2, "run_events should contain exactly two rows.");
         Assert(
-            GetInt64(connection, "SELECT MIN(seq) FROM run_events WHERE run_id = $runId;", runId) == 1,
+            CountRows(connection, "run_events") == 2,
+            "run_events should contain exactly two rows."
+        );
+        Assert(
+            GetInt64(connection, "SELECT MIN(seq) FROM run_events WHERE run_id = $runId;", runId)
+                == 1,
             "run_events should persist seq=1."
         );
         Assert(
-            GetInt64(connection, "SELECT MAX(seq) FROM run_events WHERE run_id = $runId;", runId) == 2,
+            GetInt64(connection, "SELECT MAX(seq) FROM run_events WHERE run_id = $runId;", runId)
+                == 2,
             "run_events should persist seq=2."
         );
         Assert(
-            GetInt64(connection, "SELECT last_seq FROM run_checkpoints WHERE run_id = $runId;", runId)
-                == 2,
+            GetInt64(
+                connection,
+                "SELECT last_seq FROM run_checkpoints WHERE run_id = $runId;",
+                runId
+            ) == 2,
             "run_checkpoints should persist the checkpoint last_seq."
         );
         Assert(
             GetString(
-                connection,
-                "SELECT pending_selection_json FROM run_checkpoints WHERE run_id = $runId;",
-                runId
-            ).Contains("template-a", StringComparison.Ordinal),
+                    connection,
+                    "SELECT pending_selection_json FROM run_checkpoints WHERE run_id = $runId;",
+                    runId
+                )
+                .Contains("template-a", StringComparison.Ordinal),
             "run_checkpoints should persist pending selection payload JSON."
         );
         Assert(

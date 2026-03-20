@@ -42,7 +42,9 @@ Assert(
 
 Assert(
     !File.Exists(
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Models/ModState.cs"))
+        Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "../../../../../Models/ModState.cs")
+        )
     ),
     "ModState compatibility shell should be removed."
 );
@@ -63,7 +65,10 @@ Assert(
     "IBppConfig should expose the CombatStatusBar visible config."
 );
 Assert(
-    configInterfaceSource.Contains("CombatStatusBarSpeedMultiplierConfig", StringComparison.Ordinal),
+    configInterfaceSource.Contains(
+        "CombatStatusBarSpeedMultiplierConfig",
+        StringComparison.Ordinal
+    ),
     "IBppConfig should expose the CombatStatusBar speed config."
 );
 
@@ -171,8 +176,14 @@ Assert(
 var runLoggingModuleSource = ReadSource("Game/RunLogging/RunLoggingModule.cs");
 Assert(
     runLoggingModuleSource.Contains("Subscribe<SelectionObserved>", StringComparison.Ordinal)
-        && runLoggingModuleSource.Contains("Subscribe<RunLoggingSyncRequested>", StringComparison.Ordinal)
-        && runLoggingModuleSource.Contains("Subscribe<PvpBattleRecorded>", StringComparison.Ordinal),
+        && runLoggingModuleSource.Contains(
+            "Subscribe<RunLoggingSyncRequested>",
+            StringComparison.Ordinal
+        )
+        && runLoggingModuleSource.Contains(
+            "Subscribe<PvpBattleRecorded>",
+            StringComparison.Ordinal
+        ),
     "RunLoggingModule should be the unified subscriber for run-logging capture inputs."
 );
 
@@ -186,7 +197,9 @@ static Type RequireType(string fullName)
 
 static string ReadSource(string relativePath)
 {
-    var sourcePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../", relativePath));
+    var sourcePath = Path.GetFullPath(
+        Path.Combine(AppContext.BaseDirectory, "../../../../../", relativePath)
+    );
     Assert(File.Exists(sourcePath), $"Source file not found at {sourcePath}");
     return File.ReadAllText(sourcePath);
 }

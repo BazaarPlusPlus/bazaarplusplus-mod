@@ -116,7 +116,9 @@ internal static class SettingsMenuToggleInstaller
         return instance.transform.Find($"**/{preferredAnchorObjectName}")
             ?? instance
                 .GetComponentsInChildren<Transform>(includeInactive: true)
-                .FirstOrDefault(candidate => candidate != null && candidate.name == preferredAnchorObjectName);
+                .FirstOrDefault(candidate =>
+                    candidate != null && candidate.name == preferredAnchorObjectName
+                );
     }
 
     private static Transform? GetRowByName(OptionsDialogController instance, string objectName)

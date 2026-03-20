@@ -21,7 +21,8 @@ internal sealed class PvpBattleManifestFactory
     )
     {
         var spawnMessage =
-            window.SpawnMessage ?? throw new InvalidOperationException("Spawn message is required.");
+            window.SpawnMessage
+            ?? throw new InvalidOperationException("Spawn message is required.");
         var combatMessage =
             window.CombatMessage
             ?? throw new InvalidOperationException("Combat message is required.");

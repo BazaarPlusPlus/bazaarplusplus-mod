@@ -29,7 +29,8 @@ internal static class CombatReplayInjectedEncounterPickerMapShowPatch
 {
     private static MethodBase? TargetMethod()
     {
-        var type = AccessTools.TypeByName("InjectedEncounterPickerMapController")
+        var type =
+            AccessTools.TypeByName("InjectedEncounterPickerMapController")
             ?? AccessTools.TypeByName("TheBazaar_InjectedEncounterPickerMapController")
             ?? AccessTools.TypeByName("TheBazaar.InjectedEncounterPickerMapController");
         return type == null ? null : AccessTools.Method(type, "PlayEnter");
@@ -53,7 +54,8 @@ internal static class CombatReplayClockInjectedEncounterPickerPatch
 {
     private static MethodBase? TargetMethod()
     {
-        var type = AccessTools.TypeByName("ClockInjectedEncounterController")
+        var type =
+            AccessTools.TypeByName("ClockInjectedEncounterController")
             ?? AccessTools.TypeByName("TheBazaar_ClockInjectedEncounterController")
             ?? AccessTools.TypeByName("TheBazaar.ClockInjectedEncounterController");
         return type == null ? null : AccessTools.Method(type, "SpawnEncounterPickerVFX");

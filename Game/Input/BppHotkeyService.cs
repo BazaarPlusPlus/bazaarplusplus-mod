@@ -209,8 +209,12 @@ internal static class BppHotkeyService
     {
         return actionId switch
         {
-            BppHotkeyActionId.HoldEnchantPreview => BppRuntimeHost.Config.EnchantPreviewHotkeyPathConfig,
-            BppHotkeyActionId.HoldUpgradePreview => BppRuntimeHost.Config.UpgradePreviewHotkeyPathConfig,
+            BppHotkeyActionId.HoldEnchantPreview => BppRuntimeHost
+                .Config
+                .EnchantPreviewHotkeyPathConfig,
+            BppHotkeyActionId.HoldUpgradePreview => BppRuntimeHost
+                .Config
+                .UpgradePreviewHotkeyPathConfig,
             _ => null,
         };
     }

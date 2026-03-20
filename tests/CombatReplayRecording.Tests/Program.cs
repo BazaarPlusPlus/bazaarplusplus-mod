@@ -16,8 +16,12 @@ var collectorType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleSnapsho
 var manifestFactoryType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifestFactory");
 var payloadFactoryType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpReplayPayloadFactory");
 var catalogType = RequireType("BazaarPlusPlus.Game.PvpBattles.Persistence.PvpBattleCatalog");
-var catalogInterfaceType = RequireType("BazaarPlusPlus.Game.PvpBattles.Persistence.IPvpBattleCatalog");
-var catalogStoreType = RequireType("BazaarPlusPlus.Game.PvpBattles.Persistence.PvpBattleSqliteStore");
+var catalogInterfaceType = RequireType(
+    "BazaarPlusPlus.Game.PvpBattles.Persistence.IPvpBattleCatalog"
+);
+var catalogStoreType = RequireType(
+    "BazaarPlusPlus.Game.PvpBattles.Persistence.PvpBattleSqliteStore"
+);
 
 Assert(
     Type.GetType("BazaarPlusPlus.Game.CombatReplay.CombatReplayRecord, BazaarPlusPlus") == null,
@@ -42,7 +46,10 @@ Assert(
     "PvpBattleCardSetCapture should expose Items, Status, and Source."
 );
 Assert(
-    matcherType != null && collectorType != null && manifestFactoryType != null && payloadFactoryType != null,
+    matcherType != null
+        && collectorType != null
+        && manifestFactoryType != null
+        && payloadFactoryType != null,
     "The PVP battle matcher, collector, and factories should exist."
 );
 Assert(
@@ -111,7 +118,10 @@ var captureServiceSource = File.ReadAllText(
 );
 Assert(
     captureServiceSource.Contains("CaptureLiveSnapshots(_candidate);", StringComparison.Ordinal)
-        && captureServiceSource.Contains("CaptureLiveSnapshots(candidate);", StringComparison.Ordinal),
+        && captureServiceSource.Contains(
+            "CaptureLiveSnapshots(candidate);",
+            StringComparison.Ordinal
+        ),
     "Combat replay capture should refresh live card snapshots after the opening GameSim has had time to populate Data."
 );
 Assert(
@@ -139,12 +149,27 @@ Assert(
     "Capture pipeline should represent explicit capture status and source semantics."
 );
 Assert(
-    captureServiceSource.Contains("CaptureCurrentHandCardsAtOpening(ECombatantId.Player)", StringComparison.Ordinal)
-        && captureServiceSource.Contains("CaptureCurrentSkillsAtOpening(ECombatantId.Player)", StringComparison.Ordinal)
-        && captureServiceSource.Contains("CaptureOpeningHandCards(message, ECombatantId.Opponent)", StringComparison.Ordinal)
-        && captureServiceSource.Contains("CaptureOpponentSkillsFromOpening(message)", StringComparison.Ordinal)
+    captureServiceSource.Contains(
+        "CaptureCurrentHandCardsAtOpening(ECombatantId.Player)",
+        StringComparison.Ordinal
+    )
+        && captureServiceSource.Contains(
+            "CaptureCurrentSkillsAtOpening(ECombatantId.Player)",
+            StringComparison.Ordinal
+        )
+        && captureServiceSource.Contains(
+            "CaptureOpeningHandCards(message, ECombatantId.Opponent)",
+            StringComparison.Ordinal
+        )
+        && captureServiceSource.Contains(
+            "CaptureOpponentSkillsFromOpening(message)",
+            StringComparison.Ordinal
+        )
         && captureServiceSource.Contains("GameSimEventCardSpawned", StringComparison.Ordinal)
-        && captureServiceSource.Contains("GameSimEventPlayerSkillEquipped", StringComparison.Ordinal),
+        && captureServiceSource.Contains(
+            "GameSimEventPlayerSkillEquipped",
+            StringComparison.Ordinal
+        ),
     "Combat replay capture should read player skills from current Data and opponent skills from opening GameSim events."
 );
 Assert(
@@ -154,7 +179,10 @@ Assert(
 );
 Assert(
     captureServiceSource.Contains("OpponentName = candidate.OpponentName", StringComparison.Ordinal)
-        && captureServiceSource.Contains("OpponentAccountId = candidate.OpponentAccountId", StringComparison.Ordinal),
+        && captureServiceSource.Contains(
+            "OpponentAccountId = candidate.OpponentAccountId",
+            StringComparison.Ordinal
+        ),
     "Combat replay capture should bind opponent identity to the opening candidate instead of reading it from global state during record creation."
 );
 Assert(
@@ -172,7 +200,10 @@ Assert(
 );
 Assert(
     runtimeSource.Contains("_battleCatalog = new PvpBattleCatalog", StringComparison.Ordinal)
-        && runtimeSource.Contains("_payloadStore = new CombatReplayPayloadStore", StringComparison.Ordinal)
+        && runtimeSource.Contains(
+            "_payloadStore = new CombatReplayPayloadStore",
+            StringComparison.Ordinal
+        )
         && runtimeSource.IndexOf("_payloadStore.Save(payload);", StringComparison.Ordinal)
             < runtimeSource.IndexOf("_battleCatalog.Save(manifest);", StringComparison.Ordinal),
     "Combat replay runtime should persist payloads before making battles visible via the catalog."
@@ -212,7 +243,10 @@ Assert(
 );
 Assert(
     runtimeSource.Contains("Data.UpdateFromGameSimAsync(spawnMessage);", StringComparison.Ordinal)
-        && runtimeSource.Contains("MarkGameSimMessageHandled(gameSimHandler, spawnMessage.MessageId);", StringComparison.Ordinal),
+        && runtimeSource.Contains(
+            "MarkGameSimMessageHandled(gameSimHandler, spawnMessage.MessageId);",
+            StringComparison.Ordinal
+        ),
     "Combat replay runtime should sync replay spawn data and mark it handled without entering the live GameSim pipeline."
 );
 Assert(
@@ -232,12 +266,17 @@ Assert(
 );
 Assert(
     runtimeSource.Contains("replayState.Replay();", StringComparison.Ordinal)
-        && runtimeSource.Contains("ShowReplayAndRecapButtons(show: false, deactivate: true);", StringComparison.Ordinal),
+        && runtimeSource.Contains(
+            "ShowReplayAndRecapButtons(show: false, deactivate: true);",
+            StringComparison.Ordinal
+        ),
     "Combat replay runtime should auto-start replay playback after entering ReplayState."
 );
 Assert(
-    runtimeSource.Contains("private static void MarkGameSimMessageHandled", StringComparison.Ordinal)
-        && runtimeSource.Contains("\"_handledMessages\"", StringComparison.Ordinal),
+    runtimeSource.Contains(
+        "private static void MarkGameSimMessageHandled",
+        StringComparison.Ordinal
+    ) && runtimeSource.Contains("\"_handledMessages\"", StringComparison.Ordinal),
     "Combat replay runtime should be able to mark the replay spawn message as handled for ReplayState."
 );
 Assert(
@@ -246,8 +285,14 @@ Assert(
 );
 Assert(
     runtimeSource.Contains("does not contain opponent-hand snapshots", StringComparison.Ordinal)
-        && runtimeSource.Contains("does not contain player-skill snapshots", StringComparison.Ordinal)
-        && runtimeSource.Contains("does not contain opponent-skill snapshots", StringComparison.Ordinal),
+        && runtimeSource.Contains(
+            "does not contain player-skill snapshots",
+            StringComparison.Ordinal
+        )
+        && runtimeSource.Contains(
+            "does not contain opponent-skill snapshots",
+            StringComparison.Ordinal
+        ),
     "Combat replay runtime should warn when older replays are missing card or skill snapshots for either side."
 );
 var snapshotSource = File.ReadAllText(
@@ -280,7 +325,10 @@ Assert(
 );
 Assert(
     runtimeSource.Contains("CanReplaySavedCombats", StringComparison.Ordinal)
-        && runtimeSource.Contains("BppRuntimeHost.RunContext.IsInGameRun", StringComparison.Ordinal),
+        && runtimeSource.Contains(
+            "BppRuntimeHost.RunContext.IsInGameRun",
+            StringComparison.Ordinal
+        ),
     "Combat replay runtime should block saved replays only while local gameplay is active."
 );
 Assert(
@@ -289,7 +337,10 @@ Assert(
     "Combat replay runtime should know how to load gameplay scenes from the lobby."
 );
 Assert(
-    runtimeSource.Contains("AppState.Initialize(sharedVariables, processor);", StringComparison.Ordinal),
+    runtimeSource.Contains(
+        "AppState.Initialize(sharedVariables, processor);",
+        StringComparison.Ordinal
+    ),
     "Combat replay runtime should initialize AppState handlers when the lobby bootstrap path does not provide them."
 );
 Assert(
@@ -297,7 +348,10 @@ Assert(
     "Combat replay runtime should validate the saved spawn snapshot with NetMessageProcessor before replay injection."
 );
 Assert(
-    runtimeSource.Contains("TryGetAppStateField<GameSimHandler>(\"_gameSimHandler\") != null", StringComparison.Ordinal),
+    runtimeSource.Contains(
+        "TryGetAppStateField<GameSimHandler>(\"_gameSimHandler\") != null",
+        StringComparison.Ordinal
+    ),
     "Combat replay readiness should require GameSimHandler to exist before replay injection starts."
 );
 Assert(
@@ -306,7 +360,10 @@ Assert(
     "Combat replay runtime should bootstrap board and game services locally without RunManager.StartRun()."
 );
 Assert(
-    runtimeSource.Contains("Replay bootstrap scene environment is ready.", StringComparison.Ordinal),
+    runtimeSource.Contains(
+        "Replay bootstrap scene environment is ready.",
+        StringComparison.Ordinal
+    ),
     "Combat replay runtime should mark when scene-only replay bootstrap becomes ready."
 );
 Assert(
@@ -318,7 +375,10 @@ Assert(
     "Combat replay runtime should log when the saved replay payload has been injected."
 );
 Assert(
-    runtimeSource.Contains("Returning to main menu after bootstrapped replay exit.", StringComparison.Ordinal),
+    runtimeSource.Contains(
+        "Returning to main menu after bootstrapped replay exit.",
+        StringComparison.Ordinal
+    ),
     "Combat replay runtime should log the menu-return path after a bootstrapped replay exits."
 );
 Assert(
@@ -345,20 +405,34 @@ Assert(
         && runtimeSource.Contains("ReturnToMainMenu()", StringComparison.Ordinal),
     "Combat replay runtime should return to the main menu after a bootstrapped replay exits ReplayState."
 );
-var injectReplayBody = ExtractMethodBody(runtimeSource, "private static async Task TryInjectSavedReplayAsync(");
+var injectReplayBody = ExtractMethodBody(
+    runtimeSource,
+    "private static async Task TryInjectSavedReplayAsync("
+);
 Assert(
     injectReplayBody.IndexOf("HandleSpawnMessageAsync", StringComparison.Ordinal)
         < injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal)
         && injectReplayBody.IndexOf("TriggerCombatSequenceCreated", StringComparison.Ordinal)
-            < injectReplayBody.IndexOf("AppState.TryPushState<ReplayState>()", StringComparison.Ordinal)
-        && injectReplayBody.IndexOf("AppState.TryPushState<ReplayState>()", StringComparison.Ordinal)
-            < injectReplayBody.IndexOf("replayState.Replay()", StringComparison.Ordinal),
+            < injectReplayBody.IndexOf(
+                "AppState.TryPushState<ReplayState>()",
+                StringComparison.Ordinal
+            )
+        && injectReplayBody.IndexOf(
+            "AppState.TryPushState<ReplayState>()",
+            StringComparison.Ordinal
+        ) < injectReplayBody.IndexOf("replayState.Replay()", StringComparison.Ordinal),
     "Combat replay runtime should notify ReplayState's native sequence handler before entering ReplayState."
 );
-var triggerReplayBody = ExtractMethodBody(runtimeSource, "private static Action CreateTriggerCombatSequenceCreated(object processor)");
+var triggerReplayBody = ExtractMethodBody(
+    runtimeSource,
+    "private static Action CreateTriggerCombatSequenceCreated(object processor)"
+);
 Assert(
     triggerReplayBody.Contains("return () =>", StringComparison.Ordinal)
-        && triggerReplayBody.Contains("field?.GetValue(processor) as Action", StringComparison.Ordinal),
+        && triggerReplayBody.Contains(
+            "field?.GetValue(processor) as Action",
+            StringComparison.Ordinal
+        ),
     "Combat replay runtime should resolve CombatSequenceCreated listeners at trigger time instead of capturing a stale delegate."
 );
 
@@ -409,15 +483,38 @@ try
     Assert(payload != null, "PvpReplayPayload should be constructible.");
     SetProperty(payloadType, payload!, "BattleId", "battle-001");
     SetProperty(payloadType, payload!, "Version", 1);
-    SetProperty(payloadType, payload!, "SpawnMessageBase64", Convert.ToBase64String(new byte[] { 1, 2, 3 }));
-    SetProperty(payloadType, payload!, "CombatMessageBase64", Convert.ToBase64String(new byte[] { 4, 5, 6 }));
-    SetProperty(payloadType, payload!, "DespawnMessageBase64", Convert.ToBase64String(new byte[] { 7, 8, 9 }));
+    SetProperty(
+        payloadType,
+        payload!,
+        "SpawnMessageBase64",
+        Convert.ToBase64String(new byte[] { 1, 2, 3 })
+    );
+    SetProperty(
+        payloadType,
+        payload!,
+        "CombatMessageBase64",
+        Convert.ToBase64String(new byte[] { 4, 5, 6 })
+    );
+    SetProperty(
+        payloadType,
+        payload!,
+        "DespawnMessageBase64",
+        Convert.ToBase64String(new byte[] { 7, 8, 9 })
+    );
     Invoke(payloadStoreType, payloadStore!, "Save", new object?[] { payload! });
     Assert(
-        Equals(Invoke(payloadStoreType, payloadStore!, "Exists", new object?[] { "battle-001" }), true),
+        Equals(
+            Invoke(payloadStoreType, payloadStore!, "Exists", new object?[] { "battle-001" }),
+            true
+        ),
         "Payload store should report saved payloads."
     );
-    var loadedPayload = Invoke(payloadStoreType, payloadStore!, "Load", new object?[] { "battle-001" });
+    var loadedPayload = Invoke(
+        payloadStoreType,
+        payloadStore!,
+        "Load",
+        new object?[] { "battle-001" }
+    );
     Assert(loadedPayload != null, "Payload store should load a saved payload by battle id.");
     Assert(
         string.Equals(
@@ -485,7 +582,12 @@ try
         )
     );
     Invoke(catalogType, battleCatalog!, "Save", new object?[] { manifest! });
-    var loadedManifest = Invoke(catalogType, battleCatalog!, "TryLoad", new object?[] { "battle-001" });
+    var loadedManifest = Invoke(
+        catalogType,
+        battleCatalog!,
+        "TryLoad",
+        new object?[] { "battle-001" }
+    );
     Assert(loadedManifest != null, "Catalog should load a saved manifest by battle id.");
     Assert(
         string.Equals(
@@ -614,8 +716,7 @@ try
     {
         legacyConnection.Open();
         using var legacyCommand = legacyConnection.CreateCommand();
-        legacyCommand.CommandText =
-            """
+        legacyCommand.CommandText = """
             CREATE TABLE pvp_battles (
                 battle_id TEXT PRIMARY KEY,
                 replay_id TEXT NOT NULL,
@@ -696,7 +797,10 @@ try
     }
 
     var migratedBattleCatalog = Activator.CreateInstance(catalogType, legacyDbPath);
-    Assert(migratedBattleCatalog != null, "PvpBattleCatalog should migrate legacy pvp_battles tables.");
+    Assert(
+        migratedBattleCatalog != null,
+        "PvpBattleCatalog should migrate legacy pvp_battles tables."
+    );
     var migratedLegacyManifest = Invoke(
         catalogType,
         migratedBattleCatalog!,
@@ -795,20 +899,14 @@ try
         "Accept",
         new object?[] { pveCombatStart, "run-ignore" }
     );
-    Assert(
-        ignoredResult == null,
-        "A non-PVP combat opening should not start replay capture."
-    );
+    Assert(ignoredResult == null, "A non-PVP combat opening should not start replay capture.");
     ignoredResult = Invoke(
         captureServiceType,
         captureService!,
         "Accept",
         new object?[] { combatMessage, "run-ignore" }
     );
-    Assert(
-        ignoredResult == null,
-        "A CombatSim after a non-PVP opening should still be ignored."
-    );
+    Assert(ignoredResult == null, "A CombatSim after a non-PVP opening should still be ignored.");
 
     Assert(
         Invoke(
@@ -914,8 +1012,8 @@ try
     Invoke(payloadStoreType, payloadStore!, "Save", new object?[] { completedPayload! });
     Invoke(catalogType, battleCatalog!, "Save", new object?[] { completedManifest! });
 
-var controller = Activator.CreateInstance(controllerType, battleCatalog, payloadStore, loader);
-Assert(controller != null, "CombatReplayController should be constructible.");
+    var controller = Activator.CreateInstance(controllerType, battleCatalog, payloadStore, loader);
+    Assert(controller != null, "CombatReplayController should be constructible.");
     var savedReplays = (
         (System.Collections.IEnumerable)Invoke(
             controllerType,
@@ -935,14 +1033,20 @@ Assert(controller != null, "CombatReplayController should be constructible.");
         "LoadBattle",
         new object?[] { battleId! }
     );
-    Assert(loadedManifestFromController != null, "Controller should load a saved battle manifest by id.");
+    Assert(
+        loadedManifestFromController != null,
+        "Controller should load a saved battle manifest by id."
+    );
     var loadedPayloadFromController = Invoke(
         controllerType,
         controller!,
         "LoadPayload",
         new[] { loadedManifestFromController }
     );
-    Assert(loadedPayloadFromController != null, "Controller should load a saved replay payload by battle id.");
+    Assert(
+        loadedPayloadFromController != null,
+        "Controller should load a saved replay payload by battle id."
+    );
     var loadedFromController = Invoke(
         controllerType,
         controller!,
@@ -1036,9 +1140,11 @@ static object CreateSnapshotList(string instanceId, string templateId)
 {
     var snapshotType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayCardSnapshot");
     var listType = typeof(List<>).MakeGenericType(snapshotType);
-    var list = Activator.CreateInstance(listType)
+    var list =
+        Activator.CreateInstance(listType)
         ?? throw new InvalidOperationException("Snapshot list should be constructible.");
-    var snapshot = Activator.CreateInstance(snapshotType)
+    var snapshot =
+        Activator.CreateInstance(snapshotType)
         ?? throw new InvalidOperationException("Snapshot should be constructible.");
     SetProperty(snapshotType, snapshot, "InstanceId", instanceId);
     SetProperty(snapshotType, snapshot, "TemplateId", templateId);
@@ -1048,7 +1154,12 @@ static object CreateSnapshotList(string instanceId, string templateId)
         "Type",
         ParseEnum("BazaarGameShared.Domain.Core.Types.ECardType", "BazaarGameShared", "Skill")
     );
-    SetProperty(snapshotType, snapshot, "Name", instanceId.StartsWith("p-skill", StringComparison.Ordinal) ? "Arcane Mastery" : "Sparkblade");
+    SetProperty(
+        snapshotType,
+        snapshot,
+        "Name",
+        instanceId.StartsWith("p-skill", StringComparison.Ordinal) ? "Arcane Mastery" : "Sparkblade"
+    );
     SetProperty(snapshotType, snapshot, "Tier", "Gold");
     SetProperty(snapshotType, snapshot, "Enchant", "Radiant");
     SetProperty(snapshotType, snapshot, "Tags", new List<string> { "Weapon", "Burst" });
@@ -1056,11 +1167,7 @@ static object CreateSnapshotList(string instanceId, string templateId)
         snapshotType,
         snapshot,
         "Attributes",
-        new Dictionary<string, int>
-        {
-            ["Damage"] = 42,
-            ["Cooldown"] = 3,
-        }
+        new Dictionary<string, int> { ["Damage"] = 42, ["Cooldown"] = 3 }
     );
     Invoke(listType, list, "Add", new[] { snapshot });
     return list;
@@ -1163,8 +1270,8 @@ static object CreateManifestFixture(
 static int ReadSnapshotCount(Type recordType, object instance, string propertyName)
 {
     return ((System.Collections.IEnumerable?)GetProperty(recordType, instance, propertyName))
-        ?.Cast<object>()
-        .Count()
+            ?.Cast<object>()
+            .Count()
         ?? 0;
 }
 
@@ -1192,7 +1299,8 @@ static int GetInt32(SqliteConnection connection, string sql, string battleId)
     command.CommandText = sql;
     command.Parameters.AddWithValue("$battleId", battleId);
     return Convert.ToInt32(
-        command.ExecuteScalar() ?? throw new InvalidOperationException($"Query returned null: {sql}")
+        command.ExecuteScalar()
+            ?? throw new InvalidOperationException($"Query returned null: {sql}")
     );
 }
 

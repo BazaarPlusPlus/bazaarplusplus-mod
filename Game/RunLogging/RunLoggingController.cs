@@ -27,7 +27,8 @@ internal sealed class RunLoggingController : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        var runLogDatabasePath = BppRuntimeHost.Paths.RunLogDatabasePath
+        var runLogDatabasePath =
+            BppRuntimeHost.Paths.RunLogDatabasePath
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
         _store = new SqliteRunLogStore(runLogDatabasePath);
         _sessionManager = new RunLogSessionManager(_store);
@@ -219,7 +220,9 @@ internal sealed class RunLoggingControllerCore
     {
         var combatEvent =
             _sessionManager.AppendEvent(_captureService.BuildPvpBattleRecordedEvent(input))
-            ?? throw new InvalidOperationException("Combat replay event was unexpectedly suppressed.");
+            ?? throw new InvalidOperationException(
+                "Combat replay event was unexpectedly suppressed."
+            );
         _sessionManager.SaveCheckpoint();
         return combatEvent;
     }

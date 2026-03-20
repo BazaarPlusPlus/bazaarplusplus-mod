@@ -117,17 +117,21 @@ internal sealed class HistoryPanelRepository
         var records = new List<HistoryRunRecord>();
         while (reader.Read())
         {
-            var startedAt = DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("started_at_utc")));
+            var startedAt = DateTimeOffset.Parse(
+                reader.GetString(reader.GetOrdinal("started_at_utc"))
+            );
             var endedAt = GetNullableDateTimeOffset(reader, "ended_at_utc");
             var victories = GetNullableInt32(reader, "victories");
             var losses = GetNullableInt32(reader, "losses");
-            var finalDay = GetNullableInt32(reader, "final_day") ?? GetNullableInt32(reader, "checkpoint_day");
-            var finalHour = GetNullableInt32(reader, "final_hour") ?? GetNullableInt32(reader, "checkpoint_hour");
+            var finalDay =
+                GetNullableInt32(reader, "final_day") ?? GetNullableInt32(reader, "checkpoint_day");
+            var finalHour =
+                GetNullableInt32(reader, "final_hour")
+                ?? GetNullableInt32(reader, "checkpoint_hour");
             var lastSeen =
-                endedAt
-                ?? GetNullableDateTimeOffset(reader, "last_seen_at_utc")
-                ?? startedAt;
-            var rawStatus = GetNullableString(reader, "final_status")
+                endedAt ?? GetNullableDateTimeOffset(reader, "last_seen_at_utc") ?? startedAt;
+            var rawStatus =
+                GetNullableString(reader, "final_status")
                 ?? reader.GetString(reader.GetOrdinal("run_status"));
 
             records.Add(
@@ -223,7 +227,12 @@ internal sealed class HistoryPanelRepository
                     GetNullableString(reader, "opponent_account_id"),
                     GetNullableString(reader, "combat_kind"),
                     GetNullableString(reader, "result"),
-                    BuildSnapshotSummary(playerHandJson, playerSkillsJson, opponentHandJson, opponentSkillsJson),
+                    BuildSnapshotSummary(
+                        playerHandJson,
+                        playerSkillsJson,
+                        opponentHandJson,
+                        opponentSkillsJson
+                    ),
                     previewData
                 )
             );
@@ -254,8 +263,7 @@ internal sealed class HistoryPanelRepository
         var playerSkills = CountSnapshotItems(playerSkillsJson);
         var opponentItems = CountSnapshotItems(opponentHandJson);
         var opponentSkills = CountSnapshotItems(opponentSkillsJson);
-        return
-            $"YOU {playerItems} {Pluralize(playerItems, "item", "items")} · {playerSkills} {Pluralize(playerSkills, "skill", "skills")}"
+        return $"YOU {playerItems} {Pluralize(playerItems, "item", "items")} · {playerSkills} {Pluralize(playerSkills, "skill", "skills")}"
             + $"  |  OPP {opponentItems} {Pluralize(opponentItems, "item", "items")} · {opponentSkills} {Pluralize(opponentSkills, "skill", "skills")}";
     }
 
@@ -368,8 +376,9 @@ internal sealed class HistoryPanelRepository
 
     private static int ParseTier(string? value)
     {
-        return !string.IsNullOrWhiteSpace(value)
-               && Enum.TryParse<ETier>(value, ignoreCase: false, out var tier)
+        return
+            !string.IsNullOrWhiteSpace(value)
+            && Enum.TryParse<ETier>(value, ignoreCase: false, out var tier)
             ? (int)tier
             : 0;
     }
@@ -416,7 +425,10 @@ internal sealed class HistoryPanelRepository
         return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
     }
 
-    private static DateTimeOffset? GetNullableDateTimeOffset(SqliteDataReader reader, string columnName)
+    private static DateTimeOffset? GetNullableDateTimeOffset(
+        SqliteDataReader reader,
+        string columnName
+    )
     {
         var ordinal = reader.GetOrdinal(columnName);
         return reader.IsDBNull(ordinal) ? null : DateTimeOffset.Parse(reader.GetString(ordinal));
@@ -587,8 +599,7 @@ internal sealed class HistoryBattlePreviewData
 
     public bool HasRenderableOpponentBoard => CountRenderableCards(OpponentBoard) > 0;
 
-    public bool HasRenderableCards =>
-        HasRenderablePlayerBoard || HasRenderableOpponentBoard;
+    public bool HasRenderableCards => HasRenderablePlayerBoard || HasRenderableOpponentBoard;
 
     public HistoryBattlePreviewData PlayerOnly()
     {
@@ -622,9 +633,18 @@ internal sealed class HistoryBattlePreviewData
     {
         return new PreviewBoardModel
         {
-            ItemCards = source?.ItemCards != null ? new List<PreviewCardSpec>(source.ItemCards) : new List<PreviewCardSpec>(),
-            SkillCards = source?.SkillCards != null ? new List<PreviewCardSpec>(source.SkillCards) : new List<PreviewCardSpec>(),
-            Metadata = source?.Metadata != null ? new Dictionary<string, string>(source.Metadata) : new Dictionary<string, string>(),
+            ItemCards =
+                source?.ItemCards != null
+                    ? new List<PreviewCardSpec>(source.ItemCards)
+                    : new List<PreviewCardSpec>(),
+            SkillCards =
+                source?.SkillCards != null
+                    ? new List<PreviewCardSpec>(source.SkillCards)
+                    : new List<PreviewCardSpec>(),
+            Metadata =
+                source?.Metadata != null
+                    ? new Dictionary<string, string>(source.Metadata)
+                    : new Dictionary<string, string>(),
             Signature = source?.Signature ?? string.Empty,
         };
     }
@@ -633,12 +653,16 @@ internal sealed class HistoryBattlePreviewData
     {
         return new PreviewBoardModel
         {
-            ItemCards = source?.ItemCards != null ? new List<PreviewCardSpec>(source.ItemCards) : new List<PreviewCardSpec>(),
+            ItemCards =
+                source?.ItemCards != null
+                    ? new List<PreviewCardSpec>(source.ItemCards)
+                    : new List<PreviewCardSpec>(),
             SkillCards = new List<PreviewCardSpec>(),
-            Metadata = source?.Metadata != null ? new Dictionary<string, string>(source.Metadata) : new Dictionary<string, string>(),
+            Metadata =
+                source?.Metadata != null
+                    ? new Dictionary<string, string>(source.Metadata)
+                    : new Dictionary<string, string>(),
             Signature = source?.Signature ?? string.Empty,
         };
     }
 }
-
-

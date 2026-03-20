@@ -34,16 +34,17 @@ internal sealed class RunLoggingModule
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _core = core ?? throw new ArgumentNullException(nameof(core));
         _ensureActiveRunFromGame =
-            ensureActiveRunFromGame ?? throw new ArgumentNullException(nameof(ensureActiveRunFromGame));
+            ensureActiveRunFromGame
+            ?? throw new ArgumentNullException(nameof(ensureActiveRunFromGame));
     }
 
     public void Start()
     {
-        _pendingSelection = PendingSelectionContext.From(_sessionManager.ActiveSession?.PendingSelection);
-        _selectionSubscription = _eventBus.Subscribe<SelectionObserved>(OnSelectionObserved);
-        _syncSubscription = _eventBus.Subscribe<RunLoggingSyncRequested>(
-            OnRunLoggingSyncRequested
+        _pendingSelection = PendingSelectionContext.From(
+            _sessionManager.ActiveSession?.PendingSelection
         );
+        _selectionSubscription = _eventBus.Subscribe<SelectionObserved>(OnSelectionObserved);
+        _syncSubscription = _eventBus.Subscribe<RunLoggingSyncRequested>(OnRunLoggingSyncRequested);
         _pvpBattleSubscription = _eventBus.Subscribe<PvpBattleRecorded>(OnPvpBattleRecorded);
         Events.CardSelected.AddListener(OnCardSelected);
     }
@@ -83,9 +84,7 @@ internal sealed class RunLoggingModule
             {
                 ResolvePendingSelectionOnBoundary("run_state_exit");
                 completionAttempted = true;
-                _core.CompleteRun(
-                    RunLoggingGameDataReader.BuildRunLogCompletion("run_state_exit")
-                );
+                _core.CompleteRun(RunLoggingGameDataReader.BuildRunLogCompletion("run_state_exit"));
                 completionSucceeded = true;
                 _pendingSelection = null;
             }
@@ -100,7 +99,11 @@ internal sealed class RunLoggingModule
             {
                 _wasInRunLastTick = true;
             }
-            else if (!completionAttempted || completionSucceeded || !_sessionManager.HasActiveSession)
+            else if (
+                !completionAttempted
+                || completionSucceeded
+                || !_sessionManager.HasActiveSession
+            )
             {
                 _wasInRunLastTick = false;
             }
@@ -213,23 +216,20 @@ internal sealed class RunLoggingModule
             return;
         }
 
-        var inferredChoice = RunLoggingController
-            .Instance?
-            .InferenceService?
-            .InferChoice(
-                new RunLogChoiceInferenceInput
-                {
-                    Day = pendingSelection.Day,
-                    Hour = pendingSelection.Hour,
-                    State = pendingSelection.State,
-                    EncounterId = pendingSelection.EncounterId,
-                    ParentEncounterId = pendingSelection.ParentEncounterId,
-                    SelectionSeq = pendingSelection.SelectionSeq,
-                    TransitionedAway = transitionedAway,
-                    Options = pendingSelection.Options,
-                    ResultingInstanceIds = RunLoggingGameDataReader.GetCurrentSelectionSetInstanceIds(),
-                }
-            );
+        var inferredChoice = RunLoggingController.Instance?.InferenceService?.InferChoice(
+            new RunLogChoiceInferenceInput
+            {
+                Day = pendingSelection.Day,
+                Hour = pendingSelection.Hour,
+                State = pendingSelection.State,
+                EncounterId = pendingSelection.EncounterId,
+                ParentEncounterId = pendingSelection.ParentEncounterId,
+                SelectionSeq = pendingSelection.SelectionSeq,
+                TransitionedAway = transitionedAway,
+                Options = pendingSelection.Options,
+                ResultingInstanceIds = RunLoggingGameDataReader.GetCurrentSelectionSetInstanceIds(),
+            }
+        );
 
         if (inferredChoice != null && _core.AcceptChoiceMade(inferredChoice) != null)
         {

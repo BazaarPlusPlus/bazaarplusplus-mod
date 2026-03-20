@@ -1,7 +1,7 @@
 #nullable enable
-using BazaarPlusPlus.Game.CombatReplay;
 using BazaarGameShared.Domain.Runs;
 using BazaarGameShared.Infra.Messages;
+using BazaarPlusPlus.Game.CombatReplay;
 
 namespace BazaarPlusPlus.Game.PvpBattles;
 

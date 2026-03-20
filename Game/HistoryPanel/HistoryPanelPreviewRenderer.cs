@@ -3,9 +3,9 @@ using System.Collections;
 using System.Linq;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.MonsterPreview;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
 namespace BazaarPlusPlus;
 
@@ -118,13 +118,18 @@ internal sealed class HistoryPanelPreviewRenderer
 
     public string GetDebugSummary()
     {
-        return
-            $"boardSpacing={_boardHorizontalOffset:0.00}, cardSpacingX={_cardSpacingX:0.00}, camDepth={_cameraDepth:0.00}, camZ={_cameraVerticalCenter:0.00}, fov={_cameraFieldOfView:0.0}, cardW={_cardWidthScale:0.00}, cardH={_cardHeightScale:0.00}";
+        return $"boardSpacing={_boardHorizontalOffset:0.00}, cardSpacingX={_cardSpacingX:0.00}, camDepth={_cameraDepth:0.00}, camZ={_cameraVerticalCenter:0.00}, fov={_cameraFieldOfView:0.0}, cardW={_cardWidthScale:0.00}, cardH={_cardHeightScale:0.00}";
     }
 
     public void RenderLiveFrame(RawImage? target)
     {
-        if (target == null || _camera == null || _texture == null || _rootObject == null || !_rootObject.activeSelf)
+        if (
+            target == null
+            || _camera == null
+            || _texture == null
+            || _rootObject == null
+            || !_rootObject.activeSelf
+        )
             return;
 
         if (string.IsNullOrWhiteSpace(_renderedBattleId))
@@ -212,7 +217,11 @@ internal sealed class HistoryPanelPreviewRenderer
 
         if (!previewData.HasRenderableCards)
         {
-            ClearTarget(target, status, "No locally renderable cards were recorded for this selection.");
+            ClearTarget(
+                target,
+                status,
+                "No locally renderable cards were recorded for this selection."
+            );
             Hide();
             yield break;
         }
@@ -420,7 +429,12 @@ internal sealed class HistoryPanelPreviewRenderer
                 Object.Destroy(_texture);
             }
 
-            _texture = new RenderTexture(TextureWidth, TextureHeight, 24, RenderTextureFormat.ARGB32)
+            _texture = new RenderTexture(
+                TextureWidth,
+                TextureHeight,
+                24,
+                RenderTextureFormat.ARGB32
+            )
             {
                 antiAliasing = 2,
                 useMipMap = false,
@@ -539,16 +553,16 @@ internal sealed class HistoryPanelPreviewRenderer
         if (!showBackdrop)
             return;
 
-        var visibleBoardCount = (layout.ShowPlayerBoard ? 1 : 0) + (layout.ShowOpponentBoard ? 1 : 0);
+        var visibleBoardCount =
+            (layout.ShowPlayerBoard ? 1 : 0) + (layout.ShowOpponentBoard ? 1 : 0);
         var width = presentation.BoardSize.x + BackdropPaddingX * 2f;
         if (visibleBoardCount > 1)
             width += Mathf.Abs(layout.OpponentX - layout.PlayerX);
 
-        var centerX = visibleBoardCount > 1
-            ? (layout.PlayerX + layout.OpponentX) * 0.5f
-            : layout.ShowPlayerBoard
-                ? layout.PlayerX
-                : layout.OpponentX;
+        var centerX =
+            visibleBoardCount > 1 ? (layout.PlayerX + layout.OpponentX) * 0.5f
+            : layout.ShowPlayerBoard ? layout.PlayerX
+            : layout.OpponentX;
 
         var depth = presentation.BoardSize.y + BackdropPaddingZ * 2f;
         _backdropPlate.transform.localPosition = new Vector3(
@@ -619,7 +633,12 @@ internal sealed class HistoryPanelPreviewRenderer
 
     private readonly struct BoardLayout
     {
-        public BoardLayout(bool showPlayerBoard, bool showOpponentBoard, float playerX, float opponentX)
+        public BoardLayout(
+            bool showPlayerBoard,
+            bool showOpponentBoard,
+            float playerX,
+            float opponentX
+        )
         {
             ShowPlayerBoard = showPlayerBoard;
             ShowOpponentBoard = showOpponentBoard;

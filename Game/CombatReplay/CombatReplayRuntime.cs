@@ -6,17 +6,17 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Assets.Scripts.Audio;
 using BazaarGameClient.Domain.Models.Cards;
-using BazaarPlusPlus.Game.PvpBattles;
-using BazaarPlusPlus.Game.PvpBattles.Persistence;
-using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Cards.Enchantments;
+using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using TheBazaar;
-using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using TheBazaar.AppFramework;
+using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using TheBazaar.UI.Components;
 using TheBazaar.UI.EncounterPicker;
 using UnityEngine;
@@ -42,7 +42,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public string? ActiveBattleId => _controller?.ActiveBattleId;
 
-    public bool IsReplayPlaybackActive => _savedReplayPlaybackActive || AppState.CurrentState is ReplayState;
+    public bool IsReplayPlaybackActive =>
+        _savedReplayPlaybackActive || AppState.CurrentState is ReplayState;
 
     public bool IsSavedReplayPlaybackActive => _savedReplayPlaybackActive;
 
@@ -106,15 +107,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static IEnumerable<BoardUIController> GetSceneBoardUiControllers()
     {
-        return UnityEngine.Object.FindObjectsOfType<BoardUIController>(true)
+        return UnityEngine
+            .Object.FindObjectsOfType<BoardUIController>(true)
             .Where(controller => controller != null && controller.gameObject.scene.rootCount > 0);
     }
 
     private static void BindReplayBoardUiController(BoardUIController controller)
     {
-        var player = controller.combatantId == ECombatantId.Player
-            ? Data.Run?.Player
-            : Data.Run?.Opponent;
+        var player =
+            controller.combatantId == ECombatantId.Player ? Data.Run?.Player : Data.Run?.Opponent;
         if (player == null)
             return;
 
@@ -152,10 +153,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (player == null)
             return;
 
-        var healthBarField = controller.GetType().GetField(
-            "HealthBar",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-        );
+        var healthBarField = controller
+            .GetType()
+            .GetField(
+                "HealthBar",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
         var healthBar = healthBarField?.GetValue(controller);
         if (healthBar == null)
             return;
@@ -200,10 +203,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (player == null)
             return;
 
-        var healthBarField = controller.GetType().GetField(
-            "HealthBar",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-        );
+        var healthBarField = controller
+            .GetType()
+            .GetField(
+                "HealthBar",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
         var healthBar = healthBarField?.GetValue(controller);
         if (healthBar == null)
             return;
@@ -233,18 +238,23 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static void ApplyBoardUiDividerConfig(BoardUIController controller)
     {
-        var healthBarDividerConfigField = controller.GetType().GetField(
-            "healthBarDividerConfigSO",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-        );
-        var dividerConfig = healthBarDividerConfigField?.GetValue(controller) as HealthBarDividerConfigSO;
+        var healthBarDividerConfigField = controller
+            .GetType()
+            .GetField(
+                "healthBarDividerConfigSO",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
+        var dividerConfig =
+            healthBarDividerConfigField?.GetValue(controller) as HealthBarDividerConfigSO;
         if (dividerConfig == null)
             return;
 
-        var healthBarField = controller.GetType().GetField(
-            "HealthBar",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-        );
+        var healthBarField = controller
+            .GetType()
+            .GetField(
+                "HealthBar",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
         var healthBar = healthBarField?.GetValue(controller);
         if (healthBar == null)
             return;
@@ -280,10 +290,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static uint? TryGetPlayerAttribute(object player, EPlayerAttributeType attributeType)
     {
-        var attributesProperty = player.GetType().GetProperty(
-            "Attributes",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-        );
+        var attributesProperty = player
+            .GetType()
+            .GetProperty(
+                "Attributes",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
         if (attributesProperty?.GetValue(player) is not System.Collections.IDictionary attributes)
             return null;
         if (!attributes.Contains(attributeType))
@@ -292,15 +304,14 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         return Convert.ToUInt32(attributes[attributeType]);
     }
 
-    private static void RevealBoardUiHealthBar(
-        BoardUIController controller,
-        bool showStatusNumbers
-    )
+    private static void RevealBoardUiHealthBar(BoardUIController controller, bool showStatusNumbers)
     {
-        var healthBarField = controller.GetType().GetField(
-            "HealthBar",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-        );
+        var healthBarField = controller
+            .GetType()
+            .GetField(
+                "HealthBar",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
         var healthBar = healthBarField?.GetValue(controller);
         if (healthBar == null)
             return;
@@ -321,7 +332,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                     return false;
 
                 var parameters = candidate.GetParameters();
-                return parameters.Length == 1 && parameters[0].ParameterType.IsInstanceOfType(argument);
+                return parameters.Length == 1
+                    && parameters[0].ParameterType.IsInstanceOfType(argument);
             });
 
         method?.Invoke(target, new[] { argument });
@@ -353,10 +365,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 continue;
             }
 
-            if (
-                parameters.Length == 1
-                && parameters[0].ParameterType.IsInstanceOfType(argument)
-            )
+            if (parameters.Length == 1 && parameters[0].ParameterType.IsInstanceOfType(argument))
             {
                 targetMethod = method;
                 break;
@@ -378,10 +387,14 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        var runLogDatabasePath = BppRuntimeHost.Paths.RunLogDatabasePath
+        var runLogDatabasePath =
+            BppRuntimeHost.Paths.RunLogDatabasePath
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
-        var combatReplayDirectoryPath = BppRuntimeHost.Paths.CombatReplayDirectoryPath
-            ?? throw new InvalidOperationException("Combat replay directory path is not initialized.");
+        var combatReplayDirectoryPath =
+            BppRuntimeHost.Paths.CombatReplayDirectoryPath
+            ?? throw new InvalidOperationException(
+                "Combat replay directory path is not initialized."
+            );
         _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
         _captureService = new CombatReplayCaptureService();
@@ -418,7 +431,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
         if (BppRuntimeHost.RunContext.IsInGameRun)
         {
-            reason = "Saved replay playback is only available while you are outside an active gameplay session.";
+            reason =
+                "Saved replay playback is only available while you are outside an active gameplay session.";
             return false;
         }
 
@@ -558,10 +572,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         );
         await BootstrapReplayManagersAsync();
         EnsureReplayAppStateHandlersInitialized();
-        await WaitUntilAsync(
-            IsReplayBootstrapReady,
-            timeout: TimeSpan.FromSeconds(20)
-        );
+        await WaitUntilAsync(IsReplayBootstrapReady, timeout: TimeSpan.FromSeconds(20));
 
         await SceneLoader.SetActiveScene(SceneID.GameScene);
         SceneLoader.LoadingComplete();
@@ -723,7 +734,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return;
         }
 
-        var skills = RehydrateSavedReplaySkillCards(capture.Items, spawnMessage, Data.Run?.Opponent);
+        var skills = RehydrateSavedReplaySkillCards(
+            capture.Items,
+            spawnMessage,
+            Data.Run?.Opponent
+        );
         ReplaceSkillCollection(Data.Run?.Opponent, skills);
     }
 
@@ -738,7 +753,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             if (string.IsNullOrWhiteSpace(snapshot.InstanceId))
                 continue;
 
-            var card = Data.GetOrCreateCard(snapshot.InstanceId, snapshot.TemplateId, snapshot.Type);
+            var card = Data.GetOrCreateCard(
+                snapshot.InstanceId,
+                snapshot.TemplateId,
+                snapshot.Type
+            );
             if (spawnMessage.Data.Cards.TryGetValue(snapshot.InstanceId, out var simUpdate))
                 card.Update(simUpdate);
 
@@ -762,7 +781,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             if (string.IsNullOrWhiteSpace(snapshot.InstanceId))
                 continue;
 
-            var card = Data.GetOrCreateCard(snapshot.InstanceId, snapshot.TemplateId, snapshot.Type);
+            var card = Data.GetOrCreateCard(
+                snapshot.InstanceId,
+                snapshot.TemplateId,
+                snapshot.Type
+            );
             if (spawnMessage.Data.Cards.TryGetValue(snapshot.InstanceId, out var simUpdate))
                 card.Update(simUpdate);
 
@@ -799,8 +822,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (snapshot.Tags != null && snapshot.Tags.Count > 0)
         {
             card.Tags = snapshot
-                .Tags
-                .Select(tag =>
+                .Tags.Select(tag =>
                     Enum.TryParse<ECardTag>(tag, ignoreCase: false, out var parsedTag)
                         ? (ECardTag?)parsedTag
                         : null
@@ -833,10 +855,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (combatant == null)
             return;
 
-        var skillsProperty = combatant.GetType().GetProperty(
-            "Skills",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-        );
+        var skillsProperty = combatant
+            .GetType()
+            .GetProperty(
+                "Skills",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
         if (skillsProperty == null)
             return;
 
@@ -965,8 +989,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 return;
             }
 
-            var boardAssets = UnityEngine.Object.FindObjectsOfType<HeroBoardController>(true)
-                .Where(controller => controller != null && controller.gameObject.scene.rootCount > 0)
+            var boardAssets = UnityEngine
+                .Object.FindObjectsOfType<HeroBoardController>(true)
+                .Where(controller =>
+                    controller != null && controller.gameObject.scene.rootCount > 0
+                )
                 .Select(controller => controller.AssociatedDataSO)
                 .Where(asset => asset != null)
                 .Distinct()
@@ -988,10 +1015,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "CombatReplayRuntime",
-                $"Saved replay audio warmup failed: {ex.Message}"
-            );
+            BppLog.Warn("CombatReplayRuntime", $"Saved replay audio warmup failed: {ex.Message}");
         }
     }
 
@@ -1019,7 +1043,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             "CombatReplayRuntime",
             $"Warm replay audio bank: board='{boardAsset.name}', metadata='{boardAsset.boardBank}', asset='{boardAsset.boardAssetBank}'"
         );
-        soundManager.LoadBank(FModBank.EBankType.SFX, boardAsset.boardBank, boardAsset.boardAssetBank);
+        soundManager.LoadBank(
+            FModBank.EBankType.SFX,
+            boardAsset.boardBank,
+            boardAsset.boardAssetBank
+        );
     }
 
     private void OnStateChanged(StateChangedEvent data)
@@ -1139,7 +1167,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         throw new InvalidOperationException("SocketBehavior did not expose a NetMessageProcessor.");
     }
 
-    private static void EnsureReplayAppStateHandlersInitialized(NetMessageProcessor? processor = null)
+    private static void EnsureReplayAppStateHandlersInitialized(
+        NetMessageProcessor? processor = null
+    )
     {
         if (TryGetAppStateField<GameSimHandler>("_gameSimHandler") != null)
             return;
@@ -1226,16 +1256,23 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (boardManager == null)
             return;
 
-        var encounterCard = Data.Entities.Values.FirstOrDefault(card => card.TemplateId == encounterId);
+        var encounterCard = Data.Entities.Values.FirstOrDefault(card =>
+            card.TemplateId == encounterId
+        );
         if (encounterCard == null)
         {
-            encounterCard = DTOUtils.CreateCard(encounterId.Value.ToString(), ECardType.EventEncounter);
+            encounterCard = DTOUtils.CreateCard(
+                encounterId.Value.ToString(),
+                ECardType.EventEncounter
+            );
             encounterCard.LeftSocketId = EContainerSocketId.Socket_5;
             Data.Entities[encounterCard.InstanceId] = encounterCard;
         }
 
         await boardManager.TryLoadCurrentEncounterSO();
-        Events.EncounterPlacedSimEvent.Trigger(new EncounterPlacedEvent(encounterId.Value.ToString()));
+        Events.EncounterPlacedSimEvent.Trigger(
+            new EncounterPlacedEvent(encounterId.Value.ToString())
+        );
     }
 
     private static void MarkGameSimMessageHandled(GameSimHandler gameSimHandler, string messageId)
@@ -1245,10 +1282,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
         var handledMessagesField = gameSimHandler
             .GetType()
-            .BaseType?.GetField(
-                "_handledMessages",
-                BindingFlags.Instance | BindingFlags.NonPublic
-            );
+            .BaseType?.GetField("_handledMessages", BindingFlags.Instance | BindingFlags.NonPublic);
         if (handledMessagesField?.GetValue(gameSimHandler) is not List<string> handledMessages)
             throw new MissingFieldException(
                 gameSimHandler.GetType().BaseType?.FullName,
@@ -1291,7 +1325,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
             foreach (var candidate in types)
             {
-                if (candidate != null && string.Equals(candidate.Name, typeName, StringComparison.Ordinal))
+                if (
+                    candidate != null
+                    && string.Equals(candidate.Name, typeName, StringComparison.Ordinal)
+                )
                     return candidate;
             }
         }

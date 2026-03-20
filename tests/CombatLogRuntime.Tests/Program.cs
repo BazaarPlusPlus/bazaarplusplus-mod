@@ -36,7 +36,10 @@ static CombatLogTimeline BuildTimeline(CombatLogRuntime runtime)
                     ExecutionContextId = "ctx-2",
                     EffectId = "poison",
                     Source = new InstanceId("card-a"),
-                    Targets = new List<IEffectTarget> { new EffectTargetPlayer { Target = ECombatantId.Opponent } },
+                    Targets = new List<IEffectTarget>
+                    {
+                        new EffectTargetPlayer { Target = ECombatantId.Opponent },
+                    },
                 },
                 new CombatSimEventCardEnchanted
                 {
@@ -74,7 +77,10 @@ static CombatLogTimeline BuildTimeline(CombatLogRuntime runtime)
                     new CombatSimCardUpdate
                     {
                         CardInstanceId = new InstanceId("card-a"),
-                        Attributes = new Dictionary<ECardAttributeType, CombatSimCardAttributeUpdate>
+                        Attributes = new Dictionary<
+                            ECardAttributeType,
+                            CombatSimCardAttributeUpdate
+                        >
                         {
                             {
                                 ECardAttributeType.CritChance,
@@ -116,23 +122,36 @@ static CombatLogTimeline BuildTimeline(CombatLogRuntime runtime)
 
 static void VerifyTimeline(CombatLogTimeline timeline)
 {
-    Assert(timeline.Frames.Count == 2, "Runtime should map each sim frame into one combat log frame.");
     Assert(
-        timeline.Frames[1].LogicalTime == TimeSpan.FromMilliseconds(CombatLogTiming.MillisecondsPerFrame),
+        timeline.Frames.Count == 2,
+        "Runtime should map each sim frame into one combat log frame."
+    );
+    Assert(
+        timeline.Frames[1].LogicalTime
+            == TimeSpan.FromMilliseconds(CombatLogTiming.MillisecondsPerFrame),
         "Logical time should use frameIndex * 50ms."
     );
-    Assert(timeline.Rows.Count >= 6, "Formatter should emit deterministic rows for supported events and updates.");
+    Assert(
+        timeline.Rows.Count >= 6,
+        "Formatter should emit deterministic rows for supported events and updates."
+    );
     Assert(
         timeline.Rows[0].Category == CombatLogRowCategory.Event
             && timeline.Rows[0].Text.Contains("burn", StringComparison.Ordinal),
         "EffectExecuted should produce the first display row for the frame."
     );
     Assert(
-        timeline.Rows.Any(row => row.Category == CombatLogRowCategory.Health && row.Text.Contains("-6", StringComparison.Ordinal)),
+        timeline.Rows.Any(row =>
+            row.Category == CombatLogRowCategory.Health
+            && row.Text.Contains("-6", StringComparison.Ordinal)
+        ),
         "Player health adjustments should become display rows."
     );
     Assert(
-        timeline.Rows.Any(row => row.Category == CombatLogRowCategory.Attribute && row.Text.Contains("Poison", StringComparison.Ordinal)),
+        timeline.Rows.Any(row =>
+            row.Category == CombatLogRowCategory.Attribute
+            && row.Text.Contains("Poison", StringComparison.Ordinal)
+        ),
         "Player attribute updates should become display rows."
     );
     Assert(
@@ -140,32 +159,32 @@ static void VerifyTimeline(CombatLogTimeline timeline)
         "Card attribute updates should become display rows."
     );
     Assert(
-        timeline.Rows.Any(
-            row =>
-                row.Category == CombatLogRowCategory.CardAttribute
-                && row.Text.Contains("Fiery Dagger", StringComparison.Ordinal)
-                && !row.Text.Contains("Card card-a", StringComparison.Ordinal)
+        timeline.Rows.Any(row =>
+            row.Category == CombatLogRowCategory.CardAttribute
+            && row.Text.Contains("Fiery Dagger", StringComparison.Ordinal)
+            && !row.Text.Contains("Card card-a", StringComparison.Ordinal)
         ),
         "Card attribute rows should prefer resolved display names over raw instance IDs."
     );
     Assert(
-        timeline.Rows.Any(
-            row =>
-                row.Category == CombatLogRowCategory.CardAttribute
-                && row.SecondaryText != null
-                && row.SecondaryText.Contains("card-a", StringComparison.Ordinal)
+        timeline.Rows.Any(row =>
+            row.Category == CombatLogRowCategory.CardAttribute
+            && row.SecondaryText != null
+            && row.SecondaryText.Contains("card-a", StringComparison.Ordinal)
         ),
         "Card attribute rows should keep the raw instance ID as secondary debug context."
     );
     Assert(
-        timeline.Rows.Any(row => row.Category == CombatLogRowCategory.Death && row.Text.Contains("Opponent died", StringComparison.Ordinal)),
+        timeline.Rows.Any(row =>
+            row.Category == CombatLogRowCategory.Death
+            && row.Text.Contains("Opponent died", StringComparison.Ordinal)
+        ),
         "CombatantDied should become a death row."
     );
     Assert(
-        timeline.Rows.Any(
-            row =>
-                row.Text.Contains("Triggered poison", StringComparison.Ordinal)
-                && row.Text.Contains("Fiery Dagger", StringComparison.Ordinal)
+        timeline.Rows.Any(row =>
+            row.Text.Contains("Triggered poison", StringComparison.Ordinal)
+            && row.Text.Contains("Fiery Dagger", StringComparison.Ordinal)
         ),
         "EffectTriggered should become a display row that uses the resolved source card name."
     );
@@ -174,7 +193,9 @@ static void VerifyTimeline(CombatLogTimeline timeline)
         "Quest updates should become display rows."
     );
     Assert(
-        timeline.Rows.Any(row => row.Text.Contains("Transform Fiery Dagger", StringComparison.Ordinal)),
+        timeline.Rows.Any(row =>
+            row.Text.Contains("Transform Fiery Dagger", StringComparison.Ordinal)
+        ),
         "Transform events should become display rows."
     );
     Assert(
@@ -193,7 +214,9 @@ static void VerifyPanelState(CombatLogTimeline timeline)
     firstPlayState.Refresh(1);
     var firstPlayRows = firstPlayState.BuildVisibleRows(timeline);
     Assert(
-        firstPlayRows.Any(row => row.Row.FrameIndex == 0 && row.VisualState == CombatLogRowVisualState.Current),
+        firstPlayRows.Any(row =>
+            row.Row.FrameIndex == 0 && row.VisualState == CombatLogRowVisualState.Current
+        ),
         "Processed frame count should highlight the last processed frame, not the next frame."
     );
     Assert(
@@ -210,7 +233,9 @@ static void VerifyPanelState(CombatLogTimeline timeline)
     replayState.Refresh(1);
     var replayRows = replayState.BuildVisibleRows(replayTimeline);
     Assert(
-        replayRows.Any(row => row.Row.FrameIndex == 1 && row.VisualState == CombatLogRowVisualState.FutureDimmed),
+        replayRows.Any(row =>
+            row.Row.FrameIndex == 1 && row.VisualState == CombatLogRowVisualState.FutureDimmed
+        ),
         "Replay should keep future rows visible and dimmed."
     );
 }
@@ -226,10 +251,9 @@ static void VerifyPanelFilters(CombatLogTimeline timeline)
     state.ToggleCombatants();
     var withoutCombatantRows = state.BuildVisibleRows(timeline);
     Assert(
-        withoutCombatantRows.All(
-            row =>
-                row.Row.Category != CombatLogRowCategory.Health
-                && row.Row.Category != CombatLogRowCategory.Attribute
+        withoutCombatantRows.All(row =>
+            row.Row.Category != CombatLogRowCategory.Health
+            && row.Row.Category != CombatLogRowCategory.Attribute
         ),
         "Combatant filter should hide health and combatant attribute rows."
     );
@@ -241,14 +265,18 @@ static void VerifyPanelFilters(CombatLogTimeline timeline)
     state.ToggleCards();
     var withoutCombatantOrCardRows = state.BuildVisibleRows(timeline);
     Assert(
-        withoutCombatantOrCardRows.All(row => row.Row.Category != CombatLogRowCategory.CardAttribute),
+        withoutCombatantOrCardRows.All(row =>
+            row.Row.Category != CombatLogRowCategory.CardAttribute
+        ),
         "Card filter should hide card attribute rows independently."
     );
 
     state.ToggleSystem();
     var withoutCombatantCardOrSystemRows = state.BuildVisibleRows(timeline);
     Assert(
-        withoutCombatantCardOrSystemRows.All(row => row.Row.Category != CombatLogRowCategory.System),
+        withoutCombatantCardOrSystemRows.All(row =>
+            row.Row.Category != CombatLogRowCategory.System
+        ),
         "System filter should hide system rows."
     );
 }

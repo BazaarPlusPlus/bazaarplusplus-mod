@@ -21,9 +21,7 @@ internal sealed class EncounterTrackingModule
 
     public void Start()
     {
-        _runLifecycleSubscription = _eventBus.Subscribe<RunLifecycleChanged>(
-            OnRunLifecycleChanged
-        );
+        _runLifecycleSubscription = _eventBus.Subscribe<RunLifecycleChanged>(OnRunLifecycleChanged);
     }
 
     public void Stop()
@@ -48,7 +46,11 @@ internal sealed class EncounterTrackingModule
         }
 
         _eventBus.Publish(
-            new SelectionObserved { StateName = stateName.ToString(), Snapshot = _stateStore.GetSnapshot() }
+            new SelectionObserved
+            {
+                StateName = stateName.ToString(),
+                Snapshot = _stateStore.GetSnapshot(),
+            }
         );
     }
 

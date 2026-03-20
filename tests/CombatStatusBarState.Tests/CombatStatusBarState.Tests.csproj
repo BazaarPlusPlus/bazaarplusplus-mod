@@ -24,10 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile
-      Include="..\..\Game\Settings\LanguageCodeMatcher.cs"
-      Link="LanguageCodeMatcher.cs"
-    />
+    <Compile Include="..\..\Game\Settings\LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
     <Compile
       Include="..\..\Game\CombatLog\CombatLogPlaybackState.cs"
       Link="CombatLogPlaybackState.cs"

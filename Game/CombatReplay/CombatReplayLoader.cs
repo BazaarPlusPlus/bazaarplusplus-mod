@@ -1,8 +1,8 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Game.PvpBattles;
 using BazaarGameShared;
 using BazaarGameShared.Infra.Messages;
+using BazaarPlusPlus.Game.PvpBattles;
 using MessagePack;
 using TheBazaar;
 

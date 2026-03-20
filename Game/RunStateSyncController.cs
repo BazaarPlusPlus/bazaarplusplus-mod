@@ -1,5 +1,5 @@
-using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Core.Runtime;
 using UnityEngine;
 
 namespace BazaarPlusPlus;

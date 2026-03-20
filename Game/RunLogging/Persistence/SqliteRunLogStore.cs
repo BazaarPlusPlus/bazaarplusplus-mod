@@ -596,7 +596,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
         return JsonConvert.SerializeObject(pendingSelection, SerializerSettings);
     }
 
-    private static RunLogPendingSelectionState? DeserializePendingSelection(string? pendingSelectionJson)
+    private static RunLogPendingSelectionState? DeserializePendingSelection(
+        string? pendingSelectionJson
+    )
     {
         if (string.IsNullOrWhiteSpace(pendingSelectionJson))
             return null;

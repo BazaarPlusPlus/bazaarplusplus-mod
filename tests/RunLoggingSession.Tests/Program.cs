@@ -105,7 +105,10 @@ var choiceEvent = Invoke<RunLogEvent?>(
 );
 Assert(choiceEvent != null, "choice_made should be accepted for the pending selection.");
 Assert(choiceEvent!.Seq == 3, "choice_made should advance the sequence.");
-Assert(fakeStore.ResumeState?.PendingSelectionSeq == null, "choice_made should clear pending_selection_seq.");
+Assert(
+    fakeStore.ResumeState?.PendingSelectionSeq == null,
+    "choice_made should clear pending_selection_seq."
+);
 Assert(
     fakeStore.ResumeState?.PendingSelection == null,
     "choice_made should clear the pending selection payload."
@@ -146,7 +149,8 @@ var abandonedSelection = Invoke<RunLogEvent?>(
 );
 Assert(abandonedSelection != null, "selection_abandoned should be recorded.");
 Assert(
-    fakeStore.ResumeState?.PendingSelectionSeq == null && fakeStore.ResumeState?.PendingSelection == null,
+    fakeStore.ResumeState?.PendingSelectionSeq == null
+        && fakeStore.ResumeState?.PendingSelection == null,
     "selection_abandoned should clear the pending selection state."
 );
 
@@ -163,7 +167,10 @@ var staleChoiceEvent = Invoke<RunLogEvent?>(
         },
     ]
 );
-Assert(staleChoiceEvent == null, "A duplicate/stale choice_made should be suppressed once the pending selection is cleared.");
+Assert(
+    staleChoiceEvent == null,
+    "A duplicate/stale choice_made should be suppressed once the pending selection is cleared."
+);
 
 InvokeVoid(
     managerType,

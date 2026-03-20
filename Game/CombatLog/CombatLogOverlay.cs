@@ -1,7 +1,7 @@
 #nullable enable
-using CombatStatusBarState = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using CombatStatusBarState = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 
 namespace BazaarPlusPlus.Game.CombatLog;
 

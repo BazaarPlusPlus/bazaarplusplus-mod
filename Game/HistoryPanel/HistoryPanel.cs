@@ -38,7 +38,9 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _runs.Count == 0 ? null : _runs[Mathf.Clamp(_selectedRunIndex, 0, _runs.Count - 1)];
 
     private HistoryBattleRecord? SelectedBattle =>
-        _battles.Count == 0 ? null : _battles[Mathf.Clamp(_selectedBattleIndex, 0, _battles.Count - 1)];
+        _battles.Count == 0
+            ? null
+            : _battles[Mathf.Clamp(_selectedBattleIndex, 0, _battles.Count - 1)];
 
     private void Awake()
     {
@@ -244,9 +246,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private void ToggleDynamicPreviewFromUi()
     {
         var enabled = HistoryPanelPreviewSettings.ToggleDynamicPreviewEnabled();
-        _statusMessage = enabled
-            ? "Dynamic preview enabled."
-            : "Dynamic preview disabled.";
+        _statusMessage = enabled ? "Dynamic preview enabled." : "Dynamic preview disabled.";
         RefreshUi();
 
         if (!IsVisible)
@@ -270,15 +270,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (!ctrlPressed)
             return false;
 
-        var positionStep = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed
-            ? 1f
-            : 0.25f;
-        var fovStep = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed
-            ? 5f
-            : 1f;
-        var scaleStep = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed
-            ? 0.1f
-            : 0.025f;
+        var positionStep =
+            keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed ? 1f : 0.25f;
+        var fovStep = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed ? 5f : 1f;
+        var scaleStep =
+            keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed ? 0.1f : 0.025f;
         var altPressed = keyboard.leftAltKey.isPressed || keyboard.rightAltKey.isPressed;
 
         var handled = false;
@@ -474,11 +470,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         return string.Equals(battle.Result, "Win", StringComparison.OrdinalIgnoreCase)
             || string.Equals(battle.Result, "Won", StringComparison.OrdinalIgnoreCase)
-            ? "Win"
+                ? "Win"
             : string.Equals(battle.Result, "Loss", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(battle.Result, "Lost", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(battle.Result, "Lost", StringComparison.OrdinalIgnoreCase)
                 ? "Loss"
-                : battle.Result;
+            : battle.Result;
     }
 
     private static string? FormatOpponentHero(string? rawHero)

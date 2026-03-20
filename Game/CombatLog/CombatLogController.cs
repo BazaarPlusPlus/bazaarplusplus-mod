@@ -26,7 +26,9 @@ internal sealed class CombatLogController : MonoBehaviour
         Events.CombatSimReceived.RemoveListener(OnCombatSimReceived);
     }
 
-    private void OnCombatSimReceived(BazaarGameShared.Infra.Messages.CombatSimEvents.CombatSim combatSim)
+    private void OnCombatSimReceived(
+        BazaarGameShared.Infra.Messages.CombatSimEvents.CombatSim combatSim
+    )
     {
         if (combatSim == null)
         {

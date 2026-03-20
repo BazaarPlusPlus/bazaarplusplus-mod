@@ -48,10 +48,15 @@ internal sealed partial class HistoryPanel
         public Image? Background;
     }
 
-
     private readonly struct BattlePalette
     {
-        public BattlePalette(Color normal, Color selected, Color accent, Color badgeBg, Color badgeText)
+        public BattlePalette(
+            Color normal,
+            Color selected,
+            Color accent,
+            Color badgeBg,
+            Color badgeText
+        )
         {
             Normal = normal;
             Selected = selected;
@@ -192,23 +197,26 @@ internal sealed partial class HistoryPanel
             _statusText.text = string.Empty;
         if (_battleSectionSubtitle != null)
         {
-            _battleSectionSubtitle.text = SelectedRun == null
-                ? "Select a run to inspect its recorded battles."
-                : $"{SelectedRun.Hero} | {FormatDayOnly(SelectedRun.FinalDay)}";
+            _battleSectionSubtitle.text =
+                SelectedRun == null
+                    ? "Select a run to inspect its recorded battles."
+                    : $"{SelectedRun.Hero} | {FormatDayOnly(SelectedRun.FinalDay)}";
         }
 
         if (_footerPrimaryText != null)
         {
-            _footerPrimaryText.text = SelectedBattle == null
-                ? "No battle selected"
-                : $"{FormatBattleResult(SelectedBattle)} | {FormatDayOnly(SelectedBattle.Day)} | {SelectedBattle.OpponentName ?? "Unknown Opponent"}";
+            _footerPrimaryText.text =
+                SelectedBattle == null
+                    ? "No battle selected"
+                    : $"{FormatBattleResult(SelectedBattle)} | {FormatDayOnly(SelectedBattle.Day)} | {SelectedBattle.OpponentName ?? "Unknown Opponent"}";
         }
 
         if (_footerSecondaryText != null)
         {
-            _footerSecondaryText.text = SelectedBattle == null
-                ? "Select one battle to inspect it, then use Replay when you want to jump back into it."
-                : $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | {SelectedBattle.SnapshotSummary}";
+            _footerSecondaryText.text =
+                SelectedBattle == null
+                    ? "Select one battle to inspect it, then use Replay when you want to jump back into it."
+                    : $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | {SelectedBattle.SnapshotSummary}";
         }
 
         if (_previewStatusText != null && SelectedBattle == null)
@@ -281,7 +289,13 @@ internal sealed partial class HistoryPanel
         title.color = new Color(0.97f, 0.85f, 0.57f, 1f);
         ConfigureLayoutElement(title.gameObject, preferredHeight: 32f, minHeight: 32f);
 
-        var subtitle = CreateText("Subtitle", headerLayout, 14, FontStyle.Normal, TextAnchor.UpperLeft);
+        var subtitle = CreateText(
+            "Subtitle",
+            headerLayout,
+            14,
+            FontStyle.Normal,
+            TextAnchor.UpperLeft
+        );
         subtitle.text =
             "Review completed runs, inspect each PvP battle by day and hour, and replay the one you need.";
         subtitle.color = new Color(0.82f, 0.86f, 0.91f, 0.94f);
@@ -368,11 +382,21 @@ internal sealed partial class HistoryPanel
             false
         );
         StretchToParent(leftLayout, 0f, 0f, 0f, 0f);
-        BuildSectionHeader(leftLayout, "Runs", "Choose one run to see its recorded battles.", out _);
+        BuildSectionHeader(
+            leftLayout,
+            "Runs",
+            "Choose one run to see its recorded battles.",
+            out _
+        );
         _runListContent = CreateScrollSection(leftLayout, "RunScroll");
 
         var right = CreateSectionPanel(columnsRow, "BattlesPanel");
-        ConfigureLayoutElement(right.gameObject, flexibleWidth: 1f, preferredHeight: 0f, flexibleHeight: 1f);
+        ConfigureLayoutElement(
+            right.gameObject,
+            flexibleWidth: 1f,
+            preferredHeight: 0f,
+            flexibleHeight: 1f
+        );
         var rightLayout = CreateVerticalGroup(
             "BattlesLayout",
             right,
@@ -434,17 +458,33 @@ internal sealed partial class HistoryPanel
         );
         ConfigureLayoutElement(textArea.gameObject, flexibleWidth: 1f);
 
-        _footerPrimaryText = CreateText("Primary", textArea, 15, FontStyle.Bold, TextAnchor.UpperLeft);
+        _footerPrimaryText = CreateText(
+            "Primary",
+            textArea,
+            15,
+            FontStyle.Bold,
+            TextAnchor.UpperLeft
+        );
         _footerPrimaryText.color = Color.white;
         _footerPrimaryText.textWrappingMode = TextWrappingModes.NoWrap;
         _footerPrimaryText.overflowMode = TextOverflowModes.Ellipsis;
         ConfigureLayoutElement(_footerPrimaryText.gameObject, preferredHeight: 22f, minHeight: 22f);
 
-        _footerSecondaryText = CreateText("Secondary", textArea, 12, FontStyle.Normal, TextAnchor.UpperLeft);
+        _footerSecondaryText = CreateText(
+            "Secondary",
+            textArea,
+            12,
+            FontStyle.Normal,
+            TextAnchor.UpperLeft
+        );
         _footerSecondaryText.color = new Color(0.72f, 0.77f, 0.84f, 0.94f);
         _footerSecondaryText.textWrappingMode = TextWrappingModes.NoWrap;
         _footerSecondaryText.overflowMode = TextOverflowModes.Ellipsis;
-        ConfigureLayoutElement(_footerSecondaryText.gameObject, preferredHeight: 22f, minHeight: 22f);
+        ConfigureLayoutElement(
+            _footerSecondaryText.gameObject,
+            preferredHeight: 22f,
+            minHeight: 22f
+        );
 
         var actions = CreateHorizontalGroup(
             "Actions",
@@ -459,10 +499,21 @@ internal sealed partial class HistoryPanel
         );
         ConfigureLayoutElement(actions.gameObject, preferredWidth: 250f, minWidth: 250f);
 
-        (_replayButton, _replayButtonBackground, _replayButtonLabel) =
-            CreateStyledButton("ReplayButton", actions, "Replay", 130f, 36f);
+        (_replayButton, _replayButtonBackground, _replayButtonLabel) = CreateStyledButton(
+            "ReplayButton",
+            actions,
+            "Replay",
+            130f,
+            36f
+        );
         _replayButton.onClick.AddListener(TryReplaySelectedBattle);
-        CreateActionButton("FooterCloseButton", actions, "Close", 110f, () => SetHistoryVisible(false));
+        CreateActionButton(
+            "FooterCloseButton",
+            actions,
+            "Close",
+            110f,
+            () => SetHistoryVisible(false)
+        );
     }
 
     private void RebuildRunList()
@@ -500,17 +551,26 @@ internal sealed partial class HistoryPanel
         }
 
         for (var i = 0; i < _battles.Count; i++)
-            _battleItemViews.Add(CreateBattleItem(_battleListContent, i, _battles[i], i == _selectedBattleIndex));
+            _battleItemViews.Add(
+                CreateBattleItem(_battleListContent, i, _battles[i], i == _selectedBattleIndex)
+            );
     }
 
-    private ListItemView CreateRunItem(Transform parent, int index, HistoryRunRecord run, bool selected)
+    private ListItemView CreateRunItem(
+        Transform parent,
+        int index,
+        HistoryRunRecord run,
+        bool selected
+    )
     {
         var (button, background) = CreateCardButtonShell($"RunItem_{index}", parent, 118f);
         button.onClick.AddListener(() => SelectRun(index));
 
         var (_, body) = BuildCardShell(
             button.transform,
-            selected ? new Color(0.46f, 0.70f, 0.92f, 0.94f) : new Color(0.24f, 0.31f, 0.39f, 0.96f),
+            selected
+                ? new Color(0.46f, 0.70f, 0.92f, 0.94f)
+                : new Color(0.24f, 0.31f, 0.39f, 0.96f),
             4f,
             CreatePadding(12f, 12f, 10f, 10f)
         );
@@ -569,7 +629,12 @@ internal sealed partial class HistoryPanel
         time.color = new Color(0.72f, 0.78f, 0.85f, 0.9f);
         time.textWrappingMode = TextWrappingModes.NoWrap;
         time.overflowMode = TextOverflowModes.Ellipsis;
-        ConfigureLayoutElement(time.gameObject, preferredWidth: 96f, minWidth: 84f, preferredHeight: 16f);
+        ConfigureLayoutElement(
+            time.gameObject,
+            preferredWidth: 96f,
+            minWidth: 84f,
+            preferredHeight: 16f
+        );
 
         var metaParts = new List<string>
         {
@@ -600,29 +665,59 @@ internal sealed partial class HistoryPanel
         return new ListItemView { Index = index, Background = background };
     }
 
-    private ListItemView CreateBattleItem(Transform parent, int index, HistoryBattleRecord battle, bool selected)
+    private ListItemView CreateBattleItem(
+        Transform parent,
+        int index,
+        HistoryBattleRecord battle,
+        bool selected
+    )
     {
         var palette = GetBattlePalette(battle);
         var (button, background) = CreateCardButtonShell($"BattleItem_{index}", parent, 88f);
         button.onClick.AddListener(() => SelectBattle(index));
 
         var (_, body) = BuildCardShell(
-            button.transform, palette.Accent,
-            3f, CreatePadding(12f, 12f, 8f, 8f));
+            button.transform,
+            palette.Accent,
+            3f,
+            CreatePadding(12f, 12f, 8f, 8f)
+        );
 
         // --- top row: pills + trailing timestamp ---
         var topRow = CreateHorizontalGroup(
-            "TopRow", body, 8f, null,
-            TextAnchor.MiddleLeft, true, true, false, false);
+            "TopRow",
+            body,
+            8f,
+            null,
+            TextAnchor.MiddleLeft,
+            true,
+            true,
+            false,
+            false
+        );
         ConfigureLayoutElement(topRow.gameObject, preferredHeight: 22f, minHeight: 22f);
 
         var pillRow = CreateHorizontalGroup(
-            "PillRow", topRow, 6f, null,
-            TextAnchor.MiddleLeft, true, true, false, false);
+            "PillRow",
+            topRow,
+            6f,
+            null,
+            TextAnchor.MiddleLeft,
+            true,
+            true,
+            false,
+            false
+        );
         ConfigureLayoutElement(pillRow.gameObject, flexibleWidth: 1f);
 
-        AddPill(pillRow, "Day", FormatDayOnly(battle.Day),
-            new Color(0.18f, 0.21f, 0.27f, 0.94f), new Color(0.92f, 0.95f, 1f, 1f), 72f);
+        AddPill(
+            pillRow,
+            "Day",
+            FormatDayOnly(battle.Day),
+            new Color(0.18f, 0.21f, 0.27f, 0.94f),
+            new Color(0.92f, 0.95f, 1f, 1f),
+            72f
+        );
         var opponentHero = FormatOpponentHero(battle.OpponentHero);
         if (!string.IsNullOrWhiteSpace(opponentHero))
         {
@@ -642,7 +737,12 @@ internal sealed partial class HistoryPanel
         time.color = new Color(0.72f, 0.78f, 0.85f, 0.9f);
         time.textWrappingMode = TextWrappingModes.NoWrap;
         time.overflowMode = TextOverflowModes.Ellipsis;
-        ConfigureLayoutElement(time.gameObject, preferredWidth: 120f, minWidth: 80f, preferredHeight: 16f);
+        ConfigureLayoutElement(
+            time.gameObject,
+            preferredWidth: 120f,
+            minWidth: 80f,
+            preferredHeight: 16f
+        );
 
         // --- detail lines ---
         BuildBattleNameRow(body, battle);
@@ -653,8 +753,13 @@ internal sealed partial class HistoryPanel
             FontStyle.Normal,
             new Color(0.70f, 0.75f, 0.83f, 0.90f)
         );
-        AddDetailLine(body, battle.SnapshotSummary,
-            12, FontStyle.Normal, new Color(0.74f, 0.80f, 0.87f, 0.95f));
+        AddDetailLine(
+            body,
+            battle.SnapshotSummary,
+            12,
+            FontStyle.Normal,
+            new Color(0.74f, 0.80f, 0.87f, 0.95f)
+        );
 
         ApplyItemState(background, selected, palette.Normal, palette.Selected);
         return new ListItemView { Index = index, Background = background };
@@ -668,33 +773,74 @@ internal sealed partial class HistoryPanel
         Transform buttonTransform,
         Color accentColor,
         float bodySpacing,
-        RectOffset bodyPadding)
+        RectOffset bodyPadding
+    )
     {
         var rootLayout = CreateHorizontalGroup(
-            "RootLayout", buttonTransform, 0f, null,
-            TextAnchor.UpperLeft, true, true, false, false);
+            "RootLayout",
+            buttonTransform,
+            0f,
+            null,
+            TextAnchor.UpperLeft,
+            true,
+            true,
+            false,
+            false
+        );
         StretchToParent(rootLayout, 0f, 0f, 0f, 0f);
 
         var accent = CreateRect("Accent", rootLayout);
-        ConfigureLayoutElement(accent.gameObject, preferredWidth: 6f, minWidth: 6f, flexibleHeight: 1f);
+        ConfigureLayoutElement(
+            accent.gameObject,
+            preferredWidth: 6f,
+            minWidth: 6f,
+            flexibleHeight: 1f
+        );
         AddImage(accent.gameObject, accentColor);
 
         var body = CreateVerticalGroup(
-            "Body", rootLayout, bodySpacing, bodyPadding,
-            TextAnchor.UpperLeft, true, true, true, false);
+            "Body",
+            rootLayout,
+            bodySpacing,
+            bodyPadding,
+            TextAnchor.UpperLeft,
+            true,
+            true,
+            true,
+            false
+        );
         ConfigureLayoutElement(body.gameObject, flexibleWidth: 1f, flexibleHeight: 1f);
 
         return (accent, body);
     }
 
-    private void AddPill(RectTransform parent, string name, string label, Color bg, Color textColor, float minWidth)
+    private void AddPill(
+        RectTransform parent,
+        string name,
+        string label,
+        Color bg,
+        Color textColor,
+        float minWidth
+    )
     {
         var width = Mathf.Max(minWidth, MeasurePillWidth(label));
         var pill = CreatePill(parent, name, label, bg, textColor);
-        ConfigureLayoutElement(pill.gameObject, preferredWidth: width, minWidth: width, preferredHeight: 22f, minHeight: 22f);
+        ConfigureLayoutElement(
+            pill.gameObject,
+            preferredWidth: width,
+            minWidth: width,
+            preferredHeight: 22f,
+            minHeight: 22f
+        );
     }
 
-    private void AddDetailLine(RectTransform parent, string text, int fontSize, FontStyle style, Color color)
+    private void AddDetailLine(
+        RectTransform parent,
+        string text,
+        int fontSize,
+        FontStyle style,
+        Color color
+    )
     {
         var line = CreateText("Detail", parent, fontSize, style, TextAnchor.UpperLeft);
         line.text = text;
@@ -705,7 +851,12 @@ internal sealed partial class HistoryPanel
         ConfigureLayoutElement(line.gameObject, preferredHeight: height, minHeight: height);
     }
 
-    private static void ApplyItemState(Image background, bool selected, Color normal, Color selectedColor)
+    private static void ApplyItemState(
+        Image background,
+        bool selected,
+        Color normal,
+        Color selectedColor
+    )
     {
         background.color = selected ? selectedColor : normal;
     }
@@ -741,14 +892,25 @@ internal sealed partial class HistoryPanel
         return panel;
     }
 
-    private void BuildSectionHeader(Transform parent, string titleText, string subtitleText, out TextMeshProUGUI subtitle)
+    private void BuildSectionHeader(
+        Transform parent,
+        string titleText,
+        string subtitleText,
+        out TextMeshProUGUI subtitle
+    )
     {
         var title = CreateText("SectionTitle", parent, 20, FontStyle.Bold, TextAnchor.UpperLeft);
         title.text = titleText.ToUpperInvariant();
         title.color = new Color(0.76f, 0.91f, 1f, 1f);
         ConfigureLayoutElement(title.gameObject, preferredHeight: 24f, minHeight: 24f);
 
-        subtitle = CreateText("SectionSubtitle", parent, 12, FontStyle.Normal, TextAnchor.UpperLeft);
+        subtitle = CreateText(
+            "SectionSubtitle",
+            parent,
+            12,
+            FontStyle.Normal,
+            TextAnchor.UpperLeft
+        );
         subtitle.text = subtitleText;
         subtitle.color = new Color(0.72f, 0.77f, 0.84f, 0.92f);
         subtitle.textWrappingMode = TextWrappingModes.Normal;
@@ -791,14 +953,20 @@ internal sealed partial class HistoryPanel
         scroll.scrollSensitivity = 20f;
         scroll.movementType = ScrollRect.MovementType.Clamped;
         scroll.verticalScrollbar = CreateScrollbar(root);
-        scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+        scroll.verticalScrollbarVisibility = ScrollRect
+            .ScrollbarVisibility
+            .AutoHideAndExpandViewport;
         return content;
     }
 
     private void BuildPreviewSection(Transform parent)
     {
         var preview = CreateRect("PreviewPanel", parent);
-        ConfigureLayoutElement(preview.gameObject, preferredHeight: PreviewSectionHeight, minHeight: PreviewSectionHeight);
+        ConfigureLayoutElement(
+            preview.gameObject,
+            preferredHeight: PreviewSectionHeight,
+            minHeight: PreviewSectionHeight
+        );
         AddImage(preview.gameObject, new Color(0.07f, 0.09f, 0.12f, 0.99f));
 
         var surfaceFrame = CreateRect("PreviewSurfaceFrame", preview);
@@ -811,14 +979,26 @@ internal sealed partial class HistoryPanel
         _previewSurface.color = new Color(1f, 1f, 1f, 0.10f);
         _previewSurface.raycastTarget = false;
 
-        _previewStatusText = CreateText("PreviewStatus", surfaceFrame, 13, FontStyle.Normal, TextAnchor.MiddleCenter);
+        _previewStatusText = CreateText(
+            "PreviewStatus",
+            surfaceFrame,
+            13,
+            FontStyle.Normal,
+            TextAnchor.MiddleCenter
+        );
         _previewStatusText.text = "Select a battle to preview its recorded cards.";
         _previewStatusText.color = new Color(0.82f, 0.87f, 0.93f, 0.96f);
         _previewStatusText.textWrappingMode = TextWrappingModes.Normal;
         _previewStatusText.overflowMode = TextOverflowModes.Ellipsis;
         StretchToParent(_previewStatusText.rectTransform, 28f, 28f, 18f, 18f);
 
-        _previewDebugText = CreateText("PreviewDebug", surfaceFrame, 11, FontStyle.Bold, TextAnchor.UpperRight);
+        _previewDebugText = CreateText(
+            "PreviewDebug",
+            surfaceFrame,
+            11,
+            FontStyle.Bold,
+            TextAnchor.UpperRight
+        );
         _previewDebugText.color = new Color(0.97f, 0.85f, 0.57f, 0.96f);
         _previewDebugText.gameObject.SetActive(false);
         _previewDebugText.textWrappingMode = TextWrappingModes.NoWrap;
@@ -864,7 +1044,13 @@ internal sealed partial class HistoryPanel
     private TextMeshProUGUI CreateChip(Transform parent, float width)
     {
         var chip = CreateRect("Chip", parent);
-        ConfigureLayoutElement(chip.gameObject, preferredWidth: width, minWidth: width, preferredHeight: 32f, minHeight: 32f);
+        ConfigureLayoutElement(
+            chip.gameObject,
+            preferredWidth: width,
+            minWidth: width,
+            preferredHeight: 32f,
+            minHeight: 32f
+        );
         AddImage(chip.gameObject, new Color(0.14f, 0.18f, 0.23f, 0.96f));
         var text = CreateText("Label", chip, 12, FontStyle.Bold, TextAnchor.MiddleCenter);
         text.color = new Color(0.95f, 0.96f, 0.98f, 1f);
@@ -872,7 +1058,13 @@ internal sealed partial class HistoryPanel
         return text;
     }
 
-    private RectTransform CreatePill(Transform parent, string name, string labelText, Color backgroundColor, Color textColor)
+    private RectTransform CreatePill(
+        Transform parent,
+        string name,
+        string labelText,
+        Color backgroundColor,
+        Color textColor
+    )
     {
         var pill = CreateRect(name, parent);
         AddImage(pill.gameObject, backgroundColor);
@@ -883,7 +1075,13 @@ internal sealed partial class HistoryPanel
         return pill;
     }
 
-    private void CreateActionButton(string name, Transform parent, string label, float width, UnityEngine.Events.UnityAction onClick)
+    private void CreateActionButton(
+        string name,
+        Transform parent,
+        string label,
+        float width,
+        UnityEngine.Events.UnityAction onClick
+    )
     {
         var (button, background, text) = CreateStyledButton(name, parent, label, width, 38f);
         button.onClick.AddListener(onClick);
@@ -910,11 +1108,22 @@ internal sealed partial class HistoryPanel
         var rect = CreateRect(name, parent);
         if (width > 0f)
         {
-            ConfigureLayoutElement(rect.gameObject, preferredWidth: width, minWidth: width, preferredHeight: preferredHeight, minHeight: preferredHeight);
+            ConfigureLayoutElement(
+                rect.gameObject,
+                preferredWidth: width,
+                minWidth: width,
+                preferredHeight: preferredHeight,
+                minHeight: preferredHeight
+            );
         }
         else
         {
-            ConfigureLayoutElement(rect.gameObject, flexibleWidth: 1f, preferredHeight: preferredHeight, minHeight: preferredHeight);
+            ConfigureLayoutElement(
+                rect.gameObject,
+                flexibleWidth: 1f,
+                preferredHeight: preferredHeight,
+                minHeight: preferredHeight
+            );
         }
 
         var background = AddImage(rect.gameObject, Color.white);
@@ -931,10 +1140,19 @@ internal sealed partial class HistoryPanel
         return (button, background, label);
     }
 
-    private (Button button, Image background) CreateCardButtonShell(string name, Transform parent, float preferredHeight)
+    private (Button button, Image background) CreateCardButtonShell(
+        string name,
+        Transform parent,
+        float preferredHeight
+    )
     {
         var rect = CreateRect(name, parent);
-        ConfigureLayoutElement(rect.gameObject, flexibleWidth: 1f, preferredHeight: preferredHeight, minHeight: preferredHeight);
+        ConfigureLayoutElement(
+            rect.gameObject,
+            flexibleWidth: 1f,
+            preferredHeight: preferredHeight,
+            minHeight: preferredHeight
+        );
         var background = AddImage(rect.gameObject, Color.white);
         background.raycastTarget = true;
         var button = rect.gameObject.AddComponent<Button>();
@@ -961,7 +1179,9 @@ internal sealed partial class HistoryPanel
         button.interactable = interactable;
         button.colors = BuildColorBlock(normalColor, pressedColor, disabledColor);
         background.color = interactable ? normalColor : disabledColor;
-        label.color = interactable ? textColor : new Color(textColor.r, textColor.g, textColor.b, 0.55f);
+        label.color = interactable
+            ? textColor
+            : new Color(textColor.r, textColor.g, textColor.b, 0.55f);
     }
 
     private static RectTransform CreateRect(string name, Transform parent)
@@ -1046,7 +1266,8 @@ internal sealed partial class HistoryPanel
         float flexibleHeight = -1f
     )
     {
-        var element = gameObject.GetComponent<LayoutElement>() ?? gameObject.AddComponent<LayoutElement>();
+        var element =
+            gameObject.GetComponent<LayoutElement>() ?? gameObject.AddComponent<LayoutElement>();
         if (preferredWidth >= 0f)
             element.preferredWidth = preferredWidth;
         if (minWidth >= 0f)
@@ -1061,7 +1282,13 @@ internal sealed partial class HistoryPanel
             element.flexibleHeight = flexibleHeight;
     }
 
-    private static void StretchToParent(RectTransform rect, float left, float right, float top, float bottom)
+    private static void StretchToParent(
+        RectTransform rect,
+        float left,
+        float right,
+        float top,
+        float bottom
+    )
     {
         rect.anchorMin = Vector2.zero;
         rect.anchorMax = Vector2.one;
@@ -1080,7 +1307,13 @@ internal sealed partial class HistoryPanel
         return image;
     }
 
-    private static TextMeshProUGUI CreateText(string name, Transform parent, int fontSize, FontStyle fontStyle, TextAnchor alignment)
+    private static TextMeshProUGUI CreateText(
+        string name,
+        Transform parent,
+        int fontSize,
+        FontStyle fontStyle,
+        TextAnchor alignment
+    )
     {
         var rect = CreateRect(name, parent);
         var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
@@ -1123,7 +1356,9 @@ internal sealed partial class HistoryPanel
             }
         }
 
-        _uiFont ??= TMP_FontAsset.CreateFontAsset(Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
+        _uiFont ??= TMP_FontAsset.CreateFontAsset(
+            Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+        );
         return _uiFont;
     }
 
@@ -1174,27 +1409,29 @@ internal sealed partial class HistoryPanel
         return (dx * dx) + (dy * dy) <= radius * radius;
     }
 
-    private static FontStyles MapFontStyle(FontStyle fontStyle) => fontStyle switch
-    {
-        FontStyle.Bold => FontStyles.Bold,
-        FontStyle.Italic => FontStyles.Italic,
-        FontStyle.BoldAndItalic => FontStyles.Bold | FontStyles.Italic,
-        _ => FontStyles.Normal,
-    };
+    private static FontStyles MapFontStyle(FontStyle fontStyle) =>
+        fontStyle switch
+        {
+            FontStyle.Bold => FontStyles.Bold,
+            FontStyle.Italic => FontStyles.Italic,
+            FontStyle.BoldAndItalic => FontStyles.Bold | FontStyles.Italic,
+            _ => FontStyles.Normal,
+        };
 
-    private static TextAlignmentOptions MapAlignment(TextAnchor alignment) => alignment switch
-    {
-        TextAnchor.UpperLeft => TextAlignmentOptions.TopLeft,
-        TextAnchor.UpperCenter => TextAlignmentOptions.Top,
-        TextAnchor.UpperRight => TextAlignmentOptions.TopRight,
-        TextAnchor.MiddleLeft => TextAlignmentOptions.MidlineLeft,
-        TextAnchor.MiddleCenter => TextAlignmentOptions.Midline,
-        TextAnchor.MiddleRight => TextAlignmentOptions.MidlineRight,
-        TextAnchor.LowerLeft => TextAlignmentOptions.BottomLeft,
-        TextAnchor.LowerCenter => TextAlignmentOptions.Bottom,
-        TextAnchor.LowerRight => TextAlignmentOptions.BottomRight,
-        _ => TextAlignmentOptions.TopLeft,
-    };
+    private static TextAlignmentOptions MapAlignment(TextAnchor alignment) =>
+        alignment switch
+        {
+            TextAnchor.UpperLeft => TextAlignmentOptions.TopLeft,
+            TextAnchor.UpperCenter => TextAlignmentOptions.Top,
+            TextAnchor.UpperRight => TextAlignmentOptions.TopRight,
+            TextAnchor.MiddleLeft => TextAlignmentOptions.MidlineLeft,
+            TextAnchor.MiddleCenter => TextAlignmentOptions.Midline,
+            TextAnchor.MiddleRight => TextAlignmentOptions.MidlineRight,
+            TextAnchor.LowerLeft => TextAlignmentOptions.BottomLeft,
+            TextAnchor.LowerCenter => TextAlignmentOptions.Bottom,
+            TextAnchor.LowerRight => TextAlignmentOptions.BottomRight,
+            _ => TextAlignmentOptions.TopLeft,
+        };
 
     private static float MeasurePillWidth(string text)
     {
@@ -1210,11 +1447,9 @@ internal sealed partial class HistoryPanel
 
     private static string ShortenBattleId(string battleId)
     {
-        return string.IsNullOrWhiteSpace(battleId)
-            ? "-"
-            : battleId.Length <= 12
-                ? battleId
-                : battleId[..12];
+        return string.IsNullOrWhiteSpace(battleId) ? "-"
+            : battleId.Length <= 12 ? battleId
+            : battleId[..12];
     }
 
     private static BattlePalette GetBattlePalette(HistoryBattleRecord battle)
@@ -1307,7 +1542,14 @@ internal sealed partial class HistoryPanel
             else
             {
                 var palette = GetRankBadgePalette(rank);
-                AddPill(row, "Rank", rank.ToUpperInvariant(), palette.Background, palette.Text, 68f);
+                AddPill(
+                    row,
+                    "Rank",
+                    rank.ToUpperInvariant(),
+                    palette.Background,
+                    palette.Text,
+                    68f
+                );
             }
         }
 
@@ -1316,7 +1558,12 @@ internal sealed partial class HistoryPanel
         nameText.color = Color.white;
         nameText.textWrappingMode = TextWrappingModes.NoWrap;
         nameText.overflowMode = TextOverflowModes.Ellipsis;
-        ConfigureLayoutElement(nameText.gameObject, flexibleWidth: 1f, preferredHeight: 20f, minHeight: 20f);
+        ConfigureLayoutElement(
+            nameText.gameObject,
+            flexibleWidth: 1f,
+            preferredHeight: 20f,
+            minHeight: 20f
+        );
     }
 
     private static string? FormatOpponentRank(string? rawRank)
@@ -1361,10 +1608,20 @@ internal sealed partial class HistoryPanel
         CreateRunStatChip(row, "GLD", run.Gold, new Color(1f, 0.86f, 0.10f, 1f));
     }
 
-    private static void CreateRunStatChip(Transform parent, string labelText, int? value, Color valueColor)
+    private static void CreateRunStatChip(
+        Transform parent,
+        string labelText,
+        int? value,
+        Color valueColor
+    )
     {
         var chip = CreateRect(labelText, parent);
-        ConfigureLayoutElement(chip.gameObject, flexibleWidth: 1f, preferredHeight: 32f, minHeight: 32f);
+        ConfigureLayoutElement(
+            chip.gameObject,
+            flexibleWidth: 1f,
+            preferredHeight: 32f,
+            minHeight: 32f
+        );
         AddImage(chip.gameObject, BuildRunStatChipBackground(valueColor));
 
         var accent = CreateRect("Accent", chip);
@@ -1422,7 +1679,14 @@ internal sealed partial class HistoryPanel
             "Jules" => BuildHeroBadgeStyle("JUL", 180, 52, 236),
             "Karnok" => BuildHeroBadgeStyle("KAR", 59, 136, 156),
             "Stelle" => BuildHeroBadgeStyle("STE", 255, 235, 24),
-            _ => BuildHeroBadgeStyle(heroName.Length <= 3 ? heroName.ToUpperInvariant() : heroName[..3].ToUpperInvariant(), 57, 73, 97),
+            _ => BuildHeroBadgeStyle(
+                heroName.Length <= 3
+                    ? heroName.ToUpperInvariant()
+                    : heroName[..3].ToUpperInvariant(),
+                57,
+                73,
+                97
+            ),
         };
     }
 
@@ -1430,9 +1694,7 @@ internal sealed partial class HistoryPanel
     {
         var background = ColorFromRgb(r, g, b);
         var luminance = (0.299f * background.r) + (0.587f * background.g) + (0.114f * background.b);
-        var text = luminance > 0.62f
-            ? new Color(0.10f, 0.12f, 0.15f, 1f)
-            : Color.white;
+        var text = luminance > 0.62f ? new Color(0.10f, 0.12f, 0.15f, 1f) : Color.white;
         return new HeroBadgeStyle(shortCode, background, text);
     }
 

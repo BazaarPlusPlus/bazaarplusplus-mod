@@ -1,6 +1,4 @@
 #nullable enable
 namespace BazaarPlusPlus.Core.Events;
 
-internal sealed class RunLoggingSyncRequested
-{
-}
+internal sealed class RunLoggingSyncRequested { }

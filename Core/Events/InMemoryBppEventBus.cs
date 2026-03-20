@@ -38,7 +38,10 @@ internal sealed class InMemoryBppEventBus : IBppEventBus
         List<Delegate>? snapshot;
         lock (_syncRoot)
         {
-            if (!_handlers.TryGetValue(typeof(TEvent), out var registrations) || registrations.Count == 0)
+            if (
+                !_handlers.TryGetValue(typeof(TEvent), out var registrations)
+                || registrations.Count == 0
+            )
                 return;
 
             snapshot = new List<Delegate>(registrations);

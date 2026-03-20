@@ -28,13 +28,7 @@ try
     var store = new SqliteRunLogStore(dbPath);
     WriteCompletedRun(store, runId1, startedAt, "Vanessa", 42);
     WriteCompletedRun(store, runId2, startedAt.AddHours(1), "Dooly", 43);
-    WritePvpBattle(
-        dbPath,
-        runId1,
-        startedAt.AddMinutes(7),
-        "battle-001",
-        "Test Rival"
-    );
+    WritePvpBattle(dbPath, runId1, startedAt.AddMinutes(7), "battle-001", "Test Rival");
 
     RunPython(scriptPath, ["--db", dbPath, "--run-id", runId1, "--out", singleOutDir]);
     RunPython(scriptPath, ["--db", dbPath, "--all", "--out", allOutDir]);
@@ -80,7 +74,11 @@ try
         ReadJsonString(Path.Combine(singleRunDir, "checkpoint.json"), "run_id") == runId1,
         "checkpoint.json should match the requested run."
     );
-    using (var checkpointDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(singleRunDir, "checkpoint.json"))))
+    using (
+        var checkpointDocument = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(singleRunDir, "checkpoint.json"))
+        )
+    )
     {
         var pendingSelection = checkpointDocument.RootElement.GetProperty("pending_selection");
         Assert(
@@ -137,8 +135,10 @@ try
             "pvp_battles.ndjson should expand player_hand.items JSON content."
         );
         Assert(
-            root.GetProperty("player_hand").GetProperty("items")[0].GetProperty("enchant").GetString()
-                == "Radiant",
+            root.GetProperty("player_hand")
+                .GetProperty("items")[0]
+                .GetProperty("enchant")
+                .GetString() == "Radiant",
             "pvp_battles.ndjson should preserve hand-card enchantments."
         );
         Assert(
@@ -207,8 +207,7 @@ static void WritePvpBattle(
     connection.Open();
 
     using var command = connection.CreateCommand();
-    command.CommandText =
-        """
+    command.CommandText = """
         INSERT INTO pvp_battles (
             battle_id,
             run_id,

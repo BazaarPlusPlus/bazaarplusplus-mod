@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.Input;
 using HarmonyLib;
-using TMPro;
 using TheBazaar.UI;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
@@ -62,7 +62,9 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
 
         UpdateTexts();
         if (_isRebinding)
-            ShowWarning(BppKeybindLabelResolver.ResolveRebindPrompt(PlayerPreferences.Data.LanguageCode));
+            ShowWarning(
+                BppKeybindLabelResolver.ResolveRebindPrompt(PlayerPreferences.Data.LanguageCode)
+            );
     }
 
     private void Update()
@@ -86,9 +88,7 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
                 continue;
 
             var bindingPath = $"<Keyboard>/{keyControl.name}";
-            if (
-                BppHotkeyService.TrySetBindingPath(_actionId, bindingPath, out var errorMessage)
-            )
+            if (BppHotkeyService.TrySetBindingPath(_actionId, bindingPath, out var errorMessage))
             {
                 EnterDefaultState();
             }
@@ -106,7 +106,9 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
         _isRebinding = true;
         SetObjectsActive(_displayObjects, false);
         SetObjectsActive(_editObjects, true);
-        ShowWarning(BppKeybindLabelResolver.ResolveRebindPrompt(PlayerPreferences.Data.LanguageCode));
+        ShowWarning(
+            BppKeybindLabelResolver.ResolveRebindPrompt(PlayerPreferences.Data.LanguageCode)
+        );
     }
 
     private void EnterDefaultState()
@@ -154,7 +156,10 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
         _keybindText = GetFieldValue<TextMeshProUGUI>(templateController, "_keybindText");
         _warningText = GetFieldValue<TextMeshProUGUI>(templateController, "_warningText");
 
-        var displayObjects = GetFieldValue<List<GameObject>>(templateController, "_displayKeybindObjects");
+        var displayObjects = GetFieldValue<List<GameObject>>(
+            templateController,
+            "_displayKeybindObjects"
+        );
         if (displayObjects != null)
             _displayObjects.AddRange(displayObjects.Where(candidate => candidate != null));
 
@@ -166,9 +171,13 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
     private void FindFallbackReferences()
     {
         _keybindButton ??= GetComponentInChildren<Button>(includeInactive: true);
-        _resetButton ??= GetComponentsInChildren<Button>(includeInactive: true).Skip(1).FirstOrDefault();
+        _resetButton ??= GetComponentsInChildren<Button>(includeInactive: true)
+            .Skip(1)
+            .FirstOrDefault();
         _keybindText ??= GetComponentsInChildren<TextMeshProUGUI>(includeInactive: true)
-            .FirstOrDefault(text => text != null && text.transform.IsChildOf(_keybindButton?.transform));
+            .FirstOrDefault(text =>
+                text != null && text.transform.IsChildOf(_keybindButton?.transform)
+            );
         _warningText ??= GetComponentsInChildren<TextMeshProUGUI>(includeInactive: true)
             .FirstOrDefault(text =>
                 text != null
@@ -185,13 +194,14 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
 
     private TextMeshProUGUI? FindActionLabelText()
     {
-        return GetComponentsInChildren<TextMeshProUGUI>(includeInactive: true).FirstOrDefault(text =>
-            text != null
-            && text != _keybindText
-            && text != _warningText
-            && (_keybindButton == null || !text.transform.IsChildOf(_keybindButton.transform))
-            && (_resetButton == null || !text.transform.IsChildOf(_resetButton.transform))
-        );
+        return GetComponentsInChildren<TextMeshProUGUI>(includeInactive: true)
+            .FirstOrDefault(text =>
+                text != null
+                && text != _keybindText
+                && text != _warningText
+                && (_keybindButton == null || !text.transform.IsChildOf(_keybindButton.transform))
+                && (_resetButton == null || !text.transform.IsChildOf(_resetButton.transform))
+            );
     }
 
     private static T? GetFieldValue<T>(object instance, string fieldName)

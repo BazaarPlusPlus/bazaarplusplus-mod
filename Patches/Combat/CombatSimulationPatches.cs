@@ -1,8 +1,8 @@
 #pragma warning disable CS0436
 using System.Threading;
+using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarGameShared.Infra.Messages;
 using HarmonyLib;
 using TheBazaar;
 

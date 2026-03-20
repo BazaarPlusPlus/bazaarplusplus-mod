@@ -79,7 +79,10 @@ internal sealed class HistoryCollectionsEntryBridge : MonoBehaviour
         foreach (var component in candidate.GetComponents<MonoBehaviour>())
         {
             var typeName = component?.GetType().Name ?? string.Empty;
-            if (typeName.IndexOf("CollectionsNavigationButton", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (
+                typeName.IndexOf("CollectionsNavigationButton", StringComparison.OrdinalIgnoreCase)
+                >= 0
+            )
                 score += 120;
             else if (typeName.IndexOf("Collection", StringComparison.OrdinalIgnoreCase) >= 0)
                 score += 30;

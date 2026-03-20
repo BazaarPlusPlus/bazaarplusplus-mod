@@ -65,7 +65,10 @@ internal static class CombatLogFormatter
 
         foreach (var health in side.HealthAdjustments)
         {
-            var suffix = health.IsCrit ? " crit" : health.IsReduced ? " reduced" : string.Empty;
+            var suffix =
+                health.IsCrit ? " crit"
+                : health.IsReduced ? " reduced"
+                : string.Empty;
             rows.Add(
                 new CombatLogRow(
                     frame.FrameIndex,

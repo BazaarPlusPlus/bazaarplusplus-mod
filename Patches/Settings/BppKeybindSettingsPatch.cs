@@ -110,7 +110,9 @@ internal static class BppKeybindSettingsAwakePatch
             return null;
 
         return keybindRows
-            .Where(candidate => candidate != null && candidate.GetComponent<KeyBindController>() != null)
+            .Where(candidate =>
+                candidate != null && candidate.GetComponent<KeyBindController>() != null
+            )
             .LastOrDefault();
     }
 

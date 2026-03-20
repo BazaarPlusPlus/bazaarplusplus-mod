@@ -75,7 +75,10 @@ Assert(
 );
 
 var keybindSettingsPatchSourcePath = Path.GetFullPath(
-    Path.Combine(AppContext.BaseDirectory, "../../../../../Patches/Settings/BppKeybindSettingsPatch.cs")
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Patches/Settings/BppKeybindSettingsPatch.cs"
+    )
 );
 Assert(
     File.Exists(keybindSettingsPatchSourcePath),
@@ -129,7 +132,10 @@ Assert(
 );
 
 var upgradePatchSourcePath = Path.GetFullPath(
-    Path.Combine(AppContext.BaseDirectory, "../../../../../Patches/Tooltips/UpgradePreviewTooltipPatch.cs")
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Patches/Tooltips/UpgradePreviewTooltipPatch.cs"
+    )
 );
 var upgradePatchSource = File.ReadAllText(upgradePatchSourcePath);
 Assert(
@@ -138,7 +144,10 @@ Assert(
 );
 
 var enchantPatchSourcePath = Path.GetFullPath(
-    Path.Combine(AppContext.BaseDirectory, "../../../../../Patches/Tooltips/ItemEnchantPreviewPatch.cs")
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Patches/Tooltips/ItemEnchantPreviewPatch.cs"
+    )
 );
 var enchantPatchSource = File.ReadAllText(enchantPatchSourcePath);
 Assert(

@@ -63,8 +63,14 @@ var eventBus = Activator.CreateInstance(eventBusType);
 initializeMethod!.Invoke(null, [eventBus]);
 var module = moduleField!.GetValue(null);
 Assert(module != null, "Encounter tracking module should be available.");
-var updateSelectionMethod = moduleType.GetMethod("UpdateSelection", BindingFlags.Instance | BindingFlags.Public);
-Assert(updateSelectionMethod != null, "Encounter tracking module should support selection updates.");
+var updateSelectionMethod = moduleType.GetMethod(
+    "UpdateSelection",
+    BindingFlags.Instance | BindingFlags.Public
+);
+Assert(
+    updateSelectionMethod != null,
+    "Encounter tracking module should support selection updates."
+);
 updateSelectionMethod!.Invoke(
     module,
     [
