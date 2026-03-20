@@ -2,48 +2,64 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal sealed class CombatReplayController
 {
-    private readonly CombatReplayStore _store;
+    private readonly IPvpBattleCatalog _battleCatalog;
+    private readonly CombatReplayPayloadStore _payloadStore;
     private readonly CombatReplayLoader _loader;
 
-    public CombatReplayController(CombatReplayStore store, CombatReplayLoader loader)
+    public CombatReplayController(
+        IPvpBattleCatalog battleCatalog,
+        CombatReplayPayloadStore payloadStore,
+        CombatReplayLoader loader
+    )
     {
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _battleCatalog = battleCatalog ?? throw new ArgumentNullException(nameof(battleCatalog));
+        _payloadStore = payloadStore ?? throw new ArgumentNullException(nameof(payloadStore));
         _loader = loader ?? throw new ArgumentNullException(nameof(loader));
     }
 
-    public string? ActiveReplayId { get; private set; }
+    public string? ActiveBattleId { get; private set; }
 
-    public IReadOnlyList<CombatReplayRecord> ListSavedReplays()
+    public IReadOnlyList<PvpBattleManifest> ListRecentBattles()
     {
-        return _store.List();
+        return _battleCatalog.ListRecentBattles(50);
     }
 
-    public CombatReplayRecord? GetLatestReplay()
+    public PvpBattleManifest? GetLatestBattle()
     {
-        return _store.List().FirstOrDefault();
+        return _battleCatalog.ListRecentBattles(1).FirstOrDefault();
     }
 
-    public CombatReplayRecord? LoadReplayRecord(string replayId)
+    public PvpBattleManifest? LoadBattle(string battleId)
     {
-        var record = _store.Load(replayId);
-        if (record == null)
+        var manifest = _battleCatalog.TryLoad(battleId);
+        if (manifest == null)
             return null;
 
-        ActiveReplayId = record.ReplayId;
-        return record;
+        ActiveBattleId = manifest.BattleId;
+        return manifest;
     }
 
-    public CombatSequenceMessages LoadReplay(CombatReplayRecord record)
+    public PvpReplayPayload? LoadPayload(PvpBattleManifest manifest)
     {
-        if (record == null)
-            throw new ArgumentNullException(nameof(record));
+        if (manifest == null)
+            throw new ArgumentNullException(nameof(manifest));
 
-        return _loader.Load(record);
+        return _payloadStore.Load(manifest.BattleId);
+    }
+
+    public CombatSequenceMessages LoadReplay(PvpReplayPayload payload)
+    {
+        if (payload == null)
+            throw new ArgumentNullException(nameof(payload));
+
+        return _loader.Load(payload);
     }
 }

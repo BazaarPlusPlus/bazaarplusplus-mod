@@ -151,7 +151,6 @@ def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.
         """
         SELECT
             battle_id,
-            replay_id,
             run_id,
             recorded_at_utc,
             day,
@@ -180,7 +179,6 @@ def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.
         for battle_row in pvp_battle_rows:
             battle: dict[str, object] = {
                 "battle_id": battle_row["battle_id"],
-                "replay_id": battle_row["replay_id"],
                 "recorded_at_utc": battle_row["recorded_at_utc"],
                 "player_name": battle_row["player_name"],
                 "player_account_id": battle_row["player_account_id"],

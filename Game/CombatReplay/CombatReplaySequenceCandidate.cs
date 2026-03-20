@@ -14,9 +14,13 @@ internal sealed class CombatReplaySequenceCandidate
 
     public bool PlayerHandCardsCapturedFromOpening { get; set; }
 
+    public bool PlayerHandCardsCapturedLive { get; set; }
+
     public List<CombatReplayCardSnapshot> PlayerHandCards { get; set; } = new();
 
     public bool PlayerSkillsCapturedFromOpening { get; set; }
+
+    public bool PlayerSkillsCapturedLive { get; set; }
 
     public List<CombatReplayCardSnapshot> PlayerSkills { get; set; } = new();
 

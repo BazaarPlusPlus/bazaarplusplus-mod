@@ -36,7 +36,7 @@ public sealed class RunLogEvent
 
     public string? CombatKind { get; set; }
 
-    public string? ReplayId { get; set; }
+    public string? BattleId { get; set; }
 
     public string? OpponentName { get; set; }
 

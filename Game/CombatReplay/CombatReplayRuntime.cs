@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
@@ -18,8 +20,8 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal sealed class CombatReplayRuntime : MonoBehaviour
 {
-    private CombatReplayStore? _store;
-    private PvpBattleSqliteStore? _pvpBattleStore;
+    private PvpBattleCatalog? _battleCatalog;
+    private CombatReplayPayloadStore? _payloadStore;
     private CombatReplayCaptureService? _captureService;
     private CombatReplayLoader? _loader;
     private CombatReplayController? _controller;
@@ -30,18 +32,18 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public static CombatReplayRuntime? Instance { get; private set; }
 
-    public string? ActiveReplayId => _controller?.ActiveReplayId;
+    public string? ActiveBattleId => _controller?.ActiveBattleId;
 
     public bool IsReplayPlaybackActive => _savedReplayPlaybackActive || AppState.CurrentState is ReplayState;
 
     private void Awake()
     {
         Instance = this;
-        _store = new CombatReplayStore(ModState.CombatReplayDirectoryPath);
-        _pvpBattleStore = new PvpBattleSqliteStore(ModState.RunLogDatabasePath);
+        _battleCatalog = new PvpBattleCatalog(ModState.RunLogDatabasePath);
+        _payloadStore = new CombatReplayPayloadStore(ModState.CombatReplayDirectoryPath);
         _captureService = new CombatReplayCaptureService();
         _loader = new CombatReplayLoader();
-        _controller = new CombatReplayController(_store, _loader);
+        _controller = new CombatReplayController(_battleCatalog, _payloadStore, _loader);
         Events.StateChanged.AddListener(OnStateChanged, this);
     }
 
@@ -53,14 +55,14 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         Events.StateChanged.RemoveListener(OnStateChanged);
     }
 
-    public IReadOnlyList<CombatReplayRecord> ListSavedReplays()
+    public IReadOnlyList<PvpBattleManifest> ListRecentBattles()
     {
-        return _controller?.ListSavedReplays() ?? Array.Empty<CombatReplayRecord>();
+        return _controller?.ListRecentBattles() ?? Array.Empty<PvpBattleManifest>();
     }
 
-    public CombatReplayRecord? GetLatestReplay()
+    public PvpBattleManifest? GetLatestBattle()
     {
-        return _controller?.GetLatestReplay();
+        return _controller?.GetLatestBattle();
     }
 
     public bool CanReplaySavedCombats(out string reason)
@@ -89,21 +91,23 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public void ObserveMessage(INetMessage message)
     {
-        if (_captureService == null || _store == null || _pvpBattleStore == null)
+        if (_captureService == null || _battleCatalog == null || _payloadStore == null)
             return;
 
         try
         {
-            var record = _captureService.Accept(message, ModState.CurrentServerRunId);
-            if (record == null)
+            var artifact = _captureService.Accept(message, ModState.CurrentServerRunId);
+            if (artifact == null)
                 return;
 
-            _store.Save(record);
-            _pvpBattleStore.Save(record);
-            RunLoggingController.Instance?.CaptureCombatReplay(record);
+            var payload = artifact.Payload;
+            var manifest = artifact.Manifest;
+            _payloadStore.Save(payload);
+            _battleCatalog.Save(manifest);
+            RunLoggingController.Instance?.CapturePvpBattle(manifest);
             BppLog.Info(
                 "CombatReplayRuntime",
-                $"Saved combat replay {record.ReplayId} for run={record.RunId ?? "unknown"}"
+                $"Saved combat replay {manifest.BattleId} for run={manifest.RunId ?? "unknown"}"
             );
         }
         catch (Exception ex)
@@ -114,14 +118,14 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public bool ReplayLatest()
     {
-        var latest = _controller?.GetLatestReplay();
+        var latest = _controller?.GetLatestBattle();
         if (latest == null)
             return false;
 
-        return ReplaySaved(latest.ReplayId);
+        return ReplaySaved(latest.BattleId);
     }
 
-    public bool ReplaySaved(string replayId)
+    public bool ReplaySaved(string battleId)
     {
         if (_controller == null)
             return false;
@@ -131,20 +135,24 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        var record = _controller.LoadReplayRecord(replayId);
-        if (record == null)
+        var manifest = _controller.LoadBattle(battleId);
+        if (manifest == null)
             return false;
 
-        var sequence = _controller.LoadReplay(record);
+        var payload = _controller.LoadPayload(manifest);
+        if (payload == null)
+            return false;
+
+        var sequence = _controller.LoadReplay(payload);
         _savedReplayPlaybackActive = true;
-        _ = StartReplayAsync(record, sequence, replayId);
+        _ = StartReplayAsync(manifest, sequence, battleId);
         return true;
     }
 
     private async Task StartReplayAsync(
-        CombatReplayRecord record,
+        PvpBattleManifest manifest,
         CombatSequenceMessages sequence,
-        string replayId
+        string battleId
     )
     {
         var attemptedBootstrapFromLobby = false;
@@ -159,16 +167,16 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             var bootstrappedFromLobby = await EnsureReplayBootstrapReadyAsync();
             _returnToMenuAfterReplay = bootstrappedFromLobby;
             var bootstrapContext = ResolveReplayDependencies();
-            await TryInjectSavedReplayAsync(bootstrapContext, record, sequence, replayId);
+            await TryInjectSavedReplayAsync(bootstrapContext, manifest, sequence, battleId);
             _bootstrappedReplayActive = bootstrappedFromLobby;
-            BppLog.Info("CombatReplayRuntime", $"Started replay for saved combat {replayId}");
+            BppLog.Info("CombatReplayRuntime", $"Started replay for saved combat {battleId}");
         }
         catch (Exception ex)
         {
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
             _savedReplayPlaybackActive = false;
-            BppLog.Error("CombatReplayRuntime", $"Failed to start replay {replayId}: {ex}");
+            BppLog.Error("CombatReplayRuntime", $"Failed to start replay {battleId}: {ex}");
             if (attemptedBootstrapFromLobby)
                 await RollbackReplayBootstrapAsync();
         }
@@ -265,17 +273,17 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static async Task TryInjectSavedReplayAsync(
         ReplayBootstrapContext bootstrapContext,
-        CombatReplayRecord record,
+        PvpBattleManifest manifest,
         CombatSequenceMessages sequence,
-        string replayId
+        string battleId
     )
     {
         bootstrapContext.SetLastCombatSequence(sequence);
         await bootstrapContext.HandleSpawnMessageAsync(sequence.SpawnMessage);
-        RehydrateSavedReplayPlayerCards(record, sequence.SpawnMessage);
-        RehydrateSavedReplayOpponentCards(record, sequence.SpawnMessage);
-        RehydrateSavedReplayPlayerSkills(record, sequence.SpawnMessage);
-        RehydrateSavedReplayOpponentSkills(record, sequence.SpawnMessage);
+        RehydrateSavedReplayPlayerCards(manifest, sequence.SpawnMessage);
+        RehydrateSavedReplayOpponentCards(manifest, sequence.SpawnMessage);
+        RehydrateSavedReplayPlayerSkills(manifest, sequence.SpawnMessage);
+        RehydrateSavedReplayOpponentSkills(manifest, sequence.SpawnMessage);
         bootstrapContext.TriggerCombatSequenceCreated();
         await Task.Delay(50);
         await AppState.TryPushState<ReplayState>();
@@ -285,76 +293,80 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         replayState.Replay();
         Singleton<BoardManager>.Instance.ShowReplayAndRecapButtons(show: false, deactivate: true);
 
-        BppLog.Info("CombatReplayRuntime", $"Saved replay injection completed for {replayId}.");
+        BppLog.Info("CombatReplayRuntime", $"Saved replay injection completed for {battleId}.");
     }
 
     private static void RehydrateSavedReplayPlayerCards(
-        CombatReplayRecord record,
+        PvpBattleManifest manifest,
         NetMessageGameSim spawnMessage
     )
     {
-        if (record.PlayerHandCards.Count == 0)
+        var capture = manifest.Snapshots.PlayerHand;
+        if (capture.Status == PvpBattleCaptureStatus.Missing)
         {
             BppLog.Warn(
                 "CombatReplayRuntime",
-                $"Saved replay {record.ReplayId} does not contain player-hand snapshots; player cards may be missing. Re-capture this fight with the current mod build."
+                $"Saved replay {manifest.BattleId} does not contain player-hand snapshots; player cards may be missing. Re-capture this fight with the current mod build."
             );
             return;
         }
 
-        RehydrateSavedReplayCards(record.PlayerHandCards, spawnMessage, Data.Run?.Player);
+        RehydrateSavedReplayCards(capture.Items, spawnMessage, Data.Run?.Player);
     }
 
     private static void RehydrateSavedReplayOpponentCards(
-        CombatReplayRecord record,
+        PvpBattleManifest manifest,
         NetMessageGameSim spawnMessage
     )
     {
-        if (record.OpponentHandCards.Count == 0)
+        var capture = manifest.Snapshots.OpponentHand;
+        if (capture.Status == PvpBattleCaptureStatus.Missing)
         {
             BppLog.Warn(
                 "CombatReplayRuntime",
-                $"Saved replay {record.ReplayId} does not contain opponent-hand snapshots; opponent cards may be missing. Re-capture this fight with the current mod build."
+                $"Saved replay {manifest.BattleId} does not contain opponent-hand snapshots; opponent cards may be missing. Re-capture this fight with the current mod build."
             );
             return;
         }
 
-        RehydrateSavedReplayCards(record.OpponentHandCards, spawnMessage, Data.Run?.Opponent);
+        RehydrateSavedReplayCards(capture.Items, spawnMessage, Data.Run?.Opponent);
     }
 
     private static void RehydrateSavedReplayPlayerSkills(
-        CombatReplayRecord record,
+        PvpBattleManifest manifest,
         NetMessageGameSim spawnMessage
     )
     {
-        if (record.PlayerSkills.Count == 0)
+        var capture = manifest.Snapshots.PlayerSkills;
+        if (capture.Status == PvpBattleCaptureStatus.Missing)
         {
             BppLog.Warn(
                 "CombatReplayRuntime",
-                $"Saved replay {record.ReplayId} does not contain player-skill snapshots; player skills may be missing. Re-capture this fight with the current mod build."
+                $"Saved replay {manifest.BattleId} does not contain player-skill snapshots; player skills may be missing. Re-capture this fight with the current mod build."
             );
             return;
         }
 
-        var skills = RehydrateSavedReplaySkillCards(record.PlayerSkills, spawnMessage, Data.Run?.Player);
+        var skills = RehydrateSavedReplaySkillCards(capture.Items, spawnMessage, Data.Run?.Player);
         ReplaceSkillCollection(Data.Run?.Player, skills);
     }
 
     private static void RehydrateSavedReplayOpponentSkills(
-        CombatReplayRecord record,
+        PvpBattleManifest manifest,
         NetMessageGameSim spawnMessage
     )
     {
-        if (record.OpponentSkills.Count == 0)
+        var capture = manifest.Snapshots.OpponentSkills;
+        if (capture.Status == PvpBattleCaptureStatus.Missing)
         {
             BppLog.Warn(
                 "CombatReplayRuntime",
-                $"Saved replay {record.ReplayId} does not contain opponent-skill snapshots; opponent skills may be missing. Re-capture this fight with the current mod build."
+                $"Saved replay {manifest.BattleId} does not contain opponent-skill snapshots; opponent skills may be missing. Re-capture this fight with the current mod build."
             );
             return;
         }
 
-        var skills = RehydrateSavedReplaySkillCards(record.OpponentSkills, spawnMessage, Data.Run?.Opponent);
+        var skills = RehydrateSavedReplaySkillCards(capture.Items, spawnMessage, Data.Run?.Opponent);
         ReplaceSkillCollection(Data.Run?.Opponent, skills);
     }
 

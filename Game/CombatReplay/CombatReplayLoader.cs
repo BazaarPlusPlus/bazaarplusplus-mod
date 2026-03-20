@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.PvpBattles;
 using BazaarGameShared;
 using BazaarGameShared.Infra.Messages;
 using MessagePack;
@@ -9,15 +10,15 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal sealed class CombatReplayLoader
 {
-    public CombatSequenceMessages Load(CombatReplayRecord record)
+    public CombatSequenceMessages Load(PvpReplayPayload payload)
     {
-        if (record == null)
-            throw new ArgumentNullException(nameof(record));
+        if (payload == null)
+            throw new ArgumentNullException(nameof(payload));
 
         return new CombatSequenceMessages(
-            DeserializeGameSim(record.SpawnMessageBase64),
-            DeserializeGameSim(record.DespawnMessageBase64),
-            DeserializeCombatSim(record.CombatMessageBase64)
+            DeserializeGameSim(payload.SpawnMessageBase64),
+            DeserializeGameSim(payload.DespawnMessageBase64),
+            DeserializeCombatSim(payload.CombatMessageBase64)
         );
     }
 

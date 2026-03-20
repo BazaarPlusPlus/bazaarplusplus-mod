@@ -1,0 +1,456 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using System.IO;
+using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using Microsoft.Data.Sqlite;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
+
+namespace BazaarPlusPlus.Game.PvpBattles.Persistence;
+
+internal sealed class PvpBattleSqliteStore
+{
+    private static readonly JsonSerializerSettings SerializerSettings = new()
+    {
+        ContractResolver = new DefaultContractResolver
+        {
+            NamingStrategy = new SnakeCaseNamingStrategy(),
+        },
+        Converters = new List<JsonConverter> { new StringEnumConverter() },
+        NullValueHandling = NullValueHandling.Ignore,
+        Formatting = Formatting.None,
+        DateFormatString = "yyyy-MM-dd'T'HH:mm:ss.fffK",
+    };
+
+    private readonly string _databasePath;
+
+    public PvpBattleSqliteStore(string databasePath)
+    {
+        if (string.IsNullOrWhiteSpace(databasePath))
+            throw new ArgumentException("Database path is required.", nameof(databasePath));
+
+        _databasePath = databasePath;
+
+        var directory = Path.GetDirectoryName(_databasePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+            Directory.CreateDirectory(directory);
+
+        using var connection = OpenConnection();
+        using var command = CreateCommand(connection);
+        command.CommandText = RunLogSqliteSchema.BootstrapSql;
+        command.ExecuteNonQuery();
+        MigrateLegacyReplayIdColumn(connection);
+    }
+
+    public void Save(PvpBattleManifest manifest)
+    {
+        if (manifest == null)
+            throw new ArgumentNullException(nameof(manifest));
+        if (string.IsNullOrWhiteSpace(manifest.BattleId))
+            throw new ArgumentException("Battle id is required.", nameof(manifest));
+        if (!string.Equals(manifest.CombatKind, "PVPCombat", StringComparison.Ordinal))
+            return;
+
+        using var connection = OpenConnection();
+        using var command = CreateCommand(connection);
+        command.CommandText = $"""
+            INSERT INTO {RunLogSqliteSchema.PvpBattlesTableName} (
+                battle_id,
+                run_id,
+                recorded_at_utc,
+                day,
+                hour,
+                encounter_id,
+                player_name,
+                player_account_id,
+                opponent_name,
+                opponent_account_id,
+                combat_kind,
+                result,
+                winner_combatant_id,
+                loser_combatant_id,
+                player_hand_json,
+                player_skills_json,
+                opponent_hand_json,
+                opponent_skills_json
+            ) VALUES (
+                $battleId,
+                $runId,
+                $recordedAtUtc,
+                $day,
+                $hour,
+                $encounterId,
+                $playerName,
+                $playerAccountId,
+                $opponentName,
+                $opponentAccountId,
+                $combatKind,
+                $result,
+                $winnerCombatantId,
+                $loserCombatantId,
+                $playerHandJson,
+                $playerSkillsJson,
+                $opponentHandJson,
+                $opponentSkillsJson
+            )
+            ON CONFLICT(battle_id) DO UPDATE SET
+                run_id = excluded.run_id,
+                recorded_at_utc = excluded.recorded_at_utc,
+                day = excluded.day,
+                hour = excluded.hour,
+                encounter_id = excluded.encounter_id,
+                player_name = excluded.player_name,
+                player_account_id = excluded.player_account_id,
+                opponent_name = excluded.opponent_name,
+                opponent_account_id = excluded.opponent_account_id,
+                combat_kind = excluded.combat_kind,
+                result = excluded.result,
+                winner_combatant_id = excluded.winner_combatant_id,
+                loser_combatant_id = excluded.loser_combatant_id,
+                player_hand_json = excluded.player_hand_json,
+                player_skills_json = excluded.player_skills_json,
+                opponent_hand_json = excluded.opponent_hand_json,
+                opponent_skills_json = excluded.opponent_skills_json;
+            """;
+        command.Parameters.AddWithValue("$battleId", manifest.BattleId);
+        command.Parameters.AddWithValue("$runId", (object?)manifest.RunId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$recordedAtUtc", manifest.SavedAtUtc.ToString("o"));
+        AddNullableInt32(command, "$day", manifest.Day);
+        AddNullableInt32(command, "$hour", manifest.Hour);
+        command.Parameters.AddWithValue("$encounterId", (object?)manifest.EncounterId ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$playerName",
+            (object?)manifest.Participants.PlayerName ?? DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$playerAccountId",
+            (object?)manifest.Participants.PlayerAccountId ?? DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$opponentName",
+            (object?)manifest.Participants.OpponentName ?? DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$opponentAccountId",
+            (object?)manifest.Participants.OpponentAccountId ?? DBNull.Value
+        );
+        command.Parameters.AddWithValue("$combatKind", manifest.CombatKind);
+        command.Parameters.AddWithValue("$result", (object?)manifest.Outcome.Result ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$winnerCombatantId",
+            (object?)manifest.Outcome.WinnerCombatantId ?? DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$loserCombatantId",
+            (object?)manifest.Outcome.LoserCombatantId ?? DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$playerHandJson",
+            SerializeCapture(manifest.Snapshots.PlayerHand)
+        );
+        command.Parameters.AddWithValue(
+            "$playerSkillsJson",
+            SerializeCapture(manifest.Snapshots.PlayerSkills)
+        );
+        command.Parameters.AddWithValue(
+            "$opponentHandJson",
+            SerializeCapture(manifest.Snapshots.OpponentHand)
+        );
+        command.Parameters.AddWithValue(
+            "$opponentSkillsJson",
+            SerializeCapture(manifest.Snapshots.OpponentSkills)
+        );
+        command.ExecuteNonQuery();
+    }
+
+    public PvpBattleManifest? TryLoad(string battleId)
+    {
+        using var connection = OpenConnection();
+        using var command = CreateCommand(connection);
+        command.CommandText = $"""
+            SELECT
+                battle_id,
+                run_id,
+                recorded_at_utc,
+                day,
+                hour,
+                encounter_id,
+                player_name,
+                player_account_id,
+                opponent_name,
+                opponent_account_id,
+                combat_kind,
+                result,
+                winner_combatant_id,
+                loser_combatant_id,
+                player_hand_json,
+                player_skills_json,
+                opponent_hand_json,
+                opponent_skills_json
+            FROM {RunLogSqliteSchema.PvpBattlesTableName}
+            WHERE battle_id = $battleId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$battleId", battleId);
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        return ReadManifest(reader);
+    }
+
+    public IReadOnlyList<PvpBattleManifest> ListRecentBattles(int limit)
+    {
+        using var connection = OpenConnection();
+        using var command = CreateCommand(connection);
+        command.CommandText = $"""
+            SELECT
+                battle_id,
+                run_id,
+                recorded_at_utc,
+                day,
+                hour,
+                encounter_id,
+                player_name,
+                player_account_id,
+                opponent_name,
+                opponent_account_id,
+                combat_kind,
+                result,
+                winner_combatant_id,
+                loser_combatant_id,
+                player_hand_json,
+                player_skills_json,
+                opponent_hand_json,
+                opponent_skills_json
+            FROM {RunLogSqliteSchema.PvpBattlesTableName}
+            ORDER BY recorded_at_utc DESC, battle_id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        var manifests = new List<PvpBattleManifest>();
+        while (reader.Read())
+        {
+            manifests.Add(ReadManifest(reader));
+        }
+
+        return manifests;
+    }
+
+    private SqliteConnection OpenConnection()
+    {
+        var connection = new SqliteConnection($"Data Source={_databasePath}");
+        try
+        {
+            connection.Open();
+
+            using var command = CreateCommand(connection);
+            command.CommandText = "PRAGMA foreign_keys = ON;";
+            command.ExecuteNonQuery();
+
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
+    }
+
+    private static void MigrateLegacyReplayIdColumn(SqliteConnection connection)
+    {
+        if (!TableHasColumn(connection, RunLogSqliteSchema.PvpBattlesTableName, "replay_id"))
+            return;
+
+        using var transaction = connection.BeginTransaction();
+        using var command = CreateCommand(connection, transaction);
+        var legacyTableName = $"{RunLogSqliteSchema.PvpBattlesTableName}_legacy";
+        command.CommandText = $"""
+            ALTER TABLE {RunLogSqliteSchema.PvpBattlesTableName}
+            RENAME TO {legacyTableName};
+
+            CREATE TABLE {RunLogSqliteSchema.PvpBattlesTableName} (
+                battle_id TEXT PRIMARY KEY,
+                run_id TEXT NULL,
+                recorded_at_utc TEXT NOT NULL,
+                day INTEGER NULL,
+                hour INTEGER NULL,
+                encounter_id TEXT NULL,
+                player_name TEXT NULL,
+                player_account_id TEXT NULL,
+                opponent_name TEXT NULL,
+                opponent_account_id TEXT NULL,
+                combat_kind TEXT NOT NULL,
+                result TEXT NULL,
+                winner_combatant_id TEXT NULL,
+                loser_combatant_id TEXT NULL,
+                player_hand_json TEXT NOT NULL,
+                player_skills_json TEXT NOT NULL,
+                opponent_hand_json TEXT NOT NULL,
+                opponent_skills_json TEXT NOT NULL
+            );
+
+            INSERT INTO {RunLogSqliteSchema.PvpBattlesTableName} (
+                battle_id,
+                run_id,
+                recorded_at_utc,
+                day,
+                hour,
+                encounter_id,
+                player_name,
+                player_account_id,
+                opponent_name,
+                opponent_account_id,
+                combat_kind,
+                result,
+                winner_combatant_id,
+                loser_combatant_id,
+                player_hand_json,
+                player_skills_json,
+                opponent_hand_json,
+                opponent_skills_json
+            )
+            SELECT
+                battle_id,
+                run_id,
+                recorded_at_utc,
+                day,
+                hour,
+                encounter_id,
+                player_name,
+                player_account_id,
+                opponent_name,
+                opponent_account_id,
+                combat_kind,
+                result,
+                winner_combatant_id,
+                loser_combatant_id,
+                player_hand_json,
+                player_skills_json,
+                opponent_hand_json,
+                opponent_skills_json
+            FROM {legacyTableName};
+
+            DROP TABLE {legacyTableName};
+
+            CREATE INDEX IF NOT EXISTS idx_{RunLogSqliteSchema.PvpBattlesTableName}_run_id
+                ON {RunLogSqliteSchema.PvpBattlesTableName}(run_id);
+
+            CREATE INDEX IF NOT EXISTS idx_{RunLogSqliteSchema.PvpBattlesTableName}_recorded_at_utc
+                ON {RunLogSqliteSchema.PvpBattlesTableName}(recorded_at_utc);
+            """;
+        command.ExecuteNonQuery();
+        transaction.Commit();
+        BppLog.Info(
+            "PvpBattleSqliteStore",
+            $"Migrated legacy {RunLogSqliteSchema.PvpBattlesTableName} schema by dropping replay_id."
+        );
+    }
+
+    private static bool TableHasColumn(SqliteConnection connection, string tableName, string columnName)
+    {
+        using var command = CreateCommand(connection);
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (
+                string.Equals(
+                    reader.GetString(reader.GetOrdinal("name")),
+                    columnName,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static SqliteCommand CreateCommand(SqliteConnection connection)
+    {
+        var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        return command;
+    }
+
+    private static SqliteCommand CreateCommand(
+        SqliteConnection connection,
+        SqliteTransaction transaction
+    )
+    {
+        var command = CreateCommand(connection);
+        command.Transaction = transaction;
+        return command;
+    }
+
+    private static void AddNullableInt32(SqliteCommand command, string name, int? value)
+    {
+        command.Parameters.AddWithValue(name, value.HasValue ? value.Value : DBNull.Value);
+    }
+
+    private static string SerializeCapture(PvpBattleCardSetCapture capture)
+    {
+        return JsonConvert.SerializeObject(capture, SerializerSettings);
+    }
+
+    private static PvpBattleCardSetCapture DeserializeCapture(string json)
+    {
+        return JsonConvert.DeserializeObject<PvpBattleCardSetCapture>(json, SerializerSettings)
+            ?? new PvpBattleCardSetCapture();
+    }
+
+    private static PvpBattleManifest ReadManifest(SqliteDataReader reader)
+    {
+        return new PvpBattleManifest
+        {
+            BattleId = reader.GetString(reader.GetOrdinal("battle_id")),
+            RunId = GetNullableString(reader, "run_id"),
+            SavedAtUtc = DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
+            Day = GetNullableInt32(reader, "day"),
+            Hour = GetNullableInt32(reader, "hour"),
+            EncounterId = GetNullableString(reader, "encounter_id"),
+            CombatKind = reader.GetString(reader.GetOrdinal("combat_kind")),
+            Participants = new PvpBattleParticipants
+            {
+                PlayerName = GetNullableString(reader, "player_name"),
+                PlayerAccountId = GetNullableString(reader, "player_account_id"),
+                OpponentName = GetNullableString(reader, "opponent_name"),
+                OpponentAccountId = GetNullableString(reader, "opponent_account_id"),
+            },
+            Outcome = new PvpBattleOutcome
+            {
+                Result = GetNullableString(reader, "result"),
+                WinnerCombatantId = GetNullableString(reader, "winner_combatant_id"),
+                LoserCombatantId = GetNullableString(reader, "loser_combatant_id"),
+            },
+            Snapshots = new PvpBattleSnapshots
+            {
+                PlayerHand = DeserializeCapture(reader.GetString(reader.GetOrdinal("player_hand_json"))),
+                PlayerSkills = DeserializeCapture(reader.GetString(reader.GetOrdinal("player_skills_json"))),
+                OpponentHand = DeserializeCapture(reader.GetString(reader.GetOrdinal("opponent_hand_json"))),
+                OpponentSkills = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("opponent_skills_json"))
+                ),
+            },
+        };
+    }
+
+    private static string? GetNullableString(SqliteDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+    }
+
+    private static int? GetNullableInt32(SqliteDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
+    }
+}

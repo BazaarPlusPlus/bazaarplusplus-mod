@@ -10,7 +10,31 @@ var progressInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogRunPro
 var stateInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogStateSnapshotInput");
 var selectionInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogSelectionSnapshotInput");
 var optionInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogSelectionOptionInput");
-var combatReplayInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCombatReplayInput");
+var pvpBattleInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogPvpBattleInput");
+var manifestType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifest");
+var payloadType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpReplayPayload");
+var cardSetCaptureType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSetCapture");
+
+Assert(manifestType.GetProperty("BattleId") != null, "Manifest should expose BattleId.");
+Assert(manifestType.GetProperty("ReplayId") == null, "Manifest should not expose ReplayId.");
+Assert(payloadType.GetProperty("BattleId") != null, "Replay payload should expose BattleId.");
+Assert(
+    cardSetCaptureType.GetProperty("Items") != null
+        && cardSetCaptureType.GetProperty("Status") != null
+        && cardSetCaptureType.GetProperty("Source") != null,
+    "PvpBattleCardSetCapture should expose Items, Status, and Source."
+);
+Assert(
+    File.ReadAllText(
+            Path.GetFullPath(
+                Path.Combine(
+                    AppContext.BaseDirectory,
+                    "../../../../../Game/RunLogging/RunLoggingController.cs"
+                )
+            )
+        ).Contains("CapturePvpBattle", StringComparison.Ordinal),
+    "RunLoggingController should expose manifest-first CapturePvpBattle."
+);
 
 var runInitializedPatchPath = Path.GetFullPath(
     Path.Combine(
@@ -156,21 +180,21 @@ Assert(selectionEvent.Options[0].Name == "Frost Street", "Option projection shou
 Assert(selectionEvent.Options[0].Tier == "Bronze", "Option projection should preserve tier.");
 Assert(selectionEvent.Options[0].Enchant == "None", "Option projection should preserve enchant.");
 
-var combatReplayInput =
-    Activator.CreateInstance(combatReplayInputType)
-    ?? throw new InvalidOperationException("RunLogCombatReplayInput should be constructible.");
-SetProperty(combatReplayInputType, combatReplayInput, "ReplayId", "replay-123");
-SetProperty(combatReplayInputType, combatReplayInput, "CombatKind", "PVPCombat");
-SetProperty(combatReplayInputType, combatReplayInput, "Day", 4);
-SetProperty(combatReplayInputType, combatReplayInput, "Hour", 6);
-SetProperty(combatReplayInputType, combatReplayInput, "EncounterId", "encounter-pvp-1");
-SetProperty(combatReplayInputType, combatReplayInput, "OpponentName", "Rival");
+var pvpBattleInput =
+    Activator.CreateInstance(pvpBattleInputType)
+    ?? throw new InvalidOperationException("RunLogPvpBattleInput should be constructible.");
+SetProperty(pvpBattleInputType, pvpBattleInput, "BattleId", "battle-123");
+SetProperty(pvpBattleInputType, pvpBattleInput, "CombatKind", "PVPCombat");
+SetProperty(pvpBattleInputType, pvpBattleInput, "Day", 4);
+SetProperty(pvpBattleInputType, pvpBattleInput, "Hour", 6);
+SetProperty(pvpBattleInputType, pvpBattleInput, "EncounterId", "encounter-pvp-1");
+SetProperty(pvpBattleInputType, pvpBattleInput, "OpponentName", "Rival");
 
 var combatReplayEvent = Invoke<RunLogEvent>(
     captureServiceType,
     service,
-    "BuildCombatReplayRecordedEvent",
-    [combatReplayInput]
+    "BuildPvpBattleRecordedEvent",
+    [pvpBattleInput]
 );
 Assert(
     combatReplayEvent.Kind == "pvp_combat_recorded",
@@ -181,8 +205,8 @@ Assert(
     "Combat replay events should preserve the combat kind."
 );
 Assert(
-    combatReplayEvent.ReplayId == "replay-123",
-    "Combat replay events should preserve the replay id."
+    combatReplayEvent.BattleId == "battle-123",
+    "Combat replay events should preserve the battle id."
 );
 Assert(
     combatReplayEvent.OpponentName == "Rival",
@@ -282,9 +306,9 @@ Invoke<object>(
     core,
     "AcceptCombatReplay",
     [
-        new RunLogCombatReplayInput
+        new RunLogPvpBattleInput
         {
-            ReplayId = "replay-123",
+            BattleId = "battle-123",
             CombatKind = "PVPCombat",
             Day = 1,
             Hour = 2,

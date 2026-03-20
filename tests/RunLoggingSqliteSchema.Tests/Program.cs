@@ -54,6 +54,10 @@ Assert(
     "Bootstrap SQL should define pvp_battles."
 );
 Assert(
+    !bootstrapSql.Contains("replay_id", StringComparison.Ordinal),
+    "Bootstrap SQL should not retain replay_id in pvp_battles."
+);
+Assert(
     bootstrapSql.Contains("player_name", StringComparison.Ordinal)
         && bootstrapSql.Contains("player_account_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("opponent_name", StringComparison.Ordinal)
@@ -62,6 +66,13 @@ Assert(
         && bootstrapSql.Contains("loser_combatant_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("result", StringComparison.Ordinal),
     "Bootstrap SQL should define PVP battle player identity and outcome columns."
+);
+Assert(
+    bootstrapSql.Contains("player_hand_json", StringComparison.Ordinal)
+        && bootstrapSql.Contains("player_skills_json", StringComparison.Ordinal)
+        && bootstrapSql.Contains("opponent_hand_json", StringComparison.Ordinal)
+        && bootstrapSql.Contains("opponent_skills_json", StringComparison.Ordinal),
+    "Bootstrap SQL should define snapshot capture JSON columns."
 );
 
 Console.WriteLine("RunLogging SQLite schema checks passed.");

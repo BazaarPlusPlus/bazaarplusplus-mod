@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
 using UnityEngine;
@@ -145,15 +146,15 @@ internal sealed class RunLoggingController : MonoBehaviour
         return RequireCore().AcceptSelectionSnapshot(input);
     }
 
-    public RunLogEvent? CaptureCombatReplay(CombatReplayRecord record)
+    public RunLogEvent? CapturePvpBattle(PvpBattleManifest manifest)
     {
         try
         {
-            if (record == null)
-                throw new ArgumentNullException(nameof(record));
+            if (manifest == null)
+                throw new ArgumentNullException(nameof(manifest));
 
             if (
-                !string.Equals(record.CombatKind, "PVPCombat", StringComparison.Ordinal)
+                !string.Equals(manifest.CombatKind, "PVPCombat", StringComparison.Ordinal)
                 || !ModState.IsInGameRun
             )
             {
@@ -164,20 +165,20 @@ internal sealed class RunLoggingController : MonoBehaviour
                 return null;
 
             return RequireCore().AcceptCombatReplay(
-                new RunLogCombatReplayInput
+                new RunLogPvpBattleInput
                 {
-                    Day = record.Day,
-                    Hour = record.Hour,
-                    EncounterId = record.EncounterId,
-                    CombatKind = record.CombatKind,
-                    ReplayId = record.ReplayId,
-                    OpponentName = record.OpponentName,
+                    Day = manifest.Day,
+                    Hour = manifest.Hour,
+                    EncounterId = manifest.EncounterId,
+                    CombatKind = manifest.CombatKind,
+                    BattleId = manifest.BattleId,
+                    OpponentName = manifest.Participants.OpponentName,
                 }
             );
         }
         catch (Exception ex)
         {
-            BppLog.Error("RunLoggingController", $"CaptureCombatReplay failed: {ex}");
+            BppLog.Error("RunLoggingController", $"CapturePvpBattle failed: {ex}");
             return null;
         }
     }
@@ -273,10 +274,10 @@ internal sealed class RunLoggingControllerCore
         return selectionEvent;
     }
 
-    public RunLogEvent AcceptCombatReplay(RunLogCombatReplayInput input)
+    public RunLogEvent AcceptCombatReplay(RunLogPvpBattleInput input)
     {
         var combatEvent =
-            _sessionManager.AppendEvent(_captureService.BuildCombatReplayRecordedEvent(input))
+            _sessionManager.AppendEvent(_captureService.BuildPvpBattleRecordedEvent(input))
             ?? throw new InvalidOperationException("Combat replay event was unexpectedly suppressed.");
         _sessionManager.SaveCheckpoint();
         return combatEvent;

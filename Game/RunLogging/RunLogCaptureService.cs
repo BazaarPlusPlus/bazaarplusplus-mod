@@ -59,7 +59,7 @@ public sealed class RunLogCaptureService
         };
     }
 
-    public RunLogEvent BuildCombatReplayRecordedEvent(RunLogCombatReplayInput input)
+    public RunLogEvent BuildPvpBattleRecordedEvent(RunLogPvpBattleInput input)
     {
         if (input == null)
             throw new ArgumentNullException(nameof(input));
@@ -72,7 +72,7 @@ public sealed class RunLogCaptureService
             State = input.CombatKind,
             EncounterId = input.EncounterId,
             CombatKind = input.CombatKind,
-            ReplayId = input.ReplayId,
+            BattleId = input.BattleId,
             OpponentName = input.OpponentName,
         };
     }
@@ -143,7 +143,7 @@ public sealed class RunLogSelectionOptionInput
         new Dictionary<string, object?>();
 }
 
-public sealed class RunLogCombatReplayInput
+public sealed class RunLogPvpBattleInput
 {
     public int? Day { get; set; }
 
@@ -153,7 +153,7 @@ public sealed class RunLogCombatReplayInput
 
     public string? CombatKind { get; set; }
 
-    public string? ReplayId { get; set; }
+    public string? BattleId { get; set; }
 
     public string? OpponentName { get; set; }
 }

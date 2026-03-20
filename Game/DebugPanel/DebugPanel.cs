@@ -6,6 +6,7 @@ using BazaarPlusPlus.Game.CombatLog;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.PvpBattles;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -44,7 +45,7 @@ internal sealed class DebugPanel : MonoBehaviour
         public RunSummary Run;
         public List<EncounterSection> EncounterSections = new List<EncounterSection>();
         public List<ReplayEntry> Replays = new List<ReplayEntry>();
-        public string ActiveReplayId;
+        public string ActiveBattleId;
     }
 
     private sealed class RunSummary
@@ -76,7 +77,7 @@ internal sealed class DebugPanel : MonoBehaviour
 
     private sealed class ReplayEntry
     {
-        public string ReplayId;
+        public string BattleId;
         public string SavedAt;
         public string Label;
     }
@@ -293,7 +294,7 @@ internal sealed class DebugPanel : MonoBehaviour
 
         DrawRow(
             "Active Replay",
-            string.IsNullOrWhiteSpace(_snapshot.ActiveReplayId) ? "-" : _snapshot.ActiveReplayId
+            string.IsNullOrWhiteSpace(_snapshot.ActiveBattleId) ? "-" : _snapshot.ActiveBattleId
         );
 
         if (!canReplaySavedCombats)
@@ -310,7 +311,7 @@ internal sealed class DebugPanel : MonoBehaviour
             previousEnabled = GUI.enabled;
             GUI.enabled = canReplaySavedCombats;
             if (GUILayout.Button($"Replay {replay.Label}", EntryStyle))
-                runtime.ReplaySaved(replay.ReplayId);
+                runtime.ReplaySaved(replay.BattleId);
             GUI.enabled = previousEnabled;
 
             GUILayout.Label($"Saved {replay.SavedAt}", MutedStyle);
@@ -480,7 +481,7 @@ internal sealed class DebugPanel : MonoBehaviour
             Run = BuildRunSummary(),
             Preview = BuildPreviewState(),
             Replays = BuildReplayEntries(),
-            ActiveReplayId = CombatReplayRuntime.Instance?.ActiveReplayId ?? string.Empty,
+            ActiveBattleId = CombatReplayRuntime.Instance?.ActiveBattleId ?? string.Empty,
         };
 
         snapshot.EncounterSections.Add(
@@ -509,27 +510,27 @@ internal sealed class DebugPanel : MonoBehaviour
             return new List<ReplayEntry>();
 
         return runtime
-            .ListSavedReplays()
+            .ListRecentBattles()
             .Take(10)
             .Select(record => new ReplayEntry
             {
-                ReplayId = record.ReplayId,
+                BattleId = record.BattleId,
                 SavedAt = record.SavedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
                 Label = BuildReplayLabel(record),
             })
             .ToList();
     }
 
-    private static string BuildReplayLabel(CombatReplayRecord record)
+    private static string BuildReplayLabel(PvpBattleManifest record)
     {
         var runText = record.RunId ?? "unknown-run";
         var dayHour =
             record.Day.HasValue && record.Hour.HasValue
                 ? $"D{record.Day.Value} H{record.Hour.Value}"
                 : "D? H?";
-        var opponent = string.IsNullOrWhiteSpace(record.OpponentName)
+        var opponent = string.IsNullOrWhiteSpace(record.Participants.OpponentName)
             ? "Unknown Opponent"
-            : record.OpponentName;
+            : record.Participants.OpponentName;
         return $"{dayHour}  {opponent}  {runText}";
     }
 

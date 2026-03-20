@@ -27,4 +27,22 @@ internal sealed class CombatReplayCardSnapshot
     public IList<string> Tags { get; set; } = new List<string>();
 
     public IDictionary<string, int> Attributes { get; set; } = new Dictionary<string, int>();
+
+    public CombatReplayCardSnapshot Clone()
+    {
+        return new CombatReplayCardSnapshot
+        {
+            InstanceId = InstanceId,
+            TemplateId = TemplateId,
+            Type = Type,
+            Size = Size,
+            Section = Section,
+            Socket = Socket,
+            Name = Name,
+            Tier = Tier,
+            Enchant = Enchant,
+            Tags = new List<string>(Tags),
+            Attributes = new Dictionary<string, int>(Attributes),
+        };
+    }
 }

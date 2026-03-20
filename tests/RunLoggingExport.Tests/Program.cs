@@ -33,7 +33,6 @@ try
         runId1,
         startedAt.AddMinutes(7),
         "battle-001",
-        "replay-001",
         "Test Rival"
     );
 
@@ -85,19 +84,32 @@ try
             "pvp_battles.ndjson should preserve combat outcome metadata."
         );
         Assert(
-            root.GetProperty("player_hand")[0].GetProperty("name").GetString() == "Sparkblade",
-            "pvp_battles.ndjson should expand player_hand JSON content."
+            root.GetProperty("player_hand").GetProperty("status").GetString() == "Captured"
+                && root.GetProperty("player_hand").GetProperty("source").GetString()
+                    == "OpeningMessage",
+            "pvp_battles.ndjson should export the full player_hand capture object."
         );
         Assert(
-            root.GetProperty("player_hand")[0].GetProperty("enchant").GetString() == "Radiant",
+            root.GetProperty("player_hand").GetProperty("items")[0].GetProperty("name").GetString()
+                == "Sparkblade",
+            "pvp_battles.ndjson should expand player_hand.items JSON content."
+        );
+        Assert(
+            root.GetProperty("player_hand").GetProperty("items")[0].GetProperty("enchant").GetString()
+                == "Radiant",
             "pvp_battles.ndjson should preserve hand-card enchantments."
         );
         Assert(
-            root.GetProperty("player_hand")[0]
+            root.GetProperty("player_hand")
+                .GetProperty("items")[0]
                 .GetProperty("attributes")
                 .GetProperty("Damage")
                 .GetInt32() == 42,
             "pvp_battles.ndjson should preserve hand-card attributes."
+        );
+        Assert(
+            root.GetProperty("player_skills").GetProperty("source").GetString() == "LiveRetry",
+            "pvp_battles.ndjson should preserve snapshot capture source metadata."
         );
     }
 
@@ -146,7 +158,6 @@ static void WritePvpBattle(
     string runId,
     DateTimeOffset recordedAtUtc,
     string battleId,
-    string replayId,
     string opponentName
 )
 {
@@ -158,7 +169,6 @@ static void WritePvpBattle(
         """
         INSERT INTO pvp_battles (
             battle_id,
-            replay_id,
             run_id,
             recorded_at_utc,
             day,
@@ -178,7 +188,6 @@ static void WritePvpBattle(
             opponent_skills_json
         ) VALUES (
             $battleId,
-            $replayId,
             $runId,
             $recordedAtUtc,
             $day,
@@ -199,7 +208,6 @@ static void WritePvpBattle(
         );
         """;
     command.Parameters.AddWithValue("$battleId", battleId);
-    command.Parameters.AddWithValue("$replayId", replayId);
     command.Parameters.AddWithValue("$runId", runId);
     command.Parameters.AddWithValue("$recordedAtUtc", recordedAtUtc.ToString("o"));
     command.Parameters.AddWithValue("$day", 1);
@@ -215,19 +223,19 @@ static void WritePvpBattle(
     command.Parameters.AddWithValue("$loserCombatantId", "Opponent");
     command.Parameters.AddWithValue(
         "$playerHandJson",
-        """[{"instance_id":"hand-1","name":"Sparkblade","enchant":"Radiant","attributes":{"Damage":42}}]"""
+        """{"status":"Captured","source":"OpeningMessage","items":[{"instance_id":"hand-1","name":"Sparkblade","enchant":"Radiant","attributes":{"Damage":42}}]}"""
     );
     command.Parameters.AddWithValue(
         "$playerSkillsJson",
-        """[{"instance_id":"skill-1","name":"Arcane Mastery","attributes":{"Cooldown":3}}]"""
+        """{"status":"Captured","source":"LiveRetry","items":[{"instance_id":"skill-1","name":"Arcane Mastery","attributes":{"Cooldown":3}}]}"""
     );
     command.Parameters.AddWithValue(
         "$opponentHandJson",
-        """[{"instance_id":"opp-hand-1","name":"Frostbite","enchant":"None","attributes":{"Damage":30}}]"""
+        """{"status":"Captured","source":"OpeningMessage","items":[{"instance_id":"opp-hand-1","name":"Frostbite","enchant":"None","attributes":{"Damage":30}}]}"""
     );
     command.Parameters.AddWithValue(
         "$opponentSkillsJson",
-        """[{"instance_id":"opp-skill-1","name":"Ice Wall","attributes":{"Shield":20}}]"""
+        """{"status":"CapturedEmpty","source":"OpeningMessage","items":[{"instance_id":"opp-skill-1","name":"Ice Wall","attributes":{"Shield":20}}]}"""
     );
     command.ExecuteNonQuery();
 }

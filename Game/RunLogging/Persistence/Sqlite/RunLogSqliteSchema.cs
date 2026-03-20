@@ -74,7 +74,6 @@ public static class RunLogSqliteSchema
 
             CREATE TABLE IF NOT EXISTS {PvpBattlesTableName} (
                 battle_id TEXT PRIMARY KEY,
-                replay_id TEXT NOT NULL,
                 run_id TEXT NULL,
                 recorded_at_utc TEXT NOT NULL,
                 day INTEGER NULL,
