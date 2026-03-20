@@ -256,9 +256,20 @@ static void VerifyPanelFilters(CombatLogTimeline timeline)
 static void VerifySourceWiring()
 {
     var pluginSource = ReadSource("Plugin.cs");
+    var debugBranchIndex = pluginSource.IndexOf("if (BppBuild.IsDebug)", StringComparison.Ordinal);
+    var controllerAddIndex = pluginSource.IndexOf(
+        "AddComponent<CombatLogController>()",
+        StringComparison.Ordinal
+    );
+    var overlayAddIndex = pluginSource.IndexOf(
+        "AddComponent<CombatLogOverlay>()",
+        StringComparison.Ordinal
+    );
     Assert(
-        pluginSource.Contains("AddComponent<CombatLogController>()", StringComparison.Ordinal),
-        "Plugin should attach the combat log controller."
+        debugBranchIndex >= 0
+            && controllerAddIndex > debugBranchIndex
+            && overlayAddIndex > debugBranchIndex,
+        "Plugin should attach both combat log components only in debug builds."
     );
 
     var debugPanelSource = ReadSource("Game/DebugPanel/DebugPanel.cs");
@@ -268,7 +279,7 @@ static void VerifySourceWiring()
     );
 
     Assert(
-        pluginSource.Contains("AddComponent<CombatLogOverlay>()", StringComparison.Ordinal),
+        overlayAddIndex >= 0,
         "Plugin should attach the standalone combat log overlay in debug builds."
     );
 

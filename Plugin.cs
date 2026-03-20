@@ -44,7 +44,6 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<RunStateSyncController>();
         gameObject.AddComponent<RunLoggingController>();
         gameObject.AddComponent<CombatReplayRuntime>();
-        gameObject.AddComponent<CombatLogController>();
         gameObject.AddComponent<HistoryPanel>();
         gameObject.AddComponent<HistoryCollectionsEntryBridge>();
         gameObject.AddComponent<CombatStatusBar>();
@@ -56,6 +55,7 @@ public class Plugin : BaseUnityPlugin
         if (BppBuild.IsDebug)
         {
             gameObject.AddComponent<DebugPanel>();
+            gameObject.AddComponent<CombatLogController>();
             gameObject.AddComponent<CombatLogOverlay>();
             gameObject.AddComponent<MonsterPreviewDebugController>();
         }
