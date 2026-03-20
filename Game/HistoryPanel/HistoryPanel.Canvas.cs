@@ -285,7 +285,7 @@ internal sealed partial class HistoryPanel
         StretchToParent(headerLayout, 0f, 0f, 0f, 0f);
 
         var title = CreateText("Title", headerLayout, 28, FontStyle.Bold, TextAnchor.UpperLeft);
-        title.text = "Battle History";
+        title.text = "Game History";
         title.color = new Color(0.97f, 0.85f, 0.57f, 1f);
         ConfigureLayoutElement(title.gameObject, preferredHeight: 32f, minHeight: 32f);
 
@@ -297,7 +297,7 @@ internal sealed partial class HistoryPanel
             TextAnchor.UpperLeft
         );
         subtitle.text =
-            "Review completed runs, inspect each PvP battle by day and hour, and replay the one you need.";
+            "Review your game history and replay any battle you want. Support BazaarPlusPlus at bazaarplusplus.com. -- Xinyu YANG";
         subtitle.color = new Color(0.82f, 0.86f, 0.91f, 0.94f);
         subtitle.textWrappingMode = TextWrappingModes.Normal;
         subtitle.overflowMode = TextOverflowModes.Ellipsis;
