@@ -646,16 +646,6 @@ internal sealed partial class HistoryPanel
 
         // --- detail lines ---
         BuildBattleNameRow(body, battle);
-        if (!string.IsNullOrWhiteSpace(battle.OpponentAccountId))
-        {
-            AddDetailLine(
-                body,
-                $"UserID: {battle.OpponentAccountId}",
-                11,
-                FontStyle.Normal,
-                new Color(0.72f, 0.78f, 0.85f, 0.92f)
-            );
-        }
         AddDetailLine(
             body,
             $"ID: {ShortenBattleId(battle.BattleId)}",
@@ -1305,12 +1295,14 @@ internal sealed partial class HistoryPanel
         {
             if (string.Equals(rank, "Legendary", StringComparison.OrdinalIgnoreCase))
             {
-                var ratingText = CreateText("Rating", row, 11, FontStyle.Bold, TextAnchor.MiddleLeft);
-                ratingText.text = battle.OpponentRating.HasValue
-                    ? $"Rating {battle.OpponentRating.Value}"
-                    : "Legendary";
-                ratingText.color = new Color(0.99f, 0.84f, 0.34f, 0.96f);
-                ConfigureLayoutElement(ratingText.gameObject, preferredHeight: 16f, minHeight: 16f);
+                AddPill(
+                    row,
+                    "LegendaryRating",
+                    battle.OpponentRating.HasValue ? battle.OpponentRating.Value.ToString() : "LEG",
+                    ColorFromRgb(241, 54, 41),
+                    Color.white,
+                    68f
+                );
             }
             else
             {
