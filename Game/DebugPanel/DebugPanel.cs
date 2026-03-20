@@ -31,7 +31,6 @@ internal sealed class DebugPanel : MonoBehaviour
     private static bool _stylesInitialized;
 
     private readonly DebugPanelState _panelState = new DebugPanelState();
-    private readonly CombatLogPanel _combatLogPanel = new CombatLogPanel();
     private Vector2 _scroll = Vector2.zero;
     private PanelSnapshot _snapshot = PanelSnapshot.Empty;
     private float _nextRefreshTime;
@@ -101,9 +100,6 @@ internal sealed class DebugPanel : MonoBehaviour
                 RefreshSnapshot(force: true);
         }
 
-        if (keyboard[KeyBindings.Toggle.CombatLogPanel].wasPressedThisFrame)
-            _combatLogPanel.ToggleVisibility();
-
         if (!IsVisible)
             return;
 
@@ -153,9 +149,6 @@ internal sealed class DebugPanel : MonoBehaviour
             DrawSection(_panelState.ActiveSection);
         GUILayout.EndScrollView();
         GUILayout.EndArea();
-
-        var timeline = CombatLogController.Instance?.Runtime.CurrentTimeline;
-        _combatLogPanel.Draw(windowRect, timeline, CombatStatusBar.ProcessedCombatFrames);
     }
 
     private void DrawToolbar()
@@ -166,7 +159,7 @@ internal sealed class DebugPanel : MonoBehaviour
             StatusStyle
         );
         GUILayout.Label(
-            $"[F2] Toggle  [F7] Combat Log  [1-5] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}",
+            $"[F2] Toggle  [F7] Combat Log Overlay  [1-5] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}",
             MutedStyle
         );
         GUILayout.Space(8);

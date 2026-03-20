@@ -84,6 +84,8 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
     public bool IsAlive => _boardRoot != null;
 
+    public Transform RootTransform => _boardRoot.transform;
+
     public MonsterPreviewBoard(
         string name,
         IPreviewCardFactory factory,
@@ -337,6 +339,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
             );
         _skillContentRoot.transform.localRotation = Quaternion.identity;
         _skillContentRoot.transform.localScale = Vector3.one;
+        SetActive(_skillContentRoot, _presentation.ShowSkillBoard);
 
         RefreshBoardSlots();
         RefreshSkillSlots();
@@ -570,6 +573,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         if (_boardFill != null)
         {
+            SetActive(_boardFill, _presentation.ShowItemBoardFill);
             _boardFill.transform.localPosition = new Vector3(
                 0f,
                 boardThickness * 0.2f,
@@ -585,6 +589,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         if (_skillBoardFill != null)
         {
+            SetActive(_skillBoardFill, _presentation.ShowSkillBoard);
             _skillBoardFill.transform.localPosition = new Vector3(
                 skillBoardCenterX,
                 boardThickness * 0.2f,
@@ -600,6 +605,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         if (_brandingBoardFill != null)
         {
+            SetActive(_brandingBoardFill, _presentation.ShowBrandingBoard);
             _brandingBoardFill.transform.localPosition = new Vector3(
                 brandingBoardCenterX,
                 boardThickness * 0.2f,
@@ -615,6 +621,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         if (_monsterInfoBoardFill != null)
         {
+            SetActive(_monsterInfoBoardFill, _presentation.ShowMonsterInfoBoard);
             _monsterInfoBoardFill.transform.localPosition = new Vector3(
                 monsterInfoBoardCenterX,
                 boardThickness * 0.2f,
@@ -630,6 +637,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         if (_monsterInfoTextStripFill != null)
         {
+            SetActive(_monsterInfoTextStripFill, _presentation.ShowMonsterInfoBoard);
             _monsterInfoTextStripFill.transform.localPosition = new Vector3(
                 monsterInfoBoardCenterX,
                 boardThickness * 0.3f,
@@ -678,6 +686,8 @@ internal sealed class MonsterPreviewBoard : IDisposable
         if (_skillBoardBorders.Count >= 4)
         {
             var skillHalfWidth = skillBoardWidth * 0.5f;
+            for (var index = 0; index < _skillBoardBorders.Count; index++)
+                SetActive(_skillBoardBorders[index], _presentation.ShowSkillBoard);
             UpdateBorder(
                 _skillBoardBorders[0],
                 new Vector3(skillBoardCenterX, borderHeight * 0.5f, -halfDepth),
@@ -711,6 +721,8 @@ internal sealed class MonsterPreviewBoard : IDisposable
         if (_brandingBoardBorders.Count >= 4)
         {
             var brandingHalfWidth = BrandingBoardWidth * 0.5f;
+            for (var index = 0; index < _brandingBoardBorders.Count; index++)
+                SetActive(_brandingBoardBorders[index], _presentation.ShowBrandingBoard);
             UpdateBorder(
                 _brandingBoardBorders[0],
                 new Vector3(brandingBoardCenterX, borderHeight * 0.5f, -halfDepth),
@@ -745,6 +757,8 @@ internal sealed class MonsterPreviewBoard : IDisposable
         {
             var monsterInfoHalfWidth = monsterInfoBoardWidth * 0.5f;
             var monsterInfoHalfDepth = monsterInfoBoardDepth * 0.5f;
+            for (var index = 0; index < _monsterInfoBoardBorders.Count; index++)
+                SetActive(_monsterInfoBoardBorders[index], _presentation.ShowMonsterInfoBoard);
             UpdateBorder(
                 _monsterInfoBoardBorders[0],
                 new Vector3(
@@ -785,6 +799,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
 
         if (_brandingText != null)
         {
+            SetActive(_brandingText.gameObject, _presentation.ShowBrandingBoard);
             _brandingText.transform.localPosition = new Vector3(
                 brandingBoardCenterX,
                 borderHeight + 0.01f,
@@ -807,7 +822,7 @@ internal sealed class MonsterPreviewBoard : IDisposable
         var debugEnabled = IsDebugVisualEnabled();
 
         SetActive(_boardCenterMarker, debugEnabled && _debugOptions.ShowAnchorPoint);
-        SetActive(_brandingText?.gameObject, true);
+        SetActive(_brandingText?.gameObject, _presentation.ShowBrandingBoard);
 
         for (var index = 0; index < _boardSlotMarkers.Count; index++)
             SetActive(_boardSlotMarkers[index], debugEnabled && _debugOptions.ShowItemSlots);
@@ -937,6 +952,15 @@ internal sealed class MonsterPreviewBoard : IDisposable
     )
     {
         if (_monsterInfoTexts.Count == 0)
+            return;
+
+        for (var index = 0; index < _monsterInfoTexts.Count; index++)
+        {
+            if (_monsterInfoTexts[index] != null)
+                SetActive(_monsterInfoTexts[index].gameObject, _presentation.ShowMonsterInfoBoard);
+        }
+
+        if (!_presentation.ShowMonsterInfoBoard)
             return;
 
         var dividerX = boardCenterX + boardWidth * 0.02f;

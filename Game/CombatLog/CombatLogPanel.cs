@@ -9,6 +9,7 @@ internal sealed class CombatLogPanel
     private const float WindowWidth = 420f;
     private const float MinWindowWidth = 320f;
     private const float Spacing = 10f;
+    private const float ScreenMargin = 10f;
 
     private static readonly GUIStyle HeaderStyle = new GUIStyle();
     private static readonly GUIStyle StatusStyle = new GUIStyle();
@@ -25,7 +26,7 @@ internal sealed class CombatLogPanel
     private readonly CombatLogPanelState _state = new CombatLogPanelState();
     private Vector2 _scroll;
 
-    public bool IsVisible { get; private set; } = true;
+    public bool IsVisible { get; private set; }
 
     public void ToggleVisibility()
     {
@@ -57,6 +58,26 @@ internal sealed class CombatLogPanel
         GUILayout.EndArea();
     }
 
+    public void DrawStandalone(CombatLogTimeline? timeline, int processedFrameCount)
+    {
+        if (!IsVisible)
+            return;
+
+        var windowRect = GetStandaloneWindowRect();
+        if (windowRect.width <= 0f || windowRect.height <= 0f)
+            return;
+
+        InitStyles();
+        _state.Refresh(processedFrameCount);
+
+        GUI.Box(windowRect, string.Empty);
+        GUILayout.BeginArea(
+            new Rect(windowRect.x + 8f, windowRect.y + 8f, windowRect.width - 16f, windowRect.height - 16f)
+        );
+        DrawWindowContents(timeline);
+        GUILayout.EndArea();
+    }
+
     private Rect GetWindowRect(Rect debugPanelRect)
     {
         var remainingWidth = Screen.width - (debugPanelRect.xMax + Spacing) - 10f;
@@ -65,6 +86,17 @@ internal sealed class CombatLogPanel
 
         var width = Mathf.Min(WindowWidth, remainingWidth);
         return new Rect(debugPanelRect.xMax + Spacing, debugPanelRect.y, width, debugPanelRect.height);
+    }
+
+    private Rect GetStandaloneWindowRect()
+    {
+        var availableWidth = Screen.width - (ScreenMargin * 2f);
+        if (availableWidth < MinWindowWidth)
+            return Rect.zero;
+
+        var width = Mathf.Min(WindowWidth, availableWidth);
+        var height = Mathf.Max(Screen.height - (ScreenMargin * 2f), 0f);
+        return new Rect(Screen.width - width - ScreenMargin, ScreenMargin, width, height);
     }
 
     private void DrawWindowContents(CombatLogTimeline? timeline)

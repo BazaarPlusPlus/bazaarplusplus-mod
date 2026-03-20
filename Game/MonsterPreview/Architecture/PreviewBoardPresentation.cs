@@ -9,6 +9,14 @@ internal sealed class PreviewBoardPresentation
 
     public bool DebugEnabled { get; set; }
 
+    public bool ShowSkillBoard { get; set; } = true;
+
+    public bool ShowBrandingBoard { get; set; } = true;
+
+    public bool ShowMonsterInfoBoard { get; set; } = true;
+
+    public bool ShowItemBoardFill { get; set; } = true;
+
     public Vector3 LocalOffset { get; set; } = Vector3.zero;
 
     public Vector3 CardScale { get; set; } = Vector3.one;

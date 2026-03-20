@@ -10,6 +10,14 @@ internal sealed class CombatReplaySequenceCandidate
 
     public string? OpponentName { get; set; }
 
+    public string? OpponentHero { get; set; }
+
+    public string? OpponentRank { get; set; }
+
+    public int? OpponentRating { get; set; }
+
+    public int? OpponentLevel { get; set; }
+
     public string? OpponentAccountId { get; set; }
 
     public bool PlayerHandCardsCapturedFromOpening { get; set; }

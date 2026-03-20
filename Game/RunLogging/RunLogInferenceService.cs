@@ -47,18 +47,57 @@ public sealed class RunLogInferenceService
     {
         return new RunLogEvent
         {
-            Kind = "choice_made",
+            Kind = ResolveChoiceMadeKind(input.State),
+            Day = input.Day,
+            Hour = input.Hour,
+            State = input.State,
+            EncounterId = input.EncounterId,
+            ParentEncounterId = input.ParentEncounterId,
             SelectionSeq = input.SelectionSeq,
             SelectedInstanceId = option.InstanceId,
             SelectedTemplateId = option.TemplateId,
+            SelectedEncounterId = ResolveSelectedEncounterId(input.State, option.TemplateId),
+            SelectedName = option.Name,
+            SelectedTier = option.Tier,
+            SelectedEnchant = option.Enchant,
             InferredFrom = inferredFrom,
             Confidence = confidence,
         };
+    }
+
+    private static string ResolveChoiceMadeKind(string? state)
+    {
+        return state switch
+        {
+            "Encounter" => "encounter_selected",
+            "Choice" => "choice_selected",
+            "Loot" => "loot_selected",
+            "Pedestal" => "pedestal_selected",
+            _ => "choice_made",
+        };
+    }
+
+    private static string? ResolveSelectedEncounterId(string? state, string? selectedTemplateId)
+    {
+        if (string.Equals(state, "Encounter", StringComparison.Ordinal))
+            return selectedTemplateId;
+
+        return null;
     }
 }
 
 public sealed class RunLogChoiceInferenceInput
 {
+    public int? Day { get; set; }
+
+    public int? Hour { get; set; }
+
+    public string? State { get; set; }
+
+    public string? EncounterId { get; set; }
+
+    public string? ParentEncounterId { get; set; }
+
     public long SelectionSeq { get; set; }
 
     public bool TransitionedAway { get; set; }

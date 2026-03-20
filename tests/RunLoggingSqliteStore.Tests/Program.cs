@@ -98,6 +98,23 @@ try
                 Day = 1,
                 Hour = 2,
                 State = "Encounter",
+                PendingSelectionSeq = 2,
+                PendingSelection = new RunLogPendingSelectionState
+                {
+                    Day = 1,
+                    Hour = 2,
+                    State = "Encounter",
+                    SelectionSeq = 2,
+                    Options =
+                    [
+                        new RunLogOptionSnapshot
+                        {
+                            InstanceId = "instance-a",
+                            TemplateId = "template-a",
+                            Name = "Frost Street",
+                        },
+                    ],
+                },
                 Completed = false,
             },
         ]
@@ -126,81 +143,92 @@ try
 
     Assert(File.Exists(dbPath), "CreateRun should initialize the SQLite database file.");
 
-    using var connection = new SqliteConnection($"Data Source={dbPath}");
-    connection.Open();
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
 
-    Assert(CountRows(connection, "runs") == 1, "runs should contain exactly one row.");
-    Assert(
-        GetString(connection, "SELECT run_id FROM runs WHERE run_id = $runId;", runId) == runId,
-        "runs should contain the created run."
-    );
-    Assert(CountRows(connection, "run_events") == 2, "run_events should contain exactly two rows.");
-    Assert(
-        GetInt64(connection, "SELECT MIN(seq) FROM run_events WHERE run_id = $runId;", runId) == 1,
-        "run_events should persist seq=1."
-    );
-    Assert(
-        GetInt64(connection, "SELECT MAX(seq) FROM run_events WHERE run_id = $runId;", runId) == 2,
-        "run_events should persist seq=2."
-    );
-    Assert(
-        GetInt64(connection, "SELECT last_seq FROM run_checkpoints WHERE run_id = $runId;", runId)
-            == 2,
-        "run_checkpoints should persist the checkpoint last_seq."
-    );
-    Assert(
-        GetString(connection, "SELECT status FROM run_status WHERE run_id = $runId;", runId)
-            == "completed",
-        "run_status should persist terminal status."
-    );
+        Assert(CountRows(connection, "runs") == 1, "runs should contain exactly one row.");
+        Assert(
+            GetString(connection, "SELECT run_id FROM runs WHERE run_id = $runId;", runId) == runId,
+            "runs should contain the created run."
+        );
+        Assert(CountRows(connection, "run_events") == 2, "run_events should contain exactly two rows.");
+        Assert(
+            GetInt64(connection, "SELECT MIN(seq) FROM run_events WHERE run_id = $runId;", runId) == 1,
+            "run_events should persist seq=1."
+        );
+        Assert(
+            GetInt64(connection, "SELECT MAX(seq) FROM run_events WHERE run_id = $runId;", runId) == 2,
+            "run_events should persist seq=2."
+        );
+        Assert(
+            GetInt64(connection, "SELECT last_seq FROM run_checkpoints WHERE run_id = $runId;", runId)
+                == 2,
+            "run_checkpoints should persist the checkpoint last_seq."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT pending_selection_json FROM run_checkpoints WHERE run_id = $runId;",
+                runId
+            ).Contains("template-a", StringComparison.Ordinal),
+            "run_checkpoints should persist pending selection payload JSON."
+        );
+        Assert(
+            GetString(connection, "SELECT status FROM run_status WHERE run_id = $runId;", runId)
+                == "completed",
+            "run_status should persist terminal status."
+        );
 
-    const string abandonedRunId = "server-run-456";
-    Invoke<RunLogSessionState>(
-        storeType,
-        store,
-        "CreateRun",
-        [
-            new RunLogCreateRequest
-            {
-                SchemaVersion = 1,
-                RunId = abandonedRunId,
-                StartedAtUtc = startedAt.AddHours(1),
-                Hero = "Pygmalien",
-                GameMode = "Unranked",
-                Day = 1,
-                Hour = 1,
-            },
-        ]
-    );
-    InvokeVoid(
-        storeType,
-        store,
-        "CompleteRun",
-        [
-            abandonedRunId,
-            new RunLogCompletion
-            {
-                SchemaVersion = 1,
-                RunId = abandonedRunId,
-                Status = "abandoned",
-                EndedAtUtc = startedAt.AddHours(1).AddMinutes(5),
-                FinalDay = 1,
-                FinalHour = 2,
-                Reason = "interrupted",
-            },
-        ]
-    );
-    Assert(
-        GetString(
-            connection,
-            "SELECT status FROM run_status WHERE run_id = $runId;",
-            abandonedRunId
-        ) == "abandoned",
-        "run_status should preserve interrupted/abandoned terminal statuses."
-    );
+        const string abandonedRunId = "server-run-456";
+        Invoke<RunLogSessionState>(
+            storeType,
+            store,
+            "CreateRun",
+            [
+                new RunLogCreateRequest
+                {
+                    SchemaVersion = 1,
+                    RunId = abandonedRunId,
+                    StartedAtUtc = startedAt.AddHours(1),
+                    Hero = "Pygmalien",
+                    GameMode = "Unranked",
+                    Day = 1,
+                    Hour = 1,
+                },
+            ]
+        );
+        InvokeVoid(
+            storeType,
+            store,
+            "CompleteRun",
+            [
+                abandonedRunId,
+                new RunLogCompletion
+                {
+                    SchemaVersion = 1,
+                    RunId = abandonedRunId,
+                    Status = "abandoned",
+                    EndedAtUtc = startedAt.AddHours(1).AddMinutes(5),
+                    FinalDay = 1,
+                    FinalHour = 2,
+                    Reason = "interrupted",
+                },
+            ]
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT status FROM run_status WHERE run_id = $runId;",
+                abandonedRunId
+            ) == "abandoned",
+            "run_status should preserve interrupted/abandoned terminal statuses."
+        );
+    }
 }
 finally
 {
+    SqliteConnection.ClearAllPools();
     if (Directory.Exists(tempRoot))
         Directory.Delete(tempRoot, recursive: true);
 }

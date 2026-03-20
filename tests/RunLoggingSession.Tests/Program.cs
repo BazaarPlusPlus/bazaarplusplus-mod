@@ -48,6 +48,10 @@ var firstSelection = Invoke<RunLogEvent?>(
 Assert(firstSelection != null, "The first selection_seen event should be recorded.");
 Assert(firstSelection!.Seq == 1, "The first recorded event should get seq=1.");
 Assert(fakeStore.AppendedEvents.Count == 1, "The first selection event should be persisted.");
+Assert(
+    fakeStore.ResumeState?.PendingSelection?.SelectionSeq == 1,
+    "selection_seen should persist the pending selection payload."
+);
 
 var duplicateSelection = Invoke<RunLogEvent?>(
     managerType,
@@ -84,6 +88,83 @@ Assert(progressEvent != null, "A non-duplicate event should be persisted.");
 Assert(progressEvent!.Seq == 2, "Sequence numbers should remain monotonic after suppression.");
 Assert(fakeStore.AppendedEvents.Count == 2, "Two unique events should be persisted.");
 
+var choiceEvent = Invoke<RunLogEvent?>(
+    managerType,
+    manager,
+    "AppendEvent",
+    [
+        new RunLogEvent
+        {
+            Kind = "choice_made",
+            SelectionSeq = 1,
+            SelectedInstanceId = "instance-a",
+            SelectedTemplateId = "template-a",
+            SelectedName = "Frost Street",
+        },
+    ]
+);
+Assert(choiceEvent != null, "choice_made should be accepted for the pending selection.");
+Assert(choiceEvent!.Seq == 3, "choice_made should advance the sequence.");
+Assert(fakeStore.ResumeState?.PendingSelectionSeq == null, "choice_made should clear pending_selection_seq.");
+Assert(
+    fakeStore.ResumeState?.PendingSelection == null,
+    "choice_made should clear the pending selection payload."
+);
+
+var secondSelection = Invoke<RunLogEvent?>(
+    managerType,
+    manager,
+    "AppendEvent",
+    [
+        new RunLogEvent
+        {
+            Kind = "choice_options_seen",
+            Day = 1,
+            Hour = 2,
+            State = "Choice",
+            SelectionFingerprint = "selection-fp-2",
+        },
+    ]
+);
+Assert(secondSelection != null, "A second selection should be recorded.");
+
+var abandonedSelection = Invoke<RunLogEvent?>(
+    managerType,
+    manager,
+    "AppendEvent",
+    [
+        new RunLogEvent
+        {
+            Kind = "selection_abandoned",
+            Day = 1,
+            Hour = 2,
+            State = "Choice",
+            SelectionSeq = secondSelection!.Seq,
+            AbandonedReason = "superseded_by_new_selection",
+        },
+    ]
+);
+Assert(abandonedSelection != null, "selection_abandoned should be recorded.");
+Assert(
+    fakeStore.ResumeState?.PendingSelectionSeq == null && fakeStore.ResumeState?.PendingSelection == null,
+    "selection_abandoned should clear the pending selection state."
+);
+
+var staleChoiceEvent = Invoke<RunLogEvent?>(
+    managerType,
+    manager,
+    "AppendEvent",
+    [
+        new RunLogEvent
+        {
+            Kind = "choice_made",
+            SelectionSeq = secondSelection!.Seq,
+            SelectedInstanceId = "instance-a",
+        },
+    ]
+);
+Assert(staleChoiceEvent == null, "A duplicate/stale choice_made should be suppressed once the pending selection is cleared.");
+
 InvokeVoid(
     managerType,
     manager,
@@ -108,6 +189,24 @@ fakeStore.ResumeState = new RunLogSessionState
     State = "Choice",
     LastSelectionFingerprint = "selection-fp-prev",
     PendingSelectionSeq = 40,
+    PendingSelection = new RunLogPendingSelectionState
+    {
+        Day = 4,
+        Hour = 2,
+        State = "Choice",
+        EncounterId = "enc-40",
+        ParentEncounterId = "enc-40",
+        SelectionSeq = 40,
+        Options =
+        [
+            new RunLogOptionSnapshot
+            {
+                InstanceId = "instance-prev",
+                TemplateId = "template-prev",
+                Name = "Recovered Choice",
+            },
+        ],
+    },
 };
 
 var resumedManager = ctor.Invoke([fakeStore, new Func<DateTimeOffset>(() => now.AddMinutes(20))]);
@@ -281,6 +380,7 @@ file sealed class FakeRunLogStore : IRunLogStore
             ResumeState.LastStateFingerprint = checkpoint.LastStateFingerprint;
             ResumeState.LastSelectionFingerprint = checkpoint.LastSelectionFingerprint;
             ResumeState.PendingSelectionSeq = checkpoint.PendingSelectionSeq;
+            ResumeState.PendingSelection = checkpoint.PendingSelection;
             ResumeState.Completed = checkpoint.Completed;
         }
     }

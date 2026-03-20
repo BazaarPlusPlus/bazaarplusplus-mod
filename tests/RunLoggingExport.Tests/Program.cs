@@ -43,13 +43,51 @@ try
     Assert(Directory.Exists(singleOutDir), "Single-run output directory should exist.");
     Assert(File.Exists(Path.Combine(singleRunDir, "meta.json")), "meta.json should exist.");
     Assert(
-        File.ReadAllLines(Path.Combine(singleRunDir, "events.ndjson")).Length == 2,
+        File.ReadAllLines(Path.Combine(singleRunDir, "events.ndjson")).Length == 3,
         "events.ndjson should contain the expected number of lines."
     );
+    Assert(
+        File.Exists(Path.Combine(singleRunDir, "decision_chain.ndjson")),
+        "decision_chain.ndjson should exist when the run contains player choices."
+    );
+    var decisionLines = File.ReadAllLines(Path.Combine(singleRunDir, "decision_chain.ndjson"));
+    Assert(
+        decisionLines.Length == 1,
+        "decision_chain.ndjson should contain one line per exported choice."
+    );
+    using (var decisionDocument = JsonDocument.Parse(decisionLines[0]))
+    {
+        var root = decisionDocument.RootElement;
+        Assert(
+            root.GetProperty("selection_kind").GetString() == "encounter_options_seen",
+            "decision_chain.ndjson should preserve the selection event kind."
+        );
+        Assert(
+            root.GetProperty("options").GetArrayLength() == 2,
+            "decision_chain.ndjson should preserve the visible options."
+        );
+        Assert(
+            root.GetProperty("choice").GetProperty("kind").GetString() == "encounter_selected",
+            "decision_chain.ndjson should preserve the matching choice event."
+        );
+        Assert(
+            root.GetProperty("choice").GetProperty("selected_encounter_id").GetString()
+                == "template-a",
+            "decision_chain.ndjson should keep selected_encounter_id for encounter choices."
+        );
+    }
     Assert(
         ReadJsonString(Path.Combine(singleRunDir, "checkpoint.json"), "run_id") == runId1,
         "checkpoint.json should match the requested run."
     );
+    using (var checkpointDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(singleRunDir, "checkpoint.json"))))
+    {
+        var pendingSelection = checkpointDocument.RootElement.GetProperty("pending_selection");
+        Assert(
+            pendingSelection.GetProperty("selection_seq").GetInt64() == 2,
+            "checkpoint.json should expand pending_selection_json into a structured object."
+        );
+    }
     Assert(
         ReadJsonString(Path.Combine(singleRunDir, "status.json"), "run_id") == runId1,
         "status.json should match the requested run."
@@ -74,8 +112,12 @@ try
             root.GetProperty("player_name").GetString() == "Local Player"
                 && root.GetProperty("player_account_id").GetString() == "player-account-001"
                 && root.GetProperty("opponent_name").GetString() == "Test Rival"
+                && root.GetProperty("opponent_hero").GetString() == "Vanessa"
+                && root.GetProperty("opponent_rank").GetString() == "Gold"
+                && root.GetProperty("opponent_rating").GetInt32() == 1337
+                && root.GetProperty("opponent_level").GetInt32() == 9
                 && root.GetProperty("opponent_account_id").GetString() == "opponent-account-001",
-            "pvp_battles.ndjson should preserve both player names and account ids."
+            "pvp_battles.ndjson should preserve both player and opponent identity metadata."
         );
         Assert(
             root.GetProperty("result").GetString() == "win"
@@ -177,6 +219,10 @@ static void WritePvpBattle(
             player_name,
             player_account_id,
             opponent_name,
+            opponent_hero,
+            opponent_rank,
+            opponent_rating,
+            opponent_level,
             opponent_account_id,
             combat_kind,
             result,
@@ -196,6 +242,10 @@ static void WritePvpBattle(
             $playerName,
             $playerAccountId,
             $opponentName,
+            $opponentHero,
+            $opponentRank,
+            $opponentRating,
+            $opponentLevel,
             $opponentAccountId,
             $combatKind,
             $result,
@@ -216,6 +266,10 @@ static void WritePvpBattle(
     command.Parameters.AddWithValue("$playerName", "Local Player");
     command.Parameters.AddWithValue("$playerAccountId", "player-account-001");
     command.Parameters.AddWithValue("$opponentName", opponentName);
+    command.Parameters.AddWithValue("$opponentHero", "Vanessa");
+    command.Parameters.AddWithValue("$opponentRank", "Gold");
+    command.Parameters.AddWithValue("$opponentRating", 1337);
+    command.Parameters.AddWithValue("$opponentLevel", 9);
     command.Parameters.AddWithValue("$opponentAccountId", "opponent-account-001");
     command.Parameters.AddWithValue("$combatKind", "PVPCombat");
     command.Parameters.AddWithValue("$result", "win");
@@ -287,11 +341,47 @@ static void WriteCompletedRun(
             RunId = runId,
             Seq = 2,
             Ts = startedAt.AddSeconds(5),
-            Kind = "run_progress",
+            Kind = "encounter_options_seen",
             Day = 1,
             Hour = 2,
-            Victories = 1,
-            Losses = 0,
+            State = "Encounter",
+            Options =
+            [
+                new RunLogOptionSnapshot
+                {
+                    Index = 0,
+                    InstanceId = "instance-a",
+                    TemplateId = "template-a",
+                    Name = "Frost Street",
+                },
+                new RunLogOptionSnapshot
+                {
+                    Index = 1,
+                    InstanceId = "instance-b",
+                    TemplateId = "template-b",
+                    Name = "Amber Cove",
+                },
+            ],
+        }
+    );
+    store.AppendEvent(
+        runId,
+        new RunLogEvent
+        {
+            SchemaVersion = 1,
+            RunId = runId,
+            Seq = 3,
+            Ts = startedAt.AddSeconds(7),
+            Kind = "encounter_selected",
+            Day = 1,
+            Hour = 2,
+            State = "Encounter",
+            SelectionSeq = 2,
+            EncounterId = "map-node-encounter",
+            SelectedInstanceId = "instance-a",
+            SelectedTemplateId = "template-a",
+            SelectedEncounterId = "template-a",
+            SelectedName = "Frost Street",
         }
     );
 
@@ -301,11 +391,36 @@ static void WriteCompletedRun(
         {
             SchemaVersion = 1,
             RunId = runId,
-            LastSeq = 2,
-            LastSeenAtUtc = startedAt.AddSeconds(5),
+            LastSeq = 3,
+            LastSeenAtUtc = startedAt.AddSeconds(7),
             Day = 1,
             Hour = 2,
             State = "Encounter",
+            PendingSelectionSeq = 2,
+            PendingSelection = new RunLogPendingSelectionState
+            {
+                Day = 1,
+                Hour = 2,
+                State = "Encounter",
+                SelectionSeq = 2,
+                Options =
+                [
+                    new RunLogOptionSnapshot
+                    {
+                        Index = 0,
+                        InstanceId = "instance-a",
+                        TemplateId = "template-a",
+                        Name = "Frost Street",
+                    },
+                    new RunLogOptionSnapshot
+                    {
+                        Index = 1,
+                        InstanceId = "instance-b",
+                        TemplateId = "template-b",
+                        Name = "Amber Cove",
+                    },
+                ],
+            },
             Completed = false,
         }
     );

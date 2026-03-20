@@ -643,6 +643,9 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         {
             Visible = presentation.Visible,
             DebugEnabled = presentation.DebugEnabled,
+            ShowSkillBoard = presentation.ShowSkillBoard,
+            ShowBrandingBoard = presentation.ShowBrandingBoard,
+            ShowMonsterInfoBoard = presentation.ShowMonsterInfoBoard,
             LocalOffset = presentation.LocalOffset,
             CardSpacing = presentation.CardSpacing,
             CardScale = presentation.CardScale,

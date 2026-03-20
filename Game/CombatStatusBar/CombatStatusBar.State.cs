@@ -7,6 +7,7 @@ namespace BazaarPlusPlus.Game.CombatStatusBar;
 internal sealed partial class CombatStatusBar
 {
     private static readonly float[] SpeedSteps = { 0.25f, 0.33f, 0.5f, 1f };
+    private static readonly float[] SupportedSpeedValues = { 0.25f, 0.33f, 0.5f, 1f, 3f };
 
     internal static bool IsOverlayVisible { get; private set; } = true;
     internal static bool IsCombatPlaybackActive { get; private set; }
@@ -55,6 +56,9 @@ internal sealed partial class CombatStatusBar
 
     internal static float StepCombatSpeed(int direction)
     {
+        if (!IsUiSpeedStep(CombatSpeedMultiplier))
+            return CombatSpeedMultiplier;
+
         var currentIndex = GetCurrentSpeedStepIndex();
         currentIndex = Math.Clamp(currentIndex + direction, 0, SpeedSteps.Length - 1);
         return SetCombatSpeed(SpeedSteps[currentIndex]);
@@ -62,7 +66,7 @@ internal sealed partial class CombatStatusBar
 
     internal static float SetCombatSpeed(float speed)
     {
-        if (!IsSupportedSpeedStep(speed))
+        if (!IsSupportedSpeedValue(speed))
             return CombatSpeedMultiplier;
 
         CombatSpeedMultiplier = speed;
@@ -98,6 +102,9 @@ internal sealed partial class CombatStatusBar
 
     internal static bool CanStepCombatSpeed(int direction)
     {
+        if (!IsUiSpeedStep(CombatSpeedMultiplier))
+            return false;
+
         var currentIndex = GetCurrentSpeedStepIndex();
         var nextIndex = currentIndex + direction;
         return nextIndex >= 0 && nextIndex < SpeedSteps.Length;
@@ -105,7 +112,7 @@ internal sealed partial class CombatStatusBar
 
     internal static float NormalizeConfiguredDefaultSpeed(float configuredSpeed)
     {
-        return IsSupportedSpeedStep(configuredSpeed) ? configuredSpeed : 1f;
+        return IsSupportedSpeedValue(configuredSpeed) ? configuredSpeed : 1f;
     }
 
     internal static string FormatCombatSpeedLabel()
@@ -193,11 +200,22 @@ internal sealed partial class CombatStatusBar
         return currentIndex;
     }
 
-    private static bool IsSupportedSpeedStep(float speed)
+    private static bool IsUiSpeedStep(float speed)
     {
         for (var i = 0; i < SpeedSteps.Length; i++)
         {
             if (Math.Abs(SpeedSteps[i] - speed) < 0.0001f)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsSupportedSpeedValue(float speed)
+    {
+        for (var i = 0; i < SupportedSpeedValues.Length; i++)
+        {
+            if (Math.Abs(SupportedSpeedValues[i] - speed) < 0.0001f)
                 return true;
         }
 

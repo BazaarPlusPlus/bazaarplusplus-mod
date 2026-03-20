@@ -17,6 +17,7 @@ public static class RunLogSnapshotBuilder
                 input.Hour?.ToString(CultureInfo.InvariantCulture),
                 input.State,
                 input.EncounterId,
+                input.ParentEncounterId,
                 input.RerollCost?.ToString(CultureInfo.InvariantCulture),
                 input.RerollsRemaining?.ToString(CultureInfo.InvariantCulture)
             )
@@ -31,7 +32,8 @@ public static class RunLogSnapshotBuilder
                 input.Day?.ToString(CultureInfo.InvariantCulture),
                 input.Hour?.ToString(CultureInfo.InvariantCulture),
                 input.State,
-                input.EncounterId
+                input.EncounterId,
+                input.ParentEncounterId
             )
         );
 

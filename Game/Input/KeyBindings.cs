@@ -24,6 +24,7 @@ internal static class KeyBindings
         public static Key DebugPanel => Key.F2;
         public static Key CombatStatusBar => Key.F6;
         public static Key CombatLogPanel => Key.F7;
+        public static Key HistoryPanel => Key.F8;
     }
 
     internal static class DebugPanel

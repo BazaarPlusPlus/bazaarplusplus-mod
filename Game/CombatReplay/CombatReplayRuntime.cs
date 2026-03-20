@@ -4,16 +4,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Assets.Scripts.Audio;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
+using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using TheBazaar.AppFramework;
+using TheBazaar.UI.Components;
+using TheBazaar.UI.EncounterPicker;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 
@@ -21,6 +26,8 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal sealed class CombatReplayRuntime : MonoBehaviour
 {
+    private static readonly HashSet<int> InitializedReplayBoardUiControllers = new();
+
     private PvpBattleCatalog? _battleCatalog;
     private CombatReplayPayloadStore? _payloadStore;
     private CombatReplayCaptureService? _captureService;
@@ -36,6 +43,337 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     public string? ActiveBattleId => _controller?.ActiveBattleId;
 
     public bool IsReplayPlaybackActive => _savedReplayPlaybackActive || AppState.CurrentState is ReplayState;
+
+    public bool IsSavedReplayPlaybackActive => _savedReplayPlaybackActive;
+
+    public static void HideEncounterPickerOverlays()
+    {
+        HideObjectsOfType<EncounterPickerMapController>();
+        HideObjectsOfType<InjectedEncounterPickerMapController>();
+
+        foreach (var transform in Resources.FindObjectsOfTypeAll<Transform>())
+        {
+            if (
+                transform?.gameObject != null
+                && string.Equals(
+                    transform.gameObject.name,
+                    "EncounterPicker_Map(Clone)",
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                transform.gameObject.SetActive(false);
+            }
+        }
+    }
+
+    public static void EnsureOpponentPortraitVisible()
+    {
+        var encounterController = Data.CurrentEncounterController;
+        if (encounterController?.gameObject == null)
+            return;
+
+        encounterController.gameObject.SetActive(true);
+        encounterController.ShowCard(show: true);
+    }
+
+    public static async Task PrepareReplayHealthBarsAsync()
+    {
+        var controllers = await RefreshReplayHealthBarBindingsAsync();
+        ShowReplayPlayerHealthBar(
+            controllers.FirstOrDefault(controller => controller.combatantId == ECombatantId.Player)
+        );
+        Data.PlayerExperienceBar?.ToggleExperienceBarAndText(isVisible: false);
+        Events.TryShowEmptyOpponentHealthBar.Trigger();
+    }
+
+    public static void RefillReplayOpponentHealthBar()
+    {
+        Events.TryRefillOpponentHealthBar.Trigger();
+    }
+
+    private static async Task<List<BoardUIController>> RefreshReplayHealthBarBindingsAsync()
+    {
+        var controllers = GetSceneBoardUiControllers().ToList();
+        foreach (var controller in controllers)
+        {
+            BindReplayBoardUiController(controller);
+        }
+
+        await Task.Delay(150);
+        return controllers;
+    }
+
+    private static IEnumerable<BoardUIController> GetSceneBoardUiControllers()
+    {
+        return UnityEngine.Object.FindObjectsOfType<BoardUIController>(true)
+            .Where(controller => controller != null && controller.gameObject.scene.rootCount > 0);
+    }
+
+    private static void BindReplayBoardUiController(BoardUIController controller)
+    {
+        var player = controller.combatantId == ECombatantId.Player
+            ? Data.Run?.Player
+            : Data.Run?.Opponent;
+        if (player == null)
+            return;
+
+        if (InitializedReplayBoardUiControllers.Add(controller.GetInstanceID()))
+            InvokeBoardUiMethod(controller, "Init", player);
+
+        if (controller.combatantId == ECombatantId.Player)
+            UnregisterPlayerPortraitPlacedHandler(controller);
+
+        InvokeBoardUiMethod(controller, "SetBattlePlayer", player);
+        ApplyBoardUiDividerConfig(controller);
+        InitializeBoardUiHealthBar(controller, player);
+
+        if (controller.combatantId == ECombatantId.Player)
+            Data.RegisterPlayerHealthBar(controller);
+    }
+
+    private static void ShowReplayPlayerHealthBar(BoardUIController? playerController)
+    {
+        if (playerController != null)
+        {
+            InvokeBoardUiMethod(playerController, "SetBattlePlayer", Data.Run?.Player);
+            InitializeBoardUiHealthBar(playerController, Data.Run?.Player);
+            playerController.ShowEmptyPlayerHealthBar();
+            RevealBoardUiHealthBar(playerController, showStatusNumbers: true);
+            RecalculateHealthBarDividers(playerController, Data.Run?.Player);
+            return;
+        }
+
+        Data.PlayerHealthBar?.ShowEmptyPlayerHealthBar();
+    }
+
+    private static void RecalculateHealthBarDividers(BoardUIController controller, object? player)
+    {
+        if (player == null)
+            return;
+
+        var healthBarField = controller.GetType().GetField(
+            "HealthBar",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+        var healthBar = healthBarField?.GetValue(controller);
+        if (healthBar == null)
+            return;
+
+        ApplyHealthBarMaxValue(healthBar, player);
+    }
+
+    private static void UnregisterPlayerPortraitPlacedHandler(BoardUIController controller)
+    {
+        try
+        {
+            var handlerMethod = controller
+                .GetType()
+                .GetMethod(
+                    "HandleOnPlayerPortraitPlaced",
+                    BindingFlags.Instance | BindingFlags.NonPublic
+                );
+            if (handlerMethod == null)
+                return;
+
+            var handler = Delegate.CreateDelegate(typeof(Action), controller, handlerMethod);
+            var eventField = typeof(BoardManager).GetField(
+                "_playerPortraitPlaced",
+                BindingFlags.Static | BindingFlags.NonPublic
+            );
+            if (eventField?.GetValue(null) is Action currentDelegate)
+            {
+                eventField.SetValue(null, (Action)Delegate.Remove(currentDelegate, handler));
+            }
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Failed to unregister PlayerPortraitPlaced handler: {ex.Message}"
+            );
+        }
+    }
+
+    private static void InitializeBoardUiHealthBar(BoardUIController controller, object? player)
+    {
+        if (player == null)
+            return;
+
+        var healthBarField = controller.GetType().GetField(
+            "HealthBar",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+        var healthBar = healthBarField?.GetValue(controller);
+        if (healthBar == null)
+            return;
+
+        var initMethod = healthBar
+            .GetType()
+            .GetMethod(
+                "Init",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
+        if (initMethod == null)
+            return;
+
+        try
+        {
+            initMethod.Invoke(healthBar, new[] { player });
+            ApplyHealthBarMaxValue(healthBar, player);
+        }
+        catch (TargetInvocationException ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Skipping health bar init for {controller.combatantId}: {ex.InnerException?.Message ?? ex.Message}"
+            );
+        }
+    }
+
+    private static void ApplyBoardUiDividerConfig(BoardUIController controller)
+    {
+        var healthBarDividerConfigField = controller.GetType().GetField(
+            "healthBarDividerConfigSO",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+        var dividerConfig = healthBarDividerConfigField?.GetValue(controller) as HealthBarDividerConfigSO;
+        if (dividerConfig == null)
+            return;
+
+        var healthBarField = controller.GetType().GetField(
+            "HealthBar",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+        var healthBar = healthBarField?.GetValue(controller);
+        if (healthBar == null)
+            return;
+
+        InvokeOptionalMethod(healthBar, "SetDividerConfig", dividerConfig);
+    }
+
+    private static void ApplyHealthBarMaxValue(object healthBar, object player)
+    {
+        var healthMax = TryGetPlayerAttribute(player, EPlayerAttributeType.HealthMax);
+        if (!healthMax.HasValue)
+            return;
+
+        var updateMaxHealth = healthBar
+            .GetType()
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .FirstOrDefault(method =>
+            {
+                if (!string.Equals(method.Name, "UpdateMaxHealth", StringComparison.Ordinal))
+                    return false;
+
+                var parameters = method.GetParameters();
+                return parameters.Length == 3
+                    && parameters[0].ParameterType == typeof(uint)
+                    && parameters[1].ParameterType == typeof(uint)
+                    && parameters[2].ParameterType == typeof(bool);
+            });
+        if (updateMaxHealth == null)
+            return;
+
+        updateMaxHealth.Invoke(healthBar, new object[] { healthMax.Value, healthMax.Value, false });
+    }
+
+    private static uint? TryGetPlayerAttribute(object player, EPlayerAttributeType attributeType)
+    {
+        var attributesProperty = player.GetType().GetProperty(
+            "Attributes",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+        if (attributesProperty?.GetValue(player) is not System.Collections.IDictionary attributes)
+            return null;
+        if (!attributes.Contains(attributeType))
+            return null;
+
+        return Convert.ToUInt32(attributes[attributeType]);
+    }
+
+    private static void RevealBoardUiHealthBar(
+        BoardUIController controller,
+        bool showStatusNumbers
+    )
+    {
+        var healthBarField = controller.GetType().GetField(
+            "HealthBar",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+        var healthBar = healthBarField?.GetValue(controller);
+        if (healthBar == null)
+            return;
+
+        InvokeOptionalMethod(healthBar, "ToggleBarParent", true);
+        InvokeOptionalMethod(healthBar, "ToggleStatusNumbers", showStatusNumbers);
+        InvokeOptionalMethod(healthBar, "RefillHealthBar", 1f);
+    }
+
+    private static void InvokeOptionalMethod(object target, string methodName, object argument)
+    {
+        var method = target
+            .GetType()
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .FirstOrDefault(candidate =>
+            {
+                if (!string.Equals(candidate.Name, methodName, StringComparison.Ordinal))
+                    return false;
+
+                var parameters = candidate.GetParameters();
+                return parameters.Length == 1 && parameters[0].ParameterType.IsInstanceOfType(argument);
+            });
+
+        method?.Invoke(target, new[] { argument });
+    }
+
+    private static void InvokeBoardUiMethod(
+        BoardUIController controller,
+        string methodName,
+        object? argument = null
+    )
+    {
+        var methods = controller
+            .GetType()
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Where(method => string.Equals(method.Name, methodName, StringComparison.Ordinal));
+
+        MethodInfo? targetMethod = null;
+        foreach (var method in methods)
+        {
+            var parameters = method.GetParameters();
+            if (argument == null)
+            {
+                if (parameters.Length == 0)
+                {
+                    targetMethod = method;
+                    break;
+                }
+
+                continue;
+            }
+
+            if (
+                parameters.Length == 1
+                && parameters[0].ParameterType.IsInstanceOfType(argument)
+            )
+            {
+                targetMethod = method;
+                break;
+            }
+        }
+
+        if (targetMethod == null)
+            return;
+
+        if (argument == null)
+        {
+            targetMethod.Invoke(controller, null);
+            return;
+        }
+
+        targetMethod.Invoke(controller, new[] { argument });
+    }
 
     private void Awake()
     {
@@ -152,6 +490,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
 
         var sequence = _controller.LoadReplay(payload);
+        InitializedReplayBoardUiControllers.Clear();
         _savedReplayPlaybackActive = true;
         _ = StartReplayAsync(manifest, sequence, battleId);
         return true;
@@ -292,13 +631,23 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         RehydrateSavedReplayOpponentCards(manifest, sequence.SpawnMessage);
         RehydrateSavedReplayPlayerSkills(manifest, sequence.SpawnMessage);
         RehydrateSavedReplayOpponentSkills(manifest, sequence.SpawnMessage);
+        await RebuildSavedReplaySkillPresentationAsync();
         bootstrapContext.TriggerCombatSequenceCreated();
         await Task.Delay(50);
         await AppState.TryPushState<ReplayState>();
         if (AppState.CurrentState is not ReplayState replayState)
             throw new InvalidOperationException("ReplayState did not become active.");
+        HideEncounterPickerOverlays();
+        EnsureOpponentPortraitVisible();
+        await PrepareReplayHealthBarsAsync();
         Singleton<BoardManager>.Instance.ToggleOpponentPortrait(isVisible: true);
+        await WaitForReplayPresentationReadyAsync();
+        WarmReplayAudioBanks();
+        HideEncounterPickerOverlays();
+        EnsureOpponentPortraitVisible();
+        RefillReplayOpponentHealthBar();
         replayState.Replay();
+        EnsureOpponentPortraitVisible();
         Singleton<BoardManager>.Instance.ShowReplayAndRecapButtons(show: false, deactivate: true);
 
         BppLog.Info("CombatReplayRuntime", $"Saved replay injection completed for {battleId}.");
@@ -393,6 +742,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             if (spawnMessage.Data.Cards.TryGetValue(snapshot.InstanceId, out var simUpdate))
                 card.Update(simUpdate);
 
+            ApplySnapshotFallback(card, snapshot);
             card.Size = snapshot.Size;
             card.Owner = owner;
             card.Section = snapshot.Section;
@@ -416,6 +766,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             if (spawnMessage.Data.Cards.TryGetValue(snapshot.InstanceId, out var simUpdate))
                 card.Update(simUpdate);
 
+            ApplySnapshotFallback(card, snapshot);
             card.Size = snapshot.Size;
             card.Owner = owner;
             card.Section = snapshot.Section;
@@ -426,6 +777,55 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
 
         return skills;
+    }
+
+    private static void ApplySnapshotFallback(Card card, CombatReplayCardSnapshot snapshot)
+    {
+        if (snapshot.Attributes != null && snapshot.Attributes.Count > 0)
+        {
+            foreach (var entry in snapshot.Attributes)
+            {
+                if (
+                    Enum.TryParse<ECardAttributeType>(
+                        entry.Key,
+                        ignoreCase: false,
+                        out var attributeType
+                    )
+                )
+                    card.Attributes[attributeType] = entry.Value;
+            }
+        }
+
+        if (snapshot.Tags != null && snapshot.Tags.Count > 0)
+        {
+            card.Tags = snapshot
+                .Tags
+                .Select(tag =>
+                    Enum.TryParse<ECardTag>(tag, ignoreCase: false, out var parsedTag)
+                        ? (ECardTag?)parsedTag
+                        : null
+                )
+                .Where(tag => tag.HasValue)
+                .Select(tag => tag!.Value)
+                .ToHashSet();
+        }
+
+        if (
+            !string.IsNullOrWhiteSpace(snapshot.Tier)
+            && Enum.TryParse<ETier>(snapshot.Tier, ignoreCase: false, out var tier)
+        )
+            card.Tier = tier;
+
+        if (
+            card is ItemCard itemCard
+            && !string.IsNullOrWhiteSpace(snapshot.Enchant)
+            && Enum.TryParse<EEnchantmentType>(
+                snapshot.Enchant,
+                ignoreCase: false,
+                out var enchantment
+            )
+        )
+            itemCard.Enchantment = enchantment;
     }
 
     private static void ReplaceSkillCollection(object? combatant, IReadOnlyList<SkillCard> skills)
@@ -506,6 +906,122 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
     }
 
+    private static async Task WaitForReplayPresentationReadyAsync()
+    {
+        await WaitUntilAsync(
+            () =>
+            {
+                var boardManager = Singleton<BoardManager>.Instance;
+                if (boardManager == null || !boardManager.IsInitialized)
+                    return false;
+
+                var playerSkillPresentationReady =
+                    Data.PlayerSkillPresentationManager == null
+                    || !Data.PlayerSkillPresentationManager.IsUpdatingSkillBoard;
+                var opponentSkillPresentationReady =
+                    Data.OpponentSkillPresenationManager == null
+                    || !Data.OpponentSkillPresenationManager.IsUpdatingSkillBoard;
+
+                return !boardManager.StorageMoving
+                    && !boardManager.IsUpdatingBoard
+                    && !boardManager.IsUpdatingSkillBoard
+                    && playerSkillPresentationReady
+                    && opponentSkillPresentationReady
+                    && !boardManager.isUpdatingPresentation
+                    && !boardManager.IsCarpetUnrolling
+                    && !boardManager.HasCardsToReveal();
+            },
+            timeout: TimeSpan.FromSeconds(5)
+        );
+
+        // Let one more frame pass so ReplayState.OnEnter fire-and-forget spawn work can settle
+        // before combat sim playback starts.
+        await Task.Delay(100);
+    }
+
+    private static async Task RebuildSavedReplaySkillPresentationAsync()
+    {
+        var playerSkills = Data.Run?.Player?.Skills?.Cast<Card>().ToList() ?? new List<Card>();
+        var opponentSkills = Data.Run?.Opponent?.Skills?.Cast<Card>().ToList() ?? new List<Card>();
+
+        if (Data.PlayerSkillPresentationManager != null)
+            await Data.PlayerSkillPresentationManager.Initialize(playerSkills);
+
+        if (Data.OpponentSkillPresenationManager != null)
+            await Data.OpponentSkillPresenationManager.Initialize(opponentSkills);
+    }
+
+    private static void WarmReplayAudioBanks()
+    {
+        try
+        {
+            var soundManager = Services.Get<SoundManager>();
+            if (soundManager == null)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    "Saved replay audio warmup skipped because SoundManager is unavailable."
+                );
+                return;
+            }
+
+            var boardAssets = UnityEngine.Object.FindObjectsOfType<HeroBoardController>(true)
+                .Where(controller => controller != null && controller.gameObject.scene.rootCount > 0)
+                .Select(controller => controller.AssociatedDataSO)
+                .Where(asset => asset != null)
+                .Distinct()
+                .ToList();
+
+            if (boardAssets.Count == 0)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    "Saved replay audio warmup found no HeroBoardController instances in the scene."
+                );
+                return;
+            }
+
+            foreach (var boardAsset in boardAssets)
+            {
+                WarmReplayAudioBank(soundManager, boardAsset!);
+            }
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay audio warmup failed: {ex.Message}"
+            );
+        }
+    }
+
+    private static void WarmReplayAudioBank(SoundManager soundManager, BoardAssetDataSO boardAsset)
+    {
+        if (string.IsNullOrWhiteSpace(boardAsset.boardBank))
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Board '{boardAsset.name}' has no boardBank; replay SFX may be incomplete."
+            );
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(boardAsset.boardAssetBank))
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Board '{boardAsset.name}' has no boardAssetBank; replay SFX may be incomplete."
+            );
+            return;
+        }
+
+        BppLog.Info(
+            "CombatReplayRuntime",
+            $"Warm replay audio bank: board='{boardAsset.name}', metadata='{boardAsset.boardBank}', asset='{boardAsset.boardAssetBank}'"
+        );
+        soundManager.LoadBank(FModBank.EBankType.SFX, boardAsset.boardBank, boardAsset.boardAssetBank);
+    }
+
     private void OnStateChanged(StateChangedEvent data)
     {
         if (!_returnToMenuAfterReplay || !_bootstrappedReplayActive || data == null)
@@ -517,6 +1033,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _returnToMenuAfterReplay = false;
         _bootstrappedReplayActive = false;
         _savedReplayPlaybackActive = false;
+        InitializedReplayBoardUiControllers.Clear();
 
         try
         {
@@ -694,9 +1211,31 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 );
 
             Data.UpdateFromGameSimAsync(spawnMessage);
+            await EnsureReplayEncounterPortraitAsync();
             MarkGameSimMessageHandled(gameSimHandler, spawnMessage.MessageId);
-            await Task.CompletedTask;
         };
+    }
+
+    private static async Task EnsureReplayEncounterPortraitAsync()
+    {
+        var encounterId = Data.CurrentEncounterId;
+        if (!encounterId.HasValue)
+            return;
+
+        var boardManager = Singleton<BoardManager>.Instance;
+        if (boardManager == null)
+            return;
+
+        var encounterCard = Data.Entities.Values.FirstOrDefault(card => card.TemplateId == encounterId);
+        if (encounterCard == null)
+        {
+            encounterCard = DTOUtils.CreateCard(encounterId.Value.ToString(), ECardType.EventEncounter);
+            encounterCard.LeftSocketId = EContainerSocketId.Socket_5;
+            Data.Entities[encounterCard.InstanceId] = encounterCard;
+        }
+
+        await boardManager.TryLoadCurrentEncounterSO();
+        Events.EncounterPlacedSimEvent.Trigger(new EncounterPlacedEvent(encounterId.Value.ToString()));
     }
 
     private static void MarkGameSimMessageHandled(GameSimHandler gameSimHandler, string messageId)
@@ -800,5 +1339,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         public Func<NetMessageGameSim, Task> HandleSpawnMessageAsync { get; }
 
         public Action TriggerCombatSequenceCreated { get; }
+    }
+
+    private static void HideObjectsOfType<T>()
+        where T : Component
+    {
+        foreach (var component in Resources.FindObjectsOfTypeAll<T>())
+        {
+            if (component?.gameObject != null)
+                component.gameObject.SetActive(false);
+        }
     }
 }

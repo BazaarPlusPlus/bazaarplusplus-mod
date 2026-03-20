@@ -96,6 +96,16 @@ internal sealed class RunLoggingController : MonoBehaviour
         return RequireCore().AcceptSelectionSnapshot(input);
     }
 
+    public RunLogEvent? AcceptChoiceMade(RunLogEvent entry)
+    {
+        return RequireCore().AcceptChoiceMade(entry);
+    }
+
+    public RunLogEvent? AcceptSelectionAbandoned(RunLogEvent entry)
+    {
+        return RequireCore().AcceptSelectionAbandoned(entry);
+    }
+
     private RunLogSessionState? EnsureActiveRunFromGame()
     {
         if (!RunLoggingGameDataReader.TryCreateRunLogCreateRequest(out var request))
@@ -185,6 +195,24 @@ internal sealed class RunLoggingControllerCore
             _sessionManager.SaveCheckpoint();
 
         return selectionEvent;
+    }
+
+    public RunLogEvent? AcceptChoiceMade(RunLogEvent entry)
+    {
+        var choiceEvent = _sessionManager.AppendEvent(entry);
+        if (choiceEvent != null)
+            _sessionManager.SaveCheckpoint();
+
+        return choiceEvent;
+    }
+
+    public RunLogEvent? AcceptSelectionAbandoned(RunLogEvent entry)
+    {
+        var abandonedEvent = _sessionManager.AppendEvent(entry);
+        if (abandonedEvent != null)
+            _sessionManager.SaveCheckpoint();
+
+        return abandonedEvent;
     }
 
     public RunLogEvent AcceptCombatReplay(RunLogPvpBattleInput input)

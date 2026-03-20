@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+from typing import Any
 from pathlib import Path
 
 
@@ -32,6 +33,88 @@ def write_ndjson(path: Path, payloads: list[dict[str, object]]) -> None:
         for payload in payloads:
             handle.write(json.dumps(payload, ensure_ascii=True, separators=(",", ":")))
             handle.write("\n")
+
+
+def load_event_payloads(event_rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
+    payloads: list[dict[str, Any]] = []
+    for event_row in event_rows:
+        payload = json.loads(event_row["payload_json"])
+        if isinstance(payload, dict):
+            payloads.append(payload)
+    return payloads
+
+
+def build_decision_chain(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    decisions: list[dict[str, Any]] = []
+    selection_by_seq: dict[int, dict[str, Any]] = {}
+
+    for event in events:
+        seq = event.get("seq")
+        if not isinstance(seq, int):
+            continue
+
+        kind = event.get("kind")
+        if kind in {
+            "selection_seen",
+            "encounter_options_seen",
+            "choice_options_seen",
+            "loot_options_seen",
+            "pedestal_options_seen",
+        }:
+            selection_by_seq[seq] = event
+            continue
+
+        if kind not in {
+            "choice_made",
+            "encounter_selected",
+            "choice_selected",
+            "loot_selected",
+            "pedestal_selected",
+            "selection_abandoned",
+        }:
+            continue
+
+        selection_seq = event.get("selection_seq")
+        if not isinstance(selection_seq, int):
+            continue
+
+        selection_event = selection_by_seq.get(selection_seq)
+        decisions.append(
+            {
+                "selection_seq": selection_seq,
+                "selection_kind": selection_event.get("kind") if selection_event else None,
+                "selection_ts_utc": selection_event.get("ts") if selection_event else None,
+                "selection_state": selection_event.get("state") if selection_event else None,
+                "selection_day": selection_event.get("day") if selection_event else None,
+                "selection_hour": selection_event.get("hour") if selection_event else None,
+                "selection_encounter_id": (
+                    selection_event.get("encounter_id") if selection_event else None
+                ),
+                "selection_parent_encounter_id": (
+                    selection_event.get("parent_encounter_id") if selection_event else None
+                ),
+                "options": selection_event.get("options") if selection_event else None,
+                "choice": {
+                    "seq": seq,
+                    "kind": kind,
+                    "ts_utc": event.get("ts"),
+                    "state": event.get("state"),
+                    "encounter_id": event.get("encounter_id"),
+                    "parent_encounter_id": event.get("parent_encounter_id"),
+                    "selected_instance_id": event.get("selected_instance_id"),
+                    "selected_template_id": event.get("selected_template_id"),
+                    "selected_encounter_id": event.get("selected_encounter_id"),
+                    "selected_name": event.get("selected_name"),
+                    "selected_tier": event.get("selected_tier"),
+                    "selected_enchant": event.get("selected_enchant"),
+                    "abandoned_reason": event.get("abandoned_reason"),
+                    "inferred_from": event.get("inferred_from"),
+                    "confidence": event.get("confidence"),
+                },
+            }
+        )
+
+    return decisions
 
 
 def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.Row) -> None:
@@ -66,10 +149,15 @@ def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.
         """,
         (run_id,),
     ).fetchall()
+    event_payloads = load_event_payloads(event_rows)
     with (run_dir / "events.ndjson").open("w", encoding="utf-8") as handle:
         for event_row in event_rows:
             handle.write(event_row["payload_json"])
             handle.write("\n")
+
+    decision_chain = build_decision_chain(event_payloads)
+    if decision_chain:
+        write_ndjson(run_dir / "decision_chain.ndjson", decision_chain)
 
     checkpoint_row = connection.execute(
         """
@@ -85,6 +173,7 @@ def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.
             last_state_fingerprint,
             last_selection_fingerprint,
             pending_selection_seq,
+            pending_selection_json,
             completed
         FROM run_checkpoints
         WHERE run_id = ?
@@ -106,9 +195,12 @@ def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.
                 "last_state_fingerprint",
                 "last_selection_fingerprint",
                 "pending_selection_seq",
+                "pending_selection_json",
                 "completed",
             ],
         )
+        if "pending_selection_json" in checkpoint:
+            checkpoint["pending_selection"] = json.loads(checkpoint.pop("pending_selection_json"))
         if "completed" in checkpoint:
             checkpoint["completed"] = bool(checkpoint["completed"])
         write_json(run_dir / "checkpoint.json", checkpoint)
@@ -159,6 +251,10 @@ def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.
             player_name,
             player_account_id,
             opponent_name,
+            opponent_hero,
+            opponent_rank,
+            opponent_rating,
+            opponent_level,
             opponent_account_id,
             combat_kind,
             result,
@@ -183,6 +279,10 @@ def export_run(connection: sqlite3.Connection, out_root: Path, run_row: sqlite3.
                 "player_name": battle_row["player_name"],
                 "player_account_id": battle_row["player_account_id"],
                 "opponent_name": battle_row["opponent_name"],
+                "opponent_hero": battle_row["opponent_hero"],
+                "opponent_rank": battle_row["opponent_rank"],
+                "opponent_rating": battle_row["opponent_rating"],
+                "opponent_level": battle_row["opponent_level"],
                 "opponent_account_id": battle_row["opponent_account_id"],
                 "combat_kind": battle_row["combat_kind"],
                 "result": battle_row["result"],

@@ -263,9 +263,20 @@ static void VerifySourceWiring()
 
     var debugPanelSource = ReadSource("Game/DebugPanel/DebugPanel.cs");
     Assert(
-        debugPanelSource.Contains("CombatLogPanel", StringComparison.Ordinal)
-            && debugPanelSource.Contains("Toggle.CombatLogPanel", StringComparison.Ordinal),
-        "Debug panel should own a combat log side panel with an independent toggle."
+        !debugPanelSource.Contains("CombatLogPanel", StringComparison.Ordinal),
+        "Debug panel should not own the combat log overlay."
+    );
+
+    Assert(
+        pluginSource.Contains("AddComponent<CombatLogOverlay>()", StringComparison.Ordinal),
+        "Plugin should attach the standalone combat log overlay in debug builds."
+    );
+
+    var overlaySource = ReadSource("Game/CombatLog/CombatLogOverlay.cs");
+    Assert(
+        overlaySource.Contains("Toggle.CombatLogPanel", StringComparison.Ordinal)
+            && overlaySource.Contains("DrawStandalone", StringComparison.Ordinal),
+        "Combat log overlay should own the toggle and standalone drawing path."
     );
 
     var debugPanelStateSource = ReadSource("Game/DebugPanel/DebugPanelState.cs");

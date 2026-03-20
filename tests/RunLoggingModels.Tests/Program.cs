@@ -4,6 +4,7 @@ RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCreateRequest");
 RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogSessionState");
 RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogEvent");
 RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCheckpoint");
+RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogPendingSelectionState");
 RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCompletion");
 RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogAbandonment");
 RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingGameDataReader");
@@ -22,6 +23,8 @@ RequireProperty(eventType, "RunId");
 RequireProperty(eventType, "Seq");
 RequireProperty(eventType, "Ts");
 RequireProperty(eventType, "Kind");
+RequireProperty(eventType, "SelectedEncounterId");
+RequireProperty(eventType, "AbandonedReason");
 
 var controllerSourcePath = Path.GetFullPath(
     Path.Combine(AppContext.BaseDirectory, "../../../../../Game/RunLogging/RunLoggingController.cs")
@@ -71,6 +74,10 @@ Assert(
 Assert(
     runLoggingModuleSource.Contains("completionSucceeded", StringComparison.Ordinal),
     "RunLoggingModule should only clear the leave-run retry edge after completion succeeds."
+);
+Assert(
+    runLoggingModuleSource.Contains("selection_abandoned", StringComparison.Ordinal),
+    "RunLoggingModule should emit selection_abandoned when a pending selection cannot be resolved cleanly."
 );
 
 var pluginSourcePath = Path.GetFullPath(
@@ -184,6 +191,10 @@ Assert(
 Assert(
     sqliteStoreSource.Contains("connection.Dispose();", StringComparison.Ordinal),
     "SqliteRunLogStore should dispose connections when OpenConnection initialization fails."
+);
+Assert(
+    sqliteStoreSource.Contains("pending_selection_json", StringComparison.Ordinal),
+    "SqliteRunLogStore should persist pending selection payloads for recovery."
 );
 
 var csprojSourcePath = Path.GetFullPath(

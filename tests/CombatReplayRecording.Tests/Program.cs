@@ -443,6 +443,10 @@ try
         playerName: "Local Player",
         playerAccountId: "player-account-001",
         opponentName: "Test Opponent",
+        opponentHero: "Vanessa",
+        opponentRank: "Legend",
+        opponentRating: 2048,
+        opponentLevel: 12,
         opponentAccountId: "opponent-account-001",
         result: "win",
         winnerCombatantId: "Player",
@@ -530,6 +534,38 @@ try
         Assert(
             GetString(
                 connection,
+                "SELECT opponent_hero FROM pvp_battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == "Vanessa",
+            "pvp_battles should persist the opponent hero."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT opponent_rank FROM pvp_battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == "Legend",
+            "pvp_battles should persist the opponent rank."
+        );
+        Assert(
+            GetInt32(
+                connection,
+                "SELECT opponent_rating FROM pvp_battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 2048,
+            "pvp_battles should persist the opponent rating."
+        );
+        Assert(
+            GetInt32(
+                connection,
+                "SELECT opponent_level FROM pvp_battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 12,
+            "pvp_battles should persist the opponent level."
+        );
+        Assert(
+            GetString(
+                connection,
                 "SELECT result FROM pvp_battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == "win",
@@ -591,6 +627,10 @@ try
                 player_name TEXT NULL,
                 player_account_id TEXT NULL,
                 opponent_name TEXT NULL,
+                opponent_hero TEXT NULL,
+                opponent_rank TEXT NULL,
+                opponent_rating INTEGER NULL,
+                opponent_level INTEGER NULL,
                 opponent_account_id TEXT NULL,
                 combat_kind TEXT NOT NULL,
                 result TEXT NULL,
@@ -613,6 +653,10 @@ try
                 player_name,
                 player_account_id,
                 opponent_name,
+                opponent_hero,
+                opponent_rank,
+                opponent_rating,
+                opponent_level,
                 opponent_account_id,
                 combat_kind,
                 result,
@@ -633,6 +677,10 @@ try
                 'Legacy Player',
                 'legacy-player-account',
                 'Legacy Opponent',
+                NULL,
+                NULL,
+                NULL,
+                NULL,
                 'legacy-opponent-account',
                 'PVPCombat',
                 'loss',
@@ -1059,6 +1107,10 @@ static object CreateManifestFixture(
     string playerName,
     string playerAccountId,
     string opponentName,
+    string opponentHero,
+    string opponentRank,
+    int opponentRating,
+    int opponentLevel,
     string opponentAccountId,
     string result,
     string winnerCombatantId,
@@ -1077,6 +1129,10 @@ static object CreateManifestFixture(
     SetProperty(participantsType, participants, "PlayerName", playerName);
     SetProperty(participantsType, participants, "PlayerAccountId", playerAccountId);
     SetProperty(participantsType, participants, "OpponentName", opponentName);
+    SetProperty(participantsType, participants, "OpponentHero", opponentHero);
+    SetProperty(participantsType, participants, "OpponentRank", opponentRank);
+    SetProperty(participantsType, participants, "OpponentRating", opponentRating);
+    SetProperty(participantsType, participants, "OpponentLevel", opponentLevel);
     SetProperty(participantsType, participants, "OpponentAccountId", opponentAccountId);
 
     var outcome = Activator.CreateInstance(outcomeType)!;
@@ -1127,6 +1183,16 @@ static string GetString(SqliteConnection connection, string sql, string battleId
     return (string)(
         command.ExecuteScalar()
         ?? throw new InvalidOperationException($"Query returned null: {sql}")
+    );
+}
+
+static int GetInt32(SqliteConnection connection, string sql, string battleId)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = sql;
+    command.Parameters.AddWithValue("$battleId", battleId);
+    return Convert.ToInt32(
+        command.ExecuteScalar() ?? throw new InvalidOperationException($"Query returned null: {sql}")
     );
 }
 
@@ -1259,19 +1325,21 @@ static object CreateCombatSimMessage()
 
 static object CreatePvpOpponent(Type simPvpOpponentType, Type loadoutType, string opponentName)
 {
+    var loadout = Activator.CreateInstance(loadoutType)!;
+    SetField(loadoutType, loadout, "accountId", "opponent-account-live");
     return Activator.CreateInstance(
         simPvpOpponentType,
         opponentName,
         null,
         null,
-        null,
-        0,
-        null,
-        null,
+        ParseEnum("BazaarGameShared.TempoNet.Enums.ERank", "BazaarGameShared", "Gold"),
+        1337,
         null,
         null,
         null,
-        Activator.CreateInstance(loadoutType),
+        9,
+        ParseEnum("BazaarGameShared.Domain.Core.Types.EHero", "BazaarGameShared", "Vanessa"),
+        loadout,
         null
     )!;
 }

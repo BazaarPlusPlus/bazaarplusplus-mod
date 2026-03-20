@@ -26,6 +26,7 @@ public class Plugin : BaseUnityPlugin
     protected virtual void Awake()
     {
         var configFile = new ConfigFile(Path.Combine(Paths.ConfigPath, "BazaarPlusPlus.cfg"), true);
+        HistoryPanelPreviewSettings.Initialize(configFile);
 
         _runtimeHost = new BppRuntimeHost(gameObject, Logger, configFile);
         _runtimeHost.Install();
@@ -44,6 +45,8 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<RunLoggingController>();
         gameObject.AddComponent<CombatReplayRuntime>();
         gameObject.AddComponent<CombatLogController>();
+        gameObject.AddComponent<HistoryPanel>();
+        gameObject.AddComponent<HistoryCollectionsEntryBridge>();
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewController>();
         gameObject.AddComponent<MonsterPreviewWarmupController>();
@@ -53,6 +56,7 @@ public class Plugin : BaseUnityPlugin
         if (BppBuild.IsDebug)
         {
             gameObject.AddComponent<DebugPanel>();
+            gameObject.AddComponent<CombatLogOverlay>();
             gameObject.AddComponent<MonsterPreviewDebugController>();
         }
 

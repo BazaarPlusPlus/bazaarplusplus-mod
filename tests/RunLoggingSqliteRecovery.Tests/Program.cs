@@ -78,6 +78,24 @@ try
                 LastStateFingerprint = "state-fp-1",
                 LastSelectionFingerprint = "selection-fp-1",
                 PendingSelectionSeq = 1,
+                PendingSelection = new RunLogPendingSelectionState
+                {
+                    Day = 2,
+                    Hour = 1,
+                    State = "Choice",
+                    EncounterId = "encounter-123",
+                    ParentEncounterId = "encounter-123",
+                    SelectionSeq = 1,
+                    Options =
+                    [
+                        new RunLogOptionSnapshot
+                        {
+                            InstanceId = "instance-a",
+                            TemplateId = "template-a",
+                            Name = "Recovered Choice",
+                        },
+                    ],
+                },
                 Completed = false,
             },
         ]
@@ -107,6 +125,11 @@ try
     Assert(
         resumed.PendingSelectionSeq == 1,
         "Recovered session should preserve pending selection sequence."
+    );
+    Assert(
+        resumed.PendingSelection?.Options.Count == 1
+            && resumed.PendingSelection.Options[0].TemplateId == "template-a",
+        "Recovered session should preserve pending selection payload."
     );
 
     InvokeVoid(
@@ -151,6 +174,7 @@ try
 }
 finally
 {
+    SqliteConnection.ClearAllPools();
     if (Directory.Exists(tempRoot))
         Directory.Delete(tempRoot, recursive: true);
 }

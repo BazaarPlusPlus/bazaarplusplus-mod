@@ -50,8 +50,8 @@ internal sealed class BppConfig : IBppConfig
             "SpeedMultiplier",
             1f,
             new ConfigDescription(
-                "Default combat playback speed multiplier. Supported values: 0.25, 0.33, 0.50, 1.00",
-                new AcceptableValueList<float>(0.25f, 0.33f, 0.5f, 1f)
+                "Default combat playback speed multiplier. Supported values: 0.25, 0.33, 0.50, 1.00, 3.00 (config only)",
+                new AcceptableValueList<float>(0.25f, 0.33f, 0.5f, 1f, 3f)
             )
         );
         EnchantPreviewHotkeyPathConfig = config.Bind(
