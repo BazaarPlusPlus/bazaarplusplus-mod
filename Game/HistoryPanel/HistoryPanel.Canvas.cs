@@ -563,7 +563,7 @@ internal sealed partial class HistoryPanel
         bool selected
     )
     {
-        var (button, background) = CreateCardButtonShell($"RunItem_{index}", parent, 118f);
+        var (button, background) = CreateCardButtonShell($"RunItem_{index}", parent, 130f);
         button.onClick.AddListener(() => SelectRun(index));
 
         var (_, body) = BuildCardShell(
@@ -1599,7 +1599,7 @@ internal sealed partial class HistoryPanel
             false,
             false
         );
-        ConfigureLayoutElement(row.gameObject, preferredHeight: 32f, minHeight: 32f);
+        ConfigureLayoutElement(row.gameObject, preferredHeight: 40f, minHeight: 40f);
 
         CreateRunStatChip(row, "HP", run.MaxHealth, new Color(0.63f, 0.98f, 0.35f, 1f));
         CreateRunStatChip(row, "PRE", run.Prestige, new Color(1f, 0.65f, 0.13f, 1f));
@@ -1619,8 +1619,8 @@ internal sealed partial class HistoryPanel
         ConfigureLayoutElement(
             chip.gameObject,
             flexibleWidth: 1f,
-            preferredHeight: 32f,
-            minHeight: 32f
+            preferredHeight: 40f,
+            minHeight: 40f
         );
         AddImage(chip.gameObject, BuildRunStatChipBackground(valueColor));
 
@@ -1631,28 +1631,23 @@ internal sealed partial class HistoryPanel
         accent.sizeDelta = new Vector2(3f, 0f);
         AddImage(accent.gameObject, new Color(valueColor.r, valueColor.g, valueColor.b, 0.95f));
 
-        var layout = CreateVerticalGroup(
-            "Layout",
-            chip,
-            1f,
-            CreatePadding(8f, 6f, 4f, 4f),
-            TextAnchor.UpperLeft,
-            true,
-            true,
-            true,
-            false
-        );
-        StretchToParent(layout, 5f, 0f, 0f, 0f);
-
-        var label = CreateText("Label", layout, 8, FontStyle.Bold, TextAnchor.UpperLeft);
+        var label = CreateText("Label", chip, 9, FontStyle.Bold, TextAnchor.UpperLeft);
         label.text = labelText;
         label.color = new Color(0.86f, 0.90f, 0.96f, 0.86f);
-        ConfigureLayoutElement(label.gameObject, preferredHeight: 9f, minHeight: 9f);
+        label.rectTransform.anchorMin = new Vector2(0f, 1f);
+        label.rectTransform.anchorMax = new Vector2(1f, 1f);
+        label.rectTransform.pivot = new Vector2(0f, 1f);
+        label.rectTransform.offsetMin = new Vector2(9f, -16f);
+        label.rectTransform.offsetMax = new Vector2(-6f, -5f);
 
-        var valueText = CreateText("Value", layout, 13, FontStyle.Bold, TextAnchor.UpperLeft);
+        var valueText = CreateText("Value", chip, 14, FontStyle.Bold, TextAnchor.UpperLeft);
         valueText.text = value?.ToString() ?? "--";
         valueText.color = valueColor;
-        ConfigureLayoutElement(valueText.gameObject, preferredHeight: 14f, minHeight: 14f);
+        valueText.rectTransform.anchorMin = new Vector2(0f, 0f);
+        valueText.rectTransform.anchorMax = new Vector2(1f, 0f);
+        valueText.rectTransform.pivot = new Vector2(0f, 0f);
+        valueText.rectTransform.offsetMin = new Vector2(9f, 5f);
+        valueText.rectTransform.offsetMax = new Vector2(-6f, 21f);
     }
 
     private static Color BuildRunStatChipBackground(Color accent)

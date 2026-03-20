@@ -172,6 +172,15 @@ Assert(
     "A duplicate/stale choice_made should be suppressed once the pending selection is cleared."
 );
 
+Assert(fakeStore.ResumeState != null, "The fake store should retain the active session.");
+fakeStore.ResumeState!.Day = 6;
+fakeStore.ResumeState.Hour = 4;
+fakeStore.ResumeState.MaxHealth = 90;
+fakeStore.ResumeState.Prestige = 7;
+fakeStore.ResumeState.Level = 5;
+fakeStore.ResumeState.Income = 3;
+fakeStore.ResumeState.Gold = 12;
+
 InvokeVoid(
     managerType,
     manager,
@@ -179,6 +188,22 @@ InvokeVoid(
     [new RunLogCompletion { Status = "completed", EndedAtUtc = now.AddMinutes(10) }]
 );
 Assert(fakeStore.CompleteRunCalls == 1, "CompleteRun should call the store exactly once.");
+Assert(
+    fakeStore.LastCompletion != null,
+    "CompleteRun should pass the resolved completion payload to the store."
+);
+Assert(
+    fakeStore.LastCompletion!.FinalDay == 6 && fakeStore.LastCompletion.FinalHour == 4,
+    "CompleteRun should fall back to the session day/hour when the completion payload omits them."
+);
+Assert(
+    fakeStore.LastCompletion.MaxHealth == 90
+        && fakeStore.LastCompletion.Prestige == 7
+        && fakeStore.LastCompletion.Level == 5
+        && fakeStore.LastCompletion.Income == 3
+        && fakeStore.LastCompletion.Gold == 12,
+    "CompleteRun should fall back to the last checkpoint stats when the completion payload omits them."
+);
 Assert(
     !GetProperty<bool>(managerType, manager, "HasActiveSession"),
     "CompleteRun should clear the active session."
@@ -335,6 +360,8 @@ file sealed class FakeRunLogStore : IRunLogStore
 
     public List<RunLogEvent> AppendedEvents { get; } = [];
 
+    public RunLogCompletion? LastCompletion { get; private set; }
+
     public RunLogSessionState? ResumeState { get; set; }
 
     public RunLogSessionState? TryResumeActiveRun()
@@ -354,6 +381,11 @@ file sealed class FakeRunLogStore : IRunLogStore
             LastSeq = 0,
             Day = request.Day,
             Hour = request.Hour,
+            MaxHealth = 90,
+            Prestige = 7,
+            Level = 5,
+            Income = 3,
+            Gold = 12,
             Completed = false,
         };
         return ResumeState;
@@ -395,6 +427,7 @@ file sealed class FakeRunLogStore : IRunLogStore
     public void CompleteRun(string runId, RunLogCompletion completion)
     {
         CompleteRunCalls++;
+        LastCompletion = completion;
         ResumeState = null;
     }
 

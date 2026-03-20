@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.Game.CombatStatusBar;
 internal sealed partial class CombatStatusBar
 {
     private static readonly float[] SpeedSteps = { 0.25f, 0.33f, 0.5f, 1f };
-    private static readonly float[] SupportedSpeedValues = { 0.25f, 0.33f, 0.5f, 1f, 2f };
+    private static readonly float[] SupportedSpeedValues = { 0.25f, 0.33f, 0.5f, 1f, 1.57f };
 
     internal static bool IsOverlayVisible { get; private set; } = true;
     internal static bool IsCombatPlaybackActive { get; private set; }

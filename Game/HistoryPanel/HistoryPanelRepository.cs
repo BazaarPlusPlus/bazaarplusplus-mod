@@ -318,7 +318,18 @@ internal sealed class HistoryPanelRepository
         if (snapshots == null)
             return specs;
 
-        foreach (var snapshot in snapshots)
+        foreach (
+            var snapshot in snapshots
+                .Select((snapshot, index) => new { snapshot, index })
+                .OrderBy(entry => entry.snapshot?.Socket.HasValue == true ? 0 : 1)
+                .ThenBy(entry =>
+                    entry.snapshot?.Socket.HasValue == true
+                        ? (int)entry.snapshot.Socket!.Value
+                        : int.MaxValue
+                )
+                .ThenBy(entry => entry.index)
+                .Select(entry => entry.snapshot)
+        )
         {
             if (snapshot == null || string.IsNullOrWhiteSpace(snapshot.TemplateId))
                 continue;

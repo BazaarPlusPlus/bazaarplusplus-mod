@@ -178,6 +178,13 @@ public sealed class RunLogSessionManager
         completion.RunId = session.RunId;
         if (completion.EndedAtUtc == default)
             completion.EndedAtUtc = _utcNow();
+        completion.FinalDay ??= session.Day;
+        completion.FinalHour ??= session.Hour;
+        completion.MaxHealth ??= session.MaxHealth;
+        completion.Prestige ??= session.Prestige;
+        completion.Level ??= session.Level;
+        completion.Income ??= session.Income;
+        completion.Gold ??= session.Gold;
 
         _store.CompleteRun(session.RunId, completion);
         session.Completed = true;

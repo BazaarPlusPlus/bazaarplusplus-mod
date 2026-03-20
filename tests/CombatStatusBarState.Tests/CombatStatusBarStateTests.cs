@@ -115,11 +115,11 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void NormalizeConfiguredDefaultSpeed_AcceptsConfigOnlyThreeXSpeed()
+    public void NormalizeConfiguredDefaultSpeed_AcceptsConfigOnlySpecialSpeed()
     {
-        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(3f);
+        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(1.57f);
 
-        Assert.Equal(3f, result);
+        Assert.Equal(1.57f, result);
     }
 
     [Fact]
@@ -137,13 +137,13 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void ConfigOnlyThreeXSpeed_DisablesUiStepControls()
+    public void ConfigOnlySpecialSpeed_DisablesUiStepControls()
     {
-        CombatStatusBar.SetCombatSpeed(3f);
+        CombatStatusBar.SetCombatSpeed(1.57f);
 
         Assert.False(CombatStatusBar.CanStepCombatSpeed(-1));
         Assert.False(CombatStatusBar.CanStepCombatSpeed(1));
-        Assert.Equal(3f, CombatStatusBar.StepCombatSpeed(-1));
+        Assert.Equal(1.57f, CombatStatusBar.StepCombatSpeed(-1));
     }
 
     [Fact]
