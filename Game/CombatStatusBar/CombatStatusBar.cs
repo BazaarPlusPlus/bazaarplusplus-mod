@@ -12,6 +12,7 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
     {
         Events.CombatStarted.AddListener(OnCombatStarted, this);
         Events.CombatEnded.AddListener(OnCombatEnded, this);
+        EnsureConfigStateInitialized();
         EnsureUi();
         RefreshUi();
     }
@@ -30,6 +31,8 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
 
     private void Update()
     {
+        EnsureConfigStateInitialized();
+
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard[KeyBindings.Toggle.CombatStatusBar].wasPressedThisFrame)
             ToggleOverlayVisibility();
@@ -46,6 +49,7 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
 
     private bool ShouldDraw()
     {
+        EnsureConfigStateInitialized();
         return ShouldRenderForState(IsOverlayVisible, IsEnabled());
     }
 

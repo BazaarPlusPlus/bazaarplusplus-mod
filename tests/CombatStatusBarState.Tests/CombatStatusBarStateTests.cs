@@ -189,8 +189,8 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "战斗状态栏｜F6 显隐")]
-    [InlineData("zh-CN", "战斗状态栏｜F6 显隐")]
+    [InlineData("zh-Hans", "战斗状态栏 | F6 切换")]
+    [InlineData("zh-CN", "战斗状态栏 | F6 切换")]
     [InlineData("en", "Combat Status Bar | F6 Toggle")]
     [InlineData("", "Combat Status Bar | F6 Toggle")]
     public void SettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
@@ -239,10 +239,10 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "附魔预览始终显示")]
-    [InlineData("zh-CN", "附魔预览始终显示")]
-    [InlineData("en", "Enchant Preview Always Show")]
-    [InlineData("", "Enchant Preview Always Show")]
+    [InlineData("zh-Hans", "始终显示附魔预览")]
+    [InlineData("zh-CN", "始终显示附魔预览")]
+    [InlineData("en", "Always Show Enchant Preview")]
+    [InlineData("", "Always Show Enchant Preview")]
     public void EnchantPreviewSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
         string languageCode,
         string expected

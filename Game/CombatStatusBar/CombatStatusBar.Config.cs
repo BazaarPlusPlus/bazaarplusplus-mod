@@ -1,72 +1,61 @@
 #nullable enable
 
-using BepInEx.Configuration;
+using BazaarPlusPlus.Core.Runtime;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal sealed partial class CombatStatusBar
 {
-    private static ConfigEntry<bool>? _enableCombatStatusBarConfig;
-    private static ConfigEntry<bool>? _visibleCombatStatusBarConfig;
-    private static ConfigEntry<float>? _defaultCombatSpeedConfig;
+    private static bool _configStateInitialized;
 
-    internal static void InitializeConfig(ConfigFile config)
+    internal static void EnsureConfigStateInitialized()
     {
-        _enableCombatStatusBarConfig = config.Bind(
-            "CombatStatusBar",
-            "Enabled",
-            false,
-            "Whether to show the combat status bar with elapsed time and speed controls"
-        );
-        _visibleCombatStatusBarConfig = config.Bind(
-            "CombatStatusBar",
-            "Visible",
-            true,
-            "Whether the combat status bar is currently visible when enabled. Toggled in game with F6."
-        );
-        _defaultCombatSpeedConfig = config.Bind(
-            "CombatStatusBar",
-            "SpeedMultiplier",
-            1f,
-            new ConfigDescription(
-                "Default combat playback speed multiplier. Supported values: 0.25, 0.33, 0.50, 1.00",
-                new AcceptableValueList<float>(0.25f, 0.33f, 0.5f, 1f)
-            )
-        );
-        IsOverlayVisible = _visibleCombatStatusBarConfig.Value;
-        CombatSpeedMultiplier = SetConfiguredDefaultSpeed(_defaultCombatSpeedConfig.Value);
+        if (_configStateInitialized)
+            return;
+
+        var visibleConfig = BppRuntimeHost.Config.VisibleCombatStatusBarConfig;
+        var speedConfig = BppRuntimeHost.Config.CombatStatusBarSpeedMultiplierConfig;
+        if (visibleConfig == null || speedConfig == null)
+            return;
+
+        IsOverlayVisible = visibleConfig.Value;
+        CombatSpeedMultiplier = SetConfiguredDefaultSpeed(speedConfig.Value);
+        _configStateInitialized = true;
         BppLog.Info(
             "CombatStatusBar",
-            $"Combat config initialized: enabled={_enableCombatStatusBarConfig.Value}, visible={IsOverlayVisible}, speed={CombatSpeedMultiplier:F2}x"
+            $"Combat config initialized: enabled={IsEnabled()}, visible={IsOverlayVisible}, speed={CombatSpeedMultiplier:F2}x"
         );
     }
 
     internal static bool IsEnabled()
     {
-        return _enableCombatStatusBarConfig?.Value ?? false;
+        return BppRuntimeHost.Config.EnableCombatStatusBarConfig?.Value ?? false;
     }
 
     internal static bool GetEnabledSettingValue()
     {
-        return _enableCombatStatusBarConfig?.Value ?? false;
+        return BppRuntimeHost.Config.EnableCombatStatusBarConfig?.Value ?? false;
     }
 
     internal static void SetEnabledSettingValue(bool enabled)
     {
-        if (_enableCombatStatusBarConfig != null)
-            _enableCombatStatusBarConfig.Value = enabled;
+        var config = BppRuntimeHost.Config.EnableCombatStatusBarConfig;
+        if (config != null)
+            config.Value = enabled;
     }
 
     static partial void PersistOverlayVisibility(bool visible)
     {
-        if (_visibleCombatStatusBarConfig != null)
-            _visibleCombatStatusBarConfig.Value = visible;
+        var config = BppRuntimeHost.Config.VisibleCombatStatusBarConfig;
+        if (config != null)
+            config.Value = visible;
     }
 
     static partial void PersistCombatSpeed(float speed)
     {
-        if (_defaultCombatSpeedConfig != null)
-            _defaultCombatSpeedConfig.Value = speed;
+        var config = BppRuntimeHost.Config.CombatStatusBarSpeedMultiplierConfig;
+        if (config != null)
+            config.Value = speed;
     }
 
     private static float SetConfiguredDefaultSpeed(float configuredSpeed)
@@ -76,7 +65,7 @@ internal sealed partial class CombatStatusBar
             return SetCombatSpeed(configuredSpeed);
 
         CombatSpeedMultiplier = normalizedSpeed;
-        _defaultCombatSpeedConfig!.Value = normalizedSpeed;
+        BppRuntimeHost.Config.CombatStatusBarSpeedMultiplierConfig!.Value = normalizedSpeed;
         return CombatSpeedMultiplier;
     }
 }

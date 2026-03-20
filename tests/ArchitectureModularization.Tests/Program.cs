@@ -35,6 +35,10 @@ Assert(
     pluginSource.Contains("_runtimeHost.Start();", StringComparison.Ordinal),
     "Plugin should start the runtime host."
 );
+Assert(
+    !pluginSource.Contains("CombatStatusBar.InitializeConfig", StringComparison.Ordinal),
+    "Plugin should not initialize CombatStatusBar config directly."
+);
 
 Assert(
     !File.Exists(
@@ -47,6 +51,34 @@ var runtimeHostSource = ReadSource("Core/Runtime/BppRuntimeHost.cs");
 Assert(
     runtimeHostSource.Contains("public static IBppConfig Config", StringComparison.Ordinal),
     "BppRuntimeHost should expose configuration through BppConfig."
+);
+
+var configInterfaceSource = ReadSource("Core/Config/IBppConfig.cs");
+Assert(
+    configInterfaceSource.Contains("EnableCombatStatusBarConfig", StringComparison.Ordinal),
+    "IBppConfig should expose the CombatStatusBar enabled config."
+);
+Assert(
+    configInterfaceSource.Contains("VisibleCombatStatusBarConfig", StringComparison.Ordinal),
+    "IBppConfig should expose the CombatStatusBar visible config."
+);
+Assert(
+    configInterfaceSource.Contains("CombatStatusBarSpeedMultiplierConfig", StringComparison.Ordinal),
+    "IBppConfig should expose the CombatStatusBar speed config."
+);
+
+var configSource = ReadSource("Core/Config/BppConfig.cs");
+Assert(
+    configSource.Contains("EnableCombatStatusBarConfig", StringComparison.Ordinal),
+    "BppConfig should bind the CombatStatusBar enabled config."
+);
+Assert(
+    configSource.Contains("VisibleCombatStatusBarConfig", StringComparison.Ordinal),
+    "BppConfig should bind the CombatStatusBar visible config."
+);
+Assert(
+    configSource.Contains("CombatStatusBarSpeedMultiplierConfig", StringComparison.Ordinal),
+    "BppConfig should bind the CombatStatusBar speed config."
 );
 Assert(
     runtimeHostSource.Contains("public static IRunContext RunContext", StringComparison.Ordinal),

@@ -26,7 +26,6 @@ public class Plugin : BaseUnityPlugin
     protected virtual void Awake()
     {
         var configFile = new ConfigFile(Path.Combine(Paths.ConfigPath, "BazaarPlusPlus.cfg"), true);
-        CombatStatusBar.InitializeConfig(configFile);
 
         _runtimeHost = new BppRuntimeHost(gameObject, Logger, configFile);
         _runtimeHost.Install();
