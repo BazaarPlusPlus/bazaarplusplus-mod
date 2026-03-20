@@ -54,12 +54,14 @@ Assert(
     "The PVP battle catalog read side should expose Save, TryLoad, and ListRecentBattles."
 );
 
-var modStateSource = File.ReadAllText(
-    Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Models/ModState.cs"))
+var pathServiceSource = File.ReadAllText(
+    Path.GetFullPath(
+        Path.Combine(AppContext.BaseDirectory, "../../../../../Core/Paths/BppPathService.cs")
+    )
 );
 Assert(
-    modStateSource.Contains("CombatReplayDirectoryPath", StringComparison.Ordinal),
-    "ModState should expose a combat replay storage path."
+    pathServiceSource.Contains("CombatReplayDirectoryPath", StringComparison.Ordinal),
+    "BppPathService should expose a combat replay storage path."
 );
 
 var pluginSource = File.ReadAllText(
@@ -160,8 +162,13 @@ Assert(
     "Combat replay runtime should expose a dedicated saved replay bootstrap entrypoint."
 );
 Assert(
-    runtimeSource.Contains("CapturePvpBattle(manifest)", StringComparison.Ordinal),
-    "Combat replay runtime should forward saved battle metadata into run logging."
+    runtimeSource.Contains("BppRuntimeHost.EventBus.Publish", StringComparison.Ordinal)
+        && runtimeSource.Contains("new PvpBattleRecorded", StringComparison.Ordinal),
+    "Combat replay runtime should publish saved battle metadata through the event bus."
+);
+Assert(
+    !runtimeSource.Contains("RunLoggingController.Instance", StringComparison.Ordinal),
+    "Combat replay runtime should not call RunLoggingController directly."
 );
 Assert(
     runtimeSource.Contains("_battleCatalog = new PvpBattleCatalog", StringComparison.Ordinal)
@@ -273,7 +280,7 @@ Assert(
 );
 Assert(
     runtimeSource.Contains("CanReplaySavedCombats", StringComparison.Ordinal)
-        && runtimeSource.Contains("ModState.IsInGameRun", StringComparison.Ordinal),
+        && runtimeSource.Contains("BppRuntimeHost.RunContext.IsInGameRun", StringComparison.Ordinal),
     "Combat replay runtime should block saved replays only while local gameplay is active."
 );
 Assert(

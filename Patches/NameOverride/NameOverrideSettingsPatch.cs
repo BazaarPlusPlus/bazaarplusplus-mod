@@ -1,5 +1,6 @@
 #pragma warning disable CS0436
 using System;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.Settings;
 using HarmonyLib;
@@ -40,13 +41,13 @@ internal static class NameOverrideSettingsAwakePatch
 
     private static bool ReadEnabledValue()
     {
-        var entry = ModState.EnableNameOverrideConfig;
+        var entry = BppRuntimeHost.Config.EnableNameOverrideConfig;
         return entry != null && entry.Value;
     }
 
     private static void WriteEnabledValue(bool enabled)
     {
-        var entry = ModState.EnableNameOverrideConfig;
+        var entry = BppRuntimeHost.Config.EnableNameOverrideConfig;
         if (entry != null)
             entry.Value = enabled;
     }

@@ -1,8 +1,20 @@
-namespace BazaarPlusPlus
+namespace BazaarPlusPlus.Core.Runtime
 {
-    internal static class ModState
+    internal interface IRunContext
     {
-        internal static bool IsInGameRun { get; set; }
+        bool IsInGameRun { get; }
+    }
+
+    internal sealed class TestRunContext : IRunContext
+    {
+        public bool IsInGameRun { get; set; }
+    }
+
+    internal static class BppRuntimeHost
+    {
+        internal static TestRunContext TestContext { get; } = new();
+
+        internal static IRunContext RunContext => TestContext;
     }
 }
 

@@ -2,6 +2,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using BazaarPlusPlus.Core.Runtime;
 using BepInEx.Logging;
 
 namespace BazaarPlusPlus;
@@ -18,7 +19,7 @@ internal static class BppLog
     private static int _activeSequenceIndex;
     private static int _activeSequenceRepeatCount;
 
-    private static ManualLogSource? Logger => ModState.Logger;
+    private static ManualLogSource? Logger => BppRuntimeHost.Logger;
 
     private readonly struct BufferedLogEntry
     {
@@ -50,7 +51,7 @@ internal static class BppLog
 
     public static void Debug(string component, string message)
     {
-        if (ModState.IsDebug)
+        if (BppBuild.IsDebug)
             Write(LogLevel.Debug, Format(component, message));
     }
 

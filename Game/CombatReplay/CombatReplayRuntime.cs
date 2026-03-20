@@ -10,7 +10,8 @@ using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
-using BazaarPlusPlus.Game.RunLogging;
+using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;
@@ -39,9 +40,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        var runLogDatabasePath = ModState.RunLogDatabasePath
+        var runLogDatabasePath = BppRuntimeHost.Paths.RunLogDatabasePath
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
-        var combatReplayDirectoryPath = ModState.CombatReplayDirectoryPath
+        var combatReplayDirectoryPath = BppRuntimeHost.Paths.CombatReplayDirectoryPath
             ?? throw new InvalidOperationException("Combat replay directory path is not initialized.");
         _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
@@ -77,7 +78,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        if (ModState.IsInGameRun)
+        if (BppRuntimeHost.RunContext.IsInGameRun)
         {
             reason = "Saved replay playback is only available while you are outside an active gameplay session.";
             return false;
@@ -100,7 +101,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
         try
         {
-            var artifact = _captureService.Accept(message, ModState.CurrentServerRunId);
+            var artifact = _captureService.Accept(
+                message,
+                BppRuntimeHost.RunContext.CurrentServerRunId
+            );
             if (artifact == null)
                 return;
 
@@ -108,7 +112,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             var manifest = artifact.Manifest;
             _payloadStore.Save(payload);
             _battleCatalog.Save(manifest);
-            RunLoggingController.Instance?.CapturePvpBattle(manifest);
+            BppRuntimeHost.EventBus.Publish(new PvpBattleRecorded { Manifest = manifest });
             BppLog.Info(
                 "CombatReplayRuntime",
                 $"Saved combat replay {manifest.BattleId} for run={manifest.RunId ?? "unknown"}"
@@ -166,7 +170,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
             Data.ResetRunData();
-            ModState.RefreshRunStateFromCurrentState();
+            BppRuntimeHost.RunLifecycle.RefreshRunStateFromCurrentState();
             attemptedBootstrapFromLobby = !IsReplayBootstrapReady();
             var bootstrappedFromLobby = await EnsureReplayBootstrapReadyAsync();
             _returnToMenuAfterReplay = bootstrappedFromLobby;

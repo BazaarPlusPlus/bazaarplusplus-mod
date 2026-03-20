@@ -1,5 +1,6 @@
 #pragma warning disable CS0436
 using System.Text;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using HarmonyLib;
@@ -50,7 +51,7 @@ public static class CardTooltipDataPassivePatch
             if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
                 return;
 
-            var alwaysShow = ModState.EnchantPreviewAlwaysShowConfig?.Value ?? true;
+            var alwaysShow = BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig?.Value ?? true;
             if (!alwaysShow && !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview))
                 return;
 

@@ -1,3 +1,5 @@
+using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Core.Events;
 using UnityEngine;
 
 namespace BazaarPlusPlus;
@@ -10,7 +12,7 @@ internal sealed class RunStateSyncController : MonoBehaviour
 
     private void OnEnable()
     {
-        ModState.RefreshRunStateFromCurrentState();
+        BppRuntimeHost.RunLifecycle.RefreshRunStateFromCurrentState();
     }
 
     private void Update()
@@ -19,7 +21,7 @@ internal sealed class RunStateSyncController : MonoBehaviour
             return;
 
         _nextRefreshAt = Time.unscaledTime + RefreshIntervalSeconds;
-        ModState.RefreshRunStateFromCurrentState();
-        Game.RunLogging.RunLoggingController.Instance?.PollRunState();
+        BppRuntimeHost.RunLifecycle.RefreshRunStateFromCurrentState();
+        BppRuntimeHost.EventBus.Publish(new RunLoggingSyncRequested());
     }
 }

@@ -1,5 +1,6 @@
 #pragma warning disable CS0436
 using HarmonyLib;
+using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
 
 namespace BazaarPlusPlus;
@@ -12,7 +13,7 @@ internal static class NameOverrideHelper
     {
         replacementName = null;
 
-        if (!ModState.EnableNameOverrideConfig.Value)
+        if (BppRuntimeHost.Config.EnableNameOverrideConfig?.Value != true)
             return false;
 
         var profileName = Data.Profile?.Username;

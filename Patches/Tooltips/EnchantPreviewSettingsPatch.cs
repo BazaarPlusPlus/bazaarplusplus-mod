@@ -1,5 +1,6 @@
 #pragma warning disable CS0436
 using System;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.Settings;
 using HarmonyLib;
@@ -37,13 +38,13 @@ internal static class EnchantPreviewSettingsAwakePatch
 
     private static bool ReadEnabledValue()
     {
-        var entry = ModState.EnchantPreviewAlwaysShowConfig;
+        var entry = BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig;
         return entry != null && entry.Value;
     }
 
     private static void WriteEnabledValue(bool enabled)
     {
-        var entry = ModState.EnchantPreviewAlwaysShowConfig;
+        var entry = BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig;
         if (entry != null)
             entry.Value = enabled;
     }

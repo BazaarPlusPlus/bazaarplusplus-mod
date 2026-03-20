@@ -15,6 +15,12 @@ RequireType("BazaarPlusPlus.Core.Events.RunInitializedObserved");
 RequireType("BazaarPlusPlus.Core.Events.NetMessageObserved");
 RequireType("BazaarPlusPlus.Core.Events.CombatSimObserved");
 RequireType("BazaarPlusPlus.Core.Events.CombatFrameAdvanced");
+RequireType("BazaarPlusPlus.Core.Events.RunLifecycleChanged");
+RequireType("BazaarPlusPlus.Core.Events.RunLoggingSyncRequested");
+RequireType("BazaarPlusPlus.Core.Events.PvpBattleRecorded");
+RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayModule");
+RequireType("BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBarModule");
+RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingModule");
 
 var pluginSource = ReadSource("Plugin.cs");
 Assert(
@@ -30,18 +36,32 @@ Assert(
     "Plugin should start the runtime host."
 );
 
-var modStateSource = ReadSource("Models/ModState.cs");
 Assert(
-    modStateSource.Contains("BppConfig", StringComparison.Ordinal),
-    "ModState should delegate config concerns through BppConfig."
+    !File.Exists(
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Models/ModState.cs"))
+    ),
+    "ModState compatibility shell should be removed."
+);
+
+var runtimeHostSource = ReadSource("Core/Runtime/BppRuntimeHost.cs");
+Assert(
+    runtimeHostSource.Contains("public static IBppConfig Config", StringComparison.Ordinal),
+    "BppRuntimeHost should expose configuration through BppConfig."
 );
 Assert(
-    modStateSource.Contains("RunContextStore", StringComparison.Ordinal),
-    "ModState should delegate run context through RunContextStore."
+    runtimeHostSource.Contains("public static IRunContext RunContext", StringComparison.Ordinal),
+    "BppRuntimeHost should expose run context through RunContextStore."
 );
 Assert(
-    modStateSource.Contains("BppPathService", StringComparison.Ordinal),
-    "ModState should delegate path concerns through BppPathService."
+    runtimeHostSource.Contains("public static IPathService Paths", StringComparison.Ordinal),
+    "BppRuntimeHost should expose paths through BppPathService."
+);
+Assert(
+    !runtimeHostSource.Contains("OnNetMessageObserved", StringComparison.Ordinal)
+        && !runtimeHostSource.Contains("OnCombatSimObserved", StringComparison.Ordinal)
+        && !runtimeHostSource.Contains("OnCombatFrameAdvanced", StringComparison.Ordinal)
+        && !runtimeHostSource.Contains("OnRunInitializedObserved", StringComparison.Ordinal),
+    "BppRuntimeHost should compose feature modules instead of routing feature events itself."
 );
 
 var logSource = ReadSource("Infrastructure/BppLog.cs");
@@ -82,6 +102,46 @@ Assert(
 Assert(
     !combatPatchSource.Contains("CombatStatusBar.AdvanceCombatFrame", StringComparison.Ordinal),
     "Combat frame advance patch should not call CombatStatusBar directly."
+);
+
+var runLifecycleSource = ReadSource("Game/RunLifecycle/RunLifecycleModule.cs");
+Assert(
+    runLifecycleSource.Contains("Subscribe<RunInitializedObserved>", StringComparison.Ordinal),
+    "RunLifecycleModule should consume run initialization through the event bus."
+);
+Assert(
+    runLifecycleSource.Contains("_eventBus.Publish(", StringComparison.Ordinal)
+        && runLifecycleSource.Contains("new RunLifecycleChanged", StringComparison.Ordinal),
+    "RunLifecycleModule should publish lifecycle changes for dependent modules."
+);
+Assert(
+    !runLifecycleSource.Contains("EncounterTracker.ResetEncounterState", StringComparison.Ordinal),
+    "RunLifecycleModule should not reach into encounter tracking directly."
+);
+
+var encounterTrackerSource = ReadSource("Game/EncounterTracker.cs");
+Assert(
+    !encounterTrackerSource.Contains("RunLoggingController.Instance", StringComparison.Ordinal),
+    "EncounterTracker should not call run logging directly."
+);
+
+var runStateSyncSource = ReadSource("Game/RunStateSyncController.cs");
+Assert(
+    runStateSyncSource.Contains("BppRuntimeHost.EventBus.Publish", StringComparison.Ordinal)
+        && runStateSyncSource.Contains("new RunLoggingSyncRequested", StringComparison.Ordinal),
+    "RunStateSyncController should publish run-logging sync requests instead of calling the controller directly."
+);
+Assert(
+    !runStateSyncSource.Contains("RunLoggingController.Instance", StringComparison.Ordinal),
+    "RunStateSyncController should not call RunLoggingController directly."
+);
+
+var runLoggingModuleSource = ReadSource("Game/RunLogging/RunLoggingModule.cs");
+Assert(
+    runLoggingModuleSource.Contains("Subscribe<SelectionObserved>", StringComparison.Ordinal)
+        && runLoggingModuleSource.Contains("Subscribe<RunLoggingSyncRequested>", StringComparison.Ordinal)
+        && runLoggingModuleSource.Contains("Subscribe<PvpBattleRecorded>", StringComparison.Ordinal),
+    "RunLoggingModule should be the unified subscriber for run-logging capture inputs."
 );
 
 Console.WriteLine("Architecture modularization smoke checks passed.");

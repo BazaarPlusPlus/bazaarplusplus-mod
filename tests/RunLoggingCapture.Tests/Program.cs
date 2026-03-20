@@ -32,8 +32,26 @@ Assert(
                     "../../../../../Game/RunLogging/RunLoggingController.cs"
                 )
             )
-        ).Contains("CapturePvpBattle", StringComparison.Ordinal),
-    "RunLoggingController should expose manifest-first CapturePvpBattle."
+        ).Contains("RunLoggingModule", StringComparison.Ordinal),
+    "RunLoggingController should compose the unified RunLoggingModule."
+);
+
+var runLoggingModulePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/RunLogging/RunLoggingModule.cs"
+    )
+);
+Assert(
+    File.Exists(runLoggingModulePath),
+    $"RunLoggingModule source not found at {runLoggingModulePath}"
+);
+var runLoggingModuleSource = File.ReadAllText(runLoggingModulePath);
+Assert(
+    runLoggingModuleSource.Contains("OnSelectionObserved", StringComparison.Ordinal)
+        && runLoggingModuleSource.Contains("OnRunLoggingSyncRequested", StringComparison.Ordinal)
+        && runLoggingModuleSource.Contains("OnPvpBattleRecorded", StringComparison.Ordinal),
+    "RunLoggingModule should own the selection, sync, and PVP battle capture handlers."
 );
 
 var runInitializedPatchPath = Path.GetFullPath(
@@ -52,8 +70,9 @@ Assert(
     "RunInitialized patch should intercept the server run initialization message."
 );
 Assert(
-    runInitializedPatchSource.Contains("CurrentServerRunId", StringComparison.Ordinal),
-    "RunInitialized patch should store the authoritative server run id."
+    runInitializedPatchSource.Contains("BppRuntimeHost.EventBus.Publish", StringComparison.Ordinal)
+        && runInitializedPatchSource.Contains("new RunInitializedObserved", StringComparison.Ordinal),
+    "RunInitialized patch should publish the authoritative server run id through the event bus."
 );
 
 var service =

@@ -5,6 +5,7 @@ using System.Linq;
 using BazaarPlusPlus.Game.CombatLog;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.EncounterTracking;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.PvpBattles;
 using TheBazaar;
@@ -476,6 +477,7 @@ internal sealed class DebugPanel : MonoBehaviour
 
     private PanelSnapshot BuildSnapshot()
     {
+        var selectionSnapshot = EncounterTracker.SelectionQuery.GetSnapshot();
         var snapshot = new PanelSnapshot
         {
             Run = BuildRunSummary(),
@@ -488,16 +490,16 @@ internal sealed class DebugPanel : MonoBehaviour
             BuildEncounterSection(
                 "map",
                 "Available Encounters (map)",
-                ModState.AvailableEncounters,
-                ModState.EncounterMonsterPreviews
+                selectionSnapshot.AvailableEncounters,
+                selectionSnapshot.EncounterMonsterPreviews
             )
         );
         snapshot.EncounterSections.Add(
             BuildEncounterSection(
                 "choice",
                 "Current Encounter Choices",
-                ModState.CurrentEncounterChoices,
-                ModState.EncounterMonsterPreviews
+                selectionSnapshot.CurrentEncounterChoices,
+                selectionSnapshot.EncounterMonsterPreviews
             )
         );
         return snapshot;

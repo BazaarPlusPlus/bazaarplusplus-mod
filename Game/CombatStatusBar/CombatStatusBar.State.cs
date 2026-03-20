@@ -1,4 +1,5 @@
 using System;
+using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
@@ -92,7 +93,7 @@ internal sealed partial class CombatStatusBar
 
     internal static bool ShouldRenderForState(bool overlayVisible, bool enabled)
     {
-        return overlayVisible && enabled && ModState.IsInGameRun;
+        return overlayVisible && enabled && BppRuntimeHost.RunContext.IsInGameRun;
     }
 
     internal static bool CanStepCombatSpeed(int direction)

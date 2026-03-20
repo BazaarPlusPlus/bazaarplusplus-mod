@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using BazaarPlusPlus.Core.Runtime;
 using Newtonsoft.Json.Linq;
 
 namespace BazaarPlusPlus;
@@ -34,7 +35,7 @@ internal static class LocalCardTemplateCatalog
 
     private static bool EnsureLoaded()
     {
-        var path = ModState.CardsJsonPath;
+        var path = BppRuntimeHost.Paths.CardsJsonPath;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             return false;
 

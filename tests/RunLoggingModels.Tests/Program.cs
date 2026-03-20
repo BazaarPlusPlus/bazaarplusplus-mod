@@ -6,6 +6,7 @@ RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogEvent");
 RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCheckpoint");
 RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCompletion");
 RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogAbandonment");
+RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingGameDataReader");
 
 var storeType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.IRunLogStore");
 RequireMethod(storeType, "TryResumeActiveRun");
@@ -39,24 +40,37 @@ Assert(
     "RunLoggingController should create SqliteRunLogStore."
 );
 Assert(
-    controllerSource.Contains("catch (Exception ex)", StringComparison.Ordinal),
-    "RunLoggingController should isolate polling failures behind exception guards."
-);
-Assert(
-    controllerSource.Contains("BppLog.Error", StringComparison.Ordinal),
-    "RunLoggingController should log polling failures instead of throwing through Update."
-);
-Assert(
-    controllerSource.Contains("completionAttempted", StringComparison.Ordinal),
-    "RunLoggingController should track whether leave-run completion was attempted before clearing the retry edge."
-);
-Assert(
-    controllerSource.Contains("completionSucceeded", StringComparison.Ordinal),
-    "RunLoggingController should only clear the leave-run retry edge after completion succeeds."
+    controllerSource.Contains("new RunLoggingModule(", StringComparison.Ordinal),
+    "RunLoggingController should compose the unified RunLoggingModule."
 );
 Assert(
     !controllerSource.Contains("JsonRunLogStore", StringComparison.Ordinal),
     "RunLoggingController should no longer reference JsonRunLogStore."
+);
+
+var runLoggingModuleSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/RunLogging/RunLoggingModule.cs")
+);
+Assert(
+    File.Exists(runLoggingModuleSourcePath),
+    $"RunLoggingModule source not found at {runLoggingModuleSourcePath}"
+);
+var runLoggingModuleSource = File.ReadAllText(runLoggingModuleSourcePath);
+Assert(
+    runLoggingModuleSource.Contains("catch (Exception ex)", StringComparison.Ordinal),
+    "RunLoggingModule should isolate capture failures behind exception guards."
+);
+Assert(
+    runLoggingModuleSource.Contains("BppLog.Error", StringComparison.Ordinal),
+    "RunLoggingModule should log capture failures instead of throwing through event handlers."
+);
+Assert(
+    runLoggingModuleSource.Contains("completionAttempted", StringComparison.Ordinal),
+    "RunLoggingModule should track whether leave-run completion was attempted before clearing the retry edge."
+);
+Assert(
+    runLoggingModuleSource.Contains("completionSucceeded", StringComparison.Ordinal),
+    "RunLoggingModule should only clear the leave-run retry edge after completion succeeds."
 );
 
 var pluginSourcePath = Path.GetFullPath(
@@ -72,26 +86,38 @@ Assert(
     "Plugin.Awake should mount RunLoggingController."
 );
 
-var modStateSourcePath = Path.GetFullPath(
-    Path.Combine(AppContext.BaseDirectory, "../../../../../Models/ModState.cs")
-);
-Assert(File.Exists(modStateSourcePath), $"ModState source not found at {modStateSourcePath}");
-var modStateSource = File.ReadAllText(modStateSourcePath);
-Assert(
-    modStateSource.Contains("RunLogDatabasePath", StringComparison.Ordinal),
-    "ModState should expose a SQLite database path."
+var pathServiceSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Core/Paths/BppPathService.cs")
 );
 Assert(
-    modStateSource.Contains("CurrentServerRunId", StringComparison.Ordinal),
-    "ModState should cache the authoritative server run id."
+    File.Exists(pathServiceSourcePath),
+    $"Path service source not found at {pathServiceSourcePath}"
+);
+var pathServiceSource = File.ReadAllText(pathServiceSourcePath);
+Assert(
+    pathServiceSource.Contains("RunLogDatabasePath", StringComparison.Ordinal),
+    "BppPathService should expose a SQLite database path."
+);
+
+var runContextSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Core/RunContext/RunContextStore.cs")
 );
 Assert(
-    modStateSource.Contains("LastRunExitKind", StringComparison.Ordinal),
-    "ModState should track how the active run exited."
+    File.Exists(runContextSourcePath),
+    $"Run context source not found at {runContextSourcePath}"
+);
+var runContextSource = File.ReadAllText(runContextSourcePath);
+Assert(
+    runContextSource.Contains("CurrentServerRunId", StringComparison.Ordinal),
+    "RunContextStore should cache the authoritative server run id."
 );
 Assert(
-    !modStateSource.Contains("RunLogRootPath", StringComparison.Ordinal),
-    "ModState should no longer expose a JSON run log root path."
+    runContextSource.Contains("LastRunExitKind", StringComparison.Ordinal),
+    "RunContextStore should track how the active run exited."
+);
+Assert(
+    !pathServiceSource.Contains("RunLogRootPath", StringComparison.Ordinal),
+    "Run logging path service should not expose a JSON run log root path."
 );
 
 var gameDataReaderSourcePath = Path.GetFullPath(
@@ -103,8 +129,10 @@ Assert(
 );
 var gameDataReaderSource = File.ReadAllText(gameDataReaderSourcePath);
 Assert(
-    gameDataReaderSource.Contains("CurrentServerRunId", StringComparison.Ordinal),
-    "GameDataReader should require the server run id before building a run log create request."
+    !gameDataReaderSource.Contains("RunLogCreateRequest", StringComparison.Ordinal)
+        && !gameDataReaderSource.Contains("RunLogRunProgressInput", StringComparison.Ordinal)
+        && !gameDataReaderSource.Contains("RunLogSelectionSnapshotInput", StringComparison.Ordinal),
+    "GameDataReader should stay focused on game snapshots instead of run logging DTO assembly."
 );
 Assert(
     !gameDataReaderSource.Contains("RunIdFactory.Create(", StringComparison.Ordinal),
@@ -113,6 +141,22 @@ Assert(
 Assert(
     !gameDataReaderSource.Contains("Status = \"completed\"", StringComparison.Ordinal),
     "GameDataReader should not hard-code completed terminal status."
+);
+
+var runLoggingReaderSourcePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/RunLogging/RunLoggingGameDataReader.cs"
+    )
+);
+Assert(
+    File.Exists(runLoggingReaderSourcePath),
+    $"Run logging game-data reader source not found at {runLoggingReaderSourcePath}"
+);
+var runLoggingReaderSource = File.ReadAllText(runLoggingReaderSourcePath);
+Assert(
+    runLoggingReaderSource.Contains("CurrentServerRunId", StringComparison.Ordinal),
+    "Run logging game-data reader should require the server run id before building a run log create request."
 );
 
 var sqliteStoreSourcePath = Path.GetFullPath(

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -177,7 +178,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     private static bool IsMonsterSourceCard(Card card)
     {
-        if (card == null || !ModState.IsInGameRun)
+        if (card == null || !BppRuntimeHost.RunContext.IsInGameRun)
             return false;
 
         if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out _))
@@ -195,7 +196,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         previewModel = null;
         source = string.Empty;
 
-        if (card == null || !ModState.IsInGameRun)
+        if (card == null || !BppRuntimeHost.RunContext.IsInGameRun)
             return false;
 
         if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out var monster))
@@ -263,7 +264,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     private static RunInfo.MonsterPreview FindEncounterPreview(Card card)
     {
-        var previews = ModState.EncounterMonsterPreviews;
+        var previews = EncounterTracker.SelectionQuery.GetSnapshot().EncounterMonsterPreviews;
         if (previews == null || previews.Count == 0)
             return null;
 

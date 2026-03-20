@@ -1,4 +1,5 @@
 ﻿#pragma warning disable CS0436
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,23 +8,46 @@ using BazaarGameShared.Domain.Cards.Encounter.Combat;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
+using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.EncounterTracking;
 using BazaarPlusPlus.Game.MonsterPreview;
-using BazaarPlusPlus.Game.RunLogging;
 using TheBazaar;
 
 namespace BazaarPlusPlus;
 
 internal static class EncounterTracker
 {
+    private static EncounterTrackingModule? Module;
+    private static bool _subscribed;
+
+    internal static IEncounterSelectionQuery SelectionQuery => RequireModule().Query;
+
+    internal static void Initialize(IBppEventBus eventBus)
+    {
+        if (eventBus == null)
+            throw new ArgumentNullException(nameof(eventBus));
+        if (Module != null)
+            return;
+
+        Module = new EncounterTrackingModule(eventBus);
+    }
+
     public static void Subscribe()
     {
+        Initialize(BppRuntimeHost.EventBus);
+        if (_subscribed)
+            return;
+
+        RequireModule().Start();
         Events.CardDealtSimEvent.AddListener(OnCardDealt, null);
+        _subscribed = true;
         BppLog.Info("EncounterTracker", "Subscribed to CardDealtSimEvent");
     }
 
     private static void OnCardDealt(List<Card> dealtCards)
     {
-        if (!ModState.IsInGameRun)
+        if (!BppRuntimeHost.RunContext.IsInGameRun)
         {
             ResetEncounterState("Ignoring card dealt outside of an active run");
             return;
@@ -65,29 +89,17 @@ internal static class EncounterTracker
         var cardInfos = GameDataReader.GetCardInfo(cards);
         var monsterPreviews = BuildMonsterPreviews(cards);
 
-        if (stateName == ERunState.Encounter)
-        {
-            ModState.AvailableEncounters = cardInfos;
-            ModState.EncounterMonsterPreviews = monsterPreviews.Count > 0 ? monsterPreviews : null;
-            ModState.CurrentEncounterChoices = null;
-            BppLog.Debug(
-                "EncounterTracker",
-                $"Updated map encounters: count={cardInfos.Count}, monsterPreviews={ModState.EncounterMonsterPreviews?.Count ?? 0}"
-            );
-        }
-        else
-        {
-            ModState.CurrentEncounterChoices = cardInfos;
-            ModState.AvailableEncounters = null;
-            ModState.EncounterMonsterPreviews = monsterPreviews.Count > 0 ? monsterPreviews : null;
-            BppLog.Debug(
-                "EncounterTracker",
-                $"Updated encounter choices: state={stateName}, count={cardInfos.Count}, monsterPreviews={ModState.EncounterMonsterPreviews?.Count ?? 0}"
-            );
-        }
+        var normalizedMonsterPreviews = monsterPreviews.Count > 0 ? monsterPreviews : null;
+        RequireModule().UpdateSelection(stateName, cardInfos, normalizedMonsterPreviews);
+        var snapshot = SelectionQuery.GetSnapshot();
+        BppLog.Debug(
+            "EncounterTracker",
+            stateName == ERunState.Encounter
+                ? $"Updated map encounters: count={cardInfos.Count}, monsterPreviews={snapshot.EncounterMonsterPreviews?.Count ?? 0}"
+                : $"Updated encounter choices: state={stateName}, count={cardInfos.Count}, monsterPreviews={snapshot.EncounterMonsterPreviews?.Count ?? 0}"
+        );
 
         BppLog.Debug("EncounterTracker", $"State={stateName}, choiceCount={cards.Count}");
-        RunLoggingController.Instance?.CaptureSelectionFromCurrentState();
     }
 
     private static List<RunInfo.MonsterPreview> BuildMonsterPreviews(List<Card> cards)
@@ -150,18 +162,23 @@ internal static class EncounterTracker
 
     internal static void ResetEncounterState(string reason)
     {
+        var snapshot = SelectionQuery.GetSnapshot();
         var hadState =
-            ModState.AvailableEncounters != null
-            || ModState.CurrentEncounterChoices != null
-            || ModState.EncounterMonsterPreviews != null;
+            snapshot.AvailableEncounters != null
+            || snapshot.CurrentEncounterChoices != null
+            || snapshot.EncounterMonsterPreviews != null;
 
-        ModState.AvailableEncounters = null;
-        ModState.CurrentEncounterChoices = null;
-        ModState.EncounterMonsterPreviews = null;
+        RequireModule().Clear();
 
         if (hadState)
             BppLog.Debug("EncounterTracker", $"Cleared encounter state: {reason}");
         else
             BppLog.Debug("EncounterTracker", $"Encounter state already empty: {reason}");
+    }
+
+    private static EncounterTrackingModule RequireModule()
+    {
+        return Module
+            ?? throw new InvalidOperationException("EncounterTracker is not initialized.");
     }
 }

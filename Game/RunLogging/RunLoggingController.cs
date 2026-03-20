@@ -1,7 +1,6 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Game.CombatReplay;
-using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
 using UnityEngine;
@@ -17,7 +16,7 @@ internal sealed class RunLoggingController : MonoBehaviour
     private RunLogCaptureService? _captureService;
     private RunLogInferenceService? _inferenceService;
     private RunLoggingControllerCore? _core;
-    private bool _wasInRunLastTick;
+    private RunLoggingModule? _module;
 
     public RunLogSessionManager? SessionManager => _sessionManager;
 
@@ -28,7 +27,7 @@ internal sealed class RunLoggingController : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        var runLogDatabasePath = ModState.RunLogDatabasePath
+        var runLogDatabasePath = BppRuntimeHost.Paths.RunLogDatabasePath
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
         _store = new SqliteRunLogStore(runLogDatabasePath);
         _sessionManager = new RunLogSessionManager(_store);
@@ -36,10 +35,25 @@ internal sealed class RunLoggingController : MonoBehaviour
         _captureService = new RunLogCaptureService();
         _inferenceService = new RunLogInferenceService();
         _core = new RunLoggingControllerCore(_sessionManager, _captureService);
+        _module = new RunLoggingModule(
+            BppRuntimeHost.EventBus,
+            _sessionManager,
+            _core,
+            EnsureActiveRunFromGame
+        );
+        _module.Start();
         BppLog.Info(
             "RunLoggingController",
-            $"Initialized run logging database: {ModState.RunLogDatabasePath}"
+            $"Initialized run logging database: {BppRuntimeHost.Paths.RunLogDatabasePath}"
         );
+    }
+
+    private void OnDestroy()
+    {
+        _module?.Stop();
+        _module = null;
+        if (ReferenceEquals(Instance, this))
+            Instance = null;
     }
 
     public RunLogSessionState EnsureActiveSession(RunLogCreateRequest request)
@@ -67,72 +81,6 @@ internal sealed class RunLoggingController : MonoBehaviour
         RequireSessionManager().MarkRunAbandoned(abandonment);
     }
 
-    public void PollRunState()
-    {
-        var inRun = ModState.IsInGameRun;
-        var completionAttempted = false;
-        var completionSucceeded = false;
-        try
-        {
-            if (inRun)
-            {
-                var session = EnsureActiveRunFromGame();
-                if (session != null)
-                {
-                    if (GameDataReader.TryBuildRunLogRunProgressInput(out var progressInput))
-                        RequireCore().AcceptRunProgress(progressInput);
-
-                    if (GameDataReader.TryBuildRunLogStateSnapshot(out var stateInput))
-                        RequireCore().AcceptStateSnapshot(stateInput);
-                }
-            }
-            else if (_wasInRunLastTick && _sessionManager?.HasActiveSession == true)
-            {
-                completionAttempted = true;
-                RequireCore().CompleteRun(GameDataReader.BuildRunLogCompletion("run_state_exit"));
-                completionSucceeded = true;
-            }
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("RunLoggingController", $"PollRunState failed: {ex}");
-        }
-        finally
-        {
-            if (inRun)
-            {
-                _wasInRunLastTick = true;
-            }
-            else if (
-                !completionAttempted
-                || completionSucceeded
-                || _sessionManager?.HasActiveSession != true
-            )
-            {
-                _wasInRunLastTick = false;
-            }
-        }
-    }
-
-    public void CaptureSelectionFromCurrentState()
-    {
-        try
-        {
-            if (!ModState.IsInGameRun)
-                return;
-
-            if (EnsureActiveRunFromGame() == null)
-                return;
-
-            if (GameDataReader.TryBuildRunLogSelectionSnapshot(out var selectionInput))
-                RequireCore().AcceptSelectionSnapshot(selectionInput);
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("RunLoggingController", $"CaptureSelectionFromCurrentState failed: {ex}");
-        }
-    }
-
     public RunLogEvent AcceptRunProgress(RunLogRunProgressInput input)
     {
         return RequireCore().AcceptRunProgress(input);
@@ -148,46 +96,9 @@ internal sealed class RunLoggingController : MonoBehaviour
         return RequireCore().AcceptSelectionSnapshot(input);
     }
 
-    public RunLogEvent? CapturePvpBattle(PvpBattleManifest manifest)
-    {
-        try
-        {
-            if (manifest == null)
-                throw new ArgumentNullException(nameof(manifest));
-
-            if (
-                !string.Equals(manifest.CombatKind, "PVPCombat", StringComparison.Ordinal)
-                || !ModState.IsInGameRun
-            )
-            {
-                return null;
-            }
-
-            if (EnsureActiveRunFromGame() == null)
-                return null;
-
-            return RequireCore().AcceptCombatReplay(
-                new RunLogPvpBattleInput
-                {
-                    Day = manifest.Day,
-                    Hour = manifest.Hour,
-                    EncounterId = manifest.EncounterId,
-                    CombatKind = manifest.CombatKind,
-                    BattleId = manifest.BattleId,
-                    OpponentName = manifest.Participants.OpponentName,
-                }
-            );
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("RunLoggingController", $"CapturePvpBattle failed: {ex}");
-            return null;
-        }
-    }
-
     private RunLogSessionState? EnsureActiveRunFromGame()
     {
-        if (!GameDataReader.TryCreateRunLogCreateRequest(out var request))
+        if (!RunLoggingGameDataReader.TryCreateRunLogCreateRequest(out var request))
             return null;
 
         return RequireCore().EnsureRunStarted(request);

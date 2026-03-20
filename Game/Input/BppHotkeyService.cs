@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
 using UnityEngine.InputSystem;
 
@@ -208,8 +209,8 @@ internal static class BppHotkeyService
     {
         return actionId switch
         {
-            BppHotkeyActionId.HoldEnchantPreview => ModState.EnchantPreviewHotkeyPathConfig,
-            BppHotkeyActionId.HoldUpgradePreview => ModState.UpgradePreviewHotkeyPathConfig,
+            BppHotkeyActionId.HoldEnchantPreview => BppRuntimeHost.Config.EnchantPreviewHotkeyPathConfig,
+            BppHotkeyActionId.HoldUpgradePreview => BppRuntimeHost.Config.UpgradePreviewHotkeyPathConfig,
             _ => null,
         };
     }

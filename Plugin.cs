@@ -25,23 +25,21 @@ public class Plugin : BaseUnityPlugin
 
     protected virtual void Awake()
     {
-        ModState.Logger = Logger;
-        BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            _ = CheckNetworkAsync();
-
         var configFile = new ConfigFile(Path.Combine(Paths.ConfigPath, "BazaarPlusPlus.cfg"), true);
-        ModState.Initialize(configFile);
-        ModState.Subscribe();
         CombatStatusBar.InitializeConfig(configFile);
 
         _runtimeHost = new BppRuntimeHost(gameObject, Logger, configFile);
         _runtimeHost.Install();
         _runtimeHost.Start();
+        BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            _ = CheckNetworkAsync();
 
         _harmony.PatchAll();
 
         MonsterDatabase.Load();
+        EncounterTracker.Initialize(BppRuntimeHost.EventBus);
         EncounterTracker.Subscribe();
         gameObject.AddComponent<RunStateSyncController>();
         gameObject.AddComponent<RunLoggingController>();
@@ -53,7 +51,7 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
         gameObject.AddComponent<TooltipModifierRefreshController>();
 
-        if (ModState.IsDebug)
+        if (BppBuild.IsDebug)
         {
             gameObject.AddComponent<DebugPanel>();
             gameObject.AddComponent<MonsterPreviewDebugController>();
