@@ -1,7 +1,12 @@
 #pragma warning disable CS0436
+#nullable enable
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Core.GameState;
+using BazaarPlusPlus.Core.Paths;
+using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -11,6 +16,11 @@ namespace BazaarPlusPlus;
 
 internal static class ModState
 {
+    internal static readonly BppConfig Config = new();
+    internal static readonly BppPathService Paths = new();
+    internal static readonly RunContextStore RunContext = new();
+    internal static readonly GameStateProbe GameStateProbe = new();
+
     internal enum RunExitKind
     {
         Completed,
@@ -24,67 +34,65 @@ internal static class ModState
 #endif
 
     // Logging
-    public static ManualLogSource Logger;
+    public static ManualLogSource? Logger;
 
     // Config entries
-    public static ConfigEntry<bool> EnableNameOverrideConfig;
-    public static ConfigEntry<bool> EnchantPreviewAlwaysShowConfig;
-    public static ConfigEntry<string> EnchantPreviewHotkeyPathConfig;
-    public static ConfigEntry<string> UpgradePreviewHotkeyPathConfig;
+    public static ConfigEntry<bool>? EnableNameOverrideConfig => Config.EnableNameOverrideConfig;
+    public static ConfigEntry<bool>? EnchantPreviewAlwaysShowConfig =>
+        Config.EnchantPreviewAlwaysShowConfig;
+    public static ConfigEntry<string>? EnchantPreviewHotkeyPathConfig =>
+        Config.EnchantPreviewHotkeyPathConfig;
+    public static ConfigEntry<string>? UpgradePreviewHotkeyPathConfig =>
+        Config.UpgradePreviewHotkeyPathConfig;
 
     // Game state
-    public static bool IsInGameRun;
-    public static string CurrentServerRunId;
+    public static bool IsInGameRun
+    {
+        get => RunContext.IsInGameRun;
+        set => RunContext.IsInGameRun = value;
+    }
+
+    public static string? CurrentServerRunId
+    {
+        get => RunContext.CurrentServerRunId;
+        set => RunContext.CurrentServerRunId = value;
+    }
+
     public static RunExitKind LastRunExitKind;
     public static EVictoryCondition LastVictoryCondition;
-    public static string LastMessageId = "";
+    public static string LastMessageId
+    {
+        get => RunContext.LastMessageId;
+        set => RunContext.LastMessageId = value;
+    }
+
     public static DateTime LastSentTime = DateTime.MinValue;
     public static readonly TimeSpan SendInterval = TimeSpan.FromSeconds(2);
 
     // Encounter selection tracking
-    public static List<RunInfo.CardInfo> AvailableEncounters; // map path options (ERunState.Encounter)
-    public static List<RunInfo.CardInfo> CurrentEncounterChoices; // choices inside an encounter (Choice/Loot/Pedestal)
-    public static List<RunInfo.MonsterPreview> EncounterMonsterPreviews; // combat encounter monster info from local DB
+    public static List<RunInfo.CardInfo>? AvailableEncounters; // map path options (ERunState.Encounter)
+    public static List<RunInfo.CardInfo>? CurrentEncounterChoices; // choices inside an encounter (Choice/Loot/Pedestal)
+    public static List<RunInfo.MonsterPreview>? EncounterMonsterPreviews; // combat encounter monster info from local DB
 
     // Paths for local data
-    public static string CardsJsonPath;
-    public static string RunLogDatabasePath;
-    public static string CombatReplayDirectoryPath;
+    public static string? CardsJsonPath => Paths.CardsJsonPath;
+    public static string? RunLogDatabasePath => Paths.RunLogDatabasePath;
+    public static string? CombatReplayDirectoryPath => Paths.CombatReplayDirectoryPath;
 
     public static void Initialize(ConfigFile config)
     {
-        IsInGameRun = false;
-        CurrentServerRunId = null;
+        RunContext.Reset();
         LastRunExitKind = RunExitKind.Completed;
-        EnableNameOverrideConfig = config.Bind(
-            "StreamerMode",
-            "EnableNameOverride",
-            false,
-            "Whether to set the in-game display name to Anonymous"
-        );
-        EnchantPreviewAlwaysShowConfig = config.Bind(
-            "EnchantPreview",
-            "AlwaysShow",
-            true,
-            "Whether to always show enchant preview text in item tooltips. If disabled, hold Ctrl to show it."
-        );
-        EnchantPreviewHotkeyPathConfig = config.Bind(
-            "Hotkeys",
-            "EnchantPreview",
-            "<Keyboard>/ctrl",
-            "Binding path for enchant preview tooltip mode."
-        );
-        UpgradePreviewHotkeyPathConfig = config.Bind(
-            "Hotkeys",
-            "UpgradePreview",
-            "<Keyboard>/shift",
-            "Binding path for upgrade preview tooltip mode."
-        );
+        Config.Initialize(config);
+        var enableNameOverride = EnableNameOverrideConfig?.Value;
+        var enchantPreviewAlwaysShow = EnchantPreviewAlwaysShowConfig?.Value;
+        var enchantPreviewHotkey = EnchantPreviewHotkeyPathConfig?.Value;
+        var upgradePreviewHotkey = UpgradePreviewHotkeyPathConfig?.Value;
         BppLog.Info(
             "ModState",
-            $"Configuration initialized: enableNameOverride={EnableNameOverrideConfig.Value}, enchantPreviewAlwaysShow={EnchantPreviewAlwaysShowConfig.Value}, enchantPreviewHotkey={EnchantPreviewHotkeyPathConfig.Value}, upgradePreviewHotkey={UpgradePreviewHotkeyPathConfig.Value}"
+            $"Configuration initialized: enableNameOverride={enableNameOverride}, enchantPreviewAlwaysShow={enchantPreviewAlwaysShow}, enchantPreviewHotkey={enchantPreviewHotkey}, upgradePreviewHotkey={upgradePreviewHotkey}"
         );
-        CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
+        Paths.Initialize();
         if (string.IsNullOrWhiteSpace(CardsJsonPath))
         {
             BppLog.Error(
@@ -96,17 +104,6 @@ internal static class ModState
         {
             BppLog.Info("ModState", $"cards.json path initialized: {CardsJsonPath}");
         }
-
-        RunLogDatabasePath = System.IO.Path.Combine(
-            BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
-            RunLogSqliteSchema.DatabaseFileName
-        );
-        CombatReplayDirectoryPath = System.IO.Path.Combine(
-            BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
-            "CombatReplays"
-        );
     }
 
     public static void Subscribe()
@@ -160,18 +157,6 @@ internal static class ModState
 
     private static bool ComputeIsInGameRun()
     {
-        if (Data.IsInCombat)
-            return true;
-
-        var currentAppState = AppState.CurrentState;
-        if (currentAppState is RunAppState)
-            return !currentAppState.IsEndOfRunState();
-
-        if (currentAppState is ReplayState)
-            return true;
-
-        // Do not fall back to Data.HasActiveRun/Data.CurrentState when there is no active app state.
-        // Those values can linger briefly after returning to the lobby and incorrectly mark menu screens as in-run.
-        return currentAppState is StartRunAppState;
+        return GameStateProbe.ComputeIsInGameRun();
     }
 }

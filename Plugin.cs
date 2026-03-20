@@ -1,9 +1,11 @@
 #pragma warning disable CS0436
+#nullable enable
 using System;
 using System.IO;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatLog;
 using BazaarPlusPlus.Game.CombatStatusBar;
@@ -19,6 +21,7 @@ namespace BazaarPlusPlus;
 public class Plugin : BaseUnityPlugin
 {
     private readonly Harmony _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
+    private BppRuntimeHost? _runtimeHost;
 
     protected virtual void Awake()
     {
@@ -27,12 +30,16 @@ public class Plugin : BaseUnityPlugin
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             _ = CheckNetworkAsync();
 
-        _harmony.PatchAll();
-
         var configFile = new ConfigFile(Path.Combine(Paths.ConfigPath, "BazaarPlusPlus.cfg"), true);
         ModState.Initialize(configFile);
         ModState.Subscribe();
         CombatStatusBar.InitializeConfig(configFile);
+
+        _runtimeHost = new BppRuntimeHost(gameObject, Logger, configFile);
+        _runtimeHost.Install();
+        _runtimeHost.Start();
+
+        _harmony.PatchAll();
 
         MonsterDatabase.Load();
         EncounterTracker.Subscribe();
@@ -57,6 +64,7 @@ public class Plugin : BaseUnityPlugin
 
     protected virtual void OnDestroy()
     {
+        _runtimeHost?.Stop();
         BppLog.Flush();
     }
 

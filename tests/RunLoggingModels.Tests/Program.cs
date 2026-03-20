@@ -167,14 +167,14 @@ Assert(
 );
 Assert(
     csprojSource.Contains(
-        "<MacSqliteRuntimeRid>osx-arm64</MacSqliteRuntimeRid>",
+        "<MacSqliteRuntimeRid>osx-x64</MacSqliteRuntimeRid>",
         StringComparison.Ordinal
     ),
-    "Project file should pin the macOS sqlite runtime to osx-arm64."
+    "Project file should pin the macOS sqlite runtime to osx-x64 for Rosetta-based macOS support."
 );
 Assert(
-    csprojSource.Contains("Apple Silicon", StringComparison.Ordinal),
-    "Project file should fail explicitly for unsupported Intel macOS builds."
+    !csprojSource.Contains("Apple Silicon", StringComparison.Ordinal),
+    "Project file should not reject Apple Silicon hosts that run the x64 game through Rosetta."
 );
 
 AssertSourceMissing("Game/RunLogging/Persistence/JsonRunLogStore.cs");

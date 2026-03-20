@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 using BazaarGameShared.Infra.Messages;
-using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Core.Runtime;
 using HarmonyLib;
 using TheBazaar;
 
@@ -12,6 +13,6 @@ internal static class CombatReplayCapturePatch
     [HarmonyPostfix]
     private static void Postfix(INetMessage message)
     {
-        CombatReplayRuntime.Instance?.ObserveMessage(message);
+        BppRuntimeHost.EventBus.Publish(new NetMessageObserved { Message = message });
     }
 }

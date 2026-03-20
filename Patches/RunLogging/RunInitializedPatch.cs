@@ -1,5 +1,7 @@
 #pragma warning disable CS0436
 using BazaarGameShared.Infra.Messages;
+using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Core.Runtime;
 using HarmonyLib;
 using TheBazaar;
 
@@ -14,7 +16,8 @@ internal static class RunInitializedPatch
         if (message is not NetMessageRunInitialized runInitialized)
             return;
 
-        ModState.CurrentServerRunId = runInitialized.RunId;
-        BppLog.Info("RunLogging", $"Captured server run id: {runInitialized.RunId}");
+        BppRuntimeHost.EventBus.Publish(
+            new RunInitializedObserved { RunId = runInitialized.RunId }
+        );
     }
 }

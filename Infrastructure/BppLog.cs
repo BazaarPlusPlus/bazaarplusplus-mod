@@ -1,4 +1,5 @@
 #pragma warning disable CS0436
+#nullable enable
 using System;
 using System.Collections.Generic;
 using BepInEx.Logging;
@@ -13,9 +14,11 @@ internal static class BppLog
     private static readonly List<BufferedLogEntry> ActiveSequenceBuffer =
         new List<BufferedLogEntry>();
 
-    private static List<BufferedLogEntry> _activeSequence;
+    private static List<BufferedLogEntry>? _activeSequence;
     private static int _activeSequenceIndex;
     private static int _activeSequenceRepeatCount;
+
+    private static ManualLogSource? Logger => ModState.Logger;
 
     private readonly struct BufferedLogEntry
     {
@@ -73,7 +76,7 @@ internal static class BppLog
 
     public static void Flush()
     {
-        var logger = ModState.Logger;
+        var logger = Logger;
         if (logger == null)
             return;
 
@@ -86,7 +89,7 @@ internal static class BppLog
 
     private static void Write(LogLevel level, string message)
     {
-        var logger = ModState.Logger;
+        var logger = Logger;
         if (logger == null)
             return;
 

@@ -86,8 +86,9 @@ Assert(
     "Combat replay capture should hook NetMessageProcessor.ReceiveOrQueue."
 );
 Assert(
-    capturePatchSource.Contains("ObserveMessage", StringComparison.Ordinal),
-    "Combat replay capture patch should forward messages into the runtime recorder."
+    capturePatchSource.Contains("BppRuntimeHost.EventBus.Publish", StringComparison.Ordinal)
+        && capturePatchSource.Contains("new NetMessageObserved", StringComparison.Ordinal),
+    "Combat replay capture patch should publish observed messages through the runtime event bus."
 );
 
 var runtimeSource = File.ReadAllText(

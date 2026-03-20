@@ -28,7 +28,9 @@ internal sealed class RunLoggingController : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        _store = new SqliteRunLogStore(ModState.RunLogDatabasePath);
+        var runLogDatabasePath = ModState.RunLogDatabasePath
+            ?? throw new InvalidOperationException("Run log database path is not initialized.");
+        _store = new SqliteRunLogStore(runLogDatabasePath);
         _sessionManager = new RunLogSessionManager(_store);
         _sessionManager.RestoreActiveSession();
         _captureService = new RunLogCaptureService();

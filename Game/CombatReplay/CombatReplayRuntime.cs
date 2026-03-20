@@ -39,8 +39,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        _battleCatalog = new PvpBattleCatalog(ModState.RunLogDatabasePath);
-        _payloadStore = new CombatReplayPayloadStore(ModState.CombatReplayDirectoryPath);
+        var runLogDatabasePath = ModState.RunLogDatabasePath
+            ?? throw new InvalidOperationException("Run log database path is not initialized.");
+        var combatReplayDirectoryPath = ModState.CombatReplayDirectoryPath
+            ?? throw new InvalidOperationException("Combat replay directory path is not initialized.");
+        _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
+        _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
         _captureService = new CombatReplayCaptureService();
         _loader = new CombatReplayLoader();
         _controller = new CombatReplayController(_battleCatalog, _payloadStore, _loader);
