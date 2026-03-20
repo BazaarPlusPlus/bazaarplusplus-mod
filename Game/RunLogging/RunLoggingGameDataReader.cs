@@ -3,6 +3,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Core;
+using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Players;
 using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.RunLogging.Models;
@@ -12,6 +16,17 @@ namespace BazaarPlusPlus.Game.RunLogging;
 
 internal static class RunLoggingGameDataReader
 {
+    public static string? GetParentEncounterId(string? state)
+    {
+        return state switch
+        {
+            "Choice" => Data.CurrentEncounterId?.ToString(),
+            "Loot" => Data.CurrentEncounterId?.ToString(),
+            "Pedestal" => Data.CurrentEncounterId?.ToString(),
+            _ => null,
+        };
+    }
+
     public static bool TryCreateRunLogCreateRequest(out RunLogCreateRequest request)
     {
         request = null!;
@@ -51,6 +66,35 @@ internal static class RunLoggingGameDataReader
         return true;
     }
 
+    public static bool TryBuildRunLogPlayerStats(out RunLogPlayerStatsSnapshot stats)
+    {
+        stats = null!;
+        if (Data.Run?.Player == null)
+            return false;
+
+        stats = new RunLogPlayerStatsSnapshot
+        {
+            MaxHealth = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.HealthMax),
+            Prestige = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.Prestige),
+            Level = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.Level),
+            Income = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.Income),
+            Gold = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.Gold),
+        };
+        return true;
+    }
+
+    public static IList<string> GetCurrentSelectionSetInstanceIds()
+    {
+        var state = Data.CurrentState;
+        if (state?.SelectionSet == null || state.SelectionSet.Count == 0)
+            return new List<string>();
+
+        return state
+            .SelectionSet.SelectMany(ResolveSelectionInstanceIds)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
     public static bool TryBuildRunLogStateSnapshot(out RunLogStateSnapshotInput input)
     {
         input = null!;
@@ -67,6 +111,7 @@ internal static class RunLoggingGameDataReader
                     : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
             State = state.StateName.ToString(),
             EncounterId = Data.CurrentEncounterId?.ToString(),
+            ParentEncounterId = GetParentEncounterId(state.StateName.ToString()),
         };
         return true;
     }
@@ -93,6 +138,7 @@ internal static class RunLoggingGameDataReader
                     : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
             State = state.StateName.ToString(),
             EncounterId = Data.CurrentEncounterId?.ToString(),
+            ParentEncounterId = GetParentEncounterId(state.StateName.ToString()),
             Options = source.Select(ToSelectionOption).ToList(),
         };
         return true;
@@ -104,6 +150,7 @@ internal static class RunLoggingGameDataReader
             BppRuntimeHost.RunContext.LastRunExitKind == RunExitKind.Interrupted
                 ? "abandoned"
                 : "completed";
+        TryBuildRunLogPlayerStats(out var stats);
         return new RunLogCompletion
         {
             SchemaVersion = 1,
@@ -114,6 +161,11 @@ internal static class RunLoggingGameDataReader
                 Data.Run == null
                     ? null
                     : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
+            MaxHealth = stats?.MaxHealth,
+            Prestige = stats?.Prestige,
+            Level = stats?.Level,
+            Income = stats?.Income,
+            Gold = stats?.Gold,
             Victories = Data.Run == null ? null : unchecked((int)Data.Run.Victories),
             Losses = Data.Run == null ? null : unchecked((int)Data.Run.Losses),
             Reason = reason,
@@ -137,5 +189,21 @@ internal static class RunLoggingGameDataReader
                 )
                 ?? new Dictionary<string, object?>(),
         };
+    }
+
+    private static IEnumerable<string> ResolveSelectionInstanceIds(string selectionId)
+    {
+        if (string.IsNullOrWhiteSpace(selectionId))
+            yield break;
+
+        yield return selectionId;
+
+        var entity = Data.Entities.GetValueOrDefault(new InstanceId(selectionId));
+        if (entity is not Card card)
+            yield break;
+
+        var cardInstanceId = card.GetInstanceId().ToString();
+        if (!string.IsNullOrWhiteSpace(cardInstanceId))
+            yield return cardInstanceId;
     }
 }

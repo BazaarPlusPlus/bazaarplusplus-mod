@@ -19,6 +19,16 @@ public sealed class RunLogSessionState
 
     public int? Hour { get; set; }
 
+    public int? MaxHealth { get; set; }
+
+    public int? Prestige { get; set; }
+
+    public int? Level { get; set; }
+
+    public int? Income { get; set; }
+
+    public int? Gold { get; set; }
+
     public string? State { get; set; }
 
     public string? CurrentEncounterId { get; set; }
@@ -28,6 +38,8 @@ public sealed class RunLogSessionState
     public string? LastSelectionFingerprint { get; set; }
 
     public long? PendingSelectionSeq { get; set; }
+
+    public RunLogPendingSelectionState? PendingSelection { get; set; }
 
     public bool Completed { get; set; }
 }

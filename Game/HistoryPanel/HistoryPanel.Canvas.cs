@@ -1,0 +1,1451 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace BazaarPlusPlus;
+
+internal sealed partial class HistoryPanel
+{
+    private const int CanvasSortingOrder = 26;
+    private const float PanelWidth = 1280f;
+    private const float PanelHeight = 960f;
+    private const float ListColumnWidth = 392f;
+    private const float PreviewSectionHeight = 256f;
+
+    private static Sprite? _roundedSprite;
+    private static TMP_FontAsset? _uiFont;
+
+    private readonly List<ListItemView> _runItemViews = new();
+    private readonly List<ListItemView> _battleItemViews = new();
+
+    private GameObject? _canvasObject;
+    private RectTransform? _panelRoot;
+    private RectTransform? _runListContent;
+    private RectTransform? _battleListContent;
+    private RawImage? _previewSurface;
+    private TextMeshProUGUI? _previewStatusText;
+    private TextMeshProUGUI? _previewDebugText;
+    private TextMeshProUGUI? _countChipText;
+    private TextMeshProUGUI? _battleChipText;
+    private TextMeshProUGUI? _databaseChipText;
+    private TextMeshProUGUI? _statusText;
+    private TextMeshProUGUI? _battleSectionSubtitle;
+    private TextMeshProUGUI? _footerPrimaryText;
+    private TextMeshProUGUI? _footerSecondaryText;
+    private Button? _dynamicPreviewButton;
+    private Image? _dynamicPreviewButtonBackground;
+    private TextMeshProUGUI? _dynamicPreviewButtonLabel;
+    private Button? _replayButton;
+    private Image? _replayButtonBackground;
+    private TextMeshProUGUI? _replayButtonLabel;
+
+    private sealed class ListItemView
+    {
+        public int Index;
+        public Image? Background;
+    }
+
+
+    private readonly struct BattlePalette
+    {
+        public BattlePalette(Color normal, Color selected, Color accent, Color badgeBg, Color badgeText)
+        {
+            Normal = normal;
+            Selected = selected;
+            Accent = accent;
+            BadgeBg = badgeBg;
+            BadgeText = badgeText;
+        }
+
+        public Color Normal { get; }
+        public Color Selected { get; }
+        public Color Accent { get; }
+        public Color BadgeBg { get; }
+        public Color BadgeText { get; }
+    }
+
+    private readonly struct HeroBadgeStyle
+    {
+        public HeroBadgeStyle(string shortCode, Color background, Color text)
+        {
+            ShortCode = shortCode;
+            Background = background;
+            Text = text;
+        }
+
+        public string ShortCode { get; }
+
+        public Color Background { get; }
+
+        public Color Text { get; }
+    }
+
+    private void EnsureUi()
+    {
+        if (_canvasObject != null)
+            return;
+
+        _canvasObject = new GameObject(
+            "HistoryPanelCanvas",
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster)
+        );
+        _canvasObject.transform.SetParent(transform, false);
+
+        var canvas = _canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = CanvasSortingOrder;
+
+        var scaler = _canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.55f;
+
+        var canvasRect = (RectTransform)_canvasObject.transform;
+        StretchToParent(canvasRect, 0f, 0f, 0f, 0f);
+
+        var backdrop = CreateRect("Backdrop", _canvasObject.transform);
+        StretchToParent(backdrop, 0f, 0f, 0f, 0f);
+        var backdropImage = AddImage(backdrop.gameObject, new Color(0.02f, 0.03f, 0.05f, 0.82f));
+        backdropImage.raycastTarget = true;
+
+        _panelRoot = CreateRect("PanelRoot", _canvasObject.transform);
+        _panelRoot.anchorMin = new Vector2(0.5f, 0.5f);
+        _panelRoot.anchorMax = new Vector2(0.5f, 0.5f);
+        _panelRoot.pivot = new Vector2(0.5f, 0.5f);
+        _panelRoot.sizeDelta = new Vector2(PanelWidth, PanelHeight);
+        var bg = AddImage(_panelRoot.gameObject, new Color(0.08f, 0.10f, 0.13f, 0.985f));
+        bg.raycastTarget = true;
+
+        var shadow = CreateRect("Shadow", _panelRoot);
+        StretchToParent(shadow, -14f, -14f, -14f, -14f);
+        shadow.SetAsFirstSibling();
+        AddImage(shadow.gameObject, new Color(0.01f, 0.01f, 0.02f, 0.35f));
+
+        var glow = CreateRect("HeaderGlow", _panelRoot);
+        glow.anchorMin = new Vector2(0f, 1f);
+        glow.anchorMax = new Vector2(1f, 1f);
+        glow.pivot = new Vector2(0.5f, 1f);
+        glow.sizeDelta = new Vector2(0f, 170f);
+        AddImage(glow.gameObject, new Color(0.79f, 0.61f, 0.22f, 0.08f));
+
+        BuildHeader();
+        BuildContent();
+        BuildFooter();
+    }
+
+    private void DisposeUi()
+    {
+        if (_canvasObject == null)
+            return;
+
+        Destroy(_canvasObject);
+        _canvasObject = null;
+        _panelRoot = null;
+        _runListContent = null;
+        _battleListContent = null;
+        _previewSurface = null;
+        _previewStatusText = null;
+        _previewDebugText = null;
+        _countChipText = null;
+        _battleChipText = null;
+        _databaseChipText = null;
+        _statusText = null;
+        _battleSectionSubtitle = null;
+        _footerPrimaryText = null;
+        _footerSecondaryText = null;
+        _dynamicPreviewButton = null;
+        _dynamicPreviewButtonBackground = null;
+        _dynamicPreviewButtonLabel = null;
+        _replayButton = null;
+        _replayButtonBackground = null;
+        _replayButtonLabel = null;
+        _runItemViews.Clear();
+        _battleItemViews.Clear();
+    }
+
+    private void SetUiVisible(bool visible)
+    {
+        if (_canvasObject != null && _canvasObject.activeSelf != visible)
+            _canvasObject.SetActive(visible);
+    }
+
+    private void RefreshUi()
+    {
+        if (_panelRoot == null)
+            return;
+
+        if (_countChipText != null)
+            _countChipText.text = $"{_runs.Count} Runs";
+        if (_battleChipText != null)
+            _battleChipText.text = $"{_battles.Count} Battles";
+        if (_databaseChipText != null)
+            _databaseChipText.text = $"DB {GetDatabaseChipText()}";
+
+        if (_statusText != null)
+            _statusText.text = string.Empty;
+        if (_battleSectionSubtitle != null)
+        {
+            _battleSectionSubtitle.text = SelectedRun == null
+                ? "Select a run to inspect its recorded battles."
+                : $"{SelectedRun.Hero} | {FormatDayOnly(SelectedRun.FinalDay)}";
+        }
+
+        if (_footerPrimaryText != null)
+        {
+            _footerPrimaryText.text = SelectedBattle == null
+                ? "No battle selected"
+                : $"{FormatBattleResult(SelectedBattle)} | {FormatDayOnly(SelectedBattle.Day)} | {SelectedBattle.OpponentName ?? "Unknown Opponent"}";
+        }
+
+        if (_footerSecondaryText != null)
+        {
+            _footerSecondaryText.text = SelectedBattle == null
+                ? "Select one battle to inspect it, then use Replay when you want to jump back into it."
+                : $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | {SelectedBattle.SnapshotSummary}";
+        }
+
+        if (_previewStatusText != null && SelectedBattle == null)
+        {
+            _previewStatusText.text = "Select a battle to preview its recorded cards.";
+            _previewStatusText.gameObject.SetActive(true);
+        }
+
+        if (_dynamicPreviewButtonLabel != null)
+        {
+            _dynamicPreviewButtonLabel.text = HistoryPanelPreviewSettings.DynamicPreviewEnabled
+                ? "Dynamic On"
+                : "Dynamic Off";
+        }
+
+        RefreshActionButton(
+            _dynamicPreviewButton,
+            _dynamicPreviewButtonBackground,
+            _dynamicPreviewButtonLabel,
+            true,
+            HistoryPanelPreviewSettings.DynamicPreviewEnabled
+                ? new Color(0.30f, 0.47f, 0.29f, 0.98f)
+                : new Color(0.23f, 0.27f, 0.32f, 0.98f),
+            HistoryPanelPreviewSettings.DynamicPreviewEnabled
+                ? new Color(0.39f, 0.59f, 0.37f, 1f)
+                : new Color(0.35f, 0.39f, 0.44f, 1f),
+            new Color(0.24f, 0.26f, 0.30f, 0.50f),
+            Color.white
+        );
+
+        RefreshActionButton(
+            _replayButton,
+            _replayButtonBackground,
+            _replayButtonLabel,
+            SelectedBattle != null,
+            new Color(0.78f, 0.60f, 0.24f, 0.98f),
+            new Color(0.92f, 0.72f, 0.30f, 1f),
+            new Color(0.24f, 0.26f, 0.30f, 0.50f),
+            new Color(0.10f, 0.07f, 0.03f, 1f)
+        );
+
+        RebuildRunList();
+        RebuildBattleList();
+    }
+
+    private void BuildHeader()
+    {
+        var header = CreateRect("Header", _panelRoot!);
+        header.anchorMin = new Vector2(0f, 1f);
+        header.anchorMax = new Vector2(1f, 1f);
+        header.pivot = new Vector2(0.5f, 1f);
+        header.anchoredPosition = new Vector2(0f, -20f);
+        header.sizeDelta = new Vector2(-48f, 112f);
+
+        var headerLayout = CreateVerticalGroup(
+            "HeaderLayout",
+            header,
+            6f,
+            CreatePadding(0f, 0f, 0f, 0f),
+            TextAnchor.UpperLeft,
+            true,
+            true,
+            true,
+            false
+        );
+        StretchToParent(headerLayout, 0f, 0f, 0f, 0f);
+
+        var title = CreateText("Title", headerLayout, 28, FontStyle.Bold, TextAnchor.UpperLeft);
+        title.text = "Battle History";
+        title.color = new Color(0.97f, 0.85f, 0.57f, 1f);
+        ConfigureLayoutElement(title.gameObject, preferredHeight: 32f, minHeight: 32f);
+
+        var subtitle = CreateText("Subtitle", headerLayout, 14, FontStyle.Normal, TextAnchor.UpperLeft);
+        subtitle.text =
+            "Review completed runs, inspect each PvP battle by day and hour, and replay the one you need.";
+        subtitle.color = new Color(0.82f, 0.86f, 0.91f, 0.94f);
+        subtitle.textWrappingMode = TextWrappingModes.Normal;
+        subtitle.overflowMode = TextOverflowModes.Ellipsis;
+        ConfigureLayoutElement(subtitle.gameObject, preferredHeight: 28f, minHeight: 28f);
+
+        var chipsRow = CreateHorizontalGroup(
+            "ChipsRow",
+            headerLayout,
+            8f,
+            null,
+            TextAnchor.MiddleLeft,
+            true,
+            true,
+            false,
+            false
+        );
+        ConfigureLayoutElement(chipsRow.gameObject, preferredHeight: 34f, minHeight: 34f);
+
+        _countChipText = CreateChip(chipsRow, 86f);
+        _battleChipText = CreateChip(chipsRow, 96f);
+        _databaseChipText = CreateChip(chipsRow, 110f);
+        CreateFlexibleSpacer("Spacer", chipsRow);
+        (_dynamicPreviewButton, _dynamicPreviewButtonBackground, _dynamicPreviewButtonLabel) =
+            CreateStyledButton("DynamicPreviewButton", chipsRow, "Dynamic Off", 120f, 32f);
+        _dynamicPreviewButton.onClick.AddListener(ToggleDynamicPreviewFromUi);
+        CreateActionButton("CloseButton", chipsRow, "Close", 86f, () => SetHistoryVisible(false));
+
+        _statusText = null;
+    }
+
+    private void BuildContent()
+    {
+        var content = CreateRect("Content", _panelRoot!);
+        content.anchorMin = new Vector2(0f, 0f);
+        content.anchorMax = new Vector2(1f, 1f);
+        content.offsetMin = new Vector2(24f, 96f);
+        content.offsetMax = new Vector2(-24f, -164f);
+
+        var outerLayout = CreateVerticalGroup(
+            "OuterLayout",
+            content,
+            10f,
+            null,
+            TextAnchor.UpperLeft,
+            true,
+            true,
+            true,
+            false
+        );
+        StretchToParent(outerLayout, 0f, 0f, 0f, 0f);
+
+        var columnsRow = CreateHorizontalGroup(
+            "ColumnsRow",
+            outerLayout,
+            18f,
+            null,
+            TextAnchor.UpperLeft,
+            true,
+            true,
+            false,
+            true
+        );
+        ConfigureLayoutElement(columnsRow.gameObject, flexibleWidth: 1f, flexibleHeight: 1f);
+
+        var left = CreateSectionPanel(columnsRow, "RunsPanel");
+        ConfigureLayoutElement(
+            left.gameObject,
+            preferredWidth: ListColumnWidth,
+            minWidth: ListColumnWidth,
+            preferredHeight: 0f,
+            flexibleHeight: 1f
+        );
+        var leftLayout = CreateVerticalGroup(
+            "RunsLayout",
+            left,
+            10f,
+            CreatePadding(14f, 14f, 14f, 14f),
+            TextAnchor.UpperLeft,
+            true,
+            true,
+            true,
+            false
+        );
+        StretchToParent(leftLayout, 0f, 0f, 0f, 0f);
+        BuildSectionHeader(leftLayout, "Runs", "Choose one run to see its recorded battles.", out _);
+        _runListContent = CreateScrollSection(leftLayout, "RunScroll");
+
+        var right = CreateSectionPanel(columnsRow, "BattlesPanel");
+        ConfigureLayoutElement(right.gameObject, flexibleWidth: 1f, preferredHeight: 0f, flexibleHeight: 1f);
+        var rightLayout = CreateVerticalGroup(
+            "BattlesLayout",
+            right,
+            10f,
+            CreatePadding(14f, 14f, 14f, 14f),
+            TextAnchor.UpperLeft,
+            true,
+            true,
+            true,
+            false
+        );
+        StretchToParent(rightLayout, 0f, 0f, 0f, 0f);
+        BuildSectionHeader(rightLayout, "Battles", string.Empty, out _battleSectionSubtitle);
+        _battleListContent = CreateScrollSection(rightLayout, "BattleScroll");
+
+        BuildPreviewSection(outerLayout);
+    }
+
+    private void BuildFooter()
+    {
+        var footer = CreateRect("Footer", _panelRoot!);
+        footer.anchorMin = new Vector2(0f, 0f);
+        footer.anchorMax = new Vector2(1f, 0f);
+        footer.pivot = new Vector2(0.5f, 0f);
+        footer.anchoredPosition = new Vector2(0f, 20f);
+        footer.sizeDelta = new Vector2(-48f, 68f);
+        AddImage(footer.gameObject, new Color(0.10f, 0.12f, 0.16f, 0.98f));
+
+        var divider = CreateRect("Divider", footer);
+        divider.anchorMin = new Vector2(0f, 1f);
+        divider.anchorMax = new Vector2(1f, 1f);
+        divider.pivot = new Vector2(0.5f, 1f);
+        divider.sizeDelta = new Vector2(0f, 1f);
+        divider.gameObject.AddComponent<Image>().color = new Color(0.76f, 0.65f, 0.36f, 0.28f);
+
+        var footerLayout = CreateHorizontalGroup(
+            "FooterLayout",
+            footer,
+            12f,
+            CreatePadding(16f, 16f, 8f, 8f),
+            TextAnchor.MiddleLeft,
+            true,
+            true,
+            false,
+            false
+        );
+        StretchToParent(footerLayout, 0f, 0f, 0f, 0f);
+
+        var textArea = CreateVerticalGroup(
+            "TextArea",
+            footerLayout,
+            2f,
+            null,
+            TextAnchor.UpperLeft,
+            true,
+            false,
+            true,
+            false
+        );
+        ConfigureLayoutElement(textArea.gameObject, flexibleWidth: 1f);
+
+        _footerPrimaryText = CreateText("Primary", textArea, 15, FontStyle.Bold, TextAnchor.UpperLeft);
+        _footerPrimaryText.color = Color.white;
+        _footerPrimaryText.textWrappingMode = TextWrappingModes.NoWrap;
+        _footerPrimaryText.overflowMode = TextOverflowModes.Ellipsis;
+        ConfigureLayoutElement(_footerPrimaryText.gameObject, preferredHeight: 22f, minHeight: 22f);
+
+        _footerSecondaryText = CreateText("Secondary", textArea, 12, FontStyle.Normal, TextAnchor.UpperLeft);
+        _footerSecondaryText.color = new Color(0.72f, 0.77f, 0.84f, 0.94f);
+        _footerSecondaryText.textWrappingMode = TextWrappingModes.NoWrap;
+        _footerSecondaryText.overflowMode = TextOverflowModes.Ellipsis;
+        ConfigureLayoutElement(_footerSecondaryText.gameObject, preferredHeight: 22f, minHeight: 22f);
+
+        var actions = CreateHorizontalGroup(
+            "Actions",
+            footerLayout,
+            10f,
+            null,
+            TextAnchor.MiddleRight,
+            false,
+            true,
+            false,
+            false
+        );
+        ConfigureLayoutElement(actions.gameObject, preferredWidth: 250f, minWidth: 250f);
+
+        (_replayButton, _replayButtonBackground, _replayButtonLabel) =
+            CreateStyledButton("ReplayButton", actions, "Replay", 130f, 36f);
+        _replayButton.onClick.AddListener(TryReplaySelectedBattle);
+        CreateActionButton("FooterCloseButton", actions, "Close", 110f, () => SetHistoryVisible(false));
+    }
+
+    private void RebuildRunList()
+    {
+        if (_runListContent == null)
+            return;
+
+        ClearContainer(_runListContent, _runItemViews);
+        if (_runs.Count == 0)
+        {
+            CreatePlaceholder(_runListContent, "No runs found yet.");
+            return;
+        }
+
+        for (var i = 0; i < _runs.Count; i++)
+            _runItemViews.Add(CreateRunItem(_runListContent, i, _runs[i], i == _selectedRunIndex));
+    }
+
+    private void RebuildBattleList()
+    {
+        if (_battleListContent == null)
+            return;
+
+        ClearContainer(_battleListContent, _battleItemViews);
+        if (SelectedRun == null)
+        {
+            CreatePlaceholder(_battleListContent, "Select a run first.");
+            return;
+        }
+
+        if (_battles.Count == 0)
+        {
+            CreatePlaceholder(_battleListContent, "No recorded battles for this run.");
+            return;
+        }
+
+        for (var i = 0; i < _battles.Count; i++)
+            _battleItemViews.Add(CreateBattleItem(_battleListContent, i, _battles[i], i == _selectedBattleIndex));
+    }
+
+    private ListItemView CreateRunItem(Transform parent, int index, HistoryRunRecord run, bool selected)
+    {
+        var (button, background) = CreateCardButtonShell($"RunItem_{index}", parent, 118f);
+        button.onClick.AddListener(() => SelectRun(index));
+
+        var (_, body) = BuildCardShell(
+            button.transform,
+            selected ? new Color(0.46f, 0.70f, 0.92f, 0.94f) : new Color(0.24f, 0.31f, 0.39f, 0.96f),
+            4f,
+            CreatePadding(12f, 12f, 10f, 10f)
+        );
+
+        // --- pill row ---
+        var topRow = CreateHorizontalGroup(
+            "TopRow",
+            body,
+            8f,
+            null,
+            TextAnchor.MiddleLeft,
+            true,
+            true,
+            false,
+            false
+        );
+        ConfigureLayoutElement(topRow.gameObject, preferredHeight: 22f, minHeight: 22f);
+
+        var pillRow = CreateHorizontalGroup(
+            "PillRow",
+            topRow,
+            5f,
+            null,
+            TextAnchor.MiddleLeft,
+            true,
+            true,
+            false,
+            false
+        );
+        ConfigureLayoutElement(pillRow.gameObject, flexibleWidth: 1f);
+
+        var runHeroStyle = GetHeroBadgeStyle(run.Hero);
+        AddPill(
+            pillRow,
+            "Hero",
+            runHeroStyle.ShortCode,
+            runHeroStyle.Background,
+            runHeroStyle.Text,
+            60f
+        );
+        var achievement = FormatRunAchievement(run);
+        if (!string.IsNullOrWhiteSpace(achievement))
+        {
+            AddPill(
+                pillRow,
+                "Achievement",
+                achievement,
+                GetRunAchievementBackground(achievement),
+                GetRunAchievementText(achievement),
+                72f
+            );
+        }
+
+        var time = CreateText("Time", topRow, 11, FontStyle.Normal, TextAnchor.UpperRight);
+        time.text = FormatTimestamp(run.LastSeenAtUtc);
+        time.color = new Color(0.72f, 0.78f, 0.85f, 0.9f);
+        time.textWrappingMode = TextWrappingModes.NoWrap;
+        time.overflowMode = TextOverflowModes.Ellipsis;
+        ConfigureLayoutElement(time.gameObject, preferredWidth: 96f, minWidth: 84f, preferredHeight: 16f);
+
+        var metaParts = new List<string>
+        {
+            FormatDayOnly(run.FinalDay),
+            $"{run.BattleCount} battles",
+        };
+        if (run.Victories.HasValue)
+            metaParts.Add($"{run.Victories.Value} wins");
+        var duration = FormatRunDuration(run);
+        if (!string.IsNullOrWhiteSpace(duration))
+            metaParts.Add(duration);
+
+        AddDetailLine(
+            body,
+            string.Join("  |  ", metaParts),
+            13,
+            FontStyle.Normal,
+            new Color(0.82f, 0.86f, 0.92f, 0.96f)
+        );
+        BuildRunStatStrip(body, run);
+
+        ApplyItemState(
+            background,
+            selected,
+            new Color(0.11f, 0.14f, 0.18f, 0.98f),
+            new Color(0.17f, 0.24f, 0.32f, 0.99f)
+        );
+        return new ListItemView { Index = index, Background = background };
+    }
+
+    private ListItemView CreateBattleItem(Transform parent, int index, HistoryBattleRecord battle, bool selected)
+    {
+        var palette = GetBattlePalette(battle);
+        var (button, background) = CreateCardButtonShell($"BattleItem_{index}", parent, 88f);
+        button.onClick.AddListener(() => SelectBattle(index));
+
+        var (_, body) = BuildCardShell(
+            button.transform, palette.Accent,
+            3f, CreatePadding(12f, 12f, 8f, 8f));
+
+        // --- top row: pills + trailing timestamp ---
+        var topRow = CreateHorizontalGroup(
+            "TopRow", body, 8f, null,
+            TextAnchor.MiddleLeft, true, true, false, false);
+        ConfigureLayoutElement(topRow.gameObject, preferredHeight: 22f, minHeight: 22f);
+
+        var pillRow = CreateHorizontalGroup(
+            "PillRow", topRow, 6f, null,
+            TextAnchor.MiddleLeft, true, true, false, false);
+        ConfigureLayoutElement(pillRow.gameObject, flexibleWidth: 1f);
+
+        AddPill(pillRow, "Day", FormatDayOnly(battle.Day),
+            new Color(0.18f, 0.21f, 0.27f, 0.94f), new Color(0.92f, 0.95f, 1f, 1f), 72f);
+        var opponentHero = FormatOpponentHero(battle.OpponentHero);
+        if (!string.IsNullOrWhiteSpace(opponentHero))
+        {
+            var opponentHeroStyle = GetHeroBadgeStyle(opponentHero);
+            AddPill(
+                pillRow,
+                "OpponentHero",
+                opponentHeroStyle.ShortCode,
+                opponentHeroStyle.Background,
+                opponentHeroStyle.Text,
+                60f
+            );
+        }
+
+        var time = CreateText("Time", topRow, 11, FontStyle.Normal, TextAnchor.UpperRight);
+        time.text = FormatTimestamp(battle.RecordedAtUtc);
+        time.color = new Color(0.72f, 0.78f, 0.85f, 0.9f);
+        time.textWrappingMode = TextWrappingModes.NoWrap;
+        time.overflowMode = TextOverflowModes.Ellipsis;
+        ConfigureLayoutElement(time.gameObject, preferredWidth: 120f, minWidth: 80f, preferredHeight: 16f);
+
+        // --- detail lines ---
+        BuildBattleNameRow(body, battle);
+        if (!string.IsNullOrWhiteSpace(battle.OpponentAccountId))
+        {
+            AddDetailLine(
+                body,
+                $"UserID: {battle.OpponentAccountId}",
+                11,
+                FontStyle.Normal,
+                new Color(0.72f, 0.78f, 0.85f, 0.92f)
+            );
+        }
+        AddDetailLine(
+            body,
+            $"ID: {ShortenBattleId(battle.BattleId)}",
+            11,
+            FontStyle.Normal,
+            new Color(0.70f, 0.75f, 0.83f, 0.90f)
+        );
+        AddDetailLine(body, battle.SnapshotSummary,
+            12, FontStyle.Normal, new Color(0.74f, 0.80f, 0.87f, 0.95f));
+
+        ApplyItemState(background, selected, palette.Normal, palette.Selected);
+        return new ListItemView { Index = index, Background = background };
+    }
+
+    /// <summary>
+    /// Builds the shared accent-bar + body shell inside a card button.
+    /// Returns (accent, body) so each item can populate body freely.
+    /// </summary>
+    private (RectTransform accent, RectTransform body) BuildCardShell(
+        Transform buttonTransform,
+        Color accentColor,
+        float bodySpacing,
+        RectOffset bodyPadding)
+    {
+        var rootLayout = CreateHorizontalGroup(
+            "RootLayout", buttonTransform, 0f, null,
+            TextAnchor.UpperLeft, true, true, false, false);
+        StretchToParent(rootLayout, 0f, 0f, 0f, 0f);
+
+        var accent = CreateRect("Accent", rootLayout);
+        ConfigureLayoutElement(accent.gameObject, preferredWidth: 6f, minWidth: 6f, flexibleHeight: 1f);
+        AddImage(accent.gameObject, accentColor);
+
+        var body = CreateVerticalGroup(
+            "Body", rootLayout, bodySpacing, bodyPadding,
+            TextAnchor.UpperLeft, true, true, true, false);
+        ConfigureLayoutElement(body.gameObject, flexibleWidth: 1f, flexibleHeight: 1f);
+
+        return (accent, body);
+    }
+
+    private void AddPill(RectTransform parent, string name, string label, Color bg, Color textColor, float minWidth)
+    {
+        var width = Mathf.Max(minWidth, MeasurePillWidth(label));
+        var pill = CreatePill(parent, name, label, bg, textColor);
+        ConfigureLayoutElement(pill.gameObject, preferredWidth: width, minWidth: width, preferredHeight: 22f, minHeight: 22f);
+    }
+
+    private void AddDetailLine(RectTransform parent, string text, int fontSize, FontStyle style, Color color)
+    {
+        var line = CreateText("Detail", parent, fontSize, style, TextAnchor.UpperLeft);
+        line.text = text;
+        line.color = color;
+        line.textWrappingMode = TextWrappingModes.NoWrap;
+        line.overflowMode = TextOverflowModes.Ellipsis;
+        var height = fontSize <= 12 ? 16f : 20f;
+        ConfigureLayoutElement(line.gameObject, preferredHeight: height, minHeight: height);
+    }
+
+    private static void ApplyItemState(Image background, bool selected, Color normal, Color selectedColor)
+    {
+        background.color = selected ? selectedColor : normal;
+    }
+
+    private static void ClearContainer<TView>(RectTransform container, List<TView> views)
+    {
+        foreach (Transform child in container)
+            Destroy(child.gameObject);
+
+        views.Clear();
+    }
+
+    private void CreatePlaceholder(Transform parent, string message)
+    {
+        var placeholder = CreateRect("Placeholder", parent);
+        ConfigureLayoutElement(placeholder.gameObject, preferredHeight: 96f, minHeight: 96f);
+        AddImage(placeholder.gameObject, new Color(0.12f, 0.14f, 0.18f, 0.98f));
+
+        var text = CreateText("Text", placeholder, 14, FontStyle.Normal, TextAnchor.MiddleCenter);
+        text.text = message;
+        text.color = new Color(0.72f, 0.77f, 0.84f, 0.95f);
+        StretchToParent(text.rectTransform, 14f, 14f, 0f, 0f);
+    }
+
+    private RectTransform CreateSectionPanel(Transform parent, string name)
+    {
+        var panel = CreateRect(name, parent);
+        AddImage(panel.gameObject, new Color(0.11f, 0.13f, 0.18f, 0.98f));
+
+        var border = CreateRect("Border", panel);
+        StretchToParent(border, 0f, 0f, 0f, 0f);
+        AddImage(border.gameObject, new Color(0.77f, 0.83f, 0.91f, 0.08f));
+        return panel;
+    }
+
+    private void BuildSectionHeader(Transform parent, string titleText, string subtitleText, out TextMeshProUGUI subtitle)
+    {
+        var title = CreateText("SectionTitle", parent, 20, FontStyle.Bold, TextAnchor.UpperLeft);
+        title.text = titleText.ToUpperInvariant();
+        title.color = new Color(0.76f, 0.91f, 1f, 1f);
+        ConfigureLayoutElement(title.gameObject, preferredHeight: 24f, minHeight: 24f);
+
+        subtitle = CreateText("SectionSubtitle", parent, 12, FontStyle.Normal, TextAnchor.UpperLeft);
+        subtitle.text = subtitleText;
+        subtitle.color = new Color(0.72f, 0.77f, 0.84f, 0.92f);
+        subtitle.textWrappingMode = TextWrappingModes.Normal;
+        subtitle.overflowMode = TextOverflowModes.Ellipsis;
+        ConfigureLayoutElement(subtitle.gameObject, preferredHeight: 30f, minHeight: 18f);
+    }
+
+    private RectTransform CreateScrollSection(Transform parent, string name)
+    {
+        var root = CreateRect(name, parent);
+        ConfigureLayoutElement(root.gameObject, flexibleHeight: 1f, flexibleWidth: 1f);
+
+        var viewport = CreateRect("Viewport", root);
+        StretchToParent(viewport, 0f, 14f, 0f, 0f);
+        viewport.gameObject.AddComponent<RectMask2D>();
+
+        var content = CreateRect("Content", viewport);
+        content.anchorMin = new Vector2(0f, 1f);
+        content.anchorMax = new Vector2(1f, 1f);
+        content.pivot = new Vector2(0.5f, 1f);
+        content.anchoredPosition = Vector2.zero;
+        content.offsetMin = Vector2.zero;
+        content.offsetMax = Vector2.zero;
+        content.sizeDelta = Vector2.zero;
+        var group = content.gameObject.AddComponent<VerticalLayoutGroup>();
+        group.spacing = 10f;
+        group.childControlWidth = true;
+        group.childControlHeight = false;
+        group.childForceExpandWidth = true;
+        group.childForceExpandHeight = false;
+        var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        var scroll = root.gameObject.AddComponent<ScrollRect>();
+        scroll.viewport = viewport;
+        scroll.content = content;
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.scrollSensitivity = 20f;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.verticalScrollbar = CreateScrollbar(root);
+        scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+        return content;
+    }
+
+    private void BuildPreviewSection(Transform parent)
+    {
+        var preview = CreateRect("PreviewPanel", parent);
+        ConfigureLayoutElement(preview.gameObject, preferredHeight: PreviewSectionHeight, minHeight: PreviewSectionHeight);
+        AddImage(preview.gameObject, new Color(0.07f, 0.09f, 0.12f, 0.99f));
+
+        var surfaceFrame = CreateRect("PreviewSurfaceFrame", preview);
+        StretchToParent(surfaceFrame, 10f, 10f, 10f, 10f);
+        AddImage(surfaceFrame.gameObject, new Color(0.03f, 0.04f, 0.06f, 0.98f));
+
+        var rawImageRect = CreateRect("PreviewRawImage", surfaceFrame);
+        StretchToParent(rawImageRect, 1f, 1f, 1f, 1f);
+        _previewSurface = rawImageRect.gameObject.AddComponent<RawImage>();
+        _previewSurface.color = new Color(1f, 1f, 1f, 0.10f);
+        _previewSurface.raycastTarget = false;
+
+        _previewStatusText = CreateText("PreviewStatus", surfaceFrame, 13, FontStyle.Normal, TextAnchor.MiddleCenter);
+        _previewStatusText.text = "Select a battle to preview its recorded cards.";
+        _previewStatusText.color = new Color(0.82f, 0.87f, 0.93f, 0.96f);
+        _previewStatusText.textWrappingMode = TextWrappingModes.Normal;
+        _previewStatusText.overflowMode = TextOverflowModes.Ellipsis;
+        StretchToParent(_previewStatusText.rectTransform, 28f, 28f, 18f, 18f);
+
+        _previewDebugText = CreateText("PreviewDebug", surfaceFrame, 11, FontStyle.Bold, TextAnchor.UpperRight);
+        _previewDebugText.color = new Color(0.97f, 0.85f, 0.57f, 0.96f);
+        _previewDebugText.gameObject.SetActive(false);
+        _previewDebugText.textWrappingMode = TextWrappingModes.NoWrap;
+        _previewDebugText.overflowMode = TextOverflowModes.Overflow;
+        _previewDebugText.rectTransform.anchorMin = new Vector2(1f, 1f);
+        _previewDebugText.rectTransform.anchorMax = new Vector2(1f, 1f);
+        _previewDebugText.rectTransform.pivot = new Vector2(1f, 1f);
+        _previewDebugText.rectTransform.anchoredPosition = new Vector2(-14f, -12f);
+        _previewDebugText.rectTransform.sizeDelta = new Vector2(560f, 36f);
+    }
+
+    private Scrollbar CreateScrollbar(Transform parent)
+    {
+        var root = CreateRect("Scrollbar", parent);
+        root.anchorMin = new Vector2(1f, 0f);
+        root.anchorMax = new Vector2(1f, 1f);
+        root.pivot = new Vector2(1f, 0.5f);
+        root.sizeDelta = new Vector2(10f, 0f);
+
+        var track = AddImage(root.gameObject, new Color(0.16f, 0.18f, 0.22f, 0.88f));
+        track.raycastTarget = true;
+        var area = CreateRect("Area", root);
+        StretchToParent(area, 0f, 0f, 0f, 0f);
+        var handle = CreateRect("Handle", area);
+        handle.anchorMin = new Vector2(0f, 1f);
+        handle.anchorMax = new Vector2(1f, 1f);
+        handle.pivot = new Vector2(0.5f, 1f);
+        handle.sizeDelta = new Vector2(0f, 56f);
+        var handleImage = AddImage(handle.gameObject, new Color(0.74f, 0.62f, 0.31f, 0.96f));
+        handleImage.raycastTarget = true;
+        var scrollbar = root.gameObject.AddComponent<Scrollbar>();
+        scrollbar.direction = Scrollbar.Direction.BottomToTop;
+        scrollbar.handleRect = handle;
+        scrollbar.targetGraphic = handleImage;
+        scrollbar.colors = BuildColorBlock(
+            new Color(0.74f, 0.62f, 0.31f, 0.96f),
+            new Color(0.86f, 0.73f, 0.38f, 1f),
+            new Color(0.24f, 0.26f, 0.30f, 0.45f)
+        );
+        return scrollbar;
+    }
+
+    private TextMeshProUGUI CreateChip(Transform parent, float width)
+    {
+        var chip = CreateRect("Chip", parent);
+        ConfigureLayoutElement(chip.gameObject, preferredWidth: width, minWidth: width, preferredHeight: 32f, minHeight: 32f);
+        AddImage(chip.gameObject, new Color(0.14f, 0.18f, 0.23f, 0.96f));
+        var text = CreateText("Label", chip, 12, FontStyle.Bold, TextAnchor.MiddleCenter);
+        text.color = new Color(0.95f, 0.96f, 0.98f, 1f);
+        StretchToParent(text.rectTransform, 8f, 8f, 0f, 0f);
+        return text;
+    }
+
+    private RectTransform CreatePill(Transform parent, string name, string labelText, Color backgroundColor, Color textColor)
+    {
+        var pill = CreateRect(name, parent);
+        AddImage(pill.gameObject, backgroundColor);
+        var text = CreateText("Label", pill, 12, FontStyle.Bold, TextAnchor.MiddleCenter);
+        text.text = labelText;
+        text.color = textColor;
+        StretchToParent(text.rectTransform, 10f, 10f, 0f, 0f);
+        return pill;
+    }
+
+    private void CreateActionButton(string name, Transform parent, string label, float width, UnityEngine.Events.UnityAction onClick)
+    {
+        var (button, background, text) = CreateStyledButton(name, parent, label, width, 38f);
+        button.onClick.AddListener(onClick);
+        RefreshActionButton(
+            button,
+            background,
+            text,
+            true,
+            new Color(0.23f, 0.27f, 0.32f, 0.98f),
+            new Color(0.35f, 0.39f, 0.44f, 1f),
+            new Color(0.24f, 0.26f, 0.30f, 0.50f),
+            Color.white
+        );
+    }
+
+    private (Button button, Image background, TextMeshProUGUI label) CreateStyledButton(
+        string name,
+        Transform parent,
+        string labelText,
+        float width,
+        float preferredHeight = 36f
+    )
+    {
+        var rect = CreateRect(name, parent);
+        if (width > 0f)
+        {
+            ConfigureLayoutElement(rect.gameObject, preferredWidth: width, minWidth: width, preferredHeight: preferredHeight, minHeight: preferredHeight);
+        }
+        else
+        {
+            ConfigureLayoutElement(rect.gameObject, flexibleWidth: 1f, preferredHeight: preferredHeight, minHeight: preferredHeight);
+        }
+
+        var background = AddImage(rect.gameObject, Color.white);
+        background.raycastTarget = true;
+        var button = rect.gameObject.AddComponent<Button>();
+        button.targetGraphic = background;
+        button.transition = Selectable.Transition.ColorTint;
+        button.colors = BuildColorBlock(Color.white, Color.white, Color.white);
+
+        var label = CreateText("Label", rect, 13, FontStyle.Bold, TextAnchor.MiddleCenter);
+        label.text = labelText;
+        label.color = Color.white;
+        StretchToParent(label.rectTransform, 10f, 10f, 0f, 0f);
+        return (button, background, label);
+    }
+
+    private (Button button, Image background) CreateCardButtonShell(string name, Transform parent, float preferredHeight)
+    {
+        var rect = CreateRect(name, parent);
+        ConfigureLayoutElement(rect.gameObject, flexibleWidth: 1f, preferredHeight: preferredHeight, minHeight: preferredHeight);
+        var background = AddImage(rect.gameObject, Color.white);
+        background.raycastTarget = true;
+        var button = rect.gameObject.AddComponent<Button>();
+        button.targetGraphic = background;
+        button.transition = Selectable.Transition.ColorTint;
+        button.colors = BuildColorBlock(Color.white, Color.white, Color.white);
+        return (button, background);
+    }
+
+    private static void RefreshActionButton(
+        Button? button,
+        Image? background,
+        TextMeshProUGUI? label,
+        bool interactable,
+        Color normalColor,
+        Color pressedColor,
+        Color disabledColor,
+        Color textColor
+    )
+    {
+        if (button == null || background == null || label == null)
+            return;
+
+        button.interactable = interactable;
+        button.colors = BuildColorBlock(normalColor, pressedColor, disabledColor);
+        background.color = interactable ? normalColor : disabledColor;
+        label.color = interactable ? textColor : new Color(textColor.r, textColor.g, textColor.b, 0.55f);
+    }
+
+    private static RectTransform CreateRect(string name, Transform parent)
+    {
+        var rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        rect.localScale = Vector3.one;
+        return rect;
+    }
+
+    private static RectTransform CreateVerticalGroup(
+        string name,
+        Transform parent,
+        float spacing,
+        RectOffset? padding,
+        TextAnchor alignment,
+        bool controlWidth,
+        bool controlHeight,
+        bool forceExpandWidth,
+        bool forceExpandHeight
+    )
+    {
+        var rect = CreateRect(name, parent);
+        var group = rect.gameObject.AddComponent<VerticalLayoutGroup>();
+        group.spacing = spacing;
+        group.padding = padding ?? new RectOffset();
+        group.childAlignment = alignment;
+        group.childControlWidth = controlWidth;
+        group.childControlHeight = controlHeight;
+        group.childForceExpandWidth = forceExpandWidth;
+        group.childForceExpandHeight = forceExpandHeight;
+        return rect;
+    }
+
+    private static RectTransform CreateHorizontalGroup(
+        string name,
+        Transform parent,
+        float spacing,
+        RectOffset? padding,
+        TextAnchor alignment,
+        bool controlWidth,
+        bool controlHeight,
+        bool forceExpandWidth,
+        bool forceExpandHeight
+    )
+    {
+        var rect = CreateRect(name, parent);
+        var group = rect.gameObject.AddComponent<HorizontalLayoutGroup>();
+        group.spacing = spacing;
+        group.padding = padding ?? new RectOffset();
+        group.childAlignment = alignment;
+        group.childControlWidth = controlWidth;
+        group.childControlHeight = controlHeight;
+        group.childForceExpandWidth = forceExpandWidth;
+        group.childForceExpandHeight = forceExpandHeight;
+        return rect;
+    }
+
+    private static void CreateFlexibleSpacer(string name, Transform parent)
+    {
+        var spacer = CreateRect(name, parent);
+        ConfigureLayoutElement(spacer.gameObject, flexibleWidth: 1f, flexibleHeight: 1f);
+    }
+
+    private static RectOffset CreatePadding(float left, float right, float top, float bottom)
+    {
+        return new RectOffset(
+            Mathf.RoundToInt(left),
+            Mathf.RoundToInt(right),
+            Mathf.RoundToInt(top),
+            Mathf.RoundToInt(bottom)
+        );
+    }
+
+    private static void ConfigureLayoutElement(
+        GameObject gameObject,
+        float preferredWidth = -1f,
+        float minWidth = -1f,
+        float flexibleWidth = -1f,
+        float preferredHeight = -1f,
+        float minHeight = -1f,
+        float flexibleHeight = -1f
+    )
+    {
+        var element = gameObject.GetComponent<LayoutElement>() ?? gameObject.AddComponent<LayoutElement>();
+        if (preferredWidth >= 0f)
+            element.preferredWidth = preferredWidth;
+        if (minWidth >= 0f)
+            element.minWidth = minWidth;
+        if (flexibleWidth >= 0f)
+            element.flexibleWidth = flexibleWidth;
+        if (preferredHeight >= 0f)
+            element.preferredHeight = preferredHeight;
+        if (minHeight >= 0f)
+            element.minHeight = minHeight;
+        if (flexibleHeight >= 0f)
+            element.flexibleHeight = flexibleHeight;
+    }
+
+    private static void StretchToParent(RectTransform rect, float left, float right, float top, float bottom)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.offsetMin = new Vector2(left, bottom);
+        rect.offsetMax = new Vector2(-right, -top);
+    }
+
+    private static Image AddImage(GameObject gameObject, Color color)
+    {
+        var image = gameObject.AddComponent<Image>();
+        image.sprite = GetRoundedSprite();
+        image.type = Image.Type.Sliced;
+        image.color = color;
+        image.raycastTarget = false;
+        return image;
+    }
+
+    private static TextMeshProUGUI CreateText(string name, Transform parent, int fontSize, FontStyle fontStyle, TextAnchor alignment)
+    {
+        var rect = CreateRect(name, parent);
+        var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+        text.font = GetUiFont();
+        text.fontSize = fontSize;
+        text.fontStyle = MapFontStyle(fontStyle);
+        text.alignment = MapAlignment(alignment);
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.overflowMode = TextOverflowModes.Truncate;
+        text.richText = false;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    private static ColorBlock BuildColorBlock(Color normal, Color pressed, Color disabled)
+    {
+        var colors = ColorBlock.defaultColorBlock;
+        colors.normalColor = normal;
+        colors.highlightedColor = normal;
+        colors.selectedColor = normal;
+        colors.pressedColor = pressed;
+        colors.disabledColor = disabled;
+        colors.colorMultiplier = 1f;
+        colors.fadeDuration = 0.05f;
+        return colors;
+    }
+
+    private static TMP_FontAsset GetUiFont()
+    {
+        _uiFont ??= TMP_Settings.defaultFontAsset;
+        if (_uiFont == null)
+        {
+            foreach (var candidate in Resources.FindObjectsOfTypeAll<TextMeshProUGUI>())
+            {
+                if (candidate != null && candidate.font != null)
+                {
+                    _uiFont = candidate.font;
+                    break;
+                }
+            }
+        }
+
+        _uiFont ??= TMP_FontAsset.CreateFontAsset(Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
+        return _uiFont;
+    }
+
+    private static Sprite GetRoundedSprite()
+    {
+        if (_roundedSprite != null)
+            return _roundedSprite;
+
+        const int size = 32;
+        const int radius = 12;
+        var texture = new Texture2D(size, size, TextureFormat.ARGB32, false)
+        {
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+        };
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                texture.SetPixel(
+                    x,
+                    y,
+                    new Color(1f, 1f, 1f, IsInsideRoundedRect(x, y, size, radius) ? 1f : 0f)
+                );
+            }
+        }
+
+        texture.Apply();
+        _roundedSprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, size, size),
+            new Vector2(0.5f, 0.5f),
+            100f,
+            0u,
+            SpriteMeshType.FullRect,
+            new Vector4(radius, radius, radius, radius)
+        );
+        return _roundedSprite;
+    }
+
+    private static bool IsInsideRoundedRect(int x, int y, int size, int radius)
+    {
+        var clampedX = Mathf.Clamp(x, radius, size - radius - 1);
+        var clampedY = Mathf.Clamp(y, radius, size - radius - 1);
+        var dx = x - clampedX;
+        var dy = y - clampedY;
+        return (dx * dx) + (dy * dy) <= radius * radius;
+    }
+
+    private static FontStyles MapFontStyle(FontStyle fontStyle) => fontStyle switch
+    {
+        FontStyle.Bold => FontStyles.Bold,
+        FontStyle.Italic => FontStyles.Italic,
+        FontStyle.BoldAndItalic => FontStyles.Bold | FontStyles.Italic,
+        _ => FontStyles.Normal,
+    };
+
+    private static TextAlignmentOptions MapAlignment(TextAnchor alignment) => alignment switch
+    {
+        TextAnchor.UpperLeft => TextAlignmentOptions.TopLeft,
+        TextAnchor.UpperCenter => TextAlignmentOptions.Top,
+        TextAnchor.UpperRight => TextAlignmentOptions.TopRight,
+        TextAnchor.MiddleLeft => TextAlignmentOptions.MidlineLeft,
+        TextAnchor.MiddleCenter => TextAlignmentOptions.Midline,
+        TextAnchor.MiddleRight => TextAlignmentOptions.MidlineRight,
+        TextAnchor.LowerLeft => TextAlignmentOptions.BottomLeft,
+        TextAnchor.LowerCenter => TextAlignmentOptions.Bottom,
+        TextAnchor.LowerRight => TextAlignmentOptions.BottomRight,
+        _ => TextAlignmentOptions.TopLeft,
+    };
+
+    private static float MeasurePillWidth(string text)
+    {
+        return string.IsNullOrWhiteSpace(text) ? 64f : Mathf.Max(64f, (text.Length * 7f) + 24f);
+    }
+
+    private static string BuildBattleExtraLine(HistoryBattleRecord battle)
+    {
+        return string.IsNullOrWhiteSpace(battle.EncounterId)
+            ? $"Battle ID {ShortenBattleId(battle.BattleId)}"
+            : $"Encounter {battle.EncounterId}  |  Battle ID {ShortenBattleId(battle.BattleId)}";
+    }
+
+    private static string ShortenBattleId(string battleId)
+    {
+        return string.IsNullOrWhiteSpace(battleId)
+            ? "-"
+            : battleId.Length <= 12
+                ? battleId
+                : battleId[..12];
+    }
+
+    private static BattlePalette GetBattlePalette(HistoryBattleRecord battle)
+    {
+        var result = FormatBattleResult(battle);
+        if (string.Equals(result, "Win", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BattlePalette(
+                new Color(0.10f, 0.15f, 0.16f, 0.98f),
+                new Color(0.13f, 0.23f, 0.22f, 0.99f),
+                new Color(0.23f, 0.54f, 0.47f, 0.95f),
+                new Color(0.13f, 0.28f, 0.23f, 0.98f),
+                new Color(0.80f, 0.98f, 0.91f, 1f)
+            );
+        }
+
+        if (string.Equals(result, "Loss", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BattlePalette(
+                new Color(0.15f, 0.13f, 0.15f, 0.98f),
+                new Color(0.24f, 0.18f, 0.16f, 0.99f),
+                new Color(0.63f, 0.36f, 0.24f, 0.95f),
+                new Color(0.33f, 0.20f, 0.15f, 0.98f),
+                new Color(0.99f, 0.90f, 0.85f, 1f)
+            );
+        }
+
+        return new BattlePalette(
+            new Color(0.13f, 0.15f, 0.18f, 0.98f),
+            new Color(0.18f, 0.24f, 0.31f, 0.99f),
+            new Color(0.34f, 0.47f, 0.64f, 0.95f),
+            new Color(0.18f, 0.23f, 0.31f, 0.98f),
+            new Color(0.89f, 0.94f, 1f, 1f)
+        );
+    }
+
+    private static Color GetRunAchievementBackground(string achievement)
+    {
+        return achievement switch
+        {
+            "PERFECT" => new Color(0.36f, 0.28f, 0.10f, 0.98f),
+            "GOLD" => new Color(0.41f, 0.31f, 0.12f, 0.98f),
+            "SILVER" => new Color(0.36f, 0.38f, 0.44f, 0.98f),
+            "BRONZE" => new Color(0.38f, 0.25f, 0.18f, 0.98f),
+            _ => new Color(0.24f, 0.18f, 0.18f, 0.98f),
+        };
+    }
+
+    private static Color GetRunAchievementText(string achievement)
+    {
+        return achievement switch
+        {
+            "PERFECT" => new Color(1f, 0.94f, 0.71f, 1f),
+            "GOLD" => new Color(0.99f, 0.90f, 0.66f, 1f),
+            "SILVER" => new Color(0.94f, 0.97f, 1f, 1f),
+            "BRONZE" => new Color(0.98f, 0.88f, 0.80f, 1f),
+            _ => new Color(0.96f, 0.84f, 0.84f, 1f),
+        };
+    }
+
+    private void BuildBattleNameRow(RectTransform parent, HistoryBattleRecord battle)
+    {
+        var row = CreateHorizontalGroup(
+            "BattleNameRow",
+            parent,
+            6f,
+            null,
+            TextAnchor.MiddleLeft,
+            true,
+            true,
+            false,
+            false
+        );
+        ConfigureLayoutElement(row.gameObject, preferredHeight: 20f, minHeight: 20f);
+
+        var rank = FormatOpponentRank(battle.OpponentRank);
+        if (!string.IsNullOrWhiteSpace(rank))
+        {
+            if (string.Equals(rank, "Legendary", StringComparison.OrdinalIgnoreCase))
+            {
+                var ratingText = CreateText("Rating", row, 11, FontStyle.Bold, TextAnchor.MiddleLeft);
+                ratingText.text = battle.OpponentRating.HasValue
+                    ? $"Rating {battle.OpponentRating.Value}"
+                    : "Legendary";
+                ratingText.color = new Color(0.99f, 0.84f, 0.34f, 0.96f);
+                ConfigureLayoutElement(ratingText.gameObject, preferredHeight: 16f, minHeight: 16f);
+            }
+            else
+            {
+                var palette = GetRankBadgePalette(rank);
+                AddPill(row, "Rank", rank.ToUpperInvariant(), palette.Background, palette.Text, 68f);
+            }
+        }
+
+        var nameText = CreateText("OpponentName", row, 15, FontStyle.Bold, TextAnchor.MiddleLeft);
+        nameText.text = battle.OpponentName ?? "Unknown Opponent";
+        nameText.color = Color.white;
+        nameText.textWrappingMode = TextWrappingModes.NoWrap;
+        nameText.overflowMode = TextOverflowModes.Ellipsis;
+        ConfigureLayoutElement(nameText.gameObject, flexibleWidth: 1f, preferredHeight: 20f, minHeight: 20f);
+    }
+
+    private static string? FormatOpponentRank(string? rawRank)
+    {
+        if (string.IsNullOrWhiteSpace(rawRank))
+            return null;
+
+        return rawRank.Trim();
+    }
+
+    private static (Color Background, Color Text) GetRankBadgePalette(string rank)
+    {
+        return rank switch
+        {
+            "Bronze" => (new Color(0.39f, 0.24f, 0.17f, 0.98f), new Color(0.98f, 0.88f, 0.80f, 1f)),
+            "Silver" => (new Color(0.34f, 0.37f, 0.43f, 0.98f), new Color(0.94f, 0.97f, 1f, 1f)),
+            "Gold" => (new Color(0.41f, 0.31f, 0.12f, 0.98f), new Color(0.99f, 0.90f, 0.66f, 1f)),
+            "Diamond" => (new Color(0.18f, 0.35f, 0.47f, 0.98f), new Color(0.84f, 0.97f, 1f, 1f)),
+            _ => (new Color(0.24f, 0.28f, 0.36f, 0.98f), new Color(0.89f, 0.94f, 1f, 1f)),
+        };
+    }
+
+    private void BuildRunStatStrip(Transform parent, HistoryRunRecord run)
+    {
+        var row = CreateHorizontalGroup(
+            "RunStatsRow",
+            parent,
+            6f,
+            null,
+            TextAnchor.MiddleLeft,
+            true,
+            true,
+            false,
+            false
+        );
+        ConfigureLayoutElement(row.gameObject, preferredHeight: 32f, minHeight: 32f);
+
+        CreateRunStatChip(row, "HP", run.MaxHealth, new Color(0.63f, 0.98f, 0.35f, 1f));
+        CreateRunStatChip(row, "PRE", run.Prestige, new Color(1f, 0.65f, 0.13f, 1f));
+        CreateRunStatChip(row, "LVL", run.Level, new Color(0.36f, 0.79f, 1f, 1f));
+        CreateRunStatChip(row, "INC", run.Income, new Color(1f, 0.86f, 0.10f, 1f));
+        CreateRunStatChip(row, "GLD", run.Gold, new Color(1f, 0.86f, 0.10f, 1f));
+    }
+
+    private static void CreateRunStatChip(Transform parent, string labelText, int? value, Color valueColor)
+    {
+        var chip = CreateRect(labelText, parent);
+        ConfigureLayoutElement(chip.gameObject, flexibleWidth: 1f, preferredHeight: 32f, minHeight: 32f);
+        AddImage(chip.gameObject, BuildRunStatChipBackground(valueColor));
+
+        var accent = CreateRect("Accent", chip);
+        accent.anchorMin = new Vector2(0f, 0f);
+        accent.anchorMax = new Vector2(0f, 1f);
+        accent.pivot = new Vector2(0f, 0.5f);
+        accent.sizeDelta = new Vector2(3f, 0f);
+        AddImage(accent.gameObject, new Color(valueColor.r, valueColor.g, valueColor.b, 0.95f));
+
+        var layout = CreateVerticalGroup(
+            "Layout",
+            chip,
+            1f,
+            CreatePadding(8f, 6f, 4f, 4f),
+            TextAnchor.UpperLeft,
+            true,
+            true,
+            true,
+            false
+        );
+        StretchToParent(layout, 5f, 0f, 0f, 0f);
+
+        var label = CreateText("Label", layout, 8, FontStyle.Bold, TextAnchor.UpperLeft);
+        label.text = labelText;
+        label.color = new Color(0.86f, 0.90f, 0.96f, 0.86f);
+        ConfigureLayoutElement(label.gameObject, preferredHeight: 9f, minHeight: 9f);
+
+        var valueText = CreateText("Value", layout, 13, FontStyle.Bold, TextAnchor.UpperLeft);
+        valueText.text = value?.ToString() ?? "--";
+        valueText.color = valueColor;
+        ConfigureLayoutElement(valueText.gameObject, preferredHeight: 14f, minHeight: 14f);
+    }
+
+    private static Color BuildRunStatChipBackground(Color accent)
+    {
+        return new Color(
+            Mathf.Lerp(0.16f, accent.r, 0.12f),
+            Mathf.Lerp(0.15f, accent.g, 0.12f),
+            Mathf.Lerp(0.14f, accent.b, 0.12f),
+            0.98f
+        );
+    }
+
+    private static HeroBadgeStyle GetHeroBadgeStyle(string? heroName)
+    {
+        if (string.IsNullOrWhiteSpace(heroName))
+            return new HeroBadgeStyle("UNK", new Color(0.20f, 0.29f, 0.38f, 0.95f), Color.white);
+
+        return heroName.Trim() switch
+        {
+            "Vanessa" => BuildHeroBadgeStyle("VAN", 192, 33, 33),
+            "Pygmalien" => BuildHeroBadgeStyle("PYG", 39, 103, 192),
+            "Dooley" => BuildHeroBadgeStyle("DOO", 225, 154, 8),
+            "Mak" => BuildHeroBadgeStyle("MAK", 190, 230, 91),
+            "Jules" => BuildHeroBadgeStyle("JUL", 180, 52, 236),
+            "Karnok" => BuildHeroBadgeStyle("KAR", 59, 136, 156),
+            "Stelle" => BuildHeroBadgeStyle("STE", 255, 235, 24),
+            _ => BuildHeroBadgeStyle(heroName.Length <= 3 ? heroName.ToUpperInvariant() : heroName[..3].ToUpperInvariant(), 57, 73, 97),
+        };
+    }
+
+    private static HeroBadgeStyle BuildHeroBadgeStyle(string shortCode, int r, int g, int b)
+    {
+        var background = ColorFromRgb(r, g, b);
+        var luminance = (0.299f * background.r) + (0.587f * background.g) + (0.114f * background.b);
+        var text = luminance > 0.62f
+            ? new Color(0.10f, 0.12f, 0.15f, 1f)
+            : Color.white;
+        return new HeroBadgeStyle(shortCode, background, text);
+    }
+
+    private static Color ColorFromRgb(int r, int g, int b)
+    {
+        return new Color(r / 255f, g / 255f, b / 255f, 0.98f);
+    }
+}

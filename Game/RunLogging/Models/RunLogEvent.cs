@@ -34,6 +34,8 @@ public sealed class RunLogEvent
 
     public string? EncounterId { get; set; }
 
+    public string? ParentEncounterId { get; set; }
+
     public string? CombatKind { get; set; }
 
     public string? BattleId { get; set; }
@@ -59,7 +61,27 @@ public sealed class RunLogEvent
 
     public string? SelectedTemplateId { get; set; }
 
+    public string? SelectedEncounterId { get; set; }
+
+    public string? SelectedName { get; set; }
+
+    public string? SelectedTier { get; set; }
+
+    public string? SelectedEnchant { get; set; }
+
+    public string? AbandonedReason { get; set; }
+
     public string? InferredFrom { get; set; }
 
     public double? Confidence { get; set; }
+
+    public bool ShouldSerializeSelectionContextRules()
+    {
+        return SelectionContextRules.Count > 0;
+    }
+
+    public bool ShouldSerializeOptions()
+    {
+        return Options.Count > 0;
+    }
 }

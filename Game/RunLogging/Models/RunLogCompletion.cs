@@ -17,6 +17,16 @@ public sealed class RunLogCompletion
 
     public int? FinalHour { get; set; }
 
+    public int? MaxHealth { get; set; }
+
+    public int? Prestige { get; set; }
+
+    public int? Level { get; set; }
+
+    public int? Income { get; set; }
+
+    public int? Gold { get; set; }
+
     public int? Victories { get; set; }
 
     public int? Losses { get; set; }

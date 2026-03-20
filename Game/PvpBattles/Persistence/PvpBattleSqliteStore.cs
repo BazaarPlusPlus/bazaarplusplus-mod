@@ -42,6 +42,10 @@ internal sealed class PvpBattleSqliteStore
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
         MigrateLegacyReplayIdColumn(connection);
+        EnsurePvpBattleOptionalColumn(connection, "opponent_hero", "TEXT NULL");
+        EnsurePvpBattleOptionalColumn(connection, "opponent_rank", "TEXT NULL");
+        EnsurePvpBattleOptionalColumn(connection, "opponent_rating", "INTEGER NULL");
+        EnsurePvpBattleOptionalColumn(connection, "opponent_level", "INTEGER NULL");
     }
 
     public void Save(PvpBattleManifest manifest)
@@ -66,6 +70,10 @@ internal sealed class PvpBattleSqliteStore
                 player_name,
                 player_account_id,
                 opponent_name,
+                opponent_hero,
+                opponent_rank,
+                opponent_rating,
+                opponent_level,
                 opponent_account_id,
                 combat_kind,
                 result,
@@ -85,6 +93,10 @@ internal sealed class PvpBattleSqliteStore
                 $playerName,
                 $playerAccountId,
                 $opponentName,
+                $opponentHero,
+                $opponentRank,
+                $opponentRating,
+                $opponentLevel,
                 $opponentAccountId,
                 $combatKind,
                 $result,
@@ -104,6 +116,10 @@ internal sealed class PvpBattleSqliteStore
                 player_name = excluded.player_name,
                 player_account_id = excluded.player_account_id,
                 opponent_name = excluded.opponent_name,
+                opponent_hero = excluded.opponent_hero,
+                opponent_rank = excluded.opponent_rank,
+                opponent_rating = excluded.opponent_rating,
+                opponent_level = excluded.opponent_level,
                 opponent_account_id = excluded.opponent_account_id,
                 combat_kind = excluded.combat_kind,
                 result = excluded.result,
@@ -132,6 +148,16 @@ internal sealed class PvpBattleSqliteStore
             "$opponentName",
             (object?)manifest.Participants.OpponentName ?? DBNull.Value
         );
+        command.Parameters.AddWithValue(
+            "$opponentHero",
+            (object?)manifest.Participants.OpponentHero ?? DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$opponentRank",
+            (object?)manifest.Participants.OpponentRank ?? DBNull.Value
+        );
+        AddNullableInt32(command, "$opponentRating", manifest.Participants.OpponentRating);
+        AddNullableInt32(command, "$opponentLevel", manifest.Participants.OpponentLevel);
         command.Parameters.AddWithValue(
             "$opponentAccountId",
             (object?)manifest.Participants.OpponentAccountId ?? DBNull.Value
@@ -180,6 +206,10 @@ internal sealed class PvpBattleSqliteStore
                 player_name,
                 player_account_id,
                 opponent_name,
+                opponent_hero,
+                opponent_rank,
+                opponent_rating,
+                opponent_level,
                 opponent_account_id,
                 combat_kind,
                 result,
@@ -216,6 +246,10 @@ internal sealed class PvpBattleSqliteStore
                 player_name,
                 player_account_id,
                 opponent_name,
+                opponent_hero,
+                opponent_rank,
+                opponent_rating,
+                opponent_level,
                 opponent_account_id,
                 combat_kind,
                 result,
@@ -283,6 +317,10 @@ internal sealed class PvpBattleSqliteStore
                 player_name TEXT NULL,
                 player_account_id TEXT NULL,
                 opponent_name TEXT NULL,
+                opponent_hero TEXT NULL,
+                opponent_rank TEXT NULL,
+                opponent_rating INTEGER NULL,
+                opponent_level INTEGER NULL,
                 opponent_account_id TEXT NULL,
                 combat_kind TEXT NOT NULL,
                 result TEXT NULL,
@@ -304,6 +342,10 @@ internal sealed class PvpBattleSqliteStore
                 player_name,
                 player_account_id,
                 opponent_name,
+                opponent_hero,
+                opponent_rank,
+                opponent_rating,
+                opponent_level,
                 opponent_account_id,
                 combat_kind,
                 result,
@@ -324,6 +366,10 @@ internal sealed class PvpBattleSqliteStore
                 player_name,
                 player_account_id,
                 opponent_name,
+                NULL AS opponent_hero,
+                NULL AS opponent_rank,
+                NULL AS opponent_rating,
+                NULL AS opponent_level,
                 opponent_account_id,
                 combat_kind,
                 result,
@@ -371,6 +417,21 @@ internal sealed class PvpBattleSqliteStore
         }
 
         return false;
+    }
+
+    private static void EnsurePvpBattleOptionalColumn(
+        SqliteConnection connection,
+        string columnName,
+        string columnTypeSql
+    )
+    {
+        if (TableHasColumn(connection, RunLogSqliteSchema.PvpBattlesTableName, columnName))
+            return;
+
+        using var command = CreateCommand(connection);
+        command.CommandText =
+            $"ALTER TABLE {RunLogSqliteSchema.PvpBattlesTableName} ADD COLUMN {columnName} {columnTypeSql};";
+        command.ExecuteNonQuery();
     }
 
     private static SqliteCommand CreateCommand(SqliteConnection connection)
@@ -422,6 +483,10 @@ internal sealed class PvpBattleSqliteStore
                 PlayerName = GetNullableString(reader, "player_name"),
                 PlayerAccountId = GetNullableString(reader, "player_account_id"),
                 OpponentName = GetNullableString(reader, "opponent_name"),
+                OpponentHero = GetNullableString(reader, "opponent_hero"),
+                OpponentRank = GetNullableString(reader, "opponent_rank"),
+                OpponentRating = GetNullableInt32(reader, "opponent_rating"),
+                OpponentLevel = GetNullableInt32(reader, "opponent_level"),
                 OpponentAccountId = GetNullableString(reader, "opponent_account_id"),
             },
             Outcome = new PvpBattleOutcome

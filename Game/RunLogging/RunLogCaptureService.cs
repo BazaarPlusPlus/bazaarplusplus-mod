@@ -35,6 +35,7 @@ public sealed class RunLogCaptureService
             Hour = input.Hour,
             State = input.State,
             EncounterId = input.EncounterId,
+            ParentEncounterId = input.ParentEncounterId,
             RerollCost = input.RerollCost,
             RerollsRemaining = input.RerollsRemaining,
             StateFingerprint = RunLogSnapshotBuilder.ComputeStateFingerprint(input),
@@ -48,11 +49,12 @@ public sealed class RunLogCaptureService
 
         return new RunLogEvent
         {
-            Kind = "selection_seen",
+            Kind = ResolveSelectionSeenKind(input.State),
             Day = input.Day,
             Hour = input.Hour,
             State = input.State,
             EncounterId = input.EncounterId,
+            ParentEncounterId = input.ParentEncounterId,
             SelectionFingerprint = RunLogSnapshotBuilder.ComputeSelectionFingerprint(input),
             SelectionContextRules = new Dictionary<string, object?>(input.SelectionContextRules),
             Options = RunLogSnapshotBuilder.ProjectOptions(input.Options),
@@ -74,6 +76,18 @@ public sealed class RunLogCaptureService
             CombatKind = input.CombatKind,
             BattleId = input.BattleId,
             OpponentName = input.OpponentName,
+        };
+    }
+
+    private static string ResolveSelectionSeenKind(string? state)
+    {
+        return state switch
+        {
+            "Encounter" => "encounter_options_seen",
+            "Choice" => "choice_options_seen",
+            "Loot" => "loot_options_seen",
+            "Pedestal" => "pedestal_options_seen",
+            _ => "selection_seen",
         };
     }
 }
@@ -101,6 +115,8 @@ public sealed class RunLogStateSnapshotInput
 
     public string? EncounterId { get; set; }
 
+    public string? ParentEncounterId { get; set; }
+
     public int? RerollCost { get; set; }
 
     public int? RerollsRemaining { get; set; }
@@ -115,6 +131,8 @@ public sealed class RunLogSelectionSnapshotInput
     public string? State { get; set; }
 
     public string? EncounterId { get; set; }
+
+    public string? ParentEncounterId { get; set; }
 
     public IDictionary<string, object?> SelectionContextRules { get; set; } =
         new Dictionary<string, object?>();
@@ -156,4 +174,17 @@ public sealed class RunLogPvpBattleInput
     public string? BattleId { get; set; }
 
     public string? OpponentName { get; set; }
+}
+
+public sealed class RunLogPlayerStatsSnapshot
+{
+    public int? MaxHealth { get; set; }
+
+    public int? Prestige { get; set; }
+
+    public int? Level { get; set; }
+
+    public int? Income { get; set; }
+
+    public int? Gold { get; set; }
 }

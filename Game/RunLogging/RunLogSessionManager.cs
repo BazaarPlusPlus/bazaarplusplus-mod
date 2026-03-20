@@ -61,7 +61,7 @@ public sealed class RunLogSessionManager
         var session =
             ActiveSession ?? throw new InvalidOperationException("No active run session.");
         if (
-            string.Equals(entry.Kind, "selection_seen", StringComparison.Ordinal)
+            RunLogEventKinds.IsSelectionSeenKind(entry.Kind)
             && !string.IsNullOrWhiteSpace(entry.SelectionFingerprint)
             && string.Equals(
                 entry.SelectionFingerprint,
@@ -86,6 +86,12 @@ public sealed class RunLogSessionManager
             return null;
         }
 
+        if (RunLogEventKinds.IsChoiceMadeKind(entry.Kind))
+        {
+            if (!session.PendingSelectionSeq.HasValue || entry.SelectionSeq != session.PendingSelectionSeq)
+                return null;
+        }
+
         entry.SchemaVersion =
             entry.SchemaVersion == 0 ? session.SchemaVersion : entry.SchemaVersion;
         entry.RunId = session.RunId;
@@ -99,7 +105,8 @@ public sealed class RunLogSessionManager
         session.Day = entry.Day ?? session.Day;
         session.Hour = entry.Hour ?? session.Hour;
         session.State = entry.State ?? session.State;
-        session.CurrentEncounterId = entry.EncounterId ?? session.CurrentEncounterId;
+        session.CurrentEncounterId =
+            ResolveCurrentEncounterId(entry) ?? session.CurrentEncounterId;
 
         if (!string.IsNullOrWhiteSpace(entry.StateFingerprint))
             session.LastStateFingerprint = entry.StateFingerprint;
@@ -107,8 +114,16 @@ public sealed class RunLogSessionManager
         if (!string.IsNullOrWhiteSpace(entry.SelectionFingerprint))
             session.LastSelectionFingerprint = entry.SelectionFingerprint;
 
-        if (string.Equals(entry.Kind, "selection_seen", StringComparison.Ordinal))
+        if (RunLogEventKinds.IsSelectionSeenKind(entry.Kind))
+        {
             session.PendingSelectionSeq = entry.Seq;
+            session.PendingSelection = RunLogPendingSelectionState.FromEvent(entry);
+        }
+        else if (RunLogEventKinds.ClearsPendingSelectionKind(entry.Kind))
+        {
+            session.PendingSelectionSeq = null;
+            session.PendingSelection = null;
+        }
 
         return entry;
     }
@@ -117,6 +132,15 @@ public sealed class RunLogSessionManager
     {
         var session =
             ActiveSession ?? throw new InvalidOperationException("No active run session.");
+        if (RunLoggingGameDataReader.TryBuildRunLogPlayerStats(out var stats))
+        {
+            session.MaxHealth = stats.MaxHealth;
+            session.Prestige = stats.Prestige;
+            session.Level = stats.Level;
+            session.Income = stats.Income;
+            session.Gold = stats.Gold;
+        }
+
         var checkpoint = new RunLogCheckpoint
         {
             SchemaVersion = session.SchemaVersion,
@@ -125,11 +149,17 @@ public sealed class RunLogSessionManager
             LastSeenAtUtc = session.LastSeenAtUtc,
             Day = session.Day,
             Hour = session.Hour,
+            MaxHealth = session.MaxHealth,
+            Prestige = session.Prestige,
+            Level = session.Level,
+            Income = session.Income,
+            Gold = session.Gold,
             State = session.State,
             CurrentEncounterId = session.CurrentEncounterId,
             LastStateFingerprint = session.LastStateFingerprint,
             LastSelectionFingerprint = session.LastSelectionFingerprint,
             PendingSelectionSeq = session.PendingSelectionSeq,
+            PendingSelection = session.PendingSelection,
             Completed = session.Completed,
         };
 
@@ -165,5 +195,13 @@ public sealed class RunLogSessionManager
         _store.MarkRunAbandoned(session.RunId, abandonment);
         session.Completed = true;
         ActiveSession = null;
+    }
+
+    private static string? ResolveCurrentEncounterId(RunLogEvent entry)
+    {
+        if (string.Equals(entry.Kind, "encounter_selected", StringComparison.Ordinal))
+            return entry.SelectedEncounterId ?? entry.EncounterId;
+
+        return entry.EncounterId;
     }
 }

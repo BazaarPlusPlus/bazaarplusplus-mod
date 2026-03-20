@@ -39,6 +39,72 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var command = CreateCommand(connection);
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunCheckpointsTableName,
+            "pending_selection_json",
+            "TEXT NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunCheckpointsTableName,
+            "max_health",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunCheckpointsTableName,
+            "prestige",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunCheckpointsTableName,
+            "level",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunCheckpointsTableName,
+            "income",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunCheckpointsTableName,
+            "gold",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "max_health",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "prestige",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "level",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "income",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "gold",
+            "INTEGER NULL"
+        );
     }
 
     public RunLogSessionState? TryResumeActiveRun()
@@ -56,11 +122,17 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 cp.last_seen_at_utc,
                 cp.day AS checkpoint_day,
                 cp.hour AS checkpoint_hour,
+                cp.max_health,
+                cp.prestige,
+                cp.level,
+                cp.income,
+                cp.gold,
                 cp.state,
                 cp.current_encounter_id,
                 cp.last_state_fingerprint,
                 cp.last_selection_fingerprint,
                 cp.pending_selection_seq,
+                cp.pending_selection_json,
                 cp.completed
             FROM {RunLogSqliteSchema.RunsTableName} AS r
             LEFT JOIN {RunLogSqliteSchema.RunCheckpointsTableName} AS cp
@@ -98,11 +170,19 @@ public sealed class SqliteRunLogStore : IRunLogStore
             Day = GetNullableInt32(reader, "checkpoint_day") ?? GetNullableInt32(reader, "run_day"),
             Hour =
                 GetNullableInt32(reader, "checkpoint_hour") ?? GetNullableInt32(reader, "run_hour"),
+            MaxHealth = GetNullableInt32(reader, "max_health"),
+            Prestige = GetNullableInt32(reader, "prestige"),
+            Level = GetNullableInt32(reader, "level"),
+            Income = GetNullableInt32(reader, "income"),
+            Gold = GetNullableInt32(reader, "gold"),
             State = GetNullableString(reader, "state"),
             CurrentEncounterId = GetNullableString(reader, "current_encounter_id"),
             LastStateFingerprint = GetNullableString(reader, "last_state_fingerprint"),
             LastSelectionFingerprint = GetNullableString(reader, "last_selection_fingerprint"),
             PendingSelectionSeq = GetNullableInt64(reader, "pending_selection_seq"),
+            PendingSelection = DeserializePendingSelection(
+                GetNullableString(reader, "pending_selection_json")
+            ),
             Completed = false,
         };
     }
@@ -204,11 +284,17 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 last_seen_at_utc,
                 day,
                 hour,
+                max_health,
+                prestige,
+                level,
+                income,
+                gold,
                 state,
                 current_encounter_id,
                 last_state_fingerprint,
                 last_selection_fingerprint,
                 pending_selection_seq,
+                pending_selection_json,
                 completed
             ) VALUES (
                 $runId,
@@ -217,11 +303,17 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 $lastSeenAtUtc,
                 $day,
                 $hour,
+                $maxHealth,
+                $prestige,
+                $level,
+                $income,
+                $gold,
                 $state,
                 $currentEncounterId,
                 $lastStateFingerprint,
                 $lastSelectionFingerprint,
                 $pendingSelectionSeq,
+                $pendingSelectionJson,
                 $completed
             )
             ON CONFLICT(run_id) DO UPDATE SET
@@ -230,11 +322,17 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 last_seen_at_utc = excluded.last_seen_at_utc,
                 day = excluded.day,
                 hour = excluded.hour,
+                max_health = excluded.max_health,
+                prestige = excluded.prestige,
+                level = excluded.level,
+                income = excluded.income,
+                gold = excluded.gold,
                 state = excluded.state,
                 current_encounter_id = excluded.current_encounter_id,
                 last_state_fingerprint = excluded.last_state_fingerprint,
                 last_selection_fingerprint = excluded.last_selection_fingerprint,
                 pending_selection_seq = excluded.pending_selection_seq,
+                pending_selection_json = excluded.pending_selection_json,
                 completed = excluded.completed;
             """;
         command.Parameters.AddWithValue("$runId", runId);
@@ -243,6 +341,11 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.Parameters.AddWithValue("$lastSeenAtUtc", checkpoint.LastSeenAtUtc.ToString("o"));
         AddNullableInt32(command, "$day", checkpoint.Day);
         AddNullableInt32(command, "$hour", checkpoint.Hour);
+        AddNullableInt32(command, "$maxHealth", checkpoint.MaxHealth);
+        AddNullableInt32(command, "$prestige", checkpoint.Prestige);
+        AddNullableInt32(command, "$level", checkpoint.Level);
+        AddNullableInt32(command, "$income", checkpoint.Income);
+        AddNullableInt32(command, "$gold", checkpoint.Gold);
         AddNullableString(command, "$state", checkpoint.State);
         AddNullableString(command, "$currentEncounterId", checkpoint.CurrentEncounterId);
         AddNullableString(command, "$lastStateFingerprint", checkpoint.LastStateFingerprint);
@@ -252,6 +355,11 @@ public sealed class SqliteRunLogStore : IRunLogStore
             checkpoint.LastSelectionFingerprint
         );
         AddNullableInt64(command, "$pendingSelectionSeq", checkpoint.PendingSelectionSeq);
+        AddNullableString(
+            command,
+            "$pendingSelectionJson",
+            SerializePendingSelection(checkpoint.PendingSelection)
+        );
         command.Parameters.AddWithValue("$completed", checkpoint.Completed ? 1 : 0);
         command.ExecuteNonQuery();
 
@@ -279,6 +387,11 @@ public sealed class SqliteRunLogStore : IRunLogStore
             completion.EndedAtUtc,
             completion.FinalDay,
             completion.FinalHour,
+            completion.MaxHealth,
+            completion.Prestige,
+            completion.Level,
+            completion.Income,
+            completion.Gold,
             completion.Victories,
             completion.Losses,
             completion.Reason
@@ -296,6 +409,11 @@ public sealed class SqliteRunLogStore : IRunLogStore
             abandonment.FinalHour,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
             abandonment.Reason
         );
     }
@@ -307,6 +425,11 @@ public sealed class SqliteRunLogStore : IRunLogStore
         DateTimeOffset endedAtUtc,
         int? finalDay,
         int? finalHour,
+        int? maxHealth,
+        int? prestige,
+        int? level,
+        int? income,
+        int? gold,
         int? victories,
         int? losses,
         string? reason
@@ -324,6 +447,11 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 ended_at_utc,
                 final_day,
                 final_hour,
+                max_health,
+                prestige,
+                level,
+                income,
+                gold,
                 victories,
                 losses,
                 reason
@@ -334,6 +462,11 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 $endedAtUtc,
                 $finalDay,
                 $finalHour,
+                $maxHealth,
+                $prestige,
+                $level,
+                $income,
+                $gold,
                 $victories,
                 $losses,
                 $reason
@@ -344,6 +477,11 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 ended_at_utc = excluded.ended_at_utc,
                 final_day = excluded.final_day,
                 final_hour = excluded.final_hour,
+                max_health = excluded.max_health,
+                prestige = excluded.prestige,
+                level = excluded.level,
+                income = excluded.income,
+                gold = excluded.gold,
                 victories = excluded.victories,
                 losses = excluded.losses,
                 reason = excluded.reason;
@@ -354,6 +492,11 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.Parameters.AddWithValue("$endedAtUtc", endedAtUtc.ToString("o"));
         AddNullableInt32(command, "$finalDay", finalDay);
         AddNullableInt32(command, "$finalHour", finalHour);
+        AddNullableInt32(command, "$maxHealth", maxHealth);
+        AddNullableInt32(command, "$prestige", prestige);
+        AddNullableInt32(command, "$level", level);
+        AddNullableInt32(command, "$income", income);
+        AddNullableInt32(command, "$gold", gold);
         AddNullableInt32(command, "$victories", victories);
         AddNullableInt32(command, "$losses", losses);
         AddNullableString(command, "$reason", reason);
@@ -415,6 +558,55 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.Transaction = transaction;
         return command;
     }
+
+    private static void EnsureColumnExists(
+        SqliteConnection connection,
+        string tableName,
+        string columnName,
+        string columnDefinition
+    )
+    {
+        using var command = CreateCommand(connection);
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (
+                string.Equals(
+                    reader.GetString(reader.GetOrdinal("name")),
+                    columnName,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return;
+            }
+        }
+
+        using var alter = CreateCommand(connection);
+        alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+        alter.ExecuteNonQuery();
+    }
+
+    private static string? SerializePendingSelection(RunLogPendingSelectionState? pendingSelection)
+    {
+        if (pendingSelection == null)
+            return null;
+
+        return JsonConvert.SerializeObject(pendingSelection, SerializerSettings);
+    }
+
+    private static RunLogPendingSelectionState? DeserializePendingSelection(string? pendingSelectionJson)
+    {
+        if (string.IsNullOrWhiteSpace(pendingSelectionJson))
+            return null;
+
+        return JsonConvert.DeserializeObject<RunLogPendingSelectionState>(
+            pendingSelectionJson,
+            SerializerSettings
+        );
+    }
+
     private static void AddNullableInt32(SqliteCommand command, string name, int? value)
     {
         command.Parameters.AddWithValue(name, value.HasValue ? value.Value : DBNull.Value);

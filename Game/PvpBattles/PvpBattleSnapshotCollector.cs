@@ -19,11 +19,22 @@ internal sealed class PvpBattleSnapshotCollector
         string? runId
     )
     {
-        var (opponentName, opponentAccountId) = CaptureOpponentIdentityAtOpening();
+        var (
+            opponentName,
+            opponentHero,
+            opponentRank,
+            opponentRating,
+            opponentLevel,
+            opponentAccountId
+        ) = CaptureOpponentIdentityAtOpening(message);
         var candidate = new CombatReplaySequenceCandidate
         {
             RunId = runId,
             OpponentName = opponentName,
+            OpponentHero = opponentHero,
+            OpponentRank = opponentRank,
+            OpponentRating = opponentRating,
+            OpponentLevel = opponentLevel,
             OpponentAccountId = opponentAccountId,
             SpawnMessage = message,
         };
@@ -73,6 +84,10 @@ internal sealed class PvpBattleSnapshotCollector
             PlayerName = TryGetPlayerNameSafe(),
             PlayerAccountId = TryGetPlayerAccountIdSafe(),
             OpponentName = candidate.OpponentName,
+            OpponentHero = candidate.OpponentHero,
+            OpponentRank = candidate.OpponentRank,
+            OpponentRating = candidate.OpponentRating,
+            OpponentLevel = candidate.OpponentLevel,
             OpponentAccountId = candidate.OpponentAccountId,
         };
     }
@@ -443,20 +458,36 @@ internal sealed class PvpBattleSnapshotCollector
         }
     }
 
-    private static (string? Name, string? AccountId) CaptureOpponentIdentityAtOpening()
+    private static (
+        string? Name,
+        string? Hero,
+        string? Rank,
+        int? Rating,
+        int? Level,
+        string? AccountId
+    ) CaptureOpponentIdentityAtOpening(NetMessageGameSim? message)
     {
         try
         {
-            var name = Data.SimPvpOpponent?.Name;
-            var accountId = Data.SimPvpOpponent?.PlayerLoadout?.accountId;
+            var opponent = message?.Data.CurrentState?.PvpOpponent ?? Data.SimPvpOpponent;
+            var name = opponent?.Name;
+            var hero = opponent?.Hero.ToString() ?? Data.Run?.Opponent?.Hero.ToString();
+            var rank = opponent?.Rank?.ToString();
+            int? rating = opponent != null ? opponent.Rating : null;
+            int? level = opponent != null ? opponent.Level : null;
+            var accountId = opponent?.PlayerLoadout?.accountId;
             return (
                 string.IsNullOrWhiteSpace(name) ? null : name,
+                string.IsNullOrWhiteSpace(hero) ? null : hero,
+                string.IsNullOrWhiteSpace(rank) ? null : rank,
+                rating,
+                level,
                 string.IsNullOrWhiteSpace(accountId) ? null : accountId
             );
         }
         catch
         {
-            return (null, null);
+            return (null, null, null, null, null, null);
         }
     }
 }

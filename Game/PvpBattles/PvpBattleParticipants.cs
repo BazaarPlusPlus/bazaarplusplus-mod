@@ -9,5 +9,13 @@ internal sealed class PvpBattleParticipants
 
     public string? OpponentName { get; set; }
 
+    public string? OpponentHero { get; set; }
+
+    public string? OpponentRank { get; set; }
+
+    public int? OpponentRating { get; set; }
+
+    public int? OpponentLevel { get; set; }
+
     public string? OpponentAccountId { get; set; }
 }
