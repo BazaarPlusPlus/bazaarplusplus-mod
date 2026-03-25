@@ -38,6 +38,7 @@ internal sealed class PvpBattleSqliteStore
             Directory.CreateDirectory(directory);
 
         using var connection = OpenConnection();
+        EnableWriteAheadLogging(connection);
         using var command = CreateCommand(connection);
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
@@ -237,6 +238,36 @@ internal sealed class PvpBattleSqliteStore
         return ReadManifest(reader);
     }
 
+    public void Delete(string battleId)
+    {
+        if (string.IsNullOrWhiteSpace(battleId))
+            return;
+
+        using var connection = OpenConnection();
+        using var command = CreateCommand(connection);
+        command.CommandText =
+            $"DELETE FROM {RunLogSqliteSchema.PvpBattlesTableName} WHERE battle_id = $battleId;";
+        command.Parameters.AddWithValue("$battleId", battleId);
+        command.ExecuteNonQuery();
+    }
+
+    public IEnumerable<string> ListBattleIds()
+    {
+        using var connection = OpenConnection();
+        using var command = CreateCommand(connection);
+        command.CommandText = $"""
+            SELECT battle_id
+            FROM {RunLogSqliteSchema.PvpBattlesTableName}
+            ORDER BY recorded_at_utc DESC, battle_id DESC;
+            """;
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            yield return reader.GetString(0);
+        }
+    }
+
     public IReadOnlyList<PvpBattleManifest> ListRecentBattles(int limit)
     {
         using var connection = OpenConnection();
@@ -289,7 +320,10 @@ internal sealed class PvpBattleSqliteStore
             connection.Open();
 
             using var command = CreateCommand(connection);
-            command.CommandText = "PRAGMA foreign_keys = ON;";
+            command.CommandText = """
+                PRAGMA foreign_keys = ON;
+                PRAGMA busy_timeout = 2000;
+                """;
             command.ExecuteNonQuery();
 
             return connection;
@@ -401,6 +435,13 @@ internal sealed class PvpBattleSqliteStore
             "PvpBattleSqliteStore",
             $"Migrated legacy {RunLogSqliteSchema.PvpBattlesTableName} schema by dropping replay_id."
         );
+    }
+
+    private static void EnableWriteAheadLogging(SqliteConnection connection)
+    {
+        using var command = CreateCommand(connection);
+        command.CommandText = "PRAGMA journal_mode = WAL;";
+        command.ExecuteNonQuery();
     }
 
     private static bool TableHasColumn(

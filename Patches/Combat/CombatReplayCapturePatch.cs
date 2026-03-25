@@ -13,6 +13,9 @@ internal static class CombatReplayCapturePatch
     [HarmonyPostfix]
     private static void Postfix(INetMessage message)
     {
+        if (message is not NetMessageGameSim && message is not NetMessageCombatSim)
+            return;
+
         BppRuntimeHost.EventBus.Publish(new NetMessageObserved { Message = message });
     }
 }

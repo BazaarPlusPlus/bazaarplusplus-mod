@@ -21,9 +21,19 @@ internal sealed class PvpBattleCatalog : IPvpBattleCatalog
         _store.Save(manifest);
     }
 
+    public void Delete(string battleId)
+    {
+        _store.Delete(battleId);
+    }
+
     public PvpBattleManifest? TryLoad(string battleId)
     {
         return _store.TryLoad(battleId);
+    }
+
+    public IEnumerable<string> ListBattleIds()
+    {
+        return _store.ListBattleIds();
     }
 
     public IReadOnlyList<PvpBattleManifest> ListRecentBattles(int limit)

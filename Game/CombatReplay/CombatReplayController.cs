@@ -29,18 +29,23 @@ internal sealed class CombatReplayController
 
     public IReadOnlyList<PvpBattleManifest> ListRecentBattles()
     {
-        return _battleCatalog.ListRecentBattles(50);
+        return _battleCatalog
+            .ListRecentBattles(50)
+            .Where(manifest => _payloadStore.Exists(manifest.BattleId))
+            .ToList();
     }
 
     public PvpBattleManifest? GetLatestBattle()
     {
-        return _battleCatalog.ListRecentBattles(1).FirstOrDefault();
+        return _battleCatalog
+            .ListRecentBattles(50)
+            .FirstOrDefault(manifest => _payloadStore.Exists(manifest.BattleId));
     }
 
     public PvpBattleManifest? LoadBattle(string battleId)
     {
         var manifest = _battleCatalog.TryLoad(battleId);
-        if (manifest == null)
+        if (manifest == null || !_payloadStore.Exists(manifest.BattleId))
             return null;
 
         ActiveBattleId = manifest.BattleId;

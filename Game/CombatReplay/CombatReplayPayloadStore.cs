@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 
@@ -59,6 +60,35 @@ internal sealed class CombatReplayPayloadStore
     public bool Exists(string battleId)
     {
         return !string.IsNullOrWhiteSpace(battleId) && File.Exists(GetFilePath(battleId));
+    }
+
+    public void Delete(string battleId)
+    {
+        if (string.IsNullOrWhiteSpace(battleId))
+            return;
+
+        var filePath = GetFilePath(battleId);
+        if (!File.Exists(filePath))
+            return;
+
+        File.Delete(filePath);
+    }
+
+    public IEnumerable<string> ListBattleIds()
+    {
+        Directory.CreateDirectory(_rootPath);
+
+        foreach (var filePath in Directory.EnumerateFiles(_rootPath, "*.payload.json"))
+        {
+            var fileName = Path.GetFileName(filePath);
+            if (
+                fileName.EndsWith(".payload.json", StringComparison.OrdinalIgnoreCase)
+                && fileName.Length > ".payload.json".Length
+            )
+            {
+                yield return fileName[..^".payload.json".Length];
+            }
+        }
     }
 
     private string GetFilePath(string battleId)
