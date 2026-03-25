@@ -45,7 +45,7 @@ internal static class RunLoggingGameDataReader
             Hero = Data.Run.Player.Hero.ToString(),
             GameMode = Data.SelectedPlayMode.ToString(),
             Day = (int?)Data.Run.Day,
-            Hour = unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
+            Hour = GetCurrentRunHour(),
         };
         return true;
     }
@@ -59,7 +59,7 @@ internal static class RunLoggingGameDataReader
         input = new RunLogRunProgressInput
         {
             Day = (int?)Data.Run.Day,
-            Hour = unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
+            Hour = GetCurrentRunHour(),
             Victories = unchecked((int)Data.Run.Victories),
             Losses = unchecked((int)Data.Run.Losses),
         };
@@ -105,10 +105,7 @@ internal static class RunLoggingGameDataReader
         input = new RunLogStateSnapshotInput
         {
             Day = Data.Run == null ? null : (int?)Data.Run.Day,
-            Hour =
-                Data.Run == null
-                    ? null
-                    : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
+            Hour = GetCurrentRunHour(),
             State = state.StateName.ToString(),
             EncounterId = Data.CurrentEncounterId?.ToString(),
             ParentEncounterId = GetParentEncounterId(state.StateName.ToString()),
@@ -132,10 +129,7 @@ internal static class RunLoggingGameDataReader
         input = new RunLogSelectionSnapshotInput
         {
             Day = Data.Run == null ? null : (int?)Data.Run.Day,
-            Hour =
-                Data.Run == null
-                    ? null
-                    : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
+            Hour = GetCurrentRunHour(),
             State = state.StateName.ToString(),
             EncounterId = Data.CurrentEncounterId?.ToString(),
             ParentEncounterId = GetParentEncounterId(state.StateName.ToString()),
@@ -157,10 +151,7 @@ internal static class RunLoggingGameDataReader
             Status = status,
             EndedAtUtc = DateTimeOffset.UtcNow,
             FinalDay = Data.Run == null ? null : (int?)Data.Run.Day,
-            FinalHour =
-                Data.Run == null
-                    ? null
-                    : unchecked((int)(Data.Run.Victories + Data.Run.Losses + 1)),
+            FinalHour = GetCurrentRunHour(),
             MaxHealth = stats?.MaxHealth,
             Prestige = stats?.Prestige,
             Level = stats?.Level,
@@ -170,6 +161,11 @@ internal static class RunLoggingGameDataReader
             Losses = Data.Run == null ? null : unchecked((int)Data.Run.Losses),
             Reason = reason,
         };
+    }
+
+    private static int? GetCurrentRunHour()
+    {
+        return Data.Run == null ? null : (int?)Data.Run.Hour;
     }
 
     private static RunLogSelectionOptionInput ToSelectionOption(RunInfo.CardInfo card)

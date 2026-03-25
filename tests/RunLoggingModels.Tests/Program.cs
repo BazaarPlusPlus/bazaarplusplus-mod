@@ -165,6 +165,41 @@ Assert(
     runLoggingReaderSource.Contains("CurrentServerRunId", StringComparison.Ordinal),
     "Run logging game-data reader should require the server run id before building a run log create request."
 );
+Assert(
+    runLoggingReaderSource.Contains("Data.Run.Hour", StringComparison.Ordinal),
+    "Run logging game-data reader should read the authoritative run hour from Data.Run.Hour."
+);
+Assert(
+    !runLoggingReaderSource.Contains(
+        "Data.Run.Victories + Data.Run.Losses + 1",
+        StringComparison.Ordinal
+    ),
+    "Run logging game-data reader should not derive hour from victories plus losses."
+);
+
+var historyPanelRepositorySourcePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/HistoryPanel/HistoryPanelRepository.cs"
+    )
+);
+Assert(
+    File.Exists(historyPanelRepositorySourcePath),
+    $"History panel repository source not found at {historyPanelRepositorySourcePath}"
+);
+var historyPanelRepositorySource = File.ReadAllText(historyPanelRepositorySourcePath);
+Assert(
+    !historyPanelRepositorySource.Contains("const string marker = \"\\\"instance_id\\\"\";", StringComparison.Ordinal),
+    "History panel snapshot summary should not count raw instance_id markers in JSON text."
+);
+Assert(
+    historyPanelRepositorySource.Contains("DeserializeCapture(playerHandJson)", StringComparison.Ordinal)
+        && historyPanelRepositorySource.Contains(
+            "DeserializeCapture(opponentHandJson)",
+            StringComparison.Ordinal
+        ),
+    "History panel snapshot summary should count items from structured capture payloads."
+);
 
 var sqliteStoreSourcePath = Path.GetFullPath(
     Path.Combine(

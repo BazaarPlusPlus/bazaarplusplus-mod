@@ -259,10 +259,10 @@ internal sealed class HistoryPanelRepository
         string opponentSkillsJson
     )
     {
-        var playerItems = CountSnapshotItems(playerHandJson);
-        var playerSkills = CountSnapshotItems(playerSkillsJson);
-        var opponentItems = CountSnapshotItems(opponentHandJson);
-        var opponentSkills = CountSnapshotItems(opponentSkillsJson);
+        var playerItems = CountSnapshotItems(DeserializeCapture(playerHandJson));
+        var playerSkills = CountSnapshotItems(DeserializeCapture(playerSkillsJson));
+        var opponentItems = CountSnapshotItems(DeserializeCapture(opponentHandJson));
+        var opponentSkills = CountSnapshotItems(DeserializeCapture(opponentSkillsJson));
         return $"YOU {playerItems} {Pluralize(playerItems, "item", "items")} · {playerSkills} {Pluralize(playerSkills, "skill", "skills")}"
             + $"  |  OPP {opponentItems} {Pluralize(opponentItems, "item", "items")} · {opponentSkills} {Pluralize(opponentSkills, "skill", "skills")}";
     }
@@ -405,23 +405,9 @@ internal sealed class HistoryPanelRepository
         };
     }
 
-    private static int CountSnapshotItems(string? json)
+    private static int CountSnapshotItems(PvpBattleCardSetCapture? capture)
     {
-        if (string.IsNullOrWhiteSpace(json))
-            return 0;
-
-        const string marker = "\"instance_id\"";
-        var count = 0;
-        var start = 0;
-        while (true)
-        {
-            var index = json.IndexOf(marker, start, StringComparison.Ordinal);
-            if (index < 0)
-                return count;
-
-            count++;
-            start = index + marker.Length;
-        }
+        return capture?.Items?.Count ?? 0;
     }
 
     private static string? GetNullableString(SqliteDataReader reader, string columnName)

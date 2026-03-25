@@ -87,7 +87,7 @@ internal sealed class RunLoggingController : MonoBehaviour
         return RequireCore().AcceptRunProgress(input);
     }
 
-    public RunLogEvent AcceptStateSnapshot(RunLogStateSnapshotInput input)
+    public RunLogEvent? AcceptStateSnapshot(RunLogStateSnapshotInput input)
     {
         return RequireCore().AcceptStateSnapshot(input);
     }
@@ -178,12 +178,12 @@ internal sealed class RunLoggingControllerCore
         return runEvent;
     }
 
-    public RunLogEvent AcceptStateSnapshot(RunLogStateSnapshotInput input)
+    public RunLogEvent? AcceptStateSnapshot(RunLogStateSnapshotInput input)
     {
-        var stateEvent =
-            _sessionManager.AppendEvent(_captureService.BuildStateSeenEvent(input))
-            ?? throw new InvalidOperationException("State event was unexpectedly suppressed.");
-        _sessionManager.SaveCheckpoint();
+        var stateEvent = _sessionManager.AppendEvent(_captureService.BuildStateSeenEvent(input));
+        if (stateEvent != null)
+            _sessionManager.SaveCheckpoint();
+
         return stateEvent;
     }
 

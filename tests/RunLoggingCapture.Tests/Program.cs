@@ -180,8 +180,8 @@ var selectionEvent = Invoke<RunLogEvent>(
     [selectionInput]
 );
 Assert(
-    selectionEvent.Kind == "selection_seen",
-    "Selection snapshots should map to selection_seen."
+    selectionEvent.Kind == "encounter_options_seen",
+    "Encounter selection snapshots should map to encounter_options_seen."
 );
 Assert(
     selectionEvent.SelectionFingerprint == firstFingerprint,
@@ -357,7 +357,7 @@ Assert(
             "run_started",
             "run_progress",
             "state_seen",
-            "selection_seen",
+            "encounter_options_seen",
             "pvp_combat_recorded",
         ]),
     "Controller seam should forward events in run-started to pvp-combat-recorded order."
@@ -575,7 +575,7 @@ file sealed class ControllerSeamStore : IRunLogStore
             ResumeState.CurrentEncounterId = entry.EncounterId;
             ResumeState.LastStateFingerprint = entry.StateFingerprint;
             ResumeState.LastSelectionFingerprint = entry.SelectionFingerprint;
-            if (entry.Kind == "selection_seen")
+            if (entry.Kind.EndsWith("_options_seen", StringComparison.Ordinal))
                 ResumeState.PendingSelectionSeq = entry.Seq;
         }
     }

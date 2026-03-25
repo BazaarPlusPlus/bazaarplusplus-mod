@@ -12,6 +12,8 @@ internal sealed class HistoryCollectionsEntryBridge : MonoBehaviour
 {
     private const string EntryObjectName = "BPP_HistoryCollectionsEntry";
     private float _nextScanTime;
+    private Button? _cachedAnchorButton;
+    private Transform? _cachedAnchorParent;
 
     private void Update()
     {
@@ -22,15 +24,18 @@ internal sealed class HistoryCollectionsEntryBridge : MonoBehaviour
         TryEnsureEntry();
     }
 
-    private static void TryEnsureEntry()
+    private void TryEnsureEntry()
     {
-        var anchor = FindCollectionsAnchorButton();
+        var anchor = ResolveCollectionsAnchorButton();
         if (anchor == null)
             return;
 
         var parent = anchor.transform.parent;
         if (parent == null)
+        {
+            ClearCachedAnchor();
             return;
+        }
 
         var existing = parent.Find(EntryObjectName);
         if (existing != null)
@@ -42,6 +47,55 @@ internal sealed class HistoryCollectionsEntryBridge : MonoBehaviour
         var clone = Instantiate(anchor.gameObject, parent);
         clone.name = EntryObjectName;
         ConfigureEntry(clone, anchor.transform);
+    }
+
+    private Button? ResolveCollectionsAnchorButton()
+    {
+        if (HasValidCachedAnchor())
+            return _cachedAnchorButton;
+
+        var anchor = FindCollectionsAnchorButton();
+        CacheAnchor(anchor);
+        return anchor;
+    }
+
+    private bool HasValidCachedAnchor()
+    {
+        if (_cachedAnchorButton == null || _cachedAnchorParent == null)
+            return false;
+
+        if (!_cachedAnchorButton.gameObject.activeInHierarchy)
+            return false;
+
+        if (_cachedAnchorButton.name == EntryObjectName)
+            return false;
+
+        return _cachedAnchorButton.transform.parent == _cachedAnchorParent;
+    }
+
+    private void CacheAnchor(Button? anchor)
+    {
+        if (anchor == null)
+        {
+            ClearCachedAnchor();
+            return;
+        }
+
+        var parent = anchor.transform.parent;
+        if (parent == null)
+        {
+            ClearCachedAnchor();
+            return;
+        }
+
+        _cachedAnchorButton = anchor;
+        _cachedAnchorParent = parent;
+    }
+
+    private void ClearCachedAnchor()
+    {
+        _cachedAnchorButton = null;
+        _cachedAnchorParent = null;
     }
 
     private static Button? FindCollectionsAnchorButton()

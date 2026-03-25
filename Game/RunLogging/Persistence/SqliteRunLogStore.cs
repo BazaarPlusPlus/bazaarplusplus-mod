@@ -36,6 +36,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
             Directory.CreateDirectory(directory);
 
         using var connection = OpenConnection();
+        EnableWriteAheadLogging(connection);
         using var command = CreateCommand(connection);
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
@@ -536,7 +537,10 @@ public sealed class SqliteRunLogStore : IRunLogStore
             connection.Open();
 
             using var command = CreateCommand(connection);
-            command.CommandText = "PRAGMA foreign_keys = ON;";
+            command.CommandText = """
+                PRAGMA foreign_keys = ON;
+                PRAGMA busy_timeout = 2000;
+                """;
             command.ExecuteNonQuery();
 
             return connection;
@@ -557,6 +561,13 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.CommandTimeout = 2;
         command.Transaction = transaction;
         return command;
+    }
+
+    private static void EnableWriteAheadLogging(SqliteConnection connection)
+    {
+        using var command = CreateCommand(connection);
+        command.CommandText = "PRAGMA journal_mode = WAL;";
+        command.ExecuteNonQuery();
     }
 
     private static void EnsureColumnExists(

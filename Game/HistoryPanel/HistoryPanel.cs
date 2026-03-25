@@ -53,7 +53,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         EnsureUi();
         SetUiVisible(false);
-        RefreshData();
     }
 
     private void OnDisable()
