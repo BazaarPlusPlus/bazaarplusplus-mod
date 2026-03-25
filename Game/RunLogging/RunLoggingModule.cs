@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PvpBattles;
@@ -13,6 +14,10 @@ namespace BazaarPlusPlus.Game.RunLogging;
 
 internal sealed class RunLoggingModule
 {
+    private static readonly TimeSpan ReplayPersistenceCompletionGracePeriod = TimeSpan.FromSeconds(
+        2
+    );
+
     private readonly IBppEventBus _eventBus;
     private readonly RunLogSessionManager _sessionManager;
     private readonly RunLoggingControllerCore _core;
@@ -22,6 +27,8 @@ internal sealed class RunLoggingModule
     private IDisposable? _pvpBattleSubscription;
     private bool _wasInRunLastTick;
     private PendingSelectionContext? _pendingSelection;
+    private RunLogCompletion? _deferredRunCompletion;
+    private DateTime? _deferredRunCompletionDeadlineUtc;
 
     public RunLoggingModule(
         IBppEventBus eventBus,
@@ -51,8 +58,25 @@ internal sealed class RunLoggingModule
 
     public void Stop()
     {
+        if (_deferredRunCompletion != null && _sessionManager.HasActiveSession)
+        {
+            try
+            {
+                TryCompleteDeferredRunExit(forceCompletion: true);
+            }
+            catch (Exception ex)
+            {
+                BppLog.Error(
+                    "RunLoggingModule",
+                    $"Failed to finalize deferred run completion during teardown: {ex}"
+                );
+            }
+        }
+
         Events.CardSelected.RemoveListener(OnCardSelected);
         _pendingSelection = null;
+        _deferredRunCompletion = null;
+        _deferredRunCompletionDeadlineUtc = null;
         _pvpBattleSubscription?.Dispose();
         _pvpBattleSubscription = null;
         _syncSubscription?.Dispose();
@@ -80,13 +104,26 @@ internal sealed class RunLoggingModule
                         _core.AcceptStateSnapshot(stateInput);
                 }
             }
-            else if (_wasInRunLastTick && _sessionManager.HasActiveSession)
+            else if ((_wasInRunLastTick || _deferredRunCompletion != null) && _sessionManager.HasActiveSession)
             {
-                ResolvePendingSelectionOnBoundary("run_state_exit");
                 completionAttempted = true;
-                _core.CompleteRun(RunLoggingGameDataReader.BuildRunLogCompletion("run_state_exit"));
-                completionSucceeded = true;
-                _pendingSelection = null;
+                if (_deferredRunCompletion == null)
+                {
+                    ResolvePendingSelectionOnBoundary("run_state_exit");
+                    _deferredRunCompletion = RunLoggingGameDataReader.BuildRunLogCompletion(
+                        "run_state_exit"
+                    );
+                }
+
+                var replayPersistencePending =
+                    CombatReplayRuntime.Instance?.HasPendingPersistence == true;
+                if (replayPersistencePending && _deferredRunCompletionDeadlineUtc == null)
+                {
+                    _deferredRunCompletionDeadlineUtc =
+                        DateTime.UtcNow + ReplayPersistenceCompletionGracePeriod;
+                }
+
+                completionSucceeded = TryCompleteDeferredRunExit();
             }
         }
         catch (Exception ex)
@@ -143,17 +180,24 @@ internal sealed class RunLoggingModule
         try
         {
             var manifest = recorded.Manifest;
+            var inRun = BppRuntimeHost.RunContext.IsInGameRun;
             if (
                 manifest == null
                 || !string.Equals(manifest.CombatKind, "PVPCombat", StringComparison.Ordinal)
-                || !BppRuntimeHost.RunContext.IsInGameRun
             )
             {
                 return;
             }
 
-            if (_ensureActiveRunFromGame() == null)
+            if (inRun)
+            {
+                if (_ensureActiveRunFromGame() == null)
+                    return;
+            }
+            else if (!_sessionManager.HasActiveSession)
+            {
                 return;
+            }
 
             _core.AcceptCombatReplay(
                 new RunLogPvpBattleInput
@@ -166,6 +210,9 @@ internal sealed class RunLoggingModule
                     OpponentName = manifest.Participants.OpponentName,
                 }
             );
+
+            if (!inRun)
+                TryCompleteDeferredRunExit();
         }
         catch (Exception ex)
         {
@@ -303,6 +350,40 @@ internal sealed class RunLoggingModule
 
         if (_core.AcceptSelectionAbandoned(abandonedEvent) != null)
             _pendingSelection = null;
+    }
+
+    private bool TryCompleteDeferredRunExit(bool forceCompletion = false)
+    {
+        if (_deferredRunCompletion == null)
+            return false;
+
+        if (!forceCompletion && CombatReplayRuntime.Instance?.HasPendingPersistence == true)
+        {
+            var deadline =
+                _deferredRunCompletionDeadlineUtc
+                ?? (DateTime.UtcNow + ReplayPersistenceCompletionGracePeriod);
+            _deferredRunCompletionDeadlineUtc = deadline;
+            if (DateTime.UtcNow < deadline)
+                return false;
+
+            BppLog.Warn(
+                "RunLoggingModule",
+                "Completing run before replay persistence drained after grace timeout."
+            );
+        }
+        else if (forceCompletion && CombatReplayRuntime.Instance?.HasPendingPersistence == true)
+        {
+            BppLog.Warn(
+                "RunLoggingModule",
+                "Completing deferred run during teardown before replay persistence drained."
+            );
+        }
+
+        _core.CompleteRun(_deferredRunCompletion);
+        _pendingSelection = null;
+        _deferredRunCompletion = null;
+        _deferredRunCompletionDeadlineUtc = null;
+        return true;
     }
 
     private sealed class PendingSelectionContext

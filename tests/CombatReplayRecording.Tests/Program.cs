@@ -1,4 +1,8 @@
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 
 var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
@@ -60,6 +64,13 @@ Assert(
         && catalogStoreType != null,
     "The PVP battle catalog read side should expose Save, TryLoad, and ListRecentBattles."
 );
+Assert(
+    catalogType.GetMethod("Delete") != null
+        && catalogType.GetMethod("ListBattleIds") != null
+        && catalogInterfaceType.GetMethod("Delete") != null
+        && catalogInterfaceType.GetMethod("ListBattleIds") != null,
+    "The PVP battle catalog should expose Delete and ListBattleIds so replay cleanup can remove manifest entries whose payload is missing."
+);
 
 var pathServiceSource = File.ReadAllText(
     Path.GetFullPath(
@@ -99,12 +110,26 @@ Assert(
         && capturePatchSource.Contains("new NetMessageObserved", StringComparison.Ordinal),
     "Combat replay capture patch should publish observed messages through the runtime event bus."
 );
+Assert(
+    capturePatchSource.Contains("NetMessageGameSim", StringComparison.Ordinal)
+        && capturePatchSource.Contains("NetMessageCombatSim", StringComparison.Ordinal)
+        && capturePatchSource.Contains("return;", StringComparison.Ordinal),
+    "Combat replay capture patch should ignore non-GameSim and non-CombatSim messages before publishing."
+);
 
 var runtimeSource = File.ReadAllText(
     Path.GetFullPath(
         Path.Combine(
             AppContext.BaseDirectory,
             "../../../../../Game/CombatReplay/CombatReplayRuntime.cs"
+        )
+    )
+);
+var payloadStoreSource = File.ReadAllText(
+    Path.GetFullPath(
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../../Game/CombatReplay/CombatReplayPayloadStore.cs"
         )
     )
 );
@@ -115,6 +140,11 @@ var captureServiceSource = File.ReadAllText(
             "../../../../../Game/CombatReplay/CombatReplayCaptureService.cs"
         )
     )
+);
+Assert(
+    payloadStoreSource.Contains("Delete(string battleId)", StringComparison.Ordinal)
+        && payloadStoreSource.Contains("ListBattleIds()", StringComparison.Ordinal),
+    "Combat replay payload store should expose Delete(string battleId) and ListBattleIds() so orphan payload cleanup can enumerate and remove files."
 );
 Assert(
     captureServiceSource.Contains("CaptureLiveSnapshots(_candidate);", StringComparison.Ordinal)
@@ -204,9 +234,248 @@ Assert(
             "_payloadStore = new CombatReplayPayloadStore",
             StringComparison.Ordinal
         )
-        && runtimeSource.IndexOf("_payloadStore.Save(payload);", StringComparison.Ordinal)
-            < runtimeSource.IndexOf("_battleCatalog.Save(manifest);", StringComparison.Ordinal),
-    "Combat replay runtime should persist payloads before making battles visible via the catalog."
+        && runtimeSource.Contains(
+            "_persistenceQueue = new CombatReplayPersistenceQueue",
+            StringComparison.Ordinal
+        ),
+    "Combat replay runtime should construct the payload store, battle catalog, and a dedicated background persistence queue."
+);
+Assert(
+    runtimeSource.Contains("public bool HasPendingPersistence", StringComparison.Ordinal)
+        && runtimeSource.Contains("_persistenceQueue?.HasPendingPersistence == true", StringComparison.Ordinal),
+    "Combat replay runtime should expose whether replay persistence is still outstanding so run completion can wait for post-persist replay events."
+);
+var observeMessageBody = ExtractMethodBody(
+    runtimeSource,
+    "public void ObserveMessage(INetMessage message)"
+);
+Assert(
+    observeMessageBody.Contains("_persistenceQueue.Enqueue(payload, manifest);", StringComparison.Ordinal),
+    "Combat replay runtime should enqueue replay persistence work instead of writing synchronously on the message observer hot path."
+);
+Assert(
+    !observeMessageBody.Contains("_payloadStore.Save(payload);", StringComparison.Ordinal)
+        && !observeMessageBody.Contains("_battleCatalog.Save(manifest);", StringComparison.Ordinal),
+    "Combat replay runtime should not write replay payloads or manifests directly inside ObserveMessage."
+);
+var runtimeUpdateBody = ExtractMethodBody(runtimeSource, "private void Update()");
+Assert(
+    runtimeUpdateBody.Contains("DrainPersistenceResults();", StringComparison.Ordinal),
+    "Combat replay runtime should drain completed persistence work from Update so replay-recorded events stay on the main thread."
+);
+var drainPersistenceBody = ExtractMethodBody(
+    runtimeSource,
+    "private void DrainPersistenceResults()"
+);
+Assert(
+    drainPersistenceBody.Contains("TryDequeueResult", StringComparison.Ordinal)
+        && drainPersistenceBody.Contains("new PvpBattleRecorded", StringComparison.Ordinal),
+    "Combat replay runtime should publish replay-recorded events only after draining completed persistence work."
+);
+
+var persistenceQueuePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/CombatReplay/CombatReplayPersistenceQueue.cs"
+    )
+);
+Assert(File.Exists(persistenceQueuePath), "Combat replay persistence queue should exist.");
+var persistenceQueueSource = File.ReadAllText(persistenceQueuePath);
+Assert(
+    persistenceQueueSource.Contains("ConcurrentQueue", StringComparison.Ordinal)
+        && persistenceQueueSource.Contains("Task.Run", StringComparison.Ordinal),
+    "Combat replay persistence queue should serialize replay saves onto background tasks and surface completions through a thread-safe queue."
+);
+Assert(
+    persistenceQueueSource.Contains("public bool HasPendingPersistence", StringComparison.Ordinal)
+        && persistenceQueueSource.Contains("Interlocked.Increment", StringComparison.Ordinal)
+        && persistenceQueueSource.Contains("Interlocked.Decrement", StringComparison.Ordinal),
+    "Combat replay persistence queue should track outstanding replay writes until the main thread drains completion results."
+);
+var queueDisposeBody = ExtractMethodBody(persistenceQueueSource, "public void Dispose()");
+Assert(
+    queueDisposeBody.Contains("_stopAcceptingNewWork", StringComparison.Ordinal)
+        && queueDisposeBody.Contains("_worker.Wait(ShutdownDrainTimeout)", StringComparison.Ordinal),
+    "Combat replay persistence queue should stop new enqueues and wait briefly for queued work to drain during teardown."
+);
+Assert(
+    queueDisposeBody.Contains("BppLog.Warn", StringComparison.Ordinal)
+        && queueDisposeBody.Contains("_shutdown.Cancel();", StringComparison.Ordinal)
+        && queueDisposeBody.Contains("_worker.Wait();", StringComparison.Ordinal)
+        && queueDisposeBody.Contains("EnqueueAbandonedPendingResults();", StringComparison.Ordinal)
+        && queueDisposeBody.Contains("_signal.Dispose();", StringComparison.Ordinal)
+        && queueDisposeBody.Contains("_shutdown.Dispose();", StringComparison.Ordinal),
+    "Combat replay persistence queue should cancel, wait for the worker to stop, surface abandoned work as completed failures, and only then dispose synchronization primitives."
+);
+var queueProcessLoopBody = ExtractMethodBody(
+    persistenceQueueSource,
+    "private async Task ProcessLoopAsync()"
+);
+Assert(
+    queueProcessLoopBody.Contains("ShouldExitWorkerLoop()", StringComparison.Ordinal)
+        && queueProcessLoopBody.Contains("WaitAsync(_shutdown.Token)", StringComparison.Ordinal),
+    "Combat replay persistence queue worker should only exit after an explicit stop request and a drained queue unless forced shutdown cancels the wait."
+);
+Assert(
+    queueProcessLoopBody.Contains(
+        "while (!_shutdown.IsCancellationRequested && _pending.TryDequeue(out var request))",
+        StringComparison.Ordinal
+    ),
+    "Combat replay persistence queue should stop dequeuing new replay requests once forced shutdown cancellation begins so abandoned requests remain visible for teardown result draining."
+);
+Assert(
+    persistenceQueueSource.Contains("Action<string> deletePayload", StringComparison.Ordinal)
+        && persistenceQueueSource.Contains("_deletePayload", StringComparison.Ordinal),
+    "Combat replay persistence queue should accept a payload-delete callback for manifest-save rollback."
+);
+Assert(
+    queueProcessLoopBody.Contains("var payloadSaved = false;", StringComparison.Ordinal)
+        && queueProcessLoopBody.Contains("payloadSaved = true;", StringComparison.Ordinal)
+        && queueProcessLoopBody.Contains("_deletePayload(request.Payload.BattleId);", StringComparison.Ordinal),
+    "Combat replay persistence queue should delete the just-written payload when manifest persistence fails after payload persistence succeeds."
+);
+var runtimeAwakeBody = ExtractMethodBody(runtimeSource, "private void Awake()");
+Assert(
+    runtimeAwakeBody.Contains("CleanupOrphanedPayloads();", StringComparison.Ordinal),
+    "Combat replay runtime should trigger orphan payload cleanup during Awake."
+);
+Assert(
+    runtimeSource.Contains("private void CleanupOrphanedPayloads()", StringComparison.Ordinal)
+        && runtimeSource.Contains("_payloadStore.ListBattleIds()", StringComparison.Ordinal)
+        && runtimeSource.Contains("_battleCatalog.TryLoad", StringComparison.Ordinal)
+        && runtimeSource.Contains("_payloadStore.Delete(", StringComparison.Ordinal),
+    "Combat replay runtime should compare payload battle ids against the manifest catalog and delete orphaned payloads at startup."
+);
+Assert(
+    runtimeSource.Contains("_battleCatalog.ListBattleIds()", StringComparison.Ordinal)
+        && runtimeSource.Contains("_payloadStore.Exists(", StringComparison.Ordinal)
+        && runtimeSource.Contains("_battleCatalog.Delete(", StringComparison.Ordinal),
+    "Combat replay runtime should also delete manifest entries whose replay payload file is missing."
+);
+var runtimeOnDestroyBody = ExtractMethodBody(runtimeSource, "private void OnDestroy()");
+Assert(
+    runtimeOnDestroyBody.Contains("DrainPersistenceResults();", StringComparison.Ordinal),
+    "Combat replay runtime should drain late persistence completions during teardown so successfully saved replays can still publish their completion event."
+);
+var persistenceQueueType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.CombatReplayPersistenceQueue"
+);
+var persistenceResultType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.CombatReplayPersistenceResult"
+);
+var queueCtor = persistenceQueueType.GetConstructor(
+    [
+        typeof(Action<>).MakeGenericType(payloadType),
+        typeof(Action<>).MakeGenericType(manifestType),
+        typeof(Action<string>),
+    ]
+);
+Assert(
+    queueCtor != null,
+    "Combat replay persistence queue should accept payload-save, manifest-save, and payload-delete callbacks."
+);
+var queueHarness = new QueuePersistenceHarness();
+var queue = queueCtor!.Invoke(
+    [
+        queueHarness.CreateSavePayloadDelegate(typeof(Action<>).MakeGenericType(payloadType)),
+        queueHarness.CreateSaveManifestDelegate(typeof(Action<>).MakeGenericType(manifestType)),
+        new Action<string>(queueHarness.DeletePayload),
+    ]
+);
+Assert(queue != null, "Combat replay persistence queue should be constructible.");
+
+var slowPayload = Activator.CreateInstance(payloadType);
+Assert(slowPayload != null, "Slow replay payload should be constructible.");
+SetProperty(payloadType, slowPayload!, "BattleId", "battle-dispose-slow");
+var slowManifest = Activator.CreateInstance(manifestType);
+Assert(slowManifest != null, "Slow replay manifest should be constructible.");
+SetProperty(manifestType, slowManifest!, "BattleId", "battle-dispose-slow");
+
+var abandonedPayload = Activator.CreateInstance(payloadType);
+Assert(abandonedPayload != null, "Abandoned replay payload should be constructible.");
+SetProperty(payloadType, abandonedPayload!, "BattleId", "battle-dispose-abandoned");
+var abandonedManifest = Activator.CreateInstance(manifestType);
+Assert(abandonedManifest != null, "Abandoned replay manifest should be constructible.");
+SetProperty(manifestType, abandonedManifest!, "BattleId", "battle-dispose-abandoned");
+
+Invoke(
+    persistenceQueueType,
+    queue!,
+    "Enqueue",
+    new object?[] { slowPayload!, slowManifest! }
+);
+Invoke(
+    persistenceQueueType,
+    queue!,
+    "Enqueue",
+    new object?[] { abandonedPayload!, abandonedManifest! }
+);
+Assert(
+    queueHarness.FirstPayloadStarted.Wait(TimeSpan.FromSeconds(2)),
+    "Queue should begin persisting the first replay request before disposal starts."
+);
+
+var disposeTask = Task.Run(() =>
+    Invoke(persistenceQueueType, queue!, "Dispose", Array.Empty<object?>())
+);
+Thread.Sleep(millisecondsTimeout: 650);
+queueHarness.AllowFirstPayloadToComplete.Set();
+Assert(
+    disposeTask.Wait(TimeSpan.FromSeconds(5)),
+    "Disposing the persistence queue should return after the in-flight replay write finishes."
+);
+
+var queueResults = new List<object>();
+while (TryDequeuePersistenceResult(persistenceQueueType, queue!, out var result))
+{
+    queueResults.Add(result!);
+}
+
+Assert(
+    queueResults.Count == 2,
+    "Queue disposal should surface one result for the completed in-flight replay and one result for the abandoned pending replay."
+);
+Assert(
+    queueResults.Any(result =>
+        (bool)GetProperty(persistenceResultType, result, "Succeeded")
+            && string.Equals(
+                (string?)GetProperty(
+                    manifestType,
+                    GetProperty(persistenceResultType, result, "Manifest"),
+                    "BattleId"
+                ),
+                "battle-dispose-slow",
+                StringComparison.Ordinal
+            )
+    ),
+    "Queue disposal should preserve the successful in-flight replay result even when shutdown cancellation starts before it finishes."
+);
+Assert(
+    queueResults.Any(result =>
+        !(bool)GetProperty(persistenceResultType, result, "Succeeded")
+            && string.Equals(
+                (string?)GetProperty(
+                    manifestType,
+                    GetProperty(persistenceResultType, result, "Manifest"),
+                    "BattleId"
+                ),
+                "battle-dispose-abandoned",
+                StringComparison.Ordinal
+            )
+    ),
+    "Queue disposal should convert abandoned pending replays into completed failure results instead of dropping them silently."
+);
+Assert(
+    queueHarness.SavedManifestBattleIds.SequenceEqual(["battle-dispose-slow"]),
+    "Forced shutdown should not begin persisting the second replay manifest after cancellation starts."
+);
+Assert(
+    !queueHarness.DeletedPayloadBattleIds.Any(),
+    "Forced shutdown abandonment should not roll back payloads when the manifest save was never attempted."
+);
+Assert(
+    !(bool)GetProperty(persistenceQueueType, queue!, "HasPendingPersistence"),
+    "After draining the completed queue results from disposal, replay persistence should no longer report outstanding work."
 );
 Assert(
     runtimeSource.Contains("ResolveReplayDependencies", StringComparison.Ordinal),
@@ -1014,6 +1283,63 @@ try
 
     var controller = Activator.CreateInstance(controllerType, battleCatalog, payloadStore, loader);
     Assert(controller != null, "CombatReplayController should be constructible.");
+    var missingPayloadManifest = CreateManifestFixture(
+        manifestType,
+        cardSetCaptureType,
+        captureStatusType,
+        captureSourceType,
+        battleId: "battle-missing-payload",
+        runId: "run-missing-payload",
+        savedAtUtc: new DateTimeOffset(2026, 3, 19, 1, 2, 3, TimeSpan.Zero),
+        combatKind: "PVPCombat",
+        day: 4,
+        hour: 6,
+        encounterId: "encounter-missing-payload",
+        playerName: "Local Player",
+        playerAccountId: "player-account-001",
+        opponentName: "Missing Payload Opponent",
+        opponentHero: "Pygmalien",
+        opponentRank: "Master",
+        opponentRating: 2199,
+        opponentLevel: 14,
+        opponentAccountId: "opponent-account-missing-payload",
+        result: "loss",
+        winnerCombatantId: "Opponent",
+        loserCombatantId: "Player",
+        playerHandCapture: CreateCardSetCapture(
+            cardSetCaptureType,
+            captureStatusType,
+            captureSourceType,
+            "Captured",
+            "LiveRetry",
+            CreateSnapshotList("missing-p-hand-1", "tpl-missing-p-hand")
+        ),
+        playerSkillsCapture: CreateCardSetCapture(
+            cardSetCaptureType,
+            captureStatusType,
+            captureSourceType,
+            "CapturedEmpty",
+            "LiveRetry",
+            CreateEmptySnapshotList()
+        ),
+        opponentHandCapture: CreateCardSetCapture(
+            cardSetCaptureType,
+            captureStatusType,
+            captureSourceType,
+            "Captured",
+            "OpeningMessage",
+            CreateSnapshotList("missing-o-hand-1", "tpl-missing-o-hand")
+        ),
+        opponentSkillsCapture: CreateCardSetCapture(
+            cardSetCaptureType,
+            captureStatusType,
+            captureSourceType,
+            "Captured",
+            "OpeningMessage",
+            CreateSnapshotList("missing-o-skill-1", "tpl-missing-o-skill")
+        )
+    );
+    Invoke(catalogType, battleCatalog!, "Save", new object?[] { missingPayloadManifest! });
     var savedReplays = (
         (System.Collections.IEnumerable)Invoke(
             controllerType,
@@ -1025,6 +1351,31 @@ try
         .Cast<object>()
         .ToList();
     Assert(savedReplays.Count >= 1, "Controller should expose recent battle manifests.");
+    Assert(
+        savedReplays.All(manifestEntry =>
+            !string.Equals(
+                (string?)GetProperty(manifestType, manifestEntry, "BattleId"),
+                "battle-missing-payload",
+                StringComparison.Ordinal
+            )
+        ),
+        "Controller should hide battle manifests whose replay payload file is missing."
+    );
+    var latestBattle = Invoke(
+        controllerType,
+        controller!,
+        "GetLatestBattle",
+        Array.Empty<object?>()
+    );
+    Assert(
+        latestBattle != null
+            && !string.Equals(
+                (string?)GetProperty(manifestType, latestBattle, "BattleId"),
+                "battle-missing-payload",
+                StringComparison.Ordinal
+            ),
+        "Controller should not surface a latest battle whose replay payload file is missing."
+    );
 
     var battleId = (string?)GetProperty(manifestType, completedManifest!, "BattleId");
     var loadedManifestFromController = Invoke(
@@ -1036,6 +1387,15 @@ try
     Assert(
         loadedManifestFromController != null,
         "Controller should load a saved battle manifest by id."
+    );
+    Assert(
+        Invoke(
+            controllerType,
+            controller!,
+            "LoadBattle",
+            new object?[] { "battle-missing-payload" }
+        ) == null,
+        "Controller should reject loading a battle whose replay payload file is missing."
     );
     var loadedPayloadFromController = Invoke(
         controllerType,
@@ -1104,6 +1464,19 @@ static object? Invoke(Type type, object instance, string methodName, object?[] a
     );
     Assert(method != null, $"Method not found: {type.FullName}.{methodName}");
     return method!.Invoke(instance, args);
+}
+
+static bool TryDequeuePersistenceResult(Type queueType, object queue, out object? result)
+{
+    var method = queueType.GetMethod(
+        "TryDequeueResult",
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+    );
+    Assert(method != null, $"Method not found: {queueType.FullName}.TryDequeueResult");
+    var args = new object?[] { null };
+    var dequeued = (bool)(method!.Invoke(queue, args) ?? false);
+    result = args[0];
+    return dequeued;
 }
 
 static void SetProperty(Type type, object instance, string name, object? value)
@@ -1472,4 +1845,74 @@ static void SetField(Type type, object instance, string name, object? value)
     );
     Assert(field != null, $"Field not found: {type.FullName}.{name}");
     field!.SetValue(instance, value);
+}
+
+file sealed class QueuePersistenceHarness
+{
+    private int _payloadSaveCallCount;
+
+    public ManualResetEventSlim FirstPayloadStarted { get; } = new(initialState: false);
+
+    public ManualResetEventSlim AllowFirstPayloadToComplete { get; } = new(initialState: false);
+
+    public ConcurrentQueue<string> SavedManifestBattleIds { get; } = new();
+
+    public ConcurrentQueue<string> DeletedPayloadBattleIds { get; } = new();
+
+    public Delegate CreateSavePayloadDelegate(Type delegateType)
+    {
+        return CreateObjectForwardingDelegate(delegateType, nameof(SavePayload));
+    }
+
+    public Delegate CreateSaveManifestDelegate(Type delegateType)
+    {
+        return CreateObjectForwardingDelegate(delegateType, nameof(SaveManifest));
+    }
+
+    public void SavePayload(object payload)
+    {
+        var battleId = ReadBattleId(payload);
+        if (Interlocked.Increment(ref _payloadSaveCallCount) == 1)
+        {
+            FirstPayloadStarted.Set();
+            AllowFirstPayloadToComplete.Wait(TimeSpan.FromSeconds(5));
+        }
+
+        if (string.IsNullOrWhiteSpace(battleId))
+            throw new InvalidOperationException("Replay payload should expose a battle id.");
+    }
+
+    public void SaveManifest(object manifest)
+    {
+        SavedManifestBattleIds.Enqueue(ReadBattleId(manifest));
+    }
+
+    public void DeletePayload(string battleId)
+    {
+        DeletedPayloadBattleIds.Enqueue(battleId);
+    }
+
+    private static string ReadBattleId(object instance)
+    {
+        return (string)(
+            instance
+                .GetType()
+                .GetProperty("BattleId", BindingFlags.Public | BindingFlags.Instance)
+                ?.GetValue(instance)
+            ?? throw new InvalidOperationException("BattleId property not found.")
+        );
+    }
+
+    private Delegate CreateObjectForwardingDelegate(Type delegateType, string methodName)
+    {
+        var argumentType = delegateType.GenericTypeArguments.Single();
+        var parameter = Expression.Parameter(argumentType, "value");
+        var body = Expression.Call(
+            Expression.Constant(this),
+            GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance)
+                ?? throw new InvalidOperationException($"Method not found: {methodName}"),
+            Expression.Convert(parameter, typeof(object))
+        );
+        return Expression.Lambda(delegateType, body, parameter).Compile();
+    }
 }

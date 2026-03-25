@@ -71,6 +71,44 @@ var duplicateSelection = Invoke<RunLogEvent?>(
 Assert(duplicateSelection == null, "Duplicate selection_seen fingerprints should be suppressed.");
 Assert(fakeStore.AppendedEvents.Count == 1, "Duplicate selection_seen should not be persisted.");
 
+var firstStateEvent = Invoke<RunLogEvent?>(
+    managerType,
+    manager,
+    "AppendEvent",
+    [
+        new RunLogEvent
+        {
+            Kind = "state_seen",
+            Day = 1,
+            Hour = 1,
+            State = "Encounter",
+            StateFingerprint = "state-fp-1",
+        },
+    ]
+);
+Assert(firstStateEvent != null, "The first state_seen event should be recorded.");
+
+var duplicateStateEvent = Invoke<RunLogEvent?>(
+    managerType,
+    manager,
+    "AppendEvent",
+    [
+        new RunLogEvent
+        {
+            Kind = "state_seen",
+            Day = 1,
+            Hour = 1,
+            State = "Encounter",
+            StateFingerprint = "state-fp-1",
+        },
+    ]
+);
+Assert(duplicateStateEvent == null, "Duplicate state_seen fingerprints should be suppressed.");
+Assert(
+    fakeStore.AppendedEvents.Count(e => e.Kind == "state_seen") == 1,
+    "Duplicate state_seen should not be persisted."
+);
+
 var progressEvent = Invoke<RunLogEvent?>(
     managerType,
     manager,
@@ -85,8 +123,8 @@ var progressEvent = Invoke<RunLogEvent?>(
     ]
 );
 Assert(progressEvent != null, "A non-duplicate event should be persisted.");
-Assert(progressEvent!.Seq == 2, "Sequence numbers should remain monotonic after suppression.");
-Assert(fakeStore.AppendedEvents.Count == 2, "Two unique events should be persisted.");
+Assert(progressEvent!.Seq == 3, "Sequence numbers should remain monotonic after suppression.");
+Assert(fakeStore.AppendedEvents.Count == 3, "Three unique events should be persisted.");
 
 var choiceEvent = Invoke<RunLogEvent?>(
     managerType,
@@ -104,7 +142,7 @@ var choiceEvent = Invoke<RunLogEvent?>(
     ]
 );
 Assert(choiceEvent != null, "choice_made should be accepted for the pending selection.");
-Assert(choiceEvent!.Seq == 3, "choice_made should advance the sequence.");
+Assert(choiceEvent!.Seq == 4, "choice_made should advance the sequence.");
 Assert(
     fakeStore.ResumeState?.PendingSelectionSeq == null,
     "choice_made should clear pending_selection_seq."
@@ -309,6 +347,105 @@ Assert(
 Assert(fakeStore.MarkRunAbandonedCalls == 1, "A mismatched restored session should be abandoned.");
 Assert(fakeStore.CreateRunCalls == 2, "A mismatched restored session should create a fresh run.");
 
+var runLoggingControllerPath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/RunLogging/RunLoggingController.cs"
+    )
+);
+var runLoggingControllerSource = File.ReadAllText(runLoggingControllerPath);
+Assert(
+    runLoggingControllerSource.Contains(
+        "public RunLogEvent? AcceptStateSnapshot",
+        StringComparison.Ordinal
+    ),
+    "AcceptStateSnapshot should return a nullable event so duplicate state snapshots can be ignored without throwing."
+);
+Assert(
+    !runLoggingControllerSource.Contains(
+        "State event was unexpectedly suppressed.",
+        StringComparison.Ordinal
+    ),
+    "AcceptStateSnapshot should not throw when duplicate state snapshots are suppressed."
+);
+
+var runLoggingModulePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/RunLogging/RunLoggingModule.cs")
+);
+var runLoggingModuleSource = File.ReadAllText(runLoggingModulePath);
+var runLoggingStopBody = ExtractMethodBody(runLoggingModuleSource, "public void Stop()");
+Assert(
+    runLoggingStopBody.Contains(
+        "TryCompleteDeferredRunExit(forceCompletion: true);",
+        StringComparison.Ordinal
+    )
+        && runLoggingStopBody.IndexOf(
+            "TryCompleteDeferredRunExit(forceCompletion: true);",
+            StringComparison.Ordinal
+        )
+            < runLoggingStopBody.IndexOf(
+                "_deferredRunCompletion = null;",
+                StringComparison.Ordinal
+            ),
+    "RunLoggingModule.Stop should force a deferred run completion before clearing deferred exit state during teardown."
+);
+var runLoggingSyncBody = ExtractMethodBody(
+    runLoggingModuleSource,
+    "private void OnRunLoggingSyncRequested(RunLoggingSyncRequested request)"
+);
+Assert(
+    runLoggingSyncBody.Contains("HasPendingPersistence", StringComparison.Ordinal),
+    "RunLoggingModule should inspect replay persistence state before completing a run on exit."
+);
+Assert(
+    runLoggingModuleSource.Contains("TryCompleteDeferredRunExit", StringComparison.Ordinal)
+        && runLoggingModuleSource.Contains("DateTime.UtcNow", StringComparison.Ordinal)
+        && runLoggingModuleSource.Contains("TimeSpan.FromSeconds", StringComparison.Ordinal),
+    "RunLoggingModule should defer run completion until replay persistence drains or a short grace window expires."
+);
+var pvpBattleRecordedBody = ExtractMethodBody(
+    runLoggingModuleSource,
+    "private void OnPvpBattleRecorded(PvpBattleRecorded recorded)"
+);
+Assert(
+    !pvpBattleRecordedBody.Contains(
+        "|| !BppRuntimeHost.RunContext.IsInGameRun",
+        StringComparison.Ordinal
+    )
+        && pvpBattleRecordedBody.Contains("_sessionManager.HasActiveSession", StringComparison.Ordinal),
+    "RunLoggingModule should still accept post-persist PVP replay events while a deferred active session remains open."
+);
+
+var historyBridgePath = Path.GetFullPath(
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/HistoryPanel/HistoryCollectionsEntryBridge.cs"
+    )
+);
+var historyBridgeSource = File.ReadAllText(historyBridgePath);
+Assert(
+    historyBridgeSource.Contains("_cachedAnchorButton", StringComparison.Ordinal),
+    "HistoryCollectionsEntryBridge should cache the detected collections anchor between scans."
+);
+
+var historyPanelPath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/HistoryPanel/HistoryPanel.cs")
+);
+var historyPanelSource = File.ReadAllText(historyPanelPath);
+var historyPanelAwakeBody = ExtractMethodBody(historyPanelSource, "private void Awake()");
+Assert(
+    !historyPanelAwakeBody.Contains("RefreshData();", StringComparison.Ordinal),
+    "HistoryPanel.Awake should not load sqlite data before the panel is opened."
+);
+var historyPanelVisibilityBody = ExtractMethodBody(
+    historyPanelSource,
+    "private void SetHistoryVisible(bool visible)"
+);
+Assert(
+    historyPanelVisibilityBody.Contains("RefreshData();", StringComparison.Ordinal),
+    "HistoryPanel should still load data when the panel becomes visible."
+);
+
 Console.WriteLine("RunLogging session checks passed.");
 
 static Type RequireType(string fullName)
@@ -348,6 +485,31 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+static string ExtractMethodBody(string source, string signature)
+{
+    var signatureIndex = source.IndexOf(signature, StringComparison.Ordinal);
+    if (signatureIndex < 0)
+        throw new InvalidOperationException($"Method signature not found: {signature}");
+
+    var bodyStart = source.IndexOf('{', signatureIndex);
+    if (bodyStart < 0)
+        throw new InvalidOperationException($"Method body start not found: {signature}");
+
+    var depth = 0;
+    for (var index = bodyStart; index < source.Length; index++)
+    {
+        if (source[index] == '{')
+            depth++;
+        else if (source[index] == '}')
+            depth--;
+
+        if (depth == 0)
+            return source.Substring(bodyStart + 1, index - bodyStart - 1);
+    }
+
+    throw new InvalidOperationException($"Method body end not found: {signature}");
 }
 
 file sealed class FakeRunLogStore : IRunLogStore
