@@ -69,7 +69,7 @@ Assert(
         && catalogType.GetMethod("ListBattleIds") != null
         && catalogInterfaceType.GetMethod("Delete") != null
         && catalogInterfaceType.GetMethod("ListBattleIds") != null,
-    "The PVP battle catalog should expose Delete and ListBattleIds so replay cleanup can remove manifest entries whose payload is missing."
+    "The PVP battle catalog should expose Delete and ListBattleIds so replay maintenance can reconcile stored manifests when needed."
 );
 
 var pathServiceSource = File.ReadAllText(
@@ -347,10 +347,8 @@ Assert(
     "Combat replay runtime should compare payload battle ids against the manifest catalog and delete orphaned payloads at startup."
 );
 Assert(
-    runtimeSource.Contains("_battleCatalog.ListBattleIds()", StringComparison.Ordinal)
-        && runtimeSource.Contains("_payloadStore.Exists(", StringComparison.Ordinal)
-        && runtimeSource.Contains("_battleCatalog.Delete(", StringComparison.Ordinal),
-    "Combat replay runtime should also delete manifest entries whose replay payload file is missing."
+    !runtimeSource.Contains("_battleCatalog.Delete(", StringComparison.Ordinal),
+    "Combat replay runtime should preserve battle manifests whose replay payload file is missing so history views can still render the snapshot data stored in sqlite."
 );
 var runtimeOnDestroyBody = ExtractMethodBody(runtimeSource, "private void OnDestroy()");
 Assert(

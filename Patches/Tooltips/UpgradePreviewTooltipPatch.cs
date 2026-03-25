@@ -51,12 +51,12 @@ internal static class UpgradePreviewTooltipPatch
             return false;
 
         controller.StartCoroutine(
-            ShowUpgradeTooltipWhenReady(controller, card, resolvedTooltipData)
+            RefreshUpgradePreviewWhenReady(controller, card, resolvedTooltipData)
         );
         return true;
     }
 
-    private static IEnumerator ShowUpgradeTooltipWhenReady(
+    private static IEnumerator RefreshUpgradePreviewWhenReady(
         CardController controller,
         Card card,
         CardTooltipData tooltipData
@@ -79,11 +79,7 @@ internal static class UpgradePreviewTooltipPatch
                 var tooltipParent = Data.TooltipParentComponent;
                 if (tooltipParent != null && tooltipParent.GetCardTooltipController(card) != null)
                 {
-                    tooltipParent.DisplayUpgradeTooltips(
-                        controller.transform,
-                        controller.TooltipOffset,
-                        tooltipData
-                    );
+                    RefreshPrimaryTooltipForUpgradePreview(controller, card, tooltipData, tooltipParent);
                     yield break;
                 }
 
@@ -94,5 +90,38 @@ internal static class UpgradePreviewTooltipPatch
         {
             PendingControllers.Remove(controller);
         }
+    }
+
+    private static void RefreshPrimaryTooltipForUpgradePreview(
+        CardController controller,
+        Card card,
+        CardTooltipData tooltipData,
+        TooltipParentComponent tooltipParent
+    )
+    {
+        if (controller == null || tooltipParent == null)
+            return;
+
+        if (tooltipParent.GetCardTooltipController(card) == null)
+            return;
+
+        var refreshedTooltipData = new CardTooltipData(card, tooltipData.CardTemplate);
+        tooltipParent.HideCardTooltipController();
+
+        if (
+            controller == null
+            || controller.CardData != card
+            || !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview)
+        )
+        {
+            return;
+        }
+
+        controller.EnterUpgradePreview();
+        tooltipParent.ShowCardTooltipController(
+            controller.transform,
+            controller.TooltipOffset,
+            refreshedTooltipData
+        );
     }
 }

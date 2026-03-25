@@ -17,11 +17,11 @@ Assert(
 );
 var labelSource = File.ReadAllText(labelSourcePath);
 Assert(
-    labelSource.Contains("Enchant Preview Always Show", StringComparison.Ordinal),
+    labelSource.Contains("Always Show Enchant Preview", StringComparison.Ordinal),
     "Enchant preview settings label should expose the English label."
 );
 Assert(
-    labelSource.Contains("附魔预览始终显示", StringComparison.Ordinal),
+    labelSource.Contains("始终显示附魔预览", StringComparison.Ordinal),
     "Enchant preview settings label should expose the Simplified Chinese label."
 );
 
@@ -73,6 +73,31 @@ Assert(
         && hotkeyServiceSource.Contains("UpgradePreview", StringComparison.Ordinal),
     "BPP hotkey service should define dedicated enchant and upgrade preview actions."
 );
+Assert(
+    hotkeyServiceSource.Contains("<Mouse>/", StringComparison.Ordinal),
+    "BPP hotkey service should recognize mouse binding paths."
+);
+Assert(
+    hotkeyServiceSource.Contains("Mouse.current", StringComparison.Ordinal),
+    "BPP hotkey service should read current mouse state for mouse-backed hotkeys."
+);
+Assert(
+    hotkeyServiceSource.Contains("ButtonControl", StringComparison.Ordinal),
+    "BPP hotkey service should validate mouse inputs as button controls."
+);
+Assert(
+    hotkeyServiceSource.Contains("candidate.name", StringComparison.Ordinal)
+        && hotkeyServiceSource.Contains("buttonName", StringComparison.Ordinal),
+    "BPP hotkey service should resolve canonical mouse bindings by mouse control name instead of raw InputControl.path."
+);
+Assert(
+    hotkeyServiceSource.Contains("scroll", StringComparison.Ordinal),
+    "BPP hotkey service should explicitly reject scroll-style mouse inputs."
+);
+Assert(
+    hotkeyServiceSource.Contains("IsExplicitlyUnsupportedMousePath(normalized)", StringComparison.Ordinal),
+    "BPP hotkey service should keep rejecting unsupported continuous mouse controls before accepting canonical mouse bindings."
+);
 
 var keybindSettingsPatchSourcePath = Path.GetFullPath(
     Path.Combine(
@@ -115,8 +140,29 @@ Assert(
         || keybindLabelResolverSource.Contains(
             "SimplifiedChineseLanguage.Matches",
             StringComparison.Ordinal
+        )
+        || keybindLabelResolverSource.Contains(
+            "LanguageCodeMatcher.IsSimplifiedChinese",
+            StringComparison.Ordinal
         ),
     "BPP keybind label resolver should recognize zh-Hans as Simplified Chinese, directly or through the shared helper."
+);
+
+var keybindRowControllerSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/Input/BppKeyBindRowController.cs")
+);
+Assert(
+    File.Exists(keybindRowControllerSourcePath),
+    $"BPP keybind row controller source not found at {keybindRowControllerSourcePath}"
+);
+var keybindRowControllerSource = File.ReadAllText(keybindRowControllerSourcePath);
+Assert(
+    keybindRowControllerSource.Contains("Mouse.current", StringComparison.Ordinal),
+    "BPP keybind row controller should listen to mouse buttons while rebinding."
+);
+Assert(
+    keybindRowControllerSource.Contains("<Mouse>/{buttonControl.name}", StringComparison.Ordinal),
+    "BPP keybind row controller should save mouse bindings using the canonical <Mouse>/<buttonName> format."
 );
 
 var tooltipRefreshSourcePath = Path.GetFullPath(
@@ -141,6 +187,22 @@ var upgradePatchSource = File.ReadAllText(upgradePatchSourcePath);
 Assert(
     upgradePatchSource.Contains("BppHotkeyService", StringComparison.Ordinal),
     "Upgrade preview tooltip patch should query BPP hotkey service instead of hard-coded Shift."
+);
+Assert(
+    !upgradePatchSource.Contains("DisplayUpgradeTooltips(", StringComparison.Ordinal),
+    "Upgrade preview tooltip patch should refresh the primary tooltip instead of spawning the native secondary upgrade tooltip."
+);
+Assert(
+    upgradePatchSource.Contains("EnterUpgradePreview()", StringComparison.Ordinal)
+        && upgradePatchSource.Contains("ShowCardTooltipController(", StringComparison.Ordinal),
+    "Upgrade preview tooltip patch should enter upgrade preview and refresh the primary tooltip."
+);
+Assert(
+    upgradePatchSource.Contains(
+        "new CardTooltipData(card, tooltipData.CardTemplate)",
+        StringComparison.Ordinal
+    ),
+    "Upgrade preview tooltip patch should rebuild CardTooltipData before re-showing the primary tooltip so the native controller does not ignore a reused tooltip instance during card-to-card transitions."
 );
 
 var enchantPatchSourcePath = Path.GetFullPath(
@@ -171,7 +233,7 @@ Assert(
     "Native keybind label patch should expose the English monster preview label."
 );
 Assert(
-    nativeKeybindLabelPatchSource.Contains("展示野怪预览", StringComparison.Ordinal),
+    nativeKeybindLabelPatchSource.Contains("显示怪物预览", StringComparison.Ordinal),
     "Native keybind label patch should expose the Simplified Chinese monster preview label."
 );
 Assert(
@@ -182,6 +244,10 @@ Assert(
     nativeKeybindLabelPatchSource.Contains("zh-Hans", StringComparison.Ordinal)
         || nativeKeybindLabelPatchSource.Contains(
             "SimplifiedChineseLanguage.Matches",
+            StringComparison.Ordinal
+        )
+        || nativeKeybindLabelPatchSource.Contains(
+            "LanguageCodeMatcher.IsSimplifiedChinese",
             StringComparison.Ordinal
         ),
     "Native keybind label patch should recognize zh-Hans as Simplified Chinese, directly or through the shared helper."

@@ -4,7 +4,7 @@
 
 - Normal hover shows the native primary tooltip.
 - `Ctrl + hover` appends Bazaar++ enchant preview text to the passive block.
-- `Shift + hover` shows the native upgrade preview tooltip.
+- `Shift + hover` refreshes the native primary tooltip into upgrade preview mode.
 - While hovering, pressing or releasing `Ctrl` or `Shift` refreshes the tooltip immediately.
 - Priority is `Shift > Ctrl`.
 - Upgrade preview is restricted to `ItemCard` only.
@@ -12,15 +12,16 @@
 ## Why Upgrade Tooltip Works
 
 Bazaar++ does not build a separate upgrade tooltip UI.
-It reuses the game's native upgrade preview path:
+It reuses the game's native upgrade-preview state on the hovered card:
 
 1. normal hover shows the main card tooltip
 2. Bazaar++ detects `Shift`
-3. Bazaar++ calls `TooltipParentComponent.DisplayUpgradeTooltips(...)`
-4. the native UI creates a secondary tooltip
-5. the native tooltip pipeline switches the card into upgrade preview mode
+3. Bazaar++ waits for the native primary tooltip controller to exist
+4. Bazaar++ hides the current primary tooltip
+5. Bazaar++ calls `cardController.EnterUpgradePreview()`
+6. Bazaar++ rebuilds `CardTooltipData` and shows the native primary tooltip again
 
-Once the card is in upgrade preview mode, the game's own tooltip rendering starts showing next-tier values.
+Once the card is in upgrade preview mode, the game's own tooltip rendering starts showing next-tier values through the normal primary tooltip.
 
 ## Native Game Path
 
@@ -33,8 +34,6 @@ Relevant native files:
 
 Important native behavior:
 
-- `TooltipParentComponent.DisplayUpgradeTooltips(...)` creates the secondary tooltip.
-- `HandleUpgradePreview(...)` calls `cardController.EnterUpgradePreview()`.
 - `CardController.CanFuse()` returns `true` while upgrade preview is active.
 - `CardTooltipTypeHandler` copies that state into `tooltipData.CanFuse`.
 - `CardTooltipData` then renders current values and next-tier values using the native fusion/upgrade formatting.
@@ -57,9 +56,12 @@ Behavior:
   - tooltip data is `CardTooltipData`
 
 The patch does not force upgrade preview in the same frame.
-Instead it waits briefly for the native primary tooltip controller to exist, then calls:
+Instead it waits briefly for the native primary tooltip controller to exist, then:
 
-- `Data.TooltipParentComponent.DisplayUpgradeTooltips(...)`
+- hides the current primary tooltip
+- calls `cardController.EnterUpgradePreview()`
+- rebuilds `CardTooltipData` for the same card/template
+- reopens the native primary tooltip via `ShowCardTooltipController(...)`
 
 That wait is necessary because the native primary tooltip is created asynchronously.
 
@@ -96,7 +98,7 @@ Behavior:
   - finds the currently hovered `ItemCard`
   - hides the current card tooltip
   - shows the native primary tooltip again
-  - if `Shift` is pressed and the item can upgrade, shows native upgrade preview again
+  - if `Shift` is pressed and the item can upgrade, lets the patch refresh the primary tooltip into upgrade preview mode
 
 This is what makes modifier changes feel live while already hovering.
 

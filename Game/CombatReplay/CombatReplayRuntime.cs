@@ -41,6 +41,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private PvpBattleCatalog? _battleCatalog;
     private CombatReplayPayloadStore? _payloadStore;
+    private CombatReplayPersistenceQueue? _persistenceQueue;
     private CombatReplayCaptureService? _captureService;
     private CombatReplayLoader? _loader;
     private CombatReplayController? _controller;
@@ -57,6 +58,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _savedReplayPlaybackActive || AppState.CurrentState is ReplayState;
 
     public bool IsSavedReplayPlaybackActive => _savedReplayPlaybackActive;
+
+    public bool HasPendingPersistence => _persistenceQueue?.HasPendingPersistence == true;
 
     public static void HideEncounterPickerOverlays()
     {
@@ -408,14 +411,28 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             );
         _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
+        _persistenceQueue = new CombatReplayPersistenceQueue(
+            _payloadStore.Save,
+            _battleCatalog.Save,
+            _payloadStore.Delete
+        );
         _captureService = new CombatReplayCaptureService();
         _loader = new CombatReplayLoader();
         _controller = new CombatReplayController(_battleCatalog, _payloadStore, _loader);
+        CleanupOrphanedPayloads();
         Events.StateChanged.AddListener(OnStateChanged, this);
+    }
+
+    private void Update()
+    {
+        DrainPersistenceResults();
     }
 
     private void OnDestroy()
     {
+        _persistenceQueue?.Dispose();
+        DrainPersistenceResults();
+
         if (Instance == this)
             Instance = null;
 
@@ -459,7 +476,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public void ObserveMessage(INetMessage message)
     {
-        if (_captureService == null || _battleCatalog == null || _payloadStore == null)
+        if (_captureService == null || _persistenceQueue == null)
             return;
 
         try
@@ -473,17 +490,66 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
             var payload = artifact.Payload;
             var manifest = artifact.Manifest;
-            _payloadStore.Save(payload);
-            _battleCatalog.Save(manifest);
-            BppRuntimeHost.EventBus.Publish(new PvpBattleRecorded { Manifest = manifest });
-            BppLog.Info(
-                "CombatReplayRuntime",
-                $"Saved combat replay {manifest.BattleId} for run={manifest.RunId ?? "unknown"}"
-            );
+            _persistenceQueue.Enqueue(payload, manifest);
         }
         catch (Exception ex)
         {
             BppLog.Error("CombatReplayRuntime", $"Failed to capture combat replay: {ex}");
+        }
+    }
+
+    private void DrainPersistenceResults()
+    {
+        while (_persistenceQueue?.TryDequeueResult(out var result) == true)
+        {
+            if (!result.Succeeded)
+            {
+                BppLog.Error(
+                    "CombatReplayRuntime",
+                    $"Failed to persist combat replay {result.Manifest.BattleId}: {result.Error}"
+                );
+                continue;
+            }
+
+            BppRuntimeHost.EventBus.Publish(new PvpBattleRecorded { Manifest = result.Manifest });
+            BppLog.Info(
+                "CombatReplayRuntime",
+                $"Saved combat replay {result.Manifest.BattleId} for run={result.Manifest.RunId ?? "unknown"}"
+            );
+        }
+    }
+
+    private void CleanupOrphanedPayloads()
+    {
+        if (_payloadStore == null || _battleCatalog == null)
+            return;
+
+        try
+        {
+            foreach (var battleId in _payloadStore.ListBattleIds())
+            {
+                if (_battleCatalog.TryLoad(battleId) != null)
+                    continue;
+
+                try
+                {
+                    _payloadStore.Delete(battleId);
+                }
+                catch (Exception ex)
+                {
+                    BppLog.Warn(
+                        "CombatReplayRuntime",
+                        $"Failed to delete orphaned combat replay payload {battleId}: {ex.Message}"
+                    );
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Failed to scan combat replay payloads for orphan cleanup: {ex.Message}"
+            );
         }
     }
 
