@@ -7,6 +7,7 @@ using TheBazaar.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus;
@@ -24,6 +25,7 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
     private TextMeshProUGUI? _labelText;
     private bool _isRebinding;
     private bool _initialized;
+    private int _rebindStartedFrame = -1;
 
     internal void Initialize(BppHotkeyActionId actionId, KeyBindController? templateController)
     {
@@ -72,29 +74,59 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
         if (!_initialized || !_isRebinding)
             return;
 
-        var keyboard = Keyboard.current;
-        if (keyboard == null)
+        if (Time.frameCount == _rebindStartedFrame)
             return;
 
-        if (keyboard.escapeKey.wasPressedThisFrame)
+        var keyboard = Keyboard.current;
+        if (keyboard?.escapeKey.wasPressedThisFrame == true)
         {
             EnterDefaultState();
             return;
         }
 
-        foreach (var keyControl in keyboard.allKeys)
+        if (keyboard != null)
         {
-            if (!keyControl.wasPressedThisFrame)
+            foreach (var keyControl in keyboard.allKeys)
+            {
+                if (!keyControl.wasPressedThisFrame)
+                    continue;
+
+                var bindingPath = $"<Keyboard>/{keyControl.name}";
+                if (BppHotkeyService.TrySetBindingPath(_actionId, bindingPath, out var errorMessage))
+                {
+                    EnterDefaultState();
+                }
+                else
+                {
+                    ShowWarning(errorMessage);
+                }
+
+                return;
+            }
+        }
+
+        var mouse = Mouse.current;
+        if (mouse == null)
+            return;
+
+        foreach (var buttonControl in mouse.allControls.OfType<ButtonControl>())
+        {
+            if (buttonControl.synthetic || !buttonControl.wasPressedThisFrame)
                 continue;
 
-            var bindingPath = $"<Keyboard>/{keyControl.name}";
-            if (BppHotkeyService.TrySetBindingPath(_actionId, bindingPath, out var errorMessage))
+            if (
+                BppHotkeyService.TrySetBindingPath(
+                    _actionId,
+                    $"<Mouse>/{buttonControl.name}",
+                    out var error
+                )
+            )
             {
                 EnterDefaultState();
             }
             else
             {
-                ShowWarning(errorMessage);
+                ShowWarning(error);
             }
 
             return;
@@ -104,6 +136,7 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
     private void EnterRebindState()
     {
         _isRebinding = true;
+        _rebindStartedFrame = Time.frameCount;
         SetObjectsActive(_displayObjects, false);
         SetObjectsActive(_editObjects, true);
         ShowWarning(
@@ -114,6 +147,7 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
     private void EnterDefaultState()
     {
         _isRebinding = false;
+        _rebindStartedFrame = -1;
         SetObjectsActive(_displayObjects, true);
         SetObjectsActive(_editObjects, false);
         UpdateTexts();

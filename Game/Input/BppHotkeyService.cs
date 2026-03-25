@@ -5,14 +5,28 @@ using System.Linq;
 using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 
 namespace BazaarPlusPlus.Game.Input;
 
 internal static class BppHotkeyService
 {
     private const string KeyboardPrefix = "<Keyboard>/";
+    private const string MousePrefix = "<Mouse>/";
     private const string CtrlAliasPath = "<Keyboard>/ctrl";
     private const string ShiftAliasPath = "<Keyboard>/shift";
+
+    private static readonly IReadOnlyDictionary<string, string> BindingDisplayAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [CtrlAliasPath] = "Ctrl",
+            [ShiftAliasPath] = "Shift",
+            [MousePrefix + "leftButton"] = "LMB",
+            [MousePrefix + "rightButton"] = "RMB",
+            [MousePrefix + "middleButton"] = "MMB",
+            [MousePrefix + "backButton"] = "BMB",
+            [MousePrefix + "forwardButton"] = "FMB",
+        };
 
     private static readonly IReadOnlyDictionary<BppHotkeyActionId, string> DefaultBindingPaths =
         new Dictionary<BppHotkeyActionId, string>
@@ -21,13 +35,17 @@ internal static class BppHotkeyService
             [BppHotkeyActionId.HoldUpgradePreview] = ShiftAliasPath,
         };
 
-    internal static bool IsHeld(BppHotkeyActionId actionId, Keyboard? keyboard = null)
+    internal static bool IsHeld(
+        BppHotkeyActionId actionId,
+        Keyboard? keyboard = null,
+        Mouse? mouse = null
+    )
     {
         keyboard ??= Keyboard.current;
-        if (keyboard == null)
-            return false;
+        mouse ??= Mouse.current;
 
-        return ExpandBindingPaths(GetBindingPath(actionId)).Any(path => IsPathHeld(path, keyboard));
+        return ExpandBindingPaths(GetBindingPath(actionId))
+            .Any(path => IsPathHeld(path, keyboard, mouse));
     }
 
     internal static string GetBindingPath(BppHotkeyActionId actionId)
@@ -45,15 +63,19 @@ internal static class BppHotkeyService
     internal static string GetBindingDisplay(string bindingPath)
     {
         var normalized = NormalizeBindingPath(bindingPath);
-        return normalized switch
-        {
-            CtrlAliasPath => "Ctrl",
-            ShiftAliasPath => "Shift",
-            _ => InputControlPath.ToHumanReadableString(
-                normalized,
-                InputControlPath.HumanReadableStringOptions.OmitDevice
-            ),
-        };
+        if (BindingDisplayAliases.TryGetValue(normalized, out var alias))
+            return alias;
+
+        var display = InputControlPath.ToHumanReadableString(
+            normalized,
+            InputControlPath.HumanReadableStringOptions.OmitDevice
+        );
+        if (string.IsNullOrWhiteSpace(display))
+            return normalized;
+
+        return normalized.StartsWith(MousePrefix, StringComparison.OrdinalIgnoreCase)
+            ? $"{display}"
+            : display;
     }
 
     internal static bool UsesDefault(BppHotkeyActionId actionId)
@@ -145,19 +167,38 @@ internal static class BppHotkeyService
         }
     }
 
-    private static bool IsPathHeld(string bindingPath, Keyboard keyboard)
+    private static bool IsPathHeld(string bindingPath, Keyboard? keyboard, Mouse? mouse)
     {
         var normalized = NormalizeBindingPath(bindingPath);
         if (string.IsNullOrWhiteSpace(normalized))
             return false;
 
         if (string.Equals(normalized, CtrlAliasPath, StringComparison.OrdinalIgnoreCase))
+        {
+            if (keyboard == null)
+                return false;
             return keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
+        }
 
         if (string.Equals(normalized, ShiftAliasPath, StringComparison.OrdinalIgnoreCase))
+        {
+            if (keyboard == null)
+                return false;
             return keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
+        }
+
+        if (normalized.StartsWith(MousePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryFindSupportedMouseButton(normalized, mouse, out var button))
+                return false;
+
+            return button.isPressed;
+        }
 
         if (!TryParseKey(normalized, out var key))
+            return false;
+
+        if (keyboard == null)
             return false;
 
         return keyboard[key].isPressed;
@@ -181,9 +222,71 @@ internal static class BppHotkeyService
             return string.Empty;
 
         var trimmed = bindingPath.Trim();
-        return trimmed.StartsWith(KeyboardPrefix, StringComparison.OrdinalIgnoreCase)
-            ? KeyboardPrefix + trimmed[KeyboardPrefix.Length..]
-            : string.Empty;
+        if (trimmed.StartsWith(KeyboardPrefix, StringComparison.OrdinalIgnoreCase))
+            return KeyboardPrefix + trimmed[KeyboardPrefix.Length..];
+
+        if (!trimmed.StartsWith(MousePrefix, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        if (!TryGetMouseButtonName(trimmed, out var buttonName))
+            return string.Empty;
+
+        var normalized = MousePrefix + buttonName;
+        if (IsExplicitlyUnsupportedMousePath(normalized))
+            return string.Empty;
+
+        if (
+            TryFindMouseControl(buttonName, Mouse.current, out var control)
+            && control is not ButtonControl
+        )
+        {
+            return string.Empty;
+        }
+
+        return normalized;
+    }
+
+    private static bool TryFindSupportedMouseButton(
+        string bindingPath,
+        Mouse? mouse,
+        out ButtonControl button
+    )
+    {
+        button = default!;
+        return TryGetMouseButtonName(bindingPath, out var buttonName)
+            && TryFindMouseControl(buttonName, mouse, out var control)
+            && control is ButtonControl candidate
+            && !candidate.synthetic
+            && (button = candidate) != null;
+    }
+
+    private static bool TryGetMouseButtonName(string bindingPath, out string buttonName)
+    {
+        buttonName = string.Empty;
+        if (!bindingPath.StartsWith(MousePrefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        buttonName = bindingPath[MousePrefix.Length..].Trim();
+        return !string.IsNullOrWhiteSpace(buttonName);
+    }
+
+    private static bool TryFindMouseControl(
+        string buttonName,
+        Mouse? mouse,
+        out InputControl? control
+    )
+    {
+        control = mouse?.allControls.FirstOrDefault(candidate =>
+            string.Equals(candidate.name, buttonName, StringComparison.OrdinalIgnoreCase)
+        );
+        return control != null;
+    }
+
+    private static bool IsExplicitlyUnsupportedMousePath(string bindingPath)
+    {
+        return bindingPath.Contains("scroll", StringComparison.OrdinalIgnoreCase)
+            || bindingPath.Contains("position", StringComparison.OrdinalIgnoreCase)
+            || bindingPath.Contains("delta", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetDefaultBindingPath(BppHotkeyActionId actionId)
