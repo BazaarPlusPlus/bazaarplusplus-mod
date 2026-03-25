@@ -20,6 +20,12 @@ From the currently inspected decompiled runtime and message types:
 
 So if the goal is to reconstruct the full run afterward, you need to record it yourself during gameplay by hooking runtime messages or state transitions.
 
+## Status
+
+This note predates the current `Game/RunLogging/` implementation. Keep it as background for why
+BazaarPlusPlus records live run history itself; the capture strategy below is no longer pending
+work.
+
 ## Decompiled Types Checked
 
 Primary files inspected:
@@ -231,9 +237,9 @@ So the practical answer is:
 
 - if you want a complete per-day, per-hour run log with concrete choices and encounter contents, you must record it yourself while the run is happening
 
-## Recommended Capture Strategy
+## Capture Strategy That Informed The Current Implementation
 
-If we want to build automatic run logging later, the most promising points to hook are:
+The run-logging implementation that landed later follows these same broad hook points:
 
 1. `NetMessageGameSim.Data.Run`
 2. `NetMessageGameSim.Data.CurrentState`

@@ -186,6 +186,8 @@ internal sealed partial class HistoryPanel
         if (_panelRoot == null)
             return;
 
+        var canReplaySelectedBattle = CanReplaySelectedBattle(out var replayUnavailableReason);
+
         if (_countChipText != null)
             _countChipText.text = $"{_runs.Count} Runs";
         if (_battleChipText != null)
@@ -216,7 +218,9 @@ internal sealed partial class HistoryPanel
             _footerSecondaryText.text =
                 SelectedBattle == null
                     ? "Select one battle to inspect it, then use Replay when you want to jump back into it."
-                    : $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | {SelectedBattle.SnapshotSummary}";
+                    : canReplaySelectedBattle
+                        ? $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | {SelectedBattle.SnapshotSummary}"
+                        : $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | Replay unavailable: {replayUnavailableReason}";
         }
 
         if (_previewStatusText != null && SelectedBattle == null)
@@ -251,7 +255,7 @@ internal sealed partial class HistoryPanel
             _replayButton,
             _replayButtonBackground,
             _replayButtonLabel,
-            SelectedBattle != null,
+            canReplaySelectedBattle,
             new Color(0.78f, 0.60f, 0.24f, 0.98f),
             new Color(0.92f, 0.72f, 0.30f, 1f),
             new Color(0.24f, 0.26f, 0.30f, 0.50f),

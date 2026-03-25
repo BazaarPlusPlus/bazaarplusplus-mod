@@ -16,7 +16,7 @@
 - 默认路径是 `<GameRoot>/BazaarPlusPlus/bazaarplusplus.db`
 - 代码级 schema version 目前固定为 `1`
 - 当前库里一共 5 张业务表：
-  - `runs
+  - `runs`
   - `run_events`
   - `run_checkpoints`
   - `run_status`
@@ -437,6 +437,7 @@ CREATE INDEX idx_pvp_battles_recorded_at_utc
 
 - `runs -> meta.json`
 - `run_events -> events.ndjson`
+- `run_events -> decision_chain.ndjson`（派生读模型，不是直接原样 dump）
 - `run_checkpoints -> checkpoint.json`
 - `run_status -> status.json`
 - `pvp_battles -> pvp_battles.ndjson`

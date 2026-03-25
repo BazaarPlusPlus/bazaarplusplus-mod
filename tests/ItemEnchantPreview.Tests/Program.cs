@@ -147,6 +147,14 @@ Assert(
         ),
     "BPP keybind label resolver should recognize zh-Hans as Simplified Chinese, directly or through the shared helper."
 );
+Assert(
+    keybindLabelResolverSource.Contains(
+        "Press a key or mouse button",
+        StringComparison.Ordinal
+    )
+        && keybindLabelResolverSource.Contains("按下一个按键或鼠标按钮", StringComparison.Ordinal),
+    "BPP keybind label resolver should tell users that rebinding accepts both keys and mouse buttons."
+);
 
 var keybindRowControllerSourcePath = Path.GetFullPath(
     Path.Combine(AppContext.BaseDirectory, "../../../../../Game/Input/BppKeyBindRowController.cs")

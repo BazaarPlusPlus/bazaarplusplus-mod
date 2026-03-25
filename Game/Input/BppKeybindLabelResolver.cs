@@ -35,12 +35,12 @@ internal static class BppKeybindLabelResolver
     {
         return ResolveLocalizedLabel(
             languageCode,
-            "Press a key",
-            "按下一个按键",
-            "Taste druecken",
-            "Pressione uma tecla",
-            "키를 누르세요",
-            "Premi un tasto"
+            "Press a key or mouse button",
+            "按下一个按键或鼠标按钮",
+            "Taste oder Maustaste druecken",
+            "Pressione uma tecla ou botao do mouse",
+            "키 또는 마우스 버튼을 누르세요",
+            "Premi un tasto o un pulsante del mouse"
         );
     }
 

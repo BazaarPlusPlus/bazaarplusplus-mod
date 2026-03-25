@@ -474,6 +474,33 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         return true;
     }
 
+    public bool CanReplaySavedBattle(string battleId, out string reason)
+    {
+        if (string.IsNullOrWhiteSpace(battleId))
+        {
+            reason = "Select a saved battle to replay.";
+            return false;
+        }
+
+        if (_controller == null)
+        {
+            reason = "Combat replay runtime is unavailable.";
+            return false;
+        }
+
+        if (!CanReplaySavedCombats(out reason))
+            return false;
+
+        if (!_controller.HasSavedReplay(battleId))
+        {
+            reason = "Replay payload for the selected battle is unavailable.";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
     public void ObserveMessage(INetMessage message)
     {
         if (_captureService == null || _persistenceQueue == null)
@@ -564,23 +591,25 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public bool ReplaySaved(string battleId)
     {
-        if (_controller == null)
-            return false;
-        if (!CanReplaySavedCombats(out var reason))
+        if (!CanReplaySavedBattle(battleId, out var reason))
         {
             BppLog.Warn("CombatReplayRuntime", $"Rejected saved replay request: {reason}");
             return false;
         }
 
-        var manifest = _controller.LoadBattle(battleId);
+        var controller = _controller;
+        if (controller == null)
+            return false;
+
+        var manifest = controller.LoadBattle(battleId);
         if (manifest == null)
             return false;
 
-        var payload = _controller.LoadPayload(manifest);
+        var payload = controller.LoadPayload(manifest);
         if (payload == null)
             return false;
 
-        var sequence = _controller.LoadReplay(payload);
+        var sequence = controller.LoadReplay(payload);
         InitializedReplayBoardUiControllers.Clear();
         _savedReplayPlaybackActive = true;
         _ = StartReplayAsync(manifest, sequence, battleId);

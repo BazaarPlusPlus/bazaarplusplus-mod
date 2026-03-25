@@ -432,6 +432,10 @@ var historyPanelPath = Path.GetFullPath(
     Path.Combine(AppContext.BaseDirectory, "../../../../../Game/HistoryPanel/HistoryPanel.cs")
 );
 var historyPanelSource = File.ReadAllText(historyPanelPath);
+var historyPanelCanvasPath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/HistoryPanel/HistoryPanel.Canvas.cs")
+);
+var historyPanelCanvasSource = File.ReadAllText(historyPanelCanvasPath);
 var historyPanelAwakeBody = ExtractMethodBody(historyPanelSource, "private void Awake()");
 Assert(
     !historyPanelAwakeBody.Contains("RefreshData();", StringComparison.Ordinal),
@@ -444,6 +448,26 @@ var historyPanelVisibilityBody = ExtractMethodBody(
 Assert(
     historyPanelVisibilityBody.Contains("RefreshData();", StringComparison.Ordinal),
     "HistoryPanel should still load data when the panel becomes visible."
+);
+Assert(
+    historyPanelSource.Contains(
+        "private bool CanReplaySelectedBattle(out string reason)",
+        StringComparison.Ordinal
+    ),
+    "HistoryPanel should centralize selected-battle replay availability checks."
+);
+var tryReplaySelectedBattleBody = ExtractMethodBody(
+    historyPanelSource,
+    "private void TryReplaySelectedBattle()"
+);
+Assert(
+    tryReplaySelectedBattleBody.Contains("CanReplaySelectedBattle(", StringComparison.Ordinal),
+    "HistoryPanel should reuse the shared replay availability helper before starting a replay."
+);
+Assert(
+    historyPanelCanvasSource.Contains("CanReplaySelectedBattle(", StringComparison.Ordinal)
+        && historyPanelCanvasSource.Contains("Replay unavailable:", StringComparison.Ordinal),
+    "HistoryPanel UI should disable replay and explain why when the selected battle cannot be replayed."
 );
 
 Console.WriteLine("RunLogging session checks passed.");

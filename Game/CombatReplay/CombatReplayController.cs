@@ -42,6 +42,15 @@ internal sealed class CombatReplayController
             .FirstOrDefault(manifest => _payloadStore.Exists(manifest.BattleId));
     }
 
+    public bool HasSavedReplay(string battleId)
+    {
+        if (string.IsNullOrWhiteSpace(battleId))
+            return false;
+
+        var manifest = _battleCatalog.TryLoad(battleId);
+        return manifest != null && _payloadStore.Exists(manifest.BattleId);
+    }
+
     public PvpBattleManifest? LoadBattle(string battleId)
     {
         var manifest = _battleCatalog.TryLoad(battleId);

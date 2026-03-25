@@ -1,289 +1,77 @@
 # Combat Status Bar
 
-## Goal
-
-Add a lightweight combat playback controller that stays visible in both standby and combat states and shows:
-
-- logical combat time
-- current processed frame count without exposing total frame count
-- current playback speed
-- step-based speed controls
-- a live pause toggle during combat
-
-This intentionally does not implement frame stepping, rewind, or a custom replay controller.
-
 ## Scope
+
+The current implementation adds a bottom-centered combat HUD that is attached from
+`Plugin.Awake()`. Runtime state is split between:
+
+- `CombatStatusBar`, which owns UI, persisted local state, and input handling
+- `CombatStatusBarModule`, which consumes combat events through `BppRuntimeHost.EventBus`
 
 Implemented behavior:
 
-- show the same bottom-centered controller in standby and combat
-- display standby content outside combat and active content during combat
-- display logical combat time based on processed combat frames
-- display frame progress as processed count only
-- allow playback speed changes through discrete step buttons only
-- allow pause toggling during active combat playback
-- keep the original game combat simulation loop intact
+- render only while `BppRuntimeHost.RunContext.IsInGameRun` and the feature is enabled
+- show logical combat time derived from processed combat frames
+- show processed frame count during combat and a standby / last-combat summary outside combat
+- allow only discrete speed steps: `0.25x`, `0.33x`, `0.50x`, `1.00x`
+- allow pause toggling through `GameServiceManager.PauseOrUnpauseGame(...)`
+- persist enabled, visible, and default-speed config
 
 Explicitly out of scope:
 
-- rewind one frame
-- fast-forward one frame
-- exposing or patching the local `watch` variable inside `CombatSimHandler.Simulate`
-- replacing the full combat replay pipeline
+- frame stepping
+- rewind
+- custom replay controls
+- arbitrary or faster-than-native speed overrides
 
-## Files
+## Key Files
 
 - [Plugin.cs](../Plugin.cs)
+- [Core/Runtime/BppRuntimeHost.cs](../Core/Runtime/BppRuntimeHost.cs)
+- [Core/Config/BppConfig.cs](../Core/Config/BppConfig.cs)
 - [Game/CombatStatusBar/CombatStatusBar.cs](../Game/CombatStatusBar/CombatStatusBar.cs)
 - [Game/CombatStatusBar/CombatStatusBar.State.cs](../Game/CombatStatusBar/CombatStatusBar.State.cs)
 - [Game/CombatStatusBar/CombatStatusBar.Config.cs](../Game/CombatStatusBar/CombatStatusBar.Config.cs)
-- [Models/ModState.cs](../Models/ModState.cs)
+- [Game/CombatStatusBar/CombatStatusBarModule.cs](../Game/CombatStatusBar/CombatStatusBarModule.cs)
+- [Game/CombatStatusBar/CombatStatusBar.SettingsMenuBridge.cs](../Game/CombatStatusBar/CombatStatusBar.SettingsMenuBridge.cs)
+- [Game/Input/KeyBindings.cs](../Game/Input/KeyBindings.cs)
 - [Patches/Combat/CombatSimulationPatches.cs](../Patches/Combat/CombatSimulationPatches.cs)
 - [Patches/Combat/CombatSpeedPatch.cs](../Patches/Combat/CombatSpeedPatch.cs)
+- [Patches/Combat/CombatStatusBarSettingsPatch.cs](../Patches/Combat/CombatStatusBarSettingsPatch.cs)
 
-## Runtime Model
+## Runtime Flow
 
-### UI component
+1. `CombatSimPatch` publishes `CombatSimObserved` at the start of
+   `CombatSimHandler.Simulate(...)`.
+2. `CombatStatusBarModule` reads the incoming `NetMessageCombatSim`, stores
+   `TotalCombatFrames`, and updates `BppRuntimeHost.RunContext.LastVictoryCondition`.
+3. `CombatFrameAdvancePatch` publishes `CombatFrameAdvanced` once per processed combat frame.
+4. `CombatStatusBarModule` calls `CombatStatusBar.AdvanceCombatFrame()` to keep UI state in sync.
+5. `CombatStatusBar` listens to `Events.CombatStarted` / `Events.CombatEnded`, builds the runtime
+   canvas, and refreshes the HUD every `Update()`.
 
-`CombatStatusBar` is a `MonoBehaviour` added from `Plugin.Awake()`.
+The same processed-frame counter is also used by the debug combat log runtime to keep row
+visibility aligned with playback.
 
-Responsibilities:
+## Logical Time
 
-- subscribe to combat start/end events
-- show and hide the bottom controller
-- build and refresh a runtime `Canvas` HUD
-- render standby and active content states
-- render current logical time, frame progress, and speed
-- expose combat playback state to Harmony patches
-- allow the user to move between predefined speed steps and pause combat playback
+Logical combat time is defined as:
 
-### Shared runtime state
+`ProcessedCombatFrames * 50ms`
 
-`CombatStatusBar` stores the combat playback state needed by both the overlay and Harmony patches:
+That keeps the display tied to simulation progress instead of wall-clock playback time. Speed
+changes therefore do not distort the time label, and the counter remains stable across pause and
+final-blow slowdown.
 
-- `CombatPlaybackActive`
-- `CombatSpeedMultiplier`
-- `CombatSpeedSteps`
-- `ProcessedCombatFrames`
-- `TotalCombatFrames`
+## Input And Config
 
-It also exposes helper methods:
+- `KeyBindings.Toggle.CombatStatusBar` (`F6`) toggles the overlay visibility.
+- Native settings integration is provided through the combat-status-bar settings bridge and patch.
+- Config is read from `BppConfig`:
+  - `EnableCombatStatusBarConfig`
+  - `VisibleCombatStatusBarConfig`
+  - `CombatStatusBarSpeedMultiplierConfig`
 
-- `BeginCombatPlayback()`
-- `EndCombatPlayback()`
-- `SetCombatFrameTotal(int totalFrames)`
-- `AdvanceCombatFrame()`
-- `SetCombatSpeed(float speed)`
-- `GetCombatLogicalElapsed()`
-
-Shared consumers:
-
-- `CombatStatusBar` uses this state for the bottom playback controller
-- `CombatLogPanel` uses the same processed-frame count to follow combat rows without deriving position from wall-clock time
-
-## Event Flow
-
-### Combat start
-
-Source:
-
-- original game code triggers `Events.CombatStarted` from `CombatSimHandler.Simulate()`
-
-Mod flow:
-
-1. `CombatStatusBar` listens to `Events.CombatStarted`
-2. `CombatStatusBar.OnCombatStarted()` calls `CombatStatusBar.BeginCombatPlayback()`
-3. the controller transitions from standby visuals to active visuals
-
-### Combat end
-
-Source:
-
-- original game code triggers `Events.CombatEnded` near the end of `CombatSimHandler.Simulate()`
-
-Mod flow:
-
-1. `CombatStatusBar` listens to `Events.CombatEnded`
-2. `CombatStatusBar.OnCombatEnded()` calls `CombatStatusBar.EndCombatPlayback()`
-3. the controller transitions back to standby visuals
-
-## Logical Time Design
-
-### Why not use `Stopwatch`
-
-The original `CombatSimHandler.Simulate()` method uses a local `Stopwatch watch` to control playback pacing and to log the final elapsed playback time.
-
-That value is not suitable for the status bar because:
-
-- it is a local variable, not a stable public state source
-- it measures actual playback time, not logical combat time
-- playback time changes when speed changes
-
-### What logical time means here
-
-The combat simulation loop advances one simulation frame at a time.
-
-From the decompiled runtime:
-
-- each frame is scheduled at a base interval of `50ms`
-- that means the simulation runs at a base rate of `20 frames/second`
-
-The controller therefore defines logical combat time as:
-
-`logical time = processed frame count * 50ms`
-
-This means:
-
-- changing playback speed does not change the logical time shown
-- the displayed time reflects progress on the combat simulation timeline
-- outside combat, the controller shows `-:--:--`
-- the debug-only combat log panel can stay synchronized under speed changes, pause, and final-blow slowdown because it follows the same processed-frame model
-
-### How processed frames are counted
-
-The implementation deliberately avoids patching the local loop index inside `CombatSimHandler.Simulate()`, because that would be more fragile across game updates.
-
-Instead:
-
-1. total frame count is captured at the start of `CombatSimHandler.Simulate(NetMessageCombatSim, CancellationTokenSource)`
-2. processed frame count is advanced by a postfix patch on `FinalBlowSlowDownController.Process(int framesLeft)`
-
-This works because `FinalBlowSlowDownController.Process(...)` is invoked once per simulation frame inside the main combat loop.
-
-Default UI behavior:
-
-- during combat, show processed frame count only
-- do not show total frame count in the default UI, to avoid telegraphing combat length
-- outside combat, show `Standby`
-
-The same processed-frame model now also drives the debug-only combat log panel:
-
-- the panel is runtime-only and does not persist combat history
-- future rows are hidden during first play
-- future rows are visible but dimmed during explicit replay playback
-- `F7` toggles the side panel independently from the `F2` debug panel toggle
-
-## Speed Control Design
-
-### Step-based speeds
-
-The controller allows only discrete speed steps.
-
-Current step list is stored in `CombatStatusBar.CombatSpeedSteps`.
-
-At the moment the list is:
-
-- `0.25x`
-- `0.33x`
-- `0.50x`
-- `1.00x`
-
-### Why step-based
-
-Discrete speeds keep the behavior predictable:
-
-- one compact multiplier control instead of a row of buttons
-- fewer edge cases
-- no arbitrary user-entered values
-- easier balancing against the game’s own final-blow slowdown logic
-
-### How the speed override works
-
-The mod patches `CombatSimHandler.SetSpeed(float speed)` with a Harmony prefix.
-
-When combat playback is active:
-
-- the incoming speed argument is replaced with `CombatStatusBar.CombatSpeedMultiplier`
-
-This means the game still uses its normal simulation loop, but speed selection is overridden by the mod’s chosen preset.
-
-## Config
-
-Current config entries:
-
-- `Combat.EnableCombatStatusBar`
-- `Combat.DefaultSpeedMultiplier`
-
-Behavior:
-
-- the default speed is loaded at startup
-- invalid configured default speeds are reset to `1.00`
-- selecting a step in the UI updates the active speed
-- the selected speed is also written back to the config entry
-- native first-fight fast-forward keeps its original game-selected speed
-
-## UI Behavior
-
-Rendering:
-
-- runtime uGUI `Canvas`
-- `Screen Space - Overlay`
-- scaled with `CanvasScaler` against a `1920x1080` reference resolution
-
-Location:
-
-- bottom center of the screen
-
-Layout:
-
-- four fixed segments: `Time | Frame | Multiplier | Pause`
-
-State content:
-
-- standby: `Time=-:--:--`, `Frame=Standby`, `Multiplier=current preset`, `Pause=disabled`
-- combat: `Time=logical elapsed`, `Frame=processed only`, `Multiplier=current speed`, `Pause=enabled`
-- paused combat: `Pause` segment switches to a paused visual state and resume glyph
-
-Visual transition:
-
-- standby uses a darker, lower-contrast palette
-- combat uses a brighter warm palette
-- the controller blends between those palettes when combat starts or ends
-- the `CanvasScaler` keeps the bar at a more stable relative size across resolutions
-
-Controls:
-
-- left/right multiplier step buttons
-- pause button is disabled outside combat and active during combat
-- `F6` toggles the visibility of the bar
-
-## Tradeoffs
-
-### Chosen tradeoff
-
-Prefer stable hooks over exact access to internal loop variables.
-
-Benefits:
-
-- less dependent on IL layout
-- lower chance of breaking on minor upstream refactors
-- easier to reason about and maintain
-
-Cost:
-
-- processed frame counting depends on `FinalBlowSlowDownController.Process(...)` continuing to be called once per frame
-
-### Not chosen
-
-Patch the local frame index `i` inside `CombatSimHandler.Simulate()`.
-
-Reason:
-
-- higher maintenance cost
-- more likely to break after upstream changes
-- would require a more invasive patch strategy
-
-## Known Limitations
-
-- frame counting assumes `FinalBlowSlowDownController.Process(...)` remains one call per processed combat frame
-- the controller tracks combat playback time only, not recap browsing or board transition time
-- this is not a full replay controller and does not support frame stepping or rewind
-
-## Future Extensions
-
-Reasonable next steps if needed:
-
-- show both logical time and real playback time side by side
-- add a compact mode for the status bar
-- add a small marker when the game enters final-blow slowdown
-- persist the last selected preset more explicitly if config write-back is not sufficient
+Configured speed is normalized to the supported step list. `CombatSpeedPatch` only overrides
+requested speeds up to `1.00x`, which preserves native fast-forward / slowdown paths that the game
+applies on its own.

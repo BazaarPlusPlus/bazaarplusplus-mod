@@ -599,6 +599,10 @@ Assert(
     "Combat replay runtime should block saved replays only while local gameplay is active."
 );
 Assert(
+    runtimeSource.Contains("CanReplaySavedBattle", StringComparison.Ordinal),
+    "Combat replay runtime should expose selected-battle replay availability checks for non-debug UI surfaces."
+);
+Assert(
     runtimeSource.Contains("SceneID.GameScene", StringComparison.Ordinal)
         && runtimeSource.Contains("SceneID.GameplayLoading", StringComparison.Ordinal),
     "Combat replay runtime should know how to load gameplay scenes from the lobby."
@@ -729,6 +733,27 @@ Assert(
 Assert(
     debugPanelSource.Contains("CanReplaySavedCombats", StringComparison.Ordinal),
     "Debug panel should respect replay availability checks instead of always offering replay actions."
+);
+var replayReferenceSource = File.ReadAllText(
+    Path.GetFullPath(
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../../docs/reference/combat-replay-recording.md"
+        )
+    )
+);
+Assert(
+    replayReferenceSource.Contains("HistoryPanel", StringComparison.Ordinal)
+        && replayReferenceSource.Contains("DebugPanel", StringComparison.Ordinal),
+    "Combat replay reference should document both the HistoryPanel and DebugPanel replay entry points."
+);
+var readmeSource = File.ReadAllText(
+    Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../README.md"))
+);
+Assert(
+    readmeSource.Contains("HistoryPanel", StringComparison.Ordinal)
+        && readmeSource.Contains("DebugPanel", StringComparison.Ordinal),
+    "README should mention both the HistoryPanel and DebugPanel replay entry points for saved replays."
 );
 
 var tempRoot = Path.Combine(

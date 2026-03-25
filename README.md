@@ -1,46 +1,44 @@
 # BazaarPlusPlus
 
-BazaarPlusPlus 是一个面向 **《The Bazaar》** 的 **BepInEx 增强模组**，专注于提供更清晰、更顺手的局内信息展示，提升游戏过程中信息获取与决策的效率。
+BazaarPlusPlus 是一个面向 **《The Bazaar》** 的 **BepInEx 增强模组**。当前仓库里的实现主要围绕战斗 HUD、怪物预览、tooltip 增强、run 记录，以及若干调试 / 设置集成展开。
 
 ## 功能
 
 **战斗状态条**
 
-提供更直观的战斗播放状态与节奏信息，帮助玩家更清楚地理解战斗节奏。
+底部 HUD，显示逻辑战斗时间、已处理帧数，并提供暂停与离散倍速控制。功能通过游戏内 Gameplay Settings 开关控制。
 
-**怪物预览优化**
+**怪物预览**
 
-在怪物预览界面支持右键查看敌方卡牌与技能信息，补充游戏内默认未展示的内容。
+右键锁定怪物 / 遭遇牌时显示敌方物品与技能面板。数据优先来自 `MonsterDatabase`，缺失时回退到 `EncounterTracker` 的运行时缓存。
 
-**附魔与词条预览增强**
+**附魔 / 升级预览**
 
-扩展物品附魔相关的可见信息，使部分原本隐藏或不完整的词条更加直观。
+在原生主 tooltip 上追加附魔预览，或在按住升级预览热键时复用游戏原生 upgrade-preview 路径。两种 tooltip 动作都支持在设置菜单里改绑键位，支持键盘和鼠标按钮。
 
-**战斗录像保存与回放（Debug）**
+**Run Logging 与历史面板**
 
-在调试面板中保存并重放最近捕获到的战斗。录像基于原始 `GameSim -> CombatSim -> GameSim` 三件套消息保存，重启游戏后仍可从 Debug Panel 的 `Replays` 区域重新播放。已保存录像的 bootstrap 不依赖正常 run start，只允许在没有 active run 的 lobby 中启动，并通过本地日志与代码路径检查进行验证。
+活跃 run 会持续写入 SQLite；游戏内可通过 `HistoryPanel` 浏览最近 runs、关联的 PVP battles，以及保存的战斗快照预览；离线可用 `scripts/export_run_log.py` 导出。
 
-## 安装
+**战斗录像保存 / 调试回放**
 
-使用发布包内附带的 **安装器（Installer）**。
+`CombatReplayRuntime` 会持续持久化 PVP replay payload；常规 UI 里的 `HistoryPanel` 会在选中 battle 且 payload 仍存在时启用 `Replay`，Debug build 额外挂载 `DebugPanel` 和独立的 `CombatLog` 叠加层，并提供最近已保存 replay 的调试入口。已保存的 replay 可以在 lobby 中重新 bootstrap 到原生 replay 流程。
 
-当前仅发布了 **Windows 版本**，macOS 仍在适配中。
+**匿名模式**
 
-对于本地开发构建，依赖 SQLite 的功能当前只支持 **macOS arm64 / Apple Silicon**；**Intel Mac (macOS x64)** 不在支持范围内。
+可将本地玩家名在 `HeroBannerController` 上替换为 `Anonymous`，并通过游戏内 Gameplay Settings 开关控制。
 
-### Windows 安装步骤
+## 构建与安装
 
-1. 下载最新发布包
-2. 运行安装器并选择你的 **The Bazaar 游戏目录**
-3. 安装完成后重新启动 Steam 和游戏
-4. 首次进入游戏时，BazaarPlusPlus 会自动生成配置文件。
-5. 如果需要倍速功能，请在游戏内选项菜单中启用 Combat Status Bar，然后重启游戏。
+发布包使用配套安装器；本仓库只描述代码里可见的构建行为，不声明最新发布范围。
+
+- Debug 构建会在检测到常见 Windows Steam 安装目录或 macOS 默认 Steam 目录时，把插件复制到游戏的 `BepInEx/plugins`。
+- Release 构建在相邻 `../bazaarplusplus-installer` 仓库存在时，会把 DLL、`.version` 文件和托管的 SQLite 运行时程序集复制到 installer 资源目录。
+- 项目目标框架是 `netstandard2.1`，依赖 Bazaar 游戏程序集、`Microsoft.Data.Sqlite`、`Newtonsoft.Json` 和 BepInEx 5。
 
 ## 开发者
 
-项目基于 **C#、.NET 和 BepInEx 5**。
-
-项目相关代码仍在整理中，后续会逐步补充源码，架构说明与开发指南。
+当前代码入口和活跃模块主要在 `Plugin.cs`、`Core/`、`Game/`、`Patches/`、`Data/`、`scripts/`、`tests/`。文档入口见 `docs/README.md`。
 
 ## 致谢
 
@@ -67,47 +65,45 @@ BazaarPlusPlus 基于以下项目运行：
 
 # BazaarPlusPlus
 
-BazaarPlusPlus is a **BepInEx enhancement mod for *The Bazaar*** focused on providing clearer, more convenient in-run information displays, improving the efficiency of information gathering and decision-making during gameplay.
+BazaarPlusPlus is a **BepInEx enhancement mod for *The Bazaar***. The current repository is centered on combat HUDs, monster preview overlays, tooltip enhancements, run logging, and a small set of debug / settings integrations.
 
 ## Features
 
 **Combat Status Bar**
 
-Provides more intuitive combat playback status and pacing information, helping players understand the flow of battle more clearly.
+Bottom HUD with logical combat time, processed-frame count, pause, and discrete speed control. The feature is exposed through the in-game gameplay settings.
 
-**Monster Preview Improvements**
+**Monster Preview**
 
-Supports right-clicking in the monster preview interface to inspect enemy cards and skill information, supplementing content not shown by default in the game.
+Right-clicking a monster / encounter card locks an overlay that shows the enemy item and skill board. Data comes from `MonsterDatabase` first, then falls back to live `EncounterTracker` cache when static coverage is missing.
 
-**Enchant & Modifier Preview Enhancements**
+**Enchant / Upgrade Preview**
 
-Expands the visible information related to item enchants, making some originally hidden or incomplete modifiers more intuitive.
+Adds enchant preview lines to the native primary tooltip, or reuses the game's native upgrade-preview path while the upgrade modifier is held. Both tooltip actions are rebindable from the settings menu and support keyboard plus mouse buttons.
 
-**Saved Combat Replay (Debug)**
+**Run Logging And History Panel**
 
-Captures and persists raw `GameSim -> CombatSim -> GameSim` combat triplets, then exposes them in the debug panel so a saved fight can be replayed after restarting the game. Saved replay bootstrap no longer depends on a normal run start, remains restricted to the lobby with no active run, and is verified through local logs plus code-path review.
+Active runs are captured into SQLite; the in-game `HistoryPanel` browses recent runs, linked PVP battles, and stored battle snapshot previews; `scripts/export_run_log.py` handles offline export.
 
-## Installation
+**Saved Replay / Debug Playback**
 
-Use the **installer included in the release package**.
+`CombatReplayRuntime` continuously persists PVP replay payloads; the normal `HistoryPanel` enables `Replay` when the selected battle still has a saved payload, while debug builds additionally mount the `DebugPanel` and a standalone `CombatLog` overlay for recent replay playback and inspection. Saved replays can be bootstrapped from the lobby back into the native replay pipeline.
 
-Currently, only the **Windows version** has been released, while macOS support is still being adapted.
+**Anonymous Mode**
 
-For local development builds, SQLite-backed features currently support only **macOS arm64 / Apple Silicon**. **Intel Mac (macOS x64)** is out of scope.
+Optionally replaces the local player's hero-banner name with `Anonymous`, with an in-game gameplay setting toggle.
 
-### Windows Installation Steps
+## Build And Install
 
-1. Download the latest release package
-2. Run the installer and select your **The Bazaar game directory**
-3. Restart Steam and the game after installation
-4. BazaarPlusPlus will automatically generate its configuration file the first time you enter the game.
-5. If you need the speed-up feature, enable Combat Status Bar from the in-game options menu, then restart the game.
+Release packages are installed through the companion installer; this repository only documents build behavior that is visible in source.
+
+- Debug builds auto-copy the plugin into `BepInEx/plugins` when a common Windows Steam install or the default macOS Steam install path is detected.
+- Release builds copy the DLL, `.version` file, and managed SQLite runtime assemblies into the adjacent `../bazaarplusplus-installer` resources when that repository exists.
+- The project targets `netstandard2.1` and depends on Bazaar game assemblies, `Microsoft.Data.Sqlite`, `Newtonsoft.Json`, and BepInEx 5.
 
 ## For Developers
 
-The project is built using **C#, .NET, and BepInEx 5**.
-
-The project code is still being organized, and the source code, architecture notes, and development guide will be added gradually.
+Current entry points and active modules live under `Plugin.cs`, `Core/`, `Game/`, `Patches/`, `Data/`, `scripts/`, and `tests/`. The doc index is `docs/README.md`.
 
 ## Credits
 

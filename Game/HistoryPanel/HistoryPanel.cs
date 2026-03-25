@@ -378,11 +378,37 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         public HistoryBattlePreviewData? PreviewData { get; }
     }
 
+    private bool CanReplaySelectedBattle(out string reason)
+    {
+        var battle = SelectedBattle;
+        if (battle == null)
+        {
+            reason = "Select a battle to replay.";
+            return false;
+        }
+
+        var runtime = CombatReplayRuntime.Instance;
+        if (runtime == null)
+        {
+            reason = "Combat replay runtime is unavailable.";
+            return false;
+        }
+
+        return runtime.CanReplaySavedBattle(battle.BattleId, out reason);
+    }
+
     private void TryReplaySelectedBattle()
     {
         var battle = SelectedBattle;
         if (battle == null)
             return;
+
+        if (!CanReplaySelectedBattle(out var reason))
+        {
+            _statusMessage = reason;
+            RefreshUi();
+            return;
+        }
 
         var runtime = CombatReplayRuntime.Instance;
         if (runtime == null)

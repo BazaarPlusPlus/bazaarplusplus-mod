@@ -3,10 +3,12 @@
 ## Current Behavior
 
 - Normal hover shows the native primary tooltip.
-- `Ctrl + hover` appends Bazaar++ enchant preview text to the passive block.
-- `Shift + hover` refreshes the native primary tooltip into upgrade preview mode.
-- While hovering, pressing or releasing `Ctrl` or `Shift` refreshes the tooltip immediately.
-- Priority is `Shift > Ctrl`.
+- Enchant preview text is appended when `EnchantPreviewAlwaysShow` is enabled or the configured
+  enchant-preview hotkey is held. The default binding is `Ctrl`.
+- Upgrade preview refreshes the native primary tooltip into upgrade preview mode while the
+  configured upgrade-preview hotkey is held. The default binding is `Shift`.
+- While hovering, pressing or releasing either modifier hotkey refreshes the tooltip immediately.
+- Priority is `upgrade > enchant`.
 - Upgrade preview is restricted to `ItemCard` only.
 
 ## Why Upgrade Tooltip Works
@@ -15,13 +17,14 @@ Bazaar++ does not build a separate upgrade tooltip UI.
 It reuses the game's native upgrade-preview state on the hovered card:
 
 1. normal hover shows the main card tooltip
-2. Bazaar++ detects `Shift`
+2. Bazaar++ detects the configured upgrade-preview hotkey
 3. Bazaar++ waits for the native primary tooltip controller to exist
 4. Bazaar++ hides the current primary tooltip
 5. Bazaar++ calls `cardController.EnterUpgradePreview()`
 6. Bazaar++ rebuilds `CardTooltipData` and shows the native primary tooltip again
 
-Once the card is in upgrade preview mode, the game's own tooltip rendering starts showing next-tier values through the normal primary tooltip.
+Once the card is in upgrade preview mode, the game's own tooltip rendering starts showing next-tier
+values through the normal primary tooltip.
 
 ## Native Game Path
 
@@ -40,7 +43,23 @@ Important native behavior:
 
 ## Bazaar++ Hook Points
 
-### Shift upgrade preview
+### Hotkey resolution
+
+Files:
+
+- `Game/Input/BppHotkeyActionId.cs`
+- `Game/Input/BppHotkeyService.cs`
+- `Game/Input/BppKeyBindRowController.cs`
+- `Patches/Settings/BppKeybindSettingsPatch.cs`
+
+Behavior:
+
+- `BppHotkeyService` resolves keyboard and mouse bindings from BazaarPlusPlus config
+- the default aliases remain `Ctrl` and `Shift`
+- `BppKeybindSettingsPatch` injects native-settings rows so the user can rebind the two tooltip
+  actions without editing config manually
+
+### Upgrade preview refresh
 
 File:
 
@@ -50,7 +69,7 @@ Behavior:
 
 - patches `CardController.ShowTooltips()`
 - only continues when:
-  - `Shift` is pressed
+  - the upgrade-preview hotkey is held
   - the card is an `ItemCard`
   - the card can upgrade
   - tooltip data is `CardTooltipData`
@@ -65,7 +84,7 @@ Instead it waits briefly for the native primary tooltip controller to exist, the
 
 That wait is necessary because the native primary tooltip is created asynchronously.
 
-### Ctrl enchant preview
+### Enchant preview append
 
 File:
 
@@ -76,14 +95,14 @@ Behavior:
 - patches `CardTooltipData.GetPassiveTooltipBlock()`
 - appends Bazaar++ enchant preview lines to the passive tooltip text
 
-### Shift suppresses enchant preview
+### Upgrade preview suppresses enchant preview
 
 Also in:
 
 - `Patches/Tooltips/ItemEnchantPreviewPatch.cs`
 
-If `Shift` is pressed, the Bazaar++ enchant-text append path returns early.
-This prevents mixed output where upgrade preview and enchant preview are shown together.
+If the upgrade-preview hotkey is held, the Bazaar++ enchant append path returns early. This
+prevents mixed output where upgrade preview and enchant preview are shown together.
 
 ## Runtime Refresh
 
@@ -93,12 +112,13 @@ File:
 
 Behavior:
 
-- watches `Ctrl` and `Shift`
+- watches the current resolved tooltip modifier mode
 - when modifier state changes during hover:
   - finds the currently hovered `ItemCard`
   - hides the current card tooltip
   - shows the native primary tooltip again
-  - if `Shift` is pressed and the item can upgrade, lets the patch refresh the primary tooltip into upgrade preview mode
+  - if the upgrade-preview hotkey is held and the item can upgrade, lets the patch refresh the
+    primary tooltip into upgrade preview mode
 
 This is what makes modifier changes feel live while already hovering.
 
@@ -115,8 +135,11 @@ This excludes:
 
 ## Bazaar++ Files
 
-- `Game/Input/KeyBindings.cs`
+- `Game/Input/BppHotkeyActionId.cs`
+- `Game/Input/BppHotkeyService.cs`
+- `Game/Input/BppKeyBindRowController.cs`
 - `Game/Tooltips/TooltipModifierRefreshController.cs`
+- `Patches/Settings/BppKeybindSettingsPatch.cs`
 - `Patches/Tooltips/UpgradePreviewTooltipPatch.cs`
 - `Patches/Tooltips/ItemEnchantPreviewPatch.cs`
 - `Plugin.cs`
