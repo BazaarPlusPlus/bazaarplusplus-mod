@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.Game.CombatStatusBar;
 internal sealed partial class CombatStatusBar
 {
     private static readonly float[] SpeedSteps = { 0.25f, 0.33f, 0.5f, 1f };
-    private static readonly float[] SupportedSpeedValues = { 0.25f, 0.33f, 0.5f, 1f, 1.57f };
+    private static readonly float[] SupportedSpeedValues = { 0.25f, 0.33f, 0.5f, 1f };
 
     internal static bool IsOverlayVisible { get; private set; } = true;
     internal static bool IsCombatPlaybackActive { get; private set; }
@@ -66,6 +66,9 @@ internal sealed partial class CombatStatusBar
 
     internal static float SetCombatSpeed(float speed)
     {
+        if (speed > 1f + 0.0001f)
+            return CombatSpeedMultiplier;
+
         if (!IsSupportedSpeedValue(speed))
             return CombatSpeedMultiplier;
 
@@ -112,6 +115,9 @@ internal sealed partial class CombatStatusBar
 
     internal static float NormalizeConfiguredDefaultSpeed(float configuredSpeed)
     {
+        if (configuredSpeed > 1f + 0.0001f)
+            return 1f;
+
         return IsSupportedSpeedValue(configuredSpeed) ? configuredSpeed : 1f;
     }
 

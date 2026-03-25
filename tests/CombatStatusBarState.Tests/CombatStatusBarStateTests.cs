@@ -115,11 +115,11 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void NormalizeConfiguredDefaultSpeed_AcceptsConfigOnlySpecialSpeed()
+    public void NormalizeConfiguredDefaultSpeed_ClampsLegacyConfiguredSpeedAboveOneToOne()
     {
         var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(1.57f);
 
-        Assert.Equal(1.57f, result);
+        Assert.Equal(1f, result);
     }
 
     [Fact]
@@ -137,13 +137,14 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void ConfigOnlySpecialSpeed_DisablesUiStepControls()
+    public void SetCombatSpeed_RejectsUnsupportedValueAboveOne()
     {
-        CombatStatusBar.SetCombatSpeed(1.57f);
+        CombatStatusBar.SetCombatSpeed(0.5f);
 
-        Assert.False(CombatStatusBar.CanStepCombatSpeed(-1));
-        Assert.False(CombatStatusBar.CanStepCombatSpeed(1));
-        Assert.Equal(1.57f, CombatStatusBar.StepCombatSpeed(-1));
+        var result = CombatStatusBar.SetCombatSpeed(1.57f);
+
+        Assert.Equal(0.5f, result);
+        Assert.Equal("0.50x", CombatStatusBar.FormatCombatSpeedLabel());
     }
 
     [Fact]
