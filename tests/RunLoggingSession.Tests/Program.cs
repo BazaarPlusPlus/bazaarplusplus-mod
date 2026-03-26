@@ -416,8 +416,14 @@ Assert(
         "|| !BppRuntimeHost.RunContext.IsInGameRun",
         StringComparison.Ordinal
     )
-        && pvpBattleRecordedBody.Contains("_sessionManager.HasActiveSession", StringComparison.Ordinal),
-    "RunLoggingModule should still accept post-persist PVP replay events while a deferred active session remains open."
+        && pvpBattleRecordedBody.Contains("TryResolveReplayTargetSession", StringComparison.Ordinal),
+    "RunLoggingModule should route post-persist PVP replay events through a shared session ownership check."
+);
+Assert(
+    runLoggingModuleSource.Contains("private bool TryResolveReplayTargetSession", StringComparison.Ordinal)
+        && runLoggingModuleSource.Contains("manifest.RunId", StringComparison.Ordinal)
+        && runLoggingModuleSource.Contains("ActiveSession", StringComparison.Ordinal),
+    "RunLoggingModule should verify that a persisted replay still belongs to the active or deferred session before appending it."
 );
 
 var historyBridgePath = Path.GetFullPath(

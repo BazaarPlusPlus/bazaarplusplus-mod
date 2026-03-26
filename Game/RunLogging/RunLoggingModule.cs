@@ -197,12 +197,7 @@ internal sealed class RunLoggingModule
                 return;
             }
 
-            if (inRun)
-            {
-                if (_ensureActiveRunFromGame() == null)
-                    return;
-            }
-            else if (!_sessionManager.HasActiveSession)
+            if (!TryResolveReplayTargetSession(manifest, inRun))
             {
                 return;
             }
@@ -226,6 +221,54 @@ internal sealed class RunLoggingModule
         {
             BppLog.Error("RunLoggingModule", $"PVP battle capture failed: {ex}");
         }
+    }
+
+    private bool TryResolveReplayTargetSession(PvpBattleManifest manifest, bool inRun)
+    {
+        if (inRun)
+        {
+            var session = _ensureActiveRunFromGame();
+            if (session == null)
+                return false;
+
+            if (
+                !string.IsNullOrWhiteSpace(manifest.RunId)
+                && !string.Equals(session.RunId, manifest.RunId, StringComparison.Ordinal)
+            )
+            {
+                BppLog.Warn(
+                    "RunLoggingModule",
+                    $"Skipping replay event for run {manifest.RunId} because active in-run session is {session.RunId}."
+                );
+                return false;
+            }
+
+            return true;
+        }
+
+        var deferredSession = _sessionManager.ActiveSession;
+        if (deferredSession == null)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(manifest.RunId))
+        {
+            BppLog.Warn(
+                "RunLoggingModule",
+                $"Skipping deferred replay event for battle {manifest.BattleId} because manifest run id is unavailable."
+            );
+            return false;
+        }
+
+        if (!string.Equals(deferredSession.RunId, manifest.RunId, StringComparison.Ordinal))
+        {
+            BppLog.Warn(
+                "RunLoggingModule",
+                $"Skipping deferred replay event for run {manifest.RunId} because active deferred session is {deferredSession.RunId}."
+            );
+            return false;
+        }
+
+        return true;
     }
 
     private void OnCardSelected()

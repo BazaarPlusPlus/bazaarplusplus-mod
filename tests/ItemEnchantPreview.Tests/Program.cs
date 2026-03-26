@@ -170,7 +170,8 @@ Assert(
 );
 Assert(
     keybindRowControllerSource.Contains("WithControlsExcluding(\"<Mouse>/scroll\")", StringComparison.Ordinal)
-        && keybindRowControllerSource.Contains("WithCancelingThrough(\"<Keyboard>/escape\")", StringComparison.Ordinal),
+        && keybindRowControllerSource.Contains("WithCancelingThrough(\"<Keyboard>/escape\")", StringComparison.Ordinal)
+        && keybindRowControllerSource.Contains("WithControlsExcluding(\"<Mouse>/leftButton\")", StringComparison.Ordinal),
     "BPP keybind row controller should exclude unsupported mouse controls and allow cancelling the rebind with Escape."
 );
 Assert(
