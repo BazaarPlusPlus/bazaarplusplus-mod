@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
@@ -9,8 +10,6 @@ namespace BazaarPlusPlus.Game.RunLogging;
 
 internal sealed class RunLoggingController : MonoBehaviour
 {
-    public static RunLoggingController? Instance { get; private set; }
-
     private IRunLogStore? _store;
     private RunLogSessionManager? _sessionManager;
     private RunLogCaptureService? _captureService;
@@ -22,11 +21,8 @@ internal sealed class RunLoggingController : MonoBehaviour
 
     public RunLogCaptureService? CaptureService => _captureService;
 
-    public RunLogInferenceService? InferenceService => _inferenceService;
-
     private void Awake()
     {
-        Instance = this;
         var runLogDatabasePath =
             BppRuntimeHost.Paths.RunLogDatabasePath
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
@@ -40,6 +36,8 @@ internal sealed class RunLoggingController : MonoBehaviour
             BppRuntimeHost.EventBus,
             _sessionManager,
             _core,
+            _inferenceService,
+            () => CombatReplayRuntime.Instance?.HasPendingPersistence == true,
             EnsureActiveRunFromGame
         );
         _module.Start();
@@ -53,8 +51,6 @@ internal sealed class RunLoggingController : MonoBehaviour
     {
         _module?.Stop();
         _module = null;
-        if (ReferenceEquals(Instance, this))
-            Instance = null;
     }
 
     public RunLogSessionState EnsureActiveSession(RunLogCreateRequest request)

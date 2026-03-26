@@ -201,41 +201,54 @@ internal sealed class HistoryPanelRepository
         var records = new List<HistoryBattleRecord>();
         while (reader.Read())
         {
-            var playerHandJson = reader.GetString(reader.GetOrdinal("player_hand_json"));
-            var playerSkillsJson = reader.GetString(reader.GetOrdinal("player_skills_json"));
-            var opponentHandJson = reader.GetString(reader.GetOrdinal("opponent_hand_json"));
-            var opponentSkillsJson = reader.GetString(reader.GetOrdinal("opponent_skills_json"));
-            var previewData = BuildPreviewData(
-                playerHandJson,
-                playerSkillsJson,
-                opponentHandJson,
-                opponentSkillsJson
-            );
+            var battleId = SafeGetNullableString(reader, "battle_id") ?? "unknown";
+            try
+            {
+                var playerHand = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("player_hand_json"))
+                );
+                var playerSkills = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("player_skills_json"))
+                );
+                var opponentHand = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("opponent_hand_json"))
+                );
+                var opponentSkills = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("opponent_skills_json"))
+                );
 
-            records.Add(
-                new HistoryBattleRecord(
-                    reader.GetString(reader.GetOrdinal("battle_id")),
-                    reader.GetString(reader.GetOrdinal("run_id")),
-                    DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
-                    GetNullableInt32(reader, "day"),
-                    GetNullableInt32(reader, "hour"),
-                    GetNullableString(reader, "encounter_id"),
-                    GetNullableString(reader, "opponent_name"),
-                    GetNullableString(reader, "opponent_hero"),
-                    GetNullableString(reader, "opponent_rank"),
-                    GetNullableInt32(reader, "opponent_rating"),
-                    GetNullableString(reader, "opponent_account_id"),
-                    GetNullableString(reader, "combat_kind"),
-                    GetNullableString(reader, "result"),
-                    BuildSnapshotSummary(
-                        playerHandJson,
-                        playerSkillsJson,
-                        opponentHandJson,
-                        opponentSkillsJson
-                    ),
-                    previewData
-                )
-            );
+                records.Add(
+                    new HistoryBattleRecord(
+                        battleId,
+                        reader.GetString(reader.GetOrdinal("run_id")),
+                        DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
+                        GetNullableInt32(reader, "day"),
+                        GetNullableInt32(reader, "hour"),
+                        GetNullableString(reader, "encounter_id"),
+                        GetNullableString(reader, "opponent_name"),
+                        GetNullableString(reader, "opponent_hero"),
+                        GetNullableString(reader, "opponent_rank"),
+                        GetNullableInt32(reader, "opponent_rating"),
+                        GetNullableString(reader, "opponent_account_id"),
+                        GetNullableString(reader, "combat_kind"),
+                        GetNullableString(reader, "result"),
+                        BuildSnapshotSummary(
+                            playerHand,
+                            playerSkills,
+                            opponentHand,
+                            opponentSkills
+                        ),
+                        BuildPreviewData(playerHand, playerSkills, opponentHand, opponentSkills)
+                    )
+                );
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "HistoryPanelRepository",
+                    $"Skipping unreadable battle history row '{battleId}': {ex.Message}"
+                );
+            }
         }
 
         return records;
@@ -253,18 +266,18 @@ internal sealed class HistoryPanelRepository
     }
 
     private static string BuildSnapshotSummary(
-        string playerHandJson,
-        string playerSkillsJson,
-        string opponentHandJson,
-        string opponentSkillsJson
+        PvpBattleCardSetCapture playerHand,
+        PvpBattleCardSetCapture playerSkills,
+        PvpBattleCardSetCapture opponentHand,
+        PvpBattleCardSetCapture opponentSkills
     )
     {
-        var playerItems = CountSnapshotItems(DeserializeCapture(playerHandJson));
-        var playerSkills = CountSnapshotItems(DeserializeCapture(playerSkillsJson));
-        var opponentItems = CountSnapshotItems(DeserializeCapture(opponentHandJson));
-        var opponentSkills = CountSnapshotItems(DeserializeCapture(opponentSkillsJson));
-        return $"YOU {playerItems} {Pluralize(playerItems, "item", "items")} · {playerSkills} {Pluralize(playerSkills, "skill", "skills")}"
-            + $"  |  OPP {opponentItems} {Pluralize(opponentItems, "item", "items")} · {opponentSkills} {Pluralize(opponentSkills, "skill", "skills")}";
+        var playerItems = CountSnapshotItems(playerHand);
+        var playerSkillCount = CountSnapshotItems(playerSkills);
+        var opponentItems = CountSnapshotItems(opponentHand);
+        var opponentSkillCount = CountSnapshotItems(opponentSkills);
+        return $"YOU {playerItems} {Pluralize(playerItems, "item", "items")} · {playerSkillCount} {Pluralize(playerSkillCount, "skill", "skills")}"
+            + $"  |  OPP {opponentItems} {Pluralize(opponentItems, "item", "items")} · {opponentSkillCount} {Pluralize(opponentSkillCount, "skill", "skills")}";
     }
 
     private static string Pluralize(int count, string singular, string plural)
@@ -273,20 +286,14 @@ internal sealed class HistoryPanelRepository
     }
 
     private static HistoryBattlePreviewData BuildPreviewData(
-        string playerHandJson,
-        string playerSkillsJson,
-        string opponentHandJson,
-        string opponentSkillsJson
+        PvpBattleCardSetCapture playerHand,
+        PvpBattleCardSetCapture playerSkills,
+        PvpBattleCardSetCapture opponentHand,
+        PvpBattleCardSetCapture opponentSkills
     )
     {
-        var playerBoard = BuildPreviewBoard(
-            DeserializeCapture(playerHandJson),
-            DeserializeCapture(playerSkillsJson)
-        );
-        var opponentBoard = BuildPreviewBoard(
-            DeserializeCapture(opponentHandJson),
-            DeserializeCapture(opponentSkillsJson)
-        );
+        var playerBoard = BuildPreviewBoard(playerHand, playerSkills);
+        var opponentBoard = BuildPreviewBoard(opponentHand, opponentSkills);
         return new HistoryBattlePreviewData(playerBoard, opponentBoard);
     }
 
@@ -414,6 +421,18 @@ internal sealed class HistoryPanelRepository
     {
         var ordinal = reader.GetOrdinal(columnName);
         return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+    }
+
+    private static string? SafeGetNullableString(SqliteDataReader reader, string columnName)
+    {
+        try
+        {
+            return GetNullableString(reader, columnName);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static int? GetNullableInt32(SqliteDataReader reader, string columnName)

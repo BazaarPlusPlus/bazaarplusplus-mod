@@ -47,6 +47,13 @@ Assert(
     "RunLoggingController should compose the unified RunLoggingModule."
 );
 Assert(
+    controllerSource.Contains(
+        "() => CombatReplayRuntime.Instance?.HasPendingPersistence == true",
+        StringComparison.Ordinal
+    ),
+    "RunLoggingController should provide replay persistence state to RunLoggingModule through composition."
+);
+Assert(
     !controllerSource.Contains("JsonRunLogStore", StringComparison.Ordinal),
     "RunLoggingController should no longer reference JsonRunLogStore."
 );
@@ -78,6 +85,10 @@ Assert(
 Assert(
     runLoggingModuleSource.Contains("selection_abandoned", StringComparison.Ordinal),
     "RunLoggingModule should emit selection_abandoned when a pending selection cannot be resolved cleanly."
+);
+Assert(
+    !runLoggingModuleSource.Contains("CombatReplayRuntime.Instance", StringComparison.Ordinal),
+    "RunLoggingModule should not reach into CombatReplayRuntime.Instance directly."
 );
 
 var pluginSourcePath = Path.GetFullPath(
@@ -193,12 +204,26 @@ Assert(
     "History panel snapshot summary should not count raw instance_id markers in JSON text."
 );
 Assert(
-    historyPanelRepositorySource.Contains("DeserializeCapture(playerHandJson)", StringComparison.Ordinal)
+    historyPanelRepositorySource.Contains(
+            "BuildSnapshotSummary(",
+            StringComparison.Ordinal
+        )
         && historyPanelRepositorySource.Contains(
-            "DeserializeCapture(opponentHandJson)",
+            "PvpBattleCardSetCapture playerHand",
+            StringComparison.Ordinal
+        )
+        && historyPanelRepositorySource.Contains(
+            "BuildPreviewData(playerHand, playerSkills, opponentHand, opponentSkills)",
             StringComparison.Ordinal
         ),
-    "History panel snapshot summary should count items from structured capture payloads."
+    "History panel snapshot summary should operate on parsed structured capture payloads."
+);
+Assert(
+    historyPanelRepositorySource.Contains(
+        "Skipping unreadable battle history row",
+        StringComparison.Ordinal
+    ),
+    "History panel repository should skip malformed battle rows instead of failing the whole query."
 );
 
 var sqliteStoreSourcePath = Path.GetFullPath(

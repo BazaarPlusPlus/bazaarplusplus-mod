@@ -28,8 +28,15 @@ public class Plugin : BaseUnityPlugin
         var configFile = new ConfigFile(Path.Combine(Paths.ConfigPath, "BazaarPlusPlus.cfg"), true);
         HistoryPanelPreviewSettings.Initialize(configFile);
 
-        _runtimeHost = new BppRuntimeHost(gameObject, Logger, configFile);
+        CombatReplayRuntime? combatReplayRuntime = null;
+        _runtimeHost = new BppRuntimeHost(
+            gameObject,
+            Logger,
+            configFile,
+            () => combatReplayRuntime
+        );
         _runtimeHost.Install();
+        combatReplayRuntime = gameObject.AddComponent<CombatReplayRuntime>();
         _runtimeHost.Start();
         BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
 
@@ -43,7 +50,6 @@ public class Plugin : BaseUnityPlugin
         EncounterTracker.Subscribe();
         gameObject.AddComponent<RunStateSyncController>();
         gameObject.AddComponent<RunLoggingController>();
-        gameObject.AddComponent<CombatReplayRuntime>();
         gameObject.AddComponent<HistoryPanel>();
         gameObject.AddComponent<HistoryCollectionsEntryBridge>();
         gameObject.AddComponent<CombatStatusBar>();
@@ -83,7 +89,7 @@ public class Plugin : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            BppLog.Error("Network", $"Network check FAILED: {ex.GetType().Name} — {ex.Message}");
+            BppLog.Error("Network", $"Network check FAILED: {ex.GetType().Name} - {ex.Message}");
             BppLog.Error("Network", "This likely explains the login failure. Possible causes:");
             BppLog.Error("Network", "  1. Antivirus blocked or quarantined BepInEx winhttp.dll");
             BppLog.Error("Network", "  2. VPN or proxy software conflicts with winhttp.dll hook");
@@ -101,7 +107,7 @@ public class Plugin : BaseUnityPlugin
         {
             BppLog.Warn(
                 "Network",
-                "winhttp.dll not found in game directory — BepInEx may not be installed correctly."
+                "winhttp.dll not found in game directory - BepInEx may not be installed correctly."
             );
             return;
         }
@@ -114,7 +120,7 @@ public class Plugin : BaseUnityPlugin
         if (info.CompanyName?.Contains("Microsoft") == true)
             BppLog.Warn(
                 "Network",
-                "winhttp.dll appears to be the system DLL — BepInEx proxy may have been removed by antivirus."
+                "winhttp.dll appears to be the system DLL - BepInEx proxy may have been removed by antivirus."
             );
     }
 }

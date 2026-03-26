@@ -49,7 +49,23 @@ internal sealed class InMemoryBppEventBus : IBppEventBus
 
         foreach (var registration in snapshot)
         {
-            ((Action<TEvent>)registration).Invoke(eventData);
+            try
+            {
+                ((Action<TEvent>)registration).Invoke(eventData);
+            }
+            catch (Exception ex)
+            {
+                var method = registration.Method;
+                var handlerName =
+                    method.DeclaringType?.FullName != null
+                        ? $"{method.DeclaringType.FullName}.{method.Name}"
+                        : method.Name;
+                global::BazaarPlusPlus.BppLog.Error(
+                    "EventBus",
+                    $"Handler failed for event {typeof(TEvent).FullName}: {handlerName}",
+                    ex
+                );
+            }
         }
     }
 

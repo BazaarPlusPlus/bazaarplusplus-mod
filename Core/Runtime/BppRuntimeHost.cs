@@ -33,7 +33,12 @@ internal sealed class BppRuntimeHost
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
 
-    public BppRuntimeHost(GameObject hostObject, ManualLogSource logger, ConfigFile configFile)
+    public BppRuntimeHost(
+        GameObject hostObject,
+        ManualLogSource logger,
+        ConfigFile configFile,
+        Func<CombatReplayRuntime?> combatReplayRuntimeAccessor
+    )
     {
         if (hostObject == null)
             throw new ArgumentNullException(nameof(hostObject));
@@ -41,13 +46,15 @@ internal sealed class BppRuntimeHost
             throw new ArgumentNullException(nameof(logger));
         if (configFile == null)
             throw new ArgumentNullException(nameof(configFile));
+        if (combatReplayRuntimeAccessor == null)
+            throw new ArgumentNullException(nameof(combatReplayRuntimeAccessor));
 
         _logger = logger;
         _config.Initialize(configFile);
         _paths.Initialize();
         _runContext.Reset();
         _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);
-        _combatReplayModule = new CombatReplayModule(_eventBus);
+        _combatReplayModule = new CombatReplayModule(_eventBus, combatReplayRuntimeAccessor);
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
     }
 

@@ -21,6 +21,8 @@ internal sealed class RunLoggingModule
     private readonly IBppEventBus _eventBus;
     private readonly RunLogSessionManager _sessionManager;
     private readonly RunLoggingControllerCore _core;
+    private readonly RunLogInferenceService _inferenceService;
+    private readonly Func<bool> _hasPendingReplayPersistence;
     private readonly Func<RunLogSessionState?> _ensureActiveRunFromGame;
     private IDisposable? _selectionSubscription;
     private IDisposable? _syncSubscription;
@@ -34,12 +36,19 @@ internal sealed class RunLoggingModule
         IBppEventBus eventBus,
         RunLogSessionManager sessionManager,
         RunLoggingControllerCore core,
+        RunLogInferenceService inferenceService,
+        Func<bool> hasPendingReplayPersistence,
         Func<RunLogSessionState?> ensureActiveRunFromGame
     )
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _core = core ?? throw new ArgumentNullException(nameof(core));
+        _inferenceService =
+            inferenceService ?? throw new ArgumentNullException(nameof(inferenceService));
+        _hasPendingReplayPersistence =
+            hasPendingReplayPersistence
+            ?? throw new ArgumentNullException(nameof(hasPendingReplayPersistence));
         _ensureActiveRunFromGame =
             ensureActiveRunFromGame
             ?? throw new ArgumentNullException(nameof(ensureActiveRunFromGame));
@@ -115,8 +124,7 @@ internal sealed class RunLoggingModule
                     );
                 }
 
-                var replayPersistencePending =
-                    CombatReplayRuntime.Instance?.HasPendingPersistence == true;
+                var replayPersistencePending = _hasPendingReplayPersistence();
                 if (replayPersistencePending && _deferredRunCompletionDeadlineUtc == null)
                 {
                     _deferredRunCompletionDeadlineUtc =
@@ -263,7 +271,7 @@ internal sealed class RunLoggingModule
             return;
         }
 
-        var inferredChoice = RunLoggingController.Instance?.InferenceService?.InferChoice(
+        var inferredChoice = _inferenceService.InferChoice(
             new RunLogChoiceInferenceInput
             {
                 Day = pendingSelection.Day,
@@ -357,7 +365,7 @@ internal sealed class RunLoggingModule
         if (_deferredRunCompletion == null)
             return false;
 
-        if (!forceCompletion && CombatReplayRuntime.Instance?.HasPendingPersistence == true)
+        if (!forceCompletion && _hasPendingReplayPersistence())
         {
             var deadline =
                 _deferredRunCompletionDeadlineUtc
@@ -371,7 +379,7 @@ internal sealed class RunLoggingModule
                 "Completing run before replay persistence drained after grace timeout."
             );
         }
-        else if (forceCompletion && CombatReplayRuntime.Instance?.HasPendingPersistence == true)
+        else if (forceCompletion && _hasPendingReplayPersistence())
         {
             BppLog.Warn(
                 "RunLoggingModule",

@@ -394,14 +394,18 @@ var runLoggingSyncBody = ExtractMethodBody(
     "private void OnRunLoggingSyncRequested(RunLoggingSyncRequested request)"
 );
 Assert(
-    runLoggingSyncBody.Contains("HasPendingPersistence", StringComparison.Ordinal),
-    "RunLoggingModule should inspect replay persistence state before completing a run on exit."
+    runLoggingSyncBody.Contains("_hasPendingReplayPersistence()", StringComparison.Ordinal),
+    "RunLoggingModule should inspect injected replay persistence state before completing a run on exit."
 );
 Assert(
     runLoggingModuleSource.Contains("TryCompleteDeferredRunExit", StringComparison.Ordinal)
         && runLoggingModuleSource.Contains("DateTime.UtcNow", StringComparison.Ordinal)
         && runLoggingModuleSource.Contains("TimeSpan.FromSeconds", StringComparison.Ordinal),
     "RunLoggingModule should defer run completion until replay persistence drains or a short grace window expires."
+);
+Assert(
+    !runLoggingModuleSource.Contains("CombatReplayRuntime.Instance", StringComparison.Ordinal),
+    "RunLoggingModule should not reach into CombatReplayRuntime.Instance directly."
 );
 var pvpBattleRecordedBody = ExtractMethodBody(
     runLoggingModuleSource,
