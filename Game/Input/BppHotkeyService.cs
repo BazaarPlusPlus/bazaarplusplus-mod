@@ -15,17 +15,22 @@ internal static class BppHotkeyService
     private const string MousePrefix = "<Mouse>/";
     private const string CtrlAliasPath = "<Keyboard>/ctrl";
     private const string ShiftAliasPath = "<Keyboard>/shift";
+    private const string LeftMouseButtonName = "leftButton";
+    private const string RightMouseButtonName = "rightButton";
+    private const string MiddleMouseButtonName = "middleButton";
+    private const string BackMouseButtonName = "backButton";
+    private const string ForwardMouseButtonName = "forwardButton";
 
     private static readonly IReadOnlyDictionary<string, string> BindingDisplayAliases =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             [CtrlAliasPath] = "Ctrl",
             [ShiftAliasPath] = "Shift",
-            [MousePrefix + "leftButton"] = "LMB",
-            [MousePrefix + "rightButton"] = "RMB",
-            [MousePrefix + "middleButton"] = "MMB",
-            [MousePrefix + "backButton"] = "BMB",
-            [MousePrefix + "forwardButton"] = "FMB",
+            [MousePrefix + LeftMouseButtonName] = "LMB",
+            [MousePrefix + RightMouseButtonName] = "RMB",
+            [MousePrefix + MiddleMouseButtonName] = "MMB",
+            [MousePrefix + BackMouseButtonName] = "BACK",
+            [MousePrefix + ForwardMouseButtonName] = "FORWARD",
         };
 
     private static readonly IReadOnlyDictionary<BppHotkeyActionId, string> DefaultBindingPaths =
@@ -228,7 +233,7 @@ internal static class BppHotkeyService
         if (!trimmed.StartsWith(MousePrefix, StringComparison.OrdinalIgnoreCase))
             return string.Empty;
 
-        if (!TryGetMouseButtonName(trimmed, out var buttonName))
+        if (!TryGetSupportedMouseButtonName(trimmed, out var buttonName))
             return string.Empty;
 
         var normalized = MousePrefix + buttonName;
@@ -253,21 +258,40 @@ internal static class BppHotkeyService
     )
     {
         button = default!;
-        return TryGetMouseButtonName(bindingPath, out var buttonName)
-            && TryFindMouseControl(buttonName, mouse, out var control)
-            && control is ButtonControl candidate
-            && !candidate.synthetic
-            && (button = candidate) != null;
+        if (!TryGetSupportedMouseButtonName(bindingPath, out var buttonName) || mouse == null)
+            return false;
+
+        var control = buttonName switch
+        {
+            LeftMouseButtonName => mouse.leftButton,
+            RightMouseButtonName => mouse.rightButton,
+            MiddleMouseButtonName => mouse.middleButton,
+            BackMouseButtonName => mouse.backButton,
+            ForwardMouseButtonName => mouse.forwardButton,
+            _ => null,
+        };
+
+        if (control == null || control.synthetic)
+            return false;
+
+        button = control;
+        return true;
     }
 
-    private static bool TryGetMouseButtonName(string bindingPath, out string buttonName)
+    private static bool TryGetSupportedMouseButtonName(string bindingPath, out string buttonName)
     {
         buttonName = string.Empty;
         if (!bindingPath.StartsWith(MousePrefix, StringComparison.OrdinalIgnoreCase))
             return false;
 
-        buttonName = bindingPath[MousePrefix.Length..].Trim();
-        return !string.IsNullOrWhiteSpace(buttonName);
+        var rawButtonName = bindingPath[MousePrefix.Length..].Trim();
+        if (string.IsNullOrWhiteSpace(rawButtonName))
+            return false;
+
+        if (TryFindMouseControl(rawButtonName, Mouse.current, out var control) && control != null)
+            rawButtonName = control.name;
+
+        return TryNormalizeSupportedMouseButtonName(rawButtonName, out buttonName);
     }
 
     private static bool TryFindMouseControl(
@@ -287,6 +311,48 @@ internal static class BppHotkeyService
         return bindingPath.Contains("scroll", StringComparison.OrdinalIgnoreCase)
             || bindingPath.Contains("position", StringComparison.OrdinalIgnoreCase)
             || bindingPath.Contains("delta", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryNormalizeSupportedMouseButtonName(
+        string buttonName,
+        out string normalized
+    )
+    {
+        normalized = buttonName.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+            return false;
+
+        if (string.Equals(normalized, LeftMouseButtonName, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = LeftMouseButtonName;
+            return true;
+        }
+
+        if (string.Equals(normalized, RightMouseButtonName, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = RightMouseButtonName;
+            return true;
+        }
+
+        if (string.Equals(normalized, MiddleMouseButtonName, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = MiddleMouseButtonName;
+            return true;
+        }
+
+        if (string.Equals(normalized, BackMouseButtonName, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = BackMouseButtonName;
+            return true;
+        }
+
+        if (string.Equals(normalized, ForwardMouseButtonName, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = ForwardMouseButtonName;
+            return true;
+        }
+
+        return false;
     }
 
     private static string GetDefaultBindingPath(BppHotkeyActionId actionId)

@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.Input;
@@ -7,13 +8,14 @@ using TheBazaar.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus;
 
 internal sealed class BppKeyBindRowController : MonoBehaviour
 {
+    private static BppKeyBindRowController? _activeController;
+
     private readonly List<GameObject> _displayObjects = [];
     private readonly List<GameObject> _editObjects = [];
 
@@ -25,7 +27,9 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
     private TextMeshProUGUI? _labelText;
     private bool _isRebinding;
     private bool _initialized;
-    private int _rebindStartedFrame = -1;
+    private Coroutine? _beginRebindCoroutine;
+    private InputAction? _rebindCaptureAction;
+    private InputActionRebindingExtensions.RebindingOperation? _rebindOperation;
 
     internal void Initialize(BppHotkeyActionId actionId, KeyBindController? templateController)
     {
@@ -44,7 +48,7 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
         if (_keybindButton != null)
         {
             _keybindButton.onClick.RemoveAllListeners();
-            _keybindButton.onClick.AddListener(EnterRebindState);
+            _keybindButton.onClick.AddListener(BeginDelayRebind);
         }
 
         if (_resetButton != null)
@@ -55,6 +59,14 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
 
         _initialized = true;
         EnterDefaultState();
+    }
+
+    private void OnDisable()
+    {
+        if (_activeController == this)
+            _activeController = null;
+
+        DisposeRebindResources();
     }
 
     internal void RefreshLanguage()
@@ -69,87 +81,58 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
             );
     }
 
-    private void Update()
+    private void BeginDelayRebind()
     {
-        if (!_initialized || !_isRebinding)
+        if (!_initialized)
             return;
 
-        if (Time.frameCount == _rebindStartedFrame)
-            return;
+        if (_beginRebindCoroutine != null)
+            StopCoroutine(_beginRebindCoroutine);
 
-        var keyboard = Keyboard.current;
-        if (keyboard?.escapeKey.wasPressedThisFrame == true)
-        {
-            EnterDefaultState();
-            return;
-        }
+        _beginRebindCoroutine = StartCoroutine(BeginDelayRebindCoroutine());
+    }
 
-        if (keyboard != null)
-        {
-            foreach (var keyControl in keyboard.allKeys)
-            {
-                if (!keyControl.wasPressedThisFrame)
-                    continue;
+    private IEnumerator BeginDelayRebindCoroutine()
+    {
+        yield return null;
+        _beginRebindCoroutine = null;
 
-                var bindingPath = $"<Keyboard>/{keyControl.name}";
-                if (BppHotkeyService.TrySetBindingPath(_actionId, bindingPath, out var errorMessage))
-                {
-                    EnterDefaultState();
-                }
-                else
-                {
-                    ShowWarning(errorMessage);
-                }
+        if (!isActiveAndEnabled)
+            yield break;
 
-                return;
-            }
-        }
-
-        var mouse = Mouse.current;
-        if (mouse == null)
-            return;
-
-        foreach (var buttonControl in mouse.allControls.OfType<ButtonControl>())
-        {
-            if (buttonControl.synthetic || !buttonControl.wasPressedThisFrame)
-                continue;
-
-            if (
-                BppHotkeyService.TrySetBindingPath(
-                    _actionId,
-                    $"<Mouse>/{buttonControl.name}",
-                    out var error
-                )
-            )
-            {
-                EnterDefaultState();
-            }
-            else
-            {
-                ShowWarning(error);
-            }
-
-            return;
-        }
+        EnterRebindState();
     }
 
     private void EnterRebindState()
     {
+        if (_activeController != null && _activeController != this)
+            return;
+
+        _activeController = this;
         _isRebinding = true;
-        _rebindStartedFrame = Time.frameCount;
+        if (_resetButton != null)
+            _resetButton.interactable = false;
+        if (_keybindButton != null)
+            _keybindButton.interactable = false;
         SetObjectsActive(_displayObjects, false);
         SetObjectsActive(_editObjects, true);
         ShowWarning(
             BppKeybindLabelResolver.ResolveRebindPrompt(PlayerPreferences.Data.LanguageCode)
         );
+        StartInteractiveRebind();
     }
 
     private void EnterDefaultState()
     {
+        if (_activeController == this)
+            _activeController = null;
+
         _isRebinding = false;
-        _rebindStartedFrame = -1;
         SetObjectsActive(_displayObjects, true);
         SetObjectsActive(_editObjects, false);
+        DisposeRebindOperation();
+        if (_keybindButton != null)
+            _keybindButton.interactable = true;
         UpdateTexts();
         ShowWarning(null);
     }
@@ -248,5 +231,75 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
     {
         foreach (var gameObject in objects.Where(candidate => candidate != null))
             gameObject.SetActive(active);
+    }
+
+    private void StartInteractiveRebind()
+    {
+        DisposeRebindOperation();
+        _rebindCaptureAction ??= CreateRebindCaptureAction();
+        _rebindOperation = _rebindCaptureAction
+            .PerformInteractiveRebinding(0)
+            .WithControlsExcluding("<Mouse>/position")
+            .WithControlsExcluding("<Mouse>/delta")
+            .WithControlsExcluding("<Mouse>/scroll")
+            .WithControlsExcluding("<Mouse>/leftButton")
+            .WithCancelingThrough("<Keyboard>/escape")
+            .OnMatchWaitForAnother(0.1f)
+            .OnCancel(_ =>
+            {
+                if (isActiveAndEnabled)
+                    EnterDefaultState();
+            })
+            .OnComplete(HandleRebindComplete);
+        _rebindOperation.Start();
+    }
+
+    private void HandleRebindComplete(InputActionRebindingExtensions.RebindingOperation operation)
+    {
+        var bindingPath =
+            _rebindCaptureAction?.bindings.Count > 0
+                ? _rebindCaptureAction.bindings[0].overridePath
+                : null;
+        bindingPath ??= operation.selectedControl?.path;
+
+        DisposeRebindOperation();
+
+        if (
+            BppHotkeyService.TrySetBindingPath(_actionId, bindingPath, out var errorMessage)
+        )
+        {
+            EnterDefaultState();
+            return;
+        }
+
+        ShowWarning(errorMessage);
+        StartInteractiveRebind();
+    }
+
+    private void DisposeRebindOperation()
+    {
+        _rebindOperation?.Dispose();
+        _rebindOperation = null;
+    }
+
+    private void DisposeRebindResources()
+    {
+        if (_beginRebindCoroutine != null)
+        {
+            StopCoroutine(_beginRebindCoroutine);
+            _beginRebindCoroutine = null;
+        }
+
+        DisposeRebindOperation();
+
+        _rebindCaptureAction?.Dispose();
+        _rebindCaptureAction = null;
+    }
+
+    private static InputAction CreateRebindCaptureAction()
+    {
+        var action = new InputAction(type: InputActionType.Button);
+        action.AddBinding("<Keyboard>/space");
+        return action;
     }
 }

@@ -165,12 +165,21 @@ Assert(
 );
 var keybindRowControllerSource = File.ReadAllText(keybindRowControllerSourcePath);
 Assert(
-    keybindRowControllerSource.Contains("Mouse.current", StringComparison.Ordinal),
-    "BPP keybind row controller should listen to mouse buttons while rebinding."
+    keybindRowControllerSource.Contains("PerformInteractiveRebinding", StringComparison.Ordinal),
+    "BPP keybind row controller should use Unity's interactive rebinding flow for key and mouse capture."
 );
 Assert(
-    keybindRowControllerSource.Contains("<Mouse>/{buttonControl.name}", StringComparison.Ordinal),
-    "BPP keybind row controller should save mouse bindings using the canonical <Mouse>/<buttonName> format."
+    keybindRowControllerSource.Contains("WithControlsExcluding(\"<Mouse>/scroll\")", StringComparison.Ordinal)
+        && keybindRowControllerSource.Contains("WithCancelingThrough(\"<Keyboard>/escape\")", StringComparison.Ordinal),
+    "BPP keybind row controller should exclude unsupported mouse controls and allow cancelling the rebind with Escape."
+);
+Assert(
+    keybindRowControllerSource.Contains("bindings[0].overridePath", StringComparison.Ordinal),
+    "BPP keybind row controller should save the canonical override path produced by the interactive rebind operation."
+);
+Assert(
+    keybindRowControllerSource.Contains("operation.selectedControl?.path", StringComparison.Ordinal),
+    "BPP keybind row controller should fall back to the selected control path when rebinding to the capture action's default key produces no override."
 );
 
 var tooltipRefreshSourcePath = Path.GetFullPath(

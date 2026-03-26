@@ -39,7 +39,7 @@ modifier actions:
 Current behavior:
 
 - defaults stay `Ctrl` for enchant preview and `Shift` for upgrade preview
-- supported mouse bindings include `LMB`, `RMB`, `MMB`, `BMB`, and `FMB`
+- supported mouse bindings include `LMB`, `RMB`, `MMB`, `BACK`, and `FORWARD`
 - conflicting Bazaar++ actions are rejected before the new binding is stored
 - `TooltipModifierRefreshController` refreshes the hovered item tooltip when the modifier mode
   changes during hover
