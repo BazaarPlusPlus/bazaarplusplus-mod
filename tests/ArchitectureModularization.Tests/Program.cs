@@ -11,6 +11,15 @@ RequireType("BazaarPlusPlus.Core.Config.BppConfig");
 RequireType("BazaarPlusPlus.Core.Paths.BppPathService");
 RequireType("BazaarPlusPlus.Core.RunContext.RunContextStore");
 RequireType("BazaarPlusPlus.Core.GameState.GameStateProbe");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadSqliteStore");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadService");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRegistrationClient");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRequestSigner");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadApiClient");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteSelector");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteStateStore");
 RequireType("BazaarPlusPlus.Core.Events.RunInitializedObserved");
 RequireType("BazaarPlusPlus.Core.Events.NetMessageObserved");
 RequireType("BazaarPlusPlus.Core.Events.CombatSimObserved");
@@ -34,6 +43,10 @@ Assert(
 Assert(
     pluginSource.Contains("_runtimeHost.Start();", StringComparison.Ordinal),
     "Plugin should start the runtime host."
+);
+Assert(
+    pluginSource.Contains("gameObject.AddComponent<RunUploadController>();", StringComparison.Ordinal),
+    "Plugin should mount the delayed run-upload controller."
 );
 Assert(
     !pluginSource.Contains("CombatStatusBar.InitializeConfig", StringComparison.Ordinal),
@@ -71,6 +84,14 @@ Assert(
     ),
     "IBppConfig should expose the CombatStatusBar speed config."
 );
+Assert(
+    configInterfaceSource.Contains("EnableRunUploadConfig", StringComparison.Ordinal)
+        && configInterfaceSource.Contains("RunUploadEndpointConfig", StringComparison.Ordinal)
+        && configInterfaceSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal)
+        && configInterfaceSource.Contains("RunUploadModeConfig", StringComparison.Ordinal)
+        && configInterfaceSource.Contains("RunUploadEndpointCnConfig", StringComparison.Ordinal),
+    "IBppConfig should expose run-upload configuration."
+);
 
 var configSource = ReadSource("Core/Config/BppConfig.cs");
 Assert(
@@ -84,6 +105,14 @@ Assert(
 Assert(
     configSource.Contains("CombatStatusBarSpeedMultiplierConfig", StringComparison.Ordinal),
     "BppConfig should bind the CombatStatusBar speed config."
+);
+Assert(
+    configSource.Contains("EnableRunUploadConfig", StringComparison.Ordinal)
+        && configSource.Contains("RunUploadEndpointConfig", StringComparison.Ordinal)
+        && configSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal)
+        && configSource.Contains("RunUploadModeConfig", StringComparison.Ordinal)
+        && configSource.Contains("RunUploadEndpointCnConfig", StringComparison.Ordinal),
+    "BppConfig should bind run-upload settings."
 );
 Assert(
     runtimeHostSource.Contains("public static IRunContext RunContext", StringComparison.Ordinal),
@@ -185,6 +214,30 @@ Assert(
             StringComparison.Ordinal
         ),
     "RunLoggingModule should be the unified subscriber for run-logging capture inputs."
+);
+
+var uploadControllerSource = ReadSource("Game/RunLogging/Upload/RunUploadController.cs");
+Assert(
+    uploadControllerSource.Contains("BppRuntimeHost.RunContext.IsInGameRun", StringComparison.Ordinal),
+    "RunUploadController should avoid uploads during active runs."
+);
+Assert(
+    uploadControllerSource.Contains("UploadPendingRunsAsync", StringComparison.Ordinal),
+    "RunUploadController should drive background upload batches through the upload service."
+);
+
+var uploadServiceSource = ReadSource("Game/RunLogging/Upload/RunUploadService.cs");
+Assert(
+    uploadServiceSource.Contains("RunUploadRegistrationClient", StringComparison.Ordinal)
+        && uploadServiceSource.Contains("RunUploadApiClient", StringComparison.Ordinal),
+    "RunUploadService should coordinate registration and upload through dedicated collaborators."
+);
+
+var requestSignerSource = ReadSource("Game/RunLogging/Upload/RunUploadRequestSigner.cs");
+Assert(
+    requestSignerSource.Contains("BuildCanonicalRequest", StringComparison.Ordinal)
+        && requestSignerSource.Contains("ComputeBodyHash", StringComparison.Ordinal),
+    "RunUploadRequestSigner should own request canonicalization and hashing."
 );
 
 Console.WriteLine("Architecture modularization smoke checks passed.");

@@ -85,6 +85,10 @@ Adds enchant preview lines to the native primary tooltip, or reuses the game's n
 
 Active runs are captured into SQLite; the in-game `HistoryPanel` browses recent runs, linked PVP battles, and stored battle snapshot previews; `scripts/export_run_log.py` handles offline export.
 
+**Optional Background Run Upload**
+
+Run upload is opt-in and disabled by default. When enabled, completed runs are registered and uploaded in the background outside live gameplay; local SQLite remains the source of truth. See `docs/run-upload.md`.
+
 **Saved Replay / Debug Playback**
 
 `CombatReplayRuntime` continuously persists PVP replay payloads; the normal `HistoryPanel` enables `Replay` when the selected battle still has a saved payload, while debug builds additionally mount the `DebugPanel` and a standalone `CombatLog` overlay for recent replay playback and inspection. Saved replays can be bootstrapped from the lobby back into the native replay pipeline.

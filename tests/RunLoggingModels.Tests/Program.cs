@@ -43,6 +43,10 @@ Assert(
     "RunLoggingController should create SqliteRunLogStore."
 );
 Assert(
+    controllerSource.Contains("new ReplicatedRunLogStore(", StringComparison.Ordinal),
+    "RunLoggingController should wrap local run logging with replicated sync-state tracking."
+);
+Assert(
     controllerSource.Contains("new RunLoggingModule(", StringComparison.Ordinal),
     "RunLoggingController should compose the unified RunLoggingModule."
 );
@@ -115,6 +119,16 @@ var pathServiceSource = File.ReadAllText(pathServiceSourcePath);
 Assert(
     pathServiceSource.Contains("RunLogDatabasePath", StringComparison.Ordinal),
     "BppPathService should expose a SQLite database path."
+);
+Assert(
+    pathServiceSource.Contains("RunUploadInstallIdentityPath", StringComparison.Ordinal),
+    "BppPathService should expose the install-id path for delayed run upload."
+);
+Assert(
+    pathServiceSource.Contains("RunUploadClientStatePath", StringComparison.Ordinal)
+        && pathServiceSource.Contains("RunUploadPrivateKeyPath", StringComparison.Ordinal)
+        && pathServiceSource.Contains("RunUploadRouteStatePath", StringComparison.Ordinal),
+    "BppPathService should expose client-state, private-key, and route-state paths for signed uploads."
 );
 
 var runContextSourcePath = Path.GetFullPath(

@@ -4,6 +4,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
+using BazaarPlusPlus.Game.RunLogging.Upload;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.RunLogging;
@@ -26,7 +27,9 @@ internal sealed class RunLoggingController : MonoBehaviour
         var runLogDatabasePath =
             BppRuntimeHost.Paths.RunLogDatabasePath
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
-        _store = new SqliteRunLogStore(runLogDatabasePath);
+        var sqliteStore = new SqliteRunLogStore(runLogDatabasePath);
+        var uploadStore = new RunUploadSqliteStore(runLogDatabasePath);
+        _store = new ReplicatedRunLogStore(sqliteStore, uploadStore);
         _sessionManager = new RunLogSessionManager(_store);
         _sessionManager.RestoreActiveSession();
         _captureService = new RunLogCaptureService();

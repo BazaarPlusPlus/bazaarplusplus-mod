@@ -8,4 +8,12 @@ internal interface IPathService
     string? RunLogDatabasePath { get; }
 
     string? CombatReplayDirectoryPath { get; }
+
+    string? RunUploadInstallIdentityPath { get; }
+
+    string? RunUploadClientStatePath { get; }
+
+    string? RunUploadPrivateKeyPath { get; }
+
+    string? RunUploadRouteStatePath { get; }
 }

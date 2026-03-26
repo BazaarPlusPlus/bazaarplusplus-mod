@@ -11,6 +11,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.RunLogging;
+using BazaarPlusPlus.Game.RunLogging.Upload;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -50,6 +51,7 @@ public class Plugin : BaseUnityPlugin
         EncounterTracker.Subscribe();
         gameObject.AddComponent<RunStateSyncController>();
         gameObject.AddComponent<RunLoggingController>();
+        gameObject.AddComponent<RunUploadController>();
         gameObject.AddComponent<HistoryPanel>();
         gameObject.AddComponent<HistoryCollectionsEntryBridge>();
         gameObject.AddComponent<CombatStatusBar>();

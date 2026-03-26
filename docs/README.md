@@ -10,6 +10,8 @@ and `tests/` remain the source of truth.
 - `combat-status-bar.md`: runtime HUD, speed control, and combat-frame timing model
 - `monster-preview-design.md`: monster preview overlay pipeline and data sources
 - `run-logging.md`: run log capture, SQLite persistence, history UI, and export flow
+- `run-upload.md`: current background upload implementation, config, and request format
+- `run-upload-identity-design.md`: install identity, signed upload, uid binding, and dual-backend design
 
 ## Reference Docs
 
