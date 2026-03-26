@@ -76,7 +76,8 @@ The live reader uses `RunLoggingGameDataReader` plus `EncounterTracker` state to
 - state snapshots (`state_seen`)
 - selection snapshots (`selection_seen` and related option events)
 - choice events and selection-abandon events
-- `pvp_battle_recorded` events when `CombatReplayRuntime` publishes `PvpBattleRecorded`
+- `pvp_combat_recorded` events when `CombatReplayRuntime` persistence completion publishes
+  `PvpBattleRecorded`
 
 The persistence model is append-only at the event layer. Fingerprint checks suppress duplicate
 `state_seen` and repeated identical selection snapshots.

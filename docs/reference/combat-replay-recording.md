@@ -9,8 +9,9 @@ for native combat replay:
 2. `NetMessageCombatSim`
 3. closing `NetMessageGameSim`
 
-The live observer is installed by `CombatReplayCapturePatch`, which hooks
-`NetMessageProcessor.ReceiveOrQueue(...)` and forwards matching messages into
+The live observer starts at `CombatReplayCapturePatch`, which hooks
+`NetMessageProcessor.ReceiveOrQueue(...)`, publishes matching messages as
+`NetMessageObserved`, and lets `CombatReplayModule` forward them into
 `CombatReplayRuntime`.
 
 ## Storage
@@ -37,15 +38,18 @@ That manifest carries:
 
 Live capture flow:
 
-1. `CombatReplayCaptureService` matches an opening `GameSim`, one `CombatSim`, and a closing
+1. `CombatReplayCapturePatch` publishes matching `GameSim` / `CombatSim` messages as
+   `NetMessageObserved`
+2. `CombatReplayModule` forwards those observed messages to `CombatReplayRuntime`
+3. `CombatReplayCaptureService` matches an opening `GameSim`, one `CombatSim`, and a closing
    `GameSim`
-2. it captures player / opponent hand and skill snapshots
-3. it builds:
+4. it captures player / opponent hand and skill snapshots
+5. it builds:
    - `PvpReplayPayload`
    - `PvpBattleManifest`
-4. `CombatReplayRuntime` enqueues asynchronous persistence through
+6. `CombatReplayRuntime` enqueues asynchronous persistence through
    `CombatReplayPersistenceQueue`
-5. payload and manifest persistence completion eventually publishes `PvpBattleRecorded`
+7. payload and manifest persistence completion eventually publishes `PvpBattleRecorded`
 
 Saved replay loading uses the native replay path, but with an extra rehydration step for player
 cards and replay UI:
