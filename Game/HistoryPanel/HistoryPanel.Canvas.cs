@@ -41,6 +41,9 @@ internal sealed partial class HistoryPanel
     private Button? _replayButton;
     private Image? _replayButtonBackground;
     private TextMeshProUGUI? _replayButtonLabel;
+    private Button? _deleteRunButton;
+    private Image? _deleteRunButtonBackground;
+    private TextMeshProUGUI? _deleteRunButtonLabel;
 
     private sealed class ListItemView
     {
@@ -171,6 +174,9 @@ internal sealed partial class HistoryPanel
         _replayButton = null;
         _replayButtonBackground = null;
         _replayButtonLabel = null;
+        _deleteRunButton = null;
+        _deleteRunButtonBackground = null;
+        _deleteRunButtonLabel = null;
         _runItemViews.Clear();
         _battleItemViews.Clear();
     }
@@ -196,7 +202,10 @@ internal sealed partial class HistoryPanel
             _databaseChipText.text = $"DB {GetDatabaseChipText()}";
 
         if (_statusText != null)
-            _statusText.text = string.Empty;
+        {
+            _statusText.text = _statusMessage ?? string.Empty;
+            _statusText.gameObject.SetActive(!string.IsNullOrWhiteSpace(_statusText.text));
+        }
         if (_battleSectionSubtitle != null)
         {
             _battleSectionSubtitle.text =
@@ -215,12 +224,15 @@ internal sealed partial class HistoryPanel
 
         if (_footerSecondaryText != null)
         {
-            _footerSecondaryText.text =
+            var battleSummary =
                 SelectedBattle == null
                     ? "Select one battle to inspect it, then use Replay when you want to jump back into it."
                     : canReplaySelectedBattle
                         ? $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | {SelectedBattle.SnapshotSummary}"
                         : $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | Replay unavailable: {replayUnavailableReason}";
+            _footerSecondaryText.text = string.IsNullOrWhiteSpace(_statusMessage)
+                ? battleSummary
+                : $"{_statusMessage} | {battleSummary}";
         }
 
         if (_previewStatusText != null && SelectedBattle == null)
@@ -260,6 +272,28 @@ internal sealed partial class HistoryPanel
             new Color(0.92f, 0.72f, 0.30f, 1f),
             new Color(0.24f, 0.26f, 0.30f, 0.50f),
             new Color(0.10f, 0.07f, 0.03f, 1f)
+        );
+
+        var canDeleteSelectedRun = CanDeleteSelectedRun(out _);
+        if (_deleteRunButtonLabel != null)
+        {
+            _deleteRunButtonLabel.text =
+                SelectedRun != null && IsDeleteRunConfirmationActive(SelectedRun.RunId)
+                    ? "Confirm Delete"
+                    : "Delete Run";
+        }
+
+        RefreshActionButton(
+            _deleteRunButton,
+            _deleteRunButtonBackground,
+            _deleteRunButtonLabel,
+            canDeleteSelectedRun,
+            SelectedRun != null && IsDeleteRunConfirmationActive(SelectedRun.RunId)
+                ? new Color(0.75f, 0.23f, 0.20f, 0.98f)
+                : new Color(0.46f, 0.19f, 0.18f, 0.98f),
+            new Color(0.86f, 0.29f, 0.25f, 1f),
+            new Color(0.24f, 0.26f, 0.30f, 0.50f),
+            new Color(1f, 0.95f, 0.94f, 1f)
         );
 
         RebuildRunList();
@@ -329,7 +363,12 @@ internal sealed partial class HistoryPanel
         _dynamicPreviewButton.onClick.AddListener(ToggleDynamicPreviewFromUi);
         CreateActionButton("CloseButton", chipsRow, "Close", 86f, () => SetHistoryVisible(false));
 
-        _statusText = null;
+        _statusText = CreateText("Status", headerLayout, 12, FontStyle.Normal, TextAnchor.UpperLeft);
+        _statusText.color = new Color(0.93f, 0.79f, 0.51f, 0.98f);
+        _statusText.textWrappingMode = TextWrappingModes.NoWrap;
+        _statusText.overflowMode = TextOverflowModes.Ellipsis;
+        _statusText.gameObject.SetActive(false);
+        ConfigureLayoutElement(_statusText.gameObject, preferredHeight: 18f, minHeight: 18f);
     }
 
     private void BuildContent()
@@ -501,13 +540,22 @@ internal sealed partial class HistoryPanel
             false,
             false
         );
-        ConfigureLayoutElement(actions.gameObject, preferredWidth: 250f, minWidth: 250f);
+        ConfigureLayoutElement(actions.gameObject, preferredWidth: 390f, minWidth: 390f);
+
+        (_deleteRunButton, _deleteRunButtonBackground, _deleteRunButtonLabel) = CreateStyledButton(
+            "DeleteRunButton",
+            actions,
+            "Delete Run",
+            130f,
+            36f
+        );
+        _deleteRunButton.onClick.AddListener(TryDeleteSelectedRun);
 
         (_replayButton, _replayButtonBackground, _replayButtonLabel) = CreateStyledButton(
             "ReplayButton",
             actions,
             "Replay",
-            130f,
+            120f,
             36f
         );
         _replayButton.onClick.AddListener(TryReplaySelectedBattle);
@@ -515,7 +563,7 @@ internal sealed partial class HistoryPanel
             "FooterCloseButton",
             actions,
             "Close",
-            110f,
+            120f,
             () => SetHistoryVisible(false)
         );
     }

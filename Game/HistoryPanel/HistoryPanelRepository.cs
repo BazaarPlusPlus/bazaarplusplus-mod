@@ -254,6 +254,64 @@ internal sealed class HistoryPanelRepository
         return records;
     }
 
+    public IReadOnlyList<string> ListBattleIdsByRun(string runId)
+    {
+        if (!DatabaseExists || string.IsNullOrWhiteSpace(runId))
+            return Array.Empty<string>();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"""
+            SELECT battle_id
+            FROM {RunLogSqliteSchema.PvpBattlesTableName}
+            WHERE run_id = $runId
+            ORDER BY recorded_at_utc DESC, battle_id DESC;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        var battleIds = new List<string>();
+        while (reader.Read())
+        {
+            if (!reader.IsDBNull(0))
+                battleIds.Add(reader.GetString(0));
+        }
+
+        return battleIds;
+    }
+
+    public void DeleteRun(string runId)
+    {
+        if (!DatabaseExists || string.IsNullOrWhiteSpace(runId))
+            return;
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+
+        using (var deleteBattles = connection.CreateCommand())
+        {
+            deleteBattles.Transaction = transaction;
+            deleteBattles.CommandTimeout = 2;
+            deleteBattles.CommandText =
+                $"DELETE FROM {RunLogSqliteSchema.PvpBattlesTableName} WHERE run_id = $runId;";
+            deleteBattles.Parameters.AddWithValue("$runId", runId);
+            deleteBattles.ExecuteNonQuery();
+        }
+
+        using (var deleteRun = connection.CreateCommand())
+        {
+            deleteRun.Transaction = transaction;
+            deleteRun.CommandTimeout = 2;
+            deleteRun.CommandText =
+                $"DELETE FROM {RunLogSqliteSchema.RunsTableName} WHERE run_id = $runId;";
+            deleteRun.Parameters.AddWithValue("$runId", runId);
+            deleteRun.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
     private SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection($"Data Source={_databasePath}");

@@ -469,9 +469,24 @@ Assert(
     "HistoryPanel should reuse the shared replay availability helper before starting a replay."
 );
 Assert(
+    historyPanelSource.Contains(
+        "private bool CanDeleteSelectedRun(out string reason)",
+        StringComparison.Ordinal
+    )
+        && historyPanelSource.Contains("private void TryDeleteSelectedRun()", StringComparison.Ordinal)
+        && historyPanelSource.Contains("_repository.DeleteRun(", StringComparison.Ordinal),
+    "HistoryPanel should expose a guarded selected-run deletion flow that delegates sqlite cleanup to the repository."
+);
+Assert(
     historyPanelCanvasSource.Contains("CanReplaySelectedBattle(", StringComparison.Ordinal)
         && historyPanelCanvasSource.Contains("Replay unavailable:", StringComparison.Ordinal),
     "HistoryPanel UI should disable replay and explain why when the selected battle cannot be replayed."
+);
+Assert(
+    historyPanelCanvasSource.Contains("Delete Run", StringComparison.Ordinal)
+        && historyPanelCanvasSource.Contains("Confirm Delete", StringComparison.Ordinal)
+        && historyPanelCanvasSource.Contains("_statusText = CreateText(", StringComparison.Ordinal),
+    "HistoryPanel UI should surface a run delete action with confirmation copy and a visible status text row."
 );
 
 Console.WriteLine("RunLogging session checks passed.");

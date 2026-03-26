@@ -29,6 +29,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private Coroutine? _previewCoroutine;
     private string? _statusMessage;
     private float _previewDebugOverlayUntil;
+    private string? _deleteRunConfirmationRunId;
+    private float _deleteRunConfirmationUntil;
     private PreviewSelectionMode _previewSelectionMode = PreviewSelectionMode.Run;
     private int _lastSceneHandle;
 
@@ -58,6 +60,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private void OnDisable()
     {
         IsVisible = false;
+        ClearDeleteRunConfirmation();
         StopPreviewRender();
         _previewRenderer?.Hide();
         SetUiVisible(false);
@@ -107,6 +110,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             RefreshData();
         else
         {
+            ClearDeleteRunConfirmation();
             StopPreviewRender();
             _previewRenderer?.Dispose();
         }
@@ -124,6 +128,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         try
         {
+            ClearDeleteRunConfirmation();
             _runs.Clear();
             _battles.Clear();
 
@@ -158,6 +163,9 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         if (index < 0 || index >= _runs.Count)
             return;
+
+        if (_selectedRunIndex != index)
+            ClearDeleteRunConfirmation();
 
         _selectedRunIndex = index;
         LoadBattlesForSelectedRun();
@@ -397,6 +405,44 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         return runtime.CanReplaySavedBattle(battle.BattleId, out reason);
     }
 
+    private bool CanDeleteSelectedRun(out string reason)
+    {
+        var run = SelectedRun;
+        if (run == null)
+        {
+            reason = "Select a run to delete.";
+            return false;
+        }
+
+        if (string.Equals(run.RawStatus, "active", StringComparison.OrdinalIgnoreCase))
+        {
+            reason = "Active runs cannot be deleted.";
+            return false;
+        }
+
+        if (
+            BppRuntimeHost.RunContext.IsInGameRun
+            && string.Equals(
+                BppRuntimeHost.RunContext.CurrentServerRunId,
+                run.RunId,
+                StringComparison.Ordinal
+            )
+        )
+        {
+            reason = "The currently active gameplay run cannot be deleted.";
+            return false;
+        }
+
+        if (_repository == null)
+        {
+            reason = "Run log repository is unavailable.";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
     private void TryReplaySelectedBattle()
     {
         var battle = SelectedBattle;
@@ -427,6 +473,92 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         _statusMessage = $"Starting replay for {battle.BattleId}.";
         SetHistoryVisible(false);
+    }
+
+    private void TryDeleteSelectedRun()
+    {
+        var run = SelectedRun;
+        if (run == null)
+            return;
+
+        if (!CanDeleteSelectedRun(out var reason))
+        {
+            ClearDeleteRunConfirmation();
+            _statusMessage = reason;
+            RefreshUi();
+            return;
+        }
+
+        if (!IsDeleteRunConfirmationActive(run.RunId))
+        {
+            _deleteRunConfirmationRunId = run.RunId;
+            _deleteRunConfirmationUntil = Time.unscaledTime + 5f;
+            _statusMessage = $"Click Delete Run again within 5s to remove {ShortenRunId(run.RunId)}.";
+            RefreshUi();
+            return;
+        }
+
+        ClearDeleteRunConfirmation();
+
+        try
+        {
+            var battleIds = _repository!.ListBattleIdsByRun(run.RunId);
+            _repository.DeleteRun(run.RunId);
+            CleanupReplayPayloads(battleIds);
+
+            var deletedMessage =
+                battleIds.Count > 0
+                    ? $"Deleted run {ShortenRunId(run.RunId)} and cleaned {battleIds.Count} linked battle records."
+                    : $"Deleted run {ShortenRunId(run.RunId)}.";
+            RefreshData();
+            _statusMessage = deletedMessage;
+            RefreshUi();
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Run delete failed: {ex.Message}";
+            BppLog.Error("HistoryPanel", $"Failed to delete run {run.RunId}", ex);
+            RefreshUi();
+        }
+    }
+
+    private void CleanupReplayPayloads(IReadOnlyList<string> battleIds)
+    {
+        if (battleIds.Count == 0)
+            return;
+
+        var replayDirectory = BppRuntimeHost.Paths.CombatReplayDirectoryPath;
+        if (string.IsNullOrWhiteSpace(replayDirectory))
+            return;
+
+        var payloadStore = new CombatReplayPayloadStore(replayDirectory);
+        foreach (var battleId in battleIds)
+        {
+            try
+            {
+                payloadStore.Delete(battleId);
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "HistoryPanel",
+                    $"Failed to delete replay payload for battle {battleId}: {ex.Message}"
+                );
+            }
+        }
+    }
+
+    private void ClearDeleteRunConfirmation()
+    {
+        _deleteRunConfirmationRunId = null;
+        _deleteRunConfirmationUntil = 0f;
+    }
+
+    private bool IsDeleteRunConfirmationActive(string runId)
+    {
+        return !string.IsNullOrWhiteSpace(runId)
+            && string.Equals(_deleteRunConfirmationRunId, runId, StringComparison.Ordinal)
+            && Time.unscaledTime < _deleteRunConfirmationUntil;
     }
 
     private string GetDatabaseChipText()
