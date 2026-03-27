@@ -16,6 +16,7 @@ and `tests/` remain the source of truth.
 ## Reference Docs
 
 - `reference/combat-replay-recording.md`: saved replay capture and playback architecture
+- `reference/hotkeys-reference.md`: current player-facing, debug-only, and internal panel hotkeys
 - `reference/upgrade-tooltip-implementation.md`: enchant and upgrade tooltip behavior
 - `reference/settings-and-debug-surfaces.md`: gameplay settings toggles, tooltip keybind rows, and debug-only panels
 - `reference/sqlite-schema-reference.md`: current SQLite schema and read/write paths

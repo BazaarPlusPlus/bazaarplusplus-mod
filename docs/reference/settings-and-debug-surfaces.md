@@ -61,14 +61,17 @@ of visible hero banners through `NameOverrideUiRefresh`.
 When `BppBuild.IsDebug` is true, `Plugin.Awake()` adds:
 
 - `DebugPanel`
-- `CombatLogController`
-- `CombatLogOverlay`
 - `MonsterPreviewDebugController`
 
-Key debug entry points:
+Player-facing overlay entry points:
+
+- `F6`: toggle `CombatStatusBar`
+- `F7`: toggle standalone `CombatLogOverlay`
+- `F8`: toggle `HistoryPanel`
+
+Debug-only entry points:
 
 - `F2`: toggle `DebugPanel`
-- `F7`: toggle standalone `CombatLogOverlay`
 - `DebugPanel -> Replays`: launch saved replay playback through `CombatReplayRuntime`
 - `DebugPanel -> Preview`: inspect monster-preview anchor / presentation state from
   `MonsterPreviewDebugController`
