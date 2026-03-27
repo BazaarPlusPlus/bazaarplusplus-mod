@@ -58,6 +58,11 @@ Assert(
     "Bootstrap SQL should not retain replay_id in pvp_battles."
 );
 Assert(
+    bootstrapSql.Contains("player_rank", StringComparison.Ordinal)
+        && bootstrapSql.Contains("player_rating", StringComparison.Ordinal),
+    "Bootstrap SQL should define player rank and rating columns."
+);
+Assert(
     bootstrapSql.Contains("player_name", StringComparison.Ordinal)
         && bootstrapSql.Contains("player_account_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("opponent_name", StringComparison.Ordinal)

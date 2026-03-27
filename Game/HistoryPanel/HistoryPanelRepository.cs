@@ -180,6 +180,8 @@ internal sealed class HistoryPanelRepository
                 day,
                 hour,
                 encounter_id,
+                player_rank,
+                player_rating,
                 opponent_name,
                 opponent_hero,
                 opponent_rank,
@@ -225,6 +227,8 @@ internal sealed class HistoryPanelRepository
                         GetNullableInt32(reader, "day"),
                         GetNullableInt32(reader, "hour"),
                         GetNullableString(reader, "encounter_id"),
+                        GetNullableString(reader, "player_rank"),
+                        GetNullableInt32(reader, "player_rating"),
                         GetNullableString(reader, "opponent_name"),
                         GetNullableString(reader, "opponent_hero"),
                         GetNullableString(reader, "opponent_rank"),
@@ -590,6 +594,8 @@ internal sealed class HistoryBattleRecord
         int? day,
         int? hour,
         string? encounterId,
+        string? playerRank,
+        int? playerRating,
         string? opponentName,
         string? opponentHero,
         string? opponentRank,
@@ -607,6 +613,8 @@ internal sealed class HistoryBattleRecord
         Day = day;
         Hour = hour;
         EncounterId = encounterId;
+        PlayerRank = playerRank;
+        PlayerRating = playerRating;
         OpponentName = opponentName;
         OpponentHero = opponentHero;
         OpponentRank = opponentRank;
@@ -629,6 +637,10 @@ internal sealed class HistoryBattleRecord
     public int? Hour { get; }
 
     public string? EncounterId { get; }
+
+    public string? PlayerRank { get; }
+
+    public int? PlayerRating { get; }
 
     public string? OpponentName { get; }
 

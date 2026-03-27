@@ -37,6 +37,14 @@ try
     Assert(Directory.Exists(singleOutDir), "Single-run output directory should exist.");
     Assert(File.Exists(Path.Combine(singleRunDir, "meta.json")), "meta.json should exist.");
     Assert(
+        ReadJsonString(Path.Combine(singleRunDir, "meta.json"), "player_rank") == "Gold 2",
+        "meta.json should include the player's rank snapshot."
+    );
+    Assert(
+        ReadJsonInt32(Path.Combine(singleRunDir, "meta.json"), "player_rating") == 1420,
+        "meta.json should include the player's rating snapshot."
+    );
+    Assert(
         File.ReadAllLines(Path.Combine(singleRunDir, "events.ndjson")).Length == 3,
         "events.ndjson should contain the expected number of lines."
     );
@@ -109,6 +117,8 @@ try
         Assert(
             root.GetProperty("player_name").GetString() == "Local Player"
                 && root.GetProperty("player_account_id").GetString() == "player-account-001"
+                && root.GetProperty("player_rank").GetString() == "Gold 2"
+                && root.GetProperty("player_rating").GetInt32() == 1420
                 && root.GetProperty("opponent_name").GetString() == "Test Rival"
                 && root.GetProperty("opponent_hero").GetString() == "Vanessa"
                 && root.GetProperty("opponent_rank").GetString() == "Gold"
@@ -217,6 +227,8 @@ static void WritePvpBattle(
             encounter_id,
             player_name,
             player_account_id,
+            player_rank,
+            player_rating,
             opponent_name,
             opponent_hero,
             opponent_rank,
@@ -240,6 +252,8 @@ static void WritePvpBattle(
             $encounterId,
             $playerName,
             $playerAccountId,
+            $playerRank,
+            $playerRating,
             $opponentName,
             $opponentHero,
             $opponentRank,
@@ -264,6 +278,8 @@ static void WritePvpBattle(
     command.Parameters.AddWithValue("$encounterId", "encounter-pvp-1");
     command.Parameters.AddWithValue("$playerName", "Local Player");
     command.Parameters.AddWithValue("$playerAccountId", "player-account-001");
+    command.Parameters.AddWithValue("$playerRank", "Gold 2");
+    command.Parameters.AddWithValue("$playerRating", 1420);
     command.Parameters.AddWithValue("$opponentName", opponentName);
     command.Parameters.AddWithValue("$opponentHero", "Vanessa");
     command.Parameters.AddWithValue("$opponentRank", "Gold");
@@ -311,6 +327,8 @@ static void WriteCompletedRun(
             StartedAtUtc = startedAt,
             Hero = hero,
             GameMode = "Ranked",
+            PlayerRank = "Gold 2",
+            PlayerRating = 1420,
             Day = 1,
             Hour = 1,
             Seed = seed,
@@ -472,6 +490,12 @@ static string ReadJsonString(string path, string propertyName)
     using var document = JsonDocument.Parse(File.ReadAllText(path));
     return document.RootElement.GetProperty(propertyName).GetString()
         ?? throw new InvalidOperationException($"Property {propertyName} was null in {path}");
+}
+
+static int ReadJsonInt32(string path, string propertyName)
+{
+    using var document = JsonDocument.Parse(File.ReadAllText(path));
+    return document.RootElement.GetProperty(propertyName).GetInt32();
 }
 
 static void Assert(bool condition, string message)

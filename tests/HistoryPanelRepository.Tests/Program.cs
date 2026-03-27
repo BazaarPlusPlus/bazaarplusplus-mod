@@ -67,6 +67,12 @@ try
     );
 
     var battleId = (string)(recordList[0].GetType().GetProperty("BattleId")!.GetValue(recordList[0])!);
+    var playerRank = (string?)(
+        recordList[0].GetType().GetProperty("PlayerRank")!.GetValue(recordList[0])
+    );
+    var playerRating = (int?)(
+        recordList[0].GetType().GetProperty("PlayerRating")!.GetValue(recordList[0])
+    );
     var snapshotSummary = (string)(
         recordList[0].GetType().GetProperty("SnapshotSummary")!.GetValue(recordList[0])!
     );
@@ -74,6 +80,10 @@ try
     Assert(
         battleId == "battle-good",
         "ListBattlesByRun should preserve valid rows even when an earlier row is malformed."
+    );
+    Assert(
+        playerRank == "Diamond 1" && playerRating == 1777,
+        "ListBattlesByRun should surface the persisted player rank and rating snapshot."
     );
     Assert(
         snapshotSummary.Contains("YOU 0 items", StringComparison.Ordinal)
@@ -241,6 +251,8 @@ static void InsertBattle(
             run_id,
             recorded_at_utc,
             combat_kind,
+            player_rank,
+            player_rating,
             player_hand_json,
             player_skills_json,
             opponent_hand_json,
@@ -250,6 +262,8 @@ static void InsertBattle(
             $runId,
             $recordedAtUtc,
             'PVPCombat',
+            'Diamond 1',
+            1777,
             $playerHandJson,
             $playerSkillsJson,
             $opponentHandJson,

@@ -33,6 +33,8 @@ try
                 StartedAtUtc = startedAt,
                 Hero = "Vanessa",
                 GameMode = "Ranked",
+                PlayerRank = "Gold 2",
+                PlayerRating = 1420,
                 Day = 1,
                 Hour = 1,
                 Seed = 42,
@@ -151,6 +153,16 @@ try
         Assert(
             GetString(connection, "SELECT run_id FROM runs WHERE run_id = $runId;", runId) == runId,
             "runs should contain the created run."
+        );
+        Assert(
+            GetString(connection, "SELECT player_rank FROM runs WHERE run_id = $runId;", runId)
+                == "Gold 2",
+            "runs should persist the player's rank snapshot."
+        );
+        Assert(
+            GetInt64(connection, "SELECT player_rating FROM runs WHERE run_id = $runId;", runId)
+                == 1420,
+            "runs should persist the player's rating snapshot."
         );
         Assert(
             CountRows(connection, "run_events") == 2,

@@ -8,6 +8,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.RunLogging;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.PvpBattles;
@@ -66,10 +67,13 @@ internal sealed class PvpBattleSnapshotCollector
 
     public PvpBattleParticipants BuildParticipants(CombatReplaySequenceCandidate candidate)
     {
+        RunLoggingGameDataReader.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
         return new PvpBattleParticipants
         {
             PlayerName = TryGetPlayerNameSafe(),
             PlayerAccountId = TryGetPlayerAccountIdSafe(),
+            PlayerRank = playerRank,
+            PlayerRating = playerRating,
             OpponentName = candidate.OpponentName,
             OpponentHero = candidate.OpponentHero,
             OpponentRank = candidate.OpponentRank,

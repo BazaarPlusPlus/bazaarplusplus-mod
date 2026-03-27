@@ -147,6 +147,8 @@ internal sealed class RunUploadSqliteStore
                 started_at_utc,
                 hero,
                 game_mode,
+                player_rank,
+                player_rating,
                 day,
                 hour,
                 seed,
@@ -169,6 +171,8 @@ internal sealed class RunUploadSqliteStore
                 "started_at_utc",
                 "hero",
                 "game_mode",
+                "player_rank",
+                "player_rating",
                 "day",
                 "hour",
                 "seed",
@@ -267,6 +271,8 @@ internal sealed class RunUploadSqliteStore
                 encounter_id,
                 player_name,
                 player_account_id,
+                player_rank,
+                player_rating,
                 opponent_name,
                 opponent_hero,
                 opponent_rank,
@@ -299,6 +305,8 @@ internal sealed class RunUploadSqliteStore
                 "encounter_id",
                 "player_name",
                 "player_account_id",
+                "player_rank",
+                "player_rating",
                 "opponent_name",
                 "opponent_hero",
                 "opponent_rank",
@@ -353,6 +361,25 @@ internal sealed class RunUploadSqliteStore
         command.CommandTimeout = 2;
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
+        EnsureColumnExists(connection, RunLogSqliteSchema.RunsTableName, "player_rank", "TEXT NULL");
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunsTableName,
+            "player_rating",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.PvpBattlesTableName,
+            "player_rank",
+            "TEXT NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.PvpBattlesTableName,
+            "player_rating",
+            "INTEGER NULL"
+        );
     }
 
     private SqliteConnection OpenConnection()
@@ -412,5 +439,36 @@ internal sealed class RunUploadSqliteStore
         }
 
         return payload;
+    }
+
+    private static void EnsureColumnExists(
+        SqliteConnection connection,
+        string tableName,
+        string columnName,
+        string columnDefinition
+    )
+    {
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (
+                string.Equals(
+                    reader.GetString(reader.GetOrdinal("name")),
+                    columnName,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return;
+            }
+        }
+
+        using var alter = connection.CreateCommand();
+        alter.CommandTimeout = 2;
+        alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+        alter.ExecuteNonQuery();
     }
 }

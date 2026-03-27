@@ -11,6 +11,7 @@ using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using TheBazaar;
+using TheBazaar.ProfileData;
 
 namespace BazaarPlusPlus.Game.RunLogging;
 
@@ -44,10 +45,33 @@ internal static class RunLoggingGameDataReader
             StartedAtUtc = DateTimeOffset.UtcNow,
             Hero = Data.Run.Player.Hero.ToString(),
             GameMode = Data.SelectedPlayMode.ToString(),
+            PlayerRank = GetCurrentPlayerRank(),
+            PlayerRating = GetCurrentPlayerRating(),
             Day = (int?)Data.Run.Day,
             Hour = GetCurrentRunHour(),
         };
         return true;
+    }
+
+    public static bool TryGetPlayerRankSnapshot(out string? rank, out int? rating)
+    {
+        rank = null;
+        rating = null;
+
+        try
+        {
+            var currentSeasonRank = Data.Rank?.CurrentSeasonRank;
+            if (currentSeasonRank == null)
+                return false;
+
+            rank = FormatPlayerRank(currentSeasonRank);
+            rating = currentSeasonRank.Rating;
+            return !string.IsNullOrWhiteSpace(rank) || rating.HasValue;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static bool TryBuildRunLogRunProgressInput(out RunLogRunProgressInput input)
@@ -166,6 +190,27 @@ internal static class RunLoggingGameDataReader
     private static int? GetCurrentRunHour()
     {
         return Data.Run == null ? null : (int?)Data.Run.Hour;
+    }
+
+    private static string? GetCurrentPlayerRank()
+    {
+        return TryGetPlayerRankSnapshot(out var rank, out _) ? rank : null;
+    }
+
+    private static int? GetCurrentPlayerRating()
+    {
+        return TryGetPlayerRankSnapshot(out _, out var rating) ? rating : null;
+    }
+
+    private static string? FormatPlayerRank(ISeasonRank currentSeasonRank)
+    {
+        var rank = currentSeasonRank.Rank.ToString();
+        if (string.IsNullOrWhiteSpace(rank))
+            return null;
+
+        return currentSeasonRank.Division > 0
+            ? $"{rank} {currentSeasonRank.Division}"
+            : rank;
     }
 
     private static RunLogSelectionOptionInput ToSelectionOption(RunInfo.CardInfo card)

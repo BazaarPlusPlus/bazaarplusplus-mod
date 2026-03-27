@@ -40,6 +40,13 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var command = CreateCommand(connection);
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
+        EnsureColumnExists(connection, RunLogSqliteSchema.RunsTableName, "player_rank", "TEXT NULL");
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunsTableName,
+            "player_rating",
+            "INTEGER NULL"
+        );
         EnsureColumnExists(
             connection,
             RunLogSqliteSchema.RunCheckpointsTableName,
@@ -201,6 +208,8 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 started_at_utc,
                 hero,
                 game_mode,
+                player_rank,
+                player_rating,
                 day,
                 hour,
                 seed,
@@ -211,6 +220,8 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 $startedAtUtc,
                 $hero,
                 $gameMode,
+                $playerRank,
+                $playerRating,
                 $day,
                 $hour,
                 $seed,
@@ -222,6 +233,8 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.Parameters.AddWithValue("$startedAtUtc", request.StartedAtUtc.ToString("o"));
         command.Parameters.AddWithValue("$hero", request.Hero);
         command.Parameters.AddWithValue("$gameMode", request.GameMode);
+        AddNullableString(command, "$playerRank", request.PlayerRank);
+        AddNullableInt32(command, "$playerRating", request.PlayerRating);
         AddNullableInt32(command, "$day", request.Day);
         AddNullableInt32(command, "$hour", request.Hour);
         AddNullableInt32(command, "$seed", request.Seed);

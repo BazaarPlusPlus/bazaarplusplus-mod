@@ -7,6 +7,10 @@ internal sealed class PvpBattleParticipants
 
     public string? PlayerAccountId { get; set; }
 
+    public string? PlayerRank { get; set; }
+
+    public int? PlayerRating { get; set; }
+
     public string? OpponentName { get; set; }
 
     public string? OpponentHero { get; set; }

@@ -15,6 +15,10 @@ public sealed class RunLogCreateRequest
 
     public string GameMode { get; set; } = string.Empty;
 
+    public string? PlayerRank { get; set; }
+
+    public int? PlayerRating { get; set; }
+
     public int? Day { get; set; }
 
     public int? Hour { get; set; }
