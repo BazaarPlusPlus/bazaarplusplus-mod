@@ -10,6 +10,8 @@ var timeline = BuildTimeline(runtime);
 VerifyTimeline(timeline);
 VerifyPanelState(timeline);
 VerifyPanelFilters(timeline);
+VerifyVisibleRowCaching(timeline);
+VerifyViewportWindowing();
 VerifySourceWiring();
 
 Console.WriteLine("CombatLogRuntime checks passed.");
@@ -281,34 +283,83 @@ static void VerifyPanelFilters(CombatLogTimeline timeline)
     );
 }
 
+static void VerifyVisibleRowCaching(CombatLogTimeline timeline)
+{
+    var state = new CombatLogPanelState();
+    state.Refresh(99);
+
+    var firstRows = state.BuildVisibleRows(timeline);
+    var secondRows = state.BuildVisibleRows(timeline);
+    Assert(
+        ReferenceEquals(firstRows, secondRows),
+        "Visible-row projection should be cached when playback state and filters are unchanged."
+    );
+
+    state.ToggleCards();
+    var filteredRows = state.BuildVisibleRows(timeline);
+    Assert(
+        !ReferenceEquals(firstRows, filteredRows),
+        "Changing a filter should invalidate the cached visible rows."
+    );
+}
+
+static void VerifyViewportWindowing()
+{
+    var topWindow = CombatLogViewport.CalculateVisibleRowRange(
+        totalRowCount: 500,
+        scrollY: 0f,
+        viewportHeight: 220f
+    );
+    Assert(topWindow.StartIndex == 0, "Top-of-list rendering should start at the first row.");
+    Assert(
+        topWindow.EndIndex > topWindow.StartIndex && topWindow.EndIndex < 500,
+        "Windowed rendering should only draw a subset of the full row list."
+    );
+
+    var middleWindow = CombatLogViewport.CalculateVisibleRowRange(
+        totalRowCount: 500,
+        scrollY: 2400f,
+        viewportHeight: 220f
+    );
+    Assert(
+        middleWindow.StartIndex > 0,
+        "Scrolled rendering should skip rows before the visible viewport."
+    );
+    Assert(
+        middleWindow.EndIndex > middleWindow.StartIndex && middleWindow.EndIndex < 500,
+        "Scrolled rendering should still cap the draw range to a small window."
+    );
+
+    var overscrolledWindow = CombatLogViewport.CalculateVisibleRowRange(
+        totalRowCount: 12,
+        scrollY: 10000f,
+        viewportHeight: 220f
+    );
+    Assert(
+        overscrolledWindow.StartIndex < 12 && overscrolledWindow.EndIndex == 12,
+        "Windowed rendering should clamp overscrolled positions back to the last available rows."
+    );
+}
+
 static void VerifySourceWiring()
 {
     var pluginSource = ReadSource("Plugin.cs");
-    var debugBranchIndex = pluginSource.IndexOf("if (BppBuild.IsDebug)", StringComparison.Ordinal);
-    var controllerAddIndex = pluginSource.IndexOf(
-        "AddComponent<CombatLogController>()",
-        StringComparison.Ordinal
-    );
-    var overlayAddIndex = pluginSource.IndexOf(
-        "AddComponent<CombatLogOverlay>()",
-        StringComparison.Ordinal
+    var debugBranch = ReadBraceBlock(pluginSource, "if (BppBuild.IsDebug)");
+    Assert(
+        pluginSource.Contains("AddComponent<CombatLogController>()", StringComparison.Ordinal)
+            && pluginSource.Contains("AddComponent<CombatLogOverlay>()", StringComparison.Ordinal),
+        "Plugin should attach both combat log components."
     );
     Assert(
-        debugBranchIndex >= 0
-            && controllerAddIndex > debugBranchIndex
-            && overlayAddIndex > debugBranchIndex,
-        "Plugin should attach both combat log components only in debug builds."
+        !debugBranch.Contains("CombatLogController", StringComparison.Ordinal)
+            && !debugBranch.Contains("CombatLogOverlay", StringComparison.Ordinal),
+        "DebugPanel debug-only wiring should no longer own combat log components."
     );
 
     var debugPanelSource = ReadSource("Game/DebugPanel/DebugPanel.cs");
     Assert(
-        !debugPanelSource.Contains("CombatLogPanel", StringComparison.Ordinal),
-        "Debug panel should not own the combat log overlay."
-    );
-
-    Assert(
-        overlayAddIndex >= 0,
-        "Plugin should attach the standalone combat log overlay in debug builds."
+        !debugPanelSource.Contains("CombatLog", StringComparison.Ordinal),
+        "Debug panel should not reference combat log code or copy."
     );
 
     var overlaySource = ReadSource("Game/CombatLog/CombatLogOverlay.cs");
@@ -344,6 +395,11 @@ static void VerifySourceWiring()
             && panelSource.Contains("ToggleCards", StringComparison.Ordinal),
         "Combat log panel should expose separate combatant and card filter toggles."
     );
+
+    Assert(
+        panelSource.Contains("CombatLogViewport.CalculateVisibleRowRange", StringComparison.Ordinal),
+        "Combat log panel should use windowed rendering helpers for large timelines."
+    );
 }
 
 static CombatLogCardDisplayInfo? ResolveCardDisplayInfo(string instanceId)
@@ -361,6 +417,29 @@ static string ReadSource(string relativePath)
     return File.ReadAllText(
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../", relativePath))
     );
+}
+
+static string ReadBraceBlock(string source, string anchor)
+{
+    var anchorIndex = source.IndexOf(anchor, StringComparison.Ordinal);
+    Assert(anchorIndex >= 0, $"Could not find source anchor: {anchor}");
+
+    var openBraceIndex = source.IndexOf('{', anchorIndex);
+    Assert(openBraceIndex >= 0, $"Could not find block start for anchor: {anchor}");
+
+    var depth = 0;
+    for (var index = openBraceIndex; index < source.Length; index++)
+    {
+        if (source[index] == '{')
+            depth++;
+        else if (source[index] == '}')
+            depth--;
+
+        if (depth == 0)
+            return source.Substring(openBraceIndex, index - openBraceIndex + 1);
+    }
+
+    throw new InvalidOperationException($"Could not find block end for anchor: {anchor}");
 }
 
 static void Assert(bool condition, string message)

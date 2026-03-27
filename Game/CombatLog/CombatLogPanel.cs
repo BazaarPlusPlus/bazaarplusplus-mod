@@ -10,6 +10,7 @@ internal sealed class CombatLogPanel
     private const float MinWindowWidth = 320f;
     private const float Spacing = 10f;
     private const float ScreenMargin = 10f;
+    private const float ScrollViewportChromeHeight = 132f;
 
     private static readonly GUIStyle HeaderStyle = new GUIStyle();
     private static readonly GUIStyle StatusStyle = new GUIStyle();
@@ -59,7 +60,7 @@ internal sealed class CombatLogPanel
                 windowRect.height - 16f
             )
         );
-        DrawWindowContents(timeline);
+        DrawWindowContents(timeline, windowRect.height - 16f);
         GUILayout.EndArea();
     }
 
@@ -84,7 +85,7 @@ internal sealed class CombatLogPanel
                 windowRect.height - 16f
             )
         );
-        DrawWindowContents(timeline);
+        DrawWindowContents(timeline, windowRect.height - 16f);
         GUILayout.EndArea();
     }
 
@@ -114,7 +115,7 @@ internal sealed class CombatLogPanel
         return new Rect(Screen.width - width - ScreenMargin, ScreenMargin, width, height);
     }
 
-    private void DrawWindowContents(CombatLogTimeline? timeline)
+    private void DrawWindowContents(CombatLogTimeline? timeline, float contentHeight)
     {
         GUILayout.Label("Combat Log", HeaderStyle);
         GUILayout.Label(
@@ -130,6 +131,7 @@ internal sealed class CombatLogPanel
             return;
         }
 
+        var viewportHeight = Mathf.Max(contentHeight - ScrollViewportChromeHeight, 80f);
         var visibleRows = _state.BuildVisibleRows(timeline);
         if (visibleRows.Count == 0)
         {
@@ -137,8 +139,17 @@ internal sealed class CombatLogPanel
             return;
         }
 
-        _scroll = GUILayout.BeginScrollView(_scroll);
-        DrawRows(visibleRows);
+        var visibleRange = CombatLogViewport.CalculateVisibleRowRange(
+            visibleRows.Count,
+            _scroll.y,
+            viewportHeight
+        );
+        _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(viewportHeight));
+        if (visibleRange.TopSpacerHeight > 0f)
+            GUILayout.Space(visibleRange.TopSpacerHeight);
+        DrawRows(visibleRows, visibleRange.StartIndex, visibleRange.EndIndex);
+        if (visibleRange.BottomSpacerHeight > 0f)
+            GUILayout.Space(visibleRange.BottomSpacerHeight);
         GUILayout.EndScrollView();
     }
 
@@ -167,10 +178,11 @@ internal sealed class CombatLogPanel
         GUI.color = previousColor;
     }
 
-    private static void DrawRows(IReadOnlyList<CombatLogVisibleRow> rows)
+    private static void DrawRows(IReadOnlyList<CombatLogVisibleRow> rows, int startIndex, int endIndex)
     {
-        foreach (var row in rows)
+        for (var index = startIndex; index < endIndex; index++)
         {
+            var row = rows[index];
             var primaryStyle = row.VisualState switch
             {
                 CombatLogRowVisualState.Current => CurrentRowStyle,

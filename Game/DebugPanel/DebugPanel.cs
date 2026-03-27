@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Game.CombatLog;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.EncounterTracking;
@@ -159,7 +158,7 @@ internal sealed class DebugPanel : MonoBehaviour
             StatusStyle
         );
         GUILayout.Label(
-            $"[F2] Toggle  [F7] Combat Log Overlay  [1-5] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}",
+            $"[F2] Toggle  [1-5] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}",
             MutedStyle
         );
         GUILayout.Space(8);

@@ -54,6 +54,8 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<HistoryPanel>();
         gameObject.AddComponent<HistoryCollectionsEntryBridge>();
         gameObject.AddComponent<CombatStatusBar>();
+        gameObject.AddComponent<CombatLogController>();
+        gameObject.AddComponent<CombatLogOverlay>();
         gameObject.AddComponent<MonsterPreviewController>();
         gameObject.AddComponent<MonsterPreviewWarmupController>();
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
@@ -62,8 +64,6 @@ public class Plugin : BaseUnityPlugin
         if (BppBuild.IsDebug)
         {
             gameObject.AddComponent<DebugPanel>();
-            gameObject.AddComponent<CombatLogController>();
-            gameObject.AddComponent<CombatLogOverlay>();
             gameObject.AddComponent<MonsterPreviewDebugController>();
         }
 

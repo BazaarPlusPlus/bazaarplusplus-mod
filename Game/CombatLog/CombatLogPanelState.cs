@@ -5,6 +5,11 @@ namespace BazaarPlusPlus.Game.CombatLog;
 
 internal sealed class CombatLogPanelState
 {
+    private CombatLogTimeline? _cachedTimeline;
+    private IReadOnlyList<CombatLogVisibleRow> _cachedVisibleRows =
+        System.Array.Empty<CombatLogVisibleRow>();
+    private bool _visibleRowsDirty = true;
+
     public int ProcessedFrameCount { get; private set; }
 
     public int CurrentFrameIndex { get; private set; } = -1;
@@ -23,44 +28,57 @@ internal sealed class CombatLogPanelState
 
     public void Refresh(int processedFrameCount)
     {
-        ProcessedFrameCount = processedFrameCount < 0 ? 0 : processedFrameCount;
+        var normalizedFrameCount = processedFrameCount < 0 ? 0 : processedFrameCount;
+        if (ProcessedFrameCount != normalizedFrameCount)
+            _visibleRowsDirty = true;
+
+        ProcessedFrameCount = normalizedFrameCount;
         CurrentFrameIndex = CombatLogPlaybackState.GetLastProcessedFrameIndex(ProcessedFrameCount);
     }
 
     public void ToggleActions()
     {
         ShowActions = !ShowActions;
+        _visibleRowsDirty = true;
     }
 
     public void ToggleCombatants()
     {
         ShowCombatants = !ShowCombatants;
+        _visibleRowsDirty = true;
     }
 
     public void ToggleCards()
     {
         ShowCards = !ShowCards;
+        _visibleRowsDirty = true;
     }
 
     public void ToggleRewards()
     {
         ShowRewards = !ShowRewards;
+        _visibleRowsDirty = true;
     }
 
     public void ToggleSystem()
     {
         ShowSystem = !ShowSystem;
+        _visibleRowsDirty = true;
     }
 
     public void ToggleUnknown()
     {
         ShowUnknown = !ShowUnknown;
+        _visibleRowsDirty = true;
     }
 
     public IReadOnlyList<CombatLogVisibleRow> BuildVisibleRows(CombatLogTimeline? timeline)
     {
         if (timeline?.Rows == null || timeline.Rows.Count == 0)
             return System.Array.Empty<CombatLogVisibleRow>();
+
+        if (!_visibleRowsDirty && ReferenceEquals(_cachedTimeline, timeline))
+            return _cachedVisibleRows;
 
         var rows = new List<CombatLogVisibleRow>(timeline.Rows.Count);
         foreach (var row in timeline.Rows)
@@ -78,7 +96,10 @@ internal sealed class CombatLogPanelState
             rows.Add(new CombatLogVisibleRow(row, visualState));
         }
 
-        return rows;
+        _cachedTimeline = timeline;
+        _cachedVisibleRows = rows;
+        _visibleRowsDirty = false;
+        return _cachedVisibleRows;
     }
 
     private bool ShouldInclude(CombatLogRowCategory category)
