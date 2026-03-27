@@ -42,16 +42,14 @@ Assert(
     "Source name should be preserved."
 );
 
-var previewDataSourceType = RequireType(
-    "BazaarPlusPlus.Game.MonsterPreview.MonsterDatabasePreviewDataSource"
-);
-var buildModelMethod = previewDataSourceType.GetMethod(
+var previewProjectorType = RequireType("BazaarPlusPlus.Game.MonsterPreview.MonsterPreviewProjector");
+var buildModelMethod = previewProjectorType.GetMethod(
     "BuildModel",
     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
 );
 Assert(
     buildModelMethod != null,
-    "MonsterDatabasePreviewDataSource should expose BuildModel for monster preview projection."
+    "MonsterPreviewProjector should expose BuildModel for monster preview projection."
 );
 
 var monsterInfoType = RequireType("BazaarPlusPlus.MonsterInfo");

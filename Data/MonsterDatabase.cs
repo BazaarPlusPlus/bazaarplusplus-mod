@@ -1,4 +1,5 @@
 #pragma warning disable CS0436
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,12 +10,12 @@ using Newtonsoft.Json;
 
 namespace BazaarPlusPlus;
 
-internal static class MonsterDatabase
+internal sealed class MonsterDatabase : IMonsterCatalog
 {
     private const string EmbeddedResourceName = "BazaarPlusPlus.Data.monsters_bazaardb.json";
 
-    private static readonly Dictionary<Guid, MonsterInfo> _db = new Dictionary<Guid, MonsterInfo>();
-    private static readonly Dictionary<string, MonsterInfo> _dbByShortEncounterId = new Dictionary<
+    private readonly Dictionary<Guid, MonsterInfo> _db = new Dictionary<Guid, MonsterInfo>();
+    private readonly Dictionary<string, MonsterInfo> _dbByShortEncounterId = new Dictionary<
         string,
         MonsterInfo
     >(StringComparer.OrdinalIgnoreCase);
@@ -31,13 +32,13 @@ internal static class MonsterDatabase
         public string BaseTier { get; set; } = string.Empty;
 
         [JsonProperty("rewards")]
-        public MonsterRewardsDto Rewards { get; set; }
+        public MonsterRewardsDto? Rewards { get; set; }
 
         [JsonProperty("combatant")]
-        public MonsterCombatantDto Combatant { get; set; }
+        public MonsterCombatantDto? Combatant { get; set; }
 
         [JsonProperty("monster_metadata")]
-        public MonsterMetadataDto MonsterMetadata { get; set; }
+        public MonsterMetadataDto? MonsterMetadata { get; set; }
     }
 
     private sealed class MonsterRewardsDto
@@ -112,7 +113,7 @@ internal static class MonsterDatabase
         public string Type { get; set; } = string.Empty;
     }
 
-    public static void Load()
+    public void Initialize()
     {
         try
         {
@@ -161,14 +162,14 @@ internal static class MonsterDatabase
         }
     }
 
-    public static bool TryGetByEncounterId(Guid encounterId, out MonsterInfo monster)
+    public bool TryGetByEncounterId(Guid encounterId, out MonsterInfo? monster)
     {
         var found = _db.TryGetValue(encounterId, out monster);
         BppLog.Debug("MonsterDatabase", $"Lookup encounterId={encounterId} found={found}");
         return found;
     }
 
-    public static bool TryGetByEncounterId(string encounterId, out MonsterInfo monster)
+    public bool TryGetByEncounterId(string encounterId, out MonsterInfo? monster)
     {
         monster = null;
         if (string.IsNullOrWhiteSpace(encounterId))
@@ -186,7 +187,7 @@ internal static class MonsterDatabase
         return TryGetByEncounterIdPrefix(encounterId, out monster);
     }
 
-    public static bool TryGetByEncounterIdPrefix(string encounterIdPrefix, out MonsterInfo monster)
+    public bool TryGetByEncounterIdPrefix(string encounterIdPrefix, out MonsterInfo? monster)
     {
         monster = null;
         var key = GetShortEncounterId(encounterIdPrefix);
@@ -199,21 +200,9 @@ internal static class MonsterDatabase
         return found;
     }
 
-    public static LegacyMonsterEntry TryGet(string encounterInternalName)
-    {
-        return null;
-    }
-
-    public static IReadOnlyCollection<MonsterInfo> GetAll()
+    public IReadOnlyCollection<MonsterInfo> GetAll()
     {
         return _db.Values.ToList();
-    }
-
-    internal sealed class LegacyMonsterEntry
-    {
-        public List<string> Items { get; set; }
-
-        public List<string> Skills { get; set; }
     }
 
     private static string ReadDatabaseJson(out string source)
@@ -243,16 +232,24 @@ internal static class MonsterDatabase
         );
     }
 
-    private static MonsterInfo MapMonster(Guid encounterId, MonsterRecordDto dto)
+    private static MonsterInfo? MapMonster(Guid encounterId, MonsterRecordDto dto)
     {
         if (dto == null)
             return null;
 
         var boardCards =
-            dto.MonsterMetadata?.Board?.Select(MapBoardCard).Where(card => card != null).ToList()
+            dto.MonsterMetadata
+                ?.Board?.Select(MapBoardCard)
+                .Where(card => card != null)
+                .Cast<MonsterBoardCardInfo>()
+                .ToList()
             ?? new List<MonsterBoardCardInfo>();
         var skills =
-            dto.MonsterMetadata?.Skills?.Select(MapSkill).Where(skill => skill != null).ToList()
+            dto.MonsterMetadata
+                ?.Skills?.Select(MapSkill)
+                .Where(skill => skill != null)
+                .Cast<MonsterSkillInfo>()
+                .ToList()
             ?? new List<MonsterSkillInfo>();
 
         return new MonsterInfo
@@ -271,7 +268,7 @@ internal static class MonsterDatabase
         };
     }
 
-    private static MonsterBoardCardInfo MapBoardCard(MonsterBoardCardDto dto)
+    private static MonsterBoardCardInfo? MapBoardCard(MonsterBoardCardDto dto)
     {
         if (dto == null || !Guid.TryParse(dto.CardId, out var cardId))
         {
@@ -293,7 +290,7 @@ internal static class MonsterDatabase
         };
     }
 
-    private static MonsterSkillInfo MapSkill(MonsterSkillDto dto)
+    private static MonsterSkillInfo? MapSkill(MonsterSkillDto dto)
     {
         if (dto == null || !Guid.TryParse(dto.SkillId, out var skillId))
         {

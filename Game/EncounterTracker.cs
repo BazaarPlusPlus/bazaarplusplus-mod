@@ -114,13 +114,10 @@ internal static class EncounterTracker
 
             var encounterName = card.Template.InternalName;
             var monster = combat.CombatantType as TCombatantMonster;
-            MonsterDatabase.TryGetByEncounterId(card.TemplateId, out var monsterInfo);
+            BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(card.TemplateId, out var monsterInfo);
             var previewModel =
                 monsterInfo != null
-                    ? MonsterDatabasePreviewDataSource.BuildModel(
-                        monsterInfo,
-                        "encounter_tracker_cache"
-                    )
+                    ? MonsterPreviewProjector.BuildModel(monsterInfo, "encounter_tracker_cache")
                     : null;
 
             previews.Add(

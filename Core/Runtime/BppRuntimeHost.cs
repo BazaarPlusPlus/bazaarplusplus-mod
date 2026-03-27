@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
@@ -21,12 +22,14 @@ internal sealed class BppRuntimeHost
     private static readonly IBppEventBus DetachedEventBus = new InMemoryBppEventBus();
     private static readonly BppConfig DetachedConfig = new();
     private static readonly BppPathService DetachedPaths = new();
+    private static readonly IMonsterCatalog DetachedMonsterCatalog = new EmptyMonsterCatalog();
     private static readonly RunContextStore DetachedRunContext = new();
     private static readonly GameStateProbe DetachedGameStateProbe = new();
     private readonly ManualLogSource _logger;
     private readonly InMemoryBppEventBus _eventBus = new();
     private readonly BppConfig _config = new();
     private readonly BppPathService _paths = new();
+    private readonly MonsterDatabase _monsterCatalog = new();
     private readonly RunContextStore _runContext = new();
     private readonly GameStateProbe _gameStateProbe = new();
     private readonly RunLifecycleModule _runLifecycle;
@@ -52,6 +55,7 @@ internal sealed class BppRuntimeHost
         _logger = logger;
         _config.Initialize(configFile);
         _paths.Initialize();
+        _monsterCatalog.Initialize();
         _runContext.Reset();
         _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);
         _combatReplayModule = new CombatReplayModule(_eventBus, combatReplayRuntimeAccessor);
@@ -67,6 +71,8 @@ internal sealed class BppRuntimeHost
     public static IBppConfig Config => Current?._config ?? DetachedConfig;
 
     public static IPathService Paths => Current?._paths ?? DetachedPaths;
+
+    public static IMonsterCatalog MonsterCatalog => Current?._monsterCatalog ?? DetachedMonsterCatalog;
 
     public static IRunContext RunContext => Current?._runContext ?? DetachedRunContext;
 
@@ -98,5 +104,31 @@ internal sealed class BppRuntimeHost
         _runLifecycle.Stop();
         if (ReferenceEquals(Current, this))
             Current = null;
+    }
+
+    private sealed class EmptyMonsterCatalog : IMonsterCatalog
+    {
+        public bool TryGetByEncounterId(Guid encounterId, out MonsterInfo? monster)
+        {
+            monster = null;
+            return false;
+        }
+
+        public bool TryGetByEncounterId(string encounterId, out MonsterInfo? monster)
+        {
+            monster = null;
+            return false;
+        }
+
+        public bool TryGetByEncounterIdPrefix(string encounterIdPrefix, out MonsterInfo? monster)
+        {
+            monster = null;
+            return false;
+        }
+
+        public IReadOnlyCollection<MonsterInfo> GetAll()
+        {
+            return Array.Empty<MonsterInfo>();
+        }
     }
 }

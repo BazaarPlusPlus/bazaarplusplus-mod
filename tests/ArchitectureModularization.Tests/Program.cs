@@ -5,6 +5,7 @@ RequireType("BazaarPlusPlus.Core.Events.IBppEventBus");
 RequireType("BazaarPlusPlus.Core.Events.InMemoryBppEventBus");
 RequireType("BazaarPlusPlus.Core.Config.IBppConfig");
 RequireType("BazaarPlusPlus.Core.Paths.IPathService");
+RequireType("BazaarPlusPlus.IMonsterCatalog");
 RequireType("BazaarPlusPlus.Core.RunContext.IRunContext");
 RequireType("BazaarPlusPlus.Core.GameState.IGameStateProbe");
 RequireType("BazaarPlusPlus.Core.Config.BppConfig");
@@ -47,6 +48,10 @@ Assert(
 Assert(
     pluginSource.Contains("gameObject.AddComponent<RunUploadController>();", StringComparison.Ordinal),
     "Plugin should mount the delayed run-upload controller."
+);
+Assert(
+    !pluginSource.Contains("MonsterDatabase.Load();", StringComparison.Ordinal),
+    "Plugin should not preload monster data through a global static database."
 );
 Assert(
     !pluginSource.Contains("CombatStatusBar.InitializeConfig", StringComparison.Ordinal),
@@ -123,6 +128,10 @@ Assert(
     "BppRuntimeHost should expose paths through BppPathService."
 );
 Assert(
+    runtimeHostSource.Contains("public static IMonsterCatalog MonsterCatalog", StringComparison.Ordinal),
+    "BppRuntimeHost should expose monster data through an IMonsterCatalog boundary."
+);
+Assert(
     !runtimeHostSource.Contains("OnNetMessageObserved", StringComparison.Ordinal)
         && !runtimeHostSource.Contains("OnCombatSimObserved", StringComparison.Ordinal)
         && !runtimeHostSource.Contains("OnCombatFrameAdvanced", StringComparison.Ordinal)
@@ -189,6 +198,13 @@ var encounterTrackerSource = ReadSource("Game/EncounterTracker.cs");
 Assert(
     !encounterTrackerSource.Contains("RunLoggingController.Instance", StringComparison.Ordinal),
     "EncounterTracker should not call run logging directly."
+);
+
+var monsterDatabaseSource = ReadSource("Data/MonsterDatabase.cs");
+Assert(
+    !monsterDatabaseSource.Contains("LegacyMonsterEntry", StringComparison.Ordinal)
+        && !monsterDatabaseSource.Contains("TryGet(string encounterInternalName)", StringComparison.Ordinal),
+    "MonsterDatabase should remove unused legacy entry APIs once the catalog boundary is in place."
 );
 
 var runStateSyncSource = ReadSource("Game/RunStateSyncController.cs");

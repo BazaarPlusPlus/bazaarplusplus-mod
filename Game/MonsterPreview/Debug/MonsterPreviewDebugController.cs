@@ -5,6 +5,7 @@ using System.Linq;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
 using UnityEngine;
 
@@ -452,7 +453,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
     {
         _activeEncounterId = DefaultEncounterId;
 
-        if (!MonsterDatabase.TryGetByEncounterId(DefaultEncounterId, out var monster))
+        if (!BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(DefaultEncounterId, out var monster))
         {
             _activeMonsterTitle = string.Empty;
             BppLog.Warn(
@@ -465,7 +466,7 @@ internal sealed class MonsterPreviewDebugController : MonoBehaviour
         }
 
         _activeMonsterTitle = monster.Title;
-        var previewModel = MonsterDatabasePreviewDataSource.BuildModel(monster, "monster_db");
+        var previewModel = MonsterPreviewProjector.BuildModel(monster, "monster_db");
         var specs = previewModel.ItemCards.ToList();
         var skillSpecs = previewModel.SkillCards.ToList();
         BppLog.Debug(

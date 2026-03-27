@@ -181,7 +181,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         if (card == null || !BppRuntimeHost.RunContext.IsInGameRun)
             return false;
 
-        if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out _))
+        if (BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(card.TemplateId.ToString(), out _))
             return true;
 
         return FindEncounterPreview(card) != null;
@@ -199,9 +199,14 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         if (card == null || !BppRuntimeHost.RunContext.IsInGameRun)
             return false;
 
-        if (MonsterDatabase.TryGetByEncounterId(card.TemplateId.ToString(), out var monster))
+        if (
+            BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(
+                card.TemplateId.ToString(),
+                out var monster
+            )
+        )
         {
-            var sourceModel = MonsterDatabasePreviewDataSource.BuildModel(monster, "monster_db");
+            var sourceModel = MonsterPreviewProjector.BuildModel(monster, "monster_db");
             var cards = PreviewCardSpecFilter.FilterLocallyRenderable(sourceModel.ItemCards);
             var skillCards = PreviewCardSpecFilter.FilterLocallyRenderable(sourceModel.SkillCards);
             source = $"monster_db:{monster.EncounterShortId}";

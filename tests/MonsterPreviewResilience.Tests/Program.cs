@@ -7,6 +7,7 @@ TestRecoverableLocalCatalogCache();
 TestRecoverableItemAttrCache();
 TestPreviewFactoriesCatchAsyncInitializationFailures();
 TestMonsterPreviewWarmupIsMounted();
+TestMonsterPreviewProjectionSeams();
 
 Console.WriteLine("MonsterPreviewResilience checks passed.");
 
@@ -119,6 +120,7 @@ static void TestMonsterPreviewBoardSupportsOverflowSkills()
 static void TestRecoverableLocalCatalogCache()
 {
     var source = ReadRepoFile("Data/LocalCardTemplateCatalog.cs");
+    var sharedCacheSource = ReadRepoFile("Data/CardsJsonCache.cs");
 
     Assert(
         !source.Contains("Lazy<HashSet<Guid>>", StringComparison.Ordinal),
@@ -139,6 +141,16 @@ static void TestRecoverableLocalCatalogCache()
     Assert(
         source.Contains("catch (Exception ex)", StringComparison.Ordinal),
         "LocalCardTemplateCatalog should catch file and parse failures instead of faulting permanently."
+    );
+    Assert(
+        source.Contains("CardsJsonCache", StringComparison.Ordinal)
+            && !source.Contains("JObject.Parse", StringComparison.Ordinal),
+        "LocalCardTemplateCatalog should reuse the shared cards.json cache instead of parsing the file independently."
+    );
+    Assert(
+        sharedCacheSource.Contains("JObject.Parse", StringComparison.Ordinal)
+            && sharedCacheSource.Contains("LoadSnapshot", StringComparison.Ordinal),
+        "CardsJsonCache should own the shared cards.json parse path."
     );
 }
 
@@ -168,6 +180,11 @@ static void TestRecoverableItemAttrCache()
     Assert(
         source.Contains("catch (Exception ex)", StringComparison.Ordinal),
         "ItemAttr should catch file and parse failures instead of faulting permanently."
+    );
+    Assert(
+        source.Contains("CardsJsonCache", StringComparison.Ordinal)
+            && !source.Contains("JObject.Parse", StringComparison.Ordinal),
+        "ItemAttr should reuse the shared cards.json cache instead of parsing the file independently."
     );
 }
 
@@ -209,6 +226,37 @@ static void TestMonsterPreviewWarmupIsMounted()
             && warmupSource.Contains("ItemAttr.Warm()", StringComparison.Ordinal)
             && warmupSource.Contains("Data.GetStatic()", StringComparison.Ordinal),
         "MonsterPreviewWarmupController should warm the local template catalog, attribute cache, and static data."
+    );
+}
+
+static void TestMonsterPreviewProjectionSeams()
+{
+    var dataSourceSource = ReadRepoFile(
+        "Game/MonsterPreview/DataSources/MonsterDatabasePreviewDataSource.cs"
+    );
+    var projectorSource = ReadRepoFile("Game/MonsterPreview/DataSources/MonsterPreviewProjector.cs");
+    var resolverSource = ReadRepoFile(
+        "Game/MonsterPreview/DataSources/MonsterPreviewAttributeResolver.cs"
+    );
+
+    Assert(
+        dataSourceSource.Contains("MonsterPreviewProjector", StringComparison.Ordinal),
+        "MonsterDatabasePreviewDataSource should delegate preview projection to MonsterPreviewProjector."
+    );
+    Assert(
+        !dataSourceSource.Contains("ParseTier(", StringComparison.Ordinal)
+            && !dataSourceSource.Contains("ParseSize(", StringComparison.Ordinal)
+            && !dataSourceSource.Contains("ItemAttr.GetAttributes", StringComparison.Ordinal),
+        "MonsterDatabasePreviewDataSource should not keep projection and attribute-building details inline."
+    );
+    Assert(
+        projectorSource.Contains("BuildModel", StringComparison.Ordinal)
+            && projectorSource.Contains("MonsterPreviewAttributeResolver", StringComparison.Ordinal),
+        "MonsterPreviewProjector should own preview model projection and use the attribute resolver."
+    );
+    Assert(
+        resolverSource.Contains("ItemAttr.GetAttributes", StringComparison.Ordinal),
+        "MonsterPreviewAttributeResolver should own attribute translation from ItemAttr."
     );
 }
 

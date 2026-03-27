@@ -46,7 +46,6 @@ public class Plugin : BaseUnityPlugin
 
         _harmony.PatchAll();
 
-        MonsterDatabase.Load();
         EncounterTracker.Initialize(BppRuntimeHost.EventBus);
         EncounterTracker.Subscribe();
         gameObject.AddComponent<RunStateSyncController>();
