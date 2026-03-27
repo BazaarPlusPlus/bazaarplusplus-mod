@@ -14,7 +14,8 @@ internal sealed class RunUploadRegistrationClient
     private readonly HttpClient _httpClient;
     private readonly RunUploadClientStateStore _clientStateStore;
     private readonly RunUploadKeyStore _keyStore;
-    private readonly RunUploadRouteKind _routeKind;
+    private readonly string _clientStateScope;
+    private readonly string _purpose;
     private readonly string _registrationEndpoint;
 
     public RunUploadRegistrationClient(
@@ -24,11 +25,34 @@ internal sealed class RunUploadRegistrationClient
         RunUploadRouteKind routeKind,
         string registrationEndpoint
     )
+        : this(
+            httpClient,
+            clientStateStore,
+            keyStore,
+            routeKind.ToString(),
+            "runs",
+            registrationEndpoint
+        ) { }
+
+    public RunUploadRegistrationClient(
+        HttpClient httpClient,
+        RunUploadClientStateStore clientStateStore,
+        RunUploadKeyStore keyStore,
+        string clientStateScope,
+        string purpose,
+        string registrationEndpoint
+    )
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _clientStateStore = clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
         _keyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
-        _routeKind = routeKind;
+        if (string.IsNullOrWhiteSpace(clientStateScope))
+            throw new ArgumentException("Client state scope is required.", nameof(clientStateScope));
+        if (string.IsNullOrWhiteSpace(purpose))
+            throw new ArgumentException("Purpose is required.", nameof(purpose));
+
+        _clientStateScope = clientStateScope.Trim();
+        _purpose = purpose.Trim();
         if (string.IsNullOrWhiteSpace(registrationEndpoint))
             throw new ArgumentException("Registration endpoint is required.", nameof(registrationEndpoint));
 
@@ -40,7 +64,7 @@ internal sealed class RunUploadRegistrationClient
         CancellationToken cancellationToken
     )
     {
-        var existingClientId = _clientStateStore.TryGetClientId(_routeKind);
+        var existingClientId = _clientStateStore.TryGetScopedClientId(_clientStateScope);
         if (!string.IsNullOrWhiteSpace(existingClientId))
             return existingClientId;
 
@@ -52,6 +76,7 @@ internal sealed class RunUploadRegistrationClient
                 {
                     ["install_id"] = installId,
                     ["plugin_version"] = MyPluginInfo.PLUGIN_VERSION,
+                    ["purpose"] = _purpose,
                     ["requested_at_utc"] = DateTimeOffset.UtcNow.ToString("o"),
                     ["public_key"] = JToken.FromObject(keyMaterial.ToPublicKey()),
                 },
@@ -91,7 +116,7 @@ internal sealed class RunUploadRegistrationClient
                 return null;
             }
 
-            _clientStateStore.SaveClientId(_routeKind, clientId);
+            _clientStateStore.SaveScopedClientId(_clientStateScope, clientId);
             return clientId;
         }
         catch (OperationCanceledException)

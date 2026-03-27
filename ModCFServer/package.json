@@ -1,0 +1,18 @@
+{
+  "name": "mod-cf-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "tsx --test test/**/*.test.ts",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260317.1",
+    "typescript": "^5.8.3",
+    "tsx": "^4.19.3",
+    "wrangler": "^4.8.0"
+  }
+}

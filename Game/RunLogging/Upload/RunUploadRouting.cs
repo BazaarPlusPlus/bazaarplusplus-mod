@@ -75,9 +75,19 @@ internal sealed class RunUploadRouteStateStore
     {
         if (!File.Exists(_statePath))
             return new RunUploadRouteState();
-
-        return JsonConvert.DeserializeObject<RunUploadRouteState>(File.ReadAllText(_statePath))
-            ?? new RunUploadRouteState();
+        try
+        {
+            return JsonConvert.DeserializeObject<RunUploadRouteState>(File.ReadAllText(_statePath))
+                ?? new RunUploadRouteState();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "RunUploadRouteStateStore",
+                $"Failed to read route state from {_statePath}: {ex.GetType().Name} - {ex.Message}. Resetting to defaults."
+            );
+            return new RunUploadRouteState();
+        }
     }
 }
 
@@ -123,10 +133,18 @@ internal sealed class RunUploadClientStateStore
 
     public string? TryGetClientId(RunUploadRouteKind routeKind)
     {
+        return TryGetScopedClientId(routeKind.ToString());
+    }
+
+    public string? TryGetScopedClientId(string scope)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+            throw new ArgumentException("Scope is required.", nameof(scope));
+
         lock (_sync)
         {
             _cachedClientIds ??= ReadStateFromDisk();
-            return _cachedClientIds.TryGetValue(routeKind.ToString(), out var clientId)
+            return _cachedClientIds.TryGetValue(scope.Trim(), out var clientId)
                 ? clientId
                 : null;
         }
@@ -134,13 +152,20 @@ internal sealed class RunUploadClientStateStore
 
     public void SaveClientId(RunUploadRouteKind routeKind, string clientId)
     {
+        SaveScopedClientId(routeKind.ToString(), clientId);
+    }
+
+    public void SaveScopedClientId(string scope, string clientId)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+            throw new ArgumentException("Scope is required.", nameof(scope));
         if (string.IsNullOrWhiteSpace(clientId))
             throw new ArgumentException("Client id is required.", nameof(clientId));
 
         lock (_sync)
         {
             _cachedClientIds ??= ReadStateFromDisk();
-            _cachedClientIds[routeKind.ToString()] = clientId.Trim();
+            _cachedClientIds[scope.Trim()] = clientId.Trim();
 
             var directory = Path.GetDirectoryName(_statePath);
             if (!string.IsNullOrWhiteSpace(directory))
@@ -156,15 +181,60 @@ internal sealed class RunUploadClientStateStore
         }
     }
 
+    public void ClearClientId(RunUploadRouteKind routeKind)
+    {
+        ClearScopedClientId(routeKind.ToString());
+    }
+
+    public void ClearScopedClientId(string scope)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+            throw new ArgumentException("Scope is required.", nameof(scope));
+
+        lock (_sync)
+        {
+            _cachedClientIds ??= ReadStateFromDisk();
+            if (!_cachedClientIds.Remove(scope.Trim()))
+                return;
+
+            PersistState();
+        }
+    }
+
     private Dictionary<string, string> ReadStateFromDisk()
     {
         if (!File.Exists(_statePath))
             return new Dictionary<string, string>(StringComparer.Ordinal);
+        try
+        {
+            var payload = JsonConvert.DeserializeObject<RunUploadClientState>(File.ReadAllText(_statePath));
+            return payload?.ClientIds != null
+                ? new Dictionary<string, string>(payload.ClientIds, StringComparer.Ordinal)
+                : new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "RunUploadClientStateStore",
+                $"Failed to read client state from {_statePath}: {ex.GetType().Name} - {ex.Message}. Resetting to empty state."
+            );
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+    }
 
-        var payload = JsonConvert.DeserializeObject<RunUploadClientState>(File.ReadAllText(_statePath));
-        return payload?.ClientIds != null
-            ? new Dictionary<string, string>(payload.ClientIds, StringComparer.Ordinal)
-            : new Dictionary<string, string>(StringComparer.Ordinal);
+    private void PersistState()
+    {
+        var directory = Path.GetDirectoryName(_statePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+            Directory.CreateDirectory(directory);
+
+        File.WriteAllText(
+            _statePath,
+            JsonConvert.SerializeObject(
+                new RunUploadClientState { ClientIds = _cachedClientIds },
+                Formatting.Indented
+            )
+        );
     }
 
     private sealed class RunUploadClientState

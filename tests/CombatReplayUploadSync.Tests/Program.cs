@@ -1,0 +1,352 @@
+#nullable enable
+using System.Reflection;
+using Microsoft.Data.Sqlite;
+
+var tempRoot = Path.Combine(
+    Path.GetTempPath(),
+    "bpp-combat-replay-upload-sync-tests",
+    Guid.NewGuid().ToString("N")
+);
+Directory.CreateDirectory(tempRoot);
+
+var dbPath = Path.Combine(tempRoot, "run-logs.db");
+var replayRoot = Path.Combine(tempRoot, "CombatReplays");
+
+try
+{
+    var storeType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Upload.CombatReplayUploadSqliteStore"
+    );
+    var serviceType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Upload.CombatReplayUploadService"
+    );
+    Assert(
+        storeType != null && serviceType != null,
+        "Combat replay upload store and service should exist."
+    );
+
+    var controllerSource = File.ReadAllText(
+        Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "../../../../../Game/CombatReplay/Upload/CombatReplayUploadController.cs"
+            )
+        )
+    );
+    Assert(
+        controllerSource.Contains(
+            "internal sealed class CombatReplayUploadController : MonoBehaviour",
+            StringComparison.Ordinal
+        ),
+        "CombatReplayUploadController should exist as a MonoBehaviour runtime entry point."
+    );
+    Assert(
+        controllerSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal)
+            && controllerSource.Contains("TryDeriveReplayUploadEndpoint", StringComparison.Ordinal)
+            && !controllerSource.Contains("RunUploadModeConfig", StringComparison.Ordinal)
+            && !controllerSource.Contains("RunUploadRouteStatePath", StringComparison.Ordinal),
+        "CombatReplayUploadController should reuse the Cloudflare run endpoint contract without replay route fallback."
+    );
+    Assert(
+        controllerSource.Contains(
+            "requires the shared Cloudflare/global run upload endpoint",
+            StringComparison.Ordinal
+        ),
+        "CombatReplayUploadController should warn when replay upload is enabled without the shared Cloudflare/global endpoint."
+    );
+
+    var pluginSource = File.ReadAllText(
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Plugin.cs"))
+    );
+    Assert(
+        pluginSource.Contains(
+            "gameObject.AddComponent<CombatReplayUploadController>();",
+            StringComparison.Ordinal
+        ),
+        "Plugin should mount the delayed combat replay upload controller."
+    );
+
+    var schemaSource = File.ReadAllText(
+        Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "../../../../../Game/RunLogging/Persistence/Sqlite/RunLogSqliteSchema.cs"
+            )
+        )
+    );
+    Assert(
+        schemaSource.Contains("ReplaySyncStateTableName", StringComparison.Ordinal)
+            && schemaSource.Contains("replay_sync_state", StringComparison.Ordinal),
+        "RunLogSqliteSchema should define replay_sync_state."
+    );
+
+    var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
+    var payloadStore = Activator.CreateInstance(payloadStoreType, replayRoot)
+        ?? throw new InvalidOperationException("Failed to create CombatReplayPayloadStore.");
+    var payloadType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpReplayPayload");
+    var payload = Activator.CreateInstance(payloadType)!;
+    payloadType.GetProperty("BattleId")!.SetValue(payload, "battle-upload-001");
+    payloadType.GetProperty("Version")!.SetValue(payload, 1);
+    payloadType.GetProperty("SpawnMessageBase64")!.SetValue(payload, "spawn");
+    payloadType.GetProperty("CombatMessageBase64")!.SetValue(payload, "combat");
+    payloadType.GetProperty("DespawnMessageBase64")!.SetValue(payload, "despawn");
+    InvokeVoid(payloadStoreType, payloadStore, "Save", [payload]);
+
+    var catalogType = RequireType("BazaarPlusPlus.Game.PvpBattles.Persistence.PvpBattleCatalog");
+    var catalog = Activator.CreateInstance(catalogType, dbPath)
+        ?? throw new InvalidOperationException("Failed to create PvpBattleCatalog.");
+    var manifestType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifest");
+    var manifest = Activator.CreateInstance(manifestType)!;
+    manifestType.GetProperty("BattleId")!.SetValue(manifest, "battle-upload-001");
+    manifestType.GetProperty("RunId")!.SetValue(manifest, "server-run-001");
+    manifestType.GetProperty("SavedAtUtc")!.SetValue(
+        manifest,
+        new DateTimeOffset(2026, 3, 28, 1, 0, 0, TimeSpan.Zero)
+    );
+    manifestType.GetProperty("CombatKind")!.SetValue(manifest, "PVPCombat");
+    InvokeVoid(catalogType, catalog, "Save", [manifest]);
+
+    var store = Activator.CreateInstance(storeType, dbPath, replayRoot)
+        ?? throw new InvalidOperationException("Failed to create CombatReplayUploadSqliteStore.");
+    InvokeVoid(storeType, store, "MarkReplayDirty", ["battle-upload-001"]);
+
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
+        Assert(
+            GetInt64(
+                connection,
+                "SELECT dirty FROM replay_sync_state WHERE battle_id = $battleId;",
+                "battle-upload-001"
+            ) == 1,
+            "MarkReplayDirty should set replay_sync_state.dirty."
+        );
+    }
+
+    var pendingBattleIds = (IReadOnlyList<string>)Invoke<object>(
+        storeType,
+        store,
+        "GetPendingBattleIds",
+        [2]
+    );
+    Assert(
+        pendingBattleIds.Count == 1 && pendingBattleIds[0] == "battle-upload-001",
+        "CombatReplayUploadSqliteStore should return dirty replay ids."
+    );
+
+    var snapshot = Invoke<object>(
+        storeType,
+        store,
+        "TryBuildSnapshot",
+        ["battle-upload-001", "install-123", null]
+    );
+    Assert(snapshot != null, "CombatReplayUploadSqliteStore should build an upload snapshot.");
+
+    var snapshotType = snapshot!.GetType();
+    var payloadEnvelope = snapshotType.GetProperty("Payload")!.GetValue(snapshot)
+        ?? throw new InvalidOperationException("Replay upload snapshot should expose Payload.");
+    var payloadEnvelopeType = payloadEnvelope.GetType();
+    Assert(
+        (string)payloadEnvelopeType.GetProperty("InstallId")!.GetValue(payloadEnvelope)! == "install-123",
+        "Replay upload payload should include the install id."
+    );
+    Assert(
+        (string)payloadEnvelopeType.GetProperty("BattleId")!.GetValue(payloadEnvelope)! == "battle-upload-001",
+        "Replay upload payload should include the battle id."
+    );
+    Assert(
+        (string?)payloadEnvelopeType.GetProperty("RunId")!.GetValue(payloadEnvelope) == "server-run-001",
+        "Replay upload payload should include the linked run id."
+    );
+    Assert(
+        payloadEnvelopeType.GetProperty("ReplayPayload") != null,
+        "Replay upload payload should embed the replay payload body."
+    );
+
+    var payloadSha256 = (string)snapshotType.GetProperty("PayloadSha256")!.GetValue(snapshot)!;
+    Assert(
+        !string.IsNullOrWhiteSpace(payloadSha256),
+        "Replay upload snapshot should compute a payload SHA-256."
+    );
+
+    InvokeVoid(
+        storeType,
+        store,
+        "MarkReplayUploaded",
+        [
+            "battle-upload-001",
+            payloadSha256,
+            "combat-replays/global/client-001/battle-upload-001.payload.json",
+            new DateTimeOffset(2026, 3, 28, 2, 0, 0, TimeSpan.Zero),
+        ]
+    );
+
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
+        Assert(
+            GetInt64(
+                connection,
+                "SELECT dirty FROM replay_sync_state WHERE battle_id = $battleId;",
+                "battle-upload-001"
+            ) == 0,
+            "MarkReplayUploaded should clear replay_sync_state.dirty."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT object_key FROM replay_sync_state WHERE battle_id = $battleId;",
+                "battle-upload-001"
+            ) == "combat-replays/global/client-001/battle-upload-001.payload.json",
+            "MarkReplayUploaded should persist the returned object key."
+        );
+    }
+
+    payloadStore = Activator.CreateInstance(payloadStoreType, replayRoot)
+        ?? throw new InvalidOperationException("Failed to recreate CombatReplayPayloadStore.");
+    InvokeVoid(payloadStoreType, payloadStore, "Delete", ["battle-upload-001"]);
+    InvokeVoid(storeType, store, "MarkReplayDirty", ["battle-upload-001"]);
+
+    var clientStatePath = Path.Combine(tempRoot, "client.json");
+    File.WriteAllText(
+        clientStatePath,
+        """
+        {
+          "client_ids": {
+            "Global": "client-existing-001"
+          }
+        }
+        """
+    );
+    var identityStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore");
+    var identityStore = Activator.CreateInstance(
+        identityStoreType,
+        Path.Combine(tempRoot, "install-id.txt")
+    ) ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
+    var clientStateStoreType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
+    );
+    var clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
+        ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
+    InvokeVoid(
+        clientStateStoreType,
+        clientStateStore,
+        "SaveScopedClientId",
+        ["Global", "run-client-001"]
+    );
+    var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
+    var keyStore = Activator.CreateInstance(keyStoreType, Path.Combine(tempRoot, "key.json"))
+        ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
+    var service = Activator.CreateInstance(
+        serviceType,
+        store,
+        identityStore,
+        clientStateStore,
+        keyStore,
+        "https://cloudflare.example/clients/register",
+        "https://cloudflare.example/replays/upload",
+        1,
+        TimeSpan.FromSeconds(10)
+    ) ?? throw new InvalidOperationException("Failed to create CombatReplayUploadService.");
+    var uploadTask = (Task)Invoke<object>(
+        serviceType,
+        service,
+        "UploadPendingReplaysAsync",
+        [CancellationToken.None]
+    );
+    uploadTask.GetAwaiter().GetResult();
+
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
+        Assert(
+            GetInt64(
+                connection,
+                "SELECT dirty FROM replay_sync_state WHERE battle_id = $battleId;",
+                "battle-upload-001"
+            ) == 0,
+            "Missing local replay payloads should stop retrying instead of staying dirty forever."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT last_error FROM replay_sync_state WHERE battle_id = $battleId;",
+                "battle-upload-001"
+            ) == "replay_snapshot_not_found",
+            "Missing local replay payloads should still persist a terminal error reason."
+        );
+    }
+
+    var persistedClientState = File.ReadAllText(clientStatePath);
+    Assert(
+        persistedClientState.Contains("\"Global\": \"run-client-001\"", StringComparison.Ordinal)
+            && !persistedClientState.Contains("\"ReplayCloudflare\"", StringComparison.Ordinal),
+        "Replay upload verification should keep the pre-existing run client id untouched when replay registration never starts."
+    );
+}
+finally
+{
+    SqliteConnection.ClearAllPools();
+    if (Directory.Exists(tempRoot))
+        Directory.Delete(tempRoot, recursive: true);
+}
+
+Console.WriteLine("Combat replay upload sync checks passed.");
+
+static Type RequireType(string fullName)
+{
+    return Type.GetType($"{fullName}, BazaarPlusPlus")
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static T Invoke<T>(Type type, object instance, string name, object?[] args)
+{
+    var method = type.GetMethod(
+        name,
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+    );
+    if (method == null)
+        throw new InvalidOperationException($"Method not found: {type.FullName}.{name}");
+
+    return (T)method.Invoke(instance, args)!;
+}
+
+static void InvokeVoid(Type type, object instance, string name, object?[] args)
+{
+    var method = type.GetMethod(
+        name,
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+    );
+    if (method == null)
+        throw new InvalidOperationException($"Method not found: {type.FullName}.{name}");
+
+    method.Invoke(instance, args);
+}
+
+static long GetInt64(SqliteConnection connection, string sql, string battleId)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = sql;
+    command.Parameters.AddWithValue("$battleId", battleId);
+    return (long)(
+        command.ExecuteScalar()
+        ?? throw new InvalidOperationException($"Query returned null: {sql}")
+    );
+}
+
+static string GetString(SqliteConnection connection, string sql, string battleId)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = sql;
+    command.Parameters.AddWithValue("$battleId", battleId);
+    return (string)(
+        command.ExecuteScalar()
+        ?? throw new InvalidOperationException($"Query returned null: {sql}")
+    );
+}
+
+static void Assert(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}

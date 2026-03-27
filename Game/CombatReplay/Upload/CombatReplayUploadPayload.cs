@@ -1,0 +1,46 @@
+#nullable enable
+using System;
+using BazaarPlusPlus.Game.PvpBattles;
+
+namespace BazaarPlusPlus.Game.CombatReplay.Upload;
+
+internal sealed class CombatReplayUploadPayload
+{
+    public int SchemaVersion { get; set; } = 1;
+
+    public string InstallId { get; set; } = string.Empty;
+
+    public string? ClientId { get; set; }
+
+    public string PluginVersion { get; set; } = string.Empty;
+
+    public DateTimeOffset SubmittedAtUtc { get; set; }
+
+    public string BattleId { get; set; } = string.Empty;
+
+    public string? RunId { get; set; }
+
+    public PvpReplayPayload ReplayPayload { get; set; } = new();
+}
+
+internal sealed class CombatReplayUploadSnapshot
+{
+    public CombatReplayUploadPayload Payload { get; set; } = new();
+
+    public string Json { get; set; } = string.Empty;
+
+    public string PayloadSha256 { get; set; } = string.Empty;
+}
+
+internal readonly struct CombatReplayUploadCycleResult
+{
+    public CombatReplayUploadCycleResult(int uploadedCount, bool hasMorePending)
+    {
+        UploadedCount = uploadedCount;
+        HasMorePending = hasMorePending;
+    }
+
+    public int UploadedCount { get; }
+
+    public bool HasMorePending { get; }
+}

@@ -131,6 +131,17 @@ Assert(
     "BppPathService should expose client-state, private-key, and route-state paths for signed uploads."
 );
 
+var configSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Core/Config/BppConfig.cs")
+);
+Assert(File.Exists(configSourcePath), $"Config source not found at {configSourcePath}");
+var configSource = File.ReadAllText(configSourcePath);
+Assert(
+    !configSource.Contains("ReplayUploadEndpointConfig", StringComparison.Ordinal)
+        && !configSource.Contains("ReplayUploadRegistrationEndpointConfig", StringComparison.Ordinal),
+    "BppConfig should not add separate replay endpoint entries when replay shares the Cloudflare upload service."
+);
+
 var runContextSourcePath = Path.GetFullPath(
     Path.Combine(AppContext.BaseDirectory, "../../../../../Core/RunContext/RunContextStore.cs")
 );
