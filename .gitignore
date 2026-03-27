@@ -10,6 +10,7 @@ decompiled/
 # IDE
 .idea/
 .vs/
+.vscode/
 *.user
 *.suo
 .dotnet-home/
