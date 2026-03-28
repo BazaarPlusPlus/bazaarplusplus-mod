@@ -2,7 +2,7 @@
 using Microsoft.Data.Sqlite;
 
 var schemaType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite.RunLogSqliteSchema");
-var repositoryType = RequireType("BazaarPlusPlus.HistoryPanelRepository");
+var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var ctor = repositoryType.GetConstructor([typeof(string)]);
 Assert(ctor != null, "HistoryPanelRepository should expose a constructor taking the database path.");
 
@@ -139,7 +139,8 @@ Console.WriteLine("HistoryPanelRepository checks passed.");
 
 static Type RequireType(string fullName)
 {
-    return Type.GetType($"{fullName}, BazaarPlusPlus")
+    var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus");
+    return assembly.GetType(fullName, throwOnError: false)
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 

@@ -9,6 +9,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.EncounterTracking;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using TheBazaar;
 using TheBazaar.ProfileData;

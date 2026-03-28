@@ -10,6 +10,7 @@ using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.EncounterTracking;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -19,12 +20,14 @@ namespace BazaarPlusPlus.Core.Runtime;
 
 internal sealed class BppRuntimeHost
 {
-    private static readonly IBppEventBus DetachedEventBus = new InMemoryBppEventBus();
-    private static readonly BppConfig DetachedConfig = new();
-    private static readonly BppPathService DetachedPaths = new();
-    private static readonly IMonsterCatalog DetachedMonsterCatalog = new EmptyMonsterCatalog();
-    private static readonly RunContextStore DetachedRunContext = new();
-    private static readonly GameStateProbe DetachedGameStateProbe = new();
+    private static readonly BppRuntimeServices DetachedServices = new(
+        new InMemoryBppEventBus(),
+        new BppConfig(),
+        new BppPathService(),
+        new EmptyMonsterCatalog(),
+        new RunContextStore(),
+        new GameStateProbe()
+    );
     private readonly ManualLogSource _logger;
     private readonly InMemoryBppEventBus _eventBus = new();
     private readonly BppConfig _config = new();
@@ -35,6 +38,8 @@ internal sealed class BppRuntimeHost
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
+    private readonly EncounterTrackingFeature _encounterTrackingFeature;
+    private readonly BppFeatureRegistry _featureRegistry;
 
     public BppRuntimeHost(
         GameObject hostObject,
@@ -57,27 +62,55 @@ internal sealed class BppRuntimeHost
         _paths.Initialize();
         _monsterCatalog.Initialize();
         _runContext.Reset();
-        _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);
-        _combatReplayModule = new CombatReplayModule(_eventBus, combatReplayRuntimeAccessor);
-        _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
+        Services = new BppRuntimeServices(
+            _eventBus,
+            _config,
+            _paths,
+            _monsterCatalog,
+            _runContext,
+            _gameStateProbe
+        );
+        _runLifecycle = new RunLifecycleModule(
+            Services.EventBus,
+            Services.GameStateProbe,
+            Services.RunContext
+        );
+        _combatReplayModule = new CombatReplayModule(Services.EventBus, combatReplayRuntimeAccessor);
+        _combatStatusBarModule = new CombatStatusBarModule(Services.EventBus, Services.RunContext);
+        _encounterTrackingFeature = new EncounterTrackingFeature(
+            Services.EventBus,
+            Services.RunContext,
+            Services.MonsterCatalog
+        );
+        EncounterTracker.AttachFeature(_encounterTrackingFeature);
+        _featureRegistry = new BppFeatureRegistry();
+        _featureRegistry.Register(_runLifecycle);
+        _featureRegistry.Register(_combatReplayModule);
+        _featureRegistry.Register(_combatStatusBarModule);
+        _featureRegistry.Register(_encounterTrackingFeature);
     }
 
     public static BppRuntimeHost? Current { get; private set; }
 
-    public static IBppEventBus EventBus => Current?._eventBus ?? DetachedEventBus;
+    public BppRuntimeServices Services { get; }
+
+    public RunLifecycleModule LifecycleModule => _runLifecycle;
+
+    public static IBppEventBus EventBus => Current?.Services.EventBus ?? DetachedServices.EventBus;
 
     public static ManualLogSource? Logger => Current?._logger;
 
-    public static IBppConfig Config => Current?._config ?? DetachedConfig;
+    public static IBppConfig Config => Current?.Services.Config ?? DetachedServices.Config;
 
-    public static IPathService Paths => Current?._paths ?? DetachedPaths;
+    public static IPathService Paths => Current?.Services.Paths ?? DetachedServices.Paths;
 
-    public static IMonsterCatalog MonsterCatalog => Current?._monsterCatalog ?? DetachedMonsterCatalog;
+    public static IMonsterCatalog MonsterCatalog =>
+        Current?.Services.MonsterCatalog ?? DetachedServices.MonsterCatalog;
 
-    public static IRunContext RunContext => Current?._runContext ?? DetachedRunContext;
+    public static IRunContext RunContext => Current?.Services.RunContext ?? DetachedServices.RunContext;
 
     public static IGameStateProbe GameStateProbe =>
-        Current?._gameStateProbe ?? DetachedGameStateProbe;
+        Current?.Services.GameStateProbe ?? DetachedServices.GameStateProbe;
 
     public static RunLifecycleModule RunLifecycle =>
         Current?._runLifecycle
@@ -91,17 +124,14 @@ internal sealed class BppRuntimeHost
 
     public void Start()
     {
-        _runLifecycle.Start();
-        _combatReplayModule.Start();
-        _combatStatusBarModule.Start();
+        _featureRegistry.Start();
         BppLog.Info("RuntimeHost", "Started runtime host");
     }
 
     public void Stop()
     {
-        _combatStatusBarModule.Stop();
-        _combatReplayModule.Stop();
-        _runLifecycle.Stop();
+        _featureRegistry.Stop();
+        EncounterTracker.DetachFeature();
         if (ReferenceEquals(Current, this))
             Current = null;
     }

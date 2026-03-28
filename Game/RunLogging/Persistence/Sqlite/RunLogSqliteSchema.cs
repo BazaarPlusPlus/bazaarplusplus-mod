@@ -19,6 +19,8 @@ public static class RunLogSqliteSchema
 
     public static string RunSyncStateTableName => "run_sync_state";
 
+    public static string ReplaySyncStateTableName => "replay_sync_state";
+
     public static string BootstrapSql =>
         $"""
             PRAGMA foreign_keys = ON;
@@ -126,6 +128,18 @@ public static class RunLogSqliteSchema
                 FOREIGN KEY (run_id) REFERENCES {RunsTableName}(run_id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS {ReplaySyncStateTableName} (
+                battle_id TEXT PRIMARY KEY,
+                dirty INTEGER NOT NULL,
+                payload_sha256 TEXT NULL,
+                object_key TEXT NULL,
+                last_attempt_at_utc TEXT NULL,
+                last_uploaded_at_utc TEXT NULL,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT NULL,
+                FOREIGN KEY (battle_id) REFERENCES {PvpBattlesTableName}(battle_id) ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS idx_{RunEventsTableName}_ts_utc
                 ON {RunEventsTableName}(ts_utc);
 
@@ -140,5 +154,8 @@ public static class RunLogSqliteSchema
 
             CREATE INDEX IF NOT EXISTS idx_{RunSyncStateTableName}_dirty
                 ON {RunSyncStateTableName}(dirty, last_attempt_at_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_{ReplaySyncStateTableName}_dirty
+                ON {ReplaySyncStateTableName}(dirty, last_attempt_at_utc);
             """;
 }

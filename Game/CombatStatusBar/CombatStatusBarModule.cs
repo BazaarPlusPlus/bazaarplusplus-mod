@@ -2,11 +2,12 @@
 using System;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Core.RunContext;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 
-internal sealed class CombatStatusBarModule
+internal sealed class CombatStatusBarModule : IBppFeature
 {
     private readonly IBppEventBus _eventBus;
     private readonly IRunContext _runContext;

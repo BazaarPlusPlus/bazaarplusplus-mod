@@ -2,12 +2,13 @@
 using System.Collections;
 using System.Linq;
 using System.Threading.Tasks;
+using BazaarPlusPlus;
 using BazaarPlusPlus.Game.MonsterPreview;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class HistoryPanelPreviewRenderer
 {

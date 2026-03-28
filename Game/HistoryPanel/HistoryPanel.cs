@@ -2,13 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Coroutine = UnityEngine.Coroutine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed partial class HistoryPanel : MonoBehaviour
 {
@@ -24,8 +24,10 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private readonly List<HistoryBattleRecord> _battles = new List<HistoryBattleRecord>();
     private int _selectedRunIndex;
     private int _selectedBattleIndex;
-    private HistoryPanelRepository? _repository;
+    private HistoryPanelDataService _dataService = null!;
+    private HistoryPanelReplayService _replayService = null!;
     private HistoryPanelPreviewRenderer? _previewRenderer;
+    private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
     private string? _statusMessage;
     private float _previewDebugOverlayUntil;
@@ -48,13 +50,25 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         Instance = this;
         _lastSceneHandle = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle;
-        var databasePath = BppRuntimeHost.Paths.RunLogDatabasePath;
-        if (!string.IsNullOrWhiteSpace(databasePath))
-            _repository = new HistoryPanelRepository(databasePath);
         _previewRenderer = new HistoryPanelPreviewRenderer();
 
         EnsureUi();
         SetUiVisible(false);
+    }
+
+    internal void Configure(IHistoryPanelRuntime runtime)
+    {
+        _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+
+        HistoryPanelRepository? repository = null;
+        if (!string.IsNullOrWhiteSpace(_runtime.RunLogDatabasePath))
+            repository = new HistoryPanelRepository(_runtime.RunLogDatabasePath);
+
+        _dataService = new HistoryPanelDataService(repository);
+        _replayService = new HistoryPanelReplayService(
+            _runtime.CombatReplayRuntimeAccessor,
+            () => _runtime.CombatReplayDirectoryPath
+        );
     }
 
     private void OnDisable()
@@ -122,86 +136,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     internal void OpenFromUiEntry()
     {
         SetHistoryVisible(true);
-    }
-
-    private void RefreshData()
-    {
-        try
-        {
-            ClearDeleteRunConfirmation();
-            _runs.Clear();
-            _battles.Clear();
-
-            if (_repository == null)
-            {
-                _statusMessage = "Run log database path is unavailable.";
-                RefreshUi();
-                return;
-            }
-
-            _runs.AddRange(_repository.ListRecentRuns(40));
-            _selectedRunIndex = Mathf.Clamp(_selectedRunIndex, 0, Mathf.Max(0, _runs.Count - 1));
-            LoadBattlesForSelectedRun();
-            _previewSelectionMode = PreviewSelectionMode.Run;
-            _statusMessage = _repository.DatabaseExists
-                ? $"Loaded {_runs.Count} runs from sqlite."
-                : "Database file does not exist yet.";
-        }
-        catch (Exception ex)
-        {
-            _runs.Clear();
-            _battles.Clear();
-            _statusMessage = $"History load failed: {ex.Message}";
-            BppLog.Error("HistoryPanel", "Failed to load history page data", ex);
-        }
-
-        RefreshUi();
-        RefreshSelectedBattlePreview();
-    }
-
-    private void SelectRun(int index)
-    {
-        if (index < 0 || index >= _runs.Count)
-            return;
-
-        if (_selectedRunIndex != index)
-            ClearDeleteRunConfirmation();
-
-        _selectedRunIndex = index;
-        LoadBattlesForSelectedRun();
-        _previewSelectionMode = PreviewSelectionMode.Run;
-        RefreshUi();
-        RefreshSelectedBattlePreview();
-    }
-
-    private void SelectBattle(int index)
-    {
-        if (index < 0 || index >= _battles.Count)
-            return;
-
-        _selectedBattleIndex = index;
-        _previewSelectionMode = PreviewSelectionMode.Battle;
-        RefreshUi();
-        RefreshSelectedBattlePreview();
-    }
-
-    private void LoadBattlesForSelectedRun()
-    {
-        _battles.Clear();
-        _selectedBattleIndex = 0;
-
-        if (_repository == null || SelectedRun == null)
-            return;
-
-        try
-        {
-            _battles.AddRange(_repository.ListBattlesByRun(SelectedRun.RunId));
-        }
-        catch (Exception ex)
-        {
-            _statusMessage = $"Battle load failed: {ex.Message}";
-            BppLog.Error("HistoryPanel", $"Failed to load battles for run {SelectedRun.RunId}", ex);
-        }
     }
 
     private void RefreshSelectedBattlePreview()
@@ -386,297 +320,4 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         public HistoryBattlePreviewData? PreviewData { get; }
     }
 
-    private bool CanReplaySelectedBattle(out string reason)
-    {
-        var battle = SelectedBattle;
-        if (battle == null)
-        {
-            reason = "Select a battle to replay.";
-            return false;
-        }
-
-        var runtime = CombatReplayRuntime.Instance;
-        if (runtime == null)
-        {
-            reason = "Combat replay runtime is unavailable.";
-            return false;
-        }
-
-        return runtime.CanReplaySavedBattle(battle.BattleId, out reason);
-    }
-
-    private bool CanDeleteSelectedRun(out string reason)
-    {
-        var run = SelectedRun;
-        if (run == null)
-        {
-            reason = "Select a run to delete.";
-            return false;
-        }
-
-        if (string.Equals(run.RawStatus, "active", StringComparison.OrdinalIgnoreCase))
-        {
-            reason = "Active runs cannot be deleted.";
-            return false;
-        }
-
-        if (
-            BppRuntimeHost.RunContext.IsInGameRun
-            && string.Equals(
-                BppRuntimeHost.RunContext.CurrentServerRunId,
-                run.RunId,
-                StringComparison.Ordinal
-            )
-        )
-        {
-            reason = "The currently active gameplay run cannot be deleted.";
-            return false;
-        }
-
-        if (_repository == null)
-        {
-            reason = "Run log repository is unavailable.";
-            return false;
-        }
-
-        reason = string.Empty;
-        return true;
-    }
-
-    private void TryReplaySelectedBattle()
-    {
-        var battle = SelectedBattle;
-        if (battle == null)
-            return;
-
-        if (!CanReplaySelectedBattle(out var reason))
-        {
-            _statusMessage = reason;
-            RefreshUi();
-            return;
-        }
-
-        var runtime = CombatReplayRuntime.Instance;
-        if (runtime == null)
-        {
-            _statusMessage = "Combat replay runtime is unavailable.";
-            RefreshUi();
-            return;
-        }
-
-        if (!runtime.ReplaySaved(battle.BattleId))
-        {
-            _statusMessage = $"Replay rejected for battle {battle.BattleId}.";
-            RefreshUi();
-            return;
-        }
-
-        _statusMessage = $"Starting replay for {battle.BattleId}.";
-        SetHistoryVisible(false);
-    }
-
-    private void TryDeleteSelectedRun()
-    {
-        var run = SelectedRun;
-        if (run == null)
-            return;
-
-        if (!CanDeleteSelectedRun(out var reason))
-        {
-            ClearDeleteRunConfirmation();
-            _statusMessage = reason;
-            RefreshUi();
-            return;
-        }
-
-        if (!IsDeleteRunConfirmationActive(run.RunId))
-        {
-            _deleteRunConfirmationRunId = run.RunId;
-            _deleteRunConfirmationUntil = Time.unscaledTime + 5f;
-            _statusMessage = $"Click Delete Run again within 5s to remove {ShortenRunId(run.RunId)}.";
-            RefreshUi();
-            return;
-        }
-
-        ClearDeleteRunConfirmation();
-
-        try
-        {
-            var battleIds = _repository!.ListBattleIdsByRun(run.RunId);
-            _repository.DeleteRun(run.RunId);
-            CleanupReplayPayloads(battleIds);
-
-            var deletedMessage =
-                battleIds.Count > 0
-                    ? $"Deleted run {ShortenRunId(run.RunId)} and cleaned {battleIds.Count} linked battle records."
-                    : $"Deleted run {ShortenRunId(run.RunId)}.";
-            RefreshData();
-            _statusMessage = deletedMessage;
-            RefreshUi();
-        }
-        catch (Exception ex)
-        {
-            _statusMessage = $"Run delete failed: {ex.Message}";
-            BppLog.Error("HistoryPanel", $"Failed to delete run {run.RunId}", ex);
-            RefreshUi();
-        }
-    }
-
-    private void CleanupReplayPayloads(IReadOnlyList<string> battleIds)
-    {
-        if (battleIds.Count == 0)
-            return;
-
-        var replayDirectory = BppRuntimeHost.Paths.CombatReplayDirectoryPath;
-        if (string.IsNullOrWhiteSpace(replayDirectory))
-            return;
-
-        var payloadStore = new CombatReplayPayloadStore(replayDirectory);
-        foreach (var battleId in battleIds)
-        {
-            try
-            {
-                payloadStore.Delete(battleId);
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "HistoryPanel",
-                    $"Failed to delete replay payload for battle {battleId}: {ex.Message}"
-                );
-            }
-        }
-    }
-
-    private void ClearDeleteRunConfirmation()
-    {
-        _deleteRunConfirmationRunId = null;
-        _deleteRunConfirmationUntil = 0f;
-    }
-
-    private bool IsDeleteRunConfirmationActive(string runId)
-    {
-        return !string.IsNullOrWhiteSpace(runId)
-            && string.Equals(_deleteRunConfirmationRunId, runId, StringComparison.Ordinal)
-            && Time.unscaledTime < _deleteRunConfirmationUntil;
-    }
-
-    private string GetDatabaseChipText()
-    {
-        if (_repository == null)
-            return "Unavailable";
-
-        return _repository.DatabaseExists ? "Connected" : "Missing";
-    }
-
-    private static string ShortenRunId(string runId)
-    {
-        if (string.IsNullOrWhiteSpace(runId))
-            return "Unknown Run";
-
-        return runId.Length <= 14 ? runId : runId[..14];
-    }
-
-    private static string FormatRunRecord(HistoryRunRecord run)
-    {
-        return run.Victories.HasValue || run.Losses.HasValue
-            ? $"{run.Victories ?? 0}W - {run.Losses ?? 0}L"
-            : "-";
-    }
-
-    private static string? FormatRunAchievement(HistoryRunRecord run)
-    {
-        if (!string.Equals(run.RawStatus, "completed", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        var wins = run.Victories ?? 0;
-        var losses = run.Losses ?? 0;
-        var totalBattles = wins + losses;
-
-        if (wins == 10 && totalBattles == 10)
-            return "PERFECT";
-
-        if (wins >= 10 && totalBattles > 10)
-            return "GOLD";
-
-        if (wins >= 7)
-            return "SILVER";
-
-        if (wins >= 4)
-            return "BRONZE";
-
-        return "UNFORTUNE";
-    }
-
-    private static string FormatRunStatus(string? rawStatus)
-    {
-        return rawStatus switch
-        {
-            "completed" => "Completed",
-            "abandoned" => "Abandoned",
-            "active" => "Active",
-            null => "Unknown",
-            _ => char.ToUpperInvariant(rawStatus[0]) + rawStatus[1..],
-        };
-    }
-
-    private static string FormatBattleResult(HistoryBattleRecord battle)
-    {
-        if (string.IsNullOrWhiteSpace(battle.Result))
-            return "Unknown";
-
-        return string.Equals(battle.Result, "Win", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(battle.Result, "Won", StringComparison.OrdinalIgnoreCase)
-                ? "Win"
-            : string.Equals(battle.Result, "Loss", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(battle.Result, "Lost", StringComparison.OrdinalIgnoreCase)
-                ? "Loss"
-            : battle.Result;
-    }
-
-    private static string? FormatOpponentHero(string? rawHero)
-    {
-        if (string.IsNullOrWhiteSpace(rawHero))
-            return null;
-
-        return rawHero;
-    }
-
-    private static string FormatDayOnly(int? day)
-    {
-        return day.HasValue ? $"D{day.Value}" : "D?";
-    }
-
-    private static string FormatDayHour(int? day, int? hour)
-    {
-        var dayText = day.HasValue ? $"D{day.Value}" : "D?";
-        var hourText = hour.HasValue ? $"H{hour.Value}" : "H?";
-        return $"{dayText} {hourText}";
-    }
-
-    private static string? FormatRunDuration(HistoryRunRecord run)
-    {
-        if (!string.Equals(run.RawStatus, "completed", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        if (!run.EndedAtUtc.HasValue)
-            return null;
-
-        var duration = run.EndedAtUtc.Value - run.StartedAtUtc;
-        if (duration <= TimeSpan.Zero)
-            return null;
-
-        if (duration.TotalHours >= 1d)
-            return $"{(int)duration.TotalHours}h {duration.Minutes}m";
-
-        if (duration.TotalMinutes >= 1d)
-            return $"{Mathf.Max(1, Mathf.RoundToInt((float)duration.TotalMinutes))}m";
-
-        return $"{Mathf.Max(1, duration.Seconds)}s";
-    }
-
-    private static string FormatTimestamp(DateTimeOffset value)
-    {
-        return value.ToLocalTime().ToString("MM-dd HH:mm");
-    }
 }

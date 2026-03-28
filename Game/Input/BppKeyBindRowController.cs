@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Game.Input;
 using HarmonyLib;
 using TheBazaar.UI;
 using TMPro;
@@ -10,7 +9,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.Input;
 
 internal sealed class BppKeyBindRowController : MonoBehaviour
 {

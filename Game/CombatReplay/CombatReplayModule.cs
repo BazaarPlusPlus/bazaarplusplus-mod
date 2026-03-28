@@ -1,10 +1,11 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Core.Runtime;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
-internal sealed class CombatReplayModule
+internal sealed class CombatReplayModule : IBppFeature
 {
     private readonly IBppEventBus _eventBus;
     private readonly Func<CombatReplayRuntime?> _runtimeAccessor;

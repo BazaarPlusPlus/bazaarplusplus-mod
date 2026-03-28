@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.EncounterTracking;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.EventSystems;

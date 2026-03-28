@@ -2,12 +2,13 @@
 using System;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Core.RunContext;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.RunLifecycle;
 
-internal sealed class RunLifecycleModule
+internal sealed class RunLifecycleModule : IBppFeature
 {
     private readonly IBppEventBus _eventBus;
     private readonly IGameStateProbe _gameStateProbe;

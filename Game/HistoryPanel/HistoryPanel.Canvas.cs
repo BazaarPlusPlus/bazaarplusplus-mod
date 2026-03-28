@@ -5,7 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed partial class HistoryPanel
 {
@@ -211,7 +211,7 @@ internal sealed partial class HistoryPanel
             _battleSectionSubtitle.text =
                 SelectedRun == null
                     ? "Select a run to inspect its recorded battles."
-                    : $"{SelectedRun.Hero} | {FormatDayOnly(SelectedRun.FinalDay)}";
+                    : $"{SelectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(SelectedRun.FinalDay)}";
         }
 
         if (_footerPrimaryText != null)
@@ -219,7 +219,7 @@ internal sealed partial class HistoryPanel
             _footerPrimaryText.text =
                 SelectedBattle == null
                     ? "No battle selected"
-                    : $"{FormatBattleResult(SelectedBattle)} | {FormatDayOnly(SelectedBattle.Day)} | {SelectedBattle.OpponentName ?? "Unknown Opponent"}";
+                    : $"{HistoryPanelFormatter.FormatBattleResult(SelectedBattle)} | {HistoryPanelFormatter.FormatDayOnly(SelectedBattle.Day)} | {SelectedBattle.OpponentName ?? "Unknown Opponent"}";
         }
 
         if (_footerSecondaryText != null)
@@ -228,8 +228,8 @@ internal sealed partial class HistoryPanel
                 SelectedBattle == null
                     ? "Select one battle to inspect it, then use Replay when you want to jump back into it."
                     : canReplaySelectedBattle
-                        ? $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | {SelectedBattle.SnapshotSummary}"
-                        : $"{FormatTimestamp(SelectedBattle.RecordedAtUtc)} | Replay unavailable: {replayUnavailableReason}";
+                        ? $"{HistoryPanelFormatter.FormatTimestamp(SelectedBattle.RecordedAtUtc)} | {SelectedBattle.SnapshotSummary}"
+                        : $"{HistoryPanelFormatter.FormatTimestamp(SelectedBattle.RecordedAtUtc)} | Replay unavailable: {replayUnavailableReason}";
             _footerSecondaryText.text = string.IsNullOrWhiteSpace(_statusMessage)
                 ? battleSummary
                 : $"{_statusMessage} | {battleSummary}";
@@ -663,7 +663,7 @@ internal sealed partial class HistoryPanel
             runHeroStyle.Text,
             60f
         );
-        var achievement = FormatRunAchievement(run);
+        var achievement = HistoryPanelFormatter.FormatRunAchievement(run);
         if (!string.IsNullOrWhiteSpace(achievement))
         {
             AddPill(
@@ -677,7 +677,7 @@ internal sealed partial class HistoryPanel
         }
 
         var time = CreateText("Time", topRow, 11, FontStyle.Normal, TextAnchor.UpperRight);
-        time.text = FormatTimestamp(run.LastSeenAtUtc);
+        time.text = HistoryPanelFormatter.FormatTimestamp(run.LastSeenAtUtc);
         time.color = new Color(0.72f, 0.78f, 0.85f, 0.9f);
         time.textWrappingMode = TextWrappingModes.NoWrap;
         time.overflowMode = TextOverflowModes.Ellipsis;
@@ -690,12 +690,12 @@ internal sealed partial class HistoryPanel
 
         var metaParts = new List<string>
         {
-            FormatDayOnly(run.FinalDay),
+            HistoryPanelFormatter.FormatDayOnly(run.FinalDay),
             $"{run.BattleCount} battles",
         };
         if (run.Victories.HasValue)
             metaParts.Add($"{run.Victories.Value} wins");
-        var duration = FormatRunDuration(run);
+        var duration = HistoryPanelFormatter.FormatRunDuration(run);
         if (!string.IsNullOrWhiteSpace(duration))
             metaParts.Add(duration);
 
@@ -765,12 +765,12 @@ internal sealed partial class HistoryPanel
         AddPill(
             pillRow,
             "Day",
-            FormatDayOnly(battle.Day),
+            HistoryPanelFormatter.FormatDayOnly(battle.Day),
             new Color(0.18f, 0.21f, 0.27f, 0.94f),
             new Color(0.92f, 0.95f, 1f, 1f),
             72f
         );
-        var opponentHero = FormatOpponentHero(battle.OpponentHero);
+        var opponentHero = HistoryPanelFormatter.FormatOpponentHero(battle.OpponentHero);
         if (!string.IsNullOrWhiteSpace(opponentHero))
         {
             var opponentHeroStyle = GetHeroBadgeStyle(opponentHero);
@@ -785,7 +785,7 @@ internal sealed partial class HistoryPanel
         }
 
         var time = CreateText("Time", topRow, 11, FontStyle.Normal, TextAnchor.UpperRight);
-        time.text = FormatTimestamp(battle.RecordedAtUtc);
+        time.text = HistoryPanelFormatter.FormatTimestamp(battle.RecordedAtUtc);
         time.color = new Color(0.72f, 0.78f, 0.85f, 0.9f);
         time.textWrappingMode = TextWrappingModes.NoWrap;
         time.overflowMode = TextOverflowModes.Ellipsis;
@@ -1506,7 +1506,7 @@ internal sealed partial class HistoryPanel
 
     private static BattlePalette GetBattlePalette(HistoryBattleRecord battle)
     {
-        var result = FormatBattleResult(battle);
+        var result = HistoryPanelFormatter.FormatBattleResult(battle);
         if (string.Equals(result, "Win", StringComparison.OrdinalIgnoreCase))
         {
             return new BattlePalette(

@@ -442,6 +442,10 @@ var historyPanelPath = Path.GetFullPath(
     Path.Combine(AppContext.BaseDirectory, "../../../../../Game/HistoryPanel/HistoryPanel.cs")
 );
 var historyPanelSource = File.ReadAllText(historyPanelPath);
+var historyPanelControllerPath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/HistoryPanel/HistoryPanelController.cs")
+);
+var historyPanelControllerSource = File.ReadAllText(historyPanelControllerPath);
 var historyPanelCanvasPath = Path.GetFullPath(
     Path.Combine(AppContext.BaseDirectory, "../../../../../Game/HistoryPanel/HistoryPanel.Canvas.cs")
 );
@@ -460,14 +464,14 @@ Assert(
     "HistoryPanel should still load data when the panel becomes visible."
 );
 Assert(
-    historyPanelSource.Contains(
+    historyPanelControllerSource.Contains(
         "private bool CanReplaySelectedBattle(out string reason)",
         StringComparison.Ordinal
     ),
     "HistoryPanel should centralize selected-battle replay availability checks."
 );
 var tryReplaySelectedBattleBody = ExtractMethodBody(
-    historyPanelSource,
+    historyPanelControllerSource,
     "private void TryReplaySelectedBattle()"
 );
 Assert(
@@ -475,12 +479,12 @@ Assert(
     "HistoryPanel should reuse the shared replay availability helper before starting a replay."
 );
 Assert(
-    historyPanelSource.Contains(
+    historyPanelControllerSource.Contains(
         "private bool CanDeleteSelectedRun(out string reason)",
         StringComparison.Ordinal
     )
-        && historyPanelSource.Contains("private void TryDeleteSelectedRun()", StringComparison.Ordinal)
-        && historyPanelSource.Contains("_repository.DeleteRun(", StringComparison.Ordinal),
+        && historyPanelControllerSource.Contains("private void TryDeleteSelectedRun()", StringComparison.Ordinal)
+        && historyPanelControllerSource.Contains("_dataService.TryDeleteRun(", StringComparison.Ordinal),
     "HistoryPanel should expose a guarded selected-run deletion flow that delegates sqlite cleanup to the repository."
 );
 Assert(

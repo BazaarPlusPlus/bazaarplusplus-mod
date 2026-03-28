@@ -8,10 +8,13 @@ using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatLog;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.CombatReplay.Upload;
 using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Upload;
+using BazaarPlusPlus.Game.Tooltips;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -39,6 +42,7 @@ public class Plugin : BaseUnityPlugin
         _runtimeHost.Install();
         combatReplayRuntime = gameObject.AddComponent<CombatReplayRuntime>();
         _runtimeHost.Start();
+        var services = _runtimeHost.Services;
         BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -46,12 +50,20 @@ public class Plugin : BaseUnityPlugin
 
         _harmony.PatchAll();
 
-        EncounterTracker.Initialize(BppRuntimeHost.EventBus);
-        EncounterTracker.Subscribe();
-        gameObject.AddComponent<RunStateSyncController>();
+        var runStateSyncController = gameObject.AddComponent<RunStateSyncController>();
+        runStateSyncController.Initialize(services.EventBus, _runtimeHost.LifecycleModule);
         gameObject.AddComponent<RunLoggingController>();
         gameObject.AddComponent<RunUploadController>();
-        gameObject.AddComponent<HistoryPanel>();
+        gameObject.AddComponent<CombatReplayUploadController>();
+        var historyPanel = gameObject.AddComponent<HistoryPanel>();
+        historyPanel.Configure(
+            new PluginHistoryPanelRuntime(
+                services.RunContext,
+                services.Paths.RunLogDatabasePath ?? string.Empty,
+                services.Paths.CombatReplayDirectoryPath ?? string.Empty,
+                () => combatReplayRuntime
+            )
+        );
         gameObject.AddComponent<HistoryCollectionsEntryBridge>();
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<CombatLogController>();
@@ -59,7 +71,9 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<MonsterPreviewController>();
         gameObject.AddComponent<MonsterPreviewWarmupController>();
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
-        gameObject.AddComponent<TooltipModifierRefreshController>();
+        var tooltipModifierRefreshController =
+            gameObject.AddComponent<TooltipModifierRefreshController>();
+        tooltipModifierRefreshController.Initialize(services.Config);
 
         if (BppBuild.IsDebug)
         {
@@ -123,5 +137,35 @@ public class Plugin : BaseUnityPlugin
                 "Network",
                 "winhttp.dll appears to be the system DLL - BepInEx proxy may have been removed by antivirus."
             );
+    }
+
+    private sealed class PluginHistoryPanelRuntime : IHistoryPanelRuntime
+    {
+        private readonly Core.RunContext.IRunContext _runContext;
+
+        public PluginHistoryPanelRuntime(
+            Core.RunContext.IRunContext runContext,
+            string runLogDatabasePath,
+            string combatReplayDirectoryPath,
+            Func<CombatReplayRuntime?> combatReplayRuntimeAccessor
+        )
+        {
+            _runContext = runContext ?? throw new ArgumentNullException(nameof(runContext));
+            RunLogDatabasePath = runLogDatabasePath ?? string.Empty;
+            CombatReplayDirectoryPath = combatReplayDirectoryPath ?? string.Empty;
+            CombatReplayRuntimeAccessor =
+                combatReplayRuntimeAccessor
+                ?? throw new ArgumentNullException(nameof(combatReplayRuntimeAccessor));
+        }
+
+        public bool IsInGameRun => _runContext.IsInGameRun;
+
+        public string? CurrentServerRunId => _runContext.CurrentServerRunId;
+
+        public string RunLogDatabasePath { get; }
+
+        public string CombatReplayDirectoryPath { get; }
+
+        public Func<CombatReplayRuntime?> CombatReplayRuntimeAccessor { get; }
     }
 }

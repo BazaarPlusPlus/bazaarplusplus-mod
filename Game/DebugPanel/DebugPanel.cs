@@ -5,6 +5,7 @@ using System.Linq;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.EncounterTracking;
+using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.PvpBattles;
 using TheBazaar;

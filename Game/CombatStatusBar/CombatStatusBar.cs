@@ -1,3 +1,4 @@
+using BazaarPlusPlus.Game.Input;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.InputSystem;

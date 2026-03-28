@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarPlusPlus.Game.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using CombatStatusBarState = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;

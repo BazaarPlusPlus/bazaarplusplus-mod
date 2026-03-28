@@ -55,7 +55,13 @@ internal sealed class RunUploadApiClient
             var statusCode = (int)response.StatusCode;
             return RunUploadApiResult.Failure(
                 $"http_{statusCode}:{RunUploadErrorFormatter.Truncate(responseBody)}",
-                shouldFallback: statusCode >= 500 || statusCode == 429
+                shouldFallback: statusCode >= 500 || statusCode == 429,
+                shouldReRegister: statusCode == 401
+                    || statusCode == 403
+                    || (
+                        statusCode == 404
+                        && RunUploadErrorFormatter.IndicatesMissingClient(responseBody)
+                    )
             );
         }
         catch (OperationCanceledException)
@@ -66,7 +72,8 @@ internal sealed class RunUploadApiClient
         {
             return RunUploadApiResult.Failure(
                 RunUploadErrorFormatter.Truncate(ex.Message),
-                shouldFallback: true
+                shouldFallback: true,
+                shouldReRegister: false
             );
         }
     }
@@ -74,11 +81,17 @@ internal sealed class RunUploadApiClient
 
 internal readonly struct RunUploadApiResult
 {
-    private RunUploadApiResult(bool succeeded, string? error, bool shouldFallback)
+    private RunUploadApiResult(
+        bool succeeded,
+        string? error,
+        bool shouldFallback,
+        bool shouldReRegister
+    )
     {
         Succeeded = succeeded;
         Error = error;
         ShouldFallback = shouldFallback;
+        ShouldReRegister = shouldReRegister;
     }
 
     public bool Succeeded { get; }
@@ -87,8 +100,13 @@ internal readonly struct RunUploadApiResult
 
     public bool ShouldFallback { get; }
 
-    public static RunUploadApiResult Success() => new(true, null, false);
+    public bool ShouldReRegister { get; }
 
-    public static RunUploadApiResult Failure(string error, bool shouldFallback) =>
-        new(false, error, shouldFallback);
+    public static RunUploadApiResult Success() => new(true, null, false, false);
+
+    public static RunUploadApiResult Failure(
+        string error,
+        bool shouldFallback,
+        bool shouldReRegister
+    ) => new(false, error, shouldFallback, shouldReRegister);
 }

@@ -1,6 +1,6 @@
 using UnityEngine.InputSystem;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.Input;
 
 internal static class KeyBindings
 {

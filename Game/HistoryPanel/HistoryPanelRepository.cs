@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.PvpBattles;
@@ -13,7 +14,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class HistoryPanelRepository
 {

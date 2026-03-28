@@ -1,7 +1,7 @@
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.Settings;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Game.Input;
 
 internal static class BppKeybindLabelResolver
 {

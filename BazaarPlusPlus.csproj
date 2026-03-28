@@ -29,6 +29,9 @@
     <Compile Remove="decompiled/**" />
     <EmbeddedResource Remove="decompiled/**" />
     <None Remove="decompiled/**" />
+    <Compile Remove="ModCFServer/**" />
+    <EmbeddedResource Remove="ModCFServer/**" />
+    <None Remove="ModCFServer/**" />
   </ItemGroup>
   <!-- Project paths -->
   <PropertyGroup>

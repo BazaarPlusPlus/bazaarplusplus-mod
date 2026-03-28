@@ -17,6 +17,7 @@ using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
+using BazaarPlusPlus.Game.CombatReplay.Upload;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
@@ -41,6 +42,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private PvpBattleCatalog? _battleCatalog;
     private CombatReplayPayloadStore? _payloadStore;
+    private CombatReplayUploadSqliteStore? _uploadStore;
     private CombatReplayPersistenceQueue? _persistenceQueue;
     private CombatReplayCaptureService? _captureService;
     private CombatReplayLoader? _loader;
@@ -411,6 +413,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             );
         _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
+        _uploadStore = new CombatReplayUploadSqliteStore(
+            runLogDatabasePath,
+            combatReplayDirectoryPath
+        );
         _persistenceQueue = new CombatReplayPersistenceQueue(
             _payloadStore.Save,
             _battleCatalog.Save,
@@ -539,6 +545,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             }
 
             BppRuntimeHost.EventBus.Publish(new PvpBattleRecorded { Manifest = result.Manifest });
+            _uploadStore?.MarkReplayDirty(result.Manifest.BattleId);
             BppLog.Info(
                 "CombatReplayRuntime",
                 $"Saved combat replay {result.Manifest.BattleId} for run={result.Manifest.RunId ?? "unknown"}"
