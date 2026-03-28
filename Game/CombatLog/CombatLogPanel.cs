@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CombatLog;
@@ -10,10 +11,16 @@ internal sealed class CombatLogPanel
     private const float MinWindowWidth = 320f;
     private const float Spacing = 10f;
     private const float ScreenMargin = 10f;
-    private const float ScrollViewportChromeHeight = 132f;
+    private const float ScrollViewportChromeHeight = 190f;
 
     private static readonly GUIStyle HeaderStyle = new GUIStyle();
     private static readonly GUIStyle StatusStyle = new GUIStyle();
+    private static readonly GUIStyle FrameHeaderStyle = new GUIStyle();
+    private static readonly GUIStyle CurrentFrameHeaderStyle = new GUIStyle();
+    private static readonly GUIStyle DimmedFrameHeaderStyle = new GUIStyle();
+    private static readonly GUIStyle FrameSummaryStyle = new GUIStyle();
+    private static readonly GUIStyle CurrentFrameSummaryStyle = new GUIStyle();
+    private static readonly GUIStyle DimmedFrameSummaryStyle = new GUIStyle();
     private static readonly GUIStyle RowStyle = new GUIStyle();
     private static readonly GUIStyle CurrentRowStyle = new GUIStyle();
     private static readonly GUIStyle DimmedRowStyle = new GUIStyle();
@@ -122,6 +129,8 @@ internal sealed class CombatLogPanel
             $"Pass: {timeline?.PlaybackPass.ToString() ?? "-"}  Current: {_state.CurrentFrameIndex}",
             StatusStyle
         );
+        DrawModeButtons();
+        DrawVerbosityButtons();
         DrawFilters();
         GUILayout.Space(8f);
 
@@ -132,25 +141,73 @@ internal sealed class CombatLogPanel
         }
 
         var viewportHeight = Mathf.Max(contentHeight - ScrollViewportChromeHeight, 80f);
-        var visibleRows = _state.BuildVisibleRows(timeline);
-        if (visibleRows.Count == 0)
+        var visibleGroups = _state.BuildVisibleFrameGroups(timeline);
+        if (visibleGroups.Count == 0)
         {
-            GUILayout.Label("No visible log rows yet.", MutedStyle);
+            GUILayout.Label("No visible frame groups yet.", MutedStyle);
             return;
         }
 
-        var visibleRange = CombatLogViewport.CalculateVisibleRowRange(
-            visibleRows.Count,
+        // Keep the old row-range helper referenced while the viewport transitions to group-aware rendering.
+        var _ = CombatLogViewport.CalculateVisibleRowRange(
+            Mathf.Max(visibleGroups.Sum(group => 1 + group.VisibleRowCount), 1),
             _scroll.y,
             viewportHeight
         );
-        _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(viewportHeight));
+        var visibleRange = CombatLogViewport.CalculateVisibleGroupRange(
+            visibleGroups,
+            _scroll.y,
+            viewportHeight
+        );
+        _scroll = GUILayout.BeginScrollView(
+            _scroll,
+            GUILayout.Height(viewportHeight),
+            GUILayout.ExpandHeight(true)
+        );
         if (visibleRange.TopSpacerHeight > 0f)
             GUILayout.Space(visibleRange.TopSpacerHeight);
-        DrawRows(visibleRows, visibleRange.StartIndex, visibleRange.EndIndex);
+        DrawFrameGroups(visibleGroups, visibleRange.StartIndex, visibleRange.EndIndex);
         if (visibleRange.BottomSpacerHeight > 0f)
             GUILayout.Space(visibleRange.BottomSpacerHeight);
         GUILayout.EndScrollView();
+    }
+
+    private void DrawModeButtons()
+    {
+        GUILayout.Space(6f);
+        GUILayout.BeginHorizontal();
+        DrawOptionButton(
+            "Release",
+            _state.DisplayOptions.Mode == CombatLogDisplayMode.Release,
+            () => _state.SetDisplayMode(CombatLogDisplayMode.Release)
+        );
+        DrawOptionButton(
+            "Debug",
+            _state.DisplayOptions.Mode == CombatLogDisplayMode.Debug,
+            () => _state.SetDisplayMode(CombatLogDisplayMode.Debug)
+        );
+        GUILayout.EndHorizontal();
+    }
+
+    private void DrawVerbosityButtons()
+    {
+        GUILayout.BeginHorizontal();
+        DrawOptionButton(
+            "Compact",
+            _state.DisplayOptions.Verbosity == CombatLogVerbosity.Compact,
+            () => _state.SetVerbosity(CombatLogVerbosity.Compact)
+        );
+        DrawOptionButton(
+            "Standard",
+            _state.DisplayOptions.Verbosity == CombatLogVerbosity.Standard,
+            () => _state.SetVerbosity(CombatLogVerbosity.Standard)
+        );
+        DrawOptionButton(
+            "Verbose",
+            _state.DisplayOptions.Verbosity == CombatLogVerbosity.Verbose,
+            () => _state.SetVerbosity(CombatLogVerbosity.Verbose)
+        );
+        GUILayout.EndHorizontal();
     }
 
     private void DrawFilters()
@@ -178,28 +235,98 @@ internal sealed class CombatLogPanel
         GUI.color = previousColor;
     }
 
-    private static void DrawRows(IReadOnlyList<CombatLogVisibleRow> rows, int startIndex, int endIndex)
+    private static void DrawOptionButton(string label, bool enabled, System.Action onClick)
+    {
+        DrawFilterButton(label, enabled, onClick);
+    }
+
+    private void DrawFrameGroups(
+        IReadOnlyList<CombatLogFrameGroupViewModel> groups,
+        int startIndex,
+        int endIndex
+    )
     {
         for (var index = startIndex; index < endIndex; index++)
         {
+            var group = groups[index];
+            DrawFrameHeader(group);
+            if (group.IsExpanded)
+                DrawFrameRows(group.Rows);
+            GUILayout.Space(4f);
+        }
+    }
+
+    private void DrawFrameHeader(CombatLogFrameGroupViewModel group)
+    {
+        var toggleLabel = group.IsExpanded ? "[-]" : "[+]";
+        if (
+            GUILayout.Button(
+                $"{toggleLabel} [{group.FrameIndex:000}] {group.SummaryText}",
+                GetFrameHeaderStyle(group.VisualState)
+            )
+        )
+        {
+            _state.ToggleFrameExpanded(group.FrameIndex);
+        }
+
+        GUILayout.Label(
+            $"{group.LogicalTime:mm\\:ss\\.ff}  rows: {group.VisibleRowCount}/{group.TotalRowCount}",
+            GetFrameSummaryStyle(group.VisualState)
+        );
+    }
+
+    private static void DrawFrameRows(IReadOnlyList<CombatLogDisplayRowViewModel> rows)
+    {
+        for (var index = 0; index < rows.Count; index++)
+        {
             var row = rows[index];
-            var primaryStyle = row.VisualState switch
-            {
-                CombatLogRowVisualState.Current => CurrentRowStyle,
-                CombatLogRowVisualState.FutureDimmed => DimmedRowStyle,
-                _ => RowStyle,
-            };
-            var secondaryStyle = row.VisualState switch
-            {
-                CombatLogRowVisualState.Current => SecondaryCurrentRowStyle,
-                CombatLogRowVisualState.FutureDimmed => SecondaryDimmedRowStyle,
-                _ => SecondaryRowStyle,
-            };
-            GUILayout.Label($"[{row.Row.FrameIndex:000}] {row.Row.Text}", primaryStyle);
-            if (!string.IsNullOrWhiteSpace(row.Row.SecondaryText))
-                GUILayout.Label($"      {row.Row.SecondaryText}", secondaryStyle);
+            var primaryStyle = GetPrimaryRowStyle(row);
+            GUILayout.Label($"    {row.PrimaryText}", primaryStyle);
+            if (!string.IsNullOrWhiteSpace(row.SecondaryText))
+                GUILayout.Label($"      {row.SecondaryText}", GetSecondaryRowStyle(row.VisualState));
             GUILayout.Space(2f);
         }
+    }
+
+    private static GUIStyle GetFrameHeaderStyle(CombatLogRowVisualState visualState)
+    {
+        return visualState switch
+        {
+            CombatLogRowVisualState.Current => CurrentFrameHeaderStyle,
+            CombatLogRowVisualState.FutureDimmed => DimmedFrameHeaderStyle,
+            _ => FrameHeaderStyle,
+        };
+    }
+
+    private static GUIStyle GetFrameSummaryStyle(CombatLogRowVisualState visualState)
+    {
+        return visualState switch
+        {
+            CombatLogRowVisualState.Current => CurrentFrameSummaryStyle,
+            CombatLogRowVisualState.FutureDimmed => DimmedFrameSummaryStyle,
+            _ => FrameSummaryStyle,
+        };
+    }
+
+    private static GUIStyle GetPrimaryRowStyle(CombatLogDisplayRowViewModel row)
+    {
+        if (row.VisualState == CombatLogRowVisualState.FutureDimmed)
+            return DimmedRowStyle;
+
+        if (row.VisualState == CombatLogRowVisualState.Current || row.Emphasize)
+            return CurrentRowStyle;
+
+        return RowStyle;
+    }
+
+    private static GUIStyle GetSecondaryRowStyle(CombatLogRowVisualState visualState)
+    {
+        return visualState switch
+        {
+            CombatLogRowVisualState.Current => SecondaryCurrentRowStyle,
+            CombatLogRowVisualState.FutureDimmed => SecondaryDimmedRowStyle,
+            _ => SecondaryRowStyle,
+        };
     }
 
     private static void InitStyles()
@@ -213,6 +340,39 @@ internal sealed class CombatLogPanel
 
         StatusStyle.normal.textColor = new Color(0.82f, 0.9f, 1f);
         StatusStyle.fontSize = 13;
+
+        FrameHeaderStyle.normal.textColor = new Color(0.9f, 0.92f, 1f);
+        FrameHeaderStyle.fontSize = 13;
+        FrameHeaderStyle.fontStyle = FontStyle.Bold;
+        FrameHeaderStyle.alignment = TextAnchor.MiddleLeft;
+        FrameHeaderStyle.padding = new RectOffset(8, 8, 6, 6);
+        FrameHeaderStyle.margin = new RectOffset(0, 0, 2, 2);
+
+        CurrentFrameHeaderStyle.normal.textColor = new Color(1f, 0.95f, 0.6f);
+        CurrentFrameHeaderStyle.fontSize = 13;
+        CurrentFrameHeaderStyle.fontStyle = FontStyle.Bold;
+        CurrentFrameHeaderStyle.alignment = TextAnchor.MiddleLeft;
+        CurrentFrameHeaderStyle.padding = new RectOffset(8, 8, 6, 6);
+        CurrentFrameHeaderStyle.margin = new RectOffset(0, 0, 2, 2);
+
+        DimmedFrameHeaderStyle.normal.textColor = new Color(0.65f, 0.65f, 0.65f);
+        DimmedFrameHeaderStyle.fontSize = 13;
+        DimmedFrameHeaderStyle.fontStyle = FontStyle.Bold;
+        DimmedFrameHeaderStyle.alignment = TextAnchor.MiddleLeft;
+        DimmedFrameHeaderStyle.padding = new RectOffset(8, 8, 6, 6);
+        DimmedFrameHeaderStyle.margin = new RectOffset(0, 0, 2, 2);
+
+        FrameSummaryStyle.normal.textColor = new Color(0.7f, 0.76f, 0.82f);
+        FrameSummaryStyle.fontSize = 11;
+        FrameSummaryStyle.wordWrap = true;
+
+        CurrentFrameSummaryStyle.normal.textColor = new Color(0.93f, 0.86f, 0.60f);
+        CurrentFrameSummaryStyle.fontSize = 11;
+        CurrentFrameSummaryStyle.wordWrap = true;
+
+        DimmedFrameSummaryStyle.normal.textColor = new Color(0.55f, 0.55f, 0.55f);
+        DimmedFrameSummaryStyle.fontSize = 11;
+        DimmedFrameSummaryStyle.wordWrap = true;
 
         RowStyle.normal.textColor = Color.white;
         RowStyle.fontSize = 13;

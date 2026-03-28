@@ -111,19 +111,25 @@ internal sealed class CombatLogEventEntry
         string eventType,
         string? executionContextId,
         string? sourceId,
+        string? triggerSourceId,
         string? targetId,
+        string? targetKind,
         string? sourceDisplayName,
         string? targetDisplayName,
-        string text
+        string text,
+        CombatLogEventFormatData? formatData = null
     )
     {
         EventType = eventType;
         ExecutionContextId = executionContextId;
         SourceId = sourceId;
+        TriggerSourceId = triggerSourceId;
         TargetId = targetId;
+        TargetKind = targetKind;
         SourceDisplayName = sourceDisplayName;
         TargetDisplayName = targetDisplayName;
         Text = text;
+        FormatData = formatData;
     }
 
     public string EventType { get; }
@@ -132,13 +138,95 @@ internal sealed class CombatLogEventEntry
 
     public string? SourceId { get; }
 
+    public string? TriggerSourceId { get; }
+
     public string? TargetId { get; }
+
+    public string? TargetKind { get; }
 
     public string? SourceDisplayName { get; }
 
     public string? TargetDisplayName { get; }
 
     public string Text { get; }
+
+    public CombatLogEventFormatData? FormatData { get; }
+}
+
+internal sealed class CombatLogEventFormatData
+{
+    public CombatLogEventFormatData(
+        string? effectId = null,
+        string? actionType = null,
+        string? rewardKind = null,
+        double? amount = null,
+        string? auraAppliedDisplay = null,
+        string? auraRemovedDisplay = null,
+        string? enchantmentLabel = null,
+        bool? isReverted = null,
+        string? originalDisplayText = null,
+        IReadOnlyList<string>? relatedDisplayItems = null,
+        IReadOnlyList<string>? relatedRawItems = null,
+        int? questGroupIndex = null,
+        int? questEntryIndex = null,
+        int? previousProgress = null,
+        int? currentProgress = null,
+        string? systemKey = null,
+        string? fallbackText = null
+    )
+    {
+        EffectId = effectId;
+        ActionType = actionType;
+        RewardKind = rewardKind;
+        Amount = amount;
+        AuraAppliedDisplay = auraAppliedDisplay;
+        AuraRemovedDisplay = auraRemovedDisplay;
+        EnchantmentLabel = enchantmentLabel;
+        IsReverted = isReverted;
+        OriginalDisplayText = originalDisplayText;
+        RelatedDisplayItems = relatedDisplayItems ?? Array.Empty<string>();
+        RelatedRawItems = relatedRawItems ?? Array.Empty<string>();
+        QuestGroupIndex = questGroupIndex;
+        QuestEntryIndex = questEntryIndex;
+        PreviousProgress = previousProgress;
+        CurrentProgress = currentProgress;
+        SystemKey = systemKey;
+        FallbackText = fallbackText;
+    }
+
+    public string? EffectId { get; }
+
+    public string? ActionType { get; }
+
+    public string? RewardKind { get; }
+
+    public double? Amount { get; }
+
+    public string? AuraAppliedDisplay { get; }
+
+    public string? AuraRemovedDisplay { get; }
+
+    public string? EnchantmentLabel { get; }
+
+    public bool? IsReverted { get; }
+
+    public string? OriginalDisplayText { get; }
+
+    public IReadOnlyList<string> RelatedDisplayItems { get; }
+
+    public IReadOnlyList<string> RelatedRawItems { get; }
+
+    public int? QuestGroupIndex { get; }
+
+    public int? QuestEntryIndex { get; }
+
+    public int? PreviousProgress { get; }
+
+    public int? CurrentProgress { get; }
+
+    public string? SystemKey { get; }
+
+    public string? FallbackText { get; }
 }
 
 internal sealed class CombatLogSideUpdate

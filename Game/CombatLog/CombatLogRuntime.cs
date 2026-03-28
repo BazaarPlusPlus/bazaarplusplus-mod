@@ -6,6 +6,7 @@ using System.Reflection;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
+using BazaarPlusPlus.Game.ItemEnchantPreview;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.CombatLog;
@@ -73,20 +74,27 @@ internal sealed class CombatLogRuntime
                 case CombatSimEventEffectExecuted executed:
                     var executedSourceId = FormatInstanceId(executed.Source);
                     var executedSourceDisplay = ResolveCardDisplayName(executedSourceId);
-                    var executedTargetId = FormatTargetId(executed.Target);
+                    var executedTriggerSourceId = FormatInstanceId(executed.TriggerSource);
+                    var executedTarget = DescribeTarget(executed.Target);
                     var executedTargetDisplay = FormatTargetDisplay(executed.Target);
                     results.Add(
                         new CombatLogEventEntry(
                             "EffectExecuted",
                             executed.ExecutionContextId,
                             executedSourceId,
-                            executedTargetId,
+                            executedTriggerSourceId,
+                            executedTarget.Raw,
+                            executedTarget.Kind,
                             executedSourceDisplay,
                             executedTargetDisplay,
                             BuildEffectExecutedText(
                                 executed,
                                 executedSourceDisplay,
                                 executedTargetDisplay
+                            ),
+                            new CombatLogEventFormatData(
+                                effectId: executed.EffectId,
+                                actionType: executed.ActionType.ToString()
                             )
                         )
                     );
@@ -97,10 +105,13 @@ internal sealed class CombatLogRuntime
                             "CombatantDied",
                             null,
                             null,
-                            died.CombatantId.ToString(),
                             null,
                             died.CombatantId.ToString(),
-                            $"{died.CombatantId} died"
+                            "Player",
+                            null,
+                            died.CombatantId.ToString(),
+                            $"{died.CombatantId} died",
+                            new CombatLogEventFormatData()
                         )
                     );
                     break;
@@ -113,7 +124,13 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             null,
-                            $"Monster gold +{gold.HealthAmount:0.##}"
+                            null,
+                            null,
+                            $"Monster gold +{gold.HealthAmount:0.##}",
+                            new CombatLogEventFormatData(
+                                rewardKind: "Monster gold",
+                                amount: gold.HealthAmount
+                            )
                         )
                     );
                     break;
@@ -126,7 +143,13 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             null,
-                            $"Monster xp +{xp.HealthAmount:0.##}"
+                            null,
+                            null,
+                            $"Monster xp +{xp.HealthAmount:0.##}",
+                            new CombatLogEventFormatData(
+                                rewardKind: "Monster xp",
+                                amount: xp.HealthAmount
+                            )
                         )
                     );
                     break;
@@ -139,29 +162,41 @@ internal sealed class CombatLogRuntime
                             "EffectTriggered",
                             triggered.ExecutionContextId,
                             triggeredSourceId,
+                            null,
                             triggeredTargets.raw,
+                            triggeredTargets.kind,
                             triggeredSourceDisplay,
                             triggeredTargets.display,
                             BuildEffectTriggeredText(
                                 triggered,
                                 triggeredSourceDisplay,
                                 triggeredTargets.display
-                            )
+                            ),
+                            new CombatLogEventFormatData(effectId: triggered.EffectId)
                         )
                     );
                     break;
                 case CombatSimEventEffectAuraExecuted auraExecuted:
                     var auraSourceId = FormatInstanceId(auraExecuted.Source);
                     var auraSourceDisplay = ResolveCardDisplayName(auraSourceId);
+                    var auraAppliedTargets = JoinTargets(auraExecuted.AppliedTo);
+                    var auraRemovedTargets = JoinTargets(auraExecuted.RemovedFrom);
                     results.Add(
                         new CombatLogEventEntry(
                             "EffectAuraExecuted",
                             auraExecuted.ExecutionContextId,
                             auraSourceId,
                             null,
+                            auraAppliedTargets.raw ?? auraRemovedTargets.raw,
+                            auraAppliedTargets.kind ?? auraRemovedTargets.kind,
                             auraSourceDisplay,
-                            null,
-                            BuildEffectAuraExecutedText(auraExecuted, auraSourceDisplay)
+                            auraAppliedTargets.display ?? auraRemovedTargets.display,
+                            BuildEffectAuraExecutedText(auraExecuted, auraSourceDisplay),
+                            new CombatLogEventFormatData(
+                                effectId: auraExecuted.EffectId,
+                                auraAppliedDisplay: auraAppliedTargets.display,
+                                auraRemovedDisplay: auraRemovedTargets.display
+                            )
                         )
                     );
                     break;
@@ -173,27 +208,53 @@ internal sealed class CombatLogRuntime
                             null,
                             enchanted.InstanceId,
                             null,
+                            null,
+                            null,
                             enchantedDisplay,
                             null,
-                            BuildCardEnchantedText(enchanted, enchantedDisplay)
+                            BuildCardEnchantedText(enchanted, enchantedDisplay),
+                            new CombatLogEventFormatData(
+                                enchantmentLabel: enchanted.EnchantmentType.HasValue
+                                    ? ItemEnchantPreviewFormatting.GetEnchantmentLabel(
+                                        enchanted.EnchantmentType.Value
+                                    )
+                                    : "none",
+                                isReverted: enchanted.IsReverted
+                            )
                         )
                     );
                     break;
                 case CombatSimEventCardTransformed transformed:
                     var transformedDisplay = ResolveCardDisplayName(transformed.OriginalInstanceId);
+                    var transformedCards =
+                        transformed.TransformedCards?.Select(GetTransformationDisplayName).ToList()
+                        ?? (IReadOnlyList<string>)Array.Empty<string>();
+                    var transformedCardDebugItems =
+                        transformed.TransformedCards?.Select(FormatTransformation).ToList()
+                        ?? (IReadOnlyList<string>)Array.Empty<string>();
                     results.Add(
                         new CombatLogEventEntry(
                             "CardTransformed",
                             transformed.ExecutionContextId,
                             transformed.OriginalInstanceId,
                             null,
+                            null,
+                            null,
                             transformedDisplay,
                             null,
-                            BuildCardTransformedText(transformed, transformedDisplay)
+                            BuildCardTransformedText(transformed, transformedDisplay),
+                            new CombatLogEventFormatData(
+                                relatedDisplayItems: transformedCards,
+                                relatedRawItems: transformedCardDebugItems
+                            )
                         )
                     );
                     break;
                 case CombatSimEventCardTransformReverted reverted:
+                    var revertedOriginal = FormatTransformation(reverted.OriginalCard);
+                    var revertedIds =
+                        reverted.TransformedCardInstanceIds?.ToList()
+                        ?? (IReadOnlyList<string>)Array.Empty<string>();
                     results.Add(
                         new CombatLogEventEntry(
                             "CardTransformReverted",
@@ -202,7 +263,13 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             null,
-                            BuildCardTransformRevertedText(reverted)
+                            null,
+                            null,
+                            BuildCardTransformRevertedText(reverted),
+                            new CombatLogEventFormatData(
+                                originalDisplayText: revertedOriginal,
+                                relatedRawItems: revertedIds
+                            )
                         )
                     );
                     break;
@@ -214,9 +281,15 @@ internal sealed class CombatLogRuntime
                             null,
                             questCompleted.InstanceId,
                             null,
+                            null,
+                            null,
                             questCompletedDisplay,
                             null,
-                            $"Quest completed {questCompletedDisplay ?? questCompleted.InstanceId} group={questCompleted.QuestGroupIndex} entry={questCompleted.QuestEntryIndex}"
+                            $"Quest completed {questCompletedDisplay ?? questCompleted.InstanceId} group={questCompleted.QuestGroupIndex} entry={questCompleted.QuestEntryIndex}",
+                            new CombatLogEventFormatData(
+                                questGroupIndex: questCompleted.QuestGroupIndex,
+                                questEntryIndex: questCompleted.QuestEntryIndex
+                            )
                         )
                     );
                     break;
@@ -228,9 +301,17 @@ internal sealed class CombatLogRuntime
                             null,
                             questUpdated.InstanceId,
                             null,
+                            null,
+                            null,
                             questUpdatedDisplay,
                             null,
-                            $"Quest updated {questUpdatedDisplay ?? questUpdated.InstanceId} group={questUpdated.QuestGroupIndex} entry={questUpdated.QuestEntryIndex} {questUpdated.OldProgress} -> {questUpdated.NewProgress}"
+                            $"Quest updated {questUpdatedDisplay ?? questUpdated.InstanceId} group={questUpdated.QuestGroupIndex} entry={questUpdated.QuestEntryIndex} {questUpdated.OldProgress} -> {questUpdated.NewProgress}",
+                            new CombatLogEventFormatData(
+                                questGroupIndex: questUpdated.QuestGroupIndex,
+                                questEntryIndex: questUpdated.QuestEntryIndex,
+                                previousProgress: questUpdated.OldProgress,
+                                currentProgress: questUpdated.NewProgress
+                            )
                         )
                     );
                     break;
@@ -243,7 +324,12 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             null,
-                            "Sandstorm countdown started"
+                            null,
+                            null,
+                            "Sandstorm countdown started",
+                            new CombatLogEventFormatData(
+                                systemKey: "SandstormCountdownStarted"
+                            )
                         )
                     );
                     break;
@@ -256,7 +342,10 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             null,
-                            "Sandstorm started"
+                            null,
+                            null,
+                            "Sandstorm started",
+                            new CombatLogEventFormatData(systemKey: "SandstormStarted")
                         )
                     );
                     break;
@@ -269,7 +358,12 @@ internal sealed class CombatLogRuntime
                             null,
                             null,
                             null,
-                            BuildFallbackEventText(simEvent)
+                            null,
+                            null,
+                            BuildFallbackEventText(simEvent),
+                            new CombatLogEventFormatData(
+                                fallbackText: BuildFallbackEventText(simEvent)
+                            )
                         )
                     );
                     break;
@@ -388,6 +482,11 @@ internal sealed class CombatLogRuntime
         return $"{executed.ActionType} {executed.EffectId} {sourceText} -> {targetText}";
     }
 
+    private static string? FormatTargetId(IEffectTarget? target)
+    {
+        return DescribeTarget(target).Raw;
+    }
+
     private string BuildEffectTriggeredText(
         CombatSimEventEffectTriggered triggered,
         string? sourceDisplayName,
@@ -458,19 +557,32 @@ internal sealed class CombatLogRuntime
         return $"{displayName ?? transformation.InstanceId}/{transformation.TemplateId} {transformation.Type} {transformation.CombatantId} {section}:{socket}";
     }
 
+    private string GetTransformationDisplayName(SimEventCardTransformation transformation)
+    {
+        return ResolveCardDisplayName(transformation.InstanceId) ?? transformation.InstanceId;
+    }
+
     private static string? FormatInstanceId(BazaarGameShared.Domain.Core.InstanceId? instanceId)
     {
         return instanceId?.ToString();
     }
 
-    private static string? FormatTargetId(IEffectTarget? target)
+    private static CombatLogTargetDescription DescribeTarget(IEffectTarget? target)
     {
         return target switch
         {
-            EffectTargetCard card => card.Target.ToString(),
-            EffectTargetPlayer player => player.Target.ToString(),
-            null => null,
-            _ => target.GetType().Name,
+            EffectTargetCard card => new(
+                card.Target.ToString(),
+                "Card",
+                null
+            ),
+            EffectTargetPlayer player => new(
+                player.Target.ToString(),
+                "Player",
+                player.Target.ToString()
+            ),
+            null => default,
+            _ => new(target.GetType().Name, target.GetType().Name, target.GetType().Name),
         };
     }
 
@@ -486,23 +598,46 @@ internal sealed class CombatLogRuntime
         };
     }
 
-    private (string? raw, string? display) JoinTargets(IEnumerable<IEffectTarget>? targets)
+    private (string? raw, string? display, string? kind) JoinTargets(IEnumerable<IEffectTarget>? targets)
     {
         if (targets == null)
-            return (null, null);
+            return (null, null, null);
 
-        var rawValues = targets
-            .Select(FormatTargetId)
+        var describedTargets = targets.Select(DescribeTarget).ToList();
+        var rawValues = describedTargets
+            .Select(target => target.Raw)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToList();
         var displayValues = targets
             .Select(FormatTargetDisplay)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToList();
+        var kindValues = describedTargets
+            .Select(target => target.Kind)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct()
+            .ToList();
         return (
             rawValues.Count == 0 ? null : string.Join(", ", rawValues),
-            displayValues.Count == 0 ? null : string.Join(", ", displayValues)
+            displayValues.Count == 0 ? null : string.Join(", ", displayValues),
+            kindValues.Count == 0 ? null : string.Join(", ", kindValues)
         );
+    }
+
+    private readonly struct CombatLogTargetDescription
+    {
+        public CombatLogTargetDescription(string? raw, string? kind, string? display)
+        {
+            Raw = raw;
+            Kind = kind;
+            Display = display;
+        }
+
+        public string? Raw { get; }
+
+        public string? Kind { get; }
+
+        public string? Display { get; }
     }
 
     private static string BuildFallbackEventText(ICombatSimEvent simEvent)

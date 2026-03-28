@@ -6,6 +6,39 @@ namespace BazaarPlusPlus.Game.CombatLog;
 
 internal static class CombatLogFormatter
 {
+    internal interface ICombatLogLineFormatter
+    {
+        CombatLogDisplayRowViewModel FormatEvent(
+            CombatLogFrame frame,
+            CombatLogEventEntry entry,
+            CombatLogDisplayOptions options
+        );
+
+        CombatLogDisplayRowViewModel FormatCombatant(
+            CombatLogFrame frame,
+            string side,
+            CombatLogHealthAdjustment health
+        );
+
+        CombatLogDisplayRowViewModel FormatCombatant(
+            CombatLogFrame frame,
+            string side,
+            CombatLogAttributeChange attribute
+        );
+
+        CombatLogDisplayRowViewModel FormatCard(
+            CombatLogFrame frame,
+            CombatLogCardUpdateEntry entry,
+            CombatLogAttributeChange attribute
+        );
+
+        CombatLogDisplayRowViewModel FormatCardDetail(
+            CombatLogFrame frame,
+            CombatLogCardUpdateEntry entry,
+            string detail
+        );
+    }
+
     internal static IReadOnlyList<CombatLogRow> BuildRows(IReadOnlyList<CombatLogFrame> frames)
     {
         var rows = new List<CombatLogRow>();
@@ -27,27 +60,13 @@ internal static class CombatLogFormatter
     {
         foreach (var entry in frame.Events)
         {
-            var category = entry.EventType switch
-            {
-                "CombatantDied" => CombatLogRowCategory.Death,
-                "MonsterGoldReceived" or "MonsterXpReceived" => CombatLogRowCategory.Reward,
-                "SandstormCountdownStarted" or "SandstormStarted" => CombatLogRowCategory.System,
-                "EffectExecuted"
-                or "EffectTriggered"
-                or "EffectAuraExecuted"
-                or "CardEnchanted"
-                or "CardTransformed"
-                or "CardTransformReverted"
-                or "CardQuestCompleted"
-                or "CardQuestUpdated" => CombatLogRowCategory.Event,
-                _ => CombatLogRowCategory.Unknown,
-            };
+            var category = GetEventCategory(entry.EventType);
             rows.Add(
                 new CombatLogRow(
                     frame.FrameIndex,
                     frame.LogicalTime,
                     category,
-                    entry.Text,
+                    CombatLogEventTextBuilder.BuildPrimaryText(entry),
                     BuildEventSecondaryText(entry)
                 )
             );
@@ -139,10 +158,16 @@ internal static class CombatLogFormatter
     private static string? BuildEventSecondaryText(CombatLogEventEntry entry)
     {
         var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(entry.ExecutionContextId))
+            parts.Add($"ctx: {entry.ExecutionContextId}");
         if (!string.IsNullOrWhiteSpace(entry.SourceId))
             parts.Add($"src: {entry.SourceId}");
+        if (!string.IsNullOrWhiteSpace(entry.TriggerSourceId))
+            parts.Add($"trigger: {entry.TriggerSourceId}");
         if (!string.IsNullOrWhiteSpace(entry.TargetId))
             parts.Add($"target: {entry.TargetId}");
+        if (!string.IsNullOrWhiteSpace(entry.TargetKind))
+            parts.Add($"kind: {entry.TargetKind}");
 
         return parts.Count == 0 ? null : string.Join(" | ", parts);
     }
@@ -154,5 +179,38 @@ internal static class CombatLogFormatter
             parts.Add($"tpl: {card.TemplateId}");
 
         return string.Join(" | ", parts);
+    }
+
+    internal static CombatLogRowCategory GetEventCategory(string eventType)
+    {
+        return eventType switch
+        {
+            "CombatantDied" => CombatLogRowCategory.Death,
+            "MonsterGoldReceived" or "MonsterXpReceived" => CombatLogRowCategory.Reward,
+            "SandstormCountdownStarted" or "SandstormStarted" => CombatLogRowCategory.System,
+            "EffectExecuted"
+            or "EffectTriggered"
+            or "EffectAuraExecuted"
+            or "CardEnchanted"
+            or "CardTransformed"
+            or "CardTransformReverted"
+            or "CardQuestCompleted"
+            or "CardQuestUpdated" => CombatLogRowCategory.Event,
+            _ => CombatLogRowCategory.Unknown,
+        };
+    }
+
+    internal static bool ShouldInclude(CombatLogDisplayOptions options, CombatLogRowCategory category)
+    {
+        return category switch
+        {
+            CombatLogRowCategory.Event or CombatLogRowCategory.Death => options.ShowEvents,
+            CombatLogRowCategory.Health or CombatLogRowCategory.Attribute => options.ShowCombatants,
+            CombatLogRowCategory.CardAttribute => options.ShowCards,
+            CombatLogRowCategory.Reward => options.ShowRewards,
+            CombatLogRowCategory.System => options.ShowSystem,
+            CombatLogRowCategory.Unknown => options.ShowUnknown,
+            _ => true,
+        };
     }
 }

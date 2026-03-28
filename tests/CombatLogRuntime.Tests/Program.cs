@@ -4,17 +4,59 @@ using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
 using BazaarPlusPlus.Game.CombatLog;
+using System.Globalization;
 
 var runtime = new CombatLogRuntime(ResolveCardDisplayInfo);
 var timeline = BuildTimeline(runtime);
+VerifyDisplayOptionsAndViewModels();
 VerifyTimeline(timeline);
+VerifyViewModelBuilder(timeline);
 VerifyPanelState(timeline);
+VerifyLargeTimelineSafeguards();
 VerifyPanelFilters(timeline);
 VerifyVisibleRowCaching(timeline);
 VerifyViewportWindowing();
 VerifySourceWiring();
 
 Console.WriteLine("CombatLogRuntime checks passed.");
+
+static void VerifyDisplayOptionsAndViewModels()
+{
+    var options = CombatLogDisplayOptions.ReleaseStandard;
+    Assert(
+        options.Mode == CombatLogDisplayMode.Release,
+        "Release preset should default to release mode."
+    );
+    Assert(
+        options.Verbosity == CombatLogVerbosity.Standard,
+        "Release preset should default to standard verbosity."
+    );
+
+    var group = new CombatLogFrameGroupViewModel(
+        frameIndex: 12,
+        logicalTime: TimeSpan.FromMilliseconds(600),
+        summaryText: "2 events, 1 combatant update",
+        visualState: CombatLogRowVisualState.Played,
+        isExpanded: false,
+        visibleRowCount: 3,
+        totalRowCount: 3,
+        rows: new[]
+        {
+            new CombatLogDisplayRowViewModel(
+                "primary",
+                null,
+                false,
+                CombatLogRowVisualState.Played
+            )
+        }
+    );
+    Assert(group.FrameIndex == 12, "Frame group should expose frame metadata.");
+    Assert(group.Rows.Count == 1, "Frame group should own its rendered rows.");
+    Assert(
+        group.VisualState == CombatLogRowVisualState.Played,
+        "Frame group should expose playback visual state."
+    );
+}
 
 static CombatLogTimeline BuildTimeline(CombatLogRuntime runtime)
 {
@@ -30,6 +72,7 @@ static CombatLogTimeline BuildTimeline(CombatLogRuntime runtime)
                     ExecutionContextId = "ctx-1",
                     EffectId = "burn",
                     Source = new InstanceId("card-a"),
+                    TriggerSource = new InstanceId("card-b"),
                     Target = new EffectTargetPlayer { Target = ECombatantId.Opponent },
                 },
                 new CombatSimEventMonsterGoldReceived { HealthAmount = 3 },
@@ -139,7 +182,7 @@ static void VerifyTimeline(CombatLogTimeline timeline)
     );
     Assert(
         timeline.Rows[0].Category == CombatLogRowCategory.Event
-            && timeline.Rows[0].Text.Contains("burn", StringComparison.Ordinal),
+            && timeline.Rows[0].Text.Contains("炽焰匕首", StringComparison.Ordinal),
         "EffectExecuted should produce the first display row for the frame."
     );
     Assert(
@@ -163,7 +206,7 @@ static void VerifyTimeline(CombatLogTimeline timeline)
     Assert(
         timeline.Rows.Any(row =>
             row.Category == CombatLogRowCategory.CardAttribute
-            && row.Text.Contains("Fiery Dagger", StringComparison.Ordinal)
+            && row.Text.Contains("炽焰匕首", StringComparison.Ordinal)
             && !row.Text.Contains("Card card-a", StringComparison.Ordinal)
         ),
         "Card attribute rows should prefer resolved display names over raw instance IDs."
@@ -179,30 +222,48 @@ static void VerifyTimeline(CombatLogTimeline timeline)
     Assert(
         timeline.Rows.Any(row =>
             row.Category == CombatLogRowCategory.Death
-            && row.Text.Contains("Opponent died", StringComparison.Ordinal)
+            && (row.Text.Contains("对手", StringComparison.Ordinal)
+                || row.Text.Contains("Opponent", StringComparison.Ordinal))
         ),
         "CombatantDied should become a death row."
     );
     Assert(
         timeline.Rows.Any(row =>
-            row.Text.Contains("Triggered poison", StringComparison.Ordinal)
-            && row.Text.Contains("Fiery Dagger", StringComparison.Ordinal)
+            row.Category == CombatLogRowCategory.Event
+            && row.Text.Contains("炽焰匕首", StringComparison.Ordinal)
+            && row.Text.Contains("对手", StringComparison.Ordinal)
         ),
         "EffectTriggered should become a display row that uses the resolved source card name."
     );
+    var executed = timeline.Frames[0].Events.First(entry => entry.EventType == "EffectExecuted");
     Assert(
-        timeline.Rows.Any(row => row.Text.Contains("Quest updated", StringComparison.Ordinal)),
+        executed.TriggerSourceId == "card-b",
+        "Debug mode needs trigger-source chaining."
+    );
+    Assert(
+        executed.TargetKind == "Player",
+        "Formatter should know whether a target is a player or card."
+    );
+    Assert(
+        executed.ExecutionContextId == "ctx-1",
+        "Execution context should remain available to debug output."
+    );
+    Assert(
+        timeline.Rows.Any(row =>
+            row.Text.Contains("炽焰匕首", StringComparison.Ordinal)
+            && (row.Text.Contains("任务更新", StringComparison.Ordinal)
+                || row.Text.Contains("Quest updated", StringComparison.Ordinal))
+            && row.Text.Contains("3 -> 4", StringComparison.Ordinal)
+        ),
         "Quest updates should become display rows."
     );
     Assert(
         timeline.Rows.Any(row =>
-            row.Text.Contains("Transform Fiery Dagger", StringComparison.Ordinal)
+            row.Text.Contains("炽焰匕首", StringComparison.Ordinal)
+            && row.Text.Contains("灰烬回响", StringComparison.Ordinal)
+            && !row.Text.Contains("tpl-b", StringComparison.Ordinal)
         ),
         "Transform events should become display rows."
-    );
-    Assert(
-        timeline.Rows.Any(row => row.Text.Contains("Sandstorm started", StringComparison.Ordinal)),
-        "Sandstorm events should become display rows."
     );
     Assert(
         timeline.Rows.Any(row => row.Category == CombatLogRowCategory.System),
@@ -210,9 +271,168 @@ static void VerifyTimeline(CombatLogTimeline timeline)
     );
 }
 
+static void VerifyViewModelBuilder(CombatLogTimeline timeline)
+{
+    var previousCulture = CultureInfo.CurrentCulture;
+    var previousUICulture = CultureInfo.CurrentUICulture;
+    CultureInfo.CurrentCulture = new CultureInfo("zh-CN");
+    CultureInfo.CurrentUICulture = new CultureInfo("zh-CN");
+
+    try
+    {
+    var builder = new CombatLogViewModelBuilder();
+    var releaseGroups = builder.Build(timeline, CombatLogDisplayOptions.ReleaseStandard, []);
+    Assert(releaseGroups.Count == 2, "Non-empty frames should become visible frame groups.");
+    Assert(
+        releaseGroups[0].Rows[0].PrimaryText.Contains("炽焰匕首", StringComparison.Ordinal),
+        "Release formatter should prefer readable names."
+    );
+    Assert(
+        releaseGroups[0].Rows.All(row => row.SecondaryText is null),
+        "Release formatter should suppress debug metadata."
+    );
+
+    var debugGroups = builder.Build(timeline, CombatLogDisplayOptions.DebugVerbose, [0]);
+    Assert(
+        debugGroups[0].Rows.Any(row =>
+            row.SecondaryText?.Contains("ctx=ctx-1", StringComparison.Ordinal) == true
+        ),
+        "Debug formatter should expose execution context."
+    );
+    Assert(
+        debugGroups[0].SummaryText.Contains("事件", StringComparison.Ordinal)
+            || debugGroups[0].SummaryText.Contains("event", StringComparison.Ordinal),
+        "Each frame should expose a summary string."
+    );
+    Assert(
+        releaseGroups[0].SummaryText.Contains("3 个事件", StringComparison.Ordinal)
+            && releaseGroups[0].SummaryText.Contains("1 个奖励", StringComparison.Ordinal),
+        "Summary should count action events separately from reward events and localize the count labels."
+    );
+    Assert(
+        releaseGroups[1].Rows.Any(row =>
+            row.PrimaryText.Contains("沙暴开始", StringComparison.Ordinal)
+        ),
+        "Localized release rows should not keep the English system-event sentence."
+    );
+    Assert(
+        releaseGroups[1].Rows.Any(row =>
+            row.PrimaryText.Contains("任务更新", StringComparison.Ordinal)
+        ),
+        "Localized release rows should not keep the English quest sentence."
+    );
+    var transformedReleaseRow = releaseGroups[1].Rows.First(row =>
+        row.PrimaryText.Contains("变形", StringComparison.Ordinal)
+    );
+    Assert(
+        !transformedReleaseRow.PrimaryText.Contains("tpl-b", StringComparison.Ordinal)
+            && !transformedReleaseRow.PrimaryText.Contains("Player", StringComparison.Ordinal),
+        "Release transform rows should not leak template IDs or combatant metadata."
+    );
+
+    var localizedRuntime = new CombatLogRuntime(ResolveCardDisplayInfo);
+    var localizedTimeline = BuildTimeline(localizedRuntime);
+    Assert(
+        localizedTimeline.Rows.Any(row =>
+            row.Text.Contains("沙暴开始", StringComparison.Ordinal)
+        ),
+        "The flat runtime rows should use the localized system-event text consumed by the current panel."
+    );
+    Assert(
+        localizedTimeline.Rows.Any(row =>
+            row.Text.Contains("任务更新", StringComparison.Ordinal)
+        ),
+        "The flat runtime rows should use localized quest text while the panel still renders timeline rows."
+    );
+    Assert(
+        localizedTimeline.Rows.Any(row =>
+            row.Text.Contains("变形", StringComparison.Ordinal)
+            && !row.Text.Contains("tpl-b", StringComparison.Ordinal)
+            && !row.Text.Contains("Player", StringComparison.Ordinal)
+        ),
+        "The flat runtime rows should not leak transform debug metadata in release-oriented text."
+    );
+
+    var syntheticTimeline = new CombatLogTimeline(
+        CombatLogPlaybackPass.FirstPlay,
+        new[]
+        {
+            new CombatLogFrame(
+                frameIndex: 0,
+                framesLeft: 0,
+                logicalTime: TimeSpan.Zero,
+                events: new[]
+                {
+                    new CombatLogEventEntry(
+                        eventType: "EffectExecuted",
+                        executionContextId: "ctx-localized",
+                        sourceId: "card-a",
+                        triggerSourceId: null,
+                        targetId: "Opponent",
+                        targetKind: "Player",
+                        sourceDisplayName: "炽焰匕首",
+                        targetDisplayName: "Opponent",
+                        text: "LEGACY EVENT TEXT",
+                        formatData: new CombatLogEventFormatData(
+                            effectId: "burn",
+                            actionType: "Cast"
+                        )
+                    )
+                },
+                player: null,
+                opponent: null,
+                cardUpdates: Array.Empty<CombatLogCardUpdateEntry>()
+            )
+        },
+        Array.Empty<CombatLogRow>()
+    );
+    var collapsedVerboseGroups = builder.Build(
+        syntheticTimeline,
+        CombatLogDisplayOptions.DebugVerbose,
+        []
+    );
+    Assert(
+        collapsedVerboseGroups[0].VisibleRowCount == 0
+            && collapsedVerboseGroups[0].TotalRowCount == 1
+            && collapsedVerboseGroups[0].Rows.Count == 0,
+        "Collapsed verbose groups should not claim hidden rows are already rendered."
+    );
+
+    var expandedSyntheticGroups = builder.Build(
+        syntheticTimeline,
+        CombatLogDisplayOptions.DebugVerbose,
+        [0]
+    );
+    Assert(
+        !expandedSyntheticGroups[0].Rows[0].PrimaryText.Contains(
+            "LEGACY EVENT TEXT",
+            StringComparison.Ordinal
+        ),
+        "Formatter should build event copy from structured data, not legacy text."
+    );
+    Assert(
+        expandedSyntheticGroups[0].Rows[0].PrimaryText.Contains("炽焰匕首", StringComparison.Ordinal),
+        "Formatter should use the localized card display name in primary event text."
+    );
+    }
+    finally
+    {
+        CultureInfo.CurrentCulture = previousCulture;
+        CultureInfo.CurrentUICulture = previousUICulture;
+    }
+}
+
 static void VerifyPanelState(CombatLogTimeline timeline)
 {
     var firstPlayState = new CombatLogPanelState();
+    Assert(
+        firstPlayState.DisplayOptions.Mode == CombatLogDisplayMode.Debug,
+        "Debug builds should start in debug mode."
+    );
+    Assert(
+        firstPlayState.DisplayOptions.Verbosity == CombatLogVerbosity.Verbose,
+        "Debug builds should start verbose."
+    );
     firstPlayState.Refresh(1);
     var firstPlayRows = firstPlayState.BuildVisibleRows(timeline);
     Assert(
@@ -224,6 +444,82 @@ static void VerifyPanelState(CombatLogTimeline timeline)
     Assert(
         firstPlayRows.All(row => row.Row.FrameIndex <= 0),
         "First play should hide future rows."
+    );
+
+    var visibleGroups = firstPlayState.BuildVisibleFrameGroups(timeline);
+    Assert(
+        visibleGroups.Any(group => group.FrameIndex == 0 && group.IsExpanded),
+        "Verbose mode should expand the current processed frame by default."
+    );
+    Assert(
+        visibleGroups.Any(group => group.FrameIndex == 0 && group.VisualState == CombatLogRowVisualState.Current),
+        "Visible frame groups should expose the current playback state."
+    );
+    Assert(
+        visibleGroups.All(group => group.VisibleRowCount == group.Rows.Count),
+        "Visible row count should match the rows actually rendered for each group."
+    );
+
+    firstPlayState.ToggleFrameExpanded(0);
+    var collapsedGroups = firstPlayState.BuildVisibleFrameGroups(timeline);
+    Assert(
+        collapsedGroups.Any(group =>
+            group.FrameIndex == 0
+            && !group.IsExpanded
+            && group.VisibleRowCount == 0
+            && group.TotalRowCount > 0
+        ),
+        "Users should be able to explicitly collapse the default-expanded current frame."
+    );
+
+    firstPlayState.ToggleFrameExpanded(0);
+    var reExpandedGroups = firstPlayState.BuildVisibleFrameGroups(timeline);
+    Assert(
+        reExpandedGroups.Any(group => group.FrameIndex == 0 && group.IsExpanded),
+        "Toggling the same frame again should re-expand it."
+    );
+
+    var sparseTimeline = new CombatLogTimeline(
+        timeline.PlaybackPass,
+        new[]
+        {
+            timeline.Frames[0],
+            new CombatLogFrame(
+                frameIndex: 2,
+                framesLeft: 0,
+                logicalTime: TimeSpan.FromMilliseconds(100),
+                events: Array.Empty<CombatLogEventEntry>(),
+                player: null,
+                opponent: null,
+                cardUpdates: Array.Empty<CombatLogCardUpdateEntry>()
+            )
+        },
+        timeline.Rows
+    );
+    var sparseGroups = firstPlayState.BuildVisibleFrameGroups(sparseTimeline);
+    Assert(
+        sparseGroups.All(group => group.TotalRowCount > 0),
+        "Empty frames should not be rendered by default."
+    );
+
+    var cachedGroups = firstPlayState.BuildVisibleFrameGroups(timeline);
+    firstPlayState.SetDisplayOptions(
+        new CombatLogDisplayOptions(
+            CombatLogDisplayMode.Release,
+            CombatLogVerbosity.Standard,
+            firstPlayState.DisplayOptions.ShowEvents,
+            firstPlayState.DisplayOptions.ShowCombatants,
+            firstPlayState.DisplayOptions.ShowCards,
+            firstPlayState.DisplayOptions.ShowRewards,
+            firstPlayState.DisplayOptions.ShowSystem,
+            firstPlayState.DisplayOptions.ShowUnknown,
+            firstPlayState.DisplayOptions.ShowEmptyFrames
+        )
+    );
+    var updatedGroups = firstPlayState.BuildVisibleFrameGroups(timeline);
+    Assert(
+        !object.ReferenceEquals(cachedGroups, updatedGroups),
+        "Changing mode or verbosity should invalidate the cached frame-group projection."
     );
 
     var replayTimeline = new CombatLogTimeline(
@@ -239,6 +535,33 @@ static void VerifyPanelState(CombatLogTimeline timeline)
             row.Row.FrameIndex == 1 && row.VisualState == CombatLogRowVisualState.FutureDimmed
         ),
         "Replay should keep future rows visible and dimmed."
+    );
+
+    var replayGroups = replayState.BuildVisibleFrameGroups(replayTimeline);
+    Assert(
+        replayGroups.Any(group =>
+            group.FrameIndex == 1 && group.VisualState == CombatLogRowVisualState.FutureDimmed
+        ),
+        "Replay frame groups should keep future frames visible and dimmed."
+    );
+}
+
+static void VerifyLargeTimelineSafeguards()
+{
+    var denseTimeline = BuildLargeTimeline(frameCount: 500, rowsPerFrame: 8);
+    var state = new CombatLogPanelState();
+    state.Refresh(250);
+    state.SetDisplayOptions(CombatLogDisplayOptions.DebugVerbose);
+    var groups = state.BuildVisibleFrameGroups(denseTimeline);
+
+    Assert(groups.Count > 0, "Large timelines should still produce visible frame groups.");
+    Assert(
+        groups.Count < denseTimeline.Frames.Count + 1,
+        "Empty frames should stay filtered."
+    );
+    Assert(
+        groups.Count(group => group.IsExpanded) <= 1,
+        "Verbose mode should not eagerly expand every frame."
     );
 }
 
@@ -303,6 +626,71 @@ static void VerifyVisibleRowCaching(CombatLogTimeline timeline)
     );
 }
 
+static CombatLogTimeline BuildLargeTimeline(int frameCount, int rowsPerFrame)
+{
+    var frames = new List<CombatLogFrame>(frameCount);
+    for (var frameIndex = 0; frameIndex < frameCount; frameIndex++)
+    {
+        var isEmptyFrame = frameIndex % 5 == 0;
+        var events = new List<CombatLogEventEntry>();
+        var cardUpdates = new List<CombatLogCardUpdateEntry>();
+        if (!isEmptyFrame)
+        {
+            for (var rowIndex = 0; rowIndex < rowsPerFrame / 2; rowIndex++)
+            {
+                events.Add(
+                    new CombatLogEventEntry(
+                        eventType: "EffectExecuted",
+                        executionContextId: $"ctx-{frameIndex}-{rowIndex}",
+                        sourceId: "card-a",
+                        triggerSourceId: null,
+                        targetId: "Opponent",
+                        targetKind: "Player",
+                        sourceDisplayName: "炽焰匕首",
+                        targetDisplayName: "对手",
+                        text: $"legacy-{frameIndex}-{rowIndex}",
+                        formatData: new CombatLogEventFormatData(
+                            effectId: "burn",
+                            actionType: "Cast"
+                        )
+                    )
+                );
+            }
+
+            cardUpdates.Add(
+                new CombatLogCardUpdateEntry(
+                    new CombatLogCardDisplayInfo("card-a", "tpl-a", "炽焰匕首"),
+                    new[]
+                    {
+                        new CombatLogAttributeChange("CritChance", frameIndex, frameIndex + 1)
+                    },
+                    new[] { $"Tier -> {frameIndex % 3}" }
+                )
+            );
+        }
+
+        frames.Add(
+            new CombatLogFrame(
+                frameIndex: frameIndex,
+                framesLeft: Math.Max(frameCount - frameIndex - 1, 0),
+                logicalTime: TimeSpan.FromMilliseconds(
+                    frameIndex * CombatLogTiming.MillisecondsPerFrame
+                ),
+                events: events,
+                player: null,
+                opponent: null,
+                cardUpdates: cardUpdates
+            )
+        );
+    }
+
+    return new CombatLogTimeline(
+        CombatLogPlaybackPass.Replay,
+        frames,
+        CombatLogFormatter.BuildRows(frames)
+    );
+}
+
 static void VerifyViewportWindowing()
 {
     var topWindow = CombatLogViewport.CalculateVisibleRowRange(
@@ -338,6 +726,46 @@ static void VerifyViewportWindowing()
     Assert(
         overscrolledWindow.StartIndex < 12 && overscrolledWindow.EndIndex == 12,
         "Windowed rendering should clamp overscrolled positions back to the last available rows."
+    );
+
+    var collapsedGroup = new CombatLogFrameGroupViewModel(
+        frameIndex: 0,
+        logicalTime: TimeSpan.Zero,
+        summaryText: "summary",
+        visualState: CombatLogRowVisualState.Current,
+        isExpanded: false,
+        visibleRowCount: 0,
+        totalRowCount: 2,
+        rows: Array.Empty<CombatLogDisplayRowViewModel>()
+    );
+    var expandedGroup = new CombatLogFrameGroupViewModel(
+        frameIndex: 1,
+        logicalTime: TimeSpan.FromMilliseconds(50),
+        summaryText: "summary",
+        visualState: CombatLogRowVisualState.FutureDimmed,
+        isExpanded: true,
+        visibleRowCount: 1,
+        totalRowCount: 1,
+        rows: new[]
+        {
+            new CombatLogDisplayRowViewModel(
+                "primary",
+                "secondary",
+                false,
+                CombatLogRowVisualState.FutureDimmed
+            )
+        }
+    );
+
+    var collapsedHeight = CombatLogViewport.EstimateGroupHeight(collapsedGroup);
+    var expandedHeight = CombatLogViewport.EstimateGroupHeight(expandedGroup);
+    Assert(
+        collapsedHeight > 38f,
+        "Collapsed groups should account for both header and summary height."
+    );
+    Assert(
+        expandedHeight > collapsedHeight,
+        "Expanded groups with secondary text should estimate more height than collapsed groups."
     );
 }
 
@@ -406,8 +834,8 @@ static CombatLogCardDisplayInfo? ResolveCardDisplayInfo(string instanceId)
 {
     return instanceId switch
     {
-        "card-a" => new CombatLogCardDisplayInfo("card-a", "tpl-a", "Fiery Dagger"),
-        "card-b" => new CombatLogCardDisplayInfo("card-b", "tpl-b", "Ashen Echo"),
+        "card-a" => new CombatLogCardDisplayInfo("card-a", "tpl-a", "炽焰匕首"),
+        "card-b" => new CombatLogCardDisplayInfo("card-b", "tpl-b", "灰烬回响"),
         _ => null,
     };
 }
