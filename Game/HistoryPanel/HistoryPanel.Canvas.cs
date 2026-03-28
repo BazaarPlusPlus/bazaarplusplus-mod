@@ -10,6 +10,7 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed partial class HistoryPanel
 {
     private const int CanvasSortingOrder = 26;
+    private const int PillMaxVisibleCharacters = 10;
     private const float PanelWidth = 1280f;
     private const float PanelHeight = 960f;
     private const float ListColumnWidth = 392f;
@@ -243,9 +244,9 @@ internal sealed partial class HistoryPanel
 
         if (_dynamicPreviewButtonLabel != null)
         {
-            _dynamicPreviewButtonLabel.text = HistoryPanelPreviewSettings.DynamicPreviewEnabled
-                ? "Dynamic On"
-                : "Dynamic Off";
+            _dynamicPreviewButtonLabel.text = GetDynamicPreviewButtonLabel(
+                HistoryPanelPreviewSettings.DynamicPreviewEnabled
+            );
         }
 
         RefreshActionButton(
@@ -277,10 +278,9 @@ internal sealed partial class HistoryPanel
         var canDeleteSelectedRun = CanDeleteSelectedRun(out _);
         if (_deleteRunButtonLabel != null)
         {
-            _deleteRunButtonLabel.text =
+            _deleteRunButtonLabel.text = GetDeleteRunButtonLabel(
                 SelectedRun != null && IsDeleteRunConfirmationActive(SelectedRun.RunId)
-                    ? "Confirm Delete"
-                    : "Delete Run";
+            );
         }
 
         RefreshActionButton(
@@ -359,7 +359,13 @@ internal sealed partial class HistoryPanel
         _databaseChipText = CreateChip(chipsRow, 110f);
         CreateFlexibleSpacer("Spacer", chipsRow);
         (_dynamicPreviewButton, _dynamicPreviewButtonBackground, _dynamicPreviewButtonLabel) =
-            CreateStyledButton("DynamicPreviewButton", chipsRow, "Dynamic Off", 120f, 32f);
+            CreateStyledButton(
+                "DynamicPreviewButton",
+                chipsRow,
+                GetDynamicPreviewButtonLabel(false),
+                120f,
+                32f
+            );
         _dynamicPreviewButton.onClick.AddListener(ToggleDynamicPreviewFromUi);
         CreateActionButton("CloseButton", chipsRow, "Close", 86f, () => SetHistoryVisible(false));
 
@@ -545,7 +551,7 @@ internal sealed partial class HistoryPanel
         (_deleteRunButton, _deleteRunButtonBackground, _deleteRunButtonLabel) = CreateStyledButton(
             "DeleteRunButton",
             actions,
-            "Delete Run",
+            GetDeleteRunButtonLabel(false),
             130f,
             36f
         );
@@ -663,6 +669,7 @@ internal sealed partial class HistoryPanel
             runHeroStyle.Text,
             60f
         );
+        BuildRunRankBadge(pillRow, run);
         var achievement = HistoryPanelFormatter.FormatRunAchievement(run);
         if (!string.IsNullOrWhiteSpace(achievement))
         {
@@ -875,8 +882,9 @@ internal sealed partial class HistoryPanel
         float minWidth
     )
     {
-        var width = Mathf.Max(minWidth, MeasurePillWidth(label));
-        var pill = CreatePill(parent, name, label, bg, textColor);
+        var displayLabel = FormatPillLabel(label);
+        var width = Mathf.Max(minWidth, MeasurePillWidth(displayLabel));
+        var pill = CreatePill(parent, name, displayLabel, bg, textColor);
         ConfigureLayoutElement(
             pill.gameObject,
             preferredWidth: width,
@@ -1123,6 +1131,11 @@ internal sealed partial class HistoryPanel
         var text = CreateText("Label", pill, 12, FontStyle.Bold, TextAnchor.MiddleCenter);
         text.text = labelText;
         text.color = textColor;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 10f;
+        text.fontSizeMax = 12f;
+        text.maxVisibleCharacters = PillMaxVisibleCharacters;
+        text.overflowMode = TextOverflowModes.Ellipsis;
         StretchToParent(text.rectTransform, 10f, 10f, 0f, 0f);
         return pill;
     }
@@ -1188,6 +1201,10 @@ internal sealed partial class HistoryPanel
         var label = CreateText("Label", rect, 13, FontStyle.Bold, TextAnchor.MiddleCenter);
         label.text = labelText;
         label.color = Color.white;
+        label.enableAutoSizing = true;
+        label.fontSizeMin = 10f;
+        label.fontSizeMax = 13f;
+        label.overflowMode = TextOverflowModes.Ellipsis;
         StretchToParent(label.rectTransform, 10f, 10f, 0f, 0f);
         return (button, background, label);
     }
@@ -1490,6 +1507,30 @@ internal sealed partial class HistoryPanel
         return string.IsNullOrWhiteSpace(text) ? 64f : Mathf.Max(64f, (text.Length * 7f) + 24f);
     }
 
+    private static string FormatPillLabel(string label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+            return label;
+
+        var trimmed = label.Trim();
+        return trimmed.ToUpperInvariant() switch
+        {
+            "PERFECT" => "PERFCT",
+            "UNFORTUNE" => "UNFRT",
+            _ => trimmed,
+        };
+    }
+
+    private static string GetDynamicPreviewButtonLabel(bool enabled)
+    {
+        return enabled ? "Live" : "Still";
+    }
+
+    private static string GetDeleteRunButtonLabel(bool confirming)
+    {
+        return confirming ? "Sure?" : "Delete";
+    }
+
     private static string BuildBattleExtraLine(HistoryBattleRecord battle)
     {
         return string.IsNullOrWhiteSpace(battle.EncounterId)
@@ -1577,33 +1618,7 @@ internal sealed partial class HistoryPanel
         );
         ConfigureLayoutElement(row.gameObject, preferredHeight: 20f, minHeight: 20f);
 
-        var rank = FormatOpponentRank(battle.OpponentRank);
-        if (!string.IsNullOrWhiteSpace(rank))
-        {
-            if (string.Equals(rank, "Legendary", StringComparison.OrdinalIgnoreCase))
-            {
-                AddPill(
-                    row,
-                    "LegendaryRating",
-                    battle.OpponentRating.HasValue ? battle.OpponentRating.Value.ToString() : "LEG",
-                    ColorFromRgb(241, 54, 41),
-                    Color.white,
-                    68f
-                );
-            }
-            else
-            {
-                var palette = GetRankBadgePalette(rank);
-                AddPill(
-                    row,
-                    "Rank",
-                    rank.ToUpperInvariant(),
-                    palette.Background,
-                    palette.Text,
-                    68f
-                );
-            }
-        }
+        BuildRankBadge(row, battle.OpponentRank, battle.OpponentRating, "OpponentRank");
 
         var nameText = CreateText("OpponentName", row, 15, FontStyle.Bold, TextAnchor.MiddleLeft);
         nameText.text = battle.OpponentName ?? "Unknown Opponent";
@@ -1618,7 +1633,60 @@ internal sealed partial class HistoryPanel
         );
     }
 
-    private static string? FormatOpponentRank(string? rawRank)
+    private void BuildRankBadge(
+        RectTransform parent,
+        string? rawRank,
+        int? rating,
+        string badgeName
+    )
+    {
+        var rank = FormatRank(rawRank);
+        if (string.IsNullOrWhiteSpace(rank))
+            return;
+
+        if (string.Equals(rank, "Legendary", StringComparison.OrdinalIgnoreCase))
+        {
+            AddPill(
+                parent,
+                badgeName,
+                rating.HasValue ? rating.Value.ToString() : "LEG",
+                ColorFromRgb(241, 54, 41),
+                Color.white,
+                68f
+            );
+            return;
+        }
+
+        var palette = GetRankBadgePalette(rank);
+        AddPill(
+            parent,
+            badgeName,
+            rank.ToUpperInvariant(),
+            palette.Background,
+            palette.Text,
+            68f
+        );
+    }
+
+    private void BuildRunRankBadge(RectTransform parent, HistoryRunRecord run)
+    {
+        if (string.Equals(run.GameMode?.Trim(), "Ranked", StringComparison.OrdinalIgnoreCase))
+        {
+            BuildRankBadge(parent, run.PlayerRank, run.PlayerRating, "PlayerRank");
+            return;
+        }
+
+        AddPill(
+            parent,
+            "PlayerRank",
+            "Unrank",
+            new Color(0.22f, 0.24f, 0.29f, 0.98f),
+            new Color(0.90f, 0.94f, 1f, 1f),
+            84f
+        );
+    }
+
+    private static string? FormatRank(string? rawRank)
     {
         if (string.IsNullOrWhiteSpace(rawRank))
             return null;

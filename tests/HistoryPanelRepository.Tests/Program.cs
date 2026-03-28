@@ -56,6 +56,31 @@ try
     }
 
     var repository = ctor!.Invoke([dbPath]);
+    var recentRuns = ((System.Collections.IEnumerable)(
+        repositoryType.GetMethod("ListRecentRuns")!.Invoke(repository, [10])!
+    )).Cast<object>().ToList();
+    Assert(
+        recentRuns.Count == 2,
+        "ListRecentRuns should return the inserted runs."
+    );
+    var recentPlayerRank = (string?)(
+        recentRuns[0].GetType().GetProperty("PlayerRank")!.GetValue(recentRuns[0])
+    );
+    var recentPlayerRating = (int?)(
+        recentRuns[0].GetType().GetProperty("PlayerRating")!.GetValue(recentRuns[0])
+    );
+    var recentGameMode = (string?)(
+        recentRuns[0].GetType().GetProperty("GameMode")!.GetValue(recentRuns[0])
+    );
+    Assert(
+        recentPlayerRank == "Gold 2" && recentPlayerRating == 1420,
+        "ListRecentRuns should surface the persisted player rank and rating snapshot."
+    );
+    Assert(
+        recentGameMode == "Ranked",
+        "ListRecentRuns should surface the persisted game mode."
+    );
+
     var records = (System.Collections.IEnumerable)(
         repositoryType.GetMethod("ListBattlesByRun")!.Invoke(repository, ["run-1"])!
     );
@@ -154,6 +179,8 @@ static void InsertRun(SqliteConnection connection, string runId, string status)
             started_at_utc,
             hero,
             game_mode,
+            player_rank,
+            player_rating,
             status
         ) VALUES (
             $runId,
@@ -161,6 +188,8 @@ static void InsertRun(SqliteConnection connection, string runId, string status)
             '2026-03-15T11:00:00.0000000+00:00',
             'Vanessa',
             'Ranked',
+            'Gold 2',
+            1420,
             $status
         );
         """;

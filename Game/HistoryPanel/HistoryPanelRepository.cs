@@ -54,7 +54,10 @@ internal sealed class HistoryPanelRepository
             SELECT
                 r.run_id,
                 r.hero,
+                r.game_mode,
                 r.started_at_utc,
+                r.player_rank,
+                r.player_rating,
                 r.status AS run_status,
                 rs.status AS final_status,
                 rs.final_day,
@@ -86,7 +89,10 @@ internal sealed class HistoryPanelRepository
             GROUP BY
                 r.run_id,
                 r.hero,
+                r.game_mode,
                 r.started_at_utc,
+                r.player_rank,
+                r.player_rating,
                 r.status,
                 rs.status,
                 rs.final_day,
@@ -139,6 +145,7 @@ internal sealed class HistoryPanelRepository
                 new HistoryRunRecord(
                     reader.GetString(reader.GetOrdinal("run_id")),
                     reader.GetString(reader.GetOrdinal("hero")),
+                    reader.GetString(reader.GetOrdinal("game_mode")),
                     startedAt,
                     endedAt,
                     lastSeen,
@@ -154,6 +161,8 @@ internal sealed class HistoryPanelRepository
                         ?? GetNullableInt32(reader, "checkpoint_income"),
                     GetNullableInt32(reader, "final_gold")
                         ?? GetNullableInt32(reader, "checkpoint_gold"),
+                    GetNullableString(reader, "player_rank"),
+                    GetNullableInt32(reader, "player_rating"),
                     victories,
                     losses,
                     rawStatus,
@@ -519,6 +528,7 @@ internal sealed class HistoryRunRecord
     public HistoryRunRecord(
         string runId,
         string hero,
+        string gameMode,
         DateTimeOffset startedAtUtc,
         DateTimeOffset? endedAtUtc,
         DateTimeOffset lastSeenAtUtc,
@@ -529,6 +539,8 @@ internal sealed class HistoryRunRecord
         int? level,
         int? income,
         int? gold,
+        string? playerRank,
+        int? playerRating,
         int? victories,
         int? losses,
         string rawStatus,
@@ -537,6 +549,7 @@ internal sealed class HistoryRunRecord
     {
         RunId = runId;
         Hero = hero;
+        GameMode = gameMode;
         StartedAtUtc = startedAtUtc;
         EndedAtUtc = endedAtUtc;
         LastSeenAtUtc = lastSeenAtUtc;
@@ -547,6 +560,8 @@ internal sealed class HistoryRunRecord
         Level = level;
         Income = income;
         Gold = gold;
+        PlayerRank = playerRank;
+        PlayerRating = playerRating;
         Victories = victories;
         Losses = losses;
         RawStatus = rawStatus;
@@ -556,6 +571,8 @@ internal sealed class HistoryRunRecord
     public string RunId { get; }
 
     public string Hero { get; }
+
+    public string GameMode { get; }
 
     public DateTimeOffset StartedAtUtc { get; }
 
@@ -576,6 +593,10 @@ internal sealed class HistoryRunRecord
     public int? Income { get; }
 
     public int? Gold { get; }
+
+    public string? PlayerRank { get; }
+
+    public int? PlayerRating { get; }
 
     public int? Victories { get; }
 
