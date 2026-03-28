@@ -23,15 +23,39 @@ internal sealed class RunUploadRequestSigner
         string runId
     )
     {
-        if (string.IsNullOrWhiteSpace(uploadEndpoint))
-            throw new ArgumentException("Upload endpoint is required.", nameof(uploadEndpoint));
+        var request = CreateSignedRequest(
+            HttpMethod.Post,
+            uploadEndpoint,
+            json,
+            clientId,
+            installId,
+            "application/json"
+        );
+        request.Headers.TryAddWithoutValidation("X-BPP-Run-Id", runId);
+        return request;
+    }
+
+    public HttpRequestMessage CreateSignedRequest(
+        HttpMethod method,
+        string endpoint,
+        string? body,
+        string clientId,
+        string installId,
+        string? contentType = null
+    )
+    {
+        if (method == null)
+            throw new ArgumentNullException(nameof(method));
+        if (string.IsNullOrWhiteSpace(endpoint))
+            throw new ArgumentException("Endpoint is required.", nameof(endpoint));
 
         var timestamp = DateTimeOffset.UtcNow.ToString("o");
         var nonce = Guid.NewGuid().ToString("N");
-        var bodyHash = ComputeBodyHash(json);
+        var bodyText = body ?? string.Empty;
+        var bodyHash = ComputeBodyHash(bodyText);
         var canonical = BuildCanonicalRequest(
-            "POST",
-            new Uri(uploadEndpoint).AbsolutePath,
+            method.Method,
+            new Uri(endpoint).AbsolutePath,
             clientId,
             installId,
             timestamp,
@@ -39,15 +63,14 @@ internal sealed class RunUploadRequestSigner
             bodyHash
         );
         var signature = _keyStore.Sign(canonical);
+        var pluginVersion = BppPluginVersion.Current;
 
-        var request = new HttpRequestMessage(HttpMethod.Post, uploadEndpoint)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json"),
-        };
+        var request = new HttpRequestMessage(method, endpoint);
+        if (body != null)
+            request.Content = new StringContent(body, Encoding.UTF8, contentType ?? "application/json");
         request.Headers.TryAddWithoutValidation("X-BPP-Client-Id", clientId);
         request.Headers.TryAddWithoutValidation("X-BPP-Install-Id", installId);
-        request.Headers.TryAddWithoutValidation("X-BPP-Run-Id", runId);
-        request.Headers.TryAddWithoutValidation("X-BPP-Plugin-Version", MyPluginInfo.PLUGIN_VERSION);
+        request.Headers.TryAddWithoutValidation("X-BPP-Plugin-Version", pluginVersion);
         request.Headers.TryAddWithoutValidation("X-BPP-Timestamp", timestamp);
         request.Headers.TryAddWithoutValidation("X-BPP-Nonce", nonce);
         request.Headers.TryAddWithoutValidation("X-BPP-Content-SHA256", bodyHash);

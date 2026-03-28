@@ -44,7 +44,7 @@ public sealed class MainMenuVersionLabelFormatterTests
 
         Assert.Contains("VersionShow", source, StringComparison.Ordinal);
         Assert.Contains("BuildVersionLabel", source, StringComparison.Ordinal);
-        Assert.Contains("MyPluginInfo.PLUGIN_VERSION", source, StringComparison.Ordinal);
+        Assert.Contains("BppPluginVersion.Current", source, StringComparison.Ordinal);
         Assert.Contains("versionLabel", source, StringComparison.Ordinal);
     }
 }

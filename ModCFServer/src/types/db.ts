@@ -8,3 +8,30 @@ export type RegisteredClientRow = {
   exponent_b64: string;
   plugin_version: string | null;
 };
+
+export type ActiveBindingUidRow = {
+  uid: string;
+};
+
+export type ObservedPlayerAccountRow = {
+  player_account_id: string;
+};
+
+export type ReplayUploadLookupRow = {
+  battle_id: string;
+  object_key: string;
+  uploaded_at_utc: string;
+};
+
+export type ProjectedBattleQueryRow = {
+  battle_id: string;
+  recorded_at_utc: string;
+  opponent_account_id: string | null;
+  payload_json: string;
+  replay_available: number;
+};
+
+export type RunUploadProjectionStatus =
+  | "pending"
+  | "projected"
+  | "failed";

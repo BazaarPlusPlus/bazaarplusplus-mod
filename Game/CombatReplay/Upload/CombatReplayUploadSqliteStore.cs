@@ -184,7 +184,7 @@ internal sealed class CombatReplayUploadSqliteStore
             SchemaVersion = RunLogSqliteSchema.CurrentSchemaVersion,
             InstallId = installId,
             ClientId = clientId,
-            PluginVersion = MyPluginInfo.PLUGIN_VERSION,
+            PluginVersion = BppPluginVersion.Current,
             SubmittedAtUtc = DateTimeOffset.UtcNow,
             BattleId = battleId,
             RunId = manifest.RunId,

@@ -20,6 +20,9 @@ internal sealed class PvpBattleSnapshotCollector
         string? runId
     )
     {
+        RunLoggingGameDataReader.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
+        var playerHero = TryGetPlayerHeroSafe();
+        var playerLevel = TryGetPlayerLevelSafe();
         var (
             opponentName,
             opponentHero,
@@ -31,6 +34,10 @@ internal sealed class PvpBattleSnapshotCollector
         var candidate = new CombatReplaySequenceCandidate
         {
             RunId = runId,
+            PlayerHero = playerHero,
+            PlayerRank = playerRank,
+            PlayerRating = playerRating,
+            PlayerLevel = playerLevel,
             OpponentName = opponentName,
             OpponentHero = opponentHero,
             OpponentRank = opponentRank,
@@ -67,13 +74,14 @@ internal sealed class PvpBattleSnapshotCollector
 
     public PvpBattleParticipants BuildParticipants(CombatReplaySequenceCandidate candidate)
     {
-        RunLoggingGameDataReader.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
         return new PvpBattleParticipants
         {
             PlayerName = TryGetPlayerNameSafe(),
             PlayerAccountId = TryGetPlayerAccountIdSafe(),
-            PlayerRank = playerRank,
-            PlayerRating = playerRating,
+            PlayerHero = candidate.PlayerHero,
+            PlayerRank = candidate.PlayerRank,
+            PlayerRating = candidate.PlayerRating,
+            PlayerLevel = candidate.PlayerLevel,
             OpponentName = candidate.OpponentName,
             OpponentHero = candidate.OpponentHero,
             OpponentRank = candidate.OpponentRank,
@@ -456,6 +464,31 @@ internal sealed class PvpBattleSnapshotCollector
         try
         {
             return Data.Profile?.AccountId.ToString();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? TryGetPlayerHeroSafe()
+    {
+        try
+        {
+            var hero = Data.Run?.Player?.Hero.ToString();
+            return string.IsNullOrWhiteSpace(hero) ? null : hero;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static int? TryGetPlayerLevelSafe()
+    {
+        try
+        {
+            return Data.Run?.Player?.GetAttributeValue(EPlayerAttributeType.Level);
         }
         catch
         {

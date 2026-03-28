@@ -40,6 +40,7 @@ internal sealed class CombatReplayUploadRequestSigner
             bodyHash
         );
         var signature = _keyStore.Sign(canonical);
+        var pluginVersion = BppPluginVersion.Current;
 
         var request = new HttpRequestMessage(HttpMethod.Post, uploadEndpoint)
         {
@@ -50,7 +51,7 @@ internal sealed class CombatReplayUploadRequestSigner
         request.Headers.TryAddWithoutValidation("X-BPP-Battle-Id", battleId);
         if (!string.IsNullOrWhiteSpace(runId))
             request.Headers.TryAddWithoutValidation("X-BPP-Run-Id", runId);
-        request.Headers.TryAddWithoutValidation("X-BPP-Plugin-Version", MyPluginInfo.PLUGIN_VERSION);
+        request.Headers.TryAddWithoutValidation("X-BPP-Plugin-Version", pluginVersion);
         request.Headers.TryAddWithoutValidation("X-BPP-Timestamp", timestamp);
         request.Headers.TryAddWithoutValidation("X-BPP-Nonce", nonce);
         request.Headers.TryAddWithoutValidation("X-BPP-Content-SHA256", bodyHash);

@@ -8,6 +8,14 @@ internal sealed class CombatReplaySequenceCandidate
 {
     public string? RunId { get; set; }
 
+    public string? PlayerHero { get; set; }
+
+    public string? PlayerRank { get; set; }
+
+    public int? PlayerRating { get; set; }
+
+    public int? PlayerLevel { get; set; }
+
     public string? OpponentName { get; set; }
 
     public string? OpponentHero { get; set; }

@@ -1,306 +1,14 @@
-import { bytesToBase64 } from "./crypto/base64";
-import { sha256Base64 } from "./crypto/hash";
-import { canonicalRequest, verifySignature } from "./crypto/signature";
 import type { Env } from "./env";
-import { json, readJson } from "./http/json";
 import {
-  absolutePath,
-  normalizePurpose,
-  trimString,
-} from "./http/request";
-import type { UploadPurpose, RegisterRequest } from "./types/api";
-import type { RegisteredClientRow } from "./types/db";
-
-const MAX_TIMESTAMP_SKEW_MS = 10 * 60 * 1000;
-
-async function ensureSchema(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `
-      CREATE TABLE IF NOT EXISTS registered_clients (
-        client_id TEXT PRIMARY KEY,
-        install_id TEXT NOT NULL,
-        purpose TEXT NOT NULL,
-        modulus_b64 TEXT NOT NULL,
-        exponent_b64 TEXT NOT NULL,
-        plugin_version TEXT NULL,
-        registered_at_utc TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS replay_uploads (
-        battle_id TEXT PRIMARY KEY,
-        client_id TEXT NOT NULL,
-        install_id TEXT NOT NULL,
-        run_id TEXT NULL,
-        payload_sha256 TEXT NOT NULL,
-        object_key TEXT NOT NULL,
-        uploaded_at_utc TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS run_uploads (
-        run_id TEXT PRIMARY KEY,
-        client_id TEXT NOT NULL,
-        install_id TEXT NOT NULL,
-        payload_sha256 TEXT NOT NULL,
-        uploaded_at_utc TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS request_nonces (
-        nonce_key TEXT PRIMARY KEY,
-        created_at_utc TEXT NOT NULL
-      );
-    `,
-  ).run();
-}
-
-async function registerClient(request: Request, env: Env): Promise<Response> {
-  const body = (await readJson(request)) as RegisterRequest;
-  const installId = trimString(body.install_id);
-  const purpose = normalizePurpose(body.purpose) ?? "runs";
-  const modulusB64 = trimString(body.public_key?.modulus_b64);
-  const exponentB64 = trimString(body.public_key?.exponent_b64);
-  if (!installId) {
-    return json({ error: "install_id_required" }, { status: 400 });
-  }
-
-  if (!modulusB64 || !exponentB64) {
-    return json({ error: "public_key_required" }, { status: 400 });
-  }
-
-  const registeredAtUtc = new Date().toISOString();
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(
-      [purpose, installId, modulusB64, exponentB64].join(":"),
-    ),
-  );
-  const clientId = `${purpose}-${bytesToBase64(new Uint8Array(digest))
-    .replace(/[+/=]/g, "")
-    .slice(0, 24)}`;
-
-  await env.DB.prepare(
-    `
-      INSERT INTO registered_clients (
-        client_id,
-        install_id,
-        purpose,
-        modulus_b64,
-        exponent_b64,
-        plugin_version,
-        registered_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(client_id) DO UPDATE SET
-        install_id = excluded.install_id,
-        purpose = excluded.purpose,
-        modulus_b64 = excluded.modulus_b64,
-        exponent_b64 = excluded.exponent_b64,
-        plugin_version = excluded.plugin_version,
-        registered_at_utc = excluded.registered_at_utc
-    `,
-  )
-    .bind(
-      clientId,
-      installId,
-      purpose,
-      modulusB64,
-      exponentB64,
-      trimString(body.plugin_version) || null,
-      registeredAtUtc,
-    )
-    .run();
-
-  return json({
-    client_id: clientId,
-    purpose,
-    status: "registered",
-  });
-}
-
-async function requireVerifiedClient(
-  request: Request,
-  env: Env,
-  purpose: UploadPurpose,
-): Promise<
-  | {
-      client: RegisteredClientRow;
-      payload: ArrayBuffer;
-      payloadHash: string;
-      timestamp: string;
-      nonce: string;
-    }
-  | Response
-> {
-  const clientId = trimString(request.headers.get("x-bpp-client-id"));
-  const installId = trimString(request.headers.get("x-bpp-install-id"));
-  const timestamp = trimString(request.headers.get("x-bpp-timestamp"));
-  const nonce = trimString(request.headers.get("x-bpp-nonce"));
-  const advertisedBodyHash = trimString(request.headers.get("x-bpp-content-sha256"));
-  const signatureAlg = trimString(request.headers.get("x-bpp-signature-alg"));
-  const signature = trimString(request.headers.get("x-bpp-signature"));
-  if (!clientId || !installId || !timestamp || !nonce || !advertisedBodyHash || !signature) {
-    return json({ error: "signed_headers_required" }, { status: 401 });
-  }
-
-  if (signatureAlg && signatureAlg !== "rsa-pkcs1-sha256") {
-    return json({ error: "unsupported_signature_alg" }, { status: 401 });
-  }
-
-  const requestTimestamp = Date.parse(timestamp);
-  if (
-    Number.isNaN(requestTimestamp) ||
-    Math.abs(Date.now() - requestTimestamp) > MAX_TIMESTAMP_SKEW_MS
-  ) {
-    return json({ error: "timestamp_out_of_range" }, { status: 401 });
-  }
-
-  const nonceKey = `${purpose}:${clientId}:${nonce}`;
-  const existingNonce = await env.DB.prepare(
-    "SELECT nonce_key FROM request_nonces WHERE nonce_key = ?",
-  )
-    .bind(nonceKey)
-    .first<{ nonce_key: string }>();
-  if (existingNonce) {
-    return json({ error: "nonce_reused" }, { status: 409 });
-  }
-
-  const client = await env.DB.prepare(
-    `
-      SELECT client_id, install_id, purpose, modulus_b64, exponent_b64, plugin_version
-      FROM registered_clients
-      WHERE client_id = ?
-    `,
-  )
-    .bind(clientId)
-    .first<RegisteredClientRow>();
-  if (!client || client.install_id !== installId || client.purpose !== purpose) {
-    return json({ error: "unknown_client" }, { status: 404 });
-  }
-
-  const payload = await request.arrayBuffer();
-  const payloadHash = await sha256Base64(payload);
-  if (payloadHash !== advertisedBodyHash) {
-    return json({ error: "body_hash_mismatch" }, { status: 401 });
-  }
-
-  const canonical = canonicalRequest(
-    request.method,
-    absolutePath(request),
-    clientId,
-    installId,
-    timestamp,
-    nonce,
-    advertisedBodyHash,
-  );
-  const signatureValid = await verifySignature(
-    client.modulus_b64,
-    client.exponent_b64,
-    canonical,
-    signature,
-  );
-  if (!signatureValid) {
-    return json({ error: "invalid_signature" }, { status: 401 });
-  }
-
-  await env.DB.prepare(
-    "INSERT INTO request_nonces (nonce_key, created_at_utc) VALUES (?, ?)",
-  )
-    .bind(nonceKey, new Date().toISOString())
-    .run();
-
-  return { client, payload, payloadHash, timestamp, nonce };
-}
-
-async function handleReplayUpload(request: Request, env: Env): Promise<Response> {
-  const battleId = trimString(request.headers.get("x-bpp-battle-id"));
-  if (!battleId) {
-    return json({ error: "battle_id_required" }, { status: 400 });
-  }
-
-  const verified = await requireVerifiedClient(request, env, "replays");
-  if (verified instanceof Response) {
-    return verified;
-  }
-
-  const runId = trimString(request.headers.get("x-bpp-run-id")) || null;
-  const objectKey = `combat-replays/replays/${verified.client.client_id}/${battleId}/${verified.payloadHash
-    .replace(/[+/=]/g, "")
-    .slice(0, 16)}.payload.json`;
-  await env.REPLAY_BUCKET.put(objectKey, verified.payload, {
-    httpMetadata: {
-      contentType: request.headers.get("content-type") ?? "application/json",
-    },
-  });
-
-  await env.DB.prepare(
-    `
-      INSERT INTO replay_uploads (
-        client_id,
-        install_id,
-        battle_id,
-        run_id,
-        payload_sha256,
-        object_key,
-        uploaded_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(battle_id) DO UPDATE SET
-        client_id = excluded.client_id,
-        install_id = excluded.install_id,
-        run_id = excluded.run_id,
-        payload_sha256 = excluded.payload_sha256,
-        object_key = excluded.object_key,
-        uploaded_at_utc = excluded.uploaded_at_utc
-    `,
-  )
-    .bind(
-      verified.client.client_id,
-      verified.client.install_id,
-      battleId,
-      runId,
-      verified.payloadHash,
-      objectKey,
-      new Date().toISOString(),
-    )
-    .run();
-
-  return json({
-    status: "accepted",
-    object_key: objectKey,
-  });
-}
-
-async function handleRunUpload(request: Request, env: Env): Promise<Response> {
-  const verified = await requireVerifiedClient(request, env, "runs");
-  if (verified instanceof Response) {
-    return verified;
-  }
-
-  const runId = trimString(request.headers.get("x-bpp-run-id")) || null;
-  await env.DB.prepare(
-    `
-      INSERT INTO run_uploads (
-        client_id,
-        install_id,
-        run_id,
-        payload_sha256,
-        uploaded_at_utc
-      ) VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(run_id) DO UPDATE SET
-        client_id = excluded.client_id,
-        install_id = excluded.install_id,
-        payload_sha256 = excluded.payload_sha256,
-        uploaded_at_utc = excluded.uploaded_at_utc
-    `,
-  )
-    .bind(
-      verified.client.client_id,
-      verified.client.install_id,
-      runId,
-      verified.payloadHash,
-      new Date().toISOString(),
-    )
-    .run();
-
-  return json({ status: "accepted" });
-}
+  handleGhostBattleReplayDownloadLink,
+  handleGhostBattlesAgainstMe,
+  handleReplayDownload,
+} from "./features/ghostBattles";
+import { json } from "./http/json";
+import { ensureSchema } from "./persistence/schema";
+import { registerClient } from "./features/registerClient";
+import { handleRunUpload } from "./features/uploadRun";
+import { handleReplayUpload } from "./features/uploadReplay";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -321,6 +29,25 @@ export default {
 
     if (request.method === "POST" && url.pathname === "/replays/upload") {
       return handleReplayUpload(request, env);
+    }
+
+    if (request.method === "GET" && url.pathname === "/me/pvp-battles/against-me") {
+      return handleGhostBattlesAgainstMe(request, env);
+    }
+
+    const replayDownloadMatch = url.pathname.match(
+      /^\/me\/pvp-battles\/([^/]+)\/replay-download-link$/,
+    );
+    if (request.method === "POST" && replayDownloadMatch) {
+      return handleGhostBattleReplayDownloadLink(
+        request,
+        env,
+        decodeURIComponent(replayDownloadMatch[1] ?? ""),
+      );
+    }
+
+    if (request.method === "GET" && url.pathname === "/replays/download") {
+      return handleReplayDownload(request, env);
     }
 
     return json({ error: "not_found" }, { status: 404 });

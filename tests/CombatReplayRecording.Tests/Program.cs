@@ -12,6 +12,7 @@ var controllerType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayC
 var artifactType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureArtifact");
 var manifestType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifest");
 var payloadType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpReplayPayload");
+var candidateType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplaySequenceCandidate");
 var cardSetCaptureType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSetCapture");
 var captureStatusType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureStatus");
 var captureSourceType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureSource");
@@ -1282,6 +1283,52 @@ try
     Assert(
         GetProperty(manifestType, completedManifest!, "Snapshots") != null,
         "Completed battle manifests should capture snapshot wrappers for both sides."
+    );
+
+    var collector = Activator.CreateInstance(collectorType);
+    Assert(collector != null, "PvpBattleSnapshotCollector should be constructible.");
+    var participantCandidate = Activator.CreateInstance(candidateType);
+    Assert(
+        participantCandidate != null,
+        "CombatReplaySequenceCandidate should be constructible for participant tests."
+    );
+    SetProperty(candidateType, participantCandidate!, "PlayerRank", "Legendary 5");
+    SetProperty(candidateType, participantCandidate!, "PlayerRating", 502);
+    SetProperty(candidateType, participantCandidate!, "OpponentName", "Snapshot Opponent");
+    SetProperty(candidateType, participantCandidate!, "OpponentHero", "Vanessa");
+    SetProperty(candidateType, participantCandidate!, "OpponentRank", "Legendary");
+    SetProperty(candidateType, participantCandidate!, "OpponentRating", 728);
+    SetProperty(candidateType, participantCandidate!, "OpponentLevel", 9);
+    SetProperty(candidateType, participantCandidate!, "OpponentAccountId", "opponent-snapshot-id");
+    var participants = Invoke(
+        collectorType,
+        collector!,
+        "BuildParticipants",
+        new object?[] { participantCandidate! }
+    );
+    Assert(participants != null, "BuildParticipants should return a participants snapshot.");
+    var participantsType = participants!.GetType();
+    Assert(
+        string.Equals(
+            (string?)GetProperty(participantsType, participants, "PlayerRank"),
+            "Legendary 5",
+            StringComparison.Ordinal
+        )
+            && Equals(GetProperty(participantsType, participants, "PlayerRating"), 502),
+        "BuildParticipants should preserve the player rank and rating captured on the opening candidate."
+    );
+    Assert(
+        string.Equals(
+            (string?)GetProperty(participantsType, participants, "OpponentName"),
+            "Snapshot Opponent",
+            StringComparison.Ordinal
+        )
+            && string.Equals(
+                (string?)GetProperty(participantsType, participants, "OpponentAccountId"),
+                "opponent-snapshot-id",
+                StringComparison.Ordinal
+            ),
+        "BuildParticipants should preserve opponent identity captured on the opening candidate."
     );
 
     var loader = Activator.CreateInstance(loaderType);

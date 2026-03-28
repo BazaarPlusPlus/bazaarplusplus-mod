@@ -18,14 +18,31 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         Battle,
     }
 
+    private enum HistorySectionMode
+    {
+        Runs,
+        Ghost,
+    }
+
+    private enum GhostBattleFilter
+    {
+        All,
+        IWon,
+        ILost,
+    }
+
     internal static HistoryPanel? Instance { get; private set; }
 
     private readonly List<HistoryRunRecord> _runs = new List<HistoryRunRecord>();
     private readonly List<HistoryBattleRecord> _battles = new List<HistoryBattleRecord>();
+    private readonly List<HistoryBattleRecord> _ghostBattles = new List<HistoryBattleRecord>();
     private int _selectedRunIndex;
     private int _selectedBattleIndex;
+    private int _selectedGhostBattleIndex;
+    private GhostBattleFilter _ghostBattleFilter = GhostBattleFilter.All;
     private HistoryPanelDataService _dataService = null!;
     private HistoryPanelReplayService _replayService = null!;
+    private GhostBattleSyncService? _ghostSyncService;
     private HistoryPanelPreviewRenderer? _previewRenderer;
     private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
@@ -34,6 +51,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private string? _deleteRunConfirmationRunId;
     private float _deleteRunConfirmationUntil;
     private PreviewSelectionMode _previewSelectionMode = PreviewSelectionMode.Run;
+    private HistorySectionMode _sectionMode = HistorySectionMode.Runs;
     private int _lastSceneHandle;
 
     public static bool IsVisible { get; private set; }
@@ -45,6 +63,19 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _battles.Count == 0
             ? null
             : _battles[Mathf.Clamp(_selectedBattleIndex, 0, _battles.Count - 1)];
+
+    private HistoryBattleRecord? SelectedGhostBattle =>
+        FilteredGhostBattles.Count == 0
+            ? null
+            : FilteredGhostBattles[
+                Mathf.Clamp(_selectedGhostBattleIndex, 0, FilteredGhostBattles.Count - 1)
+            ];
+
+    private HistoryBattleRecord? ActiveSelectedBattle =>
+        _sectionMode == HistorySectionMode.Ghost ? SelectedGhostBattle : SelectedBattle;
+
+    private IReadOnlyList<HistoryBattleRecord> FilteredGhostBattles =>
+        _ghostBattles.Where(MatchesGhostFilter).ToList();
 
     private void Awake()
     {
@@ -64,10 +95,13 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(_runtime.RunLogDatabasePath))
             repository = new HistoryPanelRepository(_runtime.RunLogDatabasePath);
 
-        _dataService = new HistoryPanelDataService(repository);
+        _ghostSyncService = TryCreateGhostSyncService(repository);
+        _dataService = new HistoryPanelDataService(repository, _ghostSyncService);
         _replayService = new HistoryPanelReplayService(
             _runtime.CombatReplayRuntimeAccessor,
-            () => _runtime.CombatReplayDirectoryPath
+            () => _runtime.CombatReplayDirectoryPath,
+            repository,
+            _ghostSyncService
         );
     }
 
@@ -87,6 +121,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         StopPreviewRender();
         _previewRenderer?.Dispose();
+        _ghostSyncService?.Dispose();
+        _ghostSyncService = null;
         DisposeUi();
     }
 
@@ -275,11 +311,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private PreviewRequest BuildPreviewRequest()
     {
-        if (_previewSelectionMode == PreviewSelectionMode.Battle && SelectedBattle != null)
+        if (_previewSelectionMode == PreviewSelectionMode.Battle && ActiveSelectedBattle != null)
         {
             return new PreviewRequest(
-                $"battle:{SelectedBattle.BattleId}",
-                SelectedBattle.PreviewData.OpponentHandOnly()
+                $"battle:{ActiveSelectedBattle.BattleId}",
+                ActiveSelectedBattle.PreviewData.OpponentHandOnly()
             );
         }
 
@@ -305,6 +341,55 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             .ThenByDescending(battle => battle.Hour ?? int.MinValue)
             .ThenByDescending(battle => battle.RecordedAtUtc)
             .FirstOrDefault();
+    }
+
+    private bool MatchesGhostFilter(HistoryBattleRecord battle)
+    {
+        if (battle == null)
+            return false;
+
+        return _ghostBattleFilter switch
+        {
+            GhostBattleFilter.IWon => IsGhostOutcomeIWon(battle),
+            GhostBattleFilter.ILost => IsGhostOutcomeILost(battle),
+            _ => true,
+        };
+    }
+
+    private static bool IsGhostOutcomeIWon(HistoryBattleRecord battle)
+    {
+        var result = battle.Result?.Trim();
+        if (
+            string.Equals(result, "Loss", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(result, "Lost", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return true;
+        }
+
+        return string.Equals(
+            battle.WinnerCombatantId,
+            "Opponent",
+            StringComparison.OrdinalIgnoreCase
+        );
+    }
+
+    private static bool IsGhostOutcomeILost(HistoryBattleRecord battle)
+    {
+        var result = battle.Result?.Trim();
+        if (
+            string.Equals(result, "Win", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(result, "Won", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return true;
+        }
+
+        return string.Equals(
+            battle.WinnerCombatantId,
+            "Player",
+            StringComparison.OrdinalIgnoreCase
+        );
     }
 
     private readonly struct PreviewRequest

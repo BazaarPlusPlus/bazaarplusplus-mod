@@ -190,15 +190,20 @@ internal sealed class HistoryPanelRepository
                 day,
                 hour,
                 encounter_id,
+                player_hero,
                 player_rank,
                 player_rating,
+                player_level,
                 opponent_name,
                 opponent_hero,
                 opponent_rank,
                 opponent_rating,
+                opponent_level,
                 opponent_account_id,
                 combat_kind,
                 result,
+                winner_combatant_id,
+                loser_combatant_id,
                 player_hand_json,
                 player_skills_json,
                 opponent_hand_json,
@@ -237,22 +242,30 @@ internal sealed class HistoryPanelRepository
                         GetNullableInt32(reader, "day"),
                         GetNullableInt32(reader, "hour"),
                         GetNullableString(reader, "encounter_id"),
+                        GetNullableString(reader, "player_hero"),
                         GetNullableString(reader, "player_rank"),
                         GetNullableInt32(reader, "player_rating"),
+                        GetNullableInt32(reader, "player_level"),
                         GetNullableString(reader, "opponent_name"),
                         GetNullableString(reader, "opponent_hero"),
                         GetNullableString(reader, "opponent_rank"),
                         GetNullableInt32(reader, "opponent_rating"),
+                        GetNullableInt32(reader, "opponent_level"),
                         GetNullableString(reader, "opponent_account_id"),
                         GetNullableString(reader, "combat_kind"),
                         GetNullableString(reader, "result"),
+                        GetNullableString(reader, "winner_combatant_id"),
+                        GetNullableString(reader, "loser_combatant_id"),
                         BuildSnapshotSummary(
                             playerHand,
                             playerSkills,
                             opponentHand,
                             opponentSkills
                         ),
-                        BuildPreviewData(playerHand, playerSkills, opponentHand, opponentSkills)
+                        BuildPreviewData(playerHand, playerSkills, opponentHand, opponentSkills),
+                        HistoryBattleSource.Local,
+                        replayAvailable: true,
+                        replayDownloaded: true
                     )
                 );
             }
@@ -266,6 +279,345 @@ internal sealed class HistoryPanelRepository
         }
 
         return records;
+    }
+
+    public IReadOnlyList<HistoryBattleRecord> ListRecentGhostBattles(int limit)
+    {
+        if (!DatabaseExists)
+            return Array.Empty<HistoryBattleRecord>();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"""
+            SELECT
+                battle_id,
+                recorded_at_utc,
+                day,
+                hour,
+                encounter_id,
+                player_hero,
+                player_rank,
+                player_rating,
+                player_level,
+                opponent_name,
+                opponent_hero,
+                opponent_rank,
+                opponent_rating,
+                opponent_level,
+                opponent_account_id,
+                combat_kind,
+                result,
+                winner_combatant_id,
+                loser_combatant_id,
+                player_hand_json,
+                player_skills_json,
+                opponent_hand_json,
+                opponent_skills_json,
+                replay_available,
+                replay_downloaded
+            FROM {RunLogSqliteSchema.GhostBattlesTableName}
+            ORDER BY recorded_at_utc DESC, battle_id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        var records = new List<HistoryBattleRecord>();
+        while (reader.Read())
+        {
+            var battleId = SafeGetNullableString(reader, "battle_id") ?? "unknown";
+            try
+            {
+                var playerHand = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("player_hand_json"))
+                );
+                var playerSkills = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("player_skills_json"))
+                );
+                var opponentHand = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("opponent_hand_json"))
+                );
+                var opponentSkills = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("opponent_skills_json"))
+                );
+
+                records.Add(
+                    new HistoryBattleRecord(
+                        battleId,
+                        string.Empty,
+                        DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
+                        GetNullableInt32(reader, "day"),
+                        GetNullableInt32(reader, "hour"),
+                        GetNullableString(reader, "encounter_id"),
+                        GetNullableString(reader, "player_hero"),
+                        GetNullableString(reader, "player_rank"),
+                        GetNullableInt32(reader, "player_rating"),
+                        GetNullableInt32(reader, "player_level"),
+                        GetNullableString(reader, "opponent_name"),
+                        GetNullableString(reader, "opponent_hero"),
+                        GetNullableString(reader, "opponent_rank"),
+                        GetNullableInt32(reader, "opponent_rating"),
+                        GetNullableInt32(reader, "opponent_level"),
+                        GetNullableString(reader, "opponent_account_id"),
+                        GetNullableString(reader, "combat_kind"),
+                        GetNullableString(reader, "result"),
+                        GetNullableString(reader, "winner_combatant_id"),
+                        GetNullableString(reader, "loser_combatant_id"),
+                        BuildSnapshotSummary(
+                            playerHand,
+                            playerSkills,
+                            opponentHand,
+                            opponentSkills
+                        ),
+                        BuildPreviewData(playerHand, playerSkills, opponentHand, opponentSkills),
+                        HistoryBattleSource.Ghost,
+                        replayAvailable: GetNullableInt32(reader, "replay_available") == 1,
+                        replayDownloaded: GetNullableInt32(reader, "replay_downloaded") == 1
+                    )
+                );
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "HistoryPanelRepository",
+                    $"Skipping unreadable ghost battle row '{battleId}': {ex.Message}"
+                );
+            }
+        }
+
+        return records;
+    }
+
+    public void ReplaceGhostBattles(IReadOnlyList<GhostBattleImportRecord> battles)
+    {
+        using var connection = OpenConnection(ensureSchema: true);
+        using var transaction = connection.BeginTransaction();
+
+        using (var deleteCommand = connection.CreateCommand())
+        {
+            deleteCommand.Transaction = transaction;
+            deleteCommand.CommandTimeout = 2;
+            deleteCommand.CommandText = $"DELETE FROM {RunLogSqliteSchema.GhostBattlesTableName};";
+            deleteCommand.ExecuteNonQuery();
+        }
+
+        foreach (var battle in battles)
+        {
+            using var insertCommand = connection.CreateCommand();
+            insertCommand.Transaction = transaction;
+            insertCommand.CommandTimeout = 2;
+            insertCommand.CommandText = $"""
+                INSERT INTO {RunLogSqliteSchema.GhostBattlesTableName} (
+                    battle_id,
+                    recorded_at_utc,
+                    day,
+                    hour,
+                    encounter_id,
+                    player_name,
+                    player_account_id,
+                    player_hero,
+                    player_rank,
+                    player_rating,
+                    player_level,
+                    opponent_name,
+                    opponent_hero,
+                    opponent_rank,
+                    opponent_rating,
+                    opponent_level,
+                    opponent_account_id,
+                    combat_kind,
+                    result,
+                    winner_combatant_id,
+                    loser_combatant_id,
+                    player_hand_json,
+                    player_skills_json,
+                    opponent_hand_json,
+                    opponent_skills_json,
+                    replay_available,
+                    replay_downloaded,
+                    last_synced_at_utc
+                ) VALUES (
+                    $battleId,
+                    $recordedAtUtc,
+                    $day,
+                    $hour,
+                    $encounterId,
+                    $playerName,
+                    $playerAccountId,
+                    $playerHero,
+                    $playerRank,
+                    $playerRating,
+                    $playerLevel,
+                    $opponentName,
+                    $opponentHero,
+                    $opponentRank,
+                    $opponentRating,
+                    $opponentLevel,
+                    $opponentAccountId,
+                    $combatKind,
+                    $result,
+                    $winnerCombatantId,
+                    $loserCombatantId,
+                    $playerHandJson,
+                    $playerSkillsJson,
+                    $opponentHandJson,
+                    $opponentSkillsJson,
+                    $replayAvailable,
+                    $replayDownloaded,
+                    $lastSyncedAtUtc
+                );
+                """;
+            insertCommand.Parameters.AddWithValue("$battleId", battle.BattleId);
+            insertCommand.Parameters.AddWithValue("$recordedAtUtc", battle.RecordedAtUtc.ToString("o"));
+            insertCommand.Parameters.AddWithValue("$day", (object?)battle.Day ?? DBNull.Value);
+            insertCommand.Parameters.AddWithValue("$hour", (object?)battle.Hour ?? DBNull.Value);
+            insertCommand.Parameters.AddWithValue(
+                "$encounterId",
+                (object?)battle.EncounterId ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerName",
+                (object?)battle.PlayerName ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerAccountId",
+                (object?)battle.PlayerAccountId ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerHero",
+                (object?)battle.PlayerHero ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerRank",
+                (object?)battle.PlayerRank ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerRating",
+                (object?)battle.PlayerRating ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerLevel",
+                (object?)battle.PlayerLevel ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentName",
+                (object?)battle.OpponentName ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentHero",
+                (object?)battle.OpponentHero ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentRank",
+                (object?)battle.OpponentRank ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentRating",
+                (object?)battle.OpponentRating ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentLevel",
+                (object?)battle.OpponentLevel ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentAccountId",
+                (object?)battle.OpponentAccountId ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue("$combatKind", battle.CombatKind);
+            insertCommand.Parameters.AddWithValue("$result", (object?)battle.Result ?? DBNull.Value);
+            insertCommand.Parameters.AddWithValue(
+                "$winnerCombatantId",
+                (object?)battle.WinnerCombatantId ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$loserCombatantId",
+                (object?)battle.LoserCombatantId ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue("$playerHandJson", battle.PlayerHandJson);
+            insertCommand.Parameters.AddWithValue("$playerSkillsJson", battle.PlayerSkillsJson);
+            insertCommand.Parameters.AddWithValue("$opponentHandJson", battle.OpponentHandJson);
+            insertCommand.Parameters.AddWithValue("$opponentSkillsJson", battle.OpponentSkillsJson);
+            insertCommand.Parameters.AddWithValue(
+                "$replayAvailable",
+                battle.ReplayAvailable ? 1 : 0
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$replayDownloaded",
+                battle.ReplayDownloaded ? 1 : 0
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$lastSyncedAtUtc",
+                battle.LastSyncedAtUtc.ToString("o")
+            );
+            insertCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
+    public void MarkGhostReplayDownloaded(string battleId)
+    {
+        if (string.IsNullOrWhiteSpace(battleId))
+            return;
+
+        using var connection = OpenConnection(ensureSchema: true);
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"""
+            UPDATE {RunLogSqliteSchema.GhostBattlesTableName}
+            SET replay_downloaded = 1
+            WHERE battle_id = $battleId;
+            """;
+        command.Parameters.AddWithValue("$battleId", battleId);
+        command.ExecuteNonQuery();
+    }
+
+    public PvpBattleManifest? TryLoadGhostManifest(string battleId)
+    {
+        if (!DatabaseExists || string.IsNullOrWhiteSpace(battleId))
+            return null;
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"""
+            SELECT
+                battle_id,
+                recorded_at_utc,
+                day,
+                hour,
+                encounter_id,
+                player_name,
+                player_account_id,
+                player_hero,
+                player_rank,
+                player_rating,
+                player_level,
+                opponent_name,
+                opponent_hero,
+                opponent_rank,
+                opponent_rating,
+                opponent_level,
+                opponent_account_id,
+                combat_kind,
+                result,
+                winner_combatant_id,
+                loser_combatant_id,
+                player_hand_json,
+                player_skills_json,
+                opponent_hand_json,
+                opponent_skills_json
+            FROM {RunLogSqliteSchema.GhostBattlesTableName}
+            WHERE battle_id = $battleId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$battleId", battleId);
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        return ReadManifest(reader, runIdColumnName: null);
     }
 
     public IReadOnlyList<string> ListBattleIdsByRun(string runId)
@@ -326,7 +678,7 @@ internal sealed class HistoryPanelRepository
         transaction.Commit();
     }
 
-    private SqliteConnection OpenConnection()
+    private SqliteConnection OpenConnection(bool ensureSchema = false)
     {
         var connection = new SqliteConnection($"Data Source={_databasePath}");
         connection.Open();
@@ -334,7 +686,75 @@ internal sealed class HistoryPanelRepository
         using var pragma = connection.CreateCommand();
         pragma.CommandText = "PRAGMA foreign_keys = ON;";
         pragma.ExecuteNonQuery();
+        if (ensureSchema)
+        {
+            using var bootstrap = connection.CreateCommand();
+            bootstrap.CommandTimeout = 2;
+            bootstrap.CommandText = RunLogSqliteSchema.BootstrapSql;
+            bootstrap.ExecuteNonQuery();
+        }
+        EnsureColumnExists(connection, RunLogSqliteSchema.PvpBattlesTableName, "player_hero", "TEXT NULL");
+        EnsureColumnExists(connection, RunLogSqliteSchema.PvpBattlesTableName, "player_level", "INTEGER NULL");
+        EnsureColumnExists(connection, RunLogSqliteSchema.GhostBattlesTableName, "player_hero", "TEXT NULL");
+        EnsureColumnExists(connection, RunLogSqliteSchema.GhostBattlesTableName, "player_level", "INTEGER NULL");
         return connection;
+    }
+
+    private static PvpBattleManifest ReadManifest(
+        SqliteDataReader reader,
+        string? runIdColumnName
+    )
+    {
+        return new PvpBattleManifest
+        {
+            BattleId = reader.GetString(reader.GetOrdinal("battle_id")),
+            RunId = string.IsNullOrWhiteSpace(runIdColumnName)
+                ? null
+                : GetNullableString(reader, runIdColumnName),
+            SavedAtUtc = DateTimeOffset.Parse(
+                reader.GetString(reader.GetOrdinal("recorded_at_utc"))
+            ),
+            Day = GetNullableInt32(reader, "day"),
+            Hour = GetNullableInt32(reader, "hour"),
+            EncounterId = GetNullableString(reader, "encounter_id"),
+            CombatKind = reader.GetString(reader.GetOrdinal("combat_kind")),
+            Participants = new PvpBattleParticipants
+            {
+                PlayerName = GetNullableString(reader, "player_name"),
+                PlayerAccountId = GetNullableString(reader, "player_account_id"),
+                PlayerHero = GetNullableString(reader, "player_hero"),
+                PlayerRank = GetNullableString(reader, "player_rank"),
+                PlayerRating = GetNullableInt32(reader, "player_rating"),
+                PlayerLevel = GetNullableInt32(reader, "player_level"),
+                OpponentName = GetNullableString(reader, "opponent_name"),
+                OpponentHero = GetNullableString(reader, "opponent_hero"),
+                OpponentRank = GetNullableString(reader, "opponent_rank"),
+                OpponentRating = GetNullableInt32(reader, "opponent_rating"),
+                OpponentLevel = GetNullableInt32(reader, "opponent_level"),
+                OpponentAccountId = GetNullableString(reader, "opponent_account_id"),
+            },
+            Outcome = new PvpBattleOutcome
+            {
+                Result = GetNullableString(reader, "result"),
+                WinnerCombatantId = GetNullableString(reader, "winner_combatant_id"),
+                LoserCombatantId = GetNullableString(reader, "loser_combatant_id"),
+            },
+            Snapshots = new PvpBattleSnapshots
+            {
+                PlayerHand = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("player_hand_json"))
+                ),
+                PlayerSkills = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("player_skills_json"))
+                ),
+                OpponentHand = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("opponent_hand_json"))
+                ),
+                OpponentSkills = DeserializeCapture(
+                    reader.GetString(reader.GetOrdinal("opponent_skills_json"))
+                ),
+            },
+        };
     }
 
     private static string BuildSnapshotSummary(
@@ -489,6 +909,47 @@ internal sealed class HistoryPanelRepository
         return capture?.Items?.Count ?? 0;
     }
 
+    private static void EnsureColumnExists(
+        SqliteConnection connection,
+        string tableName,
+        string columnName,
+        string columnDefinition
+    )
+    {
+        using (var exists = connection.CreateCommand())
+        {
+            exists.CommandTimeout = 2;
+            exists.CommandText =
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $tableName LIMIT 1;";
+            exists.Parameters.AddWithValue("$tableName", tableName);
+            if (exists.ExecuteScalar() == null)
+                return;
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (
+                string.Equals(
+                    reader.GetString(reader.GetOrdinal("name")),
+                    columnName,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return;
+            }
+        }
+
+        using var alter = connection.CreateCommand();
+        alter.CommandTimeout = 2;
+        alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+        alter.ExecuteNonQuery();
+    }
+
     private static string? GetNullableString(SqliteDataReader reader, string columnName)
     {
         var ordinal = reader.GetOrdinal(columnName);
@@ -616,17 +1077,25 @@ internal sealed class HistoryBattleRecord
         int? day,
         int? hour,
         string? encounterId,
+        string? playerHero,
         string? playerRank,
         int? playerRating,
+        int? playerLevel,
         string? opponentName,
         string? opponentHero,
         string? opponentRank,
         int? opponentRating,
+        int? opponentLevel,
         string? opponentAccountId,
         string? combatKind,
         string? result,
+        string? winnerCombatantId,
+        string? loserCombatantId,
         string snapshotSummary,
-        HistoryBattlePreviewData previewData
+        HistoryBattlePreviewData previewData,
+        HistoryBattleSource source,
+        bool replayAvailable,
+        bool replayDownloaded
     )
     {
         BattleId = battleId;
@@ -635,17 +1104,25 @@ internal sealed class HistoryBattleRecord
         Day = day;
         Hour = hour;
         EncounterId = encounterId;
+        PlayerHero = playerHero;
         PlayerRank = playerRank;
         PlayerRating = playerRating;
+        PlayerLevel = playerLevel;
         OpponentName = opponentName;
         OpponentHero = opponentHero;
         OpponentRank = opponentRank;
         OpponentRating = opponentRating;
+        OpponentLevel = opponentLevel;
         OpponentAccountId = opponentAccountId;
         CombatKind = combatKind;
         Result = result;
+        WinnerCombatantId = winnerCombatantId;
+        LoserCombatantId = loserCombatantId;
         SnapshotSummary = snapshotSummary;
         PreviewData = previewData;
+        Source = source;
+        ReplayAvailable = replayAvailable;
+        ReplayDownloaded = replayDownloaded;
     }
 
     public string BattleId { get; }
@@ -660,9 +1137,13 @@ internal sealed class HistoryBattleRecord
 
     public string? EncounterId { get; }
 
+    public string? PlayerHero { get; }
+
     public string? PlayerRank { get; }
 
     public int? PlayerRating { get; }
+
+    public int? PlayerLevel { get; }
 
     public string? OpponentName { get; }
 
@@ -672,15 +1153,33 @@ internal sealed class HistoryBattleRecord
 
     public int? OpponentRating { get; }
 
+    public int? OpponentLevel { get; }
+
     public string? OpponentAccountId { get; }
 
     public string? CombatKind { get; }
 
     public string? Result { get; }
 
+    public string? WinnerCombatantId { get; }
+
+    public string? LoserCombatantId { get; }
+
     public string SnapshotSummary { get; }
 
     public HistoryBattlePreviewData PreviewData { get; }
+
+    public HistoryBattleSource Source { get; }
+
+    public bool ReplayAvailable { get; }
+
+    public bool ReplayDownloaded { get; }
+}
+
+internal enum HistoryBattleSource
+{
+    Local,
+    Ghost,
 }
 
 internal sealed class HistoryBattlePreviewData

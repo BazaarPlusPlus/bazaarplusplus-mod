@@ -271,8 +271,10 @@ internal sealed class RunUploadSqliteStore
                 encounter_id,
                 player_name,
                 player_account_id,
+                player_hero,
                 player_rank,
                 player_rating,
+                player_level,
                 opponent_name,
                 opponent_hero,
                 opponent_rank,
@@ -305,8 +307,10 @@ internal sealed class RunUploadSqliteStore
                 "encounter_id",
                 "player_name",
                 "player_account_id",
+                "player_hero",
                 "player_rank",
                 "player_rating",
+                "player_level",
                 "opponent_name",
                 "opponent_hero",
                 "opponent_rank",
@@ -342,7 +346,7 @@ internal sealed class RunUploadSqliteStore
                 SchemaVersion = RunLogSqliteSchema.CurrentSchemaVersion,
                 InstallId = installId,
                 ClientId = clientId,
-                PluginVersion = MyPluginInfo.PLUGIN_VERSION,
+                PluginVersion = BppPluginVersion.Current,
                 SubmittedAtUtc = DateTimeOffset.UtcNow,
                 RunId = runId,
                 Meta = meta,
@@ -371,6 +375,12 @@ internal sealed class RunUploadSqliteStore
         EnsureColumnExists(
             connection,
             RunLogSqliteSchema.PvpBattlesTableName,
+            "player_hero",
+            "TEXT NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.PvpBattlesTableName,
             "player_rank",
             "TEXT NULL"
         );
@@ -378,6 +388,12 @@ internal sealed class RunUploadSqliteStore
             connection,
             RunLogSqliteSchema.PvpBattlesTableName,
             "player_rating",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.PvpBattlesTableName,
+            "player_level",
             "INTEGER NULL"
         );
     }

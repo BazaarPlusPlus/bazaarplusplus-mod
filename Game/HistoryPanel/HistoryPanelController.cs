@@ -12,6 +12,13 @@ internal sealed partial class HistoryPanel
         ClearDeleteRunConfirmation();
         _runs.Clear();
         _battles.Clear();
+        _ghostBattles.Clear();
+
+        if (_sectionMode == HistorySectionMode.Ghost)
+        {
+            RefreshGhostData();
+            return;
+        }
 
         if (!_dataService.TryLoadRecentRuns(40, out var runs, out var statusMessage, out var error))
         {
@@ -38,6 +45,71 @@ internal sealed partial class HistoryPanel
         RefreshSelectedBattlePreview();
     }
 
+    private void RefreshGhostData()
+    {
+        if (
+            !_dataService.TryLoadGhostBattles(
+                100,
+                out var battles,
+                out var statusMessage,
+                out var error
+            )
+        )
+        {
+            _statusMessage = statusMessage;
+            if (error != null)
+            {
+                BppLog.Error("HistoryPanel", "Failed to load ghost battle data", error);
+                RefreshUi();
+                RefreshSelectedBattlePreview();
+                return;
+            }
+
+            RefreshUi();
+            return;
+        }
+
+        _ghostBattles.AddRange(battles);
+        _selectedGhostBattleIndex = Mathf.Clamp(
+            _selectedGhostBattleIndex,
+            0,
+            Mathf.Max(0, FilteredGhostBattles.Count - 1)
+        );
+        _previewSelectionMode = PreviewSelectionMode.Battle;
+        _statusMessage = statusMessage;
+
+        RefreshUi();
+        RefreshSelectedBattlePreview();
+    }
+
+    private void SetSectionMode(HistorySectionMode mode)
+    {
+        if (_sectionMode == mode)
+            return;
+
+        _sectionMode = mode;
+        _previewSelectionMode = mode == HistorySectionMode.Ghost
+            ? PreviewSelectionMode.Battle
+            : PreviewSelectionMode.Run;
+        RefreshData();
+    }
+
+    private void SetGhostBattleFilter(GhostBattleFilter filter)
+    {
+        if (_ghostBattleFilter == filter)
+            return;
+
+        _ghostBattleFilter = filter;
+        _selectedGhostBattleIndex = Mathf.Clamp(
+            _selectedGhostBattleIndex,
+            0,
+            Mathf.Max(0, FilteredGhostBattles.Count - 1)
+        );
+        _previewSelectionMode = PreviewSelectionMode.Battle;
+        RefreshUi();
+        RefreshSelectedBattlePreview();
+    }
+
     private void SelectRun(int index)
     {
         if (index < 0 || index >= _runs.Count)
@@ -55,10 +127,14 @@ internal sealed partial class HistoryPanel
 
     private void SelectBattle(int index)
     {
-        if (index < 0 || index >= _battles.Count)
+        var source = _sectionMode == HistorySectionMode.Ghost ? _ghostBattles : _battles;
+        if (index < 0 || index >= source.Count)
             return;
 
-        _selectedBattleIndex = index;
+        if (_sectionMode == HistorySectionMode.Ghost)
+            _selectedGhostBattleIndex = index;
+        else
+            _selectedBattleIndex = index;
         _previewSelectionMode = PreviewSelectionMode.Battle;
         RefreshUi();
         RefreshSelectedBattlePreview();
@@ -85,11 +161,17 @@ internal sealed partial class HistoryPanel
 
     private bool CanReplaySelectedBattle(out string reason)
     {
-        return _replayService.CanReplayBattle(SelectedBattle, out reason);
+        return _replayService.CanReplayBattle(ActiveSelectedBattle, out reason);
     }
 
     private bool CanDeleteSelectedRun(out string reason)
     {
+        if (_sectionMode == HistorySectionMode.Ghost)
+        {
+            reason = "Ghost battles cannot be deleted from this panel yet.";
+            return false;
+        }
+
         var run = SelectedRun;
         if (run == null)
         {
@@ -124,7 +206,7 @@ internal sealed partial class HistoryPanel
 
     private void TryReplaySelectedBattle()
     {
-        var battle = SelectedBattle;
+        var battle = ActiveSelectedBattle;
         if (battle == null)
             return;
 
@@ -213,5 +295,30 @@ internal sealed partial class HistoryPanel
             return "Unavailable";
 
         return _dataService.DatabaseExists ? "Connected" : "Missing";
+    }
+
+    private void TrySyncGhostBattles()
+    {
+        if (!_dataService.CanSyncGhostBattles)
+        {
+            _statusMessage = "Ghost sync is unavailable.";
+            RefreshUi();
+            return;
+        }
+
+        if (!_dataService.TrySyncGhostBattles(out var statusMessage, out var error))
+        {
+            _statusMessage = statusMessage;
+            if (error != null)
+                BppLog.Error("HistoryPanel", "Failed to sync ghost battles", error);
+            RefreshUi();
+            return;
+        }
+
+        _statusMessage = statusMessage;
+        if (_sectionMode == HistorySectionMode.Ghost)
+            RefreshData();
+        else
+            RefreshUi();
     }
 }

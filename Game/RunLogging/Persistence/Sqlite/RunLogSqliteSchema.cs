@@ -17,6 +17,8 @@ public static class RunLogSqliteSchema
 
     public static string PvpBattlesTableName => "pvp_battles";
 
+    public static string GhostBattlesTableName => "ghost_battles";
+
     public static string RunSyncStateTableName => "run_sync_state";
 
     public static string ReplaySyncStateTableName => "replay_sync_state";
@@ -98,8 +100,10 @@ public static class RunLogSqliteSchema
                 encounter_id TEXT NULL,
                 player_name TEXT NULL,
                 player_account_id TEXT NULL,
+                player_hero TEXT NULL,
                 player_rank TEXT NULL,
                 player_rating INTEGER NULL,
+                player_level INTEGER NULL,
                 opponent_name TEXT NULL,
                 opponent_hero TEXT NULL,
                 opponent_rank TEXT NULL,
@@ -114,6 +118,37 @@ public static class RunLogSqliteSchema
                 player_skills_json TEXT NOT NULL,
                 opponent_hand_json TEXT NOT NULL,
                 opponent_skills_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS {GhostBattlesTableName} (
+                battle_id TEXT PRIMARY KEY,
+                recorded_at_utc TEXT NOT NULL,
+                day INTEGER NULL,
+                hour INTEGER NULL,
+                encounter_id TEXT NULL,
+                player_name TEXT NULL,
+                player_account_id TEXT NULL,
+                player_hero TEXT NULL,
+                player_rank TEXT NULL,
+                player_rating INTEGER NULL,
+                player_level INTEGER NULL,
+                opponent_name TEXT NULL,
+                opponent_hero TEXT NULL,
+                opponent_rank TEXT NULL,
+                opponent_rating INTEGER NULL,
+                opponent_level INTEGER NULL,
+                opponent_account_id TEXT NULL,
+                combat_kind TEXT NOT NULL,
+                result TEXT NULL,
+                winner_combatant_id TEXT NULL,
+                loser_combatant_id TEXT NULL,
+                player_hand_json TEXT NOT NULL,
+                player_skills_json TEXT NOT NULL,
+                opponent_hand_json TEXT NOT NULL,
+                opponent_skills_json TEXT NOT NULL,
+                replay_available INTEGER NOT NULL DEFAULT 0,
+                replay_downloaded INTEGER NOT NULL DEFAULT 0,
+                last_synced_at_utc TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS {RunSyncStateTableName} (
@@ -151,6 +186,9 @@ public static class RunLogSqliteSchema
 
             CREATE INDEX IF NOT EXISTS idx_{PvpBattlesTableName}_recorded_at_utc
                 ON {PvpBattlesTableName}(recorded_at_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_{GhostBattlesTableName}_recorded_at_utc
+                ON {GhostBattlesTableName}(recorded_at_utc DESC);
 
             CREATE INDEX IF NOT EXISTS idx_{RunSyncStateTableName}_dirty
                 ON {RunSyncStateTableName}(dirty, last_attempt_at_utc);

@@ -623,6 +623,30 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         return true;
     }
 
+    public bool ReplayImportedBattle(PvpBattleManifest manifest, PvpReplayPayload payload)
+    {
+        if (manifest == null)
+            throw new ArgumentNullException(nameof(manifest));
+        if (payload == null)
+            throw new ArgumentNullException(nameof(payload));
+
+        if (!CanReplaySavedCombats(out var reason))
+        {
+            BppLog.Warn("CombatReplayRuntime", $"Rejected imported replay request: {reason}");
+            return false;
+        }
+
+        var loader = _loader;
+        if (loader == null)
+            return false;
+
+        var sequence = loader.Load(payload);
+        InitializedReplayBoardUiControllers.Clear();
+        _savedReplayPlaybackActive = true;
+        _ = StartReplayAsync(manifest, sequence, manifest.BattleId);
+        return true;
+    }
+
     private async Task StartReplayAsync(
         PvpBattleManifest manifest,
         CombatSequenceMessages sequence,

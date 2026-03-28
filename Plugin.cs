@@ -26,6 +26,7 @@ public class Plugin : BaseUnityPlugin
 
     protected virtual void Awake()
     {
+        BppPluginVersion.Initialize(Info.Location);
         var configFile = CreateConfigFile();
         var runtime = InstallRuntimeHost(configFile);
         var services = runtime.Services;

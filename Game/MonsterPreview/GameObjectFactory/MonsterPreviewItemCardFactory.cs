@@ -159,7 +159,7 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
             Size = ParseSize(entry.Size, template.Size),
             Type = ECardType.Item,
             Attributes = new Dictionary<ECardAttributeType, int>(),
-            Tags = new HashSet<ECardTag>(),
+            Tags = BuildPreviewTags(template),
             HiddenTags = new HashSet<EHiddenTag>(),
             Heroes = new HashSet<EHero>(),
             Owner = null,
@@ -190,6 +190,13 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
             $"BuildCard result template={entry.TemplateId} tier={card.Tier} size={card.Size} type={card.Type} enchant={card.Enchantment} attrs={card.Attributes.Count} templateName={template.InternalName}"
         );
         return card;
+    }
+
+    private static HashSet<ECardTag> BuildPreviewTags(ITCard template)
+    {
+        return template?.Tags != null
+            ? new HashSet<ECardTag>(template.Tags)
+            : new HashSet<ECardTag>();
     }
 
     private static ECardSize ParseSize(int size, ECardSize fallback)

@@ -5,6 +5,8 @@
   - targeted code changes should run the smallest relevant test project or build first, not the whole repo by default
   - prefer the focused `tests/<Feature>.Tests` project when one covers the touched code
   - run the full `BuildAll` target when touching build logic, packaging, or before release-oriented validation
+  - if there is no meaningful automated test seam for a change, it is acceptable to ship without adding a new test
+  - do not add source-text tests that only assert exact code snippets or lines exist in a file; those are not meaningful verification
 - The main mod project and most test projects resolve game assemblies through `ManagedPath`. If auto-detection does not match the local install, pass `ManagedPath` explicitly instead of changing project references or treating the failure as a code regression.
 - In project documentation, write paths as relative paths from the project root.
 - On Windows, do not rely on PowerShell default encoding for Chinese text; use explicit UTF-8 when reading or writing files.

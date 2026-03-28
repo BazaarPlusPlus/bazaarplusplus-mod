@@ -23,7 +23,7 @@ internal static class MainMenuVersionLabelBuildPatch
 
             versionLabel.text = MainMenuVersionLabelFormatter.Build(
                 Application.version,
-                MyPluginInfo.PLUGIN_VERSION
+                BppPluginVersion.Current
             );
         }
         catch (Exception ex)
