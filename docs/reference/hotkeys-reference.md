@@ -10,7 +10,6 @@ player-facing features, debug-only features, and panel-internal tuning controls.
 | Hotkey | Function | Scope | Rebindable | Notes |
 | --- | --- | --- | --- | --- |
 | `F6` | Toggle `CombatStatusBar` | Global | No | Shows or hides the combat status HUD. |
-| `F7` | Toggle `CombatLog` overlay | Global | No | Shows or hides the standalone combat log overlay. |
 | `F8` | Toggle `HistoryPanel` | Global | No | Opens or closes the run-history panel. |
 | `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No | Closes the panel when it is open. |
 | `Ctrl` | Show enchant preview | Tooltip hover | Yes | Default binding for `HoldEnchantPreview`. |
@@ -69,7 +68,6 @@ All of the following require `Ctrl` to be held while `HistoryPanel` is open:
 - `Game/Input/KeyBindings.cs`
 - `Game/Input/BppHotkeyService.cs`
 - `Game/CombatStatusBar/CombatStatusBar.cs`
-- `Game/CombatLog/CombatLogOverlay.cs`
 - `Game/HistoryPanel/HistoryPanel.cs`
 - `Game/DebugPanel/DebugPanel.cs`
 - `Patches/Settings/BppKeybindSettingsPatch.cs`

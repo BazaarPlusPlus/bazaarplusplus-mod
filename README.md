@@ -22,7 +22,7 @@ BazaarPlusPlus 是一个面向 **《The Bazaar》** 的 **BepInEx 增强模组**
 
 **战斗录像保存 / 调试回放**
 
-`CombatReplayRuntime` 会持续持久化 PVP replay payload；常规 UI 里的 `HistoryPanel` 会在选中 battle 且 payload 仍存在时启用 `Replay`，Debug build 额外挂载 `DebugPanel` 和独立的 `CombatLog` 叠加层，并提供最近已保存 replay 的调试入口。已保存的 replay 可以在 lobby 中重新 bootstrap 到原生 replay 流程。
+`CombatReplayRuntime` 会持续持久化 PVP replay payload；常规 UI 里的 `HistoryPanel` 会在选中 battle 且 payload 仍存在时启用 `Replay`。已保存的 replay 可以在 lobby 中重新 bootstrap 到原生 replay 流程。
 
 **匿名模式**
 
@@ -91,7 +91,7 @@ Run upload is opt-in and disabled by default. When enabled, completed runs are r
 
 **Saved Replay / Debug Playback**
 
-`CombatReplayRuntime` continuously persists PVP replay payloads; the normal `HistoryPanel` enables `Replay` when the selected battle still has a saved payload, while debug builds additionally mount the `DebugPanel` and a standalone `CombatLog` overlay for recent replay playback and inspection. Saved replays can be bootstrapped from the lobby back into the native replay pipeline.
+`CombatReplayRuntime` continuously persists PVP replay payloads; the normal `HistoryPanel` enables `Replay` when the selected battle still has a saved payload. Saved replays can be bootstrapped from the lobby back into the native replay pipeline.
 
 **Anonymous Mode**
 

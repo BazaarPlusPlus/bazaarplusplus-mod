@@ -50,9 +50,6 @@ Explicitly out of scope:
 5. `CombatStatusBar` listens to `Events.CombatStarted` / `Events.CombatEnded`, builds the runtime
    canvas, and refreshes the HUD every `Update()`.
 
-The same processed-frame counter is also used by the debug combat log runtime to keep row
-visibility aligned with playback.
-
 ## Logical Time
 
 Logical combat time is defined as:

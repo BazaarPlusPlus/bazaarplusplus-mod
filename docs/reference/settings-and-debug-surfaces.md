@@ -66,7 +66,6 @@ When `BppBuild.IsDebug` is true, `Plugin.Awake()` adds:
 Player-facing overlay entry points:
 
 - `F6`: toggle `CombatStatusBar`
-- `F7`: toggle standalone `CombatLogOverlay`
 - `F8`: toggle `HistoryPanel`
 
 Debug-only entry points:
@@ -75,9 +74,6 @@ Debug-only entry points:
 - `DebugPanel -> Replays`: launch saved replay playback through `CombatReplayRuntime`
 - `DebugPanel -> Preview`: inspect monster-preview anchor / presentation state from
   `MonsterPreviewDebugController`
-
-`CombatLogOverlay` renders the current combat timeline and uses
-`CombatStatusBar.ProcessedCombatFrames` to decide which rows are visible during playback.
 
 ## Key Files
 
@@ -93,5 +89,3 @@ Debug-only entry points:
 - [Patches/Tooltips/EnchantPreviewSettingsPatch.cs](../../Patches/Tooltips/EnchantPreviewSettingsPatch.cs)
 - [Game/Tooltips/TooltipModifierRefreshController.cs](../../Game/Tooltips/TooltipModifierRefreshController.cs)
 - [Game/DebugPanel/DebugPanel.cs](../../Game/DebugPanel/DebugPanel.cs)
-- [Game/CombatLog/CombatLogController.cs](../../Game/CombatLog/CombatLogController.cs)
-- [Game/CombatLog/CombatLogOverlay.cs](../../Game/CombatLog/CombatLogOverlay.cs)

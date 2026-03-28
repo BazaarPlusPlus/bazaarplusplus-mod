@@ -26,10 +26,6 @@
   <ItemGroup>
     <Compile Include="..\..\Game\Settings\LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
     <Compile
-      Include="..\..\Game\CombatLog\CombatLogPlaybackState.cs"
-      Link="CombatLogPlaybackState.cs"
-    />
-    <Compile
       Include="..\..\Game\Settings\SettingsMenuToggleBridge.cs"
       Link="SettingsMenuToggleBridge.cs"
     />
