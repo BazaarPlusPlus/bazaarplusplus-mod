@@ -29,11 +29,22 @@ internal sealed class RunUploadKeyStore
 
             if (File.Exists(_privateKeyPath))
             {
-                _cachedKeyMaterial = JsonConvert.DeserializeObject<RunUploadKeyMaterial>(
-                    File.ReadAllText(_privateKeyPath)
-                );
-                if (_cachedKeyMaterial != null)
-                    return _cachedKeyMaterial;
+                try
+                {
+                    var keyMaterial = JsonConvert.DeserializeObject<RunUploadKeyMaterial>(
+                        File.ReadAllText(_privateKeyPath)
+                    );
+                    if (keyMaterial != null)
+                    {
+                        ValidateKeyMaterial(keyMaterial);
+                        _cachedKeyMaterial = keyMaterial;
+                        return _cachedKeyMaterial;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    BackupCorruptedKeyFile(ex);
+                }
             }
 
             using var rsa = RSA.Create();
@@ -68,6 +79,32 @@ internal sealed class RunUploadKeyStore
             RSASignaturePadding.Pkcs1
         );
         return Convert.ToBase64String(signatureBytes);
+    }
+
+    private void BackupCorruptedKeyFile(Exception ex)
+    {
+        try
+        {
+            var backupPath = $"{_privateKeyPath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+            File.Copy(_privateKeyPath, backupPath, overwrite: false);
+            BppLog.Warn(
+                "RunUploadKeyStore",
+                $"Failed to read private key from {_privateKeyPath}: {ex.GetType().Name} - {ex.Message}. Backed up corrupted key to {backupPath} and generating a new keypair."
+            );
+        }
+        catch (Exception backupEx)
+        {
+            BppLog.Warn(
+                "RunUploadKeyStore",
+                $"Failed to read private key from {_privateKeyPath}: {ex.GetType().Name} - {ex.Message}. Could not back up corrupted key: {backupEx.GetType().Name} - {backupEx.Message}. Generating a new keypair."
+            );
+        }
+    }
+
+    private static void ValidateKeyMaterial(RunUploadKeyMaterial keyMaterial)
+    {
+        using var rsa = RSA.Create();
+        rsa.ImportParameters(keyMaterial.ToParameters());
     }
 }
 

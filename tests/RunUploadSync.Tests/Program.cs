@@ -211,6 +211,19 @@ try
         (string)Invoke<object>(clientStateStoreType, clientStateStore, "TryGetClientId", [globalRouteKind]) == "client-abc",
         "Client state store should persist client id."
     );
+    InvokeVoid(clientStateStoreType, clientStateStore, "ClearClientId", [globalRouteKind]);
+    Assert(
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetClientId", [globalRouteKind]) == null,
+        "Client state store should clear a route-scoped client id."
+    );
+
+    File.WriteAllText(clientStatePath, "{ not-valid-json");
+    clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
+        ?? throw new InvalidOperationException("Failed to recreate RunUploadClientStateStore.");
+    Assert(
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetClientId", [globalRouteKind]) == null,
+        "Client state store should recover from corrupted JSON by treating it as empty state."
+    );
 
     var routeStateStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteStateStore");
     var routeStatePath = Path.Combine(tempRoot, "route.json");
@@ -261,6 +274,28 @@ try
         "Auto mode should fall back to CN after repeated Global failures."
     );
 
+    File.WriteAllText(routeStatePath, "{ not-valid-json");
+    routeStateStore = Activator.CreateInstance(routeStateStoreType, routeStatePath)
+        ?? throw new InvalidOperationException("Failed to recreate RunUploadRouteStateStore.");
+    routeSelector = Activator.CreateInstance(
+        routeSelectorType,
+        autoMode,
+        routeStateStore,
+        2,
+        TimeSpan.FromMinutes(60)
+    ) ?? throw new InvalidOperationException("Failed to recreate RunUploadRouteSelector.");
+    routeOrder = (System.Collections.IEnumerable)Invoke<object>(
+        routeSelectorType,
+        routeSelector,
+        "GetRouteOrder",
+        [globalEndpoint, cnEndpoint]
+    );
+    firstRoute = routeOrder.Cast<object>().First();
+    Assert(
+        endpointSetType.GetProperty("RouteKind")!.GetValue(firstRoute)!.ToString() == "Global",
+        "Route selector should recover from corrupted route state by reverting to default ordering."
+    );
+
     var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
     var keyStore = Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
@@ -276,6 +311,63 @@ try
     Assert(
         !string.IsNullOrWhiteSpace(signature) && File.Exists(privateKeyPath),
         "Key store should sign payloads and persist the local private key."
+    );
+
+    File.WriteAllText(privateKeyPath, "{ not-valid-json");
+    keyStore = Activator.CreateInstance(keyStoreType, privateKeyPath)
+        ?? throw new InvalidOperationException("Failed to recreate RunUploadKeyStore.");
+    var recoveredKeyMaterial = Invoke<object>(keyStoreType, keyStore, "GetOrCreateKeyMaterial", []);
+    var recoveredFingerprint = (string)fingerprintProperty.GetValue(recoveredKeyMaterial)!;
+    var recoveredSignature = (string)Invoke<object>(keyStoreType, keyStore, "Sign", ["hello-again"]);
+    Assert(
+        !string.IsNullOrWhiteSpace(recoveredFingerprint) && !string.IsNullOrWhiteSpace(recoveredSignature),
+        "Key store should recover from corrupted key material by minting a replacement keypair."
+    );
+    Assert(
+        Directory.GetFiles(tempRoot, "key.json.corrupt-*").Length == 1,
+        "Key store should preserve the corrupted key payload for inspection before regenerating."
+    );
+
+    File.WriteAllText(
+        privateKeyPath,
+        """
+        {
+          "algorithm": "rsa-pkcs1-sha256",
+          "modulus_b64": "not-base64",
+          "exponent_b64": "AQAB",
+          "d_b64": "AQAB",
+          "p_b64": "AQAB",
+          "q_b64": "AQAB",
+          "dp_b64": "AQAB",
+          "dq_b64": "AQAB",
+          "inverse_q_b64": "AQAB",
+          "fingerprint": "broken"
+        }
+        """
+    );
+    keyStore = Activator.CreateInstance(keyStoreType, privateKeyPath)
+        ?? throw new InvalidOperationException("Failed to recreate RunUploadKeyStore.");
+    var recoveredFromMalformedJsonKey = Invoke<object>(
+        keyStoreType,
+        keyStore,
+        "GetOrCreateKeyMaterial",
+        []
+    );
+    var recoveredFromMalformedJsonSignature = (string)Invoke<object>(
+        keyStoreType,
+        keyStore,
+        "Sign",
+        ["hello-after-valid-json-corruption"]
+    );
+    Assert(
+        !string.IsNullOrWhiteSpace(
+            (string)fingerprintProperty.GetValue(recoveredFromMalformedJsonKey)!
+        ) && !string.IsNullOrWhiteSpace(recoveredFromMalformedJsonSignature),
+        "Key store should recover when persisted key JSON is syntactically valid but contains invalid RSA material."
+    );
+    Assert(
+        Directory.GetFiles(tempRoot, "key.json.corrupt-*").Length == 2,
+        "Key store should also preserve valid-JSON corrupted key payloads before regenerating."
     );
 }
 finally
