@@ -95,7 +95,10 @@ Assert(
     "BPP hotkey service should explicitly reject scroll-style mouse inputs."
 );
 Assert(
-    hotkeyServiceSource.Contains("IsExplicitlyUnsupportedMousePath(normalized)", StringComparison.Ordinal),
+    hotkeyServiceSource.Contains(
+        "IsExplicitlyUnsupportedMousePath(normalized)",
+        StringComparison.Ordinal
+    ),
     "BPP hotkey service should keep rejecting unsupported continuous mouse controls before accepting canonical mouse bindings."
 );
 
@@ -148,10 +151,7 @@ Assert(
     "BPP keybind label resolver should recognize zh-Hans as Simplified Chinese, directly or through the shared helper."
 );
 Assert(
-    keybindLabelResolverSource.Contains(
-        "Press a key or mouse button",
-        StringComparison.Ordinal
-    )
+    keybindLabelResolverSource.Contains("Press a key or mouse button", StringComparison.Ordinal)
         && keybindLabelResolverSource.Contains("按下一个按键或鼠标按钮", StringComparison.Ordinal),
     "BPP keybind label resolver should tell users that rebinding accepts both keys and mouse buttons."
 );
@@ -169,9 +169,18 @@ Assert(
     "BPP keybind row controller should use Unity's interactive rebinding flow for key and mouse capture."
 );
 Assert(
-    keybindRowControllerSource.Contains("WithControlsExcluding(\"<Mouse>/scroll\")", StringComparison.Ordinal)
-        && keybindRowControllerSource.Contains("WithCancelingThrough(\"<Keyboard>/escape\")", StringComparison.Ordinal)
-        && keybindRowControllerSource.Contains("WithControlsExcluding(\"<Mouse>/leftButton\")", StringComparison.Ordinal),
+    keybindRowControllerSource.Contains(
+        "WithControlsExcluding(\"<Mouse>/scroll\")",
+        StringComparison.Ordinal
+    )
+        && keybindRowControllerSource.Contains(
+            "WithCancelingThrough(\"<Keyboard>/escape\")",
+            StringComparison.Ordinal
+        )
+        && keybindRowControllerSource.Contains(
+            "WithControlsExcluding(\"<Mouse>/leftButton\")",
+            StringComparison.Ordinal
+        ),
     "BPP keybind row controller should exclude unsupported mouse controls and allow cancelling the rebind with Escape."
 );
 Assert(
@@ -179,7 +188,10 @@ Assert(
     "BPP keybind row controller should save the canonical override path produced by the interactive rebind operation."
 );
 Assert(
-    keybindRowControllerSource.Contains("operation.selectedControl?.path", StringComparison.Ordinal),
+    keybindRowControllerSource.Contains(
+        "operation.selectedControl?.path",
+        StringComparison.Ordinal
+    ),
     "BPP keybind row controller should fall back to the selected control path when rebinding to the capture action's default key produces no override."
 );
 

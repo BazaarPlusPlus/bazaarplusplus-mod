@@ -38,10 +38,7 @@ internal static class RandomHeroPoolPlayerPrefs
             return false;
         }
 
-        state = RandomHeroPoolStateFactory.Create(
-            normalizedUnlockedHeroIds,
-            LoadSelectedHeroIds()
-        );
+        state = RandomHeroPoolStateFactory.Create(normalizedUnlockedHeroIds, LoadSelectedHeroIds());
         return true;
     }
 
@@ -72,7 +69,10 @@ internal static class RandomHeroPoolPlayerPrefs
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroPool", $"Failed to parse saved random hero pool '{key}': {ex.Message}");
+            BppLog.Warn(
+                "RandomHeroPool",
+                $"Failed to parse saved random hero pool '{key}': {ex.Message}"
+            );
             return null;
         }
     }
@@ -129,9 +129,7 @@ internal static class RandomHeroPoolPlayerPrefs
             if (!string.IsNullOrWhiteSpace(username))
                 return Uri.EscapeDataString(username);
         }
-        catch
-        {
-        }
+        catch { }
 
         return AnonymousAccountScope;
     }

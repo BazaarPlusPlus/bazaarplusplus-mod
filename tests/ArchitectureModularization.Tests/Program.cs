@@ -44,7 +44,9 @@ var bppFeatureRegistryType = RequireType("BazaarPlusPlus.Core.Runtime.BppFeature
 var encounterTrackerType = RequireType("BazaarPlusPlus.Game.EncounterTracking.EncounterTracker");
 var runLifecycleModuleType = RequireType("BazaarPlusPlus.Game.RunLifecycle.RunLifecycleModule");
 var combatReplayModuleType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayModule");
-var combatStatusBarModuleType = RequireType("BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBarModule");
+var combatStatusBarModuleType = RequireType(
+    "BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBarModule"
+);
 var encounterTrackingFeatureType = RequireType(
     "BazaarPlusPlus.Game.EncounterTracking.EncounterTrackingFeature"
 );
@@ -144,7 +146,10 @@ Assert(
     "Plugin should start the runtime host."
 );
 Assert(
-    pluginSource.Contains("gameObject.AddComponent<RunUploadController>();", StringComparison.Ordinal),
+    pluginSource.Contains(
+        "gameObject.AddComponent<RunUploadController>();",
+        StringComparison.Ordinal
+    ),
     "Plugin should mount the delayed run-upload controller."
 );
 Assert(
@@ -212,7 +217,10 @@ Assert(
 Assert(
     configInterfaceSource.Contains("EnableRunUploadConfig", StringComparison.Ordinal)
         && configInterfaceSource.Contains("RunUploadEndpointConfig", StringComparison.Ordinal)
-        && configInterfaceSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal),
+        && configInterfaceSource.Contains(
+            "RunUploadRegistrationEndpointConfig",
+            StringComparison.Ordinal
+        ),
     "IBppConfig should expose run-upload configuration."
 );
 
@@ -244,7 +252,10 @@ Assert(
     "BppRuntimeHost should expose paths through BppPathService."
 );
 Assert(
-    runtimeHostSource.Contains("public static IMonsterCatalog MonsterCatalog", StringComparison.Ordinal),
+    runtimeHostSource.Contains(
+        "public static IMonsterCatalog MonsterCatalog",
+        StringComparison.Ordinal
+    ),
     "BppRuntimeHost should expose monster data through an IMonsterCatalog boundary."
 );
 Assert(
@@ -326,9 +337,15 @@ Assert(
 );
 Assert(
     !encounterTrackerSource.Contains("OnCardDealt(", StringComparison.Ordinal)
-        && !encounterTrackerSource.Contains("Events.CardDealtSimEvent.AddListener", StringComparison.Ordinal)
+        && !encounterTrackerSource.Contains(
+            "Events.CardDealtSimEvent.AddListener",
+            StringComparison.Ordinal
+        )
         && !encounterTrackerSource.Contains("BuildMonsterPreviews(", StringComparison.Ordinal)
-        && !encounterTrackerSource.Contains("new EncounterTrackingModule(", StringComparison.Ordinal),
+        && !encounterTrackerSource.Contains(
+            "new EncounterTrackingModule(",
+            StringComparison.Ordinal
+        ),
     "EncounterTracker should remain a compatibility shell and delegate orchestration to EncounterTrackingFeature."
 );
 
@@ -336,7 +353,9 @@ var encounterTrackerFields = encounterTrackerType.GetFields(
     BindingFlags.NonPublic | BindingFlags.Static
 );
 Assert(
-    !encounterTrackerFields.Any(field => field.FieldType.FullName == "BazaarPlusPlus.Game.EncounterTracking.EncounterTrackingModule"),
+    !encounterTrackerFields.Any(field =>
+        field.FieldType.FullName == "BazaarPlusPlus.Game.EncounterTracking.EncounterTrackingModule"
+    ),
     "EncounterTracker should not store EncounterTrackingModule directly."
 );
 Assert(
@@ -347,7 +366,10 @@ Assert(
 var monsterDatabaseSource = ReadSource("Data/MonsterDatabase.cs");
 Assert(
     !monsterDatabaseSource.Contains("LegacyMonsterEntry", StringComparison.Ordinal)
-        && !monsterDatabaseSource.Contains("TryGet(string encounterInternalName)", StringComparison.Ordinal),
+        && !monsterDatabaseSource.Contains(
+            "TryGet(string encounterInternalName)",
+            StringComparison.Ordinal
+        ),
     "MonsterDatabase should remove unused legacy entry APIs once the catalog boundary is in place."
 );
 
@@ -363,8 +385,10 @@ Assert(
     "RunStateSyncController should not call RunLoggingController directly."
 );
 Assert(
-    runStateSyncSource.Contains("namespace BazaarPlusPlus.Game.RunLogging;", StringComparison.Ordinal)
-        && !runStateSyncSource.Contains("BppRuntimeHost.", StringComparison.Ordinal),
+    runStateSyncSource.Contains(
+        "namespace BazaarPlusPlus.Game.RunLogging;",
+        StringComparison.Ordinal
+    ) && !runStateSyncSource.Contains("BppRuntimeHost.", StringComparison.Ordinal),
     "RunStateSyncController should live in the run-logging namespace and avoid runtime-host statics."
 );
 
@@ -395,7 +419,10 @@ Assert(
 );
 Assert(
     historyPanelRepositorySource.Contains("SqliteConnection", StringComparison.Ordinal)
-        && historyPanelRepositorySource.Contains("JsonSerializerSettings", StringComparison.Ordinal),
+        && historyPanelRepositorySource.Contains(
+            "JsonSerializerSettings",
+            StringComparison.Ordinal
+        ),
     "HistoryPanelRepository should own low-level sqlite/json concerns."
 );
 Assert(
@@ -404,7 +431,10 @@ Assert(
     "HistoryPanel should avoid direct low-level sqlite/json concerns."
 );
 Assert(
-    historyPanelSource.Contains("namespace BazaarPlusPlus.Game.HistoryPanel;", StringComparison.Ordinal)
+    historyPanelSource.Contains(
+        "namespace BazaarPlusPlus.Game.HistoryPanel;",
+        StringComparison.Ordinal
+    )
         && historyPanelControllerSource.Contains(
             "namespace BazaarPlusPlus.Game.HistoryPanel;",
             StringComparison.Ordinal
@@ -422,8 +452,7 @@ Assert(
     tooltipRefreshSource.Contains(
         "namespace BazaarPlusPlus.Game.Tooltips;",
         StringComparison.Ordinal
-    )
-        && !tooltipRefreshSource.Contains("BppRuntimeHost.", StringComparison.Ordinal),
+    ) && !tooltipRefreshSource.Contains("BppRuntimeHost.", StringComparison.Ordinal),
     "TooltipModifierRefreshController should move into BazaarPlusPlus.Game.Tooltips and avoid runtime-host statics."
 );
 
@@ -431,7 +460,10 @@ var keyBindRowSource = ReadSource("Game/Input/BppKeyBindRowController.cs");
 var keyBindingsSource = ReadSource("Game/Input/KeyBindings.cs");
 Assert(
     keyBindRowSource.Contains("namespace BazaarPlusPlus.Game.Input;", StringComparison.Ordinal)
-        && keyBindingsSource.Contains("namespace BazaarPlusPlus.Game.Input;", StringComparison.Ordinal),
+        && keyBindingsSource.Contains(
+            "namespace BazaarPlusPlus.Game.Input;",
+            StringComparison.Ordinal
+        ),
     "Input feature files should live in BazaarPlusPlus.Game.Input."
 );
 
@@ -439,14 +471,16 @@ Assert(
     encounterTrackerSource.Contains(
         "namespace BazaarPlusPlus.Game.EncounterTracking;",
         StringComparison.Ordinal
-    )
-        && !encounterTrackerSource.Contains("BppRuntimeHost.", StringComparison.Ordinal),
+    ) && !encounterTrackerSource.Contains("BppRuntimeHost.", StringComparison.Ordinal),
     "EncounterTracker should move into encounter-tracking namespace and avoid runtime-host statics."
 );
 
 var uploadControllerSource = ReadSource("Game/RunLogging/Upload/RunUploadController.cs");
 Assert(
-    uploadControllerSource.Contains("BppRuntimeHost.RunContext.IsInGameRun", StringComparison.Ordinal),
+    uploadControllerSource.Contains(
+        "BppRuntimeHost.RunContext.IsInGameRun",
+        StringComparison.Ordinal
+    ),
     "RunUploadController should avoid uploads during active runs."
 );
 Assert(
@@ -499,10 +533,7 @@ static void AssertReadableProperty(
     string message
 )
 {
-    var property = ownerType.GetProperty(
-        propertyName,
-        BindingFlags.Instance | BindingFlags.Public
-    );
+    var property = ownerType.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
     if (property == null)
         throw new InvalidOperationException(message);
     Assert(property.CanRead, message);

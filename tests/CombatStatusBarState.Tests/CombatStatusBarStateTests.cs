@@ -369,5 +369,4 @@ public sealed class CombatStatusBarStateTests : IDisposable
 
         Assert.Equal(expected, result, precision: 3);
     }
-
 }

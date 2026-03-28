@@ -131,9 +131,7 @@ internal sealed class CombatReplayPersistenceQueue : IDisposable
                         }
                     }
 
-                    _completed.Enqueue(
-                        CombatReplayPersistenceResult.Failure(request.Manifest, ex)
-                    );
+                    _completed.Enqueue(CombatReplayPersistenceResult.Failure(request.Manifest, ex));
                 }
                 finally
                 {

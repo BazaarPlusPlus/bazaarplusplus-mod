@@ -2,8 +2,8 @@
 using System;
 using BazaarGameShared.Domain.Runs;
 using BazaarPlusPlus.Core.Events;
-using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Core.RunContext;
+using BazaarPlusPlus.Core.Runtime;
 
 namespace BazaarPlusPlus.Game.EncounterTracking;
 

@@ -152,10 +152,7 @@ internal sealed class HistoryPanelDataService
 
         try
         {
-            var result = _ghostSyncService
-                .SyncRecentBattlesAsync(default)
-                .GetAwaiter()
-                .GetResult();
+            var result = _ghostSyncService.SyncRecentBattlesAsync(default).GetAwaiter().GetResult();
             if (!result.Succeeded)
             {
                 statusMessage = $"Ghost sync failed: {result.Error ?? "unknown_error"}";

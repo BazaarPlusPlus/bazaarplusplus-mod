@@ -21,7 +21,8 @@ internal sealed class HistoryPanelReplayService
         GhostBattleSyncService? ghostSyncService = null
     )
     {
-        _runtimeAccessor = runtimeAccessor ?? throw new ArgumentNullException(nameof(runtimeAccessor));
+        _runtimeAccessor =
+            runtimeAccessor ?? throw new ArgumentNullException(nameof(runtimeAccessor));
         _replayDirectoryPathAccessor =
             replayDirectoryPathAccessor
             ?? throw new ArgumentNullException(nameof(replayDirectoryPathAccessor));
@@ -64,11 +65,12 @@ internal sealed class HistoryPanelReplayService
 
     public string GetReplayActionLabel(HistoryBattleRecord? battle)
     {
-        return battle?.Source == HistoryBattleSource.Ghost
+        return
+            battle?.Source == HistoryBattleSource.Ghost
             && !battle.ReplayDownloaded
             && battle.ReplayAvailable
-                ? "Download Replay"
-                : "Replay";
+            ? "Download Replay"
+            : "Replay";
     }
 
     public bool TryReplayBattle(HistoryBattleRecord? battle, out string statusMessage)

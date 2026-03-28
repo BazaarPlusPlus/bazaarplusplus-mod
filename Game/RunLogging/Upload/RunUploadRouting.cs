@@ -42,9 +42,7 @@ internal sealed class RunUploadClientStateStore
         lock (_sync)
         {
             _cachedClientIds ??= ReadStateFromDisk();
-            return _cachedClientIds.TryGetValue(scope.Trim(), out var clientId)
-                ? clientId
-                : null;
+            return _cachedClientIds.TryGetValue(scope.Trim(), out var clientId) ? clientId : null;
         }
     }
 
@@ -84,7 +82,9 @@ internal sealed class RunUploadClientStateStore
             return new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
-            var payload = JsonConvert.DeserializeObject<RunUploadClientState>(File.ReadAllText(_statePath));
+            var payload = JsonConvert.DeserializeObject<RunUploadClientState>(
+                File.ReadAllText(_statePath)
+            );
             return payload?.ClientIds != null
                 ? new Dictionary<string, string>(payload.ClientIds, StringComparer.Ordinal)
                 : new Dictionary<string, string>(StringComparer.Ordinal);

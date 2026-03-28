@@ -3,8 +3,8 @@
 using System;
 using BazaarPlusPlus.Game.Lobby;
 using HarmonyLib;
-using TMPro;
 using TheBazaar;
+using TMPro;
 using UnityEngine;
 
 namespace BazaarPlusPlus;
@@ -17,7 +17,10 @@ internal static class MainMenuVersionLabelBuildPatch
     {
         try
         {
-            var versionLabel = Traverse.Create(__instance).Field("versionLabel").GetValue<TextMeshProUGUI>();
+            var versionLabel = Traverse
+                .Create(__instance)
+                .Field("versionLabel")
+                .GetValue<TextMeshProUGUI>();
             if (versionLabel == null)
                 return;
 

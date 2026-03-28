@@ -137,7 +137,10 @@ Assert(File.Exists(configSourcePath), $"Config source not found at {configSource
 var configSource = File.ReadAllText(configSourcePath);
 Assert(
     !configSource.Contains("ReplayUploadEndpointConfig", StringComparison.Ordinal)
-        && !configSource.Contains("ReplayUploadRegistrationEndpointConfig", StringComparison.Ordinal),
+        && !configSource.Contains(
+            "ReplayUploadRegistrationEndpointConfig",
+            StringComparison.Ordinal
+        ),
     "BppConfig should not add separate replay endpoint entries when replay shares the Cloudflare upload service."
 );
 
@@ -224,14 +227,14 @@ Assert(
 );
 var historyPanelRepositorySource = File.ReadAllText(historyPanelRepositorySourcePath);
 Assert(
-    !historyPanelRepositorySource.Contains("const string marker = \"\\\"instance_id\\\"\";", StringComparison.Ordinal),
+    !historyPanelRepositorySource.Contains(
+        "const string marker = \"\\\"instance_id\\\"\";",
+        StringComparison.Ordinal
+    ),
     "History panel snapshot summary should not count raw instance_id markers in JSON text."
 );
 Assert(
-    historyPanelRepositorySource.Contains(
-            "BuildSnapshotSummary(",
-            StringComparison.Ordinal
-        )
+    historyPanelRepositorySource.Contains("BuildSnapshotSummary(", StringComparison.Ordinal)
         && historyPanelRepositorySource.Contains(
             "PvpBattleCardSetCapture playerHand",
             StringComparison.Ordinal

@@ -21,7 +21,8 @@ AssertSet(fallbackState.SelectedHeroIds, "Vanessa", "Pygmalien", "Mak");
 var toggledState = filteredState.SetSelected("Pygmalien", isSelected: true);
 AssertSet(toggledState.SelectedHeroIds, "Mak", "Pygmalien");
 
-var unchangedState = toggledState.SetSelected("Mak", isSelected: false)
+var unchangedState = toggledState
+    .SetSelected("Mak", isSelected: false)
     .SetSelected("Pygmalien", isSelected: false);
 AssertSet(unchangedState.SelectedHeroIds, "Pygmalien");
 
@@ -29,7 +30,8 @@ var clearToZeroGuardState = RandomHeroPoolStateFactory.Create(
     unlockedHeroIds: new[] { "Vanessa", "Pygmalien" },
     savedPoolHeroIds: new[] { "Vanessa", "Pygmalien" }
 );
-var clearToZeroBlockedState = clearToZeroGuardState.SetSelected("Vanessa", isSelected: false)
+var clearToZeroBlockedState = clearToZeroGuardState
+    .SetSelected("Vanessa", isSelected: false)
     .SetSelected("Pygmalien", isSelected: false);
 AssertSet(clearToZeroBlockedState.SelectedHeroIds, "Pygmalien");
 
@@ -207,7 +209,9 @@ static void MutateSnapshotOrThrow(IReadOnlyCollection<string> snapshot, string r
 
     if (snapshotArray.Length == 0)
     {
-        throw new InvalidOperationException("Expected snapshot collection to contain at least one item.");
+        throw new InvalidOperationException(
+            "Expected snapshot collection to contain at least one item."
+        );
     }
 
     snapshotArray[0] = replacementValue;
@@ -227,7 +231,9 @@ file sealed class SinglePassEnumerable : IEnumerable<string>
     {
         if (_enumerated)
         {
-            throw new InvalidOperationException("SinglePassEnumerable can only be enumerated once.");
+            throw new InvalidOperationException(
+                "SinglePassEnumerable can only be enumerated once."
+            );
         }
 
         _enumerated = true;

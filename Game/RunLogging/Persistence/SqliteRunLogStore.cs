@@ -40,7 +40,12 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var command = CreateCommand(connection);
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
-        EnsureColumnExists(connection, RunLogSqliteSchema.RunsTableName, "player_rank", "TEXT NULL");
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunsTableName,
+            "player_rank",
+            "TEXT NULL"
+        );
         EnsureColumnExists(
             connection,
             RunLogSqliteSchema.RunsTableName,

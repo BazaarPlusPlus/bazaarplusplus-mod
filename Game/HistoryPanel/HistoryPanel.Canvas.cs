@@ -240,19 +240,22 @@ internal sealed partial class HistoryPanel
         var canReplaySelectedBattle = CanReplaySelectedBattle(out var replayUnavailableReason);
 
         if (_countChipText != null)
-            _countChipText.text = _sectionMode == HistorySectionMode.Ghost
-                ? $"{FilteredGhostBattles.Count} Ghost"
-                : $"{_runs.Count} Runs";
+            _countChipText.text =
+                _sectionMode == HistorySectionMode.Ghost
+                    ? $"{FilteredGhostBattles.Count} Ghost"
+                    : $"{_runs.Count} Runs";
         if (_battleChipText != null)
-            _battleChipText.text = _sectionMode == HistorySectionMode.Ghost
-                ? $"{FilteredGhostBattles.Count} Battles"
-                : $"{_battles.Count} Battles";
+            _battleChipText.text =
+                _sectionMode == HistorySectionMode.Ghost
+                    ? $"{FilteredGhostBattles.Count} Battles"
+                    : $"{_battles.Count} Battles";
         if (_databaseChipText != null)
             _databaseChipText.text = $"DB {GetDatabaseChipText()}";
 
         if (_runSectionTitle != null)
-            _runSectionTitle.text = (_sectionMode == HistorySectionMode.Ghost ? "Ghost" : "Runs")
-                .ToUpperInvariant();
+            _runSectionTitle.text = (
+                _sectionMode == HistorySectionMode.Ghost ? "Ghost" : "Runs"
+            ).ToUpperInvariant();
         if (_battleSectionTitle != null)
             _battleSectionTitle.text = (
                 _sectionMode == HistorySectionMode.Ghost ? "Ghost Battles" : "Battles"
@@ -264,11 +267,11 @@ internal sealed partial class HistoryPanel
             _statusText.gameObject.SetActive(!string.IsNullOrWhiteSpace(_statusText.text));
         }
         if (_battleSectionSubtitle != null)
-            _battleSectionSubtitle.text = _sectionMode == HistorySectionMode.Ghost
-                ? $"Remote battles where you appeared as the opponent. Showing {GetGhostFilterLabel(_ghostBattleFilter)}."
-                : SelectedRun == null
-                    ? "Select a run to inspect its recorded battles."
-                    : $"{SelectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(SelectedRun.FinalDay)}";
+            _battleSectionSubtitle.text =
+                _sectionMode == HistorySectionMode.Ghost
+                    ? $"Remote battles where you appeared as the opponent. Showing {GetGhostFilterLabel(_ghostBattleFilter)}."
+                : SelectedRun == null ? "Select a run to inspect its recorded battles."
+                : $"{SelectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(SelectedRun.FinalDay)}";
 
         if (_runSectionPanel != null)
             _runSectionPanel.gameObject.SetActive(_sectionMode != HistorySectionMode.Ghost);
@@ -289,9 +292,9 @@ internal sealed partial class HistoryPanel
             var battleSummary =
                 ActiveSelectedBattle == null
                     ? "Select one battle to inspect it, then use Replay when you want to jump back into it."
-                    : canReplaySelectedBattle
-                        ? $"{HistoryPanelFormatter.FormatTimestamp(ActiveSelectedBattle.RecordedAtUtc)} | {ActiveSelectedBattle.SnapshotSummary}"
-                        : $"{HistoryPanelFormatter.FormatTimestamp(ActiveSelectedBattle.RecordedAtUtc)} | Replay unavailable: {replayUnavailableReason}";
+                : canReplaySelectedBattle
+                    ? $"{HistoryPanelFormatter.FormatTimestamp(ActiveSelectedBattle.RecordedAtUtc)} | {ActiveSelectedBattle.SnapshotSummary}"
+                : $"{HistoryPanelFormatter.FormatTimestamp(ActiveSelectedBattle.RecordedAtUtc)} | Replay unavailable: {replayUnavailableReason}";
             _footerSecondaryText.text = string.IsNullOrWhiteSpace(_statusMessage)
                 ? battleSummary
                 : $"{_statusMessage} | {battleSummary}";
@@ -412,8 +415,8 @@ internal sealed partial class HistoryPanel
             _deleteRunButtonLabel,
             canDeleteSelectedRun,
             _sectionMode == HistorySectionMode.Runs
-                && SelectedRun != null
-                && IsDeleteRunConfirmationActive(SelectedRun.RunId)
+            && SelectedRun != null
+            && IsDeleteRunConfirmationActive(SelectedRun.RunId)
                 ? new Color(0.75f, 0.23f, 0.20f, 0.98f)
                 : new Color(0.46f, 0.19f, 0.18f, 0.98f),
             new Color(0.86f, 0.29f, 0.25f, 1f),
@@ -518,7 +521,13 @@ internal sealed partial class HistoryPanel
         _dynamicPreviewButton.onClick.AddListener(ToggleDynamicPreviewFromUi);
         CreateActionButton("CloseButton", chipsRow, "Close", 86f, () => SetHistoryVisible(false));
 
-        _statusText = CreateText("Status", headerLayout, 12, FontStyle.Normal, TextAnchor.UpperLeft);
+        _statusText = CreateText(
+            "Status",
+            headerLayout,
+            12,
+            FontStyle.Normal,
+            TextAnchor.UpperLeft
+        );
         _statusText.color = new Color(0.93f, 0.79f, 0.51f, 0.98f);
         _statusText.textWrappingMode = TextWrappingModes.NoWrap;
         _statusText.overflowMode = TextOverflowModes.Ellipsis;
@@ -622,19 +631,18 @@ internal sealed partial class HistoryPanel
         ConfigureLayoutElement(_ghostFilterRow.gameObject, preferredHeight: 30f, minHeight: 30f);
         (_ghostFilterAllButton, _ghostFilterAllButtonBackground, _ghostFilterAllButtonLabel) =
             CreateStyledButton("GhostFilterAllButton", _ghostFilterRow, "All", 70f, 28f);
-        _ghostFilterAllButton.onClick.AddListener(() => SetGhostBattleFilter(GhostBattleFilter.All));
+        _ghostFilterAllButton.onClick.AddListener(() =>
+            SetGhostBattleFilter(GhostBattleFilter.All)
+        );
         (_ghostFilterIWonButton, _ghostFilterIWonButtonBackground, _ghostFilterIWonButtonLabel) =
             CreateStyledButton("GhostFilterIWonButton", _ghostFilterRow, "I Won", 78f, 28f);
-        _ghostFilterIWonButton.onClick.AddListener(
-            () => SetGhostBattleFilter(GhostBattleFilter.IWon)
+        _ghostFilterIWonButton.onClick.AddListener(() =>
+            SetGhostBattleFilter(GhostBattleFilter.IWon)
         );
-        (
-            _ghostFilterILostButton,
-            _ghostFilterILostButtonBackground,
-            _ghostFilterILostButtonLabel
-        ) = CreateStyledButton("GhostFilterILostButton", _ghostFilterRow, "I Lost", 78f, 28f);
-        _ghostFilterILostButton.onClick.AddListener(
-            () => SetGhostBattleFilter(GhostBattleFilter.ILost)
+        (_ghostFilterILostButton, _ghostFilterILostButtonBackground, _ghostFilterILostButtonLabel) =
+            CreateStyledButton("GhostFilterILostButton", _ghostFilterRow, "I Lost", 78f, 28f);
+        _ghostFilterILostButton.onClick.AddListener(() =>
+            SetGhostBattleFilter(GhostBattleFilter.ILost)
         );
         CreateFlexibleSpacer("GhostFilterSpacer", _ghostFilterRow);
         BuildSectionHeader(
@@ -767,7 +775,10 @@ internal sealed partial class HistoryPanel
         ClearContainer(_runListContent, _runItemViews);
         if (_sectionMode == HistorySectionMode.Ghost)
         {
-            CreatePlaceholder(_runListContent, "Ghost mode uses the battle list on the right. Use Sync Ghost to refresh remote battles.");
+            CreatePlaceholder(
+                _runListContent,
+                "Ghost mode uses the battle list on the right. Use Sync Ghost to refresh remote battles."
+            );
             return;
         }
 
@@ -1940,14 +1951,7 @@ internal sealed partial class HistoryPanel
         }
 
         var palette = GetRankBadgePalette(rank);
-        AddPill(
-            parent,
-            badgeName,
-            rank.ToUpperInvariant(),
-            palette.Background,
-            palette.Text,
-            68f
-        );
+        AddPill(parent, badgeName, rank.ToUpperInvariant(), palette.Background, palette.Text, 68f);
     }
 
     private void BuildRunRankBadge(RectTransform parent, HistoryRunRecord run)

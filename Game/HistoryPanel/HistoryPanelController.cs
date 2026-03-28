@@ -88,9 +88,10 @@ internal sealed partial class HistoryPanel
             return;
 
         _sectionMode = mode;
-        _previewSelectionMode = mode == HistorySectionMode.Ghost
-            ? PreviewSelectionMode.Battle
-            : PreviewSelectionMode.Run;
+        _previewSelectionMode =
+            mode == HistorySectionMode.Ghost
+                ? PreviewSelectionMode.Battle
+                : PreviewSelectionMode.Run;
         RefreshData();
     }
 

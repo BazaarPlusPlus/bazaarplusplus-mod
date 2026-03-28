@@ -234,7 +234,9 @@ static void TestMonsterPreviewProjectionSeams()
     var dataSourceSource = ReadRepoFile(
         "Game/MonsterPreview/DataSources/MonsterDatabasePreviewDataSource.cs"
     );
-    var projectorSource = ReadRepoFile("Game/MonsterPreview/DataSources/MonsterPreviewProjector.cs");
+    var projectorSource = ReadRepoFile(
+        "Game/MonsterPreview/DataSources/MonsterPreviewProjector.cs"
+    );
     var resolverSource = ReadRepoFile(
         "Game/MonsterPreview/DataSources/MonsterPreviewAttributeResolver.cs"
     );
@@ -251,7 +253,10 @@ static void TestMonsterPreviewProjectionSeams()
     );
     Assert(
         projectorSource.Contains("BuildModel", StringComparison.Ordinal)
-            && projectorSource.Contains("MonsterPreviewAttributeResolver", StringComparison.Ordinal),
+            && projectorSource.Contains(
+                "MonsterPreviewAttributeResolver",
+                StringComparison.Ordinal
+            ),
         "MonsterPreviewProjector should own preview model projection and use the attribute resolver."
     );
     Assert(

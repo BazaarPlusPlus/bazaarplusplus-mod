@@ -348,10 +348,7 @@ Assert(fakeStore.MarkRunAbandonedCalls == 1, "A mismatched restored session shou
 Assert(fakeStore.CreateRunCalls == 2, "A mismatched restored session should create a fresh run.");
 
 var runLoggingControllerPath = Path.GetFullPath(
-    Path.Combine(
-        AppContext.BaseDirectory,
-        "../../../../../Game/RunLogging/RunLoggingController.cs"
-    )
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/RunLogging/RunLoggingController.cs")
 );
 var runLoggingControllerSource = File.ReadAllText(runLoggingControllerPath);
 Assert(
@@ -382,11 +379,7 @@ Assert(
         && runLoggingStopBody.IndexOf(
             "TryCompleteDeferredRunExit(forceCompletion: true);",
             StringComparison.Ordinal
-        )
-            < runLoggingStopBody.IndexOf(
-                "_deferredRunCompletion = null;",
-                StringComparison.Ordinal
-            ),
+        ) < runLoggingStopBody.IndexOf("_deferredRunCompletion = null;", StringComparison.Ordinal),
     "RunLoggingModule.Stop should force a deferred run completion before clearing deferred exit state during teardown."
 );
 var runLoggingSyncBody = ExtractMethodBody(
@@ -415,12 +408,14 @@ Assert(
     !pvpBattleRecordedBody.Contains(
         "|| !BppRuntimeHost.RunContext.IsInGameRun",
         StringComparison.Ordinal
-    )
-        && pvpBattleRecordedBody.Contains("TryResolveReplayTargetSession", StringComparison.Ordinal),
+    ) && pvpBattleRecordedBody.Contains("TryResolveReplayTargetSession", StringComparison.Ordinal),
     "RunLoggingModule should route post-persist PVP replay events through a shared session ownership check."
 );
 Assert(
-    runLoggingModuleSource.Contains("private bool TryResolveReplayTargetSession", StringComparison.Ordinal)
+    runLoggingModuleSource.Contains(
+        "private bool TryResolveReplayTargetSession",
+        StringComparison.Ordinal
+    )
         && runLoggingModuleSource.Contains("manifest.RunId", StringComparison.Ordinal)
         && runLoggingModuleSource.Contains("ActiveSession", StringComparison.Ordinal),
     "RunLoggingModule should verify that a persisted replay still belongs to the active or deferred session before appending it."
@@ -443,11 +438,17 @@ var historyPanelPath = Path.GetFullPath(
 );
 var historyPanelSource = File.ReadAllText(historyPanelPath);
 var historyPanelControllerPath = Path.GetFullPath(
-    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/HistoryPanel/HistoryPanelController.cs")
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/HistoryPanel/HistoryPanelController.cs"
+    )
 );
 var historyPanelControllerSource = File.ReadAllText(historyPanelControllerPath);
 var historyPanelCanvasPath = Path.GetFullPath(
-    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/HistoryPanel/HistoryPanel.Canvas.cs")
+    Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../Game/HistoryPanel/HistoryPanel.Canvas.cs"
+    )
 );
 var historyPanelCanvasSource = File.ReadAllText(historyPanelCanvasPath);
 var historyPanelAwakeBody = ExtractMethodBody(historyPanelSource, "private void Awake()");
@@ -483,8 +484,14 @@ Assert(
         "private bool CanDeleteSelectedRun(out string reason)",
         StringComparison.Ordinal
     )
-        && historyPanelControllerSource.Contains("private void TryDeleteSelectedRun()", StringComparison.Ordinal)
-        && historyPanelControllerSource.Contains("_dataService.TryDeleteRun(", StringComparison.Ordinal),
+        && historyPanelControllerSource.Contains(
+            "private void TryDeleteSelectedRun()",
+            StringComparison.Ordinal
+        )
+        && historyPanelControllerSource.Contains(
+            "_dataService.TryDeleteRun(",
+            StringComparison.Ordinal
+        ),
     "HistoryPanel should expose a guarded selected-run deletion flow that delegates sqlite cleanup to the repository."
 );
 Assert(

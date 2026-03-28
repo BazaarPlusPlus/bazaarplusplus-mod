@@ -5,9 +5,9 @@ using System.Linq;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarPlusPlus.Game.EndOfRun;
 using HarmonyLib;
-using TMPro;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -78,7 +78,10 @@ internal static class LegendaryEndOfMatchRatingUi
         }
         catch (Exception ex)
         {
-            BppLog.Warn("LegendaryEndOfMatchRating", $"Failed to refresh rating line: {ex.Message}");
+            BppLog.Warn(
+                "LegendaryEndOfMatchRating",
+                $"Failed to refresh rating line: {ex.Message}"
+            );
         }
     }
 
@@ -98,8 +101,11 @@ internal static class LegendaryEndOfMatchRatingUi
         if (currentSeasonRank == null)
             return null;
 
-        return AccessTools.Field(currentSeasonRank.GetType(), "Rating")?.GetValue(currentSeasonRank) as int?
-            ?? AccessTools.Property(currentSeasonRank.GetType(), "Rating")?.GetValue(currentSeasonRank) as int?;
+        return AccessTools.Field(currentSeasonRank.GetType(), "Rating")?.GetValue(currentSeasonRank)
+                as int?
+            ?? AccessTools
+                .Property(currentSeasonRank.GetType(), "Rating")
+                ?.GetValue(currentSeasonRank) as int?;
     }
 
     private static int? ResolveRatingAfterRun()
@@ -112,7 +118,8 @@ internal static class LegendaryEndOfMatchRatingUi
         var bigDisplay = Traverse.Create(controller).Field("bigDisplay").GetValue<object>();
         var bigDisplaySwap = Traverse.Create(controller).Field("bigDisplaySwap").GetValue<object>();
 
-        var swapLabel = AccessTools.Field(bigDisplaySwap?.GetType(), "rankLabel")?.GetValue(bigDisplaySwap)
+        var swapLabel =
+            AccessTools.Field(bigDisplaySwap?.GetType(), "rankLabel")?.GetValue(bigDisplaySwap)
             as TextMeshProUGUI;
         if (swapLabel != null && swapLabel.gameObject.activeInHierarchy)
             return swapLabel;
@@ -146,7 +153,8 @@ internal static class LegendaryEndOfMatchRatingUi
 
     private static TextMeshProUGUI? FindExistingRatingLine(EndOfRunRankController controller)
     {
-        return controller.GetComponentsInChildren<TextMeshProUGUI>(includeInactive: true)
+        return controller
+            .GetComponentsInChildren<TextMeshProUGUI>(includeInactive: true)
             .FirstOrDefault(text => text.name == RatingLineObjectName);
     }
 

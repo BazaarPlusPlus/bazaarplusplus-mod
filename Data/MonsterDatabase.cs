@@ -238,15 +238,13 @@ internal sealed class MonsterDatabase : IMonsterCatalog
             return null;
 
         var boardCards =
-            dto.MonsterMetadata
-                ?.Board?.Select(MapBoardCard)
+            dto.MonsterMetadata?.Board?.Select(MapBoardCard)
                 .Where(card => card != null)
                 .Cast<MonsterBoardCardInfo>()
                 .ToList()
             ?? new List<MonsterBoardCardInfo>();
         var skills =
-            dto.MonsterMetadata
-                ?.Skills?.Select(MapSkill)
+            dto.MonsterMetadata?.Skills?.Select(MapSkill)
                 .Where(skill => skill != null)
                 .Cast<MonsterSkillInfo>()
                 .ToList()

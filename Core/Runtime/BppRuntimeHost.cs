@@ -75,7 +75,10 @@ internal sealed class BppRuntimeHost
             Services.GameStateProbe,
             Services.RunContext
         );
-        _combatReplayModule = new CombatReplayModule(Services.EventBus, combatReplayRuntimeAccessor);
+        _combatReplayModule = new CombatReplayModule(
+            Services.EventBus,
+            combatReplayRuntimeAccessor
+        );
         _combatStatusBarModule = new CombatStatusBarModule(Services.EventBus, Services.RunContext);
         _encounterTrackingFeature = new EncounterTrackingFeature(
             Services.EventBus,
@@ -107,7 +110,8 @@ internal sealed class BppRuntimeHost
     public static IMonsterCatalog MonsterCatalog =>
         Current?.Services.MonsterCatalog ?? DetachedServices.MonsterCatalog;
 
-    public static IRunContext RunContext => Current?.Services.RunContext ?? DetachedServices.RunContext;
+    public static IRunContext RunContext =>
+        Current?.Services.RunContext ?? DetachedServices.RunContext;
 
     public static IGameStateProbe GameStateProbe =>
         Current?.Services.GameStateProbe ?? DetachedServices.GameStateProbe;

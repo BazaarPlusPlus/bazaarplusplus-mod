@@ -92,11 +92,7 @@ internal sealed class CombatReplayUploadSqliteStore
         return command.ExecuteScalar() != null;
     }
 
-    public void MarkReplayUploadFailed(
-        string battleId,
-        DateTimeOffset attemptedAtUtc,
-        string error
-    )
+    public void MarkReplayUploadFailed(string battleId, DateTimeOffset attemptedAtUtc, string error)
     {
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();

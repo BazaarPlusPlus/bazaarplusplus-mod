@@ -32,20 +32,21 @@ internal sealed class CombatReplayUploadService : IDisposable
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _identityStore = identityStore ?? throw new ArgumentNullException(nameof(identityStore));
-        _clientStateStore = clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
+        _clientStateStore =
+            clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
         _keyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
         if (string.IsNullOrWhiteSpace(registrationEndpoint))
-            throw new ArgumentException("Registration endpoint is required.", nameof(registrationEndpoint));
+            throw new ArgumentException(
+                "Registration endpoint is required.",
+                nameof(registrationEndpoint)
+            );
         if (string.IsNullOrWhiteSpace(uploadEndpoint))
             throw new ArgumentException("Upload endpoint is required.", nameof(uploadEndpoint));
 
         _registrationEndpoint = registrationEndpoint;
         _uploadEndpoint = uploadEndpoint;
         _batchSize = Math.Max(1, batchSize);
-        _httpClient = new HttpClient
-        {
-            Timeout = timeout,
-        };
+        _httpClient = new HttpClient { Timeout = timeout };
     }
 
     public async Task<CombatReplayUploadCycleResult> UploadPendingReplaysAsync(
@@ -88,7 +89,10 @@ internal sealed class CombatReplayUploadService : IDisposable
                 {
                     if (string.IsNullOrWhiteSpace(clientId))
                     {
-                        clientId = await EnsureClientRegistrationAsync(installId, cancellationToken);
+                        clientId = await EnsureClientRegistrationAsync(
+                            installId,
+                            cancellationToken
+                        );
                         if (string.IsNullOrWhiteSpace(clientId))
                         {
                             _store.MarkReplayUploadFailed(
@@ -176,10 +180,7 @@ internal sealed class CombatReplayUploadService : IDisposable
             }
         }
 
-        return new CombatReplayUploadCycleResult(
-            uploadedCount,
-            _store.HasMorePendingReplays()
-        );
+        return new CombatReplayUploadCycleResult(uploadedCount, _store.HasMorePendingReplays());
     }
 
     public void Dispose()
@@ -218,11 +219,7 @@ internal sealed class CombatReplayUploadService : IDisposable
             return null;
 
         var replayPath = absolutePath[..^"/runs/upload".Length] + "/replays/upload";
-        var builder = new UriBuilder(uploadUri)
-        {
-            Path = replayPath,
-            Query = string.Empty,
-        };
+        var builder = new UriBuilder(uploadUri) { Path = replayPath, Query = string.Empty };
         return builder.Uri.ToString();
     }
 }

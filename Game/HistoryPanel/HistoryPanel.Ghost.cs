@@ -44,7 +44,10 @@ internal sealed partial class HistoryPanel
         );
     }
 
-    private static RunUploadEndpointSet? TryBuildEndpointSet(string? registrationEndpoint, string? uploadEndpoint)
+    private static RunUploadEndpointSet? TryBuildEndpointSet(
+        string? registrationEndpoint,
+        string? uploadEndpoint
+    )
     {
         if (
             string.IsNullOrWhiteSpace(registrationEndpoint)

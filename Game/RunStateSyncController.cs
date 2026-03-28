@@ -1,6 +1,6 @@
 #nullable enable
-using BazaarPlusPlus.Core.Events;
 using System;
+using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Game.RunLifecycle;
 using UnityEngine;
 

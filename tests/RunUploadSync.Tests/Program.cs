@@ -24,12 +24,14 @@ try
 
     var sqliteStore = new SqliteRunLogStore(dbPath);
     var uploadStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadSqliteStore");
-    var uploadStore = Activator.CreateInstance(uploadStoreType, dbPath)
+    var uploadStore =
+        Activator.CreateInstance(uploadStoreType, dbPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadSqliteStore.");
     var replicatedStoreType = RequireType(
         "BazaarPlusPlus.Game.RunLogging.Persistence.ReplicatedRunLogStore"
     );
-    var replicatedStore = Activator.CreateInstance(replicatedStoreType, sqliteStore, uploadStore)
+    var replicatedStore =
+        Activator.CreateInstance(replicatedStoreType, sqliteStore, uploadStore)
         ?? throw new InvalidOperationException("Failed to create ReplicatedRunLogStore.");
 
     Invoke<RunLogSessionState>(
@@ -116,12 +118,9 @@ try
         );
     }
 
-    var pendingRunIds = (IReadOnlyList<string>)Invoke<object>(
-        uploadStoreType,
-        uploadStore,
-        "GetPendingCompletedRunIds",
-        [2]
-    );
+    var pendingRunIds =
+        (IReadOnlyList<string>)
+            Invoke<object>(uploadStoreType, uploadStore, "GetPendingCompletedRunIds", [2]);
     Assert(
         pendingRunIds.Count == 1 && pendingRunIds[0] == runId,
         "RunUploadSqliteStore should return dirty completed runs."
@@ -133,8 +132,12 @@ try
         "TryBuildSnapshot",
         [runId, "install-123", null]
     );
-    Assert(snapshot != null, "RunUploadSqliteStore should build an upload snapshot for a completed run.");
-    var payload = snapshot!.GetType().GetProperty("Payload")!.GetValue(snapshot)
+    Assert(
+        snapshot != null,
+        "RunUploadSqliteStore should build an upload snapshot for a completed run."
+    );
+    var payload =
+        snapshot!.GetType().GetProperty("Payload")!.GetValue(snapshot)
         ?? throw new InvalidOperationException("Snapshot payload should be populated.");
     var payloadType = payload.GetType();
     Assert(
@@ -173,21 +176,16 @@ try
         );
     }
 
-    var identityStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore");
-    var identityStore = Activator.CreateInstance(identityStoreType, installIdPath)
+    var identityStoreType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore"
+    );
+    var identityStore =
+        Activator.CreateInstance(identityStoreType, installIdPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
-    var installId1 = (string)Invoke<object>(
-        identityStoreType,
-        identityStore,
-        "GetOrCreateInstallId",
-        []
-    );
-    var installId2 = (string)Invoke<object>(
-        identityStoreType,
-        identityStore,
-        "GetOrCreateInstallId",
-        []
-    );
+    var installId1 = (string)
+        Invoke<object>(identityStoreType, identityStore, "GetOrCreateInstallId", []);
+    var installId2 = (string)
+        Invoke<object>(identityStoreType, identityStore, "GetOrCreateInstallId", []);
     Assert(
         !string.IsNullOrWhiteSpace(installId1) && installId1 == installId2,
         "RunUploadIdentityStore should persist a stable install id."
@@ -197,41 +195,58 @@ try
         "RunUploadIdentityStore should write the install id to disk."
     );
 
-    var clientStateStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore");
-    var clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
+    var clientStateStoreType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
+    );
+    var clientStateStore =
+        Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
     Assert(
-        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"]) == null,
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"])
+            == null,
         "Client state store should return null before registration."
     );
-    InvokeVoid(clientStateStoreType, clientStateStore, "SaveScopedClientId", ["Runs", "client-abc"]);
+    InvokeVoid(
+        clientStateStoreType,
+        clientStateStore,
+        "SaveScopedClientId",
+        ["Runs", "client-abc"]
+    );
     Assert(
-        (string)Invoke<object>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"]) == "client-abc",
+        (string)
+            Invoke<object>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"])
+            == "client-abc",
         "Client state store should persist client id."
     );
     InvokeVoid(clientStateStoreType, clientStateStore, "ClearScopedClientId", ["Runs"]);
     Assert(
-        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"]) == null,
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"])
+            == null,
         "Client state store should clear a route-scoped client id."
     );
 
     File.WriteAllText(clientStatePath, "{ not-valid-json");
-    clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
+    clientStateStore =
+        Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to recreate RunUploadClientStateStore.");
     Assert(
-        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"]) == null,
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"])
+            == null,
         "Client state store should recover from corrupted JSON by treating it as empty state."
     );
 
     var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
-    var keyStore = Activator.CreateInstance(keyStoreType, privateKeyPath)
+    var keyStore =
+        Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
     var keyMaterial1 = Invoke<object>(keyStoreType, keyStore, "GetOrCreateKeyMaterial", []);
     var keyMaterial2 = Invoke<object>(keyStoreType, keyStore, "GetOrCreateKeyMaterial", []);
-    var fingerprintProperty = keyMaterial1.GetType().GetProperty("Fingerprint")
+    var fingerprintProperty =
+        keyMaterial1.GetType().GetProperty("Fingerprint")
         ?? throw new InvalidOperationException("Key material should expose fingerprint.");
     Assert(
-        (string)fingerprintProperty.GetValue(keyMaterial1)! == (string)fingerprintProperty.GetValue(keyMaterial2)!,
+        (string)fingerprintProperty.GetValue(keyMaterial1)!
+            == (string)fingerprintProperty.GetValue(keyMaterial2)!,
         "Key store should persist a stable RSA keypair."
     );
     var signature = (string)Invoke<object>(keyStoreType, keyStore, "Sign", ["hello"]);
@@ -241,13 +256,16 @@ try
     );
 
     File.WriteAllText(privateKeyPath, "{ not-valid-json");
-    keyStore = Activator.CreateInstance(keyStoreType, privateKeyPath)
+    keyStore =
+        Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to recreate RunUploadKeyStore.");
     var recoveredKeyMaterial = Invoke<object>(keyStoreType, keyStore, "GetOrCreateKeyMaterial", []);
     var recoveredFingerprint = (string)fingerprintProperty.GetValue(recoveredKeyMaterial)!;
-    var recoveredSignature = (string)Invoke<object>(keyStoreType, keyStore, "Sign", ["hello-again"]);
+    var recoveredSignature = (string)
+        Invoke<object>(keyStoreType, keyStore, "Sign", ["hello-again"]);
     Assert(
-        !string.IsNullOrWhiteSpace(recoveredFingerprint) && !string.IsNullOrWhiteSpace(recoveredSignature),
+        !string.IsNullOrWhiteSpace(recoveredFingerprint)
+            && !string.IsNullOrWhiteSpace(recoveredSignature),
         "Key store should recover from corrupted key material by minting a replacement keypair."
     );
     Assert(
@@ -272,7 +290,8 @@ try
         }
         """
     );
-    keyStore = Activator.CreateInstance(keyStoreType, privateKeyPath)
+    keyStore =
+        Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to recreate RunUploadKeyStore.");
     var recoveredFromMalformedJsonKey = Invoke<object>(
         keyStoreType,
@@ -280,12 +299,8 @@ try
         "GetOrCreateKeyMaterial",
         []
     );
-    var recoveredFromMalformedJsonSignature = (string)Invoke<object>(
-        keyStoreType,
-        keyStore,
-        "Sign",
-        ["hello-after-valid-json-corruption"]
-    );
+    var recoveredFromMalformedJsonSignature = (string)
+        Invoke<object>(keyStoreType, keyStore, "Sign", ["hello-after-valid-json-corruption"]);
     Assert(
         !string.IsNullOrWhiteSpace(
             (string)fingerprintProperty.GetValue(recoveredFromMalformedJsonKey)!

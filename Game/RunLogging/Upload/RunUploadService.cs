@@ -29,18 +29,18 @@ internal sealed class RunUploadService : IDisposable
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _identityStore = identityStore ?? throw new ArgumentNullException(nameof(identityStore));
-        _clientStateStore = clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
+        _clientStateStore =
+            clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
         _keyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
         _endpoint = endpoint ?? throw new ArgumentNullException(nameof(endpoint));
 
         _batchSize = Math.Max(1, batchSize);
-        _httpClient = new HttpClient
-        {
-            Timeout = timeout,
-        };
+        _httpClient = new HttpClient { Timeout = timeout };
     }
 
-    public async Task<RunUploadCycleResult> UploadPendingRunsAsync(CancellationToken cancellationToken)
+    public async Task<RunUploadCycleResult> UploadPendingRunsAsync(
+        CancellationToken cancellationToken
+    )
     {
         var pendingRunIds = _store.GetPendingCompletedRunIds(_batchSize);
         if (pendingRunIds.Count == 0)
@@ -63,11 +63,7 @@ internal sealed class RunUploadService : IDisposable
                 var snapshot = _store.TryBuildSnapshot(runId, installId, clientId);
                 if (snapshot == null)
                 {
-                    _store.MarkRunUploadFailed(
-                        runId,
-                        attemptedAtUtc,
-                        "run_snapshot_not_found"
-                    );
+                    _store.MarkRunUploadFailed(runId, attemptedAtUtc, "run_snapshot_not_found");
                     break;
                 }
 
@@ -170,7 +166,10 @@ internal sealed class RunUploadService : IDisposable
         );
     }
 
-    private Task<string?> EnsureClientRegistrationAsync(string installId, CancellationToken cancellationToken)
+    private Task<string?> EnsureClientRegistrationAsync(
+        string installId,
+        CancellationToken cancellationToken
+    )
     {
         var registrationClient = new RunUploadRegistrationClient(
             _httpClient,

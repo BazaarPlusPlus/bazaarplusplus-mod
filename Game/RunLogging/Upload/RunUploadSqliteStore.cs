@@ -126,15 +126,16 @@ internal sealed class RunUploadSqliteStore
             """;
         command.Parameters.AddWithValue("$runId", runId);
         command.Parameters.AddWithValue("$uploadedSeq", uploadedSeq);
-        command.Parameters.AddWithValue(
-            "$uploadedStatus",
-            uploadedStatus ?? (object)DBNull.Value
-        );
+        command.Parameters.AddWithValue("$uploadedStatus", uploadedStatus ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$uploadedAtUtc", uploadedAtUtc.ToString("o"));
         command.ExecuteNonQuery();
     }
 
-    public RunUploadSnapshot? TryBuildSnapshot(string runId, string installId, string? clientId = null)
+    public RunUploadSnapshot? TryBuildSnapshot(
+        string runId,
+        string installId,
+        string? clientId = null
+    )
     {
         using var connection = OpenConnection();
 
@@ -203,31 +204,34 @@ internal sealed class RunUploadSqliteStore
         var checkpoint = ReadSingleObject(
             connection,
             $"""
-                SELECT
-                    schema_version,
-                    run_id,
-                    last_seq,
-                    last_seen_at_utc,
-                    day,
-                    hour,
-                    max_health,
-                    prestige,
-                    level,
-                    income,
-                    gold,
-                    state,
-                    current_encounter_id,
-                    last_state_fingerprint,
-                    last_selection_fingerprint,
-                    pending_selection_seq,
-                    pending_selection_json,
-                    completed
-                FROM {RunLogSqliteSchema.RunCheckpointsTableName}
-                WHERE run_id = $runId;
-                """,
+            SELECT
+                schema_version,
+                run_id,
+                last_seq,
+                last_seen_at_utc,
+                day,
+                hour,
+                max_health,
+                prestige,
+                level,
+                income,
+                gold,
+                state,
+                current_encounter_id,
+                last_state_fingerprint,
+                last_selection_fingerprint,
+                pending_selection_seq,
+                pending_selection_json,
+                completed
+            FROM {RunLogSqliteSchema.RunCheckpointsTableName}
+            WHERE run_id = $runId;
+            """,
             runId
         );
-        if (checkpoint != null && checkpoint.TryGetValue("pending_selection_json", out var pendingJson))
+        if (
+            checkpoint != null
+            && checkpoint.TryGetValue("pending_selection_json", out var pendingJson)
+        )
         {
             checkpoint.Remove("pending_selection_json");
             if (pendingJson.Type == JTokenType.String)
@@ -237,24 +241,24 @@ internal sealed class RunUploadSqliteStore
         var status = ReadSingleObject(
             connection,
             $"""
-                SELECT
-                    schema_version,
-                    run_id,
-                    status,
-                    ended_at_utc,
-                    final_day,
-                    final_hour,
-                    max_health,
-                    prestige,
-                    level,
-                    income,
-                    gold,
-                    victories,
-                    losses,
-                    reason
-                FROM {RunLogSqliteSchema.RunStatusTableName}
-                WHERE run_id = $runId;
-                """,
+            SELECT
+                schema_version,
+                run_id,
+                status,
+                ended_at_utc,
+                final_day,
+                final_hour,
+                max_health,
+                prestige,
+                level,
+                income,
+                gold,
+                victories,
+                losses,
+                reason
+            FROM {RunLogSqliteSchema.RunStatusTableName}
+            WHERE run_id = $runId;
+            """,
             runId
         );
 
@@ -365,7 +369,12 @@ internal sealed class RunUploadSqliteStore
         command.CommandTimeout = 2;
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
-        EnsureColumnExists(connection, RunLogSqliteSchema.RunsTableName, "player_rank", "TEXT NULL");
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunsTableName,
+            "player_rank",
+            "TEXT NULL"
+        );
         EnsureColumnExists(
             connection,
             RunLogSqliteSchema.RunsTableName,

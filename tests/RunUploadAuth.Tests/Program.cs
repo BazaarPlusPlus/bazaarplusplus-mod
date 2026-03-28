@@ -66,13 +66,23 @@ var requestsHandled = Task.Run(async () =>
                 "Signed upload should include the same install id used at registration."
             );
 
-            var timestamp = request.Headers["X-BPP-Timestamp"] ?? throw new InvalidOperationException("Missing timestamp header.");
-            var nonce = request.Headers["X-BPP-Nonce"] ?? throw new InvalidOperationException("Missing nonce header.");
-            var bodyHash = request.Headers["X-BPP-Content-SHA256"] ?? throw new InvalidOperationException("Missing body hash header.");
-            var signature = request.Headers["X-BPP-Signature"] ?? throw new InvalidOperationException("Missing signature header.");
+            var timestamp =
+                request.Headers["X-BPP-Timestamp"]
+                ?? throw new InvalidOperationException("Missing timestamp header.");
+            var nonce =
+                request.Headers["X-BPP-Nonce"]
+                ?? throw new InvalidOperationException("Missing nonce header.");
+            var bodyHash =
+                request.Headers["X-BPP-Content-SHA256"]
+                ?? throw new InvalidOperationException("Missing body hash header.");
+            var signature =
+                request.Headers["X-BPP-Signature"]
+                ?? throw new InvalidOperationException("Missing signature header.");
 
             using var sha256 = SHA256.Create();
-            var computedHash = Convert.ToBase64String(sha256.ComputeHash(Encoding.UTF8.GetBytes(body)));
+            var computedHash = Convert.ToBase64String(
+                sha256.ComputeHash(Encoding.UTF8.GetBytes(body))
+            );
             Assert(computedHash == bodyHash, "Signed upload should send the raw body SHA-256.");
 
             var canonical = BuildCanonical(
@@ -89,8 +99,14 @@ var requestsHandled = Task.Run(async () =>
             rsa.ImportParameters(
                 new RSAParameters
                 {
-                    Modulus = Convert.FromBase64String(publicModulus ?? throw new InvalidOperationException("Missing public modulus.")),
-                    Exponent = Convert.FromBase64String(publicExponent ?? throw new InvalidOperationException("Missing public exponent.")),
+                    Modulus = Convert.FromBase64String(
+                        publicModulus
+                            ?? throw new InvalidOperationException("Missing public modulus.")
+                    ),
+                    Exponent = Convert.FromBase64String(
+                        publicExponent
+                            ?? throw new InvalidOperationException("Missing public exponent.")
+                    ),
                 }
             );
             var valid = rsa.VerifyData(
@@ -124,46 +140,54 @@ try
 
     var sqliteStore = new SqliteRunLogStore(dbPath);
     var uploadStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadSqliteStore");
-    var uploadStore = Activator.CreateInstance(uploadStoreType, dbPath)
+    var uploadStore =
+        Activator.CreateInstance(uploadStoreType, dbPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadSqliteStore.");
     var replicatedStoreType = RequireType(
         "BazaarPlusPlus.Game.RunLogging.Persistence.ReplicatedRunLogStore"
     );
-    var replicatedStore = Activator.CreateInstance(replicatedStoreType, sqliteStore, uploadStore)
+    var replicatedStore =
+        Activator.CreateInstance(replicatedStoreType, sqliteStore, uploadStore)
         ?? throw new InvalidOperationException("Failed to create ReplicatedRunLogStore.");
 
     SeedCompletedRun(replicatedStoreType, replicatedStore, runId, startedAt);
-    var identityStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore");
-    var identityStore = Activator.CreateInstance(identityStoreType, installIdPath)
+    var identityStoreType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore"
+    );
+    var identityStore =
+        Activator.CreateInstance(identityStoreType, installIdPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
-    var clientStateStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore");
-    var clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
+    var clientStateStoreType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
+    );
+    var clientStateStore =
+        Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
     var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
-    var keyStore = Activator.CreateInstance(keyStoreType, privateKeyPath)
+    var keyStore =
+        Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
     var endpointSetType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadEndpointSet");
     var endpoint = Activator.CreateInstance(endpointSetType)!;
-    endpointSetType.GetProperty("RegistrationEndpoint")!.SetValue(endpoint, $"{prefix}clients/register");
+    endpointSetType
+        .GetProperty("RegistrationEndpoint")!
+        .SetValue(endpoint, $"{prefix}clients/register");
     endpointSetType.GetProperty("UploadEndpoint")!.SetValue(endpoint, $"{prefix}runs/upload");
     var serviceType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadService");
-    var service = Activator.CreateInstance(
-        serviceType,
-        uploadStore,
-        identityStore,
-        clientStateStore,
-        keyStore,
-        endpoint,
-        3,
-        TimeSpan.FromSeconds(10)
-    ) ?? throw new InvalidOperationException("Failed to create RunUploadService.");
+    var service =
+        Activator.CreateInstance(
+            serviceType,
+            uploadStore,
+            identityStore,
+            clientStateStore,
+            keyStore,
+            endpoint,
+            3,
+            TimeSpan.FromSeconds(10)
+        ) ?? throw new InvalidOperationException("Failed to create RunUploadService.");
 
-    var uploadTask = (Task)Invoke<object>(
-        serviceType,
-        service,
-        "UploadPendingRunsAsync",
-        [CancellationToken.None]
-    );
+    var uploadTask = (Task)
+        Invoke<object>(serviceType, service, "UploadPendingRunsAsync", [CancellationToken.None]);
     await uploadTask.ConfigureAwait(false);
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -192,7 +216,8 @@ try
         }
         """
     );
-    clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
+    clientStateStore =
+        Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to recreate RunUploadClientStateStore.");
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
     {
@@ -244,7 +269,9 @@ try
                     publicModulus = publicKey?["modulus_b64"]?.Value<string>();
                     publicExponent = publicKey?["exponent_b64"]?.Value<string>();
 
-                    var responseBytes = Encoding.UTF8.GetBytes("""{"client_id":"client-test-002"}""");
+                    var responseBytes = Encoding.UTF8.GetBytes(
+                        """{"client_id":"client-test-002"}"""
+                    );
                     context.Response.StatusCode = 200;
                     context.Response.ContentType = "application/json";
                     context.Response.OutputStream.Write(responseBytes, 0, responseBytes.Length);
@@ -261,7 +288,9 @@ try
                             request.Headers["X-BPP-Client-Id"] == "client-stale-001",
                             "First retry upload should use the stale cached client id."
                         );
-                        var responseBytes = Encoding.UTF8.GetBytes("""{"error":"client not found"}""");
+                        var responseBytes = Encoding.UTF8.GetBytes(
+                            """{"error":"client not found"}"""
+                        );
                         context.Response.StatusCode = 404;
                         context.Response.ContentType = "application/json";
                         context.Response.OutputStream.Write(responseBytes, 0, responseBytes.Length);
@@ -278,14 +307,27 @@ try
                         "Recovered upload should keep the persisted install id."
                     );
 
-                    var timestamp = request.Headers["X-BPP-Timestamp"] ?? throw new InvalidOperationException("Missing timestamp header.");
-                    var nonce = request.Headers["X-BPP-Nonce"] ?? throw new InvalidOperationException("Missing nonce header.");
-                    var bodyHash = request.Headers["X-BPP-Content-SHA256"] ?? throw new InvalidOperationException("Missing body hash header.");
-                    var signature = request.Headers["X-BPP-Signature"] ?? throw new InvalidOperationException("Missing signature header.");
+                    var timestamp =
+                        request.Headers["X-BPP-Timestamp"]
+                        ?? throw new InvalidOperationException("Missing timestamp header.");
+                    var nonce =
+                        request.Headers["X-BPP-Nonce"]
+                        ?? throw new InvalidOperationException("Missing nonce header.");
+                    var bodyHash =
+                        request.Headers["X-BPP-Content-SHA256"]
+                        ?? throw new InvalidOperationException("Missing body hash header.");
+                    var signature =
+                        request.Headers["X-BPP-Signature"]
+                        ?? throw new InvalidOperationException("Missing signature header.");
 
                     using var sha256 = SHA256.Create();
-                    var computedHash = Convert.ToBase64String(sha256.ComputeHash(Encoding.UTF8.GetBytes(body)));
-                    Assert(computedHash == bodyHash, "Recovered upload should preserve body hashing.");
+                    var computedHash = Convert.ToBase64String(
+                        sha256.ComputeHash(Encoding.UTF8.GetBytes(body))
+                    );
+                    Assert(
+                        computedHash == bodyHash,
+                        "Recovered upload should preserve body hashing."
+                    );
 
                     var canonical = BuildCanonical(
                         "POST",
@@ -301,8 +343,18 @@ try
                     rsa.ImportParameters(
                         new RSAParameters
                         {
-                            Modulus = Convert.FromBase64String(publicModulus ?? throw new InvalidOperationException("Missing public modulus.")),
-                            Exponent = Convert.FromBase64String(publicExponent ?? throw new InvalidOperationException("Missing public exponent.")),
+                            Modulus = Convert.FromBase64String(
+                                publicModulus
+                                    ?? throw new InvalidOperationException(
+                                        "Missing public modulus."
+                                    )
+                            ),
+                            Exponent = Convert.FromBase64String(
+                                publicExponent
+                                    ?? throw new InvalidOperationException(
+                                        "Missing public exponent."
+                                    )
+                            ),
                         }
                     );
                     var valid = rsa.VerifyData(
@@ -311,7 +363,10 @@ try
                         HashAlgorithmName.SHA256,
                         RSASignaturePadding.Pkcs1
                     );
-                    Assert(valid, "Recovered upload should verify against the current registered public key.");
+                    Assert(
+                        valid,
+                        "Recovered upload should verify against the current registered public key."
+                    );
 
                     context.Response.StatusCode = 200;
                     context.Response.Close();
@@ -322,35 +377,37 @@ try
                 context.Response.Close();
             }
         }
-        catch (HttpListenerException)
-        {
-        }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (HttpListenerException) { }
+        catch (ObjectDisposedException) { }
     });
 
     try
     {
-        endpointSetType.GetProperty("RegistrationEndpoint")!.SetValue(endpoint, $"{recoveryPrefix}clients/register");
-        endpointSetType.GetProperty("UploadEndpoint")!.SetValue(endpoint, $"{recoveryPrefix}runs/upload");
-        service = Activator.CreateInstance(
-            serviceType,
-            uploadStore,
-            identityStore,
-            clientStateStore,
-            keyStore,
-            endpoint,
-            3,
-            TimeSpan.FromSeconds(10)
-        ) ?? throw new InvalidOperationException("Failed to recreate RunUploadService.");
+        endpointSetType
+            .GetProperty("RegistrationEndpoint")!
+            .SetValue(endpoint, $"{recoveryPrefix}clients/register");
+        endpointSetType
+            .GetProperty("UploadEndpoint")!
+            .SetValue(endpoint, $"{recoveryPrefix}runs/upload");
+        service =
+            Activator.CreateInstance(
+                serviceType,
+                uploadStore,
+                identityStore,
+                clientStateStore,
+                keyStore,
+                endpoint,
+                3,
+                TimeSpan.FromSeconds(10)
+            ) ?? throw new InvalidOperationException("Failed to recreate RunUploadService.");
 
-        uploadTask = (Task)Invoke<object>(
-            serviceType,
-            service,
-            "UploadPendingRunsAsync",
-            [CancellationToken.None]
-        );
+        uploadTask = (Task)
+            Invoke<object>(
+                serviceType,
+                service,
+                "UploadPendingRunsAsync",
+                [CancellationToken.None]
+            );
         await uploadTask.ConfigureAwait(false);
     }
     finally
@@ -402,7 +459,16 @@ static string BuildCanonical(
 {
     return string.Join(
         "\n",
-        new[] { method.ToUpperInvariant(), absolutePath, clientId, installId, timestamp, nonce, bodyHash }
+        new[]
+        {
+            method.ToUpperInvariant(),
+            absolutePath,
+            clientId,
+            installId,
+            timestamp,
+            nonce,
+            bodyHash,
+        }
     );
 }
 

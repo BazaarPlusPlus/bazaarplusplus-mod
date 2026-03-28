@@ -60,7 +60,10 @@ internal sealed class CombatReplayUploadApiClient
                 {
                     try
                     {
-                        objectKey = JObject.Parse(responseBody)["object_key"]?.Value<string>()?.Trim();
+                        objectKey = JObject
+                            .Parse(responseBody)["object_key"]
+                            ?.Value<string>()
+                            ?.Trim();
                     }
                     catch
                     {

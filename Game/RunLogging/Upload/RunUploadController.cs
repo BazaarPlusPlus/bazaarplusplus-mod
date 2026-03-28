@@ -80,10 +80,7 @@ internal sealed class RunUploadController : MonoBehaviour
             );
             _shutdown = new CancellationTokenSource();
             _nextAttemptAt = Time.unscaledTime + startupDelaySeconds;
-            BppLog.Info(
-                "RunUploadController",
-                "Background run upload armed."
-            );
+            BppLog.Info("RunUploadController", "Background run upload armed.");
         }
         catch (Exception ex)
         {
@@ -142,7 +139,10 @@ internal sealed class RunUploadController : MonoBehaviour
         _uploadService = null;
     }
 
-    private static RunUploadEndpointSet? TryBuildEndpointSet(string? registrationEndpoint, string? uploadEndpoint)
+    private static RunUploadEndpointSet? TryBuildEndpointSet(
+        string? registrationEndpoint,
+        string? uploadEndpoint
+    )
     {
         if (
             string.IsNullOrWhiteSpace(registrationEndpoint)

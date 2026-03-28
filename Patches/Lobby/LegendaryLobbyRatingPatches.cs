@@ -4,10 +4,10 @@ using System;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarPlusPlus.Game.Lobby;
 using HarmonyLib;
-using TMPro;
 using TheBazaar;
 using TheBazaar.ProfileData;
 using TheBazaar.UI;
+using TMPro;
 
 namespace BazaarPlusPlus;
 
@@ -40,7 +40,10 @@ internal static class LegendaryLobbyRatingUi
     {
         try
         {
-            var heroBanner = Traverse.Create(controller).Field("HeroBanner").GetValue<HeroBannerController>();
+            var heroBanner = Traverse
+                .Create(controller)
+                .Field("HeroBanner")
+                .GetValue<HeroBannerController>();
             if (heroBanner == null)
                 return;
 
@@ -65,7 +68,10 @@ internal static class LegendaryLobbyRatingUi
         }
         catch (Exception ex)
         {
-            BppLog.Warn("LegendaryLobbyRating", $"Failed to refresh lobby rating text: {ex.Message}");
+            BppLog.Warn(
+                "LegendaryLobbyRating",
+                $"Failed to refresh lobby rating text: {ex.Message}"
+            );
         }
     }
 }

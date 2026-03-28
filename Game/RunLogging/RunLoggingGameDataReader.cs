@@ -209,9 +209,7 @@ internal static class RunLoggingGameDataReader
         if (string.IsNullOrWhiteSpace(rank))
             return null;
 
-        return currentSeasonRank.Division > 0
-            ? $"{rank} {currentSeasonRank.Division}"
-            : rank;
+        return currentSeasonRank.Division > 0 ? $"{rank} {currentSeasonRank.Division}" : rank;
     }
 
     private static RunLogSelectionOptionInput ToSelectionOption(RunInfo.CardInfo card)

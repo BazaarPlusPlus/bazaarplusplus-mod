@@ -6,14 +6,15 @@ namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal static class RunUploadSerialization
 {
-    public static JsonSerializerSettings SerializerSettings { get; } = new()
-    {
-        ContractResolver = new DefaultContractResolver
+    public static JsonSerializerSettings SerializerSettings { get; } =
+        new()
         {
-            NamingStrategy = new SnakeCaseNamingStrategy(),
-        },
-        NullValueHandling = NullValueHandling.Ignore,
-        Formatting = Formatting.None,
-        DateFormatString = "yyyy-MM-dd'T'HH:mm:ss.fffK",
-    };
+            ContractResolver = new DefaultContractResolver
+            {
+                NamingStrategy = new SnakeCaseNamingStrategy(),
+            },
+            NullValueHandling = NullValueHandling.Ignore,
+            Formatting = Formatting.None,
+            DateFormatString = "yyyy-MM-dd'T'HH:mm:ss.fffK",
+        };
 }

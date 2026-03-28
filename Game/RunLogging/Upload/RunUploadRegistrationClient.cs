@@ -28,17 +28,24 @@ internal sealed class RunUploadRegistrationClient
     )
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _clientStateStore = clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
+        _clientStateStore =
+            clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
         _keyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
         if (string.IsNullOrWhiteSpace(clientStateScope))
-            throw new ArgumentException("Client state scope is required.", nameof(clientStateScope));
+            throw new ArgumentException(
+                "Client state scope is required.",
+                nameof(clientStateScope)
+            );
         if (string.IsNullOrWhiteSpace(purpose))
             throw new ArgumentException("Purpose is required.", nameof(purpose));
 
         _clientStateScope = clientStateScope.Trim();
         _purpose = purpose.Trim();
         if (string.IsNullOrWhiteSpace(registrationEndpoint))
-            throw new ArgumentException("Registration endpoint is required.", nameof(registrationEndpoint));
+            throw new ArgumentException(
+                "Registration endpoint is required.",
+                nameof(registrationEndpoint)
+            );
 
         _registrationEndpoint = registrationEndpoint;
     }

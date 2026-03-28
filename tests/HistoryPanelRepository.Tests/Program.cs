@@ -1,10 +1,15 @@
 #nullable enable
 using Microsoft.Data.Sqlite;
 
-var schemaType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite.RunLogSqliteSchema");
+var schemaType = RequireType(
+    "BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite.RunLogSqliteSchema"
+);
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var ctor = repositoryType.GetConstructor([typeof(string)]);
-Assert(ctor != null, "HistoryPanelRepository should expose a constructor taking the database path.");
+Assert(
+    ctor != null,
+    "HistoryPanelRepository should expose a constructor taking the database path."
+);
 
 var tempRoot = Path.Combine(
     Path.GetTempPath(),
@@ -56,13 +61,14 @@ try
     }
 
     var repository = ctor!.Invoke([dbPath]);
-    var recentRuns = ((System.Collections.IEnumerable)(
-        repositoryType.GetMethod("ListRecentRuns")!.Invoke(repository, [10])!
-    )).Cast<object>().ToList();
-    Assert(
-        recentRuns.Count == 2,
-        "ListRecentRuns should return the inserted runs."
-    );
+    var recentRuns = (
+        (System.Collections.IEnumerable)(
+            repositoryType.GetMethod("ListRecentRuns")!.Invoke(repository, [10])!
+        )
+    )
+        .Cast<object>()
+        .ToList();
+    Assert(recentRuns.Count == 2, "ListRecentRuns should return the inserted runs.");
     var recentPlayerRank = (string?)(
         recentRuns[0].GetType().GetProperty("PlayerRank")!.GetValue(recentRuns[0])
     );
@@ -76,10 +82,7 @@ try
         recentPlayerRank == "Gold 2" && recentPlayerRating == 1420,
         "ListRecentRuns should surface the persisted player rank and rating snapshot."
     );
-    Assert(
-        recentGameMode == "Ranked",
-        "ListRecentRuns should surface the persisted game mode."
-    );
+    Assert(recentGameMode == "Ranked", "ListRecentRuns should surface the persisted game mode.");
 
     var records = (System.Collections.IEnumerable)(
         repositoryType.GetMethod("ListBattlesByRun")!.Invoke(repository, ["run-1"])!
@@ -91,7 +94,9 @@ try
         "ListBattlesByRun should skip unreadable rows and return remaining valid battles."
     );
 
-    var battleId = (string)(recordList[0].GetType().GetProperty("BattleId")!.GetValue(recordList[0])!);
+    var battleId = (string)(
+        recordList[0].GetType().GetProperty("BattleId")!.GetValue(recordList[0])!
+    );
     var playerRank = (string?)(
         recordList[0].GetType().GetProperty("PlayerRank")!.GetValue(recordList[0])
     );
@@ -116,9 +121,13 @@ try
         "ListBattlesByRun should still build the snapshot summary from parsed capture payloads."
     );
 
-    var battleIds = ((System.Collections.IEnumerable)(
-        repositoryType.GetMethod("ListBattleIdsByRun")!.Invoke(repository, ["run-1"])!
-    )).Cast<string>().ToList();
+    var battleIds = (
+        (System.Collections.IEnumerable)(
+            repositoryType.GetMethod("ListBattleIdsByRun")!.Invoke(repository, ["run-1"])!
+        )
+    )
+        .Cast<string>()
+        .ToList();
     Assert(
         battleIds.SequenceEqual(["battle-bad", "battle-good"]),
         "ListBattleIdsByRun should return all linked battles ordered from newest to oldest."

@@ -67,7 +67,11 @@ internal sealed class RunUploadRequestSigner
 
         var request = new HttpRequestMessage(method, endpoint);
         if (body != null)
-            request.Content = new StringContent(body, Encoding.UTF8, contentType ?? "application/json");
+            request.Content = new StringContent(
+                body,
+                Encoding.UTF8,
+                contentType ?? "application/json"
+            );
         request.Headers.TryAddWithoutValidation("X-BPP-Client-Id", clientId);
         request.Headers.TryAddWithoutValidation("X-BPP-Install-Id", installId);
         request.Headers.TryAddWithoutValidation("X-BPP-Plugin-Version", pluginVersion);

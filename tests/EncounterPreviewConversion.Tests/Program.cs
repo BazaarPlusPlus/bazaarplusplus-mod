@@ -42,7 +42,9 @@ Assert(
     "Source name should be preserved."
 );
 
-var previewProjectorType = RequireType("BazaarPlusPlus.Game.MonsterPreview.MonsterPreviewProjector");
+var previewProjectorType = RequireType(
+    "BazaarPlusPlus.Game.MonsterPreview.MonsterPreviewProjector"
+);
 var buildModelMethod = previewProjectorType.GetMethod(
     "BuildModel",
     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static

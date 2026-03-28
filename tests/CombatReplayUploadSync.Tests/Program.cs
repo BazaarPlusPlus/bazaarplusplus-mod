@@ -80,7 +80,8 @@ try
     );
 
     var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
-    var payloadStore = Activator.CreateInstance(payloadStoreType, replayRoot)
+    var payloadStore =
+        Activator.CreateInstance(payloadStoreType, replayRoot)
         ?? throw new InvalidOperationException("Failed to create CombatReplayPayloadStore.");
     var payloadType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpReplayPayload");
     var payload = Activator.CreateInstance(payloadType)!;
@@ -92,20 +93,21 @@ try
     InvokeVoid(payloadStoreType, payloadStore, "Save", [payload]);
 
     var catalogType = RequireType("BazaarPlusPlus.Game.PvpBattles.Persistence.PvpBattleCatalog");
-    var catalog = Activator.CreateInstance(catalogType, dbPath)
+    var catalog =
+        Activator.CreateInstance(catalogType, dbPath)
         ?? throw new InvalidOperationException("Failed to create PvpBattleCatalog.");
     var manifestType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifest");
     var manifest = Activator.CreateInstance(manifestType)!;
     manifestType.GetProperty("BattleId")!.SetValue(manifest, "battle-upload-001");
     manifestType.GetProperty("RunId")!.SetValue(manifest, "server-run-001");
-    manifestType.GetProperty("SavedAtUtc")!.SetValue(
-        manifest,
-        new DateTimeOffset(2026, 3, 28, 1, 0, 0, TimeSpan.Zero)
-    );
+    manifestType
+        .GetProperty("SavedAtUtc")!
+        .SetValue(manifest, new DateTimeOffset(2026, 3, 28, 1, 0, 0, TimeSpan.Zero));
     manifestType.GetProperty("CombatKind")!.SetValue(manifest, "PVPCombat");
     InvokeVoid(catalogType, catalog, "Save", [manifest]);
 
-    var store = Activator.CreateInstance(storeType, dbPath, replayRoot)
+    var store =
+        Activator.CreateInstance(storeType, dbPath, replayRoot)
         ?? throw new InvalidOperationException("Failed to create CombatReplayUploadSqliteStore.");
     InvokeVoid(storeType, store, "MarkReplayDirty", ["battle-upload-001"]);
 
@@ -122,12 +124,8 @@ try
         );
     }
 
-    var pendingBattleIds = (IReadOnlyList<string>)Invoke<object>(
-        storeType,
-        store,
-        "GetPendingBattleIds",
-        [2]
-    );
+    var pendingBattleIds =
+        (IReadOnlyList<string>)Invoke<object>(storeType, store, "GetPendingBattleIds", [2]);
     Assert(
         pendingBattleIds.Count == 1 && pendingBattleIds[0] == "battle-upload-001",
         "CombatReplayUploadSqliteStore should return dirty replay ids."
@@ -142,19 +140,23 @@ try
     Assert(snapshot != null, "CombatReplayUploadSqliteStore should build an upload snapshot.");
 
     var snapshotType = snapshot!.GetType();
-    var payloadEnvelope = snapshotType.GetProperty("Payload")!.GetValue(snapshot)
+    var payloadEnvelope =
+        snapshotType.GetProperty("Payload")!.GetValue(snapshot)
         ?? throw new InvalidOperationException("Replay upload snapshot should expose Payload.");
     var payloadEnvelopeType = payloadEnvelope.GetType();
     Assert(
-        (string)payloadEnvelopeType.GetProperty("InstallId")!.GetValue(payloadEnvelope)! == "install-123",
+        (string)payloadEnvelopeType.GetProperty("InstallId")!.GetValue(payloadEnvelope)!
+            == "install-123",
         "Replay upload payload should include the install id."
     );
     Assert(
-        (string)payloadEnvelopeType.GetProperty("BattleId")!.GetValue(payloadEnvelope)! == "battle-upload-001",
+        (string)payloadEnvelopeType.GetProperty("BattleId")!.GetValue(payloadEnvelope)!
+            == "battle-upload-001",
         "Replay upload payload should include the battle id."
     );
     Assert(
-        (string?)payloadEnvelopeType.GetProperty("RunId")!.GetValue(payloadEnvelope) == "server-run-001",
+        (string?)payloadEnvelopeType.GetProperty("RunId")!.GetValue(payloadEnvelope)
+            == "server-run-001",
         "Replay upload payload should include the linked run id."
     );
     Assert(
@@ -201,7 +203,8 @@ try
         );
     }
 
-    payloadStore = Activator.CreateInstance(payloadStoreType, replayRoot)
+    payloadStore =
+        Activator.CreateInstance(payloadStoreType, replayRoot)
         ?? throw new InvalidOperationException("Failed to recreate CombatReplayPayloadStore.");
     InvokeVoid(payloadStoreType, payloadStore, "Delete", ["battle-upload-001"]);
     InvokeVoid(storeType, store, "MarkReplayDirty", ["battle-upload-001"]);
@@ -217,15 +220,17 @@ try
         }
         """
     );
-    var identityStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore");
-    var identityStore = Activator.CreateInstance(
-        identityStoreType,
-        Path.Combine(tempRoot, "install-id.txt")
-    ) ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
+    var identityStoreType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore"
+    );
+    var identityStore =
+        Activator.CreateInstance(identityStoreType, Path.Combine(tempRoot, "install-id.txt"))
+        ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
     var clientStateStoreType = RequireType(
         "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
     );
-    var clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
+    var clientStateStore =
+        Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
     InvokeVoid(
         clientStateStoreType,
@@ -234,25 +239,23 @@ try
         ["Runs", "run-client-001"]
     );
     var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
-    var keyStore = Activator.CreateInstance(keyStoreType, Path.Combine(tempRoot, "key.json"))
+    var keyStore =
+        Activator.CreateInstance(keyStoreType, Path.Combine(tempRoot, "key.json"))
         ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
-    var service = Activator.CreateInstance(
-        serviceType,
-        store,
-        identityStore,
-        clientStateStore,
-        keyStore,
-        "https://cloudflare.example/clients/register",
-        "https://cloudflare.example/replays/upload",
-        1,
-        TimeSpan.FromSeconds(10)
-    ) ?? throw new InvalidOperationException("Failed to create CombatReplayUploadService.");
-    var uploadTask = (Task)Invoke<object>(
-        serviceType,
-        service,
-        "UploadPendingReplaysAsync",
-        [CancellationToken.None]
-    );
+    var service =
+        Activator.CreateInstance(
+            serviceType,
+            store,
+            identityStore,
+            clientStateStore,
+            keyStore,
+            "https://cloudflare.example/clients/register",
+            "https://cloudflare.example/replays/upload",
+            1,
+            TimeSpan.FromSeconds(10)
+        ) ?? throw new InvalidOperationException("Failed to create CombatReplayUploadService.");
+    var uploadTask = (Task)
+        Invoke<object>(serviceType, service, "UploadPendingReplaysAsync", [CancellationToken.None]);
     uploadTask.GetAwaiter().GetResult();
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))

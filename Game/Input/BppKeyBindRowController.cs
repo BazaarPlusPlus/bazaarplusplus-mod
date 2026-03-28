@@ -263,9 +263,7 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
 
         DisposeRebindOperation();
 
-        if (
-            BppHotkeyService.TrySetBindingPath(_actionId, bindingPath, out var errorMessage)
-        )
+        if (BppHotkeyService.TrySetBindingPath(_actionId, bindingPath, out var errorMessage))
         {
             EnterDefaultState();
             return;

@@ -4,9 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Lobby.RandomHeroPool;
 using HarmonyLib;
-using BazaarGameShared.Domain.Core.Types;
 using TheBazaar.UI;
 using UnityEngine;
 
@@ -119,7 +119,8 @@ internal static class RandomHeroPoolSelectRandomHeroImmediatePatch
     private static bool TrySelectConfiguredRandomHero(HeroSelectButtonsView instance)
     {
         if (
-            UnlockedHeroesField?.GetValue(instance) is not IEnumerable<HeroItemView> reflectedUnlockedHeroes
+            UnlockedHeroesField?.GetValue(instance)
+            is not IEnumerable<HeroItemView> reflectedUnlockedHeroes
         )
         {
             return false;

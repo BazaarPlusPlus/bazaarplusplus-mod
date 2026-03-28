@@ -57,9 +57,7 @@ public class Plugin : BaseUnityPlugin
         BppRuntimeServices Services,
         RunLifecycleModule LifecycleModule,
         CombatReplayRuntime CombatReplayRuntime
-    ) InstallRuntimeHost(
-        ConfigFile configFile
-    )
+    ) InstallRuntimeHost(ConfigFile configFile)
     {
         CombatReplayRuntime? combatReplayRuntime = null;
         _runtimeHost = new BppRuntimeHost(

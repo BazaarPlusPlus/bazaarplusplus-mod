@@ -5,10 +5,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using HarmonyLib;
-using TMPro;
 using TheBazaar;
-using TheBazaar.Utilities;
 using TheBazaar.UI;
+using TheBazaar.Utilities;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -45,10 +45,8 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         "RandomHeroToggle"
     );
 
-    private static readonly System.Reflection.FieldInfo? HeroItemIsUnlockedField = AccessTools.Field(
-        typeof(HeroItemView),
-        "_isUnlocked"
-    );
+    private static readonly System.Reflection.FieldInfo? HeroItemIsUnlockedField =
+        AccessTools.Field(typeof(HeroItemView), "_isUnlocked");
 
     private readonly Dictionary<string, HeroPoolEntryView> _heroEntryViews = new(
         StringComparer.Ordinal
@@ -339,8 +337,14 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         emptyRect.anchorMin = new Vector2(0f, 1f);
         emptyRect.anchorMax = new Vector2(1f, 1f);
         emptyRect.pivot = new Vector2(0.5f, 1f);
-        emptyRect.offsetMin = new Vector2(PanelHorizontalPadding, -PanelTopPadding - HeaderHeight - 38f);
-        emptyRect.offsetMax = new Vector2(-PanelHorizontalPadding, -PanelTopPadding - HeaderHeight - 8f);
+        emptyRect.offsetMin = new Vector2(
+            PanelHorizontalPadding,
+            -PanelTopPadding - HeaderHeight - 38f
+        );
+        emptyRect.offsetMax = new Vector2(
+            -PanelHorizontalPadding,
+            -PanelTopPadding - HeaderHeight - 8f
+        );
         _emptyLabel.text = "No heroes";
         _emptyLabel.gameObject.SetActive(false);
 
@@ -431,7 +435,10 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
             .Select(candidate => candidate.HeroId)
             .ToArray();
 
-        if (RandomHeroPoolPlayerPrefs.TryResolveState(_unlockedHeroIds, out var state) && state != null)
+        if (
+            RandomHeroPoolPlayerPrefs.TryResolveState(_unlockedHeroIds, out var state)
+            && state != null
+        )
         {
             ApplyState(state, persist: true);
         }
@@ -455,7 +462,10 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
 
         heroAvailabilities = heroItemViews
             .Where(candidate => candidate != null)
-            .Select(candidate => new HeroAvailability(candidate.Hero.ToString(), IsUnlocked(candidate)))
+            .Select(candidate => new HeroAvailability(
+                candidate.Hero.ToString(),
+                IsUnlocked(candidate)
+            ))
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate.HeroId))
             .Distinct(HeroAvailabilityComparer.Instance)
             .ToArray();
@@ -508,9 +518,8 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
             CreateHeroEntry(_heroAvailabilities[index], index);
 
         var rows = Mathf.CeilToInt(_heroAvailabilities.Length / (float)EntryColumnCount);
-        var entriesHeight = rows <= 0
-            ? 0f
-            : (rows * EntryHeight) + ((rows - 1) * EntryVerticalSpacing);
+        var entriesHeight =
+            rows <= 0 ? 0f : (rows * EntryHeight) + ((rows - 1) * EntryVerticalSpacing);
         _entriesRoot.sizeDelta = new Vector2(
             PanelWidth - (PanelHorizontalPadding * 2f),
             entriesHeight
@@ -567,7 +576,10 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         );
         if (label == null)
         {
-            BppLog.Warn(LogCategory, $"Failed to create hero pool label for '{heroAvailability.HeroId}'.");
+            BppLog.Warn(
+                LogCategory,
+                $"Failed to create hero pool label for '{heroAvailability.HeroId}'."
+            );
             return;
         }
 
@@ -613,9 +625,10 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         if (_headerLabel != null)
         {
             var selectedCount = _state?.SelectedHeroIds.Count ?? 0;
-            _headerLabel.text = _unlockedHeroIds.Length == 0
-                ? "POOL 0/0"
-                : $"POOL {selectedCount}/{_unlockedHeroIds.Length}";
+            _headerLabel.text =
+                _unlockedHeroIds.Length == 0
+                    ? "POOL 0/0"
+                    : $"POOL {selectedCount}/{_unlockedHeroIds.Length}";
         }
     }
 
@@ -714,9 +727,8 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
 
     private static float CalculatePanelHeight(int rows)
     {
-        var entriesHeight = rows <= 0
-            ? 24f
-            : (rows * EntryHeight) + ((rows - 1) * EntryVerticalSpacing);
+        var entriesHeight =
+            rows <= 0 ? 24f : (rows * EntryHeight) + ((rows - 1) * EntryVerticalSpacing);
         return PanelTopPadding
             + HeaderHeight
             + HeaderToEntriesSpacing

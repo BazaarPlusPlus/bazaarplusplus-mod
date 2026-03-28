@@ -79,7 +79,12 @@ internal static class UpgradePreviewTooltipPatch
                 var tooltipParent = Data.TooltipParentComponent;
                 if (tooltipParent != null && tooltipParent.GetCardTooltipController(card) != null)
                 {
-                    RefreshPrimaryTooltipForUpgradePreview(controller, card, tooltipData, tooltipParent);
+                    RefreshPrimaryTooltipForUpgradePreview(
+                        controller,
+                        card,
+                        tooltipData,
+                        tooltipParent
+                    );
                     yield break;
                 }
 

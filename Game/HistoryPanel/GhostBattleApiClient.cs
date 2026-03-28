@@ -187,7 +187,10 @@ internal sealed class GhostBattleApiClient
                 responseBody,
                 RunUploadSerialization.SerializerSettings
             );
-            if (payload?.ReplayPayload == null || string.IsNullOrWhiteSpace(payload.ReplayPayload.BattleId))
+            if (
+                payload?.ReplayPayload == null
+                || string.IsNullOrWhiteSpace(payload.ReplayPayload.BattleId)
+            )
             {
                 return GhostBattleReplayPayloadResult.Failure("replay_payload_missing");
             }
@@ -271,7 +274,10 @@ internal sealed class GhostBattleApiClient
         return builder.Uri.ToString();
     }
 
-    private static string DeriveReplayDownloadLinkEndpoint(string againstMeEndpoint, string battleId)
+    private static string DeriveReplayDownloadLinkEndpoint(
+        string againstMeEndpoint,
+        string battleId
+    )
     {
         var baseUri = new Uri(againstMeEndpoint, UriKind.Absolute);
         var builder = new UriBuilder(baseUri)
@@ -379,6 +385,5 @@ internal readonly struct GhostBattleReplayPayloadResult
     public static GhostBattleReplayPayloadResult Success(CombatReplayUploadPayload payload) =>
         new(true, payload, null);
 
-    public static GhostBattleReplayPayloadResult Failure(string error) =>
-        new(false, null, error);
+    public static GhostBattleReplayPayloadResult Failure(string error) => new(false, null, error);
 }

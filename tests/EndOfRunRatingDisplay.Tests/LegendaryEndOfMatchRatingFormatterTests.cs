@@ -12,11 +12,7 @@ public sealed class LegendaryEndOfMatchRatingFormatterTests
     [InlineData(1420, 1436, "1420 -> 1436 <color=#6DD16B>(+16)</color>")]
     [InlineData(1436, 1420, "1436 -> 1420 <color=#E06767>(-16)</color>")]
     [InlineData(1436, 1436, "1436 -> 1436 <color=#D8D8D8>(0)</color>")]
-    public void BuildLine_FormatsBeforeAfterAndColoredDelta(
-        int before,
-        int after,
-        string expected
-    )
+    public void BuildLine_FormatsBeforeAfterAndColoredDelta(int before, int after, string expected)
     {
         var line = LegendaryEndOfMatchRatingFormatter.BuildLine(before, after);
 

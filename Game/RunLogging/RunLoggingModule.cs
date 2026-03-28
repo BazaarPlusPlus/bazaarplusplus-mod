@@ -3,9 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarGameClient.Domain.Models.Cards;
-using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using TheBazaar;
@@ -113,7 +113,10 @@ internal sealed class RunLoggingModule
                         _core.AcceptStateSnapshot(stateInput);
                 }
             }
-            else if ((_wasInRunLastTick || _deferredRunCompletion != null) && _sessionManager.HasActiveSession)
+            else if (
+                (_wasInRunLastTick || _deferredRunCompletion != null)
+                && _sessionManager.HasActiveSession
+            )
             {
                 completionAttempted = true;
                 if (_deferredRunCompletion == null)

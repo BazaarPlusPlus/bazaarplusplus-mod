@@ -11,7 +11,10 @@ public sealed class RandomHeroPoolState
     private readonly HashSet<string> _unlockedHeroIdSet;
     private readonly HashSet<string> _selectedHeroIds;
 
-    public RandomHeroPoolState(IEnumerable<string> unlockedHeroIds, IEnumerable<string>? selectedHeroIds)
+    public RandomHeroPoolState(
+        IEnumerable<string> unlockedHeroIds,
+        IEnumerable<string>? selectedHeroIds
+    )
     {
         if (unlockedHeroIds is null)
         {

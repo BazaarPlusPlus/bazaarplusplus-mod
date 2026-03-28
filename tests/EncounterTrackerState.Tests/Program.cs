@@ -4,7 +4,9 @@ using BazaarPlusPlus;
 
 var trackerType = RequireType("BazaarPlusPlus.Game.EncounterTracking.EncounterTracker");
 var featureType = RequireType("BazaarPlusPlus.Game.EncounterTracking.EncounterTrackingFeature");
-var controllerType = RequireType("BazaarPlusPlus.Game.EncounterTracking.EncounterTrackingController");
+var controllerType = RequireType(
+    "BazaarPlusPlus.Game.EncounterTracking.EncounterTrackingController"
+);
 var moduleType = RequireType("BazaarPlusPlus.Game.EncounterTracking.EncounterTrackingModule");
 var queryType = RequireType("BazaarPlusPlus.Game.EncounterTracking.IEncounterSelectionQuery");
 var snapshotType = RequireType("BazaarPlusPlus.Game.EncounterTracking.EncounterSelectionSnapshot");
@@ -54,9 +56,13 @@ var eventBusType = RequireType("BazaarPlusPlus.Core.Events.InMemoryBppEventBus")
 var eventBus = Activator.CreateInstance(eventBusType);
 var runContextType = RequireType("BazaarPlusPlus.Core.RunContext.RunContextStore");
 var runContext = Activator.CreateInstance(runContextType);
-var monsterCatalog = featureType.Assembly.GetType("BazaarPlusPlus.Core.Runtime.BppRuntimeHost+EmptyMonsterCatalog")
+var monsterCatalog =
+    featureType.Assembly.GetType("BazaarPlusPlus.Core.Runtime.BppRuntimeHost+EmptyMonsterCatalog")
     ?? throw new InvalidOperationException("EmptyMonsterCatalog not found.");
-initializeMethod!.Invoke(null, [eventBus, runContext, Activator.CreateInstance(monsterCatalog, nonPublic: true)]);
+initializeMethod!.Invoke(
+    null,
+    [eventBus, runContext, Activator.CreateInstance(monsterCatalog, nonPublic: true)]
+);
 
 Assert(Supports(ERunState.Encounter), "Encounter state should be supported.");
 Assert(Supports(ERunState.Choice), "Choice state should be supported.");
@@ -119,7 +125,8 @@ updateSelectionMethod!.Invoke(
     ]
 );
 
-var moduleQuery = moduleType.GetProperty("Query", BindingFlags.Instance | BindingFlags.Public)!
+var moduleQuery = moduleType
+    .GetProperty("Query", BindingFlags.Instance | BindingFlags.Public)!
     .GetValue(module);
 var seededSnapshot = queryType.GetMethod("GetSnapshot")!.Invoke(moduleQuery, Array.Empty<object>());
 Assert(
@@ -130,7 +137,9 @@ Assert(
 var clearMethod = moduleType.GetMethod("Clear", BindingFlags.Instance | BindingFlags.Public);
 Assert(clearMethod != null, "EncounterTrackingModule should expose Clear().");
 clearMethod!.Invoke(module, Array.Empty<object>());
-var clearedModuleSnapshot = queryType.GetMethod("GetSnapshot")!.Invoke(moduleQuery, Array.Empty<object>());
+var clearedModuleSnapshot = queryType
+    .GetMethod("GetSnapshot")!
+    .Invoke(moduleQuery, Array.Empty<object>());
 Assert(
     snapshotType.GetProperty("AvailableEncounters")!.GetValue(clearedModuleSnapshot) == null,
     "EncounterTrackingModule Clear should remove available encounters."

@@ -238,7 +238,9 @@ internal sealed class HistoryPanelRepository
                     new HistoryBattleRecord(
                         battleId,
                         reader.GetString(reader.GetOrdinal("run_id")),
-                        DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
+                        DateTimeOffset.Parse(
+                            reader.GetString(reader.GetOrdinal("recorded_at_utc"))
+                        ),
                         GetNullableInt32(reader, "day"),
                         GetNullableInt32(reader, "hour"),
                         GetNullableString(reader, "encounter_id"),
@@ -346,7 +348,9 @@ internal sealed class HistoryPanelRepository
                     new HistoryBattleRecord(
                         battleId,
                         string.Empty,
-                        DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
+                        DateTimeOffset.Parse(
+                            reader.GetString(reader.GetOrdinal("recorded_at_utc"))
+                        ),
                         GetNullableInt32(reader, "day"),
                         GetNullableInt32(reader, "hour"),
                         GetNullableString(reader, "encounter_id"),
@@ -469,7 +473,10 @@ internal sealed class HistoryPanelRepository
                 );
                 """;
             insertCommand.Parameters.AddWithValue("$battleId", battle.BattleId);
-            insertCommand.Parameters.AddWithValue("$recordedAtUtc", battle.RecordedAtUtc.ToString("o"));
+            insertCommand.Parameters.AddWithValue(
+                "$recordedAtUtc",
+                battle.RecordedAtUtc.ToString("o")
+            );
             insertCommand.Parameters.AddWithValue("$day", (object?)battle.Day ?? DBNull.Value);
             insertCommand.Parameters.AddWithValue("$hour", (object?)battle.Hour ?? DBNull.Value);
             insertCommand.Parameters.AddWithValue(
@@ -525,7 +532,10 @@ internal sealed class HistoryPanelRepository
                 (object?)battle.OpponentAccountId ?? DBNull.Value
             );
             insertCommand.Parameters.AddWithValue("$combatKind", battle.CombatKind);
-            insertCommand.Parameters.AddWithValue("$result", (object?)battle.Result ?? DBNull.Value);
+            insertCommand.Parameters.AddWithValue(
+                "$result",
+                (object?)battle.Result ?? DBNull.Value
+            );
             insertCommand.Parameters.AddWithValue(
                 "$winnerCombatantId",
                 (object?)battle.WinnerCombatantId ?? DBNull.Value
@@ -693,17 +703,34 @@ internal sealed class HistoryPanelRepository
             bootstrap.CommandText = RunLogSqliteSchema.BootstrapSql;
             bootstrap.ExecuteNonQuery();
         }
-        EnsureColumnExists(connection, RunLogSqliteSchema.PvpBattlesTableName, "player_hero", "TEXT NULL");
-        EnsureColumnExists(connection, RunLogSqliteSchema.PvpBattlesTableName, "player_level", "INTEGER NULL");
-        EnsureColumnExists(connection, RunLogSqliteSchema.GhostBattlesTableName, "player_hero", "TEXT NULL");
-        EnsureColumnExists(connection, RunLogSqliteSchema.GhostBattlesTableName, "player_level", "INTEGER NULL");
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.PvpBattlesTableName,
+            "player_hero",
+            "TEXT NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.PvpBattlesTableName,
+            "player_level",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.GhostBattlesTableName,
+            "player_hero",
+            "TEXT NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.GhostBattlesTableName,
+            "player_level",
+            "INTEGER NULL"
+        );
         return connection;
     }
 
-    private static PvpBattleManifest ReadManifest(
-        SqliteDataReader reader,
-        string? runIdColumnName
-    )
+    private static PvpBattleManifest ReadManifest(SqliteDataReader reader, string? runIdColumnName)
     {
         return new PvpBattleManifest
         {

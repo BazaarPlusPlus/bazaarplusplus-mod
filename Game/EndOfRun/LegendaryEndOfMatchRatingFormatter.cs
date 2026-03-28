@@ -13,11 +13,10 @@ internal static class LegendaryEndOfMatchRatingFormatter
     {
         var delta = after - before;
         var deltaText = delta > 0 ? $"+{delta}" : delta.ToString();
-        var deltaColor = delta > 0
-            ? PositiveDeltaColor
-            : delta < 0
-                ? NegativeDeltaColor
-                : NeutralDeltaColor;
+        var deltaColor =
+            delta > 0 ? PositiveDeltaColor
+            : delta < 0 ? NegativeDeltaColor
+            : NeutralDeltaColor;
 
         return $"{before} -> {after} <color={deltaColor}>({deltaText})</color>";
     }

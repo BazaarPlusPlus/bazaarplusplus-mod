@@ -68,14 +68,27 @@ var requestsHandled = Task.Run(async () =>
                 "Signed replay upload should include the battle id."
             );
 
-            var timestamp = request.Headers["X-BPP-Timestamp"] ?? throw new InvalidOperationException("Missing timestamp header.");
-            var nonce = request.Headers["X-BPP-Nonce"] ?? throw new InvalidOperationException("Missing nonce header.");
-            var bodyHash = request.Headers["X-BPP-Content-SHA256"] ?? throw new InvalidOperationException("Missing body hash header.");
-            var signature = request.Headers["X-BPP-Signature"] ?? throw new InvalidOperationException("Missing signature header.");
+            var timestamp =
+                request.Headers["X-BPP-Timestamp"]
+                ?? throw new InvalidOperationException("Missing timestamp header.");
+            var nonce =
+                request.Headers["X-BPP-Nonce"]
+                ?? throw new InvalidOperationException("Missing nonce header.");
+            var bodyHash =
+                request.Headers["X-BPP-Content-SHA256"]
+                ?? throw new InvalidOperationException("Missing body hash header.");
+            var signature =
+                request.Headers["X-BPP-Signature"]
+                ?? throw new InvalidOperationException("Missing signature header.");
 
             using var sha256 = SHA256.Create();
-            var computedHash = Convert.ToBase64String(sha256.ComputeHash(Encoding.UTF8.GetBytes(body)));
-            Assert(computedHash == bodyHash, "Signed replay upload should send the raw body SHA-256.");
+            var computedHash = Convert.ToBase64String(
+                sha256.ComputeHash(Encoding.UTF8.GetBytes(body))
+            );
+            Assert(
+                computedHash == bodyHash,
+                "Signed replay upload should send the raw body SHA-256."
+            );
 
             var canonical = BuildCanonical(
                 "POST",
@@ -91,8 +104,14 @@ var requestsHandled = Task.Run(async () =>
             rsa.ImportParameters(
                 new RSAParameters
                 {
-                    Modulus = Convert.FromBase64String(publicModulus ?? throw new InvalidOperationException("Missing public modulus.")),
-                    Exponent = Convert.FromBase64String(publicExponent ?? throw new InvalidOperationException("Missing public exponent.")),
+                    Modulus = Convert.FromBase64String(
+                        publicModulus
+                            ?? throw new InvalidOperationException("Missing public modulus.")
+                    ),
+                    Exponent = Convert.FromBase64String(
+                        publicExponent
+                            ?? throw new InvalidOperationException("Missing public exponent.")
+                    ),
                 }
             );
             var valid = rsa.VerifyData(
@@ -135,7 +154,8 @@ var requestsHandled = Task.Run(async () =>
 try
 {
     var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
-    var payloadStore = Activator.CreateInstance(payloadStoreType, replayRoot)
+    var payloadStore =
+        Activator.CreateInstance(payloadStoreType, replayRoot)
         ?? throw new InvalidOperationException("Failed to create CombatReplayPayloadStore.");
     var payloadType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpReplayPayload");
     var payload = Activator.CreateInstance(payloadType)!;
@@ -147,56 +167,61 @@ try
     InvokeVoid(payloadStoreType, payloadStore, "Save", [payload]);
 
     var catalogType = RequireType("BazaarPlusPlus.Game.PvpBattles.Persistence.PvpBattleCatalog");
-    var catalog = Activator.CreateInstance(catalogType, dbPath)
+    var catalog =
+        Activator.CreateInstance(catalogType, dbPath)
         ?? throw new InvalidOperationException("Failed to create PvpBattleCatalog.");
     var manifestType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifest");
     var manifest = Activator.CreateInstance(manifestType)!;
     manifestType.GetProperty("BattleId")!.SetValue(manifest, "battle-auth-001");
     manifestType.GetProperty("RunId")!.SetValue(manifest, "server-run-auth-001");
-    manifestType.GetProperty("SavedAtUtc")!.SetValue(
-        manifest,
-        new DateTimeOffset(2026, 3, 28, 3, 0, 0, TimeSpan.Zero)
-    );
+    manifestType
+        .GetProperty("SavedAtUtc")!
+        .SetValue(manifest, new DateTimeOffset(2026, 3, 28, 3, 0, 0, TimeSpan.Zero));
     manifestType.GetProperty("CombatKind")!.SetValue(manifest, "PVPCombat");
     InvokeVoid(catalogType, catalog, "Save", [manifest]);
 
     var storeType = RequireType(
         "BazaarPlusPlus.Game.CombatReplay.Upload.CombatReplayUploadSqliteStore"
     );
-    var store = Activator.CreateInstance(storeType, dbPath, replayRoot)
+    var store =
+        Activator.CreateInstance(storeType, dbPath, replayRoot)
         ?? throw new InvalidOperationException("Failed to create CombatReplayUploadSqliteStore.");
     InvokeVoid(storeType, store, "MarkReplayDirty", ["battle-auth-001"]);
 
-    var identityStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore");
-    var identityStore = Activator.CreateInstance(identityStoreType, installIdPath)
+    var identityStoreType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore"
+    );
+    var identityStore =
+        Activator.CreateInstance(identityStoreType, installIdPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
-    var clientStateStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore");
-    var clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
+    var clientStateStoreType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
+    );
+    var clientStateStore =
+        Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
     var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
-    var keyStore = Activator.CreateInstance(keyStoreType, privateKeyPath)
+    var keyStore =
+        Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
     var serviceType = RequireType(
         "BazaarPlusPlus.Game.CombatReplay.Upload.CombatReplayUploadService"
     );
-    var service = Activator.CreateInstance(
-        serviceType,
-        store,
-        identityStore,
-        clientStateStore,
-        keyStore,
-        $"{prefix}clients/register",
-        $"{prefix}replays/upload",
-        3,
-        TimeSpan.FromSeconds(10)
-    ) ?? throw new InvalidOperationException("Failed to create CombatReplayUploadService.");
+    var service =
+        Activator.CreateInstance(
+            serviceType,
+            store,
+            identityStore,
+            clientStateStore,
+            keyStore,
+            $"{prefix}clients/register",
+            $"{prefix}replays/upload",
+            3,
+            TimeSpan.FromSeconds(10)
+        ) ?? throw new InvalidOperationException("Failed to create CombatReplayUploadService.");
 
-    var uploadTask = (Task)Invoke<object>(
-        serviceType,
-        service,
-        "UploadPendingReplaysAsync",
-        [CancellationToken.None]
-    );
+    var uploadTask = (Task)
+        Invoke<object>(serviceType, service, "UploadPendingReplaysAsync", [CancellationToken.None]);
     await uploadTask.ConfigureAwait(false);
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))

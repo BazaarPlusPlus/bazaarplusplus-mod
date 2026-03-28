@@ -26,9 +26,7 @@ internal static class EncounterTracker
             throw new ArgumentNullException(nameof(runContext));
         if (monsterCatalog == null)
             throw new ArgumentNullException(nameof(monsterCatalog));
-        ReplaceFeature(
-            new EncounterTrackingFeature(eventBus, runContext, monsterCatalog)
-        );
+        ReplaceFeature(new EncounterTrackingFeature(eventBus, runContext, monsterCatalog));
     }
 
     internal static void AttachFeature(EncounterTrackingFeature feature)

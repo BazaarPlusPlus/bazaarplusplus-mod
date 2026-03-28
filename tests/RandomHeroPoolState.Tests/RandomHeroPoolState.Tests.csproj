@@ -11,9 +11,21 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolPreferences.cs" Link="RandomHeroPool/RandomHeroPoolPreferences.cs" />
-    <Compile Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolSelector.cs" Link="RandomHeroPool/RandomHeroPoolSelector.cs" />
-    <Compile Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolState.cs" Link="RandomHeroPool/RandomHeroPoolState.cs" />
-    <Compile Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolStateFactory.cs" Link="RandomHeroPool/RandomHeroPoolStateFactory.cs" />
+    <Compile
+      Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolPreferences.cs"
+      Link="RandomHeroPool/RandomHeroPoolPreferences.cs"
+    />
+    <Compile
+      Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolSelector.cs"
+      Link="RandomHeroPool/RandomHeroPoolSelector.cs"
+    />
+    <Compile
+      Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolState.cs"
+      Link="RandomHeroPool/RandomHeroPoolState.cs"
+    />
+    <Compile
+      Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolStateFactory.cs"
+      Link="RandomHeroPool/RandomHeroPoolStateFactory.cs"
+    />
   </ItemGroup>
 </Project>

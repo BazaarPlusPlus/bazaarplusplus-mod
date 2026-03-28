@@ -28,16 +28,16 @@ internal sealed class GhostBattleSyncService : IDisposable
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _identityStore = identityStore ?? throw new ArgumentNullException(nameof(identityStore));
-        _clientStateStore = clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
+        _clientStateStore =
+            clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
         _keyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
         _endpoint = endpoint ?? throw new ArgumentNullException(nameof(endpoint));
-        _httpClient = new HttpClient
-        {
-            Timeout = timeout,
-        };
+        _httpClient = new HttpClient { Timeout = timeout };
     }
 
-    public async Task<GhostBattleSyncResult> SyncRecentBattlesAsync(CancellationToken cancellationToken)
+    public async Task<GhostBattleSyncResult> SyncRecentBattlesAsync(
+        CancellationToken cancellationToken
+    )
     {
         var installId = _identityStore.GetOrCreateInstallId();
         var clientId = await EnsureClientRegistrationAsync(installId, cancellationToken);
@@ -129,7 +129,10 @@ internal sealed class GhostBattleSyncService : IDisposable
         _httpClient.Dispose();
     }
 
-    private Task<string?> EnsureClientRegistrationAsync(string installId, CancellationToken cancellationToken)
+    private Task<string?> EnsureClientRegistrationAsync(
+        string installId,
+        CancellationToken cancellationToken
+    )
     {
         var registrationClient = new RunUploadRegistrationClient(
             _httpClient,
@@ -161,8 +164,7 @@ internal readonly struct GhostBattleSyncResult
     public static GhostBattleSyncResult Success(int importedCount) =>
         new(true, importedCount, null);
 
-    public static GhostBattleSyncResult Failure(string error) =>
-        new(false, 0, error);
+    public static GhostBattleSyncResult Failure(string error) => new(false, 0, error);
 }
 
 internal readonly struct GhostBattleReplayDownloadResult
@@ -177,9 +179,7 @@ internal readonly struct GhostBattleReplayDownloadResult
 
     public string? Error { get; }
 
-    public static GhostBattleReplayDownloadResult Success() =>
-        new(true, null);
+    public static GhostBattleReplayDownloadResult Success() => new(true, null);
 
-    public static GhostBattleReplayDownloadResult Failure(string error) =>
-        new(false, error);
+    public static GhostBattleReplayDownloadResult Failure(string error) => new(false, error);
 }

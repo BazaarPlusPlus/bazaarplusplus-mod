@@ -243,7 +243,10 @@ Assert(
 );
 Assert(
     runtimeSource.Contains("public bool HasPendingPersistence", StringComparison.Ordinal)
-        && runtimeSource.Contains("_persistenceQueue?.HasPendingPersistence == true", StringComparison.Ordinal),
+        && runtimeSource.Contains(
+            "_persistenceQueue?.HasPendingPersistence == true",
+            StringComparison.Ordinal
+        ),
     "Combat replay runtime should expose whether replay persistence is still outstanding so run completion can wait for post-persist replay events."
 );
 var observeMessageBody = ExtractMethodBody(
@@ -251,7 +254,10 @@ var observeMessageBody = ExtractMethodBody(
     "public void ObserveMessage(INetMessage message)"
 );
 Assert(
-    observeMessageBody.Contains("_persistenceQueue.Enqueue(payload, manifest);", StringComparison.Ordinal),
+    observeMessageBody.Contains(
+        "_persistenceQueue.Enqueue(payload, manifest);",
+        StringComparison.Ordinal
+    ),
     "Combat replay runtime should enqueue replay persistence work instead of writing synchronously on the message observer hot path."
 );
 Assert(
@@ -296,7 +302,10 @@ Assert(
 var queueDisposeBody = ExtractMethodBody(persistenceQueueSource, "public void Dispose()");
 Assert(
     queueDisposeBody.Contains("_stopAcceptingNewWork", StringComparison.Ordinal)
-        && queueDisposeBody.Contains("_worker.Wait(ShutdownDrainTimeout)", StringComparison.Ordinal),
+        && queueDisposeBody.Contains(
+            "_worker.Wait(ShutdownDrainTimeout)",
+            StringComparison.Ordinal
+        ),
     "Combat replay persistence queue should stop new enqueues and wait briefly for queued work to drain during teardown."
 );
 Assert(
@@ -332,7 +341,10 @@ Assert(
 Assert(
     queueProcessLoopBody.Contains("var payloadSaved = false;", StringComparison.Ordinal)
         && queueProcessLoopBody.Contains("payloadSaved = true;", StringComparison.Ordinal)
-        && queueProcessLoopBody.Contains("_deletePayload(request.Payload.BattleId);", StringComparison.Ordinal),
+        && queueProcessLoopBody.Contains(
+            "_deletePayload(request.Payload.BattleId);",
+            StringComparison.Ordinal
+        ),
     "Combat replay persistence queue should delete the just-written payload when manifest persistence fails after payload persistence succeeds."
 );
 var runtimeAwakeBody = ExtractMethodBody(runtimeSource, "private void Awake()");
@@ -362,25 +374,21 @@ var persistenceQueueType = RequireType(
 var persistenceResultType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.CombatReplayPersistenceResult"
 );
-var queueCtor = persistenceQueueType.GetConstructor(
-    [
-        typeof(Action<>).MakeGenericType(payloadType),
-        typeof(Action<>).MakeGenericType(manifestType),
-        typeof(Action<string>),
-    ]
-);
+var queueCtor = persistenceQueueType.GetConstructor([
+    typeof(Action<>).MakeGenericType(payloadType),
+    typeof(Action<>).MakeGenericType(manifestType),
+    typeof(Action<string>),
+]);
 Assert(
     queueCtor != null,
     "Combat replay persistence queue should accept payload-save, manifest-save, and payload-delete callbacks."
 );
 var queueHarness = new QueuePersistenceHarness();
-var queue = queueCtor!.Invoke(
-    [
-        queueHarness.CreateSavePayloadDelegate(typeof(Action<>).MakeGenericType(payloadType)),
-        queueHarness.CreateSaveManifestDelegate(typeof(Action<>).MakeGenericType(manifestType)),
-        new Action<string>(queueHarness.DeletePayload),
-    ]
-);
+var queue = queueCtor!.Invoke([
+    queueHarness.CreateSavePayloadDelegate(typeof(Action<>).MakeGenericType(payloadType)),
+    queueHarness.CreateSaveManifestDelegate(typeof(Action<>).MakeGenericType(manifestType)),
+    new Action<string>(queueHarness.DeletePayload),
+]);
 Assert(queue != null, "Combat replay persistence queue should be constructible.");
 
 var slowPayload = Activator.CreateInstance(payloadType);
@@ -397,12 +405,7 @@ var abandonedManifest = Activator.CreateInstance(manifestType);
 Assert(abandonedManifest != null, "Abandoned replay manifest should be constructible.");
 SetProperty(manifestType, abandonedManifest!, "BattleId", "battle-dispose-abandoned");
 
-Invoke(
-    persistenceQueueType,
-    queue!,
-    "Enqueue",
-    new object?[] { slowPayload!, slowManifest! }
-);
+Invoke(persistenceQueueType, queue!, "Enqueue", new object?[] { slowPayload!, slowManifest! });
 Invoke(
     persistenceQueueType,
     queue!,
@@ -437,30 +440,30 @@ Assert(
 Assert(
     queueResults.Any(result =>
         (bool)GetProperty(persistenceResultType, result, "Succeeded")
-            && string.Equals(
-                (string?)GetProperty(
-                    manifestType,
-                    GetProperty(persistenceResultType, result, "Manifest"),
-                    "BattleId"
-                ),
-                "battle-dispose-slow",
-                StringComparison.Ordinal
-            )
+        && string.Equals(
+            (string?)GetProperty(
+                manifestType,
+                GetProperty(persistenceResultType, result, "Manifest"),
+                "BattleId"
+            ),
+            "battle-dispose-slow",
+            StringComparison.Ordinal
+        )
     ),
     "Queue disposal should preserve the successful in-flight replay result even when shutdown cancellation starts before it finishes."
 );
 Assert(
     queueResults.Any(result =>
         !(bool)GetProperty(persistenceResultType, result, "Succeeded")
-            && string.Equals(
-                (string?)GetProperty(
-                    manifestType,
-                    GetProperty(persistenceResultType, result, "Manifest"),
-                    "BattleId"
-                ),
-                "battle-dispose-abandoned",
-                StringComparison.Ordinal
-            )
+        && string.Equals(
+            (string?)GetProperty(
+                manifestType,
+                GetProperty(persistenceResultType, result, "Manifest"),
+                "BattleId"
+            ),
+            "battle-dispose-abandoned",
+            StringComparison.Ordinal
+        )
     ),
     "Queue disposal should convert abandoned pending replays into completed failure results instead of dropping them silently."
 );
@@ -1313,8 +1316,7 @@ try
             (string?)GetProperty(participantsType, participants, "PlayerRank"),
             "Legendary 5",
             StringComparison.Ordinal
-        )
-            && Equals(GetProperty(participantsType, participants, "PlayerRating"), 502),
+        ) && Equals(GetProperty(participantsType, participants, "PlayerRating"), 502),
         "BuildParticipants should preserve the player rank and rating captured on the opening candidate."
     );
     Assert(

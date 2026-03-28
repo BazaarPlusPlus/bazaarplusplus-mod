@@ -404,5 +404,4 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         public HistoryBattlePreviewData? PreviewData { get; }
     }
-
 }

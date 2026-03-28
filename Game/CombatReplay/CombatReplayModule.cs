@@ -11,13 +11,11 @@ internal sealed class CombatReplayModule : IBppFeature
     private readonly Func<CombatReplayRuntime?> _runtimeAccessor;
     private IDisposable? _messageSubscription;
 
-    public CombatReplayModule(
-        IBppEventBus eventBus,
-        Func<CombatReplayRuntime?> runtimeAccessor
-    )
+    public CombatReplayModule(IBppEventBus eventBus, Func<CombatReplayRuntime?> runtimeAccessor)
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-        _runtimeAccessor = runtimeAccessor ?? throw new ArgumentNullException(nameof(runtimeAccessor));
+        _runtimeAccessor =
+            runtimeAccessor ?? throw new ArgumentNullException(nameof(runtimeAccessor));
     }
 
     public void Start()
