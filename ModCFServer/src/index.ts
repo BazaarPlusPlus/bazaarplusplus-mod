@@ -1,123 +1,17 @@
+import { bytesToBase64 } from "./crypto/base64";
+import { sha256Base64 } from "./crypto/hash";
+import { canonicalRequest, verifySignature } from "./crypto/signature";
 import type { Env } from "./env";
+import { json, readJson } from "./http/json";
+import {
+  absolutePath,
+  normalizePurpose,
+  trimString,
+} from "./http/request";
 import type { UploadPurpose, RegisterRequest } from "./types/api";
 import type { RegisteredClientRow } from "./types/db";
 
 const MAX_TIMESTAMP_SKEW_MS = 10 * 60 * 1000;
-
-function json(data: unknown, init?: ResponseInit): Response {
-  return new Response(JSON.stringify(data), {
-    ...init,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      ...(init?.headers ?? {}),
-    },
-  });
-}
-
-async function readJson(request: Request): Promise<unknown> {
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    throw new Response("expected application/json", { status: 415 });
-  }
-
-  return request.json();
-}
-
-function trimString(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function normalizePurpose(value: unknown): UploadPurpose | null {
-  const normalized = trimString(value).toLowerCase();
-  if (normalized === "runs" || normalized === "replays") {
-    return normalized;
-  }
-
-  return null;
-}
-
-function absolutePath(request: Request): string {
-  return new URL(request.url).pathname || "/";
-}
-
-function canonicalRequest(
-  method: string,
-  path: string,
-  clientId: string,
-  installId: string,
-  timestamp: string,
-  nonce: string,
-  bodyHash: string,
-): string {
-  return [
-    method.trim().toUpperCase(),
-    path.trim() || "/",
-    clientId.trim(),
-    installId.trim(),
-    timestamp.trim(),
-    nonce.trim(),
-    bodyHash.trim(),
-  ].join("\n");
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const value of bytes) {
-    binary += String.fromCharCode(value);
-  }
-
-  return btoa(binary);
-}
-
-function toBase64Url(base64: string): string {
-  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function sha256Base64(payload: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", payload);
-  return bytesToBase64(new Uint8Array(digest));
-}
-
-async function verifySignature(
-  modulusB64: string,
-  exponentB64: string,
-  canonical: string,
-  signatureB64: string,
-): Promise<boolean> {
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    {
-      kty: "RSA",
-      n: toBase64Url(modulusB64),
-      e: toBase64Url(exponentB64),
-      alg: "RS256",
-      ext: true,
-    },
-    {
-      name: "RSASSA-PKCS1-v1_5",
-      hash: "SHA-256",
-    },
-    false,
-    ["verify"],
-  );
-
-  return crypto.subtle.verify(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    base64ToBytes(signatureB64),
-    new TextEncoder().encode(canonical),
-  );
-}
 
 async function ensureSchema(env: Env): Promise<void> {
   await env.DB.prepare(
