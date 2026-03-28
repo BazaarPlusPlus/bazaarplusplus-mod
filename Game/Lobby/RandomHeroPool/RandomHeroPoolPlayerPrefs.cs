@@ -11,7 +11,6 @@ namespace BazaarPlusPlus.Game.Lobby.RandomHeroPool;
 internal static class RandomHeroPoolPlayerPrefs
 {
     private const string SelectedPoolPrefsKeyPrefix = "BPP.RandomHeroPool.Selected";
-    private const string KnownUnlockedPrefsKeyPrefix = "BPP.RandomHeroPool.KnownUnlocked";
     private const string AnonymousAccountScope = "anonymous";
 
     public static IReadOnlyCollection<string>? LoadSelectedHeroIds()
@@ -24,36 +23,38 @@ internal static class RandomHeroPoolPlayerPrefs
         SaveHeroIdCollection(BuildScopedPrefsKey(SelectedPoolPrefsKeyPrefix), heroIds);
     }
 
-    public static IReadOnlyCollection<string>? LoadKnownUnlockedHeroIds()
+    public static bool TryResolveState(
+        IEnumerable<string> unlockedHeroIds,
+        out RandomHeroPoolState? state
+    )
     {
-        return LoadHeroIdCollection(BuildScopedPrefsKey(KnownUnlockedPrefsKeyPrefix));
-    }
+        if (unlockedHeroIds is null)
+            throw new ArgumentNullException(nameof(unlockedHeroIds));
 
-    public static void SaveKnownUnlockedHeroIds(IEnumerable<string> heroIds)
-    {
-        SaveHeroIdCollection(BuildScopedPrefsKey(KnownUnlockedPrefsKeyPrefix), heroIds);
+        var normalizedUnlockedHeroIds = NormalizeHeroIds(unlockedHeroIds);
+        if (normalizedUnlockedHeroIds.Length == 0)
+        {
+            state = null;
+            return false;
+        }
+
+        state = RandomHeroPoolStateFactory.Create(
+            normalizedUnlockedHeroIds,
+            LoadSelectedHeroIds()
+        );
+        return true;
     }
 
     public static IReadOnlyList<string> ResolveEffectivePool(IEnumerable<string> unlockedHeroIds)
     {
-        var unlockedHeroIdArray = unlockedHeroIds
-            .Where(heroId => !string.IsNullOrWhiteSpace(heroId))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        if (unlockedHeroIdArray.Length == 0)
+        if (!TryResolveState(unlockedHeroIds, out var state) || state == null)
         {
             return Array.Empty<string>();
         }
 
-        var mergedPool = RandomHeroPoolPreferences.MergeWithKnownUnlockedHeroIds(
-            unlockedHeroIdArray,
-            LoadSelectedHeroIds(),
-            LoadKnownUnlockedHeroIds()
-        );
-        SaveSelectedHeroIds(mergedPool);
-        SaveKnownUnlockedHeroIds(unlockedHeroIdArray);
-
-        return new RandomHeroPoolSelector().BuildCandidateHeroIds(unlockedHeroIdArray, mergedPool);
+        var candidateHeroIds = state.SelectedHeroIds.ToArray();
+        SaveSelectedHeroIds(candidateHeroIds);
+        return candidateHeroIds;
     }
 
     private static IReadOnlyCollection<string>? LoadHeroIdCollection(string key)
@@ -78,10 +79,7 @@ internal static class RandomHeroPoolPlayerPrefs
 
     private static void SaveHeroIdCollection(string key, IEnumerable<string> heroIds)
     {
-        var normalized = heroIds
-            .Where(heroId => !string.IsNullOrWhiteSpace(heroId))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var normalized = NormalizeHeroIds(heroIds);
 
         if (normalized.Length == 0)
         {
@@ -93,6 +91,14 @@ internal static class RandomHeroPoolPlayerPrefs
         }
 
         PlayerPrefs.Save();
+    }
+
+    private static string[] NormalizeHeroIds(IEnumerable<string> heroIds)
+    {
+        return heroIds
+            .Where(heroId => !string.IsNullOrWhiteSpace(heroId))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static string BuildScopedPrefsKey(string keyPrefix)

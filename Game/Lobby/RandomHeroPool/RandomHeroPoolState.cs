@@ -53,7 +53,8 @@ public sealed class RandomHeroPoolState
 
     public IReadOnlyList<string> UnlockedHeroIds => _unlockedHeroIds.ToArray();
 
-    public IReadOnlyCollection<string> SelectedHeroIds => _selectedHeroIds.ToArray();
+    public IReadOnlyCollection<string> SelectedHeroIds =>
+        _unlockedHeroIds.Where(_selectedHeroIds.Contains).ToArray();
 
     public bool IsSelected(string heroId)
     {

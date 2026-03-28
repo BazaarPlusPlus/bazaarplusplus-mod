@@ -1,9 +1,13 @@
 #nullable enable
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using HarmonyLib;
 using TMPro;
+using TheBazaar;
+using TheBazaar.Utilities;
 using TheBazaar.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -62,64 +66,92 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
     private bool _warnedMissingHeroItemViewsField;
     private bool _warnedMissingHeroUnlockStateField;
     private bool _warnedMissingRandomHeroToggleField;
-    private bool _attachCompleted;
-    private float _nextAttachRetryAt;
-    private float _nextStateRefreshAt;
-    private string _lastAvailabilitySignature = string.Empty;
+    private bool _subscribedToEvents;
+    private Coroutine? _pendingRosterRefreshCoroutine;
 
     internal static void Attach(HeroSelectButtonsView view)
     {
         if (view == null)
             return;
 
-        var controller = view.GetComponent<RandomHeroPoolPanelController>();
-        if (controller == null)
-            controller = view.gameObject.AddComponent<RandomHeroPoolPanelController>();
-
+        var controller = GetOrCreateController(view);
         controller.TryAttach(view);
+        controller.RefreshRosterState(forceRebuild: true);
+        controller.UpdatePanelVisibility();
     }
 
-    private void LateUpdate()
+    internal static void NotifyRosterChanged(HeroSelectButtonsView view, bool forceRebuild)
     {
-        if (!_attachCompleted && _view != null && Time.unscaledTime >= _nextAttachRetryAt)
-        {
-            _nextAttachRetryAt = Time.unscaledTime + 0.5f;
-            TryAttach(_view);
-        }
-
-        if (_panelRoot == null || _randomHeroToggle == null)
+        if (view == null)
             return;
 
-        var shouldBeVisible = _randomHeroToggle.gameObject.activeSelf && _randomHeroToggle.isOn;
-        if (_panelRoot.gameObject.activeSelf != shouldBeVisible)
-            _panelRoot.gameObject.SetActive(shouldBeVisible);
+        var controller = GetOrCreateController(view);
+        controller.TryAttach(view);
+        controller.RefreshRosterState(forceRebuild);
+        controller.UpdatePanelVisibility();
+    }
 
-        if (!shouldBeVisible)
+    internal static void ScheduleRosterRefresh(
+        HeroSelectButtonsView view,
+        Task refreshTask,
+        bool forceRebuild
+    )
+    {
+        if (view == null || refreshTask == null)
             return;
 
-        SyncPanelPlacement();
+        var controller = GetOrCreateController(view);
+        controller.TryAttach(view);
+        controller.ScheduleRosterRefresh(refreshTask, forceRebuild);
+    }
 
-        if (Time.unscaledTime >= _nextStateRefreshAt)
-        {
-            _nextStateRefreshAt = Time.unscaledTime + 0.5f;
-            RefreshPanelEntries(forceRebuild: false);
-        }
+    internal static void NotifyVisibilityChanged(HeroSelectButtonsView view)
+    {
+        if (view == null)
+            return;
+
+        view.GetComponent<RandomHeroPoolPanelController>()?.UpdatePanelVisibility();
+    }
+
+    private void OnDestroy()
+    {
+        CancelPendingRosterRefresh();
+        UnsubscribeFromEvents();
+        UnbindToggle();
+    }
+
+    private void OnRectTransformDimensionsChange()
+    {
+        UpdatePanelVisibility();
+    }
+
+    private static RandomHeroPoolPanelController GetOrCreateController(HeroSelectButtonsView view)
+    {
+        var controller = view.GetComponent<RandomHeroPoolPanelController>();
+        return controller ?? view.gameObject.AddComponent<RandomHeroPoolPanelController>();
     }
 
     private void TryAttach(HeroSelectButtonsView view)
     {
-        _attachCompleted = false;
-        _view = view;
         if (!TryReadRandomHeroToggle(view, out var randomHeroToggle))
             return;
 
+        if (
+            ReferenceEquals(_view, view)
+            && ReferenceEquals(_randomHeroToggle, randomHeroToggle)
+            && _panelRoot != null
+            && _subscribedToEvents
+        )
+        {
+            return;
+        }
+
+        _view = view;
         _randomHeroToggle = randomHeroToggle;
+        BindToggle(randomHeroToggle);
+        SubscribeToEvents();
         if (!TryEnsurePanel())
             return;
-
-        RefreshPanelEntries(forceRebuild: true);
-        SyncPanelPlacement();
-        _attachCompleted = true;
     }
 
     private bool TryReadRandomHeroToggle(HeroSelectButtonsView view, out Toggle randomHeroToggle)
@@ -142,6 +174,61 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         }
 
         return false;
+    }
+
+    private void BindToggle(Toggle randomHeroToggle)
+    {
+        UnbindToggle();
+        _randomHeroToggle = randomHeroToggle;
+        _randomHeroToggle.onValueChanged.AddListener(OnRandomHeroToggleValueChanged);
+    }
+
+    private void UnbindToggle()
+    {
+        if (_randomHeroToggle != null)
+            _randomHeroToggle.onValueChanged.RemoveListener(OnRandomHeroToggleValueChanged);
+    }
+
+    private void SubscribeToEvents()
+    {
+        if (_subscribedToEvents)
+            return;
+
+        Events.RandomHeroModeChanged.AddListener(OnRandomHeroModeChanged, this);
+        Events.ScreenSizeChanged.AddListener(OnScreenSizeChanged, this);
+        Events.ResolutionChanged.AddListener(OnResolutionChanged, this);
+        _subscribedToEvents = true;
+    }
+
+    private void UnsubscribeFromEvents()
+    {
+        if (!_subscribedToEvents)
+            return;
+
+        Events.RandomHeroModeChanged.RemoveListener(OnRandomHeroModeChanged);
+        Events.ScreenSizeChanged.RemoveListener(OnScreenSizeChanged);
+        Events.ResolutionChanged.RemoveListener(OnResolutionChanged);
+        _subscribedToEvents = false;
+    }
+
+    private void OnRandomHeroToggleValueChanged(bool _)
+    {
+        UpdatePanelVisibility();
+    }
+
+    private void OnRandomHeroModeChanged(bool _)
+    {
+        UpdatePanelVisibility();
+    }
+
+    private void OnScreenSizeChanged(Rect _)
+    {
+        UpdatePanelVisibility();
+    }
+
+    private void OnResolutionChanged(ResolutionChangeData _)
+    {
+        UpdatePanelVisibility();
     }
 
     private bool TryEnsurePanel()
@@ -261,6 +348,46 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         return true;
     }
 
+    private void UpdatePanelVisibility()
+    {
+        if (_panelRoot == null || _randomHeroToggle == null)
+            return;
+
+        var shouldBeVisible = _randomHeroToggle.gameObject.activeSelf && _randomHeroToggle.isOn;
+        if (_panelRoot.gameObject.activeSelf != shouldBeVisible)
+            _panelRoot.gameObject.SetActive(shouldBeVisible);
+
+        if (shouldBeVisible)
+            SyncPanelPlacement();
+    }
+
+    private void ScheduleRosterRefresh(Task refreshTask, bool forceRebuild)
+    {
+        CancelPendingRosterRefresh();
+        _pendingRosterRefreshCoroutine = StartCoroutine(
+            WaitForRosterRefresh(refreshTask, forceRebuild)
+        );
+    }
+
+    private void CancelPendingRosterRefresh()
+    {
+        if (_pendingRosterRefreshCoroutine == null)
+            return;
+
+        StopCoroutine(_pendingRosterRefreshCoroutine);
+        _pendingRosterRefreshCoroutine = null;
+    }
+
+    private IEnumerator WaitForRosterRefresh(Task refreshTask, bool forceRebuild)
+    {
+        while (!refreshTask.IsCompleted)
+            yield return null;
+
+        _pendingRosterRefreshCoroutine = null;
+        if (_view != null)
+            NotifyRosterChanged(_view, forceRebuild);
+    }
+
     private void SyncPanelPlacement()
     {
         if (_panelRoot == null || _randomHeroToggle == null)
@@ -287,43 +414,26 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         );
     }
 
-    private void RefreshPanelEntries(bool forceRebuild)
+    private void RefreshRosterState(bool forceRebuild)
     {
         if (_entriesRoot == null || _view == null || _panelRoot == null)
             return;
 
-        if (!TryReadHeroItemViews(_view, out var heroItemViews))
+        if (!TryBuildHeroAvailabilities(_view, out var heroAvailabilities))
             return;
 
-        _heroAvailabilities = heroItemViews
-            .Where(candidate => candidate != null)
-            .Select(candidate => new HeroAvailability(candidate.Hero.ToString(), IsUnlocked(candidate)))
-            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.HeroId))
-            .Distinct(HeroAvailabilityComparer.Instance)
-            .ToArray();
-
-        var availabilitySignature = string.Join(
-            "|",
-            _heroAvailabilities.Select(candidate => $"{candidate.HeroId}:{(candidate.IsUnlocked ? '1' : '0')}")
-        );
-        if (!forceRebuild && string.Equals(_lastAvailabilitySignature, availabilitySignature, StringComparison.Ordinal))
+        if (!forceRebuild && !HasHeroAvailabilityChanged(heroAvailabilities))
             return;
 
-        _lastAvailabilitySignature = availabilitySignature;
-        _unlockedHeroIds = _heroAvailabilities
+        _heroAvailabilities = heroAvailabilities;
+        _unlockedHeroIds = heroAvailabilities
             .Where(candidate => candidate.IsUnlocked)
             .Select(candidate => candidate.HeroId)
             .ToArray();
 
-        if (_unlockedHeroIds.Length > 0)
+        if (RandomHeroPoolPlayerPrefs.TryResolveState(_unlockedHeroIds, out var state) && state != null)
         {
-            var mergedPool = RandomHeroPoolPreferences.MergeWithKnownUnlockedHeroIds(
-                _unlockedHeroIds,
-                RandomHeroPoolPlayerPrefs.LoadSelectedHeroIds(),
-                RandomHeroPoolPlayerPrefs.LoadKnownUnlockedHeroIds()
-            );
-            ApplyState(RandomHeroPoolStateFactory.Create(_unlockedHeroIds, mergedPool), persist: true);
-            RandomHeroPoolPlayerPrefs.SaveKnownUnlockedHeroIds(_unlockedHeroIds);
+            ApplyState(state, persist: true);
         }
         else
         {
@@ -332,6 +442,45 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
 
         RebuildHeroEntries();
         RebindHeroEntries();
+    }
+
+    private bool TryBuildHeroAvailabilities(
+        HeroSelectButtonsView view,
+        out HeroAvailability[] heroAvailabilities
+    )
+    {
+        heroAvailabilities = Array.Empty<HeroAvailability>();
+        if (!TryReadHeroItemViews(view, out var heroItemViews))
+            return false;
+
+        heroAvailabilities = heroItemViews
+            .Where(candidate => candidate != null)
+            .Select(candidate => new HeroAvailability(candidate.Hero.ToString(), IsUnlocked(candidate)))
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.HeroId))
+            .Distinct(HeroAvailabilityComparer.Instance)
+            .ToArray();
+        return true;
+    }
+
+    private bool HasHeroAvailabilityChanged(HeroAvailability[] nextHeroAvailabilities)
+    {
+        if (_heroAvailabilities.Length != nextHeroAvailabilities.Length)
+            return true;
+
+        for (var index = 0; index < nextHeroAvailabilities.Length; index++)
+        {
+            var current = _heroAvailabilities[index];
+            var next = nextHeroAvailabilities[index];
+            if (
+                !string.Equals(current.HeroId, next.HeroId, StringComparison.Ordinal)
+                || current.IsUnlocked != next.IsUnlocked
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void ApplyState(RandomHeroPoolState nextState, bool persist)

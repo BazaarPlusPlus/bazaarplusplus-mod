@@ -40,6 +40,12 @@ var sanitizedUnlockedState = RandomHeroPoolStateFactory.Create(
 AssertSet(sanitizedUnlockedState.UnlockedHeroIds, "Vanessa", "Pygmalien");
 AssertSet(sanitizedUnlockedState.SelectedHeroIds, "Pygmalien");
 
+var stableSelectedOrderState = RandomHeroPoolStateFactory.Create(
+    unlockedHeroIds: new[] { "Vanessa", "Pygmalien", "Mak" },
+    savedPoolHeroIds: new[] { "Mak", "Vanessa" }
+);
+AssertSequence(stableSelectedOrderState.SelectedHeroIds, "Vanessa", "Mak");
+
 var noMutationThroughUnlockedView = RandomHeroPoolStateFactory.Create(
     unlockedHeroIds: new[] { "Vanessa", "Pygmalien" },
     savedPoolHeroIds: new[] { "Vanessa" }
@@ -86,33 +92,17 @@ var singlePassSavedPool = new SinglePassEnumerable("Mak");
 var singlePassSavedState = RandomHeroPoolStateFactory.Create(unlocked, singlePassSavedPool);
 AssertSet(singlePassSavedState.SelectedHeroIds, "Mak");
 
-var persisted = RandomHeroPoolPreferences.MergeUnlockedHeroIds(
-    unlockedHeroIds: new[] { "Vanessa", "Pygmalien" },
-    savedPoolHeroIds: new[] { "Vanessa" },
-    newlyUnlockedHeroIds: new[] { "Mak" }
-);
-AssertSet(persisted, "Vanessa", "Mak");
-
-var singlePassNewlyUnlocked = new SinglePassEnumerable("Mak");
-var mergedWithSinglePassNewlyUnlocked = RandomHeroPoolPreferences.MergeUnlockedHeroIds(
-    unlockedHeroIds: new[] { "Vanessa", "Pygmalien" },
-    savedPoolHeroIds: new[] { "Vanessa" },
-    newlyUnlockedHeroIds: singlePassNewlyUnlocked
-);
-AssertSet(mergedWithSinglePassNewlyUnlocked, "Vanessa", "Mak");
-
 var sanitized = RandomHeroPoolPreferences.Sanitize(
     unlockedHeroIds: new[] { "Vanessa", "Pygmalien" },
     savedPoolHeroIds: new[] { "MissingHero" }
 );
 AssertSet(sanitized, "Vanessa", "Pygmalien");
 
-var mergedWithKnownUnlocked = RandomHeroPoolPreferences.MergeWithKnownUnlockedHeroIds(
+var curatedPoolStaysCurated = RandomHeroPoolPreferences.Sanitize(
     unlockedHeroIds: new[] { "Vanessa", "Pygmalien", "Mak" },
-    savedPoolHeroIds: new[] { "Vanessa" },
-    knownUnlockedHeroIds: new[] { "Vanessa", "Pygmalien" }
+    savedPoolHeroIds: new[] { "Vanessa" }
 );
-AssertSet(mergedWithKnownUnlocked, "Vanessa", "Mak");
+AssertSet(curatedPoolStaysCurated, "Vanessa");
 
 var sanitizedSnapshot = RandomHeroPoolPreferences.Sanitize(
     unlockedHeroIds: new[] { "Vanessa", "Pygmalien" },

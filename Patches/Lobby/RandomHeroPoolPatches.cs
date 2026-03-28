@@ -3,8 +3,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using BazaarPlusPlus.Game.Lobby.RandomHeroPool;
 using HarmonyLib;
+using BazaarGameShared.Domain.Core.Types;
 using TheBazaar.UI;
 using UnityEngine;
 
@@ -29,6 +31,63 @@ internal static class RandomHeroPoolAwakePatch
         {
             BppLog.Warn("RandomHeroPool", $"Failed to attach random hero pool panel: {ex}");
         }
+    }
+}
+
+[HarmonyPatch(typeof(HeroSelectButtonsView), "RefreshButtons")]
+internal static class RandomHeroPoolRefreshButtonsPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(HeroSelectButtonsView __instance, Task __result)
+    {
+        if (__result == null)
+            return;
+
+        try
+        {
+            RandomHeroPoolPanelController.ScheduleRosterRefresh(
+                __instance,
+                __result,
+                forceRebuild: true
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn("RandomHeroPool", $"Failed to schedule random hero pool refresh: {ex}");
+        }
+    }
+}
+
+[HarmonyPatch(typeof(HeroSelectButtonsView), "ShowHeroesButtons")]
+internal static class RandomHeroPoolShowHeroesButtonsPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(HeroSelectButtonsView __instance, bool show)
+    {
+        if (!show)
+            return;
+
+        RandomHeroPoolPanelController.NotifyRosterChanged(__instance, forceRebuild: true);
+    }
+}
+
+[HarmonyPatch(typeof(HeroSelectButtonsView), "OnHeroPurchased")]
+internal static class RandomHeroPoolOnHeroPurchasedPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(HeroSelectButtonsView __instance, EHero hero)
+    {
+        RandomHeroPoolPanelController.NotifyRosterChanged(__instance, forceRebuild: true);
+    }
+}
+
+[HarmonyPatch(typeof(HeroSelectButtonsView), "OnHeroSelected")]
+internal static class RandomHeroPoolOnHeroSelectedPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(HeroSelectButtonsView __instance, EHero hero)
+    {
+        RandomHeroPoolPanelController.NotifyVisibilityChanged(__instance);
     }
 }
 
