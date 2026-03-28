@@ -24,35 +24,19 @@ internal sealed class RunUploadController : MonoBehaviour
             if (BppRuntimeHost.Config.EnableRunUploadConfig?.Value != true)
                 return;
 
-            var legacyUploadEndpoint = BppRuntimeHost.Config.RunUploadEndpointConfig?.Value?.Trim();
-            var legacyRegistrationEndpoint =
+            var uploadEndpoint = BppRuntimeHost.Config.RunUploadEndpointConfig?.Value?.Trim();
+            var registrationEndpoint =
                 BppRuntimeHost.Config.RunUploadRegistrationEndpointConfig?.Value?.Trim();
-            var globalUploadEndpoint =
-                BppRuntimeHost.Config.RunUploadEndpointGlobalConfig?.Value?.Trim();
-            var globalRegistrationEndpoint =
-                BppRuntimeHost.Config.RunUploadRegistrationEndpointGlobalConfig?.Value?.Trim();
-            var cnUploadEndpoint = BppRuntimeHost.Config.RunUploadEndpointCnConfig?.Value?.Trim();
-            var cnRegistrationEndpoint =
-                BppRuntimeHost.Config.RunUploadRegistrationEndpointCnConfig?.Value?.Trim();
             var databasePath = BppRuntimeHost.Paths.RunLogDatabasePath;
             var identityPath = BppRuntimeHost.Paths.RunUploadInstallIdentityPath;
             var clientStatePath = BppRuntimeHost.Paths.RunUploadClientStatePath;
             var privateKeyPath = BppRuntimeHost.Paths.RunUploadPrivateKeyPath;
-            var routeStatePath = BppRuntimeHost.Paths.RunUploadRouteStatePath;
-
-            globalUploadEndpoint = string.IsNullOrWhiteSpace(globalUploadEndpoint)
-                ? legacyUploadEndpoint
-                : globalUploadEndpoint;
-            globalRegistrationEndpoint = string.IsNullOrWhiteSpace(globalRegistrationEndpoint)
-                ? legacyRegistrationEndpoint
-                : globalRegistrationEndpoint;
 
             if (
                 string.IsNullOrWhiteSpace(databasePath)
                 || string.IsNullOrWhiteSpace(identityPath)
                 || string.IsNullOrWhiteSpace(clientStatePath)
                 || string.IsNullOrWhiteSpace(privateKeyPath)
-                || string.IsNullOrWhiteSpace(routeStatePath)
             )
             {
                 BppLog.Warn(
@@ -71,37 +55,12 @@ internal sealed class RunUploadController : MonoBehaviour
                 BppRuntimeHost.Config.RunUploadIntervalSecondsConfig?.Value ?? 180
             );
             var batchSize = Math.Max(1, BppRuntimeHost.Config.RunUploadBatchSizeConfig?.Value ?? 3);
-            var failureThreshold = Math.Max(
-                1,
-                BppRuntimeHost.Config.RunUploadGlobalFailureThresholdConfig?.Value ?? 2
-            );
-            var preferredRouteCacheMinutes = Math.Max(
-                5,
-                BppRuntimeHost.Config.RunUploadPreferredRouteCacheMinutesConfig?.Value ?? 1440
-            );
-            var mode = RunUploadRouteSelector.ParseMode(
-                BppRuntimeHost.Config.RunUploadModeConfig?.Value
-            );
-
-            var globalEndpoint = TryBuildEndpointSet(
-                RunUploadRouteKind.Global,
-                globalRegistrationEndpoint,
-                globalUploadEndpoint
-            );
-            var cnEndpoint = TryBuildEndpointSet(
-                RunUploadRouteKind.CN,
-                cnRegistrationEndpoint,
-                cnUploadEndpoint
-            );
-            if (
-                mode != RunUploadMode.Off
-                && globalEndpoint == null
-                && cnEndpoint == null
-            )
+            var endpoint = TryBuildEndpointSet(registrationEndpoint, uploadEndpoint);
+            if (endpoint == null)
             {
                 BppLog.Warn(
                     "RunUploadController",
-                    "Run upload is enabled but neither Global nor CN endpoint pair is configured."
+                    "Run upload is enabled but the registration/upload endpoint pair is not configured."
                 );
                 return;
             }
@@ -110,21 +69,12 @@ internal sealed class RunUploadController : MonoBehaviour
             var identityStore = new RunUploadIdentityStore(identityPath);
             var clientStateStore = new RunUploadClientStateStore(clientStatePath);
             var keyStore = new RunUploadKeyStore(privateKeyPath);
-            var routeStateStore = new RunUploadRouteStateStore(routeStatePath);
-            var routeSelector = new RunUploadRouteSelector(
-                mode,
-                routeStateStore,
-                failureThreshold,
-                TimeSpan.FromMinutes(preferredRouteCacheMinutes)
-            );
             _uploadService = new RunUploadService(
                 uploadStore,
                 identityStore,
                 clientStateStore,
                 keyStore,
-                routeSelector,
-                globalEndpoint,
-                cnEndpoint,
+                endpoint,
                 batchSize,
                 timeout: TimeSpan.FromSeconds(10)
             );
@@ -132,7 +82,7 @@ internal sealed class RunUploadController : MonoBehaviour
             _nextAttemptAt = Time.unscaledTime + startupDelaySeconds;
             BppLog.Info(
                 "RunUploadController",
-                $"Background run upload armed in {mode} mode."
+                "Background run upload armed."
             );
         }
         catch (Exception ex)
@@ -192,11 +142,7 @@ internal sealed class RunUploadController : MonoBehaviour
         _uploadService = null;
     }
 
-    private static RunUploadEndpointSet? TryBuildEndpointSet(
-        RunUploadRouteKind routeKind,
-        string? registrationEndpoint,
-        string? uploadEndpoint
-    )
+    private static RunUploadEndpointSet? TryBuildEndpointSet(string? registrationEndpoint, string? uploadEndpoint)
     {
         if (
             string.IsNullOrWhiteSpace(registrationEndpoint)
@@ -218,7 +164,6 @@ internal sealed class RunUploadController : MonoBehaviour
 
         return new RunUploadEndpointSet
         {
-            RouteKind = routeKind,
             RegistrationEndpoint = registrationUri.ToString(),
             UploadEndpoint = uploadUri.ToString(),
         };

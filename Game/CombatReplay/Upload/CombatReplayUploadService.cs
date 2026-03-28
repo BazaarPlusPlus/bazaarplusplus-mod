@@ -10,8 +10,6 @@ namespace BazaarPlusPlus.Game.CombatReplay.Upload;
 
 internal sealed class CombatReplayUploadService : IDisposable
 {
-    internal const string ReplayClientStateScope = "ReplayCloudflare";
-
     private readonly CombatReplayUploadSqliteStore _store;
     private readonly RunUploadIdentityStore _identityStore;
     private readonly RunUploadClientStateStore _clientStateStore;
@@ -127,7 +125,7 @@ internal sealed class CombatReplayUploadService : IDisposable
                         if (uploadResult.ShouldReRegister && !recoveredRegistration)
                         {
                             recoveredRegistration = true;
-                            _clientStateStore.ClearScopedClientId(ReplayClientStateScope);
+                            _clientStateStore.ClearScopedClientId(RunUploadScopes.Replays);
                             clientId = await EnsureClientRegistrationAsync(
                                 installId,
                                 cancellationToken
@@ -198,7 +196,7 @@ internal sealed class CombatReplayUploadService : IDisposable
             _httpClient,
             _clientStateStore,
             _keyStore,
-            ReplayClientStateScope,
+            RunUploadScopes.Replays,
             "replays",
             _registrationEndpoint
         );

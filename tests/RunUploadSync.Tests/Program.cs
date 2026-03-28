@@ -200,20 +200,18 @@ try
     var clientStateStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore");
     var clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
-    var routeKindType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteKind");
-    var globalRouteKind = Enum.Parse(routeKindType, "Global");
     Assert(
-        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetClientId", [globalRouteKind]) == null,
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"]) == null,
         "Client state store should return null before registration."
     );
-    InvokeVoid(clientStateStoreType, clientStateStore, "SaveClientId", [globalRouteKind, "client-abc"]);
+    InvokeVoid(clientStateStoreType, clientStateStore, "SaveScopedClientId", ["Runs", "client-abc"]);
     Assert(
-        (string)Invoke<object>(clientStateStoreType, clientStateStore, "TryGetClientId", [globalRouteKind]) == "client-abc",
+        (string)Invoke<object>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"]) == "client-abc",
         "Client state store should persist client id."
     );
-    InvokeVoid(clientStateStoreType, clientStateStore, "ClearClientId", [globalRouteKind]);
+    InvokeVoid(clientStateStoreType, clientStateStore, "ClearScopedClientId", ["Runs"]);
     Assert(
-        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetClientId", [globalRouteKind]) == null,
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"]) == null,
         "Client state store should clear a route-scoped client id."
     );
 
@@ -221,79 +219,8 @@ try
     clientStateStore = Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to recreate RunUploadClientStateStore.");
     Assert(
-        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetClientId", [globalRouteKind]) == null,
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"]) == null,
         "Client state store should recover from corrupted JSON by treating it as empty state."
-    );
-
-    var routeStateStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteStateStore");
-    var routeStatePath = Path.Combine(tempRoot, "route.json");
-    var routeStateStore = Activator.CreateInstance(routeStateStoreType, routeStatePath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadRouteStateStore.");
-    var routeSelectorType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteSelector");
-    var modeType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadMode");
-    var autoMode = Enum.Parse(modeType, "Auto");
-    var routeSelector = Activator.CreateInstance(
-        routeSelectorType,
-        autoMode,
-        routeStateStore,
-        2,
-        TimeSpan.FromMinutes(60)
-    ) ?? throw new InvalidOperationException("Failed to create RunUploadRouteSelector.");
-    var endpointSetType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadEndpointSet");
-    var globalEndpoint = Activator.CreateInstance(endpointSetType)!;
-    endpointSetType.GetProperty("RouteKind")!.SetValue(globalEndpoint, globalRouteKind);
-    endpointSetType.GetProperty("RegistrationEndpoint")!.SetValue(globalEndpoint, "https://global.example/register");
-    endpointSetType.GetProperty("UploadEndpoint")!.SetValue(globalEndpoint, "https://global.example/upload");
-    var cnRouteKind = Enum.Parse(routeKindType, "CN");
-    var cnEndpoint = Activator.CreateInstance(endpointSetType)!;
-    endpointSetType.GetProperty("RouteKind")!.SetValue(cnEndpoint, cnRouteKind);
-    endpointSetType.GetProperty("RegistrationEndpoint")!.SetValue(cnEndpoint, "https://cn.example/register");
-    endpointSetType.GetProperty("UploadEndpoint")!.SetValue(cnEndpoint, "https://cn.example/upload");
-    var routeOrder = (System.Collections.IEnumerable)Invoke<object>(
-        routeSelectorType,
-        routeSelector,
-        "GetRouteOrder",
-        [globalEndpoint, cnEndpoint]
-    );
-    var firstRoute = routeOrder.Cast<object>().First();
-    Assert(
-        endpointSetType.GetProperty("RouteKind")!.GetValue(firstRoute)!.ToString() == "Global",
-        "Auto mode should try Global before CN."
-    );
-    InvokeVoid(routeSelectorType, routeSelector, "RecordRouteFailure", [globalRouteKind]);
-    InvokeVoid(routeSelectorType, routeSelector, "RecordRouteFailure", [globalRouteKind]);
-    routeOrder = (System.Collections.IEnumerable)Invoke<object>(
-        routeSelectorType,
-        routeSelector,
-        "GetRouteOrder",
-        [globalEndpoint, cnEndpoint]
-    );
-    firstRoute = routeOrder.Cast<object>().First();
-    Assert(
-        endpointSetType.GetProperty("RouteKind")!.GetValue(firstRoute)!.ToString() == "CN",
-        "Auto mode should fall back to CN after repeated Global failures."
-    );
-
-    File.WriteAllText(routeStatePath, "{ not-valid-json");
-    routeStateStore = Activator.CreateInstance(routeStateStoreType, routeStatePath)
-        ?? throw new InvalidOperationException("Failed to recreate RunUploadRouteStateStore.");
-    routeSelector = Activator.CreateInstance(
-        routeSelectorType,
-        autoMode,
-        routeStateStore,
-        2,
-        TimeSpan.FromMinutes(60)
-    ) ?? throw new InvalidOperationException("Failed to recreate RunUploadRouteSelector.");
-    routeOrder = (System.Collections.IEnumerable)Invoke<object>(
-        routeSelectorType,
-        routeSelector,
-        "GetRouteOrder",
-        [globalEndpoint, cnEndpoint]
-    );
-    firstRoute = routeOrder.Cast<object>().First();
-    Assert(
-        endpointSetType.GetProperty("RouteKind")!.GetValue(firstRoute)!.ToString() == "Global",
-        "Route selector should recover from corrupted route state by reverting to default ordering."
     );
 
     var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");

@@ -142,28 +142,10 @@ try
     var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
     var keyStore = Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
-    var routeKindType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteKind");
-    var modeType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadMode");
-    var routeStateStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteStateStore");
-    var routeStateStore = Activator.CreateInstance(
-        routeStateStoreType,
-        Path.Combine(tempRoot, "route.json")
-    ) ?? throw new InvalidOperationException("Failed to create RunUploadRouteStateStore.");
-    var routeSelectorType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteSelector");
-    var globalRouteKind = Enum.Parse(routeKindType, "Global");
-    var globalMode = Enum.Parse(modeType, "Global");
-    var routeSelector = Activator.CreateInstance(
-        routeSelectorType,
-        globalMode,
-        routeStateStore,
-        2,
-        TimeSpan.FromMinutes(60)
-    ) ?? throw new InvalidOperationException("Failed to create RunUploadRouteSelector.");
     var endpointSetType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadEndpointSet");
-    var globalEndpoint = Activator.CreateInstance(endpointSetType)!;
-    endpointSetType.GetProperty("RouteKind")!.SetValue(globalEndpoint, globalRouteKind);
-    endpointSetType.GetProperty("RegistrationEndpoint")!.SetValue(globalEndpoint, $"{prefix}clients/register");
-    endpointSetType.GetProperty("UploadEndpoint")!.SetValue(globalEndpoint, $"{prefix}runs/upload");
+    var endpoint = Activator.CreateInstance(endpointSetType)!;
+    endpointSetType.GetProperty("RegistrationEndpoint")!.SetValue(endpoint, $"{prefix}clients/register");
+    endpointSetType.GetProperty("UploadEndpoint")!.SetValue(endpoint, $"{prefix}runs/upload");
     var serviceType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadService");
     var service = Activator.CreateInstance(
         serviceType,
@@ -171,9 +153,7 @@ try
         identityStore,
         clientStateStore,
         keyStore,
-        routeSelector,
-        globalEndpoint,
-        null,
+        endpoint,
         3,
         TimeSpan.FromSeconds(10)
     ) ?? throw new InvalidOperationException("Failed to create RunUploadService.");
@@ -198,7 +178,7 @@ try
 
     var clientState = JObject.Parse(File.ReadAllText(clientStatePath));
     Assert(
-        clientState["client_ids"]?["Global"]?.Value<string>() == "client-test-001",
+        clientState["client_ids"]?["Runs"]?.Value<string>() == "client-test-001",
         "Client registration should persist route-scoped client_id locally."
     );
 
@@ -207,7 +187,7 @@ try
         """
         {
           "client_ids": {
-            "Global": "client-stale-001"
+            "Runs": "client-stale-001"
           }
         }
         """
@@ -352,17 +332,15 @@ try
 
     try
     {
-        endpointSetType.GetProperty("RegistrationEndpoint")!.SetValue(globalEndpoint, $"{recoveryPrefix}clients/register");
-        endpointSetType.GetProperty("UploadEndpoint")!.SetValue(globalEndpoint, $"{recoveryPrefix}runs/upload");
+        endpointSetType.GetProperty("RegistrationEndpoint")!.SetValue(endpoint, $"{recoveryPrefix}clients/register");
+        endpointSetType.GetProperty("UploadEndpoint")!.SetValue(endpoint, $"{recoveryPrefix}runs/upload");
         service = Activator.CreateInstance(
             serviceType,
             uploadStore,
             identityStore,
             clientStateStore,
             keyStore,
-            routeSelector,
-            globalEndpoint,
-            null,
+            endpoint,
             3,
             TimeSpan.FromSeconds(10)
         ) ?? throw new InvalidOperationException("Failed to recreate RunUploadService.");
@@ -394,7 +372,7 @@ try
 
     clientState = JObject.Parse(File.ReadAllText(clientStatePath));
     Assert(
-        clientState["client_ids"]?["Global"]?.Value<string>() == "client-test-002",
+        clientState["client_ids"]?["Runs"]?.Value<string>() == "client-test-002",
         "Re-registration should replace the stale route-scoped client id."
     );
     Assert(reRegisterCount == 1, "A stale client id should trigger exactly one re-registration.");

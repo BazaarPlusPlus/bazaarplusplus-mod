@@ -1,12 +1,17 @@
-name = "mod-cf-server"
+name = "bazaarplusplus-mod-api"
 main = "src/index.ts"
 compatibility_date = "2026-03-28"
+workers_dev = false
+
+[[routes]]
+pattern = "mod-api.bazaarplusplus.com"
+custom_domain = true
 
 [[d1_databases]]
 binding = "DB"
-database_name = "mod-cf-server"
+database_name = "bazaarplusplus-mod-api-db"
 database_id = "replace-me"
 
 [[r2_buckets]]
 binding = "REPLAY_BUCKET"
-bucket_name = "replace-me"
+bucket_name = "bazaarplusplus-replays"

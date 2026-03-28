@@ -9,6 +9,7 @@ and `tests/` remain the source of truth.
 - `../README.md`: repository-level feature summary and build / packaging notes
 - `combat-status-bar.md`: runtime HUD, speed control, and combat-frame timing model
 - `monster-preview-design.md`: monster preview overlay pipeline and data sources
+- `mod-cf-server-deploy.md`: Cloudflare Worker, D1, R2, secret, and custom-domain deployment flow
 - `run-logging.md`: run log capture, SQLite persistence, history UI, and export flow
 - `run-upload.md`: current background upload implementation, config, and request format
 - `run-upload-identity-design.md`: install identity, signed upload, uid binding, and dual-backend design

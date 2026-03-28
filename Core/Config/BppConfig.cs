@@ -21,29 +21,15 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableRunUploadConfig { get; private set; }
 
-    public ConfigEntry<string>? RunUploadModeConfig { get; private set; }
-
     public ConfigEntry<string>? RunUploadEndpointConfig { get; private set; }
 
     public ConfigEntry<string>? RunUploadRegistrationEndpointConfig { get; private set; }
-
-    public ConfigEntry<string>? RunUploadEndpointGlobalConfig { get; private set; }
-
-    public ConfigEntry<string>? RunUploadRegistrationEndpointGlobalConfig { get; private set; }
-
-    public ConfigEntry<string>? RunUploadEndpointCnConfig { get; private set; }
-
-    public ConfigEntry<string>? RunUploadRegistrationEndpointCnConfig { get; private set; }
 
     public ConfigEntry<int>? RunUploadStartupDelaySecondsConfig { get; private set; }
 
     public ConfigEntry<int>? RunUploadIntervalSecondsConfig { get; private set; }
 
     public ConfigEntry<int>? RunUploadBatchSizeConfig { get; private set; }
-
-    public ConfigEntry<int>? RunUploadGlobalFailureThresholdConfig { get; private set; }
-
-    public ConfigEntry<int>? RunUploadPreferredRouteCacheMinutesConfig { get; private set; }
 
     public void Initialize(ConfigFile config)
     {
@@ -98,47 +84,17 @@ internal sealed class BppConfig : IBppConfig
             false,
             "Whether completed run logs should be uploaded in the background while not in a live run."
         );
-        RunUploadModeConfig = config.Bind(
-            "RunUpload",
-            "Mode",
-            "Auto",
-            "Upload route mode: Off, Auto, Global, or CN. Auto tries Global first and falls back to CN."
-        );
         RunUploadEndpointConfig = config.Bind(
             "RunUpload",
             "Endpoint",
-            string.Empty,
-            "Legacy upload endpoint. Used as the Global upload endpoint when EndpointGlobal is empty."
+            "https://mod-api.bazaarplusplus.com/runs/upload",
+            "Run upload endpoint."
         );
         RunUploadRegistrationEndpointConfig = config.Bind(
             "RunUpload",
             "RegistrationEndpoint",
-            string.Empty,
-            "Legacy registration endpoint. Used as the Global registration endpoint when RegistrationEndpointGlobal is empty."
-        );
-        RunUploadEndpointGlobalConfig = config.Bind(
-            "RunUpload",
-            "EndpointGlobal",
-            string.Empty,
-            "Preferred Global upload endpoint."
-        );
-        RunUploadRegistrationEndpointGlobalConfig = config.Bind(
-            "RunUpload",
-            "RegistrationEndpointGlobal",
-            string.Empty,
-            "Preferred Global registration endpoint."
-        );
-        RunUploadEndpointCnConfig = config.Bind(
-            "RunUpload",
-            "EndpointCn",
-            string.Empty,
-            "Fallback CN upload endpoint. May temporarily be an IP-based HTTPS endpoint during ICP setup."
-        );
-        RunUploadRegistrationEndpointCnConfig = config.Bind(
-            "RunUpload",
-            "RegistrationEndpointCn",
-            string.Empty,
-            "Fallback CN registration endpoint. May temporarily be an IP-based HTTPS endpoint during ICP setup."
+            "https://mod-api.bazaarplusplus.com/clients/register",
+            "Run upload client registration endpoint."
         );
         RunUploadStartupDelaySecondsConfig = config.Bind(
             "RunUpload",
@@ -165,24 +121,6 @@ internal sealed class BppConfig : IBppConfig
             new ConfigDescription(
                 "Maximum number of completed runs to upload in one background batch.",
                 new AcceptableValueRange<int>(1, 20)
-            )
-        );
-        RunUploadGlobalFailureThresholdConfig = config.Bind(
-            "RunUpload",
-            "GlobalFailureThreshold",
-            2,
-            new ConfigDescription(
-                "How many consecutive Global route failures trigger Auto-mode fallback to CN.",
-                new AcceptableValueRange<int>(1, 10)
-            )
-        );
-        RunUploadPreferredRouteCacheMinutesConfig = config.Bind(
-            "RunUpload",
-            "PreferredRouteCacheMinutes",
-            1440,
-            new ConfigDescription(
-                "How long Auto mode should keep using the last successful route before trying Global first again.",
-                new AcceptableValueRange<int>(5, 10080)
             )
         );
     }

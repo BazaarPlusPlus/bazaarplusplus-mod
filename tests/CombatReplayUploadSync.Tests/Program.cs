@@ -43,16 +43,15 @@ try
     Assert(
         controllerSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal)
             && controllerSource.Contains("TryDeriveReplayUploadEndpoint", StringComparison.Ordinal)
-            && !controllerSource.Contains("RunUploadModeConfig", StringComparison.Ordinal)
             && !controllerSource.Contains("RunUploadRouteStatePath", StringComparison.Ordinal),
-        "CombatReplayUploadController should reuse the Cloudflare run endpoint contract without replay route fallback."
+        "CombatReplayUploadController should reuse the shared run endpoint contract without replay route fallback."
     );
     Assert(
         controllerSource.Contains(
-            "requires the shared Cloudflare/global run upload endpoint",
+            "requires the shared run upload endpoint",
             StringComparison.Ordinal
         ),
-        "CombatReplayUploadController should warn when replay upload is enabled without the shared Cloudflare/global endpoint."
+        "CombatReplayUploadController should warn when replay upload is enabled without the shared run endpoint."
     );
 
     var pluginSource = File.ReadAllText(
@@ -213,7 +212,7 @@ try
         """
         {
           "client_ids": {
-            "Global": "client-existing-001"
+            "Runs": "client-existing-001"
           }
         }
         """
@@ -232,7 +231,7 @@ try
         clientStateStoreType,
         clientStateStore,
         "SaveScopedClientId",
-        ["Global", "run-client-001"]
+        ["Runs", "run-client-001"]
     );
     var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
     var keyStore = Activator.CreateInstance(keyStoreType, Path.Combine(tempRoot, "key.json"))
@@ -279,7 +278,7 @@ try
 
     var persistedClientState = File.ReadAllText(clientStatePath);
     Assert(
-        persistedClientState.Contains("\"Global\": \"run-client-001\"", StringComparison.Ordinal)
+        persistedClientState.Contains("\"Runs\": \"run-client-001\"", StringComparison.Ordinal)
             && !persistedClientState.Contains("\"ReplayCloudflare\"", StringComparison.Ordinal),
         "Replay upload verification should keep the pre-existing run client id untouched when replay registration never starts."
     );

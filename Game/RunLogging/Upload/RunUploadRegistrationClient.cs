@@ -22,22 +22,6 @@ internal sealed class RunUploadRegistrationClient
         HttpClient httpClient,
         RunUploadClientStateStore clientStateStore,
         RunUploadKeyStore keyStore,
-        RunUploadRouteKind routeKind,
-        string registrationEndpoint
-    )
-        : this(
-            httpClient,
-            clientStateStore,
-            keyStore,
-            routeKind.ToString(),
-            "runs",
-            registrationEndpoint
-        ) { }
-
-    public RunUploadRegistrationClient(
-        HttpClient httpClient,
-        RunUploadClientStateStore clientStateStore,
-        RunUploadKeyStore keyStore,
         string clientStateScope,
         string purpose,
         string registrationEndpoint
@@ -71,11 +55,12 @@ internal sealed class RunUploadRegistrationClient
         try
         {
             var keyMaterial = _keyStore.GetOrCreateKeyMaterial();
+            var pluginVersion = BppPluginVersion.Current;
             var requestBody = JsonConvert.SerializeObject(
                 new JObject
                 {
                     ["install_id"] = installId,
-                    ["plugin_version"] = MyPluginInfo.PLUGIN_VERSION,
+                    ["plugin_version"] = pluginVersion,
                     ["purpose"] = _purpose,
                     ["requested_at_utc"] = DateTimeOffset.UtcNow.ToString("o"),
                     ["public_key"] = JToken.FromObject(keyMaterial.ToPublicKey()),
@@ -87,7 +72,7 @@ internal sealed class RunUploadRegistrationClient
                 Content = new StringContent(requestBody, Encoding.UTF8, "application/json"),
             };
             request.Headers.TryAddWithoutValidation("X-BPP-Install-Id", installId);
-            request.Headers.TryAddWithoutValidation("X-BPP-Plugin-Version", MyPluginInfo.PLUGIN_VERSION);
+            request.Headers.TryAddWithoutValidation("X-BPP-Plugin-Version", pluginVersion);
 
             using var response = await _httpClient.SendAsync(
                 request,

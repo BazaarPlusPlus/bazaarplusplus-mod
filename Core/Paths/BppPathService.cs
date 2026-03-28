@@ -17,8 +17,6 @@ internal sealed class BppPathService : IPathService
 
     public string? RunUploadPrivateKeyPath { get; private set; }
 
-    public string? RunUploadRouteStatePath { get; private set; }
-
     public void Initialize()
     {
         CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
@@ -46,11 +44,6 @@ internal sealed class BppPathService : IPathService
             BepInEx.Paths.GameRootPath,
             "BazaarPlusPlus",
             "run-upload-rsa.json"
-        );
-        RunUploadRouteStatePath = System.IO.Path.Combine(
-            BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
-            "run-upload-route.json"
         );
     }
 }

@@ -14,6 +14,4 @@ internal interface IPathService
     string? RunUploadClientStatePath { get; }
 
     string? RunUploadPrivateKeyPath { get; }
-
-    string? RunUploadRouteStatePath { get; }
 }

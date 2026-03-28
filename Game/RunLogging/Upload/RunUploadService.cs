@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,9 +13,7 @@ internal sealed class RunUploadService : IDisposable
     private readonly RunUploadIdentityStore _identityStore;
     private readonly RunUploadClientStateStore _clientStateStore;
     private readonly RunUploadKeyStore _keyStore;
-    private readonly RunUploadRouteSelector _routeSelector;
-    private readonly RunUploadEndpointSet? _globalEndpoint;
-    private readonly RunUploadEndpointSet? _cnEndpoint;
+    private readonly RunUploadEndpointSet _endpoint;
     private readonly int _batchSize;
     private readonly HttpClient _httpClient;
 
@@ -25,9 +22,7 @@ internal sealed class RunUploadService : IDisposable
         RunUploadIdentityStore identityStore,
         RunUploadClientStateStore clientStateStore,
         RunUploadKeyStore keyStore,
-        RunUploadRouteSelector routeSelector,
-        RunUploadEndpointSet? globalEndpoint,
-        RunUploadEndpointSet? cnEndpoint,
+        RunUploadEndpointSet endpoint,
         int batchSize,
         TimeSpan timeout
     )
@@ -36,9 +31,7 @@ internal sealed class RunUploadService : IDisposable
         _identityStore = identityStore ?? throw new ArgumentNullException(nameof(identityStore));
         _clientStateStore = clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
         _keyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
-        _routeSelector = routeSelector ?? throw new ArgumentNullException(nameof(routeSelector));
-        _globalEndpoint = globalEndpoint;
-        _cnEndpoint = cnEndpoint;
+        _endpoint = endpoint ?? throw new ArgumentNullException(nameof(endpoint));
 
         _batchSize = Math.Max(1, batchSize);
         _httpClient = new HttpClient
@@ -54,156 +47,112 @@ internal sealed class RunUploadService : IDisposable
             return new RunUploadCycleResult(uploadedCount: 0, hasMorePending: false);
 
         var installId = _identityStore.GetOrCreateInstallId();
-        var remainingRunIds = new List<string>(pendingRunIds);
         var uploadedCount = 0;
-        foreach (var endpoint in _routeSelector.GetRouteOrder(_globalEndpoint, _cnEndpoint))
+        var clientId = await EnsureClientRegistrationAsync(installId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(clientId))
+            return new RunUploadCycleResult(uploadedCount: 0, hasMorePending: true);
+
+        var apiClient = CreateApiClient();
+        foreach (var runId in pendingRunIds)
         {
-            if (remainingRunIds.Count == 0)
-                break;
-
             cancellationToken.ThrowIfCancellationRequested();
-            var clientId = await EnsureClientRegistrationAsync(endpoint, installId, cancellationToken);
-            if (string.IsNullOrWhiteSpace(clientId))
+            var recoveredRegistration = false;
+            while (true)
             {
-                _routeSelector.RecordRouteFailure(endpoint.RouteKind);
-                continue;
-            }
-
-            var apiClient = CreateApiClient(endpoint);
-            var routeUploadedAny = false;
-            var shouldTryFallback = false;
-
-            foreach (var runId in remainingRunIds.ToArray())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var recoveredRegistration = false;
-                while (true)
+                var attemptedAtUtc = DateTimeOffset.UtcNow;
+                var snapshot = _store.TryBuildSnapshot(runId, installId, clientId);
+                if (snapshot == null)
                 {
-                    var attemptedAtUtc = DateTimeOffset.UtcNow;
-                    var snapshot = _store.TryBuildSnapshot(runId, installId, clientId);
-                    if (snapshot == null)
-                    {
-                        _store.MarkRunUploadFailed(
-                            runId,
-                            attemptedAtUtc,
-                            "run_snapshot_not_found"
-                        );
-                        break;
-                    }
+                    _store.MarkRunUploadFailed(
+                        runId,
+                        attemptedAtUtc,
+                        "run_snapshot_not_found"
+                    );
+                    break;
+                }
 
-                    try
+                try
+                {
+                    var json = JsonConvert.SerializeObject(
+                        snapshot.Payload,
+                        RunUploadSerialization.SerializerSettings
+                    );
+                    var uploadResult = await apiClient.UploadRunAsync(
+                        json,
+                        clientId!,
+                        installId,
+                        runId,
+                        cancellationToken
+                    );
+                    if (!uploadResult.Succeeded)
                     {
-                        if (string.IsNullOrWhiteSpace(clientId))
+                        if (uploadResult.ShouldReRegister && !recoveredRegistration)
                         {
-                            shouldTryFallback = true;
+                            recoveredRegistration = true;
                             BppLog.Warn(
                                 "RunUploadService",
-                                $"Client registration was unavailable for route {endpoint.RouteKind}; trying fallback."
+                                $"Upload rejected for run {runId}; clearing cached client registration and retrying once."
                             );
-                            break;
-                        }
-
-                        var json = JsonConvert.SerializeObject(
-                            snapshot.Payload,
-                            RunUploadSerialization.SerializerSettings
-                        );
-                        var uploadResult = await apiClient.UploadRunAsync(
-                            json,
-                            clientId,
-                            installId,
-                            runId,
-                            cancellationToken
-                        );
-                        if (!uploadResult.Succeeded)
-                        {
-                            if (uploadResult.ShouldReRegister && !recoveredRegistration)
+                            _clientStateStore.ClearScopedClientId(RunUploadScopes.Runs);
+                            clientId = await EnsureClientRegistrationAsync(
+                                installId,
+                                cancellationToken
+                            );
+                            if (string.IsNullOrWhiteSpace(clientId))
                             {
-                                recoveredRegistration = true;
-                                BppLog.Warn(
-                                    "RunUploadService",
-                                    $"Upload rejected for run {runId} on route {endpoint.RouteKind}; clearing cached client registration and retrying once."
-                                );
-                                _clientStateStore.ClearClientId(endpoint.RouteKind);
-                                clientId = await EnsureClientRegistrationAsync(
-                                    endpoint,
-                                    installId,
-                                    cancellationToken
-                                );
-                                if (string.IsNullOrWhiteSpace(clientId))
-                                {
-                                    shouldTryFallback = true;
-                                    BppLog.Warn(
-                                        "RunUploadService",
-                                        $"Re-registration failed for route {endpoint.RouteKind}; trying fallback."
-                                    );
-                                    break;
-                                }
-
-                                continue;
-                            }
-
-                            if (uploadResult.ShouldFallback)
-                            {
-                                shouldTryFallback = true;
-                                BppLog.Warn(
-                                    "RunUploadService",
-                                    $"Route {endpoint.RouteKind} failed for run {runId}; trying fallback."
+                                _store.MarkRunUploadFailed(
+                                    runId,
+                                    attemptedAtUtc,
+                                    "registration_unavailable"
                                 );
                                 break;
                             }
 
-                            _store.MarkRunUploadFailed(
-                                runId,
-                                attemptedAtUtc,
-                                uploadResult.Error ?? "upload_failed"
-                            );
-                            BppLog.Warn(
-                                "RunUploadService",
-                                $"Upload failed for run {runId}: {uploadResult.Error ?? "unknown_error"}."
-                            );
-                            break;
+                            continue;
                         }
 
-                        _store.MarkRunUploaded(
+                        _store.MarkRunUploadFailed(
                             runId,
-                            snapshot.LastSeq,
-                            snapshot.UploadedStatus,
-                            DateTimeOffset.UtcNow
+                            attemptedAtUtc,
+                            uploadResult.Error ?? "upload_failed"
                         );
-                        remainingRunIds.Remove(runId);
-                        uploadedCount++;
-                        routeUploadedAny = true;
-                        break;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        shouldTryFallback = true;
                         BppLog.Warn(
                             "RunUploadService",
-                            $"Upload failed for run {runId}: {ex.GetType().Name} - {ex.Message}"
+                            $"Upload failed for run {runId}: {uploadResult.Error ?? "unknown_error"}."
                         );
                         break;
                     }
-                }
 
-                if (shouldTryFallback)
+                    _store.MarkRunUploaded(
+                        runId,
+                        snapshot.LastSeq,
+                        snapshot.UploadedStatus,
+                        DateTimeOffset.UtcNow
+                    );
+                    uploadedCount++;
                     break;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _store.MarkRunUploadFailed(
+                        runId,
+                        attemptedAtUtc,
+                        RunUploadErrorFormatter.Truncate(ex.Message)
+                    );
+                    BppLog.Warn(
+                        "RunUploadService",
+                        $"Upload failed for run {runId}: {ex.GetType().Name} - {ex.Message}"
+                    );
+                    break;
+                }
             }
-
-            if (routeUploadedAny)
-                _routeSelector.RecordRouteSuccess(endpoint.RouteKind);
-            else if (shouldTryFallback)
-                _routeSelector.RecordRouteFailure(endpoint.RouteKind);
-
-            if (!shouldTryFallback)
-                break;
         }
 
-        var hasMorePending = remainingRunIds.Count > 0 || _store.HasMorePendingCompletedRuns();
+        var hasMorePending = _store.HasMorePendingCompletedRuns();
         return new RunUploadCycleResult(uploadedCount, hasMorePending);
     }
 
@@ -212,27 +161,24 @@ internal sealed class RunUploadService : IDisposable
         _httpClient.Dispose();
     }
 
-    private RunUploadApiClient CreateApiClient(RunUploadEndpointSet endpoint)
+    private RunUploadApiClient CreateApiClient()
     {
         return new RunUploadApiClient(
             _httpClient,
             new RunUploadRequestSigner(_keyStore),
-            endpoint.UploadEndpoint
+            _endpoint.UploadEndpoint
         );
     }
 
-    private Task<string?> EnsureClientRegistrationAsync(
-        RunUploadEndpointSet endpoint,
-        string installId,
-        CancellationToken cancellationToken
-    )
+    private Task<string?> EnsureClientRegistrationAsync(string installId, CancellationToken cancellationToken)
     {
         var registrationClient = new RunUploadRegistrationClient(
             _httpClient,
             _clientStateStore,
             _keyStore,
-            endpoint.RouteKind,
-            endpoint.RegistrationEndpoint
+            RunUploadScopes.Runs,
+            "runs",
+            _endpoint.RegistrationEndpoint
         );
         return registrationClient.EnsureClientRegistrationAsync(installId, cancellationToken);
     }

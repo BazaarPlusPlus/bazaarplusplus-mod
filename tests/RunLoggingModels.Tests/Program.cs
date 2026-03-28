@@ -126,9 +126,8 @@ Assert(
 );
 Assert(
     pathServiceSource.Contains("RunUploadClientStatePath", StringComparison.Ordinal)
-        && pathServiceSource.Contains("RunUploadPrivateKeyPath", StringComparison.Ordinal)
-        && pathServiceSource.Contains("RunUploadRouteStatePath", StringComparison.Ordinal),
-    "BppPathService should expose client-state, private-key, and route-state paths for signed uploads."
+        && pathServiceSource.Contains("RunUploadPrivateKeyPath", StringComparison.Ordinal),
+    "BppPathService should expose client-state and private-key paths for signed uploads."
 );
 
 var configSourcePath = Path.GetFullPath(

@@ -22,8 +22,7 @@ RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore");
 RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRegistrationClient");
 RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRequestSigner");
 RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadApiClient");
-RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteSelector");
-RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadRouteStateStore");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadEndpointSet");
 RequireType("BazaarPlusPlus.Core.Events.RunInitializedObserved");
 RequireType("BazaarPlusPlus.Core.Events.NetMessageObserved");
 RequireType("BazaarPlusPlus.Core.Events.CombatSimObserved");
@@ -213,9 +212,7 @@ Assert(
 Assert(
     configInterfaceSource.Contains("EnableRunUploadConfig", StringComparison.Ordinal)
         && configInterfaceSource.Contains("RunUploadEndpointConfig", StringComparison.Ordinal)
-        && configInterfaceSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal)
-        && configInterfaceSource.Contains("RunUploadModeConfig", StringComparison.Ordinal)
-        && configInterfaceSource.Contains("RunUploadEndpointCnConfig", StringComparison.Ordinal),
+        && configInterfaceSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal),
     "IBppConfig should expose run-upload configuration."
 );
 
@@ -235,9 +232,7 @@ Assert(
 Assert(
     configSource.Contains("EnableRunUploadConfig", StringComparison.Ordinal)
         && configSource.Contains("RunUploadEndpointConfig", StringComparison.Ordinal)
-        && configSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal)
-        && configSource.Contains("RunUploadModeConfig", StringComparison.Ordinal)
-        && configSource.Contains("RunUploadEndpointCnConfig", StringComparison.Ordinal),
+        && configSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal),
     "BppConfig should bind run-upload settings."
 );
 Assert(

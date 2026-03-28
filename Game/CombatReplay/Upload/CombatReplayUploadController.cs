@@ -26,20 +26,8 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
                 return;
 
             var registrationEndpoint =
-                BppRuntimeHost.Config.RunUploadRegistrationEndpointGlobalConfig?.Value?.Trim();
-            if (string.IsNullOrWhiteSpace(registrationEndpoint))
-            {
-                registrationEndpoint =
-                    BppRuntimeHost.Config.RunUploadRegistrationEndpointConfig?.Value?.Trim();
-            }
-
-            var runUploadEndpoint =
-                BppRuntimeHost.Config.RunUploadEndpointGlobalConfig?.Value?.Trim();
-            if (string.IsNullOrWhiteSpace(runUploadEndpoint))
-            {
-                runUploadEndpoint = BppRuntimeHost.Config.RunUploadEndpointConfig?.Value?.Trim();
-            }
-
+                BppRuntimeHost.Config.RunUploadRegistrationEndpointConfig?.Value?.Trim();
+            var runUploadEndpoint = BppRuntimeHost.Config.RunUploadEndpointConfig?.Value?.Trim();
             var uploadEndpoint = CombatReplayUploadService.TryDeriveReplayUploadEndpoint(
                 runUploadEndpoint
             );
@@ -56,7 +44,7 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
             {
                 BppLog.Warn(
                     "CombatReplayUploadController",
-                    "Replay upload is enabled but requires the shared Cloudflare/global run upload endpoint."
+                    "Replay upload is enabled but requires the shared run upload endpoint."
                 );
                 return;
             }
@@ -81,7 +69,7 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
             {
                 BppLog.Warn(
                     "CombatReplayUploadController",
-                    "Replay upload is enabled but the shared Cloudflare registration/upload endpoints are invalid."
+                    "Replay upload is enabled but the shared registration/upload endpoints are invalid."
                 );
                 return;
             }
