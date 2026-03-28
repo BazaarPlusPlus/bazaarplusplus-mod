@@ -36,5 +36,9 @@
       Include="..\..\Game\Lobby\LegendaryLobbyRatingFormatter.cs"
       Link="LegendaryLobbyRatingFormatter.cs"
     />
+    <Compile
+      Include="..\..\Game\Lobby\MainMenuVersionLabelFormatter.cs"
+      Link="MainMenuVersionLabelFormatter.cs"
+    />
   </ItemGroup>
 </Project>
