@@ -1,28 +1,6 @@
-export interface Env {
-  DB: D1Database;
-  REPLAY_BUCKET: R2Bucket;
-}
-
-type UploadPurpose = "runs" | "replays";
-
-type RegisterRequest = {
-  install_id?: unknown;
-  plugin_version?: unknown;
-  purpose?: unknown;
-  public_key?: {
-    modulus_b64?: unknown;
-    exponent_b64?: unknown;
-  };
-};
-
-type RegisteredClientRow = {
-  client_id: string;
-  install_id: string;
-  purpose: UploadPurpose;
-  modulus_b64: string;
-  exponent_b64: string;
-  plugin_version: string | null;
-};
+import type { Env } from "./env";
+import type { UploadPurpose, RegisterRequest } from "./types/api";
+import type { RegisteredClientRow } from "./types/db";
 
 const MAX_TIMESTAMP_SKEW_MS = 10 * 60 * 1000;
 
