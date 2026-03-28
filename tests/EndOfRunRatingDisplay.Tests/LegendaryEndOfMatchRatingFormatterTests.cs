@@ -37,6 +37,14 @@ public sealed class LegendaryEndOfMatchRatingFormatterTests
     }
 
     [Fact]
+    public void ShouldShow_ReturnsFalse_WhenRatingsLookUninitialized()
+    {
+        Assert.False(LegendaryEndOfMatchRatingDisplayPolicy.ShouldShow(true, 0, 1436));
+        Assert.False(LegendaryEndOfMatchRatingDisplayPolicy.ShouldShow(true, 1420, 0));
+        Assert.False(LegendaryEndOfMatchRatingDisplayPolicy.ShouldShow(true, 0, 0));
+    }
+
+    [Fact]
     public void ShouldShow_ReturnsTrue_ForLegendaryWithBothRatings()
     {
         Assert.True(LegendaryEndOfMatchRatingDisplayPolicy.ShouldShow(true, 1420, 1436));
@@ -62,10 +70,12 @@ public sealed class LegendaryEndOfMatchRatingFormatterTests
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("EndOfRunRankController", source, StringComparison.Ordinal);
-        Assert.Contains("RatingBeforeRun", source, StringComparison.Ordinal);
-        Assert.Contains("RatingAfterRun", source, StringComparison.Ordinal);
+        Assert.Contains("CommonData", source, StringComparison.Ordinal);
+        Assert.Contains("CurrentSeasonRank", source, StringComparison.Ordinal);
+        Assert.Contains("Data.Rank?.CurrentSeasonRank?.Rating", source, StringComparison.Ordinal);
         Assert.Contains("ShouldShow", source, StringComparison.Ordinal);
-        Assert.Contains("rankPositioner", source, StringComparison.Ordinal);
+        Assert.Contains("sourceLabel.rectTransform", source, StringComparison.Ordinal);
+        Assert.Contains("new GameObject(RatingLineObjectName", source, StringComparison.Ordinal);
     }
 
     [Fact]

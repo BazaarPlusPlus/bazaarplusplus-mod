@@ -1,10 +1,12 @@
 #pragma warning disable CS0436
 #nullable enable
 using System;
+using System.Linq;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarPlusPlus.Game.EndOfRun;
 using HarmonyLib;
 using TMPro;
+using TheBazaar;
 using TheBazaar.UI.EndOfRun;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,6 +37,8 @@ internal static class LegendaryEndOfMatchRatingUpdateRankDisplayPatch
 internal static class LegendaryEndOfMatchRatingUi
 {
     private const string RatingLineObjectName = "BppLegendaryRatingLine";
+    private const float MinimumVerticalOffset = 28f;
+    private const float AdditionalVerticalSpacing = 6f;
     private static readonly AccessTools.FieldRef<EndOfRunRankController, ERank> PostRunRankRef =
         AccessTools.FieldRefAccess<EndOfRunRankController, ERank>("postRunRank");
 
@@ -47,7 +51,7 @@ internal static class LegendaryEndOfMatchRatingUi
     {
         try
         {
-            var ratingBeforeRun = ResolveRatingBeforeRun();
+            var ratingBeforeRun = ResolveRatingBeforeRun(controller);
             var ratingAfterRun = ResolveRatingAfterRun();
             var shouldShow = LegendaryEndOfMatchRatingDisplayPolicy.ShouldShow(
                 isLegendary,
@@ -78,14 +82,29 @@ internal static class LegendaryEndOfMatchRatingUi
         }
     }
 
-    private static int? ResolveRatingBeforeRun()
+    private static int? ResolveRatingBeforeRun(EndOfRunRankController controller)
     {
-        return Singleton<GamePlaySceneSingleton>.Instance?.RatingBeforeRun;
+        var stateMachine = controller.StateMachine;
+        if (stateMachine == null)
+            return null;
+
+        var commonData = Traverse.Create(stateMachine).Field("CommonData").GetValue<object>();
+        if (commonData == null)
+            return null;
+
+        var currentSeasonRank = AccessTools
+            .Field(commonData.GetType(), "CurrentSeasonRank")
+            ?.GetValue(commonData);
+        if (currentSeasonRank == null)
+            return null;
+
+        return AccessTools.Field(currentSeasonRank.GetType(), "Rating")?.GetValue(currentSeasonRank) as int?
+            ?? AccessTools.Property(currentSeasonRank.GetType(), "Rating")?.GetValue(currentSeasonRank) as int?;
     }
 
     private static int? ResolveRatingAfterRun()
     {
-        return Singleton<GamePlaySceneSingleton>.Instance?.RatingAfterRun;
+        return Data.Rank?.CurrentSeasonRank?.Rating;
     }
 
     private static TextMeshProUGUI? FindActiveRankLabel(EndOfRunRankController controller)
@@ -107,43 +126,65 @@ internal static class LegendaryEndOfMatchRatingUi
         TextMeshProUGUI sourceLabel
     )
     {
-        var rankPositioner = Traverse
-            .Create(controller)
-            .Field("rankPositioner")
-            .GetValue<RectTransform>();
-        if (rankPositioner == null)
-            return null;
-
-        var existing = rankPositioner.Find(RatingLineObjectName)?.GetComponent<TextMeshProUGUI>();
-        if (existing != null)
+        var sourceRect = sourceLabel.rectTransform;
+        var existing = FindExistingRatingLine(controller);
+        if (existing == null)
         {
-            SyncStyle(sourceLabel, existing);
-            return existing;
+            existing = CreateRatingLine(sourceRect, sourceLabel);
+            if (existing == null)
+                return null;
         }
 
-        var clone = UnityEngine.Object.Instantiate(sourceLabel.gameObject, rankPositioner);
-        clone.name = RatingLineObjectName;
-        clone.SetActive(true);
+        var ratingRect = existing.rectTransform;
+        if (ratingRect.parent != sourceRect)
+            ratingRect.SetParent(sourceRect, worldPositionStays: false);
 
-        var ratingLine = clone.GetComponent<TextMeshProUGUI>();
-        if (ratingLine == null)
+        SyncStyle(sourceLabel, existing);
+        SyncPosition(sourceRect, ratingRect);
+        return existing;
+    }
+
+    private static TextMeshProUGUI? FindExistingRatingLine(EndOfRunRankController controller)
+    {
+        return controller.GetComponentsInChildren<TextMeshProUGUI>(includeInactive: true)
+            .FirstOrDefault(text => text.name == RatingLineObjectName);
+    }
+
+    private static TextMeshProUGUI? CreateRatingLine(
+        RectTransform sourceRect,
+        TextMeshProUGUI sourceLabel
+    )
+    {
+        var lineObject = new GameObject(RatingLineObjectName, typeof(RectTransform));
+        lineObject.layer = sourceLabel.gameObject.layer;
+        lineObject.SetActive(true);
+
+        var rect = lineObject.GetComponent<RectTransform>();
+        if (rect == null)
             return null;
 
-        SyncStyle(sourceLabel, ratingLine);
+        rect.SetParent(sourceRect, worldPositionStays: false);
 
-        var rect = ratingLine.rectTransform;
-        rect.SetSiblingIndex(rankPositioner.childCount - 1);
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(0f, -66f);
-        rect.localScale = Vector3.one;
-
-        var layout = clone.GetComponent<LayoutElement>() ?? clone.AddComponent<LayoutElement>();
-        layout.minHeight = 22f;
-        layout.preferredHeight = 22f;
-
+        var ratingLine = lineObject.AddComponent<TextMeshProUGUI>();
+        var layout = lineObject.AddComponent<LayoutElement>();
+        layout.ignoreLayout = true;
         return ratingLine;
+    }
+
+    private static void SyncPosition(RectTransform sourceRect, RectTransform ratingRect)
+    {
+        ratingRect.anchorMin = new Vector2(0.5f, 0.5f);
+        ratingRect.anchorMax = new Vector2(0.5f, 0.5f);
+        ratingRect.pivot = new Vector2(0.5f, 0.5f);
+        ratingRect.sizeDelta = sourceRect.sizeDelta;
+        ratingRect.localScale = Vector3.one;
+        ratingRect.SetSiblingIndex(ratingRect.parent.childCount - 1);
+
+        var verticalOffset = Mathf.Max(
+            MinimumVerticalOffset,
+            (sourceRect.rect.height * 0.5f) + AdditionalVerticalSpacing
+        );
+        ratingRect.anchoredPosition = new Vector2(0f, -verticalOffset);
     }
 
     private static void SyncStyle(TextMeshProUGUI sourceLabel, TextMeshProUGUI ratingLine)
