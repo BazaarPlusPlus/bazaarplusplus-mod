@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
-using Newtonsoft.Json;
 using TMPro;
 using TheBazaar.UI;
 using UnityEngine;
@@ -14,17 +13,23 @@ namespace BazaarPlusPlus.Game.Lobby.RandomHeroPool;
 internal sealed class RandomHeroPoolPanelController : MonoBehaviour
 {
     private const string LogCategory = "RandomHeroPool";
-    private const string ConfigButtonObjectName = "BPP_RandomHeroPoolConfigButton";
-    private const string PopupObjectName = "BPP_RandomHeroPoolPopup";
-    private const string PopupActionsRootObjectName = "BPP_RandomHeroPoolPopupActions";
-    private const string PopupEntriesRootObjectName = "BPP_RandomHeroPoolPopupEntries";
-    private const string PopupSelectAllButtonObjectName = "BPP_RandomHeroPoolSelectAll";
-    private const string PopupClearButtonObjectName = "BPP_RandomHeroPoolClear";
-    private const string PopupEntryPrefix = "BPP_RandomHeroPoolHero_";
-    private const string PopupEmptyEntryObjectName = "BPP_RandomHeroPoolHero_Empty";
-    private const string SelectedPoolPrefsKeyPrefix = "BPP.RandomHeroPool.Selected";
-    private const string KnownUnlockedPrefsKeyPrefix = "BPP.RandomHeroPool.KnownUnlocked";
-    private const string AnonymousAccountScope = "anonymous";
+    private const string PanelObjectName = "BPP_RandomHeroPoolPanel";
+    private const string HeaderObjectName = "BPP_RandomHeroPoolHeader";
+    private const string EntriesRootObjectName = "BPP_RandomHeroPoolEntries";
+    private const string EmptyLabelObjectName = "BPP_RandomHeroPoolEmpty";
+    private const string EntryPrefix = "BPP_RandomHeroPoolHero_";
+    private const int EntryColumnCount = 3;
+    private const float PanelWidth = 236f;
+    private const float PanelHorizontalPadding = 10f;
+    private const float PanelTopPadding = 8f;
+    private const float PanelBottomPadding = 10f;
+    private const float HeaderHeight = 18f;
+    private const float HeaderToEntriesSpacing = 8f;
+    private const float EntryWidth = 66f;
+    private const float EntryHeight = 32f;
+    private const float EntryHorizontalSpacing = 6f;
+    private const float EntryVerticalSpacing = 6f;
+    private static readonly Vector2 PanelAnchorOffset = new(0f, -10f);
 
     private static readonly System.Reflection.FieldInfo? HeroItemViewsField = AccessTools.Field(
         typeof(HeroSelectButtonsView),
@@ -41,22 +46,26 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         "_isUnlocked"
     );
 
-    private readonly Dictionary<string, Toggle> _heroEntryToggles = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HeroPoolEntryView> _heroEntryViews = new(
+        StringComparer.Ordinal
+    );
 
     private HeroSelectButtonsView? _view;
     private Toggle? _randomHeroToggle;
-    private Button? _configButton;
-    private RectTransform? _popupRoot;
-    private Transform? _popupEntriesRoot;
+    private RectTransform? _panelRoot;
+    private RectTransform? _entriesRoot;
+    private TextMeshProUGUI? _headerLabel;
+    private TextMeshProUGUI? _emptyLabel;
     private RandomHeroPoolState? _state;
+    private HeroAvailability[] _heroAvailabilities = Array.Empty<HeroAvailability>();
     private string[] _unlockedHeroIds = Array.Empty<string>();
-    private bool _popupVisible;
-    private bool _isRebindingToggles;
+    private bool _warnedMissingHeroItemViewsField;
     private bool _warnedMissingHeroUnlockStateField;
     private bool _warnedMissingRandomHeroToggleField;
-    private bool _warnedMissingCanvasCamera;
     private bool _attachCompleted;
     private float _nextAttachRetryAt;
+    private float _nextStateRefreshAt;
+    private string _lastAvailabilitySignature = string.Empty;
 
     internal static void Attach(HeroSelectButtonsView view)
     {
@@ -70,17 +79,6 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         controller.TryAttach(view);
     }
 
-    private void OnDisable()
-    {
-        SetPopupVisible(false);
-    }
-
-    private void OnDestroy()
-    {
-        if (_configButton != null)
-            _configButton.onClick.RemoveListener(OnConfigButtonClicked);
-    }
-
     private void LateUpdate()
     {
         if (!_attachCompleted && _view != null && Time.unscaledTime >= _nextAttachRetryAt)
@@ -89,15 +87,23 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
             TryAttach(_view);
         }
 
-        if (_configButton == null || _randomHeroToggle == null)
+        if (_panelRoot == null || _randomHeroToggle == null)
             return;
 
-        var shouldBeVisible = _randomHeroToggle.gameObject.activeSelf;
-        if (_configButton.gameObject.activeSelf != shouldBeVisible)
-            _configButton.gameObject.SetActive(shouldBeVisible);
+        var shouldBeVisible = _randomHeroToggle.gameObject.activeSelf && _randomHeroToggle.isOn;
+        if (_panelRoot.gameObject.activeSelf != shouldBeVisible)
+            _panelRoot.gameObject.SetActive(shouldBeVisible);
 
-        if (!shouldBeVisible && _popupVisible)
-            SetPopupVisible(false);
+        if (!shouldBeVisible)
+            return;
+
+        SyncPanelPlacement();
+
+        if (Time.unscaledTime >= _nextStateRefreshAt)
+        {
+            _nextStateRefreshAt = Time.unscaledTime + 0.5f;
+            RefreshPanelEntries(forceRebuild: false);
+        }
     }
 
     private void TryAttach(HeroSelectButtonsView view)
@@ -108,14 +114,11 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
             return;
 
         _randomHeroToggle = randomHeroToggle;
-        if (!TryEnsureConfigButton(randomHeroToggle))
+        if (!TryEnsurePanel())
             return;
 
-        if (!TryEnsurePopup())
-            return;
-
-        RefreshPopupEntries();
-        SetPopupVisible(false);
+        RefreshPanelEntries(forceRebuild: true);
+        SyncPanelPlacement();
         _attachCompleted = true;
     }
 
@@ -141,489 +144,360 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         return false;
     }
 
-    private bool TryEnsureConfigButton(Toggle randomHeroToggle)
+    private bool TryEnsurePanel()
     {
-        var randomToggleTransform = randomHeroToggle.transform;
-        var randomToggleParent = randomToggleTransform.parent;
-        if (randomToggleParent == null)
+        if (_randomHeroToggle == null)
         {
-            BppLog.Warn(
-                LogCategory,
-                "Random hero toggle has no parent transform; skipping pool UI injection."
-            );
+            BppLog.Warn(LogCategory, "Random hero toggle was unavailable while building panel.");
             return false;
         }
 
-        var configButtonTransform = randomToggleParent.Find(ConfigButtonObjectName);
-        GameObject configButtonObject;
-        if (configButtonTransform != null)
-        {
-            configButtonObject = configButtonTransform.gameObject;
-        }
-        else
-        {
-            configButtonObject = UnityEngine.Object.Instantiate(
-                randomHeroToggle.gameObject,
-                randomToggleParent
-            );
-            configButtonObject.name = ConfigButtonObjectName;
-            configButtonObject.transform.SetSiblingIndex(randomToggleTransform.GetSiblingIndex() + 1);
-        }
-
-        var button = configButtonObject.GetComponent<Button>();
-        if (button == null)
-            button = configButtonObject.AddComponent<Button>();
-
-        var randomToggleSelectable = randomHeroToggle.GetComponent<Selectable>();
-        if (randomToggleSelectable != null)
-        {
-            button.transition = randomToggleSelectable.transition;
-            button.colors = randomToggleSelectable.colors;
-            button.spriteState = randomToggleSelectable.spriteState;
-            button.animationTriggers = randomToggleSelectable.animationTriggers;
-            button.targetGraphic = configButtonObject.GetComponentInChildren<Graphic>(
-                includeInactive: true
-            );
-        }
-        else if (button.targetGraphic == null)
-        {
-            button.targetGraphic = configButtonObject.GetComponentInChildren<Graphic>(
-                includeInactive: true
-            );
-        }
-
-        var clonedToggle = configButtonObject.GetComponent<Toggle>();
-        if (clonedToggle != null)
-        {
-            clonedToggle.onValueChanged.RemoveAllListeners();
-            clonedToggle.enabled = false;
-        }
-
-        SetToggleCheckmarksVisible(configButtonObject.transform, visible: false);
-
-        if (!TrySetLabel(configButtonObject, "Pool"))
-        {
-            BppLog.Warn(LogCategory, "Config button label was missing on cloned random toggle.");
-        }
-
-        button.onClick.RemoveAllListeners();
-        button.onClick.AddListener(OnConfigButtonClicked);
-        button.interactable = true;
-        button.gameObject.SetActive(randomHeroToggle.gameObject.activeSelf);
-
-        _configButton = button;
-        return true;
-    }
-
-    private bool TryEnsurePopup()
-    {
-        if (_view == null)
-        {
-            BppLog.Warn(LogCategory, "Hero select view was unavailable while building popup.");
-            return false;
-        }
-
-        if (_configButton == null)
-        {
-            BppLog.Warn(LogCategory, "Config button was unavailable while building popup.");
-            return false;
-        }
-
-        var hostRect = _view.transform as RectTransform;
+        var hostRect = _randomHeroToggle.transform.parent as RectTransform;
         if (hostRect == null)
         {
             BppLog.Warn(
                 LogCategory,
-                "Hero select root is not a RectTransform; skipping popup initialization."
+                "Random hero toggle parent was not a RectTransform; skipping pool panel."
             );
             return false;
         }
 
-        var existingPopup = hostRect.Find(PopupObjectName) as RectTransform;
-        if (existingPopup != null)
+        var existingPanel = hostRect.Find(PanelObjectName) as RectTransform;
+        if (existingPanel != null)
         {
-            _popupRoot = existingPopup;
-            _popupEntriesRoot = existingPopup.Find(PopupEntriesRootObjectName);
-            if (_popupEntriesRoot != null)
-            {
-                EnsureActionButtons(existingPopup);
+            _panelRoot = existingPanel;
+            _headerLabel = existingPanel.Find(HeaderObjectName)?.GetComponent<TextMeshProUGUI>();
+            _entriesRoot = existingPanel.Find(EntriesRootObjectName) as RectTransform;
+            _emptyLabel = existingPanel.Find(EmptyLabelObjectName)?.GetComponent<TextMeshProUGUI>();
+            if (_headerLabel != null && _entriesRoot != null && _emptyLabel != null)
                 return true;
-            }
 
-            existingPopup.name = $"{PopupObjectName}_Stale";
-            UnityEngine.Object.Destroy(existingPopup.gameObject);
-            _popupRoot = null;
-            _popupEntriesRoot = null;
+            UnityEngine.Object.Destroy(existingPanel.gameObject);
+            _panelRoot = null;
+            _headerLabel = null;
+            _entriesRoot = null;
+            _emptyLabel = null;
         }
 
-        var popupObject = new GameObject(
-            PopupObjectName,
+        var panelObject = new GameObject(
+            PanelObjectName,
             typeof(RectTransform),
             typeof(Image),
-            typeof(VerticalLayoutGroup),
-            typeof(ContentSizeFitter)
+            typeof(Outline)
         );
-        _popupRoot = popupObject.GetComponent<RectTransform>();
-        _popupRoot.SetParent(hostRect, worldPositionStays: false);
-        _popupRoot.anchorMin = new Vector2(0.5f, 0.5f);
-        _popupRoot.anchorMax = new Vector2(0.5f, 0.5f);
-        _popupRoot.pivot = new Vector2(0f, 1f);
-        _popupRoot.anchoredPosition = Vector2.zero;
+        var panelRect = panelObject.GetComponent<RectTransform>();
+        panelRect.SetParent(hostRect, worldPositionStays: false);
+        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+        panelRect.pivot = new Vector2(0f, 1f);
+        panelRect.localScale = Vector3.one;
+        panelRect.localRotation = Quaternion.identity;
+        panelRect.sizeDelta = new Vector2(PanelWidth, CalculatePanelHeight(0));
 
-        var backgroundImage = popupObject.GetComponent<Image>();
-        backgroundImage.color = ResolvePopupBackgroundColor();
-        backgroundImage.raycastTarget = true;
+        var backgroundImage = panelObject.GetComponent<Image>();
+        backgroundImage.color = new Color(0.10f, 0.09f, 0.11f, 0.88f);
+        backgroundImage.raycastTarget = false;
 
-        var rootLayout = popupObject.GetComponent<VerticalLayoutGroup>();
-        rootLayout.padding = new RectOffset(8, 8, 8, 8);
-        rootLayout.spacing = 4f;
-        rootLayout.childAlignment = TextAnchor.UpperLeft;
-        rootLayout.childControlWidth = true;
-        rootLayout.childControlHeight = true;
-        rootLayout.childForceExpandWidth = true;
-        rootLayout.childForceExpandHeight = false;
+        var outline = panelObject.GetComponent<Outline>();
+        outline.effectColor = new Color(0.72f, 0.30f, 0.18f, 0.72f);
+        outline.effectDistance = new Vector2(1.5f, -1.5f);
+        outline.useGraphicAlpha = true;
 
-        var fitter = popupObject.GetComponent<ContentSizeFitter>();
-        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        var header = CreatePassiveEntry("BPP_RandomHeroPoolHeader", "Random Hero Pool", _popupRoot);
-        if (header == null)
+        _headerLabel = CreateText(
+            HeaderObjectName,
+            panelRect,
+            fontSize: 15f,
+            alignment: TextAlignmentOptions.Left,
+            color: new Color(0.96f, 0.77f, 0.45f, 1f)
+        );
+        if (_headerLabel == null)
         {
-            BppLog.Warn(LogCategory, "Could not create random hero pool popup header.");
+            BppLog.Warn(LogCategory, "Failed to create random hero pool header.");
             return false;
         }
 
-        EnsureActionButtons(_popupRoot);
+        var headerRect = _headerLabel.rectTransform;
+        headerRect.anchorMin = new Vector2(0f, 1f);
+        headerRect.anchorMax = new Vector2(1f, 1f);
+        headerRect.pivot = new Vector2(0f, 1f);
+        headerRect.offsetMin = new Vector2(PanelHorizontalPadding, -PanelTopPadding - HeaderHeight);
+        headerRect.offsetMax = new Vector2(-PanelHorizontalPadding, -PanelTopPadding);
 
-        var entriesRoot = new GameObject(
-            PopupEntriesRootObjectName,
-            typeof(RectTransform),
-            typeof(VerticalLayoutGroup)
+        var entriesObject = new GameObject(EntriesRootObjectName, typeof(RectTransform));
+        _entriesRoot = entriesObject.GetComponent<RectTransform>();
+        _entriesRoot.SetParent(panelRect, worldPositionStays: false);
+        _entriesRoot.anchorMin = new Vector2(0f, 1f);
+        _entriesRoot.anchorMax = new Vector2(0f, 1f);
+        _entriesRoot.pivot = new Vector2(0f, 1f);
+        _entriesRoot.sizeDelta = Vector2.zero;
+        _entriesRoot.anchoredPosition = new Vector2(
+            PanelHorizontalPadding,
+            -(PanelTopPadding + HeaderHeight + HeaderToEntriesSpacing)
         );
-        var entriesRect = entriesRoot.GetComponent<RectTransform>();
-        entriesRect.SetParent(_popupRoot, worldPositionStays: false);
 
-        var entriesLayout = entriesRoot.GetComponent<VerticalLayoutGroup>();
-        entriesLayout.spacing = 2f;
-        entriesLayout.childAlignment = TextAnchor.UpperLeft;
-        entriesLayout.childControlWidth = true;
-        entriesLayout.childControlHeight = true;
-        entriesLayout.childForceExpandWidth = true;
-        entriesLayout.childForceExpandHeight = false;
+        _emptyLabel = CreateText(
+            EmptyLabelObjectName,
+            panelRect,
+            fontSize: 13f,
+            alignment: TextAlignmentOptions.Center,
+            color: new Color(0.68f, 0.68f, 0.72f, 0.95f)
+        );
+        if (_emptyLabel == null)
+        {
+            BppLog.Warn(LogCategory, "Failed to create random hero pool empty label.");
+            return false;
+        }
 
-        _popupEntriesRoot = entriesRoot.transform;
+        var emptyRect = _emptyLabel.rectTransform;
+        emptyRect.anchorMin = new Vector2(0f, 1f);
+        emptyRect.anchorMax = new Vector2(1f, 1f);
+        emptyRect.pivot = new Vector2(0.5f, 1f);
+        emptyRect.offsetMin = new Vector2(PanelHorizontalPadding, -PanelTopPadding - HeaderHeight - 38f);
+        emptyRect.offsetMax = new Vector2(-PanelHorizontalPadding, -PanelTopPadding - HeaderHeight - 8f);
+        _emptyLabel.text = "No heroes";
+        _emptyLabel.gameObject.SetActive(false);
+
+        _panelRoot = panelRect;
         return true;
     }
 
-    private void EnsureActionButtons(Transform popupRootTransform)
+    private void SyncPanelPlacement()
     {
-        var actionsRoot = popupRootTransform.Find(PopupActionsRootObjectName);
-        if (actionsRoot == null)
-        {
-            var actionsObject = new GameObject(
-                PopupActionsRootObjectName,
-                typeof(RectTransform),
-                typeof(HorizontalLayoutGroup)
-            );
-            var actionRect = actionsObject.GetComponent<RectTransform>();
-            actionRect.SetParent(popupRootTransform, worldPositionStays: false);
-
-            var actionLayout = actionsObject.GetComponent<HorizontalLayoutGroup>();
-            actionLayout.spacing = 4f;
-            actionLayout.childAlignment = TextAnchor.UpperLeft;
-            actionLayout.childControlWidth = true;
-            actionLayout.childControlHeight = true;
-            actionLayout.childForceExpandWidth = true;
-            actionLayout.childForceExpandHeight = false;
-            actionsRoot = actionsObject.transform;
-        }
-
-        EnsureActionButton(
-            actionsRoot,
-            PopupSelectAllButtonObjectName,
-            "Select All",
-            OnSelectAllClicked
-        );
-        EnsureActionButton(actionsRoot, PopupClearButtonObjectName, "Clear", OnClearClicked);
-    }
-
-    private void EnsureActionButton(
-        Transform actionsRoot,
-        string objectName,
-        string label,
-        Action onClicked
-    )
-    {
-        var existing = actionsRoot.Find(objectName);
-        var actionObject = existing != null
-            ? existing.gameObject
-            : CreateActionButton(objectName, label, actionsRoot, onClicked);
-        if (actionObject == null)
+        if (_panelRoot == null || _randomHeroToggle == null)
             return;
 
-        var actionButton = actionObject.GetComponent<Button>();
-        if (actionButton == null)
+        var parentRect = _panelRoot.parent as RectTransform;
+        var randomToggleRect = _randomHeroToggle.transform as RectTransform;
+        if (parentRect == null || randomToggleRect == null)
             return;
 
-        actionButton.onClick.RemoveAllListeners();
-        actionButton.onClick.AddListener(() => onClicked());
-        TrySetLabel(actionObject, label);
-    }
+        _panelRoot.anchorMin = new Vector2(0.5f, 0.5f);
+        _panelRoot.anchorMax = new Vector2(0.5f, 0.5f);
+        _panelRoot.pivot = new Vector2(0f, 1f);
+        _panelRoot.localScale = Vector3.one;
+        _panelRoot.localRotation = Quaternion.identity;
 
-    private GameObject? CreateActionButton(
-        string objectName,
-        string label,
-        Transform parent,
-        Action onClicked
-    )
-    {
-        if (_configButton == null)
-            return null;
-
-        var actionObject = UnityEngine.Object.Instantiate(_configButton.gameObject, parent);
-        actionObject.name = objectName;
-
-        var toggle = actionObject.GetComponent<Toggle>();
-        if (toggle != null)
-        {
-            toggle.onValueChanged.RemoveAllListeners();
-            toggle.enabled = false;
-        }
-
-        SetToggleCheckmarksVisible(actionObject.transform, visible: false);
-        var button = actionObject.GetComponent<Button>();
-        if (button == null)
-            button = actionObject.AddComponent<Button>();
-
-        button.onClick.RemoveAllListeners();
-        button.onClick.AddListener(() => onClicked());
-        button.interactable = true;
-        TrySetLabel(actionObject, label);
-        return actionObject;
-    }
-
-    private void OnConfigButtonClicked()
-    {
-        if (_popupRoot == null || _popupEntriesRoot == null)
-        {
-            BppLog.Warn(LogCategory, "Popup was unavailable when opening random hero pool panel.");
-            return;
-        }
-
-        if (!_popupVisible)
-            RefreshPopupEntries();
-
-        SetPopupVisible(!_popupVisible);
-    }
-
-    private void SetPopupVisible(bool visible)
-    {
-        _popupVisible = visible && _popupRoot != null;
-        if (_popupRoot == null)
-            return;
-
-        _popupRoot.gameObject.SetActive(_popupVisible);
-        if (!_popupVisible)
-            return;
-
-        PositionPopup();
-        LayoutRebuilder.ForceRebuildLayoutImmediate(_popupRoot);
-    }
-
-    private void PositionPopup()
-    {
-        if (_popupRoot == null || _configButton == null)
-            return;
-
-        var popupParent = _popupRoot.parent as RectTransform;
-        var buttonRect = _configButton.transform as RectTransform;
-        if (popupParent == null || buttonRect == null)
-        {
-            BppLog.Warn(LogCategory, "Popup positioning failed because a RectTransform was missing.");
-            return;
-        }
-
-        var canvasCamera = ResolveCanvasCamera(popupParent);
         var corners = new Vector3[4];
-        buttonRect.GetWorldCorners(corners);
-        var screenTopRight = RectTransformUtility.WorldToScreenPoint(canvasCamera, corners[2]);
-        if (
-            !RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                popupParent,
-                screenTopRight,
-                canvasCamera,
-                out var anchoredPosition
-            )
-        )
-        {
-            BppLog.Warn(LogCategory, "Popup positioning failed while converting button coordinates.");
-            return;
-        }
-
-        _popupRoot.anchoredPosition = anchoredPosition + new Vector2(12f, -6f);
+        randomToggleRect.GetWorldCorners(corners);
+        var toggleBottomLeft = parentRect.InverseTransformPoint(corners[0]);
+        _panelRoot.localPosition = new Vector3(
+            toggleBottomLeft.x + PanelAnchorOffset.x,
+            toggleBottomLeft.y + PanelAnchorOffset.y,
+            _panelRoot.localPosition.z
+        );
     }
 
-    private Camera? ResolveCanvasCamera(RectTransform popupParent)
+    private void RefreshPanelEntries(bool forceRebuild)
     {
-        var canvas = popupParent.GetComponentInParent<Canvas>();
-        if (canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay)
-            return null;
-
-        if (canvas.worldCamera != null)
-            return canvas.worldCamera;
-
-        if (Camera.main != null)
-            return Camera.main;
-
-        if (!_warnedMissingCanvasCamera)
-        {
-            _warnedMissingCanvasCamera = true;
-            BppLog.Warn(
-                LogCategory,
-                "Popup canvas camera was unavailable; using null camera fallback."
-            );
-        }
-
-        return null;
-    }
-
-    private void RefreshPopupEntries()
-    {
-        if (_popupEntriesRoot == null || _view == null)
+        if (_entriesRoot == null || _view == null || _panelRoot == null)
             return;
-
-        _heroEntryToggles.Clear();
-        for (var index = _popupEntriesRoot.childCount - 1; index >= 0; index--)
-        {
-            var child = _popupEntriesRoot.GetChild(index);
-            if (child == null)
-                continue;
-
-            UnityEngine.Object.Destroy(child.gameObject);
-        }
 
         if (!TryReadHeroItemViews(_view, out var heroItemViews))
             return;
 
-        _unlockedHeroIds = heroItemViews
-            .Where(candidate => candidate != null && IsUnlocked(candidate))
-            .Select(candidate => candidate.Hero.ToString())
-            .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
-            .Distinct(StringComparer.Ordinal)
+        _heroAvailabilities = heroItemViews
+            .Where(candidate => candidate != null)
+            .Select(candidate => new HeroAvailability(candidate.Hero.ToString(), IsUnlocked(candidate)))
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.HeroId))
+            .Distinct(HeroAvailabilityComparer.Instance)
             .ToArray();
 
-        if (_unlockedHeroIds.Length == 0)
+        var availabilitySignature = string.Join(
+            "|",
+            _heroAvailabilities.Select(candidate => $"{candidate.HeroId}:{(candidate.IsUnlocked ? '1' : '0')}")
+        );
+        if (!forceRebuild && string.Equals(_lastAvailabilitySignature, availabilitySignature, StringComparison.Ordinal))
+            return;
+
+        _lastAvailabilitySignature = availabilitySignature;
+        _unlockedHeroIds = _heroAvailabilities
+            .Where(candidate => candidate.IsUnlocked)
+            .Select(candidate => candidate.HeroId)
+            .ToArray();
+
+        if (_unlockedHeroIds.Length > 0)
+        {
+            var mergedPool = RandomHeroPoolPreferences.MergeWithKnownUnlockedHeroIds(
+                _unlockedHeroIds,
+                RandomHeroPoolPlayerPrefs.LoadSelectedHeroIds(),
+                RandomHeroPoolPlayerPrefs.LoadKnownUnlockedHeroIds()
+            );
+            ApplyState(RandomHeroPoolStateFactory.Create(_unlockedHeroIds, mergedPool), persist: true);
+            RandomHeroPoolPlayerPrefs.SaveKnownUnlockedHeroIds(_unlockedHeroIds);
+        }
+        else
         {
             _state = null;
-            CreatePassiveEntry(PopupEmptyEntryObjectName, "No unlocked heroes", _popupEntriesRoot);
-            return;
         }
 
-        var mergedPool = RandomHeroPoolPreferences.MergeWithKnownUnlockedHeroIds(
-            _unlockedHeroIds,
-            LoadSelectedHeroIds(),
-            LoadKnownUnlockedHeroIds()
-        );
-        ApplyState(RandomHeroPoolStateFactory.Create(_unlockedHeroIds, mergedPool), persist: true);
-        SaveKnownUnlockedHeroIds(_unlockedHeroIds);
-
-        foreach (var heroId in _unlockedHeroIds)
-            CreateHeroToggleEntry(heroId, _popupEntriesRoot);
-
-        RebindHeroToggles();
-    }
-
-    private void OnSelectAllClicked()
-    {
-        if (_unlockedHeroIds.Length == 0)
-            return;
-
-        ApplyState(RandomHeroPoolStateFactory.Create(_unlockedHeroIds, _unlockedHeroIds), persist: true);
-    }
-
-    private void OnClearClicked()
-    {
-        if (_state == null || _unlockedHeroIds.Length == 0)
-            return;
-
-        var keepHeroId = _state.SelectedHeroIds.FirstOrDefault() ?? _unlockedHeroIds[0];
-        var next = _state;
-        foreach (var heroId in _unlockedHeroIds)
-        {
-            var shouldSelect = StringComparer.Ordinal.Equals(heroId, keepHeroId);
-            next = next.SetSelected(heroId, shouldSelect);
-        }
-
-        ApplyState(next, persist: true);
-    }
-
-    private void OnHeroToggled(string heroId, bool isSelected)
-    {
-        if (_isRebindingToggles || _state == null)
-            return;
-
-        var next = _state.SetSelected(heroId, isSelected);
-        ApplyState(next, persist: true);
+        RebuildHeroEntries();
+        RebindHeroEntries();
     }
 
     private void ApplyState(RandomHeroPoolState nextState, bool persist)
     {
         _state = nextState;
         if (persist)
-            SaveSelectedHeroIds(nextState.SelectedHeroIds);
-        RebindHeroToggles();
+            RandomHeroPoolPlayerPrefs.SaveSelectedHeroIds(nextState.SelectedHeroIds);
+        RebindHeroEntries();
     }
 
-    private void RebindHeroToggles()
+    private void RebuildHeroEntries()
+    {
+        if (_entriesRoot == null || _panelRoot == null)
+            return;
+
+        _heroEntryViews.Clear();
+        for (var index = _entriesRoot.childCount - 1; index >= 0; index--)
+        {
+            var child = _entriesRoot.GetChild(index);
+            if (child != null)
+                UnityEngine.Object.Destroy(child.gameObject);
+        }
+
+        for (var index = 0; index < _heroAvailabilities.Length; index++)
+            CreateHeroEntry(_heroAvailabilities[index], index);
+
+        var rows = Mathf.CeilToInt(_heroAvailabilities.Length / (float)EntryColumnCount);
+        var entriesHeight = rows <= 0
+            ? 0f
+            : (rows * EntryHeight) + ((rows - 1) * EntryVerticalSpacing);
+        _entriesRoot.sizeDelta = new Vector2(
+            PanelWidth - (PanelHorizontalPadding * 2f),
+            entriesHeight
+        );
+        _panelRoot.sizeDelta = new Vector2(PanelWidth, CalculatePanelHeight(rows));
+
+        if (_emptyLabel != null)
+            _emptyLabel.gameObject.SetActive(_heroAvailabilities.Length == 0);
+    }
+
+    private void CreateHeroEntry(HeroAvailability heroAvailability, int index)
+    {
+        if (_entriesRoot == null)
+            return;
+
+        var entryObject = new GameObject(
+            $"{EntryPrefix}{heroAvailability.HeroId}",
+            typeof(RectTransform),
+            typeof(Image),
+            typeof(Button),
+            typeof(Outline)
+        );
+        var entryRect = entryObject.GetComponent<RectTransform>();
+        entryRect.SetParent(_entriesRoot, worldPositionStays: false);
+        entryRect.anchorMin = new Vector2(0f, 1f);
+        entryRect.anchorMax = new Vector2(0f, 1f);
+        entryRect.pivot = new Vector2(0f, 1f);
+        entryRect.sizeDelta = new Vector2(EntryWidth, EntryHeight);
+        entryRect.anchoredPosition = new Vector2(
+            (index % EntryColumnCount) * (EntryWidth + EntryHorizontalSpacing),
+            -(index / EntryColumnCount) * (EntryHeight + EntryVerticalSpacing)
+        );
+
+        var background = entryObject.GetComponent<Image>();
+        background.raycastTarget = true;
+
+        var outline = entryObject.GetComponent<Outline>();
+        outline.effectDistance = new Vector2(1f, -1f);
+        outline.useGraphicAlpha = true;
+
+        var button = entryObject.GetComponent<Button>();
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(() => OnHeroEntryClicked(heroAvailability.HeroId));
+        button.targetGraphic = background;
+        button.transition = Selectable.Transition.None;
+        button.navigation = new Navigation { mode = Navigation.Mode.None };
+
+        var label = CreateText(
+            "Label",
+            entryRect,
+            fontSize: 16f,
+            alignment: TextAlignmentOptions.Center,
+            color: Color.white
+        );
+        if (label == null)
+        {
+            BppLog.Warn(LogCategory, $"Failed to create hero pool label for '{heroAvailability.HeroId}'.");
+            return;
+        }
+
+        var labelRect = label.rectTransform;
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+        label.text = GetHeroBadgeStyle(heroAvailability.HeroId).ShortCode;
+
+        _heroEntryViews[heroAvailability.HeroId] = new HeroPoolEntryView(
+            heroAvailability.HeroId,
+            button,
+            background,
+            outline,
+            label
+        );
+    }
+
+    private void OnHeroEntryClicked(string heroId)
     {
         if (_state == null)
             return;
 
-        _isRebindingToggles = true;
-        try
+        var nextState = _state.SetSelected(heroId, !_state.IsSelected(heroId));
+        ApplyState(nextState, persist: true);
+    }
+
+    private void RebindHeroEntries()
+    {
+        foreach (var heroAvailability in _heroAvailabilities)
         {
-            foreach (var pair in _heroEntryToggles)
-            {
-                pair.Value.SetIsOnWithoutNotify(_state.IsSelected(pair.Key));
-            }
+            if (!_heroEntryViews.TryGetValue(heroAvailability.HeroId, out var entryView))
+                continue;
+
+            ApplyEntryVisual(
+                entryView,
+                heroAvailability.IsUnlocked,
+                heroAvailability.IsUnlocked && _state?.IsSelected(heroAvailability.HeroId) == true
+            );
         }
-        finally
+
+        if (_headerLabel != null)
         {
-            _isRebindingToggles = false;
+            var selectedCount = _state?.SelectedHeroIds.Count ?? 0;
+            _headerLabel.text = _unlockedHeroIds.Length == 0
+                ? "POOL 0/0"
+                : $"POOL {selectedCount}/{_unlockedHeroIds.Length}";
         }
     }
 
-    private void CreateHeroToggleEntry(string heroId, Transform parent)
+    private static void ApplyEntryVisual(
+        HeroPoolEntryView entryView,
+        bool isUnlocked,
+        bool isSelected
+    )
     {
-        if (_configButton == null)
+        var style = GetHeroBadgeStyle(entryView.HeroId);
+        if (!isUnlocked)
         {
-            BppLog.Warn(LogCategory, "Config button template was unavailable for popup entries.");
+            entryView.Button.interactable = false;
+            entryView.Background.color = new Color(0.17f, 0.17f, 0.19f, 0.72f);
+            entryView.Outline.effectColor = new Color(0f, 0f, 0f, 0.30f);
+            entryView.Label.color = new Color(0.52f, 0.52f, 0.56f, 0.88f);
             return;
         }
 
-        var entryObject = UnityEngine.Object.Instantiate(_configButton.gameObject, parent);
-        entryObject.name = $"{PopupEntryPrefix}{heroId}";
-        TrySetLabel(entryObject, heroId);
-
-        var button = entryObject.GetComponent<Button>();
-        if (button != null)
+        entryView.Button.interactable = true;
+        if (isSelected)
         {
-            button.onClick.RemoveAllListeners();
-            button.interactable = false;
-            button.enabled = false;
+            entryView.Background.color = style.Background;
+            entryView.Outline.effectColor = new Color(0.98f, 0.86f, 0.45f, 0.70f);
+            entryView.Label.color = style.Text;
+            return;
         }
 
-        var toggle = entryObject.GetComponent<Toggle>();
-        if (toggle == null)
-            toggle = entryObject.AddComponent<Toggle>();
-
-        toggle.onValueChanged.RemoveAllListeners();
-        toggle.enabled = true;
-        toggle.interactable = true;
-        toggle.onValueChanged.AddListener(isSelected => OnHeroToggled(heroId, isSelected));
-        SetToggleCheckmarksVisible(entryObject.transform, visible: true);
-        _heroEntryToggles[heroId] = toggle;
+        entryView.Background.color = new Color(0.29f, 0.29f, 0.32f, 0.92f);
+        entryView.Outline.effectColor = new Color(0f, 0f, 0f, 0.45f);
+        entryView.Label.color = new Color(0.86f, 0.86f, 0.88f, 0.95f);
     }
 
     private static bool TryReadHeroItemViews(
@@ -634,10 +508,16 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         heroItemViews = Array.Empty<HeroItemView>();
         if (HeroItemViewsField?.GetValue(view) is not IEnumerable<HeroItemView> reflectedViews)
         {
-            BppLog.Warn(
-                LogCategory,
-                "HeroItemViews field was unavailable; skipping random hero pool popup entries."
-            );
+            var controller = view.GetComponent<RandomHeroPoolPanelController>();
+            if (controller != null && !controller._warnedMissingHeroItemViewsField)
+            {
+                controller._warnedMissingHeroItemViewsField = true;
+                BppLog.Warn(
+                    LogCategory,
+                    "HeroItemViews field was unavailable; skipping random hero pool entries."
+                );
+            }
+
             return false;
         }
 
@@ -662,170 +542,141 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         return heroItemView.HeroButton != null && heroItemView.HeroButton.interactable;
     }
 
-    private GameObject? CreatePassiveEntry(string objectName, string label, Transform parent)
+    private static TextMeshProUGUI? CreateText(
+        string objectName,
+        Transform parent,
+        float fontSize,
+        TextAlignmentOptions alignment,
+        Color color
+    )
     {
-        if (_configButton == null)
-        {
-            BppLog.Warn(LogCategory, "Config button template was unavailable for popup entries.");
-            return null;
-        }
+        var textObject = new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
+        var textRect = textObject.GetComponent<RectTransform>();
+        textRect.SetParent(parent, worldPositionStays: false);
 
-        var entryObject = UnityEngine.Object.Instantiate(_configButton.gameObject, parent);
-        entryObject.name = objectName;
-
-        var button = entryObject.GetComponent<Button>();
-        if (button != null)
-        {
-            button.onClick.RemoveAllListeners();
-            button.interactable = false;
-            button.enabled = false;
-        }
-
-        var toggle = entryObject.GetComponent<Toggle>();
-        if (toggle != null)
-        {
-            toggle.onValueChanged.RemoveAllListeners();
-            toggle.enabled = false;
-        }
-
-        SetToggleCheckmarksVisible(entryObject.transform, visible: false);
-        TrySetLabel(entryObject, label);
-        return entryObject;
+        var text = textObject.GetComponent<TextMeshProUGUI>();
+        text.fontSize = fontSize;
+        text.alignment = alignment;
+        text.color = color;
+        text.raycastTarget = false;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        return text;
     }
 
-    private IReadOnlyCollection<string>? LoadSelectedHeroIds()
+    private static float CalculatePanelHeight(int rows)
     {
-        return LoadHeroIdCollection(BuildScopedPrefsKey(SelectedPoolPrefsKeyPrefix));
+        var entriesHeight = rows <= 0
+            ? 24f
+            : (rows * EntryHeight) + ((rows - 1) * EntryVerticalSpacing);
+        return PanelTopPadding
+            + HeaderHeight
+            + HeaderToEntriesSpacing
+            + entriesHeight
+            + PanelBottomPadding;
     }
 
-    private void SaveSelectedHeroIds(IEnumerable<string> heroIds)
+    private static HeroBadgeStyle GetHeroBadgeStyle(string? heroName)
     {
-        SaveHeroIdCollection(BuildScopedPrefsKey(SelectedPoolPrefsKeyPrefix), heroIds);
-    }
+        if (string.IsNullOrWhiteSpace(heroName))
+            return new HeroBadgeStyle("UNK", new Color(0.20f, 0.29f, 0.38f, 0.95f), Color.white);
 
-    private IReadOnlyCollection<string>? LoadKnownUnlockedHeroIds()
-    {
-        return LoadHeroIdCollection(BuildScopedPrefsKey(KnownUnlockedPrefsKeyPrefix));
-    }
-
-    private void SaveKnownUnlockedHeroIds(IEnumerable<string> heroIds)
-    {
-        SaveHeroIdCollection(BuildScopedPrefsKey(KnownUnlockedPrefsKeyPrefix), heroIds);
-    }
-
-    private static IReadOnlyCollection<string>? LoadHeroIdCollection(string key)
-    {
-        if (!PlayerPrefs.HasKey(key))
-            return null;
-
-        var raw = PlayerPrefs.GetString(key, string.Empty);
-        if (string.IsNullOrWhiteSpace(raw))
-            return null;
-
-        try
+        return heroName.Trim() switch
         {
-            return JsonConvert.DeserializeObject<string[]>(raw);
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(LogCategory, $"Failed to parse saved random hero pool '{key}': {ex.Message}");
-            return null;
-        }
+            "Vanessa" => BuildHeroBadgeStyle("VAN", 192, 33, 33),
+            "Pygmalien" => BuildHeroBadgeStyle("PYG", 39, 103, 192),
+            "Dooley" => BuildHeroBadgeStyle("DOO", 225, 154, 8),
+            "Mak" => BuildHeroBadgeStyle("MAK", 190, 230, 91),
+            "Jules" => BuildHeroBadgeStyle("JUL", 180, 52, 236),
+            "Karnok" => BuildHeroBadgeStyle("KAR", 59, 136, 156),
+            "Stelle" => BuildHeroBadgeStyle("STE", 255, 235, 24),
+            _ => BuildHeroBadgeStyle(
+                heroName.Length <= 3
+                    ? heroName.ToUpperInvariant()
+                    : heroName[..3].ToUpperInvariant(),
+                57,
+                73,
+                97
+            ),
+        };
     }
 
-    private static void SaveHeroIdCollection(string key, IEnumerable<string> heroIds)
+    private static HeroBadgeStyle BuildHeroBadgeStyle(string shortCode, int r, int g, int b)
     {
-        var normalized = heroIds
-            .Where(heroId => !string.IsNullOrWhiteSpace(heroId))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var background = new Color(r / 255f, g / 255f, b / 255f, 0.98f);
+        var luminance = (0.299f * background.r) + (0.587f * background.g) + (0.114f * background.b);
+        var text = luminance > 0.62f ? new Color(0.10f, 0.12f, 0.15f, 1f) : Color.white;
+        return new HeroBadgeStyle(shortCode, background, text);
+    }
 
-        if (normalized.Length == 0)
+    private readonly struct HeroAvailability
+    {
+        public HeroAvailability(string heroId, bool isUnlocked)
         {
-            PlayerPrefs.DeleteKey(key);
-        }
-        else
-        {
-            PlayerPrefs.SetString(key, JsonConvert.SerializeObject(normalized));
+            HeroId = heroId;
+            IsUnlocked = isUnlocked;
         }
 
-        PlayerPrefs.Save();
+        public string HeroId { get; }
+
+        public bool IsUnlocked { get; }
     }
 
-    private static string BuildScopedPrefsKey(string keyPrefix)
+    private sealed class HeroAvailabilityComparer : IEqualityComparer<HeroAvailability>
     {
-        return $"{keyPrefix}.{ResolveAccountScopeForPrefs()}";
-    }
+        public static readonly HeroAvailabilityComparer Instance = new();
 
-    private static string ResolveAccountScopeForPrefs()
-    {
-        try
+        public bool Equals(HeroAvailability x, HeroAvailability y)
         {
-            var dataType = AccessTools.TypeByName("Data");
-            if (dataType == null)
-                return AnonymousAccountScope;
-
-            var profileProperty = AccessTools.Property(dataType, "Profile");
-            var profile = profileProperty?.GetValue(null);
-            if (profile == null)
-                return AnonymousAccountScope;
-
-            var accountIdProperty = AccessTools.Property(profile.GetType(), "AccountId");
-            var accountId = accountIdProperty?.GetValue(profile)?.ToString();
-            if (!string.IsNullOrWhiteSpace(accountId))
-                return Uri.EscapeDataString(accountId);
-
-            var usernameProperty = AccessTools.Property(profile.GetType(), "Username");
-            var username = usernameProperty?.GetValue(profile)?.ToString();
-            if (!string.IsNullOrWhiteSpace(username))
-                return Uri.EscapeDataString(username);
-        }
-        catch
-        {
+            return string.Equals(x.HeroId, y.HeroId, StringComparison.Ordinal);
         }
 
-        return AnonymousAccountScope;
-    }
-
-    private static void SetToggleCheckmarksVisible(Transform root, bool visible)
-    {
-        foreach (var candidate in root.GetComponentsInChildren<Transform>(includeInactive: true))
+        public int GetHashCode(HeroAvailability obj)
         {
-            if (candidate == null || candidate == root)
-                continue;
-
-            if (candidate.name.IndexOf("checkmark", StringComparison.OrdinalIgnoreCase) < 0)
-                continue;
-
-            candidate.gameObject.SetActive(visible);
+            return StringComparer.Ordinal.GetHashCode(obj.HeroId);
         }
     }
 
-    private static bool TrySetLabel(GameObject root, string labelText)
+    private sealed class HeroPoolEntryView
     {
-        var label = root
-            .GetComponentsInChildren<TextMeshProUGUI>(includeInactive: true)
-            .FirstOrDefault(candidate =>
-                candidate != null && !string.IsNullOrWhiteSpace(candidate.text)
-            );
-        if (label == null)
-            return false;
+        public HeroPoolEntryView(
+            string heroId,
+            Button button,
+            Image background,
+            Outline outline,
+            TextMeshProUGUI label
+        )
+        {
+            HeroId = heroId;
+            Button = button;
+            Background = background;
+            Outline = outline;
+            Label = label;
+        }
 
-        label.text = labelText;
-        return true;
+        public string HeroId { get; }
+
+        public Button Button { get; }
+
+        public Image Background { get; }
+
+        public Outline Outline { get; }
+
+        public TextMeshProUGUI Label { get; }
     }
 
-    private Color ResolvePopupBackgroundColor()
+    private readonly struct HeroBadgeStyle
     {
-        if (_randomHeroToggle == null)
-            return new Color(0.12f, 0.12f, 0.12f, 0.92f);
+        public HeroBadgeStyle(string shortCode, Color background, Color text)
+        {
+            ShortCode = shortCode;
+            Background = background;
+            Text = text;
+        }
 
-        var selectable = _randomHeroToggle.GetComponent<Selectable>();
-        if (selectable?.targetGraphic == null)
-            return new Color(0.12f, 0.12f, 0.12f, 0.92f);
+        public string ShortCode { get; }
 
-        var color = selectable.targetGraphic.color;
-        color.a = Mathf.Clamp(color.a, 0.85f, 0.98f);
-        return color;
+        public Color Background { get; }
+
+        public Color Text { get; }
     }
 }

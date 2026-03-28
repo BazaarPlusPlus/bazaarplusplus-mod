@@ -128,6 +128,11 @@ AssertSet(
 );
 
 var selector = new RandomHeroPoolSelector();
+var orderedCandidates = selector.BuildCandidateHeroIds(
+    unlockedHeroIds: new[] { "Vanessa", "Pygmalien", "Mak" },
+    savedPoolHeroIds: new[] { "Mak", "Vanessa", "MissingHero" }
+);
+AssertSequence(orderedCandidates, "Vanessa", "Mak");
 var picked = selector.SelectHero(candidateHeroIds: new[] { "Vanessa", "Mak" }, randomIndex: 1);
 AssertEqual("Mak", picked);
 
@@ -186,6 +191,19 @@ static void AssertEqual(string expected, string actual)
             $"Value assertion failed. Expected: '{expected}' Actual: '{actual}'"
         );
     }
+}
+
+static void AssertSequence(IEnumerable<string> actual, params string[] expected)
+{
+    var actualArray = actual.ToArray();
+    if (actualArray.SequenceEqual(expected, StringComparer.Ordinal))
+    {
+        return;
+    }
+
+    throw new InvalidOperationException(
+        $"Sequence assertion failed. Expected: [{string.Join(", ", expected)}] Actual: [{string.Join(", ", actualArray)}]"
+    );
 }
 
 static void MutateSnapshotOrThrow(IReadOnlyCollection<string> snapshot, string replacementValue)
