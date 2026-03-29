@@ -269,6 +269,48 @@ try
         "Ghost battle rows should be isolated per local player account."
     );
 
+    replaceGhostBattles.Invoke(
+        repository,
+        [
+            "player-account-a",
+            CreateGhostImports(
+                ghostImportType,
+                "ghost-stale-undownloaded",
+                "2026-03-01T08:00:00.0000000+00:00",
+                "ghost-stale-downloaded",
+                "2026-03-01T09:00:00.0000000+00:00"
+            ),
+        ]
+    );
+    markGhostReplayDownloaded.Invoke(repository, ["player-account-a", "ghost-stale-downloaded"]);
+    repositoryType.GetMethod("MarkOldUndownloadedGhostBattlesDeleted")!.Invoke(
+        repository,
+        ["player-account-a", new DateTimeOffset(2026, 3, 16, 0, 0, 0, TimeSpan.Zero)]
+    );
+    ghostRecords =
+        (
+            (System.Collections.IEnumerable)
+                listRecentGhostBattles.Invoke(repository, ["player-account-a", 20])!
+        )
+        .Cast<object>()
+        .ToList();
+    Assert(
+        !ghostRecords.Any(
+            record =>
+                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)!
+                == "ghost-stale-undownloaded"
+        ),
+        "Undownloaded ghost battles older than two weeks should be hidden after local deletion."
+    );
+    Assert(
+        ghostRecords.Any(
+            record =>
+                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)!
+                == "ghost-stale-downloaded"
+        ),
+        "Downloaded ghost battles should be retained even when older than two weeks."
+    );
+
     var secondCheckpoint = new DateTimeOffset(2026, 3, 16, 10, 15, 0, TimeSpan.Zero);
     saveGhostSyncCheckpoint.Invoke(repository, ["player-account-a", secondCheckpoint]);
     Assert(

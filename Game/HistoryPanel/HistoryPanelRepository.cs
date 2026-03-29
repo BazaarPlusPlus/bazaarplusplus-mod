@@ -19,6 +19,7 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed class HistoryPanelRepository
 {
     private const string RecentGhostSyncScopePrefix = "recent_against_me";
+    private static readonly TimeSpan GhostRetentionWindow = TimeSpan.FromDays(14);
 
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
@@ -293,6 +294,8 @@ internal sealed class HistoryPanelRepository
         if (!DatabaseExists || string.IsNullOrWhiteSpace(localPlayerAccountId))
             return Array.Empty<HistoryBattleRecord>();
 
+        MarkOldUndownloadedGhostBattlesDeleted(localPlayerAccountId, DateTimeOffset.UtcNow);
+
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
@@ -326,6 +329,7 @@ internal sealed class HistoryPanelRepository
                 replay_downloaded
             FROM {RunLogSqliteSchema.GhostBattlesTableName}
             WHERE local_player_account_id = $localPlayerAccountId
+              AND deleted_at_utc IS NULL
             ORDER BY recorded_at_utc DESC, battle_id DESC
             LIMIT $limit;
             """;
@@ -521,12 +525,20 @@ internal sealed class HistoryPanelRepository
                         {RunLogSqliteSchema.GhostBattlesTableName}.replay_downloaded,
                         excluded.replay_downloaded
                     ),
-                    last_synced_at_utc = excluded.last_synced_at_utc;
+                    last_synced_at_utc = excluded.last_synced_at_utc,
+                    deleted_at_utc = CASE
+                        WHEN excluded.recorded_at_utc >= $staleCutoffUtc THEN NULL
+                        ELSE {RunLogSqliteSchema.GhostBattlesTableName}.deleted_at_utc
+                    END;
                 """;
             insertCommand.Parameters.AddWithValue("$battleId", battle.BattleId);
             insertCommand.Parameters.AddWithValue(
                 "$localPlayerAccountId",
                 localPlayerAccountId
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$staleCutoffUtc",
+                DateTimeOffset.UtcNow.Subtract(GhostRetentionWindow).ToString("o")
             );
             insertCommand.Parameters.AddWithValue(
                 "$recordedAtUtc",
@@ -619,6 +631,34 @@ internal sealed class HistoryPanelRepository
         }
 
         transaction.Commit();
+    }
+
+    public void MarkOldUndownloadedGhostBattlesDeleted(
+        string localPlayerAccountId,
+        DateTimeOffset nowUtc
+    )
+    {
+        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
+            return;
+
+        using var connection = OpenConnection(ensureSchema: true);
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"""
+            UPDATE {RunLogSqliteSchema.GhostBattlesTableName}
+            SET deleted_at_utc = COALESCE(deleted_at_utc, $deletedAtUtc)
+            WHERE local_player_account_id = $localPlayerAccountId
+              AND replay_downloaded = 0
+              AND deleted_at_utc IS NULL
+              AND recorded_at_utc < $staleCutoffUtc;
+            """;
+        command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
+        command.Parameters.AddWithValue("$deletedAtUtc", nowUtc.ToString("o"));
+        command.Parameters.AddWithValue(
+            "$staleCutoffUtc",
+            nowUtc.Subtract(GhostRetentionWindow).ToString("o")
+        );
+        command.ExecuteNonQuery();
     }
 
     public DateTimeOffset? TryGetGhostSyncCheckpointUtc(string localPlayerAccountId)
@@ -839,6 +879,12 @@ internal sealed class HistoryPanelRepository
             RunLogSqliteSchema.GhostBattlesTableName,
             "local_player_account_id",
             "TEXT NOT NULL DEFAULT ''"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.GhostBattlesTableName,
+            "deleted_at_utc",
+            "TEXT NULL"
         );
         EnsureColumnExists(
             connection,

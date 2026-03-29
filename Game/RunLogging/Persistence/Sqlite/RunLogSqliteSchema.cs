@@ -161,7 +161,8 @@ public static class RunLogSqliteSchema
                 opponent_skills_json TEXT NOT NULL,
                 replay_available INTEGER NOT NULL DEFAULT 0,
                 replay_downloaded INTEGER NOT NULL DEFAULT 0,
-                last_synced_at_utc TEXT NOT NULL
+                last_synced_at_utc TEXT NOT NULL,
+                deleted_at_utc TEXT NULL
             );
 
             CREATE TABLE IF NOT EXISTS {GhostSyncStateTableName} (

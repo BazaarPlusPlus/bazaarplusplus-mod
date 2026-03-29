@@ -100,6 +100,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         }
 
         _repository.UpsertGhostBattles(localPlayerAccountId, queryResult.Battles);
+        _repository.MarkOldUndownloadedGhostBattlesDeleted(localPlayerAccountId, syncStartedAtUtc);
         if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit, lookbackDays))
             _repository.SaveGhostSyncCheckpointUtc(localPlayerAccountId, syncStartedAtUtc);
         return GhostBattleSyncResult.Success(queryResult.Battles.Count);
