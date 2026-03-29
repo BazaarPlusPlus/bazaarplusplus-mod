@@ -1,34 +1,21 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.NameOverride;
 
 internal static class NameOverrideSettingsMenuLabel
 {
-    private const string EnglishLabel = "Anonymous Mode";
-    private const string SimplifiedChineseLabel = "匿名模式";
-    private const string GermanLabel = "Anonymer Modus";
-    private const string PortugueseLabel = "Modo anonimo";
-    private const string KoreanLabel = "\uc775\uba85 \ubaa8\ub4dc";
-    private const string ItalianLabel = "Modalita anonima";
+    private static readonly LocalizedTextSet Labels = new(
+        "Anonymous Mode",
+        "\u533f\u540d\u6a21\u5f0f",
+        "Anonymer Modus",
+        "Modo anonimo",
+        "\uc775\uba85 \ubaa8\ub4dc",
+        "Modalita anonima"
+    );
 
     internal static string Resolve(string languageCode)
     {
-        if (string.IsNullOrWhiteSpace(languageCode))
-            return EnglishLabel;
-
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
-            return SimplifiedChineseLabel;
-        if (LanguageCodeMatcher.IsGerman(languageCode))
-            return GermanLabel;
-        if (LanguageCodeMatcher.IsPortuguese(languageCode))
-            return PortugueseLabel;
-        if (LanguageCodeMatcher.IsKorean(languageCode))
-            return KoreanLabel;
-        if (LanguageCodeMatcher.IsItalian(languageCode))
-            return ItalianLabel;
-
-        return EnglishLabel;
+        return Labels.Resolve(languageCode);
     }
 }

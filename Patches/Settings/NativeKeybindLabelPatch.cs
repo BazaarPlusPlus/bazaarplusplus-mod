@@ -2,7 +2,6 @@
 #nullable enable
 using System;
 using System.Linq;
-using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.Settings;
 using HarmonyLib;
 using TheBazaar.UI;
@@ -14,6 +13,15 @@ namespace BazaarPlusPlus;
 [HarmonyPatch(typeof(OptionsDialogController), "Awake")]
 internal static class NativeKeybindLabelAwakePatch
 {
+    private static readonly LocalizedTextSet MonsterPreviewLabel = new(
+        "Show Monster Preview",
+        "\u663e\u793a\u602a\u7269\u9884\u89c8",
+        "Monstervorschau anzeigen",
+        "Mostrar previa de monstro",
+        "\ubaac\uc2a4\ud130 \ubbf8\ub9ac\ubcf4\uae30 \ud45c\uc2dc",
+        "Mostra anteprima mostro"
+    );
+
     [HarmonyPostfix]
     private static void Postfix(OptionsDialogController __instance)
     {
@@ -74,18 +82,7 @@ internal static class NativeKeybindLabelAwakePatch
 
     private static string ResolveMonsterPreviewLabel(string languageCode)
     {
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
-            return "显示怪物预览";
-        if (LanguageCodeMatcher.IsGerman(languageCode))
-            return "Monstervorschau anzeigen";
-        if (LanguageCodeMatcher.IsPortuguese(languageCode))
-            return "Mostrar previa de monstro";
-        if (LanguageCodeMatcher.IsKorean(languageCode))
-            return "몬스터 미리보기 표시";
-        if (LanguageCodeMatcher.IsItalian(languageCode))
-            return "Mostra anteprima mostro";
-
-        return "Show Monster Preview";
+        return MonsterPreviewLabel.Resolve(languageCode);
     }
 }
 

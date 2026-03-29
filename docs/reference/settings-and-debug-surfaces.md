@@ -8,23 +8,27 @@ monster-preview, and run-logging docs.
 
 ## Gameplay Settings Toggles
 
-`BppGameplaySettingsCoordinator.EnsureAll(...)` is the entry point that keeps Bazaar++ gameplay
-settings rows installed and synchronized inside `OptionsDialogController`.
+`BppSettingsDockController` is the runtime entry point for Bazaar++ gameplay settings. It attaches
+a custom dock button beside native settings buttons and renders Bazaar++ toggles from
+`BppSettingsDockCatalog.Definitions`.
 
 Current toggles:
 
 - `Anonymous Mode` -> `EnableNameOverrideConfig`
 - `Enchant Preview` -> `EnchantPreviewAlwaysShowConfig`
 - `Combat Status Bar` -> `EnableCombatStatusBarConfig`
+- `Use Native Monster Preview` -> `UseNativeMonsterPreviewConfig`
 
-Current row order:
+Current dock order:
 
-- `BPP_NameOverrideToggle`
-- `BPP_EnchantPreviewToggle`
-- `BPP_CombatStatusBarToggle`
+- `NameOverride`
+- `EnchantPreview`
+- `CombatStatusBar`
+- `NativeMonsterPreview`
 
-`SettingsMenuToggleInstaller` clones a native gameplay toggle row, rewrites the label, and binds
-the toggle state back into `BppConfig`.
+`BppSettingsDockCatalog` is the source of truth for toggle ordering, labels, config bindings, and
+per-setting side effects such as refreshing visible hero banners or reapplying monster-preview
+mode.
 
 ## Tooltip Keybind Rows
 
@@ -79,12 +83,13 @@ Debug-only entry points:
 - [Plugin.cs](../../Plugin.cs)
 - [Game/Input/KeyBindings.cs](../../Game/Input/KeyBindings.cs)
 - [Game/Input/BppHotkeyService.cs](../../Game/Input/BppHotkeyService.cs)
-- [Game/Settings/SettingsMenuToggleDefinition.cs](../../Game/Settings/SettingsMenuToggleDefinition.cs)
+- [Game/Settings/BppSettingsDockController.cs](../../Game/Settings/BppSettingsDockController.cs)
+- [Game/Settings/BppSettingsDockCatalog.cs](../../Game/Settings/BppSettingsDockCatalog.cs)
+- [Game/Settings/BppSettingsDockDefinition.cs](../../Game/Settings/BppSettingsDockDefinition.cs)
+- [Game/Settings/LocalizedTextSet.cs](../../Game/Settings/LocalizedTextSet.cs)
+- [Patches/Settings/BppSettingsDockPatch.cs](../../Patches/Settings/BppSettingsDockPatch.cs)
 - [Patches/Settings/SettingsMenuToggleInstaller.cs](../../Patches/Settings/SettingsMenuToggleInstaller.cs)
-- [Patches/Settings/BppGameplaySettingsCoordinator.cs](../../Patches/Settings/BppGameplaySettingsCoordinator.cs)
 - [Patches/Settings/BppKeybindSettingsPatch.cs](../../Patches/Settings/BppKeybindSettingsPatch.cs)
 - [Patches/NameOverride/NameOverridePatches.cs](../../Patches/NameOverride/NameOverridePatches.cs)
-- [Patches/NameOverride/NameOverrideSettingsPatch.cs](../../Patches/NameOverride/NameOverrideSettingsPatch.cs)
-- [Patches/Tooltips/EnchantPreviewSettingsPatch.cs](../../Patches/Tooltips/EnchantPreviewSettingsPatch.cs)
 - [Game/Tooltips/TooltipModifierRefreshController.cs](../../Game/Tooltips/TooltipModifierRefreshController.cs)
 - [Game/DebugPanel/DebugPanel.cs](../../Game/DebugPanel/DebugPanel.cs)

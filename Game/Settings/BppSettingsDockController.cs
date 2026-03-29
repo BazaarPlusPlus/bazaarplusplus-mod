@@ -1,15 +1,9 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.CombatStatusBar;
-using BazaarPlusPlus.Game.ItemEnchantPreview;
-using BazaarPlusPlus.Game.MonsterPreview;
-using BazaarPlusPlus.Game.NameOverride;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 
 namespace BazaarPlusPlus.Game.Settings;
 
@@ -34,41 +28,6 @@ internal sealed class BppSettingsDockController : MonoBehaviour
     private const float RowSpacing = 12f;
     private const float RowInnerPadding = 16f;
     private const float StatusWidth = 80f;
-
-    private static readonly DockSettingDefinition[] Definitions =
-    [
-        new(
-            "NameOverride",
-            NameOverrideSettingsMenuLabel.Resolve,
-            new NameOverrideSettingsMenuBridge(
-                ReadNameOverrideEnabled,
-                WriteNameOverrideEnabled,
-                NameOverrideUiRefresh.TryRefreshVisibleHeroBanners
-            )
-        ),
-        new(
-            "EnchantPreview",
-            EnchantPreviewSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(ReadEnchantPreviewEnabled, WriteEnchantPreviewEnabled)
-        ),
-        new(
-            "CombatStatusBar",
-            CombatStatusBarSettingsMenuLabel.Resolve,
-            new CombatStatusBarSettingsMenuBridge(
-                CombatStatusBarFeature.GetEnabledSettingValue,
-                CombatStatusBarFeature.SetEnabledSettingValue
-            )
-        ),
-        new(
-            "NativeMonsterPreview",
-            MonsterPreviewSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                ReadUseNativeMonsterPreview,
-                WriteUseNativeMonsterPreview,
-                MonsterPreviewModeSwitchCoordinator.Apply
-            )
-        ),
-    ];
 
     private readonly List<DockSettingRowView> _rows = [];
 
@@ -220,7 +179,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         ConfigurePanelRect(panelRect);
         ConfigurePanelVisual(panelObject);
 
-            _headerLabel = CreateText(
+        _headerLabel = CreateText(
             HeaderObjectName,
             panelRect,
             21f,
@@ -245,10 +204,10 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         if (_panelRoot == null)
             return;
 
-        while (_rows.Count < Definitions.Length)
+        while (_rows.Count < BppSettingsDockCatalog.Definitions.Count)
         {
             var rowIndex = _rows.Count;
-            _rows.Add(CreateRow(Definitions[rowIndex], rowIndex));
+            _rows.Add(CreateRow(BppSettingsDockCatalog.Definitions[rowIndex], rowIndex));
         }
     }
 
@@ -258,7 +217,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             ConfigureRowRect(_rows[index].RectTransform, index);
     }
 
-    private DockSettingRowView CreateRow(DockSettingDefinition definition, int index)
+    private DockSettingRowView CreateRow(BppSettingsDockDefinition definition, int index)
     {
         if (_panelRoot == null)
             throw new InvalidOperationException("Panel root was unavailable.");
@@ -356,11 +315,11 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         UpdateDockButtonAccent();
     }
 
-    private void ToggleSetting(DockSettingDefinition definition)
+    private void ToggleSetting(BppSettingsDockDefinition definition)
     {
         var currentValue = definition.Bridge.GetInitialValue();
         definition.Bridge.ApplyValue(!currentValue);
-        RefreshView();
+        RefreshAll();
     }
 
     private void RefreshView()
@@ -401,7 +360,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             return;
 
         var enabledCount = 0;
-        foreach (var definition in Definitions)
+        foreach (var definition in BppSettingsDockCatalog.Definitions)
         {
             if (definition.Bridge.GetInitialValue())
                 enabledCount++;
@@ -463,7 +422,10 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         rectTransform.localScale = Vector3.one;
         rectTransform.localRotation = Quaternion.identity;
         rectTransform.anchoredPosition = new Vector2(-8f, 0f);
-        rectTransform.sizeDelta = new Vector2(PanelWidth, CalculatePanelHeight(Definitions.Length));
+        rectTransform.sizeDelta = new Vector2(
+            PanelWidth,
+            CalculatePanelHeight(BppSettingsDockCatalog.Definitions.Count)
+        );
     }
 
     private static void ConfigurePanelVisual(GameObject panelObject)
@@ -628,66 +590,10 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         return "BazaarPlusPlus";
     }
 
-    private static bool ReadNameOverrideEnabled()
-    {
-        return BppRuntimeHost.Config.EnableNameOverrideConfig?.Value ?? false;
-    }
-
-    private static bool ReadUseNativeMonsterPreview()
-    {
-        return BppRuntimeHost.Config.UseNativeMonsterPreviewConfig?.Value ?? false;
-    }
-
-    private static void WriteUseNativeMonsterPreview(bool enabled)
-    {
-        var config = BppRuntimeHost.Config.UseNativeMonsterPreviewConfig;
-        if (config != null)
-            config.Value = enabled;
-    }
-
-    private static void WriteNameOverrideEnabled(bool enabled)
-    {
-        var config = BppRuntimeHost.Config.EnableNameOverrideConfig;
-        if (config != null)
-            config.Value = enabled;
-    }
-
-    private static bool ReadEnchantPreviewEnabled()
-    {
-        return BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig?.Value ?? false;
-    }
-
-    private static void WriteEnchantPreviewEnabled(bool enabled)
-    {
-        var config = BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig;
-        if (config != null)
-            config.Value = enabled;
-    }
-
-    private readonly struct DockSettingDefinition
-    {
-        internal DockSettingDefinition(
-            string key,
-            Func<string, string> resolveLabel,
-            SettingsMenuToggleBridge bridge
-        )
-        {
-            Key = key;
-            ResolveLabel = resolveLabel;
-            Bridge = bridge;
-        }
-
-        internal string Key { get; }
-
-        internal Func<string, string> ResolveLabel { get; }
-
-        internal SettingsMenuToggleBridge Bridge { get; }
-    }
-
     private sealed class DockSettingRowView
     {
         internal DockSettingRowView(
-            DockSettingDefinition definition,
+            BppSettingsDockDefinition definition,
             RectTransform rectTransform,
             Image background,
             Outline outline,
@@ -703,7 +609,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             Status = status;
         }
 
-        internal DockSettingDefinition Definition { get; }
+        internal BppSettingsDockDefinition Definition { get; }
 
         internal RectTransform RectTransform { get; }
 

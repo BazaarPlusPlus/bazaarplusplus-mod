@@ -1,34 +1,21 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal static class CombatStatusBarSettingsMenuLabel
 {
-    private const string EnglishLabel = "Combat Status Bar";
-    private const string SimplifiedChineseLabel = "\u6218\u6597\u72b6\u6001\u680f";
-    private const string GermanLabel = "Kampfstatusleiste";
-    private const string PortugueseLabel = "Barra de status do combate";
-    private const string KoreanLabel = "\uc804\ud22c \uc0c1\ud0dc \ubc14";
-    private const string ItalianLabel = "Barra stato combattimento";
+    private static readonly LocalizedTextSet Labels = new(
+        "Combat Status Bar",
+        "\u6218\u6597\u72b6\u6001\u680f",
+        "Kampfstatusleiste",
+        "Barra de status do combate",
+        "\uc804\ud22c \uc0c1\ud0dc \ubc14",
+        "Barra stato combattimento"
+    );
 
     internal static string Resolve(string languageCode)
     {
-        if (string.IsNullOrWhiteSpace(languageCode))
-            return EnglishLabel;
-
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
-            return SimplifiedChineseLabel;
-        if (LanguageCodeMatcher.IsGerman(languageCode))
-            return GermanLabel;
-        if (LanguageCodeMatcher.IsPortuguese(languageCode))
-            return PortugueseLabel;
-        if (LanguageCodeMatcher.IsKorean(languageCode))
-            return KoreanLabel;
-        if (LanguageCodeMatcher.IsItalian(languageCode))
-            return ItalianLabel;
-
-        return EnglishLabel;
+        return Labels.Resolve(languageCode);
     }
 }

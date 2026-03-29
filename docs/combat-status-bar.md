@@ -34,10 +34,10 @@ Explicitly out of scope:
 - [Game/CombatStatusBar/CombatStatusBar.Config.cs](../Game/CombatStatusBar/CombatStatusBar.Config.cs)
 - [Game/CombatStatusBar/CombatStatusBarModule.cs](../Game/CombatStatusBar/CombatStatusBarModule.cs)
 - [Game/CombatStatusBar/CombatStatusBar.SettingsMenuBridge.cs](../Game/CombatStatusBar/CombatStatusBar.SettingsMenuBridge.cs)
+- [Game/Settings/BppSettingsDockCatalog.cs](../Game/Settings/BppSettingsDockCatalog.cs)
 - [Game/Input/KeyBindings.cs](../Game/Input/KeyBindings.cs)
 - [Patches/Combat/CombatSimulationPatches.cs](../Patches/Combat/CombatSimulationPatches.cs)
 - [Patches/Combat/CombatSpeedPatch.cs](../Patches/Combat/CombatSpeedPatch.cs)
-- [Patches/Combat/CombatStatusBarSettingsPatch.cs](../Patches/Combat/CombatStatusBarSettingsPatch.cs)
 
 ## Runtime Flow
 
@@ -62,7 +62,8 @@ final-blow slowdown.
 
 ## Settings And Config
 
-- Native settings integration is provided through the combat-status-bar settings bridge.
+- Bazaar++ settings integration is provided through the combat-status-bar settings bridge and the
+  shared `BppSettingsDockCatalog`.
 - Config is read from `BppConfig`:
   - `EnableCombatStatusBarConfig`
   - `CombatStatusBarSpeedMultiplierConfig`

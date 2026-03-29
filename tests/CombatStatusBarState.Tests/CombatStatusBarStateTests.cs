@@ -256,28 +256,23 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void EnchantPreviewSettingsPatch_Exists_And_BindsAlwaysShowConfig()
+    public void BppSettingsDockCatalog_ContainsEnchantPreviewBinding()
     {
         var sourcePath = Path.GetFullPath(
             Path.Combine(
                 AppContext.BaseDirectory,
-                "../../../../../Patches/Tooltips/EnchantPreviewSettingsPatch.cs"
+                "../../../../../Game/Settings/BppSettingsDockCatalog.cs"
             )
         );
         Assert.True(
             File.Exists(sourcePath),
-            $"Enchant preview settings patch not found at {sourcePath}"
+            $"BPP settings dock catalog not found at {sourcePath}"
         );
         var source = File.ReadAllText(sourcePath);
 
         Assert.Contains("EnchantPreviewAlwaysShowConfig", source, StringComparison.Ordinal);
-        Assert.Contains("BPP_EnchantPreviewToggle", source, StringComparison.Ordinal);
-        Assert.Contains("BPP_CombatStatusBarToggle", source, StringComparison.Ordinal);
-        Assert.Contains(
-            "BppGameplaySettingsCoordinator.EnsureAll",
-            source,
-            StringComparison.Ordinal
-        );
+        Assert.Contains("\"EnchantPreview\"", source, StringComparison.Ordinal);
+        Assert.Contains("EnchantPreviewSettingsMenuLabel.Resolve", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -299,42 +294,30 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void GameplaySettingsCoordinator_UsesStableToggleOrder()
+    public void BppSettingsDockCatalog_UsesStableToggleOrder()
     {
         var sourcePath = Path.GetFullPath(
             Path.Combine(
                 AppContext.BaseDirectory,
-                "../../../../../Patches/Settings/BppGameplaySettingsCoordinator.cs"
+                "../../../../../Game/Settings/BppSettingsDockCatalog.cs"
             )
         );
         Assert.True(
             File.Exists(sourcePath),
-            $"Gameplay settings coordinator not found at {sourcePath}"
+            $"BPP settings dock catalog not found at {sourcePath}"
         );
         var source = File.ReadAllText(sourcePath);
 
-        var nameIndex = source.IndexOf(
-            "NameOverrideSettingsAwakePatch.EnsureToggleExists",
-            StringComparison.Ordinal
-        );
-        var combatIndex = source.IndexOf(
-            "CombatStatusBarSettingsAwakePatch.EnsureToggleExists",
-            StringComparison.Ordinal
-        );
-        var enchantIndex = source.IndexOf(
-            "EnchantPreviewSettingsAwakePatch.EnsureToggleExists",
-            StringComparison.Ordinal
-        );
-        var arrangeIndex = source.IndexOf(
-            "SettingsMenuToggleInstaller.ArrangeRows",
-            StringComparison.Ordinal
-        );
+        var nameIndex = source.IndexOf("\"NameOverride\"", StringComparison.Ordinal);
+        var combatIndex = source.IndexOf("\"CombatStatusBar\"", StringComparison.Ordinal);
+        var enchantIndex = source.IndexOf("\"EnchantPreview\"", StringComparison.Ordinal);
+        var monsterIndex = source.IndexOf("\"NativeMonsterPreview\"", StringComparison.Ordinal);
 
         Assert.True(
             nameIndex >= 0
                 && enchantIndex > nameIndex
                 && combatIndex > enchantIndex
-                && arrangeIndex > enchantIndex
+                && monsterIndex > combatIndex
         );
     }
 

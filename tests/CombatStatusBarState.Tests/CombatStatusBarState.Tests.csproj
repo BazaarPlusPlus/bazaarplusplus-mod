@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <Compile Include="..\..\Game\Settings\LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
+    <Compile Include="..\..\Game\Settings\LocalizedTextSet.cs" Link="LocalizedTextSet.cs" />
     <Compile
       Include="..\..\Game\Settings\SettingsMenuToggleBridge.cs"
       Link="SettingsMenuToggleBridge.cs"

@@ -21,43 +21,40 @@ Assert(
     "Enchant preview settings label should expose the English label."
 );
 Assert(
-    labelSource.Contains("始终显示附魔预览", StringComparison.Ordinal),
+    labelSource.Contains("\\u59cb\\u7ec8\\u663e\\u793a\\u9644\\u9b54\\u9884\\u89c8", StringComparison.Ordinal),
     "Enchant preview settings label should expose the Simplified Chinese label."
 );
 
 var settingsPatchSourcePath = Path.GetFullPath(
     Path.Combine(
         AppContext.BaseDirectory,
-        "../../../../../Patches/Tooltips/EnchantPreviewSettingsPatch.cs"
+        "../../../../../Game/Settings/BppSettingsDockCatalog.cs"
     )
 );
 Assert(
     File.Exists(settingsPatchSourcePath),
-    $"Enchant preview settings patch not found at {settingsPatchSourcePath}"
+    $"BPP settings dock catalog not found at {settingsPatchSourcePath}"
 );
 var settingsPatchSource = File.ReadAllText(settingsPatchSourcePath);
 Assert(
     settingsPatchSource.Contains("EnchantPreviewAlwaysShowConfig", StringComparison.Ordinal),
-    "Enchant preview settings patch should bind the AlwaysShow config entry."
+    "BPP settings dock catalog should bind the AlwaysShow config entry."
 );
 Assert(
-    settingsPatchSource.Contains("BPP_EnchantPreviewToggle", StringComparison.Ordinal),
-    "Enchant preview settings patch should install a dedicated gameplay toggle."
+    settingsPatchSource.Contains("\"EnchantPreview\"", StringComparison.Ordinal),
+    "BPP settings dock catalog should register the enchant preview setting."
 );
 
 var combatSettingsPatchSourcePath = Path.GetFullPath(
     Path.Combine(
         AppContext.BaseDirectory,
-        "../../../../../Patches/Combat/CombatStatusBarSettingsPatch.cs"
+        "../../../../../Game/Settings/BppSettingsDockCatalog.cs"
     )
 );
 var combatSettingsPatchSource = File.ReadAllText(combatSettingsPatchSourcePath);
 Assert(
-    combatSettingsPatchSource.Contains(
-        "BppGameplaySettingsCoordinator.EnsureAll(__instance);",
-        StringComparison.Ordinal
-    ),
-    "Gameplay settings refresh should install the enchant preview toggle alongside the other Bazaar++ toggles."
+    combatSettingsPatchSource.Contains("\"CombatStatusBar\"", StringComparison.Ordinal),
+    "BPP settings dock catalog should register the combat status bar setting alongside the other Bazaar++ settings."
 );
 
 var hotkeyServiceSourcePath = Path.GetFullPath(
@@ -144,20 +141,15 @@ var keybindLabelResolverSourcePath = Path.GetFullPath(
 );
 var keybindLabelResolverSource = File.ReadAllText(keybindLabelResolverSourcePath);
 Assert(
-    keybindLabelResolverSource.Contains("zh-Hans", StringComparison.Ordinal)
-        || keybindLabelResolverSource.Contains(
-            "SimplifiedChineseLanguage.Matches",
-            StringComparison.Ordinal
-        )
-        || keybindLabelResolverSource.Contains(
-            "LanguageCodeMatcher.IsSimplifiedChinese",
-            StringComparison.Ordinal
-        ),
-    "BPP keybind label resolver should recognize zh-Hans as Simplified Chinese, directly or through the shared helper."
+    keybindLabelResolverSource.Contains("LocalizedTextSet", StringComparison.Ordinal),
+    "BPP keybind label resolver should centralize localization through the shared helper."
 );
 Assert(
     keybindLabelResolverSource.Contains("Press a key or mouse button", StringComparison.Ordinal)
-        && keybindLabelResolverSource.Contains("按下一个按键或鼠标按钮", StringComparison.Ordinal),
+        && keybindLabelResolverSource.Contains(
+            "\\u6309\\u4e0b\\u4e00\\u4e2a\\u952e\\u6216\\u9f20\\u6807\\u6309\\u94ae",
+            StringComparison.Ordinal
+        ),
     "BPP keybind label resolver should tell users that rebinding accepts both keys and mouse buttons."
 );
 
@@ -291,7 +283,10 @@ Assert(
     "Native keybind label patch should expose the English monster preview label."
 );
 Assert(
-    nativeKeybindLabelPatchSource.Contains("显示怪物预览", StringComparison.Ordinal),
+    nativeKeybindLabelPatchSource.Contains(
+        "\\u663e\\u793a\\u602a\\u7269\\u9884\\u89c8",
+        StringComparison.Ordinal
+    ),
     "Native keybind label patch should expose the Simplified Chinese monster preview label."
 );
 Assert(
@@ -311,16 +306,8 @@ Assert(
     "Debug panel should expose preview hotkey and raw modifier state so input handling can be verified in game."
 );
 Assert(
-    nativeKeybindLabelPatchSource.Contains("zh-Hans", StringComparison.Ordinal)
-        || nativeKeybindLabelPatchSource.Contains(
-            "SimplifiedChineseLanguage.Matches",
-            StringComparison.Ordinal
-        )
-        || nativeKeybindLabelPatchSource.Contains(
-            "LanguageCodeMatcher.IsSimplifiedChinese",
-            StringComparison.Ordinal
-        ),
-    "Native keybind label patch should recognize zh-Hans as Simplified Chinese, directly or through the shared helper."
+    nativeKeybindLabelPatchSource.Contains("LocalizedTextSet", StringComparison.Ordinal),
+    "Native keybind label patch should centralize localization through the shared helper."
 );
 
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
