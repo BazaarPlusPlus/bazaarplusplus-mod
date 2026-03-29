@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.CombatReplay.Upload;
 using BazaarPlusPlus.Game.RunLogging.Upload;
 using Newtonsoft.Json.Linq;
 
@@ -187,12 +186,13 @@ internal sealed class GhostBattleApiClient
                 );
             }
 
-            var payload = Newtonsoft.Json.JsonConvert.DeserializeObject<CombatReplayUploadPayload>(
+            var payload = Newtonsoft.Json.JsonConvert.DeserializeObject<GhostBattlePayload>(
                 responseBody,
                 RunUploadSerialization.SerializerSettings
             );
             if (
                 payload?.ReplayPayload == null
+                || payload.BattleManifest == null
                 || string.IsNullOrWhiteSpace(payload.ReplayPayload.BattleId)
             )
             {
@@ -233,8 +233,6 @@ internal sealed class GhostBattleApiClient
             Day = battle["day"]?.Value<int?>(),
             Hour = battle["hour"]?.Value<int?>(),
             EncounterId = battle["encounter_id"]?.Value<string>(),
-            PlayerName = battle["player_name"]?.Value<string>(),
-            PlayerAccountId = battle["player_account_id"]?.Value<string>(),
             PlayerHero = battle["player_hero"]?.Value<string>(),
             PlayerRank = battle["player_rank"]?.Value<string>(),
             PlayerRating = battle["player_rating"]?.Value<int?>(),
@@ -249,22 +247,10 @@ internal sealed class GhostBattleApiClient
             Result = battle["result"]?.Value<string>(),
             WinnerCombatantId = battle["winner_combatant_id"]?.Value<string>(),
             LoserCombatantId = battle["loser_combatant_id"]?.Value<string>(),
-            PlayerHandJson = NormalizeCaptureJson(battle["player_hand"]),
-            PlayerSkillsJson = NormalizeCaptureJson(battle["player_skills"]),
-            OpponentHandJson = NormalizeCaptureJson(battle["opponent_hand"]),
-            OpponentSkillsJson = NormalizeCaptureJson(battle["opponent_skills"]),
             ReplayAvailable = battle["replay"]?["available"]?.Value<bool>() == true,
             ReplayDownloaded = false,
             LastSyncedAtUtc = DateTimeOffset.UtcNow,
         };
-    }
-
-    private static string NormalizeCaptureJson(JToken? token)
-    {
-        if (token == null || token.Type == JTokenType.Null)
-            return "{\"items\":[]}";
-
-        return token.ToString(Newtonsoft.Json.Formatting.None);
     }
 
     private static string DeriveAgainstMeEndpoint(string uploadEndpoint, int lookbackDays, int limit)
@@ -379,7 +365,7 @@ internal readonly struct GhostBattleReplayPayloadResult
 {
     private GhostBattleReplayPayloadResult(
         bool succeeded,
-        CombatReplayUploadPayload? payload,
+        GhostBattlePayload? payload,
         string? error
     )
     {
@@ -390,11 +376,11 @@ internal readonly struct GhostBattleReplayPayloadResult
 
     public bool Succeeded { get; }
 
-    public CombatReplayUploadPayload? Payload { get; }
+    public GhostBattlePayload? Payload { get; }
 
     public string? Error { get; }
 
-    public static GhostBattleReplayPayloadResult Success(CombatReplayUploadPayload payload) =>
+    public static GhostBattleReplayPayloadResult Success(GhostBattlePayload payload) =>
         new(true, payload, null);
 
     public static GhostBattleReplayPayloadResult Failure(string error) => new(false, null, error);

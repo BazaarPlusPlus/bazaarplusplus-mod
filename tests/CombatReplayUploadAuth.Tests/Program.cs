@@ -53,19 +53,19 @@ var requestsHandled = Task.Run(async () =>
             continue;
         }
 
-        if (request.Url?.AbsolutePath == "/replays/upload")
+        if (request.Url?.AbsolutePath == "/battles/upload")
         {
             Assert(
                 request.Headers["X-BPP-Client-Id"] == "client-replay-001",
-                "Signed replay upload should include the registered client id."
+                "Signed battle upload should include the registered client id."
             );
             Assert(
                 request.Headers["X-BPP-Install-Id"] == registeredInstallId,
-                "Signed replay upload should include the registered install id."
+                "Signed battle upload should include the registered install id."
             );
             Assert(
                 request.Headers["X-BPP-Battle-Id"] == "battle-auth-001",
-                "Signed replay upload should include the battle id."
+                "Signed battle upload should include the battle id."
             );
 
             var timestamp =
@@ -181,11 +181,11 @@ try
     InvokeVoid(catalogType, catalog, "Save", [manifest]);
 
     var storeType = RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Upload.CombatReplayUploadSqliteStore"
+        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadSqliteStore"
     );
     var store =
         Activator.CreateInstance(storeType, dbPath, replayRoot)
-        ?? throw new InvalidOperationException("Failed to create CombatReplayUploadSqliteStore.");
+        ?? throw new InvalidOperationException("Failed to create BattleUploadSqliteStore.");
     InvokeVoid(storeType, store, "MarkReplayDirty", ["battle-auth-001"]);
 
     var identityStoreType = RequireType(
@@ -205,7 +205,7 @@ try
         Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
     var serviceType = RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Upload.CombatReplayUploadService"
+        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService"
     );
     var service =
         Activator.CreateInstance(
@@ -215,13 +215,13 @@ try
             clientStateStore,
             keyStore,
             $"{prefix}clients/register",
-            $"{prefix}replays/upload",
+            $"{prefix}battles/upload",
             3,
             TimeSpan.FromSeconds(10)
-        ) ?? throw new InvalidOperationException("Failed to create CombatReplayUploadService.");
+        ) ?? throw new InvalidOperationException("Failed to create BattleUploadService.");
 
     var uploadTask = (Task)
-        Invoke<object>(serviceType, service, "UploadPendingReplaysAsync", [CancellationToken.None]);
+        Invoke<object>(serviceType, service, "UploadPendingBattlesAsync", [CancellationToken.None]);
     await uploadTask.ConfigureAwait(false);
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -236,12 +236,9 @@ try
             "Successful replay upload should clear the dirty flag."
         );
         Assert(
-            GetString(
-                connection,
-                "SELECT object_key FROM replay_sync_state WHERE battle_id = $battleId;",
-                "battle-auth-001"
-            ) == "combat-replays/global/client-replay-001/battle-auth-001.payload.json",
-            "Successful replay upload should persist the returned object key."
+            !ColumnExists(connection, "replay_sync_state", "payload_sha256")
+                && !ColumnExists(connection, "replay_sync_state", "object_key"),
+            "Successful battle upload should not persist upload object metadata locally."
         );
     }
 
@@ -312,6 +309,26 @@ static string GetString(SqliteConnection connection, string sql, string battleId
         command.ExecuteScalar()
         ?? throw new InvalidOperationException($"Query returned null: {sql}")
     );
+}
+
+static bool ColumnExists(SqliteConnection connection, string tableName, string columnName)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = $"PRAGMA table_info({tableName});";
+    using var reader = command.ExecuteReader();
+    while (reader.Read())
+    {
+        if (
+            string.Equals(
+                reader.GetString(reader.GetOrdinal("name")),
+                columnName,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+            return true;
+    }
+
+    return false;
 }
 
 static string BuildCanonical(

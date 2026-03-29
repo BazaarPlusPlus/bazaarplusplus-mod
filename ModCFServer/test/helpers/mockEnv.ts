@@ -9,17 +9,8 @@ export type ClientRow = {
 };
 
 export type ReplayUploadRow = {
-  client_id: string;
-  install_id: string;
   battle_id: string;
-  run_id: string | null;
-  payload_sha256: string;
   object_key: string;
-  payload_bytes?: number | null;
-  schema_version?: number | null;
-  content_type?: string | null;
-  created_at_utc?: string;
-  updated_at_utc?: string;
   uploaded_at_utc: string;
 };
 
@@ -31,9 +22,7 @@ export type RunUploadRow = {
   payload_object_key?: string | null;
   payload_bytes?: number | null;
   schema_version?: number | null;
-  projection_version?: number | null;
   projection_status: string;
-  projected_battle_count?: number;
   projected_at_utc: string | null;
   last_error_code?: string | null;
   last_error_detail?: string | null;
@@ -101,10 +90,7 @@ export type PvpBattleRow = {
   result: string | null;
   winner_combatant_id: string | null;
   loser_combatant_id: string | null;
-  payload_json?: string;
-  summary_json?: string;
   replay_available?: number;
-  projection_version?: number;
   created_at_utc: string;
   updated_at_utc: string;
 };
@@ -218,14 +204,30 @@ export class MockD1Database {
       return row
         ? ({
             battle_id: row.battle_id,
+            run_id: row.run_id,
             recorded_at_utc: row.recorded_at_utc,
+            day: row.day,
+            hour: row.hour,
+            encounter_id: row.encounter_id,
+            player_name: row.player_name,
+            player_account_id: row.player_account_id,
+            player_hero: row.player_hero,
+            player_rank: row.player_rank,
+            player_rating: row.player_rating,
+            player_level: row.player_level,
+            opponent_name: row.opponent_name,
             opponent_account_id: row.opponent_account_id,
-            payload_json: row.payload_json ?? row.summary_json ?? "{}",
-            summary_json: row.summary_json ?? row.payload_json ?? "{}",
+            opponent_hero: row.opponent_hero,
+            opponent_rank: row.opponent_rank,
+            opponent_rating: row.opponent_rating,
+            opponent_level: row.opponent_level,
+            combat_kind: row.combat_kind,
+            result: row.result,
+            winner_combatant_id: row.winner_combatant_id,
+            loser_combatant_id: row.loser_combatant_id,
             replay_available:
               row.replay_available ??
               (this.replayUploads.has(row.battle_id) ? 1 : 0),
-            projection_version: row.projection_version ?? 1,
           } as T)
         : null;
     }
@@ -273,14 +275,30 @@ export class MockD1Database {
             (row) =>
               ({
                 battle_id: row.battle_id,
+                run_id: row.run_id,
                 recorded_at_utc: row.recorded_at_utc,
+                day: row.day,
+                hour: row.hour,
+                encounter_id: row.encounter_id,
+                player_name: row.player_name,
+                player_account_id: row.player_account_id,
+                player_hero: row.player_hero,
+                player_rank: row.player_rank,
+                player_rating: row.player_rating,
+                player_level: row.player_level,
+                opponent_name: row.opponent_name,
                 opponent_account_id: row.opponent_account_id,
-                payload_json: row.payload_json ?? row.summary_json ?? "{}",
-                summary_json: row.summary_json ?? row.payload_json ?? "{}",
+                opponent_hero: row.opponent_hero,
+                opponent_rank: row.opponent_rank,
+                opponent_rating: row.opponent_rating,
+                opponent_level: row.opponent_level,
+                combat_kind: row.combat_kind,
+                result: row.result,
+                winner_combatant_id: row.winner_combatant_id,
+                loser_combatant_id: row.loser_combatant_id,
                 replay_available:
                   row.replay_available ??
                   (this.replayUploads.has(row.battle_id) ? 1 : 0),
-                projection_version: row.projection_version ?? 1,
               }) as T,
           ),
       };
@@ -310,24 +328,15 @@ export class MockD1Database {
     }
 
     if (sql.includes("INSERT INTO replay_uploads")) {
-      const battleId = String(params[2]);
+      const battleId = String(params[0]);
       if (this.replayUploads.has(battleId) && !sql.includes("ON CONFLICT")) {
         throw new Error("SQLITE_CONSTRAINT: replay_uploads.battle_id");
       }
 
       const row = {
-        client_id: String(params[0]),
-        install_id: String(params[1]),
         battle_id: battleId,
-        run_id: params[3] == null ? null : String(params[3]),
-        payload_sha256: String(params[4]),
-        object_key: String(params[5]),
-        payload_bytes: params[6] == null ? null : Number(params[6]),
-        schema_version: params[7] == null ? null : Number(params[7]),
-        content_type: params[8] == null ? null : String(params[8]),
-        created_at_utc: params[9] == null ? undefined : String(params[9]),
-        updated_at_utc: params[10] == null ? undefined : String(params[10]),
-        uploaded_at_utc: String(params[11]),
+        object_key: String(params[1]),
+        uploaded_at_utc: String(params[2]),
       } satisfies ReplayUploadRow;
       this.replayUploads.set(row.battle_id, row);
       return { changes: 1 };
@@ -347,22 +356,20 @@ export class MockD1Database {
         payload_object_key: params[4] == null ? null : String(params[4]),
         payload_bytes: params[5] == null ? null : Number(params[5]),
         schema_version: params[6] == null ? null : Number(params[6]),
-        projection_version: params[7] == null ? null : Number(params[7]),
-        projection_status: String(params[8]),
-        projected_battle_count: params[9] == null ? 0 : Number(params[9]),
-        projected_at_utc: params[10] == null ? null : String(params[10]),
-        last_error_code: params[11] == null ? null : String(params[11]),
-        last_error_detail: params[12] == null ? null : String(params[12]),
-        created_at_utc: params[13] == null ? undefined : String(params[13]),
-        updated_at_utc: params[14] == null ? undefined : String(params[14]),
-        uploaded_at_utc: params[13] == null ? undefined : String(params[13]),
-        projection_error: params[12] == null ? null : String(params[12]),
+        projection_status: String(params[7]),
+        projected_at_utc: params[8] == null ? null : String(params[8]),
+        last_error_code: params[9] == null ? null : String(params[9]),
+        last_error_detail: params[10] == null ? null : String(params[10]),
+        created_at_utc: params[11] == null ? undefined : String(params[11]),
+        updated_at_utc: params[12] == null ? undefined : String(params[12]),
+        uploaded_at_utc: params[11] == null ? undefined : String(params[11]),
+        projection_error: params[10] == null ? null : String(params[10]),
       });
       return { changes: 1 };
     }
 
     if (sql.includes("UPDATE run_uploads")) {
-      const runId = String(params[6]);
+      const runId = String(params[5]);
       const existing = this.runUploads.get(runId);
       if (!existing) {
         return { changes: 0 };
@@ -371,12 +378,11 @@ export class MockD1Database {
       this.runUploads.set(runId, {
         ...existing,
         projection_status: String(params[0]),
-        projected_battle_count: params[1] == null ? 0 : Number(params[1]),
-        projected_at_utc: params[2] == null ? null : String(params[2]),
-        last_error_code: params[3] == null ? null : String(params[3]),
-        last_error_detail: params[4] == null ? null : String(params[4]),
-        updated_at_utc: params[5] == null ? existing.updated_at_utc : String(params[5]),
-        projection_error: params[4] == null ? null : String(params[4]),
+        projected_at_utc: params[1] == null ? null : String(params[1]),
+        last_error_code: params[2] == null ? null : String(params[2]),
+        last_error_detail: params[3] == null ? null : String(params[3]),
+        updated_at_utc: params[4] == null ? existing.updated_at_utc : String(params[4]),
+        projection_error: params[3] == null ? null : String(params[3]),
       });
       return { changes: 1 };
     }
@@ -474,12 +480,9 @@ export class MockD1Database {
         result: params[20] == null ? null : String(params[20]),
         winner_combatant_id: params[21] == null ? null : String(params[21]),
         loser_combatant_id: params[22] == null ? null : String(params[22]),
-        payload_json: existing?.payload_json,
-        summary_json: String(params[23]),
-        replay_available: params[24] == null ? 0 : Number(params[24]),
-        projection_version: params[25] == null ? 1 : Number(params[25]),
-        created_at_utc: existing?.created_at_utc ?? String(params[26]),
-        updated_at_utc: String(params[27]),
+        replay_available: params[23] == null ? 0 : Number(params[23]),
+        created_at_utc: existing?.created_at_utc ?? String(params[24]),
+        updated_at_utc: String(params[25]),
       });
       return { changes: 1 };
     }

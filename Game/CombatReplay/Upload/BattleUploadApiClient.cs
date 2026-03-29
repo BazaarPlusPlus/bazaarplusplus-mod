@@ -8,15 +8,15 @@ using Newtonsoft.Json.Linq;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Upload;
 
-internal sealed class CombatReplayUploadApiClient
+internal sealed class BattleUploadApiClient
 {
     private readonly HttpClient _httpClient;
-    private readonly CombatReplayUploadRequestSigner _requestSigner;
+    private readonly BattleUploadRequestSigner _requestSigner;
     private readonly string _uploadEndpoint;
 
-    public CombatReplayUploadApiClient(
+    public BattleUploadApiClient(
         HttpClient httpClient,
-        CombatReplayUploadRequestSigner requestSigner,
+        BattleUploadRequestSigner requestSigner,
         string uploadEndpoint
     )
     {
@@ -28,7 +28,7 @@ internal sealed class CombatReplayUploadApiClient
         _uploadEndpoint = uploadEndpoint;
     }
 
-    public async Task<CombatReplayUploadApiResult> UploadReplayAsync(
+    public async Task<BattleUploadApiResult> UploadBattleAsync(
         string json,
         string clientId,
         string installId,
@@ -71,11 +71,11 @@ internal sealed class CombatReplayUploadApiClient
                     }
                 }
 
-                return CombatReplayUploadApiResult.Success(objectKey);
+                return BattleUploadApiResult.Success(objectKey);
             }
 
             var statusCode = (int)response.StatusCode;
-            return CombatReplayUploadApiResult.Failure(
+            return BattleUploadApiResult.Failure(
                 $"http_{statusCode}:{RunUploadErrorFormatter.Truncate(responseBody)}",
                 shouldFallback: statusCode >= 500 || statusCode == 429,
                 shouldReRegister: statusCode == 401
@@ -93,10 +93,10 @@ internal sealed class CombatReplayUploadApiClient
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayUploadApiClient",
-                $"Replay upload request failed for endpoint={_uploadEndpoint}: {FormatException(ex)}"
+                "BattleUploadApiClient",
+                $"Battle upload request failed for endpoint={_uploadEndpoint}: {FormatException(ex)}"
             );
-            return CombatReplayUploadApiResult.Failure(
+            return BattleUploadApiResult.Failure(
                 RunUploadErrorFormatter.Truncate(ex.Message),
                 shouldFallback: true,
                 shouldReRegister: false
@@ -114,9 +114,9 @@ internal sealed class CombatReplayUploadApiClient
     }
 }
 
-internal readonly struct CombatReplayUploadApiResult : IBppAuthenticatedApiResult
+internal readonly struct BattleUploadApiResult : IBppAuthenticatedApiResult
 {
-    private CombatReplayUploadApiResult(
+    private BattleUploadApiResult(
         bool succeeded,
         string? error,
         bool shouldFallback,
@@ -141,10 +141,10 @@ internal readonly struct CombatReplayUploadApiResult : IBppAuthenticatedApiResul
 
     public string? ObjectKey { get; }
 
-    public static CombatReplayUploadApiResult Success(string? objectKey) =>
+    public static BattleUploadApiResult Success(string? objectKey) =>
         new(true, null, false, false, objectKey);
 
-    public static CombatReplayUploadApiResult Failure(
+    public static BattleUploadApiResult Failure(
         string error,
         bool shouldFallback,
         bool shouldReRegister

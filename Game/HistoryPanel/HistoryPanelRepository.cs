@@ -321,10 +321,6 @@ internal sealed class HistoryPanelRepository
                 result,
                 winner_combatant_id,
                 loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json,
                 replay_available,
                 replay_downloaded
             FROM {RunLogSqliteSchema.GhostBattlesTableName}
@@ -341,65 +337,35 @@ internal sealed class HistoryPanelRepository
         while (reader.Read())
         {
             var battleId = SafeGetNullableString(reader, "battle_id") ?? "unknown";
-            try
-            {
-                var playerHand = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("player_hand_json"))
-                );
-                var playerSkills = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("player_skills_json"))
-                );
-                var opponentHand = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("opponent_hand_json"))
-                );
-                var opponentSkills = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("opponent_skills_json"))
-                );
-
-                records.Add(
-                    new HistoryBattleRecord(
-                        battleId,
-                        string.Empty,
-                        DateTimeOffset.Parse(
-                            reader.GetString(reader.GetOrdinal("recorded_at_utc"))
-                        ),
-                        GetNullableInt32(reader, "day"),
-                        GetNullableInt32(reader, "hour"),
-                        GetNullableString(reader, "encounter_id"),
-                        GetNullableString(reader, "player_hero"),
-                        GetNullableString(reader, "player_rank"),
-                        GetNullableInt32(reader, "player_rating"),
-                        GetNullableInt32(reader, "player_level"),
-                        GetNullableString(reader, "opponent_name"),
-                        GetNullableString(reader, "opponent_hero"),
-                        GetNullableString(reader, "opponent_rank"),
-                        GetNullableInt32(reader, "opponent_rating"),
-                        GetNullableInt32(reader, "opponent_level"),
-                        GetNullableString(reader, "opponent_account_id"),
-                        GetNullableString(reader, "combat_kind"),
-                        GetNullableString(reader, "result"),
-                        GetNullableString(reader, "winner_combatant_id"),
-                        GetNullableString(reader, "loser_combatant_id"),
-                        BuildSnapshotSummary(
-                            playerHand,
-                            playerSkills,
-                            opponentHand,
-                            opponentSkills
-                        ),
-                        BuildPreviewData(playerHand, playerSkills, opponentHand, opponentSkills),
-                        HistoryBattleSource.Ghost,
-                        replayAvailable: GetNullableInt32(reader, "replay_available") == 1,
-                        replayDownloaded: GetNullableInt32(reader, "replay_downloaded") == 1
-                    )
-                );
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "HistoryPanelRepository",
-                    $"Skipping unreadable ghost battle row '{battleId}': {ex.Message}"
-                );
-            }
+            records.Add(
+                new HistoryBattleRecord(
+                    battleId,
+                    string.Empty,
+                    DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
+                    GetNullableInt32(reader, "day"),
+                    GetNullableInt32(reader, "hour"),
+                    GetNullableString(reader, "encounter_id"),
+                    GetNullableString(reader, "player_hero"),
+                    GetNullableString(reader, "player_rank"),
+                    GetNullableInt32(reader, "player_rating"),
+                    GetNullableInt32(reader, "player_level"),
+                    GetNullableString(reader, "opponent_name"),
+                    GetNullableString(reader, "opponent_hero"),
+                    GetNullableString(reader, "opponent_rank"),
+                    GetNullableInt32(reader, "opponent_rating"),
+                    GetNullableInt32(reader, "opponent_level"),
+                    GetNullableString(reader, "opponent_account_id"),
+                    GetNullableString(reader, "combat_kind"),
+                    GetNullableString(reader, "result"),
+                    GetNullableString(reader, "winner_combatant_id"),
+                    GetNullableString(reader, "loser_combatant_id"),
+                    string.Empty,
+                    BuildEmptyPreviewData(),
+                    HistoryBattleSource.Ghost,
+                    replayAvailable: GetNullableInt32(reader, "replay_available") == 1,
+                    replayDownloaded: GetNullableInt32(reader, "replay_downloaded") == 1
+                )
+            );
         }
 
         return records;
@@ -440,8 +406,6 @@ internal sealed class HistoryPanelRepository
                     day,
                     hour,
                     encounter_id,
-                    player_name,
-                    player_account_id,
                     player_hero,
                     player_rank,
                     player_rating,
@@ -456,10 +420,6 @@ internal sealed class HistoryPanelRepository
                     result,
                     winner_combatant_id,
                     loser_combatant_id,
-                    player_hand_json,
-                    player_skills_json,
-                    opponent_hand_json,
-                    opponent_skills_json,
                     replay_available,
                     replay_downloaded,
                     last_synced_at_utc
@@ -470,8 +430,6 @@ internal sealed class HistoryPanelRepository
                     $day,
                     $hour,
                     $encounterId,
-                    $playerName,
-                    $playerAccountId,
                     $playerHero,
                     $playerRank,
                     $playerRating,
@@ -486,10 +444,6 @@ internal sealed class HistoryPanelRepository
                     $result,
                     $winnerCombatantId,
                     $loserCombatantId,
-                    $playerHandJson,
-                    $playerSkillsJson,
-                    $opponentHandJson,
-                    $opponentSkillsJson,
                     $replayAvailable,
                     $replayDownloaded,
                     $lastSyncedAtUtc
@@ -500,8 +454,6 @@ internal sealed class HistoryPanelRepository
                     day = excluded.day,
                     hour = excluded.hour,
                     encounter_id = excluded.encounter_id,
-                    player_name = excluded.player_name,
-                    player_account_id = excluded.player_account_id,
                     player_hero = excluded.player_hero,
                     player_rank = excluded.player_rank,
                     player_rating = excluded.player_rating,
@@ -516,10 +468,6 @@ internal sealed class HistoryPanelRepository
                     result = excluded.result,
                     winner_combatant_id = excluded.winner_combatant_id,
                     loser_combatant_id = excluded.loser_combatant_id,
-                    player_hand_json = excluded.player_hand_json,
-                    player_skills_json = excluded.player_skills_json,
-                    opponent_hand_json = excluded.opponent_hand_json,
-                    opponent_skills_json = excluded.opponent_skills_json,
                     replay_available = excluded.replay_available,
                     replay_downloaded = MAX(
                         {RunLogSqliteSchema.GhostBattlesTableName}.replay_downloaded,
@@ -549,14 +497,6 @@ internal sealed class HistoryPanelRepository
             insertCommand.Parameters.AddWithValue(
                 "$encounterId",
                 (object?)battle.EncounterId ?? DBNull.Value
-            );
-            insertCommand.Parameters.AddWithValue(
-                "$playerName",
-                (object?)battle.PlayerName ?? DBNull.Value
-            );
-            insertCommand.Parameters.AddWithValue(
-                "$playerAccountId",
-                (object?)battle.PlayerAccountId ?? DBNull.Value
             );
             insertCommand.Parameters.AddWithValue(
                 "$playerHero",
@@ -611,10 +551,6 @@ internal sealed class HistoryPanelRepository
                 "$loserCombatantId",
                 (object?)battle.LoserCombatantId ?? DBNull.Value
             );
-            insertCommand.Parameters.AddWithValue("$playerHandJson", battle.PlayerHandJson);
-            insertCommand.Parameters.AddWithValue("$playerSkillsJson", battle.PlayerSkillsJson);
-            insertCommand.Parameters.AddWithValue("$opponentHandJson", battle.OpponentHandJson);
-            insertCommand.Parameters.AddWithValue("$opponentSkillsJson", battle.OpponentSkillsJson);
             insertCommand.Parameters.AddWithValue(
                 "$replayAvailable",
                 battle.ReplayAvailable ? 1 : 0
@@ -733,60 +669,6 @@ internal sealed class HistoryPanelRepository
         command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
         command.Parameters.AddWithValue("$battleId", battleId);
         command.ExecuteNonQuery();
-    }
-
-    public PvpBattleManifest? TryLoadGhostManifest(string localPlayerAccountId, string battleId)
-    {
-        if (
-            !DatabaseExists
-            || string.IsNullOrWhiteSpace(localPlayerAccountId)
-            || string.IsNullOrWhiteSpace(battleId)
-        )
-            return null;
-
-        using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
-        command.CommandText = $"""
-            SELECT
-                battle_id,
-                local_player_account_id,
-                recorded_at_utc,
-                day,
-                hour,
-                encounter_id,
-                player_name,
-                player_account_id,
-                player_hero,
-                player_rank,
-                player_rating,
-                player_level,
-                opponent_name,
-                opponent_hero,
-                opponent_rank,
-                opponent_rating,
-                opponent_level,
-                opponent_account_id,
-                combat_kind,
-                result,
-                winner_combatant_id,
-                loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json
-            FROM {RunLogSqliteSchema.GhostBattlesTableName}
-            WHERE local_player_account_id = $localPlayerAccountId
-              AND battle_id = $battleId
-            LIMIT 1;
-            """;
-        command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
-        command.Parameters.AddWithValue("$battleId", battleId);
-        using var reader = command.ExecuteReader();
-        if (!reader.Read())
-            return null;
-
-        return ReadManifest(reader, runIdColumnName: null);
     }
 
     public IReadOnlyList<string> ListBattleIdsByRun(string runId)
@@ -978,6 +860,26 @@ internal sealed class HistoryPanelRepository
     private static string Pluralize(int count, string singular, string plural)
     {
         return count == 1 ? singular : plural;
+    }
+
+    private static HistoryBattlePreviewData BuildEmptyPreviewData()
+    {
+        return new HistoryBattlePreviewData(
+            new PreviewBoardModel
+            {
+                ItemCards = new List<PreviewCardSpec>(),
+                SkillCards = new List<PreviewCardSpec>(),
+                Metadata = new Dictionary<string, string>(),
+                Signature = string.Empty,
+            },
+            new PreviewBoardModel
+            {
+                ItemCards = new List<PreviewCardSpec>(),
+                SkillCards = new List<PreviewCardSpec>(),
+                Metadata = new Dictionary<string, string>(),
+                Signature = string.Empty,
+            }
+        );
     }
 
     private static HistoryBattlePreviewData BuildPreviewData(

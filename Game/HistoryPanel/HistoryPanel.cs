@@ -105,8 +105,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _replayService = new HistoryPanelReplayService(
             _runtime.CombatReplayRuntimeAccessor,
             () => _runtime.CombatReplayDirectoryPath,
-            TryGetCurrentPlayerAccountId,
-            repository,
             _ghostSyncService
         );
     }

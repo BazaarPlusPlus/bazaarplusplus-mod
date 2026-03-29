@@ -25,21 +25,32 @@ export type ReplayUploadLookupRow = {
   battle_id: string;
   object_key: string;
   uploaded_at_utc: string;
-  payload_bytes?: number | null;
-  schema_version?: number | null;
-  content_type?: string | null;
-  created_at_utc?: string;
-  updated_at_utc?: string;
 };
 
 export type ProjectedBattleQueryRow = {
   battle_id: string;
   recorded_at_utc: string;
   opponent_account_id: string | null;
-  payload_json: string;
-  summary_json?: string;
+  run_id?: string | null;
+  day?: number | null;
+  hour?: number | null;
+  encounter_id?: string | null;
+  player_name?: string | null;
+  player_account_id?: string | null;
+  player_hero?: string | null;
+  player_rank?: string | null;
+  player_rating?: number | null;
+  player_level?: number | null;
+  opponent_name?: string | null;
+  opponent_hero?: string | null;
+  opponent_rank?: string | null;
+  opponent_rating?: number | null;
+  opponent_level?: number | null;
+  combat_kind?: string;
+  result?: string | null;
+  winner_combatant_id?: string | null;
+  loser_combatant_id?: string | null;
   replay_available: number;
-  projection_version?: number;
 };
 
 export type RunUploadProjectionStatus =

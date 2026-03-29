@@ -3,7 +3,7 @@ import type { ProjectedBattleQueryRow } from "../types/db";
 
 export type BattleProjectionRecord = {
   battleId: string;
-  runId: string;
+  runId: string | null;
   sourceClientId: string;
   recordedAtUtc: string;
   day: number | null;
@@ -25,9 +25,7 @@ export type BattleProjectionRecord = {
   result: string | null;
   winnerCombatantId: string | null;
   loserCombatantId: string | null;
-  summaryJson: string;
   replayAvailable: number;
-  projectionVersion: number;
   createdAtUtc: string;
   updatedAtUtc: string;
 };
@@ -73,12 +71,10 @@ function buildBattleUpsert(
         result,
         winner_combatant_id,
         loser_combatant_id,
-        summary_json,
         replay_available,
-        projection_version,
         created_at_utc,
         updated_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(battle_id) DO UPDATE SET
         run_id = excluded.run_id,
         source_client_id = excluded.source_client_id,
@@ -102,9 +98,7 @@ function buildBattleUpsert(
         result = excluded.result,
         winner_combatant_id = excluded.winner_combatant_id,
         loser_combatant_id = excluded.loser_combatant_id,
-        summary_json = excluded.summary_json,
         replay_available = excluded.replay_available,
-        projection_version = excluded.projection_version,
         updated_at_utc = excluded.updated_at_utc
     `,
   ).bind(
@@ -131,12 +125,17 @@ function buildBattleUpsert(
     battle.result,
     battle.winnerCombatantId,
     battle.loserCombatantId,
-    battle.summaryJson,
     battle.replayAvailable,
-    battle.projectionVersion,
     battle.createdAtUtc,
     battle.updatedAtUtc,
   );
+}
+
+export async function upsertProjectedBattle(
+  env: Env,
+  battle: BattleProjectionRecord,
+): Promise<void> {
+  await buildBattleUpsert(env, battle).run();
 }
 
 export async function replaceProjectedBattlesForRun(
@@ -185,11 +184,28 @@ export async function listProjectedBattlesAgainstAccountIds(
     `
       SELECT
         pb.battle_id,
+        pb.run_id,
         pb.recorded_at_utc,
+        pb.day,
+        pb.hour,
+        pb.encounter_id,
+        pb.player_name,
+        pb.player_account_id,
+        pb.player_hero,
+        pb.player_rank,
+        pb.player_rating,
+        pb.player_level,
+        pb.opponent_name,
         pb.opponent_account_id,
-        pb.summary_json,
-        pb.replay_available,
-        pb.projection_version
+        pb.opponent_hero,
+        pb.opponent_rank,
+        pb.opponent_rating,
+        pb.opponent_level,
+        pb.combat_kind,
+        pb.result,
+        pb.winner_combatant_id,
+        pb.loser_combatant_id,
+        pb.replay_available
       FROM pvp_battles AS pb
       WHERE pb.opponent_account_id IN (${placeholders})
         AND pb.combat_kind = 'PVPCombat'
@@ -212,11 +228,28 @@ export async function getProjectedBattleById(
     `
       SELECT
         pb.battle_id,
+        pb.run_id,
         pb.recorded_at_utc,
+        pb.day,
+        pb.hour,
+        pb.encounter_id,
+        pb.player_name,
+        pb.player_account_id,
+        pb.player_hero,
+        pb.player_rank,
+        pb.player_rating,
+        pb.player_level,
+        pb.opponent_name,
         pb.opponent_account_id,
-        pb.summary_json,
-        pb.replay_available,
-        pb.projection_version
+        pb.opponent_hero,
+        pb.opponent_rank,
+        pb.opponent_rating,
+        pb.opponent_level,
+        pb.combat_kind,
+        pb.result,
+        pb.winner_combatant_id,
+        pb.loser_combatant_id,
+        pb.replay_available
       FROM pvp_battles AS pb
       WHERE pb.battle_id = ?
       LIMIT 1

@@ -11,9 +11,7 @@ export async function upsertRunUpload(
     payloadObjectKey: string | null;
     payloadBytes: number | null;
     schemaVersion: number | null;
-    projectionVersion: number;
     projectionStatus: RunUploadProjectionStatus;
-    projectedBattleCount: number;
     projectedAtUtc?: string | null;
     lastErrorCode?: string | null;
     lastErrorDetail?: string | null;
@@ -31,15 +29,13 @@ export async function upsertRunUpload(
         payload_object_key,
         payload_bytes,
         schema_version,
-        projection_version,
         projection_status,
-        projected_battle_count,
         projected_at_utc,
         last_error_code,
         last_error_detail,
         created_at_utc,
         updated_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(run_id) DO UPDATE SET
         client_id = excluded.client_id,
         install_id = excluded.install_id,
@@ -47,9 +43,7 @@ export async function upsertRunUpload(
         payload_object_key = excluded.payload_object_key,
         payload_bytes = excluded.payload_bytes,
         schema_version = excluded.schema_version,
-        projection_version = excluded.projection_version,
         projection_status = excluded.projection_status,
-        projected_battle_count = excluded.projected_battle_count,
         projected_at_utc = excluded.projected_at_utc,
         last_error_code = excluded.last_error_code,
         last_error_detail = excluded.last_error_detail,
@@ -64,9 +58,7 @@ export async function upsertRunUpload(
       input.payloadObjectKey,
       input.payloadBytes,
       input.schemaVersion,
-      input.projectionVersion,
       input.projectionStatus,
-      input.projectedBattleCount,
       input.projectedAtUtc ?? null,
       input.lastErrorCode ?? null,
       input.lastErrorDetail ?? null,
@@ -81,7 +73,6 @@ export async function markRunProjectionStatus(
   input: {
     runId: string;
     projectionStatus: RunUploadProjectionStatus;
-    projectedBattleCount?: number;
     projectedAtUtc?: string | null;
     lastErrorCode?: string | null;
     lastErrorDetail?: string | null;
@@ -92,7 +83,6 @@ export async function markRunProjectionStatus(
     `
       UPDATE run_uploads
       SET projection_status = ?,
-          projected_battle_count = ?,
           projected_at_utc = ?,
           last_error_code = ?,
           last_error_detail = ?,
@@ -102,7 +92,6 @@ export async function markRunProjectionStatus(
   )
     .bind(
       input.projectionStatus,
-      input.projectedBattleCount ?? 0,
       input.projectedAtUtc ?? null,
       input.lastErrorCode ?? null,
       input.lastErrorDetail ?? null,

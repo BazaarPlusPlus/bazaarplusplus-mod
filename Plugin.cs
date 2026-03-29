@@ -102,8 +102,8 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<RunLoggingController>();
         BppLog.Info("Plugin", "Adding RunUploadController");
         gameObject.AddComponent<RunUploadController>();
-        BppLog.Info("Plugin", "Adding CombatReplayUploadController");
-        gameObject.AddComponent<CombatReplayUploadController>();
+        BppLog.Info("Plugin", "Adding BattleUploadController");
+        gameObject.AddComponent<BattleUploadController>();
         BppLog.Info("Plugin", "Adding HistoryPanel");
         var historyPanel = gameObject.AddComponent<HistoryPanel>();
         historyPanel.Configure(

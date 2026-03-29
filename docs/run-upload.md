@@ -22,7 +22,7 @@
 5. 若当前 route scope 没有 `client_id`，先调用 `POST /clients/register`。
 6. 随后把 completed run snapshot 签名后上传到 `POST /runs/upload`。
 
-`CombatReplayUploadController` 复用同一套身份与注册信息，并从 run upload endpoint 推导 `POST /replays/upload`。
+`BattleUploadController` 复用同一套身份与注册信息，并从 run upload endpoint 推导 `POST /battles/upload`。
 
 ## 当前配置
 
@@ -44,8 +44,8 @@ Enabled = true
 - `Game/RunLogging/Upload/RunUploadRequestSigner.cs`
 - `Game/RunLogging/Upload/RunUploadIdentityStore.cs`
 - `Game/RunLogging/Upload/RunUploadKeyStore.cs`
-- `Game/CombatReplay/Upload/CombatReplayUploadController.cs`
-- `Game/CombatReplay/Upload/CombatReplayUploadService.cs`
+- `Game/CombatReplay/Upload/BattleUploadController.cs`
+- `Game/CombatReplay/Upload/BattleUploadService.cs`
 
 ## Notes
 
@@ -53,7 +53,7 @@ Enabled = true
 - 已知限制：
   - `POST /clients/bind` 当前信任客户端上报的 `player_account_id`，服务端不会独立证明该账号归属。
   - `POST /runs/upload` 当前会直接投影上传体里的 battle 身份字段，默认这些字段由客户端诚实提供。
-  - `POST /replays/upload` 当前只校验签名和 `battle_id` 自一致性，不校验该客户端是否对目标 battle 具有独占上传权限；已知 `battle_id` 的客户端可以覆盖已有 replay。
+  - `POST /battles/upload` 当前只校验签名和 battle/run 标识自一致性，不校验该客户端是否对目标 battle 具有独占上传权限；已知 `battle_id` 的客户端仍可能覆盖已有 battle payload。
 - 以上风险当前按项目体量接受，优先保持实现简单；如果后续出现滥用，再考虑补更强的账号归属证明、battle 所有权校验或禁用覆盖写入。
 - 旧的未来态 identity / binding / dual-backend 设计文档已移除，避免与当前实现混淆。
 - 如果后续重新引入多路由或账号绑定，应以新的实现为准重新写文档，而不是恢复旧设计稿。

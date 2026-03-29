@@ -42,9 +42,7 @@ CREATE TABLE IF NOT EXISTS run_uploads (
   payload_object_key TEXT NULL,
   payload_bytes INTEGER NULL,
   schema_version INTEGER NULL,
-  projection_version INTEGER NOT NULL,
   projection_status TEXT NOT NULL,
-  projected_battle_count INTEGER NOT NULL DEFAULT 0,
   projected_at_utc TEXT NULL,
   last_error_code TEXT NULL,
   last_error_detail TEXT NULL,
@@ -54,16 +52,7 @@ CREATE TABLE IF NOT EXISTS run_uploads (
 
 CREATE TABLE IF NOT EXISTS replay_uploads (
   battle_id TEXT PRIMARY KEY,
-  client_id TEXT NOT NULL,
-  install_id TEXT NOT NULL,
-  run_id TEXT NULL,
-  payload_sha256 TEXT NOT NULL,
   object_key TEXT NOT NULL,
-  payload_bytes INTEGER NULL,
-  schema_version INTEGER NULL,
-  content_type TEXT NOT NULL,
-  created_at_utc TEXT NOT NULL,
-  updated_at_utc TEXT NOT NULL,
   uploaded_at_utc TEXT NOT NULL
 );
 
@@ -91,9 +80,7 @@ CREATE TABLE IF NOT EXISTS pvp_battles (
   result TEXT NULL,
   winner_combatant_id TEXT NULL,
   loser_combatant_id TEXT NULL,
-  summary_json TEXT NOT NULL,
   replay_available INTEGER NOT NULL DEFAULT 0,
-  projection_version INTEGER NOT NULL,
   created_at_utc TEXT NOT NULL,
   updated_at_utc TEXT NOT NULL
 );

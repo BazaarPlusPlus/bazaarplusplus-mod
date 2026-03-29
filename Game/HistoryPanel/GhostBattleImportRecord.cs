@@ -15,10 +15,6 @@ internal sealed class GhostBattleImportRecord
 
     public string? EncounterId { get; set; }
 
-    public string? PlayerName { get; set; }
-
-    public string? PlayerAccountId { get; set; }
-
     public string? PlayerHero { get; set; }
 
     public string? PlayerRank { get; set; }
@@ -46,14 +42,6 @@ internal sealed class GhostBattleImportRecord
     public string? WinnerCombatantId { get; set; }
 
     public string? LoserCombatantId { get; set; }
-
-    public string PlayerHandJson { get; set; } = "{}";
-
-    public string PlayerSkillsJson { get; set; } = "{}";
-
-    public string OpponentHandJson { get; set; } = "{}";
-
-    public string OpponentSkillsJson { get; set; } = "{}";
 
     public bool ReplayAvailable { get; set; }
 

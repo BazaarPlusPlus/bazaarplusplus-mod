@@ -2,19 +2,13 @@ import type { Env } from "../env";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
 import {
-  replaceProjectedBattlesForRun,
-} from "../persistence/battleProjections";
-import {
   markRunProjectionStatus,
   upsertRunUpload,
 } from "../persistence/runUploads";
 import {
-  buildBattleSummary,
   parseRunUploadBody,
 } from "./uploadRunPayload";
 import { requireVerifiedClient } from "./verifiedClient";
-
-const RUN_PROJECTION_VERSION = 1;
 
 export async function handleRunUpload(
   request: Request,
@@ -53,9 +47,7 @@ export async function handleRunUpload(
     payloadObjectKey,
     payloadBytes,
     schemaVersion: parsed.schemaVersion,
-    projectionVersion: RUN_PROJECTION_VERSION,
     projectionStatus: "received",
-    projectedBattleCount: 0,
     projectedAtUtc: null,
     lastErrorCode: null,
     lastErrorDetail: null,
@@ -79,7 +71,6 @@ export async function handleRunUpload(
     await markRunProjectionStatus(env, {
       runId,
       projectionStatus: "stored",
-      projectedBattleCount: 0,
       projectedAtUtc: null,
       lastErrorCode: null,
       lastErrorDetail: null,
@@ -89,7 +80,6 @@ export async function handleRunUpload(
     await markRunProjectionStatus(env, {
       runId,
       projectionStatus: "projecting",
-      projectedBattleCount: 0,
       projectedAtUtc: null,
       lastErrorCode: null,
       lastErrorDetail: null,
@@ -97,52 +87,10 @@ export async function handleRunUpload(
     });
 
     const observedAtUtc = new Date().toISOString();
-    const projectedBattles = parsed.battles
-      .filter(
-        (battle) =>
-          battle.combatKind === "PVPCombat" && !!battle.battleId,
-      )
-      .map((battle) => ({
-        battleId: battle.battleId!,
-        runId,
-        sourceClientId: verified.client.client_id,
-        recordedAtUtc: battle.recordedAtUtc ?? observedAtUtc,
-        day: battle.day,
-        hour: battle.hour,
-        encounterId: battle.encounterId,
-        playerName: battle.playerName,
-        playerAccountId: battle.playerAccountId,
-        playerHero: battle.playerHero,
-        playerRank: battle.playerRank,
-        playerRating: battle.playerRating,
-        playerLevel: battle.playerLevel,
-        opponentName: battle.opponentName,
-        opponentAccountId: battle.opponentAccountId,
-        opponentHero: battle.opponentHero,
-        opponentRank: battle.opponentRank,
-        opponentRating: battle.opponentRating,
-        opponentLevel: battle.opponentLevel,
-        combatKind: battle.combatKind!,
-        result: battle.result,
-        winnerCombatantId: battle.winnerCombatantId,
-        loserCombatantId: battle.loserCombatantId,
-        summaryJson: JSON.stringify(buildBattleSummary(battle)),
-        replayAvailable: 0,
-        projectionVersion: RUN_PROJECTION_VERSION,
-        createdAtUtc: observedAtUtc,
-        updatedAtUtc: observedAtUtc,
-      }));
-
-    await replaceProjectedBattlesForRun(env, {
-      sourceClientId: verified.client.client_id,
-      runId,
-      battles: projectedBattles,
-    });
 
     await markRunProjectionStatus(env, {
       runId,
       projectionStatus: "projected",
-      projectedBattleCount: projectedBattles.length,
       projectedAtUtc: observedAtUtc,
       lastErrorCode: null,
       lastErrorDetail: null,
@@ -155,7 +103,6 @@ export async function handleRunUpload(
     await markRunProjectionStatus(env, {
       runId,
       projectionStatus: "failed",
-      projectedBattleCount: 0,
       projectedAtUtc: null,
       lastErrorCode: "projection_failed",
       lastErrorDetail: message,

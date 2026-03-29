@@ -184,22 +184,12 @@ internal sealed class RunUploadSqliteStore
         using var eventsCommand = connection.CreateCommand();
         eventsCommand.CommandTimeout = 2;
         eventsCommand.CommandText = $"""
-            SELECT seq, payload_json
+            SELECT COALESCE(MAX(seq), 0)
             FROM {RunLogSqliteSchema.RunEventsTableName}
-            WHERE run_id = $runId
-            ORDER BY seq ASC;
+            WHERE run_id = $runId;
             """;
         eventsCommand.Parameters.AddWithValue("$runId", runId);
-        var events = new JArray();
-        long lastSeq = 0;
-        using (var eventsReader = eventsCommand.ExecuteReader())
-        {
-            while (eventsReader.Read())
-            {
-                lastSeq = eventsReader.GetInt64(0);
-                events.Add(JToken.Parse(eventsReader.GetString(1)));
-            }
-        }
+        var lastSeq = Convert.ToInt64(eventsCommand.ExecuteScalar() ?? 0L);
 
         var checkpoint = ReadSingleObject(
             connection,
@@ -265,85 +255,6 @@ internal sealed class RunUploadSqliteStore
             runId
         );
 
-        var pvpBattles = new JArray();
-        using var pvpCommand = connection.CreateCommand();
-        pvpCommand.CommandTimeout = 2;
-        pvpCommand.CommandText = $"""
-            SELECT
-                battle_id,
-                run_id,
-                recorded_at_utc,
-                day,
-                hour,
-                encounter_id,
-                player_name,
-                player_account_id,
-                player_hero,
-                player_rank,
-                player_rating,
-                player_level,
-                opponent_name,
-                opponent_hero,
-                opponent_rank,
-                opponent_rating,
-                opponent_level,
-                opponent_account_id,
-                combat_kind,
-                result,
-                winner_combatant_id,
-                loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json
-            FROM {RunLogSqliteSchema.PvpBattlesTableName}
-            WHERE run_id = $runId
-            ORDER BY recorded_at_utc ASC, battle_id ASC;
-            """;
-        pvpCommand.Parameters.AddWithValue("$runId", runId);
-        using var pvpReader = pvpCommand.ExecuteReader();
-        while (pvpReader.Read())
-        {
-            var battle = ReadObject(
-                pvpReader,
-                "battle_id",
-                "run_id",
-                "recorded_at_utc",
-                "day",
-                "hour",
-                "encounter_id",
-                "player_name",
-                "player_account_id",
-                "player_hero",
-                "player_rank",
-                "player_rating",
-                "player_level",
-                "opponent_name",
-                "opponent_hero",
-                "opponent_rank",
-                "opponent_rating",
-                "opponent_level",
-                "opponent_account_id",
-                "combat_kind",
-                "result",
-                "winner_combatant_id",
-                "loser_combatant_id"
-            );
-            battle["player_hand"] = JToken.Parse(
-                pvpReader.GetString(pvpReader.GetOrdinal("player_hand_json"))
-            );
-            battle["player_skills"] = JToken.Parse(
-                pvpReader.GetString(pvpReader.GetOrdinal("player_skills_json"))
-            );
-            battle["opponent_hand"] = JToken.Parse(
-                pvpReader.GetString(pvpReader.GetOrdinal("opponent_hand_json"))
-            );
-            battle["opponent_skills"] = JToken.Parse(
-                pvpReader.GetString(pvpReader.GetOrdinal("opponent_skills_json"))
-            );
-            pvpBattles.Add(battle);
-        }
-
         return new RunUploadSnapshot
         {
             LastSeq = lastSeq,
@@ -357,10 +268,8 @@ internal sealed class RunUploadSqliteStore
                 SubmittedAtUtc = DateTimeOffset.UtcNow,
                 RunId = runId,
                 Meta = meta,
-                Events = events,
                 Checkpoint = checkpoint,
                 Status = status,
-                PvpBattles = pvpBattles,
             },
         };
     }

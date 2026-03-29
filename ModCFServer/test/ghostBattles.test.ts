@@ -158,34 +158,7 @@ test("lists recent ghost battles against the bound player account", async () => 
     result: "loss",
     winner_combatant_id: "Opponent",
     loser_combatant_id: "Player",
-    payload_json: JSON.stringify({ battle_id: "legacy-battle-ghost-001" }),
-    summary_json: JSON.stringify({
-      battle_id: "battle-ghost-001",
-      run_id: "run-ghost-001",
-      recorded_at_utc: "2099-03-29T12:00:00.000Z",
-      player_name: "Uploader",
-      player_account_id: "uploader-account",
-      player_hero: "Dooley",
-      player_rank: "Legendary",
-      player_rating: 1800,
-      player_level: 11,
-      opponent_name: "Me",
-      opponent_account_id: "my-account",
-      opponent_hero: "Vanessa",
-      opponent_rank: "Legendary",
-      opponent_rating: 1750,
-      opponent_level: 10,
-      combat_kind: "PVPCombat",
-      result: "loss",
-      winner_combatant_id: "Opponent",
-      loser_combatant_id: "Player",
-      player_hand: { items: [] },
-      player_skills: { items: [] },
-      opponent_hand: { items: [] },
-      opponent_skills: { items: [] },
-    }),
     replay_available: 1,
-    projection_version: 1,
     created_at_utc: "2099-03-29T12:00:00.000Z",
     updated_at_utc: "2099-03-29T12:00:00.000Z",
   });
@@ -213,10 +186,7 @@ test("lists recent ghost battles against the bound player account", async () => 
     result: "win",
     winner_combatant_id: "Player",
     loser_combatant_id: "Opponent",
-    payload_json: JSON.stringify({ battle_id: "battle-ghost-ignored" }),
-    summary_json: JSON.stringify({ battle_id: "battle-ghost-ignored" }),
     replay_available: 0,
-    projection_version: 1,
     created_at_utc: "2099-03-29T11:00:00.000Z",
     updated_at_utc: "2099-03-29T11:00:00.000Z",
   });
@@ -240,8 +210,8 @@ test("lists recent ghost battles against the bound player account", async () => 
       battle_id: string;
       player_hero?: string;
       player_level?: number;
-      player_hand?: { items: unknown[] };
-      opponent_skills?: { items: unknown[] };
+      player_hand?: unknown;
+      opponent_skills?: unknown;
       replay?: { available: boolean };
     }>;
   };
@@ -250,8 +220,8 @@ test("lists recent ghost battles against the bound player account", async () => 
   assert.equal(body.battles[0]?.battle_id, "battle-ghost-001");
   assert.equal(body.battles[0]?.player_hero, "Dooley");
   assert.equal(body.battles[0]?.player_level, 11);
-  assert.deepEqual(body.battles[0]?.player_hand, { items: [] });
-  assert.deepEqual(body.battles[0]?.opponent_skills, { items: [] });
+  assert.equal("player_hand" in (body.battles[0] ?? {}), false);
+  assert.equal("opponent_skills" in (body.battles[0] ?? {}), false);
   assert.equal(body.battles[0]?.replay?.available, true);
   assert.equal(env.DB.nonces.size, 1);
 });
@@ -352,22 +322,44 @@ test("creates a replay download link and serves the payload", async () => {
     result: "loss",
     winner_combatant_id: "Opponent",
     loser_combatant_id: "Player",
-    payload_json: JSON.stringify({ battle_id: "battle-ghost-download" }),
     created_at_utc: "2099-03-29T12:00:00.000Z",
     updated_at_utc: "2099-03-29T12:00:00.000Z",
   });
   env.DB.replayUploads.set("battle-ghost-download", {
     battle_id: "battle-ghost-download",
-    client_id: "replay-client",
-    install_id: "replay-install",
-    run_id: "run-ghost-download",
-    payload_sha256: "hash",
     object_key: "combat-replays/replays/replay-client/battle-ghost-download/hash.payload.json",
     uploaded_at_utc: "2099-03-29T12:05:00.000Z",
   });
   env.REPLAY_BUCKET.objects.set(
     "combat-replays/replays/replay-client/battle-ghost-download/hash.payload.json",
-    new TextEncoder().encode("{\"battle_id\":\"battle-ghost-download\"}"),
+    new TextEncoder().encode(
+      JSON.stringify({
+        battle_id: "battle-ghost-download",
+        battle_manifest: {
+          battle_id: "battle-ghost-download",
+          run_id: "run-ghost-download",
+          recorded_at_utc: "2099-03-29T12:00:00.000Z",
+          combat_kind: "PVPCombat",
+          participants: {
+            opponent_account_id: "my-account",
+          },
+          outcome: {},
+          snapshots: {
+            player_hand: { items: [{ id: "remote-item" }] },
+            player_skills: { items: [] },
+            opponent_hand: { items: [] },
+            opponent_skills: { items: [{ id: "remote-skill" }] },
+          },
+        },
+        replay_payload: {
+          battle_id: "battle-ghost-download",
+          version: 1,
+          spawn_message_base64: "c3Bhd24=",
+          combat_message_base64: "Y29tYmF0",
+          despawn_message_base64: "ZGVzcGF3bg==",
+        },
+      }),
+    ),
   );
 
   const linkResponse = await worker.fetch(
@@ -397,8 +389,26 @@ test("creates a replay download link and serves the payload", async () => {
   );
 
   assert.equal(downloadResponse.status, 200);
+  const downloadBody = (await downloadResponse.json()) as {
+    battle_id: string;
+    battle_manifest?: {
+      battle_id?: string;
+      snapshots?: {
+        player_hand?: { items?: Array<{ id?: string }> };
+        opponent_skills?: { items?: Array<{ id?: string }> };
+      };
+    };
+    replay_payload?: { battle_id?: string };
+  };
+  assert.equal(downloadBody.battle_id, "battle-ghost-download");
+  assert.equal(downloadBody.battle_manifest?.battle_id, "battle-ghost-download");
   assert.equal(
-    await downloadResponse.text(),
-    "{\"battle_id\":\"battle-ghost-download\"}",
+    downloadBody.battle_manifest?.snapshots?.player_hand?.items?.[0]?.id,
+    "remote-item",
   );
+  assert.equal(
+    downloadBody.battle_manifest?.snapshots?.opponent_skills?.items?.[0]?.id,
+    "remote-skill",
+  );
+  assert.equal(downloadBody.replay_payload?.battle_id, "battle-ghost-download");
 });

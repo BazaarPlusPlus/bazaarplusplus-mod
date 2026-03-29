@@ -77,14 +77,14 @@ curl https://mod-api.bazaarplusplus.com/health
 - `POST /clients/register`
 - `POST /clients/bind`
 - `POST /runs/upload`
-- `POST /replays/upload`
+- `POST /battles/upload`
 - `GET /me/pvp-battles/against-me`
 
 建议使用已注册并验签的测试客户端，确认：
 
 - `client_player_account_bindings` 写入 active binding
 - run payload 落到 `runs/...`
-- replay payload 落到 `replays/...`
+- battle payload 落到 `replays/...`
 - ghost battle 查询能返回 `replay.available`
 
 ## Notes

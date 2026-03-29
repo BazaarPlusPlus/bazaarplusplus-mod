@@ -21,13 +21,13 @@ internal sealed class RunUploadPayload
 
     public JObject Meta { get; set; } = new();
 
-    public JArray Events { get; set; } = [];
+    public JArray? Events { get; set; }
 
     public JObject? Checkpoint { get; set; }
 
     public JObject? Status { get; set; }
 
-    public JArray PvpBattles { get; set; } = [];
+    public JArray? PvpBattles { get; set; }
 }
 
 internal sealed class RunUploadSnapshot

@@ -8,13 +8,13 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Upload;
 
-internal sealed class CombatReplayUploadController : MonoBehaviour
+internal sealed class BattleUploadController : MonoBehaviour
 {
     private const float BacklogDrainDelaySeconds = 5f;
 
-    private CombatReplayUploadService? _uploadService;
+    private BattleUploadService? _uploadService;
     private CancellationTokenSource? _shutdown;
-    private Task<CombatReplayUploadCycleResult>? _uploadTask;
+    private Task<BattleUploadCycleResult>? _uploadTask;
     private float _nextAttemptAt;
     private float _intervalSeconds;
 
@@ -27,7 +27,7 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
 
             var registrationEndpoint = RunUploadDefaults.RegistrationEndpoint;
             var runUploadEndpoint = RunUploadDefaults.UploadEndpoint;
-            var uploadEndpoint = CombatReplayUploadService.TryDeriveReplayUploadEndpoint(
+            var uploadEndpoint = BattleUploadService.TryDeriveBattleUploadEndpoint(
                 runUploadEndpoint
             );
             var databasePath = BppRuntimeHost.Paths.RunLogDatabasePath;
@@ -42,8 +42,8 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
             )
             {
                 BppLog.Warn(
-                    "CombatReplayUploadController",
-                    "Replay upload is enabled but requires the shared run upload endpoint."
+                    "BattleUploadController",
+                    "Battle upload is enabled but requires the shared run upload endpoint."
                 );
                 return;
             }
@@ -57,8 +57,8 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
             )
             {
                 BppLog.Warn(
-                    "CombatReplayUploadController",
-                    "Replay upload is enabled but local auth/state or replay paths are missing."
+                    "BattleUploadController",
+                    "Battle upload is enabled but local auth/state or replay paths are missing."
                 );
                 return;
             }
@@ -71,8 +71,8 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
             )
             {
                 BppLog.Warn(
-                    "CombatReplayUploadController",
-                    "Replay upload is enabled but the shared registration/upload endpoints are invalid."
+                    "BattleUploadController",
+                    "Battle upload is enabled but the shared registration/upload endpoints are invalid."
                 );
                 return;
             }
@@ -91,11 +91,11 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
                 RunUploadDefaults.RequestTimeoutSeconds
             );
 
-            var uploadStore = new CombatReplayUploadSqliteStore(databasePath, replayRootPath);
+            var uploadStore = new BattleUploadSqliteStore(databasePath, replayRootPath);
             var identityStore = new RunUploadIdentityStore(identityPath);
             var clientStateStore = new RunUploadClientStateStore(clientStatePath);
             var keyStore = new RunUploadKeyStore(privateKeyPath);
-            _uploadService = new CombatReplayUploadService(
+            _uploadService = new BattleUploadService(
                 uploadStore,
                 identityStore,
                 clientStateStore,
@@ -108,15 +108,15 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
             _shutdown = new CancellationTokenSource();
             _nextAttemptAt = Time.unscaledTime + startupDelaySeconds;
             BppLog.Info(
-                "CombatReplayUploadController",
-                $"Background replay upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}."
+                "BattleUploadController",
+                $"Background battle upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}."
             );
         }
         catch (Exception ex)
         {
             BppLog.Error(
-                "CombatReplayUploadController",
-                $"Failed to initialize replay upload service: {ex}"
+                "BattleUploadController",
+                $"Failed to initialize battle upload service: {ex}"
             );
         }
     }
@@ -145,8 +145,8 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
             catch (Exception ex)
             {
                 BppLog.Error(
-                    "CombatReplayUploadController",
-                    $"Background replay upload failed: {ex}"
+                    "BattleUploadController",
+                    $"Background battle upload failed: {ex}"
                 );
             }
             finally
@@ -159,7 +159,7 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
         if (BppRuntimeHost.RunContext.IsInGameRun || Time.unscaledTime < _nextAttemptAt)
             return;
 
-        _uploadTask = _uploadService.UploadPendingReplaysAsync(_shutdown.Token);
+        _uploadTask = _uploadService.UploadPendingBattlesAsync(_shutdown.Token);
     }
 
     private void OnDestroy()

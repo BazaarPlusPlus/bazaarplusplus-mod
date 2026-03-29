@@ -42,7 +42,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private PvpBattleCatalog? _battleCatalog;
     private CombatReplayPayloadStore? _payloadStore;
-    private CombatReplayUploadSqliteStore? _uploadStore;
+    private BattleUploadSqliteStore? _uploadStore;
     private CombatReplayPersistenceQueue? _persistenceQueue;
     private CombatReplayCaptureService? _captureService;
     private CombatReplayLoader? _loader;
@@ -413,7 +413,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             );
         _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
-        _uploadStore = new CombatReplayUploadSqliteStore(
+        _uploadStore = new BattleUploadSqliteStore(
             runLogDatabasePath,
             combatReplayDirectoryPath
         );

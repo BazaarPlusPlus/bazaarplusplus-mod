@@ -6,11 +6,11 @@ var schemaType = RequireType(
 );
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 2,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 5,
     "Local database schema version mismatch."
 );
 Assert(
-    GetStaticValue<int>(schemaType, "RowSchemaVersion") == 2,
+    GetStaticValue<int>(schemaType, "RowSchemaVersion") == 5,
     "Row schema version mismatch."
 );
 Assert(
@@ -46,7 +46,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 2;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 5;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
@@ -93,6 +93,11 @@ Assert(
     "Bootstrap SQL should define PVP battle player identity and outcome columns."
 );
 Assert(
+    !TableContainsColumn(bootstrapSql, "ghost_battles", "player_name")
+        && !TableContainsColumn(bootstrapSql, "ghost_battles", "player_account_id"),
+    "Bootstrap SQL should not duplicate player identity columns in ghost_battles."
+);
+Assert(
     bootstrapSql.Contains("player_hand_json", StringComparison.Ordinal)
         && bootstrapSql.Contains("player_skills_json", StringComparison.Ordinal)
         && bootstrapSql.Contains("opponent_hand_json", StringComparison.Ordinal)
@@ -121,4 +126,18 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+static bool TableContainsColumn(string sql, string tableName, string columnName)
+{
+    var tableStart = sql.IndexOf($"CREATE TABLE IF NOT EXISTS {tableName} (", StringComparison.Ordinal);
+    if (tableStart < 0)
+        return false;
+
+    var tableEnd = sql.IndexOf(");", tableStart, StringComparison.Ordinal);
+    if (tableEnd < 0)
+        return false;
+
+    var section = sql.Substring(tableStart, tableEnd - tableStart);
+    return section.Contains(columnName, StringComparison.Ordinal);
 }

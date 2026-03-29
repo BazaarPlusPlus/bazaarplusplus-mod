@@ -5,7 +5,7 @@ using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Upload;
 
-internal sealed class CombatReplayUploadPayload
+internal sealed class BattleUploadPayload
 {
     public int SchemaVersion { get; set; } = RunLogSqliteSchema.UploadPayloadSchemaVersion;
 
@@ -21,21 +21,23 @@ internal sealed class CombatReplayUploadPayload
 
     public string? RunId { get; set; }
 
+    public PvpBattleManifest BattleManifest { get; set; } = new();
+
     public PvpReplayPayload ReplayPayload { get; set; } = new();
 }
 
-internal sealed class CombatReplayUploadSnapshot
+internal sealed class BattleUploadSnapshot
 {
-    public CombatReplayUploadPayload Payload { get; set; } = new();
+    public BattleUploadPayload Payload { get; set; } = new();
 
     public string Json { get; set; } = string.Empty;
 
     public string PayloadSha256 { get; set; } = string.Empty;
 }
 
-internal readonly struct CombatReplayUploadCycleResult
+internal readonly struct BattleUploadCycleResult
 {
-    public CombatReplayUploadCycleResult(int uploadedCount, bool hasMorePending)
+    public BattleUploadCycleResult(int uploadedCount, bool hasMorePending)
     {
         UploadedCount = uploadedCount;
         HasMorePending = hasMorePending;

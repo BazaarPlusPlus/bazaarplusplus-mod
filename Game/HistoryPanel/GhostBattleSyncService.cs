@@ -215,8 +215,10 @@ internal sealed class GhostBattleSyncService : IDisposable
             return GhostBattleReplayDownloadResult.Failure("ghost_replay_battle_id_mismatch");
         }
 
-        var payloadStore = new CombatReplayPayloadStore(replayDirectoryPath);
-        payloadStore.Save(payloadResult.Payload.ReplayPayload);
+        var payloadStore = new GhostBattlePayloadStore(
+            BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
+        );
+        payloadStore.Save(payloadResult.Payload);
         _repository.MarkGhostReplayDownloaded(localPlayerAccountId, battleId);
         return GhostBattleReplayDownloadResult.Success();
     }
@@ -352,6 +354,14 @@ internal sealed class GhostBattleSyncService : IDisposable
         var bindPath = absolutePath[..^suffix.Length] + "/clients/bind";
         var builder = new UriBuilder(registrationUri) { Path = bindPath, Query = string.Empty };
         return builder.Uri.ToString();
+    }
+
+    private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)
+    {
+        var parentDirectory = System.IO.Path.GetDirectoryName(replayDirectoryPath);
+        return string.IsNullOrWhiteSpace(parentDirectory)
+            ? System.IO.Path.Combine(replayDirectoryPath, "GhostBattlePayloads")
+            : System.IO.Path.Combine(parentDirectory, "GhostBattlePayloads");
     }
 }
 

@@ -96,15 +96,58 @@ async function isValidDownloadSignature(
   return diff === 0;
 }
 
-function withReplayAvailability(
-  summaryJson: string,
-  replayAvailable: boolean,
+function buildBattlePayload(
+  battle: {
+    battle_id: string;
+    run_id?: string | null;
+    recorded_at_utc: string;
+    day?: number | null;
+    hour?: number | null;
+    encounter_id?: string | null;
+    player_name?: string | null;
+    player_account_id?: string | null;
+    player_hero?: string | null;
+    player_rank?: string | null;
+    player_rating?: number | null;
+    player_level?: number | null;
+    opponent_name?: string | null;
+    opponent_account_id: string | null;
+    opponent_hero?: string | null;
+    opponent_rank?: string | null;
+    opponent_rating?: number | null;
+    opponent_level?: number | null;
+    combat_kind?: string;
+    result?: string | null;
+    winner_combatant_id?: string | null;
+    loser_combatant_id?: string | null;
+    replay_available: number;
+  },
 ): AgainstMeBattlePayload {
-  const parsed = JSON.parse(summaryJson) as AgainstMeBattlePayload;
   return {
-    ...parsed,
+    battle_id: battle.battle_id,
+    run_id: battle.run_id ?? null,
+    recorded_at_utc: battle.recorded_at_utc,
+    day: battle.day ?? null,
+    hour: battle.hour ?? null,
+    encounter_id: battle.encounter_id ?? null,
+    player_name: battle.player_name ?? null,
+    player_account_id: battle.player_account_id ?? null,
+    player_hero: battle.player_hero ?? null,
+    player_rank: battle.player_rank ?? null,
+    player_rating: battle.player_rating ?? null,
+    player_level: battle.player_level ?? null,
+    opponent_name: battle.opponent_name ?? null,
+    opponent_account_id: battle.opponent_account_id ?? null,
+    opponent_hero: battle.opponent_hero ?? null,
+    opponent_rank: battle.opponent_rank ?? null,
+    opponent_rating: battle.opponent_rating ?? null,
+    opponent_level: battle.opponent_level ?? null,
+    combat_kind: battle.combat_kind ?? "PVPCombat",
+    result: battle.result ?? null,
+    winner_combatant_id: battle.winner_combatant_id ?? null,
+    loser_combatant_id: battle.loser_combatant_id ?? null,
     replay: {
-      available: replayAvailable,
+      available: battle.replay_available !== 0,
     },
   };
 }
@@ -155,12 +198,7 @@ export async function handleGhostBattlesAgainstMe(
     resolved_account_ids: resolvedAccountIds,
     from_utc: fromUtc,
     to_utc: now.toISOString(),
-    battles: battles.map((battle) =>
-      withReplayAvailability(
-        battle.summary_json ?? battle.payload_json,
-        battle.replay_available !== 0,
-      ),
-    ),
+    battles: battles.map((battle) => buildBattlePayload(battle)),
   });
 }
 
@@ -252,14 +290,27 @@ export async function handleReplayDownload(
     return json({ error: "replay_not_found" }, { status: 404 });
   }
 
+  const battle = await getProjectedBattleById(env, battleId);
+  if (!battle) {
+    return json({ error: "battle_not_found" }, { status: 404 });
+  }
+
   const object = await env.REPLAY_BUCKET.get(replayUpload.object_key);
   if (!object) {
     return json({ error: "replay_not_found" }, { status: 404 });
   }
 
-  return new Response(await object.arrayBuffer(), {
+  const payloadText = new TextDecoder().decode(await object.arrayBuffer());
+  try {
+    JSON.parse(payloadText);
+  } catch {
+    return json({ error: "replay_corrupt" }, { status: 500 });
+  }
+
+  return new Response(payloadText, {
+    status: 200,
     headers: {
-      "content-type": "application/json; charset=utf-8",
+      "content-type": object.httpMetadata?.contentType ?? "application/json; charset=utf-8",
     },
   });
 }

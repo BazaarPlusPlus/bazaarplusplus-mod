@@ -144,12 +144,10 @@ test("accepts signed run uploads", async () => {
   );
   assert.equal(uploadedRun?.payload_bytes, new TextEncoder().encode(payload).byteLength);
   assert.equal(uploadedRun?.schema_version, 3);
-  assert.equal(uploadedRun?.projection_version, 1);
-  assert.equal(uploadedRun?.projected_battle_count, 0);
   assert.ok(env.REPLAY_BUCKET.objects.has(`runs/${clientId}/run-001/${bodyHash}.json`));
 });
 
-test("projects uploaded pvp battles for a bound player account client", async () => {
+test("run uploads ignore pvp battle payloads for projection", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   const clientId = "runs-client-projection";
@@ -244,27 +242,11 @@ test("projects uploaded pvp battles for a bound player account client", async ()
   );
 
   assert.equal(response.status, 200);
-  const projectedBattle = env.DB.pvpBattles.get("battle-projection-001");
-  assert.equal(projectedBattle?.source_client_id, clientId);
-  assert.equal(projectedBattle?.combat_kind, "PVPCombat");
-  assert.equal(projectedBattle?.player_account_id, "player-account-001");
-  assert.equal(projectedBattle?.player_hero, "Dooley");
-  assert.equal(projectedBattle?.player_level, 8);
-  assert.equal(projectedBattle?.replay_available, 0);
-  const projectedSummary = JSON.parse(projectedBattle?.summary_json ?? "{}") as Record<
-    string,
-    unknown
-  >;
-  assert.equal(projectedSummary.player_hero, "Dooley");
-  assert.deepEqual(projectedSummary.player_hand, { items: [] });
-  assert.deepEqual(projectedSummary.opponent_skills, { items: [] });
-  assert.equal("debug_extra" in projectedSummary, false);
+  assert.equal(env.DB.pvpBattles.size, 0);
   assert.equal(env.DB.runUploads.get("run-projection")?.projection_status, "projected");
-  assert.equal(env.DB.runUploads.get("run-projection")?.projected_battle_count, 1);
-  assert.equal(env.DB.runUploads.get("run-projection")?.projection_version, 1);
 });
 
-test("records a failed projection in the run ingestion ledger", async () => {
+test("records a failed run payload store in the run ingestion ledger", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   const clientId = "runs-client-projection-failure";
@@ -277,8 +259,8 @@ test("records a failed projection in the run ingestion ledger", async () => {
     plugin_version: "1.9.0",
     registered_at_utc: new Date().toISOString(),
   });
-  env.DB.batch = async () => {
-    throw new Error("projection-write-failed");
+  env.REPLAY_BUCKET.put = async () => {
+    throw new Error("run-store-failed");
   };
 
   const payload = JSON.stringify({
@@ -334,7 +316,7 @@ test("records a failed projection in the run ingestion ledger", async () => {
   assert.equal(env.DB.runUploads.get("run-projection-failure")?.last_error_code, "projection_failed");
   assert.match(
     env.DB.runUploads.get("run-projection-failure")?.last_error_detail ?? "",
-    /projection-write-failed/,
+    /run-store-failed/,
   );
 });
 
@@ -560,7 +542,7 @@ test("skips non-pvp battles during run projection", async () => {
   assert.equal(env.DB.runUploads.get("run-nonpvp")?.projection_status, "projected");
 });
 
-test("re-uploading a run replaces projected battles for that run", async () => {
+test("re-uploading a run leaves battle rows untouched", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   const clientId = "runs-client-reconcile";
@@ -574,6 +556,34 @@ test("re-uploading a run replaces projected battles for that run", async () => {
     registered_at_utc: new Date().toISOString(),
   });
 
+  env.DB.pvpBattles.set("battle-reconcile-001", {
+    battle_id: "battle-reconcile-001",
+    run_id: "run-reconcile",
+    source_client_id: clientId,
+    recorded_at_utc: "2026-03-29T10:15:00.000Z",
+    day: null,
+    hour: null,
+    encounter_id: null,
+    player_name: null,
+    player_account_id: "player-a",
+    player_hero: null,
+    player_rank: null,
+    player_rating: null,
+    player_level: null,
+    opponent_name: null,
+    opponent_account_id: "player-b",
+    opponent_hero: null,
+    opponent_rank: null,
+    opponent_rating: null,
+    opponent_level: null,
+    combat_kind: "PVPCombat",
+    result: null,
+    winner_combatant_id: null,
+    loser_combatant_id: null,
+    replay_available: 0,
+    created_at_utc: "2026-03-29T10:15:00.000Z",
+    updated_at_utc: "2026-03-29T10:15:00.000Z",
+  });
   const firstPayload = JSON.stringify({
     run_id: "run-reconcile",
     pvp_battles: [
@@ -661,7 +671,91 @@ test("re-uploading a run replaces projected battles for that run", async () => {
     env as never,
   );
   assert.equal(secondResponse.status, 200);
-  assert.equal(env.DB.pvpBattles.size, 0);
+  assert.equal(env.DB.pvpBattles.size, 1);
+  assert.equal(env.DB.pvpBattles.get("battle-reconcile-001")?.run_id, "run-reconcile");
+});
+
+test("run uploads do not delete battle rows uploaded separately", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "runs-client-preserve-battles";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: "install-run-preserve-battles",
+    purpose: "runs",
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+  });
+  env.DB.pvpBattles.set("battle-preserve-001", {
+    battle_id: "battle-preserve-001",
+    run_id: "run-preserve",
+    source_client_id: clientId,
+    recorded_at_utc: "2026-03-29T10:15:00.000Z",
+    day: 8,
+    hour: 1,
+    encounter_id: "encounter-preserve-001",
+    player_name: "Uploader",
+    player_account_id: "player-a",
+    player_hero: "Dooley",
+    player_rank: null,
+    player_rating: null,
+    player_level: 8,
+    opponent_name: "Opponent",
+    opponent_account_id: "player-b",
+    opponent_hero: "Vanessa",
+    opponent_rank: null,
+    opponent_rating: null,
+    opponent_level: 9,
+    combat_kind: "PVPCombat",
+    result: "win",
+    winner_combatant_id: "Player",
+    loser_combatant_id: "Opponent",
+    replay_available: 1,
+    created_at_utc: "2026-03-29T10:15:00.000Z",
+    updated_at_utc: "2026-03-29T10:15:00.000Z",
+  });
+
+  const payload = JSON.stringify({ run_id: "run-preserve" });
+  const bodyHash = sha256Base64(payload);
+  const timestamp = new Date().toISOString();
+  const nonce = "nonce-run-preserve";
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      "/runs/upload",
+      clientId,
+      "install-run-preserve-battles",
+      timestamp,
+      nonce,
+      bodyHash,
+    ),
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/runs/upload", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-bpp-client-id": clientId,
+        "x-bpp-install-id": "install-run-preserve-battles",
+        "x-bpp-run-id": "run-preserve",
+        "x-bpp-plugin-version": "1.9.0",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-nonce": nonce,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+        "x-bpp-signature": signature,
+      },
+      body: payload,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  assert.ok(env.DB.pvpBattles.has("battle-preserve-001"));
 });
 
 test("rejects run uploads when header and body run ids disagree", async () => {
@@ -782,7 +876,7 @@ test("re-uploading the same run payload remains idempotent", async () => {
   assert.equal(env.DB.runUploads.get("run-repeat")?.projection_status, "projected");
 });
 
-test("rejects run uploads when pvp_battles is missing", async () => {
+test("accepts run uploads when pvp_battles is missing", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   const clientId = "runs-client-missing-battles";
@@ -833,13 +927,13 @@ test("rejects run uploads when pvp_battles is missing", async () => {
     env as never,
   );
 
-  assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "pvp_battles_required" });
-  assert.equal(env.DB.runUploads.size, 0);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: "accepted" });
+  assert.equal(env.DB.runUploads.size, 1);
   assert.equal(env.DB.pvpBattles.size, 0);
 });
 
-test("rejects run uploads with incomplete pvp battle payloads", async () => {
+test("ignores pvp_battles in run uploads when present", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   const clientId = "runs-client-invalid-battle";
@@ -898,8 +992,8 @@ test("rejects run uploads with incomplete pvp battle payloads", async () => {
     env as never,
   );
 
-  assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "invalid_pvp_battle_payload" });
-  assert.equal(env.DB.runUploads.size, 0);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: "accepted" });
+  assert.equal(env.DB.runUploads.size, 1);
   assert.equal(env.DB.pvpBattles.size, 0);
 });

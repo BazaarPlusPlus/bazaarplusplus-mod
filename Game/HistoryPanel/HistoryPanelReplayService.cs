@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
-using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -12,15 +11,11 @@ internal sealed class HistoryPanelReplayService
 {
     private readonly Func<CombatReplayRuntime?> _runtimeAccessor;
     private readonly Func<string?> _replayDirectoryPathAccessor;
-    private readonly Func<string?> _currentPlayerAccountIdAccessor;
-    private readonly HistoryPanelRepository? _repository;
     private readonly GhostBattleSyncService? _ghostSyncService;
 
     public HistoryPanelReplayService(
         Func<CombatReplayRuntime?> runtimeAccessor,
         Func<string?> replayDirectoryPathAccessor,
-        Func<string?>? currentPlayerAccountIdAccessor = null,
-        HistoryPanelRepository? repository = null,
         GhostBattleSyncService? ghostSyncService = null
     )
     {
@@ -29,8 +24,6 @@ internal sealed class HistoryPanelReplayService
         _replayDirectoryPathAccessor =
             replayDirectoryPathAccessor
             ?? throw new ArgumentNullException(nameof(replayDirectoryPathAccessor));
-        _currentPlayerAccountIdAccessor = currentPlayerAccountIdAccessor ?? TryGetCurrentPlayerAccountId;
-        _repository = repository;
         _ghostSyncService = ghostSyncService;
     }
 
@@ -147,28 +140,23 @@ internal sealed class HistoryPanelReplayService
             }
         }
 
-        if (_repository == null)
-        {
-            statusMessage = "History repository is unavailable.";
-            return false;
-        }
-
-        var localPlayerAccountId = _currentPlayerAccountIdAccessor();
-        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
-        {
-            statusMessage = "Current player account is unavailable.";
-            return false;
-        }
-
-        var manifest = _repository.TryLoadGhostManifest(localPlayerAccountId, battle.BattleId);
+        var ghostPayloadStore = new GhostBattlePayloadStore(
+            BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
+        );
+        var ghostPayload = ghostPayloadStore.Load(battle.BattleId);
+        var manifest = ghostPayload?.BattleManifest;
         if (manifest == null)
         {
             statusMessage = $"Ghost manifest for battle {battle.BattleId} is unavailable.";
             return false;
         }
 
-        var payloadStore = new CombatReplayPayloadStore(replayDirectoryPath);
-        var payload = payloadStore.Load(battle.BattleId);
+        var payload = ghostPayload?.ReplayPayload;
+        if (payload == null)
+        {
+            var payloadStore = new CombatReplayPayloadStore(replayDirectoryPath);
+            payload = payloadStore.Load(battle.BattleId);
+        }
         if (payload == null)
         {
             statusMessage = $"Replay payload for battle {battle.BattleId} is unavailable.";
@@ -197,11 +185,15 @@ internal sealed class HistoryPanelReplayService
             return;
 
         var payloadStore = new CombatReplayPayloadStore(replayDirectoryPath);
+        var ghostPayloadStore = new GhostBattlePayloadStore(
+            BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
+        );
         foreach (var battleId in battleIds)
         {
             try
             {
                 payloadStore.Delete(battleId);
+                ghostPayloadStore.Delete(battleId);
             }
             catch (Exception ex)
             {
@@ -213,15 +205,11 @@ internal sealed class HistoryPanelReplayService
         }
     }
 
-    private static string? TryGetCurrentPlayerAccountId()
+    private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)
     {
-        try
-        {
-            return ClientCache.Profile.Value?.AccountId.ToString();
-        }
-        catch
-        {
-            return null;
-        }
+        var parentDirectory = System.IO.Path.GetDirectoryName(replayDirectoryPath);
+        return string.IsNullOrWhiteSpace(parentDirectory)
+            ? System.IO.Path.Combine(replayDirectoryPath, "GhostBattlePayloads")
+            : System.IO.Path.Combine(parentDirectory, "GhostBattlePayloads");
     }
 }

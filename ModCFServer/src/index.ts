@@ -8,7 +8,7 @@ import {
 import { json } from "./http/json";
 import { registerClient } from "./features/registerClient";
 import { handleRunUpload } from "./features/uploadRun";
-import { handleReplayUpload } from "./features/uploadReplay";
+import { handleBattleUpload } from "./features/uploadBattle";
 import { purgeExpiredNonces } from "./persistence/nonces";
 
 export default {
@@ -31,8 +31,8 @@ export default {
       return handleRunUpload(request, env);
     }
 
-    if (request.method === "POST" && url.pathname === "/replays/upload") {
-      return handleReplayUpload(request, env);
+    if (request.method === "POST" && url.pathname === "/battles/upload") {
+      return handleBattleUpload(request, env);
     }
 
     if (request.method === "GET" && url.pathname === "/me/pvp-battles/against-me") {

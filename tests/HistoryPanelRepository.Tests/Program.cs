@@ -58,6 +58,11 @@ try
             opponentHandJson: "{\"items\":[]}",
             opponentSkillsJson: "{\"items\":[]}"
         );
+        Assert(
+            !ColumnExists(connection, "ghost_battles", "player_name")
+                && !ColumnExists(connection, "ghost_battles", "player_account_id"),
+            "Ghost battle cache should not keep local copies of player identity fields."
+        );
     }
 
     var repository = ctor!.Invoke([dbPath]);
@@ -212,6 +217,12 @@ try
     Assert(
         (bool)downloadedGhost.GetType().GetProperty("ReplayDownloaded")!.GetValue(downloadedGhost)!,
         "ReplaceGhostBattles should preserve replay_downloaded for ghost battles already fetched locally."
+    );
+    Assert(
+        string.IsNullOrEmpty(
+            (string?)downloadedGhost.GetType().GetProperty("SnapshotSummary")!.GetValue(downloadedGhost)
+        ),
+        "Ghost battle list rows should not depend on remote snapshot payloads for their summary."
     );
 
     replaceGhostBattles.Invoke(
@@ -519,10 +530,6 @@ static object CreateGhostImports(Type ghostImportType, params string[] battlePai
         ghostImportType.GetProperty("CombatKind")!.SetValue(battle, "PVPCombat");
         ghostImportType.GetProperty("PlayerHero")!.SetValue(battle, "Dooley");
         ghostImportType.GetProperty("OpponentName")!.SetValue(battle, "Me");
-        ghostImportType.GetProperty("PlayerHandJson")!.SetValue(battle, "{\"items\":[]}");
-        ghostImportType.GetProperty("PlayerSkillsJson")!.SetValue(battle, "{\"items\":[]}");
-        ghostImportType.GetProperty("OpponentHandJson")!.SetValue(battle, "{\"items\":[]}");
-        ghostImportType.GetProperty("OpponentSkillsJson")!.SetValue(battle, "{\"items\":[]}");
         ghostImportType.GetProperty("ReplayAvailable")!.SetValue(battle, true);
         ghostImportType.GetProperty("ReplayDownloaded")!.SetValue(battle, false);
         ghostImportType.GetProperty("LastSyncedAtUtc")!.SetValue(battle, DateTimeOffset.UtcNow);
@@ -537,6 +544,26 @@ static long CountRows(SqliteConnection connection, string table, string whereCla
     using var command = connection.CreateCommand();
     command.CommandText = $"SELECT COUNT(*) FROM {table} WHERE {whereClause};";
     return (long)command.ExecuteScalar()!;
+}
+
+static bool ColumnExists(SqliteConnection connection, string tableName, string columnName)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = $"PRAGMA table_info({tableName});";
+    using var reader = command.ExecuteReader();
+    while (reader.Read())
+    {
+        if (
+            string.Equals(
+                reader.GetString(reader.GetOrdinal("name")),
+                columnName,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+            return true;
+    }
+
+    return false;
 }
 
 static void Assert(bool condition, string message)

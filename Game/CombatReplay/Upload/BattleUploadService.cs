@@ -8,9 +8,9 @@ using BazaarPlusPlus.Game.RunLogging.Upload;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Upload;
 
-internal sealed class CombatReplayUploadService : IDisposable
+internal sealed class BattleUploadService : IDisposable
 {
-    private readonly CombatReplayUploadSqliteStore _store;
+    private readonly BattleUploadSqliteStore _store;
     private readonly RunUploadIdentityStore _identityStore;
     private readonly RunUploadClientStateStore _clientStateStore;
     private readonly RunUploadKeyStore _keyStore;
@@ -19,8 +19,8 @@ internal sealed class CombatReplayUploadService : IDisposable
     private readonly int _batchSize;
     private readonly HttpClient _httpClient;
 
-    public CombatReplayUploadService(
-        CombatReplayUploadSqliteStore store,
+    public BattleUploadService(
+        BattleUploadSqliteStore store,
         RunUploadIdentityStore identityStore,
         RunUploadClientStateStore clientStateStore,
         RunUploadKeyStore keyStore,
@@ -49,24 +49,24 @@ internal sealed class CombatReplayUploadService : IDisposable
         _httpClient = new HttpClient { Timeout = timeout };
     }
 
-    public async Task<CombatReplayUploadCycleResult> UploadPendingReplaysAsync(
+    public async Task<BattleUploadCycleResult> UploadPendingBattlesAsync(
         CancellationToken cancellationToken
     )
     {
         var pendingBattleIds = _store.GetPendingBattleIds(_batchSize);
         if (pendingBattleIds.Count == 0)
-            return new CombatReplayUploadCycleResult(uploadedCount: 0, hasMorePending: false);
+            return new BattleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
 
         BppLog.Info(
-            "CombatReplayUploadService",
-            $"Starting upload cycle for {pendingBattleIds.Count} pending replay(s)."
+            "BattleUploadService",
+            $"Starting upload cycle for {pendingBattleIds.Count} pending battle artifact(s)."
         );
 
         var installId = _identityStore.GetOrCreateInstallId();
         var uploadedCount = 0;
-        var apiClient = new CombatReplayUploadApiClient(
+        var apiClient = new BattleUploadApiClient(
             _httpClient,
-            new CombatReplayUploadRequestSigner(_keyStore),
+            new BattleUploadRequestSigner(_keyStore),
             _uploadEndpoint
         );
         var routeClient = CreateAuthenticatedRouteClient();
@@ -75,7 +75,7 @@ internal sealed class CombatReplayUploadService : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             var attemptedAtUtc = DateTimeOffset.UtcNow;
-            BppLog.Info("CombatReplayUploadService", $"Preparing upload for replay {battleId}.");
+            BppLog.Info("BattleUploadService", $"Preparing upload for battle {battleId}.");
             var preflightSnapshot = _store.TryBuildSnapshot(battleId, installId, clientId: null);
             if (preflightSnapshot == null)
             {
@@ -85,13 +85,13 @@ internal sealed class CombatReplayUploadService : IDisposable
                     "replay_snapshot_not_found"
                 );
                 BppLog.Warn(
-                    "CombatReplayUploadService",
-                    $"Marking replay {battleId} as terminal failure because the local snapshot is unavailable."
+                    "BattleUploadService",
+                    $"Marking battle {battleId} as terminal failure because the local snapshot is unavailable."
                 );
                 continue;
             }
 
-            CombatReplayUploadSnapshot? snapshot = null;
+            BattleUploadSnapshot? snapshot = null;
             try
             {
                 var requestResult = await routeClient.SendAsync(
@@ -101,7 +101,7 @@ internal sealed class CombatReplayUploadService : IDisposable
                         snapshot = _store.TryBuildSnapshot(battleId, installId, clientId);
                         if (snapshot == null)
                         {
-                            return CombatReplayUploadApiResult.Failure(
+                            return BattleUploadApiResult.Failure(
                                 "replay_snapshot_not_found",
                                 shouldFallback: false,
                                 shouldReRegister: false
@@ -109,10 +109,10 @@ internal sealed class CombatReplayUploadService : IDisposable
                         }
 
                         BppLog.Info(
-                            "CombatReplayUploadService",
-                            $"Uploading replay {battleId} with client_id={clientId}, run_id={snapshot.Payload.RunId ?? "none"}."
+                            "BattleUploadService",
+                            $"Uploading battle {battleId} with client_id={clientId}, run_id={snapshot.Payload.RunId ?? "none"}."
                         );
-                        return await apiClient.UploadReplayAsync(
+                        return await apiClient.UploadBattleAsync(
                             snapshot.Json,
                             clientId,
                             installId,
@@ -132,8 +132,8 @@ internal sealed class CombatReplayUploadService : IDisposable
                         "registration_unavailable"
                     );
                     BppLog.Warn(
-                        "CombatReplayUploadService",
-                        $"Skipping replay {battleId} because client registration is unavailable."
+                        "BattleUploadService",
+                        $"Skipping battle {battleId} because client registration is unavailable."
                     );
                     continue;
                 }
@@ -155,8 +155,8 @@ internal sealed class CombatReplayUploadService : IDisposable
                             "replay_snapshot_not_found"
                         );
                         BppLog.Warn(
-                            "CombatReplayUploadService",
-                            $"Marking replay {battleId} as terminal failure because the local snapshot disappeared before upload."
+                            "BattleUploadService",
+                            $"Marking battle {battleId} as terminal failure because the local snapshot disappeared before upload."
                         );
                         continue;
                     }
@@ -167,8 +167,8 @@ internal sealed class CombatReplayUploadService : IDisposable
                         uploadResult.Error ?? "upload_failed"
                     );
                     BppLog.Warn(
-                        "CombatReplayUploadService",
-                        $"Upload failed for replay {battleId}: {uploadResult.Error ?? "unknown_error"}."
+                        "BattleUploadService",
+                        $"Upload failed for battle {battleId}: {uploadResult.Error ?? "unknown_error"}."
                     );
                     continue;
                 }
@@ -181,21 +181,19 @@ internal sealed class CombatReplayUploadService : IDisposable
                         "replay_snapshot_not_found"
                     );
                     BppLog.Warn(
-                        "CombatReplayUploadService",
-                        $"Marking replay {battleId} as terminal failure because the local snapshot was lost before completion."
-                    );
+                            "BattleUploadService",
+                            $"Marking battle {battleId} as terminal failure because the local snapshot was lost before completion."
+                        );
                     continue;
                 }
 
                 _store.MarkReplayUploaded(
                     battleId,
-                    snapshot.PayloadSha256,
-                    uploadResult.ObjectKey,
                     DateTimeOffset.UtcNow
                 );
                 BppLog.Info(
-                    "CombatReplayUploadService",
-                    $"Uploaded replay {battleId} with object_key={uploadResult.ObjectKey ?? "none"}."
+                    "BattleUploadService",
+                    $"Uploaded battle {battleId} with object_key={uploadResult.ObjectKey ?? "none"}."
                 );
                 uploadedCount++;
             }
@@ -211,18 +209,18 @@ internal sealed class CombatReplayUploadService : IDisposable
                     RunUploadErrorFormatter.Truncate(ex.Message)
                 );
                 BppLog.Warn(
-                    "CombatReplayUploadService",
-                    $"Upload failed for replay {battleId}: {ex.GetType().Name} - {ex.Message}"
+                    "BattleUploadService",
+                    $"Upload failed for battle {battleId}: {ex.GetType().Name} - {ex.Message}"
                 );
             }
         }
 
         var hasMorePending = _store.HasMorePendingReplays();
         BppLog.Info(
-            "CombatReplayUploadService",
-            $"Replay upload cycle finished: uploaded={uploadedCount}, remaining={(hasMorePending ? "yes" : "no")}."
+            "BattleUploadService",
+            $"Battle upload cycle finished: uploaded={uploadedCount}, remaining={(hasMorePending ? "yes" : "no")}."
         );
-        return new CombatReplayUploadCycleResult(uploadedCount, hasMorePending);
+        return new BattleUploadCycleResult(uploadedCount, hasMorePending);
     }
 
     public void Dispose()
@@ -247,7 +245,7 @@ internal sealed class CombatReplayUploadService : IDisposable
         );
     }
 
-    internal static string? TryDeriveReplayUploadEndpoint(string? runUploadEndpoint)
+    internal static string? TryDeriveBattleUploadEndpoint(string? runUploadEndpoint)
     {
         if (
             string.IsNullOrWhiteSpace(runUploadEndpoint)
@@ -261,7 +259,7 @@ internal sealed class CombatReplayUploadService : IDisposable
         if (!absolutePath.EndsWith("/runs/upload", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        var replayPath = absolutePath[..^"/runs/upload".Length] + "/replays/upload";
+        var replayPath = absolutePath[..^"/runs/upload".Length] + "/battles/upload";
         var builder = new UriBuilder(uploadUri) { Path = replayPath, Query = string.Empty };
         return builder.Uri.ToString();
     }

@@ -498,7 +498,7 @@ Then manually verify:
 
 - `POST /clients/register`
 - `POST /runs/upload`
-- `POST /replays/upload`
+- `POST /battles/upload`
 - `GET /me/pvp-battles/against-me`
 
 using a signed test client or the mod itself.

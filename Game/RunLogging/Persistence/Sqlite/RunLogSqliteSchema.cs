@@ -3,9 +3,9 @@ namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int LocalDatabaseSchemaVersion => 4;
+    public static int LocalDatabaseSchemaVersion => 5;
 
-    public static int RowSchemaVersion => 4;
+    public static int RowSchemaVersion => 5;
 
     public static int UploadPayloadSchemaVersion => 1;
 
@@ -139,8 +139,6 @@ public static class RunLogSqliteSchema
                 day INTEGER NULL,
                 hour INTEGER NULL,
                 encounter_id TEXT NULL,
-                player_name TEXT NULL,
-                player_account_id TEXT NULL,
                 player_hero TEXT NULL,
                 player_rank TEXT NULL,
                 player_rating INTEGER NULL,
@@ -155,10 +153,6 @@ public static class RunLogSqliteSchema
                 result TEXT NULL,
                 winner_combatant_id TEXT NULL,
                 loser_combatant_id TEXT NULL,
-                player_hand_json TEXT NOT NULL,
-                player_skills_json TEXT NOT NULL,
-                opponent_hand_json TEXT NOT NULL,
-                opponent_skills_json TEXT NOT NULL,
                 replay_available INTEGER NOT NULL DEFAULT 0,
                 replay_downloaded INTEGER NOT NULL DEFAULT 0,
                 last_synced_at_utc TEXT NOT NULL,
@@ -185,8 +179,6 @@ public static class RunLogSqliteSchema
             CREATE TABLE IF NOT EXISTS {ReplaySyncStateTableName} (
                 battle_id TEXT PRIMARY KEY,
                 dirty INTEGER NOT NULL,
-                payload_sha256 TEXT NULL,
-                object_key TEXT NULL,
                 last_attempt_at_utc TEXT NULL,
                 last_uploaded_at_utc TEXT NULL,
                 retry_count INTEGER NOT NULL DEFAULT 0,

@@ -6,11 +6,11 @@ using BazaarPlusPlus.Game.RunLogging.Upload;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Upload;
 
-internal sealed class CombatReplayUploadRequestSigner
+internal sealed class BattleUploadRequestSigner
 {
     private readonly RunUploadRequestSigner _requestSigner;
 
-    public CombatReplayUploadRequestSigner(RunUploadKeyStore keyStore)
+    public BattleUploadRequestSigner(RunUploadKeyStore keyStore)
     {
         _requestSigner = new RunUploadRequestSigner(
             keyStore ?? throw new ArgumentNullException(nameof(keyStore))

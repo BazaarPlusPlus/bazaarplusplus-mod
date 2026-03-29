@@ -9,13 +9,13 @@ using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Upload;
 
-internal sealed class CombatReplayUploadSqliteStore
+internal sealed class BattleUploadSqliteStore
 {
     private readonly string _databasePath;
     private readonly CombatReplayPayloadStore _payloadStore;
     private readonly PvpBattleCatalog _battleCatalog;
 
-    public CombatReplayUploadSqliteStore(string databasePath, string replayRootPath)
+    public BattleUploadSqliteStore(string databasePath, string replayRootPath)
     {
         if (string.IsNullOrWhiteSpace(databasePath))
             throw new ArgumentException("Database path is required.", nameof(databasePath));
@@ -135,8 +135,6 @@ internal sealed class CombatReplayUploadSqliteStore
 
     public void MarkReplayUploaded(
         string battleId,
-        string payloadSha256,
-        string? objectKey,
         DateTimeOffset uploadedAtUtc
     )
     {
@@ -146,8 +144,6 @@ internal sealed class CombatReplayUploadSqliteStore
         command.CommandText = $"""
             UPDATE {RunLogSqliteSchema.ReplaySyncStateTableName}
             SET dirty = 0,
-                payload_sha256 = $payloadSha256,
-                object_key = $objectKey,
                 last_attempt_at_utc = $uploadedAtUtc,
                 last_uploaded_at_utc = $uploadedAtUtc,
                 retry_count = 0,
@@ -155,13 +151,11 @@ internal sealed class CombatReplayUploadSqliteStore
             WHERE battle_id = $battleId;
             """;
         command.Parameters.AddWithValue("$battleId", battleId);
-        command.Parameters.AddWithValue("$payloadSha256", payloadSha256);
-        command.Parameters.AddWithValue("$objectKey", objectKey ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$uploadedAtUtc", uploadedAtUtc.ToString("o"));
         command.ExecuteNonQuery();
     }
 
-    public CombatReplayUploadSnapshot? TryBuildSnapshot(
+    public BattleUploadSnapshot? TryBuildSnapshot(
         string battleId,
         string installId,
         string? clientId = null
@@ -175,7 +169,7 @@ internal sealed class CombatReplayUploadSqliteStore
         if (replayPayload == null)
             return null;
 
-        var payload = new CombatReplayUploadPayload
+        var payload = new BattleUploadPayload
         {
             SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
             InstallId = installId,
@@ -184,11 +178,12 @@ internal sealed class CombatReplayUploadSqliteStore
             SubmittedAtUtc = DateTimeOffset.UtcNow,
             BattleId = battleId,
             RunId = manifest.RunId,
+            BattleManifest = manifest,
             ReplayPayload = replayPayload,
         };
         var json = JsonConvert.SerializeObject(payload, RunUploadSerialization.SerializerSettings);
 
-        return new CombatReplayUploadSnapshot
+        return new BattleUploadSnapshot
         {
             Payload = payload,
             Json = json,

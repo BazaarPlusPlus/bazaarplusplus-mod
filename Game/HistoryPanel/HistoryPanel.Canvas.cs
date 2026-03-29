@@ -293,12 +293,19 @@ internal sealed partial class HistoryPanel
 
         if (_footerSecondaryText != null)
         {
+            var selectedBattleTimestamp =
+                ActiveSelectedBattle == null
+                    ? null
+                    : HistoryPanelFormatter.FormatTimestamp(ActiveSelectedBattle.RecordedAtUtc);
+            var selectedBattleTimestampText = selectedBattleTimestamp ?? string.Empty;
             var battleSummary =
                 ActiveSelectedBattle == null
                     ? "Select one battle to inspect it, then use Replay when you want to jump back into it."
                 : canReplaySelectedBattle
-                    ? $"{HistoryPanelFormatter.FormatTimestamp(ActiveSelectedBattle.RecordedAtUtc)} | {ActiveSelectedBattle.SnapshotSummary}"
-                : $"{HistoryPanelFormatter.FormatTimestamp(ActiveSelectedBattle.RecordedAtUtc)} | Replay unavailable: {replayUnavailableReason}";
+                    ? string.IsNullOrWhiteSpace(ActiveSelectedBattle.SnapshotSummary)
+                        ? selectedBattleTimestampText
+                        : $"{selectedBattleTimestampText} | {ActiveSelectedBattle.SnapshotSummary}"
+                : $"{selectedBattleTimestampText} | Replay unavailable: {replayUnavailableReason}";
             _footerSecondaryText.text = string.IsNullOrWhiteSpace(_statusMessage)
                 ? battleSummary
                 : $"{_statusMessage} | {battleSummary}";
@@ -1121,13 +1128,16 @@ internal sealed partial class HistoryPanel
             FontStyle.Normal,
             new Color(0.70f, 0.75f, 0.83f, 0.90f)
         );
-        AddDetailLine(
-            body,
-            battle.SnapshotSummary,
-            12,
-            FontStyle.Normal,
-            new Color(0.74f, 0.80f, 0.87f, 0.95f)
-        );
+        if (!string.IsNullOrWhiteSpace(battle.SnapshotSummary))
+        {
+            AddDetailLine(
+                body,
+                battle.SnapshotSummary,
+                12,
+                FontStyle.Normal,
+                new Color(0.74f, 0.80f, 0.87f, 0.95f)
+            );
+        }
 
         ApplyItemState(background, selected, palette.Normal, palette.Selected);
         return new ListItemView { Index = index, Background = background };

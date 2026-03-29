@@ -11,7 +11,7 @@ import {
 } from "./helpers/crypto";
 import { buildEnv } from "./helpers/mockEnv";
 
-test("rejects replay uploads with an invalid body hash", async () => {
+test("rejects battle uploads with an invalid body hash", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   const clientId = "client-bad-hash";
@@ -33,7 +33,7 @@ test("rejects replay uploads with an invalid body hash", async () => {
     privateKey,
     canonicalRequest(
       "POST",
-      "/replays/upload",
+      "/battles/upload",
       clientId,
       "install-002",
       timestamp,
@@ -43,7 +43,7 @@ test("rejects replay uploads with an invalid body hash", async () => {
   );
 
   const response = await worker.fetch(
-    new Request("https://example.com/replays/upload", {
+    new Request("https://example.com/battles/upload", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -68,7 +68,7 @@ test("rejects replay uploads with an invalid body hash", async () => {
   assert.equal(env.REPLAY_BUCKET.objects.size, 0);
 });
 
-test("rejects replay uploads when the nonce is reused", async () => {
+test("rejects battle uploads when the nonce is reused", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   const clientId = "client-reused-nonce";
@@ -91,7 +91,7 @@ test("rejects replay uploads when the nonce is reused", async () => {
     privateKey,
     canonicalRequest(
       "POST",
-      "/replays/upload",
+      "/battles/upload",
       clientId,
       "install-003",
       timestamp,
@@ -101,7 +101,7 @@ test("rejects replay uploads when the nonce is reused", async () => {
   );
 
   const response = await worker.fetch(
-    new Request("https://example.com/replays/upload", {
+    new Request("https://example.com/battles/upload", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -124,7 +124,7 @@ test("rejects replay uploads when the nonce is reused", async () => {
   assert.deepEqual(await response.json(), { error: "nonce_reused" });
 });
 
-test("rejects replay uploads with an out-of-range timestamp", async () => {
+test("rejects battle uploads with an out-of-range timestamp", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   const clientId = "client-old-timestamp";
@@ -146,7 +146,7 @@ test("rejects replay uploads with an out-of-range timestamp", async () => {
     privateKey,
     canonicalRequest(
       "POST",
-      "/replays/upload",
+      "/battles/upload",
       clientId,
       "install-004",
       timestamp,
@@ -156,7 +156,7 @@ test("rejects replay uploads with an out-of-range timestamp", async () => {
   );
 
   const response = await worker.fetch(
-    new Request("https://example.com/replays/upload", {
+    new Request("https://example.com/battles/upload", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -179,7 +179,7 @@ test("rejects replay uploads with an out-of-range timestamp", async () => {
   assert.deepEqual(await response.json(), { error: "timestamp_out_of_range" });
 });
 
-test("rejects replay uploads with an invalid signature", async () => {
+test("rejects battle uploads with an invalid signature", async () => {
   const env = buildEnv();
   const { modulusB64, exponentB64 } = generateClientKeyPair();
   const { privateKey } = generateClientKeyPair();
@@ -202,7 +202,7 @@ test("rejects replay uploads with an invalid signature", async () => {
     privateKey,
     canonicalRequest(
       "POST",
-      "/replays/upload",
+      "/battles/upload",
       clientId,
       "install-005",
       timestamp,
@@ -212,7 +212,7 @@ test("rejects replay uploads with an invalid signature", async () => {
   );
 
   const response = await worker.fetch(
-    new Request("https://example.com/replays/upload", {
+    new Request("https://example.com/battles/upload", {
       method: "POST",
       headers: {
         "content-type": "application/json",

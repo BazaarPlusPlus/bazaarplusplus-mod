@@ -15,14 +15,14 @@ var replayRoot = Path.Combine(tempRoot, "CombatReplays");
 try
 {
     var storeType = RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Upload.CombatReplayUploadSqliteStore"
+        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadSqliteStore"
     );
     var serviceType = RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Upload.CombatReplayUploadService"
+        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService"
     );
     Assert(
         storeType != null && serviceType != null,
-        "Combat replay upload store and service should exist."
+        "Battle upload store and service should exist."
     );
 
     var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
@@ -54,7 +54,7 @@ try
 
     var store =
         Activator.CreateInstance(storeType, dbPath, replayRoot)
-        ?? throw new InvalidOperationException("Failed to create CombatReplayUploadSqliteStore.");
+        ?? throw new InvalidOperationException("Failed to create BattleUploadSqliteStore.");
     InvokeVoid(storeType, store, "MarkReplayDirty", ["battle-upload-001"]);
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -74,7 +74,7 @@ try
         (IReadOnlyList<string>)Invoke<object>(storeType, store, "GetPendingBattleIds", [2]);
     Assert(
         pendingBattleIds.Count == 1 && pendingBattleIds[0] == "battle-upload-001",
-        "CombatReplayUploadSqliteStore should return dirty replay ids."
+        "BattleUploadSqliteStore should return dirty replay ids."
     );
 
     var snapshot = Invoke<object>(
@@ -83,7 +83,7 @@ try
         "TryBuildSnapshot",
         ["battle-upload-001", "install-123", null]
     );
-    Assert(snapshot != null, "CombatReplayUploadSqliteStore should build an upload snapshot.");
+    Assert(snapshot != null, "BattleUploadSqliteStore should build an upload snapshot.");
 
     var snapshotType = snapshot!.GetType();
     var payloadEnvelope =
@@ -122,8 +122,6 @@ try
         "MarkReplayUploaded",
         [
             "battle-upload-001",
-            payloadSha256,
-            "combat-replays/global/client-001/battle-upload-001.payload.json",
             new DateTimeOffset(2026, 3, 28, 2, 0, 0, TimeSpan.Zero),
         ]
     );
@@ -140,12 +138,9 @@ try
             "MarkReplayUploaded should clear replay_sync_state.dirty."
         );
         Assert(
-            GetString(
-                connection,
-                "SELECT object_key FROM replay_sync_state WHERE battle_id = $battleId;",
-                "battle-upload-001"
-            ) == "combat-replays/global/client-001/battle-upload-001.payload.json",
-            "MarkReplayUploaded should persist the returned object key."
+            !ColumnExists(connection, "replay_sync_state", "payload_sha256")
+                && !ColumnExists(connection, "replay_sync_state", "object_key"),
+            "Replay sync state should no longer persist upload object metadata."
         );
     }
 
@@ -196,12 +191,12 @@ try
             clientStateStore,
             keyStore,
             "https://cloudflare.example/clients/register",
-            "https://cloudflare.example/replays/upload",
+            "https://cloudflare.example/battles/upload",
             1,
             TimeSpan.FromSeconds(10)
-        ) ?? throw new InvalidOperationException("Failed to create CombatReplayUploadService.");
+        ) ?? throw new InvalidOperationException("Failed to create BattleUploadService.");
     var uploadTask = (Task)
-        Invoke<object>(serviceType, service, "UploadPendingReplaysAsync", [CancellationToken.None]);
+        Invoke<object>(serviceType, service, "UploadPendingBattlesAsync", [CancellationToken.None]);
     uploadTask.GetAwaiter().GetResult();
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -291,6 +286,26 @@ static string GetString(SqliteConnection connection, string sql, string battleId
         command.ExecuteScalar()
         ?? throw new InvalidOperationException($"Query returned null: {sql}")
     );
+}
+
+static bool ColumnExists(SqliteConnection connection, string tableName, string columnName)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = $"PRAGMA table_info({tableName});";
+    using var reader = command.ExecuteReader();
+    while (reader.Read())
+    {
+        if (
+            string.Equals(
+                reader.GetString(reader.GetOrdinal("name")),
+                columnName,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+            return true;
+    }
+
+    return false;
 }
 
 static void Assert(bool condition, string message)
