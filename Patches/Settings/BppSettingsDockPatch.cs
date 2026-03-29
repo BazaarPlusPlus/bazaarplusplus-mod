@@ -38,3 +38,32 @@ internal static class BppSettingsDockAwakePatch
         BppSettingsDockController.Attach(button);
     }
 }
+
+[HarmonyPatch(typeof(FightMenuDialog), "Start")]
+internal static class BppSettingsDockFightMenuPatch
+{
+    private static readonly System.Reflection.FieldInfo? SettingButtonField = AccessTools.Field(
+        typeof(FightMenuDialog),
+        "SettingButton"
+    );
+
+    [HarmonyPostfix]
+    private static void Postfix(FightMenuDialog __instance)
+    {
+        try
+        {
+            var settingButtonCustom = SettingButtonField?.GetValue(__instance) as ButtonCustom;
+            var button = settingButtonCustom?.GetButton();
+            if (button != null)
+                BppSettingsDockController.Attach(button);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error(
+                "BppSettingsDock",
+                "Failed to attach BPP settings dock in fight menu",
+                ex
+            );
+        }
+    }
+}
