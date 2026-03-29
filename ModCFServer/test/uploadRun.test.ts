@@ -10,6 +10,73 @@ import {
 } from "./helpers/crypto";
 import { buildEnv } from "./helpers/mockEnv";
 
+function buildSignedJsonRequest(
+  url: string,
+  clientId: string,
+  installId: string,
+  privateKey: Parameters<typeof signCanonical>[0],
+  nonce: string,
+  payload: string,
+  extraHeaders?: Record<string, string>,
+): Request {
+  const timestamp = new Date().toISOString();
+  const bodyHash = sha256Base64(payload);
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      new URL(url).pathname,
+      clientId,
+      installId,
+      timestamp,
+      nonce,
+      bodyHash,
+    ),
+  );
+
+  return new Request(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-bpp-client-id": clientId,
+      "x-bpp-install-id": installId,
+      "x-bpp-timestamp": timestamp,
+      "x-bpp-nonce": nonce,
+      "x-bpp-content-sha256": bodyHash,
+      "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+      "x-bpp-signature": signature,
+      ...(extraHeaders ?? {}),
+    },
+    body: payload,
+  });
+}
+
+async function bindClientToPlayerAccount(
+  env: ReturnType<typeof buildEnv>,
+  clientId: string,
+  installId: string,
+  privateKey: Parameters<typeof signCanonical>[0],
+  playerAccountId: string,
+  nonce: string,
+): Promise<void> {
+  const response = await worker.fetch(
+    buildSignedJsonRequest(
+      "https://example.com/clients/bind",
+      clientId,
+      installId,
+      privateKey,
+      nonce,
+      JSON.stringify({
+        player_account_id: playerAccountId,
+        observed_player_account_id: playerAccountId,
+      }),
+    ),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+}
+
 test("accepts signed run uploads", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
@@ -82,26 +149,28 @@ test("accepts signed run uploads", async () => {
   assert.ok(env.REPLAY_BUCKET.objects.has(`runs/${clientId}/run-001/${bodyHash}.json`));
 });
 
-test("projects uploaded pvp battles and records bound player accounts", async () => {
+test("projects uploaded pvp battles for a bound player account client", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   const clientId = "runs-client-projection";
+  const installId = "install-run-projection";
   env.DB.clients.set(clientId, {
     client_id: clientId,
-    install_id: "install-run-projection",
+    install_id: installId,
     purpose: "runs",
     modulus_b64: modulusB64,
     exponent_b64: exponentB64,
     plugin_version: "1.9.0",
     registered_at_utc: new Date().toISOString(),
   });
-  env.DB.clientUidBindings.set("binding-001", {
-    binding_id: "binding-001",
-    client_id: clientId,
-    uid: "uid-001",
-    bound_at_utc: new Date().toISOString(),
-    unbound_at_utc: null,
-  });
+  await bindClientToPlayerAccount(
+    env,
+    clientId,
+    installId,
+    privateKey,
+    "player-account-001",
+    "nonce-bind-run-projection",
+  );
 
   const payload = JSON.stringify({
     run_id: "run-projection",
@@ -147,7 +216,7 @@ test("projects uploaded pvp battles and records bound player accounts", async ()
       "POST",
       "/runs/upload",
       clientId,
-      "install-run-projection",
+      installId,
       timestamp,
       nonce,
       bodyHash,
@@ -160,7 +229,7 @@ test("projects uploaded pvp battles and records bound player accounts", async ()
       headers: {
         "content-type": "application/json",
         "x-bpp-client-id": clientId,
-        "x-bpp-install-id": "install-run-projection",
+        "x-bpp-install-id": installId,
         "x-bpp-run-id": "run-projection",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
@@ -193,10 +262,6 @@ test("projects uploaded pvp battles and records bound player accounts", async ()
   assert.equal(env.DB.runUploads.get("run-projection")?.projection_status, "projected");
   assert.equal(env.DB.runUploads.get("run-projection")?.projected_battle_count, 1);
   assert.equal(env.DB.runUploads.get("run-projection")?.projection_version, 1);
-  assert.equal(
-    env.DB.uidPlayerAccounts.get("uid-001:player-account-001")?.last_client_id,
-    clientId,
-  );
 });
 
 test("records a failed projection in the run ingestion ledger", async () => {
@@ -273,40 +338,42 @@ test("records a failed projection in the run ingestion ledger", async () => {
   );
 });
 
-test("does not expand bound player accounts from a newly claimed account id", async () => {
+test("run uploads do not depend on legacy uid bindings once the client is bound", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  const clientId = "runs-client-sticky-account";
+  const clientId = "runs-client-no-legacy-uid";
+  const installId = "install-run-no-legacy-uid";
   env.DB.clients.set(clientId, {
     client_id: clientId,
-    install_id: "install-run-sticky-account",
+    install_id: installId,
     purpose: "runs",
     modulus_b64: modulusB64,
     exponent_b64: exponentB64,
     plugin_version: "1.9.0",
     registered_at_utc: new Date().toISOString(),
   });
-  env.DB.clientUidBindings.set("binding-sticky-account", {
-    binding_id: "binding-sticky-account",
-    client_id: clientId,
-    uid: "uid-sticky-account",
-    bound_at_utc: new Date().toISOString(),
-    unbound_at_utc: null,
-  });
-  env.DB.uidPlayerAccounts.set("uid-sticky-account:player-account-existing", {
-    uid: "uid-sticky-account",
-    player_account_id: "player-account-existing",
-    first_seen_at_utc: "2026-03-28T00:00:00.000Z",
-    last_seen_at_utc: "2026-03-29T12:00:00.000Z",
-    last_client_id: clientId,
-  });
+  await bindClientToPlayerAccount(
+    env,
+    clientId,
+    installId,
+    privateKey,
+    "player-account-new",
+    "nonce-bind-no-legacy-uid",
+  );
+  const originalFirst = env.DB.first.bind(env.DB);
+  env.DB.first = ((sql: string, params: unknown[]) => {
+    if (sql.includes("FROM client_uid_bindings") || sql.includes("FROM uid_player_accounts")) {
+      throw new Error("legacy_uid_lookup_invoked");
+    }
+    return originalFirst(sql, params);
+  }) as typeof env.DB.first;
 
   const payload = JSON.stringify({
-    run_id: "run-sticky-account",
+    run_id: "run-no-legacy-uid",
     pvp_battles: [
       {
-        battle_id: "battle-sticky-account-001",
-        run_id: "run-sticky-account",
+        battle_id: "battle-no-legacy-uid-001",
+        run_id: "run-no-legacy-uid",
         recorded_at_utc: "2026-03-29T10:15:00.000Z",
         player_account_id: "player-account-new",
         opponent_account_id: "opponent-account-001",
@@ -323,7 +390,7 @@ test("does not expand bound player accounts from a newly claimed account id", as
       "POST",
       "/runs/upload",
       clientId,
-      "install-run-sticky-account",
+      installId,
       timestamp,
       nonce,
       bodyHash,
@@ -336,8 +403,8 @@ test("does not expand bound player accounts from a newly claimed account id", as
       headers: {
         "content-type": "application/json",
         "x-bpp-client-id": clientId,
-        "x-bpp-install-id": "install-run-sticky-account",
-        "x-bpp-run-id": "run-sticky-account",
+        "x-bpp-install-id": installId,
+        "x-bpp-run-id": "run-no-legacy-uid",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
         "x-bpp-nonce": nonce,
@@ -351,42 +418,34 @@ test("does not expand bound player accounts from a newly claimed account id", as
   );
 
   assert.equal(response.status, 200);
-  assert.ok(env.DB.uidPlayerAccounts.has("uid-sticky-account:player-account-existing"));
-  assert.ok(!env.DB.uidPlayerAccounts.has("uid-sticky-account:player-account-new"));
+  assert.equal(env.DB.runUploads.get("run-no-legacy-uid")?.projection_status, "projected");
 });
 
-test("skips ambiguous bound player account observations within one run upload", async () => {
+test("run uploads do not create legacy uid-player-account observations", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  const clientId = "runs-client-ambiguous-account";
+  const clientId = "runs-client-no-legacy-observations";
   env.DB.clients.set(clientId, {
     client_id: clientId,
-    install_id: "install-run-ambiguous-account",
+    install_id: "install-run-no-legacy-observations",
     purpose: "runs",
     modulus_b64: modulusB64,
     exponent_b64: exponentB64,
     plugin_version: "1.9.0",
     registered_at_utc: new Date().toISOString(),
   });
-  env.DB.clientUidBindings.set("binding-ambiguous-account", {
-    binding_id: "binding-ambiguous-account",
-    client_id: clientId,
-    uid: "uid-ambiguous-account",
-    bound_at_utc: new Date().toISOString(),
-    unbound_at_utc: null,
-  });
 
   const payload = JSON.stringify({
-    run_id: "run-ambiguous-account",
+    run_id: "run-no-legacy-observations",
     pvp_battles: [
       {
-        battle_id: "battle-ambiguous-account-001",
+        battle_id: "battle-no-legacy-observations-001",
         player_account_id: "player-account-a",
         opponent_account_id: "opponent-account-001",
         combat_kind: "PVPCombat",
       },
       {
-        battle_id: "battle-ambiguous-account-002",
+        battle_id: "battle-no-legacy-observations-002",
         player_account_id: "player-account-b",
         opponent_account_id: "opponent-account-002",
         combat_kind: "PVPCombat",
@@ -402,7 +461,7 @@ test("skips ambiguous bound player account observations within one run upload", 
       "POST",
       "/runs/upload",
       clientId,
-      "install-run-ambiguous-account",
+      "install-run-no-legacy-observations",
       timestamp,
       nonce,
       bodyHash,
@@ -415,8 +474,8 @@ test("skips ambiguous bound player account observations within one run upload", 
       headers: {
         "content-type": "application/json",
         "x-bpp-client-id": clientId,
-        "x-bpp-install-id": "install-run-ambiguous-account",
-        "x-bpp-run-id": "run-ambiguous-account",
+        "x-bpp-install-id": "install-run-no-legacy-observations",
+        "x-bpp-run-id": "run-no-legacy-observations",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
         "x-bpp-nonce": nonce,

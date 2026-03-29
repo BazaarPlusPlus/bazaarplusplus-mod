@@ -2,14 +2,8 @@ import type { Env } from "../env";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
 import {
-  batchExecute,
   replaceProjectedBattlesForRun,
 } from "../persistence/battleProjections";
-import {
-  buildPlayerAccountUpsert,
-  getActiveBindingUid,
-  listObservedPlayerAccountIds,
-} from "../persistence/bindings";
 import {
   markRunProjectionStatus,
   upsertRunUpload,
@@ -17,7 +11,6 @@ import {
 import {
   buildBattleSummary,
   parseRunUploadBody,
-  type ParsedRunBattle,
 } from "./uploadRunPayload";
 import { requireVerifiedClient } from "./verifiedClient";
 
@@ -104,7 +97,6 @@ export async function handleRunUpload(
     });
 
     const observedAtUtc = new Date().toISOString();
-    const boundUid = await getActiveBindingUid(env, verified.client.client_id);
     const projectedBattles = parsed.battles
       .filter(
         (battle) =>
@@ -147,27 +139,6 @@ export async function handleRunUpload(
       battles: projectedBattles,
     });
 
-    if (boundUid) {
-      const observedPlayerAccountIds = distinctNonEmptyPlayerAccountIds(parsed.battles);
-      if (observedPlayerAccountIds.length === 1) {
-        const existingPlayerAccountIds = await listObservedPlayerAccountIds(env, boundUid);
-        const playerAccountId = observedPlayerAccountIds[0]!;
-        if (
-          existingPlayerAccountIds.length === 0
-          || existingPlayerAccountIds.includes(playerAccountId)
-        ) {
-          await batchExecute(env, [
-            buildPlayerAccountUpsert(env, {
-              uid: boundUid,
-              playerAccountId,
-              lastClientId: verified.client.client_id,
-              observedAtUtc,
-            }),
-          ]);
-        }
-      }
-    }
-
     await markRunProjectionStatus(env, {
       runId,
       projectionStatus: "projected",
@@ -194,15 +165,4 @@ export async function handleRunUpload(
   }
 
   return json({ status: "accepted" });
-}
-
-function distinctNonEmptyPlayerAccountIds(battles: ParsedRunBattle[]): string[] {
-  const values = new Set<string>();
-  for (const battle of battles) {
-    if (battle.playerAccountId) {
-      values.add(battle.playerAccountId);
-    }
-  }
-
-  return Array.from(values);
 }
