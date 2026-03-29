@@ -15,6 +15,7 @@ import {
   upsertRunUpload,
 } from "../persistence/runUploads";
 import {
+  buildBattleSummary,
   parseRunUploadBody,
   type ParsedRunBattle,
 } from "./uploadRunPayload";
@@ -133,7 +134,9 @@ export async function handleRunUpload(
         result: battle.result,
         winnerCombatantId: battle.winnerCombatantId,
         loserCombatantId: battle.loserCombatantId,
-        payloadJson: JSON.stringify(battle.raw),
+        summaryJson: JSON.stringify(buildBattleSummary(battle)),
+        replayAvailable: 0,
+        projectionVersion: RUN_PROJECTION_VERSION,
         createdAtUtc: observedAtUtc,
         updatedAtUtc: observedAtUtc,
       }));

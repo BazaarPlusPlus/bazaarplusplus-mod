@@ -25,7 +25,9 @@ export type BattleProjectionRecord = {
   result: string | null;
   winnerCombatantId: string | null;
   loserCombatantId: string | null;
-  payloadJson: string;
+  summaryJson: string;
+  replayAvailable: number;
+  projectionVersion: number;
   createdAtUtc: string;
   updatedAtUtc: string;
 };
@@ -71,10 +73,12 @@ function buildBattleUpsert(
         result,
         winner_combatant_id,
         loser_combatant_id,
-        payload_json,
+        summary_json,
+        replay_available,
+        projection_version,
         created_at_utc,
         updated_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(battle_id) DO UPDATE SET
         run_id = excluded.run_id,
         source_client_id = excluded.source_client_id,
@@ -98,7 +102,9 @@ function buildBattleUpsert(
         result = excluded.result,
         winner_combatant_id = excluded.winner_combatant_id,
         loser_combatant_id = excluded.loser_combatant_id,
-        payload_json = excluded.payload_json,
+        summary_json = excluded.summary_json,
+        replay_available = excluded.replay_available,
+        projection_version = excluded.projection_version,
         updated_at_utc = excluded.updated_at_utc
     `,
   ).bind(
@@ -125,7 +131,9 @@ function buildBattleUpsert(
     battle.result,
     battle.winnerCombatantId,
     battle.loserCombatantId,
-    battle.payloadJson,
+    battle.summaryJson,
+    battle.replayAvailable,
+    battle.projectionVersion,
     battle.createdAtUtc,
     battle.updatedAtUtc,
   );
@@ -179,11 +187,10 @@ export async function listProjectedBattlesAgainstAccountIds(
         pb.battle_id,
         pb.recorded_at_utc,
         pb.opponent_account_id,
-        pb.payload_json,
-        CASE WHEN ru.battle_id IS NULL THEN 0 ELSE 1 END AS replay_available
+        pb.summary_json,
+        pb.replay_available,
+        pb.projection_version
       FROM pvp_battles AS pb
-      LEFT JOIN replay_uploads AS ru
-        ON ru.battle_id = pb.battle_id
       WHERE pb.opponent_account_id IN (${placeholders})
         AND pb.combat_kind = 'PVPCombat'
         AND pb.recorded_at_utc >= ?
@@ -207,11 +214,10 @@ export async function getProjectedBattleById(
         pb.battle_id,
         pb.recorded_at_utc,
         pb.opponent_account_id,
-        pb.payload_json,
-        CASE WHEN ru.battle_id IS NULL THEN 0 ELSE 1 END AS replay_available
+        pb.summary_json,
+        pb.replay_available,
+        pb.projection_version
       FROM pvp_battles AS pb
-      LEFT JOIN replay_uploads AS ru
-        ON ru.battle_id = pb.battle_id
       WHERE pb.battle_id = ?
       LIMIT 1
     `,

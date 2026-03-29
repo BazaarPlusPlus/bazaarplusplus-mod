@@ -158,7 +158,8 @@ test("lists recent ghost battles against the bound player account", async () => 
     result: "loss",
     winner_combatant_id: "Opponent",
     loser_combatant_id: "Player",
-    payload_json: JSON.stringify({
+    payload_json: JSON.stringify({ battle_id: "legacy-battle-ghost-001" }),
+    summary_json: JSON.stringify({
       battle_id: "battle-ghost-001",
       run_id: "run-ghost-001",
       recorded_at_utc: "2099-03-29T12:00:00.000Z",
@@ -183,6 +184,8 @@ test("lists recent ghost battles against the bound player account", async () => 
       opponent_hand: { items: [] },
       opponent_skills: { items: [] },
     }),
+    replay_available: 1,
+    projection_version: 1,
     created_at_utc: "2099-03-29T12:00:00.000Z",
     updated_at_utc: "2099-03-29T12:00:00.000Z",
   });
@@ -211,17 +214,11 @@ test("lists recent ghost battles against the bound player account", async () => 
     winner_combatant_id: "Player",
     loser_combatant_id: "Opponent",
     payload_json: JSON.stringify({ battle_id: "battle-ghost-ignored" }),
+    summary_json: JSON.stringify({ battle_id: "battle-ghost-ignored" }),
+    replay_available: 0,
+    projection_version: 1,
     created_at_utc: "2099-03-29T11:00:00.000Z",
     updated_at_utc: "2099-03-29T11:00:00.000Z",
-  });
-  env.DB.replayUploads.set("battle-ghost-001", {
-    battle_id: "battle-ghost-001",
-    client_id: "replay-client",
-    install_id: "replay-install",
-    run_id: "run-ghost-001",
-    payload_sha256: "hash",
-    object_key: "combat-replays/replays/replay-client/battle-ghost-001/hash.payload.json",
-    uploaded_at_utc: "2099-03-29T12:05:00.000Z",
   });
 
   const response = await worker.fetch(
@@ -243,6 +240,8 @@ test("lists recent ghost battles against the bound player account", async () => 
       battle_id: string;
       player_hero?: string;
       player_level?: number;
+      player_hand?: { items: unknown[] };
+      opponent_skills?: { items: unknown[] };
       replay?: { available: boolean };
     }>;
   };
@@ -251,6 +250,8 @@ test("lists recent ghost battles against the bound player account", async () => 
   assert.equal(body.battles[0]?.battle_id, "battle-ghost-001");
   assert.equal(body.battles[0]?.player_hero, "Dooley");
   assert.equal(body.battles[0]?.player_level, 11);
+  assert.deepEqual(body.battles[0]?.player_hand, { items: [] });
+  assert.deepEqual(body.battles[0]?.opponent_skills, { items: [] });
   assert.equal(body.battles[0]?.replay?.available, true);
   assert.equal(env.DB.nonces.size, 1);
 });

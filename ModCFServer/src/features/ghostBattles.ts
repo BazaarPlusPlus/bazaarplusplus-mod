@@ -97,10 +97,10 @@ async function isValidDownloadSignature(
 }
 
 function withReplayAvailability(
-  payloadJson: string,
+  summaryJson: string,
   replayAvailable: boolean,
 ): AgainstMeBattlePayload {
-  const parsed = JSON.parse(payloadJson) as AgainstMeBattlePayload;
+  const parsed = JSON.parse(summaryJson) as AgainstMeBattlePayload;
   return {
     ...parsed,
     replay: {
@@ -157,7 +157,7 @@ export async function handleGhostBattlesAgainstMe(
     to_utc: now.toISOString(),
     battles: battles.map((battle) =>
       withReplayAvailability(
-        battle.payload_json,
+        battle.summary_json ?? battle.payload_json,
         battle.replay_available !== 0,
       ),
     ),

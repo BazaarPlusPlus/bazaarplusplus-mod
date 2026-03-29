@@ -4,6 +4,7 @@ import { trimString } from "../http/request";
 const textDecoder = new TextDecoder();
 
 export type JsonObject = Record<string, unknown>;
+export type BattleSummary = JsonObject;
 
 export type ParsedRunBattle = {
   raw: JsonObject;
@@ -97,6 +98,45 @@ function parseBattle(value: unknown): ParsedRunBattle | null {
     result: asString(raw.result),
     winnerCombatantId: asString(raw.winner_combatant_id),
     loserCombatantId: asString(raw.loser_combatant_id),
+  };
+}
+
+function cloneJsonValue(value: unknown): unknown {
+  if (value == null) {
+    return null;
+  }
+
+  return JSON.parse(JSON.stringify(value)) as unknown;
+}
+
+export function buildBattleSummary(battle: ParsedRunBattle): BattleSummary {
+  return {
+    battle_id: battle.battleId,
+    run_id: battle.runId,
+    recorded_at_utc: battle.recordedAtUtc,
+    day: battle.day,
+    hour: battle.hour,
+    encounter_id: battle.encounterId,
+    player_name: battle.playerName,
+    player_account_id: battle.playerAccountId,
+    player_hero: battle.playerHero,
+    player_rank: battle.playerRank,
+    player_rating: battle.playerRating,
+    player_level: battle.playerLevel,
+    opponent_name: battle.opponentName,
+    opponent_account_id: battle.opponentAccountId,
+    opponent_hero: battle.opponentHero,
+    opponent_rank: battle.opponentRank,
+    opponent_rating: battle.opponentRating,
+    opponent_level: battle.opponentLevel,
+    combat_kind: battle.combatKind,
+    result: battle.result,
+    winner_combatant_id: battle.winnerCombatantId,
+    loser_combatant_id: battle.loserCombatantId,
+    player_hand: cloneJsonValue(battle.raw.player_hand) ?? { items: [] },
+    player_skills: cloneJsonValue(battle.raw.player_skills) ?? { items: [] },
+    opponent_hand: cloneJsonValue(battle.raw.opponent_hand) ?? { items: [] },
+    opponent_skills: cloneJsonValue(battle.raw.opponent_skills) ?? { items: [] },
   };
 }
 

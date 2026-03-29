@@ -134,6 +134,7 @@ test("projects uploaded pvp battles and records bound player accounts", async ()
         player_skills: { items: [] },
         opponent_hand: { items: [] },
         opponent_skills: { items: [] },
+        debug_extra: "drop-me",
       },
     ],
   });
@@ -180,6 +181,15 @@ test("projects uploaded pvp battles and records bound player accounts", async ()
   assert.equal(projectedBattle?.player_account_id, "player-account-001");
   assert.equal(projectedBattle?.player_hero, "Dooley");
   assert.equal(projectedBattle?.player_level, 8);
+  assert.equal(projectedBattle?.replay_available, 0);
+  const projectedSummary = JSON.parse(projectedBattle?.summary_json ?? "{}") as Record<
+    string,
+    unknown
+  >;
+  assert.equal(projectedSummary.player_hero, "Dooley");
+  assert.deepEqual(projectedSummary.player_hand, { items: [] });
+  assert.deepEqual(projectedSummary.opponent_skills, { items: [] });
+  assert.equal("debug_extra" in projectedSummary, false);
   assert.equal(env.DB.runUploads.get("run-projection")?.projection_status, "projected");
   assert.equal(env.DB.runUploads.get("run-projection")?.projected_battle_count, 1);
   assert.equal(env.DB.runUploads.get("run-projection")?.projection_version, 1);

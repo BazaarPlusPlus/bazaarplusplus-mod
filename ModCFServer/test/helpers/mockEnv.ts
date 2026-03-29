@@ -101,7 +101,7 @@ export type PvpBattleRow = {
   result: string | null;
   winner_combatant_id: string | null;
   loser_combatant_id: string | null;
-  payload_json: string;
+  payload_json?: string;
   summary_json?: string;
   replay_available?: number;
   projection_version?: number;
@@ -220,8 +220,12 @@ export class MockD1Database {
             battle_id: row.battle_id,
             recorded_at_utc: row.recorded_at_utc,
             opponent_account_id: row.opponent_account_id,
-            payload_json: row.payload_json,
-            replay_available: this.replayUploads.has(row.battle_id) ? 1 : 0,
+            payload_json: row.payload_json ?? row.summary_json ?? "{}",
+            summary_json: row.summary_json ?? row.payload_json ?? "{}",
+            replay_available:
+              row.replay_available ??
+              (this.replayUploads.has(row.battle_id) ? 1 : 0),
+            projection_version: row.projection_version ?? 1,
           } as T)
         : null;
     }
@@ -271,8 +275,12 @@ export class MockD1Database {
                 battle_id: row.battle_id,
                 recorded_at_utc: row.recorded_at_utc,
                 opponent_account_id: row.opponent_account_id,
-                payload_json: row.payload_json,
-                replay_available: this.replayUploads.has(row.battle_id) ? 1 : 0,
+                payload_json: row.payload_json ?? row.summary_json ?? "{}",
+                summary_json: row.summary_json ?? row.payload_json ?? "{}",
+                replay_available:
+                  row.replay_available ??
+                  (this.replayUploads.has(row.battle_id) ? 1 : 0),
+                projection_version: row.projection_version ?? 1,
               }) as T,
           ),
       };
@@ -461,9 +469,12 @@ export class MockD1Database {
         result: params[20] == null ? null : String(params[20]),
         winner_combatant_id: params[21] == null ? null : String(params[21]),
         loser_combatant_id: params[22] == null ? null : String(params[22]),
-        payload_json: String(params[23]),
-        created_at_utc: existing?.created_at_utc ?? String(params[24]),
-        updated_at_utc: String(params[25]),
+        payload_json: existing?.payload_json,
+        summary_json: String(params[23]),
+        replay_available: params[24] == null ? 0 : Number(params[24]),
+        projection_version: params[25] == null ? 1 : Number(params[25]),
+        created_at_utc: existing?.created_at_utc ?? String(params[26]),
+        updated_at_utc: String(params[27]),
       });
       return { changes: 1 };
     }
