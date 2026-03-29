@@ -129,8 +129,6 @@ public class Plugin : BaseUnityPlugin
                 combatReplayRuntimeAccessor
             )
         );
-        BppLog.Info("Plugin", "Adding HistoryCollectionsEntryBridge");
-        gameObject.AddComponent<HistoryCollectionsEntryBridge>();
         BppLog.Info("Plugin", "Adding CombatStatusBar");
         gameObject.AddComponent<CombatStatusBar>();
         BppLog.Info("Plugin", "Adding MonsterPreviewController");

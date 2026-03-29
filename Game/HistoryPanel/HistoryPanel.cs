@@ -164,20 +164,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         RefreshUi();
     }
 
-    internal void OpenFromUiEntry()
-    {
-        EnsureInitialized("OpenFromUiEntry");
-
-        try
-        {
-            SetHistoryVisible(true);
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("HistoryPanel", "Collections entry failed to open history panel", ex);
-        }
-    }
-
     internal void ToggleFromHotkey()
     {
         EnsureInitialized("ToggleFromHotkey");

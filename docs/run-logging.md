@@ -17,7 +17,6 @@
 - `RunStateSyncController`
 - `RunLoggingController`
 - `HistoryPanel`
-- `HistoryCollectionsEntryBridge`
 
 `Patches/RunLogging/RunInitializedPatch.cs` 还会监听 `NetMessageRunInitialized`，在会话创建前拿到服务端 `run_id`。
 
