@@ -15,7 +15,7 @@ Implemented behavior:
 - show processed frame count during combat and a standby / last-combat summary outside combat
 - allow only discrete speed steps: `0.25x`, `0.33x`, `0.50x`, `1.00x`
 - allow pause toggling through `GameServiceManager.PauseOrUnpauseGame(...)`
-- persist enabled, visible, and default-speed config
+- persist enabled and default-speed config
 
 Explicitly out of scope:
 
@@ -60,13 +60,11 @@ That keeps the display tied to simulation progress instead of wall-clock playbac
 changes therefore do not distort the time label, and the counter remains stable across pause and
 final-blow slowdown.
 
-## Input And Config
+## Settings And Config
 
-- `KeyBindings.Toggle.CombatStatusBar` (`F6`) toggles the overlay visibility.
-- Native settings integration is provided through the combat-status-bar settings bridge and patch.
+- Native settings integration is provided through the combat-status-bar settings bridge.
 - Config is read from `BppConfig`:
   - `EnableCombatStatusBarConfig`
-  - `VisibleCombatStatusBarConfig`
   - `CombatStatusBarSpeedMultiplierConfig`
 
 Configured speed is normalized to the supported step list. `CombatSpeedPatch` only overrides

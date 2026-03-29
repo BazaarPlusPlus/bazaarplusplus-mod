@@ -9,7 +9,6 @@ player-facing features, debug-only features, and panel-internal tuning controls.
 
 | Hotkey | Function | Scope | Rebindable | Notes |
 | --- | --- | --- | --- | --- |
-| `F6` | Toggle `CombatStatusBar` | Global | No | Shows or hides the combat status HUD. |
 | `F8` | Toggle `HistoryPanel` | Global | No | Opens or closes the run-history panel. |
 | `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No | Closes the panel when it is open. |
 | `Ctrl` | Show enchant preview | Tooltip hover | Yes | Default binding for `HoldEnchantPreview`. |

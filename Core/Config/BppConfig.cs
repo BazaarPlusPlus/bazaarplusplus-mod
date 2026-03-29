@@ -13,8 +13,6 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
 
-    public ConfigEntry<bool>? VisibleCombatStatusBarConfig { get; private set; }
-
     public ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; private set; }
 
     public ConfigEntry<string>? EnchantPreviewHotkeyPathConfig { get; private set; }
@@ -58,12 +56,6 @@ internal sealed class BppConfig : IBppConfig
             "Enabled",
             false,
             "Whether to show the combat status bar with elapsed time and speed controls"
-        );
-        VisibleCombatStatusBarConfig = config.Bind(
-            "CombatStatusBar",
-            "Visible",
-            true,
-            "Whether the combat status bar is currently visible when enabled. Toggled in game with F6."
         );
         CombatStatusBarSpeedMultiplierConfig = config.Bind(
             "CombatStatusBar",

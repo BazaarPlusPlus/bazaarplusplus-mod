@@ -65,7 +65,6 @@ When `BppBuild.IsDebug` is true, `Plugin.Awake()` adds:
 
 Player-facing overlay entry points:
 
-- `F6`: toggle `CombatStatusBar`
 - `F8`: toggle `HistoryPanel`
 
 Debug-only entry points:

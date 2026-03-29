@@ -1,7 +1,5 @@
-using BazaarPlusPlus.Game.Input;
 using TheBazaar;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 
@@ -34,10 +32,6 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
     {
         EnsureConfigStateInitialized();
 
-        var keyboard = Keyboard.current;
-        if (keyboard != null && keyboard[KeyBindings.Toggle.CombatStatusBar].wasPressedThisFrame)
-            ToggleOverlayVisibility();
-
         _visualBlend = AdvanceVisualBlend(
             _visualBlend,
             IsCombatPlaybackActive,
@@ -51,7 +45,7 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
     private bool ShouldDraw()
     {
         EnsureConfigStateInitialized();
-        return ShouldRenderForState(IsOverlayVisible, IsEnabled());
+        return ShouldRenderForState(IsEnabled());
     }
 
     private static void OnCombatStarted()

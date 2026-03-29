@@ -13,17 +13,15 @@ internal sealed partial class CombatStatusBar
         if (_configStateInitialized)
             return;
 
-        var visibleConfig = BppRuntimeHost.Config.VisibleCombatStatusBarConfig;
         var speedConfig = BppRuntimeHost.Config.CombatStatusBarSpeedMultiplierConfig;
-        if (visibleConfig == null || speedConfig == null)
+        if (speedConfig == null)
             return;
 
-        IsOverlayVisible = visibleConfig.Value;
         CombatSpeedMultiplier = SetConfiguredDefaultSpeed(speedConfig.Value);
         _configStateInitialized = true;
         BppLog.Info(
             "CombatStatusBar",
-            $"Combat config initialized: enabled={IsEnabled()}, visible={IsOverlayVisible}, speed={CombatSpeedMultiplier:F2}x"
+            $"Combat config initialized: enabled={IsEnabled()}, speed={CombatSpeedMultiplier:F2}x"
         );
     }
 
@@ -42,13 +40,6 @@ internal sealed partial class CombatStatusBar
         var config = BppRuntimeHost.Config.EnableCombatStatusBarConfig;
         if (config != null)
             config.Value = enabled;
-    }
-
-    static partial void PersistOverlayVisibility(bool visible)
-    {
-        var config = BppRuntimeHost.Config.VisibleCombatStatusBarConfig;
-        if (config != null)
-            config.Value = visible;
     }
 
     static partial void PersistCombatSpeed(float speed)

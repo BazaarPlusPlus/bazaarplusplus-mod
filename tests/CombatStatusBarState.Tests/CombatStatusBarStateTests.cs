@@ -11,39 +11,12 @@ public sealed class CombatStatusBarStateTests : IDisposable
     public CombatStatusBarStateTests()
     {
         CombatStatusBar.ResetStateForTests();
-        CombatStatusBar.ClearPersistedOverlayVisibilityForTests();
     }
 
     public void Dispose()
     {
         CombatStatusBar.ResetStateForTests();
-        CombatStatusBar.ClearPersistedOverlayVisibilityForTests();
-    }
-
-    [Fact]
-    public void OverlayVisibility_DefaultsToVisible()
-    {
-        Assert.True(CombatStatusBar.IsOverlayVisible);
-    }
-
-    [Fact]
-    public void ToggleOverlayVisibility_FlipsVisibilityAndPersists()
-    {
-        var result = CombatStatusBar.ToggleOverlayVisibility();
-
-        Assert.False(result);
-        Assert.False(CombatStatusBar.IsOverlayVisible);
-        Assert.False(CombatStatusBar.GetPersistedOverlayVisibilityForTests());
-    }
-
-    [Fact]
-    public void SetOverlayVisibility_PersistsRequestedValue()
-    {
-        var result = CombatStatusBar.SetOverlayVisibility(false);
-
-        Assert.False(result);
-        Assert.False(CombatStatusBar.IsOverlayVisible);
-        Assert.False(CombatStatusBar.GetPersistedOverlayVisibilityForTests());
+        BazaarPlusPlus.Core.Runtime.BppRuntimeHost.TestContext.IsInGameRun = false;
     }
 
     [Fact]
@@ -175,6 +148,17 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
+    public void ShouldRenderForState_RequiresFeatureEnabledAndInGameRun()
+    {
+        BazaarPlusPlus.Core.Runtime.BppRuntimeHost.TestContext.IsInGameRun = false;
+        Assert.False(CombatStatusBar.ShouldRenderForState(enabled: true));
+
+        BazaarPlusPlus.Core.Runtime.BppRuntimeHost.TestContext.IsInGameRun = true;
+        Assert.True(CombatStatusBar.ShouldRenderForState(enabled: true));
+        Assert.False(CombatStatusBar.ShouldRenderForState(enabled: false));
+    }
+
+    [Fact]
     public void SettingsMenuBridge_ReadsInitialValueAndWritesBackChanges()
     {
         var enabled = false;
@@ -207,10 +191,10 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "战斗状态栏 | F6 切换")]
-    [InlineData("zh-CN", "战斗状态栏 | F6 切换")]
-    [InlineData("en", "Combat Status Bar | F6 Toggle")]
-    [InlineData("", "Combat Status Bar | F6 Toggle")]
+    [InlineData("zh-Hans", "\u6218\u6597\u72b6\u6001\u680f")]
+    [InlineData("zh-CN", "\u6218\u6597\u72b6\u6001\u680f")]
+    [InlineData("en", "Combat Status Bar")]
+    [InlineData("", "Combat Status Bar")]
     public void SettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
         string languageCode,
         string expected
@@ -242,8 +226,8 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "匿名模式")]
-    [InlineData("zh-CN", "匿名模式")]
+    [InlineData("zh-Hans", "\u533f\u540d\u6a21\u5f0f")]
+    [InlineData("zh-CN", "\u533f\u540d\u6a21\u5f0f")]
     [InlineData("en", "Anonymous Mode")]
     [InlineData("", "Anonymous Mode")]
     public void NameOverrideSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
@@ -257,8 +241,8 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "始终显示附魔预览")]
-    [InlineData("zh-CN", "始终显示附魔预览")]
+    [InlineData("zh-Hans", "\u59cb\u7ec8\u663e\u793a\u9644\u9b54\u9884\u89c8")]
+    [InlineData("zh-CN", "\u59cb\u7ec8\u663e\u793a\u9644\u9b54\u9884\u89c8")]
     [InlineData("en", "Always Show Enchant Preview")]
     [InlineData("", "Always Show Enchant Preview")]
     public void EnchantPreviewSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(

@@ -204,10 +204,6 @@ Assert(
     "IBppConfig should expose the CombatStatusBar enabled config."
 );
 Assert(
-    configInterfaceSource.Contains("VisibleCombatStatusBarConfig", StringComparison.Ordinal),
-    "IBppConfig should expose the CombatStatusBar visible config."
-);
-Assert(
     configInterfaceSource.Contains(
         "CombatStatusBarSpeedMultiplierConfig",
         StringComparison.Ordinal
@@ -228,10 +224,6 @@ var configSource = ReadSource("Core/Config/BppConfig.cs");
 Assert(
     configSource.Contains("EnableCombatStatusBarConfig", StringComparison.Ordinal),
     "BppConfig should bind the CombatStatusBar enabled config."
-);
-Assert(
-    configSource.Contains("VisibleCombatStatusBarConfig", StringComparison.Ordinal),
-    "BppConfig should bind the CombatStatusBar visible config."
 );
 Assert(
     configSource.Contains("CombatStatusBarSpeedMultiplierConfig", StringComparison.Ordinal),

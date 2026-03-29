@@ -21,17 +21,16 @@ internal static class KeyBindings
 
     internal static class Toggle
     {
-        public static Key DebugPanel => Key.F2;
-        public static Key CombatStatusBar => Key.F6;
-        public static Key HistoryPanel => Key.F8;
+        public const string DebugPanel = "<Keyboard>/f2";
+        public const string HistoryPanel = "<Keyboard>/f8";
     }
 
     internal static class DebugPanel
     {
-        public static Key SelectSummary => Key.Digit1;
-        public static Key SelectRun => Key.Digit2;
-        public static Key SelectEncounters => Key.Digit3;
-        public static Key SelectReplays => Key.Digit4;
-        public static Key ToggleViewMode => Key.Tab;
+        public const string SelectSummary = "<Keyboard>/digit1";
+        public const string SelectRun = "<Keyboard>/digit2";
+        public const string SelectEncounters = "<Keyboard>/digit3";
+        public const string SelectReplays = "<Keyboard>/digit4";
+        public const string ToggleViewMode = "<Keyboard>/tab";
     }
 }
