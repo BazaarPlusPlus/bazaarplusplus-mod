@@ -92,7 +92,7 @@ public static class CardTooltipControllerLockTogglePatch
     static bool Prefix(CardTooltipController __instance)
     {
         var currentCard = __instance?.CurrentCard;
-        if (MonsterPreviewFeature.IsEnabled)
+        if (MonsterPreviewFeature.UseCustomLivePreview)
         {
             var runtime = MonsterLockShowcaseRuntime.Instance;
             if (

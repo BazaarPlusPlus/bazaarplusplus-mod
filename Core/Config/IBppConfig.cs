@@ -7,6 +7,8 @@ internal interface IBppConfig
 {
     ConfigEntry<bool>? EnableMonsterPreviewConfig { get; }
 
+    ConfigEntry<bool>? UseNativeMonsterPreviewConfig { get; }
+
     ConfigEntry<bool>? EnableNameOverrideConfig { get; }
 
     ConfigEntry<bool>? EnchantPreviewAlwaysShowConfig { get; }

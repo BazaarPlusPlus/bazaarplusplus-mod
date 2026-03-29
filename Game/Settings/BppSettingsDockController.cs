@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
+using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.NameOverride;
 using TMPro;
 using UnityEngine;
@@ -56,6 +57,15 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             new CombatStatusBarSettingsMenuBridge(
                 CombatStatusBarFeature.GetEnabledSettingValue,
                 CombatStatusBarFeature.SetEnabledSettingValue
+            )
+        ),
+        new(
+            "NativeMonsterPreview",
+            MonsterPreviewSettingsMenuLabel.Resolve,
+            new SettingsMenuToggleBridge(
+                ReadUseNativeMonsterPreview,
+                WriteUseNativeMonsterPreview,
+                value => MonsterLockShowcaseRuntime.Instance?.HandlePreviewModeChanged(value)
             )
         ),
     ];
@@ -582,6 +592,18 @@ internal sealed class BppSettingsDockController : MonoBehaviour
     private static bool ReadNameOverrideEnabled()
     {
         return BppRuntimeHost.Config.EnableNameOverrideConfig?.Value ?? false;
+    }
+
+    private static bool ReadUseNativeMonsterPreview()
+    {
+        return BppRuntimeHost.Config.UseNativeMonsterPreviewConfig?.Value ?? false;
+    }
+
+    private static void WriteUseNativeMonsterPreview(bool enabled)
+    {
+        var config = BppRuntimeHost.Config.UseNativeMonsterPreviewConfig;
+        if (config != null)
+            config.Value = enabled;
     }
 
     private static void WriteNameOverrideEnabled(bool enabled)

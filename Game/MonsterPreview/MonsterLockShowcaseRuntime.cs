@@ -143,6 +143,14 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         );
     }
 
+    public void HandlePreviewModeChanged(bool useNativePreview)
+    {
+        if (!useNativePreview || !IsPreviewActive)
+            return;
+
+        HideOverlay("switched to native monster preview");
+    }
+
     private void HideOverlay(string reason)
     {
         _lockedCard = null;
