@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { handleBindClient } from "./features/bindClient";
 import {
   handleGhostBattleReplayDownloadLink,
   handleGhostBattlesAgainstMe,
@@ -20,6 +21,10 @@ export default {
 
     if (request.method === "POST" && url.pathname === "/clients/register") {
       return registerClient(request, env);
+    }
+
+    if (request.method === "POST" && url.pathname === "/clients/bind") {
+      return handleBindClient(request, env);
     }
 
     if (request.method === "POST" && url.pathname === "/runs/upload") {

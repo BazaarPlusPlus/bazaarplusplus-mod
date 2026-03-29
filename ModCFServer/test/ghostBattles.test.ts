@@ -48,6 +48,71 @@ function buildSignedRequest(
   });
 }
 
+function buildSignedJsonRequest(
+  url: string,
+  clientId: string,
+  installId: string,
+  privateKey: Parameters<typeof signCanonical>[0],
+  nonce: string,
+  payload: string,
+): Request {
+  const timestamp = new Date().toISOString();
+  const bodyHash = sha256Base64(payload);
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      new URL(url).pathname,
+      clientId,
+      installId,
+      timestamp,
+      nonce,
+      bodyHash,
+    ),
+  );
+
+  return new Request(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-bpp-client-id": clientId,
+      "x-bpp-install-id": installId,
+      "x-bpp-timestamp": timestamp,
+      "x-bpp-nonce": nonce,
+      "x-bpp-content-sha256": bodyHash,
+      "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+      "x-bpp-signature": signature,
+    },
+    body: payload,
+  });
+}
+
+async function bindClientToPlayerAccount(
+  env: ReturnType<typeof buildEnv>,
+  clientId: string,
+  installId: string,
+  privateKey: Parameters<typeof signCanonical>[0],
+  playerAccountId: string,
+  nonce: string,
+): Promise<void> {
+  const response = await worker.fetch(
+    buildSignedJsonRequest(
+      "https://example.com/clients/bind",
+      clientId,
+      installId,
+      privateKey,
+      nonce,
+      JSON.stringify({
+        player_account_id: playerAccountId,
+        observed_player_account_id: playerAccountId,
+      }),
+    ),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+}
+
 test("lists recent ghost battles against the bound player account", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
@@ -61,20 +126,14 @@ test("lists recent ghost battles against the bound player account", async () => 
     plugin_version: "1.9.0",
     registered_at_utc: new Date().toISOString(),
   });
-  env.DB.clientUidBindings.set("binding-ghost-query", {
-    binding_id: "binding-ghost-query",
-    client_id: clientId,
-    uid: "uid-ghost-query",
-    bound_at_utc: new Date().toISOString(),
-    unbound_at_utc: null,
-  });
-  env.DB.uidPlayerAccounts.set("uid-ghost-query:my-account", {
-    uid: "uid-ghost-query",
-    player_account_id: "my-account",
-    first_seen_at_utc: "2026-03-28T00:00:00.000Z",
-    last_seen_at_utc: "2026-03-29T12:00:00.000Z",
-    last_client_id: clientId,
-  });
+  await bindClientToPlayerAccount(
+    env,
+    clientId,
+    "install-ghost-query",
+    privateKey,
+    "my-account",
+    "nonce-bind-ghost-query",
+  );
   env.DB.pvpBattles.set("battle-ghost-001", {
     battle_id: "battle-ghost-001",
     run_id: "run-ghost-001",
@@ -193,7 +252,7 @@ test("lists recent ghost battles against the bound player account", async () => 
   assert.equal(body.battles[0]?.player_hero, "Dooley");
   assert.equal(body.battles[0]?.player_level, 11);
   assert.equal(body.battles[0]?.replay?.available, true);
-  assert.equal(env.DB.nonces.size, 0);
+  assert.equal(env.DB.nonces.size, 1);
 });
 
 test("allows ghost queries even when the nonce was already observed", async () => {
@@ -211,20 +270,14 @@ test("allows ghost queries even when the nonce was already observed", async () =
     plugin_version: "1.9.0",
     registered_at_utc: new Date().toISOString(),
   });
-  env.DB.clientUidBindings.set("binding-ghost-reused-nonce", {
-    binding_id: "binding-ghost-reused-nonce",
-    client_id: clientId,
-    uid: "uid-ghost-reused-nonce",
-    bound_at_utc: new Date().toISOString(),
-    unbound_at_utc: null,
-  });
-  env.DB.uidPlayerAccounts.set("uid-ghost-reused-nonce:my-account", {
-    uid: "uid-ghost-reused-nonce",
-    player_account_id: "my-account",
-    first_seen_at_utc: "2026-03-28T00:00:00.000Z",
-    last_seen_at_utc: "2026-03-29T12:00:00.000Z",
-    last_client_id: clientId,
-  });
+  await bindClientToPlayerAccount(
+    env,
+    clientId,
+    installId,
+    privateKey,
+    "my-account",
+    "nonce-bind-ghost-reused",
+  );
   env.DB.nonces.add(`runs:${clientId}:${nonce}`);
 
   const response = await worker.fetch(
@@ -250,7 +303,7 @@ test("allows ghost queries even when the nonce was already observed", async () =
   assert.equal(body.battles.length, 0);
   assert.ok(body.from_utc.length > 0);
   assert.ok(body.to_utc.length > 0);
-  assert.equal(env.DB.nonces.size, 1);
+  assert.equal(env.DB.nonces.size, 2);
 });
 
 test("creates a replay download link and serves the payload", async () => {
@@ -266,20 +319,14 @@ test("creates a replay download link and serves the payload", async () => {
     plugin_version: "1.9.0",
     registered_at_utc: new Date().toISOString(),
   });
-  env.DB.clientUidBindings.set("binding-ghost-download", {
-    binding_id: "binding-ghost-download",
-    client_id: clientId,
-    uid: "uid-ghost-download",
-    bound_at_utc: new Date().toISOString(),
-    unbound_at_utc: null,
-  });
-  env.DB.uidPlayerAccounts.set("uid-ghost-download:my-account", {
-    uid: "uid-ghost-download",
-    player_account_id: "my-account",
-    first_seen_at_utc: "2026-03-28T00:00:00.000Z",
-    last_seen_at_utc: "2026-03-29T12:00:00.000Z",
-    last_client_id: clientId,
-  });
+  await bindClientToPlayerAccount(
+    env,
+    clientId,
+    "install-ghost-download",
+    privateKey,
+    "my-account",
+    "nonce-bind-ghost-download",
+  );
   env.DB.pvpBattles.set("battle-ghost-download", {
     battle_id: "battle-ghost-download",
     run_id: "run-ghost-download",
@@ -341,7 +388,7 @@ test("creates a replay download link and serves the payload", async () => {
   };
   assert.ok(linkBody.download_url.includes("/replays/download?"));
   assert.equal(linkBody.replay_uploaded_at_utc, "2099-03-29T12:05:00.000Z");
-  assert.equal(env.DB.nonces.size, 0);
+  assert.equal(env.DB.nonces.size, 1);
 
   const downloadResponse = await worker.fetch(
     new Request(linkBody.download_url, { method: "GET" }),

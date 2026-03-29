@@ -13,6 +13,10 @@ export type ActiveBindingUidRow = {
   uid: string;
 };
 
+export type ActiveBindingPlayerAccountRow = {
+  player_account_id: string;
+};
+
 export type ObservedPlayerAccountRow = {
   player_account_id: string;
 };

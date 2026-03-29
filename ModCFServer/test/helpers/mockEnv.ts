@@ -37,6 +37,24 @@ export type ClientUidBindingRow = {
   unbound_at_utc: string | null;
 };
 
+export type ClientPlayerAccountBindingRow = {
+  binding_id: string;
+  client_id: string;
+  player_account_id: string;
+  binding_source: string;
+  confidence: number;
+  bound_at_utc: string;
+  unbound_at_utc: string | null;
+};
+
+export type ClientPlayerAccountObservationRow = {
+  client_id: string;
+  player_account_id: string;
+  first_seen_at_utc: string;
+  last_seen_at_utc: string;
+  evidence_count: number;
+};
+
 export type UidPlayerAccountRow = {
   uid: string;
   player_account_id: string;
@@ -104,6 +122,14 @@ export class MockD1Database {
   public readonly replayUploads = new Map<string, ReplayUploadRow>();
   public readonly runUploads = new Map<string, RunUploadRow>();
   public readonly clientUidBindings = new Map<string, ClientUidBindingRow>();
+  public readonly clientPlayerAccountBindings = new Map<
+    string,
+    ClientPlayerAccountBindingRow
+  >();
+  public readonly clientPlayerAccountObservations = new Map<
+    string,
+    ClientPlayerAccountObservationRow
+  >();
   public readonly uidPlayerAccounts = new Map<string, UidPlayerAccountRow>();
   public readonly pvpBattles = new Map<string, PvpBattleRow>();
   public readonly nonces = new Set<string>();
@@ -144,6 +170,17 @@ export class MockD1Database {
           binding.client_id === clientId && binding.unbound_at_utc == null,
       );
       return (row ? ({ uid: row.uid } as T) : null);
+    }
+
+    if (sql.includes("FROM client_player_account_bindings")) {
+      const clientId = String(params[0] ?? "");
+      const row = Array.from(this.clientPlayerAccountBindings.values()).find(
+        (binding) =>
+          binding.client_id === clientId && binding.unbound_at_utc == null,
+      );
+      return row
+        ? ({ player_account_id: row.player_account_id } as T)
+        : null;
     }
 
     if (sql.includes("FROM replay_uploads")) {
@@ -320,6 +357,49 @@ export class MockD1Database {
         first_seen_at_utc: existing?.first_seen_at_utc ?? String(params[2]),
         last_seen_at_utc: String(params[3]),
         last_client_id: String(params[4]),
+      });
+      return { changes: 1 };
+    }
+
+    if (sql.includes("UPDATE client_player_account_bindings")) {
+      const unboundAtUtc = String(params[0] ?? "");
+      const clientId = String(params[1] ?? "");
+      let changes = 0;
+      for (const [bindingId, row] of this.clientPlayerAccountBindings.entries()) {
+        if (row.client_id === clientId && row.unbound_at_utc == null) {
+          this.clientPlayerAccountBindings.set(bindingId, {
+            ...row,
+            unbound_at_utc: unboundAtUtc,
+          });
+          changes += 1;
+        }
+      }
+      return { changes };
+    }
+
+    if (sql.includes("INSERT INTO client_player_account_bindings")) {
+      const bindingId = String(params[0] ?? "");
+      this.clientPlayerAccountBindings.set(bindingId, {
+        binding_id: bindingId,
+        client_id: String(params[1] ?? ""),
+        player_account_id: String(params[2] ?? ""),
+        binding_source: String(params[3] ?? ""),
+        confidence: Number(params[4] ?? 0),
+        bound_at_utc: String(params[5] ?? ""),
+        unbound_at_utc: params[6] == null ? null : String(params[6]),
+      });
+      return { changes: 1 };
+    }
+
+    if (sql.includes("INSERT INTO client_player_account_observations")) {
+      const key = `${String(params[0] ?? "")}:${String(params[1] ?? "")}`;
+      const existing = this.clientPlayerAccountObservations.get(key);
+      this.clientPlayerAccountObservations.set(key, {
+        client_id: String(params[0] ?? ""),
+        player_account_id: String(params[1] ?? ""),
+        first_seen_at_utc: existing?.first_seen_at_utc ?? String(params[2] ?? ""),
+        last_seen_at_utc: String(params[3] ?? ""),
+        evidence_count: existing ? existing.evidence_count + 1 : 1,
       });
       return { changes: 1 };
     }

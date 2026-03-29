@@ -5,8 +5,7 @@ import {
   listProjectedBattlesAgainstAccountIds,
 } from "../persistence/battleProjections";
 import {
-  getActiveBindingUid,
-  listObservedPlayerAccountIds,
+  getActiveBoundPlayerAccountId,
 } from "../persistence/bindings";
 import { getReplayUploadByBattleId } from "../persistence/replayUploads";
 import { requireVerifiedClient } from "./verifiedClient";
@@ -119,8 +118,11 @@ export async function handleGhostBattlesAgainstMe(
     return verified;
   }
 
-  const boundUid = await getActiveBindingUid(env, verified.client.client_id);
-  if (!boundUid) {
+  const boundPlayerAccountId = await getActiveBoundPlayerAccountId(
+    env,
+    verified.client.client_id,
+  );
+  if (!boundPlayerAccountId) {
     return json({
       resolved_account_ids: [],
       from_utc: subtractDaysIso(new Date(), DEFAULT_LOOKBACK_DAYS),
@@ -142,8 +144,7 @@ export async function handleGhostBattlesAgainstMe(
   );
   const now = new Date();
   const fromUtc = subtractDaysIso(now, lookbackDays);
-  const resolvedAccountIds = (await listObservedPlayerAccountIds(env, boundUid))
-    .slice(0, MAX_ACCOUNT_IDS);
+  const resolvedAccountIds = [boundPlayerAccountId].slice(0, MAX_ACCOUNT_IDS);
   const battles = await listProjectedBattlesAgainstAccountIds(env, {
     opponentAccountIds: resolvedAccountIds,
     fromUtc,
@@ -173,8 +174,11 @@ export async function handleGhostBattleReplayDownloadLink(
     return verified;
   }
 
-  const boundUid = await getActiveBindingUid(env, verified.client.client_id);
-  if (!boundUid) {
+  const boundPlayerAccountId = await getActiveBoundPlayerAccountId(
+    env,
+    verified.client.client_id,
+  );
+  if (!boundPlayerAccountId) {
     return json({ error: "battle_forbidden" }, { status: 403 });
   }
 
@@ -183,8 +187,7 @@ export async function handleGhostBattleReplayDownloadLink(
     return json({ error: "battle_not_found" }, { status: 404 });
   }
 
-  const resolvedAccountIds = await listObservedPlayerAccountIds(env, boundUid);
-  if (!battle.opponent_account_id || !resolvedAccountIds.includes(battle.opponent_account_id)) {
+  if (battle.opponent_account_id !== boundPlayerAccountId) {
     return json({ error: "battle_forbidden" }, { status: 403 });
   }
 
