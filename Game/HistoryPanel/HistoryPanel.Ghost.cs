@@ -14,9 +14,8 @@ internal sealed partial class HistoryPanel
         if (repository == null || BppRuntimeHost.Config.EnableRunUploadConfig?.Value != true)
             return null;
 
-        var uploadEndpoint = BppRuntimeHost.Config.RunUploadEndpointConfig?.Value?.Trim();
-        var registrationEndpoint =
-            BppRuntimeHost.Config.RunUploadRegistrationEndpointConfig?.Value?.Trim();
+        var uploadEndpoint = RunUploadDefaults.UploadEndpoint;
+        var registrationEndpoint = RunUploadDefaults.RegistrationEndpoint;
         var identityPath = BppRuntimeHost.Paths.RunUploadInstallIdentityPath;
         var clientStatePath = BppRuntimeHost.Paths.RunUploadClientStatePath;
         var privateKeyPath = BppRuntimeHost.Paths.RunUploadPrivateKeyPath;

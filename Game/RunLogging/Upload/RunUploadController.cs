@@ -24,9 +24,8 @@ internal sealed class RunUploadController : MonoBehaviour
             if (BppRuntimeHost.Config.EnableRunUploadConfig?.Value != true)
                 return;
 
-            var uploadEndpoint = BppRuntimeHost.Config.RunUploadEndpointConfig?.Value?.Trim();
-            var registrationEndpoint =
-                BppRuntimeHost.Config.RunUploadRegistrationEndpointConfig?.Value?.Trim();
+            var uploadEndpoint = RunUploadDefaults.UploadEndpoint;
+            var registrationEndpoint = RunUploadDefaults.RegistrationEndpoint;
             var databasePath = BppRuntimeHost.Paths.RunLogDatabasePath;
             var identityPath = BppRuntimeHost.Paths.RunUploadInstallIdentityPath;
             var clientStatePath = BppRuntimeHost.Paths.RunUploadClientStatePath;
@@ -48,16 +47,16 @@ internal sealed class RunUploadController : MonoBehaviour
 
             var startupDelaySeconds = Math.Max(
                 5,
-                BppRuntimeHost.Config.RunUploadStartupDelaySecondsConfig?.Value ?? 20
+                RunUploadDefaults.StartupDelaySeconds
             );
             _intervalSeconds = Math.Max(
                 15,
-                BppRuntimeHost.Config.RunUploadIntervalSecondsConfig?.Value ?? 180
+                RunUploadDefaults.IntervalSeconds
             );
-            var batchSize = Math.Max(1, BppRuntimeHost.Config.RunUploadBatchSizeConfig?.Value ?? 3);
+            var batchSize = Math.Max(1, RunUploadDefaults.BatchSize);
             var requestTimeoutSeconds = Math.Max(
                 10,
-                BppRuntimeHost.Config.RunUploadRequestTimeoutSecondsConfig?.Value ?? 60
+                RunUploadDefaults.RequestTimeoutSeconds
             );
             var endpoint = TryBuildEndpointSet(registrationEndpoint, uploadEndpoint);
             if (endpoint == null)

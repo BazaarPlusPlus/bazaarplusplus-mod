@@ -5,7 +5,7 @@
 当前上传实现是一个可选的后台同步层，建立在本地 SQLite 之上。
 
 - 本地 SQLite 仍然是 source of truth。
-- 默认关闭。
+- 默认开启。
 - 仅当 `RunUpload.Enabled = true` 时启用。
 - 仅在玩家不处于 live run 时执行。
 - 当前代码只实现单路由注册与上传，没有文档化的多区域自动路由逻辑。
@@ -30,12 +30,7 @@
 
 ```ini
 [RunUpload]
-Enabled = false
-Endpoint = https://mod-api.bazaarplusplus.com/runs/upload
-RegistrationEndpoint = https://mod-api.bazaarplusplus.com/clients/register
-StartupDelaySeconds = 20
-IntervalSeconds = 180
-BatchSize = 3
+Enabled = true
 ```
 
 ## 当前实现文件

@@ -20,16 +20,4 @@ internal interface IBppConfig
     ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; }
 
     ConfigEntry<bool>? EnableRunUploadConfig { get; }
-
-    ConfigEntry<string>? RunUploadEndpointConfig { get; }
-
-    ConfigEntry<string>? RunUploadRegistrationEndpointConfig { get; }
-
-    ConfigEntry<int>? RunUploadStartupDelaySecondsConfig { get; }
-
-    ConfigEntry<int>? RunUploadIntervalSecondsConfig { get; }
-
-    ConfigEntry<int>? RunUploadBatchSizeConfig { get; }
-
-    ConfigEntry<int>? RunUploadRequestTimeoutSecondsConfig { get; }
 }

@@ -25,9 +25,8 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
             if (BppRuntimeHost.Config.EnableRunUploadConfig?.Value != true)
                 return;
 
-            var registrationEndpoint =
-                BppRuntimeHost.Config.RunUploadRegistrationEndpointConfig?.Value?.Trim();
-            var runUploadEndpoint = BppRuntimeHost.Config.RunUploadEndpointConfig?.Value?.Trim();
+            var registrationEndpoint = RunUploadDefaults.RegistrationEndpoint;
+            var runUploadEndpoint = RunUploadDefaults.UploadEndpoint;
             var uploadEndpoint = CombatReplayUploadService.TryDeriveReplayUploadEndpoint(
                 runUploadEndpoint
             );
@@ -80,16 +79,16 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
 
             var startupDelaySeconds = Math.Max(
                 5,
-                BppRuntimeHost.Config.RunUploadStartupDelaySecondsConfig?.Value ?? 20
+                RunUploadDefaults.StartupDelaySeconds
             );
             _intervalSeconds = Math.Max(
                 15,
-                BppRuntimeHost.Config.RunUploadIntervalSecondsConfig?.Value ?? 180
+                RunUploadDefaults.IntervalSeconds
             );
-            var batchSize = Math.Max(1, BppRuntimeHost.Config.RunUploadBatchSizeConfig?.Value ?? 3);
+            var batchSize = Math.Max(1, RunUploadDefaults.BatchSize);
             var requestTimeoutSeconds = Math.Max(
                 10,
-                BppRuntimeHost.Config.RunUploadRequestTimeoutSecondsConfig?.Value ?? 60
+                RunUploadDefaults.RequestTimeoutSeconds
             );
 
             var uploadStore = new CombatReplayUploadSqliteStore(databasePath, replayRootPath);
