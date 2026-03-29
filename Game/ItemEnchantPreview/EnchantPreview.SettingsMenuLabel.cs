@@ -10,7 +10,8 @@ internal static class EnchantPreviewSettingsMenuLabel
     private const string SimplifiedChineseLabel = "始终显示附魔预览";
     private const string GermanLabel = "Verzauberungsvorschau immer anzeigen";
     private const string PortugueseLabel = "Sempre mostrar previa de encantamento";
-    private const string KoreanLabel = "마법부여 미리보기 항상 표시";
+    private const string KoreanLabel =
+        "\ub9c8\ubc95\ubd80\uc5ec \ubbf8\ub9ac\ubcf4\uae30 \ud56d\uc0c1 \ud45c\uc2dc";
     private const string ItalianLabel = "Mostra sempre anteprima incantamento";
 
     internal static string Resolve(string languageCode)

@@ -1,5 +1,6 @@
 #pragma warning disable CS0436
 using System;
+using BazaarPlusPlus.Game.Settings;
 using HarmonyLib;
 
 namespace BazaarPlusPlus;
@@ -12,7 +13,7 @@ internal static class OptionsDialogLanguageRefreshPatch
     {
         try
         {
-            BppGameplaySettingsCoordinator.EnsureAll(__instance);
+            BppSettingsDockController.RefreshAll();
             BppKeybindSettingsAwakePatch.RefreshLanguage(__instance);
             NativeKeybindLabelAwakePatch.TryUpdateLabels(__instance);
         }

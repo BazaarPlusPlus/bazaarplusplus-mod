@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using BazaarPlusPlus.Game.Settings;
 
@@ -9,7 +10,7 @@ internal static class NameOverrideSettingsMenuLabel
     private const string SimplifiedChineseLabel = "匿名模式";
     private const string GermanLabel = "Anonymer Modus";
     private const string PortugueseLabel = "Modo anonimo";
-    private const string KoreanLabel = "익명 모드";
+    private const string KoreanLabel = "\uc775\uba85 \ubaa8\ub4dc";
     private const string ItalianLabel = "Modalita anonima";
 
     internal static string Resolve(string languageCode)
