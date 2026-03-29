@@ -289,7 +289,7 @@ internal sealed class GhostBattleApiClient
     }
 }
 
-internal readonly struct GhostBattleApiResult
+internal readonly struct GhostBattleApiResult : IBppAuthenticatedApiResult
 {
     private GhostBattleApiResult(
         bool succeeded,
@@ -326,7 +326,7 @@ internal readonly struct GhostBattleApiResult
     ) => new(false, null, error, shouldFallback, shouldReRegister);
 }
 
-internal readonly struct GhostBattleReplayDownloadLinkResult
+internal readonly struct GhostBattleReplayDownloadLinkResult : IBppAuthenticatedApiResult
 {
     private GhostBattleReplayDownloadLinkResult(
         bool succeeded,

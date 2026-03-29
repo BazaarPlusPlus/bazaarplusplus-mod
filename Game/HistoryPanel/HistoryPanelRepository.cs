@@ -398,12 +398,31 @@ internal sealed class HistoryPanelRepository
         using var connection = OpenConnection(ensureSchema: true);
         using var transaction = connection.BeginTransaction();
 
-        using (var deleteCommand = connection.CreateCommand())
+        using (var pruneCommand = connection.CreateCommand())
         {
-            deleteCommand.Transaction = transaction;
-            deleteCommand.CommandTimeout = 2;
-            deleteCommand.CommandText = $"DELETE FROM {RunLogSqliteSchema.GhostBattlesTableName};";
-            deleteCommand.ExecuteNonQuery();
+            pruneCommand.Transaction = transaction;
+            pruneCommand.CommandTimeout = 2;
+            if (battles.Count == 0)
+            {
+                pruneCommand.CommandText =
+                    $"DELETE FROM {RunLogSqliteSchema.GhostBattlesTableName};";
+            }
+            else
+            {
+                var placeholders = string.Join(
+                    ", ",
+                    Enumerable.Range(0, battles.Count).Select(index => $"$battleId{index}")
+                );
+                pruneCommand.CommandText =
+                    $"""
+                    DELETE FROM {RunLogSqliteSchema.GhostBattlesTableName}
+                    WHERE battle_id NOT IN ({placeholders});
+                    """;
+                for (var i = 0; i < battles.Count; i++)
+                    pruneCommand.Parameters.AddWithValue($"$battleId{i}", battles[i].BattleId);
+            }
+
+            pruneCommand.ExecuteNonQuery();
         }
 
         foreach (var battle in battles)
@@ -470,7 +489,38 @@ internal sealed class HistoryPanelRepository
                     $replayAvailable,
                     $replayDownloaded,
                     $lastSyncedAtUtc
-                );
+                )
+                ON CONFLICT(battle_id) DO UPDATE SET
+                    recorded_at_utc = excluded.recorded_at_utc,
+                    day = excluded.day,
+                    hour = excluded.hour,
+                    encounter_id = excluded.encounter_id,
+                    player_name = excluded.player_name,
+                    player_account_id = excluded.player_account_id,
+                    player_hero = excluded.player_hero,
+                    player_rank = excluded.player_rank,
+                    player_rating = excluded.player_rating,
+                    player_level = excluded.player_level,
+                    opponent_name = excluded.opponent_name,
+                    opponent_hero = excluded.opponent_hero,
+                    opponent_rank = excluded.opponent_rank,
+                    opponent_rating = excluded.opponent_rating,
+                    opponent_level = excluded.opponent_level,
+                    opponent_account_id = excluded.opponent_account_id,
+                    combat_kind = excluded.combat_kind,
+                    result = excluded.result,
+                    winner_combatant_id = excluded.winner_combatant_id,
+                    loser_combatant_id = excluded.loser_combatant_id,
+                    player_hand_json = excluded.player_hand_json,
+                    player_skills_json = excluded.player_skills_json,
+                    opponent_hand_json = excluded.opponent_hand_json,
+                    opponent_skills_json = excluded.opponent_skills_json,
+                    replay_available = excluded.replay_available,
+                    replay_downloaded = MAX(
+                        {RunLogSqliteSchema.GhostBattlesTableName}.replay_downloaded,
+                        excluded.replay_downloaded
+                    ),
+                    last_synced_at_utc = excluded.last_synced_at_utc;
                 """;
             insertCommand.Parameters.AddWithValue("$battleId", battle.BattleId);
             insertCommand.Parameters.AddWithValue(

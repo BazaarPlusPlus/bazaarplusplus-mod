@@ -40,27 +40,25 @@ internal sealed class GhostBattleSyncService : IDisposable
     )
     {
         var installId = _identityStore.GetOrCreateInstallId();
-        var clientId = await EnsureClientRegistrationAsync(installId, cancellationToken);
-        if (string.IsNullOrWhiteSpace(clientId))
-        {
-            return GhostBattleSyncResult.Failure("registration_failed");
-        }
-
         var apiClient = new GhostBattleApiClient(
             _httpClient,
             new RunUploadRequestSigner(_keyStore),
             _endpoint.UploadEndpoint
         );
-        var queryResult = await apiClient.QueryAgainstMeAsync(
-            clientId,
+        var routeClient = CreateAuthenticatedRouteClient();
+        var requestResult = await routeClient.SendAsync(
             installId,
+            (clientId, token) => apiClient.QueryAgainstMeAsync(clientId, installId, token),
             cancellationToken
         );
+        if (!requestResult.RegistrationAvailable)
+        {
+            return GhostBattleSyncResult.Failure("registration_failed");
+        }
+
+        var queryResult = requestResult.Response;
         if (!queryResult.Succeeded)
         {
-            if (queryResult.ShouldReRegister)
-                _clientStateStore.ClearScopedClientId(RunUploadScopes.Runs);
-
             return GhostBattleSyncResult.Failure(queryResult.Error ?? "ghost_sync_failed");
         }
 
@@ -80,28 +78,26 @@ internal sealed class GhostBattleSyncService : IDisposable
             return GhostBattleReplayDownloadResult.Failure("replay_directory_required");
 
         var installId = _identityStore.GetOrCreateInstallId();
-        var clientId = await EnsureClientRegistrationAsync(installId, cancellationToken);
-        if (string.IsNullOrWhiteSpace(clientId))
-        {
-            return GhostBattleReplayDownloadResult.Failure("registration_failed");
-        }
-
         var apiClient = new GhostBattleApiClient(
             _httpClient,
             new RunUploadRequestSigner(_keyStore),
             _endpoint.UploadEndpoint
         );
-        var linkResult = await apiClient.RequestReplayDownloadLinkAsync(
-            battleId,
-            clientId,
+        var routeClient = CreateAuthenticatedRouteClient();
+        var requestResult = await routeClient.SendAsync(
             installId,
+            (clientId, token) =>
+                apiClient.RequestReplayDownloadLinkAsync(battleId, clientId, installId, token),
             cancellationToken
         );
+        if (!requestResult.RegistrationAvailable)
+        {
+            return GhostBattleReplayDownloadResult.Failure("registration_failed");
+        }
+
+        var linkResult = requestResult.Response;
         if (!linkResult.Succeeded)
         {
-            if (linkResult.ShouldReRegister)
-                _clientStateStore.ClearScopedClientId(RunUploadScopes.Runs);
-
             return GhostBattleReplayDownloadResult.Failure(
                 linkResult.Error ?? "ghost_replay_link_failed"
             );
@@ -129,10 +125,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         _httpClient.Dispose();
     }
 
-    private Task<string?> EnsureClientRegistrationAsync(
-        string installId,
-        CancellationToken cancellationToken
-    )
+    private BppAuthenticatedRouteClient CreateAuthenticatedRouteClient()
     {
         var registrationClient = new RunUploadRegistrationClient(
             _httpClient,
@@ -142,7 +135,11 @@ internal sealed class GhostBattleSyncService : IDisposable
             "runs",
             _endpoint.RegistrationEndpoint
         );
-        return registrationClient.EnsureClientRegistrationAsync(installId, cancellationToken);
+        return new BppAuthenticatedRouteClient(
+            registrationClient,
+            _clientStateStore,
+            RunUploadScopes.Runs
+        );
     }
 }
 

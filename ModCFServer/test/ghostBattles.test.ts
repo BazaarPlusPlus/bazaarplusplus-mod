@@ -193,6 +193,64 @@ test("lists recent ghost battles against the bound player account", async () => 
   assert.equal(body.battles[0]?.player_hero, "Dooley");
   assert.equal(body.battles[0]?.player_level, 11);
   assert.equal(body.battles[0]?.replay?.available, true);
+  assert.equal(env.DB.nonces.size, 0);
+});
+
+test("allows ghost queries even when the nonce was already observed", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "runs-client-ghost-reused-nonce";
+  const installId = "install-ghost-reused-nonce";
+  const nonce = "nonce-ghost-reused";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: installId,
+    purpose: "runs",
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+  });
+  env.DB.clientUidBindings.set("binding-ghost-reused-nonce", {
+    binding_id: "binding-ghost-reused-nonce",
+    client_id: clientId,
+    uid: "uid-ghost-reused-nonce",
+    bound_at_utc: new Date().toISOString(),
+    unbound_at_utc: null,
+  });
+  env.DB.uidPlayerAccounts.set("uid-ghost-reused-nonce:my-account", {
+    uid: "uid-ghost-reused-nonce",
+    player_account_id: "my-account",
+    first_seen_at_utc: "2026-03-28T00:00:00.000Z",
+    last_seen_at_utc: "2026-03-29T12:00:00.000Z",
+    last_client_id: clientId,
+  });
+  env.DB.nonces.add(`runs:${clientId}:${nonce}`);
+
+  const response = await worker.fetch(
+    buildSignedRequest(
+      "GET",
+      "https://example.com/me/pvp-battles/against-me?days=3&limit=10",
+      clientId,
+      installId,
+      privateKey,
+      nonce,
+    ),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  const body = (await response.json()) as {
+    resolved_account_ids: string[];
+    from_utc: string;
+    to_utc: string;
+    battles: unknown[];
+  };
+  assert.deepEqual(body.resolved_account_ids, ["my-account"]);
+  assert.equal(body.battles.length, 0);
+  assert.ok(body.from_utc.length > 0);
+  assert.ok(body.to_utc.length > 0);
+  assert.equal(env.DB.nonces.size, 1);
 });
 
 test("creates a replay download link and serves the payload", async () => {
@@ -277,8 +335,13 @@ test("creates a replay download link and serves the payload", async () => {
   );
 
   assert.equal(linkResponse.status, 200);
-  const linkBody = (await linkResponse.json()) as { download_url: string };
+  const linkBody = (await linkResponse.json()) as {
+    download_url: string;
+    replay_uploaded_at_utc: string;
+  };
   assert.ok(linkBody.download_url.includes("/replays/download?"));
+  assert.equal(linkBody.replay_uploaded_at_utc, "2099-03-29T12:05:00.000Z");
+  assert.equal(env.DB.nonces.size, 0);
 
   const downloadResponse = await worker.fetch(
     new Request(linkBody.download_url, { method: "GET" }),

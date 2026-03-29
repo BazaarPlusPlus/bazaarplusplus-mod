@@ -101,7 +101,7 @@ internal sealed class CombatReplayUploadApiClient
     }
 }
 
-internal readonly struct CombatReplayUploadApiResult
+internal readonly struct CombatReplayUploadApiResult : IBppAuthenticatedApiResult
 {
     private CombatReplayUploadApiResult(
         bool succeeded,

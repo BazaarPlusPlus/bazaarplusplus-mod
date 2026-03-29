@@ -59,22 +59,94 @@ internal sealed class CombatReplayUploadService : IDisposable
 
         var installId = _identityStore.GetOrCreateInstallId();
         var uploadedCount = 0;
-        string? clientId = null;
-
         var apiClient = new CombatReplayUploadApiClient(
             _httpClient,
             new CombatReplayUploadRequestSigner(_keyStore),
             _uploadEndpoint
         );
+        var routeClient = CreateAuthenticatedRouteClient();
 
         foreach (var battleId in pendingBattleIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var recoveredRegistration = false;
-            while (true)
+            var attemptedAtUtc = DateTimeOffset.UtcNow;
+            var preflightSnapshot = _store.TryBuildSnapshot(battleId, installId, clientId: null);
+            if (preflightSnapshot == null)
             {
-                var attemptedAtUtc = DateTimeOffset.UtcNow;
-                var snapshot = _store.TryBuildSnapshot(battleId, installId, clientId);
+                _store.MarkReplayUploadTerminalFailure(
+                    battleId,
+                    attemptedAtUtc,
+                    "replay_snapshot_not_found"
+                );
+                continue;
+            }
+
+            CombatReplayUploadSnapshot? snapshot = null;
+            try
+            {
+                var requestResult = await routeClient.SendAsync(
+                    installId,
+                    async (clientId, token) =>
+                    {
+                        snapshot = _store.TryBuildSnapshot(battleId, installId, clientId);
+                        if (snapshot == null)
+                        {
+                            return CombatReplayUploadApiResult.Failure(
+                                "replay_snapshot_not_found",
+                                shouldFallback: false,
+                                shouldReRegister: false
+                            );
+                        }
+
+                        return await apiClient.UploadReplayAsync(
+                            snapshot.Json,
+                            clientId,
+                            installId,
+                            battleId,
+                            snapshot.Payload.RunId,
+                            token
+                        );
+                    },
+                    cancellationToken
+                );
+
+                if (!requestResult.RegistrationAvailable)
+                {
+                    _store.MarkReplayUploadFailed(
+                        battleId,
+                        attemptedAtUtc,
+                        "registration_unavailable"
+                    );
+                    continue;
+                }
+
+                var uploadResult = requestResult.Response;
+                if (!uploadResult.Succeeded)
+                {
+                    if (
+                        string.Equals(
+                            uploadResult.Error,
+                            "replay_snapshot_not_found",
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        _store.MarkReplayUploadTerminalFailure(
+                            battleId,
+                            attemptedAtUtc,
+                            "replay_snapshot_not_found"
+                        );
+                        continue;
+                    }
+
+                    _store.MarkReplayUploadFailed(
+                        battleId,
+                        attemptedAtUtc,
+                        uploadResult.Error ?? "upload_failed"
+                    );
+                    continue;
+                }
+
                 if (snapshot == null)
                 {
                     _store.MarkReplayUploadTerminalFailure(
@@ -82,101 +154,28 @@ internal sealed class CombatReplayUploadService : IDisposable
                         attemptedAtUtc,
                         "replay_snapshot_not_found"
                     );
-                    break;
+                    continue;
                 }
 
-                try
-                {
-                    if (string.IsNullOrWhiteSpace(clientId))
-                    {
-                        clientId = await EnsureClientRegistrationAsync(
-                            installId,
-                            cancellationToken
-                        );
-                        if (string.IsNullOrWhiteSpace(clientId))
-                        {
-                            _store.MarkReplayUploadFailed(
-                                battleId,
-                                attemptedAtUtc,
-                                "registration_unavailable"
-                            );
-                            break;
-                        }
-
-                        snapshot = _store.TryBuildSnapshot(battleId, installId, clientId);
-                        if (snapshot == null)
-                        {
-                            _store.MarkReplayUploadTerminalFailure(
-                                battleId,
-                                attemptedAtUtc,
-                                "replay_snapshot_not_found"
-                            );
-                            break;
-                        }
-                    }
-
-                    var resolvedClientId = clientId!;
-                    var uploadResult = await apiClient.UploadReplayAsync(
-                        snapshot.Json,
-                        resolvedClientId,
-                        installId,
-                        battleId,
-                        snapshot.Payload.RunId,
-                        cancellationToken
-                    );
-                    if (!uploadResult.Succeeded)
-                    {
-                        if (uploadResult.ShouldReRegister && !recoveredRegistration)
-                        {
-                            recoveredRegistration = true;
-                            _clientStateStore.ClearScopedClientId(RunUploadScopes.Replays);
-                            clientId = await EnsureClientRegistrationAsync(
-                                installId,
-                                cancellationToken
-                            );
-                            if (string.IsNullOrWhiteSpace(clientId))
-                            {
-                                _store.MarkReplayUploadFailed(
-                                    battleId,
-                                    attemptedAtUtc,
-                                    "registration_unavailable"
-                                );
-                                break;
-                            }
-
-                            continue;
-                        }
-
-                        _store.MarkReplayUploadFailed(
-                            battleId,
-                            attemptedAtUtc,
-                            uploadResult.Error ?? "upload_failed"
-                        );
-                        break;
-                    }
-
-                    _store.MarkReplayUploaded(
-                        battleId,
-                        snapshot.PayloadSha256,
-                        uploadResult.ObjectKey,
-                        DateTimeOffset.UtcNow
-                    );
-                    uploadedCount++;
-                    break;
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _store.MarkReplayUploadFailed(
-                        battleId,
-                        attemptedAtUtc,
-                        RunUploadErrorFormatter.Truncate(ex.Message)
-                    );
-                    break;
-                }
+                _store.MarkReplayUploaded(
+                    battleId,
+                    snapshot.PayloadSha256,
+                    uploadResult.ObjectKey,
+                    DateTimeOffset.UtcNow
+                );
+                uploadedCount++;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _store.MarkReplayUploadFailed(
+                    battleId,
+                    attemptedAtUtc,
+                    RunUploadErrorFormatter.Truncate(ex.Message)
+                );
             }
         }
 
@@ -188,10 +187,7 @@ internal sealed class CombatReplayUploadService : IDisposable
         _httpClient.Dispose();
     }
 
-    private Task<string?> EnsureClientRegistrationAsync(
-        string installId,
-        CancellationToken cancellationToken
-    )
+    private BppAuthenticatedRouteClient CreateAuthenticatedRouteClient()
     {
         var registrationClient = new RunUploadRegistrationClient(
             _httpClient,
@@ -201,7 +197,11 @@ internal sealed class CombatReplayUploadService : IDisposable
             "replays",
             _registrationEndpoint
         );
-        return registrationClient.EnsureClientRegistrationAsync(installId, cancellationToken);
+        return new BppAuthenticatedRouteClient(
+            registrationClient,
+            _clientStateStore,
+            RunUploadScopes.Replays
+        );
     }
 
     internal static string? TryDeriveReplayUploadEndpoint(string? runUploadEndpoint)

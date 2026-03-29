@@ -48,103 +48,94 @@ internal sealed class RunUploadService : IDisposable
 
         var installId = _identityStore.GetOrCreateInstallId();
         var uploadedCount = 0;
-        var clientId = await EnsureClientRegistrationAsync(installId, cancellationToken);
-        if (string.IsNullOrWhiteSpace(clientId))
-            return new RunUploadCycleResult(uploadedCount: 0, hasMorePending: true);
-
         var apiClient = CreateApiClient();
+        var routeClient = CreateAuthenticatedRouteClient();
         foreach (var runId in pendingRunIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var recoveredRegistration = false;
-            while (true)
+            var attemptedAtUtc = DateTimeOffset.UtcNow;
+            RunUploadSnapshot? snapshot = null;
+            try
             {
-                var attemptedAtUtc = DateTimeOffset.UtcNow;
-                var snapshot = _store.TryBuildSnapshot(runId, installId, clientId);
-                if (snapshot == null)
-                {
-                    _store.MarkRunUploadFailed(runId, attemptedAtUtc, "run_snapshot_not_found");
-                    break;
-                }
-
-                try
-                {
-                    var json = JsonConvert.SerializeObject(
-                        snapshot.Payload,
-                        RunUploadSerialization.SerializerSettings
-                    );
-                    var uploadResult = await apiClient.UploadRunAsync(
-                        json,
-                        clientId!,
-                        installId,
-                        runId,
-                        cancellationToken
-                    );
-                    if (!uploadResult.Succeeded)
+                var requestResult = await routeClient.SendAsync(
+                    installId,
+                    async (clientId, token) =>
                     {
-                        if (uploadResult.ShouldReRegister && !recoveredRegistration)
+                        snapshot = _store.TryBuildSnapshot(runId, installId, clientId);
+                        if (snapshot == null)
                         {
-                            recoveredRegistration = true;
-                            BppLog.Warn(
-                                "RunUploadService",
-                                $"Upload rejected for run {runId}; clearing cached client registration and retrying once."
+                            return RunUploadApiResult.Failure(
+                                "run_snapshot_not_found",
+                                shouldFallback: false,
+                                shouldReRegister: false
                             );
-                            _clientStateStore.ClearScopedClientId(RunUploadScopes.Runs);
-                            clientId = await EnsureClientRegistrationAsync(
-                                installId,
-                                cancellationToken
-                            );
-                            if (string.IsNullOrWhiteSpace(clientId))
-                            {
-                                _store.MarkRunUploadFailed(
-                                    runId,
-                                    attemptedAtUtc,
-                                    "registration_unavailable"
-                                );
-                                break;
-                            }
-
-                            continue;
                         }
 
-                        _store.MarkRunUploadFailed(
+                        var json = JsonConvert.SerializeObject(
+                            snapshot.Payload,
+                            RunUploadSerialization.SerializerSettings
+                        );
+                        return await apiClient.UploadRunAsync(
+                            json,
+                            clientId,
+                            installId,
                             runId,
-                            attemptedAtUtc,
-                            uploadResult.Error ?? "upload_failed"
+                            token
                         );
-                        BppLog.Warn(
-                            "RunUploadService",
-                            $"Upload failed for run {runId}: {uploadResult.Error ?? "unknown_error"}."
-                        );
-                        break;
-                    }
+                    },
+                    cancellationToken
+                );
 
-                    _store.MarkRunUploaded(
-                        runId,
-                        snapshot.LastSeq,
-                        snapshot.UploadedStatus,
-                        DateTimeOffset.UtcNow
-                    );
-                    uploadedCount++;
-                    break;
-                }
-                catch (OperationCanceledException)
+                if (!requestResult.RegistrationAvailable)
                 {
-                    throw;
+                    _store.MarkRunUploadFailed(runId, attemptedAtUtc, "registration_unavailable");
+                    continue;
                 }
-                catch (Exception ex)
+
+                var uploadResult = requestResult.Response;
+                if (!uploadResult.Succeeded)
                 {
                     _store.MarkRunUploadFailed(
                         runId,
                         attemptedAtUtc,
-                        RunUploadErrorFormatter.Truncate(ex.Message)
+                        uploadResult.Error ?? "upload_failed"
                     );
                     BppLog.Warn(
                         "RunUploadService",
-                        $"Upload failed for run {runId}: {ex.GetType().Name} - {ex.Message}"
+                        $"Upload failed for run {runId}: {uploadResult.Error ?? "unknown_error"}."
                     );
-                    break;
+                    continue;
                 }
+
+                if (snapshot == null)
+                {
+                    _store.MarkRunUploadFailed(runId, attemptedAtUtc, "run_snapshot_not_found");
+                    continue;
+                }
+
+                _store.MarkRunUploaded(
+                    runId,
+                    snapshot.LastSeq,
+                    snapshot.UploadedStatus,
+                    DateTimeOffset.UtcNow
+                );
+                uploadedCount++;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _store.MarkRunUploadFailed(
+                    runId,
+                    attemptedAtUtc,
+                    RunUploadErrorFormatter.Truncate(ex.Message)
+                );
+                BppLog.Warn(
+                    "RunUploadService",
+                    $"Upload failed for run {runId}: {ex.GetType().Name} - {ex.Message}"
+                );
             }
         }
 
@@ -166,10 +157,7 @@ internal sealed class RunUploadService : IDisposable
         );
     }
 
-    private Task<string?> EnsureClientRegistrationAsync(
-        string installId,
-        CancellationToken cancellationToken
-    )
+    private BppAuthenticatedRouteClient CreateAuthenticatedRouteClient()
     {
         var registrationClient = new RunUploadRegistrationClient(
             _httpClient,
@@ -179,6 +167,10 @@ internal sealed class RunUploadService : IDisposable
             "runs",
             _endpoint.RegistrationEndpoint
         );
-        return registrationClient.EnsureClientRegistrationAsync(installId, cancellationToken);
+        return new BppAuthenticatedRouteClient(
+            registrationClient,
+            _clientStateStore,
+            RunUploadScopes.Runs
+        );
     }
 }

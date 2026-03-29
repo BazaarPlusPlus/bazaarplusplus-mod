@@ -15,6 +15,7 @@ const DEFAULT_LOOKBACK_DAYS = 3;
 const MAX_LOOKBACK_DAYS = 14;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+const MAX_ACCOUNT_IDS = 50;
 const DOWNLOAD_TTL_SECONDS = 5 * 60;
 
 type AgainstMeBattlePayload = {
@@ -77,12 +78,23 @@ async function isValidDownloadSignature(
   expiresAtUnixSeconds: number,
   signature: string,
 ): Promise<boolean> {
-  const expectedSignature = await createDownloadSignature(
+  const expected = await createDownloadSignature(
     secret,
     battleId,
     expiresAtUnixSeconds,
   );
-  return expectedSignature === signature;
+  if (expected.length !== signature.length) {
+    return false;
+  }
+
+  const a = new TextEncoder().encode(expected);
+  const b = new TextEncoder().encode(signature);
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a[i]! ^ b[i]!;
+  }
+
+  return diff === 0;
 }
 
 function withReplayAvailability(
@@ -130,7 +142,8 @@ export async function handleGhostBattlesAgainstMe(
   );
   const now = new Date();
   const fromUtc = subtractDaysIso(now, lookbackDays);
-  const resolvedAccountIds = await listObservedPlayerAccountIds(env, boundUid);
+  const resolvedAccountIds = (await listObservedPlayerAccountIds(env, boundUid))
+    .slice(0, MAX_ACCOUNT_IDS);
   const battles = await listProjectedBattlesAgainstAccountIds(env, {
     opponentAccountIds: resolvedAccountIds,
     fromUtc,

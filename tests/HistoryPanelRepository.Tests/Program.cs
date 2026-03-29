@@ -133,6 +133,59 @@ try
         "ListBattleIdsByRun should return all linked battles ordered from newest to oldest."
     );
 
+    var ghostImportType = RequireType("BazaarPlusPlus.Game.HistoryPanel.GhostBattleImportRecord");
+    var replaceGhostBattles = repositoryType.GetMethod("ReplaceGhostBattles")!;
+    var markGhostReplayDownloaded = repositoryType.GetMethod("MarkGhostReplayDownloaded")!;
+    var listRecentGhostBattles = repositoryType.GetMethod("ListRecentGhostBattles")!;
+
+    replaceGhostBattles.Invoke(
+        repository,
+        [CreateGhostImports(ghostImportType, "ghost-1", "2026-03-16T10:00:00.0000000+00:00")]
+    );
+    markGhostReplayDownloaded.Invoke(repository, ["ghost-1"]);
+
+    replaceGhostBattles.Invoke(
+        repository,
+        [
+            CreateGhostImports(
+                ghostImportType,
+                "ghost-1",
+                "2026-03-16T10:05:00.0000000+00:00",
+                "ghost-2",
+                "2026-03-16T10:10:00.0000000+00:00"
+            ),
+        ]
+    );
+
+    var ghostRecords = ((System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!)
+        .Cast<object>()
+        .ToList();
+    Assert(
+        ghostRecords.Count == 2,
+        "ReplaceGhostBattles should upsert current ghost rows without requiring a full table reset."
+    );
+    var downloadedGhost = ghostRecords.Single(
+        record => (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
+    );
+    Assert(
+        (bool)downloadedGhost.GetType().GetProperty("ReplayDownloaded")!.GetValue(downloadedGhost)!,
+        "ReplaceGhostBattles should preserve replay_downloaded for ghost battles already fetched locally."
+    );
+
+    replaceGhostBattles.Invoke(
+        repository,
+        [CreateGhostImports(ghostImportType, "ghost-2", "2026-03-16T10:10:00.0000000+00:00")]
+    );
+    ghostRecords = ((System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!)
+        .Cast<object>()
+        .ToList();
+    Assert(
+        ghostRecords.Count == 1
+            && (string)ghostRecords[0].GetType().GetProperty("BattleId")!.GetValue(ghostRecords[0])!
+                == "ghost-2",
+        "ReplaceGhostBattles should prune ghost rows that are no longer returned by the server."
+    );
+
     repositoryType.GetMethod("DeleteRun")!.Invoke(repository, ["run-1"]);
 
     using var verificationConnection = new SqliteConnection($"Data Source={dbPath}");
@@ -317,6 +370,33 @@ static void InsertBattle(
     command.Parameters.AddWithValue("$opponentHandJson", opponentHandJson);
     command.Parameters.AddWithValue("$opponentSkillsJson", opponentSkillsJson);
     command.ExecuteNonQuery();
+}
+
+static object CreateGhostImports(Type ghostImportType, params string[] battlePairs)
+{
+    var listType = typeof(List<>).MakeGenericType(ghostImportType);
+    var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
+    for (var i = 0; i < battlePairs.Length; i += 2)
+    {
+        var battle = Activator.CreateInstance(ghostImportType)!;
+        ghostImportType.GetProperty("BattleId")!.SetValue(battle, battlePairs[i]);
+        ghostImportType
+            .GetProperty("RecordedAtUtc")!
+            .SetValue(battle, DateTimeOffset.Parse(battlePairs[i + 1]));
+        ghostImportType.GetProperty("CombatKind")!.SetValue(battle, "PVPCombat");
+        ghostImportType.GetProperty("PlayerHero")!.SetValue(battle, "Dooley");
+        ghostImportType.GetProperty("OpponentName")!.SetValue(battle, "Me");
+        ghostImportType.GetProperty("PlayerHandJson")!.SetValue(battle, "{\"items\":[]}");
+        ghostImportType.GetProperty("PlayerSkillsJson")!.SetValue(battle, "{\"items\":[]}");
+        ghostImportType.GetProperty("OpponentHandJson")!.SetValue(battle, "{\"items\":[]}");
+        ghostImportType.GetProperty("OpponentSkillsJson")!.SetValue(battle, "{\"items\":[]}");
+        ghostImportType.GetProperty("ReplayAvailable")!.SetValue(battle, true);
+        ghostImportType.GetProperty("ReplayDownloaded")!.SetValue(battle, false);
+        ghostImportType.GetProperty("LastSyncedAtUtc")!.SetValue(battle, DateTimeOffset.UtcNow);
+        list.Add(battle);
+    }
+
+    return list;
 }
 
 static long CountRows(SqliteConnection connection, string table, string whereClause)

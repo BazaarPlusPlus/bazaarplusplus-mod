@@ -4,11 +4,15 @@ import type { Env } from "../env";
 import { json } from "../http/json";
 import { absolutePath, trimString } from "../http/request";
 import { getRegisteredClient } from "../persistence/clients";
-import { hasSeenNonce, storeNonce } from "../persistence/nonces";
+import { tryConsumeNonce } from "../persistence/nonces";
 import type { UploadPurpose } from "../types/api";
 import type { RegisteredClientRow } from "../types/db";
 
 const MAX_TIMESTAMP_SKEW_MS = 10 * 60 * 1000;
+
+type RequireVerifiedClientOptions = {
+  consumeNonce?: boolean;
+};
 
 export type VerifiedClientRequest = {
   client: RegisteredClientRow;
@@ -22,6 +26,7 @@ export async function requireVerifiedClient(
   request: Request,
   env: Env,
   purpose: UploadPurpose,
+  options?: RequireVerifiedClientOptions,
 ): Promise<VerifiedClientRequest | Response> {
   const clientId = trimString(request.headers.get("x-bpp-client-id"));
   const installId = trimString(request.headers.get("x-bpp-install-id"));
@@ -44,11 +49,6 @@ export async function requireVerifiedClient(
     Math.abs(Date.now() - requestTimestamp) > MAX_TIMESTAMP_SKEW_MS
   ) {
     return json({ error: "timestamp_out_of_range" }, { status: 401 });
-  }
-
-  const nonceKey = `${purpose}:${clientId}:${nonce}`;
-  if (await hasSeenNonce(env, nonceKey)) {
-    return json({ error: "nonce_reused" }, { status: 409 });
   }
 
   const client = await getRegisteredClient(env, clientId);
@@ -81,6 +81,13 @@ export async function requireVerifiedClient(
     return json({ error: "invalid_signature" }, { status: 401 });
   }
 
-  await storeNonce(env, nonceKey, new Date().toISOString());
+  if (options?.consumeNonce ?? false) {
+    const nonceKey = `${purpose}:${clientId}:${nonce}`;
+    const consumed = await tryConsumeNonce(env, nonceKey, new Date().toISOString());
+    if (!consumed) {
+      return json({ error: "nonce_reused" }, { status: 409 });
+    }
+  }
+
   return { client, payload, payloadHash, timestamp, nonce };
 }

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -44,6 +45,27 @@ internal sealed class RunUploadRequestSigner
         string? contentType = null
     )
     {
+        return CreateSignedRequest(
+            method,
+            endpoint,
+            body,
+            clientId,
+            installId,
+            contentType,
+            extraHeaders: null
+        );
+    }
+
+    public HttpRequestMessage CreateSignedRequest(
+        HttpMethod method,
+        string endpoint,
+        string? body,
+        string clientId,
+        string installId,
+        string? contentType,
+        IReadOnlyDictionary<string, string?>? extraHeaders
+    )
+    {
         if (method == null)
             throw new ArgumentNullException(nameof(method));
         if (string.IsNullOrWhiteSpace(endpoint))
@@ -80,6 +102,17 @@ internal sealed class RunUploadRequestSigner
         request.Headers.TryAddWithoutValidation("X-BPP-Content-SHA256", bodyHash);
         request.Headers.TryAddWithoutValidation("X-BPP-Signature-Alg", "rsa-pkcs1-sha256");
         request.Headers.TryAddWithoutValidation("X-BPP-Signature", signature);
+        if (extraHeaders != null)
+        {
+            foreach (var entry in extraHeaders)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Key) || string.IsNullOrWhiteSpace(entry.Value))
+                    continue;
+
+                request.Headers.TryAddWithoutValidation(entry.Key, entry.Value);
+            }
+        }
+
         return request;
     }
 

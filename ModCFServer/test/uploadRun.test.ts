@@ -171,6 +171,166 @@ test("projects uploaded pvp battles and records bound player accounts", async ()
   );
 });
 
+test("does not expand bound player accounts from a newly claimed account id", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "runs-client-sticky-account";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: "install-run-sticky-account",
+    purpose: "runs",
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+  });
+  env.DB.clientUidBindings.set("binding-sticky-account", {
+    binding_id: "binding-sticky-account",
+    client_id: clientId,
+    uid: "uid-sticky-account",
+    bound_at_utc: new Date().toISOString(),
+    unbound_at_utc: null,
+  });
+  env.DB.uidPlayerAccounts.set("uid-sticky-account:player-account-existing", {
+    uid: "uid-sticky-account",
+    player_account_id: "player-account-existing",
+    first_seen_at_utc: "2026-03-28T00:00:00.000Z",
+    last_seen_at_utc: "2026-03-29T12:00:00.000Z",
+    last_client_id: clientId,
+  });
+
+  const payload = JSON.stringify({
+    run_id: "run-sticky-account",
+    pvp_battles: [
+      {
+        battle_id: "battle-sticky-account-001",
+        run_id: "run-sticky-account",
+        recorded_at_utc: "2026-03-29T10:15:00.000Z",
+        player_account_id: "player-account-new",
+        opponent_account_id: "opponent-account-001",
+        combat_kind: "PVPCombat",
+      },
+    ],
+  });
+  const bodyHash = sha256Base64(payload);
+  const timestamp = new Date().toISOString();
+  const nonce = "nonce-sticky-account";
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      "/runs/upload",
+      clientId,
+      "install-run-sticky-account",
+      timestamp,
+      nonce,
+      bodyHash,
+    ),
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/runs/upload", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-bpp-client-id": clientId,
+        "x-bpp-install-id": "install-run-sticky-account",
+        "x-bpp-run-id": "run-sticky-account",
+        "x-bpp-plugin-version": "1.9.0",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-nonce": nonce,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+        "x-bpp-signature": signature,
+      },
+      body: payload,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  assert.ok(env.DB.uidPlayerAccounts.has("uid-sticky-account:player-account-existing"));
+  assert.ok(!env.DB.uidPlayerAccounts.has("uid-sticky-account:player-account-new"));
+});
+
+test("skips ambiguous bound player account observations within one run upload", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "runs-client-ambiguous-account";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: "install-run-ambiguous-account",
+    purpose: "runs",
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+  });
+  env.DB.clientUidBindings.set("binding-ambiguous-account", {
+    binding_id: "binding-ambiguous-account",
+    client_id: clientId,
+    uid: "uid-ambiguous-account",
+    bound_at_utc: new Date().toISOString(),
+    unbound_at_utc: null,
+  });
+
+  const payload = JSON.stringify({
+    run_id: "run-ambiguous-account",
+    pvp_battles: [
+      {
+        battle_id: "battle-ambiguous-account-001",
+        player_account_id: "player-account-a",
+        opponent_account_id: "opponent-account-001",
+        combat_kind: "PVPCombat",
+      },
+      {
+        battle_id: "battle-ambiguous-account-002",
+        player_account_id: "player-account-b",
+        opponent_account_id: "opponent-account-002",
+        combat_kind: "PVPCombat",
+      },
+    ],
+  });
+  const bodyHash = sha256Base64(payload);
+  const timestamp = new Date().toISOString();
+  const nonce = "nonce-ambiguous-account";
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      "/runs/upload",
+      clientId,
+      "install-run-ambiguous-account",
+      timestamp,
+      nonce,
+      bodyHash,
+    ),
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/runs/upload", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-bpp-client-id": clientId,
+        "x-bpp-install-id": "install-run-ambiguous-account",
+        "x-bpp-run-id": "run-ambiguous-account",
+        "x-bpp-plugin-version": "1.9.0",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-nonce": nonce,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+        "x-bpp-signature": signature,
+      },
+      body: payload,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(env.DB.uidPlayerAccounts.size, 0);
+});
+
 test("skips non-pvp battles during run projection", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();

@@ -51,7 +51,7 @@ export async function getReplayUploadByBattleId(
 ): Promise<ReplayUploadLookupRow | null> {
   return env.DB.prepare(
     `
-      SELECT battle_id, object_key
+      SELECT battle_id, object_key, uploaded_at_utc
       FROM replay_uploads
       WHERE battle_id = ?
     `,

@@ -1,23 +1,32 @@
 import type { Env } from "../env";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
-import { replaceProjectedBattlesForRun } from "../persistence/battleProjections";
 import {
+  batchExecute,
+  replaceProjectedBattlesForRun,
+} from "../persistence/battleProjections";
+import {
+  buildPlayerAccountUpsert,
   getActiveBindingUid,
-  upsertObservedPlayerAccount,
+  listObservedPlayerAccountIds,
 } from "../persistence/bindings";
 import {
   markRunProjectionStatus,
   upsertRunUpload,
 } from "../persistence/runUploads";
-import { parseRunUploadBody } from "./uploadRunPayload";
+import {
+  parseRunUploadBody,
+  type ParsedRunBattle,
+} from "./uploadRunPayload";
 import { requireVerifiedClient } from "./verifiedClient";
 
 export async function handleRunUpload(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  const verified = await requireVerifiedClient(request, env, "runs");
+  const verified = await requireVerifiedClient(request, env, "runs", {
+    consumeNonce: true,
+  });
   if (verified instanceof Response) {
     return verified;
   }
@@ -95,17 +104,23 @@ export async function handleRunUpload(
     });
 
     if (boundUid) {
-      for (const battle of parsed.battles) {
-        if (!battle.playerAccountId) {
-          continue;
+      const observedPlayerAccountIds = distinctNonEmptyPlayerAccountIds(parsed.battles);
+      if (observedPlayerAccountIds.length === 1) {
+        const existingPlayerAccountIds = await listObservedPlayerAccountIds(env, boundUid);
+        const playerAccountId = observedPlayerAccountIds[0]!;
+        if (
+          existingPlayerAccountIds.length === 0
+          || existingPlayerAccountIds.includes(playerAccountId)
+        ) {
+          await batchExecute(env, [
+            buildPlayerAccountUpsert(env, {
+              uid: boundUid,
+              playerAccountId,
+              lastClientId: verified.client.client_id,
+              observedAtUtc,
+            }),
+          ]);
         }
-
-        await upsertObservedPlayerAccount(env, {
-          uid: boundUid,
-          playerAccountId: battle.playerAccountId,
-          lastClientId: verified.client.client_id,
-          observedAtUtc,
-        });
       }
     }
 
@@ -128,4 +143,15 @@ export async function handleRunUpload(
   }
 
   return json({ status: "accepted" });
+}
+
+function distinctNonEmptyPlayerAccountIds(battles: ParsedRunBattle[]): string[] {
+  const values = new Set<string>();
+  for (const battle of battles) {
+    if (battle.playerAccountId) {
+      values.add(battle.playerAccountId);
+    }
+  }
+
+  return Array.from(values);
 }

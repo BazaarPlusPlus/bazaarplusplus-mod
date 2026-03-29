@@ -11,11 +11,18 @@ export async function registerClient(
 ): Promise<Response> {
   const body = (await readJson(request)) as RegisterRequest;
   const installId = trimString(body.install_id);
-  const purpose = normalizePurpose(body.purpose) ?? "runs";
+  const requestedPurpose = trimString(body.purpose);
+  const purpose = requestedPurpose
+    ? normalizePurpose(requestedPurpose)
+    : "runs";
   const modulusB64 = trimString(body.public_key?.modulus_b64);
   const exponentB64 = trimString(body.public_key?.exponent_b64);
   if (!installId) {
     return json({ error: "install_id_required" }, { status: 400 });
+  }
+
+  if (!purpose) {
+    return json({ error: "invalid_purpose" }, { status: 400 });
   }
 
   if (!modulusB64 || !exponentB64) {

@@ -7,7 +7,7 @@ import { buildEnv } from "./helpers/mockEnv";
 test("responds to the health endpoint", async () => {
   const response = await worker.fetch(
     new Request("https://example.com/health", {
-      method: "POST",
+      method: "GET",
     }),
     buildEnv() as never,
   );

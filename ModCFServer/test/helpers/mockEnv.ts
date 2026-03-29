@@ -94,9 +94,9 @@ class MockD1Statement {
     return this.db.all<T>(this.sql, this.params);
   }
 
-  async run(): Promise<{ success: boolean }> {
-    this.db.run(this.sql, this.params);
-    return { success: true };
+  async run(): Promise<{ success: boolean; meta: { changes: number } }> {
+    const result = this.db.run(this.sql, this.params);
+    return { success: true, meta: { changes: result.changes } };
   }
 }
 
@@ -228,7 +228,7 @@ export class MockD1Database {
     return { results: [] };
   }
 
-  run(sql: string, params: unknown[]): void {
+  run(sql: string, params: unknown[]): { changes: number } {
     if (sql.includes("INSERT INTO registered_clients")) {
       const clientId = String(params[0]);
       if (this.clients.has(clientId) && !sql.includes("ON CONFLICT")) {
@@ -245,7 +245,7 @@ export class MockD1Database {
         registered_at_utc: String(params[6]),
       } satisfies ClientRow;
       this.clients.set(row.client_id, row);
-      return;
+      return { changes: 1 };
     }
 
     if (sql.includes("INSERT INTO replay_uploads")) {
@@ -264,7 +264,7 @@ export class MockD1Database {
         uploaded_at_utc: String(params[6]),
       } satisfies ReplayUploadRow;
       this.replayUploads.set(row.battle_id, row);
-      return;
+      return { changes: 1 };
     }
 
     if (sql.includes("INSERT INTO run_uploads")) {
@@ -284,14 +284,14 @@ export class MockD1Database {
         projected_at_utc: params[7] == null ? null : String(params[7]),
         projection_error: params[8] == null ? null : String(params[8]),
       });
-      return;
+      return { changes: 1 };
     }
 
     if (sql.includes("UPDATE run_uploads")) {
       const runId = String(params[3]);
       const existing = this.runUploads.get(runId);
       if (!existing) {
-        return;
+        return { changes: 0 };
       }
 
       this.runUploads.set(runId, {
@@ -300,12 +300,17 @@ export class MockD1Database {
         projected_at_utc: params[1] == null ? null : String(params[1]),
         projection_error: params[2] == null ? null : String(params[2]),
       });
-      return;
+      return { changes: 1 };
     }
 
     if (sql.includes("INSERT INTO request_nonces")) {
-      this.nonces.add(String(params[0]));
-      return;
+      const nonceKey = String(params[0]);
+      if (this.nonces.has(nonceKey)) {
+        return { changes: 0 };
+      }
+
+      this.nonces.add(nonceKey);
+      return { changes: 1 };
     }
 
     if (sql.includes("INSERT INTO uid_player_accounts")) {
@@ -318,7 +323,7 @@ export class MockD1Database {
         last_seen_at_utc: String(params[3]),
         last_client_id: String(params[4]),
       });
-      return;
+      return { changes: 1 };
     }
 
     if (sql.includes("INSERT INTO pvp_battles")) {
@@ -352,18 +357,23 @@ export class MockD1Database {
         created_at_utc: existing?.created_at_utc ?? String(params[24]),
         updated_at_utc: String(params[25]),
       });
-      return;
+      return { changes: 1 };
     }
 
     if (sql.includes("DELETE FROM pvp_battles")) {
       const sourceClientId = String(params[0]);
       const runId = String(params[1]);
+      let changes = 0;
       for (const [battleId, row] of this.pvpBattles.entries()) {
         if (row.source_client_id === sourceClientId && row.run_id === runId) {
           this.pvpBattles.delete(battleId);
+          changes++;
         }
       }
+      return { changes };
     }
+
+    return { changes: 0 };
   }
 }
 

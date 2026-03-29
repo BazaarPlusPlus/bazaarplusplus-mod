@@ -75,3 +75,28 @@ test("re-registering the same replay client returns the existing registration", 
   assert.equal(secondJson.client_id, firstJson.client_id);
   assert.equal(env.DB.clients.size, 1);
 });
+
+test("rejects invalid registration purposes", async () => {
+  const env = buildEnv();
+  const { modulusB64, exponentB64 } = generateClientKeyPair();
+
+  const response = await worker.fetch(
+    new Request("https://example.com/clients/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        install_id: "install-invalid-purpose",
+        plugin_version: "1.9.0",
+        purpose: "ghosts",
+        public_key: {
+          modulus_b64: modulusB64,
+          exponent_b64: exponentB64,
+        },
+      }),
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid_purpose" });
+});

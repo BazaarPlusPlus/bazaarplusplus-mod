@@ -13,7 +13,9 @@ export async function handleReplayUpload(
     return json({ error: "battle_id_required" }, { status: 400 });
   }
 
-  const verified = await requireVerifiedClient(request, env, "replays");
+  const verified = await requireVerifiedClient(request, env, "replays", {
+    consumeNonce: true,
+  });
   if (verified instanceof Response) {
     return verified;
   }

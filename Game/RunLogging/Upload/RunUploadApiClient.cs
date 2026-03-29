@@ -79,7 +79,7 @@ internal sealed class RunUploadApiClient
     }
 }
 
-internal readonly struct RunUploadApiResult
+internal readonly struct RunUploadApiResult : IBppAuthenticatedApiResult
 {
     private RunUploadApiResult(
         bool succeeded,
