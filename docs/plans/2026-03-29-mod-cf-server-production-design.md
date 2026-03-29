@@ -22,14 +22,13 @@
 - Worker 路由、D1 migration、R2 bucket 绑定、下载签名逻辑都已经在仓库内存在
 - `ModCFServer/test` 当前全部通过
 - `ModCFServer/wrangler.toml` 里的 `database_id` 仍是 `replace-me`
-- 当前代码没有完整的账号绑定写入闭环，且现有服务端设计仍把 `uid` 当作身份中心
-- run upload 还没有把原始 run payload 归档到 `R2`
-- 本地执行 `npm run check` 时因缺少 `node` 类型定义失败；这是当前工作区依赖状态问题，不是已证明的运行时逻辑回归
+- `POST /clients/bind` 已按 `player_account_id` 作为正式身份中心落地
+- run/replay upload 都已经写入单个 `REPLAY_BUCKET`，分别使用 `runs/...` 与 `replays/...` 前缀
+- `pvp_battles` 已收敛为 `summary_json + replay_available + projection_version` 查询模型
 
 结论：
 
-- 现在可以开始准备部署环境和资源
-- 但正式版上线前，仍应先补齐生产资源配置、run 原文归档方案、以及账号绑定闭环
+- 现在主要剩余工作是生产资源创建、`database_id` 回填和首次部署验证
 
 ## Production Architecture
 
@@ -51,6 +50,7 @@
 - `R2`
   - 保存 replay 原始 payload
   - 保存 run 原始 snapshot
+  - 首发阶段使用一个 bucket，通过 key prefix 区分对象类型
 
 设计原则：
 
