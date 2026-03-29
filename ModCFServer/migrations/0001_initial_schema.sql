@@ -1,4 +1,4 @@
--- Initial schema for bazaarplusplus-mod-api
+-- Initial production schema for bazaarplusplus-mod-api
 
 CREATE TABLE IF NOT EXISTS registered_clients (
   client_id TEXT PRIMARY KEY,
@@ -10,14 +10,28 @@ CREATE TABLE IF NOT EXISTS registered_clients (
   registered_at_utc TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS replay_uploads (
-  battle_id TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS request_nonces (
+  nonce_key TEXT PRIMARY KEY,
+  created_at_utc TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS client_player_account_bindings (
+  binding_id TEXT PRIMARY KEY,
   client_id TEXT NOT NULL,
-  install_id TEXT NOT NULL,
-  run_id TEXT NULL,
-  payload_sha256 TEXT NOT NULL,
-  object_key TEXT NOT NULL,
-  uploaded_at_utc TEXT NOT NULL
+  player_account_id TEXT NOT NULL,
+  binding_source TEXT NOT NULL,
+  confidence INTEGER NOT NULL,
+  bound_at_utc TEXT NOT NULL,
+  unbound_at_utc TEXT NULL
+);
+
+CREATE TABLE IF NOT EXISTS client_player_account_observations (
+  client_id TEXT NOT NULL,
+  player_account_id TEXT NOT NULL,
+  first_seen_at_utc TEXT NOT NULL,
+  last_seen_at_utc TEXT NOT NULL,
+  evidence_count INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (client_id, player_account_id)
 );
 
 CREATE TABLE IF NOT EXISTS run_uploads (
@@ -25,32 +39,32 @@ CREATE TABLE IF NOT EXISTS run_uploads (
   client_id TEXT NOT NULL,
   install_id TEXT NOT NULL,
   payload_sha256 TEXT NOT NULL,
-  uploaded_at_utc TEXT NOT NULL,
+  payload_object_key TEXT NULL,
+  payload_bytes INTEGER NULL,
+  schema_version INTEGER NULL,
+  projection_version INTEGER NOT NULL,
   projection_status TEXT NOT NULL,
+  projected_battle_count INTEGER NOT NULL DEFAULT 0,
   projected_at_utc TEXT NULL,
-  projection_error TEXT NULL
+  last_error_code TEXT NULL,
+  last_error_detail TEXT NULL,
+  created_at_utc TEXT NOT NULL,
+  updated_at_utc TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS request_nonces (
-  nonce_key TEXT PRIMARY KEY,
-  created_at_utc TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS client_uid_bindings (
-  binding_id TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS replay_uploads (
+  battle_id TEXT PRIMARY KEY,
   client_id TEXT NOT NULL,
-  uid TEXT NOT NULL,
-  bound_at_utc TEXT NOT NULL,
-  unbound_at_utc TEXT NULL
-);
-
-CREATE TABLE IF NOT EXISTS uid_player_accounts (
-  uid TEXT NOT NULL,
-  player_account_id TEXT NOT NULL,
-  first_seen_at_utc TEXT NOT NULL,
-  last_seen_at_utc TEXT NOT NULL,
-  last_client_id TEXT NOT NULL,
-  PRIMARY KEY (uid, player_account_id)
+  install_id TEXT NOT NULL,
+  run_id TEXT NULL,
+  payload_sha256 TEXT NOT NULL,
+  object_key TEXT NOT NULL,
+  payload_bytes INTEGER NULL,
+  schema_version INTEGER NULL,
+  content_type TEXT NOT NULL,
+  created_at_utc TEXT NOT NULL,
+  updated_at_utc TEXT NOT NULL,
+  uploaded_at_utc TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS pvp_battles (
@@ -77,32 +91,49 @@ CREATE TABLE IF NOT EXISTS pvp_battles (
   result TEXT NULL,
   winner_combatant_id TEXT NULL,
   loser_combatant_id TEXT NULL,
-  payload_json TEXT NOT NULL,
+  summary_json TEXT NOT NULL,
+  replay_available INTEGER NOT NULL DEFAULT 0,
+  projection_version INTEGER NOT NULL,
   created_at_utc TEXT NOT NULL,
   updated_at_utc TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_client_uid_bindings_uid
-  ON client_uid_bindings(uid);
+CREATE INDEX IF NOT EXISTS idx_client_player_account_bindings_account
+  ON client_player_account_bindings(player_account_id);
 
-CREATE INDEX IF NOT EXISTS idx_client_uid_bindings_uid_active
-  ON client_uid_bindings(uid, unbound_at_utc);
+CREATE INDEX IF NOT EXISTS idx_client_player_account_bindings_client
+  ON client_player_account_bindings(client_id);
 
-CREATE INDEX IF NOT EXISTS idx_client_uid_bindings_client
-  ON client_uid_bindings(client_id);
+CREATE INDEX IF NOT EXISTS idx_client_player_account_bindings_account_active
+  ON client_player_account_bindings(player_account_id, unbound_at_utc);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_client_uid_bindings_client_active
-  ON client_uid_bindings(client_id)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_client_player_account_bindings_client_active
+  ON client_player_account_bindings(client_id)
   WHERE unbound_at_utc IS NULL;
 
-CREATE INDEX IF NOT EXISTS idx_uid_player_accounts_uid
-  ON uid_player_accounts(uid);
+CREATE INDEX IF NOT EXISTS idx_client_player_account_observations_client_recent
+  ON client_player_account_observations(client_id, last_seen_at_utc DESC);
 
-CREATE INDEX IF NOT EXISTS idx_uid_player_accounts_account
-  ON uid_player_accounts(player_account_id);
+CREATE INDEX IF NOT EXISTS idx_client_player_account_observations_account
+  ON client_player_account_observations(player_account_id);
 
 CREATE INDEX IF NOT EXISTS idx_run_uploads_projection_status
-  ON run_uploads(projection_status, uploaded_at_utc);
+  ON run_uploads(projection_status, updated_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_run_uploads_client_created
+  ON run_uploads(client_id, created_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_run_uploads_payload_sha256
+  ON run_uploads(payload_sha256);
+
+CREATE INDEX IF NOT EXISTS idx_replay_uploads_run_id
+  ON replay_uploads(run_id);
+
+CREATE INDEX IF NOT EXISTS idx_replay_uploads_client_uploaded
+  ON replay_uploads(client_id, uploaded_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_replay_uploads_payload_sha256
+  ON replay_uploads(payload_sha256);
 
 CREATE INDEX IF NOT EXISTS idx_pvp_battles_recorded_at_utc
   ON pvp_battles(recorded_at_utc DESC);

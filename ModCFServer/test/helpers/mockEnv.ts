@@ -15,6 +15,11 @@ export type ReplayUploadRow = {
   run_id: string | null;
   payload_sha256: string;
   object_key: string;
+  payload_bytes?: number | null;
+  schema_version?: number | null;
+  content_type?: string | null;
+  created_at_utc?: string;
+  updated_at_utc?: string;
   uploaded_at_utc: string;
 };
 
@@ -23,9 +28,18 @@ export type RunUploadRow = {
   install_id: string;
   run_id: string;
   payload_sha256: string;
-  uploaded_at_utc: string;
+  payload_object_key?: string | null;
+  payload_bytes?: number | null;
+  schema_version?: number | null;
+  projection_version?: number | null;
   projection_status: string;
+  projected_battle_count?: number;
   projected_at_utc: string | null;
+  last_error_code?: string | null;
+  last_error_detail?: string | null;
+  uploaded_at_utc?: string;
+  created_at_utc?: string;
+  updated_at_utc?: string;
   projection_error: string | null;
 };
 
@@ -88,6 +102,9 @@ export type PvpBattleRow = {
   winner_combatant_id: string | null;
   loser_combatant_id: string | null;
   payload_json: string;
+  summary_json?: string;
+  replay_available?: number;
+  projection_version?: number;
   created_at_utc: string;
   updated_at_utc: string;
 };
