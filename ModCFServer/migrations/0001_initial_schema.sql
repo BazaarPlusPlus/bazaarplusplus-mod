@@ -50,12 +50,6 @@ CREATE TABLE IF NOT EXISTS run_uploads (
   updated_at_utc TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS replay_uploads (
-  battle_id TEXT PRIMARY KEY,
-  object_key TEXT NOT NULL,
-  uploaded_at_utc TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS pvp_battles (
   battle_id TEXT PRIMARY KEY,
   run_id TEXT NULL,
@@ -81,6 +75,8 @@ CREATE TABLE IF NOT EXISTS pvp_battles (
   winner_combatant_id TEXT NULL,
   loser_combatant_id TEXT NULL,
   replay_available INTEGER NOT NULL DEFAULT 0,
+  replay_object_key TEXT NULL,
+  replay_uploaded_at_utc TEXT NULL,
   created_at_utc TEXT NOT NULL,
   updated_at_utc TEXT NOT NULL
 );
@@ -112,15 +108,6 @@ CREATE INDEX IF NOT EXISTS idx_run_uploads_client_created
 
 CREATE INDEX IF NOT EXISTS idx_run_uploads_payload_sha256
   ON run_uploads(payload_sha256);
-
-CREATE INDEX IF NOT EXISTS idx_replay_uploads_run_id
-  ON replay_uploads(run_id);
-
-CREATE INDEX IF NOT EXISTS idx_replay_uploads_client_uploaded
-  ON replay_uploads(client_id, uploaded_at_utc DESC);
-
-CREATE INDEX IF NOT EXISTS idx_replay_uploads_payload_sha256
-  ON replay_uploads(payload_sha256);
 
 CREATE INDEX IF NOT EXISTS idx_pvp_battles_recorded_at_utc
   ON pvp_battles(recorded_at_utc DESC);

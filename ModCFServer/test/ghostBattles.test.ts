@@ -322,13 +322,12 @@ test("creates a replay download link and serves the payload", async () => {
     result: "loss",
     winner_combatant_id: "Opponent",
     loser_combatant_id: "Player",
+    replay_available: 1,
+    replay_object_key:
+      "combat-replays/replays/replay-client/battle-ghost-download/hash.payload.json",
+    replay_uploaded_at_utc: "2099-03-29T12:05:00.000Z",
     created_at_utc: "2099-03-29T12:00:00.000Z",
     updated_at_utc: "2099-03-29T12:00:00.000Z",
-  });
-  env.DB.replayUploads.set("battle-ghost-download", {
-    battle_id: "battle-ghost-download",
-    object_key: "combat-replays/replays/replay-client/battle-ghost-download/hash.payload.json",
-    uploaded_at_utc: "2099-03-29T12:05:00.000Z",
   });
   env.REPLAY_BUCKET.objects.set(
     "combat-replays/replays/replay-client/battle-ghost-download/hash.payload.json",

@@ -193,10 +193,10 @@ test("persists verified battle uploads", async () => {
     json.object_key,
     `replays/${registerJson.client_id}/battle-001/${storedBattlePayloadHash}.json`,
   );
-  const replayUpload = env.DB.replayUploads.get("battle-001");
-  assert.equal(replayUpload?.object_key, json.object_key);
-  assert.ok((replayUpload?.uploaded_at_utc ?? "").length > 0);
-  assert.equal(env.DB.pvpBattles.get("battle-001")?.replay_available, 1);
+  const projectedBattle = env.DB.pvpBattles.get("battle-001");
+  assert.equal(projectedBattle?.replay_object_key, json.object_key);
+  assert.ok((projectedBattle?.replay_uploaded_at_utc ?? "").length > 0);
+  assert.equal(projectedBattle?.replay_available, 1);
   assert.ok(env.REPLAY_BUCKET.objects.has(json.object_key));
 });
 
@@ -279,7 +279,6 @@ test("rejects battle uploads when top-level and manifest run ids disagree", asyn
 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: "run_id_mismatch" });
-  assert.equal(env.DB.replayUploads.size, 0);
   assert.equal(env.DB.pvpBattles.size, 0);
 });
 
@@ -363,7 +362,6 @@ test("rejects battle uploads when x-bpp-run-id disagrees with the payload", asyn
 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: "run_id_mismatch" });
-  assert.equal(env.DB.replayUploads.size, 0);
   assert.equal(env.DB.pvpBattles.size, 0);
 });
 
@@ -446,8 +444,8 @@ test("re-uploading the same replay payload remains idempotent", async () => {
     assert.equal(response.status, 200);
   }
 
-  assert.equal(env.DB.replayUploads.size, 1);
   assert.equal(env.REPLAY_BUCKET.objects.size, 1);
+  assert.equal(env.DB.pvpBattles.get("battle-repeat")?.replay_available, 1);
 });
 
 test("rejects battle uploads with incomplete replay payloads", async () => {
@@ -526,6 +524,5 @@ test("rejects battle uploads with incomplete replay payloads", async () => {
 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: "invalid_replay_payload" });
-  assert.equal(env.DB.replayUploads.size, 0);
   assert.equal(env.REPLAY_BUCKET.objects.size, 0);
 });

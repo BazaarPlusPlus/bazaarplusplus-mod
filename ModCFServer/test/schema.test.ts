@@ -48,23 +48,6 @@ test("migration promotes run_uploads to the production ingestion ledger", () => 
   assert.doesNotMatch(runUploadsSection, /\bpayload_json\b/);
 });
 
-test("migration stores production replay upload metadata", () => {
-  const sql = readMigrationSql();
-  const replayUploadsSection = getTableSection(sql, "replay_uploads");
-
-  assert.match(replayUploadsSection, /\bobject_key\b/);
-  assert.match(replayUploadsSection, /\buploaded_at_utc\b/);
-  assert.doesNotMatch(replayUploadsSection, /\bclient_id\b/);
-  assert.doesNotMatch(replayUploadsSection, /\binstall_id\b/);
-  assert.doesNotMatch(replayUploadsSection, /\brun_id\b/);
-  assert.doesNotMatch(replayUploadsSection, /\bpayload_sha256\b/);
-  assert.doesNotMatch(replayUploadsSection, /\bpayload_bytes\b/);
-  assert.doesNotMatch(replayUploadsSection, /\bschema_version\b/);
-  assert.doesNotMatch(replayUploadsSection, /\bcontent_type\b/);
-  assert.doesNotMatch(replayUploadsSection, /\bcreated_at_utc\b/);
-  assert.doesNotMatch(replayUploadsSection, /\bupdated_at_utc\b/);
-});
-
 test("migration stores the production pvp battle query model", () => {
   const sql = readMigrationSql();
   const pvpBattlesSection = getTableSection(sql, "pvp_battles");
@@ -74,6 +57,8 @@ test("migration stores the production pvp battle query model", () => {
   assert.doesNotMatch(pvpBattlesSection, /\bopponent_hand_json\b/);
   assert.doesNotMatch(pvpBattlesSection, /\bopponent_skills_json\b/);
   assert.match(pvpBattlesSection, /\breplay_available\b/);
+  assert.match(pvpBattlesSection, /\breplay_object_key\b/);
+  assert.match(pvpBattlesSection, /\breplay_uploaded_at_utc\b/);
   assert.doesNotMatch(pvpBattlesSection, /\bprojection_version\b/);
   assert.doesNotMatch(pvpBattlesSection, /\bsummary_json\b/);
 });

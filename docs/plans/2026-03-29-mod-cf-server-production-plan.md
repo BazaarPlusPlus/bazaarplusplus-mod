@@ -109,9 +109,8 @@ git commit -m "Add client binding flow for production server"
 
 Extend `ModCFServer/test/schema.test.ts` to assert that `0001_initial_schema.sql` contains:
 
-- production `run_uploads` columns such as `payload_object_key`, `payload_bytes`, `projection_version`, `projected_battle_count`, `last_error_code`, `created_at_utc`, `updated_at_utc`
-- production `replay_uploads` columns such as `payload_bytes`, `schema_version`, `content_type`, `created_at_utc`, `updated_at_utc`
-- production `pvp_battles` columns such as `summary_json`, `replay_available`, `projection_version`
+- production `run_uploads` columns such as `payload_object_key`, `payload_bytes`, `projection_status`, `projected_at_utc`, `last_error_code`, `created_at_utc`, `updated_at_utc`
+- production `pvp_battles` columns such as `replay_available`, `replay_object_key`, `replay_uploaded_at_utc`
 
 Run:
 
@@ -287,7 +286,7 @@ In `ModCFServer/src/persistence/battleProjections.ts`:
 
 - persist `replay_available`
 - default it to `0` on run projection
-- expose query helpers that no longer need to left join `replay_uploads` just to answer availability
+- expose query helpers that can answer replay availability directly from `pvp_battles`
 
 **Step 4: Re-run focused tests**
 
@@ -307,12 +306,11 @@ git add ModCFServer/src/features/uploadRun.ts ModCFServer/src/features/uploadRun
 git commit -m "Turn pvp battles into a production query model"
 ```
 
-### Task 5: Expand Replay Upload Metadata And Sync Replay Availability
+### Task 5: Inline Replay Metadata Into The Battle Query Model
 
 **Files:**
 - Modify: `ModCFServer/src/features/uploadReplay.ts`
 - Modify: `ModCFServer/src/features/uploadReplayPayload.ts`
-- Modify: `ModCFServer/src/persistence/replayUploads.ts`
 - Modify: `ModCFServer/src/persistence/battleProjections.ts`
 - Modify: `ModCFServer/test/uploadReplay.test.ts`
 - Modify: `ModCFServer/test/ghostBattles.test.ts`
@@ -321,10 +319,8 @@ git commit -m "Turn pvp battles into a production query model"
 
 Extend `ModCFServer/test/uploadReplay.test.ts` to assert:
 
-- `replay_uploads.payload_bytes` is stored
-- `replay_uploads.schema_version` is stored
-- `replay_uploads.content_type` is stored
-- `replay_uploads.created_at_utc` and `updated_at_utc` are tracked separately
+- uploading a replay stores `pvp_battles.replay_object_key`
+- uploading a replay stores `pvp_battles.replay_uploaded_at_utc`
 - uploading a replay marks `pvp_battles.replay_available = 1`
 
 Run:
@@ -334,7 +330,7 @@ cd ModCFServer
 npx tsx --test test/uploadReplay.test.ts
 ```
 
-Expected: FAIL because replay metadata is still minimal and projection rows are not explicitly updated.
+Expected: FAIL because replay metadata is not yet persisted on `pvp_battles`.
 
 **Step 2: Parse and persist replay metadata**
 

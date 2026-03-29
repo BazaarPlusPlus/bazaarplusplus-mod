@@ -8,12 +8,6 @@ export type ClientRow = {
   registered_at_utc: string;
 };
 
-export type ReplayUploadRow = {
-  battle_id: string;
-  object_key: string;
-  uploaded_at_utc: string;
-};
-
 export type RunUploadRow = {
   client_id: string;
   install_id: string;
@@ -91,6 +85,8 @@ export type PvpBattleRow = {
   winner_combatant_id: string | null;
   loser_combatant_id: string | null;
   replay_available?: number;
+  replay_object_key?: string | null;
+  replay_uploaded_at_utc?: string | null;
   created_at_utc: string;
   updated_at_utc: string;
 };
@@ -122,7 +118,6 @@ class MockD1Statement {
 
 export class MockD1Database {
   public readonly clients = new Map<string, ClientRow>();
-  public readonly replayUploads = new Map<string, ReplayUploadRow>();
   public readonly runUploads = new Map<string, RunUploadRow>();
   public readonly clientUidBindings = new Map<string, ClientUidBindingRow>();
   public readonly clientPlayerAccountBindings = new Map<
@@ -186,18 +181,6 @@ export class MockD1Database {
         : null;
     }
 
-    if (sql.includes("FROM replay_uploads")) {
-      const battleId = String(params[0] ?? "");
-      const row = this.replayUploads.get(battleId);
-      return row
-        ? ({
-            battle_id: row.battle_id,
-            object_key: row.object_key,
-            uploaded_at_utc: row.uploaded_at_utc,
-          } as T)
-        : null;
-    }
-
     if (sql.includes("WHERE pb.battle_id = ?")) {
       const battleId = String(params[0] ?? "");
       const row = this.pvpBattles.get(battleId);
@@ -225,9 +208,9 @@ export class MockD1Database {
             result: row.result,
             winner_combatant_id: row.winner_combatant_id,
             loser_combatant_id: row.loser_combatant_id,
-            replay_available:
-              row.replay_available ??
-              (this.replayUploads.has(row.battle_id) ? 1 : 0),
+            replay_available: row.replay_available ?? 0,
+            replay_object_key: row.replay_object_key ?? null,
+            replay_uploaded_at_utc: row.replay_uploaded_at_utc ?? null,
           } as T)
         : null;
     }
@@ -296,9 +279,9 @@ export class MockD1Database {
                 result: row.result,
                 winner_combatant_id: row.winner_combatant_id,
                 loser_combatant_id: row.loser_combatant_id,
-                replay_available:
-                  row.replay_available ??
-                  (this.replayUploads.has(row.battle_id) ? 1 : 0),
+                replay_available: row.replay_available ?? 0,
+                replay_object_key: row.replay_object_key ?? null,
+                replay_uploaded_at_utc: row.replay_uploaded_at_utc ?? null,
               }) as T,
           ),
       };
@@ -324,21 +307,6 @@ export class MockD1Database {
         registered_at_utc: String(params[6]),
       } satisfies ClientRow;
       this.clients.set(row.client_id, row);
-      return { changes: 1 };
-    }
-
-    if (sql.includes("INSERT INTO replay_uploads")) {
-      const battleId = String(params[0]);
-      if (this.replayUploads.has(battleId) && !sql.includes("ON CONFLICT")) {
-        throw new Error("SQLITE_CONSTRAINT: replay_uploads.battle_id");
-      }
-
-      const row = {
-        battle_id: battleId,
-        object_key: String(params[1]),
-        uploaded_at_utc: String(params[2]),
-      } satisfies ReplayUploadRow;
-      this.replayUploads.set(row.battle_id, row);
       return { changes: 1 };
     }
 
@@ -481,8 +449,10 @@ export class MockD1Database {
         winner_combatant_id: params[21] == null ? null : String(params[21]),
         loser_combatant_id: params[22] == null ? null : String(params[22]),
         replay_available: params[23] == null ? 0 : Number(params[23]),
-        created_at_utc: existing?.created_at_utc ?? String(params[24]),
-        updated_at_utc: String(params[25]),
+        replay_object_key: params[24] == null ? null : String(params[24]),
+        replay_uploaded_at_utc: params[25] == null ? null : String(params[25]),
+        created_at_utc: existing?.created_at_utc ?? String(params[26]),
+        updated_at_utc: String(params[27]),
       });
       return { changes: 1 };
     }
@@ -501,7 +471,7 @@ export class MockD1Database {
     }
 
     if (sql.includes("UPDATE pvp_battles") && sql.includes("SET replay_available = 1")) {
-      const battleId = String(params[0] ?? "");
+      const battleId = String(params[2] ?? "");
       const existing = this.pvpBattles.get(battleId);
       if (!existing) {
         return { changes: 0 };
@@ -510,6 +480,8 @@ export class MockD1Database {
       this.pvpBattles.set(battleId, {
         ...existing,
         replay_available: 1,
+        replay_object_key: params[0] == null ? null : String(params[0]),
+        replay_uploaded_at_utc: params[1] == null ? null : String(params[1]),
       });
       return { changes: 1 };
     }

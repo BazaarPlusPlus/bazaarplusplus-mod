@@ -21,12 +21,6 @@ export type ObservedPlayerAccountRow = {
   player_account_id: string;
 };
 
-export type ReplayUploadLookupRow = {
-  battle_id: string;
-  object_key: string;
-  uploaded_at_utc: string;
-};
-
 export type ProjectedBattleQueryRow = {
   battle_id: string;
   recorded_at_utc: string;
@@ -51,6 +45,8 @@ export type ProjectedBattleQueryRow = {
   winner_combatant_id?: string | null;
   loser_combatant_id?: string | null;
   replay_available: number;
+  replay_object_key?: string | null;
+  replay_uploaded_at_utc?: string | null;
 };
 
 export type RunUploadProjectionStatus =

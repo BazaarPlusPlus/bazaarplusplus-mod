@@ -26,6 +26,8 @@ export type BattleProjectionRecord = {
   winnerCombatantId: string | null;
   loserCombatantId: string | null;
   replayAvailable: number;
+  replayObjectKey: string | null;
+  replayUploadedAtUtc: string | null;
   createdAtUtc: string;
   updatedAtUtc: string;
 };
@@ -72,9 +74,11 @@ function buildBattleUpsert(
         winner_combatant_id,
         loser_combatant_id,
         replay_available,
+        replay_object_key,
+        replay_uploaded_at_utc,
         created_at_utc,
         updated_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(battle_id) DO UPDATE SET
         run_id = excluded.run_id,
         source_client_id = excluded.source_client_id,
@@ -99,6 +103,8 @@ function buildBattleUpsert(
         winner_combatant_id = excluded.winner_combatant_id,
         loser_combatant_id = excluded.loser_combatant_id,
         replay_available = excluded.replay_available,
+        replay_object_key = excluded.replay_object_key,
+        replay_uploaded_at_utc = excluded.replay_uploaded_at_utc,
         updated_at_utc = excluded.updated_at_utc
     `,
   ).bind(
@@ -126,6 +132,8 @@ function buildBattleUpsert(
     battle.winnerCombatantId,
     battle.loserCombatantId,
     battle.replayAvailable,
+    battle.replayObjectKey,
+    battle.replayUploadedAtUtc,
     battle.createdAtUtc,
     battle.updatedAtUtc,
   );
@@ -205,7 +213,9 @@ export async function listProjectedBattlesAgainstAccountIds(
         pb.result,
         pb.winner_combatant_id,
         pb.loser_combatant_id,
-        pb.replay_available
+        pb.replay_available,
+        pb.replay_object_key,
+        pb.replay_uploaded_at_utc
       FROM pvp_battles AS pb
       WHERE pb.opponent_account_id IN (${placeholders})
         AND pb.combat_kind = 'PVPCombat'
@@ -249,7 +259,9 @@ export async function getProjectedBattleById(
         pb.result,
         pb.winner_combatant_id,
         pb.loser_combatant_id,
-        pb.replay_available
+        pb.replay_available,
+        pb.replay_object_key,
+        pb.replay_uploaded_at_utc
       FROM pvp_battles AS pb
       WHERE pb.battle_id = ?
       LIMIT 1
@@ -261,15 +273,21 @@ export async function getProjectedBattleById(
 
 export async function markBattleReplayAvailable(
   env: Env,
-  battleId: string,
+  input: {
+    battleId: string;
+    replayObjectKey: string;
+    replayUploadedAtUtc: string;
+  },
 ): Promise<void> {
   await env.DB.prepare(
     `
       UPDATE pvp_battles
-      SET replay_available = 1
+      SET replay_available = 1,
+          replay_object_key = ?,
+          replay_uploaded_at_utc = ?
       WHERE battle_id = ?
     `,
   )
-    .bind(battleId)
+    .bind(input.replayObjectKey, input.replayUploadedAtUtc, input.battleId)
     .run();
 }

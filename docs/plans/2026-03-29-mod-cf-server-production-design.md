@@ -203,21 +203,17 @@
 - `run_uploads` 不再只是“收到了一个 hash”，而是 ingestion ledger
 - 这张表为补投影和故障恢复提供依据
 
-### 6. `replay_uploads`
+### 6. Replay Metadata On `pvp_battles`
 
-用途：replay 元数据与对象索引表。
+用途：把 replay 下载所需的最小对象索引直接附着在 battle 查询模型上。
 
 建议字段：
 
 | column | type | notes |
 | --- | --- | --- |
-| `battle_id` | `TEXT PRIMARY KEY` | battle 主键 |
-| `client_id` | `TEXT NOT NULL` | 上传客户端 |
-| `install_id` | `TEXT NOT NULL` | 安装实例 |
-| `run_id` | `TEXT NULL` | 对应 run，可为空 |
-| `payload_sha256` | `TEXT NOT NULL` | 内容 hash |
-| `object_key` | `TEXT NOT NULL` | `R2` 对象 key |
-| `payload_bytes` | `INTEGER NULL` | 字节数 |
+| `replay_available` | `INTEGER NOT NULL` | 是否已有远端 payload |
+| `replay_object_key` | `TEXT NULL` | `R2` 对象 key |
+| `replay_uploaded_at_utc` | `TEXT NULL` | payload 上传时间 |
 | `schema_version` | `INTEGER NULL` | replay payload 版本 |
 | `content_type` | `TEXT NOT NULL` | 默认 `application/json` |
 | `created_at_utc` | `TEXT NOT NULL` | 首次写入时间 |
@@ -358,8 +354,7 @@
 2. 校验并消费 nonce
 3. 校验 `battle_id`
 4. replay payload 写入 `R2`
-5. upsert `replay_uploads`
-6. 更新对应 `pvp_battles.replay_available`
+5. upsert `pvp_battles.replay_*` 元数据
 
 ## Query Flow
 
@@ -369,7 +364,7 @@
 
 1. 从 `client_player_account_bindings` 找 active `player_account_id`
 2. 从 `pvp_battles` 查 `opponent_account_id = ?`
-3. 用 `replay_uploads` 或 `pvp_battles.replay_available` 判断是否可下载 replay
+3. 直接用 `pvp_battles.replay_available` 和 `replay_object_key` 判断是否可下载 replay
 
 这条查询链的重点是：
 

@@ -64,7 +64,6 @@ test("rejects battle uploads with an invalid body hash", async () => {
 
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), { error: "body_hash_mismatch" });
-  assert.equal(env.DB.replayUploads.size, 0);
   assert.equal(env.REPLAY_BUCKET.objects.size, 0);
 });
 

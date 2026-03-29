@@ -7,7 +7,6 @@ import {
 import {
   getActiveBoundPlayerAccountId,
 } from "../persistence/bindings";
-import { getReplayUploadByBattleId } from "../persistence/replayUploads";
 import { requireVerifiedClient } from "./verifiedClient";
 
 const DEFAULT_LOOKBACK_DAYS = 3;
@@ -229,8 +228,7 @@ export async function handleGhostBattleReplayDownloadLink(
     return json({ error: "battle_forbidden" }, { status: 403 });
   }
 
-  const replayUpload = await getReplayUploadByBattleId(env, battleId);
-  if (!replayUpload) {
+  if (!battle.replay_object_key || !battle.replay_uploaded_at_utc) {
     return json({ error: "replay_unavailable" }, { status: 409 });
   }
 
@@ -250,7 +248,7 @@ export async function handleGhostBattleReplayDownloadLink(
     battle_id: battleId,
     expires_at_utc: new Date(expiresAtUnixSeconds * 1000).toISOString(),
     download_url: downloadUrl.toString(),
-    replay_uploaded_at_utc: replayUpload.uploaded_at_utc,
+    replay_uploaded_at_utc: battle.replay_uploaded_at_utc,
   });
 }
 
@@ -285,17 +283,16 @@ export async function handleReplayDownload(
     return json({ error: "invalid_download_signature" }, { status: 403 });
   }
 
-  const replayUpload = await getReplayUploadByBattleId(env, battleId);
-  if (!replayUpload) {
-    return json({ error: "replay_not_found" }, { status: 404 });
-  }
-
   const battle = await getProjectedBattleById(env, battleId);
   if (!battle) {
     return json({ error: "battle_not_found" }, { status: 404 });
   }
 
-  const object = await env.REPLAY_BUCKET.get(replayUpload.object_key);
+  if (!battle.replay_object_key) {
+    return json({ error: "replay_not_found" }, { status: 404 });
+  }
+
+  const object = await env.REPLAY_BUCKET.get(battle.replay_object_key);
   if (!object) {
     return json({ error: "replay_not_found" }, { status: 404 });
   }

@@ -3,7 +3,6 @@ import { sha256Base64 } from "../crypto/hash";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
 import { upsertProjectedBattle } from "../persistence/battleProjections";
-import { upsertReplayUpload } from "../persistence/replayUploads";
 import { requireVerifiedClient } from "./verifiedClient";
 import { parseBattleUploadBody } from "./uploadBattlePayload";
 
@@ -77,14 +76,10 @@ export async function handleBattleUpload(
     winnerCombatantId: parsed.manifest.winnerCombatantId,
     loserCombatantId: parsed.manifest.loserCombatantId,
     replayAvailable: 1,
+    replayObjectKey: objectKey,
+    replayUploadedAtUtc: uploadedAtUtc,
     createdAtUtc: uploadedAtUtc,
     updatedAtUtc: uploadedAtUtc,
-  });
-
-  await upsertReplayUpload(env, {
-    battleId,
-    objectKey,
-    uploadedAtUtc,
   });
 
   return json({
