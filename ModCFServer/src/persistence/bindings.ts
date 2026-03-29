@@ -24,7 +24,7 @@ export async function getActiveBindingUid(
   return row?.uid ?? null;
 }
 
-export async function upsertObservedPlayerAccount(
+export function buildPlayerAccountUpsert(
   env: Env,
   input: {
     uid: string;
@@ -32,8 +32,8 @@ export async function upsertObservedPlayerAccount(
     lastClientId: string;
     observedAtUtc: string;
   },
-): Promise<void> {
-  await env.DB.prepare(
+): D1PreparedStatement {
+  return env.DB.prepare(
     `
       INSERT INTO uid_player_accounts (
         uid,
@@ -46,15 +46,13 @@ export async function upsertObservedPlayerAccount(
         last_seen_at_utc = excluded.last_seen_at_utc,
         last_client_id = excluded.last_client_id
     `,
-  )
-    .bind(
-      input.uid,
-      input.playerAccountId,
-      input.observedAtUtc,
-      input.observedAtUtc,
-      input.lastClientId,
-    )
-    .run();
+  ).bind(
+    input.uid,
+    input.playerAccountId,
+    input.observedAtUtc,
+    input.observedAtUtc,
+    input.lastClientId,
+  );
 }
 
 export async function listObservedPlayerAccountIds(

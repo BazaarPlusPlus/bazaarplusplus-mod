@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS run_uploads (
   client_id TEXT NOT NULL,
   install_id TEXT NOT NULL,
   payload_sha256 TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
   uploaded_at_utc TEXT NOT NULL,
   projection_status TEXT NOT NULL,
   projected_at_utc TEXT NULL,

@@ -24,7 +24,11 @@ test("accepts signed run uploads", async () => {
     registered_at_utc: new Date().toISOString(),
   });
 
-  const payload = JSON.stringify({ run_id: "run-001", state: "active" });
+  const payload = JSON.stringify({
+    run_id: "run-001",
+    state: "active",
+    pvp_battles: [],
+  });
   const bodyHash = sha256Base64(payload);
   const timestamp = new Date().toISOString();
   const nonce = "nonce-run-001";
@@ -572,7 +576,11 @@ test("re-uploading the same run payload remains idempotent", async () => {
     registered_at_utc: new Date().toISOString(),
   });
 
-  const payload = JSON.stringify({ run_id: "run-repeat", state: "active" });
+  const payload = JSON.stringify({
+    run_id: "run-repeat",
+    state: "active",
+    pvp_battles: [],
+  });
   const bodyHash = sha256Base64(payload);
 
   for (const nonce of ["nonce-run-repeat-1", "nonce-run-repeat-2"]) {
@@ -615,4 +623,126 @@ test("re-uploading the same run payload remains idempotent", async () => {
 
   assert.equal(env.DB.runUploads.size, 1);
   assert.equal(env.DB.runUploads.get("run-repeat")?.projection_status, "projected");
+});
+
+test("rejects run uploads when pvp_battles is missing", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "runs-client-missing-battles";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: "install-run-missing-battles",
+    purpose: "runs",
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+  });
+
+  const payload = JSON.stringify({ run_id: "run-missing-battles" });
+  const bodyHash = sha256Base64(payload);
+  const timestamp = new Date().toISOString();
+  const nonce = "nonce-run-missing-battles";
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      "/runs/upload",
+      clientId,
+      "install-run-missing-battles",
+      timestamp,
+      nonce,
+      bodyHash,
+    ),
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/runs/upload", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-bpp-client-id": clientId,
+        "x-bpp-install-id": "install-run-missing-battles",
+        "x-bpp-run-id": "run-missing-battles",
+        "x-bpp-plugin-version": "1.9.0",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-nonce": nonce,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+        "x-bpp-signature": signature,
+      },
+      body: payload,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "pvp_battles_required" });
+  assert.equal(env.DB.runUploads.size, 0);
+  assert.equal(env.DB.pvpBattles.size, 0);
+});
+
+test("rejects run uploads with incomplete pvp battle payloads", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "runs-client-invalid-battle";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: "install-run-invalid-battle",
+    purpose: "runs",
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+  });
+
+  const payload = JSON.stringify({
+    run_id: "run-invalid-battle",
+    pvp_battles: [
+      {
+        battle_id: "battle-invalid-001",
+        combat_kind: "PVPCombat",
+      },
+    ],
+  });
+  const bodyHash = sha256Base64(payload);
+  const timestamp = new Date().toISOString();
+  const nonce = "nonce-run-invalid-battle";
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      "/runs/upload",
+      clientId,
+      "install-run-invalid-battle",
+      timestamp,
+      nonce,
+      bodyHash,
+    ),
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/runs/upload", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-bpp-client-id": clientId,
+        "x-bpp-install-id": "install-run-invalid-battle",
+        "x-bpp-run-id": "run-invalid-battle",
+        "x-bpp-plugin-version": "1.9.0",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-nonce": nonce,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+        "x-bpp-signature": signature,
+      },
+      body: payload,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid_pvp_battle_payload" });
+  assert.equal(env.DB.runUploads.size, 0);
+  assert.equal(env.DB.pvpBattles.size, 0);
 });

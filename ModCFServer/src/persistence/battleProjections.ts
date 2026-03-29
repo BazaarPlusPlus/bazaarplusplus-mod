@@ -30,6 +30,107 @@ export type BattleProjectionRecord = {
   updatedAtUtc: string;
 };
 
+const D1_BATCH_LIMIT = 400;
+
+export async function batchExecute(
+  env: Env,
+  statements: D1PreparedStatement[],
+): Promise<void> {
+  for (let i = 0; i < statements.length; i += D1_BATCH_LIMIT) {
+    await env.DB.batch(statements.slice(i, i + D1_BATCH_LIMIT));
+  }
+}
+
+function buildBattleUpsert(
+  env: Env,
+  battle: BattleProjectionRecord,
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `
+      INSERT INTO pvp_battles (
+        battle_id,
+        run_id,
+        source_client_id,
+        recorded_at_utc,
+        day,
+        hour,
+        encounter_id,
+        player_name,
+        player_account_id,
+        player_hero,
+        player_rank,
+        player_rating,
+        player_level,
+        opponent_name,
+        opponent_account_id,
+        opponent_hero,
+        opponent_rank,
+        opponent_rating,
+        opponent_level,
+        combat_kind,
+        result,
+        winner_combatant_id,
+        loser_combatant_id,
+        payload_json,
+        created_at_utc,
+        updated_at_utc
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(battle_id) DO UPDATE SET
+        run_id = excluded.run_id,
+        source_client_id = excluded.source_client_id,
+        recorded_at_utc = excluded.recorded_at_utc,
+        day = excluded.day,
+        hour = excluded.hour,
+        encounter_id = excluded.encounter_id,
+        player_name = excluded.player_name,
+        player_account_id = excluded.player_account_id,
+        player_hero = excluded.player_hero,
+        player_rank = excluded.player_rank,
+        player_rating = excluded.player_rating,
+        player_level = excluded.player_level,
+        opponent_name = excluded.opponent_name,
+        opponent_account_id = excluded.opponent_account_id,
+        opponent_hero = excluded.opponent_hero,
+        opponent_rank = excluded.opponent_rank,
+        opponent_rating = excluded.opponent_rating,
+        opponent_level = excluded.opponent_level,
+        combat_kind = excluded.combat_kind,
+        result = excluded.result,
+        winner_combatant_id = excluded.winner_combatant_id,
+        loser_combatant_id = excluded.loser_combatant_id,
+        payload_json = excluded.payload_json,
+        updated_at_utc = excluded.updated_at_utc
+    `,
+  ).bind(
+    battle.battleId,
+    battle.runId,
+    battle.sourceClientId,
+    battle.recordedAtUtc,
+    battle.day,
+    battle.hour,
+    battle.encounterId,
+    battle.playerName,
+    battle.playerAccountId,
+    battle.playerHero,
+    battle.playerRank,
+    battle.playerRating,
+    battle.playerLevel,
+    battle.opponentName,
+    battle.opponentAccountId,
+    battle.opponentHero,
+    battle.opponentRank,
+    battle.opponentRating,
+    battle.opponentLevel,
+    battle.combatKind,
+    battle.result,
+    battle.winnerCombatantId,
+    battle.loserCombatantId,
+    battle.payloadJson,
+    battle.createdAtUtc,
+    battle.updatedAtUtc,
+  );
+}
+
 export async function replaceProjectedBattlesForRun(
   env: Env,
   input: {
@@ -38,103 +139,25 @@ export async function replaceProjectedBattlesForRun(
     battles: BattleProjectionRecord[];
   },
 ): Promise<void> {
-  const statements = [
-    env.DB.prepare(
-      `
-        DELETE FROM pvp_battles
-        WHERE source_client_id = ?
-          AND run_id = ?
-      `,
-    ).bind(input.sourceClientId, input.runId),
-    ...input.battles.map((battle) =>
-      env.DB.prepare(
-        `
-          INSERT INTO pvp_battles (
-            battle_id,
-            run_id,
-            source_client_id,
-            recorded_at_utc,
-            day,
-            hour,
-            encounter_id,
-            player_name,
-            player_account_id,
-            player_hero,
-            player_rank,
-            player_rating,
-            player_level,
-            opponent_name,
-            opponent_account_id,
-            opponent_hero,
-            opponent_rank,
-            opponent_rating,
-            opponent_level,
-            combat_kind,
-            result,
-            winner_combatant_id,
-            loser_combatant_id,
-            payload_json,
-            created_at_utc,
-            updated_at_utc
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(battle_id) DO UPDATE SET
-            run_id = excluded.run_id,
-            source_client_id = excluded.source_client_id,
-            recorded_at_utc = excluded.recorded_at_utc,
-            day = excluded.day,
-            hour = excluded.hour,
-            encounter_id = excluded.encounter_id,
-            player_name = excluded.player_name,
-            player_account_id = excluded.player_account_id,
-            player_hero = excluded.player_hero,
-            player_rank = excluded.player_rank,
-            player_rating = excluded.player_rating,
-            player_level = excluded.player_level,
-            opponent_name = excluded.opponent_name,
-            opponent_account_id = excluded.opponent_account_id,
-            opponent_hero = excluded.opponent_hero,
-            opponent_rank = excluded.opponent_rank,
-            opponent_rating = excluded.opponent_rating,
-            opponent_level = excluded.opponent_level,
-            combat_kind = excluded.combat_kind,
-            result = excluded.result,
-            winner_combatant_id = excluded.winner_combatant_id,
-            loser_combatant_id = excluded.loser_combatant_id,
-            payload_json = excluded.payload_json,
-            updated_at_utc = excluded.updated_at_utc
-        `,
-      ).bind(
-        battle.battleId,
-        battle.runId,
-        battle.sourceClientId,
-        battle.recordedAtUtc,
-        battle.day,
-        battle.hour,
-        battle.encounterId,
-        battle.playerName,
-        battle.playerAccountId,
-        battle.playerHero,
-        battle.playerRank,
-        battle.playerRating,
-        battle.playerLevel,
-        battle.opponentName,
-        battle.opponentAccountId,
-        battle.opponentHero,
-        battle.opponentRank,
-        battle.opponentRating,
-        battle.opponentLevel,
-        battle.combatKind,
-        battle.result,
-        battle.winnerCombatantId,
-        battle.loserCombatantId,
-        battle.payloadJson,
-        battle.createdAtUtc,
-        battle.updatedAtUtc,
-      ),
-    ),
-  ];
+  const deleteStmt = env.DB.prepare(
+    `
+      DELETE FROM pvp_battles
+      WHERE source_client_id = ?
+        AND run_id = ?
+    `,
+  ).bind(input.sourceClientId, input.runId);
 
-  await env.DB.batch(statements);
+  const firstBatch = input.battles
+    .slice(0, D1_BATCH_LIMIT - 1)
+    .map((b) => buildBattleUpsert(env, b));
+  await env.DB.batch([deleteStmt, ...firstBatch]);
+
+  const remaining = input.battles
+    .slice(D1_BATCH_LIMIT - 1)
+    .map((b) => buildBattleUpsert(env, b));
+  if (remaining.length > 0) {
+    await batchExecute(env, remaining);
+  }
 }
 
 export async function listProjectedBattlesAgainstAccountIds(

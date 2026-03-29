@@ -2,6 +2,7 @@ import type { Env } from "../env";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
 import { upsertReplayUpload } from "../persistence/replayUploads";
+import { parseReplayUploadBody } from "./uploadReplayPayload";
 import { requireVerifiedClient } from "./verifiedClient";
 
 export async function handleReplayUpload(
@@ -18,6 +19,11 @@ export async function handleReplayUpload(
   });
   if (verified instanceof Response) {
     return verified;
+  }
+
+  const parsed = parseReplayUploadBody(verified.payload, battleId);
+  if (parsed instanceof Response) {
+    return parsed;
   }
 
   const runId = trimString(request.headers.get("x-bpp-run-id")) || null;

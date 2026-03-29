@@ -8,7 +8,6 @@ export async function upsertRunUpload(
     installId: string;
     runId: string;
     payloadSha256: string;
-    payloadJson: string;
     uploadedAtUtc: string;
     projectionStatus: RunUploadProjectionStatus;
     projectedAtUtc?: string | null;
@@ -22,17 +21,15 @@ export async function upsertRunUpload(
         install_id,
         run_id,
         payload_sha256,
-        payload_json,
         uploaded_at_utc,
         projection_status,
         projected_at_utc,
         projection_error
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(run_id) DO UPDATE SET
         client_id = excluded.client_id,
         install_id = excluded.install_id,
         payload_sha256 = excluded.payload_sha256,
-        payload_json = excluded.payload_json,
         uploaded_at_utc = excluded.uploaded_at_utc,
         projection_status = excluded.projection_status,
         projected_at_utc = excluded.projected_at_utc,
@@ -44,7 +41,6 @@ export async function upsertRunUpload(
       input.installId,
       input.runId,
       input.payloadSha256,
-      input.payloadJson,
       input.uploadedAtUtc,
       input.projectionStatus,
       input.projectedAtUtc ?? null,

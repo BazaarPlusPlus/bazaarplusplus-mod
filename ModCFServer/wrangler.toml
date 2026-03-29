@@ -11,7 +11,11 @@ custom_domain = true
 binding = "DB"
 database_name = "bazaarplusplus-mod-api-db"
 database_id = "replace-me"
+migrations_dir = "migrations"
 
 [[r2_buckets]]
 binding = "REPLAY_BUCKET"
 bucket_name = "bazaarplusplus-replays"
+
+[triggers]
+crons = ["0 */6 * * *"]

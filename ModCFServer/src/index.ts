@@ -5,17 +5,16 @@ import {
   handleReplayDownload,
 } from "./features/ghostBattles";
 import { json } from "./http/json";
-import { ensureSchema } from "./persistence/schema";
 import { registerClient } from "./features/registerClient";
 import { handleRunUpload } from "./features/uploadRun";
 import { handleReplayUpload } from "./features/uploadReplay";
+import { purgeExpiredNonces } from "./persistence/nonces";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    await ensureSchema(env);
     const url = new URL(request.url);
 
-    if (request.method === "POST" && url.pathname === "/health") {
+    if (request.method === "GET" && url.pathname === "/health") {
       return json({ ok: true });
     }
 
@@ -51,5 +50,9 @@ export default {
     }
 
     return json({ error: "not_found" }, { status: 404 });
+  },
+
+  async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
+    await purgeExpiredNonces(env, 15 * 60 * 1000);
   },
 };

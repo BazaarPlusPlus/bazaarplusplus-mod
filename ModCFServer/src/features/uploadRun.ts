@@ -47,13 +47,11 @@ export async function handleRunUpload(
   }
 
   const uploadedAtUtc = new Date().toISOString();
-  const payloadJson = JSON.stringify(parsed.raw);
   await upsertRunUpload(env, {
     clientId: verified.client.client_id,
     installId: verified.client.install_id,
     runId,
     payloadSha256: verified.payloadHash,
-    payloadJson,
     uploadedAtUtc,
     projectionStatus: "pending",
     projectedAtUtc: null,

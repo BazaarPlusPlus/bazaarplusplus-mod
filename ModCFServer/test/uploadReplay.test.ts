@@ -36,7 +36,13 @@ test("persists verified replay uploads", async () => {
   const payload = JSON.stringify({
     battle_id: "battle-001",
     client_id: registerJson.client_id,
-    replay_payload: { battle_id: "battle-001" },
+    replay_payload: {
+      battle_id: "battle-001",
+      version: 1,
+      spawn_message_base64: "c3Bhd24=",
+      combat_message_base64: "Y29tYmF0",
+      despawn_message_base64: "ZGVzcGF3bg==",
+    },
   });
   const bodyHash = sha256Base64(payload);
   const timestamp = new Date().toISOString();
@@ -100,7 +106,13 @@ test("re-uploading the same replay payload remains idempotent", async () => {
 
   const payload = JSON.stringify({
     battle_id: "battle-repeat",
-    replay_payload: { battle_id: "battle-repeat" },
+    replay_payload: {
+      battle_id: "battle-repeat",
+      version: 1,
+      spawn_message_base64: "c3Bhd24=",
+      combat_message_base64: "Y29tYmF0",
+      despawn_message_base64: "ZGVzcGF3bg==",
+    },
   });
   const bodyHash = sha256Base64(payload);
 
@@ -144,4 +156,69 @@ test("re-uploading the same replay payload remains idempotent", async () => {
 
   assert.equal(env.DB.replayUploads.size, 1);
   assert.equal(env.REPLAY_BUCKET.objects.size, 1);
+});
+
+test("rejects replay uploads with incomplete replay payloads", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "replays-client-invalid";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: "install-invalid-replay",
+    purpose: "replays",
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+  });
+
+  const payload = JSON.stringify({
+    battle_id: "battle-invalid",
+    replay_payload: {
+      battle_id: "battle-invalid",
+      version: 1,
+      spawn_message_base64: "c3Bhd24=",
+      combat_message_base64: "Y29tYmF0",
+    },
+  });
+  const bodyHash = sha256Base64(payload);
+  const timestamp = new Date().toISOString();
+  const nonce = "nonce-invalid-replay";
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      "/replays/upload",
+      clientId,
+      "install-invalid-replay",
+      timestamp,
+      nonce,
+      bodyHash,
+    ),
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/replays/upload", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-bpp-client-id": clientId,
+        "x-bpp-install-id": "install-invalid-replay",
+        "x-bpp-battle-id": "battle-invalid",
+        "x-bpp-plugin-version": "1.9.0",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-nonce": nonce,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+        "x-bpp-signature": signature,
+      },
+      body: payload,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid_replay_payload" });
+  assert.equal(env.DB.replayUploads.size, 0);
+  assert.equal(env.REPLAY_BUCKET.objects.size, 0);
 });

@@ -23,7 +23,6 @@ export type RunUploadRow = {
   install_id: string;
   run_id: string;
   payload_sha256: string;
-  payload_json: string;
   uploaded_at_utc: string;
   projection_status: string;
   projected_at_utc: string | null;
@@ -278,11 +277,10 @@ export class MockD1Database {
         install_id: String(params[1]),
         run_id: String(params[2]),
         payload_sha256: String(params[3]),
-        payload_json: String(params[4]),
-        uploaded_at_utc: String(params[5]),
-        projection_status: String(params[6]),
-        projected_at_utc: params[7] == null ? null : String(params[7]),
-        projection_error: params[8] == null ? null : String(params[8]),
+        uploaded_at_utc: String(params[4]),
+        projection_status: String(params[5]),
+        projected_at_utc: params[6] == null ? null : String(params[6]),
+        projection_error: params[7] == null ? null : String(params[7]),
       });
       return { changes: 1 };
     }

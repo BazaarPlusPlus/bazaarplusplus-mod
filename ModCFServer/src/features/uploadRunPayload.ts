@@ -53,6 +53,19 @@ function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function hasRequiredProjectedBattleFields(raw: JsonObject): boolean {
+  const combatKind = asString(raw.combat_kind);
+  if (combatKind == null) {
+    return false;
+  }
+
+  if (combatKind !== "PVPCombat") {
+    return true;
+  }
+
+  return asString(raw.battle_id) != null && asString(raw.opponent_account_id) != null;
+}
+
 function parseBattle(value: unknown): ParsedRunBattle | null {
   const raw = asObject(value);
   if (raw == null) {
@@ -96,11 +109,20 @@ export function parseRunUploadBody(
       return json({ error: "invalid_json_body" }, { status: 400 });
     }
 
-    const battles = Array.isArray(raw.pvp_battles)
-      ? raw.pvp_battles
-          .map(parseBattle)
-          .filter((battle): battle is ParsedRunBattle => battle != null)
-      : [];
+    if (!Array.isArray(raw.pvp_battles)) {
+      return json({ error: "pvp_battles_required" }, { status: 400 });
+    }
+
+    for (const battle of raw.pvp_battles) {
+      const battleObject = asObject(battle);
+      if (battleObject == null || !hasRequiredProjectedBattleFields(battleObject)) {
+        return json({ error: "invalid_pvp_battle_payload" }, { status: 400 });
+      }
+    }
+
+    const battles = raw.pvp_battles
+      .map(parseBattle)
+      .filter((battle): battle is ParsedRunBattle => battle != null);
 
     return {
       raw,
