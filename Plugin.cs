@@ -7,7 +7,6 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Upload;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
-using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
@@ -24,7 +23,6 @@ public class Plugin : BaseUnityPlugin
 {
     private readonly Harmony _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
     private BppRuntimeHost? _runtimeHost;
-    private HistoryPanel? _historyPanel;
 
     protected virtual void Awake()
     {
@@ -59,22 +57,9 @@ public class Plugin : BaseUnityPlugin
 
     protected virtual void OnDestroy()
     {
+        _harmony.UnpatchSelf();
         _runtimeHost?.Stop();
         BppLog.Flush();
-    }
-
-    protected virtual void Update()
-    {
-        if (!BppHotkeyService.WasPressedThisFrame(KeyBindings.Toggle.HistoryPanel))
-            return;
-
-        if (_historyPanel == null)
-        {
-            BppLog.Warn("Plugin", "History hotkey was pressed, but HistoryPanel is unavailable.");
-            return;
-        }
-
-        _historyPanel.ToggleFromHotkey();
     }
 
     private ConfigFile CreateConfigFile()
@@ -120,8 +105,8 @@ public class Plugin : BaseUnityPlugin
         BppLog.Info("Plugin", "Adding CombatReplayUploadController");
         gameObject.AddComponent<CombatReplayUploadController>();
         BppLog.Info("Plugin", "Adding HistoryPanel");
-        _historyPanel = gameObject.AddComponent<HistoryPanel>();
-        _historyPanel.Configure(
+        var historyPanel = gameObject.AddComponent<HistoryPanel>();
+        historyPanel.Configure(
             new HistoryPanelRuntime(
                 services.RunContext,
                 services.Paths.RunLogDatabasePath,

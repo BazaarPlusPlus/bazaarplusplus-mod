@@ -5,6 +5,8 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.NameOverride;
+using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
+using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
 using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 
 namespace BazaarPlusPlus.Game.Settings;
@@ -13,6 +15,14 @@ internal static class BppSettingsDockCatalog
 {
     internal static IReadOnlyList<BppSettingsDockDefinition> Definitions { get; } =
     [
+        new(
+            "GameHistory",
+            HistoryPanelLabel.Resolve,
+            _ => HistoryPanelFeature.IsVisible ? "OPEN" : "VIEW",
+            () => HistoryPanelFeature.IsVisible,
+            HistoryPanelFeature.OpenFromDockEntry,
+            collapseAfterActivate: true
+        ),
         new(
             "NameOverride",
             NameOverrideSettingsMenuLabel.Resolve,

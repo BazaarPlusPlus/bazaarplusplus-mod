@@ -247,7 +247,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         button.transition = Selectable.Transition.ColorTint;
         button.navigation = new Navigation { mode = Navigation.Mode.None };
         button.targetGraphic = background;
-        button.onClick.AddListener(() => ToggleSetting(definition));
+        button.onClick.AddListener(() => ActivateDefinition(definition));
 
         var label = CreateText(
             "Label",
@@ -315,10 +315,12 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         UpdateDockButtonAccent();
     }
 
-    private void ToggleSetting(BppSettingsDockDefinition definition)
+    private void ActivateDefinition(BppSettingsDockDefinition definition)
     {
-        var currentValue = definition.Bridge.GetInitialValue();
-        definition.Bridge.ApplyValue(!currentValue);
+        definition.Activate();
+        if (definition.CollapseAfterActivate)
+            SetExpanded(false);
+
         RefreshAll();
     }
 
@@ -335,9 +337,9 @@ internal sealed class BppSettingsDockController : MonoBehaviour
 
     private void ApplyRowState(DockSettingRowView row)
     {
-        var enabled = row.Definition.Bridge.GetInitialValue();
+        var enabled = row.Definition.IsActive();
         row.Label.text = row.Definition.ResolveLabel(PlayerPreferences.Data.LanguageCode);
-        row.Status.text = enabled ? "ON" : "OFF";
+        row.Status.text = row.Definition.ResolveStatus(PlayerPreferences.Data.LanguageCode);
         row.Background.color = enabled
             ? new Color(0.23f, 0.35f, 0.22f, 0.94f)
             : new Color(0.19f, 0.19f, 0.22f, 0.92f);
@@ -362,7 +364,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         var enabledCount = 0;
         foreach (var definition in BppSettingsDockCatalog.Definitions)
         {
-            if (definition.Bridge.GetInitialValue())
+            if (definition.IsActive())
                 enabledCount++;
         }
 

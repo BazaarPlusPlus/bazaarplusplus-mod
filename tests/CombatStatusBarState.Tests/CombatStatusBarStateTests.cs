@@ -190,6 +190,53 @@ public sealed class CombatStatusBarStateTests : IDisposable
         Assert.True(changedValue);
     }
 
+    [Fact]
+    public void DockDefinition_ToggleRow_ReportsStatusAndFlipsStateOnActivate()
+    {
+        var enabled = false;
+        var bridge = new SettingsMenuToggleBridge(() => enabled, value => enabled = value);
+        var definition = new BppSettingsDockDefinition("CombatStatusBar", _ => "Combat", bridge);
+
+        Assert.False(definition.IsActive());
+        Assert.Equal("OFF", definition.ResolveStatus("en"));
+
+        definition.Activate();
+
+        Assert.True(enabled);
+        Assert.True(definition.IsActive());
+        Assert.Equal("ON", definition.ResolveStatus("en"));
+        Assert.False(definition.CollapseAfterActivate);
+    }
+
+    [Fact]
+    public void DockDefinition_ActionRow_InvokesAction_AndReportsDynamicStatus()
+    {
+        var open = false;
+        var activationCount = 0;
+        var definition = new BppSettingsDockDefinition(
+            "GameHistory",
+            _ => "Game History",
+            _ => open ? "OPEN" : "VIEW",
+            () => open,
+            () =>
+            {
+                activationCount++;
+                open = true;
+            },
+            collapseAfterActivate: true
+        );
+
+        Assert.False(definition.IsActive());
+        Assert.Equal("VIEW", definition.ResolveStatus("en"));
+
+        definition.Activate();
+
+        Assert.Equal(1, activationCount);
+        Assert.True(definition.IsActive());
+        Assert.Equal("OPEN", definition.ResolveStatus("en"));
+        Assert.True(definition.CollapseAfterActivate);
+    }
+
     [Theory]
     [InlineData("zh-Hans", "\u6218\u6597\u72b6\u6001\u680f")]
     [InlineData("zh-CN", "\u6218\u6597\u72b6\u6001\u680f")]

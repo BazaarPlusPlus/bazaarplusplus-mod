@@ -13,6 +13,7 @@ internal sealed partial class HistoryPanel
         _runs.Clear();
         _battles.Clear();
         _ghostBattles.Clear();
+        InvalidateFilteredGhostBattles();
 
         if (_sectionMode == HistorySectionMode.Ghost)
         {
@@ -70,6 +71,7 @@ internal sealed partial class HistoryPanel
         }
 
         _ghostBattles.AddRange(battles);
+        InvalidateFilteredGhostBattles();
         _selectedGhostBattleIndex = Mathf.Clamp(
             _selectedGhostBattleIndex,
             0,
@@ -101,6 +103,7 @@ internal sealed partial class HistoryPanel
             return;
 
         _ghostBattleFilter = filter;
+        InvalidateFilteredGhostBattles();
         _selectedGhostBattleIndex = Mathf.Clamp(
             _selectedGhostBattleIndex,
             0,

@@ -22,7 +22,6 @@ internal static class KeyBindings
     internal static class Toggle
     {
         public const string DebugPanel = "<Keyboard>/f2";
-        public const string HistoryPanel = "<Keyboard>/f8";
     }
 
     internal static class DebugPanel

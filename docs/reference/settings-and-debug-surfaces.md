@@ -4,7 +4,9 @@
 
 `Game/Settings/BppSettingsDockController.cs` 负责把 Bazaar++ 设置按钮挂到原生 settings UI 上，具体定义来自 `Game/Settings/BppSettingsDockCatalog.cs`。
 
-当前 toggle：
+当前内容：
+
+- `Game History` -> 大厅 Bazaar++ panel 内入口，打开 `HistoryPanel`
 
 - `Anonymous Mode` -> `EnableNameOverrideConfig`
 - `Enchant Preview` -> `EnchantPreviewAlwaysShowConfig`
@@ -41,7 +43,7 @@
 
 当前入口：
 
-- `F8`: toggle `HistoryPanel`
+- `Bazaar++ panel -> Game History`: 打开 `HistoryPanel`
 - `F2`: toggle `DebugPanel`
 - `DebugPanel -> Replays`: 启动本地保存的 replay
 - `DebugPanel -> Encounters`: 查看当前遭遇与 monster-preview 相关状态

@@ -48,7 +48,7 @@
 - 同步和浏览 ghost battles
 - 删除 run 及其关联 battle 记录
 
-默认热键是 `F8`。面板内部还带有 preview tuning 的调试热键，见 `docs/reference/hotkeys-reference.md`。
+大厅内通过 Bazaar++ settings dock 的 `Game History` 入口打开。面板内部还带有 preview tuning 的调试热键，见 `docs/reference/hotkeys-reference.md`。
 
 ## 关键文件
 

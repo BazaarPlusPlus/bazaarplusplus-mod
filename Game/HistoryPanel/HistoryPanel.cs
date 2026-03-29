@@ -37,6 +37,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private readonly List<HistoryRunRecord> _runs = new List<HistoryRunRecord>();
     private readonly List<HistoryBattleRecord> _battles = new List<HistoryBattleRecord>();
     private readonly List<HistoryBattleRecord> _ghostBattles = new List<HistoryBattleRecord>();
+    private readonly List<HistoryBattleRecord> _filteredGhostBattles =
+        new List<HistoryBattleRecord>();
     private int _selectedRunIndex;
     private int _selectedBattleIndex;
     private int _selectedGhostBattleIndex;
@@ -54,6 +56,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private PreviewSelectionMode _previewSelectionMode = PreviewSelectionMode.Run;
     private HistorySectionMode _sectionMode = HistorySectionMode.Runs;
     private string _lastSceneToken = string.Empty;
+    private bool _filteredGhostBattlesDirty = true;
     private bool _initialized;
 
     public static bool IsVisible { get; private set; }
@@ -77,7 +80,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _sectionMode == HistorySectionMode.Ghost ? SelectedGhostBattle : SelectedBattle;
 
     private IReadOnlyList<HistoryBattleRecord> FilteredGhostBattles =>
-        _ghostBattles.Where(MatchesGhostFilter).ToList();
+        GetFilteredGhostBattles();
 
     private void Awake()
     {
@@ -178,6 +181,17 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         }
     }
 
+    internal static void OpenFromDockEntry()
+    {
+        if (Instance == null)
+        {
+            BppLog.Warn("HistoryPanel", "Dock entry requested while HistoryPanel is unavailable.");
+            return;
+        }
+
+        Instance.OpenFromDockEntryInternal();
+    }
+
     private void RefreshSelectedBattlePreview()
     {
         StopPreviewRender();
@@ -233,8 +247,52 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             return;
 
         _lastSceneToken = currentSceneToken;
+        if (IsVisible && _runtime?.IsInGameRun == true)
+            SetHistoryVisible(false);
+
         StopPreviewRender();
         _previewRenderer?.Dispose();
+    }
+
+    private void OpenFromDockEntryInternal()
+    {
+        EnsureInitialized("OpenFromDockEntry");
+
+        if (_runtime?.IsInGameRun == true)
+        {
+            BppLog.Warn("HistoryPanel", "Ignored dock open request while in game run.");
+            return;
+        }
+
+        try
+        {
+            SetHistoryVisible(true);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("HistoryPanel", "OpenFromDockEntry failed", ex);
+        }
+    }
+
+    private IReadOnlyList<HistoryBattleRecord> GetFilteredGhostBattles()
+    {
+        if (!_filteredGhostBattlesDirty)
+            return _filteredGhostBattles;
+
+        _filteredGhostBattles.Clear();
+        foreach (var battle in _ghostBattles)
+        {
+            if (MatchesGhostFilter(battle))
+                _filteredGhostBattles.Add(battle);
+        }
+
+        _filteredGhostBattlesDirty = false;
+        return _filteredGhostBattles;
+    }
+
+    private void InvalidateFilteredGhostBattles()
+    {
+        _filteredGhostBattlesDirty = true;
     }
 
     private static string GetSceneToken(Scene scene)

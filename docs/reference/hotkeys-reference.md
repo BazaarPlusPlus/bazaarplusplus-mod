@@ -4,7 +4,6 @@
 
 | Hotkey | Function | Scope | Rebindable |
 | --- | --- | --- | --- |
-| `F8` | Toggle `HistoryPanel` | Global | No |
 | `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No |
 | `Ctrl` | Show enchant preview | Tooltip hover | Yes |
 | `Shift` | Show upgrade preview | Tooltip hover | Yes |
