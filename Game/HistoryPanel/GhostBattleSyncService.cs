@@ -244,17 +244,6 @@ internal sealed class GhostBattleSyncService : IDisposable
                 shouldReRegister: false
             );
         }
-        if (
-            string.Equals(
-                _clientStateStore.TryGetScopedBoundPlayerAccountId(RunUploadScopes.Runs, clientId),
-                playerAccountId,
-                StringComparison.Ordinal
-            )
-        )
-        {
-            return RunUploadBindingResult.Success();
-        }
-
         var bindingClient = new RunUploadBindingClient(
             _httpClient,
             new RunUploadRequestSigner(_keyStore),
