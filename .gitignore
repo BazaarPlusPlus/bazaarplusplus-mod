@@ -16,6 +16,7 @@ decompiled/
 .dotnet-home/
 .nuget-packages/
 .npm-cache/
+.wrangler
 __pycache__/
 
 # Generated mod files
