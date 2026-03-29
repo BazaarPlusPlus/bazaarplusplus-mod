@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
 using Newtonsoft.Json;
+using TheBazaar;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.Lobby.RandomHeroPool;
@@ -110,22 +111,15 @@ internal static class RandomHeroPoolPlayerPrefs
     {
         try
         {
-            var dataType = AccessTools.TypeByName("Data");
-            if (dataType == null)
-                return AnonymousAccountScope;
-
-            var profileProperty = AccessTools.Property(dataType, "Profile");
-            var profile = profileProperty?.GetValue(null);
+            var profile = ClientCache.Profile.Value;
             if (profile == null)
                 return AnonymousAccountScope;
 
-            var accountIdProperty = AccessTools.Property(profile.GetType(), "AccountId");
-            var accountId = accountIdProperty?.GetValue(profile)?.ToString();
+            var accountId = profile.AccountId.ToString();
             if (!string.IsNullOrWhiteSpace(accountId))
                 return Uri.EscapeDataString(accountId);
 
-            var usernameProperty = AccessTools.Property(profile.GetType(), "Username");
-            var username = usernameProperty?.GetValue(profile)?.ToString();
+            var username = profile.Username;
             if (!string.IsNullOrWhiteSpace(username))
                 return Uri.EscapeDataString(username);
         }

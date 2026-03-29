@@ -7,8 +7,12 @@ internal static class NameOverrideUiRefresh
 {
     internal static void TryRefreshVisibleHeroBanners()
     {
-        var profileName = Data.Profile?.Username;
-        if (string.IsNullOrWhiteSpace(profileName))
+        var profile = ClientCache.Profile.Value;
+        if (profile == null)
+            return;
+
+        var displayName = profile.GetDisplayUsername();
+        if (string.IsNullOrWhiteSpace(displayName))
             return;
 
         var banners = Object.FindObjectsOfType<HeroBannerController>();
@@ -20,7 +24,7 @@ internal static class NameOverrideUiRefresh
             if (banner == null || !banner.isActiveAndEnabled)
                 continue;
 
-            banner.SetHeroName(profileName, 0);
+            banner.SetHeroName(displayName, 0);
         }
     }
 }

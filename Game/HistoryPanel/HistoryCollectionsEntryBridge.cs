@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.Settings;
+using HarmonyLib;
+using TheBazaar.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -100,6 +102,10 @@ internal sealed class HistoryCollectionsEntryBridge : MonoBehaviour
 
     private static Button? FindCollectionsAnchorButton()
     {
+        var anchoredButton = TryFindButtonFromCollectionsController();
+        if (anchoredButton != null)
+            return anchoredButton;
+
         Button? best = null;
         var bestScore = int.MinValue;
 
@@ -119,6 +125,32 @@ internal sealed class HistoryCollectionsEntryBridge : MonoBehaviour
         }
 
         return bestScore >= 100 ? best : null;
+    }
+
+    private static Button? TryFindButtonFromCollectionsController()
+    {
+        foreach (var controller in Resources.FindObjectsOfTypeAll<CollectionUIController>())
+        {
+            if (controller == null || !controller.gameObject.activeInHierarchy)
+                continue;
+
+            var parent = AccessTools.Field(typeof(CollectionUIController), "collectionButtonParent")
+                ?.GetValue(controller) as Transform;
+            if (parent == null)
+                continue;
+
+            foreach (var button in parent.GetComponentsInChildren<CollectionsNavigationButton>(true))
+            {
+                if (button == null || !button.gameObject.activeInHierarchy)
+                    continue;
+                if (button.name == EntryObjectName)
+                    continue;
+
+                return button;
+            }
+        }
+
+        return null;
     }
 
     private static int ScoreCandidate(Button candidate)

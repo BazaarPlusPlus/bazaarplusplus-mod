@@ -15,6 +15,7 @@ internal sealed partial class HistoryPanel
     private const float PanelHeight = 960f;
     private const float ListColumnWidth = 392f;
     private const float PreviewSectionHeight = 256f;
+    private const float GhostFilterButtonHeight = 22f;
 
     private static Sprite? _roundedSprite;
     private static TMP_FontAsset? _uiFont;
@@ -25,9 +26,12 @@ internal sealed partial class HistoryPanel
     private GameObject? _canvasObject;
     private RectTransform? _panelRoot;
     private RectTransform? _runSectionPanel;
-    private RectTransform? _ghostFilterRow;
+    private RectTransform? _ghostModeRoot;
+    private RectTransform? _ghostBattleListContent;
+    private RectTransform? _runsModeRoot;
     private RectTransform? _runListContent;
-    private RectTransform? _battleListContent;
+    private RectTransform? _runsBattleListContent;
+    private TextMeshProUGUI? _runsBattleSectionSubtitle;
     private RawImage? _previewSurface;
     private TextMeshProUGUI? _previewStatusText;
     private TextMeshProUGUI? _previewDebugText;
@@ -36,8 +40,6 @@ internal sealed partial class HistoryPanel
     private TextMeshProUGUI? _databaseChipText;
     private TextMeshProUGUI? _statusText;
     private TextMeshProUGUI? _runSectionTitle;
-    private TextMeshProUGUI? _battleSectionSubtitle;
-    private TextMeshProUGUI? _battleSectionTitle;
     private TextMeshProUGUI? _footerPrimaryText;
     private TextMeshProUGUI? _footerSecondaryText;
     private Button? _runsTabButton;
@@ -180,9 +182,12 @@ internal sealed partial class HistoryPanel
         _canvasObject = null;
         _panelRoot = null;
         _runSectionPanel = null;
-        _ghostFilterRow = null;
+        _ghostModeRoot = null;
+        _ghostBattleListContent = null;
+        _runsModeRoot = null;
         _runListContent = null;
-        _battleListContent = null;
+        _runsBattleListContent = null;
+        _runsBattleSectionSubtitle = null;
         _previewSurface = null;
         _previewStatusText = null;
         _previewDebugText = null;
@@ -191,8 +196,6 @@ internal sealed partial class HistoryPanel
         _databaseChipText = null;
         _statusText = null;
         _runSectionTitle = null;
-        _battleSectionSubtitle = null;
-        _battleSectionTitle = null;
         _footerPrimaryText = null;
         _footerSecondaryText = null;
         _runsTabButton = null;
@@ -256,28 +259,29 @@ internal sealed partial class HistoryPanel
             _runSectionTitle.text = (
                 _sectionMode == HistorySectionMode.Ghost ? "Ghost" : "Runs"
             ).ToUpperInvariant();
-        if (_battleSectionTitle != null)
-            _battleSectionTitle.text = (
-                _sectionMode == HistorySectionMode.Ghost ? "Ghost Battles" : "Battles"
-            ).ToUpperInvariant();
 
         if (_statusText != null)
         {
             _statusText.text = _statusMessage ?? string.Empty;
             _statusText.gameObject.SetActive(!string.IsNullOrWhiteSpace(_statusText.text));
         }
-        if (_battleSectionSubtitle != null)
-            _battleSectionSubtitle.text =
-                _sectionMode == HistorySectionMode.Ghost
-                    ? $"Remote battles where you appeared as the opponent. Showing {GetGhostFilterLabel(_ghostBattleFilter)}."
-                : SelectedRun == null ? "Select a run to inspect its recorded battles."
-                : $"{SelectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(SelectedRun.FinalDay)}";
 
         if (_runSectionPanel != null)
             _runSectionPanel.gameObject.SetActive(_sectionMode != HistorySectionMode.Ghost);
 
-        if (_ghostFilterRow != null)
-            _ghostFilterRow.gameObject.SetActive(_sectionMode == HistorySectionMode.Ghost);
+        if (_ghostModeRoot != null)
+            _ghostModeRoot.gameObject.SetActive(_sectionMode == HistorySectionMode.Ghost);
+
+        if (_runsModeRoot != null)
+        {
+            _runsModeRoot.gameObject.SetActive(_sectionMode != HistorySectionMode.Ghost);
+            if (_runsBattleSectionSubtitle != null)
+            {
+                _runsBattleSectionSubtitle.text = SelectedRun == null
+                    ? "Select a run to inspect its recorded battles."
+                    : $"{SelectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(SelectedRun.FinalDay)}";
+            }
+        }
 
         if (_footerPrimaryText != null)
         {
@@ -605,21 +609,31 @@ internal sealed partial class HistoryPanel
             preferredHeight: 0f,
             flexibleHeight: 1f
         );
-        var rightLayout = CreateVerticalGroup(
-            "BattlesLayout",
-            right,
-            10f,
-            CreatePadding(14f, 14f, 14f, 14f),
+        BuildGhostBattleSection(right);
+        BuildRunsBattleSection(right);
+
+        BuildPreviewSection(outerLayout);
+    }
+
+    private void BuildGhostBattleSection(RectTransform parent)
+    {
+        var layout = CreateVerticalGroup(
+            "GhostBattleLayout",
+            parent,
+            2f,
+            CreatePadding(14f, 14f, 4f, 4f),
             TextAnchor.UpperLeft,
             true,
             true,
             true,
             false
         );
-        StretchToParent(rightLayout, 0f, 0f, 0f, 0f);
-        _ghostFilterRow = CreateHorizontalGroup(
+        StretchToParent(layout, 0f, 0f, 0f, 0f);
+        _ghostModeRoot = layout;
+
+        var filterRow = CreateHorizontalGroup(
             "GhostFilterRow",
-            rightLayout,
+            layout,
             8f,
             null,
             TextAnchor.MiddleLeft,
@@ -628,33 +642,76 @@ internal sealed partial class HistoryPanel
             false,
             false
         );
-        ConfigureLayoutElement(_ghostFilterRow.gameObject, preferredHeight: 30f, minHeight: 30f);
+        ConfigureLayoutElement(
+            filterRow.gameObject,
+            preferredHeight: GhostFilterButtonHeight,
+            minHeight: GhostFilterButtonHeight
+        );
         (_ghostFilterAllButton, _ghostFilterAllButtonBackground, _ghostFilterAllButtonLabel) =
-            CreateStyledButton("GhostFilterAllButton", _ghostFilterRow, "All", 70f, 28f);
+            CreateStyledButton(
+                "GhostFilterAllButton",
+                filterRow,
+                "All",
+                70f,
+                GhostFilterButtonHeight
+            );
+        ConfigureCompactGhostFilterLabel(_ghostFilterAllButtonLabel);
         _ghostFilterAllButton.onClick.AddListener(() =>
             SetGhostBattleFilter(GhostBattleFilter.All)
         );
         (_ghostFilterIWonButton, _ghostFilterIWonButtonBackground, _ghostFilterIWonButtonLabel) =
-            CreateStyledButton("GhostFilterIWonButton", _ghostFilterRow, "I Won", 78f, 28f);
+            CreateStyledButton(
+                "GhostFilterIWonButton",
+                filterRow,
+                "I Won",
+                78f,
+                GhostFilterButtonHeight
+            );
+        ConfigureCompactGhostFilterLabel(_ghostFilterIWonButtonLabel);
         _ghostFilterIWonButton.onClick.AddListener(() =>
             SetGhostBattleFilter(GhostBattleFilter.IWon)
         );
         (_ghostFilterILostButton, _ghostFilterILostButtonBackground, _ghostFilterILostButtonLabel) =
-            CreateStyledButton("GhostFilterILostButton", _ghostFilterRow, "I Lost", 78f, 28f);
+            CreateStyledButton(
+                "GhostFilterILostButton",
+                filterRow,
+                "I Lost",
+                78f,
+                GhostFilterButtonHeight
+            );
+        ConfigureCompactGhostFilterLabel(_ghostFilterILostButtonLabel);
         _ghostFilterILostButton.onClick.AddListener(() =>
             SetGhostBattleFilter(GhostBattleFilter.ILost)
         );
-        CreateFlexibleSpacer("GhostFilterSpacer", _ghostFilterRow);
+        CreateFlexibleSpacer("GhostFilterSpacer", filterRow);
+
+        _ghostBattleListContent = CreateScrollSection(layout, "GhostBattleScroll");
+    }
+
+    private void BuildRunsBattleSection(RectTransform parent)
+    {
+        var layout = CreateVerticalGroup(
+            "RunsBattleLayout",
+            parent,
+            10f,
+            CreatePadding(14f, 14f, 14f, 14f),
+            TextAnchor.UpperLeft,
+            true,
+            true,
+            true,
+            false
+        );
+        StretchToParent(layout, 0f, 0f, 0f, 0f);
+        _runsModeRoot = layout;
+
         BuildSectionHeader(
-            rightLayout,
+            layout,
             "Battles",
             string.Empty,
-            out _battleSectionSubtitle,
-            out _battleSectionTitle
+            out _runsBattleSectionSubtitle,
+            out _
         );
-        _battleListContent = CreateScrollSection(rightLayout, "BattleScroll");
-
-        BuildPreviewSection(outerLayout);
+        _runsBattleListContent = CreateScrollSection(layout, "RunsBattleScroll");
     }
 
     private void BuildFooter()
@@ -773,14 +830,6 @@ internal sealed partial class HistoryPanel
             return;
 
         ClearContainer(_runListContent, _runItemViews);
-        if (_sectionMode == HistorySectionMode.Ghost)
-        {
-            CreatePlaceholder(
-                _runListContent,
-                "Ghost mode uses the battle list on the right. Use Sync Ghost to refresh remote battles."
-            );
-            return;
-        }
 
         if (_runs.Count == 0)
         {
@@ -794,45 +843,58 @@ internal sealed partial class HistoryPanel
 
     private void RebuildBattleList()
     {
-        if (_battleListContent == null)
+        if (_sectionMode == HistorySectionMode.Ghost)
+            RebuildGhostBattleList();
+        else
+            RebuildRunsBattleList();
+    }
+
+    private void RebuildGhostBattleList()
+    {
+        if (_ghostBattleListContent == null)
             return;
 
-        ClearContainer(_battleListContent, _battleItemViews);
-        if (_sectionMode == HistorySectionMode.Ghost)
-        {
-            if (FilteredGhostBattles.Count == 0)
-            {
-                CreatePlaceholder(_battleListContent, "No ghost battles synced yet.");
-                return;
-            }
+        ClearContainer(_ghostBattleListContent, _battleItemViews);
 
-            for (var i = 0; i < FilteredGhostBattles.Count; i++)
-                _battleItemViews.Add(
-                    CreateBattleItem(
-                        _battleListContent,
-                        i,
-                        FilteredGhostBattles[i],
-                        i == _selectedGhostBattleIndex
-                    )
-                );
+        if (FilteredGhostBattles.Count == 0)
+        {
+            CreatePlaceholder(_ghostBattleListContent, "No ghost battles synced yet.");
             return;
         }
 
+        for (var i = 0; i < FilteredGhostBattles.Count; i++)
+            _battleItemViews.Add(
+                CreateBattleItem(
+                    _ghostBattleListContent,
+                    i,
+                    FilteredGhostBattles[i],
+                    i == _selectedGhostBattleIndex
+                )
+            );
+    }
+
+    private void RebuildRunsBattleList()
+    {
+        if (_runsBattleListContent == null)
+            return;
+
+        ClearContainer(_runsBattleListContent, _battleItemViews);
+
         if (SelectedRun == null)
         {
-            CreatePlaceholder(_battleListContent, "Select a run first.");
+            CreatePlaceholder(_runsBattleListContent, "Select a run first.");
             return;
         }
 
         if (_battles.Count == 0)
         {
-            CreatePlaceholder(_battleListContent, "No recorded battles for this run.");
+            CreatePlaceholder(_runsBattleListContent, "No recorded battles for this run.");
             return;
         }
 
         for (var i = 0; i < _battles.Count; i++)
             _battleItemViews.Add(
-                CreateBattleItem(_battleListContent, i, _battles[i], i == _selectedBattleIndex)
+                CreateBattleItem(_runsBattleListContent, i, _battles[i], i == _selectedBattleIndex)
             );
     }
 
@@ -1455,6 +1517,17 @@ internal sealed partial class HistoryPanel
         label.overflowMode = TextOverflowModes.Ellipsis;
         StretchToParent(label.rectTransform, 10f, 10f, 0f, 0f);
         return (button, background, label);
+    }
+
+    private static void ConfigureCompactGhostFilterLabel(TextMeshProUGUI? label)
+    {
+        if (label == null)
+            return;
+
+        label.enableAutoSizing = false;
+        label.fontSize = 14f;
+        label.margin = Vector4.zero;
+        label.extraPadding = false;
     }
 
     private (Button button, Image background) CreateCardButtonShell(

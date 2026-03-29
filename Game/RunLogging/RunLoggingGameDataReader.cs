@@ -61,7 +61,7 @@ internal static class RunLoggingGameDataReader
 
         try
         {
-            var currentSeasonRank = Data.Rank?.CurrentSeasonRank;
+            var currentSeasonRank = GetCurrentSeasonRank();
             if (currentSeasonRank == null)
                 return false;
 
@@ -201,6 +201,17 @@ internal static class RunLoggingGameDataReader
     private static int? GetCurrentPlayerRating()
     {
         return TryGetPlayerRankSnapshot(out _, out var rating) ? rating : null;
+    }
+
+    private static SeasonRank? GetCurrentSeasonRank()
+    {
+        if (!ClientCache.Rank.HasData)
+            return null;
+
+        var seasonRank = new SeasonRank();
+        var rankResponse = ClientCache.Rank.Value;
+        seasonRank.SetRankData(in rankResponse);
+        return seasonRank;
     }
 
     private static string? FormatPlayerRank(ISeasonRank currentSeasonRank)

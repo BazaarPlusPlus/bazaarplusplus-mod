@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 #nullable enable
 using System;
+using System.Collections;
 using System.Linq;
 using BazaarPlusPlus.Game.Input;
 using HarmonyLib;
@@ -32,6 +33,8 @@ internal static class BppKeybindSettingsAwakePatch
     [HarmonyPostfix]
     private static void Postfix(OptionsDialogController __instance)
     {
+        BppKeybindSettingsRefreshDriver.Attach(__instance).RequestRefresh();
+
         try
         {
             EnsureKeybindRows(__instance);
@@ -162,6 +165,8 @@ internal static class BppKeybindSettingsOnEnablePatch
     [HarmonyPostfix]
     private static void Postfix(OptionsDialogController __instance)
     {
+        BppKeybindSettingsRefreshDriver.Attach(__instance).RequestRefresh();
+
         try
         {
             BppKeybindSettingsAwakePatch.EnsureKeybindRows(__instance);
@@ -170,5 +175,105 @@ internal static class BppKeybindSettingsOnEnablePatch
         {
             BppLog.Error("BppKeybindSettings", "Failed to refresh keybind rows", ex);
         }
+    }
+}
+
+[HarmonyPatch(typeof(OptionsDialogController), "OnGameplayButtonClick")]
+internal static class BppKeybindSettingsGameplayOpenPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(OptionsDialogController __instance)
+    {
+        BppKeybindSettingsRefreshDriver.Attach(__instance).RequestRefresh();
+
+        try
+        {
+            BppKeybindSettingsAwakePatch.EnsureKeybindRows(__instance);
+            NativeKeybindLabelAwakePatch.TryUpdateLabels(__instance);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error(
+                "BppKeybindSettings",
+                "Failed to refresh keybind rows after gameplay menu opened",
+                ex
+            );
+        }
+    }
+}
+
+internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
+{
+    private const int RetryFrames = 120;
+
+    private OptionsDialogController? _controller;
+    private Coroutine? _refreshCoroutine;
+
+    internal static BppKeybindSettingsRefreshDriver Attach(OptionsDialogController controller)
+    {
+        var driver =
+            controller.GetComponent<BppKeybindSettingsRefreshDriver>()
+            ?? controller.gameObject.AddComponent<BppKeybindSettingsRefreshDriver>();
+        driver._controller = controller;
+        return driver;
+    }
+
+    internal void RequestRefresh()
+    {
+        if (_refreshCoroutine != null)
+            StopCoroutine(_refreshCoroutine);
+
+        _refreshCoroutine = StartCoroutine(RefreshRoutine());
+    }
+
+    private void OnDisable()
+    {
+        if (_refreshCoroutine == null)
+            return;
+
+        StopCoroutine(_refreshCoroutine);
+        _refreshCoroutine = null;
+    }
+
+    private IEnumerator RefreshRoutine()
+    {
+        for (var frame = 0; frame < RetryFrames; frame++)
+        {
+            if (_controller == null)
+                yield break;
+
+            try
+            {
+                BppKeybindSettingsAwakePatch.EnsureKeybindRows(_controller);
+                BppKeybindSettingsAwakePatch.RefreshLanguage(_controller);
+                NativeKeybindLabelAwakePatch.TryUpdateLabels(_controller);
+
+                if (HasInstalledRows(_controller))
+                {
+                    _refreshCoroutine = null;
+                    yield break;
+                }
+            }
+            catch (Exception ex)
+            {
+                BppLog.Error(
+                    "BppKeybindSettings",
+                    "Failed during deferred keybind row refresh",
+                    ex
+                );
+            }
+
+            yield return null;
+        }
+
+        _refreshCoroutine = null;
+    }
+
+    private static bool HasInstalledRows(OptionsDialogController controller)
+    {
+        return controller.GetComponentsInChildren<Transform>(true)
+                .Any(candidate => candidate != null && candidate.name == "BPP_Keybind_EnchantPreview")
+            && controller.GetComponentsInChildren<Transform>(true)
+                .Any(candidate => candidate != null && candidate.name == "BPP_Keybind_UpgradePreview");
     }
 }

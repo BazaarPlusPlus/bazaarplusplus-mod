@@ -5,7 +5,6 @@ using BazaarGameShared.TempoNet.Enums;
 using BazaarPlusPlus.Game.Lobby;
 using HarmonyLib;
 using TheBazaar;
-using TheBazaar.ProfileData;
 using TheBazaar.UI;
 using TMPro;
 
@@ -15,16 +14,13 @@ namespace BazaarPlusPlus;
 internal static class LegendaryLobbyRatingOnProfileLoadedPatch
 {
     [HarmonyPostfix]
-    private static void Postfix(MainMenuController __instance, IProfile? plr)
+    private static void Postfix(MainMenuController __instance)
     {
-        if (plr == null)
-            return;
-
         LegendaryLobbyRatingUi.Refresh(__instance);
     }
 }
 
-[HarmonyPatch(typeof(MainMenuController), "OnCurrentSeasonRankDataUpdated")]
+[HarmonyPatch(typeof(MainMenuController), "OnRankUpdated")]
 internal static class LegendaryLobbyRatingOnRankUpdatedPatch
 {
     [HarmonyPostfix]
@@ -54,13 +50,15 @@ internal static class LegendaryLobbyRatingUi
             if (leaderboardLabel == null)
                 return;
 
-            var currentSeasonRank = Data.Rank?.CurrentSeasonRank;
+            var currentSeasonRank = GetCurrentSeasonRank();
             if (currentSeasonRank == null)
                 return;
             if (currentSeasonRank.Rank != ERank.Legendary)
                 return;
 
-            var leaderboardPosition = Data.LeaderboardProfile?.LeaderboardPosition;
+            var leaderboardPosition = ClientCache.Leaderboard.HasData
+                ? ClientCache.Leaderboard.Value.position
+                : null;
             leaderboardLabel.text = LegendaryLobbyRatingFormatter.BuildLegendaryText(
                 leaderboardPosition,
                 currentSeasonRank.Rating
@@ -73,5 +71,16 @@ internal static class LegendaryLobbyRatingUi
                 $"Failed to refresh lobby rating text: {ex.Message}"
             );
         }
+    }
+
+    private static TheBazaar.ProfileData.SeasonRank? GetCurrentSeasonRank()
+    {
+        if (!ClientCache.Rank.HasData)
+            return null;
+
+        var seasonRank = new TheBazaar.ProfileData.SeasonRank();
+        var rankResponse = ClientCache.Rank.Value;
+        seasonRank.SetRankData(in rankResponse);
+        return seasonRank;
     }
 }

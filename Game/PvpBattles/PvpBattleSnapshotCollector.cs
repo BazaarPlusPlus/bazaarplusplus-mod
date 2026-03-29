@@ -451,7 +451,7 @@ internal sealed class PvpBattleSnapshotCollector
     {
         try
         {
-            return Data.Profile?.Username;
+            return ClientCache.Profile.Value?.Username;
         }
         catch
         {
@@ -463,7 +463,7 @@ internal sealed class PvpBattleSnapshotCollector
     {
         try
         {
-            return Data.Profile?.AccountId.ToString();
+            return ClientCache.Profile.Value?.AccountId.ToString();
         }
         catch
         {

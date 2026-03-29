@@ -110,7 +110,7 @@ internal static class LegendaryEndOfMatchRatingUi
 
     private static int? ResolveRatingAfterRun()
     {
-        return Data.Rank?.CurrentSeasonRank?.Rating;
+        return ClientCache.Rank.HasData ? ClientCache.Rank.Value.Rating : null;
     }
 
     private static TextMeshProUGUI? FindActiveRankLabel(EndOfRunRankController controller)

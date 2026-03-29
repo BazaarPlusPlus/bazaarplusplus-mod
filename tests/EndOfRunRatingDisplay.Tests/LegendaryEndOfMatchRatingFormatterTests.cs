@@ -68,7 +68,7 @@ public sealed class LegendaryEndOfMatchRatingFormatterTests
         Assert.Contains("EndOfRunRankController", source, StringComparison.Ordinal);
         Assert.Contains("CommonData", source, StringComparison.Ordinal);
         Assert.Contains("CurrentSeasonRank", source, StringComparison.Ordinal);
-        Assert.Contains("Data.Rank?.CurrentSeasonRank?.Rating", source, StringComparison.Ordinal);
+        Assert.Contains("ClientCache.Rank.HasData ? ClientCache.Rank.Value.Rating : null", source, StringComparison.Ordinal);
         Assert.Contains("ShouldShow", source, StringComparison.Ordinal);
         Assert.Contains("sourceLabel.rectTransform", source, StringComparison.Ordinal);
         Assert.Contains("new GameObject(RatingLineObjectName", source, StringComparison.Ordinal);
@@ -111,8 +111,8 @@ public sealed class LegendaryEndOfMatchRatingFormatterTests
 
         Assert.Contains("MainMenuController", source, StringComparison.Ordinal);
         Assert.Contains("OnProfileLoaded", source, StringComparison.Ordinal);
-        Assert.Contains("OnCurrentSeasonRankDataUpdated", source, StringComparison.Ordinal);
+        Assert.Contains("OnRankUpdated", source, StringComparison.Ordinal);
         Assert.Contains("CurrentSeasonRank", source, StringComparison.Ordinal);
-        Assert.Contains("LeaderboardPosition", source, StringComparison.Ordinal);
+        Assert.Contains("ClientCache.Leaderboard.Value.position", source, StringComparison.Ordinal);
     }
 }
