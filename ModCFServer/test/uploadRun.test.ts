@@ -26,6 +26,7 @@ test("accepts signed run uploads", async () => {
 
   const payload = JSON.stringify({
     run_id: "run-001",
+    schema_version: 3,
     state: "active",
     pvp_battles: [],
   });
@@ -67,8 +68,18 @@ test("accepts signed run uploads", async () => {
 
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: "accepted" });
-  assert.equal(env.DB.runUploads.get("run-001")?.client_id, clientId);
-  assert.equal(env.DB.runUploads.get("run-001")?.projection_status, "projected");
+  const uploadedRun = env.DB.runUploads.get("run-001");
+  assert.equal(uploadedRun?.client_id, clientId);
+  assert.equal(uploadedRun?.projection_status, "projected");
+  assert.equal(
+    uploadedRun?.payload_object_key,
+    `runs/${clientId}/run-001/${bodyHash}.json`,
+  );
+  assert.equal(uploadedRun?.payload_bytes, new TextEncoder().encode(payload).byteLength);
+  assert.equal(uploadedRun?.schema_version, 3);
+  assert.equal(uploadedRun?.projection_version, 1);
+  assert.equal(uploadedRun?.projected_battle_count, 0);
+  assert.ok(env.REPLAY_BUCKET.objects.has(`runs/${clientId}/run-001/${bodyHash}.json`));
 });
 
 test("projects uploaded pvp battles and records bound player accounts", async () => {
@@ -94,6 +105,7 @@ test("projects uploaded pvp battles and records bound player accounts", async ()
 
   const payload = JSON.stringify({
     run_id: "run-projection",
+    schema_version: 5,
     pvp_battles: [
       {
         battle_id: "battle-projection-001",
@@ -169,9 +181,85 @@ test("projects uploaded pvp battles and records bound player accounts", async ()
   assert.equal(projectedBattle?.player_hero, "Dooley");
   assert.equal(projectedBattle?.player_level, 8);
   assert.equal(env.DB.runUploads.get("run-projection")?.projection_status, "projected");
+  assert.equal(env.DB.runUploads.get("run-projection")?.projected_battle_count, 1);
+  assert.equal(env.DB.runUploads.get("run-projection")?.projection_version, 1);
   assert.equal(
     env.DB.uidPlayerAccounts.get("uid-001:player-account-001")?.last_client_id,
     clientId,
+  );
+});
+
+test("records a failed projection in the run ingestion ledger", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "runs-client-projection-failure";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: "install-run-projection-failure",
+    purpose: "runs",
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+  });
+  env.DB.batch = async () => {
+    throw new Error("projection-write-failed");
+  };
+
+  const payload = JSON.stringify({
+    run_id: "run-projection-failure",
+    schema_version: 2,
+    pvp_battles: [
+      {
+        battle_id: "battle-projection-failure-001",
+        opponent_account_id: "opponent-account-001",
+        combat_kind: "PVPCombat",
+      },
+    ],
+  });
+  const bodyHash = sha256Base64(payload);
+  const timestamp = new Date().toISOString();
+  const nonce = "nonce-run-projection-failure";
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      "/runs/upload",
+      clientId,
+      "install-run-projection-failure",
+      timestamp,
+      nonce,
+      bodyHash,
+    ),
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/runs/upload", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-bpp-client-id": clientId,
+        "x-bpp-install-id": "install-run-projection-failure",
+        "x-bpp-run-id": "run-projection-failure",
+        "x-bpp-plugin-version": "1.9.0",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-nonce": nonce,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+        "x-bpp-signature": signature,
+      },
+      body: payload,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), { error: "projection_failed" });
+  assert.equal(env.DB.runUploads.get("run-projection-failure")?.projection_status, "failed");
+  assert.equal(env.DB.runUploads.get("run-projection-failure")?.last_error_code, "projection_failed");
+  assert.match(
+    env.DB.runUploads.get("run-projection-failure")?.last_error_detail ?? "",
+    /projection-write-failed/,
   );
 });
 

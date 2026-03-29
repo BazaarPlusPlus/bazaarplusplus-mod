@@ -34,6 +34,7 @@ export type ParsedRunBattle = {
 export type ParsedRunUploadBody = {
   raw: JsonObject;
   runId: string | null;
+  schemaVersion: number | null;
   battles: ParsedRunBattle[];
 };
 
@@ -127,6 +128,7 @@ export function parseRunUploadBody(
     return {
       raw,
       runId: asString(raw.run_id),
+      schemaVersion: asNumber(raw.schema_version),
       battles,
     };
   } catch {

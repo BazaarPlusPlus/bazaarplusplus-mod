@@ -8,10 +8,17 @@ export async function upsertRunUpload(
     installId: string;
     runId: string;
     payloadSha256: string;
-    uploadedAtUtc: string;
+    payloadObjectKey: string | null;
+    payloadBytes: number | null;
+    schemaVersion: number | null;
+    projectionVersion: number;
     projectionStatus: RunUploadProjectionStatus;
+    projectedBattleCount: number;
     projectedAtUtc?: string | null;
-    projectionError?: string | null;
+    lastErrorCode?: string | null;
+    lastErrorDetail?: string | null;
+    createdAtUtc: string;
+    updatedAtUtc: string;
   },
 ): Promise<void> {
   await env.DB.prepare(
@@ -21,19 +28,32 @@ export async function upsertRunUpload(
         install_id,
         run_id,
         payload_sha256,
-        uploaded_at_utc,
+        payload_object_key,
+        payload_bytes,
+        schema_version,
+        projection_version,
         projection_status,
+        projected_battle_count,
         projected_at_utc,
-        projection_error
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        last_error_code,
+        last_error_detail,
+        created_at_utc,
+        updated_at_utc
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(run_id) DO UPDATE SET
         client_id = excluded.client_id,
         install_id = excluded.install_id,
         payload_sha256 = excluded.payload_sha256,
-        uploaded_at_utc = excluded.uploaded_at_utc,
+        payload_object_key = excluded.payload_object_key,
+        payload_bytes = excluded.payload_bytes,
+        schema_version = excluded.schema_version,
+        projection_version = excluded.projection_version,
         projection_status = excluded.projection_status,
+        projected_battle_count = excluded.projected_battle_count,
         projected_at_utc = excluded.projected_at_utc,
-        projection_error = excluded.projection_error
+        last_error_code = excluded.last_error_code,
+        last_error_detail = excluded.last_error_detail,
+        updated_at_utc = excluded.updated_at_utc
     `,
   )
     .bind(
@@ -41,10 +61,17 @@ export async function upsertRunUpload(
       input.installId,
       input.runId,
       input.payloadSha256,
-      input.uploadedAtUtc,
+      input.payloadObjectKey,
+      input.payloadBytes,
+      input.schemaVersion,
+      input.projectionVersion,
       input.projectionStatus,
+      input.projectedBattleCount,
       input.projectedAtUtc ?? null,
-      input.projectionError ?? null,
+      input.lastErrorCode ?? null,
+      input.lastErrorDetail ?? null,
+      input.createdAtUtc,
+      input.updatedAtUtc,
     )
     .run();
 }
@@ -54,23 +81,32 @@ export async function markRunProjectionStatus(
   input: {
     runId: string;
     projectionStatus: RunUploadProjectionStatus;
+    projectedBattleCount?: number;
     projectedAtUtc?: string | null;
-    projectionError?: string | null;
+    lastErrorCode?: string | null;
+    lastErrorDetail?: string | null;
+    updatedAtUtc: string;
   },
 ): Promise<void> {
   await env.DB.prepare(
     `
       UPDATE run_uploads
       SET projection_status = ?,
+          projected_battle_count = ?,
           projected_at_utc = ?,
-          projection_error = ?
+          last_error_code = ?,
+          last_error_detail = ?,
+          updated_at_utc = ?
       WHERE run_id = ?
     `,
   )
     .bind(
       input.projectionStatus,
+      input.projectedBattleCount ?? 0,
       input.projectedAtUtc ?? null,
-      input.projectionError ?? null,
+      input.lastErrorCode ?? null,
+      input.lastErrorDetail ?? null,
+      input.updatedAtUtc,
       input.runId,
     )
     .run();

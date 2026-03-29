@@ -20,6 +20,8 @@ import {
 } from "./uploadRunPayload";
 import { requireVerifiedClient } from "./verifiedClient";
 
+const RUN_PROJECTION_VERSION = 1;
+
 export async function handleRunUpload(
   request: Request,
   env: Env,
@@ -46,19 +48,60 @@ export async function handleRunUpload(
     return json({ error: "run_id_mismatch" }, { status: 400 });
   }
 
-  const uploadedAtUtc = new Date().toISOString();
+  const receivedAtUtc = new Date().toISOString();
+  const payloadObjectKey = `runs/${verified.client.client_id}/${runId}/${verified.payloadHash}.json`;
+  const payloadBytes = verified.payload.byteLength;
   await upsertRunUpload(env, {
     clientId: verified.client.client_id,
     installId: verified.client.install_id,
     runId,
     payloadSha256: verified.payloadHash,
-    uploadedAtUtc,
-    projectionStatus: "pending",
+    payloadObjectKey,
+    payloadBytes,
+    schemaVersion: parsed.schemaVersion,
+    projectionVersion: RUN_PROJECTION_VERSION,
+    projectionStatus: "received",
+    projectedBattleCount: 0,
     projectedAtUtc: null,
-    projectionError: null,
+    lastErrorCode: null,
+    lastErrorDetail: null,
+    createdAtUtc: receivedAtUtc,
+    updatedAtUtc: receivedAtUtc,
   });
 
   try {
+    await env.REPLAY_BUCKET.put(payloadObjectKey, verified.payload, {
+      httpMetadata: {
+        contentType: "application/json; charset=utf-8",
+      },
+      customMetadata: {
+        "payload-sha256": verified.payloadHash,
+        "client-id": verified.client.client_id,
+        "run-id": runId,
+        "uploaded-at-utc": receivedAtUtc,
+      },
+    });
+
+    await markRunProjectionStatus(env, {
+      runId,
+      projectionStatus: "stored",
+      projectedBattleCount: 0,
+      projectedAtUtc: null,
+      lastErrorCode: null,
+      lastErrorDetail: null,
+      updatedAtUtc: new Date().toISOString(),
+    });
+
+    await markRunProjectionStatus(env, {
+      runId,
+      projectionStatus: "projecting",
+      projectedBattleCount: 0,
+      projectedAtUtc: null,
+      lastErrorCode: null,
+      lastErrorDetail: null,
+      updatedAtUtc: new Date().toISOString(),
+    });
+
     const observedAtUtc = new Date().toISOString();
     const boundUid = await getActiveBindingUid(env, verified.client.client_id);
     const projectedBattles = parsed.battles
@@ -125,17 +168,24 @@ export async function handleRunUpload(
     await markRunProjectionStatus(env, {
       runId,
       projectionStatus: "projected",
+      projectedBattleCount: projectedBattles.length,
       projectedAtUtc: observedAtUtc,
-      projectionError: null,
+      lastErrorCode: null,
+      lastErrorDetail: null,
+      updatedAtUtc: observedAtUtc,
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown projection error";
+    const failedAtUtc = new Date().toISOString();
     await markRunProjectionStatus(env, {
       runId,
       projectionStatus: "failed",
+      projectedBattleCount: 0,
       projectedAtUtc: null,
-      projectionError: message,
+      lastErrorCode: "projection_failed",
+      lastErrorDetail: message,
+      updatedAtUtc: failedAtUtc,
     });
     return json({ error: "projection_failed" }, { status: 500 });
   }

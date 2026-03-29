@@ -331,16 +331,25 @@ export class MockD1Database {
         install_id: String(params[1]),
         run_id: String(params[2]),
         payload_sha256: String(params[3]),
-        uploaded_at_utc: String(params[4]),
-        projection_status: String(params[5]),
-        projected_at_utc: params[6] == null ? null : String(params[6]),
-        projection_error: params[7] == null ? null : String(params[7]),
+        payload_object_key: params[4] == null ? null : String(params[4]),
+        payload_bytes: params[5] == null ? null : Number(params[5]),
+        schema_version: params[6] == null ? null : Number(params[6]),
+        projection_version: params[7] == null ? null : Number(params[7]),
+        projection_status: String(params[8]),
+        projected_battle_count: params[9] == null ? 0 : Number(params[9]),
+        projected_at_utc: params[10] == null ? null : String(params[10]),
+        last_error_code: params[11] == null ? null : String(params[11]),
+        last_error_detail: params[12] == null ? null : String(params[12]),
+        created_at_utc: params[13] == null ? undefined : String(params[13]),
+        updated_at_utc: params[14] == null ? undefined : String(params[14]),
+        uploaded_at_utc: params[13] == null ? undefined : String(params[13]),
+        projection_error: params[12] == null ? null : String(params[12]),
       });
       return { changes: 1 };
     }
 
     if (sql.includes("UPDATE run_uploads")) {
-      const runId = String(params[3]);
+      const runId = String(params[6]);
       const existing = this.runUploads.get(runId);
       if (!existing) {
         return { changes: 0 };
@@ -349,8 +358,12 @@ export class MockD1Database {
       this.runUploads.set(runId, {
         ...existing,
         projection_status: String(params[0]),
-        projected_at_utc: params[1] == null ? null : String(params[1]),
-        projection_error: params[2] == null ? null : String(params[2]),
+        projected_battle_count: params[1] == null ? 0 : Number(params[1]),
+        projected_at_utc: params[2] == null ? null : String(params[2]),
+        last_error_code: params[3] == null ? null : String(params[3]),
+        last_error_detail: params[4] == null ? null : String(params[4]),
+        updated_at_utc: params[5] == null ? existing.updated_at_utc : String(params[5]),
+        projection_error: params[4] == null ? null : String(params[4]),
       });
       return { changes: 1 };
     }
