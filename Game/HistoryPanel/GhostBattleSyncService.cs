@@ -71,20 +71,33 @@ internal sealed class GhostBattleSyncService : IDisposable
                 );
                 if (!bindingResult.Succeeded)
                 {
-                    return GhostBattleApiResult.Failure(
-                        bindingResult.Error ?? "binding_failed",
-                        bindingResult.ShouldFallback,
-                        bindingResult.ShouldReRegister
+                    BppLog.Warn(
+                        "GhostBattleSync",
+                        $"Binding failed for ghost sync on client {clientId}: {bindingResult.Error ?? "binding_failed"}. Continuing with query attempt."
                     );
                 }
 
-                return await apiClient.QueryAgainstMeAsync(
+                var queryResult = await apiClient.QueryAgainstMeAsync(
                     clientId,
                     installId,
                     lookbackDays,
                     MaxSyncBattleLimit,
                     token
                 );
+                if (
+                    !bindingResult.Succeeded
+                    && !queryResult.Succeeded
+                    && ShouldTreatGhostErrorAsBindingFailure(queryResult.Error)
+                )
+                {
+                    return GhostBattleApiResult.Failure(
+                        bindingResult.Error ?? "binding_failed",
+                        bindingResult.ShouldFallback || queryResult.ShouldFallback,
+                        bindingResult.ShouldReRegister || queryResult.ShouldReRegister
+                    );
+                }
+
+                return queryResult;
             },
             cancellationToken
         );
@@ -139,19 +152,32 @@ internal sealed class GhostBattleSyncService : IDisposable
                 );
                 if (!bindingResult.Succeeded)
                 {
-                    return GhostBattleReplayDownloadLinkResult.Failure(
-                        bindingResult.Error ?? "binding_failed",
-                        bindingResult.ShouldFallback,
-                        bindingResult.ShouldReRegister
+                    BppLog.Warn(
+                        "GhostBattleSync",
+                        $"Binding failed for ghost replay download on client {clientId}: {bindingResult.Error ?? "binding_failed"}. Continuing with replay link request."
                     );
                 }
 
-                return await apiClient.RequestReplayDownloadLinkAsync(
+                var linkResult = await apiClient.RequestReplayDownloadLinkAsync(
                     battleId,
                     clientId,
                     installId,
                     token
                 );
+                if (
+                    !bindingResult.Succeeded
+                    && !linkResult.Succeeded
+                    && ShouldTreatGhostErrorAsBindingFailure(linkResult.Error)
+                )
+                {
+                    return GhostBattleReplayDownloadLinkResult.Failure(
+                        bindingResult.Error ?? "binding_failed",
+                        bindingResult.ShouldFallback || linkResult.ShouldFallback,
+                        bindingResult.ShouldReRegister || linkResult.ShouldReRegister
+                    );
+                }
+
+                return linkResult;
             },
             cancellationToken
         );
@@ -285,7 +311,15 @@ internal sealed class GhostBattleSyncService : IDisposable
 
     private static bool ShouldAdvanceCheckpoint(int importedCount, int limit, int lookbackDays)
     {
-        return importedCount < limit && lookbackDays < MaxSyncLookbackDays;
+        return importedCount < limit;
+    }
+
+    private static bool ShouldTreatGhostErrorAsBindingFailure(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+            return false;
+
+        return error.Contains("battle_forbidden", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? TryGetCurrentPlayerAccountId()

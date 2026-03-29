@@ -6,9 +6,17 @@ var shouldAdvanceCheckpoint = syncServiceType.GetMethod(
     "ShouldAdvanceCheckpoint",
     BindingFlags.NonPublic | BindingFlags.Static
 );
+var shouldTreatGhostErrorAsBindingFailure = syncServiceType.GetMethod(
+    "ShouldTreatGhostErrorAsBindingFailure",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
 Assert(
     shouldAdvanceCheckpoint != null,
     "GhostBattleSyncService should expose checkpoint advancement logic."
+);
+Assert(
+    shouldTreatGhostErrorAsBindingFailure != null,
+    "GhostBattleSyncService should expose binding-related ghost error classification logic."
 );
 
 Assert(
@@ -25,7 +33,7 @@ Assert(
 );
 
 Assert(
-    !(bool)
+    (bool)
         shouldAdvanceCheckpoint!.Invoke(
             null,
             [
@@ -34,7 +42,7 @@ Assert(
                 14,
             ]
         )!,
-    "Ghost sync should not advance the checkpoint when the requested lookback is clamped to the maximum window."
+    "Ghost sync should advance the checkpoint after a non-truncated fetch even when the requested window was clamped."
 );
 
 Assert(
@@ -48,6 +56,24 @@ Assert(
             ]
         )!,
     "Ghost sync should advance the checkpoint after a non-truncated incremental fetch."
+);
+
+Assert(
+    (bool)
+        shouldTreatGhostErrorAsBindingFailure!.Invoke(
+            null,
+            ["http_403:{\"error\":\"battle_forbidden\"}"]
+        )!,
+    "Ghost replay/link failures that report battle_forbidden should be attributed to binding when bind just failed."
+);
+
+Assert(
+    !(bool)
+        shouldTreatGhostErrorAsBindingFailure!.Invoke(
+            null,
+            ["http_404:{\"error\":\"battle_not_found\"}"]
+        )!,
+    "Non-binding ghost request failures should keep their original error."
 );
 
 Console.WriteLine("Ghost battle sync checks passed.");
