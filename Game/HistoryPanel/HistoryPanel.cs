@@ -97,10 +97,15 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             repository = new HistoryPanelRepository(_runtime.RunLogDatabasePath);
 
         _ghostSyncService = TryCreateGhostSyncService(repository);
-        _dataService = new HistoryPanelDataService(repository, _ghostSyncService);
+        _dataService = new HistoryPanelDataService(
+            repository,
+            _ghostSyncService,
+            TryGetCurrentPlayerAccountId
+        );
         _replayService = new HistoryPanelReplayService(
             _runtime.CombatReplayRuntimeAccessor,
             () => _runtime.CombatReplayDirectoryPath,
+            TryGetCurrentPlayerAccountId,
             repository,
             _ghostSyncService
         );
@@ -195,6 +200,18 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     internal void OpenFromUiEntry()
     {
         OpenFromDockEntryInternal();
+    }
+
+    private static string? TryGetCurrentPlayerAccountId()
+    {
+        try
+        {
+            return TheBazaar.ClientCache.Profile.Value?.AccountId.ToString();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private void RefreshSelectedBattlePreview()

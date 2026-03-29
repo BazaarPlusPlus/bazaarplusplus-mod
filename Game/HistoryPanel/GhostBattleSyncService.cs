@@ -45,6 +45,10 @@ internal sealed class GhostBattleSyncService : IDisposable
         CancellationToken cancellationToken
     )
     {
+        var localPlayerAccountId = TryGetCurrentPlayerAccountId();
+        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
+            return GhostBattleSyncResult.Failure("player_account_id_unavailable");
+
         var installId = _identityStore.GetOrCreateInstallId();
         var apiClient = new GhostBattleApiClient(
             _httpClient,
@@ -53,13 +57,18 @@ internal sealed class GhostBattleSyncService : IDisposable
         );
         var routeClient = CreateAuthenticatedRouteClient();
         var syncStartedAtUtc = DateTimeOffset.UtcNow;
-        var checkpointUtc = _repository.TryGetGhostSyncCheckpointUtc();
+        var checkpointUtc = _repository.TryGetGhostSyncCheckpointUtc(localPlayerAccountId);
         var lookbackDays = CalculateLookbackDays(checkpointUtc, syncStartedAtUtc);
         var requestResult = await routeClient.SendAsync(
             installId,
             async (clientId, token) =>
             {
-                var bindingResult = await EnsurePlayerBindingAsync(clientId, installId, token);
+                var bindingResult = await EnsurePlayerBindingAsync(
+                    clientId,
+                    installId,
+                    localPlayerAccountId,
+                    token
+                );
                 if (!bindingResult.Succeeded)
                 {
                     return GhostBattleApiResult.Failure(
@@ -90,9 +99,9 @@ internal sealed class GhostBattleSyncService : IDisposable
             return GhostBattleSyncResult.Failure(queryResult.Error ?? "ghost_sync_failed");
         }
 
-        _repository.UpsertGhostBattles(queryResult.Battles);
+        _repository.UpsertGhostBattles(localPlayerAccountId, queryResult.Battles);
         if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit, lookbackDays))
-            _repository.SaveGhostSyncCheckpointUtc(syncStartedAtUtc);
+            _repository.SaveGhostSyncCheckpointUtc(localPlayerAccountId, syncStartedAtUtc);
         return GhostBattleSyncResult.Success(queryResult.Battles.Count);
     }
 
@@ -106,6 +115,9 @@ internal sealed class GhostBattleSyncService : IDisposable
             return GhostBattleReplayDownloadResult.Failure("battle_id_required");
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
             return GhostBattleReplayDownloadResult.Failure("replay_directory_required");
+        var localPlayerAccountId = TryGetCurrentPlayerAccountId();
+        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
+            return GhostBattleReplayDownloadResult.Failure("player_account_id_unavailable");
 
         var installId = _identityStore.GetOrCreateInstallId();
         var apiClient = new GhostBattleApiClient(
@@ -118,7 +130,12 @@ internal sealed class GhostBattleSyncService : IDisposable
             installId,
             async (clientId, token) =>
             {
-                var bindingResult = await EnsurePlayerBindingAsync(clientId, installId, token);
+                var bindingResult = await EnsurePlayerBindingAsync(
+                    clientId,
+                    installId,
+                    localPlayerAccountId,
+                    token
+                );
                 if (!bindingResult.Succeeded)
                 {
                     return GhostBattleReplayDownloadLinkResult.Failure(
@@ -173,7 +190,7 @@ internal sealed class GhostBattleSyncService : IDisposable
 
         var payloadStore = new CombatReplayPayloadStore(replayDirectoryPath);
         payloadStore.Save(payloadResult.Payload.ReplayPayload);
-        _repository.MarkGhostReplayDownloaded(battleId);
+        _repository.MarkGhostReplayDownloaded(localPlayerAccountId, battleId);
         return GhostBattleReplayDownloadResult.Success();
     }
 
@@ -185,19 +202,10 @@ internal sealed class GhostBattleSyncService : IDisposable
     private async Task<RunUploadBindingResult> EnsurePlayerBindingAsync(
         string clientId,
         string installId,
+        string playerAccountId,
         CancellationToken cancellationToken
     )
     {
-        var playerAccountId = TryGetCurrentPlayerAccountId();
-        if (string.IsNullOrWhiteSpace(playerAccountId))
-        {
-            return RunUploadBindingResult.Failure(
-                "player_account_id_unavailable",
-                shouldFallback: false,
-                shouldReRegister: false
-            );
-        }
-
         var bindEndpoint = TryDeriveBindEndpoint(_endpoint.RegistrationEndpoint);
         if (string.IsNullOrWhiteSpace(bindEndpoint))
         {

@@ -18,7 +18,7 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class HistoryPanelRepository
 {
-    private const string RecentGhostSyncScope = "recent_against_me";
+    private const string RecentGhostSyncScopePrefix = "recent_against_me";
 
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
@@ -285,9 +285,12 @@ internal sealed class HistoryPanelRepository
         return records;
     }
 
-    public IReadOnlyList<HistoryBattleRecord> ListRecentGhostBattles(int limit)
+    public IReadOnlyList<HistoryBattleRecord> ListRecentGhostBattles(
+        string localPlayerAccountId,
+        int limit
+    )
     {
-        if (!DatabaseExists)
+        if (!DatabaseExists || string.IsNullOrWhiteSpace(localPlayerAccountId))
             return Array.Empty<HistoryBattleRecord>();
 
         using var connection = OpenConnection();
@@ -296,6 +299,7 @@ internal sealed class HistoryPanelRepository
         command.CommandText = $"""
             SELECT
                 battle_id,
+                local_player_account_id,
                 recorded_at_utc,
                 day,
                 hour,
@@ -321,9 +325,11 @@ internal sealed class HistoryPanelRepository
                 replay_available,
                 replay_downloaded
             FROM {RunLogSqliteSchema.GhostBattlesTableName}
+            WHERE local_player_account_id = $localPlayerAccountId
             ORDER BY recorded_at_utc DESC, battle_id DESC
             LIMIT $limit;
             """;
+        command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
         command.Parameters.AddWithValue("$limit", limit);
 
         using var reader = command.ExecuteReader();
@@ -395,13 +401,25 @@ internal sealed class HistoryPanelRepository
         return records;
     }
 
-    public void ReplaceGhostBattles(IReadOnlyList<GhostBattleImportRecord> battles)
+    public void ReplaceGhostBattles(
+        string localPlayerAccountId,
+        IReadOnlyList<GhostBattleImportRecord> battles
+    )
     {
-        UpsertGhostBattles(battles);
+        UpsertGhostBattles(localPlayerAccountId, battles);
     }
 
-    public void UpsertGhostBattles(IReadOnlyList<GhostBattleImportRecord> battles)
+    public void UpsertGhostBattles(
+        string localPlayerAccountId,
+        IReadOnlyList<GhostBattleImportRecord> battles
+    )
     {
+        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
+            throw new ArgumentException(
+                "Local player account id is required.",
+                nameof(localPlayerAccountId)
+            );
+
         using var connection = OpenConnection(ensureSchema: true);
         using var transaction = connection.BeginTransaction();
 
@@ -413,6 +431,7 @@ internal sealed class HistoryPanelRepository
             insertCommand.CommandText = $"""
                 INSERT INTO {RunLogSqliteSchema.GhostBattlesTableName} (
                     battle_id,
+                    local_player_account_id,
                     recorded_at_utc,
                     day,
                     hour,
@@ -442,6 +461,7 @@ internal sealed class HistoryPanelRepository
                     last_synced_at_utc
                 ) VALUES (
                     $battleId,
+                    $localPlayerAccountId,
                     $recordedAtUtc,
                     $day,
                     $hour,
@@ -471,6 +491,7 @@ internal sealed class HistoryPanelRepository
                     $lastSyncedAtUtc
                 )
                 ON CONFLICT(battle_id) DO UPDATE SET
+                    local_player_account_id = excluded.local_player_account_id,
                     recorded_at_utc = excluded.recorded_at_utc,
                     day = excluded.day,
                     hour = excluded.hour,
@@ -503,6 +524,10 @@ internal sealed class HistoryPanelRepository
                     last_synced_at_utc = excluded.last_synced_at_utc;
                 """;
             insertCommand.Parameters.AddWithValue("$battleId", battle.BattleId);
+            insertCommand.Parameters.AddWithValue(
+                "$localPlayerAccountId",
+                localPlayerAccountId
+            );
             insertCommand.Parameters.AddWithValue(
                 "$recordedAtUtc",
                 battle.RecordedAtUtc.ToString("o")
@@ -596,8 +621,11 @@ internal sealed class HistoryPanelRepository
         transaction.Commit();
     }
 
-    public DateTimeOffset? TryGetGhostSyncCheckpointUtc()
+    public DateTimeOffset? TryGetGhostSyncCheckpointUtc(string localPlayerAccountId)
     {
+        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
+            return null;
+
         using var connection = OpenConnection(ensureSchema: true);
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
@@ -607,13 +635,22 @@ internal sealed class HistoryPanelRepository
             WHERE scope = $scope
             LIMIT 1;
             """;
-        command.Parameters.AddWithValue("$scope", RecentGhostSyncScope);
+        command.Parameters.AddWithValue(
+            "$scope",
+            BuildGhostSyncScope(localPlayerAccountId)
+        );
         var rawValue = command.ExecuteScalar() as string;
         return DateTimeOffset.TryParse(rawValue, out var parsed) ? parsed : null;
     }
 
-    public void SaveGhostSyncCheckpointUtc(DateTimeOffset syncedAtUtc)
+    public void SaveGhostSyncCheckpointUtc(string localPlayerAccountId, DateTimeOffset syncedAtUtc)
     {
+        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
+            throw new ArgumentException(
+                "Local player account id is required.",
+                nameof(localPlayerAccountId)
+            );
+
         using var connection = OpenConnection(ensureSchema: true);
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
@@ -628,14 +665,20 @@ internal sealed class HistoryPanelRepository
             ON CONFLICT(scope) DO UPDATE SET
                 last_successful_sync_at_utc = excluded.last_successful_sync_at_utc;
             """;
-        command.Parameters.AddWithValue("$scope", RecentGhostSyncScope);
+        command.Parameters.AddWithValue(
+            "$scope",
+            BuildGhostSyncScope(localPlayerAccountId)
+        );
         command.Parameters.AddWithValue("$syncedAtUtc", syncedAtUtc.ToString("o"));
         command.ExecuteNonQuery();
     }
 
-    public void MarkGhostReplayDownloaded(string battleId)
+    public void MarkGhostReplayDownloaded(string localPlayerAccountId, string battleId)
     {
-        if (string.IsNullOrWhiteSpace(battleId))
+        if (
+            string.IsNullOrWhiteSpace(localPlayerAccountId)
+            || string.IsNullOrWhiteSpace(battleId)
+        )
             return;
 
         using var connection = OpenConnection(ensureSchema: true);
@@ -644,15 +687,21 @@ internal sealed class HistoryPanelRepository
         command.CommandText = $"""
             UPDATE {RunLogSqliteSchema.GhostBattlesTableName}
             SET replay_downloaded = 1
-            WHERE battle_id = $battleId;
+            WHERE local_player_account_id = $localPlayerAccountId
+              AND battle_id = $battleId;
             """;
+        command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
         command.Parameters.AddWithValue("$battleId", battleId);
         command.ExecuteNonQuery();
     }
 
-    public PvpBattleManifest? TryLoadGhostManifest(string battleId)
+    public PvpBattleManifest? TryLoadGhostManifest(string localPlayerAccountId, string battleId)
     {
-        if (!DatabaseExists || string.IsNullOrWhiteSpace(battleId))
+        if (
+            !DatabaseExists
+            || string.IsNullOrWhiteSpace(localPlayerAccountId)
+            || string.IsNullOrWhiteSpace(battleId)
+        )
             return null;
 
         using var connection = OpenConnection();
@@ -661,6 +710,7 @@ internal sealed class HistoryPanelRepository
         command.CommandText = $"""
             SELECT
                 battle_id,
+                local_player_account_id,
                 recorded_at_utc,
                 day,
                 hour,
@@ -686,9 +736,11 @@ internal sealed class HistoryPanelRepository
                 opponent_hand_json,
                 opponent_skills_json
             FROM {RunLogSqliteSchema.GhostBattlesTableName}
-            WHERE battle_id = $battleId
+            WHERE local_player_account_id = $localPlayerAccountId
+              AND battle_id = $battleId
             LIMIT 1;
             """;
+        command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
         command.Parameters.AddWithValue("$battleId", battleId);
         using var reader = command.ExecuteReader();
         if (!reader.Read())
@@ -785,6 +837,12 @@ internal sealed class HistoryPanelRepository
         EnsureColumnExists(
             connection,
             RunLogSqliteSchema.GhostBattlesTableName,
+            "local_player_account_id",
+            "TEXT NOT NULL DEFAULT ''"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.GhostBattlesTableName,
             "player_hero",
             "TEXT NULL"
         );
@@ -795,6 +853,11 @@ internal sealed class HistoryPanelRepository
             "INTEGER NULL"
         );
         return connection;
+    }
+
+    private static string BuildGhostSyncScope(string localPlayerAccountId)
+    {
+        return $"{RecentGhostSyncScopePrefix}::{localPlayerAccountId.Trim()}";
     }
 
     private static PvpBattleManifest ReadManifest(SqliteDataReader reader, string? runIdColumnName)

@@ -134,6 +134,7 @@ public static class RunLogSqliteSchema
 
             CREATE TABLE IF NOT EXISTS {GhostBattlesTableName} (
                 battle_id TEXT PRIMARY KEY,
+                local_player_account_id TEXT NOT NULL,
                 recorded_at_utc TEXT NOT NULL,
                 day INTEGER NULL,
                 hour INTEGER NULL,
@@ -206,6 +207,9 @@ public static class RunLogSqliteSchema
 
             CREATE INDEX IF NOT EXISTS idx_{GhostBattlesTableName}_recorded_at_utc
                 ON {GhostBattlesTableName}(recorded_at_utc DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_{GhostBattlesTableName}_local_player_account_recent
+                ON {GhostBattlesTableName}(local_player_account_id, recorded_at_utc DESC);
 
             CREATE INDEX IF NOT EXISTS idx_{RunSyncStateTableName}_dirty
                 ON {RunSyncStateTableName}(dirty, last_attempt_at_utc);

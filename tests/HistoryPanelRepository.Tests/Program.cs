@@ -134,34 +134,57 @@ try
     );
 
     var ghostImportType = RequireType("BazaarPlusPlus.Game.HistoryPanel.GhostBattleImportRecord");
-    var replaceGhostBattles = repositoryType.GetMethod("ReplaceGhostBattles")!;
-    var markGhostReplayDownloaded = repositoryType.GetMethod("MarkGhostReplayDownloaded")!;
-    var listRecentGhostBattles = repositoryType.GetMethod("ListRecentGhostBattles")!;
-    var getGhostSyncCheckpoint = repositoryType.GetMethod("TryGetGhostSyncCheckpointUtc")!;
-    var saveGhostSyncCheckpoint = repositoryType.GetMethod("SaveGhostSyncCheckpointUtc")!;
+    var replaceGhostBattles = repositoryType.GetMethod(
+        "ReplaceGhostBattles",
+        [typeof(string), typeof(IReadOnlyList<>).MakeGenericType(ghostImportType)]
+    )!;
+    var markGhostReplayDownloaded = repositoryType.GetMethod(
+        "MarkGhostReplayDownloaded",
+        [typeof(string), typeof(string)]
+    )!;
+    var listRecentGhostBattles = repositoryType.GetMethod(
+        "ListRecentGhostBattles",
+        [typeof(string), typeof(int)]
+    )!;
+    var getGhostSyncCheckpoint = repositoryType.GetMethod(
+        "TryGetGhostSyncCheckpointUtc",
+        [typeof(string)]
+    )!;
+    var saveGhostSyncCheckpoint = repositoryType.GetMethod(
+        "SaveGhostSyncCheckpointUtc",
+        [typeof(string), typeof(DateTimeOffset)]
+    )!;
 
     Assert(
-        getGhostSyncCheckpoint.Invoke(repository, Array.Empty<object>()) == null,
+        getGhostSyncCheckpoint.Invoke(repository, ["player-account-a"]) == null,
         "Ghost sync checkpoint should be empty before the first successful sync."
     );
 
     var firstCheckpoint = new DateTimeOffset(2026, 3, 16, 9, 55, 0, TimeSpan.Zero);
-    saveGhostSyncCheckpoint.Invoke(repository, [firstCheckpoint]);
+    saveGhostSyncCheckpoint.Invoke(repository, ["player-account-a", firstCheckpoint]);
     Assert(
-        (DateTimeOffset?)getGhostSyncCheckpoint.Invoke(repository, Array.Empty<object>())
+        (DateTimeOffset?)getGhostSyncCheckpoint.Invoke(repository, ["player-account-a"])
             == firstCheckpoint,
         "Ghost sync checkpoint should persist the last successful sync timestamp."
     );
-
-    replaceGhostBattles.Invoke(
-        repository,
-        [CreateGhostImports(ghostImportType, "ghost-1", "2026-03-16T10:00:00.0000000+00:00")]
+    Assert(
+        getGhostSyncCheckpoint.Invoke(repository, ["player-account-b"]) == null,
+        "Ghost sync checkpoint should be scoped per local player account."
     );
-    markGhostReplayDownloaded.Invoke(repository, ["ghost-1"]);
 
     replaceGhostBattles.Invoke(
         repository,
         [
+            "player-account-a",
+            CreateGhostImports(ghostImportType, "ghost-1", "2026-03-16T10:00:00.0000000+00:00"),
+        ]
+    );
+    markGhostReplayDownloaded.Invoke(repository, ["player-account-a", "ghost-1"]);
+
+    replaceGhostBattles.Invoke(
+        repository,
+        [
+            "player-account-a",
             CreateGhostImports(
                 ghostImportType,
                 "ghost-1",
@@ -172,7 +195,11 @@ try
         ]
     );
 
-    var ghostRecords = ((System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!)
+    var ghostRecords =
+        (
+            (System.Collections.IEnumerable)
+                listRecentGhostBattles.Invoke(repository, ["player-account-a", 10])!
+        )
         .Cast<object>()
         .ToList();
     Assert(
@@ -189,9 +216,16 @@ try
 
     replaceGhostBattles.Invoke(
         repository,
-        [CreateGhostImports(ghostImportType, "ghost-2", "2026-03-16T10:10:00.0000000+00:00")]
+        [
+            "player-account-a",
+            CreateGhostImports(ghostImportType, "ghost-2", "2026-03-16T10:10:00.0000000+00:00"),
+        ]
     );
-    ghostRecords = ((System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!)
+    ghostRecords =
+        (
+            (System.Collections.IEnumerable)
+                listRecentGhostBattles.Invoke(repository, ["player-account-a", 10])!
+        )
         .Cast<object>()
         .ToList();
     Assert(
@@ -210,10 +244,35 @@ try
         "ReplaceGhostBattles should keep both existing and newly imported ghost rows."
     );
 
-    var secondCheckpoint = new DateTimeOffset(2026, 3, 16, 10, 15, 0, TimeSpan.Zero);
-    saveGhostSyncCheckpoint.Invoke(repository, [secondCheckpoint]);
+    replaceGhostBattles.Invoke(
+        repository,
+        [
+            "player-account-b",
+            CreateGhostImports(
+                ghostImportType,
+                "ghost-3",
+                "2026-03-16T11:00:00.0000000+00:00"
+            ),
+        ]
+    );
+    var playerBGhostRecords =
+        (
+            (System.Collections.IEnumerable)
+                listRecentGhostBattles.Invoke(repository, ["player-account-b", 10])!
+        )
+        .Cast<object>()
+        .ToList();
     Assert(
-        (DateTimeOffset?)getGhostSyncCheckpoint.Invoke(repository, Array.Empty<object>())
+        playerBGhostRecords.Count == 1
+            && (string)playerBGhostRecords[0].GetType().GetProperty("BattleId")!.GetValue(playerBGhostRecords[0])!
+                == "ghost-3",
+        "Ghost battle rows should be isolated per local player account."
+    );
+
+    var secondCheckpoint = new DateTimeOffset(2026, 3, 16, 10, 15, 0, TimeSpan.Zero);
+    saveGhostSyncCheckpoint.Invoke(repository, ["player-account-a", secondCheckpoint]);
+    Assert(
+        (DateTimeOffset?)getGhostSyncCheckpoint.Invoke(repository, ["player-account-a"])
             == secondCheckpoint,
         "Ghost sync checkpoint should overwrite the previous successful sync timestamp."
     );

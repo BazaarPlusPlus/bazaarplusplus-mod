@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -8,14 +9,17 @@ internal sealed class HistoryPanelDataService
 {
     private readonly HistoryPanelRepository? _repository;
     private readonly GhostBattleSyncService? _ghostSyncService;
+    private readonly Func<string?> _currentPlayerAccountIdAccessor;
 
     public HistoryPanelDataService(
         HistoryPanelRepository? repository,
-        GhostBattleSyncService? ghostSyncService = null
+        GhostBattleSyncService? ghostSyncService = null,
+        Func<string?>? currentPlayerAccountIdAccessor = null
     )
     {
         _repository = repository;
         _ghostSyncService = ghostSyncService;
+        _currentPlayerAccountIdAccessor = currentPlayerAccountIdAccessor ?? TryGetCurrentPlayerAccountId;
     }
 
     public bool IsAvailable => _repository != null;
@@ -129,7 +133,14 @@ internal sealed class HistoryPanelDataService
 
         try
         {
-            battles = _repository.ListRecentGhostBattles(limit);
+            var localPlayerAccountId = _currentPlayerAccountIdAccessor();
+            if (string.IsNullOrWhiteSpace(localPlayerAccountId))
+            {
+                statusMessage = "Current player account is unavailable.";
+                return false;
+            }
+
+            battles = _repository.ListRecentGhostBattles(localPlayerAccountId, limit);
             statusMessage = $"Loaded {battles.Count} ghost battles from sqlite.";
             return true;
         }
@@ -167,6 +178,18 @@ internal sealed class HistoryPanelDataService
             error = ex;
             statusMessage = $"Ghost sync failed: {ex.Message}";
             return false;
+        }
+    }
+
+    private static string? TryGetCurrentPlayerAccountId()
+    {
+        try
+        {
+            return ClientCache.Profile.Value?.AccountId.ToString();
+        }
+        catch
+        {
+            return null;
         }
     }
 }

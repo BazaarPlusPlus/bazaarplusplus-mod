@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
+using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -11,12 +12,14 @@ internal sealed class HistoryPanelReplayService
 {
     private readonly Func<CombatReplayRuntime?> _runtimeAccessor;
     private readonly Func<string?> _replayDirectoryPathAccessor;
+    private readonly Func<string?> _currentPlayerAccountIdAccessor;
     private readonly HistoryPanelRepository? _repository;
     private readonly GhostBattleSyncService? _ghostSyncService;
 
     public HistoryPanelReplayService(
         Func<CombatReplayRuntime?> runtimeAccessor,
         Func<string?> replayDirectoryPathAccessor,
+        Func<string?>? currentPlayerAccountIdAccessor = null,
         HistoryPanelRepository? repository = null,
         GhostBattleSyncService? ghostSyncService = null
     )
@@ -26,6 +29,7 @@ internal sealed class HistoryPanelReplayService
         _replayDirectoryPathAccessor =
             replayDirectoryPathAccessor
             ?? throw new ArgumentNullException(nameof(replayDirectoryPathAccessor));
+        _currentPlayerAccountIdAccessor = currentPlayerAccountIdAccessor ?? TryGetCurrentPlayerAccountId;
         _repository = repository;
         _ghostSyncService = ghostSyncService;
     }
@@ -149,7 +153,14 @@ internal sealed class HistoryPanelReplayService
             return false;
         }
 
-        var manifest = _repository.TryLoadGhostManifest(battle.BattleId);
+        var localPlayerAccountId = _currentPlayerAccountIdAccessor();
+        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
+        {
+            statusMessage = "Current player account is unavailable.";
+            return false;
+        }
+
+        var manifest = _repository.TryLoadGhostManifest(localPlayerAccountId, battle.BattleId);
         if (manifest == null)
         {
             statusMessage = $"Ghost manifest for battle {battle.BattleId} is unavailable.";
@@ -199,6 +210,18 @@ internal sealed class HistoryPanelReplayService
                     $"Failed to delete replay payload for battle {battleId}: {ex.Message}"
                 );
             }
+        }
+    }
+
+    private static string? TryGetCurrentPlayerAccountId()
+    {
+        try
+        {
+            return ClientCache.Profile.Value?.AccountId.ToString();
+        }
+        catch
+        {
+            return null;
         }
     }
 }
