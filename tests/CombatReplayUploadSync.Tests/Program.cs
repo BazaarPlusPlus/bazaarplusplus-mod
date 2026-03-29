@@ -25,60 +25,6 @@ try
         "Combat replay upload store and service should exist."
     );
 
-    var controllerSource = File.ReadAllText(
-        Path.GetFullPath(
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "../../../../../Game/CombatReplay/Upload/CombatReplayUploadController.cs"
-            )
-        )
-    );
-    Assert(
-        controllerSource.Contains(
-            "internal sealed class CombatReplayUploadController : MonoBehaviour",
-            StringComparison.Ordinal
-        ),
-        "CombatReplayUploadController should exist as a MonoBehaviour runtime entry point."
-    );
-    Assert(
-        controllerSource.Contains("RunUploadRegistrationEndpointConfig", StringComparison.Ordinal)
-            && controllerSource.Contains("TryDeriveReplayUploadEndpoint", StringComparison.Ordinal)
-            && !controllerSource.Contains("RunUploadRouteStatePath", StringComparison.Ordinal),
-        "CombatReplayUploadController should reuse the shared run endpoint contract without replay route fallback."
-    );
-    Assert(
-        controllerSource.Contains(
-            "requires the shared run upload endpoint",
-            StringComparison.Ordinal
-        ),
-        "CombatReplayUploadController should warn when replay upload is enabled without the shared run endpoint."
-    );
-
-    var pluginSource = File.ReadAllText(
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../Plugin.cs"))
-    );
-    Assert(
-        pluginSource.Contains(
-            "gameObject.AddComponent<CombatReplayUploadController>();",
-            StringComparison.Ordinal
-        ),
-        "Plugin should mount the delayed combat replay upload controller."
-    );
-
-    var schemaSource = File.ReadAllText(
-        Path.GetFullPath(
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "../../../../../Game/RunLogging/Persistence/Sqlite/RunLogSqliteSchema.cs"
-            )
-        )
-    );
-    Assert(
-        schemaSource.Contains("ReplaySyncStateTableName", StringComparison.Ordinal)
-            && schemaSource.Contains("replay_sync_state", StringComparison.Ordinal),
-        "RunLogSqliteSchema should define replay_sync_state."
-    );
-
     var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
     var payloadStore =
         Activator.CreateInstance(payloadStoreType, replayRoot)

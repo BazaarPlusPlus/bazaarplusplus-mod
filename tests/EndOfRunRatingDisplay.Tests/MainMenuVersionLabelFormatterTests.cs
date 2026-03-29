@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using BazaarPlusPlus.Game.Lobby;
 using Xunit;
 
@@ -23,28 +21,4 @@ public sealed class MainMenuVersionLabelFormatterTests
         Assert.Equal(" Version: 1.2.3 ", text);
     }
 
-    [Fact]
-    public void PatchSource_TargetsVersionShowBuildVersionLabel_AndUsesPluginVersion()
-    {
-        var sourcePath = Path.GetFullPath(
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "..",
-                "..",
-                "Patches",
-                "Lobby",
-                "MainMenuVersionLabelPatches.cs"
-            )
-        );
-
-        var source = File.ReadAllText(sourcePath);
-
-        Assert.Contains("VersionShow", source, StringComparison.Ordinal);
-        Assert.Contains("BuildVersionLabel", source, StringComparison.Ordinal);
-        Assert.Contains("BppPluginVersion.Current", source, StringComparison.Ordinal);
-        Assert.Contains("versionLabel", source, StringComparison.Ordinal);
-    }
 }

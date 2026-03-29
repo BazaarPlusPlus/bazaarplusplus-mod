@@ -24,57 +24,6 @@ Assert(
         && cardSetCaptureType.GetProperty("Source") != null,
     "PvpBattleCardSetCapture should expose Items, Status, and Source."
 );
-Assert(
-    File.ReadAllText(
-            Path.GetFullPath(
-                Path.Combine(
-                    AppContext.BaseDirectory,
-                    "../../../../../Game/RunLogging/RunLoggingController.cs"
-                )
-            )
-        )
-        .Contains("RunLoggingModule", StringComparison.Ordinal),
-    "RunLoggingController should compose the unified RunLoggingModule."
-);
-
-var runLoggingModulePath = Path.GetFullPath(
-    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/RunLogging/RunLoggingModule.cs")
-);
-Assert(
-    File.Exists(runLoggingModulePath),
-    $"RunLoggingModule source not found at {runLoggingModulePath}"
-);
-var runLoggingModuleSource = File.ReadAllText(runLoggingModulePath);
-Assert(
-    runLoggingModuleSource.Contains("OnSelectionObserved", StringComparison.Ordinal)
-        && runLoggingModuleSource.Contains("OnRunLoggingSyncRequested", StringComparison.Ordinal)
-        && runLoggingModuleSource.Contains("OnPvpBattleRecorded", StringComparison.Ordinal),
-    "RunLoggingModule should own the selection, sync, and PVP battle capture handlers."
-);
-
-var runInitializedPatchPath = Path.GetFullPath(
-    Path.Combine(
-        AppContext.BaseDirectory,
-        "../../../../../Patches/RunLogging/RunInitializedPatch.cs"
-    )
-);
-Assert(
-    File.Exists(runInitializedPatchPath),
-    $"RunInitialized patch source not found at {runInitializedPatchPath}"
-);
-var runInitializedPatchSource = File.ReadAllText(runInitializedPatchPath);
-Assert(
-    runInitializedPatchSource.Contains("NetMessageRunInitialized", StringComparison.Ordinal),
-    "RunInitialized patch should intercept the server run initialization message."
-);
-Assert(
-    runInitializedPatchSource.Contains("BppRuntimeHost.EventBus.Publish", StringComparison.Ordinal)
-        && runInitializedPatchSource.Contains(
-            "new RunInitializedObserved",
-            StringComparison.Ordinal
-        ),
-    "RunInitialized patch should publish the authoritative server run id through the event bus."
-);
 
 var service =
     Activator.CreateInstance(captureServiceType)

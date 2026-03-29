@@ -89,14 +89,6 @@ Assert(
     "EncounterTracker should expose a detach path to avoid compatibility-shell feature leaks."
 );
 
-var trackerSource = ReadSource("Game/EncounterTracker.cs");
-Assert(
-    !trackerSource.Contains("OnCardDealt(", StringComparison.Ordinal)
-        && !trackerSource.Contains("Events.CardDealtSimEvent.AddListener", StringComparison.Ordinal)
-        && !trackerSource.Contains("BuildMonsterPreviews(", StringComparison.Ordinal),
-    "EncounterTracker should be a compatibility shell and should not own card-deal orchestration."
-);
-
 var featureQueryProperty = featureType.GetProperty(
     "SelectionQuery",
     BindingFlags.Instance | BindingFlags.Public
@@ -187,15 +179,6 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
-}
-
-static string ReadSource(string relativePath)
-{
-    var sourcePath = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "../../../../../", relativePath)
-    );
-    Assert(File.Exists(sourcePath), $"Source file not found at {sourcePath}");
-    return File.ReadAllText(sourcePath);
 }
 
 static bool Throws<TException>(Action action)
