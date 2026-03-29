@@ -57,6 +57,11 @@ internal sealed class CombatReplayUploadService : IDisposable
         if (pendingBattleIds.Count == 0)
             return new CombatReplayUploadCycleResult(uploadedCount: 0, hasMorePending: false);
 
+        BppLog.Info(
+            "CombatReplayUploadService",
+            $"Starting upload cycle for {pendingBattleIds.Count} pending replay(s)."
+        );
+
         var installId = _identityStore.GetOrCreateInstallId();
         var uploadedCount = 0;
         var apiClient = new CombatReplayUploadApiClient(
@@ -70,6 +75,7 @@ internal sealed class CombatReplayUploadService : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             var attemptedAtUtc = DateTimeOffset.UtcNow;
+            BppLog.Info("CombatReplayUploadService", $"Preparing upload for replay {battleId}.");
             var preflightSnapshot = _store.TryBuildSnapshot(battleId, installId, clientId: null);
             if (preflightSnapshot == null)
             {
@@ -77,6 +83,10 @@ internal sealed class CombatReplayUploadService : IDisposable
                     battleId,
                     attemptedAtUtc,
                     "replay_snapshot_not_found"
+                );
+                BppLog.Warn(
+                    "CombatReplayUploadService",
+                    $"Marking replay {battleId} as terminal failure because the local snapshot is unavailable."
                 );
                 continue;
             }
@@ -98,6 +108,10 @@ internal sealed class CombatReplayUploadService : IDisposable
                             );
                         }
 
+                        BppLog.Info(
+                            "CombatReplayUploadService",
+                            $"Uploading replay {battleId} with client_id={clientId}, run_id={snapshot.Payload.RunId ?? "none"}."
+                        );
                         return await apiClient.UploadReplayAsync(
                             snapshot.Json,
                             clientId,
@@ -116,6 +130,10 @@ internal sealed class CombatReplayUploadService : IDisposable
                         battleId,
                         attemptedAtUtc,
                         "registration_unavailable"
+                    );
+                    BppLog.Warn(
+                        "CombatReplayUploadService",
+                        $"Skipping replay {battleId} because client registration is unavailable."
                     );
                     continue;
                 }
@@ -136,6 +154,10 @@ internal sealed class CombatReplayUploadService : IDisposable
                             attemptedAtUtc,
                             "replay_snapshot_not_found"
                         );
+                        BppLog.Warn(
+                            "CombatReplayUploadService",
+                            $"Marking replay {battleId} as terminal failure because the local snapshot disappeared before upload."
+                        );
                         continue;
                     }
 
@@ -143,6 +165,10 @@ internal sealed class CombatReplayUploadService : IDisposable
                         battleId,
                         attemptedAtUtc,
                         uploadResult.Error ?? "upload_failed"
+                    );
+                    BppLog.Warn(
+                        "CombatReplayUploadService",
+                        $"Upload failed for replay {battleId}: {uploadResult.Error ?? "unknown_error"}."
                     );
                     continue;
                 }
@@ -154,6 +180,10 @@ internal sealed class CombatReplayUploadService : IDisposable
                         attemptedAtUtc,
                         "replay_snapshot_not_found"
                     );
+                    BppLog.Warn(
+                        "CombatReplayUploadService",
+                        $"Marking replay {battleId} as terminal failure because the local snapshot was lost before completion."
+                    );
                     continue;
                 }
 
@@ -162,6 +192,10 @@ internal sealed class CombatReplayUploadService : IDisposable
                     snapshot.PayloadSha256,
                     uploadResult.ObjectKey,
                     DateTimeOffset.UtcNow
+                );
+                BppLog.Info(
+                    "CombatReplayUploadService",
+                    $"Uploaded replay {battleId} with object_key={uploadResult.ObjectKey ?? "none"}."
                 );
                 uploadedCount++;
             }
@@ -176,10 +210,19 @@ internal sealed class CombatReplayUploadService : IDisposable
                     attemptedAtUtc,
                     RunUploadErrorFormatter.Truncate(ex.Message)
                 );
+                BppLog.Warn(
+                    "CombatReplayUploadService",
+                    $"Upload failed for replay {battleId}: {ex.GetType().Name} - {ex.Message}"
+                );
             }
         }
 
-        return new CombatReplayUploadCycleResult(uploadedCount, _store.HasMorePendingReplays());
+        var hasMorePending = _store.HasMorePendingReplays();
+        BppLog.Info(
+            "CombatReplayUploadService",
+            $"Replay upload cycle finished: uploaded={uploadedCount}, remaining={(hasMorePending ? "yes" : "no")}."
+        );
+        return new CombatReplayUploadCycleResult(uploadedCount, hasMorePending);
     }
 
     public void Dispose()

@@ -55,6 +55,10 @@ internal sealed class RunUploadController : MonoBehaviour
                 BppRuntimeHost.Config.RunUploadIntervalSecondsConfig?.Value ?? 180
             );
             var batchSize = Math.Max(1, BppRuntimeHost.Config.RunUploadBatchSizeConfig?.Value ?? 3);
+            var requestTimeoutSeconds = Math.Max(
+                10,
+                BppRuntimeHost.Config.RunUploadRequestTimeoutSecondsConfig?.Value ?? 60
+            );
             var endpoint = TryBuildEndpointSet(registrationEndpoint, uploadEndpoint);
             if (endpoint == null)
             {
@@ -76,11 +80,14 @@ internal sealed class RunUploadController : MonoBehaviour
                 keyStore,
                 endpoint,
                 batchSize,
-                timeout: TimeSpan.FromSeconds(10)
+                timeout: TimeSpan.FromSeconds(requestTimeoutSeconds)
             );
             _shutdown = new CancellationTokenSource();
             _nextAttemptAt = Time.unscaledTime + startupDelaySeconds;
-            BppLog.Info("RunUploadController", "Background run upload armed.");
+            BppLog.Info(
+                "RunUploadController",
+                $"Background run upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}."
+            );
         }
         catch (Exception ex)
         {

@@ -57,6 +57,10 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
                 || string.IsNullOrWhiteSpace(privateKeyPath)
             )
             {
+                BppLog.Warn(
+                    "CombatReplayUploadController",
+                    "Replay upload is enabled but local auth/state or replay paths are missing."
+                );
                 return;
             }
 
@@ -83,6 +87,10 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
                 BppRuntimeHost.Config.RunUploadIntervalSecondsConfig?.Value ?? 180
             );
             var batchSize = Math.Max(1, BppRuntimeHost.Config.RunUploadBatchSizeConfig?.Value ?? 3);
+            var requestTimeoutSeconds = Math.Max(
+                10,
+                BppRuntimeHost.Config.RunUploadRequestTimeoutSecondsConfig?.Value ?? 60
+            );
 
             var uploadStore = new CombatReplayUploadSqliteStore(databasePath, replayRootPath);
             var identityStore = new RunUploadIdentityStore(identityPath);
@@ -96,10 +104,14 @@ internal sealed class CombatReplayUploadController : MonoBehaviour
                 registrationUri.ToString(),
                 uploadUri.ToString(),
                 batchSize,
-                timeout: TimeSpan.FromSeconds(10)
+                timeout: TimeSpan.FromSeconds(requestTimeoutSeconds)
             );
             _shutdown = new CancellationTokenSource();
             _nextAttemptAt = Time.unscaledTime + startupDelaySeconds;
+            BppLog.Info(
+                "CombatReplayUploadController",
+                $"Background replay upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}."
+            );
         }
         catch (Exception ex)
         {

@@ -57,12 +57,22 @@ internal sealed class RunUploadRegistrationClient
     {
         var existingClientId = _clientStateStore.TryGetScopedClientId(_clientStateScope);
         if (!string.IsNullOrWhiteSpace(existingClientId))
+        {
+            BppLog.Info(
+                "RunUploadRegistrationClient",
+                $"Using cached client id for scope={_clientStateScope}: {existingClientId}."
+            );
             return existingClientId;
+        }
 
         try
         {
             var keyMaterial = _keyStore.GetOrCreateKeyMaterial();
             var pluginVersion = BppPluginVersion.Current;
+            BppLog.Info(
+                "RunUploadRegistrationClient",
+                $"Registering client for scope={_clientStateScope}, purpose={_purpose}, fingerprint={keyMaterial.Fingerprint}."
+            );
             var requestBody = JsonConvert.SerializeObject(
                 new JObject
                 {
@@ -109,6 +119,10 @@ internal sealed class RunUploadRegistrationClient
             }
 
             _clientStateStore.SaveScopedClientId(_clientStateScope, clientId);
+            BppLog.Info(
+                "RunUploadRegistrationClient",
+                $"Client registration succeeded for scope={_clientStateScope}: {clientId}."
+            );
             return clientId;
         }
         catch (OperationCanceledException)
@@ -119,9 +133,18 @@ internal sealed class RunUploadRegistrationClient
         {
             BppLog.Warn(
                 "RunUploadRegistrationClient",
-                $"Client registration failed: {ex.GetType().Name} - {ex.Message}"
+                $"Client registration failed for endpoint={_registrationEndpoint}: {FormatException(ex)}"
             );
             return null;
         }
+    }
+
+    private static string FormatException(Exception ex)
+    {
+        var message = $"{ex.GetType().Name} - {ex.Message}";
+        if (ex.InnerException == null)
+            return message;
+
+        return $"{message} | Inner: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}";
     }
 }

@@ -70,12 +70,25 @@ internal sealed class RunUploadApiClient
         }
         catch (Exception ex)
         {
+            BppLog.Warn(
+                "RunUploadApiClient",
+                $"Run upload request failed for endpoint={_uploadEndpoint}: {FormatException(ex)}"
+            );
             return RunUploadApiResult.Failure(
                 RunUploadErrorFormatter.Truncate(ex.Message),
                 shouldFallback: true,
                 shouldReRegister: false
             );
         }
+    }
+
+    private static string FormatException(Exception ex)
+    {
+        var message = $"{ex.GetType().Name} - {ex.Message}";
+        if (ex.InnerException == null)
+            return message;
+
+        return $"{message} | Inner: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}";
     }
 }
 

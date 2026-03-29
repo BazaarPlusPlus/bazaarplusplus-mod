@@ -30,4 +30,6 @@ internal interface IBppConfig
     ConfigEntry<int>? RunUploadIntervalSecondsConfig { get; }
 
     ConfigEntry<int>? RunUploadBatchSizeConfig { get; }
+
+    ConfigEntry<int>? RunUploadRequestTimeoutSecondsConfig { get; }
 }

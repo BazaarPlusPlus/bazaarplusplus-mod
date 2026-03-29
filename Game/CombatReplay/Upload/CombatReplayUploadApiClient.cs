@@ -92,12 +92,25 @@ internal sealed class CombatReplayUploadApiClient
         }
         catch (Exception ex)
         {
+            BppLog.Warn(
+                "CombatReplayUploadApiClient",
+                $"Replay upload request failed for endpoint={_uploadEndpoint}: {FormatException(ex)}"
+            );
             return CombatReplayUploadApiResult.Failure(
                 RunUploadErrorFormatter.Truncate(ex.Message),
                 shouldFallback: true,
                 shouldReRegister: false
             );
         }
+    }
+
+    private static string FormatException(Exception ex)
+    {
+        var message = $"{ex.GetType().Name} - {ex.Message}";
+        if (ex.InnerException == null)
+            return message;
+
+        return $"{message} | Inner: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}";
     }
 }
 

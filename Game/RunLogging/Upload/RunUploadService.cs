@@ -46,6 +46,11 @@ internal sealed class RunUploadService : IDisposable
         if (pendingRunIds.Count == 0)
             return new RunUploadCycleResult(uploadedCount: 0, hasMorePending: false);
 
+        BppLog.Info(
+            "RunUploadService",
+            $"Starting upload cycle for {pendingRunIds.Count} pending run(s)."
+        );
+
         var installId = _identityStore.GetOrCreateInstallId();
         var uploadedCount = 0;
         var apiClient = CreateApiClient();
@@ -55,6 +60,7 @@ internal sealed class RunUploadService : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             var attemptedAtUtc = DateTimeOffset.UtcNow;
             RunUploadSnapshot? snapshot = null;
+            BppLog.Info("RunUploadService", $"Preparing upload for run {runId}.");
             try
             {
                 var requestResult = await routeClient.SendAsync(
@@ -71,6 +77,10 @@ internal sealed class RunUploadService : IDisposable
                             );
                         }
 
+                        BppLog.Info(
+                            "RunUploadService",
+                            $"Uploading run {runId} with client_id={clientId}, events={snapshot.Payload.Events.Count}, battles={snapshot.Payload.PvpBattles.Count}."
+                        );
                         var json = JsonConvert.SerializeObject(
                             snapshot.Payload,
                             RunUploadSerialization.SerializerSettings
@@ -89,6 +99,10 @@ internal sealed class RunUploadService : IDisposable
                 if (!requestResult.RegistrationAvailable)
                 {
                     _store.MarkRunUploadFailed(runId, attemptedAtUtc, "registration_unavailable");
+                    BppLog.Warn(
+                        "RunUploadService",
+                        $"Skipping run {runId} because client registration is unavailable."
+                    );
                     continue;
                 }
 
@@ -119,6 +133,10 @@ internal sealed class RunUploadService : IDisposable
                     snapshot.UploadedStatus,
                     DateTimeOffset.UtcNow
                 );
+                BppLog.Info(
+                    "RunUploadService",
+                    $"Uploaded run {runId} with last_seq={snapshot.LastSeq}, status={snapshot.UploadedStatus ?? "unknown"}."
+                );
                 uploadedCount++;
             }
             catch (OperationCanceledException)
@@ -140,6 +158,10 @@ internal sealed class RunUploadService : IDisposable
         }
 
         var hasMorePending = _store.HasMorePendingCompletedRuns();
+        BppLog.Info(
+            "RunUploadService",
+            $"Run upload cycle finished: uploaded={uploadedCount}, remaining={(hasMorePending ? "yes" : "no")}."
+        );
         return new RunUploadCycleResult(uploadedCount, hasMorePending);
     }
 

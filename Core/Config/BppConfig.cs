@@ -31,6 +31,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<int>? RunUploadBatchSizeConfig { get; private set; }
 
+    public ConfigEntry<int>? RunUploadRequestTimeoutSecondsConfig { get; private set; }
+
     public void Initialize(ConfigFile config)
     {
         UseNativeMonsterPreviewConfig = config.Bind(
@@ -81,7 +83,7 @@ internal sealed class BppConfig : IBppConfig
         EnableRunUploadConfig = config.Bind(
             "RunUpload",
             "Enabled",
-            false,
+            true,
             "Whether completed run logs should be uploaded in the background while not in a live run."
         );
         RunUploadEndpointConfig = config.Bind(
@@ -121,6 +123,15 @@ internal sealed class BppConfig : IBppConfig
             new ConfigDescription(
                 "Maximum number of completed runs to upload in one background batch.",
                 new AcceptableValueRange<int>(1, 20)
+            )
+        );
+        RunUploadRequestTimeoutSecondsConfig = config.Bind(
+            "RunUpload",
+            "RequestTimeoutSeconds",
+            60,
+            new ConfigDescription(
+                "HTTP timeout for each run/replay upload request.",
+                new AcceptableValueRange<int>(10, 300)
             )
         );
     }
