@@ -177,7 +177,7 @@ internal sealed class CombatReplayUploadSqliteStore
 
         var payload = new CombatReplayUploadPayload
         {
-            SchemaVersion = RunLogSqliteSchema.CurrentSchemaVersion,
+            SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
             InstallId = installId,
             ClientId = clientId,
             PluginVersion = BppPluginVersion.Current,

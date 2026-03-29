@@ -180,10 +180,19 @@ try
         .Cast<object>()
         .ToList();
     Assert(
-        ghostRecords.Count == 1
-            && (string)ghostRecords[0].GetType().GetProperty("BattleId")!.GetValue(ghostRecords[0])!
-                == "ghost-2",
-        "ReplaceGhostBattles should prune ghost rows that are no longer returned by the server."
+        ghostRecords.Count == 2,
+        "ReplaceGhostBattles should preserve previously imported ghost rows when the server only returns a sync window."
+    );
+    Assert(
+        ghostRecords.Any(
+            record =>
+                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
+        )
+            && ghostRecords.Any(
+                record =>
+                    (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-2"
+            ),
+        "ReplaceGhostBattles should keep both existing and newly imported ghost rows."
     );
 
     repositoryType.GetMethod("DeleteRun")!.Invoke(repository, ["run-1"]);

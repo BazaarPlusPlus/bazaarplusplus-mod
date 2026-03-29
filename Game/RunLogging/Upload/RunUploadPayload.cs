@@ -1,12 +1,13 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using Newtonsoft.Json.Linq;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal sealed class RunUploadPayload
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = RunLogSqliteSchema.UploadPayloadSchemaVersion;
 
     public string InstallId { get; set; } = string.Empty;
 

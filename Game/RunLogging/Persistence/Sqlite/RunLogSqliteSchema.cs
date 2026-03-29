@@ -3,7 +3,13 @@ namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int CurrentSchemaVersion => 1;
+    public static int LocalDatabaseSchemaVersion => 2;
+
+    public static int RowSchemaVersion => 2;
+
+    public static int UploadPayloadSchemaVersion => 1;
+
+    public static int CurrentSchemaVersion => LocalDatabaseSchemaVersion;
 
     public static string DatabaseFileName => "bazaarplusplus.db";
 
@@ -26,6 +32,7 @@ public static class RunLogSqliteSchema
     public static string BootstrapSql =>
         $"""
             PRAGMA foreign_keys = ON;
+            PRAGMA user_version = {LocalDatabaseSchemaVersion};
 
             CREATE TABLE IF NOT EXISTS {RunsTableName} (
                 run_id TEXT PRIMARY KEY,

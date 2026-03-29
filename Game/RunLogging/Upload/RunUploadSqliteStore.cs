@@ -347,7 +347,7 @@ internal sealed class RunUploadSqliteStore
             UploadedStatus = status?["status"]?.Value<string>(),
             Payload = new RunUploadPayload
             {
-                SchemaVersion = RunLogSqliteSchema.CurrentSchemaVersion,
+                SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
                 InstallId = installId,
                 ClientId = clientId,
                 PluginVersion = BppPluginVersion.Current,

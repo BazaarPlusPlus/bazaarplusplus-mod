@@ -398,33 +398,6 @@ internal sealed class HistoryPanelRepository
         using var connection = OpenConnection(ensureSchema: true);
         using var transaction = connection.BeginTransaction();
 
-        using (var pruneCommand = connection.CreateCommand())
-        {
-            pruneCommand.Transaction = transaction;
-            pruneCommand.CommandTimeout = 2;
-            if (battles.Count == 0)
-            {
-                pruneCommand.CommandText =
-                    $"DELETE FROM {RunLogSqliteSchema.GhostBattlesTableName};";
-            }
-            else
-            {
-                var placeholders = string.Join(
-                    ", ",
-                    Enumerable.Range(0, battles.Count).Select(index => $"$battleId{index}")
-                );
-                pruneCommand.CommandText =
-                    $"""
-                    DELETE FROM {RunLogSqliteSchema.GhostBattlesTableName}
-                    WHERE battle_id NOT IN ({placeholders});
-                    """;
-                for (var i = 0; i < battles.Count; i++)
-                    pruneCommand.Parameters.AddWithValue($"$battleId{i}", battles[i].BattleId);
-            }
-
-            pruneCommand.ExecuteNonQuery();
-        }
-
         foreach (var battle in battles)
         {
             using var insertCommand = connection.CreateCommand();

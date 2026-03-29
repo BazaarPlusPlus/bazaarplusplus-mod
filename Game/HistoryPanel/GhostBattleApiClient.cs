@@ -12,6 +12,9 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class GhostBattleApiClient
 {
+    private const int MaxLookbackDays = 14;
+    private const int MaxBattleLimit = 200;
+
     private readonly HttpClient _httpClient;
     private readonly RunUploadRequestSigner _requestSigner;
     private readonly string _againstMeEndpoint;
@@ -269,7 +272,7 @@ internal sealed class GhostBattleApiClient
         var builder = new UriBuilder(uploadUri)
         {
             Path = "/me/pvp-battles/against-me",
-            Query = string.Empty,
+            Query = $"days={MaxLookbackDays}&limit={MaxBattleLimit}",
         };
         return builder.Uri.ToString();
     }

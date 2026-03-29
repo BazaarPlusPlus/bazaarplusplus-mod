@@ -41,7 +41,7 @@ internal static class RunLoggingGameDataReader
 
         request = new RunLogCreateRequest
         {
-            SchemaVersion = 1,
+            SchemaVersion = Persistence.Sqlite.RunLogSqliteSchema.RowSchemaVersion,
             RunId = serverRunId,
             StartedAtUtc = DateTimeOffset.UtcNow,
             Hero = Data.Run.Player.Hero.ToString(),
@@ -172,7 +172,7 @@ internal static class RunLoggingGameDataReader
         TryBuildRunLogPlayerStats(out var stats);
         return new RunLogCompletion
         {
-            SchemaVersion = 1,
+            SchemaVersion = Persistence.Sqlite.RunLogSqliteSchema.RowSchemaVersion,
             Status = status,
             EndedAtUtc = DateTimeOffset.UtcNow,
             FinalDay = Data.Run == null ? null : (int?)Data.Run.Day,

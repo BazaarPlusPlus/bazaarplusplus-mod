@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 namespace BazaarPlusPlus.Game.RunLogging.Models;
 
@@ -7,7 +8,7 @@ public sealed class RunLogSessionState
 {
     public string RunId { get; set; } = string.Empty;
 
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = RunLogSqliteSchema.RowSchemaVersion;
 
     public DateTimeOffset StartedAtUtc { get; set; }
 

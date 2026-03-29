@@ -6,6 +6,18 @@ var schemaType = RequireType(
 );
 
 Assert(
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 2,
+    "Local database schema version mismatch."
+);
+Assert(
+    GetStaticValue<int>(schemaType, "RowSchemaVersion") == 2,
+    "Row schema version mismatch."
+);
+Assert(
+    GetStaticValue<int>(schemaType, "UploadPayloadSchemaVersion") == 1,
+    "Upload payload schema version mismatch."
+);
+Assert(
     GetStaticValue<string>(schemaType, "DatabaseFileName") == "bazaarplusplus.db",
     "Database file name mismatch."
 );
@@ -32,6 +44,10 @@ Assert(!string.IsNullOrWhiteSpace(bootstrapSql), "Bootstrap SQL should not be em
 Assert(
     bootstrapSql.Contains("CREATE TABLE", StringComparison.Ordinal),
     "Bootstrap SQL should create tables."
+);
+Assert(
+    bootstrapSql.Contains("PRAGMA user_version = 2;", StringComparison.Ordinal),
+    "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
     bootstrapSql.Contains("runs", StringComparison.Ordinal),

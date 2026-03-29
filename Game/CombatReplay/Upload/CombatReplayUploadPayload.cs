@@ -1,12 +1,13 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Upload;
 
 internal sealed class CombatReplayUploadPayload
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = RunLogSqliteSchema.UploadPayloadSchemaVersion;
 
     public string InstallId { get; set; } = string.Empty;
 
