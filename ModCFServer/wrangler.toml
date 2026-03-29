@@ -10,12 +10,12 @@ custom_domain = true
 [[d1_databases]]
 binding = "DB"
 database_name = "bazaarplusplus-mod-api-db"
-database_id = "6cf4ec06-c479-4275-a533-6c704624cffe"
+database_id = "24036fd0-6e3c-46dc-bde1-703753483792"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
-binding = "REPLAY_BUCKET"
-bucket_name = "bazaarplusplus-replays"
+binding = "PVP_BATTLE_BUCKET"
+bucket_name = "bazaarplusplus-pvp-battles"
 
 [triggers]
 crons = ["0 */6 * * *"]

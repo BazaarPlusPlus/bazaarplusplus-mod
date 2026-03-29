@@ -292,7 +292,7 @@ export async function handleReplayDownload(
     return json({ error: "replay_not_found" }, { status: 404 });
   }
 
-  const object = await env.REPLAY_BUCKET.get(battle.replay_object_key);
+  const object = await env.PVP_BATTLE_BUCKET.get(battle.replay_object_key);
   if (!object) {
     return json({ error: "replay_not_found" }, { status: 404 });
   }

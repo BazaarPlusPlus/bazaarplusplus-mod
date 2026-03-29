@@ -329,7 +329,7 @@ test("creates a replay download link and serves the payload", async () => {
     created_at_utc: "2099-03-29T12:00:00.000Z",
     updated_at_utc: "2099-03-29T12:00:00.000Z",
   });
-  env.REPLAY_BUCKET.objects.set(
+  env.PVP_BATTLE_BUCKET.objects.set(
     "combat-replays/replays/replay-client/battle-ghost-download/hash.payload.json",
     new TextEncoder().encode(
       JSON.stringify({

@@ -144,7 +144,7 @@ test("accepts signed run uploads", async () => {
   );
   assert.equal(uploadedRun?.payload_bytes, new TextEncoder().encode(payload).byteLength);
   assert.equal(uploadedRun?.schema_version, 3);
-  assert.ok(env.REPLAY_BUCKET.objects.has(`runs/${clientId}/run-001/${bodyHash}.json`));
+  assert.ok(env.PVP_BATTLE_BUCKET.objects.has(`runs/${clientId}/run-001/${bodyHash}.json`));
 });
 
 test("run uploads ignore pvp battle payloads for projection", async () => {
@@ -259,7 +259,7 @@ test("records a failed run payload store in the run ingestion ledger", async () 
     plugin_version: "1.9.0",
     registered_at_utc: new Date().toISOString(),
   });
-  env.REPLAY_BUCKET.put = async () => {
+  env.PVP_BATTLE_BUCKET.put = async () => {
     throw new Error("run-store-failed");
   };
 

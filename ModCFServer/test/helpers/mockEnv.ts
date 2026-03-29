@@ -528,7 +528,7 @@ export class MockR2Bucket {
 export function buildEnv() {
   return {
     DB: new MockD1Database(),
-    REPLAY_BUCKET: new MockR2Bucket(),
+    PVP_BATTLE_BUCKET: new MockR2Bucket(),
     REPLAY_DOWNLOAD_SECRET: "test-replay-download-secret",
   };
 }

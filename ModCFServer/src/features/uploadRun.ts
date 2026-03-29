@@ -56,7 +56,7 @@ export async function handleRunUpload(
   });
 
   try {
-    await env.REPLAY_BUCKET.put(payloadObjectKey, verified.payload, {
+    await env.PVP_BATTLE_BUCKET.put(payloadObjectKey, verified.payload, {
       httpMetadata: {
         contentType: "application/json; charset=utf-8",
       },

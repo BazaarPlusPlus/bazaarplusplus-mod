@@ -41,7 +41,7 @@ export async function handleBattleUpload(
   ) as ArrayBuffer;
   const replayPayloadHash = await sha256Base64(battlePayloadBuffer);
   const objectKey = `replays/${verified.client.client_id}/${battleId}/${replayPayloadHash}.json`;
-  await env.REPLAY_BUCKET.put(
+  await env.PVP_BATTLE_BUCKET.put(
     objectKey,
     battlePayloadBytes,
     {
