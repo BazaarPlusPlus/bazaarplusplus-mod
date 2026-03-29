@@ -2,72 +2,49 @@
 
 ## Scope
 
-The current implementation adds a bottom-centered combat HUD that is attached from
-`Plugin.Awake()`. Runtime state is split between:
+当前实现会在战斗期间显示一个底部 HUD。运行时职责分为两部分：
 
-- `CombatStatusBar`, which owns UI, persisted local state, and input handling
-- `CombatStatusBarModule`, which consumes combat events through `BppRuntimeHost.EventBus`
+- `Game/CombatStatusBar/CombatStatusBar.cs`：UI、状态与输入
+- `Game/CombatStatusBar/CombatStatusBarModule.cs`：消费 combat 事件并推进状态
 
-Implemented behavior:
+## 当前行为
 
-- render only while `BppRuntimeHost.RunContext.IsInGameRun` and the feature is enabled
-- show logical combat time derived from processed combat frames
-- show processed frame count during combat and a standby / last-combat summary outside combat
-- allow only discrete speed steps: `0.25x`, `0.33x`, `0.50x`, `1.00x`
-- allow pause toggling through `GameServiceManager.PauseOrUnpauseGame(...)`
-- persist enabled and default-speed config
+- 仅在 `BppRuntimeHost.RunContext.IsInGameRun` 且功能开启时显示。
+- 展示逻辑战斗时间与已处理帧数。
+- 支持暂停。
+- 只支持离散倍速：`0.25x`、`0.33x`、`0.50x`、`1.00x`。
+- 记住功能开关与默认倍速。
 
-Explicitly out of scope:
+不支持：
 
 - frame stepping
 - rewind
-- custom replay controls
-- arbitrary or faster-than-native speed overrides
+- 自定义 replay 控件
+- 高于原生路径的任意倍速覆盖
 
-## Key Files
+## 逻辑时间
 
-- [Plugin.cs](../Plugin.cs)
-- [Core/Runtime/BppRuntimeHost.cs](../Core/Runtime/BppRuntimeHost.cs)
-- [Core/Config/BppConfig.cs](../Core/Config/BppConfig.cs)
-- [Game/CombatStatusBar/CombatStatusBar.cs](../Game/CombatStatusBar/CombatStatusBar.cs)
-- [Game/CombatStatusBar/CombatStatusBar.State.cs](../Game/CombatStatusBar/CombatStatusBar.State.cs)
-- [Game/CombatStatusBar/CombatStatusBar.Config.cs](../Game/CombatStatusBar/CombatStatusBar.Config.cs)
-- [Game/CombatStatusBar/CombatStatusBarModule.cs](../Game/CombatStatusBar/CombatStatusBarModule.cs)
-- [Game/CombatStatusBar/CombatStatusBar.SettingsMenuBridge.cs](../Game/CombatStatusBar/CombatStatusBar.SettingsMenuBridge.cs)
-- [Game/Settings/BppSettingsDockCatalog.cs](../Game/Settings/BppSettingsDockCatalog.cs)
-- [Game/Input/KeyBindings.cs](../Game/Input/KeyBindings.cs)
-- [Patches/Combat/CombatSimulationPatches.cs](../Patches/Combat/CombatSimulationPatches.cs)
-- [Patches/Combat/CombatSpeedPatch.cs](../Patches/Combat/CombatSpeedPatch.cs)
-
-## Runtime Flow
-
-1. `CombatSimPatch` publishes `CombatSimObserved` at the start of
-   `CombatSimHandler.Simulate(...)`.
-2. `CombatStatusBarModule` reads the incoming `NetMessageCombatSim`, stores
-   `TotalCombatFrames`, and updates `BppRuntimeHost.RunContext.LastVictoryCondition`.
-3. `CombatFrameAdvancePatch` publishes `CombatFrameAdvanced` once per processed combat frame.
-4. `CombatStatusBarModule` calls `CombatStatusBar.AdvanceCombatFrame()` to keep UI state in sync.
-5. `CombatStatusBar` listens to `Events.CombatStarted` / `Events.CombatEnded`, builds the runtime
-   canvas, and refreshes the HUD every `Update()`.
-
-## Logical Time
-
-Logical combat time is defined as:
+逻辑时间定义为：
 
 `ProcessedCombatFrames * 50ms`
 
-That keeps the display tied to simulation progress instead of wall-clock playback time. Speed
-changes therefore do not distort the time label, and the counter remains stable across pause and
-final-blow slowdown.
+因此显示值跟随模拟进度，而不是墙钟时间；暂停和倍速切换不会让时间标签失真。
 
-## Settings And Config
+## Runtime Flow
 
-- Bazaar++ settings integration is provided through the combat-status-bar settings bridge and the
-  shared `BppSettingsDockCatalog`.
-- Config is read from `BppConfig`:
-  - `EnableCombatStatusBarConfig`
-  - `CombatStatusBarSpeedMultiplierConfig`
+1. `Patches/Combat/CombatSimulationPatches.cs` 发布 `CombatSimObserved` 和 `CombatFrameAdvanced`。
+2. `CombatStatusBarModule` 记录总帧数并同步处理进度。
+3. `CombatStatusBar` 在 `Update()` 中刷新 HUD。
 
-Configured speed is normalized to the supported step list. `CombatSpeedPatch` only overrides
-requested speeds up to `1.00x`, which preserves native fast-forward / slowdown paths that the game
-applies on its own.
+## 关键文件
+
+- `Plugin.cs`
+- `Core/Config/BppConfig.cs`
+- `Game/CombatStatusBar/CombatStatusBar.cs`
+- `Game/CombatStatusBar/CombatStatusBar.State.cs`
+- `Game/CombatStatusBar/CombatStatusBar.Config.cs`
+- `Game/CombatStatusBar/CombatStatusBarModule.cs`
+- `Game/CombatStatusBar/CombatStatusBar.SettingsMenuBridge.cs`
+- `Game/Settings/BppSettingsDockCatalog.cs`
+- `Patches/Combat/CombatSimulationPatches.cs`
+- `Patches/Combat/CombatSpeedPatch.cs`

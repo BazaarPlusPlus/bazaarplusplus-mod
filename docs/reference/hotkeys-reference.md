@@ -1,55 +1,37 @@
 # Hotkeys Reference
 
-## Scope
+## Player-Facing
 
-This note lists the Bazaar++ hotkeys that are currently active in the shipped mod, grouped by
-player-facing features, debug-only features, and panel-internal tuning controls.
-
-## Player-Facing Hotkeys
-
-| Hotkey | Function | Scope | Rebindable | Notes |
-| --- | --- | --- | --- | --- |
-| `F8` | Toggle `HistoryPanel` | Global | No | Opens or closes the run-history panel. |
-| `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No | Closes the panel when it is open. |
-| `Ctrl` | Show enchant preview | Tooltip hover | Yes | Default binding for `HoldEnchantPreview`. |
-| `Shift` | Show upgrade preview | Tooltip hover | Yes | Default binding for `HoldUpgradePreview`. |
+| Hotkey | Function | Scope | Rebindable |
+| --- | --- | --- | --- |
+| `F8` | Toggle `HistoryPanel` | Global | No |
+| `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No |
+| `Ctrl` | Show enchant preview | Tooltip hover | Yes |
+| `Shift` | Show upgrade preview | Tooltip hover | Yes |
 
 ## Rebindable Bazaar++ Actions
-
-Only two Bazaar++ actions currently integrate with the native keybind settings UI:
 
 - `HoldEnchantPreview`
 - `HoldUpgradePreview`
 
-Runtime behavior is owned by `Game/Input/BppHotkeyService.cs`.
+当前由 `Game/Input/BppHotkeyService.cs` 管理，默认值分别是 `Ctrl` 和 `Shift`，支持鼠标按键绑定，并在保存前拒绝 Bazaar++ 动作内部冲突。
 
-Current behavior:
+## DebugPanel
 
-- default enchant preview binding is `Ctrl`
-- default upgrade preview binding is `Shift`
-- supported mouse bindings include `LMB`, `RMB`, `MMB`, `BACK`, and `FORWARD`
-- conflicting Bazaar++ bindings are rejected before save
+仅在 debug build 可用：
 
-## Debug-Only Hotkeys
-
-These hotkeys are only available when the debug-only `DebugPanel` is mounted.
-
-| Hotkey | Function | Scope | Rebindable |
-| --- | --- | --- | --- |
-| `F2` | Toggle `DebugPanel` | Debug only | No |
-| `1` | Select `Summary` section | `DebugPanel` only | No |
-| `2` | Select `Preview` section | `DebugPanel` only | No |
-| `3` | Select `Run` section | `DebugPanel` only | No |
-| `4` | Select `Encounters` section | `DebugPanel` only | No |
-| `5` | Select `Replays` section | `DebugPanel` only | No |
-| `Tab` | Toggle All / Single section view | `DebugPanel` only | No |
+| Hotkey | Function |
+| --- | --- |
+| `F2` | Toggle `DebugPanel` |
+| `1` | `Summary` |
+| `2` | `Run` |
+| `3` | `Encounters` |
+| `4` | `Replays` |
+| `Tab` | Toggle All / Single section view |
 
 ## HistoryPanel Preview Tuning
 
-These are internal preview-tuning controls inside `HistoryPanel`. They are not exposed as normal
-player-facing keybinds.
-
-All of the following require `Ctrl` to be held while `HistoryPanel` is open:
+以下热键仅在 `HistoryPanel` 打开且按住 `Ctrl` 时生效：
 
 | Hotkey | Function |
 | --- | --- |
@@ -66,7 +48,6 @@ All of the following require `Ctrl` to be held while `HistoryPanel` is open:
 
 - `Game/Input/KeyBindings.cs`
 - `Game/Input/BppHotkeyService.cs`
-- `Game/CombatStatusBar/CombatStatusBar.cs`
 - `Game/HistoryPanel/HistoryPanel.cs`
 - `Game/DebugPanel/DebugPanel.cs`
 - `Patches/Settings/BppKeybindSettingsPatch.cs`

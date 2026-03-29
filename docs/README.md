@@ -1,34 +1,25 @@
 # Docs
 
-This directory keeps only documents that still describe the current `bazaarplusplus-mod`
-codebase. Source files under `Plugin.cs`, `Core/`, `Game/`, `Patches/`, `Data/`, `scripts/`,
-and `tests/` remain the source of truth.
+这里只保留描述当前实现的文档。若文档与代码冲突，以 `Plugin.cs`、`Core/`、`Game/`、`Patches/`、`Data/`、`scripts/`、`tests/` 为准。
 
-## Start Here
+## 功能文档
 
-- `../README.md`: repository-level feature summary and build / packaging notes
-- `combat-status-bar.md`: runtime HUD, speed control, and combat-frame timing model
-- `monster-preview-design.md`: monster preview overlay pipeline and data sources
-- `mod-cf-server-deploy.md`: Cloudflare Worker, D1, R2, secret, and custom-domain deployment flow
-- `run-logging.md`: run log capture, SQLite persistence, history UI, and export flow
-- `run-upload.md`: current background upload implementation, config, and request format
-- `run-upload-identity-design.md`: install identity, signed upload, uid binding, and dual-backend design
+- `../README.md`: 仓库总览
+- `combat-status-bar.md`: 战斗状态条
+- `monster-preview-design.md`: 怪物预览运行时路径
+- `run-logging.md`: run logging、history panel、ghost battles
+- `run-upload.md`: 当前 run / replay 后台上传实现
+- `mod-cf-server-deploy.md`: `ModCFServer` 部署与验证
 
-## Reference Docs
+## Reference
 
-- `reference/combat-replay-recording.md`: saved replay capture and playback architecture
-- `reference/hotkeys-reference.md`: current player-facing, debug-only, and internal panel hotkeys
-- `reference/upgrade-tooltip-implementation.md`: enchant and upgrade tooltip behavior
-- `reference/settings-and-debug-surfaces.md`: gameplay settings toggles, tooltip keybind rows, and debug-only panels
-- `reference/sqlite-schema-reference.md`: current SQLite schema and read/write paths
-- `reference/netmessage-data-reference.md`: useful `NetMessage*` field notes from decompiled runtime
-- `reference/card-board-type-reference.md`: inventory / board enum notes
-- `reference/run-history-decompiled-analysis.md`: why BazaarPlusPlus records run history itself
+- `reference/combat-replay-recording.md`: 回放保存与回放入口
+- `reference/hotkeys-reference.md`: 当前热键
+- `reference/settings-and-debug-surfaces.md`: 设置、keybind 和 debug 面板
+- `reference/sqlite-schema-reference.md`: 当前 SQLite schema
+- `reference/upgrade-tooltip-implementation.md`: 附魔 / 升级 tooltip 实现
 
-## Notes
+## 说明
 
-- Historical implementation plans were removed from `docs/` because they no longer reflect the
-  live repository state.
-- If historical execution context is needed, use git history instead of stale plan files.
-- `reference/run-history-decompiled-analysis.md` is retained as background for the shipped
-  `Game/RunLogging/` implementation, not as a pending design doc.
+- 已删除不再对应现有代码的设计稿、调研笔记和未来态文档。
+- 需要历史背景时，请查看 git history，不再保留冗长的过时文档副本。

@@ -2,118 +2,40 @@
 
 ## Scope
 
-This feature records a completed `PVPCombat` as the same three-message bundle the game already uses
-for native combat replay:
+当前实现会把完成的 `PVPCombat` 保存为与游戏原生 replay 流程兼容的三消息 bundle：
 
 1. opening `NetMessageGameSim`
 2. `NetMessageCombatSim`
 3. closing `NetMessageGameSim`
 
-The live observer starts at `CombatReplayCapturePatch`, which hooks
-`NetMessageProcessor.ReceiveOrQueue(...)`, publishes matching messages as
-`NetMessageObserved`, and lets `CombatReplayModule` forward them into
-`CombatReplayRuntime`.
-
 ## Storage
 
-Replay payload files are stored under:
+- payload 文件目录：`<GameRoot>/BazaarPlusPlus/CombatReplays`
+- payload 文件格式：`<battle_id>.payload.json`
+- battle metadata：SQLite `pvp_battles`
 
-- `<GameRoot>/BazaarPlusPlus/CombatReplays`
+`pvp_battles` 保存 battle manifest，包含 battle identity、player/opponent identity、结果，以及 history preview / replay bootstrap 需要的 board snapshot。
 
-Each payload file is a `*.payload.json` document containing:
+## Capture Flow
 
-- base64 MessagePack payloads for the opening game sim, combat sim, and closing game sim
-
-Battle metadata is stored separately in SQLite as a `PvpBattleManifest` row in `pvp_battles`.
-That manifest carries:
-
-- `battle_id`
-- optional `run_id`
-- save time / day / hour / encounter id
-- player and opponent identity
-- outcome
-- player / opponent item and skill snapshots used by history UI and replay bootstrap
-
-## Replay Flow
-
-Live capture flow:
-
-1. `CombatReplayCapturePatch` publishes matching `GameSim` / `CombatSim` messages as
-   `NetMessageObserved`
-2. `CombatReplayModule` forwards those observed messages to `CombatReplayRuntime`
-3. `CombatReplayCaptureService` matches an opening `GameSim`, one `CombatSim`, and a closing
-   `GameSim`
-4. it captures player / opponent hand and skill snapshots
-5. it builds:
-   - `PvpReplayPayload`
-   - `PvpBattleManifest`
-6. `CombatReplayRuntime` enqueues asynchronous persistence through
-   `CombatReplayPersistenceQueue`
-7. payload and manifest persistence completion eventually publishes `PvpBattleRecorded`
-
-Saved replay loading uses the native replay path, but with an extra rehydration step for player
-cards and replay UI:
-
-1. load the saved payload and manifest
-2. deserialize the raw triplet back into `CombatSequenceMessages`
-3. rebuild saved player hand cards into `Data.Entities`
-4. prepare replay health bars and related board UI
-5. inject the saved sequence as the current combat sequence source
-6. enter `ReplayState`
-7. auto-start native replay playback
-
-This keeps playback aligned with the native replay implementation instead of rebuilding a fight from
-custom logs.
-
-Saved replay bootstrap does not call the normal run-start path. It prepares only the minimum scene
-and service state needed to enter the native replay pipeline, without using
-`RunManager.StartRun()` or `Events.RunStarted`.
+1. `Patches/Combat/CombatReplayCapturePatch.cs` 监听相关 net messages。
+2. `Game/CombatReplay/CombatReplayModule.cs` 转发消息给 `CombatReplayRuntime`。
+3. `Game/CombatReplay/CombatReplayCaptureService.cs` 组装三消息 bundle，并抓取 player / opponent board snapshot。
+4. `Game/CombatReplay/CombatReplayRuntime.cs` 通过 `CombatReplayPersistenceQueue` 异步持久化 payload 与 manifest。
+5. 完成后发布 `PvpBattleRecorded`，供 run logging 等模块消费。
 
 ## Replay Entry Points
 
-Saved replay playback currently ships through two UI surfaces that share the same runtime gate:
+- `HistoryPanel`：本地 battle payload 存在且当前允许 bootstrap 时可回放
+- `DebugPanel -> Replays`：debug build 下的调试入口
+- ghost battle：若服务端声明 replay 可用，可先下载 payload，再走导入回放
 
-- `HistoryPanel`: the normal history UI enables `Replay` only when the selected `pvp_battles` row
-  still has a payload file and saved replay bootstrap is currently allowed
-- `DebugPanel`: in debug builds, open the panel with `F2`, then switch to the `Replays` section
+## 关键文件
 
-Available `DebugPanel` actions:
-
-- `Replay Latest`: loads the newest saved combat
-- per-entry replay buttons: load a specific saved combat
-
-The `DebugPanel` shows the currently active replay id and the most recent saved entries. The
-`HistoryPanel` gives the same replay path to non-debug users, but scoped to the currently selected
-battle entry.
-
-## Lobby Bootstrap
-
-Saved replay playback is intentionally restricted to the lobby with no active run. Both the
-`HistoryPanel` and `DebugPanel` disable replay actions while a run is in progress so the replay
-bootstrap path cannot overwrite a live run state.
-
-If replay is started from the lobby, the mod first bootstraps a minimal gameplay environment:
-
-1. load `GameScene`
-2. load `GameplayLoading`
-3. initialize the board and gameplay services
-4. inject the saved combat sequence
-5. enter `ReplayState`
-
-This allows saved combats to be replayed even after restarting the game.
-
-When a replay was bootstrapped from the lobby, exiting that replay returns the game to the main menu
-automatically.
-
-`CombatReplayRuntime.Awake()` also performs orphan cleanup: it scans payload files, compares them
-against the manifest catalog, and deletes payloads that no longer have a matching manifest row.
-
-## Limitations
-
-- Only `PVPCombat` openings create new replay candidates.
-- This feature records combat replay data only, not full run timeline playback.
-- Replays still depend on the runtime being able to enter the native `ReplayState`.
-- Saved replay playback is blocked while an active run exists.
-- Older payloads created before snapshot fields were added may still show missing player cards.
-- If the underlying game changes message formats or replay initialization order, saved replays may
-  stop loading until the mod is updated.
+- `Patches/Combat/CombatReplayCapturePatch.cs`
+- `Game/CombatReplay/CombatReplayRuntime.cs`
+- `Game/CombatReplay/CombatReplayCaptureService.cs`
+- `Game/CombatReplay/CombatReplayPersistenceQueue.cs`
+- `Game/CombatReplay/CombatReplayPayloadStore.cs`
+- `Game/CombatReplay/CombatReplayLoader.cs`
+- `Game/HistoryPanel/HistoryPanelReplayService.cs`

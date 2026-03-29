@@ -2,20 +2,17 @@
 
 ## Scope
 
-This document records the current Monster Preview runtime path and the file boundaries that still
-matter for maintenance. Older one-off investigations and implementation plans are intentionally
-omitted.
+本文只描述当前 shipped 的怪物预览实现，不再保留旧调研和一次性设计过程。
 
 ## Runtime Entry
 
-The feature is attached from [Plugin.cs](../Plugin.cs):
+`Plugin.cs` 当前挂载：
 
 - `MonsterPreviewController`
 - `MonsterPreviewWarmupController`
 - `MonsterLockShowcaseRuntime`
-- `MonsterPreviewDebugController` in debug builds only
 
-Production trigger path:
+主流程：
 
 ```text
 CardTooltipController.LockTooltipToggle()
@@ -28,76 +25,31 @@ CardTooltipController.LockTooltipToggle()
   -> MonsterPreviewBoard
 ```
 
-## Key Files
+## 当前行为
 
-- [Plugin.cs](../Plugin.cs)
-- [Patches/Showcase/ShowcaseTooltipPatches.cs](../Patches/Showcase/ShowcaseTooltipPatches.cs)
-- [Game/MonsterPreview/MonsterLockShowcaseRuntime.cs](../Game/MonsterPreview/MonsterLockShowcaseRuntime.cs)
-- [Game/MonsterPreview/MonsterPreviewController.cs](../Game/MonsterPreview/MonsterPreviewController.cs)
-- [Game/MonsterPreview/MonsterPreviewWarmupController.cs](../Game/MonsterPreview/MonsterPreviewWarmupController.cs)
-- [Game/MonsterPreview/Architecture/MonsterPreviewOverlayCoordinator.cs](../Game/MonsterPreview/Architecture/MonsterPreviewOverlayCoordinator.cs)
-- [Game/MonsterPreview/Architecture/PreviewBoardSession.cs](../Game/MonsterPreview/Architecture/PreviewBoardSession.cs)
-- [Game/MonsterPreview/Architecture/PreviewBoardRequest.cs](../Game/MonsterPreview/Architecture/PreviewBoardRequest.cs)
-- [Game/MonsterPreview/Architecture/PreviewBoardModel.cs](../Game/MonsterPreview/Architecture/PreviewBoardModel.cs)
-- [Game/MonsterPreview/Architecture/PreviewCardSpec.cs](../Game/MonsterPreview/Architecture/PreviewCardSpec.cs)
-- [Game/MonsterPreview/Architecture/PreviewBoardPresentation.cs](../Game/MonsterPreview/Architecture/PreviewBoardPresentation.cs)
-- [Game/MonsterPreview/Architecture/BoardPose.cs](../Game/MonsterPreview/Architecture/BoardPose.cs)
-- [Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoardRenderTarget.cs](../Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoardRenderTarget.cs)
-- [Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoard.cs](../Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoard.cs)
-- [Game/MonsterPreview/DataSources/MonsterDatabasePreviewDataSource.cs](../Game/MonsterPreview/DataSources/MonsterDatabasePreviewDataSource.cs)
-- [Game/EncounterTracker.cs](../Game/EncounterTracker.cs)
-- [Game/EncounterPreviewSpecConverter.cs](../Game/EncounterPreviewSpecConverter.cs)
+- 右键锁定怪物 / 遭遇牌时，Bazaar++ 可拦截原生 lock-toggle，展示自定义怪物预览。
+- `MonsterLockShowcaseRuntime` 先尝试从 `MonsterDatabase` 构建预览数据。
+- 若静态数据缺失，则回退到 `EncounterTracker` + `EncounterPreviewSpecConverter` 的运行时缓存。
+- 重复触发同一目标时会走隐藏 / 下一次点击关闭的控制逻辑。
+- `UseNativeMonsterPreview` 设置开启时，运行时会让回原生预览路径。
 
-## Responsibilities
+## 关键文件
 
-### `MonsterLockShowcaseRuntime`
+- `Plugin.cs`
+- `Patches/Showcase/ShowcaseTooltipPatches.cs`
+- `Game/MonsterPreview/MonsterLockShowcaseRuntime.cs`
+- `Game/MonsterPreview/MonsterPreviewController.cs`
+- `Game/MonsterPreview/MonsterPreviewWarmupController.cs`
+- `Game/MonsterPreview/MonsterPreviewModeSwitchCoordinator.cs`
+- `Game/MonsterPreview/Architecture/MonsterPreviewOverlayCoordinator.cs`
+- `Game/MonsterPreview/Architecture/PreviewBoardSession.cs`
+- `Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoardRenderTarget.cs`
+- `Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoard.cs`
+- `Game/MonsterPreview/DataSources/MonsterDatabasePreviewDataSource.cs`
+- `Game/EncounterTracker.cs`
+- `Game/EncounterPreviewSpecConverter.cs`
 
-- decides whether the current lock toggle should be intercepted
-- builds a `PreviewBoardModel` from `MonsterDatabase` or encounter-tracker cache
-- creates the external `PreviewBoardRequest`
-- handles repeated-toggle hide behavior and close-on-next-click behavior
+## Debug
 
-### `MonsterPreviewController`
-
-- owns the Unity `MonoBehaviour` lifecycle
-- creates the render target and overlay coordinator
-- forwards show / hide requests
-- drives coordinator updates from `LateUpdate()`
-
-### `MonsterPreviewOverlayCoordinator`
-
-- stores the active request
-- resolves the final request used for rendering
-- forwards work to `PreviewBoardSession`
-
-### `PreviewBoardSession`
-
-- compares request signatures
-- decides whether a rerender is required
-- resolves pose, presentation, and model into a render-ready result
-
-### `MonsterPreviewBoardRenderTarget` and `MonsterPreviewBoard`
-
-- ensure the world-space board root exists
-- apply pose and visibility
-- rebuild item and skill cards and their markers
-
-## Data Sources
-
-The runtime currently has two production data sources:
-
-- `MonsterDatabasePreviewDataSource` for static encounter data from `MonsterDatabase`
-- `EncounterTracker` + `EncounterPreviewSpecConverter` for cached live encounter boards when
-  static database coverage is missing
-
-`MonsterLockShowcaseRuntime.TryBuildPreview(...)` prefers the database path first and falls back
-to encounter-tracker cache.
-
-## Debug Scope
-
-Debug-only entry points live under:
-
-- [Game/MonsterPreview/Debug/MonsterPreviewDebugController.cs](../Game/MonsterPreview/Debug/MonsterPreviewDebugController.cs)
-- [Game/MonsterPreview/Debug/MonsterPreviewDebugTuner.cs](../Game/MonsterPreview/Debug/MonsterPreviewDebugTuner.cs)
-
-They are mounted only when `BppBuild.IsDebug` is true in [Plugin.cs](../Plugin.cs).
+- 当前 debug build 不再单独挂载 `MonsterPreviewDebugController`。
+- 与怪物预览相关的 debug 可见性主要通过 `DebugPanel` 的 `Encounters` 区域和 `Game/MonsterPreview/Debug/MonsterPreviewDebugTuner.cs` 协助排查。

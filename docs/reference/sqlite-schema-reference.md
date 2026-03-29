@@ -1,83 +1,71 @@
 # SQLite Schema Reference
 
-## 1. 范围与结论
+## Scope
 
-这份文档描述 BazaarPlusPlus 当前代码所定义并实际维护的 SQLite schema。
+这份文档只给出当前 schema 的紧凑摘要。完整事实来源是：
 
-这里的“当前 schema”不是只看一段建表 SQL，而是以下三部分的合并结果：
-
-- `Game/RunLogging/Persistence/Sqlite/RunLogSqliteSchema.cs` 里的 `BootstrapSql`
-- `Game/RunLogging/Persistence/SqliteRunLogStore.cs` 里的补列逻辑
-- `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs` 里的补列与 legacy 迁移逻辑
-
-当前结论：
-
-- 数据库文件名固定为 `bazaarplusplus.db`
-- 默认路径是 `<GameRoot>/BazaarPlusPlus/bazaarplusplus.db`
-- 代码级 schema version 目前固定为 `1`
-- 当前库里一共 5 张业务表：
-  - `runs`
-  - `run_events`
-  - `run_checkpoints`
-  - `run_status`
-  - `pvp_battles`
-- 这套 schema 本质上是“run 事件流 + 可恢复 checkpoint + 终态快照 + PVP battle manifest”
-- 没有单独的 migration table，也没有使用 `PRAGMA user_version`
-
-## 2. Schema 来源
-
-主要来源文件：
-
-- `Core/Paths/BppPathService.cs`
 - `Game/RunLogging/Persistence/Sqlite/RunLogSqliteSchema.cs`
 - `Game/RunLogging/Persistence/SqliteRunLogStore.cs`
 - `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
 - `Game/HistoryPanel/HistoryPanelRepository.cs`
-- `scripts/export_run_log.py`
 
-相关模型：
+## Current Version
 
-- `Game/RunLogging/Models/RunLogCreateRequest.cs`
-- `Game/RunLogging/Models/RunLogEvent.cs`
-- `Game/RunLogging/Models/RunLogCheckpoint.cs`
-- `Game/RunLogging/Models/RunLogCompletion.cs`
-- `Game/RunLogging/Models/RunLogPendingSelectionState.cs`
-- `Game/PvpBattles/PvpBattleManifest.cs`
-- `Game/PvpBattles/PvpBattleParticipants.cs`
-- `Game/PvpBattles/PvpBattleOutcome.cs`
-- `Game/PvpBattles/PvpBattleSnapshots.cs`
-- `Game/PvpBattles/PvpBattleCardSetCapture.cs`
+- database file: `bazaarplusplus.db`
+- default path: `<GameRoot>/BazaarPlusPlus/bazaarplusplus.db`
+- local schema version: `4`
+- row schema version: `4`
+- upload payload schema version: `1`
+- uses `PRAGMA user_version`
 
-## 3. 运行时数据库配置
+## Current Tables
 
-连接建立后会立刻设置：
+- `runs`
+- `run_events`
+- `run_checkpoints`
+- `run_status`
+- `pvp_battles`
+- `ghost_battles`
+- `run_sync_state`
+- `replay_sync_state`
+
+## Runtime SQLite Setup
 
 - `PRAGMA foreign_keys = ON`
+- `PRAGMA user_version = 4`
 - `PRAGMA busy_timeout = 2000`
 - `PRAGMA journal_mode = WAL`
+- command timeout is kept short
 
-另外，代码里对 SQLite command 统一设置了短超时：
-
-- `CommandTimeout = 2`
-
-这说明当前实现偏向“本地轻量存储 + 快速失败”，不是长事务或重查询型数据库。
-
-## 4. ER 图 + DDL 摘要
-
-### 4.1 ER 图
+## Relationships
 
 ```mermaid
 erDiagram
-    runs ||--o{ run_events : "run_id (FK, cascade)"
-    runs ||--o| run_checkpoints : "run_id (FK, cascade)"
-    runs ||--o| run_status : "run_id (FK, cascade)"
-    runs ||--o{ pvp_battles : "run_id (logical link only)"
+    runs ||--o{ run_events : "run_id (FK)"
+    runs ||--o| run_checkpoints : "run_id (FK)"
+    runs ||--o| run_status : "run_id (FK)"
+    pvp_battles }o--|| runs : "run_id (logical link)"
+    run_sync_state ||--|| runs : "run_id (FK)"
+    replay_sync_state ||--|| pvp_battles : "battle_id (FK)"
 ```
 
-读法：
+## Table Roles
 
-- `runs` 是 run 级主表
-- `run_events` 是 append-only 事件流
+- `runs`: run 级主表
+- `run_events`: append-only 事件流
+- `run_checkpoints`: 最近可恢复 checkpoint
+- `run_status`: run 终态摘要
+- `pvp_battles`: 本地 battle manifest 与快照
+- `ghost_battles`: 从服务端同步的 ghost battle 摘要
+- `run_sync_state`: run 上传状态
+- `replay_sync_state`: replay 上传状态
+
+## Read / Write Owners
+
+- run write path: `Game/RunLogging/Persistence/SqliteRunLogStore.cs`
+- battle write path: `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
+- history read path: `Game/HistoryPanel/HistoryPanelRepository.cs`
+- export path: `scripts/export_run_log.py`
 - `run_checkpoints` 是“最近一次可恢复状态”
 - `run_status` 是终态快照
 - `pvp_battles` 是 PVP battle 的 manifest 投影，不是 replay payload 本体

@@ -2,166 +2,57 @@
 
 ## Scope
 
-Run upload is an opt-in background feature layered on top of local SQLite persistence.
+当前上传实现是一个可选的后台同步层，建立在本地 SQLite 之上。
 
-- Local SQLite remains the source of truth.
-- Upload is disabled by default.
-- Upload only runs when `RunUpload.Enabled = true`.
-- Upload only runs while the player is not in a live run.
-
-For the full identity, binding, and dual-backend design, see
-`run-upload-identity-design.md`.
+- 本地 SQLite 仍然是 source of truth。
+- 默认关闭。
+- 仅当 `RunUpload.Enabled = true` 时启用。
+- 仅在玩家不处于 live run 时执行。
+- 当前代码只实现单路由注册与上传，没有文档化的多区域自动路由逻辑。
 
 ## Client Flow
 
-1. The mod writes run data to local SQLite as usual.
-2. `ReplicatedRunLogStore` marks the completed run as dirty in `run_sync_state`.
-3. `RunUploadController` wakes up after startup delay and scans dirty completed runs.
-4. The client loads or creates:
+1. 正常 run logging 持续写入本地 SQLite。
+2. `ReplicatedRunLogStore` 在完成 run 后把 `run_sync_state` 标记为 dirty。
+3. `RunUploadController` 在启动延迟后扫描待上传 completed runs。
+4. 客户端按需读取或创建：
    - `install-id.txt`
    - `run-upload-client.json`
    - `run-upload-rsa.json`
-5. If no `client_id` exists yet, the client registers its install and public key.
-6. Completed run snapshots are uploaded with signed request headers.
+5. 若当前 route scope 没有 `client_id`，先调用 `POST /clients/register`。
+6. 随后把 completed run snapshot 签名后上传到 `POST /runs/upload`。
 
-## Config
+`CombatReplayUploadController` 复用同一套身份与注册信息，并从 run upload endpoint 推导 `POST /replays/upload`。
+
+## 当前配置
 
 `BazaarPlusPlus.cfg`
 
 ```ini
 [RunUpload]
 Enabled = false
-Mode = Auto
-RegistrationEndpoint =
-Endpoint =
-RegistrationEndpointGlobal =
-EndpointGlobal =
-RegistrationEndpointCn =
-EndpointCn =
+Endpoint = https://mod-api.bazaarplusplus.com/runs/upload
+RegistrationEndpoint = https://mod-api.bazaarplusplus.com/clients/register
 StartupDelaySeconds = 20
 IntervalSeconds = 180
 BatchSize = 3
-GlobalFailureThreshold = 2
-PreferredRouteCacheMinutes = 1440
 ```
 
-Users who do not want upload should leave `Enabled = false`.
+## 当前实现文件
 
-Route semantics:
+- `Game/RunLogging/Persistence/ReplicatedRunLogStore.cs`
+- `Game/RunLogging/Upload/RunUploadController.cs`
+- `Game/RunLogging/Upload/RunUploadService.cs`
+- `Game/RunLogging/Upload/RunUploadSqliteStore.cs`
+- `Game/RunLogging/Upload/RunUploadRegistrationClient.cs`
+- `Game/RunLogging/Upload/RunUploadApiClient.cs`
+- `Game/RunLogging/Upload/RunUploadRequestSigner.cs`
+- `Game/RunLogging/Upload/RunUploadIdentityStore.cs`
+- `Game/RunLogging/Upload/RunUploadKeyStore.cs`
+- `Game/CombatReplay/Upload/CombatReplayUploadController.cs`
+- `Game/CombatReplay/Upload/CombatReplayUploadService.cs`
 
-- `Off`: disable upload even if `Enabled = true`
-- `Global`: use only the Global endpoint pair
-- `CN`: use only the CN endpoint pair
-- `Auto`: try Global first; if registration or upload fails repeatedly, fall back to CN
+## Notes
 
-Legacy `RegistrationEndpoint` and `Endpoint` are still accepted as the Global endpoint pair when the
-new `...Global` settings are empty.
-
-During ICP setup, `RegistrationEndpointCn` and `EndpointCn` may temporarily point at HTTPS IP
-endpoints. After ICP is complete, switch those settings to the final CN domain without changing
-client logic.
-
-## Register Endpoint
-
-`POST /clients/register`
-
-Request body:
-
-```json
-{
-  "install_id": "string",
-  "plugin_version": "string",
-  "requested_at_utc": "2026-03-27T00:00:00.000Z",
-  "public_key": {
-    "algorithm": "rsa-pkcs1-sha256",
-    "modulus_b64": "base64",
-    "exponent_b64": "base64",
-    "fingerprint": "base64"
-  }
-}
-```
-
-Success response:
-
-```json
-{
-  "client_id": "string"
-}
-```
-
-Server rules:
-
-- first registration for an `install_id` may create a new client
-- repeated registration with the same public key may return the existing `client_id`
-- repeated registration with a different key for the same `install_id` should be rejected
-
-## Upload Endpoint
-
-`POST /runs/upload`
-
-Request body is the full run snapshot payload:
-
-- `schema_version`
-- `install_id`
-- `client_id`
-- `plugin_version`
-- `submitted_at_utc`
-- `run_id`
-- `meta`
-- `events`
-- `checkpoint`
-- `status`
-- `pvp_battles`
-
-Required headers:
-
-- `X-BPP-Client-Id`
-- `X-BPP-Install-Id`
-- `X-BPP-Plugin-Version`
-- `X-BPP-Run-Id`
-- `X-BPP-Timestamp`
-- `X-BPP-Nonce`
-- `X-BPP-Content-SHA256`
-- `X-BPP-Signature-Alg`
-- `X-BPP-Signature`
-
-## Signature Canonical String
-
-The client signs this exact newline-joined string:
-
-```text
-POST
-/runs/upload
-{client_id}
-{install_id}
-{timestamp}
-{nonce}
-{body_sha256}
-```
-
-Where:
-
-- `POST` is uppercase HTTP method
-- `/runs/upload` is the request path only
-- `body_sha256` is base64-encoded SHA-256 of the raw UTF-8 request body
-- `signature` is base64-encoded RSA PKCS#1 v1.5 SHA-256 signature
-
-## Server Verification Rules
-
-The server should:
-
-1. Load the client public key by `client_id`
-2. Check `install_id` matches the registered client
-3. Recompute `body_sha256` from the raw body
-4. Rebuild the canonical string exactly
-5. Verify the RSA signature
-6. Reject stale timestamps outside a short window such as 5 minutes
-7. Reject reused nonces inside that window
-8. Upsert run data idempotently by `run_id` and `(run_id, seq)`
-
-## Privacy
-
-- Upload is opt-in only.
-- Users can disable it with one config flag.
-- `account_id` is not used for authentication.
-- This phase authenticates the install instance, not the real game account.
+- 旧的未来态 identity / binding / dual-backend 设计文档已移除，避免与当前实现混淆。
+- 如果后续重新引入多路由或账号绑定，应以新的实现为准重新写文档，而不是恢复旧设计稿。

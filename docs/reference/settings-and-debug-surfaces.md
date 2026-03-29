@@ -1,95 +1,61 @@
 # Settings And Debug Surfaces
 
-## Scope
+## Gameplay Settings
 
-This note covers active runtime surfaces that are easy to miss when reading only the larger
-feature docs. These areas are still live code paths, but they are smaller than the main combat,
-monster-preview, and run-logging docs.
+`Game/Settings/BppSettingsDockController.cs` 负责把 Bazaar++ 设置按钮挂到原生 settings UI 上，具体定义来自 `Game/Settings/BppSettingsDockCatalog.cs`。
 
-## Gameplay Settings Toggles
-
-`BppSettingsDockController` is the runtime entry point for Bazaar++ gameplay settings. It attaches
-a custom dock button beside native settings buttons and renders Bazaar++ toggles from
-`BppSettingsDockCatalog.Definitions`.
-
-Current toggles:
+当前 toggle：
 
 - `Anonymous Mode` -> `EnableNameOverrideConfig`
 - `Enchant Preview` -> `EnchantPreviewAlwaysShowConfig`
 - `Combat Status Bar` -> `EnableCombatStatusBarConfig`
 - `Use Native Monster Preview` -> `UseNativeMonsterPreviewConfig`
 
-Current dock order:
-
-- `NameOverride`
-- `EnchantPreview`
-- `CombatStatusBar`
-- `NativeMonsterPreview`
-
-`BppSettingsDockCatalog` is the source of truth for toggle ordering, labels, config bindings, and
-per-setting side effects such as refreshing visible hero banners or reapplying monster-preview
-mode.
-
 ## Tooltip Keybind Rows
 
-`BppKeybindSettingsPatch` clones native keybind rows into the settings UI for two Bazaar++
-modifier actions:
+`Patches/Settings/BppKeybindSettingsPatch.cs` 会把两条 Bazaar++ modifier action 注入原生 keybind 设置界面：
 
 - `HoldEnchantPreview`
 - `HoldUpgradePreview`
 
-`BppHotkeyService` is the runtime source of truth for these bindings.
+行为由 `Game/Input/BppHotkeyService.cs` 决定：
 
-Current behavior:
-
-- defaults stay `Ctrl` for enchant preview and `Shift` for upgrade preview
-- supported mouse bindings include `LMB`, `RMB`, `MMB`, `BACK`, and `FORWARD`
-- conflicting Bazaar++ actions are rejected before the new binding is stored
-- `TooltipModifierRefreshController` refreshes the hovered item tooltip when the modifier mode
-  changes during hover
+- 默认值分别为 `Ctrl` 和 `Shift`
+- 支持 `LMB`、`RMB`、`MMB`、`BACK`、`FORWARD`
+- Bazaar++ 内部冲突会在保存前被拒绝
+- `Game/Tooltips/TooltipModifierRefreshController.cs` 会在 hover 期间即时刷新 tooltip
 
 ## Anonymous Mode
 
-`NameOverrideHelper` replaces the local profile name with `Anonymous` only when:
+`Patches/NameOverride/NameOverridePatches.cs` 只在以下条件满足时把本地名称替换为 `Anonymous`：
 
-- `EnableNameOverrideConfig` is enabled
-- `Data.Profile.Username` is available
-- the banner text being rendered matches the local profile name
+- `EnableNameOverrideConfig` 已启用
+- 能拿到当前本地 profile name
+- 当前渲染的 banner 文本确实对应本地玩家
 
-The runtime patch points are `HeroBannerController.UpdatePlayer(...)` and
-`HeroBannerController.SetHeroName(...)`. Toggling the setting also triggers a best-effort refresh
-of visible hero banners through `NameOverrideUiRefresh`.
+## Debug Surfaces
 
-## Debug-Only Surfaces
-
-When `BppBuild.IsDebug` is true, `Plugin.Awake()` adds:
+当前 debug build 只额外挂载：
 
 - `DebugPanel`
-- `MonsterPreviewDebugController`
 
-Player-facing overlay entry points:
+当前入口：
 
 - `F8`: toggle `HistoryPanel`
-
-Debug-only entry points:
-
 - `F2`: toggle `DebugPanel`
-- `DebugPanel -> Replays`: launch saved replay playback through `CombatReplayRuntime`
-- `DebugPanel -> Preview`: inspect monster-preview anchor / presentation state from
-  `MonsterPreviewDebugController`
+- `DebugPanel -> Replays`: 启动本地保存的 replay
+- `DebugPanel -> Encounters`: 查看当前遭遇与 monster-preview 相关状态
 
 ## Key Files
 
-- [Plugin.cs](../../Plugin.cs)
-- [Game/Input/KeyBindings.cs](../../Game/Input/KeyBindings.cs)
-- [Game/Input/BppHotkeyService.cs](../../Game/Input/BppHotkeyService.cs)
-- [Game/Settings/BppSettingsDockController.cs](../../Game/Settings/BppSettingsDockController.cs)
-- [Game/Settings/BppSettingsDockCatalog.cs](../../Game/Settings/BppSettingsDockCatalog.cs)
-- [Game/Settings/BppSettingsDockDefinition.cs](../../Game/Settings/BppSettingsDockDefinition.cs)
-- [Game/Settings/LocalizedTextSet.cs](../../Game/Settings/LocalizedTextSet.cs)
-- [Patches/Settings/BppSettingsDockPatch.cs](../../Patches/Settings/BppSettingsDockPatch.cs)
-- [Patches/Settings/SettingsMenuToggleInstaller.cs](../../Patches/Settings/SettingsMenuToggleInstaller.cs)
-- [Patches/Settings/BppKeybindSettingsPatch.cs](../../Patches/Settings/BppKeybindSettingsPatch.cs)
-- [Patches/NameOverride/NameOverridePatches.cs](../../Patches/NameOverride/NameOverridePatches.cs)
-- [Game/Tooltips/TooltipModifierRefreshController.cs](../../Game/Tooltips/TooltipModifierRefreshController.cs)
-- [Game/DebugPanel/DebugPanel.cs](../../Game/DebugPanel/DebugPanel.cs)
+- `Plugin.cs`
+- `Game/Input/KeyBindings.cs`
+- `Game/Input/BppHotkeyService.cs`
+- `Game/Settings/BppSettingsDockController.cs`
+- `Game/Settings/BppSettingsDockCatalog.cs`
+- `Patches/Settings/BppSettingsDockPatch.cs`
+- `Patches/Settings/SettingsMenuToggleInstaller.cs`
+- `Patches/Settings/BppKeybindSettingsPatch.cs`
+- `Patches/NameOverride/NameOverridePatches.cs`
+- `Game/Tooltips/TooltipModifierRefreshController.cs`
+- `Game/DebugPanel/DebugPanel.cs`
