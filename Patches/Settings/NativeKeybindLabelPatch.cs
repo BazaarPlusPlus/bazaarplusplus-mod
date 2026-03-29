@@ -22,7 +22,7 @@ internal static class NativeKeybindLabelAwakePatch
 
     internal static void TryUpdateLabels(OptionsDialogController instance)
     {
-        if (instance == null || !MonsterPreviewFeature.IsEnabled)
+        if (instance == null)
             return;
 
         foreach (var controller in instance.GetComponentsInChildren<KeyBindController>(true))

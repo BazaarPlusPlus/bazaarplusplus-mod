@@ -133,19 +133,12 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<HistoryCollectionsEntryBridge>();
         BppLog.Info("Plugin", "Adding CombatStatusBar");
         gameObject.AddComponent<CombatStatusBar>();
-        if (MonsterPreviewFeature.IsEnabled)
-        {
-            BppLog.Info("Plugin", "Adding MonsterPreviewController");
-            gameObject.AddComponent<MonsterPreviewController>();
-            BppLog.Info("Plugin", "Adding MonsterPreviewWarmupController");
-            gameObject.AddComponent<MonsterPreviewWarmupController>();
-            BppLog.Info("Plugin", "Adding MonsterLockShowcaseRuntime");
-            gameObject.AddComponent<MonsterLockShowcaseRuntime>();
-        }
-        else
-        {
-            BppLog.Info("Plugin", "Monster preview disabled; skipping live preview runtime");
-        }
+        BppLog.Info("Plugin", "Adding MonsterPreviewController");
+        gameObject.AddComponent<MonsterPreviewController>();
+        BppLog.Info("Plugin", "Adding MonsterPreviewWarmupController");
+        gameObject.AddComponent<MonsterPreviewWarmupController>();
+        BppLog.Info("Plugin", "Adding MonsterLockShowcaseRuntime");
+        gameObject.AddComponent<MonsterLockShowcaseRuntime>();
 
         BppLog.Info("Plugin", "Adding TooltipModifierRefreshController");
         var tooltipModifierRefreshController =

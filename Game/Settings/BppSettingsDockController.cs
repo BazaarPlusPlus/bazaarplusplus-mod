@@ -24,10 +24,10 @@ internal sealed class BppSettingsDockController : MonoBehaviour
     private const float DockButtonHeight = 44f;
     private const float DockButtonOffsetX = -20f;
     private const float DockButtonOffsetY = 100f;
-    private const float PanelWidth = 420f;
+    private const float PanelWidth = 456f;
     private const float PanelPadding = 18f;
     private const float PanelTopPadding = 16f;
-    private const float PanelBottomPadding = 18f;
+    private const float PanelBottomPadding = 28f;
     private const float HeaderHeight = 24f;
     private const float HeaderSpacing = 16f;
     private const float RowHeight = 48f;
@@ -65,7 +65,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             new SettingsMenuToggleBridge(
                 ReadUseNativeMonsterPreview,
                 WriteUseNativeMonsterPreview,
-                value => MonsterLockShowcaseRuntime.Instance?.HandlePreviewModeChanged(value)
+                MonsterPreviewModeSwitchCoordinator.Apply
             )
         ),
     ];
@@ -188,6 +188,8 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         if (existingPanel != null)
         {
             _panelRoot = existingPanel;
+            ConfigurePanelRect(existingPanel);
+            ConfigurePanelVisual(existingPanel.gameObject);
             _headerLabel = existingPanel.Find(HeaderObjectName)?.GetComponent<TextMeshProUGUI>();
             if (_headerLabel == null)
             {
@@ -196,6 +198,8 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             }
 
             EnsureRows();
+            ConfigureHeaderRect(_headerLabel.rectTransform);
+            RefreshRowLayouts();
             return true;
         }
 
@@ -213,16 +217,8 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         panelRect.localScale = Vector3.one;
         panelRect.localRotation = Quaternion.identity;
         panelRect.anchoredPosition = new Vector2(-8f, 0f);
-        panelRect.sizeDelta = new Vector2(PanelWidth, CalculatePanelHeight(Definitions.Length));
-
-        var background = panelObject.GetComponent<Image>();
-        background.color = new Color(0.09f, 0.09f, 0.11f, 0.96f);
-        background.raycastTarget = true;
-
-        var outline = panelObject.GetComponent<Outline>();
-        outline.effectColor = new Color(0.76f, 0.45f, 0.14f, 0.75f);
-        outline.effectDistance = new Vector2(1.5f, -1.5f);
-        outline.useGraphicAlpha = true;
+        ConfigurePanelRect(panelRect);
+        ConfigurePanelVisual(panelObject);
 
             _headerLabel = CreateText(
             HeaderObjectName,
@@ -237,15 +233,10 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             return false;
         }
 
-        var headerRect = _headerLabel.rectTransform;
-        headerRect.anchorMin = new Vector2(0f, 1f);
-        headerRect.anchorMax = new Vector2(1f, 1f);
-        headerRect.pivot = new Vector2(0f, 1f);
-        headerRect.offsetMin = new Vector2(PanelPadding, -PanelTopPadding - HeaderHeight);
-        headerRect.offsetMax = new Vector2(-PanelPadding, -PanelTopPadding);
-
         _panelRoot = panelRect;
         EnsureRows();
+        ConfigureHeaderRect(_headerLabel.rectTransform);
+        RefreshRowLayouts();
         return true;
     }
 
@@ -259,6 +250,12 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             var rowIndex = _rows.Count;
             _rows.Add(CreateRow(Definitions[rowIndex], rowIndex));
         }
+    }
+
+    private void RefreshRowLayouts()
+    {
+        for (var index = 0; index < _rows.Count; index++)
+            ConfigureRowRect(_rows[index].RectTransform, index);
     }
 
     private DockSettingRowView CreateRow(DockSettingDefinition definition, int index)
@@ -278,11 +275,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         rowRect.anchorMin = new Vector2(0f, 1f);
         rowRect.anchorMax = new Vector2(1f, 1f);
         rowRect.pivot = new Vector2(0.5f, 1f);
-
-        var rowTop =
-            PanelTopPadding + HeaderHeight + HeaderSpacing + (index * (RowHeight + RowSpacing));
-        rowRect.offsetMin = new Vector2(PanelPadding, -(rowTop + RowHeight));
-        rowRect.offsetMax = new Vector2(-PanelPadding, -rowTop);
+        ConfigureRowRect(rowRect, index);
 
         var background = rowObject.GetComponent<Image>();
         background.raycastTarget = true;
@@ -336,7 +329,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         statusRect.anchoredPosition = new Vector2(-RowInnerPadding, 0f);
         status.textWrappingMode = TextWrappingModes.NoWrap;
 
-        return new DockSettingRowView(definition, background, outline, label, status);
+        return new DockSettingRowView(definition, rowRect, background, outline, label, status);
     }
 
     private void OnDockButtonClicked()
@@ -460,6 +453,52 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         rectTransform.localRotation = Quaternion.identity;
         rectTransform.sizeDelta = new Vector2(DockButtonWidth, DockButtonHeight);
         rectTransform.anchoredPosition = new Vector2(DockButtonOffsetX, DockButtonOffsetY);
+    }
+
+    private static void ConfigurePanelRect(RectTransform rectTransform)
+    {
+        rectTransform.anchorMin = new Vector2(0f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0f, 0.5f);
+        rectTransform.pivot = new Vector2(1f, 0.5f);
+        rectTransform.localScale = Vector3.one;
+        rectTransform.localRotation = Quaternion.identity;
+        rectTransform.anchoredPosition = new Vector2(-8f, 0f);
+        rectTransform.sizeDelta = new Vector2(PanelWidth, CalculatePanelHeight(Definitions.Length));
+    }
+
+    private static void ConfigurePanelVisual(GameObject panelObject)
+    {
+        var background = panelObject.GetComponent<Image>();
+        if (background != null)
+        {
+            background.color = new Color(0.09f, 0.09f, 0.11f, 0.96f);
+            background.raycastTarget = true;
+        }
+
+        var outline = panelObject.GetComponent<Outline>();
+        if (outline != null)
+        {
+            outline.effectColor = new Color(0.76f, 0.45f, 0.14f, 0.75f);
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
+            outline.useGraphicAlpha = true;
+        }
+    }
+
+    private static void ConfigureHeaderRect(RectTransform headerRect)
+    {
+        headerRect.anchorMin = new Vector2(0f, 1f);
+        headerRect.anchorMax = new Vector2(1f, 1f);
+        headerRect.pivot = new Vector2(0f, 1f);
+        headerRect.offsetMin = new Vector2(PanelPadding, -PanelTopPadding - HeaderHeight);
+        headerRect.offsetMax = new Vector2(-PanelPadding, -PanelTopPadding);
+    }
+
+    private static void ConfigureRowRect(RectTransform rowRect, int index)
+    {
+        var rowTop =
+            PanelTopPadding + HeaderHeight + HeaderSpacing + (index * (RowHeight + RowSpacing));
+        rowRect.offsetMin = new Vector2(PanelPadding, -(rowTop + RowHeight));
+        rowRect.offsetMax = new Vector2(-PanelPadding, -rowTop);
     }
 
     private static void ConfigureDockButtonVisual(GameObject dockButtonObject)
@@ -649,6 +688,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
     {
         internal DockSettingRowView(
             DockSettingDefinition definition,
+            RectTransform rectTransform,
             Image background,
             Outline outline,
             TextMeshProUGUI label,
@@ -656,6 +696,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         )
         {
             Definition = definition;
+            RectTransform = rectTransform;
             Background = background;
             Outline = outline;
             Label = label;
@@ -663,6 +704,8 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         }
 
         internal DockSettingDefinition Definition { get; }
+
+        internal RectTransform RectTransform { get; }
 
         internal Image Background { get; }
 

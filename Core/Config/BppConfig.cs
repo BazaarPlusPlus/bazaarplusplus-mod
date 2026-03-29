@@ -5,8 +5,6 @@ namespace BazaarPlusPlus.Core.Config;
 
 internal sealed class BppConfig : IBppConfig
 {
-    public ConfigEntry<bool>? EnableMonsterPreviewConfig { get; private set; }
-
     public ConfigEntry<bool>? UseNativeMonsterPreviewConfig { get; private set; }
 
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
@@ -35,17 +33,11 @@ internal sealed class BppConfig : IBppConfig
 
     public void Initialize(ConfigFile config)
     {
-        EnableMonsterPreviewConfig = config.Bind(
-            "MonsterPreview",
-            "Enabled",
-            true,
-            "Whether BazaarPlusPlus should enable its live monster preview overlay and encounter-preview capture. Does not affect history panel battle previews."
-        );
         UseNativeMonsterPreviewConfig = config.Bind(
             "MonsterPreview",
             "UseNativePreview",
             false,
-            "Whether monster preview should use the game's native preview instead of the BazaarPlusPlus overlay."
+            "Whether monster preview should use the game's native preview instead of the BazaarPlusPlus overlay. Does not affect history panel battle previews."
         );
         EnableNameOverrideConfig = config.Bind(
             "StreamerMode",
