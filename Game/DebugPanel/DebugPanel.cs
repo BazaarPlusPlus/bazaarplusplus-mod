@@ -6,7 +6,6 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.EncounterTracking;
 using BazaarPlusPlus.Game.Input;
-using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.PvpBattles;
 using TheBazaar;
 using UnityEngine;
@@ -41,7 +40,6 @@ internal sealed class DebugPanel : MonoBehaviour
     {
         public static readonly PanelSnapshot Empty = new PanelSnapshot();
 
-        public MonsterPreviewDebugController.DebugState? Preview;
         public RunSummary Run;
         public List<EncounterSection> EncounterSections = new List<EncounterSection>();
         public List<ReplayEntry> Replays = new List<ReplayEntry>();
@@ -105,8 +103,6 @@ internal sealed class DebugPanel : MonoBehaviour
 
         if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectSummary, keyboard))
             SelectSection(DebugPanelSection.Summary);
-        else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectPreview, keyboard))
-            SelectSection(DebugPanelSection.Preview);
         else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectRun, keyboard))
             SelectSection(DebugPanelSection.Run);
         else if (
@@ -161,16 +157,15 @@ internal sealed class DebugPanel : MonoBehaviour
             StatusStyle
         );
         GUILayout.Label(
-            $"[F2] Toggle  [1-5] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}",
+            $"[F2] Toggle  [1-4] Sections  [Tab] {(_panelState.ShowAllSections ? "Single" : "All")}",
             MutedStyle
         );
         GUILayout.Space(8);
         GUILayout.BeginHorizontal();
         DrawSectionButton("1 Summary", DebugPanelSection.Summary);
-        DrawSectionButton("2 Preview", DebugPanelSection.Preview);
-        DrawSectionButton("3 Run", DebugPanelSection.Run);
-        DrawSectionButton("4 Encounters", DebugPanelSection.Encounters);
-        DrawSectionButton("5 Replays", DebugPanelSection.Replays);
+        DrawSectionButton("2 Run", DebugPanelSection.Run);
+        DrawSectionButton("3 Encounters", DebugPanelSection.Encounters);
+        DrawSectionButton("4 Replays", DebugPanelSection.Replays);
         GUILayout.EndHorizontal();
     }
 
@@ -186,7 +181,6 @@ internal sealed class DebugPanel : MonoBehaviour
     private void DrawAllSections()
     {
         DrawSection(DebugPanelSection.Summary);
-        DrawSection(DebugPanelSection.Preview);
         DrawSection(DebugPanelSection.Run);
         DrawSection(DebugPanelSection.Encounters);
         DrawSection(DebugPanelSection.Replays);
@@ -198,9 +192,6 @@ internal sealed class DebugPanel : MonoBehaviour
         {
             case DebugPanelSection.Summary:
                 DrawSummarySection();
-                break;
-            case DebugPanelSection.Preview:
-                DrawPreviewSection();
                 break;
             case DebugPanelSection.Run:
                 DrawRunSection();
@@ -217,17 +208,12 @@ internal sealed class DebugPanel : MonoBehaviour
     private void DrawSummarySection()
     {
         DrawSectionHeader("SUMMARY");
-        var preview = _snapshot.Preview;
         var keyboard = Keyboard.current;
-        DrawRow("Preview Visible", preview?.Visible == true ? "on" : "off");
-        DrawRow("Data Source", preview?.DataSource ?? "-");
         DrawRow("Hero", _snapshot.Run?.Hero ?? "-");
         DrawRow("Day", _snapshot.Run?.Day ?? "-");
         DrawRow("W/L", _snapshot.Run?.WinLoss ?? "-");
         DrawRow("State", _snapshot.Run?.State ?? "-");
         DrawRow("Encounter ID", _snapshot.Run?.EncounterId ?? "-");
-        DrawRow("Monster Title", preview?.MonsterTitle ?? "-");
-        DrawRow("World Pos", preview.HasValue ? FormatVector3(preview.Value.AnchorPosition) : "-");
         DrawRow(
             "Enchant Key",
             $"{BppHotkeyService.GetBindingDisplay(BppHotkeyActionId.HoldEnchantPreview)} [{(BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview, keyboard) ? "held" : "up")}]"
@@ -247,37 +233,6 @@ internal sealed class DebugPanel : MonoBehaviour
             keyboard == null
                 ? "n/a"
                 : $"L={keyboard.leftShiftKey.isPressed} R={keyboard.rightShiftKey.isPressed}"
-        );
-    }
-
-    private void DrawPreviewSection()
-    {
-        DrawSectionHeader("PREVIEW");
-
-        if (!_snapshot.Preview.HasValue)
-        {
-            GUILayout.Label("Preview debug state unavailable.", MutedStyle);
-            return;
-        }
-
-        var state = _snapshot.Preview.Value;
-        DrawRow("Data Source", state.DataSource);
-        DrawRow("Encounter ID", state.EncounterId);
-        DrawRow("Monster Title", state.MonsterTitle);
-        DrawRow("Visible", state.Visible ? "on" : "off");
-        DrawRow("World Pos", FormatVector3(state.AnchorPosition));
-        DrawRow("World Rot", FormatVector3(state.AnchorRotationEuler));
-        DrawRow("Local Offset", FormatVector3(state.LocalOffset));
-        DrawRow("Board Size", $"{state.BoardSize.x:F2} x {state.BoardSize.y:F2}");
-        DrawRow("Card Spacing X", state.CardSpacingX.ToString("F2"));
-        DrawRow("Card Scale", state.CardScale.ToString("F2"));
-        DrawRow("Plate Thickness", state.BoardThickness.ToString("F2"));
-        DrawRow("Border Thickness", state.BorderThickness.ToString("F2"));
-        DrawRow("Border Height", state.BorderHeight.ToString("F2"));
-        GUILayout.Space(8);
-        GUILayout.Label(
-            "Preview controls moved to the compact Preview widget in the top-right corner.",
-            MutedStyle
         );
     }
 
@@ -497,7 +452,6 @@ internal sealed class DebugPanel : MonoBehaviour
         var snapshot = new PanelSnapshot
         {
             Run = BuildRunSummary(),
-            Preview = BuildPreviewState(),
             Replays = BuildReplayEntries(),
             ActiveBattleId = CombatReplayRuntime.Instance?.ActiveBattleId ?? string.Empty,
         };
@@ -564,15 +518,6 @@ internal sealed class DebugPanel : MonoBehaviour
             State = state?.StateName.ToString() ?? "-",
             EncounterId = Data.CurrentEncounterId?.ToString() ?? "-",
         };
-    }
-
-    private MonsterPreviewDebugController.DebugState? BuildPreviewState()
-    {
-        var previewDebug = GetComponent<MonsterPreviewDebugController>();
-        if (previewDebug == null || !previewDebug.TryGetDebugState(out var state))
-            return null;
-
-        return state;
     }
 
     private EncounterSection BuildEncounterSection(

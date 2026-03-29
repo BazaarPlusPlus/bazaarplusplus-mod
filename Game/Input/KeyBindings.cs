@@ -29,10 +29,9 @@ internal static class KeyBindings
     internal static class DebugPanel
     {
         public static Key SelectSummary => Key.Digit1;
-        public static Key SelectPreview => Key.Digit2;
-        public static Key SelectRun => Key.Digit3;
-        public static Key SelectEncounters => Key.Digit4;
-        public static Key SelectReplays => Key.Digit5;
+        public static Key SelectRun => Key.Digit2;
+        public static Key SelectEncounters => Key.Digit3;
+        public static Key SelectReplays => Key.Digit4;
         public static Key ToggleViewMode => Key.Tab;
     }
 }

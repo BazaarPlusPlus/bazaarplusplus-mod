@@ -5,7 +5,6 @@ namespace BazaarPlusPlus;
 internal enum DebugPanelSection
 {
     Summary,
-    Preview,
     Run,
     Encounters,
     Replays,

@@ -2,6 +2,7 @@
 #nullable enable
 using System;
 using System.Linq;
+using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.Settings;
 using HarmonyLib;
 using TheBazaar.UI;
@@ -21,7 +22,7 @@ internal static class NativeKeybindLabelAwakePatch
 
     internal static void TryUpdateLabels(OptionsDialogController instance)
     {
-        if (instance == null)
+        if (instance == null || !MonsterPreviewFeature.IsEnabled)
             return;
 
         foreach (var controller in instance.GetComponentsInChildren<KeyBindController>(true))

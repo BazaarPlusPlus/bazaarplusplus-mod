@@ -133,6 +133,8 @@ internal sealed class EncounterTrackingController
     private List<RunInfo.MonsterPreview> BuildMonsterPreviews(List<Card> cards)
     {
         var previews = new List<RunInfo.MonsterPreview>();
+        if (!MonsterPreviewFeature.IsEnabled)
+            return previews;
 
         foreach (var card in cards)
         {
