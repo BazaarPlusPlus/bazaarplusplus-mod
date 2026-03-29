@@ -79,7 +79,7 @@ internal sealed class RunUploadService : IDisposable
 
                         BppLog.Info(
                             "RunUploadService",
-                            $"Uploading run {runId} with client_id={clientId}, events={snapshot.Payload.Events?.Count ?? 0}, battles={snapshot.Payload.PvpBattles?.Count ?? 0}."
+                            $"Uploading run {runId} with client_id={clientId}."
                         );
                         var json = JsonConvert.SerializeObject(
                             snapshot.Payload,

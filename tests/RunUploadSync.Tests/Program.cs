@@ -146,8 +146,10 @@ try
         (string)payloadType.GetProperty("InstallId")!.GetValue(payload)! == "install-123",
         "Upload payload should include the install id."
     );
-    var events = (JArray)payloadType.GetProperty("Events")!.GetValue(payload)!;
-    Assert(events.Count == 1, "Upload payload should include persisted run events.");
+    Assert(
+        payloadType.GetProperty("Events") == null && payloadType.GetProperty("PvpBattles") == null,
+        "Upload payload should not expose legacy events or PVP battle arrays."
+    );
     var status = (JObject?)payloadType.GetProperty("Status")!.GetValue(payload);
     Assert(
         status?["status"]?.Value<string>() == "completed",
