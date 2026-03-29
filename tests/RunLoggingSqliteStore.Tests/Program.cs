@@ -138,6 +138,8 @@ try
                 FinalHour = 1,
                 Victories = 10,
                 Losses = 1,
+                FinalPlayerRank = "Legendary",
+                FinalPlayerRating = 1436,
                 Reason = "run_end_event",
             },
         ]
@@ -199,6 +201,30 @@ try
             GetString(connection, "SELECT status FROM run_status WHERE run_id = $runId;", runId)
                 == "completed",
             "run_status should persist terminal status."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT final_player_rank FROM run_status WHERE run_id = $runId;",
+                runId
+            ) == "Legendary",
+            "run_status should persist the final player rank snapshot."
+        );
+        Assert(
+            GetInt64(
+                connection,
+                "SELECT final_player_rating FROM run_status WHERE run_id = $runId;",
+                runId
+            ) == 1436,
+            "run_status should persist the final player rating snapshot."
+        );
+        Assert(
+            GetInt64(
+                connection,
+                "SELECT final_player_rating_delta FROM run_status WHERE run_id = $runId;",
+                runId
+            ) == 16,
+            "run_status should persist the final player rating delta."
         );
 
         const string abandonedRunId = "server-run-456";

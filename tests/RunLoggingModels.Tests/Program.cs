@@ -18,6 +18,7 @@ RequireMethod(storeType, "CompleteRun");
 RequireMethod(storeType, "MarkRunAbandoned");
 
 var eventType = RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogEvent");
+var completionType = RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCompletion");
 RequireProperty(eventType, "SchemaVersion");
 RequireProperty(eventType, "RunId");
 RequireProperty(eventType, "Seq");
@@ -25,6 +26,9 @@ RequireProperty(eventType, "Ts");
 RequireProperty(eventType, "Kind");
 RequireProperty(eventType, "SelectedEncounterId");
 RequireProperty(eventType, "AbandonedReason");
+RequireProperty(completionType, "FinalPlayerRank");
+RequireProperty(completionType, "FinalPlayerRating");
+RequireProperty(completionType, "FinalPlayerRatingDelta");
 
 var controllerSourcePath = Path.GetFullPath(
     Path.Combine(AppContext.BaseDirectory, "../../../../../Game/RunLogging/RunLoggingController.cs")

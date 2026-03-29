@@ -255,6 +255,9 @@ internal sealed class RunUploadSqliteStore
                 gold,
                 victories,
                 losses,
+                final_player_rank,
+                final_player_rating,
+                final_player_rating_delta,
                 reason
             FROM {RunLogSqliteSchema.RunStatusTableName}
             WHERE run_id = $runId;
@@ -403,6 +406,24 @@ internal sealed class RunUploadSqliteStore
             connection,
             RunLogSqliteSchema.PvpBattlesTableName,
             "player_level",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "final_player_rank",
+            "TEXT NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "final_player_rating",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "final_player_rating_delta",
             "INTEGER NULL"
         );
     }

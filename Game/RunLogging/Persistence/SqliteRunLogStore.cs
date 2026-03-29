@@ -118,6 +118,24 @@ public sealed class SqliteRunLogStore : IRunLogStore
             "gold",
             "INTEGER NULL"
         );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "final_player_rank",
+            "TEXT NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "final_player_rating",
+            "INTEGER NULL"
+        );
+        EnsureColumnExists(
+            connection,
+            RunLogSqliteSchema.RunStatusTableName,
+            "final_player_rating_delta",
+            "INTEGER NULL"
+        );
     }
 
     public RunLogSessionState? TryResumeActiveRun()
@@ -413,6 +431,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
             completion.Gold,
             completion.Victories,
             completion.Losses,
+            completion.FinalPlayerRank,
+            completion.FinalPlayerRating,
+            completion.FinalPlayerRatingDelta,
             completion.Reason
         );
     }
@@ -426,6 +447,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
             abandonment.EndedAtUtc,
             abandonment.FinalDay,
             abandonment.FinalHour,
+            null,
+            null,
+            null,
             null,
             null,
             null,
@@ -451,11 +475,18 @@ public sealed class SqliteRunLogStore : IRunLogStore
         int? gold,
         int? victories,
         int? losses,
+        string? finalPlayerRank,
+        int? finalPlayerRating,
+        int? finalPlayerRatingDelta,
         string? reason
     )
     {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
+
+        var resolvedFinalPlayerRatingDelta =
+            finalPlayerRatingDelta
+            ?? ResolvePlayerRatingDelta(connection, transaction, runId, finalPlayerRating);
 
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
@@ -473,6 +504,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 gold,
                 victories,
                 losses,
+                final_player_rank,
+                final_player_rating,
+                final_player_rating_delta,
                 reason
             ) VALUES (
                 $runId,
@@ -488,6 +522,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 $gold,
                 $victories,
                 $losses,
+                $finalPlayerRank,
+                $finalPlayerRating,
+                $finalPlayerRatingDelta,
                 $reason
             )
             ON CONFLICT(run_id) DO UPDATE SET
@@ -503,6 +540,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 gold = excluded.gold,
                 victories = excluded.victories,
                 losses = excluded.losses,
+                final_player_rank = excluded.final_player_rank,
+                final_player_rating = excluded.final_player_rating,
+                final_player_rating_delta = excluded.final_player_rating_delta,
                 reason = excluded.reason;
             """;
         command.Parameters.AddWithValue("$runId", runId);
@@ -518,6 +558,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
         AddNullableInt32(command, "$gold", gold);
         AddNullableInt32(command, "$victories", victories);
         AddNullableInt32(command, "$losses", losses);
+        AddNullableString(command, "$finalPlayerRank", finalPlayerRank);
+        AddNullableInt32(command, "$finalPlayerRating", finalPlayerRating);
+        AddNullableInt32(command, "$finalPlayerRatingDelta", resolvedFinalPlayerRatingDelta);
         AddNullableString(command, "$reason", reason);
         command.ExecuteNonQuery();
 
@@ -545,6 +588,31 @@ public sealed class SqliteRunLogStore : IRunLogStore
         completeCheckpoint.ExecuteNonQuery();
 
         transaction.Commit();
+    }
+
+    private static int? ResolvePlayerRatingDelta(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string runId,
+        int? finalPlayerRating
+    )
+    {
+        if (!finalPlayerRating.HasValue)
+            return null;
+
+        using var command = CreateCommand(connection, transaction);
+        command.CommandText = $"""
+            SELECT player_rating
+            FROM {RunLogSqliteSchema.RunsTableName}
+            WHERE run_id = $runId;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        var initialPlayerRating = command.ExecuteScalar();
+        if (initialPlayerRating == null || initialPlayerRating is DBNull)
+            return null;
+
+        return finalPlayerRating.Value - Convert.ToInt32(initialPlayerRating);
     }
 
     private SqliteConnection OpenConnection()

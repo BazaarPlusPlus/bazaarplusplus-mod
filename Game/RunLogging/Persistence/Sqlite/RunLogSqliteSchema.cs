@@ -3,9 +3,9 @@ namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int LocalDatabaseSchemaVersion => 2;
+    public static int LocalDatabaseSchemaVersion => 4;
 
-    public static int RowSchemaVersion => 2;
+    public static int RowSchemaVersion => 4;
 
     public static int UploadPayloadSchemaVersion => 1;
 
@@ -94,6 +94,9 @@ public static class RunLogSqliteSchema
                 gold INTEGER NULL,
                 victories INTEGER NULL,
                 losses INTEGER NULL,
+                final_player_rank TEXT NULL,
+                final_player_rating INTEGER NULL,
+                final_player_rating_delta INTEGER NULL,
                 reason TEXT NULL,
                 FOREIGN KEY (run_id) REFERENCES {RunsTableName}(run_id) ON DELETE CASCADE
             );

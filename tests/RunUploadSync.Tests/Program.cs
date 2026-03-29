@@ -104,6 +104,8 @@ try
                 EndedAtUtc = startedAt.AddMinutes(10),
                 FinalDay = 3,
                 FinalHour = 1,
+                FinalPlayerRank = "Legendary",
+                FinalPlayerRating = 1436,
             },
         ]
     );
@@ -150,6 +152,18 @@ try
     Assert(
         status?["status"]?.Value<string>() == "completed",
         "Upload payload should include the terminal run status."
+    );
+    Assert(
+        status?["final_player_rank"]?.Value<string>() == "Legendary",
+        "Upload payload should include the final player rank snapshot."
+    );
+    Assert(
+        status?["final_player_rating"]?.Value<int>() == 1436,
+        "Upload payload should include the final player rating snapshot."
+    );
+    Assert(
+        status?["final_player_rating_delta"]?.Value<int>() == 16,
+        "Upload payload should include the final player rating delta."
     );
 
     InvokeVoid(

@@ -32,5 +32,11 @@ public sealed class RunLogCompletion
 
     public int? Losses { get; set; }
 
+    public string? FinalPlayerRank { get; set; }
+
+    public int? FinalPlayerRating { get; set; }
+
+    public int? FinalPlayerRatingDelta { get; set; }
+
     public string? Reason { get; set; }
 }

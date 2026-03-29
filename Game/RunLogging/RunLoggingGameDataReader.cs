@@ -170,6 +170,7 @@ internal static class RunLoggingGameDataReader
                 ? "abandoned"
                 : "completed";
         TryBuildRunLogPlayerStats(out var stats);
+        TryGetPlayerRankSnapshot(out var finalPlayerRank, out var finalPlayerRating);
         return new RunLogCompletion
         {
             SchemaVersion = Persistence.Sqlite.RunLogSqliteSchema.RowSchemaVersion,
@@ -184,6 +185,8 @@ internal static class RunLoggingGameDataReader
             Gold = stats?.Gold,
             Victories = Data.Run == null ? null : unchecked((int)Data.Run.Victories),
             Losses = Data.Run == null ? null : unchecked((int)Data.Run.Losses),
+            FinalPlayerRank = finalPlayerRank,
+            FinalPlayerRating = finalPlayerRating,
             Reason = reason,
         };
     }

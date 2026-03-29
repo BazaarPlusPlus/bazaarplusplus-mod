@@ -25,14 +25,6 @@
 
   <ItemGroup>
     <Compile
-      Include="..\..\Game\EndOfRun\LegendaryEndOfMatchRatingFormatter.cs"
-      Link="LegendaryEndOfMatchRatingFormatter.cs"
-    />
-    <Compile
-      Include="..\..\Game\EndOfRun\LegendaryEndOfMatchRatingDisplayPolicy.cs"
-      Link="LegendaryEndOfMatchRatingDisplayPolicy.cs"
-    />
-    <Compile
       Include="..\..\Game\Lobby\LegendaryLobbyRatingFormatter.cs"
       Link="LegendaryLobbyRatingFormatter.cs"
     />
