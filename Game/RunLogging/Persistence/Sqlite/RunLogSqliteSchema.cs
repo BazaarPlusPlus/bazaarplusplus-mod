@@ -25,6 +25,8 @@ public static class RunLogSqliteSchema
 
     public static string GhostBattlesTableName => "ghost_battles";
 
+    public static string GhostSyncStateTableName => "ghost_sync_state";
+
     public static string RunSyncStateTableName => "run_sync_state";
 
     public static string ReplaySyncStateTableName => "replay_sync_state";
@@ -159,6 +161,11 @@ public static class RunLogSqliteSchema
                 replay_available INTEGER NOT NULL DEFAULT 0,
                 replay_downloaded INTEGER NOT NULL DEFAULT 0,
                 last_synced_at_utc TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS {GhostSyncStateTableName} (
+                scope TEXT PRIMARY KEY,
+                last_successful_sync_at_utc TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS {RunSyncStateTableName} (

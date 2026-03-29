@@ -192,6 +192,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         Instance.OpenFromDockEntryInternal();
     }
 
+    internal void OpenFromUiEntry()
+    {
+        OpenFromDockEntryInternal();
+    }
+
     private void RefreshSelectedBattlePreview()
     {
         StopPreviewRender();

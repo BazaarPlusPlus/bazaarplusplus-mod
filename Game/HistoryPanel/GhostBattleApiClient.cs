@@ -12,12 +12,9 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class GhostBattleApiClient
 {
-    private const int MaxLookbackDays = 14;
-    private const int MaxBattleLimit = 200;
-
     private readonly HttpClient _httpClient;
     private readonly RunUploadRequestSigner _requestSigner;
-    private readonly string _againstMeEndpoint;
+    private readonly string _uploadEndpoint;
 
     public GhostBattleApiClient(
         HttpClient httpClient,
@@ -30,20 +27,23 @@ internal sealed class GhostBattleApiClient
         if (string.IsNullOrWhiteSpace(uploadEndpoint))
             throw new ArgumentException("Upload endpoint is required.", nameof(uploadEndpoint));
 
-        _againstMeEndpoint = DeriveAgainstMeEndpoint(uploadEndpoint);
+        _uploadEndpoint = uploadEndpoint;
     }
 
     public async Task<GhostBattleApiResult> QueryAgainstMeAsync(
         string clientId,
         string installId,
+        int lookbackDays,
+        int limit,
         CancellationToken cancellationToken
     )
     {
         try
         {
+            var endpoint = DeriveAgainstMeEndpoint(_uploadEndpoint, lookbackDays, limit);
             using var request = _requestSigner.CreateSignedRequest(
                 HttpMethod.Get,
-                _againstMeEndpoint,
+                endpoint,
                 null,
                 clientId,
                 installId
@@ -110,9 +110,10 @@ internal sealed class GhostBattleApiClient
     {
         try
         {
+            var endpoint = DeriveReplayDownloadLinkEndpoint(_uploadEndpoint, battleId);
             using var request = _requestSigner.CreateSignedRequest(
                 HttpMethod.Post,
-                DeriveReplayDownloadLinkEndpoint(_againstMeEndpoint, battleId),
+                endpoint,
                 null,
                 clientId,
                 installId
@@ -266,29 +267,37 @@ internal sealed class GhostBattleApiClient
         return token.ToString(Newtonsoft.Json.Formatting.None);
     }
 
-    private static string DeriveAgainstMeEndpoint(string uploadEndpoint)
+    private static string DeriveAgainstMeEndpoint(string uploadEndpoint, int lookbackDays, int limit)
     {
         var uploadUri = new Uri(uploadEndpoint, UriKind.Absolute);
+        var routeBasePath = DeriveRouteBasePath(uploadUri.AbsolutePath, "/runs/upload");
         var builder = new UriBuilder(uploadUri)
         {
-            Path = "/me/pvp-battles/against-me",
-            Query = $"days={MaxLookbackDays}&limit={MaxBattleLimit}",
+            Path = $"{routeBasePath}/me/pvp-battles/against-me",
+            Query = $"days={Math.Clamp(lookbackDays, 1, 14)}&limit={Math.Clamp(limit, 1, 200)}",
         };
         return builder.Uri.ToString();
     }
 
-    private static string DeriveReplayDownloadLinkEndpoint(
-        string againstMeEndpoint,
-        string battleId
-    )
+    private static string DeriveReplayDownloadLinkEndpoint(string uploadEndpoint, string battleId)
     {
-        var baseUri = new Uri(againstMeEndpoint, UriKind.Absolute);
-        var builder = new UriBuilder(baseUri)
+        var uploadUri = new Uri(uploadEndpoint, UriKind.Absolute);
+        var routeBasePath = DeriveRouteBasePath(uploadUri.AbsolutePath, "/runs/upload");
+        var builder = new UriBuilder(uploadUri)
         {
-            Path = $"/me/pvp-battles/{Uri.EscapeDataString(battleId)}/replay-download-link",
+            Path =
+                $"{routeBasePath}/me/pvp-battles/{Uri.EscapeDataString(battleId)}/replay-download-link",
             Query = string.Empty,
         };
         return builder.Uri.ToString();
+    }
+
+    private static string DeriveRouteBasePath(string absolutePath, string suffix)
+    {
+        if (absolutePath.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            return absolutePath[..^suffix.Length];
+
+        return string.Empty;
     }
 }
 

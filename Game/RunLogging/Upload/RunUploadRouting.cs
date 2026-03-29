@@ -25,6 +25,7 @@ internal sealed class RunUploadClientStateStore
     private readonly string _statePath;
     private readonly object _sync = new();
     private Dictionary<string, string>? _cachedClientIds;
+    private Dictionary<string, string>? _cachedBoundPlayerAccountIds;
 
     public RunUploadClientStateStore(string statePath)
     {
@@ -41,8 +42,8 @@ internal sealed class RunUploadClientStateStore
 
         lock (_sync)
         {
-            _cachedClientIds ??= ReadStateFromDisk();
-            return _cachedClientIds.TryGetValue(scope.Trim(), out var clientId) ? clientId : null;
+            EnsureStateLoaded();
+            return _cachedClientIds!.TryGetValue(scope.Trim(), out var clientId) ? clientId : null;
         }
     }
 
@@ -55,8 +56,8 @@ internal sealed class RunUploadClientStateStore
 
         lock (_sync)
         {
-            _cachedClientIds ??= ReadStateFromDisk();
-            _cachedClientIds[scope.Trim()] = clientId.Trim();
+            EnsureStateLoaded();
+            _cachedClientIds![scope.Trim()] = clientId.Trim();
             PersistState();
         }
     }
@@ -68,26 +69,83 @@ internal sealed class RunUploadClientStateStore
 
         lock (_sync)
         {
-            _cachedClientIds ??= ReadStateFromDisk();
-            if (!_cachedClientIds.Remove(scope.Trim()))
+            EnsureStateLoaded();
+            if (!_cachedClientIds!.Remove(scope.Trim()))
                 return;
 
             PersistState();
         }
     }
 
-    private Dictionary<string, string> ReadStateFromDisk()
+    public string? TryGetScopedBoundPlayerAccountId(string scope, string clientId)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+            throw new ArgumentException("Scope is required.", nameof(scope));
+        if (string.IsNullOrWhiteSpace(clientId))
+            throw new ArgumentException("Client id is required.", nameof(clientId));
+
+        lock (_sync)
+        {
+            EnsureStateLoaded();
+            return _cachedBoundPlayerAccountIds!.TryGetValue(
+                BuildBoundPlayerAccountKey(scope, clientId),
+                out var playerAccountId
+            )
+                ? playerAccountId
+                : null;
+        }
+    }
+
+    public void SaveScopedBoundPlayerAccountId(string scope, string clientId, string playerAccountId)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+            throw new ArgumentException("Scope is required.", nameof(scope));
+        if (string.IsNullOrWhiteSpace(clientId))
+            throw new ArgumentException("Client id is required.", nameof(clientId));
+        if (string.IsNullOrWhiteSpace(playerAccountId))
+            throw new ArgumentException("Player account id is required.", nameof(playerAccountId));
+
+        lock (_sync)
+        {
+            EnsureStateLoaded();
+            _cachedBoundPlayerAccountIds![BuildBoundPlayerAccountKey(scope, clientId)] =
+                playerAccountId.Trim();
+            PersistState();
+        }
+    }
+
+    private void EnsureStateLoaded()
+    {
+        if (_cachedClientIds != null && _cachedBoundPlayerAccountIds != null)
+            return;
+
+        var state = ReadStateFromDisk();
+        _cachedClientIds = state.ClientIds;
+        _cachedBoundPlayerAccountIds = state.BoundPlayerAccountIds;
+    }
+
+    private RunUploadClientStatePayload ReadStateFromDisk()
     {
         if (!File.Exists(_statePath))
-            return new Dictionary<string, string>(StringComparer.Ordinal);
+        {
+            return new RunUploadClientStatePayload();
+        }
         try
         {
             var payload = JsonConvert.DeserializeObject<RunUploadClientState>(
                 File.ReadAllText(_statePath)
             );
-            return payload?.ClientIds != null
-                ? new Dictionary<string, string>(payload.ClientIds, StringComparer.Ordinal)
-                : new Dictionary<string, string>(StringComparer.Ordinal);
+            return new RunUploadClientStatePayload(
+                payload?.ClientIds != null
+                    ? new Dictionary<string, string>(payload.ClientIds, StringComparer.Ordinal)
+                    : new Dictionary<string, string>(StringComparer.Ordinal),
+                payload?.BoundPlayerAccountIds != null
+                    ? new Dictionary<string, string>(
+                        payload.BoundPlayerAccountIds,
+                        StringComparer.Ordinal
+                    )
+                    : new Dictionary<string, string>(StringComparer.Ordinal)
+            );
         }
         catch (Exception ex)
         {
@@ -95,7 +153,7 @@ internal sealed class RunUploadClientStateStore
                 "RunUploadClientStateStore",
                 $"Failed to read client state from {_statePath}: {ex.GetType().Name} - {ex.Message}. Resetting to empty state."
             );
-            return new Dictionary<string, string>(StringComparer.Ordinal);
+            return new RunUploadClientStatePayload();
         }
     }
 
@@ -108,15 +166,49 @@ internal sealed class RunUploadClientStateStore
         File.WriteAllText(
             _statePath,
             JsonConvert.SerializeObject(
-                new RunUploadClientState { ClientIds = _cachedClientIds },
+                new RunUploadClientState
+                {
+                    ClientIds = _cachedClientIds,
+                    BoundPlayerAccountIds = _cachedBoundPlayerAccountIds,
+                },
                 Formatting.Indented
             )
         );
+    }
+
+    private static string BuildBoundPlayerAccountKey(string scope, string clientId)
+    {
+        return $"{scope.Trim()}::{clientId.Trim()}";
     }
 
     private sealed class RunUploadClientState
     {
         [JsonProperty("client_ids")]
         public Dictionary<string, string>? ClientIds { get; set; }
+
+        [JsonProperty("bound_player_account_ids")]
+        public Dictionary<string, string>? BoundPlayerAccountIds { get; set; }
+    }
+
+    private sealed class RunUploadClientStatePayload
+    {
+        public RunUploadClientStatePayload()
+        {
+            ClientIds = new Dictionary<string, string>(StringComparer.Ordinal);
+            BoundPlayerAccountIds = new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        public RunUploadClientStatePayload(
+            Dictionary<string, string> clientIds,
+            Dictionary<string, string> boundPlayerAccountIds
+        )
+        {
+            ClientIds = clientIds;
+            BoundPlayerAccountIds = boundPlayerAccountIds;
+        }
+
+        public Dictionary<string, string> ClientIds { get; }
+
+        public Dictionary<string, string> BoundPlayerAccountIds { get; }
     }
 }

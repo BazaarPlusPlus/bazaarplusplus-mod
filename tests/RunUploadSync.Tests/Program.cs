@@ -232,6 +232,40 @@ try
             == "client-abc",
         "Client state store should persist client id."
     );
+    Assert(
+        Invoke<object?>(
+            clientStateStoreType,
+            clientStateStore,
+            "TryGetScopedBoundPlayerAccountId",
+            ["Runs", "client-abc"]
+        ) == null,
+        "Client state store should return null before a scoped bound player account is saved."
+    );
+    InvokeVoid(
+        clientStateStoreType,
+        clientStateStore,
+        "SaveScopedBoundPlayerAccountId",
+        ["Runs", "client-abc", "player-account-001"]
+    );
+    Assert(
+        (string)
+            Invoke<object>(
+                clientStateStoreType,
+                clientStateStore,
+                "TryGetScopedBoundPlayerAccountId",
+                ["Runs", "client-abc"]
+            ) == "player-account-001",
+        "Client state store should persist a bound player account per scope and client id."
+    );
+    Assert(
+        Invoke<object?>(
+            clientStateStoreType,
+            clientStateStore,
+            "TryGetScopedBoundPlayerAccountId",
+            ["Runs", "client-other"]
+        ) == null,
+        "Client state store should not reuse a bound player account across different client ids."
+    );
     InvokeVoid(clientStateStoreType, clientStateStore, "ClearScopedClientId", ["Runs"]);
     Assert(
         Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"])

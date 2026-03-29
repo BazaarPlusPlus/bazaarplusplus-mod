@@ -137,6 +137,21 @@ try
     var replaceGhostBattles = repositoryType.GetMethod("ReplaceGhostBattles")!;
     var markGhostReplayDownloaded = repositoryType.GetMethod("MarkGhostReplayDownloaded")!;
     var listRecentGhostBattles = repositoryType.GetMethod("ListRecentGhostBattles")!;
+    var getGhostSyncCheckpoint = repositoryType.GetMethod("TryGetGhostSyncCheckpointUtc")!;
+    var saveGhostSyncCheckpoint = repositoryType.GetMethod("SaveGhostSyncCheckpointUtc")!;
+
+    Assert(
+        getGhostSyncCheckpoint.Invoke(repository, Array.Empty<object>()) == null,
+        "Ghost sync checkpoint should be empty before the first successful sync."
+    );
+
+    var firstCheckpoint = new DateTimeOffset(2026, 3, 16, 9, 55, 0, TimeSpan.Zero);
+    saveGhostSyncCheckpoint.Invoke(repository, [firstCheckpoint]);
+    Assert(
+        (DateTimeOffset?)getGhostSyncCheckpoint.Invoke(repository, Array.Empty<object>())
+            == firstCheckpoint,
+        "Ghost sync checkpoint should persist the last successful sync timestamp."
+    );
 
     replaceGhostBattles.Invoke(
         repository,
@@ -193,6 +208,14 @@ try
                     (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-2"
             ),
         "ReplaceGhostBattles should keep both existing and newly imported ghost rows."
+    );
+
+    var secondCheckpoint = new DateTimeOffset(2026, 3, 16, 10, 15, 0, TimeSpan.Zero);
+    saveGhostSyncCheckpoint.Invoke(repository, [secondCheckpoint]);
+    Assert(
+        (DateTimeOffset?)getGhostSyncCheckpoint.Invoke(repository, Array.Empty<object>())
+            == secondCheckpoint,
+        "Ghost sync checkpoint should overwrite the previous successful sync timestamp."
     );
 
     repositoryType.GetMethod("DeleteRun")!.Invoke(repository, ["run-1"]);

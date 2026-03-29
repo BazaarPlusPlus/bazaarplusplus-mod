@@ -18,6 +18,8 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class HistoryPanelRepository
 {
+    private const string RecentGhostSyncScope = "recent_against_me";
+
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
         ContractResolver = new DefaultContractResolver
@@ -395,6 +397,11 @@ internal sealed class HistoryPanelRepository
 
     public void ReplaceGhostBattles(IReadOnlyList<GhostBattleImportRecord> battles)
     {
+        UpsertGhostBattles(battles);
+    }
+
+    public void UpsertGhostBattles(IReadOnlyList<GhostBattleImportRecord> battles)
+    {
         using var connection = OpenConnection(ensureSchema: true);
         using var transaction = connection.BeginTransaction();
 
@@ -587,6 +594,43 @@ internal sealed class HistoryPanelRepository
         }
 
         transaction.Commit();
+    }
+
+    public DateTimeOffset? TryGetGhostSyncCheckpointUtc()
+    {
+        using var connection = OpenConnection(ensureSchema: true);
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"""
+            SELECT last_successful_sync_at_utc
+            FROM {RunLogSqliteSchema.GhostSyncStateTableName}
+            WHERE scope = $scope
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$scope", RecentGhostSyncScope);
+        var rawValue = command.ExecuteScalar() as string;
+        return DateTimeOffset.TryParse(rawValue, out var parsed) ? parsed : null;
+    }
+
+    public void SaveGhostSyncCheckpointUtc(DateTimeOffset syncedAtUtc)
+    {
+        using var connection = OpenConnection(ensureSchema: true);
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"""
+            INSERT INTO {RunLogSqliteSchema.GhostSyncStateTableName} (
+                scope,
+                last_successful_sync_at_utc
+            ) VALUES (
+                $scope,
+                $syncedAtUtc
+            )
+            ON CONFLICT(scope) DO UPDATE SET
+                last_successful_sync_at_utc = excluded.last_successful_sync_at_utc;
+            """;
+        command.Parameters.AddWithValue("$scope", RecentGhostSyncScope);
+        command.Parameters.AddWithValue("$syncedAtUtc", syncedAtUtc.ToString("o"));
+        command.ExecuteNonQuery();
     }
 
     public void MarkGhostReplayDownloaded(string battleId)

@@ -56,6 +56,23 @@ export async function upsertClientPlayerAccountBinding(
     boundAtUtc: string;
   },
 ): Promise<void> {
+  const existingBinding = await env.DB.prepare(
+    `
+      SELECT player_account_id
+      FROM client_player_account_bindings
+      WHERE client_id = ?
+        AND unbound_at_utc IS NULL
+      ORDER BY bound_at_utc DESC
+      LIMIT 1
+    `,
+  )
+    .bind(input.clientId)
+    .first<ActiveBindingPlayerAccountRow>();
+
+  if (existingBinding?.player_account_id === input.playerAccountId) {
+    return;
+  }
+
   await env.DB.prepare(
     `
       UPDATE client_player_account_bindings

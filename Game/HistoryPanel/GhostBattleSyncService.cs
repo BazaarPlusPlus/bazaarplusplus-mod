@@ -5,11 +5,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.RunLogging.Upload;
+using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class GhostBattleSyncService : IDisposable
 {
+    private static readonly TimeSpan CheckpointLookbackPadding = TimeSpan.FromHours(24);
+    private const int InitialSyncLookbackDays = 3;
+    private const int MaxSyncLookbackDays = 14;
+    private const int MaxSyncBattleLimit = 200;
+
     private readonly HistoryPanelRepository _repository;
     private readonly RunUploadIdentityStore _identityStore;
     private readonly RunUploadClientStateStore _clientStateStore;
@@ -46,9 +52,31 @@ internal sealed class GhostBattleSyncService : IDisposable
             _endpoint.UploadEndpoint
         );
         var routeClient = CreateAuthenticatedRouteClient();
+        var syncStartedAtUtc = DateTimeOffset.UtcNow;
+        var checkpointUtc = _repository.TryGetGhostSyncCheckpointUtc();
+        var lookbackDays = CalculateLookbackDays(checkpointUtc, syncStartedAtUtc);
         var requestResult = await routeClient.SendAsync(
             installId,
-            (clientId, token) => apiClient.QueryAgainstMeAsync(clientId, installId, token),
+            async (clientId, token) =>
+            {
+                var bindingResult = await EnsurePlayerBindingAsync(clientId, installId, token);
+                if (!bindingResult.Succeeded)
+                {
+                    return GhostBattleApiResult.Failure(
+                        bindingResult.Error ?? "binding_failed",
+                        bindingResult.ShouldFallback,
+                        bindingResult.ShouldReRegister
+                    );
+                }
+
+                return await apiClient.QueryAgainstMeAsync(
+                    clientId,
+                    installId,
+                    lookbackDays,
+                    MaxSyncBattleLimit,
+                    token
+                );
+            },
             cancellationToken
         );
         if (!requestResult.RegistrationAvailable)
@@ -62,7 +90,9 @@ internal sealed class GhostBattleSyncService : IDisposable
             return GhostBattleSyncResult.Failure(queryResult.Error ?? "ghost_sync_failed");
         }
 
-        _repository.ReplaceGhostBattles(queryResult.Battles);
+        _repository.UpsertGhostBattles(queryResult.Battles);
+        if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit, lookbackDays))
+            _repository.SaveGhostSyncCheckpointUtc(syncStartedAtUtc);
         return GhostBattleSyncResult.Success(queryResult.Battles.Count);
     }
 
@@ -86,8 +116,25 @@ internal sealed class GhostBattleSyncService : IDisposable
         var routeClient = CreateAuthenticatedRouteClient();
         var requestResult = await routeClient.SendAsync(
             installId,
-            (clientId, token) =>
-                apiClient.RequestReplayDownloadLinkAsync(battleId, clientId, installId, token),
+            async (clientId, token) =>
+            {
+                var bindingResult = await EnsurePlayerBindingAsync(clientId, installId, token);
+                if (!bindingResult.Succeeded)
+                {
+                    return GhostBattleReplayDownloadLinkResult.Failure(
+                        bindingResult.Error ?? "binding_failed",
+                        bindingResult.ShouldFallback,
+                        bindingResult.ShouldReRegister
+                    );
+                }
+
+                return await apiClient.RequestReplayDownloadLinkAsync(
+                    battleId,
+                    clientId,
+                    installId,
+                    token
+                );
+            },
             cancellationToken
         );
         if (!requestResult.RegistrationAvailable)
@@ -113,6 +160,16 @@ internal sealed class GhostBattleSyncService : IDisposable
                 payloadResult.Error ?? "ghost_replay_payload_failed"
             );
         }
+        if (
+            !string.Equals(
+                payloadResult.Payload.ReplayPayload.BattleId,
+                battleId,
+                StringComparison.Ordinal
+            )
+        )
+        {
+            return GhostBattleReplayDownloadResult.Failure("ghost_replay_battle_id_mismatch");
+        }
 
         var payloadStore = new CombatReplayPayloadStore(replayDirectoryPath);
         payloadStore.Save(payloadResult.Payload.ReplayPayload);
@@ -123,6 +180,65 @@ internal sealed class GhostBattleSyncService : IDisposable
     public void Dispose()
     {
         _httpClient.Dispose();
+    }
+
+    private async Task<RunUploadBindingResult> EnsurePlayerBindingAsync(
+        string clientId,
+        string installId,
+        CancellationToken cancellationToken
+    )
+    {
+        var playerAccountId = TryGetCurrentPlayerAccountId();
+        if (string.IsNullOrWhiteSpace(playerAccountId))
+        {
+            return RunUploadBindingResult.Failure(
+                "player_account_id_unavailable",
+                shouldFallback: false,
+                shouldReRegister: false
+            );
+        }
+
+        var bindEndpoint = TryDeriveBindEndpoint(_endpoint.RegistrationEndpoint);
+        if (string.IsNullOrWhiteSpace(bindEndpoint))
+        {
+            return RunUploadBindingResult.Failure(
+                "bind_endpoint_unavailable",
+                shouldFallback: false,
+                shouldReRegister: false
+            );
+        }
+        if (
+            string.Equals(
+                _clientStateStore.TryGetScopedBoundPlayerAccountId(RunUploadScopes.Runs, clientId),
+                playerAccountId,
+                StringComparison.Ordinal
+            )
+        )
+        {
+            return RunUploadBindingResult.Success();
+        }
+
+        var bindingClient = new RunUploadBindingClient(
+            _httpClient,
+            new RunUploadRequestSigner(_keyStore),
+            bindEndpoint
+        );
+        var result = await bindingClient.BindPlayerAccountAsync(
+            clientId,
+            installId,
+            playerAccountId,
+            cancellationToken
+        );
+        if (result.Succeeded)
+        {
+            _clientStateStore.SaveScopedBoundPlayerAccountId(
+                RunUploadScopes.Runs,
+                clientId,
+                playerAccountId
+            );
+        }
+
+        return result;
     }
 
     private BppAuthenticatedRouteClient CreateAuthenticatedRouteClient()
@@ -140,6 +256,59 @@ internal sealed class GhostBattleSyncService : IDisposable
             _clientStateStore,
             RunUploadScopes.Runs
         );
+    }
+
+    private static int CalculateLookbackDays(
+        DateTimeOffset? checkpointUtc,
+        DateTimeOffset nowUtc
+    )
+    {
+        if (checkpointUtc == null)
+            return InitialSyncLookbackDays;
+
+        var fromUtc = checkpointUtc.Value - CheckpointLookbackPadding;
+        var totalDays = Math.Ceiling((nowUtc - fromUtc).TotalDays);
+        if (double.IsNaN(totalDays) || double.IsInfinity(totalDays))
+            return MaxSyncLookbackDays;
+
+        return Math.Clamp((int)Math.Max(1, totalDays), 1, MaxSyncLookbackDays);
+    }
+
+    private static bool ShouldAdvanceCheckpoint(int importedCount, int limit, int lookbackDays)
+    {
+        return importedCount < limit && lookbackDays < MaxSyncLookbackDays;
+    }
+
+    private static string? TryGetCurrentPlayerAccountId()
+    {
+        try
+        {
+            return ClientCache.Profile.Value?.AccountId.ToString();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? TryDeriveBindEndpoint(string registrationEndpoint)
+    {
+        if (
+            string.IsNullOrWhiteSpace(registrationEndpoint)
+            || !Uri.TryCreate(registrationEndpoint, UriKind.Absolute, out var registrationUri)
+        )
+        {
+            return null;
+        }
+
+        var absolutePath = registrationUri.AbsolutePath;
+        const string suffix = "/clients/register";
+        if (!absolutePath.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var bindPath = absolutePath[..^suffix.Length] + "/clients/bind";
+        var builder = new UriBuilder(registrationUri) { Path = bindPath, Query = string.Empty };
+        return builder.Uri.ToString();
     }
 }
 
