@@ -32,6 +32,36 @@ test("persists verified replay uploads", async () => {
   );
   assert.equal(registerResponse.status, 200);
   const registerJson = (await registerResponse.json()) as { client_id: string };
+  env.DB.pvpBattles.set("battle-001", {
+    battle_id: "battle-001",
+    run_id: "run-001",
+    source_client_id: "runs-client-001",
+    recorded_at_utc: "2026-03-29T12:00:00.000Z",
+    day: 8,
+    hour: 1,
+    encounter_id: "encounter-001",
+    player_name: "Uploader",
+    player_account_id: "uploader-account",
+    player_hero: "Dooley",
+    player_rank: "Legendary",
+    player_rating: 1800,
+    player_level: 11,
+    opponent_name: "Me",
+    opponent_account_id: "my-account",
+    opponent_hero: "Vanessa",
+    opponent_rank: "Legendary",
+    opponent_rating: 1750,
+    opponent_level: 10,
+    combat_kind: "PVPCombat",
+    result: "win",
+    winner_combatant_id: "Player",
+    loser_combatant_id: "Opponent",
+    summary_json: JSON.stringify({ battle_id: "battle-001" }),
+    replay_available: 0,
+    projection_version: 1,
+    created_at_utc: "2026-03-29T12:00:00.000Z",
+    updated_at_utc: "2026-03-29T12:00:00.000Z",
+  });
 
   const payload = JSON.stringify({
     battle_id: "battle-001",
@@ -82,11 +112,15 @@ test("persists verified replay uploads", async () => {
 
   assert.equal(response.status, 200);
   const json = (await response.json()) as { object_key: string };
-  assert.match(json.object_key, /^combat-replays\/replays\//);
-  assert.equal(
-    env.DB.replayUploads.get("battle-001")?.client_id,
-    registerJson.client_id,
-  );
+  assert.equal(json.object_key, `replays/${registerJson.client_id}/battle-001/${bodyHash}.json`);
+  const replayUpload = env.DB.replayUploads.get("battle-001");
+  assert.equal(replayUpload?.client_id, registerJson.client_id);
+  assert.equal(replayUpload?.payload_bytes, new TextEncoder().encode(payload).byteLength);
+  assert.equal(replayUpload?.schema_version, 1);
+  assert.equal(replayUpload?.content_type, "application/json");
+  assert.ok((replayUpload?.created_at_utc ?? "").length > 0);
+  assert.ok((replayUpload?.updated_at_utc ?? "").length > 0);
+  assert.equal(env.DB.pvpBattles.get("battle-001")?.replay_available, 1);
   assert.ok(env.REPLAY_BUCKET.objects.has(json.object_key));
 });
 

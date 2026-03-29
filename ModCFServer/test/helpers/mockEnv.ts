@@ -322,7 +322,12 @@ export class MockD1Database {
         run_id: params[3] == null ? null : String(params[3]),
         payload_sha256: String(params[4]),
         object_key: String(params[5]),
-        uploaded_at_utc: String(params[6]),
+        payload_bytes: params[6] == null ? null : Number(params[6]),
+        schema_version: params[7] == null ? null : Number(params[7]),
+        content_type: params[8] == null ? null : String(params[8]),
+        created_at_utc: params[9] == null ? undefined : String(params[9]),
+        updated_at_utc: params[10] == null ? undefined : String(params[10]),
+        uploaded_at_utc: String(params[11]),
       } satisfies ReplayUploadRow;
       this.replayUploads.set(row.battle_id, row);
       return { changes: 1 };
@@ -490,6 +495,20 @@ export class MockD1Database {
         }
       }
       return { changes };
+    }
+
+    if (sql.includes("UPDATE pvp_battles") && sql.includes("SET replay_available = 1")) {
+      const battleId = String(params[0] ?? "");
+      const existing = this.pvpBattles.get(battleId);
+      if (!existing) {
+        return { changes: 0 };
+      }
+
+      this.pvpBattles.set(battleId, {
+        ...existing,
+        replay_available: 1,
+      });
+      return { changes: 1 };
     }
 
     return { changes: 0 };

@@ -225,3 +225,18 @@ export async function getProjectedBattleById(
     .bind(battleId)
     .first<ProjectedBattleQueryRow>();
 }
+
+export async function markBattleReplayAvailable(
+  env: Env,
+  battleId: string,
+): Promise<void> {
+  await env.DB.prepare(
+    `
+      UPDATE pvp_battles
+      SET replay_available = 1
+      WHERE battle_id = ?
+    `,
+  )
+    .bind(battleId)
+    .run();
+}

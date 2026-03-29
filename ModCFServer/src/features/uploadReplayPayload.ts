@@ -24,7 +24,7 @@ function asNumber(value: unknown): number | null {
 export function parseReplayUploadBody(
   payload: ArrayBuffer,
   headerBattleId: string,
-): Response | { battleId: string } {
+): Response | { battleId: string; schemaVersion: number } {
   try {
     const parsed = JSON.parse(textDecoder.decode(payload));
     const raw = asObject(parsed);
@@ -62,7 +62,7 @@ export function parseReplayUploadBody(
       return json({ error: "invalid_replay_payload" }, { status: 400 });
     }
 
-    return { battleId };
+    return { battleId, schemaVersion: version };
   } catch {
     return json({ error: "invalid_json_body" }, { status: 400 });
   }

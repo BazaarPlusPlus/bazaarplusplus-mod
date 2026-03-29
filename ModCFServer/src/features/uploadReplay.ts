@@ -1,6 +1,7 @@
 import type { Env } from "../env";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
+import { markBattleReplayAvailable } from "../persistence/battleProjections";
 import { upsertReplayUpload } from "../persistence/replayUploads";
 import { parseReplayUploadBody } from "./uploadReplayPayload";
 import { requireVerifiedClient } from "./verifiedClient";
@@ -27,12 +28,12 @@ export async function handleReplayUpload(
   }
 
   const runId = trimString(request.headers.get("x-bpp-run-id")) || null;
-  const objectKey = `combat-replays/replays/${verified.client.client_id}/${battleId}/${verified.payloadHash
-    .replace(/[+/=]/g, "")
-    .slice(0, 16)}.payload.json`;
+  const uploadedAtUtc = new Date().toISOString();
+  const contentType = request.headers.get("content-type") ?? "application/json";
+  const objectKey = `replays/${verified.client.client_id}/${battleId}/${verified.payloadHash}.json`;
   await env.REPLAY_BUCKET.put(objectKey, verified.payload, {
     httpMetadata: {
-      contentType: request.headers.get("content-type") ?? "application/json",
+      contentType,
     },
   });
 
@@ -43,8 +44,14 @@ export async function handleReplayUpload(
     runId,
     payloadSha256: verified.payloadHash,
     objectKey,
-    uploadedAtUtc: new Date().toISOString(),
+    payloadBytes: verified.payload.byteLength,
+    schemaVersion: parsed.schemaVersion,
+    contentType,
+    createdAtUtc: uploadedAtUtc,
+    updatedAtUtc: uploadedAtUtc,
+    uploadedAtUtc,
   });
+  await markBattleReplayAvailable(env, battleId);
 
   return json({
     status: "accepted",
