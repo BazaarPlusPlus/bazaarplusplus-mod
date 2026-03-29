@@ -82,6 +82,11 @@ Assert(
     "BPP hotkey service should read current mouse state for mouse-backed hotkeys."
 );
 Assert(
+    hotkeyServiceSource.Contains("KeyBindings.Modifiers.IsCtrlPressed", StringComparison.Ordinal)
+        && hotkeyServiceSource.Contains("KeyBindings.Modifiers.IsShiftPressed", StringComparison.Ordinal),
+    "BPP hotkey service should fall back to raw modifier key state for Ctrl and Shift bindings."
+);
+Assert(
     hotkeyServiceSource.Contains("ButtonControl", StringComparison.Ordinal),
     "BPP hotkey service should validate mouse inputs as button controls."
 );
@@ -206,6 +211,29 @@ Assert(
     tooltipRefreshSource.Contains("BppHotkeyService", StringComparison.Ordinal),
     "Tooltip refresh flow should query BPP hotkey service instead of hard-coded modifiers."
 );
+Assert(
+    tooltipRefreshSource.Contains("PreviewInput mode=", StringComparison.Ordinal)
+        && tooltipRefreshSource.Contains("BppLog.Info", StringComparison.Ordinal),
+    "Tooltip refresh flow should report preview input state to Bazaar++ logs when the modifier mode changes."
+);
+Assert(
+    tooltipRefreshSource.Contains("PreviewRaw ctrl=", StringComparison.Ordinal)
+        && tooltipRefreshSource.Contains("Initialized alwaysShowEnchant=", StringComparison.Ordinal),
+    "Tooltip refresh flow should log initialization and raw modifier changes so input capture can be verified even when preview mode does not change."
+);
+Assert(
+    tooltipRefreshSource.Contains("RefreshApplied mode=", StringComparison.Ordinal)
+        && tooltipRefreshSource.Contains("RefreshSkipped mode=", StringComparison.Ordinal)
+        && tooltipRefreshSource.Contains("no-hovered-item", StringComparison.Ordinal),
+    "Tooltip refresh flow should log whether hovered tooltip refresh was applied or why it was skipped."
+);
+Assert(
+    tooltipRefreshSource.Contains(
+        "new CardTooltipData(card, cardTooltipData.CardTemplate)",
+        StringComparison.Ordinal
+    ),
+    "Tooltip refresh flow should rebuild CardTooltipData before re-showing a hovered tooltip so the native controller does not discard refreshes that reuse the current tooltip instance."
+);
 
 var upgradePatchSourcePath = Path.GetFullPath(
     Path.Combine(
@@ -269,6 +297,18 @@ Assert(
 Assert(
     nativeKeybindLabelPatchSource.Contains("Lock", StringComparison.Ordinal),
     "Native keybind label patch should target the native Lock keybind action."
+);
+
+var debugPanelSourcePath = Path.GetFullPath(
+    Path.Combine(AppContext.BaseDirectory, "../../../../../Game/DebugPanel/DebugPanel.cs")
+);
+var debugPanelSource = File.ReadAllText(debugPanelSourcePath);
+Assert(
+    debugPanelSource.Contains("Enchant Key", StringComparison.Ordinal)
+        && debugPanelSource.Contains("Upgrade Key", StringComparison.Ordinal)
+        && debugPanelSource.Contains("Ctrl Raw", StringComparison.Ordinal)
+        && debugPanelSource.Contains("Shift Raw", StringComparison.Ordinal),
+    "Debug panel should expose preview hotkey and raw modifier state so input handling can be verified in game."
 );
 Assert(
     nativeKeybindLabelPatchSource.Contains("zh-Hans", StringComparison.Ordinal)

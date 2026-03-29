@@ -93,7 +93,7 @@ internal sealed class DebugPanel : MonoBehaviour
         if (keyboard == null)
             return;
 
-        if (keyboard[KeyBindings.Toggle.DebugPanel].wasPressedThisFrame)
+        if (BppHotkeyService.WasPressedThisFrame(KeyBindings.Toggle.DebugPanel, keyboard))
         {
             IsVisible = !IsVisible;
             if (IsVisible)
@@ -103,18 +103,20 @@ internal sealed class DebugPanel : MonoBehaviour
         if (!IsVisible)
             return;
 
-        if (keyboard[KeyBindings.DebugPanel.SelectSummary].wasPressedThisFrame)
+        if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectSummary, keyboard))
             SelectSection(DebugPanelSection.Summary);
-        else if (keyboard[KeyBindings.DebugPanel.SelectPreview].wasPressedThisFrame)
+        else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectPreview, keyboard))
             SelectSection(DebugPanelSection.Preview);
-        else if (keyboard[KeyBindings.DebugPanel.SelectRun].wasPressedThisFrame)
+        else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectRun, keyboard))
             SelectSection(DebugPanelSection.Run);
-        else if (keyboard[KeyBindings.DebugPanel.SelectEncounters].wasPressedThisFrame)
+        else if (
+            BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectEncounters, keyboard)
+        )
             SelectSection(DebugPanelSection.Encounters);
-        else if (keyboard[KeyBindings.DebugPanel.SelectReplays].wasPressedThisFrame)
+        else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectReplays, keyboard))
             SelectSection(DebugPanelSection.Replays);
 
-        if (keyboard[KeyBindings.DebugPanel.ToggleViewMode].wasPressedThisFrame)
+        if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.ToggleViewMode, keyboard))
             _panelState.ToggleViewMode();
 
         if (Time.unscaledTime >= _nextRefreshTime)
@@ -216,6 +218,7 @@ internal sealed class DebugPanel : MonoBehaviour
     {
         DrawSectionHeader("SUMMARY");
         var preview = _snapshot.Preview;
+        var keyboard = Keyboard.current;
         DrawRow("Preview Visible", preview?.Visible == true ? "on" : "off");
         DrawRow("Data Source", preview?.DataSource ?? "-");
         DrawRow("Hero", _snapshot.Run?.Hero ?? "-");
@@ -225,6 +228,26 @@ internal sealed class DebugPanel : MonoBehaviour
         DrawRow("Encounter ID", _snapshot.Run?.EncounterId ?? "-");
         DrawRow("Monster Title", preview?.MonsterTitle ?? "-");
         DrawRow("World Pos", preview.HasValue ? FormatVector3(preview.Value.AnchorPosition) : "-");
+        DrawRow(
+            "Enchant Key",
+            $"{BppHotkeyService.GetBindingDisplay(BppHotkeyActionId.HoldEnchantPreview)} [{(BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview, keyboard) ? "held" : "up")}]"
+        );
+        DrawRow(
+            "Upgrade Key",
+            $"{BppHotkeyService.GetBindingDisplay(BppHotkeyActionId.HoldUpgradePreview)} [{(BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview, keyboard) ? "held" : "up")}]"
+        );
+        DrawRow(
+            "Ctrl Raw",
+            keyboard == null
+                ? "n/a"
+                : $"L={keyboard.leftCtrlKey.isPressed} R={keyboard.rightCtrlKey.isPressed}"
+        );
+        DrawRow(
+            "Shift Raw",
+            keyboard == null
+                ? "n/a"
+                : $"L={keyboard.leftShiftKey.isPressed} R={keyboard.rightShiftKey.isPressed}"
+        );
     }
 
     private void DrawPreviewSection()

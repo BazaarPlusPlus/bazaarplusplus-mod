@@ -1,4 +1,5 @@
 #pragma warning disable CS0436
+using System;
 using BazaarPlusPlus.Core.Runtime;
 using HarmonyLib;
 using TheBazaar;
@@ -9,14 +10,30 @@ internal static class NameOverrideHelper
 {
     private const string ReplacementName = "Anonymous";
 
+    public static bool IsEnabled()
+    {
+        return BppRuntimeHost.Config.EnableNameOverrideConfig?.Value == true;
+    }
+
+    public static bool TryGetDisplayNameOverride(string originalName, out string replacementName)
+    {
+        replacementName = null;
+
+        if (!IsEnabled())
+            return false;
+
+        replacementName = ReplacementName;
+        return !string.Equals(originalName, replacementName, StringComparison.Ordinal);
+    }
+
     public static bool TryGetReplacementName(string originalName, out string replacementName)
     {
         replacementName = null;
 
-        if (BppRuntimeHost.Config.EnableNameOverrideConfig?.Value != true)
+        if (!IsEnabled())
             return false;
 
-        var profileName = Data.Profile?.Username;
+        var profileName = ClientCache.Profile.Value?.Username;
         if (string.IsNullOrEmpty(profileName))
         {
             BppLog.Debug(
@@ -26,7 +43,7 @@ internal static class NameOverrideHelper
             return false;
         }
 
-        if (originalName != profileName)
+        if (!string.Equals(originalName, profileName, StringComparison.Ordinal))
             return false;
 
         replacementName = ReplacementName;
@@ -34,7 +51,35 @@ internal static class NameOverrideHelper
     }
 }
 
-[HarmonyPatch(typeof(HeroBannerController), "UpdatePlayer")]
+[HarmonyPatch(typeof(PlayerProfile), nameof(PlayerProfile.GetDisplayUsername))]
+public static class PlayerProfileGetDisplayUsernamePatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(ref string __result)
+    {
+        if (!NameOverrideHelper.TryGetDisplayNameOverride(__result, out var replacementName))
+            return;
+
+        __result = replacementName;
+        BppLog.Debug(
+            "NameOverride",
+            $"GetDisplayUsername replaced display username with {replacementName}"
+        );
+    }
+}
+
+[HarmonyPatch(
+    typeof(HeroBannerController),
+    "UpdatePlayer",
+    new[]
+    {
+        typeof(string),
+        typeof(int),
+        typeof(string),
+        typeof(TheBazaar.ProfileData.ISeasonRank),
+        typeof(int?),
+    }
+)]
 public static class UpdatePlayerPatch
 {
     [HarmonyPrefix]

@@ -26,18 +26,33 @@ public class Plugin : BaseUnityPlugin
 
     protected virtual void Awake()
     {
-        BppPluginVersion.Initialize(Info.Location);
-        var configFile = CreateConfigFile();
-        var runtime = InstallRuntimeHost(configFile);
-        var services = runtime.Services;
-        var lifecycleModule = runtime.LifecycleModule;
-        var combatReplayRuntime = runtime.CombatReplayRuntime;
-        BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
+        try
+        {
+            BppPluginVersion.Initialize(Info.Location);
+            var configFile = CreateConfigFile();
+            var runtime = InstallRuntimeHost(configFile);
+            var services = runtime.Services;
+            var lifecycleModule = runtime.LifecycleModule;
+            var combatReplayRuntime = runtime.CombatReplayRuntime;
+            BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
 
-        _harmony.PatchAll();
-        AttachRuntimeComponents(services, lifecycleModule, () => combatReplayRuntime);
-        AttachDebugComponents();
-        BppLog.Info("Plugin", "Plugin components attached");
+            BppLog.Info("Plugin", "Applying Harmony patches");
+            _harmony.PatchAll();
+            BppLog.Info("Plugin", "Harmony patches applied");
+
+            BppLog.Info("Plugin", "Attaching runtime components");
+            AttachRuntimeComponents(services, lifecycleModule, () => combatReplayRuntime);
+            BppLog.Info("Plugin", "Runtime components attached");
+
+            BppLog.Info("Plugin", "Attaching debug components");
+            AttachDebugComponents();
+            BppLog.Info("Plugin", "Plugin components attached");
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("Plugin", "Plugin initialization failed", ex);
+            throw;
+        }
     }
 
     protected virtual void OnDestroy()
@@ -78,12 +93,17 @@ public class Plugin : BaseUnityPlugin
         Func<CombatReplayRuntime?> combatReplayRuntimeAccessor
     )
     {
+        BppLog.Info("Plugin", "Adding RunStateSyncController");
         var runStateSyncController = gameObject.AddComponent<RunStateSyncController>();
         runStateSyncController.Initialize(services.EventBus, lifecycleModule);
 
+        BppLog.Info("Plugin", "Adding RunLoggingController");
         gameObject.AddComponent<RunLoggingController>();
+        BppLog.Info("Plugin", "Adding RunUploadController");
         gameObject.AddComponent<RunUploadController>();
+        BppLog.Info("Plugin", "Adding CombatReplayUploadController");
         gameObject.AddComponent<CombatReplayUploadController>();
+        BppLog.Info("Plugin", "Adding HistoryPanel");
         gameObject
             .AddComponent<HistoryPanel>()
             .Configure(
@@ -94,15 +114,22 @@ public class Plugin : BaseUnityPlugin
                     combatReplayRuntimeAccessor
                 )
             );
+        BppLog.Info("Plugin", "Adding HistoryCollectionsEntryBridge");
         gameObject.AddComponent<HistoryCollectionsEntryBridge>();
+        BppLog.Info("Plugin", "Adding CombatStatusBar");
         gameObject.AddComponent<CombatStatusBar>();
+        BppLog.Info("Plugin", "Adding MonsterPreviewController");
         gameObject.AddComponent<MonsterPreviewController>();
+        BppLog.Info("Plugin", "Adding MonsterPreviewWarmupController");
         gameObject.AddComponent<MonsterPreviewWarmupController>();
+        BppLog.Info("Plugin", "Adding MonsterLockShowcaseRuntime");
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
 
+        BppLog.Info("Plugin", "Adding TooltipModifierRefreshController");
         var tooltipModifierRefreshController =
             gameObject.AddComponent<TooltipModifierRefreshController>();
         tooltipModifierRefreshController.Initialize(services.Config);
+        BppLog.Info("Plugin", "TooltipModifierRefreshController initialized");
     }
 
     private void AttachDebugComponents()

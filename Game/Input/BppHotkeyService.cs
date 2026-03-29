@@ -40,6 +40,10 @@ internal static class BppHotkeyService
             [BppHotkeyActionId.HoldUpgradePreview] = ShiftAliasPath,
         };
 
+    private static readonly Dictionary<string, InputAction> CachedActions = new(
+        StringComparer.OrdinalIgnoreCase
+    );
+
     internal static bool IsHeld(
         BppHotkeyActionId actionId,
         Keyboard? keyboard = null,
@@ -49,8 +53,34 @@ internal static class BppHotkeyService
         keyboard ??= Keyboard.current;
         mouse ??= Mouse.current;
 
-        return ExpandBindingPaths(GetBindingPath(actionId))
-            .Any(path => IsPathHeld(path, keyboard, mouse));
+        return IsPressed(GetBindingPath(actionId), keyboard, mouse);
+    }
+
+    internal static bool WasPressedThisFrame(
+        string bindingPath,
+        Keyboard? keyboard = null,
+        Mouse? mouse = null
+    )
+    {
+        return GetOrCreateAction(bindingPath).WasPressedThisFrame();
+    }
+
+    private static bool IsPressed(string bindingPath, Keyboard? keyboard = null, Mouse? mouse = null)
+    {
+        var normalized = NormalizeBindingPath(bindingPath);
+        if (string.IsNullOrWhiteSpace(normalized))
+            return false;
+
+        if (string.Equals(normalized, CtrlAliasPath, StringComparison.OrdinalIgnoreCase))
+            return KeyBindings.Modifiers.IsCtrlPressed(keyboard);
+
+        if (string.Equals(normalized, ShiftAliasPath, StringComparison.OrdinalIgnoreCase))
+            return KeyBindings.Modifiers.IsShiftPressed(keyboard);
+
+        if (TryFindSupportedMouseButton(normalized, mouse, out var button))
+            return button.isPressed;
+
+        return GetOrCreateAction(normalized).IsPressed();
     }
 
     internal static string GetBindingPath(BppHotkeyActionId actionId)
@@ -172,53 +202,19 @@ internal static class BppHotkeyService
         }
     }
 
-    private static bool IsPathHeld(string bindingPath, Keyboard? keyboard, Mouse? mouse)
+    private static InputAction GetOrCreateAction(string bindingPath)
     {
         var normalized = NormalizeBindingPath(bindingPath);
-        if (string.IsNullOrWhiteSpace(normalized))
-            return false;
+        if (CachedActions.TryGetValue(normalized, out var existingAction))
+            return existingAction;
 
-        if (string.Equals(normalized, CtrlAliasPath, StringComparison.OrdinalIgnoreCase))
-        {
-            if (keyboard == null)
-                return false;
-            return keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
-        }
+        var action = new InputAction(type: InputActionType.Button);
+        foreach (var expandedPath in ExpandBindingPaths(normalized))
+            action.AddBinding(expandedPath);
 
-        if (string.Equals(normalized, ShiftAliasPath, StringComparison.OrdinalIgnoreCase))
-        {
-            if (keyboard == null)
-                return false;
-            return keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
-        }
-
-        if (normalized.StartsWith(MousePrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            if (!TryFindSupportedMouseButton(normalized, mouse, out var button))
-                return false;
-
-            return button.isPressed;
-        }
-
-        if (!TryParseKey(normalized, out var key))
-            return false;
-
-        if (keyboard == null)
-            return false;
-
-        return keyboard[key].isPressed;
-    }
-
-    private static bool TryParseKey(string bindingPath, out Key key)
-    {
-        key = default;
-        const string separator = "/";
-        var segmentIndex = bindingPath.LastIndexOf(separator, StringComparison.Ordinal);
-        if (segmentIndex < 0 || segmentIndex >= bindingPath.Length - 1)
-            return false;
-
-        var keyName = bindingPath[(segmentIndex + 1)..];
-        return Enum.TryParse(keyName, ignoreCase: true, out key);
+        action.Enable();
+        CachedActions[normalized] = action;
+        return action;
     }
 
     private static string NormalizeBindingPath(string? bindingPath)
