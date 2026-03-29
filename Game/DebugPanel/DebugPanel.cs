@@ -87,32 +87,30 @@ internal sealed class DebugPanel : MonoBehaviour
 
     private void Update()
     {
-        var keyboard = Keyboard.current;
-        if (keyboard == null)
-            return;
-
-        if (BppHotkeyService.WasPressedThisFrame(KeyBindings.Toggle.DebugPanel, keyboard))
+        if (BppHotkeyService.WasPressedThisFrame(KeyBindings.Toggle.DebugPanel))
         {
             IsVisible = !IsVisible;
             if (IsVisible)
                 RefreshSnapshot(force: true);
         }
 
+        var keyboard = Keyboard.current;
+        if (keyboard == null)
+            return;
+
         if (!IsVisible)
             return;
 
-        if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectSummary, keyboard))
+        if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectSummary))
             SelectSection(DebugPanelSection.Summary);
-        else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectRun, keyboard))
+        else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectRun))
             SelectSection(DebugPanelSection.Run);
-        else if (
-            BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectEncounters, keyboard)
-        )
+        else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectEncounters))
             SelectSection(DebugPanelSection.Encounters);
-        else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectReplays, keyboard))
+        else if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.SelectReplays))
             SelectSection(DebugPanelSection.Replays);
 
-        if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.ToggleViewMode, keyboard))
+        if (BppHotkeyService.WasPressedThisFrame(KeyBindings.DebugPanel.ToggleViewMode))
             _panelState.ToggleViewMode();
 
         if (Time.unscaledTime >= _nextRefreshTime)

@@ -6,6 +6,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using Coroutine = UnityEngine.Coroutine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -52,7 +53,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private float _deleteRunConfirmationUntil;
     private PreviewSelectionMode _previewSelectionMode = PreviewSelectionMode.Run;
     private HistorySectionMode _sectionMode = HistorySectionMode.Runs;
-    private int _lastSceneHandle;
+    private string _lastSceneToken = string.Empty;
+    private bool _initialized;
 
     public static bool IsVisible { get; private set; }
 
@@ -79,16 +81,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void Awake()
     {
-        Instance = this;
-        _lastSceneHandle = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle;
-        _previewRenderer = new HistoryPanelPreviewRenderer();
-
-        EnsureUi();
-        SetUiVisible(false);
+        EnsureInitialized("Awake");
     }
 
     internal void Configure(IHistoryPanelRuntime runtime)
     {
+        EnsureInitialized("Configure");
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
 
         HistoryPanelRepository? repository = null;
@@ -134,9 +132,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (keyboard == null)
             return;
 
-        if (keyboard[KeyBindings.Toggle.HistoryPanel].wasPressedThisFrame)
-            SetHistoryVisible(!IsVisible);
-
         if (!IsVisible)
             return;
 
@@ -171,7 +166,30 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     internal void OpenFromUiEntry()
     {
-        SetHistoryVisible(true);
+        EnsureInitialized("OpenFromUiEntry");
+
+        try
+        {
+            SetHistoryVisible(true);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("HistoryPanel", "Collections entry failed to open history panel", ex);
+        }
+    }
+
+    internal void ToggleFromHotkey()
+    {
+        EnsureInitialized("ToggleFromHotkey");
+
+        try
+        {
+            SetHistoryVisible(!IsVisible);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("HistoryPanel", "ToggleFromHotkey failed", ex);
+        }
     }
 
     private void RefreshSelectedBattlePreview()
@@ -209,15 +227,33 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _previewCoroutine = null;
     }
 
-    private void DetectSceneChange()
+    private void EnsureInitialized(string source)
     {
-        var currentSceneHandle = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle;
-        if (currentSceneHandle == _lastSceneHandle)
+        if (_initialized)
             return;
 
-        _lastSceneHandle = currentSceneHandle;
+        _initialized = true;
+        Instance = this;
+        _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
+        _previewRenderer ??= new HistoryPanelPreviewRenderer();
+        EnsureUi();
+        SetUiVisible(false);
+    }
+
+    private void DetectSceneChange()
+    {
+        var currentSceneToken = GetSceneToken(SceneManager.GetActiveScene());
+        if (string.Equals(currentSceneToken, _lastSceneToken, StringComparison.Ordinal))
+            return;
+
+        _lastSceneToken = currentSceneToken;
         StopPreviewRender();
         _previewRenderer?.Dispose();
+    }
+
+    private static string GetSceneToken(Scene scene)
+    {
+        return $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
     }
 
     private void ToggleDynamicPreviewFromUi()

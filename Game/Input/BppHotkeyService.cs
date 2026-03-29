@@ -43,6 +43,12 @@ internal static class BppHotkeyService
     private static readonly Dictionary<string, InputAction> CachedActions = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private static readonly HashSet<string> LoggedInvalidBindingPaths = new(
+        StringComparer.OrdinalIgnoreCase
+    );
+    private static readonly HashSet<string> LoggedUnresolvedBindingPaths = new(
+        StringComparer.OrdinalIgnoreCase
+    );
 
     internal static bool IsHeld(
         BppHotkeyActionId actionId,
@@ -56,13 +62,32 @@ internal static class BppHotkeyService
         return IsPressed(GetBindingPath(actionId), keyboard, mouse);
     }
 
-    internal static bool WasPressedThisFrame(
-        string bindingPath,
-        Keyboard? keyboard = null,
-        Mouse? mouse = null
-    )
+    internal static bool WasPressedThisFrame(string bindingPath)
     {
-        return GetOrCreateAction(bindingPath).WasPressedThisFrame();
+        var normalized = NormalizeBindingPath(bindingPath);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            if (LoggedInvalidBindingPaths.Add(bindingPath ?? string.Empty))
+            {
+                BppLog.Warn(
+                    "BppHotkeyService",
+                    $"Rejected hotkey binding path '{bindingPath ?? "<null>"}' because it could not be normalized."
+                );
+            }
+
+            return false;
+        }
+
+        var action = GetOrCreateAction(normalized);
+        if (action.controls.Count == 0 && LoggedUnresolvedBindingPaths.Add(normalized))
+        {
+            BppLog.Warn(
+                "BppHotkeyService",
+                $"Hotkey binding '{normalized}' resolved to zero input controls after enabling its InputAction."
+            );
+        }
+
+        return action.WasPressedThisFrame();
     }
 
     private static bool IsPressed(string bindingPath, Keyboard? keyboard = null, Mouse? mouse = null)
