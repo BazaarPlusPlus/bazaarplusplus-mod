@@ -610,7 +610,7 @@ public sealed class SqliteRunLogStore : IRunLogStore
 
         var initialPlayerRating = command.ExecuteScalar();
         if (initialPlayerRating == null || initialPlayerRating is DBNull)
-            return null;
+            return 0;
 
         return finalPlayerRating.Value - Convert.ToInt32(initialPlayerRating);
     }

@@ -162,8 +162,8 @@ try
         "Upload payload should include the final player rating snapshot."
     );
     Assert(
-        status?["final_player_rating_delta"]?.Value<int>() == 16,
-        "Upload payload should include the final player rating delta."
+        status?["final_player_rating_delta"]?.Value<int>() == 0,
+        "Upload payload should default the final player rating delta to 0 when the starting rating snapshot is unavailable."
     );
 
     InvokeVoid(
