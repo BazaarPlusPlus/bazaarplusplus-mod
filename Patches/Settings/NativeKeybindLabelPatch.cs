@@ -15,10 +15,10 @@ internal static class NativeKeybindLabelAwakePatch
 {
     private static readonly LocalizedTextSet MonsterPreviewLabel = new(
         "Show Monster Preview",
-        "\u663e\u793a\u602a\u7269\u9884\u89c8",
+        "显示怪物预览",
         "Monstervorschau anzeigen",
         "Mostrar previa de monstro",
-        "\ubaac\uc2a4\ud130 \ubbf8\ub9ac\ubcf4\uae30 \ud45c\uc2dc",
+        "몬스터 미리보기 표시",
         "Mostra anteprima mostro"
     );
 

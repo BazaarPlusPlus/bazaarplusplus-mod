@@ -238,8 +238,8 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "\u6218\u6597\u72b6\u6001\u680f")]
-    [InlineData("zh-CN", "\u6218\u6597\u72b6\u6001\u680f")]
+    [InlineData("zh-Hans", "战斗状态栏")]
+    [InlineData("zh-CN", "战斗状态栏")]
     [InlineData("en", "Combat Status Bar")]
     [InlineData("", "Combat Status Bar")]
     public void SettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
@@ -273,8 +273,8 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "\u533f\u540d\u6a21\u5f0f")]
-    [InlineData("zh-CN", "\u533f\u540d\u6a21\u5f0f")]
+    [InlineData("zh-Hans", "匿名模式")]
+    [InlineData("zh-CN", "匿名模式")]
     [InlineData("en", "Anonymous Mode")]
     [InlineData("", "Anonymous Mode")]
     public void NameOverrideSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
@@ -288,8 +288,8 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "\u59cb\u7ec8\u663e\u793a\u9644\u9b54\u9884\u89c8")]
-    [InlineData("zh-CN", "\u59cb\u7ec8\u663e\u793a\u9644\u9b54\u9884\u89c8")]
+    [InlineData("zh-Hans", "始终显示附魔预览")]
+    [InlineData("zh-CN", "始终显示附魔预览")]
     [InlineData("en", "Always Show Enchant Preview")]
     [InlineData("", "Always Show Enchant Preview")]
     public void EnchantPreviewSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(

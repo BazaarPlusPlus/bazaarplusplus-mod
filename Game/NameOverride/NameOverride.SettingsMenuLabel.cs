@@ -7,10 +7,10 @@ internal static class NameOverrideSettingsMenuLabel
 {
     private static readonly LocalizedTextSet Labels = new(
         "Anonymous Mode",
-        "\u533f\u540d\u6a21\u5f0f",
+        "匿名模式",
         "Anonymer Modus",
         "Modo anonimo",
-        "\uc775\uba85 \ubaa8\ub4dc",
+        "익명 모드",
         "Modalita anonima"
     );
 

@@ -7,10 +7,10 @@ internal static class CombatStatusBarSettingsMenuLabel
 {
     private static readonly LocalizedTextSet Labels = new(
         "Combat Status Bar",
-        "\u6218\u6597\u72b6\u6001\u680f",
+        "战斗状态栏",
         "Kampfstatusleiste",
         "Barra de status do combate",
-        "\uc804\ud22c \uc0c1\ud0dc \ubc14",
+        "전투 상태 바",
         "Barra stato combattimento"
     );
 

@@ -10,6 +10,7 @@ public static class ItemEnchantPreviewFormatting
 {
     private const int PrefixSizePercent = 60;
     private const int EffectSizePercent = 55;
+    private const string EnchantmentPrefix = "\u00A0\u00A0· ";
 
     private static readonly Regex SizeTagRegex = new Regex(
         "<size=(\\d+)%>",
@@ -26,7 +27,7 @@ public static class ItemEnchantPreviewFormatting
         var scaledText = ScaleInlineSizes(renderedText, EffectSizePercent / 100f);
 
         return new TooltipSegment(
-            $"<size={PrefixSizePercent}%>\u00A0\u00A0\u00B7 <color=#{colorHex}>{enchantmentLabel}</color>: </size><size={EffectSizePercent}%>{scaledText}</size>",
+            $"<size={PrefixSizePercent}%>{EnchantmentPrefix}<color=#{colorHex}>{enchantmentLabel}</color>: </size><size={EffectSizePercent}%>{scaledText}</size>",
             null,
             null,
             -1
