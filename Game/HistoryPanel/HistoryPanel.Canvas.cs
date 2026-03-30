@@ -277,9 +277,10 @@ internal sealed partial class HistoryPanel
             _runsModeRoot.gameObject.SetActive(_sectionMode != HistorySectionMode.Ghost);
             if (_runsBattleSectionSubtitle != null)
             {
-                _runsBattleSectionSubtitle.text = SelectedRun == null
-                    ? "Select a run to inspect its recorded battles."
-                    : $"{SelectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(SelectedRun.FinalDay)}";
+                _runsBattleSectionSubtitle.text =
+                    SelectedRun == null
+                        ? "Select a run to inspect its recorded battles."
+                        : $"{SelectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(SelectedRun.FinalDay)}";
             }
         }
 
@@ -303,7 +304,7 @@ internal sealed partial class HistoryPanel
                     ? "Select one battle to inspect it, then use Replay when you want to jump back into it."
                 : canReplaySelectedBattle
                     ? string.IsNullOrWhiteSpace(ActiveSelectedBattle.SnapshotSummary)
-                        ? selectedBattleTimestampText
+                            ? selectedBattleTimestampText
                         : $"{selectedBattleTimestampText} | {ActiveSelectedBattle.SnapshotSummary}"
                 : $"{selectedBattleTimestampText} | Replay unavailable: {replayUnavailableReason}";
             _footerSecondaryText.text = string.IsNullOrWhiteSpace(_statusMessage)
@@ -711,13 +712,7 @@ internal sealed partial class HistoryPanel
         StretchToParent(layout, 0f, 0f, 0f, 0f);
         _runsModeRoot = layout;
 
-        BuildSectionHeader(
-            layout,
-            "Battles",
-            string.Empty,
-            out _runsBattleSectionSubtitle,
-            out _
-        );
+        BuildSectionHeader(layout, "Battles", string.Empty, out _runsBattleSectionSubtitle, out _);
         _runsBattleListContent = CreateScrollSection(layout, "RunsBattleScroll");
     }
 

@@ -200,19 +200,18 @@ try
         ]
     );
 
-    var ghostRecords =
-        (
-            (System.Collections.IEnumerable)
-                listRecentGhostBattles.Invoke(repository, ["player-account-a", 10])!
-        )
+    var ghostRecords = (
+        (System.Collections.IEnumerable)
+            listRecentGhostBattles.Invoke(repository, ["player-account-a", 10])!
+    )
         .Cast<object>()
         .ToList();
     Assert(
         ghostRecords.Count == 2,
         "ReplaceGhostBattles should upsert current ghost rows without requiring a full table reset."
     );
-    var downloadedGhost = ghostRecords.Single(
-        record => (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
+    var downloadedGhost = ghostRecords.Single(record =>
+        (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
     );
     Assert(
         (bool)downloadedGhost.GetType().GetProperty("ReplayDownloaded")!.GetValue(downloadedGhost)!,
@@ -220,7 +219,8 @@ try
     );
     Assert(
         string.IsNullOrEmpty(
-            (string?)downloadedGhost.GetType().GetProperty("SnapshotSummary")!.GetValue(downloadedGhost)
+            (string?)
+                downloadedGhost.GetType().GetProperty("SnapshotSummary")!.GetValue(downloadedGhost)
         ),
         "Ghost battle list rows should not depend on remote snapshot payloads for their summary."
     );
@@ -232,11 +232,10 @@ try
             CreateGhostImports(ghostImportType, "ghost-2", "2026-03-16T10:10:00.0000000+00:00"),
         ]
     );
-    ghostRecords =
-        (
-            (System.Collections.IEnumerable)
-                listRecentGhostBattles.Invoke(repository, ["player-account-a", 10])!
-        )
+    ghostRecords = (
+        (System.Collections.IEnumerable)
+            listRecentGhostBattles.Invoke(repository, ["player-account-a", 10])!
+    )
         .Cast<object>()
         .ToList();
     Assert(
@@ -244,13 +243,11 @@ try
         "ReplaceGhostBattles should preserve previously imported ghost rows when the server only returns a sync window."
     );
     Assert(
-        ghostRecords.Any(
-            record =>
-                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
+        ghostRecords.Any(record =>
+            (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
         )
-            && ghostRecords.Any(
-                record =>
-                    (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-2"
+            && ghostRecords.Any(record =>
+                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-2"
             ),
         "ReplaceGhostBattles should keep both existing and newly imported ghost rows."
     );
@@ -259,24 +256,22 @@ try
         repository,
         [
             "player-account-b",
-            CreateGhostImports(
-                ghostImportType,
-                "ghost-3",
-                "2026-03-16T11:00:00.0000000+00:00"
-            ),
+            CreateGhostImports(ghostImportType, "ghost-3", "2026-03-16T11:00:00.0000000+00:00"),
         ]
     );
-    var playerBGhostRecords =
-        (
-            (System.Collections.IEnumerable)
-                listRecentGhostBattles.Invoke(repository, ["player-account-b", 10])!
-        )
+    var playerBGhostRecords = (
+        (System.Collections.IEnumerable)
+            listRecentGhostBattles.Invoke(repository, ["player-account-b", 10])!
+    )
         .Cast<object>()
         .ToList();
     Assert(
         playerBGhostRecords.Count == 1
-            && (string)playerBGhostRecords[0].GetType().GetProperty("BattleId")!.GetValue(playerBGhostRecords[0])!
-                == "ghost-3",
+            && (string)
+                playerBGhostRecords[0]
+                    .GetType()
+                    .GetProperty("BattleId")!
+                    .GetValue(playerBGhostRecords[0])! == "ghost-3",
         "Ghost battle rows should be isolated per local player account."
     );
 
@@ -294,30 +289,29 @@ try
         ]
     );
     markGhostReplayDownloaded.Invoke(repository, ["player-account-a", "ghost-stale-downloaded"]);
-    repositoryType.GetMethod("MarkOldUndownloadedGhostBattlesDeleted")!.Invoke(
-        repository,
-        ["player-account-a", new DateTimeOffset(2026, 3, 16, 0, 0, 0, TimeSpan.Zero)]
-    );
-    ghostRecords =
-        (
-            (System.Collections.IEnumerable)
-                listRecentGhostBattles.Invoke(repository, ["player-account-a", 20])!
-        )
+    repositoryType
+        .GetMethod("MarkOldUndownloadedGhostBattlesDeleted")!
+        .Invoke(
+            repository,
+            ["player-account-a", new DateTimeOffset(2026, 3, 16, 0, 0, 0, TimeSpan.Zero)]
+        );
+    ghostRecords = (
+        (System.Collections.IEnumerable)
+            listRecentGhostBattles.Invoke(repository, ["player-account-a", 20])!
+    )
         .Cast<object>()
         .ToList();
     Assert(
-        !ghostRecords.Any(
-            record =>
-                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)!
-                == "ghost-stale-undownloaded"
+        !ghostRecords.Any(record =>
+            (string)record.GetType().GetProperty("BattleId")!.GetValue(record)!
+            == "ghost-stale-undownloaded"
         ),
         "Undownloaded ghost battles older than two weeks should be hidden after local deletion."
     );
     Assert(
-        ghostRecords.Any(
-            record =>
-                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)!
-                == "ghost-stale-downloaded"
+        ghostRecords.Any(record =>
+            (string)record.GetType().GetProperty("BattleId")!.GetValue(record)!
+            == "ghost-stale-downloaded"
         ),
         "Downloaded ghost battles should be retained even when older than two weeks."
     );

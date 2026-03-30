@@ -20,5 +20,4 @@ public sealed class MainMenuVersionLabelFormatterTests
 
         Assert.Equal(" Version: 1.2.3 ", text);
     }
-
 }

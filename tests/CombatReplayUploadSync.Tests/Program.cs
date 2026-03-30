@@ -14,12 +14,8 @@ var replayRoot = Path.Combine(tempRoot, "CombatReplays");
 
 try
 {
-    var storeType = RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadSqliteStore"
-    );
-    var serviceType = RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService"
-    );
+    var storeType = RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadSqliteStore");
+    var serviceType = RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService");
     Assert(
         storeType != null && serviceType != null,
         "Battle upload store and service should exist."
@@ -120,10 +116,7 @@ try
         storeType,
         store,
         "MarkReplayUploaded",
-        [
-            "battle-upload-001",
-            new DateTimeOffset(2026, 3, 28, 2, 0, 0, TimeSpan.Zero),
-        ]
+        ["battle-upload-001", new DateTimeOffset(2026, 3, 28, 2, 0, 0, TimeSpan.Zero)]
     );
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))

@@ -22,41 +22,17 @@ Assert(
 );
 
 Assert(
-    !(bool)
-        shouldAdvanceCheckpoint!.Invoke(
-            null,
-            [
-                200,
-                200,
-                3,
-            ]
-        )!,
+    !(bool)shouldAdvanceCheckpoint!.Invoke(null, [200, 200, 3])!,
     "Ghost sync should not advance the checkpoint when the returned batch hits the limit."
 );
 
 Assert(
-    (bool)
-        shouldAdvanceCheckpoint!.Invoke(
-            null,
-            [
-                12,
-                200,
-                14,
-            ]
-        )!,
+    (bool)shouldAdvanceCheckpoint!.Invoke(null, [12, 200, 14])!,
     "Ghost sync should advance the checkpoint after a non-truncated fetch even when the requested window was clamped."
 );
 
 Assert(
-    (bool)
-        shouldAdvanceCheckpoint!.Invoke(
-            null,
-            [
-                12,
-                200,
-                3,
-            ]
-        )!,
+    (bool)shouldAdvanceCheckpoint!.Invoke(null, [12, 200, 3])!,
     "Ghost sync should advance the checkpoint after a non-truncated incremental fetch."
 );
 
@@ -70,11 +46,7 @@ Assert(
 );
 
 Assert(
-    (bool)
-        shouldTreatGhostErrorAsBindingFailure.Invoke(
-            null,
-            ["http_403:battle_forbidden"]
-        )!,
+    (bool)shouldTreatGhostErrorAsBindingFailure.Invoke(null, ["http_403:battle_forbidden"])!,
     "Ghost replay/link failures should still recognize battle_forbidden after client-side HTTP error formatting."
 );
 
@@ -122,12 +94,8 @@ var requestsHandled = Task.Run(async () =>
         context.Response.StatusCode = 404;
         context.Response.Close();
     }
-    catch (HttpListenerException)
-    {
-    }
-    catch (ObjectDisposedException)
-    {
-    }
+    catch (HttpListenerException) { }
+    catch (ObjectDisposedException) { }
 });
 
 try
@@ -158,10 +126,9 @@ try
         Activator.CreateInstance(keyStoreType, Path.Combine(tempRoot, "key.json"))
         ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
     var endpoint = Activator.CreateInstance(endpointSetType)!;
-    endpointSetType.GetProperty("RegistrationEndpoint")!.SetValue(
-        endpoint,
-        $"{prefix}clients/register"
-    );
+    endpointSetType
+        .GetProperty("RegistrationEndpoint")!
+        .SetValue(endpoint, $"{prefix}clients/register");
     endpointSetType.GetProperty("UploadEndpoint")!.SetValue(endpoint, $"{prefix}runs/upload");
 
     InvokeVoid(
@@ -194,12 +161,7 @@ try
     var task = (Task)
         ensurePlayerBindingAsync!.Invoke(
             syncService,
-            [
-                "runs-client-001",
-                "install-001",
-                "player-account-001",
-                CancellationToken.None,
-            ]
+            ["runs-client-001", "install-001", "player-account-001", CancellationToken.None]
         )!;
     await task.ConfigureAwait(false);
 
@@ -207,7 +169,9 @@ try
     var bindingResult =
         resultProperty?.GetValue(task)
         ?? throw new InvalidOperationException("Binding task should produce a result.");
-    var succeeded = (bool)(bindingResultType.GetProperty("Succeeded")!.GetValue(bindingResult) ?? false);
+    var succeeded = (bool)(
+        bindingResultType.GetProperty("Succeeded")!.GetValue(bindingResult) ?? false
+    );
     Assert(succeeded, "Ghost battle binding refresh should succeed when the bind route succeeds.");
     Assert(
         bindRequestCount == 1,

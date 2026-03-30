@@ -19,7 +19,8 @@ internal sealed class HistoryPanelDataService
     {
         _repository = repository;
         _ghostSyncService = ghostSyncService;
-        _currentPlayerAccountIdAccessor = currentPlayerAccountIdAccessor ?? TryGetCurrentPlayerAccountId;
+        _currentPlayerAccountIdAccessor =
+            currentPlayerAccountIdAccessor ?? TryGetCurrentPlayerAccountId;
     }
 
     public bool IsAvailable => _repository != null;

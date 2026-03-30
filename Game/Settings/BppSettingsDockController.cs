@@ -257,7 +257,9 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             new Color(0.93f, 0.93f, 0.95f, 1f)
         );
         if (label == null)
-            throw new InvalidOperationException($"Failed to create row label for {definition.Key}.");
+            throw new InvalidOperationException(
+                $"Failed to create row label for {definition.Key}."
+            );
 
         var labelRect = label.rectTransform;
         labelRect.anchorMin = new Vector2(0f, 0f);
@@ -268,13 +270,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         label.textWrappingMode = TextWrappingModes.NoWrap;
         label.overflowMode = TextOverflowModes.Ellipsis;
 
-        var status = CreateText(
-            "Status",
-            rowRect,
-            17f,
-            TextAlignmentOptions.Center,
-            Color.white
-        );
+        var status = CreateText("Status", rowRect, 17f, TextAlignmentOptions.Center, Color.white);
         if (status == null)
             throw new InvalidOperationException(
                 $"Failed to create row status label for {definition.Key}."
@@ -368,11 +364,10 @@ internal sealed class BppSettingsDockController : MonoBehaviour
                 enabledCount++;
         }
 
-        image.color = _isExpanded
-            ? new Color(0.72f, 0.34f, 0.15f, 0.98f)
-            : enabledCount > 0
-                ? new Color(0.40f, 0.21f, 0.13f, 0.96f)
-                : new Color(0.16f, 0.16f, 0.18f, 0.95f);
+        image.color =
+            _isExpanded ? new Color(0.72f, 0.34f, 0.15f, 0.98f)
+            : enabledCount > 0 ? new Color(0.40f, 0.21f, 0.13f, 0.96f)
+            : new Color(0.16f, 0.16f, 0.18f, 0.95f);
         outline.effectColor = _isExpanded
             ? new Color(0.98f, 0.87f, 0.55f, 0.82f)
             : new Color(0f, 0f, 0f, 0.50f);
@@ -577,14 +572,8 @@ internal sealed class BppSettingsDockController : MonoBehaviour
 
     private static float CalculatePanelHeight(int rowCount)
     {
-        var rowsHeight = rowCount > 0
-            ? (rowCount * RowHeight) + ((rowCount - 1) * RowSpacing)
-            : 0f;
-        return PanelTopPadding
-            + HeaderHeight
-            + HeaderSpacing
-            + rowsHeight
-            + PanelBottomPadding;
+        var rowsHeight = rowCount > 0 ? (rowCount * RowHeight) + ((rowCount - 1) * RowSpacing) : 0f;
+        return PanelTopPadding + HeaderHeight + HeaderSpacing + rowsHeight + PanelBottomPadding;
     }
 
     private static string ResolveHeader(string languageCode)

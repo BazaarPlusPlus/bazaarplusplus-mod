@@ -48,7 +48,11 @@ seasonRankType
     .GetMethod("SetRankData", [typeof(int), rankEnumType, typeof(int), typeof(int), typeof(int)])!
     .Invoke(seasonRank, [1, Enum.Parse(rankEnumType, "Gold"), 2, 0, 1420]);
 Assert(
-    string.Equals((string?)formatPlayerRank!.Invoke(null, [seasonRank]), "Gold", StringComparison.Ordinal),
+    string.Equals(
+        (string?)formatPlayerRank!.Invoke(null, [seasonRank]),
+        "Gold",
+        StringComparison.Ordinal
+    ),
     "Player rank formatting should keep only the tier and ignore division."
 );
 

@@ -474,7 +474,6 @@ static void Assert(bool condition, string message)
         throw new InvalidOperationException(message);
 }
 
-
 file sealed class FakeRunLogStore : IRunLogStore
 {
     public int CreateRunCalls { get; private set; }

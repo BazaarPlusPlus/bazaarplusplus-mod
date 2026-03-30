@@ -480,10 +480,7 @@ internal sealed class HistoryPanelRepository
                     END;
                 """;
             insertCommand.Parameters.AddWithValue("$battleId", battle.BattleId);
-            insertCommand.Parameters.AddWithValue(
-                "$localPlayerAccountId",
-                localPlayerAccountId
-            );
+            insertCommand.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
             insertCommand.Parameters.AddWithValue(
                 "$staleCutoffUtc",
                 DateTimeOffset.UtcNow.Subtract(GhostRetentionWindow).ToString("o")
@@ -611,10 +608,7 @@ internal sealed class HistoryPanelRepository
             WHERE scope = $scope
             LIMIT 1;
             """;
-        command.Parameters.AddWithValue(
-            "$scope",
-            BuildGhostSyncScope(localPlayerAccountId)
-        );
+        command.Parameters.AddWithValue("$scope", BuildGhostSyncScope(localPlayerAccountId));
         var rawValue = command.ExecuteScalar() as string;
         return DateTimeOffset.TryParse(rawValue, out var parsed) ? parsed : null;
     }
@@ -641,20 +635,14 @@ internal sealed class HistoryPanelRepository
             ON CONFLICT(scope) DO UPDATE SET
                 last_successful_sync_at_utc = excluded.last_successful_sync_at_utc;
             """;
-        command.Parameters.AddWithValue(
-            "$scope",
-            BuildGhostSyncScope(localPlayerAccountId)
-        );
+        command.Parameters.AddWithValue("$scope", BuildGhostSyncScope(localPlayerAccountId));
         command.Parameters.AddWithValue("$syncedAtUtc", syncedAtUtc.ToString("o"));
         command.ExecuteNonQuery();
     }
 
     public void MarkGhostReplayDownloaded(string localPlayerAccountId, string battleId)
     {
-        if (
-            string.IsNullOrWhiteSpace(localPlayerAccountId)
-            || string.IsNullOrWhiteSpace(battleId)
-        )
+        if (string.IsNullOrWhiteSpace(localPlayerAccountId) || string.IsNullOrWhiteSpace(battleId))
             return;
 
         using var connection = OpenConnection(ensureSchema: true);

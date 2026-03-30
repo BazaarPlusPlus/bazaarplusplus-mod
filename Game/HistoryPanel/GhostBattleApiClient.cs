@@ -253,7 +253,11 @@ internal sealed class GhostBattleApiClient
         };
     }
 
-    private static string DeriveAgainstMeEndpoint(string uploadEndpoint, int lookbackDays, int limit)
+    private static string DeriveAgainstMeEndpoint(
+        string uploadEndpoint,
+        int lookbackDays,
+        int limit
+    )
     {
         var uploadUri = new Uri(uploadEndpoint, UriKind.Absolute);
         var routeBasePath = DeriveRouteBasePath(uploadUri.AbsolutePath, "/runs/upload");

@@ -271,9 +271,15 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
 
     private static bool HasInstalledRows(OptionsDialogController controller)
     {
-        return controller.GetComponentsInChildren<Transform>(true)
-                .Any(candidate => candidate != null && candidate.name == "BPP_Keybind_EnchantPreview")
-            && controller.GetComponentsInChildren<Transform>(true)
-                .Any(candidate => candidate != null && candidate.name == "BPP_Keybind_UpgradePreview");
+        return controller
+                .GetComponentsInChildren<Transform>(true)
+                .Any(candidate =>
+                    candidate != null && candidate.name == "BPP_Keybind_EnchantPreview"
+                )
+            && controller
+                .GetComponentsInChildren<Transform>(true)
+                .Any(candidate =>
+                    candidate != null && candidate.name == "BPP_Keybind_UpgradePreview"
+                );
     }
 }

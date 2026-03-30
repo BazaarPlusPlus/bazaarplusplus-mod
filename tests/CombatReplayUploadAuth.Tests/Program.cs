@@ -180,9 +180,7 @@ try
     manifestType.GetProperty("CombatKind")!.SetValue(manifest, "PVPCombat");
     InvokeVoid(catalogType, catalog, "Save", [manifest]);
 
-    var storeType = RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadSqliteStore"
-    );
+    var storeType = RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadSqliteStore");
     var store =
         Activator.CreateInstance(storeType, dbPath, replayRoot)
         ?? throw new InvalidOperationException("Failed to create BattleUploadSqliteStore.");
@@ -204,9 +202,7 @@ try
     var keyStore =
         Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
-    var serviceType = RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService"
-    );
+    var serviceType = RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService");
     var service =
         Activator.CreateInstance(
             serviceType,

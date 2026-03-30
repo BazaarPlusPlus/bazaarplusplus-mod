@@ -79,19 +79,10 @@ internal sealed class BattleUploadController : MonoBehaviour
                 return;
             }
 
-            var startupDelaySeconds = Math.Max(
-                5,
-                RunUploadDefaults.StartupDelaySeconds
-            );
-            _intervalSeconds = Math.Max(
-                15,
-                RunUploadDefaults.IntervalSeconds
-            );
+            var startupDelaySeconds = Math.Max(5, RunUploadDefaults.StartupDelaySeconds);
+            _intervalSeconds = Math.Max(15, RunUploadDefaults.IntervalSeconds);
             var batchSize = Math.Max(1, RunUploadDefaults.BatchSize);
-            var requestTimeoutSeconds = Math.Max(
-                10,
-                RunUploadDefaults.RequestTimeoutSeconds
-            );
+            var requestTimeoutSeconds = Math.Max(10, RunUploadDefaults.RequestTimeoutSeconds);
 
             var uploadStore = new BattleUploadSqliteStore(databasePath, replayRootPath);
             var identityStore = new RunUploadIdentityStore(identityPath);
@@ -146,10 +137,7 @@ internal sealed class BattleUploadController : MonoBehaviour
             }
             catch (Exception ex)
             {
-                BppLog.Error(
-                    "BattleUploadController",
-                    $"Background battle upload failed: {ex}"
-                );
+                BppLog.Error("BattleUploadController", $"Background battle upload failed: {ex}");
             }
             finally
             {

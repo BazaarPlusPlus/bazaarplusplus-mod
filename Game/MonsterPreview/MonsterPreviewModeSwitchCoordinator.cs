@@ -11,10 +11,8 @@ internal static class MonsterPreviewModeSwitchCoordinator
     private static readonly System.Reflection.PropertyInfo? TooltipControllerProperty =
         AccessTools.Property(typeof(TooltipParentComponent), "CardTooltipController");
 
-    private static readonly System.Reflection.PropertyInfo? CurrentCardProperty = AccessTools.Property(
-        typeof(CardTooltipController),
-        "CurrentCard"
-    );
+    private static readonly System.Reflection.PropertyInfo? CurrentCardProperty =
+        AccessTools.Property(typeof(CardTooltipController), "CurrentCard");
 
     private static readonly System.Reflection.FieldInfo? CurrentCardField = AccessTools.Field(
         typeof(CardTooltipController),

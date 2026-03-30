@@ -413,10 +413,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             );
         _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
-        _uploadStore = new BattleUploadSqliteStore(
-            runLogDatabasePath,
-            combatReplayDirectoryPath
-        );
+        _uploadStore = new BattleUploadSqliteStore(runLogDatabasePath, combatReplayDirectoryPath);
         _persistenceQueue = new CombatReplayPersistenceQueue(
             _payloadStore.Save,
             _battleCatalog.Save,

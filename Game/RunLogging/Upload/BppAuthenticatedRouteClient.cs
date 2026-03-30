@@ -29,7 +29,8 @@ internal readonly struct BppAuthenticatedRequestResult<TResult>
 
     public TResult Response { get; }
 
-    public static BppAuthenticatedRequestResult<TResult> RegistrationUnavailable() => new(false, default);
+    public static BppAuthenticatedRequestResult<TResult> RegistrationUnavailable() =>
+        new(false, default);
 
     public static BppAuthenticatedRequestResult<TResult> Success(TResult response) =>
         new(true, response);
@@ -52,7 +53,10 @@ internal sealed class BppAuthenticatedRouteClient
         _clientStateStore =
             clientStateStore ?? throw new ArgumentNullException(nameof(clientStateStore));
         if (string.IsNullOrWhiteSpace(clientStateScope))
-            throw new ArgumentException("Client state scope is required.", nameof(clientStateScope));
+            throw new ArgumentException(
+                "Client state scope is required.",
+                nameof(clientStateScope)
+            );
 
         _clientStateScope = clientStateScope.Trim();
     }

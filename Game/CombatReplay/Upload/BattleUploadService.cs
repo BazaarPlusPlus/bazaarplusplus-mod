@@ -184,16 +184,13 @@ internal sealed class BattleUploadService : IDisposable
                         "replay_snapshot_not_found"
                     );
                     BppLog.Warn(
-                            "BattleUploadService",
-                            $"Marking battle {battleId} as terminal failure because the local snapshot was lost before completion."
-                        );
+                        "BattleUploadService",
+                        $"Marking battle {battleId} as terminal failure because the local snapshot was lost before completion."
+                    );
                     continue;
                 }
 
-                _store.MarkReplayUploaded(
-                    battleId,
-                    DateTimeOffset.UtcNow
-                );
+                _store.MarkReplayUploaded(battleId, DateTimeOffset.UtcNow);
                 BppLog.Info(
                     "BattleUploadService",
                     $"Uploaded battle {battleId} with object_key={uploadResult.ObjectKey ?? "none"}."

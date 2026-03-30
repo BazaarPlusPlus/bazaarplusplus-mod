@@ -27,9 +27,10 @@ internal sealed class QueuedRunLogStore : IRunLogStore, IDisposable
     internal QueuedRunLogStore(IRunLogStore innerStore, TimeSpan shutdownDrainTimeout)
     {
         _innerStore = innerStore ?? throw new ArgumentNullException(nameof(innerStore));
-        _shutdownDrainTimeout = shutdownDrainTimeout <= TimeSpan.Zero
-            ? DefaultShutdownDrainTimeout
-            : shutdownDrainTimeout;
+        _shutdownDrainTimeout =
+            shutdownDrainTimeout <= TimeSpan.Zero
+                ? DefaultShutdownDrainTimeout
+                : shutdownDrainTimeout;
         _worker = Task.Run(ProcessLoopAsync);
     }
 
@@ -45,10 +46,7 @@ internal sealed class QueuedRunLogStore : IRunLogStore, IDisposable
 
     public void AppendEvent(string runId, RunLogEvent entry)
     {
-        EnqueueWrite(
-            $"append event for run {runId}",
-            () => _innerStore.AppendEvent(runId, entry)
-        );
+        EnqueueWrite($"append event for run {runId}", () => _innerStore.AppendEvent(runId, entry));
     }
 
     public void SaveCheckpoint(string runId, RunLogCheckpoint checkpoint)
@@ -139,11 +137,7 @@ internal sealed class QueuedRunLogStore : IRunLogStore, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    BppLog.Error(
-                        "QueuedRunLogStore",
-                        $"Failed to {write.Description}.",
-                        ex
-                    );
+                    BppLog.Error("QueuedRunLogStore", $"Failed to {write.Description}.", ex);
                 }
             }
 

@@ -79,8 +79,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private HistoryBattleRecord? ActiveSelectedBattle =>
         _sectionMode == HistorySectionMode.Ghost ? SelectedGhostBattle : SelectedBattle;
 
-    private IReadOnlyList<HistoryBattleRecord> FilteredGhostBattles =>
-        GetFilteredGhostBattles();
+    private IReadOnlyList<HistoryBattleRecord> FilteredGhostBattles => GetFilteredGhostBattles();
 
     private void Awake()
     {

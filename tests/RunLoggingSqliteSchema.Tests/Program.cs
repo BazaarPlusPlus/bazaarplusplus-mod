@@ -9,10 +9,7 @@ Assert(
     GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 5,
     "Local database schema version mismatch."
 );
-Assert(
-    GetStaticValue<int>(schemaType, "RowSchemaVersion") == 5,
-    "Row schema version mismatch."
-);
+Assert(GetStaticValue<int>(schemaType, "RowSchemaVersion") == 5, "Row schema version mismatch.");
 Assert(
     GetStaticValue<int>(schemaType, "UploadPayloadSchemaVersion") == 1,
     "Upload payload schema version mismatch."
@@ -130,7 +127,10 @@ static void Assert(bool condition, string message)
 
 static bool TableContainsColumn(string sql, string tableName, string columnName)
 {
-    var tableStart = sql.IndexOf($"CREATE TABLE IF NOT EXISTS {tableName} (", StringComparison.Ordinal);
+    var tableStart = sql.IndexOf(
+        $"CREATE TABLE IF NOT EXISTS {tableName} (",
+        StringComparison.Ordinal
+    );
     if (tableStart < 0)
         return false;
 

@@ -5,9 +5,9 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.NameOverride;
+using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
-using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 
 namespace BazaarPlusPlus.Game.Settings;
 

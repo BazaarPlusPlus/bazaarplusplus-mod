@@ -20,5 +20,4 @@ public sealed class LegendaryEndOfMatchRatingFormatterTests
 
         Assert.Equal("1436", text);
     }
-
 }

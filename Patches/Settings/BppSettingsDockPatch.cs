@@ -59,11 +59,7 @@ internal static class BppSettingsDockFightMenuPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                "BppSettingsDock",
-                "Failed to attach BPP settings dock in fight menu",
-                ex
-            );
+            BppLog.Error("BppSettingsDock", "Failed to attach BPP settings dock in fight menu", ex);
         }
     }
 }

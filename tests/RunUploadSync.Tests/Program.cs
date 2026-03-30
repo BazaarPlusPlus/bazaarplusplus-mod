@@ -34,7 +34,9 @@ try
     var replicatedStore =
         Activator.CreateInstance(replicatedStoreType, sqliteStore, uploadStore)
         ?? throw new InvalidOperationException("Failed to create ReplicatedRunLogStore.");
-    var queuedStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.QueuedRunLogStore");
+    var queuedStoreType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Persistence.QueuedRunLogStore"
+    );
     queuedStore =
         Activator.CreateInstance(queuedStoreType, replicatedStore)
         ?? throw new InvalidOperationException("Failed to create QueuedRunLogStore.");

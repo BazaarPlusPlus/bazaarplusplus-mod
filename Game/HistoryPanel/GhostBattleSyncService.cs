@@ -284,10 +284,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         );
     }
 
-    private static int CalculateLookbackDays(
-        DateTimeOffset? checkpointUtc,
-        DateTimeOffset nowUtc
-    )
+    private static int CalculateLookbackDays(DateTimeOffset? checkpointUtc, DateTimeOffset nowUtc)
     {
         if (checkpointUtc == null)
             return InitialSyncLookbackDays;

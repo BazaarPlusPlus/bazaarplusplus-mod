@@ -96,7 +96,11 @@ internal sealed class RunUploadClientStateStore
         }
     }
 
-    public void SaveScopedBoundPlayerAccountId(string scope, string clientId, string playerAccountId)
+    public void SaveScopedBoundPlayerAccountId(
+        string scope,
+        string clientId,
+        string playerAccountId
+    )
     {
         if (string.IsNullOrWhiteSpace(scope))
             throw new ArgumentException("Scope is required.", nameof(scope));

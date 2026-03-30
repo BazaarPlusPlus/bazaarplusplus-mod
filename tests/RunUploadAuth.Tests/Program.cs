@@ -20,7 +20,9 @@ var installIdPath = Path.Combine(tempRoot, "install-id.txt");
 var clientStatePath = Path.Combine(tempRoot, "client.json");
 var privateKeyPath = Path.Combine(tempRoot, "key.json");
 
-var errorFormatterType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadErrorFormatter");
+var errorFormatterType = RequireType(
+    "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadErrorFormatter"
+);
 var formatHttpFailureMethod = errorFormatterType.GetMethod(
     "FormatHttpFailure",
     BindingFlags.Public | BindingFlags.Static

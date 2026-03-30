@@ -90,7 +90,11 @@ internal static class BppHotkeyService
         return action.WasPressedThisFrame();
     }
 
-    private static bool IsPressed(string bindingPath, Keyboard? keyboard = null, Mouse? mouse = null)
+    private static bool IsPressed(
+        string bindingPath,
+        Keyboard? keyboard = null,
+        Mouse? mouse = null
+    )
     {
         var normalized = NormalizeBindingPath(bindingPath);
         if (string.IsNullOrWhiteSpace(normalized))

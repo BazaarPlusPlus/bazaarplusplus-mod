@@ -47,19 +47,10 @@ internal sealed class RunUploadController : MonoBehaviour
                 return;
             }
 
-            var startupDelaySeconds = Math.Max(
-                5,
-                RunUploadDefaults.StartupDelaySeconds
-            );
-            _intervalSeconds = Math.Max(
-                15,
-                RunUploadDefaults.IntervalSeconds
-            );
+            var startupDelaySeconds = Math.Max(5, RunUploadDefaults.StartupDelaySeconds);
+            _intervalSeconds = Math.Max(15, RunUploadDefaults.IntervalSeconds);
             var batchSize = Math.Max(1, RunUploadDefaults.BatchSize);
-            var requestTimeoutSeconds = Math.Max(
-                10,
-                RunUploadDefaults.RequestTimeoutSeconds
-            );
+            var requestTimeoutSeconds = Math.Max(10, RunUploadDefaults.RequestTimeoutSeconds);
             var endpoint = TryBuildEndpointSet(registrationEndpoint, uploadEndpoint);
             if (endpoint == null)
             {

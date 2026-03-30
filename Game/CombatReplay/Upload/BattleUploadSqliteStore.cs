@@ -133,10 +133,7 @@ internal sealed class BattleUploadSqliteStore
         command.ExecuteNonQuery();
     }
 
-    public void MarkReplayUploaded(
-        string battleId,
-        DateTimeOffset uploadedAtUtc
-    )
+    public void MarkReplayUploaded(string battleId, DateTimeOffset uploadedAtUtc)
     {
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();

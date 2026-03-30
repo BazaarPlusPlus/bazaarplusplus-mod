@@ -1198,7 +1198,6 @@ static void Assert(bool condition, string message)
         throw new InvalidOperationException(message);
 }
 
-
 static object CreateGameSimMessage(
     string stateName,
     uint day,
