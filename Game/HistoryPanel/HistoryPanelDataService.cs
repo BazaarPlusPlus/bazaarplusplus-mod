@@ -1,6 +1,9 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -153,32 +156,31 @@ internal sealed class HistoryPanelDataService
         }
     }
 
-    public bool TrySyncGhostBattles(out string statusMessage, out Exception? error)
+    public async Task<HistoryPanelGhostSyncAttemptResult> SyncGhostBattlesAsync(
+        CancellationToken cancellationToken
+    )
     {
-        error = null;
         if (_ghostSyncService == null)
-        {
-            statusMessage = "Ghost sync is unavailable.";
-            return false;
-        }
+            return HistoryPanelGhostSyncAttemptResult.Failure("Ghost sync is unavailable.");
 
         try
         {
-            var result = _ghostSyncService.SyncRecentBattlesAsync(default).GetAwaiter().GetResult();
+            var result = await _ghostSyncService.SyncRecentBattlesAsync(cancellationToken);
             if (!result.Succeeded)
-            {
-                statusMessage = $"Ghost sync failed: {result.Error ?? "unknown_error"}";
-                return false;
-            }
+                return HistoryPanelGhostSyncAttemptResult.Failure(
+                    $"Ghost sync failed: {result.Error ?? "unknown_error"}"
+                );
 
-            statusMessage = $"Synced {result.ImportedCount} ghost battles.";
-            return true;
+            return HistoryPanelGhostSyncAttemptResult.Success(
+                $"Synced {result.ImportedCount} ghost battles."
+            );
         }
         catch (Exception ex)
         {
-            error = ex;
-            statusMessage = $"Ghost sync failed: {ex.Message}";
-            return false;
+            return HistoryPanelGhostSyncAttemptResult.Failure(
+                $"Ghost sync failed: {ex.Message}",
+                ex
+            );
         }
     }
 
@@ -186,11 +188,39 @@ internal sealed class HistoryPanelDataService
     {
         try
         {
-            return ClientCache.Profile.Value?.AccountId.ToString();
+            return BppClientCacheBridge.TryGetProfileAccountId();
         }
         catch
         {
             return null;
         }
     }
+}
+
+internal readonly struct HistoryPanelGhostSyncAttemptResult
+{
+    private HistoryPanelGhostSyncAttemptResult(
+        bool succeeded,
+        string statusMessage,
+        Exception? error
+    )
+    {
+        Succeeded = succeeded;
+        StatusMessage = statusMessage;
+        Error = error;
+    }
+
+    public bool Succeeded { get; }
+
+    public string StatusMessage { get; }
+
+    public Exception? Error { get; }
+
+    public static HistoryPanelGhostSyncAttemptResult Success(string statusMessage) =>
+        new(true, statusMessage, null);
+
+    public static HistoryPanelGhostSyncAttemptResult Failure(
+        string statusMessage,
+        Exception? error = null
+    ) => new(false, statusMessage, error);
 }

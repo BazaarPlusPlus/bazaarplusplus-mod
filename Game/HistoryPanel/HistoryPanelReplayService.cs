@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
@@ -70,74 +72,65 @@ internal sealed class HistoryPanelReplayService
             : "Replay";
     }
 
-    public bool TryReplayBattle(HistoryBattleRecord? battle, out string statusMessage)
+    public async Task<HistoryPanelReplayAttemptResult> ReplayBattleAsync(
+        HistoryBattleRecord? battle,
+        CancellationToken cancellationToken
+    )
     {
         if (battle == null)
-        {
-            statusMessage = "Select a battle to replay.";
-            return false;
-        }
+            return HistoryPanelReplayAttemptResult.Failure("Select a battle to replay.");
 
         if (!CanReplayBattle(battle, out var reason))
-        {
-            statusMessage = reason;
-            return false;
-        }
+            return HistoryPanelReplayAttemptResult.Failure(reason);
 
         if (battle.Source == HistoryBattleSource.Ghost)
-            return TryReplayGhostBattle(battle, out statusMessage);
+            return await ReplayGhostBattleAsync(battle, cancellationToken);
 
         var runtime = _runtimeAccessor();
         if (runtime == null)
-        {
-            statusMessage = "Combat replay runtime is unavailable.";
-            return false;
-        }
+            return HistoryPanelReplayAttemptResult.Failure("Combat replay runtime is unavailable.");
 
         if (!runtime.ReplaySaved(battle.BattleId))
-        {
-            statusMessage = $"Replay rejected for battle {battle.BattleId}.";
-            return false;
-        }
+            return HistoryPanelReplayAttemptResult.Failure(
+                $"Replay rejected for battle {battle.BattleId}."
+            );
 
-        statusMessage = $"Starting replay for {battle.BattleId}.";
-        return true;
+        return HistoryPanelReplayAttemptResult.Success(
+            $"Starting replay for {battle.BattleId}."
+        );
     }
 
-    private bool TryReplayGhostBattle(HistoryBattleRecord battle, out string statusMessage)
+    private async Task<HistoryPanelReplayAttemptResult> ReplayGhostBattleAsync(
+        HistoryBattleRecord battle,
+        CancellationToken cancellationToken
+    )
     {
         var runtime = _runtimeAccessor();
         if (runtime == null)
-        {
-            statusMessage = "Combat replay runtime is unavailable.";
-            return false;
-        }
+            return HistoryPanelReplayAttemptResult.Failure("Combat replay runtime is unavailable.");
 
         var replayDirectoryPath = _replayDirectoryPathAccessor();
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
-        {
-            statusMessage = "Combat replay directory path is unavailable.";
-            return false;
-        }
+            return HistoryPanelReplayAttemptResult.Failure(
+                "Combat replay directory path is unavailable."
+            );
 
         if (!battle.ReplayDownloaded)
         {
             if (_ghostSyncService == null)
-            {
-                statusMessage = "Ghost replay download is unavailable.";
-                return false;
-            }
+                return HistoryPanelReplayAttemptResult.Failure(
+                    "Ghost replay download is unavailable."
+                );
 
-            var downloadResult = _ghostSyncService
-                .DownloadReplayAsync(battle.BattleId, replayDirectoryPath, default)
-                .GetAwaiter()
-                .GetResult();
+            var downloadResult = await _ghostSyncService.DownloadReplayAsync(
+                battle.BattleId,
+                replayDirectoryPath,
+                cancellationToken
+            );
             if (!downloadResult.Succeeded)
-            {
-                statusMessage =
-                    $"Failed to download ghost replay: {downloadResult.Error ?? "unknown_error"}";
-                return false;
-            }
+                return HistoryPanelReplayAttemptResult.Failure(
+                    $"Failed to download ghost replay: {downloadResult.Error ?? "unknown_error"}"
+                );
         }
 
         var ghostPayloadStore = new GhostBattlePayloadStore(
@@ -146,10 +139,9 @@ internal sealed class HistoryPanelReplayService
         var ghostPayload = ghostPayloadStore.Load(battle.BattleId);
         var manifest = ghostPayload?.BattleManifest;
         if (manifest == null)
-        {
-            statusMessage = $"Ghost manifest for battle {battle.BattleId} is unavailable.";
-            return false;
-        }
+            return HistoryPanelReplayAttemptResult.Failure(
+                $"Ghost manifest for battle {battle.BattleId} is unavailable."
+            );
 
         var payload = ghostPayload?.ReplayPayload;
         if (payload == null)
@@ -158,21 +150,20 @@ internal sealed class HistoryPanelReplayService
             payload = payloadStore.Load(battle.BattleId);
         }
         if (payload == null)
-        {
-            statusMessage = $"Replay payload for battle {battle.BattleId} is unavailable.";
-            return false;
-        }
+            return HistoryPanelReplayAttemptResult.Failure(
+                $"Replay payload for battle {battle.BattleId} is unavailable."
+            );
 
         if (!runtime.ReplayImportedBattle(manifest, payload))
-        {
-            statusMessage = $"Replay rejected for ghost battle {battle.BattleId}.";
-            return false;
-        }
+            return HistoryPanelReplayAttemptResult.Failure(
+                $"Replay rejected for ghost battle {battle.BattleId}."
+            );
 
-        statusMessage = battle.ReplayDownloaded
-            ? $"Starting replay for {battle.BattleId}."
-            : $"Downloaded and starting replay for {battle.BattleId}.";
-        return true;
+        return HistoryPanelReplayAttemptResult.Success(
+            battle.ReplayDownloaded
+                ? $"Starting replay for {battle.BattleId}."
+                : $"Downloaded and starting replay for {battle.BattleId}."
+        );
     }
 
     public void CleanupReplayPayloads(IReadOnlyList<string> battleIds)
@@ -212,4 +203,23 @@ internal sealed class HistoryPanelReplayService
             ? System.IO.Path.Combine(replayDirectoryPath, "GhostBattlePayloads")
             : System.IO.Path.Combine(parentDirectory, "GhostBattlePayloads");
     }
+}
+
+internal readonly struct HistoryPanelReplayAttemptResult
+{
+    private HistoryPanelReplayAttemptResult(bool succeeded, string statusMessage)
+    {
+        Succeeded = succeeded;
+        StatusMessage = statusMessage;
+    }
+
+    public bool Succeeded { get; }
+
+    public string StatusMessage { get; }
+
+    public static HistoryPanelReplayAttemptResult Success(string statusMessage) =>
+        new(true, statusMessage);
+
+    public static HistoryPanelReplayAttemptResult Failure(string statusMessage) =>
+        new(false, statusMessage);
 }

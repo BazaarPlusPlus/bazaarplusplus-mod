@@ -3,6 +3,7 @@ using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.RunLogging.Upload;
 using TheBazaar;
@@ -314,7 +315,7 @@ internal sealed class GhostBattleSyncService : IDisposable
     {
         try
         {
-            return ClientCache.Profile.Value?.AccountId.ToString();
+            return BppClientCacheBridge.TryGetProfileAccountId();
         }
         catch
         {

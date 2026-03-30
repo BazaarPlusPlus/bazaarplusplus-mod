@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Threading.Tasks;
 using BazaarPlusPlus;
 using UnityEngine;
 
@@ -216,11 +217,18 @@ internal sealed partial class HistoryPanel
         return true;
     }
 
-    private void TryReplaySelectedBattle()
+    private async void TryReplaySelectedBattle()
     {
         var battle = ActiveSelectedBattle;
         if (battle == null)
             return;
+
+        if (_replayActionInProgress)
+        {
+            _statusMessage = "Replay action is already running.";
+            RefreshUi();
+            return;
+        }
 
         if (!CanReplaySelectedBattle(out var replayUnavailableReason))
         {
@@ -229,14 +237,38 @@ internal sealed partial class HistoryPanel
             return;
         }
 
-        if (!_replayService.TryReplayBattle(battle, out var statusMessage))
+        _replayActionInProgress = true;
+        _statusMessage =
+            battle.Source == HistoryBattleSource.Ghost && !battle.ReplayDownloaded
+                ? "Downloading ghost replay..."
+                : "Starting replay...";
+        RefreshUi();
+
+        HistoryPanelReplayAttemptResult replayResult;
+        try
         {
-            _statusMessage = statusMessage;
+            replayResult = await _replayService.ReplayBattleAsync(battle, default);
+        }
+        catch (Exception ex)
+        {
+            _replayActionInProgress = false;
+            _statusMessage = $"Replay failed: {ex.Message}";
+            BppLog.Error("HistoryPanel", "Failed to replay selected battle", ex);
             RefreshUi();
             return;
         }
 
-        _statusMessage = statusMessage;
+        _replayActionInProgress = false;
+        if (this == null)
+            return;
+
+        _statusMessage = replayResult.StatusMessage;
+        if (!replayResult.Succeeded)
+        {
+            RefreshUi();
+            return;
+        }
+
         SetHistoryVisible(false);
     }
 
@@ -309,8 +341,15 @@ internal sealed partial class HistoryPanel
         return _dataService.DatabaseExists ? "Connected" : "Missing";
     }
 
-    private void TrySyncGhostBattles()
+    private async void TrySyncGhostBattles()
     {
+        if (_ghostSyncInProgress)
+        {
+            _statusMessage = "Ghost sync is already running.";
+            RefreshUi();
+            return;
+        }
+
         if (!_dataService.CanSyncGhostBattles)
         {
             _statusMessage = "Ghost sync is unavailable.";
@@ -318,18 +357,43 @@ internal sealed partial class HistoryPanel
             return;
         }
 
-        if (!_dataService.TrySyncGhostBattles(out var statusMessage, out var error))
+        _ghostSyncInProgress = true;
+        _statusMessage = "Syncing ghost battles...";
+        RefreshUi();
+
+        HistoryPanelGhostSyncAttemptResult syncResult;
+        try
         {
-            _statusMessage = statusMessage;
-            if (error != null)
-                BppLog.Error("HistoryPanel", "Failed to sync ghost battles", error);
+            syncResult = await _dataService.SyncGhostBattlesAsync(default);
+        }
+        catch (Exception ex)
+        {
+            _ghostSyncInProgress = false;
+            _statusMessage = $"Ghost sync failed: {ex.Message}";
+            BppLog.Error("HistoryPanel", "Failed to sync ghost battles", ex);
             RefreshUi();
             return;
         }
 
-        _statusMessage = statusMessage;
+        _ghostSyncInProgress = false;
+        if (this == null)
+            return;
+
+        _statusMessage = syncResult.StatusMessage;
+        if (!syncResult.Succeeded)
+        {
+            if (syncResult.Error != null)
+                BppLog.Error("HistoryPanel", "Failed to sync ghost battles", syncResult.Error);
+            RefreshUi();
+            return;
+        }
+
         if (_sectionMode == HistorySectionMode.Ghost)
-            RefreshData();
+        {
+            RefreshGhostData();
+            _statusMessage = syncResult.StatusMessage;
+            RefreshUi();
+        }
         else
             RefreshUi();
     }

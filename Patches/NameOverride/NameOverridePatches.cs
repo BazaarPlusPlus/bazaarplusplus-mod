@@ -1,5 +1,7 @@
 #pragma warning disable CS0436
+#nullable enable
 using System;
+using System.Reflection;
 using BazaarPlusPlus.Core.Runtime;
 using HarmonyLib;
 using TheBazaar;
@@ -15,7 +17,7 @@ internal static class NameOverrideHelper
         return BppRuntimeHost.Config.EnableNameOverrideConfig?.Value == true;
     }
 
-    public static bool TryGetDisplayNameOverride(string originalName, out string replacementName)
+    public static bool TryGetDisplayNameOverride(string originalName, out string? replacementName)
     {
         replacementName = null;
 
@@ -26,14 +28,14 @@ internal static class NameOverrideHelper
         return !string.Equals(originalName, replacementName, StringComparison.Ordinal);
     }
 
-    public static bool TryGetReplacementName(string originalName, out string replacementName)
+    public static bool TryGetReplacementName(string originalName, out string? replacementName)
     {
         replacementName = null;
 
         if (!IsEnabled())
             return false;
 
-        var profileName = ClientCache.Profile.Value?.Username;
+        var profileName = BppClientCacheBridge.TryGetProfileUsername();
         if (string.IsNullOrEmpty(profileName))
         {
             BppLog.Debug(
@@ -51,9 +53,17 @@ internal static class NameOverrideHelper
     }
 }
 
-[HarmonyPatch(typeof(PlayerProfile), nameof(PlayerProfile.GetDisplayUsername))]
+[HarmonyPatch]
 public static class PlayerProfileGetDisplayUsernamePatch
 {
+    private static MethodBase? TargetMethod()
+    {
+        var playerProfileType = AccessTools.TypeByName("TheBazaar.PlayerProfile");
+        return playerProfileType == null
+            ? null
+            : AccessTools.Method(playerProfileType, "GetDisplayUsername");
+    }
+
     [HarmonyPostfix]
     private static void Postfix(ref string __result)
     {

@@ -5,6 +5,7 @@ using System.Linq;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.EncounterTracking;
 using TheBazaar;
 
@@ -19,7 +20,7 @@ internal static class GameDataReader
             BppLog.Warn("GameDataReader", "GetRunInfo requested while Data.Run is null");
             return new RunInfo
             {
-                Name = ClientCache.Profile.Value?.Username,
+                Name = BppClientCacheBridge.TryGetProfileUsername(),
                 AvailableEncounters =
                     GetSelectionSnapshot().AvailableEncounters ?? new List<RunInfo.CardInfo>(),
                 CurrentEncounterChoices =
@@ -52,7 +53,7 @@ internal static class GameDataReader
             Regen = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.HealthRegen),
             Level = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.Level),
             Prestige = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.Prestige),
-            Name = ClientCache.Profile.Value?.Username,
+            Name = BppClientCacheBridge.TryGetProfileUsername(),
             OppHealth = Data.Run.Opponent?.GetAttributeValue(EPlayerAttributeType.HealthMax),
             OppRegen = Data.Run.Opponent?.GetAttributeValue(EPlayerAttributeType.HealthRegen),
             OppName = Data.Run.Opponent?.Hero == EHero.Common ? "PvE" : Data.SimPvpOpponent?.Name,

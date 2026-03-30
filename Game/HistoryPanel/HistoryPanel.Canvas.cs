@@ -350,12 +350,14 @@ internal sealed partial class HistoryPanel
             _syncGhostButton,
             _syncGhostButtonBackground,
             _syncGhostButtonLabel,
-            _dataService.CanSyncGhostBattles,
+            _dataService.CanSyncGhostBattles && !_ghostSyncInProgress,
             new Color(0.23f, 0.27f, 0.32f, 0.98f),
             new Color(0.35f, 0.39f, 0.44f, 1f),
             new Color(0.24f, 0.26f, 0.30f, 0.50f),
             Color.white
         );
+        if (_syncGhostButtonLabel != null)
+            _syncGhostButtonLabel.text = _ghostSyncInProgress ? "Syncing..." : "Sync Ghost";
         RefreshGhostFilterButton(
             _ghostFilterAllButton,
             _ghostFilterAllButtonBackground,
@@ -383,7 +385,11 @@ internal sealed partial class HistoryPanel
         }
 
         if (_replayButtonLabel != null)
-            _replayButtonLabel.text = _replayService.GetReplayActionLabel(ActiveSelectedBattle);
+        {
+            _replayButtonLabel.text = _replayActionInProgress
+                ? "Working..."
+                : _replayService.GetReplayActionLabel(ActiveSelectedBattle);
+        }
 
         RefreshActionButton(
             _dynamicPreviewButton,
@@ -404,7 +410,7 @@ internal sealed partial class HistoryPanel
             _replayButton,
             _replayButtonBackground,
             _replayButtonLabel,
-            canReplaySelectedBattle,
+            canReplaySelectedBattle && !_replayActionInProgress,
             new Color(0.78f, 0.60f, 0.24f, 0.98f),
             new Color(0.92f, 0.72f, 0.30f, 1f),
             new Color(0.24f, 0.26f, 0.30f, 0.50f),

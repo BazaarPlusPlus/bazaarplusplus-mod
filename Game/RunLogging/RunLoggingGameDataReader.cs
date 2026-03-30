@@ -12,7 +12,6 @@ using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.EncounterTracking;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using TheBazaar;
-using TheBazaar.ProfileData;
 
 namespace BazaarPlusPlus.Game.RunLogging;
 
@@ -56,21 +55,14 @@ internal static class RunLoggingGameDataReader
 
     public static bool TryGetPlayerRankSnapshot(out string? rank, out int? rating)
     {
-        rank = null;
-        rating = null;
-
         try
         {
-            var currentSeasonRank = GetCurrentSeasonRank();
-            if (currentSeasonRank == null)
-                return false;
-
-            rank = FormatPlayerRank(currentSeasonRank);
-            rating = currentSeasonRank.Rating;
-            return !string.IsNullOrWhiteSpace(rank) || rating.HasValue;
+            return BppClientCacheBridge.TryGetPlayerRankSnapshot(out rank, out rating, out _);
         }
         catch
         {
+            rank = null;
+            rating = null;
             return false;
         }
     }
@@ -204,26 +196,6 @@ internal static class RunLoggingGameDataReader
     private static int? GetCurrentPlayerRating()
     {
         return TryGetPlayerRankSnapshot(out _, out var rating) ? rating : null;
-    }
-
-    private static SeasonRank? GetCurrentSeasonRank()
-    {
-        if (!ClientCache.Rank.HasData)
-            return null;
-
-        var seasonRank = new SeasonRank();
-        var rankResponse = ClientCache.Rank.Value;
-        seasonRank.SetRankData(in rankResponse);
-        return seasonRank;
-    }
-
-    private static string? FormatPlayerRank(ISeasonRank currentSeasonRank)
-    {
-        var rank = currentSeasonRank.Rank.ToString();
-        if (string.IsNullOrWhiteSpace(rank))
-            return null;
-
-        return rank;
     }
 
     private static RunLogSelectionOptionInput ToSelectionOption(RunInfo.CardInfo card)

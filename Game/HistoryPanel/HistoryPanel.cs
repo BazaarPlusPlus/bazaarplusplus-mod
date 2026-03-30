@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.Input;
 using UnityEngine;
@@ -56,6 +57,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private PreviewSelectionMode _previewSelectionMode = PreviewSelectionMode.Run;
     private HistorySectionMode _sectionMode = HistorySectionMode.Runs;
     private string _lastSceneToken = string.Empty;
+    private bool _ghostSyncInProgress;
+    private bool _replayActionInProgress;
     private bool _filteredGhostBattlesDirty = true;
     private bool _initialized;
 
@@ -203,7 +206,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         try
         {
-            return TheBazaar.ClientCache.Profile.Value?.AccountId.ToString();
+            return BppClientCacheBridge.TryGetProfileAccountId();
         }
         catch
         {

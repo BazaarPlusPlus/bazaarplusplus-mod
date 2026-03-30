@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BazaarPlusPlus.Core.Runtime;
 using HarmonyLib;
 using Newtonsoft.Json;
 using TheBazaar;
@@ -111,15 +112,11 @@ internal static class RandomHeroPoolPlayerPrefs
     {
         try
         {
-            var profile = ClientCache.Profile.Value;
-            if (profile == null)
-                return AnonymousAccountScope;
-
-            var accountId = profile.AccountId.ToString();
+            var accountId = BppClientCacheBridge.TryGetProfileAccountId();
             if (!string.IsNullOrWhiteSpace(accountId))
                 return Uri.EscapeDataString(accountId);
 
-            var username = profile.Username;
+            var username = BppClientCacheBridge.TryGetProfileUsername();
             if (!string.IsNullOrWhiteSpace(username))
                 return Uri.EscapeDataString(username);
         }

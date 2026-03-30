@@ -1,3 +1,4 @@
+using BazaarPlusPlus.Core.Runtime;
 using TheBazaar;
 using UnityEngine;
 
@@ -7,11 +8,7 @@ internal static class NameOverrideUiRefresh
 {
     internal static void TryRefreshVisibleHeroBanners()
     {
-        var profile = ClientCache.Profile.Value;
-        if (profile == null)
-            return;
-
-        var displayName = profile.GetDisplayUsername();
+        var displayName = BppClientCacheBridge.TryGetProfileDisplayUsername();
         if (string.IsNullOrWhiteSpace(displayName))
             return;
 

@@ -7,6 +7,7 @@ using BazaarGameShared;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.RunLogging;
 using TheBazaar;
@@ -451,7 +452,7 @@ internal sealed class PvpBattleSnapshotCollector
     {
         try
         {
-            return ClientCache.Profile.Value?.Username;
+            return BppClientCacheBridge.TryGetProfileUsername();
         }
         catch
         {
@@ -463,7 +464,7 @@ internal sealed class PvpBattleSnapshotCollector
     {
         try
         {
-            return ClientCache.Profile.Value?.AccountId.ToString();
+            return BppClientCacheBridge.TryGetProfileAccountId();
         }
         catch
         {
