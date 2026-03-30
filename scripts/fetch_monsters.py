@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+Fetches the monster database from BazaarDB and saves it as a JSON file.
+Support BazaarDB by considering a subscription if you find this helpful.
+Becoming a BazaarDB supporter by visiting https://bazaardb.gg/supporter.
+"""
 import argparse
 import json
 from pathlib import Path
