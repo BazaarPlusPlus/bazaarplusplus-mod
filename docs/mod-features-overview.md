@@ -27,8 +27,8 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 ### 战斗状态条（Combat Status Bar）
 
-- 战斗期间底部 HUD：逻辑战斗时间、已处理帧数、**暂停**与离散倍速（0.25 / 0.33 / 0.50 / 1.00）
-- 默认关闭，可在 **Bazaar++ 设置坞** 中开启；倍速与开关会写入配置
+- 战斗期间底部 HUD：逻辑战斗时间、已处理帧数与 **暂停**
+- 默认关闭，可在 **Bazaar++ 设置坞** 中开启；开关会写入配置
 - 逻辑时间基于已处理战斗帧 × 50ms，与墙钟解耦
 
 详见 `docs/combat-status-bar.md`。
@@ -118,7 +118,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | StreamerMode / EnableNameOverride | Anonymous 显示名 |
 | EnchantPreview / AlwaysShow | 附魔 tooltip 是否始终显示 |
 | Hotkeys / EnchantPreview, UpgradePreview | 附魔/升级预览按键路径 |
-| CombatStatusBar / Enabled, SpeedMultiplier | 战斗状态条与默认倍速 |
+| CombatStatusBar / Enabled | 战斗状态条开关 |
 | RunUpload / Enabled | 是否后台上传 completed runs |
 
 HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings`）。

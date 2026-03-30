@@ -2,6 +2,7 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.Settings;
+using System.Reflection;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests;
@@ -69,82 +70,26 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void FormatCombatSpeedLabel_UsesTwoDecimalPlaces()
+    public void CombatStatusBarState_DoesNotExposeSpeedControlMembers()
     {
-        CombatStatusBar.SetCombatSpeed(0.33f);
+        var forbiddenMemberNames = new[]
+        {
+            "CombatSpeedMultiplier",
+            "CombatSpeedSteps",
+            "CanStepCombatSpeed",
+            "FormatCombatSpeedLabel",
+            "NormalizeConfiguredDefaultSpeed",
+            "SetCombatSpeed",
+            "ShouldOverrideCombatSpeed",
+            "StepCombatSpeed",
+        };
+        var allMemberNames = typeof(CombatStatusBar)
+            .GetMembers(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Select(member => member.Name)
+            .ToHashSet();
 
-        var result = CombatStatusBar.FormatCombatSpeedLabel();
-
-        Assert.Equal("0.33x", result);
-    }
-
-    [Fact]
-    public void NormalizeConfiguredDefaultSpeed_AcceptsNewSupportedStep()
-    {
-        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(0.33f);
-
-        Assert.Equal(0.33f, result);
-    }
-
-    [Fact]
-    public void NormalizeConfiguredDefaultSpeed_ClampsLegacyConfiguredSpeedAboveOneToOne()
-    {
-        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(1.57f);
-
-        Assert.Equal(1f, result);
-    }
-
-    [Fact]
-    public void NormalizeConfiguredDefaultSpeed_RejectsRemovedStep()
-    {
-        var result = CombatStatusBar.NormalizeConfiguredDefaultSpeed(1.5f);
-
-        Assert.Equal(1f, result);
-    }
-
-    [Fact]
-    public void CombatSpeedSteps_ExposeExpectedOfflineSpeedPresets()
-    {
-        Assert.Equal(new[] { 0.25f, 0.33f, 0.5f, 1f }, CombatStatusBar.CombatSpeedSteps.ToArray());
-    }
-
-    [Fact]
-    public void SetCombatSpeed_RejectsUnsupportedValueAboveOne()
-    {
-        CombatStatusBar.SetCombatSpeed(0.5f);
-
-        var result = CombatStatusBar.SetCombatSpeed(1.57f);
-
-        Assert.Equal(0.5f, result);
-        Assert.Equal("0.50x", CombatStatusBar.FormatCombatSpeedLabel());
-    }
-
-    [Fact]
-    public void ShouldOverrideCombatSpeed_RequestAtNormalSpeed_DuringCombat()
-    {
-        CombatStatusBar.BeginCombatPlayback();
-
-        var result = CombatStatusBar.ShouldOverrideCombatSpeed(1f);
-
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void ShouldOverrideCombatSpeed_DoesNotOverrideFastForwardFirstFightSpeed()
-    {
-        CombatStatusBar.BeginCombatPlayback();
-
-        var result = CombatStatusBar.ShouldOverrideCombatSpeed(2f);
-
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void ShouldOverrideCombatSpeed_DoesNotOverrideOutsideCombat()
-    {
-        var result = CombatStatusBar.ShouldOverrideCombatSpeed(1f);
-
-        Assert.False(result);
+        foreach (var memberName in forbiddenMemberNames)
+            Assert.DoesNotContain(memberName, allMemberNames);
     }
 
     [Fact]

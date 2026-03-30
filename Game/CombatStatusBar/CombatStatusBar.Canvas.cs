@@ -29,16 +29,6 @@ internal sealed partial class CombatStatusBar
     private Text? _frameValue;
     private Image? _frameBackground;
 
-    private Text? _multiplierLabel;
-    private Text? _multiplierValue;
-    private Button? _decrementButton;
-    private Text? _decrementButtonText;
-    private Image? _decrementButtonBackground;
-    private Button? _incrementButton;
-    private Text? _incrementButtonText;
-    private Image? _incrementButtonBackground;
-    private Image? _multiplierBackground;
-
     private Text? _pauseLabel;
     private Button? _pauseButton;
     private Text? _pauseButtonText;
@@ -47,7 +37,6 @@ internal sealed partial class CombatStatusBar
 
     private Image? _timeDivider;
     private Image? _frameDivider;
-    private Image? _multiplierDivider;
 
     private void EnsureUi()
     {
@@ -90,7 +79,7 @@ internal sealed partial class CombatStatusBar
         _barRoot.anchorMax = new Vector2(0.5f, 0f);
         _barRoot.pivot = new Vector2(0.5f, 0f);
         _barRoot.anchoredPosition = new Vector2(0f, BarBottomMargin);
-        _barRoot.sizeDelta = new Vector2(561f, BarHeight);
+        _barRoot.sizeDelta = new Vector2(368f, BarHeight);
 
         _barBackground = AddImage(_barRoot.gameObject, new Color(0.06f, 0.07f, 0.09f, 0.90f));
         _barGlow = AddChildImage("BarGlow", _barRoot, new Color(0.28f, 0.22f, 0.12f, 0.10f));
@@ -130,18 +119,6 @@ internal sealed partial class CombatStatusBar
 
         _frameDivider = CreateDivider(_barRoot);
 
-        var multiplierSegment = CreateInteractiveSegment(
-            "MultiplierSegment",
-            _barRoot,
-            168f,
-            out _multiplierBackground,
-            out _multiplierLabel
-        );
-        SetLabel(_multiplierLabel, "Multiplier");
-        CreateMultiplierContent(multiplierSegment);
-
-        _multiplierDivider = CreateDivider(_barRoot);
-
         var pauseSegment = CreateInteractiveSegment(
             "PauseSegment",
             _barRoot,
@@ -170,15 +147,6 @@ internal sealed partial class CombatStatusBar
         _frameLabel = null;
         _frameValue = null;
         _frameBackground = null;
-        _multiplierLabel = null;
-        _multiplierValue = null;
-        _decrementButton = null;
-        _decrementButtonText = null;
-        _decrementButtonBackground = null;
-        _incrementButton = null;
-        _incrementButtonText = null;
-        _incrementButtonBackground = null;
-        _multiplierBackground = null;
         _pauseLabel = null;
         _pauseButton = null;
         _pauseButtonText = null;
@@ -186,7 +154,6 @@ internal sealed partial class CombatStatusBar
         _pauseBackground = null;
         _timeDivider = null;
         _frameDivider = null;
-        _multiplierDivider = null;
     }
 
     private void SetUiVisible(bool visible)
@@ -240,59 +207,21 @@ internal sealed partial class CombatStatusBar
         SetImageColor(_barGlow, glowColor);
         SetImageColor(_timeBackground, segmentColor);
         SetImageColor(_frameBackground, segmentColor);
-        SetImageColor(_multiplierBackground, segmentColor);
         SetImageColor(_pauseBackground, segmentColor);
         SetImageColor(_timeDivider, dividerColor);
         SetImageColor(_frameDivider, dividerColor);
-        SetImageColor(_multiplierDivider, dividerColor);
 
         SetTextColor(_timeLabel, labelColor);
         SetTextColor(_frameLabel, labelColor);
-        SetTextColor(_multiplierLabel, labelColor);
         SetTextColor(_pauseLabel, labelColor);
         SetTextColor(_timeValue, valueColor);
         SetTextColor(_frameValue, valueColor);
-        SetTextColor(_multiplierValue, valueColor);
 
         SetLabel(_timeLabel, GetDisplayedTimeLabel());
         if (_timeValue != null)
             _timeValue.text = GetDisplayedTimeText();
         if (_frameValue != null)
             _frameValue.text = GetDisplayedFrameText();
-        if (_multiplierValue != null)
-            _multiplierValue.text = FormatCombatSpeedLabel();
-
-        var multiplierButtonColor = Color.Lerp(
-            new Color(0.26f, 0.30f, 0.36f, 0.92f),
-            new Color(0.48f, 0.33f, 0.13f, 0.95f),
-            _visualBlend
-        );
-        var multiplierButtonPressedColor = Color.Lerp(
-            new Color(0.35f, 0.39f, 0.46f, 1f),
-            new Color(0.66f, 0.47f, 0.16f, 1f),
-            _visualBlend
-        );
-        var multiplierButtonDisabledColor = new Color(0.22f, 0.24f, 0.28f, 0.45f);
-        ApplyButtonColors(
-            _decrementButton,
-            _decrementButtonBackground,
-            _decrementButtonText,
-            CanStepCombatSpeed(-1),
-            multiplierButtonColor,
-            multiplierButtonPressedColor,
-            multiplierButtonDisabledColor,
-            valueColor
-        );
-        ApplyButtonColors(
-            _incrementButton,
-            _incrementButtonBackground,
-            _incrementButtonText,
-            CanStepCombatSpeed(1),
-            multiplierButtonColor,
-            multiplierButtonPressedColor,
-            multiplierButtonDisabledColor,
-            valueColor
-        );
 
         var pauseInteractable = CanToggleCombatPause();
         var pauseBaseColor = IsCombatPaused
@@ -330,50 +259,6 @@ internal sealed partial class CombatStatusBar
         );
         if (_pauseButtonText != null)
             _pauseButtonText.text = IsCombatPaused ? ">" : "||";
-    }
-
-    private void CreateMultiplierContent(RectTransform parent)
-    {
-        var row = CreateRect("MultiplierRow", parent);
-        row.anchorMin = Vector2.zero;
-        row.anchorMax = Vector2.one;
-        row.offsetMin = new Vector2(10f, 6f);
-        row.offsetMax = new Vector2(-10f, -20f);
-
-        var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 6f;
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = true;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = true;
-
-        (_decrementButton, _decrementButtonBackground, _decrementButtonText) = CreateButton(
-            "DecrementButton",
-            row,
-            "<",
-            34f
-        );
-        _multiplierValue = CreateText(
-            "MultiplierValue",
-            row,
-            15,
-            FontStyle.Bold,
-            TextAnchor.MiddleCenter
-        );
-        var valueLayout = _multiplierValue.gameObject.AddComponent<LayoutElement>();
-        valueLayout.minWidth = 52f;
-        valueLayout.preferredWidth = 64f;
-        valueLayout.flexibleWidth = 1f;
-        (_incrementButton, _incrementButtonBackground, _incrementButtonText) = CreateButton(
-            "IncrementButton",
-            row,
-            ">",
-            34f
-        );
-
-        _decrementButton.onClick.AddListener(() => StepCombatSpeed(-1));
-        _incrementButton.onClick.AddListener(() => StepCombatSpeed(1));
     }
 
     private void CreatePauseContent(RectTransform parent)

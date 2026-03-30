@@ -12,15 +12,13 @@
 - 仅在 `BppRuntimeHost.RunContext.IsInGameRun` 且功能开启时显示。
 - 展示逻辑战斗时间与已处理帧数。
 - 支持暂停。
-- 只支持离散倍速：`0.25x`、`0.33x`、`0.50x`、`1.00x`。
-- 记住功能开关与默认倍速。
+- 记住功能开关。
 
 不支持：
 
 - frame stepping
 - rewind
 - 自定义 replay 控件
-- 高于原生路径的任意倍速覆盖
 
 ## 逻辑时间
 
@@ -28,7 +26,7 @@
 
 `ProcessedCombatFrames * 50ms`
 
-因此显示值跟随模拟进度，而不是墙钟时间；暂停和倍速切换不会让时间标签失真。
+因此显示值跟随模拟进度，而不是墙钟时间；暂停不会让时间标签失真。
 
 ## Runtime Flow
 
@@ -47,4 +45,3 @@
 - `Game/CombatStatusBar/CombatStatusBar.SettingsMenuBridge.cs`
 - `Game/Settings/BppSettingsDockCatalog.cs`
 - `Patches/Combat/CombatSimulationPatches.cs`
-- `Patches/Combat/CombatSpeedPatch.cs`
