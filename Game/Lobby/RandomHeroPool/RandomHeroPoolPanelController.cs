@@ -357,12 +357,26 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         if (_panelRoot == null || _randomHeroToggle == null)
             return;
 
-        var shouldBeVisible = _randomHeroToggle.gameObject.activeSelf && _randomHeroToggle.isOn;
+        var shouldBeVisible =
+            _randomHeroToggle.gameObject.activeSelf && IsRandomHeroModeEffectivelyEnabled();
         if (_panelRoot.gameObject.activeSelf != shouldBeVisible)
             _panelRoot.gameObject.SetActive(shouldBeVisible);
 
         if (shouldBeVisible)
             SyncPanelPlacement();
+    }
+
+    private static bool IsRandomHeroModeEffectivelyEnabled()
+    {
+        try
+        {
+            return HeroSelectButtonsView.IsRandomHeroEnabled
+                || PlayerPreferences.Data.RandomHeroEnabled;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void ScheduleRosterRefresh(Task refreshTask, bool forceRebuild)
