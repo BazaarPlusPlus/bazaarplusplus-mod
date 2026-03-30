@@ -53,7 +53,8 @@ Enabled = true
 - 已知限制：
   - `POST /clients/bind` 当前信任客户端上报的 `player_account_id`，服务端不会独立证明该账号归属。
   - `POST /runs/upload` 当前会直接投影上传体里的 battle 身份字段，默认这些字段由客户端诚实提供。
-  - `POST /battles/upload` 当前只校验签名和 battle/run 标识自一致性，不校验该客户端是否对目标 battle 具有独占上传权限；已知 `battle_id` 的客户端仍可能覆盖已有 battle payload。
+  - `POST /battles/upload` 当前只校验签名和 battle/run 标识自一致性，不校验该客户端是否真的拥有该 battle；注册为 `replays` 的客户端仍可构造任意 `battle_manifest` / `opponent_account_id` 并写入 `pvp_battles`，因此 ghost 列表默认建立在“已注册客户端会诚实上报”的假设上。
+  - `POST /battles/upload` 以 `battle_id` 为幂等键并允许 `ON CONFLICT` 覆盖；已知 `battle_id` 的客户端仍可能覆盖已有 battle 行与 replay object metadata，服务端当前不会阻止跨客户端改写。
 - 以上风险当前按项目体量接受，优先保持实现简单；如果后续出现滥用，再考虑补更强的账号归属证明、battle 所有权校验或禁用覆盖写入。
 - 旧的未来态 identity / binding / dual-backend 设计文档已移除，避免与当前实现混淆。
 - 如果后续重新引入多路由或账号绑定，应以新的实现为准重新写文档，而不是恢复旧设计稿。
