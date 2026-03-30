@@ -158,7 +158,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         IsVisible = visible;
         if (visible)
-            RefreshData();
+            RefreshSectionOnEntry();
         else
         {
             ClearDeleteRunConfirmation();

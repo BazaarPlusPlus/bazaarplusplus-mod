@@ -7,6 +7,14 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed partial class HistoryPanel
 {
+    private void RefreshSectionOnEntry()
+    {
+        RefreshData();
+
+        if (_sectionMode == HistorySectionMode.Ghost && _dataService.CanSyncGhostBattles)
+            TrySyncGhostBattles();
+    }
+
     private void RefreshData()
     {
         ClearDeleteRunConfirmation();
@@ -94,7 +102,7 @@ internal sealed partial class HistoryPanel
             mode == HistorySectionMode.Ghost
                 ? PreviewSelectionMode.Battle
                 : PreviewSelectionMode.Run;
-        RefreshData();
+        RefreshSectionOnEntry();
     }
 
     private void SetGhostBattleFilter(GhostBattleFilter filter)
