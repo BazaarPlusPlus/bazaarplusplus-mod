@@ -4,6 +4,7 @@
 
 ## 功能文档
 
+- `mod-features-overview.md`: 模组功能总览（按当前代码整理）
 - `../README.md`: 仓库总览
 - `combat-status-bar.md`: 战斗状态条
 - `monster-preview-design.md`: 怪物预览运行时路径
