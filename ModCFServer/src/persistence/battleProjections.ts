@@ -32,17 +32,6 @@ export type BattleProjectionRecord = {
   updatedAtUtc: string;
 };
 
-const D1_BATCH_LIMIT = 400;
-
-export async function batchExecute(
-  env: Env,
-  statements: D1PreparedStatement[],
-): Promise<void> {
-  for (let i = 0; i < statements.length; i += D1_BATCH_LIMIT) {
-    await env.DB.batch(statements.slice(i, i + D1_BATCH_LIMIT));
-  }
-}
-
 function buildBattleUpsert(
   env: Env,
   battle: BattleProjectionRecord,
@@ -146,35 +135,6 @@ export async function upsertProjectedBattle(
   await buildBattleUpsert(env, battle).run();
 }
 
-export async function replaceProjectedBattlesForRun(
-  env: Env,
-  input: {
-    sourceClientId: string;
-    runId: string;
-    battles: BattleProjectionRecord[];
-  },
-): Promise<void> {
-  const deleteStmt = env.DB.prepare(
-    `
-      DELETE FROM pvp_battles
-      WHERE source_client_id = ?
-        AND run_id = ?
-    `,
-  ).bind(input.sourceClientId, input.runId);
-
-  const firstBatch = input.battles
-    .slice(0, D1_BATCH_LIMIT - 1)
-    .map((b) => buildBattleUpsert(env, b));
-  await env.DB.batch([deleteStmt, ...firstBatch]);
-
-  const remaining = input.battles
-    .slice(D1_BATCH_LIMIT - 1)
-    .map((b) => buildBattleUpsert(env, b));
-  if (remaining.length > 0) {
-    await batchExecute(env, remaining);
-  }
-}
-
 export async function listProjectedBattlesAgainstAccountIds(
   env: Env,
   input: {
@@ -269,25 +229,4 @@ export async function getProjectedBattleById(
   )
     .bind(battleId)
     .first<ProjectedBattleQueryRow>();
-}
-
-export async function markBattleReplayAvailable(
-  env: Env,
-  input: {
-    battleId: string;
-    replayObjectKey: string;
-    replayUploadedAtUtc: string;
-  },
-): Promise<void> {
-  await env.DB.prepare(
-    `
-      UPDATE pvp_battles
-      SET replay_available = 1,
-          replay_object_key = ?,
-          replay_uploaded_at_utc = ?
-      WHERE battle_id = ?
-    `,
-  )
-    .bind(input.replayObjectKey, input.replayUploadedAtUtc, input.battleId)
-    .run();
 }
