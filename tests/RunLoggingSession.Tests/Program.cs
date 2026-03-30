@@ -1,5 +1,7 @@
 #nullable enable
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
 
@@ -347,6 +349,90 @@ Assert(
 Assert(fakeStore.MarkRunAbandonedCalls == 1, "A mismatched restored session should be abandoned.");
 Assert(fakeStore.CreateRunCalls == 2, "A mismatched restored session should create a fresh run.");
 
+var queuedStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.QueuedRunLogStore");
+var slowStore = new SlowRunLogStore();
+var queuedStore =
+    Activator.CreateInstance(queuedStoreType, slowStore)
+    ?? throw new InvalidOperationException("Failed to create QueuedRunLogStore.");
+
+Invoke<RunLogSessionState>(
+    queuedStoreType,
+    queuedStore,
+    "CreateRun",
+    [
+        new RunLogCreateRequest
+        {
+            SchemaVersion = 1,
+            RunId = "queued-run-001",
+            StartedAtUtc = now,
+            Hero = "Vanessa",
+            GameMode = "Ranked",
+            Day = 1,
+            Hour = 1,
+        },
+    ]
+);
+
+slowStore.BlockAppend = true;
+InvokeVoid(
+    queuedStoreType,
+    queuedStore,
+    "AppendEvent",
+    [
+        "queued-run-001",
+        new RunLogEvent
+        {
+            SchemaVersion = 1,
+            RunId = "queued-run-001",
+            Seq = 1,
+            Ts = now,
+            Kind = "run_started",
+        },
+    ]
+);
+Assert(
+    slowStore.AppendEntered.Wait(TimeSpan.FromSeconds(2)),
+    "QueuedRunLogStore should process queued append operations on the worker."
+);
+
+var completionTask = Task.Run(() =>
+    InvokeVoid(
+        queuedStoreType,
+        queuedStore,
+        "CompleteRun",
+        [
+            "queued-run-001",
+            new RunLogCompletion
+            {
+                SchemaVersion = 1,
+                RunId = "queued-run-001",
+                Status = "completed",
+                EndedAtUtc = now.AddMinutes(5),
+            },
+        ]
+    )
+);
+Thread.Sleep(150);
+Assert(
+    slowStore.CompleteRunCalls == 0,
+    "QueuedRunLogStore should not write terminal status before earlier queued work completes."
+);
+slowStore.AllowAppend.Set();
+Assert(
+    completionTask.Wait(TimeSpan.FromSeconds(2)),
+    "QueuedRunLogStore should unblock CompleteRun after pending writes drain."
+);
+Assert(
+    slowStore.CompleteRunCalls == 1,
+    "QueuedRunLogStore should write terminal status once pending writes have drained."
+);
+Assert(
+    slowStore.OperationLog.SequenceEqual(["create", "append", "complete"]),
+    "QueuedRunLogStore should preserve write ordering across queued operations and synchronous completion."
+);
+
+((IDisposable)queuedStore).Dispose();
+
 Console.WriteLine("RunLogging session checks passed.");
 
 static Type RequireType(string fullName)
@@ -475,4 +561,53 @@ file sealed class FakeRunLogStore : IRunLogStore
         MarkRunAbandonedCalls++;
         ResumeState = null;
     }
+}
+
+file sealed class SlowRunLogStore : IRunLogStore
+{
+    public ManualResetEventSlim AppendEntered { get; } = new(false);
+
+    public ManualResetEventSlim AllowAppend { get; } = new(false);
+
+    public bool BlockAppend { get; set; }
+
+    public int CompleteRunCalls { get; private set; }
+
+    public List<string> OperationLog { get; } = [];
+
+    public RunLogSessionState? TryResumeActiveRun()
+    {
+        return null;
+    }
+
+    public RunLogSessionState CreateRun(RunLogCreateRequest request)
+    {
+        OperationLog.Add("create");
+        return new RunLogSessionState
+        {
+            RunId = request.RunId,
+            SchemaVersion = request.SchemaVersion,
+            StartedAtUtc = request.StartedAtUtc,
+            LastSeenAtUtc = request.StartedAtUtc,
+        };
+    }
+
+    public void AppendEvent(string runId, RunLogEvent entry)
+    {
+        AppendEntered.Set();
+        if (BlockAppend)
+            AllowAppend.Wait(TimeSpan.FromSeconds(2));
+
+        OperationLog.Add("append");
+    }
+
+    public void SaveCheckpoint(string runId, RunLogCheckpoint checkpoint) { }
+
+    public void CompleteRun(string runId, RunLogCompletion completion)
+    {
+        CompleteRunCalls++;
+        OperationLog.Add("complete");
+    }
+
+    public void MarkRunAbandoned(string runId, RunLogAbandonment abandonment) { }
 }

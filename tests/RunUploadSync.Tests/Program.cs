@@ -16,6 +16,7 @@ var dbPath = Path.Combine(tempRoot, "run-logs.db");
 var installIdPath = Path.Combine(tempRoot, "install-id.txt");
 var clientStatePath = Path.Combine(tempRoot, "client.json");
 var privateKeyPath = Path.Combine(tempRoot, "key.json");
+object? queuedStore = null;
 
 try
 {
@@ -33,10 +34,14 @@ try
     var replicatedStore =
         Activator.CreateInstance(replicatedStoreType, sqliteStore, uploadStore)
         ?? throw new InvalidOperationException("Failed to create ReplicatedRunLogStore.");
+    var queuedStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.QueuedRunLogStore");
+    queuedStore =
+        Activator.CreateInstance(queuedStoreType, replicatedStore)
+        ?? throw new InvalidOperationException("Failed to create QueuedRunLogStore.");
 
     Invoke<RunLogSessionState>(
-        replicatedStoreType,
-        replicatedStore,
+        queuedStoreType,
+        queuedStore,
         "CreateRun",
         [
             new RunLogCreateRequest
@@ -52,8 +57,8 @@ try
         ]
     );
     InvokeVoid(
-        replicatedStoreType,
-        replicatedStore,
+        queuedStoreType,
+        queuedStore,
         "AppendEvent",
         [
             runId,
@@ -72,8 +77,8 @@ try
         ]
     );
     InvokeVoid(
-        replicatedStoreType,
-        replicatedStore,
+        queuedStoreType,
+        queuedStore,
         "SaveCheckpoint",
         [
             runId,
@@ -91,8 +96,8 @@ try
         ]
     );
     InvokeVoid(
-        replicatedStoreType,
-        replicatedStore,
+        queuedStoreType,
+        queuedStore,
         "CompleteRun",
         [
             runId,
@@ -114,9 +119,22 @@ try
     {
         connection.Open();
         Assert(
+            GetInt64(connection, "SELECT COUNT(*) FROM run_events WHERE run_id = $runId;", runId)
+                == 1,
+            "QueuedRunLogStore should flush pending run events before CompleteRun returns."
+        );
+        Assert(
+            GetInt64(
+                connection,
+                "SELECT last_seq FROM run_checkpoints WHERE run_id = $runId;",
+                runId
+            ) == 1,
+            "QueuedRunLogStore should flush pending checkpoints before CompleteRun returns."
+        );
+        Assert(
             GetInt64(connection, "SELECT dirty FROM run_sync_state WHERE run_id = $runId;", runId)
                 == 1,
-            "ReplicatedRunLogStore should mark completed runs as dirty for upload."
+            "QueuedRunLogStore should mark completed runs as dirty for upload before returning."
         );
     }
 
@@ -364,6 +382,8 @@ try
 }
 finally
 {
+    if (queuedStore is IDisposable disposable)
+        disposable.Dispose();
     SqliteConnection.ClearAllPools();
     if (Directory.Exists(tempRoot))
         Directory.Delete(tempRoot, recursive: true);

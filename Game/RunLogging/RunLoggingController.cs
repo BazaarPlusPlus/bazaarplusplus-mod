@@ -29,7 +29,7 @@ internal sealed class RunLoggingController : MonoBehaviour
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
         var sqliteStore = new SqliteRunLogStore(runLogDatabasePath);
         var uploadStore = new RunUploadSqliteStore(runLogDatabasePath);
-        _store = new ReplicatedRunLogStore(sqliteStore, uploadStore);
+        _store = new QueuedRunLogStore(new ReplicatedRunLogStore(sqliteStore, uploadStore));
         _sessionManager = new RunLogSessionManager(_store);
         _sessionManager.RestoreActiveSession();
         _captureService = new RunLogCaptureService();
@@ -54,6 +54,8 @@ internal sealed class RunLoggingController : MonoBehaviour
     {
         _module?.Stop();
         _module = null;
+        (_store as IDisposable)?.Dispose();
+        _store = null;
     }
 
     public RunLogSessionState EnsureActiveSession(RunLogCreateRequest request)
