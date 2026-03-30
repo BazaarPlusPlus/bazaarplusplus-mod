@@ -76,7 +76,7 @@ internal sealed class BattleUploadApiClient
 
             var statusCode = (int)response.StatusCode;
             return BattleUploadApiResult.Failure(
-                $"http_{statusCode}:{RunUploadErrorFormatter.Truncate(responseBody)}",
+                RunUploadErrorFormatter.FormatHttpFailure(statusCode, responseBody),
                 shouldFallback: statusCode >= 500 || statusCode == 429,
                 shouldReRegister: statusCode == 401
                     || statusCode == 403

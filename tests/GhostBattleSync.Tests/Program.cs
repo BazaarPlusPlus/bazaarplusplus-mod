@@ -70,6 +70,15 @@ Assert(
 );
 
 Assert(
+    (bool)
+        shouldTreatGhostErrorAsBindingFailure.Invoke(
+            null,
+            ["http_403:battle_forbidden"]
+        )!,
+    "Ghost replay/link failures should still recognize battle_forbidden after client-side HTTP error formatting."
+);
+
+Assert(
     !(bool)
         shouldTreatGhostErrorAsBindingFailure!.Invoke(
             null,

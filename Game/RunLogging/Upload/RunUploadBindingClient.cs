@@ -72,7 +72,7 @@ internal sealed class RunUploadBindingClient
             var responseBody = await response.Content.ReadAsStringAsync();
             var statusCode = (int)response.StatusCode;
             return RunUploadBindingResult.Failure(
-                $"http_{statusCode}:{RunUploadErrorFormatter.Truncate(responseBody)}",
+                RunUploadErrorFormatter.FormatHttpFailure(statusCode, responseBody),
                 shouldFallback: statusCode >= 500 || statusCode == 429,
                 shouldReRegister: statusCode == 401
                     || statusCode == 403
@@ -88,6 +88,10 @@ internal sealed class RunUploadBindingClient
         }
         catch (Exception ex)
         {
+            BppLog.Warn(
+                "RunUploadBindingClient",
+                $"Bind request failed for endpoint={_bindEndpoint}: {ex.GetType().Name} - {ex.Message}"
+            );
             return RunUploadBindingResult.Failure(
                 RunUploadErrorFormatter.Truncate(ex.Message),
                 shouldFallback: true,

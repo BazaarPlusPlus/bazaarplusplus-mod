@@ -57,7 +57,7 @@ internal sealed class GhostBattleApiClient
             {
                 var statusCode = (int)response.StatusCode;
                 return GhostBattleApiResult.Failure(
-                    $"http_{statusCode}:{RunUploadErrorFormatter.Truncate(responseBody)}",
+                    RunUploadErrorFormatter.FormatHttpFailure(statusCode, responseBody),
                     shouldFallback: statusCode >= 500 || statusCode == 429,
                     shouldReRegister: statusCode == 401
                         || statusCode == 403
@@ -127,7 +127,7 @@ internal sealed class GhostBattleApiClient
             {
                 var statusCode = (int)response.StatusCode;
                 return GhostBattleReplayDownloadLinkResult.Failure(
-                    $"http_{statusCode}:{RunUploadErrorFormatter.Truncate(responseBody)}",
+                    RunUploadErrorFormatter.FormatHttpFailure(statusCode, responseBody),
                     shouldFallback: statusCode >= 500 || statusCode == 429,
                     shouldReRegister: statusCode == 401
                         || statusCode == 403
@@ -182,7 +182,7 @@ internal sealed class GhostBattleApiClient
             {
                 var statusCode = (int)response.StatusCode;
                 return GhostBattleReplayPayloadResult.Failure(
-                    $"http_{statusCode}:{RunUploadErrorFormatter.Truncate(responseBody)}"
+                    RunUploadErrorFormatter.FormatHttpFailure(statusCode, responseBody)
                 );
             }
 

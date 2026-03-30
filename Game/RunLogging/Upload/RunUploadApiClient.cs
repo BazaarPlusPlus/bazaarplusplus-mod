@@ -54,7 +54,7 @@ internal sealed class RunUploadApiClient
             var responseBody = await response.Content.ReadAsStringAsync();
             var statusCode = (int)response.StatusCode;
             return RunUploadApiResult.Failure(
-                $"http_{statusCode}:{RunUploadErrorFormatter.Truncate(responseBody)}",
+                RunUploadErrorFormatter.FormatHttpFailure(statusCode, responseBody),
                 shouldFallback: statusCode >= 500 || statusCode == 429,
                 shouldReRegister: statusCode == 401
                     || statusCode == 403

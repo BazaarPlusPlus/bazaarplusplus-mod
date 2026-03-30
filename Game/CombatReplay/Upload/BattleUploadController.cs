@@ -17,6 +17,8 @@ internal sealed class BattleUploadController : MonoBehaviour
     private Task<BattleUploadCycleResult>? _uploadTask;
     private float _nextAttemptAt;
     private float _intervalSeconds;
+    private bool _waitingForRunExitLogged;
+    private bool _waitingForScheduleLogged;
 
     private void Awake()
     {
@@ -109,7 +111,7 @@ internal sealed class BattleUploadController : MonoBehaviour
             _nextAttemptAt = Time.unscaledTime + startupDelaySeconds;
             BppLog.Info(
                 "BattleUploadController",
-                $"Background battle upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}."
+                $"Background battle upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}, startup_delay={startupDelaySeconds}s, interval={_intervalSeconds}s."
             );
         }
         catch (Exception ex)
@@ -153,12 +155,42 @@ internal sealed class BattleUploadController : MonoBehaviour
             {
                 _uploadTask = null;
                 _nextAttemptAt = Time.unscaledTime + delaySeconds;
+                _waitingForScheduleLogged = false;
             }
         }
 
-        if (BppRuntimeHost.RunContext.IsInGameRun || Time.unscaledTime < _nextAttemptAt)
+        if (BppRuntimeHost.RunContext.IsInGameRun)
+        {
+            _waitingForScheduleLogged = false;
+            if (!_waitingForRunExitLogged)
+            {
+                BppLog.Info(
+                    "BattleUploadController",
+                    "Skipping background battle upload because a live run is active."
+                );
+                _waitingForRunExitLogged = true;
+            }
             return;
+        }
 
+        _waitingForRunExitLogged = false;
+
+        if (Time.unscaledTime < _nextAttemptAt)
+        {
+            if (!_waitingForScheduleLogged)
+            {
+                var waitSeconds = Math.Max(0f, _nextAttemptAt - Time.unscaledTime);
+                BppLog.Info(
+                    "BattleUploadController",
+                    $"Waiting {waitSeconds:F1}s before the next battle upload attempt."
+                );
+                _waitingForScheduleLogged = true;
+            }
+            return;
+        }
+
+        _waitingForScheduleLogged = false;
+        BppLog.Info("BattleUploadController", "Starting background battle upload attempt.");
         _uploadTask = _uploadService.UploadPendingBattlesAsync(_shutdown.Token);
     }
 

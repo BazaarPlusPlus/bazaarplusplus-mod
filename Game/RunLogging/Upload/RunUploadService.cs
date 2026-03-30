@@ -44,7 +44,10 @@ internal sealed class RunUploadService : IDisposable
     {
         var pendingRunIds = _store.GetPendingCompletedRunIds(_batchSize);
         if (pendingRunIds.Count == 0)
+        {
+            BppLog.Info("RunUploadService", "No completed runs are waiting for upload.");
             return new RunUploadCycleResult(uploadedCount: 0, hasMorePending: false);
+        }
 
         BppLog.Info(
             "RunUploadService",

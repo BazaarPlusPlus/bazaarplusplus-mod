@@ -20,6 +20,44 @@ var installIdPath = Path.Combine(tempRoot, "install-id.txt");
 var clientStatePath = Path.Combine(tempRoot, "client.json");
 var privateKeyPath = Path.Combine(tempRoot, "key.json");
 
+var errorFormatterType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadErrorFormatter");
+var formatHttpFailureMethod = errorFormatterType.GetMethod(
+    "FormatHttpFailure",
+    BindingFlags.Public | BindingFlags.Static
+);
+Assert(
+    formatHttpFailureMethod != null,
+    "RunUploadErrorFormatter should expose HTTP error formatting for client-visible errors."
+);
+Assert(
+    string.Equals(
+        (string?)formatHttpFailureMethod!.Invoke(null, [403, """{"error":"battle_forbidden"}"""]),
+        "http_403:battle_forbidden",
+        StringComparison.Ordinal
+    ),
+    "HTTP formatter should extract the server error code from JSON payloads."
+);
+Assert(
+    string.Equals(
+        (string?)
+            formatHttpFailureMethod.Invoke(
+                null,
+                [500, """{"error":"projection_failed","detail":"run-store-failed"}"""]
+            ),
+        "http_500:projection_failed(run-store-failed)",
+        StringComparison.Ordinal
+    ),
+    "HTTP formatter should include concise detail text when the server provides it."
+);
+Assert(
+    string.Equals(
+        (string?)formatHttpFailureMethod.Invoke(null, [502, "bad gateway"]),
+        "http_502:bad gateway",
+        StringComparison.Ordinal
+    ),
+    "HTTP formatter should fall back to truncated plain-text bodies."
+);
+
 var listener = new HttpListener();
 var port = GetFreePort();
 var prefix = $"http://127.0.0.1:{port}/";

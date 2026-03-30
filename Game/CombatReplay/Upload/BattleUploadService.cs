@@ -55,7 +55,10 @@ internal sealed class BattleUploadService : IDisposable
     {
         var pendingBattleIds = _store.GetPendingBattleIds(_batchSize);
         if (pendingBattleIds.Count == 0)
+        {
+            BppLog.Info("BattleUploadService", "No battle artifacts are waiting for upload.");
             return new BattleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
+        }
 
         BppLog.Info(
             "BattleUploadService",

@@ -16,6 +16,8 @@ internal sealed class RunUploadController : MonoBehaviour
     private Task<RunUploadCycleResult>? _uploadTask;
     private float _nextAttemptAt;
     private float _intervalSeconds;
+    private bool _waitingForRunExitLogged;
+    private bool _waitingForScheduleLogged;
 
     private void Awake()
     {
@@ -85,7 +87,7 @@ internal sealed class RunUploadController : MonoBehaviour
             _nextAttemptAt = Time.unscaledTime + startupDelaySeconds;
             BppLog.Info(
                 "RunUploadController",
-                $"Background run upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}."
+                $"Background run upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}, startup_delay={startupDelaySeconds}s, interval={_intervalSeconds}s."
             );
         }
         catch (Exception ex)
@@ -123,12 +125,42 @@ internal sealed class RunUploadController : MonoBehaviour
             {
                 _uploadTask = null;
                 _nextAttemptAt = Time.unscaledTime + delaySeconds;
+                _waitingForScheduleLogged = false;
             }
         }
 
-        if (BppRuntimeHost.RunContext.IsInGameRun || Time.unscaledTime < _nextAttemptAt)
+        if (BppRuntimeHost.RunContext.IsInGameRun)
+        {
+            _waitingForScheduleLogged = false;
+            if (!_waitingForRunExitLogged)
+            {
+                BppLog.Info(
+                    "RunUploadController",
+                    "Skipping background run upload because a live run is active."
+                );
+                _waitingForRunExitLogged = true;
+            }
             return;
+        }
 
+        _waitingForRunExitLogged = false;
+
+        if (Time.unscaledTime < _nextAttemptAt)
+        {
+            if (!_waitingForScheduleLogged)
+            {
+                var waitSeconds = Math.Max(0f, _nextAttemptAt - Time.unscaledTime);
+                BppLog.Info(
+                    "RunUploadController",
+                    $"Waiting {waitSeconds:F1}s before the next run upload attempt."
+                );
+                _waitingForScheduleLogged = true;
+            }
+            return;
+        }
+
+        _waitingForScheduleLogged = false;
+        BppLog.Info("RunUploadController", "Starting background run upload attempt.");
         _uploadTask = _uploadService.UploadPendingRunsAsync(_shutdown.Token);
     }
 
