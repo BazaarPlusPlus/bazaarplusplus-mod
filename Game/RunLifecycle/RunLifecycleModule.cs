@@ -87,6 +87,9 @@ internal sealed class RunLifecycleModule : IBppFeature
         if (_runContext.IsInGameRun == inGameRun)
             return;
 
+        if (!inGameRun)
+            _runContext.CurrentServerRunId = null;
+
         _runContext.IsInGameRun = inGameRun;
         _eventBus.Publish(
             new RunLifecycleChanged

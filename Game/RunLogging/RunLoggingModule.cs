@@ -26,11 +26,14 @@ internal sealed class RunLoggingModule
     private readonly Func<RunLogSessionState?> _ensureActiveRunFromGame;
     private IDisposable? _selectionSubscription;
     private IDisposable? _syncSubscription;
+    private IDisposable? _runLifecycleSubscription;
     private IDisposable? _pvpBattleSubscription;
-    private bool _wasInRunLastTick;
     private PendingSelectionContext? _pendingSelection;
     private RunLogCompletion? _deferredRunCompletion;
+    private string? _deferredRunCompletionRunId;
     private DateTime? _deferredRunCompletionDeadlineUtc;
+    private readonly Func<DateTime> _utcNow;
+    private readonly Func<string, RunLogCompletion> _buildRunLogCompletion;
 
     public RunLoggingModule(
         IBppEventBus eventBus,
@@ -38,7 +41,9 @@ internal sealed class RunLoggingModule
         RunLoggingControllerCore core,
         RunLogInferenceService inferenceService,
         Func<bool> hasPendingReplayPersistence,
-        Func<RunLogSessionState?> ensureActiveRunFromGame
+        Func<RunLogSessionState?> ensureActiveRunFromGame,
+        Func<DateTime>? utcNow = null,
+        Func<string, RunLogCompletion>? buildRunLogCompletion = null
     )
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
@@ -52,6 +57,8 @@ internal sealed class RunLoggingModule
         _ensureActiveRunFromGame =
             ensureActiveRunFromGame
             ?? throw new ArgumentNullException(nameof(ensureActiveRunFromGame));
+        _utcNow = utcNow ?? (() => DateTime.UtcNow);
+        _buildRunLogCompletion = buildRunLogCompletion ?? RunLoggingGameDataReader.BuildRunLogCompletion;
     }
 
     public void Start()
@@ -61,6 +68,7 @@ internal sealed class RunLoggingModule
         );
         _selectionSubscription = _eventBus.Subscribe<SelectionObserved>(OnSelectionObserved);
         _syncSubscription = _eventBus.Subscribe<RunLoggingSyncRequested>(OnRunLoggingSyncRequested);
+        _runLifecycleSubscription = _eventBus.Subscribe<RunLifecycleChanged>(OnRunLifecycleChanged);
         _pvpBattleSubscription = _eventBus.Subscribe<PvpBattleRecorded>(OnPvpBattleRecorded);
         Events.CardSelected.AddListener(OnCardSelected);
     }
@@ -84,10 +92,11 @@ internal sealed class RunLoggingModule
 
         Events.CardSelected.RemoveListener(OnCardSelected);
         _pendingSelection = null;
-        _deferredRunCompletion = null;
-        _deferredRunCompletionDeadlineUtc = null;
+        ClearDeferredRunCompletion();
         _pvpBattleSubscription?.Dispose();
         _pvpBattleSubscription = null;
+        _runLifecycleSubscription?.Dispose();
+        _runLifecycleSubscription = null;
         _syncSubscription?.Dispose();
         _syncSubscription = null;
         _selectionSubscription?.Dispose();
@@ -103,6 +112,7 @@ internal sealed class RunLoggingModule
         {
             if (inRun)
             {
+                CancelDeferredRunExitIfRunResumed();
                 var session = _ensureActiveRunFromGame();
                 if (session != null)
                 {
@@ -114,24 +124,16 @@ internal sealed class RunLoggingModule
                 }
             }
             else if (
-                (_wasInRunLastTick || _deferredRunCompletion != null)
+                _deferredRunCompletion != null
                 && _sessionManager.HasActiveSession
             )
             {
                 completionAttempted = true;
-                if (_deferredRunCompletion == null)
-                {
-                    ResolvePendingSelectionOnBoundary("run_state_exit");
-                    _deferredRunCompletion = RunLoggingGameDataReader.BuildRunLogCompletion(
-                        "run_state_exit"
-                    );
-                }
-
                 var replayPersistencePending = _hasPendingReplayPersistence();
                 if (replayPersistencePending && _deferredRunCompletionDeadlineUtc == null)
                 {
                     _deferredRunCompletionDeadlineUtc =
-                        DateTime.UtcNow + ReplayPersistenceCompletionGracePeriod;
+                        _utcNow() + ReplayPersistenceCompletionGracePeriod;
                 }
 
                 completionSucceeded = TryCompleteDeferredRunExit();
@@ -143,18 +145,32 @@ internal sealed class RunLoggingModule
         }
         finally
         {
-            if (inRun)
-            {
-                _wasInRunLastTick = true;
-            }
-            else if (
-                !completionAttempted
-                || completionSucceeded
-                || !_sessionManager.HasActiveSession
-            )
-            {
-                _wasInRunLastTick = false;
-            }
+            _ = completionAttempted;
+            _ = completionSucceeded;
+        }
+    }
+
+    private void OnRunLifecycleChanged(RunLifecycleChanged change)
+    {
+        try
+        {
+            if (change.IsInGameRun || !_sessionManager.HasActiveSession)
+                return;
+
+            if (!IsExplicitTerminalTransition(change))
+                return;
+
+            var activeSession = _sessionManager.ActiveSession;
+            if (activeSession == null)
+                return;
+
+            ResolvePendingSelectionOnBoundary("run_state_exit");
+            _deferredRunCompletionRunId = activeSession.RunId;
+            _deferredRunCompletion = _buildRunLogCompletion("run_state_exit");
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("RunLoggingModule", $"Run lifecycle transition handling failed: {ex}");
         }
     }
 
@@ -411,13 +427,28 @@ internal sealed class RunLoggingModule
         if (_deferredRunCompletion == null)
             return false;
 
+        var activeSession = _sessionManager.ActiveSession;
+        if (
+            activeSession == null
+            || !string.Equals(
+                activeSession.RunId,
+                _deferredRunCompletionRunId,
+                StringComparison.Ordinal
+            )
+        )
+        {
+            ClearDeferredRunCompletion();
+            return false;
+        }
+
+        var now = _utcNow();
         if (!forceCompletion && _hasPendingReplayPersistence())
         {
             var deadline =
                 _deferredRunCompletionDeadlineUtc
-                ?? (DateTime.UtcNow + ReplayPersistenceCompletionGracePeriod);
+                ?? (now + ReplayPersistenceCompletionGracePeriod);
             _deferredRunCompletionDeadlineUtc = deadline;
-            if (DateTime.UtcNow < deadline)
+            if (now < deadline)
                 return false;
 
             BppLog.Warn(
@@ -435,9 +466,38 @@ internal sealed class RunLoggingModule
 
         _core.CompleteRun(_deferredRunCompletion);
         _pendingSelection = null;
-        _deferredRunCompletion = null;
-        _deferredRunCompletionDeadlineUtc = null;
+        ClearDeferredRunCompletion();
         return true;
+    }
+
+    private void CancelDeferredRunExitIfRunResumed()
+    {
+        if (_deferredRunCompletion == null || string.IsNullOrWhiteSpace(_deferredRunCompletionRunId))
+            return;
+
+        var currentRunId = BppRuntimeHost.RunContext.CurrentServerRunId;
+        var activeSession = _sessionManager.ActiveSession;
+        if (
+            activeSession != null
+            && string.Equals(activeSession.RunId, _deferredRunCompletionRunId, StringComparison.Ordinal)
+            && string.Equals(currentRunId, _deferredRunCompletionRunId, StringComparison.Ordinal)
+        )
+        {
+            ClearDeferredRunCompletion();
+        }
+    }
+
+    private void ClearDeferredRunCompletion()
+    {
+        _deferredRunCompletion = null;
+        _deferredRunCompletionRunId = null;
+        _deferredRunCompletionDeadlineUtc = null;
+    }
+
+    private static bool IsExplicitTerminalTransition(RunLifecycleChanged change)
+    {
+        return string.Equals(change.Reason, "Run ended", StringComparison.Ordinal)
+            || string.Equals(change.Reason, "Run interrupted", StringComparison.Ordinal);
     }
 
     private sealed class PendingSelectionContext
