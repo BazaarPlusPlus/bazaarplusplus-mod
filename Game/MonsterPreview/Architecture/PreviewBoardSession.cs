@@ -18,7 +18,7 @@ internal sealed class PreviewBoardSession
     public void Show(PreviewBoardRequest request)
     {
         _request = request;
-        BppLog.Info(
+        BppLog.Debug(
             "PreviewBoardSession",
             $"Show request received hasDataSource={request?.DataSource != null} hasAnchor={request?.AnchorStrategy != null} visible={request?.Presentation?.Visible ?? false}"
         );
@@ -31,7 +31,7 @@ internal sealed class PreviewBoardSession
         _lastSignature = string.Empty;
         _lastPresentationSignature = string.Empty;
         _lastPose = null;
-        BppLog.Info("PreviewBoardSession", "Hide called; cleared cached signature and pose");
+        BppLog.Debug("PreviewBoardSession", "Hide called; cleared cached signature and pose");
     }
 
     public void Tick()
@@ -43,7 +43,7 @@ internal sealed class PreviewBoardSession
         _renderTarget.SetVisible(visible);
         if (!visible)
         {
-            BppLog.Info("PreviewBoardSession", "Tick skipped because request is hidden");
+            BppLog.Debug("PreviewBoardSession", "Tick skipped because request is hidden");
             return;
         }
 
@@ -51,7 +51,7 @@ internal sealed class PreviewBoardSession
         var pose = ResolvePose(_request);
         if (model == null || pose == null)
         {
-            BppLog.Info(
+            BppLog.Debug(
                 "PreviewBoardSession",
                 $"Tick skipped modelNull={model == null} poseNull={pose == null}"
             );
@@ -64,7 +64,7 @@ internal sealed class PreviewBoardSession
         var presentationSignature = BuildPresentationSignature(_request.Presentation);
         if (!ShouldRender(signature, presentationSignature, pose))
         {
-            BppLog.Info(
+            BppLog.Debug(
                 "PreviewBoardSession",
                 "Tick skipped because signature and pose are unchanged"
             );
@@ -83,7 +83,7 @@ internal sealed class PreviewBoardSession
         _lastSignature = signature;
         _lastPresentationSignature = presentationSignature;
         _lastPose = ClonePose(pose);
-        BppLog.Info(
+        BppLog.Debug(
             "PreviewBoardSession",
             $"Rendered signature={signature} pose={pose.Position} items={model.ItemCards?.Count ?? 0} skills={model.SkillCards?.Count ?? 0}"
         );

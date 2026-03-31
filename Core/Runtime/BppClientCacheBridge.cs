@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Reflection;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
 using BazaarGameShared.TempoNet.Responses;
@@ -127,8 +128,9 @@ internal static class BppClientCacheBridge
 
     private static object? ReadStaticMember(Type type, string memberName)
     {
-        return AccessTools.Property(type, memberName)?.GetValue(null, null)
-            ?? AccessTools.Field(type, memberName)?.GetValue(null);
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+        return type.GetProperty(memberName, flags)?.GetValue(null, null)
+            ?? type.GetField(memberName, flags)?.GetValue(null);
     }
 
     private static object? ReadMember(object? instance, string memberName)
@@ -137,8 +139,10 @@ internal static class BppClientCacheBridge
             return null;
 
         var type = instance.GetType();
-        return AccessTools.Property(type, memberName)?.GetValue(instance, null)
-            ?? AccessTools.Field(type, memberName)?.GetValue(instance);
+        const BindingFlags flags =
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+        return type.GetProperty(memberName, flags)?.GetValue(instance, null)
+            ?? type.GetField(memberName, flags)?.GetValue(instance);
     }
 
     private static string? ReadStringMember(object? instance, string memberName)

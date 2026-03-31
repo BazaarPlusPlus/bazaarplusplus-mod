@@ -14,7 +14,7 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
     internal MonsterPreviewBoardRenderTarget(MonsterPreviewBoard board)
     {
         _board = board;
-        BppLog.Info(
+        BppLog.Debug(
             "MonsterPreviewBoardRenderTarget",
             $"Constructed boardExists={_board != null} boardAlive={_board?.IsAlive ?? false}"
         );
@@ -31,7 +31,7 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
     {
         if (!EnsureBoard())
         {
-            BppLog.Info(
+            BppLog.Debug(
                 "MonsterPreviewBoardRenderTarget",
                 "Render skipped because board could not be created"
             );
@@ -41,7 +41,7 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
         renderModel ??= new BoardRenderModel();
         var visible = renderModel.Presentation?.Visible ?? false;
         var generation = _renderGate.BeginRender(visible);
-        BppLog.Info(
+        BppLog.Debug(
             "MonsterPreviewBoardRenderTarget",
             $"Render visible={visible} generation={generation} items={renderModel.Data?.ItemCards?.Count ?? 0} skills={renderModel.Data?.SkillCards?.Count ?? 0} pose={renderModel.Pose?.Position}"
         );
@@ -61,7 +61,7 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
     {
         if (!EnsureBoard())
         {
-            BppLog.Info(
+            BppLog.Debug(
                 "MonsterPreviewBoardRenderTarget",
                 $"SetVisible({visible}) skipped because board could not be created"
             );
@@ -78,7 +78,7 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
             _renderGate.MarkVisible();
         }
         _board.SetVisible(visible);
-        BppLog.Info("MonsterPreviewBoardRenderTarget", $"SetVisible visible={visible}");
+        BppLog.Debug("MonsterPreviewBoardRenderTarget", $"SetVisible visible={visible}");
     }
 
     private bool EnsureBoard()
@@ -101,7 +101,7 @@ internal sealed class MonsterPreviewBoardRenderTarget : IBoardRenderTarget
             new MonsterPreviewItemCardFactory(),
             new MonsterPreviewSkillCardFactory()
         );
-        BppLog.Info(
+        BppLog.Debug(
             "MonsterPreviewBoardRenderTarget",
             $"CreateBoard created boardAlive={board?.IsAlive ?? false}"
         );

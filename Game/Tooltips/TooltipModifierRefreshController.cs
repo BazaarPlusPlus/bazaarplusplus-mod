@@ -8,7 +8,6 @@ using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus.Game.Tooltips;
 
@@ -23,44 +22,21 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
 
     private TooltipModifierMode _lastMode;
     private IBppConfig? _config;
-    private bool? _lastCtrlRaw;
-    private bool? _lastShiftRaw;
-
-    private void Awake()
-    {
-        BppLog.Info("TooltipPreview", "Controller Awake");
-    }
-
-    private void OnEnable()
-    {
-        BppLog.Info("TooltipPreview", "Controller OnEnable");
-    }
-
-    private void Start()
-    {
-        BppLog.Info("TooltipPreview", "Controller Start");
-    }
 
     internal void Initialize(IBppConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        BppLog.Info(
-            "TooltipPreview",
-            $"Initialized alwaysShowEnchant={(_config.EnchantPreviewAlwaysShowConfig?.Value ?? true)}"
-        );
     }
 
     private void Update()
     {
-        ReportRawModifierState();
-
         var mode = GetCurrentMode();
         if (mode == _lastMode)
             return;
 
         _lastMode = mode;
-        ReportModeChange(mode);
-        TryRefreshHoveredCardTooltip(mode);
+        BppLog.Info("TooltipPreview", $"ModeChanged mode={mode}");
+        TryRefreshHoveredCardTooltip();
     }
 
     private TooltipModifierMode GetCurrentMode()
@@ -75,50 +51,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         return TooltipModifierMode.Normal;
     }
 
-    private void ReportRawModifierState()
-    {
-        var keyboard = Keyboard.current;
-        var ctrlRaw =
-            keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
-        var shiftRaw =
-            keyboard != null
-            && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
-
-        if (_lastCtrlRaw == ctrlRaw && _lastShiftRaw == shiftRaw)
-            return;
-
-        _lastCtrlRaw = ctrlRaw;
-        _lastShiftRaw = shiftRaw;
-
-        BppLog.Info(
-            "TooltipPreview",
-            $"PreviewRaw ctrl={(ctrlRaw ? "down" : "up")} shift={(shiftRaw ? "down" : "up")} mode={GetCurrentMode()}"
-        );
-    }
-
-    private static void ReportModeChange(TooltipModifierMode mode)
-    {
-        var keyboard = Keyboard.current;
-        var ctrlRaw =
-            keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
-        var shiftRaw =
-            keyboard != null
-            && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
-        var enchantHeld = BppHotkeyService.IsHeld(
-            BppHotkeyActionId.HoldEnchantPreview,
-            keyboard: keyboard
-        );
-        var upgradeHeld = BppHotkeyService.IsHeld(
-            BppHotkeyActionId.HoldUpgradePreview,
-            keyboard: keyboard
-        );
-        var message =
-            $"PreviewInput mode={mode} enchant={BppHotkeyService.GetBindingDisplay(BppHotkeyActionId.HoldEnchantPreview)}:{(enchantHeld ? "held" : "up")} upgrade={BppHotkeyService.GetBindingDisplay(BppHotkeyActionId.HoldUpgradePreview)}:{(upgradeHeld ? "held" : "up")} rawCtrl={(ctrlRaw ? "down" : "up")} rawShift={(shiftRaw ? "down" : "up")}";
-
-        BppLog.Info("TooltipPreview", message);
-    }
-
-    private static void TryRefreshHoveredCardTooltip(TooltipModifierMode mode)
+    private static void TryRefreshHoveredCardTooltip()
     {
         var tooltipParent = Data.TooltipParentComponent;
         var lookup = Data.CardAndSkillLookup;
@@ -126,14 +59,14 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         {
             BppLog.Info(
                 "TooltipPreview",
-                $"RefreshSkipped mode={mode} reason={(tooltipParent == null ? "no-tooltip-parent" : "no-card-lookup")}"
+                $"RefreshSkipped reason={(tooltipParent == null ? "no-tooltip-parent" : "no-card-lookup")}"
             );
             return;
         }
 
         if (tooltipParent.HasAnyLockedTooltipControllers())
         {
-            BppLog.Info("TooltipPreview", $"RefreshSkipped mode={mode} reason=tooltip-locked");
+            BppLog.Info("TooltipPreview", "RefreshSkipped reason=tooltip-locked");
             return;
         }
 
@@ -149,28 +82,36 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             if (!controller.IsCursorOverCard && !controller.IsHovering)
                 continue;
 
+            BppLog.Info(
+                "TooltipPreview",
+                $"HoveredItemFound card={DescribeCard(card)} hovered={(controller.IsCursorOverCard ? "cursor" : "hover")}"
+            );
             var tooltipController = tooltipParent.GetCardTooltipController(card);
             if (tooltipController == null)
             {
                 BppLog.Info(
                     "TooltipPreview",
-                    $"RefreshSkipped mode={mode} card={DescribeCard(card)} reason=no-tooltip-controller"
+                    $"PrimaryTooltipMissing card={DescribeCard(card)}"
                 );
                 continue;
             }
+
+            BppLog.Info(
+                "TooltipPreview",
+                $"PrimaryTooltipFound card={DescribeCard(card)}"
+            );
 
             var tooltipData = controller.GetTooltipData();
             if (tooltipData is not CardTooltipData cardTooltipData)
             {
                 BppLog.Info(
                     "TooltipPreview",
-                    $"RefreshSkipped mode={mode} card={DescribeCard(card)} reason=non-card-tooltip-data"
+                    $"RefreshSkipped card={DescribeCard(card)} reason=non-card-tooltip-data"
                 );
                 continue;
             }
 
             var refreshedTooltipData = new CardTooltipData(card, cardTooltipData.CardTemplate);
-
             tooltipParent.HideCardTooltipController();
             tooltipParent.ShowCardTooltipController(
                 controller.transform,
@@ -178,16 +119,19 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
                 refreshedTooltipData
             );
 
-            UpgradePreviewTooltipPatch.TryScheduleUpgradeTooltip(controller, refreshedTooltipData);
+            var scheduled = UpgradePreviewTooltipPatch.TryScheduleUpgradeTooltip(
+                controller,
+                refreshedTooltipData
+            );
             BppLog.Info(
                 "TooltipPreview",
-                $"RefreshApplied mode={mode} card={DescribeCard(card)} hovered={(controller.IsCursorOverCard ? "cursor" : "hover")}"
+                $"UpgradeScheduleAttempted card={DescribeCard(card)} scheduled={scheduled}"
             );
 
             return;
         }
 
-        BppLog.Info("TooltipPreview", $"RefreshSkipped mode={mode} reason=no-hovered-item");
+        BppLog.Info("TooltipPreview", "RefreshSkipped reason=no-hovered-item");
     }
 
     private static string DescribeCard(Card card)

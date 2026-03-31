@@ -1,4 +1,5 @@
 #pragma warning disable CS0436
+#nullable enable
 using System.Collections;
 using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
@@ -24,7 +25,7 @@ internal static class UpgradePreviewTooltipPatch
 
     internal static bool TryScheduleUpgradeTooltip(
         CardController controller,
-        CardTooltipData tooltipData = null
+        CardTooltipData? tooltipData = null
     )
     {
         if (controller == null)
@@ -47,9 +48,24 @@ internal static class UpgradePreviewTooltipPatch
         if (Data.TooltipParentComponent == null)
             return false;
 
+        // The ShowTooltips postfix can run for cards that are not the actively hovered card.
+        // Only allow those implicit calls to schedule upgrade preview for the hovered controller.
+        if (
+            tooltipData == null
+            && !controller.IsCursorOverCard
+            && !controller.IsHovering
+        )
+        {
+            return false;
+        }
+
         if (!PendingControllers.Add(controller))
             return false;
 
+        BppLog.Info(
+            "TooltipPreview",
+            $"UpgradeScheduleQueued card={DescribeCard(card)} source={(tooltipData == null ? "controller" : "refresh")}"
+        );
         controller.StartCoroutine(
             RefreshUpgradePreviewWhenReady(controller, card, resolvedTooltipData)
         );
@@ -90,6 +106,11 @@ internal static class UpgradePreviewTooltipPatch
 
                 yield return null;
             }
+
+            BppLog.Info(
+                "TooltipPreview",
+                $"UpgradeScheduleTimedOut card={DescribeCard(card)}"
+            );
         }
         finally
         {
@@ -110,9 +131,6 @@ internal static class UpgradePreviewTooltipPatch
         if (tooltipParent.GetCardTooltipController(card) == null)
             return;
 
-        var refreshedTooltipData = new CardTooltipData(card, tooltipData.CardTemplate);
-        tooltipParent.HideCardTooltipController();
-
         if (
             controller == null
             || controller.CardData != card
@@ -122,11 +140,89 @@ internal static class UpgradePreviewTooltipPatch
             return;
         }
 
-        controller.EnterUpgradePreview();
-        tooltipParent.ShowCardTooltipController(
+        tooltipParent.DisplayUpgradeTooltips(
             controller.transform,
             controller.TooltipOffset,
-            refreshedTooltipData
+            new CardTooltipData(card, tooltipData.CardTemplate)
         );
+    }
+
+    private static string DescribeCard(Card? card)
+    {
+        if (card == null)
+            return "null";
+
+        var templateName = card.Template?.InternalName;
+        if (!string.IsNullOrWhiteSpace(templateName))
+            return templateName;
+
+        return card.TemplateId.ToString();
+    }
+}
+
+[HarmonyPatch(typeof(TooltipParentComponent), "DisplayUpgradeTooltips")]
+internal static class UpgradePreviewTooltipDiagnosticsPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(ITooltipData tooltipData)
+    {
+        if (tooltipData is not CardTooltipData cardTooltipData)
+            return;
+
+        BppLog.Info(
+            "TooltipPreview",
+            $"DisplayUpgradeTooltips card={DescribeCard(cardTooltipData.CardInstance)}"
+        );
+    }
+
+    [HarmonyPatch(typeof(TooltipParentComponent), "HandleUpgradePreview")]
+    [HarmonyPostfix]
+    private static void HandleUpgradePreviewPostfix(
+        TooltipParentComponent __instance,
+        ITooltipData tooltipData
+    )
+    {
+        if (tooltipData is not CardTooltipData cardTooltipData)
+            return;
+
+        var primary = Traverse
+            .Create(__instance)
+            .Property("CardTooltipController")
+            .GetValue<CardTooltipController>();
+        var secondary = Traverse
+            .Create(__instance)
+            .Property("SecondaryCardTooltipController")
+            .GetValue<CardTooltipController>();
+
+        BppLog.Info(
+            "TooltipPreview",
+            $"HandleUpgradePreview card={DescribeCard(cardTooltipData.CardInstance)} primaryMode={DescribeDisplayMode(primary)} primaryCard={DescribeTooltipCard(primary)} secondaryMode={DescribeDisplayMode(secondary)} secondaryCard={DescribeTooltipCard(secondary)}"
+        );
+    }
+
+    private static string DescribeTooltipCard(CardTooltipController? controller)
+    {
+        if (controller == null)
+            return "null";
+
+        var currentCard = controller.CurrentCard;
+        return DescribeCard(currentCard);
+    }
+
+    private static string DescribeDisplayMode(CardTooltipController? controller)
+    {
+        return controller == null ? "null" : controller.GetDisplayMode().ToString();
+    }
+
+    private static string DescribeCard(Card? card)
+    {
+        if (card == null)
+            return "null";
+
+        var templateName = card.Template?.InternalName;
+        if (!string.IsNullOrWhiteSpace(templateName))
+            return templateName;
+
+        return card.TemplateId.ToString();
     }
 }
