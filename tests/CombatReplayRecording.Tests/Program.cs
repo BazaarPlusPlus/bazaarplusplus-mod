@@ -42,6 +42,14 @@ Assert(
 );
 
 Assert(manifestType.GetProperty("BattleId") != null, "Manifest should expose BattleId.");
+Assert(
+    manifestType.GetProperty("RecordedAtUtc") != null,
+    "Manifest should expose RecordedAtUtc."
+);
+Assert(
+    manifestType.GetProperty("SavedAtUtc") == null,
+    "Manifest should not expose SavedAtUtc once replay timestamps follow the server contract directly."
+);
 Assert(manifestType.GetProperty("ReplayId") == null, "Manifest should not expose ReplayId.");
 Assert(payloadType.GetProperty("BattleId") != null, "Replay payload should expose BattleId.");
 Assert(
@@ -1124,7 +1132,7 @@ static object CreateManifestFixture(
     var manifest = Activator.CreateInstance(manifestType)!;
     SetProperty(manifestType, manifest, "BattleId", battleId);
     SetProperty(manifestType, manifest, "RunId", runId);
-    SetProperty(manifestType, manifest, "SavedAtUtc", savedAtUtc);
+    SetProperty(manifestType, manifest, "RecordedAtUtc", savedAtUtc);
     SetProperty(manifestType, manifest, "CombatKind", combatKind);
     SetProperty(manifestType, manifest, "Day", day);
     SetProperty(manifestType, manifest, "Hour", hour);

@@ -43,7 +43,7 @@ try
     manifestType.GetProperty("BattleId")!.SetValue(manifest, "battle-upload-001");
     manifestType.GetProperty("RunId")!.SetValue(manifest, "server-run-001");
     manifestType
-        .GetProperty("SavedAtUtc")!
+        .GetProperty("RecordedAtUtc")!
         .SetValue(manifest, new DateTimeOffset(2026, 3, 28, 1, 0, 0, TimeSpan.Zero));
     manifestType.GetProperty("CombatKind")!.SetValue(manifest, "PVPCombat");
     InvokeVoid(catalogType, catalog, "Save", [manifest]);

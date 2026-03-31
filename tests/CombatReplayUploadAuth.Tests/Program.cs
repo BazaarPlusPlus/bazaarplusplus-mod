@@ -181,7 +181,7 @@ try
     manifestType.GetProperty("BattleId")!.SetValue(manifest, "battle-auth-001");
     manifestType.GetProperty("RunId")!.SetValue(manifest, "server-run-auth-001");
     manifestType
-        .GetProperty("SavedAtUtc")!
+        .GetProperty("RecordedAtUtc")!
         .SetValue(manifest, new DateTimeOffset(2026, 3, 28, 3, 0, 0, TimeSpan.Zero));
     manifestType.GetProperty("CombatKind")!.SetValue(manifest, "PVPCombat");
     InvokeVoid(catalogType, catalog, "Save", [manifest]);

@@ -149,7 +149,7 @@ internal sealed class PvpBattleSqliteStore
             """;
         command.Parameters.AddWithValue("$battleId", manifest.BattleId);
         command.Parameters.AddWithValue("$runId", (object?)manifest.RunId ?? DBNull.Value);
-        command.Parameters.AddWithValue("$recordedAtUtc", manifest.SavedAtUtc.ToString("o"));
+        command.Parameters.AddWithValue("$recordedAtUtc", manifest.RecordedAtUtc.ToString("o"));
         AddNullableInt32(command, "$day", manifest.Day);
         AddNullableInt32(command, "$hour", manifest.Hour);
         command.Parameters.AddWithValue(
@@ -570,7 +570,7 @@ internal sealed class PvpBattleSqliteStore
         {
             BattleId = reader.GetString(reader.GetOrdinal("battle_id")),
             RunId = GetNullableString(reader, "run_id"),
-            SavedAtUtc = DateTimeOffset.Parse(
+            RecordedAtUtc = DateTimeOffset.Parse(
                 reader.GetString(reader.GetOrdinal("recorded_at_utc"))
             ),
             Day = GetNullableInt32(reader, "day"),

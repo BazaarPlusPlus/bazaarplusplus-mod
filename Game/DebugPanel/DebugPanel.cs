@@ -485,7 +485,7 @@ internal sealed class DebugPanel : MonoBehaviour
             .Select(record => new ReplayEntry
             {
                 BattleId = record.BattleId,
-                SavedAt = record.SavedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
+                SavedAt = record.RecordedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
                 Label = BuildReplayLabel(record),
             })
             .ToList();

@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.Game.PvpBattles;
 
@@ -10,8 +9,7 @@ internal sealed class PvpBattleManifest
 
     public string? RunId { get; set; }
 
-    [JsonProperty("recorded_at_utc")]
-    public DateTimeOffset SavedAtUtc { get; set; }
+    public DateTimeOffset RecordedAtUtc { get; set; }
 
     public string? CombatKind { get; set; }
 

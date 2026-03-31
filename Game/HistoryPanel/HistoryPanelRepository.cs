@@ -784,7 +784,7 @@ internal sealed class HistoryPanelRepository
             RunId = string.IsNullOrWhiteSpace(runIdColumnName)
                 ? null
                 : GetNullableString(reader, runIdColumnName),
-            SavedAtUtc = DateTimeOffset.Parse(
+            RecordedAtUtc = DateTimeOffset.Parse(
                 reader.GetString(reader.GetOrdinal("recorded_at_utc"))
             ),
             Day = GetNullableInt32(reader, "day"),

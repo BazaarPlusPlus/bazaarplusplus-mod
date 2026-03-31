@@ -31,7 +31,7 @@ internal sealed class PvpBattleManifestFactory
         {
             BattleId = battleId,
             RunId = window.RunId,
-            SavedAtUtc = savedAtUtc,
+            RecordedAtUtc = savedAtUtc,
             CombatKind = spawnMessage.Data.CurrentState?.StateName.ToString(),
             Day = unchecked((int)spawnMessage.Data.Run.Day),
             Hour = unchecked((int)spawnMessage.Data.Run.Hour),
