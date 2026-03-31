@@ -1244,7 +1244,12 @@ internal sealed partial class HistoryPanel
     private static void ClearContainer<TView>(RectTransform container, List<TView> views)
     {
         foreach (Transform child in container)
+        {
+            // Destroy is deferred until the end of the frame, so hide old rows first to avoid
+            // duplicate ghost entries appearing during same-frame rebuilds.
+            child.gameObject.SetActive(false);
             Destroy(child.gameObject);
+        }
 
         views.Clear();
     }

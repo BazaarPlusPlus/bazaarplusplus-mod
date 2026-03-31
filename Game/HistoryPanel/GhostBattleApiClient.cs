@@ -226,6 +226,9 @@ internal sealed class GhostBattleApiClient
             return null;
         }
 
+        // The against-me endpoint returns the uploaded battle from the remote player's
+        // perspective, where our local player is the "opponent". Flip participant and
+        // outcome fields into the local HistoryPanel perspective before persisting.
         return new GhostBattleImportRecord
         {
             BattleId = battleId,
@@ -233,23 +236,51 @@ internal sealed class GhostBattleApiClient
             Day = battle["day"]?.Value<int?>(),
             Hour = battle["hour"]?.Value<int?>(),
             EncounterId = battle["encounter_id"]?.Value<string>(),
-            PlayerHero = battle["player_hero"]?.Value<string>(),
-            PlayerRank = battle["player_rank"]?.Value<string>(),
-            PlayerRating = battle["player_rating"]?.Value<int?>(),
-            PlayerLevel = battle["player_level"]?.Value<int?>(),
-            OpponentName = battle["opponent_name"]?.Value<string>(),
-            OpponentHero = battle["opponent_hero"]?.Value<string>(),
-            OpponentRank = battle["opponent_rank"]?.Value<string>(),
-            OpponentRating = battle["opponent_rating"]?.Value<int?>(),
-            OpponentLevel = battle["opponent_level"]?.Value<int?>(),
-            OpponentAccountId = battle["opponent_account_id"]?.Value<string>(),
+            PlayerHero = battle["opponent_hero"]?.Value<string>(),
+            PlayerRank = battle["opponent_rank"]?.Value<string>(),
+            PlayerRating = battle["opponent_rating"]?.Value<int?>(),
+            PlayerLevel = battle["opponent_level"]?.Value<int?>(),
+            OpponentName = battle["player_name"]?.Value<string>(),
+            OpponentHero = battle["player_hero"]?.Value<string>(),
+            OpponentRank = battle["player_rank"]?.Value<string>(),
+            OpponentRating = battle["player_rating"]?.Value<int?>(),
+            OpponentLevel = battle["player_level"]?.Value<int?>(),
+            OpponentAccountId = battle["player_account_id"]?.Value<string>(),
             CombatKind = battle["combat_kind"]?.Value<string>()?.Trim() ?? "PVPCombat",
-            Result = battle["result"]?.Value<string>(),
-            WinnerCombatantId = battle["winner_combatant_id"]?.Value<string>(),
-            LoserCombatantId = battle["loser_combatant_id"]?.Value<string>(),
+            Result = FlipBattleResult(battle["result"]?.Value<string>()),
+            WinnerCombatantId = FlipCombatantId(battle["winner_combatant_id"]?.Value<string>()),
+            LoserCombatantId = FlipCombatantId(battle["loser_combatant_id"]?.Value<string>()),
             ReplayAvailable = battle["replay"]?["available"]?.Value<bool>() == true,
             ReplayDownloaded = false,
             LastSyncedAtUtc = DateTimeOffset.UtcNow,
+        };
+    }
+
+    private static string? FlipBattleResult(string? result)
+    {
+        if (string.IsNullOrWhiteSpace(result))
+            return result;
+
+        return result.Trim() switch
+        {
+            "Win" => "Loss",
+            "Won" => "Lost",
+            "Loss" => "Win",
+            "Lost" => "Won",
+            _ => result,
+        };
+    }
+
+    private static string? FlipCombatantId(string? combatantId)
+    {
+        if (string.IsNullOrWhiteSpace(combatantId))
+            return combatantId;
+
+        return combatantId.Trim() switch
+        {
+            "Player" => "Opponent",
+            "Opponent" => "Player",
+            _ => combatantId,
         };
     }
 
