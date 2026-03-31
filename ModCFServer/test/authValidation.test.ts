@@ -11,6 +11,31 @@ import {
 } from "./helpers/crypto";
 import { buildEnv } from "./helpers/mockEnv";
 
+function stringifyConsoleArgs(args: unknown[]): string {
+  return args
+    .map((value) =>
+      typeof value === "string" ? value : JSON.stringify(value),
+    )
+    .join(" ");
+}
+
+async function captureWarnLogs<T>(
+  run: () => Promise<T>,
+): Promise<{ result: T; entries: string[] }> {
+  const entries: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    entries.push(stringifyConsoleArgs(args));
+  };
+
+  try {
+    const result = await run();
+    return { result, entries };
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
 test("rejects battle uploads with an invalid body hash", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
@@ -52,7 +77,6 @@ test("rejects battle uploads with an invalid body hash", async () => {
         "x-bpp-battle-id": "battle-bad-hash",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": wrongHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -67,10 +91,10 @@ test("rejects battle uploads with an invalid body hash", async () => {
   assert.equal(env.PVP_BATTLE_BUCKET.objects.size, 0);
 });
 
-test("rejects battle uploads when the nonce is reused", async () => {
+test("accepts signed battle uploads without a nonce header", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  const clientId = "client-reused-nonce";
+  const clientId = "client-without-nonce";
   env.DB.clients.set(clientId, {
     client_id: clientId,
     install_id: "install-003",
@@ -81,11 +105,12 @@ test("rejects battle uploads when the nonce is reused", async () => {
     registered_at_utc: new Date().toISOString(),
   });
 
-  const payload = JSON.stringify({ battle_id: "battle-reused-nonce" });
+  const payload = JSON.stringify({
+    battle_id: "battle-without-nonce",
+    replay_payload: {},
+  });
   const bodyHash = sha256Base64(payload);
   const timestamp = new Date().toISOString();
-  const nonce = "nonce-reused";
-  env.DB.nonces.add(`replays:${clientId}:${nonce}`);
   const signature = signCanonical(
     privateKey,
     canonicalRequest(
@@ -94,7 +119,6 @@ test("rejects battle uploads when the nonce is reused", async () => {
       clientId,
       "install-003",
       timestamp,
-      nonce,
       bodyHash,
     ),
   );
@@ -106,10 +130,9 @@ test("rejects battle uploads when the nonce is reused", async () => {
         "content-type": "application/json",
         "x-bpp-client-id": clientId,
         "x-bpp-install-id": "install-003",
-        "x-bpp-battle-id": "battle-reused-nonce",
+        "x-bpp-battle-id": "battle-without-nonce",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -119,8 +142,8 @@ test("rejects battle uploads when the nonce is reused", async () => {
     env as never,
   );
 
-  assert.equal(response.status, 409);
-  assert.deepEqual(await response.json(), { error: "nonce_reused" });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "battle_manifest_required" });
 });
 
 test("rejects battle uploads with an out-of-range timestamp", async () => {
@@ -164,7 +187,6 @@ test("rejects battle uploads with an out-of-range timestamp", async () => {
         "x-bpp-battle-id": "battle-old-timestamp",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -220,7 +242,6 @@ test("rejects battle uploads with an invalid signature", async () => {
         "x-bpp-battle-id": "battle-invalid-signature",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -232,4 +253,33 @@ test("rejects battle uploads with an invalid signature", async () => {
 
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), { error: "invalid_signature" });
+});
+
+test("auth rejection logs omit nonce values", async () => {
+  const env = buildEnv();
+  const nonce = "nonce-should-not-be-logged";
+
+  const { result: response, entries } = await captureWarnLogs(() =>
+    worker.fetch(
+      new Request("https://example.com/battles/upload", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-bpp-battle-id": "battle-missing-signature-headers",
+          "x-bpp-client-id": "client-missing-headers",
+          "x-bpp-install-id": "install-missing-headers",
+          "x-bpp-timestamp": new Date().toISOString(),
+        },
+        body: JSON.stringify({ battle_id: "battle-missing-signature-headers" }),
+      }),
+      env as never,
+    ),
+  );
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "signed_headers_required" });
+  assert.equal(entries.length, 1);
+  assert.ok(entries[0]?.includes("\"event\":\"auth.rejected\""));
+  assert.ok(!entries[0]?.includes("\"nonce\""));
+  assert.ok(!entries[0]?.includes(nonce));
 });

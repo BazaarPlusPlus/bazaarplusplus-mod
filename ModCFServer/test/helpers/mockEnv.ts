@@ -130,8 +130,6 @@ export class MockD1Database {
   >();
   public readonly uidPlayerAccounts = new Map<string, UidPlayerAccountRow>();
   public readonly pvpBattles = new Map<string, PvpBattleRow>();
-  public readonly nonces = new Set<string>();
-
   prepare(sql: string): MockD1Statement {
     return new MockD1Statement(this, sql);
   }
@@ -152,13 +150,6 @@ export class MockD1Database {
     if (sql.includes("FROM registered_clients")) {
       const clientId = String(params[0] ?? "");
       return (this.clients.get(clientId) as T | undefined) ?? null;
-    }
-
-    if (sql.includes("FROM request_nonces")) {
-      const nonceKey = String(params[0] ?? "");
-      return this.nonces.has(nonceKey)
-        ? ({ nonce_key: nonceKey } as T)
-        : null;
     }
 
     if (sql.includes("FROM client_uid_bindings")) {
@@ -352,16 +343,6 @@ export class MockD1Database {
         updated_at_utc: params[4] == null ? existing.updated_at_utc : String(params[4]),
         projection_error: params[3] == null ? null : String(params[3]),
       });
-      return { changes: 1 };
-    }
-
-    if (sql.includes("INSERT INTO request_nonces")) {
-      const nonceKey = String(params[0]);
-      if (this.nonces.has(nonceKey)) {
-        return { changes: 0 };
-      }
-
-      this.nonces.add(nonceKey);
       return { changes: 1 };
     }
 

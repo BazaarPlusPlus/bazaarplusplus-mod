@@ -117,13 +117,14 @@ var requestsHandled = Task.Run(async () =>
                 request.Headers["X-BPP-Install-Id"] == registeredInstallId,
                 "Signed upload should include the same install id used at registration."
             );
+            Assert(
+                request.Headers["X-BPP-Nonce"] == null,
+                "Signed upload should no longer send a nonce header."
+            );
 
             var timestamp =
                 request.Headers["X-BPP-Timestamp"]
                 ?? throw new InvalidOperationException("Missing timestamp header.");
-            var nonce =
-                request.Headers["X-BPP-Nonce"]
-                ?? throw new InvalidOperationException("Missing nonce header.");
             var bodyHash =
                 request.Headers["X-BPP-Content-SHA256"]
                 ?? throw new InvalidOperationException("Missing body hash header.");
@@ -143,7 +144,6 @@ var requestsHandled = Task.Run(async () =>
                 request.Headers["X-BPP-Client-Id"]!,
                 request.Headers["X-BPP-Install-Id"]!,
                 timestamp,
-                nonce,
                 bodyHash
             );
 
@@ -358,13 +358,14 @@ try
                         request.Headers["X-BPP-Install-Id"] == registeredInstallId,
                         "Recovered upload should keep the persisted install id."
                     );
+                    Assert(
+                        request.Headers["X-BPP-Nonce"] == null,
+                        "Recovered upload should no longer send a nonce header."
+                    );
 
                     var timestamp =
                         request.Headers["X-BPP-Timestamp"]
                         ?? throw new InvalidOperationException("Missing timestamp header.");
-                    var nonce =
-                        request.Headers["X-BPP-Nonce"]
-                        ?? throw new InvalidOperationException("Missing nonce header.");
                     var bodyHash =
                         request.Headers["X-BPP-Content-SHA256"]
                         ?? throw new InvalidOperationException("Missing body hash header.");
@@ -387,7 +388,6 @@ try
                         request.Headers["X-BPP-Client-Id"]!,
                         request.Headers["X-BPP-Install-Id"]!,
                         timestamp,
-                        nonce,
                         bodyHash
                     );
 
@@ -505,7 +505,6 @@ static string BuildCanonical(
     string clientId,
     string installId,
     string timestamp,
-    string nonce,
     string bodyHash
 )
 {
@@ -518,7 +517,6 @@ static string BuildCanonical(
             clientId,
             installId,
             timestamp,
-            nonce,
             bodyHash,
         }
     );

@@ -91,4 +91,4 @@ curl https://mod-api.bazaarplusplus.com/health
 
 - 当前入口 `ModCFServer/src/index.ts` 不负责按请求懒建表。
 - D1 schema 由 Wrangler migration 管理，见 `ModCFServer/migrations/0001_initial_schema.sql`。
-- 定时任务会调用 `purgeExpiredNonces(...)` 清理过期 nonce。
+- 当前部署不再依赖 nonce 去重表，也不需要定时清理任务。

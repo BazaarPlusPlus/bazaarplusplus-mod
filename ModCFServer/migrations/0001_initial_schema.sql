@@ -10,11 +10,6 @@ CREATE TABLE IF NOT EXISTS registered_clients (
   registered_at_utc TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS request_nonces (
-  nonce_key TEXT PRIMARY KEY,
-  created_at_utc TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS client_player_account_bindings (
   binding_id TEXT PRIMARY KEY,
   client_id TEXT NOT NULL,

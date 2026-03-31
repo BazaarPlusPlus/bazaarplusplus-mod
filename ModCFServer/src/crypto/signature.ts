@@ -6,7 +6,6 @@ export function canonicalRequest(
   clientId: string,
   installId: string,
   timestamp: string,
-  nonce: string,
   bodyHash: string,
 ): string {
   return [
@@ -15,7 +14,6 @@ export function canonicalRequest(
     clientId.trim(),
     installId.trim(),
     timestamp.trim(),
-    nonce.trim(),
     bodyHash.trim(),
   ].join("\n");
 }

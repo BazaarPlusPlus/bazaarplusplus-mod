@@ -2,7 +2,7 @@ import type { Env } from "../env";
 import { sha256Base64 } from "../crypto/hash";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
-import { logInfo, logResponseWarning } from "../observability";
+import { logResponseWarning } from "../observability";
 import { upsertProjectedBattle } from "../persistence/battleProjections";
 import { requireVerifiedClient } from "./verifiedClient";
 import { parseBattleUploadBody } from "./uploadBattlePayload";
@@ -16,9 +16,7 @@ export async function handleBattleUpload(
     return json({ error: "battle_id_required" }, { status: 400 });
   }
 
-  const verified = await requireVerifiedClient(request, env, "replays", {
-    consumeNonce: true,
-  });
+  const verified = await requireVerifiedClient(request, env, "replays");
   if (verified instanceof Response) {
     return verified;
   }
@@ -96,16 +94,6 @@ export async function handleBattleUpload(
     replayUploadedAtUtc: uploadedAtUtc,
     createdAtUtc: uploadedAtUtc,
     updatedAtUtc: uploadedAtUtc,
-  });
-
-  logInfo("battle_upload.accepted", {
-    route: "/battles/upload",
-    status: 200,
-    client_id: verified.client.client_id,
-    install_id: verified.client.install_id,
-    battle_id: battleId,
-    run_id: parsed.runId,
-    object_key: objectKey,
   });
 
   return json({

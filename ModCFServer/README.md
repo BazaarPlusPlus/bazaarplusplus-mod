@@ -11,7 +11,6 @@ It accepts signed client uploads from the mod, stores payloads in Cloudflare R2,
 - Store uploaded run payloads in R2 and record ingestion state in D1.
 - Store uploaded replay payloads in R2 and project battle metadata into D1.
 - Expose read APIs for "battles against me" and replay download links.
-- Periodically purge consumed request nonces.
 
 ## Runtime
 
@@ -49,7 +48,6 @@ Required headers:
 - `x-bpp-client-id`
 - `x-bpp-install-id`
 - `x-bpp-timestamp`
-- `x-bpp-nonce`
 - `x-bpp-content-sha256`
 - `x-bpp-signature`
 
@@ -64,7 +62,6 @@ Validation rules:
 - The request timestamp must be within a 10 minute skew window.
 - The advertised body hash must match the request body.
 - The RSA signature must match the canonical request string.
-- Endpoints that mutate state consume a nonce and reject reuse.
 
 ## Data Flow
 
@@ -126,16 +123,9 @@ npm test
 npm run deploy
 ```
 
-## Scheduled Work
-
-The worker has a cron trigger configured in `wrangler.toml`.
-
-- Every 6 hours it deletes expired request nonces.
-- The nonce retention window is currently 15 minutes.
-
 ## File Map
 
-- `src/index.ts`: route table and scheduled entrypoint
+- `src/index.ts`: route table entrypoint
 - `src/features/`: HTTP handlers
 - `src/persistence/`: D1 persistence helpers
 - `src/crypto/`: request signing and verification helpers

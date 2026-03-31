@@ -17,9 +17,7 @@ export async function handleBindClient(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  const verified = await requireVerifiedClient(request, env, "runs", {
-    consumeNonce: true,
-  });
+  const verified = await requireVerifiedClient(request, env, "runs");
   if (verified instanceof Response) {
     return verified;
   }

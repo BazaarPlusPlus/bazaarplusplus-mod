@@ -19,16 +19,16 @@ export function canonicalRequest(
   clientId: string,
   installId: string,
   timestamp: string,
-  nonce: string,
-  bodyHash: string,
+  nonceOrBodyHash: string,
+  maybeBodyHash?: string,
 ): string {
+  const bodyHash = maybeBodyHash ?? nonceOrBodyHash;
   return [
     method.toUpperCase(),
     path,
     clientId,
     installId,
     timestamp,
-    nonce,
     bodyHash,
   ].join("\n");
 }

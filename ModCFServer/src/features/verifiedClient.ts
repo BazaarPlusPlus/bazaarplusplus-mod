@@ -5,34 +5,26 @@ import { json } from "../http/json";
 import { absolutePath, trimString } from "../http/request";
 import { logWarn } from "../observability";
 import { getRegisteredClient } from "../persistence/clients";
-import { tryConsumeNonce } from "../persistence/nonces";
 import type { UploadPurpose } from "../types/api";
 import type { RegisteredClientRow } from "../types/db";
 
 const MAX_TIMESTAMP_SKEW_MS = 10 * 60 * 1000;
-
-type RequireVerifiedClientOptions = {
-  consumeNonce?: boolean;
-};
 
 export type VerifiedClientRequest = {
   client: RegisteredClientRow;
   payload: ArrayBuffer;
   payloadHash: string;
   timestamp: string;
-  nonce: string;
 };
 
 export async function requireVerifiedClient(
   request: Request,
   env: Env,
   purpose: UploadPurpose,
-  options?: RequireVerifiedClientOptions,
 ): Promise<VerifiedClientRequest | Response> {
   const clientId = trimString(request.headers.get("x-bpp-client-id"));
   const installId = trimString(request.headers.get("x-bpp-install-id"));
   const timestamp = trimString(request.headers.get("x-bpp-timestamp"));
-  const nonce = trimString(request.headers.get("x-bpp-nonce"));
   const advertisedBodyHash = trimString(request.headers.get("x-bpp-content-sha256"));
   const signatureAlg = trimString(request.headers.get("x-bpp-signature-alg"));
   const signature = trimString(request.headers.get("x-bpp-signature"));
@@ -45,12 +37,11 @@ export async function requireVerifiedClient(
       error_code: error,
       client_id: clientId,
       install_id: installId,
-      nonce,
     });
     return json({ error }, { status });
   }
 
-  if (!clientId || !installId || !timestamp || !nonce || !advertisedBodyHash || !signature) {
+  if (!clientId || !installId || !timestamp || !advertisedBodyHash || !signature) {
     return reject(401, "signed_headers_required");
   }
 
@@ -83,7 +74,6 @@ export async function requireVerifiedClient(
     clientId,
     installId,
     timestamp,
-    nonce,
     advertisedBodyHash,
   );
   const signatureValid = await verifySignature(
@@ -96,13 +86,5 @@ export async function requireVerifiedClient(
     return reject(401, "invalid_signature");
   }
 
-  if (options?.consumeNonce ?? false) {
-    const nonceKey = `${purpose}:${clientId}:${nonce}`;
-    const consumed = await tryConsumeNonce(env, nonceKey, new Date().toISOString());
-    if (!consumed) {
-      return reject(409, "nonce_reused");
-    }
-  }
-
-  return { client, payload, payloadHash, timestamp, nonce };
+  return { client, payload, payloadHash, timestamp };
 }

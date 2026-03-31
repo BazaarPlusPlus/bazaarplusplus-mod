@@ -10,6 +10,31 @@ import {
 } from "./helpers/crypto";
 import { buildEnv } from "./helpers/mockEnv";
 
+function stringifyConsoleArgs(args: unknown[]): string {
+  return args
+    .map((value) =>
+      typeof value === "string" ? value : JSON.stringify(value),
+    )
+    .join(" ");
+}
+
+async function captureInfoLogs<T>(
+  run: () => Promise<T>,
+): Promise<{ result: T; entries: string[] }> {
+  const entries: string[] = [];
+  const originalInfo = console.info;
+  console.info = (...args: unknown[]) => {
+    entries.push(stringifyConsoleArgs(args));
+  };
+
+  try {
+    const result = await run();
+    return { result, entries };
+  } finally {
+    console.info = originalInfo;
+  }
+}
+
 function buildSignedJsonRequest(
   url: string,
   clientId: string,
@@ -41,7 +66,6 @@ function buildSignedJsonRequest(
       "x-bpp-client-id": clientId,
       "x-bpp-install-id": installId,
       "x-bpp-timestamp": timestamp,
-      "x-bpp-nonce": nonce,
       "x-bpp-content-sha256": bodyHash,
       "x-bpp-signature-alg": "rsa-pkcs1-sha256",
       "x-bpp-signature": signature,
@@ -123,7 +147,6 @@ test("accepts signed run uploads", async () => {
         "x-bpp-run-id": "run-001",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -145,6 +168,52 @@ test("accepts signed run uploads", async () => {
   assert.equal(uploadedRun?.payload_bytes, new TextEncoder().encode(payload).byteLength);
   assert.equal(uploadedRun?.schema_version, 3);
   assert.ok(env.PVP_BATTLE_BUCKET.objects.has(`runs/${clientId}/run-001/${bodyHash}.json`));
+});
+
+test("successful run uploads do not emit accepted info logs", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "runs-client-no-info-log";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: "install-run-no-info-log",
+    purpose: "runs",
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+  });
+
+  const payload = JSON.stringify({
+    run_id: "run-no-info-log",
+    schema_version: 3,
+    state: "active",
+    pvp_battles: [],
+  });
+
+  const { result: response, entries } = await captureInfoLogs(() =>
+    worker.fetch(
+      buildSignedJsonRequest(
+        "https://example.com/runs/upload",
+        clientId,
+        "install-run-no-info-log",
+        privateKey,
+        "nonce-run-no-info-log",
+        payload,
+        {
+          "x-bpp-run-id": "run-no-info-log",
+          "x-bpp-plugin-version": "1.9.0",
+        },
+      ),
+      env as never,
+    ),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(
+    entries.some((entry) => entry.includes("\"event\":\"run_upload.accepted\"")),
+    false,
+  );
 });
 
 test("run uploads ignore pvp battle payloads for projection", async () => {
@@ -231,7 +300,6 @@ test("run uploads ignore pvp battle payloads for projection", async () => {
         "x-bpp-run-id": "run-projection",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -300,7 +368,6 @@ test("records a failed run payload store in the run ingestion ledger", async () 
         "x-bpp-run-id": "run-projection-failure",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -389,7 +456,6 @@ test("run uploads do not depend on legacy uid bindings once the client is bound"
         "x-bpp-run-id": "run-no-legacy-uid",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -460,7 +526,6 @@ test("run uploads do not create legacy uid-player-account observations", async (
         "x-bpp-run-id": "run-no-legacy-observations",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -527,7 +592,6 @@ test("skips non-pvp battles during run projection", async () => {
         "x-bpp-run-id": "run-nonpvp",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -620,7 +684,6 @@ test("re-uploading a run leaves battle rows untouched", async () => {
         "x-bpp-run-id": "run-reconcile",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": firstTimestamp,
-        "x-bpp-nonce": "nonce-run-reconcile-1",
         "x-bpp-content-sha256": firstHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": firstSignature,
@@ -661,7 +724,6 @@ test("re-uploading a run leaves battle rows untouched", async () => {
         "x-bpp-run-id": "run-reconcile",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": secondTimestamp,
-        "x-bpp-nonce": "nonce-run-reconcile-2",
         "x-bpp-content-sha256": secondHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": secondSignature,
@@ -744,7 +806,6 @@ test("run uploads do not delete battle rows uploaded separately", async () => {
         "x-bpp-run-id": "run-preserve",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -799,7 +860,6 @@ test("rejects run uploads when header and body run ids disagree", async () => {
         "x-bpp-run-id": "run-header-mismatch",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -859,7 +919,6 @@ test("re-uploading the same run payload remains idempotent", async () => {
           "x-bpp-run-id": "run-repeat",
           "x-bpp-plugin-version": "1.9.0",
           "x-bpp-timestamp": timestamp,
-          "x-bpp-nonce": nonce,
           "x-bpp-content-sha256": bodyHash,
           "x-bpp-signature-alg": "rsa-pkcs1-sha256",
           "x-bpp-signature": signature,
@@ -917,7 +976,6 @@ test("accepts run uploads when pvp_battles is missing", async () => {
         "x-bpp-run-id": "run-missing-battles",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -982,7 +1040,6 @@ test("ignores pvp_battles in run uploads when present", async () => {
         "x-bpp-run-id": "run-invalid-battle",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,

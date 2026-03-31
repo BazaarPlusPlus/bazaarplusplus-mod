@@ -67,13 +67,14 @@ var requestsHandled = Task.Run(async () =>
                 request.Headers["X-BPP-Battle-Id"] == "battle-auth-001",
                 "Signed battle upload should include the battle id."
             );
+            Assert(
+                request.Headers["X-BPP-Nonce"] == null,
+                "Signed battle upload should no longer send a nonce header."
+            );
 
             var timestamp =
                 request.Headers["X-BPP-Timestamp"]
                 ?? throw new InvalidOperationException("Missing timestamp header.");
-            var nonce =
-                request.Headers["X-BPP-Nonce"]
-                ?? throw new InvalidOperationException("Missing nonce header.");
             var bodyHash =
                 request.Headers["X-BPP-Content-SHA256"]
                 ?? throw new InvalidOperationException("Missing body hash header.");
@@ -96,7 +97,6 @@ var requestsHandled = Task.Run(async () =>
                 request.Headers["X-BPP-Client-Id"]!,
                 request.Headers["X-BPP-Install-Id"]!,
                 timestamp,
-                nonce,
                 bodyHash
             );
 
@@ -339,7 +339,6 @@ static string BuildCanonical(
     string clientId,
     string installId,
     string timestamp,
-    string nonce,
     string bodyHash
 )
 {
@@ -352,7 +351,6 @@ static string BuildCanonical(
             clientId.Trim(),
             installId.Trim(),
             timestamp.Trim(),
-            nonce.Trim(),
             bodyHash.Trim(),
         }
     );

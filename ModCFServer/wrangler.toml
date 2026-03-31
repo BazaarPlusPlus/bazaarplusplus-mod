@@ -17,9 +17,6 @@ migrations_dir = "migrations"
 binding = "PVP_BATTLE_BUCKET"
 bucket_name = "bazaarplusplus-pvp-battles"
 
-[triggers]
-crons = ["0 */6 * * *"]
-
 [observability]
 enabled = false
 head_sampling_rate = 1
@@ -27,8 +24,8 @@ head_sampling_rate = 1
 [observability.logs]
 enabled = true
 head_sampling_rate = 1
-persist = true
-invocation_logs = true
+persist = false
+invocation_logs = false
 
 [observability.traces]
 enabled = false

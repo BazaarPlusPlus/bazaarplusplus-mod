@@ -72,7 +72,6 @@ internal sealed class RunUploadRequestSigner
             throw new ArgumentException("Endpoint is required.", nameof(endpoint));
 
         var timestamp = DateTimeOffset.UtcNow.ToString("o");
-        var nonce = Guid.NewGuid().ToString("N");
         var bodyText = body ?? string.Empty;
         var bodyHash = ComputeBodyHash(bodyText);
         var canonical = BuildCanonicalRequest(
@@ -81,7 +80,6 @@ internal sealed class RunUploadRequestSigner
             clientId,
             installId,
             timestamp,
-            nonce,
             bodyHash
         );
         var signature = _keyStore.Sign(canonical);
@@ -98,7 +96,6 @@ internal sealed class RunUploadRequestSigner
         request.Headers.TryAddWithoutValidation("X-BPP-Install-Id", installId);
         request.Headers.TryAddWithoutValidation("X-BPP-Plugin-Version", pluginVersion);
         request.Headers.TryAddWithoutValidation("X-BPP-Timestamp", timestamp);
-        request.Headers.TryAddWithoutValidation("X-BPP-Nonce", nonce);
         request.Headers.TryAddWithoutValidation("X-BPP-Content-SHA256", bodyHash);
         request.Headers.TryAddWithoutValidation("X-BPP-Signature-Alg", "rsa-pkcs1-sha256");
         request.Headers.TryAddWithoutValidation("X-BPP-Signature", signature);
@@ -122,7 +119,6 @@ internal sealed class RunUploadRequestSigner
         string clientId,
         string installId,
         string timestamp,
-        string nonce,
         string bodyHash
     )
     {
@@ -135,7 +131,6 @@ internal sealed class RunUploadRequestSigner
                 clientId.Trim(),
                 installId.Trim(),
                 timestamp.Trim(),
-                nonce.Trim(),
                 bodyHash.Trim(),
             }
         );

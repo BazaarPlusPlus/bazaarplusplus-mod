@@ -1,7 +1,7 @@
 import type { Env } from "../env";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
-import { logError, logInfo, logResponseWarning } from "../observability";
+import { logError, logResponseWarning } from "../observability";
 import {
   markRunProjectionStatus,
   upsertRunUpload,
@@ -15,9 +15,7 @@ export async function handleRunUpload(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  const verified = await requireVerifiedClient(request, env, "runs", {
-    consumeNonce: true,
-  });
+  const verified = await requireVerifiedClient(request, env, "runs");
   if (verified instanceof Response) {
     return verified;
   }
@@ -140,15 +138,6 @@ export async function handleRunUpload(
     });
     return json({ error: "projection_failed" }, { status: 500 });
   }
-
-  logInfo("run_upload.accepted", {
-    route: "/runs/upload",
-    status: 200,
-    client_id: verified.client.client_id,
-    install_id: verified.client.install_id,
-    run_id: runId,
-    payload_sha256: verified.payloadHash,
-  });
 
   return json({ status: "accepted" });
 }

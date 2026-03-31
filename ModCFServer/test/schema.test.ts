@@ -30,6 +30,7 @@ test("migration includes the source_client_id/run_id projection index", () => {
     sql,
     /CREATE INDEX IF NOT EXISTS idx_pvp_battles_source_run\s+ON pvp_battles\(source_client_id, run_id\);/m,
   );
+  assert.doesNotMatch(sql, /\brequest_nonces\b/);
 });
 
 test("migration promotes run_uploads to the production ingestion ledger", () => {

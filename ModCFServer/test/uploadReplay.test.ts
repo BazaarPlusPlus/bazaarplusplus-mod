@@ -35,6 +35,23 @@ async function captureWarnLogs<T>(
   }
 }
 
+async function captureInfoLogs<T>(
+  run: () => Promise<T>,
+): Promise<{ result: T; entries: string[] }> {
+  const entries: string[] = [];
+  const originalInfo = console.info;
+  console.info = (...args: unknown[]) => {
+    entries.push(stringifyConsoleArgs(args));
+  };
+
+  try {
+    const result = await run();
+    return { result, entries };
+  } finally {
+    console.info = originalInfo;
+  }
+}
+
 test("persists verified battle uploads", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
@@ -202,7 +219,6 @@ test("persists verified battle uploads", async () => {
         "x-bpp-battle-id": "battle-001",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -223,6 +239,102 @@ test("persists verified battle uploads", async () => {
   assert.ok((projectedBattle?.replay_uploaded_at_utc ?? "").length > 0);
   assert.equal(projectedBattle?.replay_available, 1);
   assert.ok(env.PVP_BATTLE_BUCKET.objects.has(json.object_key));
+});
+
+test("successful battle uploads do not emit accepted info logs", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+
+  const registerResponse = await worker.fetch(
+    new Request("https://example.com/clients/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        install_id: "install-battle-no-info-log",
+        plugin_version: "1.9.0",
+        purpose: "replays",
+        public_key: {
+          modulus_b64: modulusB64,
+          exponent_b64: exponentB64,
+        },
+      }),
+    }),
+    env as never,
+  );
+  assert.equal(registerResponse.status, 200);
+  const registerJson = (await registerResponse.json()) as { client_id: string };
+
+  const payload = JSON.stringify({
+    battle_id: "battle-no-info-log",
+    client_id: registerJson.client_id,
+    battle_manifest: {
+      battle_id: "battle-no-info-log",
+      run_id: "run-no-info-log",
+      recorded_at_utc: "2026-03-29T12:00:00.000Z",
+      combat_kind: "PVPCombat",
+      participants: {
+        player_name: "Uploader",
+        player_account_id: "uploader-account",
+        opponent_name: "Me",
+        opponent_account_id: "my-account",
+      },
+      outcome: {},
+      snapshots: {
+        player_hand: { items: [] },
+        player_skills: { items: [] },
+        opponent_hand: { items: [] },
+        opponent_skills: { items: [] },
+      },
+    },
+    replay_payload: {
+      battle_id: "battle-no-info-log",
+      version: 1,
+      spawn_message_base64: "c3Bhd24=",
+      combat_message_base64: "Y29tYmF0",
+      despawn_message_base64: "ZGVzcGF3bg==",
+    },
+  });
+  const bodyHash = sha256Base64(payload);
+  const timestamp = new Date().toISOString();
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequest(
+      "POST",
+      "/battles/upload",
+      registerJson.client_id,
+      "install-battle-no-info-log",
+      timestamp,
+      "nonce-battle-no-info-log",
+      bodyHash,
+    ),
+  );
+
+  const { result: response, entries } = await captureInfoLogs(() =>
+    worker.fetch(
+      new Request("https://example.com/battles/upload", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-bpp-client-id": registerJson.client_id,
+          "x-bpp-install-id": "install-battle-no-info-log",
+          "x-bpp-battle-id": "battle-no-info-log",
+          "x-bpp-plugin-version": "1.9.0",
+          "x-bpp-timestamp": timestamp,
+          "x-bpp-content-sha256": bodyHash,
+          "x-bpp-signature-alg": "rsa-pkcs1-sha256",
+          "x-bpp-signature": signature,
+        },
+        body: payload,
+      }),
+      env as never,
+    ),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(
+    entries.some((entry) => entry.includes("\"event\":\"battle_upload.accepted\"")),
+    false,
+  );
 });
 
 test("rejects battle uploads when top-level and manifest run ids disagree", async () => {
@@ -292,7 +404,6 @@ test("rejects battle uploads when top-level and manifest run ids disagree", asyn
         "x-bpp-battle-id": "battle-runid-mismatch",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -375,7 +486,6 @@ test("rejects battle uploads when x-bpp-run-id disagrees with the payload", asyn
         "x-bpp-run-id": "run-header",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -456,7 +566,6 @@ test("re-uploading the same replay payload remains idempotent", async () => {
           "x-bpp-battle-id": "battle-repeat",
           "x-bpp-plugin-version": "1.9.0",
           "x-bpp-timestamp": timestamp,
-          "x-bpp-nonce": nonce,
           "x-bpp-content-sha256": bodyHash,
           "x-bpp-signature-alg": "rsa-pkcs1-sha256",
           "x-bpp-signature": signature,
@@ -537,7 +646,6 @@ test("rejects battle uploads with incomplete replay payloads", async () => {
         "x-bpp-battle-id": "battle-invalid",
         "x-bpp-plugin-version": "1.9.0",
         "x-bpp-timestamp": timestamp,
-        "x-bpp-nonce": nonce,
         "x-bpp-content-sha256": bodyHash,
         "x-bpp-signature-alg": "rsa-pkcs1-sha256",
         "x-bpp-signature": signature,
@@ -620,7 +728,6 @@ test("logs battle manifest validation reasons for rejected uploads", async () =>
           "x-bpp-battle-id": "battle-missing-recorded-at",
           "x-bpp-plugin-version": "1.9.0",
           "x-bpp-timestamp": timestamp,
-          "x-bpp-nonce": nonce,
           "x-bpp-content-sha256": bodyHash,
           "x-bpp-signature-alg": "rsa-pkcs1-sha256",
           "x-bpp-signature": signature,

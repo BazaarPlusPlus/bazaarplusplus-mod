@@ -40,7 +40,6 @@ function buildSignedRequest(
       "x-bpp-client-id": clientId,
       "x-bpp-install-id": installId,
       "x-bpp-timestamp": timestamp,
-      "x-bpp-nonce": nonce,
       "x-bpp-content-sha256": EMPTY_BODY_HASH,
       "x-bpp-signature-alg": "rsa-pkcs1-sha256",
       "x-bpp-signature": signature,
@@ -78,7 +77,6 @@ function buildSignedJsonRequest(
       "x-bpp-client-id": clientId,
       "x-bpp-install-id": installId,
       "x-bpp-timestamp": timestamp,
-      "x-bpp-nonce": nonce,
       "x-bpp-content-sha256": bodyHash,
       "x-bpp-signature-alg": "rsa-pkcs1-sha256",
       "x-bpp-signature": signature,
@@ -223,15 +221,13 @@ test("lists recent ghost battles against the bound player account", async () => 
   assert.equal("player_hand" in (body.battles[0] ?? {}), false);
   assert.equal("opponent_skills" in (body.battles[0] ?? {}), false);
   assert.equal(body.battles[0]?.replay?.available, true);
-  assert.equal(env.DB.nonces.size, 1);
 });
 
-test("allows ghost queries even when the nonce was already observed", async () => {
+test("allows ghost queries without nonce tracking state", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  const clientId = "runs-client-ghost-reused-nonce";
-  const installId = "install-ghost-reused-nonce";
-  const nonce = "nonce-ghost-reused";
+  const clientId = "runs-client-ghost-query-no-nonce";
+  const installId = "install-ghost-query-no-nonce";
   env.DB.clients.set(clientId, {
     client_id: clientId,
     install_id: installId,
@@ -247,9 +243,8 @@ test("allows ghost queries even when the nonce was already observed", async () =
     installId,
     privateKey,
     "my-account",
-    "nonce-bind-ghost-reused",
+    "nonce-bind-ghost-query-no-nonce",
   );
-  env.DB.nonces.add(`runs:${clientId}:${nonce}`);
 
   const response = await worker.fetch(
     buildSignedRequest(
@@ -258,7 +253,7 @@ test("allows ghost queries even when the nonce was already observed", async () =
       clientId,
       installId,
       privateKey,
-      nonce,
+      "nonce-ghost-query-no-nonce",
     ),
     env as never,
   );
@@ -274,7 +269,6 @@ test("allows ghost queries even when the nonce was already observed", async () =
   assert.equal(body.battles.length, 0);
   assert.ok(body.from_utc.length > 0);
   assert.ok(body.to_utc.length > 0);
-  assert.equal(env.DB.nonces.size, 2);
 });
 
 test("creates a replay download link and serves the payload", async () => {
@@ -380,7 +374,6 @@ test("creates a replay download link and serves the payload", async () => {
   };
   assert.ok(linkBody.download_url.includes("/replays/download?"));
   assert.equal(linkBody.replay_uploaded_at_utc, "2099-03-29T12:05:00.000Z");
-  assert.equal(env.DB.nonces.size, 1);
 
   const downloadResponse = await worker.fetch(
     new Request(linkBody.download_url, { method: "GET" }),

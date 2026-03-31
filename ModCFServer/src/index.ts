@@ -9,7 +9,6 @@ import { json } from "./http/json";
 import { registerClient } from "./features/registerClient";
 import { handleRunUpload } from "./features/uploadRun";
 import { handleBattleUpload } from "./features/uploadBattle";
-import { purgeExpiredNonces } from "./persistence/nonces";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -55,9 +54,5 @@ export default {
     }
 
     return json({ error: "not_found" }, { status: 404 });
-  },
-
-  async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
-    await purgeExpiredNonces(env, 15 * 60 * 1000);
   },
 };
