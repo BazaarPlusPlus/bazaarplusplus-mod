@@ -52,7 +52,8 @@ internal static class RunUploadErrorFormatter
                 return null;
 
             var detail =
-                payload["detail"]?.Value<string>()?.Trim()
+                payload["reason"]?.Value<string>()?.Trim()
+                ?? payload["detail"]?.Value<string>()?.Trim()
                 ?? payload["message"]?.Value<string>()?.Trim();
             return (error, string.IsNullOrWhiteSpace(detail) ? null : Truncate(detail));
         }

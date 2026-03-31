@@ -1,6 +1,7 @@
 import type { Env } from "../env";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
+import { logError, logInfo, logResponseWarning } from "../observability";
 import {
   markRunProjectionStatus,
   upsertRunUpload,
@@ -23,17 +24,37 @@ export async function handleRunUpload(
 
   const parsed = parseRunUploadBody(verified.payload);
   if (parsed instanceof Response) {
+    await logResponseWarning("run_upload.rejected", parsed, {
+      route: "/runs/upload",
+      client_id: verified.client.client_id,
+      install_id: verified.client.install_id,
+      run_id: trimString(request.headers.get("x-bpp-run-id")) || null,
+    });
     return parsed;
   }
 
   const headerRunId = trimString(request.headers.get("x-bpp-run-id")) || null;
   const runId = headerRunId ?? parsed.runId;
   if (!runId) {
-    return json({ error: "run_id_required" }, { status: 400 });
+    const response = json({ error: "run_id_required" }, { status: 400 });
+    await logResponseWarning("run_upload.rejected", response, {
+      route: "/runs/upload",
+      client_id: verified.client.client_id,
+      install_id: verified.client.install_id,
+      run_id: null,
+    });
+    return response;
   }
 
   if (headerRunId && parsed.runId && headerRunId !== parsed.runId) {
-    return json({ error: "run_id_mismatch" }, { status: 400 });
+    const response = json({ error: "run_id_mismatch" }, { status: 400 });
+    await logResponseWarning("run_upload.rejected", response, {
+      route: "/runs/upload",
+      client_id: verified.client.client_id,
+      install_id: verified.client.install_id,
+      run_id: runId,
+    });
+    return response;
   }
 
   const receivedAtUtc = new Date().toISOString();
@@ -108,8 +129,26 @@ export async function handleRunUpload(
       lastErrorDetail: message,
       updatedAtUtc: failedAtUtc,
     });
+    logError("run_upload.failed", {
+      route: "/runs/upload",
+      status: 500,
+      client_id: verified.client.client_id,
+      install_id: verified.client.install_id,
+      run_id: runId,
+      error_code: "projection_failed",
+      detail: message,
+    });
     return json({ error: "projection_failed" }, { status: 500 });
   }
+
+  logInfo("run_upload.accepted", {
+    route: "/runs/upload",
+    status: 200,
+    client_id: verified.client.client_id,
+    install_id: verified.client.install_id,
+    run_id: runId,
+    payload_sha256: verified.payloadHash,
+  });
 
   return json({ status: "accepted" });
 }

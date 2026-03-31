@@ -53,6 +53,18 @@ Assert(
 );
 Assert(
     string.Equals(
+        (string?)
+            formatHttpFailureMethod.Invoke(
+                null,
+                [400, """{"error":"invalid_battle_manifest","reason":"missing_recorded_at_utc"}"""]
+            ),
+        "http_400:invalid_battle_manifest(missing_recorded_at_utc)",
+        StringComparison.Ordinal
+    ),
+    "HTTP formatter should surface stable server-side validation reasons in client-visible errors."
+);
+Assert(
+    string.Equals(
         (string?)formatHttpFailureMethod.Invoke(null, [502, "bad gateway"]),
         "http_502:bad gateway",
         StringComparison.Ordinal

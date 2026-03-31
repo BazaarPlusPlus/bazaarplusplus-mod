@@ -2,6 +2,7 @@ import type { Env } from "../env";
 import { sha256Base64 } from "../crypto/hash";
 import { json } from "../http/json";
 import { trimString } from "../http/request";
+import { logInfo, logResponseWarning } from "../observability";
 import { upsertProjectedBattle } from "../persistence/battleProjections";
 import { requireVerifiedClient } from "./verifiedClient";
 import { parseBattleUploadBody } from "./uploadBattlePayload";
@@ -24,12 +25,27 @@ export async function handleBattleUpload(
 
   const parsed = parseBattleUploadBody(verified.payload, battleId);
   if (parsed instanceof Response) {
+    await logResponseWarning("battle_upload.rejected", parsed, {
+      route: "/battles/upload",
+      client_id: verified.client.client_id,
+      install_id: verified.client.install_id,
+      battle_id: battleId,
+      run_id: trimString(request.headers.get("x-bpp-run-id")) || null,
+    });
     return parsed;
   }
 
   const headerRunId = trimString(request.headers.get("x-bpp-run-id")) || null;
   if (headerRunId && parsed.runId && headerRunId !== parsed.runId) {
-    return json({ error: "run_id_mismatch" }, { status: 400 });
+    const response = json({ error: "run_id_mismatch" }, { status: 400 });
+    await logResponseWarning("battle_upload.rejected", response, {
+      route: "/battles/upload",
+      client_id: verified.client.client_id,
+      install_id: verified.client.install_id,
+      battle_id: battleId,
+      run_id: parsed.runId,
+    });
+    return response;
   }
 
   const uploadedAtUtc = new Date().toISOString();
@@ -80,6 +96,16 @@ export async function handleBattleUpload(
     replayUploadedAtUtc: uploadedAtUtc,
     createdAtUtc: uploadedAtUtc,
     updatedAtUtc: uploadedAtUtc,
+  });
+
+  logInfo("battle_upload.accepted", {
+    route: "/battles/upload",
+    status: 200,
+    client_id: verified.client.client_id,
+    install_id: verified.client.install_id,
+    battle_id: battleId,
+    run_id: parsed.runId,
+    object_key: objectKey,
   });
 
   return json({

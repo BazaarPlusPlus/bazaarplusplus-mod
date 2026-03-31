@@ -3,6 +3,7 @@ import { canonicalRequest, verifySignature } from "../crypto/signature";
 import type { Env } from "../env";
 import { json } from "../http/json";
 import { absolutePath, trimString } from "../http/request";
+import { logWarn } from "../observability";
 import { getRegisteredClient } from "../persistence/clients";
 import { tryConsumeNonce } from "../persistence/nonces";
 import type { UploadPurpose } from "../types/api";
@@ -35,12 +36,26 @@ export async function requireVerifiedClient(
   const advertisedBodyHash = trimString(request.headers.get("x-bpp-content-sha256"));
   const signatureAlg = trimString(request.headers.get("x-bpp-signature-alg"));
   const signature = trimString(request.headers.get("x-bpp-signature"));
+
+  function reject(status: number, error: string): Response {
+    logWarn("auth.rejected", {
+      route: absolutePath(request),
+      status,
+      purpose,
+      error_code: error,
+      client_id: clientId,
+      install_id: installId,
+      nonce,
+    });
+    return json({ error }, { status });
+  }
+
   if (!clientId || !installId || !timestamp || !nonce || !advertisedBodyHash || !signature) {
-    return json({ error: "signed_headers_required" }, { status: 401 });
+    return reject(401, "signed_headers_required");
   }
 
   if (signatureAlg && signatureAlg !== "rsa-pkcs1-sha256") {
-    return json({ error: "unsupported_signature_alg" }, { status: 401 });
+    return reject(401, "unsupported_signature_alg");
   }
 
   const requestTimestamp = Date.parse(timestamp);
@@ -48,18 +63,18 @@ export async function requireVerifiedClient(
     Number.isNaN(requestTimestamp) ||
     Math.abs(Date.now() - requestTimestamp) > MAX_TIMESTAMP_SKEW_MS
   ) {
-    return json({ error: "timestamp_out_of_range" }, { status: 401 });
+    return reject(401, "timestamp_out_of_range");
   }
 
   const client = await getRegisteredClient(env, clientId);
   if (!client || client.install_id !== installId || client.purpose !== purpose) {
-    return json({ error: "unknown_client" }, { status: 404 });
+    return reject(404, "unknown_client");
   }
 
   const payload = await request.arrayBuffer();
   const payloadHash = await sha256Base64(payload);
   if (payloadHash !== advertisedBodyHash) {
-    return json({ error: "body_hash_mismatch" }, { status: 401 });
+    return reject(401, "body_hash_mismatch");
   }
 
   const canonical = canonicalRequest(
@@ -78,14 +93,14 @@ export async function requireVerifiedClient(
     signature,
   );
   if (!signatureValid) {
-    return json({ error: "invalid_signature" }, { status: 401 });
+    return reject(401, "invalid_signature");
   }
 
   if (options?.consumeNonce ?? false) {
     const nonceKey = `${purpose}:${clientId}:${nonce}`;
     const consumed = await tryConsumeNonce(env, nonceKey, new Date().toISOString());
     if (!consumed) {
-      return json({ error: "nonce_reused" }, { status: 409 });
+      return reject(409, "nonce_reused");
     }
   }
 

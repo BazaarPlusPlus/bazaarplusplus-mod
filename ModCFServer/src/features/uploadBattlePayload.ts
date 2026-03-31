@@ -37,6 +37,16 @@ export type ParsedBattleUploadBody = {
   battlePayloadJson: string;
 };
 
+function validationError(
+  error: string,
+  reason?: string,
+): Response {
+  return json(
+    reason ? { error, reason } : { error },
+    { status: 400 },
+  );
+}
+
 function asObject(value: unknown): JsonObject | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -84,19 +94,47 @@ export function parseBattleUploadBody(
     const participants = asObject(battleManifest.participants);
     const outcome = asObject(battleManifest.outcome) ?? {};
     const snapshots = asObject(battleManifest.snapshots);
-    if (
-      manifestBattleId !== battleId
-      || !recordedAtUtc
-      || !combatKind
-      || participants == null
-      || snapshots == null
-    ) {
-      return json({ error: "invalid_battle_manifest" }, { status: 400 });
+    if (manifestBattleId !== battleId) {
+      return validationError(
+        "invalid_battle_manifest",
+        "battle_id_mismatch_in_manifest",
+      );
+    }
+
+    if (!recordedAtUtc) {
+      return validationError(
+        "invalid_battle_manifest",
+        "missing_recorded_at_utc",
+      );
+    }
+
+    if (!combatKind) {
+      return validationError(
+        "invalid_battle_manifest",
+        "missing_combat_kind",
+      );
+    }
+
+    if (participants == null) {
+      return validationError(
+        "invalid_battle_manifest",
+        "missing_participants",
+      );
+    }
+
+    if (snapshots == null) {
+      return validationError(
+        "invalid_battle_manifest",
+        "missing_snapshots",
+      );
     }
 
     const opponentAccountId = asString(participants.opponent_account_id);
     if (combatKind === "PVPCombat" && !opponentAccountId) {
-      return json({ error: "invalid_battle_manifest" }, { status: 400 });
+      return validationError(
+        "invalid_battle_manifest",
+        "missing_opponent_account_id",
+      );
     }
 
     const replayPayload = asObject(raw.replay_payload);
@@ -109,14 +147,36 @@ export function parseBattleUploadBody(
     const spawnMessageBase64 = asString(replayPayload.spawn_message_base64);
     const combatMessageBase64 = asString(replayPayload.combat_message_base64);
     const despawnMessageBase64 = asString(replayPayload.despawn_message_base64);
-    if (
-      replayBattleId !== battleId
-      || replaySchemaVersion == null
-      || !spawnMessageBase64
-      || !combatMessageBase64
-      || !despawnMessageBase64
-    ) {
-      return json({ error: "invalid_replay_payload" }, { status: 400 });
+    if (replayBattleId !== battleId) {
+      return validationError(
+        "invalid_replay_payload",
+        "battle_id_mismatch_in_replay_payload",
+      );
+    }
+
+    if (replaySchemaVersion == null) {
+      return validationError("invalid_replay_payload", "missing_version");
+    }
+
+    if (!spawnMessageBase64) {
+      return validationError(
+        "invalid_replay_payload",
+        "missing_spawn_message_base64",
+      );
+    }
+
+    if (!combatMessageBase64) {
+      return validationError(
+        "invalid_replay_payload",
+        "missing_combat_message_base64",
+      );
+    }
+
+    if (!despawnMessageBase64) {
+      return validationError(
+        "invalid_replay_payload",
+        "missing_despawn_message_base64",
+      );
     }
 
     const topLevelRunId = asString(raw.run_id);

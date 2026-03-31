@@ -135,6 +135,12 @@ var requestsHandled = Task.Run(async () =>
                 payload["replay_payload"]?["battle_id"]?.Value<string>() == "battle-auth-001",
                 "Replay upload body should embed the replay payload."
             );
+            Assert(
+                !string.IsNullOrWhiteSpace(
+                    payload["battle_manifest"]?["recorded_at_utc"]?.Value<string>()
+                ),
+                "Replay upload body should serialize battle manifest timestamps as recorded_at_utc for the server contract."
+            );
 
             var responseBytes = Encoding.UTF8.GetBytes(
                 """{"object_key":"combat-replays/global/client-replay-001/battle-auth-001.payload.json"}"""

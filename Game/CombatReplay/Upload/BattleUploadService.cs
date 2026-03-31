@@ -171,7 +171,7 @@ internal sealed class BattleUploadService : IDisposable
                     );
                     BppLog.Warn(
                         "BattleUploadService",
-                        $"Upload failed for battle {battleId}: {uploadResult.Error ?? "unknown_error"}."
+                        $"Upload failed for battle {battleId} with client_id={snapshot?.Payload.ClientId ?? "none"}, run_id={snapshot?.Payload.RunId ?? "none"}: {uploadResult.Error ?? "unknown_error"}."
                     );
                     continue;
                 }
@@ -210,7 +210,7 @@ internal sealed class BattleUploadService : IDisposable
                 );
                 BppLog.Warn(
                     "BattleUploadService",
-                    $"Upload failed for battle {battleId}: {ex.GetType().Name} - {ex.Message}"
+                    $"Upload failed for battle {battleId} with client_id={snapshot?.Payload.ClientId ?? "none"}, run_id={snapshot?.Payload.RunId ?? "none"}: {ex.GetType().Name} - {ex.Message}"
                 );
             }
         }
