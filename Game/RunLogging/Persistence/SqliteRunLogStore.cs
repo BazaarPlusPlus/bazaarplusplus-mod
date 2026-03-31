@@ -141,87 +141,20 @@ public sealed class SqliteRunLogStore : IRunLogStore
     public RunLogSessionState? TryResumeActiveRun()
     {
         using var connection = OpenConnection();
-        using var command = CreateCommand(connection);
-        command.CommandText = $"""
-            SELECT
-                r.run_id,
-                r.schema_version,
-                r.started_at_utc,
-                r.day AS run_day,
-                r.hour AS run_hour,
-                cp.last_seq,
-                cp.last_seen_at_utc,
-                cp.day AS checkpoint_day,
-                cp.hour AS checkpoint_hour,
-                cp.max_health,
-                cp.prestige,
-                cp.level,
-                cp.income,
-                cp.gold,
-                cp.state,
-                cp.current_encounter_id,
-                cp.last_state_fingerprint,
-                cp.last_selection_fingerprint,
-                cp.pending_selection_seq,
-                cp.pending_selection_json,
-                cp.completed
-            FROM {RunLogSqliteSchema.RunsTableName} AS r
-            LEFT JOIN {RunLogSqliteSchema.RunCheckpointsTableName} AS cp
-                ON cp.run_id = r.run_id
-            LEFT JOIN {RunLogSqliteSchema.RunStatusTableName} AS rs
-                ON rs.run_id = r.run_id
-            WHERE rs.run_id IS NULL
-            ORDER BY COALESCE(cp.last_seen_at_utc, r.started_at_utc) DESC
-            LIMIT 1;
-            """;
-
-        using var reader = command.ExecuteReader();
-        if (!reader.Read())
-            return null;
-
-        var checkpointCompleted = GetNullableInt64(reader, "completed");
-        if (checkpointCompleted == 1)
-            return null;
-
-        var startedAtUtc = DateTimeOffset.Parse(
-            reader.GetString(reader.GetOrdinal("started_at_utc"))
-        );
-        var lastSeenAtUtcText = GetNullableString(reader, "last_seen_at_utc");
-        var lastSeenAtUtc = string.IsNullOrWhiteSpace(lastSeenAtUtcText)
-            ? startedAtUtc
-            : DateTimeOffset.Parse(lastSeenAtUtcText);
-
-        return new RunLogSessionState
-        {
-            RunId = reader.GetString(reader.GetOrdinal("run_id")),
-            SchemaVersion = reader.GetInt32(reader.GetOrdinal("schema_version")),
-            StartedAtUtc = startedAtUtc,
-            LastSeenAtUtc = lastSeenAtUtc,
-            LastSeq = GetNullableInt64(reader, "last_seq") ?? 0,
-            Day = GetNullableInt32(reader, "checkpoint_day") ?? GetNullableInt32(reader, "run_day"),
-            Hour =
-                GetNullableInt32(reader, "checkpoint_hour") ?? GetNullableInt32(reader, "run_hour"),
-            MaxHealth = GetNullableInt32(reader, "max_health"),
-            Prestige = GetNullableInt32(reader, "prestige"),
-            Level = GetNullableInt32(reader, "level"),
-            Income = GetNullableInt32(reader, "income"),
-            Gold = GetNullableInt32(reader, "gold"),
-            State = GetNullableString(reader, "state"),
-            CurrentEncounterId = GetNullableString(reader, "current_encounter_id"),
-            LastStateFingerprint = GetNullableString(reader, "last_state_fingerprint"),
-            LastSelectionFingerprint = GetNullableString(reader, "last_selection_fingerprint"),
-            PendingSelectionSeq = GetNullableInt64(reader, "pending_selection_seq"),
-            PendingSelection = DeserializePendingSelection(
-                GetNullableString(reader, "pending_selection_json")
-            ),
-            Completed = false,
-        };
+        return TryReadActiveRun(connection);
     }
 
     public RunLogSessionState CreateRun(RunLogCreateRequest request)
     {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
+
+        if (HasTerminalStatus(connection, transaction, request.RunId))
+        {
+            throw new InvalidOperationException(
+                $"Run {request.RunId} already has terminal status and cannot be recreated."
+            );
+        }
 
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
@@ -249,7 +182,17 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 $hour,
                 $seed,
                 $status
-            );
+            )
+            ON CONFLICT(run_id) DO UPDATE SET
+                schema_version = excluded.schema_version,
+                hero = excluded.hero,
+                game_mode = excluded.game_mode,
+                player_rank = COALESCE(excluded.player_rank, player_rank),
+                player_rating = COALESCE(excluded.player_rating, player_rating),
+                day = COALESCE(excluded.day, day),
+                hour = COALESCE(excluded.hour, hour),
+                seed = COALESCE(excluded.seed, seed),
+                status = excluded.status;
             """;
         command.Parameters.AddWithValue("$runId", request.RunId);
         command.Parameters.AddWithValue("$schemaVersion", request.SchemaVersion);
@@ -264,19 +207,14 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.Parameters.AddWithValue("$status", request.Status);
         command.ExecuteNonQuery();
 
-        transaction.Commit();
+        var session =
+            TryReadActiveRun(connection, transaction, request.RunId)
+            ?? throw new InvalidOperationException(
+                $"Run {request.RunId} could not be loaded after create."
+            );
 
-        return new RunLogSessionState
-        {
-            RunId = request.RunId,
-            SchemaVersion = request.SchemaVersion,
-            StartedAtUtc = request.StartedAtUtc,
-            LastSeenAtUtc = request.StartedAtUtc,
-            LastSeq = 0,
-            Day = request.Day,
-            Hour = request.Hour,
-            Completed = false,
-        };
+        transaction.Commit();
+        return session;
     }
 
     public void AppendEvent(string runId, RunLogEvent entry)
@@ -613,6 +551,147 @@ public sealed class SqliteRunLogStore : IRunLogStore
             return 0;
 
         return finalPlayerRating.Value - Convert.ToInt32(initialPlayerRating);
+    }
+
+    private static bool HasTerminalStatus(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string runId
+    )
+    {
+        using var command = CreateCommand(connection, transaction);
+        command.CommandText = $"""
+            SELECT 1
+            FROM {RunLogSqliteSchema.RunStatusTableName}
+            WHERE run_id = $runId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+        return command.ExecuteScalar() != null;
+    }
+
+    private static RunLogSessionState? TryReadActiveRun(
+        SqliteConnection connection,
+        SqliteTransaction? transaction = null,
+        string? runId = null
+    )
+    {
+        using var command = CreateCommand(connection, transaction);
+        command.CommandText =
+            runId == null
+                ? $"""
+                    SELECT
+                        r.run_id,
+                        r.schema_version,
+                        r.started_at_utc,
+                        r.day AS run_day,
+                        r.hour AS run_hour,
+                        cp.last_seq,
+                        cp.last_seen_at_utc,
+                        cp.day AS checkpoint_day,
+                        cp.hour AS checkpoint_hour,
+                        cp.max_health,
+                        cp.prestige,
+                        cp.level,
+                        cp.income,
+                        cp.gold,
+                        cp.state,
+                        cp.current_encounter_id,
+                        cp.last_state_fingerprint,
+                        cp.last_selection_fingerprint,
+                        cp.pending_selection_seq,
+                        cp.pending_selection_json,
+                        cp.completed
+                    FROM {RunLogSqliteSchema.RunsTableName} AS r
+                    LEFT JOIN {RunLogSqliteSchema.RunCheckpointsTableName} AS cp
+                        ON cp.run_id = r.run_id
+                    LEFT JOIN {RunLogSqliteSchema.RunStatusTableName} AS rs
+                        ON rs.run_id = r.run_id
+                    WHERE rs.run_id IS NULL
+                    ORDER BY COALESCE(cp.last_seen_at_utc, r.started_at_utc) DESC
+                    LIMIT 1;
+                    """
+                : $"""
+                    SELECT
+                        r.run_id,
+                        r.schema_version,
+                        r.started_at_utc,
+                        r.day AS run_day,
+                        r.hour AS run_hour,
+                        cp.last_seq,
+                        cp.last_seen_at_utc,
+                        cp.day AS checkpoint_day,
+                        cp.hour AS checkpoint_hour,
+                        cp.max_health,
+                        cp.prestige,
+                        cp.level,
+                        cp.income,
+                        cp.gold,
+                        cp.state,
+                        cp.current_encounter_id,
+                        cp.last_state_fingerprint,
+                        cp.last_selection_fingerprint,
+                        cp.pending_selection_seq,
+                        cp.pending_selection_json,
+                        cp.completed
+                    FROM {RunLogSqliteSchema.RunsTableName} AS r
+                    LEFT JOIN {RunLogSqliteSchema.RunCheckpointsTableName} AS cp
+                        ON cp.run_id = r.run_id
+                    LEFT JOIN {RunLogSqliteSchema.RunStatusTableName} AS rs
+                        ON rs.run_id = r.run_id
+                    WHERE rs.run_id IS NULL
+                        AND r.run_id = $runId
+                    LIMIT 1;
+                    """;
+        if (runId != null)
+            command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        return ReadSessionState(reader);
+    }
+
+    private static RunLogSessionState? ReadSessionState(SqliteDataReader reader)
+    {
+        var checkpointCompleted = GetNullableInt64(reader, "completed");
+        if (checkpointCompleted == 1)
+            return null;
+
+        var startedAtUtc = DateTimeOffset.Parse(
+            reader.GetString(reader.GetOrdinal("started_at_utc"))
+        );
+        var lastSeenAtUtcText = GetNullableString(reader, "last_seen_at_utc");
+        var lastSeenAtUtc = string.IsNullOrWhiteSpace(lastSeenAtUtcText)
+            ? startedAtUtc
+            : DateTimeOffset.Parse(lastSeenAtUtcText);
+
+        return new RunLogSessionState
+        {
+            RunId = reader.GetString(reader.GetOrdinal("run_id")),
+            SchemaVersion = reader.GetInt32(reader.GetOrdinal("schema_version")),
+            StartedAtUtc = startedAtUtc,
+            LastSeenAtUtc = lastSeenAtUtc,
+            LastSeq = GetNullableInt64(reader, "last_seq") ?? 0,
+            Day = GetNullableInt32(reader, "checkpoint_day") ?? GetNullableInt32(reader, "run_day"),
+            Hour =
+                GetNullableInt32(reader, "checkpoint_hour") ?? GetNullableInt32(reader, "run_hour"),
+            MaxHealth = GetNullableInt32(reader, "max_health"),
+            Prestige = GetNullableInt32(reader, "prestige"),
+            Level = GetNullableInt32(reader, "level"),
+            Income = GetNullableInt32(reader, "income"),
+            Gold = GetNullableInt32(reader, "gold"),
+            State = GetNullableString(reader, "state"),
+            CurrentEncounterId = GetNullableString(reader, "current_encounter_id"),
+            LastStateFingerprint = GetNullableString(reader, "last_state_fingerprint"),
+            LastSelectionFingerprint = GetNullableString(reader, "last_selection_fingerprint"),
+            PendingSelectionSeq = GetNullableInt64(reader, "pending_selection_seq"),
+            PendingSelection = DeserializePendingSelection(
+                GetNullableString(reader, "pending_selection_json")
+            ),
+            Completed = false,
+        };
     }
 
     private SqliteConnection OpenConnection()

@@ -271,6 +271,135 @@ try
             ) == "abandoned",
             "run_status should preserve interrupted/abandoned terminal statuses."
         );
+
+        const string olderActiveRunId = "server-run-older";
+        const string newerActiveRunId = "server-run-newer";
+        var olderStartedAt = startedAt.AddHours(2);
+        var newerStartedAt = startedAt.AddHours(3);
+
+        Invoke<RunLogSessionState>(
+            storeType,
+            store,
+            "CreateRun",
+            [
+                new RunLogCreateRequest
+                {
+                    SchemaVersion = 1,
+                    RunId = olderActiveRunId,
+                    StartedAtUtc = olderStartedAt,
+                    Hero = "Vanessa",
+                    GameMode = "Ranked",
+                    PlayerRank = "Silver 3",
+                    PlayerRating = 1200,
+                    Day = 2,
+                    Hour = 1,
+                },
+            ]
+        );
+        InvokeVoid(
+            storeType,
+            store,
+            "SaveCheckpoint",
+            [
+                olderActiveRunId,
+                new RunLogCheckpoint
+                {
+                    SchemaVersion = 1,
+                    RunId = olderActiveRunId,
+                    LastSeq = 4,
+                    LastSeenAtUtc = olderStartedAt.AddMinutes(5),
+                    Day = 2,
+                    Hour = 4,
+                    State = "Encounter",
+                    Completed = false,
+                },
+            ]
+        );
+
+        Invoke<RunLogSessionState>(
+            storeType,
+            store,
+            "CreateRun",
+            [
+                new RunLogCreateRequest
+                {
+                    SchemaVersion = 1,
+                    RunId = newerActiveRunId,
+                    StartedAtUtc = newerStartedAt,
+                    Hero = "Dooley",
+                    GameMode = "Ranked",
+                    Day = 3,
+                    Hour = 1,
+                },
+            ]
+        );
+        InvokeVoid(
+            storeType,
+            store,
+            "SaveCheckpoint",
+            [
+                newerActiveRunId,
+                new RunLogCheckpoint
+                {
+                    SchemaVersion = 1,
+                    RunId = newerActiveRunId,
+                    LastSeq = 2,
+                    LastSeenAtUtc = newerStartedAt.AddMinutes(10),
+                    Day = 3,
+                    Hour = 2,
+                    State = "Choice",
+                    Completed = false,
+                },
+            ]
+        );
+
+        var resumedOlderSession = Invoke<RunLogSessionState>(
+            storeType,
+            store,
+            "CreateRun",
+            [
+                new RunLogCreateRequest
+                {
+                    SchemaVersion = 1,
+                    RunId = olderActiveRunId,
+                    StartedAtUtc = olderStartedAt.AddMinutes(30),
+                    Hero = "Vanessa",
+                    GameMode = "Ranked",
+                    PlayerRank = "Gold 1",
+                    PlayerRating = 1333,
+                    Day = 2,
+                    Hour = 5,
+                },
+            ]
+        );
+
+        Assert(
+            resumedOlderSession.RunId == olderActiveRunId,
+            "CreateRun should resume an existing active run with the requested run id."
+        );
+        Assert(
+            resumedOlderSession.LastSeq == 4,
+            "CreateRun should preserve the existing checkpoint sequence when resuming."
+        );
+        Assert(
+            resumedOlderSession.Hour == 4,
+            "CreateRun should preserve the persisted checkpoint hour when resuming."
+        );
+        Assert(
+            GetInt64(connection, "SELECT COUNT(*) FROM runs WHERE run_id = $runId;", olderActiveRunId)
+                == 1,
+            "CreateRun should not duplicate an existing active run row."
+        );
+        Assert(
+            GetString(connection, "SELECT player_rank FROM runs WHERE run_id = $runId;", olderActiveRunId)
+                == "Gold 1",
+            "CreateRun should refresh the stored player rank snapshot on conflict."
+        );
+        Assert(
+            GetInt64(connection, "SELECT player_rating FROM runs WHERE run_id = $runId;", olderActiveRunId)
+                == 1333,
+            "CreateRun should refresh the stored player rating snapshot on conflict."
+        );
     }
 }
 finally
