@@ -329,88 +329,88 @@ try
     {
         connection.Open();
         Assert(
-            CountRows(connection, "pvp_battles") == 1,
-            "Saving a PVP battle manifest should insert one row into pvp_battles."
+            CountRows(connection, "battles") == 1,
+            "Saving a PVP battle manifest should insert one row into battles."
         );
         Assert(
-            !ColumnExists(connection, "pvp_battles", "replay_id"),
-            "pvp_battles should no longer expose replay_id."
+            CountRows(connection, "battle_snapshots") == 1,
+            "Saving a PVP battle manifest should persist one snapshot row."
         );
         Assert(
             GetString(
                 connection,
-                "SELECT player_name FROM pvp_battles WHERE battle_id = $battleId;",
+                "SELECT player_name FROM battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == "Local Player",
-            "pvp_battles should persist the player name."
+            "battles should persist the player name."
         );
         Assert(
             GetString(
                 connection,
-                "SELECT player_account_id FROM pvp_battles WHERE battle_id = $battleId;",
+                "SELECT player_account_id FROM battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == "player-account-001",
-            "pvp_battles should persist the player account id."
+            "battles should persist the player account id."
         );
         Assert(
             GetString(
                 connection,
-                "SELECT opponent_account_id FROM pvp_battles WHERE battle_id = $battleId;",
+                "SELECT opponent_account_id FROM battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == "opponent-account-001",
-            "pvp_battles should persist the opponent account id."
+            "battles should persist the opponent account id."
         );
         Assert(
             GetString(
                 connection,
-                "SELECT opponent_hero FROM pvp_battles WHERE battle_id = $battleId;",
+                "SELECT opponent_hero FROM battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == "Vanessa",
-            "pvp_battles should persist the opponent hero."
+            "battles should persist the opponent hero."
         );
         Assert(
             GetString(
                 connection,
-                "SELECT opponent_rank FROM pvp_battles WHERE battle_id = $battleId;",
+                "SELECT opponent_rank FROM battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == "Legend",
-            "pvp_battles should persist the opponent rank."
+            "battles should persist the opponent rank."
         );
         Assert(
             GetInt32(
                 connection,
-                "SELECT opponent_rating FROM pvp_battles WHERE battle_id = $battleId;",
+                "SELECT opponent_rating FROM battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == 2048,
-            "pvp_battles should persist the opponent rating."
+            "battles should persist the opponent rating."
         );
         Assert(
             GetInt32(
                 connection,
-                "SELECT opponent_level FROM pvp_battles WHERE battle_id = $battleId;",
+                "SELECT opponent_level FROM battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == 12,
-            "pvp_battles should persist the opponent level."
+            "battles should persist the opponent level."
         );
         Assert(
             GetString(
                 connection,
-                "SELECT result FROM pvp_battles WHERE battle_id = $battleId;",
+                "SELECT result FROM battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == "win",
-            "pvp_battles should persist the player's combat result."
+            "battles should persist the player's combat result."
         );
         Assert(
             GetString(
                 connection,
-                "SELECT winner_combatant_id FROM pvp_battles WHERE battle_id = $battleId;",
+                "SELECT winner_combatant_id FROM battles WHERE battle_id = $battleId;",
                 "battle-001"
             ) == "Player",
-            "pvp_battles should persist the winner combatant id."
+            "battles should persist the winner combatant id."
         );
         var playerHandJson = GetString(
             connection,
-            "SELECT player_hand_json FROM pvp_battles WHERE battle_id = $battleId;",
+            "SELECT player_hand_json FROM battle_snapshots WHERE battle_id = $battleId;",
             "battle-001"
         );
         Assert(
@@ -423,137 +423,18 @@ try
                 && playerHandJson.Contains("Sparkblade", StringComparison.Ordinal)
                 && playerHandJson.Contains("Radiant", StringComparison.Ordinal)
                 && playerHandJson.Contains("Damage", StringComparison.Ordinal),
-            "pvp_battles should persist detailed capture objects for hand-card metadata."
+            "battle_snapshots should persist detailed capture objects for hand-card metadata."
         );
         var playerSkillsJson = GetString(
             connection,
-            "SELECT player_skills_json FROM pvp_battles WHERE battle_id = $battleId;",
+            "SELECT player_skills_json FROM battle_snapshots WHERE battle_id = $battleId;",
             "battle-001"
         );
         Assert(
             playerSkillsJson.Contains("Missing", StringComparison.Ordinal)
                 && playerSkillsJson.Contains("Unknown", StringComparison.Ordinal)
                 && !playerSkillsJson.Contains("CapturedEmpty", StringComparison.Ordinal),
-            "pvp_battles should preserve explicit missing capture semantics instead of guessing from empty lists."
-        );
-    }
-
-    var legacyDbPath = Path.Combine(tempRoot, "legacy-run-logs.db");
-    using (var legacyConnection = new SqliteConnection($"Data Source={legacyDbPath}"))
-    {
-        legacyConnection.Open();
-        using var legacyCommand = legacyConnection.CreateCommand();
-        legacyCommand.CommandText = """
-            CREATE TABLE pvp_battles (
-                battle_id TEXT PRIMARY KEY,
-                replay_id TEXT NOT NULL,
-                run_id TEXT NULL,
-                recorded_at_utc TEXT NOT NULL,
-                day INTEGER NULL,
-                hour INTEGER NULL,
-                encounter_id TEXT NULL,
-                player_name TEXT NULL,
-                player_account_id TEXT NULL,
-                opponent_name TEXT NULL,
-                opponent_hero TEXT NULL,
-                opponent_rank TEXT NULL,
-                opponent_rating INTEGER NULL,
-                opponent_level INTEGER NULL,
-                opponent_account_id TEXT NULL,
-                combat_kind TEXT NOT NULL,
-                result TEXT NULL,
-                winner_combatant_id TEXT NULL,
-                loser_combatant_id TEXT NULL,
-                player_hand_json TEXT NOT NULL,
-                player_skills_json TEXT NOT NULL,
-                opponent_hand_json TEXT NOT NULL,
-                opponent_skills_json TEXT NOT NULL
-            );
-
-            INSERT INTO pvp_battles (
-                battle_id,
-                replay_id,
-                run_id,
-                recorded_at_utc,
-                day,
-                hour,
-                encounter_id,
-                player_name,
-                player_account_id,
-                opponent_name,
-                opponent_hero,
-                opponent_rank,
-                opponent_rating,
-                opponent_level,
-                opponent_account_id,
-                combat_kind,
-                result,
-                winner_combatant_id,
-                loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json
-            ) VALUES (
-                'legacy-battle-001',
-                'legacy-replay-001',
-                'legacy-run-001',
-                '2026-03-17T01:02:03.0000000+00:00',
-                2,
-                4,
-                'legacy-encounter',
-                'Legacy Player',
-                'legacy-player-account',
-                'Legacy Opponent',
-                NULL,
-                NULL,
-                NULL,
-                NULL,
-                'legacy-opponent-account',
-                'PVPCombat',
-                'loss',
-                'Opponent',
-                'Player',
-                '{"status":"Captured","source":"OpeningMessage","items":[]}',
-                '{"status":"Missing","source":"Unknown","items":[]}',
-                '{"status":"Captured","source":"OpeningMessage","items":[]}',
-                '{"status":"CapturedEmpty","source":"OpeningMessage","items":[]}'
-            );
-            """;
-        legacyCommand.ExecuteNonQuery();
-    }
-
-    var migratedBattleCatalog = Activator.CreateInstance(catalogType, legacyDbPath);
-    Assert(
-        migratedBattleCatalog != null,
-        "PvpBattleCatalog should migrate legacy pvp_battles tables."
-    );
-    var migratedLegacyManifest = Invoke(
-        catalogType,
-        migratedBattleCatalog!,
-        "TryLoad",
-        new object?[] { "legacy-battle-001" }
-    );
-    Assert(migratedLegacyManifest != null, "Catalog should preserve existing legacy battle rows.");
-    Assert(
-        string.Equals(
-            (string?)GetProperty(manifestType, migratedLegacyManifest!, "RunId"),
-            "legacy-run-001",
-            StringComparison.Ordinal
-        ),
-        "Legacy battle rows should survive replay_id migration."
-    );
-    Invoke(catalogType, migratedBattleCatalog!, "Save", new object?[] { manifest! });
-    using (var migratedConnection = new SqliteConnection($"Data Source={legacyDbPath}"))
-    {
-        migratedConnection.Open();
-        Assert(
-            !ColumnExists(migratedConnection, "pvp_battles", "replay_id"),
-            "Legacy pvp_battles tables should be migrated to drop replay_id."
-        );
-        Assert(
-            CountRows(migratedConnection, "pvp_battles") == 2,
-            "Migrated catalogs should keep legacy rows and accept new battle manifests."
+            "battle_snapshots should preserve explicit missing capture semantics instead of guessing from empty lists."
         );
     }
 

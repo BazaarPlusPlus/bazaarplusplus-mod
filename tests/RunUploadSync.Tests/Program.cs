@@ -128,10 +128,10 @@ try
         Assert(
             GetInt64(
                 connection,
-                "SELECT last_seq FROM run_checkpoints WHERE run_id = $runId;",
+                "SELECT last_seq FROM runs WHERE run_id = $runId;",
                 runId
             ) == 1,
-            "QueuedRunLogStore should flush pending checkpoints before CompleteRun returns."
+            "QueuedRunLogStore should flush the inline run checkpoint state before CompleteRun returns."
         );
         Assert(
             GetInt64(connection, "SELECT dirty FROM run_sync_state WHERE run_id = $runId;", runId)

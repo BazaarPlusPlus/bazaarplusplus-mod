@@ -159,6 +159,21 @@ var requestsHandled = Task.Run(async () =>
 
 try
 {
+    var runStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.SqliteRunLogStore");
+    var runStore =
+        Activator.CreateInstance(runStoreType, dbPath)
+        ?? throw new InvalidOperationException("Failed to create SqliteRunLogStore.");
+    var createRunRequestType = RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCreateRequest");
+    var createRunRequest = Activator.CreateInstance(createRunRequestType)!;
+    createRunRequestType.GetProperty("RunId")!.SetValue(createRunRequest, "server-run-auth-001");
+    createRunRequestType
+        .GetProperty("StartedAtUtc")!
+        .SetValue(createRunRequest, new DateTimeOffset(2026, 3, 28, 2, 30, 0, TimeSpan.Zero));
+    createRunRequestType.GetProperty("Hero")!.SetValue(createRunRequest, "Vanessa");
+    createRunRequestType.GetProperty("GameMode")!.SetValue(createRunRequest, "Ranked");
+    createRunRequestType.GetProperty("Status")!.SetValue(createRunRequest, "active");
+    InvokeVoid(runStoreType, runStore, "CreateRun", [createRunRequest]);
+
     var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
     var payloadStore =
         Activator.CreateInstance(payloadStoreType, replayRoot)
@@ -232,14 +247,14 @@ try
         Assert(
             GetInt64(
                 connection,
-                "SELECT dirty FROM replay_sync_state WHERE battle_id = $battleId;",
+                "SELECT replay_dirty FROM battles WHERE battle_id = $battleId;",
                 "battle-auth-001"
             ) == 0,
             "Successful replay upload should clear the dirty flag."
         );
         Assert(
-            !ColumnExists(connection, "replay_sync_state", "payload_sha256")
-                && !ColumnExists(connection, "replay_sync_state", "object_key"),
+            !ColumnExists(connection, "battles", "payload_sha256")
+                && !ColumnExists(connection, "battles", "object_key"),
             "Successful battle upload should not persist upload object metadata locally."
         );
     }

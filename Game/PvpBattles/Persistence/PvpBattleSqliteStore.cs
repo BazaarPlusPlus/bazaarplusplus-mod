@@ -42,15 +42,6 @@ internal sealed class PvpBattleSqliteStore
         using var command = CreateCommand(connection);
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
-        MigrateLegacyReplayIdColumn(connection);
-        EnsurePvpBattleOptionalColumn(connection, "player_hero", "TEXT NULL");
-        EnsurePvpBattleOptionalColumn(connection, "player_rank", "TEXT NULL");
-        EnsurePvpBattleOptionalColumn(connection, "player_rating", "INTEGER NULL");
-        EnsurePvpBattleOptionalColumn(connection, "player_level", "INTEGER NULL");
-        EnsurePvpBattleOptionalColumn(connection, "opponent_hero", "TEXT NULL");
-        EnsurePvpBattleOptionalColumn(connection, "opponent_rank", "TEXT NULL");
-        EnsurePvpBattleOptionalColumn(connection, "opponent_rating", "INTEGER NULL");
-        EnsurePvpBattleOptionalColumn(connection, "opponent_level", "INTEGER NULL");
     }
 
     public void Save(PvpBattleManifest manifest)
@@ -63,11 +54,15 @@ internal sealed class PvpBattleSqliteStore
             return;
 
         using var connection = OpenConnection();
-        using var command = CreateCommand(connection);
+        using var transaction = connection.BeginTransaction();
+        var persistedRunId = ResolvePersistedRunId(connection, transaction, manifest.RunId);
+        using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.PvpBattlesTableName} (
+            INSERT INTO {RunLogSqliteSchema.BattlesTableName} (
                 battle_id,
+                source,
                 run_id,
+                has_local_payload,
                 recorded_at_utc,
                 day,
                 hour,
@@ -87,14 +82,12 @@ internal sealed class PvpBattleSqliteStore
                 combat_kind,
                 result,
                 winner_combatant_id,
-                loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json
+                loser_combatant_id
             ) VALUES (
                 $battleId,
+                'LOCAL',
                 $runId,
+                1,
                 $recordedAtUtc,
                 $day,
                 $hour,
@@ -114,13 +107,10 @@ internal sealed class PvpBattleSqliteStore
                 $combatKind,
                 $result,
                 $winnerCombatantId,
-                $loserCombatantId,
-                $playerHandJson,
-                $playerSkillsJson,
-                $opponentHandJson,
-                $opponentSkillsJson
+                $loserCombatantId
             )
             ON CONFLICT(battle_id) DO UPDATE SET
+                source = 'LOCAL',
                 run_id = excluded.run_id,
                 recorded_at_utc = excluded.recorded_at_utc,
                 day = excluded.day,
@@ -142,13 +132,10 @@ internal sealed class PvpBattleSqliteStore
                 result = excluded.result,
                 winner_combatant_id = excluded.winner_combatant_id,
                 loser_combatant_id = excluded.loser_combatant_id,
-                player_hand_json = excluded.player_hand_json,
-                player_skills_json = excluded.player_skills_json,
-                opponent_hand_json = excluded.opponent_hand_json,
-                opponent_skills_json = excluded.opponent_skills_json;
+                has_local_payload = 1;
             """;
         command.Parameters.AddWithValue("$battleId", manifest.BattleId);
-        command.Parameters.AddWithValue("$runId", (object?)manifest.RunId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$runId", (object?)persistedRunId ?? DBNull.Value);
         command.Parameters.AddWithValue("$recordedAtUtc", manifest.RecordedAtUtc.ToString("o"));
         AddNullableInt32(command, "$day", manifest.Day);
         AddNullableInt32(command, "$hour", manifest.Hour);
@@ -205,23 +192,68 @@ internal sealed class PvpBattleSqliteStore
             "$loserCombatantId",
             (object?)manifest.Outcome.LoserCombatantId ?? DBNull.Value
         );
-        command.Parameters.AddWithValue(
+        command.ExecuteNonQuery();
+
+        using var snapshotCommand = CreateCommand(connection, transaction);
+        snapshotCommand.CommandText = $"""
+            INSERT INTO {RunLogSqliteSchema.BattleSnapshotsTableName} (
+                battle_id,
+                player_hand_json,
+                player_skills_json,
+                opponent_hand_json,
+                opponent_skills_json
+            ) VALUES (
+                $battleId,
+                $playerHandJson,
+                $playerSkillsJson,
+                $opponentHandJson,
+                $opponentSkillsJson
+            )
+            ON CONFLICT(battle_id) DO UPDATE SET
+                player_hand_json = excluded.player_hand_json,
+                player_skills_json = excluded.player_skills_json,
+                opponent_hand_json = excluded.opponent_hand_json,
+                opponent_skills_json = excluded.opponent_skills_json;
+            """;
+        snapshotCommand.Parameters.AddWithValue("$battleId", manifest.BattleId);
+        snapshotCommand.Parameters.AddWithValue(
             "$playerHandJson",
             SerializeCapture(manifest.Snapshots.PlayerHand)
         );
-        command.Parameters.AddWithValue(
+        snapshotCommand.Parameters.AddWithValue(
             "$playerSkillsJson",
             SerializeCapture(manifest.Snapshots.PlayerSkills)
         );
-        command.Parameters.AddWithValue(
+        snapshotCommand.Parameters.AddWithValue(
             "$opponentHandJson",
             SerializeCapture(manifest.Snapshots.OpponentHand)
         );
-        command.Parameters.AddWithValue(
+        snapshotCommand.Parameters.AddWithValue(
             "$opponentSkillsJson",
             SerializeCapture(manifest.Snapshots.OpponentSkills)
         );
-        command.ExecuteNonQuery();
+        snapshotCommand.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    private static string? ResolvePersistedRunId(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string? runId
+    )
+    {
+        if (string.IsNullOrWhiteSpace(runId))
+            return null;
+
+        using var command = CreateCommand(connection, transaction);
+        command.CommandText = $"""
+            SELECT 1
+            FROM {RunLogSqliteSchema.RunsTableName}
+            WHERE run_id = $runId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+        return command.ExecuteScalar() == null ? null : runId;
     }
 
     public PvpBattleManifest? TryLoad(string battleId)
@@ -230,34 +262,37 @@ internal sealed class PvpBattleSqliteStore
         using var command = CreateCommand(connection);
         command.CommandText = $"""
             SELECT
-                battle_id,
-                run_id,
-                recorded_at_utc,
-                day,
-                hour,
-                encounter_id,
-                player_name,
-                player_account_id,
-                player_hero,
-                player_rank,
-                player_rating,
-                player_level,
-                opponent_name,
-                opponent_hero,
-                opponent_rank,
-                opponent_rating,
-                opponent_level,
-                opponent_account_id,
-                combat_kind,
-                result,
-                winner_combatant_id,
-                loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json
-            FROM {RunLogSqliteSchema.PvpBattlesTableName}
-            WHERE battle_id = $battleId
+                b.battle_id,
+                b.run_id,
+                b.recorded_at_utc,
+                b.day,
+                b.hour,
+                b.encounter_id,
+                b.player_name,
+                b.player_account_id,
+                b.player_hero,
+                b.player_rank,
+                b.player_rating,
+                b.player_level,
+                b.opponent_name,
+                b.opponent_hero,
+                b.opponent_rank,
+                b.opponent_rating,
+                b.opponent_level,
+                b.opponent_account_id,
+                b.combat_kind,
+                b.result,
+                b.winner_combatant_id,
+                b.loser_combatant_id,
+                s.player_hand_json,
+                s.player_skills_json,
+                s.opponent_hand_json,
+                s.opponent_skills_json
+            FROM {RunLogSqliteSchema.BattlesTableName} AS b
+            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+                ON s.battle_id = b.battle_id
+            WHERE b.battle_id = $battleId
+              AND b.source = 'LOCAL'
             LIMIT 1;
             """;
         command.Parameters.AddWithValue("$battleId", battleId);
@@ -276,7 +311,7 @@ internal sealed class PvpBattleSqliteStore
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText =
-            $"DELETE FROM {RunLogSqliteSchema.PvpBattlesTableName} WHERE battle_id = $battleId;";
+            $"DELETE FROM {RunLogSqliteSchema.BattlesTableName} WHERE battle_id = $battleId;";
         command.Parameters.AddWithValue("$battleId", battleId);
         command.ExecuteNonQuery();
     }
@@ -287,7 +322,8 @@ internal sealed class PvpBattleSqliteStore
         using var command = CreateCommand(connection);
         command.CommandText = $"""
             SELECT battle_id
-            FROM {RunLogSqliteSchema.PvpBattlesTableName}
+            FROM {RunLogSqliteSchema.BattlesTableName}
+            WHERE source = 'LOCAL'
             ORDER BY recorded_at_utc DESC, battle_id DESC;
             """;
 
@@ -304,34 +340,37 @@ internal sealed class PvpBattleSqliteStore
         using var command = CreateCommand(connection);
         command.CommandText = $"""
             SELECT
-                battle_id,
-                run_id,
-                recorded_at_utc,
-                day,
-                hour,
-                encounter_id,
-                player_name,
-                player_account_id,
-                player_hero,
-                player_rank,
-                player_rating,
-                player_level,
-                opponent_name,
-                opponent_hero,
-                opponent_rank,
-                opponent_rating,
-                opponent_level,
-                opponent_account_id,
-                combat_kind,
-                result,
-                winner_combatant_id,
-                loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json
-            FROM {RunLogSqliteSchema.PvpBattlesTableName}
-            ORDER BY recorded_at_utc DESC, battle_id DESC
+                b.battle_id,
+                b.run_id,
+                b.recorded_at_utc,
+                b.day,
+                b.hour,
+                b.encounter_id,
+                b.player_name,
+                b.player_account_id,
+                b.player_hero,
+                b.player_rank,
+                b.player_rating,
+                b.player_level,
+                b.opponent_name,
+                b.opponent_hero,
+                b.opponent_rank,
+                b.opponent_rating,
+                b.opponent_level,
+                b.opponent_account_id,
+                b.combat_kind,
+                b.result,
+                b.winner_combatant_id,
+                b.loser_combatant_id,
+                s.player_hand_json,
+                s.player_skills_json,
+                s.opponent_hand_json,
+                s.opponent_skills_json
+            FROM {RunLogSqliteSchema.BattlesTableName} AS b
+            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+                ON s.battle_id = b.battle_id
+            WHERE b.source = 'LOCAL'
+            ORDER BY b.recorded_at_utc DESC, b.battle_id DESC
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$limit", limit);

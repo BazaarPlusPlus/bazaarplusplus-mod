@@ -59,65 +59,50 @@ internal sealed class HistoryPanelRepository
                 r.hero,
                 r.game_mode,
                 r.started_at_utc,
+                r.last_seen_at_utc,
                 r.player_rank,
                 r.player_rating,
                 r.status AS run_status,
-                rs.status AS final_status,
-                rs.final_day,
-                rs.final_hour,
-                rs.max_health AS final_max_health,
-                rs.prestige AS final_prestige,
-                rs.level AS final_level,
-                rs.income AS final_income,
-                rs.gold AS final_gold,
-                rs.victories,
-                rs.losses,
-                rs.ended_at_utc,
-                cp.day AS checkpoint_day,
-                cp.hour AS checkpoint_hour,
-                cp.max_health AS checkpoint_max_health,
-                cp.prestige AS checkpoint_prestige,
-                cp.level AS checkpoint_level,
-                cp.income AS checkpoint_income,
-                cp.gold AS checkpoint_gold,
-                cp.last_seen_at_utc,
+                r.day,
+                r.hour,
+                r.final_day,
+                r.final_hour,
+                r.max_health AS final_max_health,
+                r.prestige AS final_prestige,
+                r.level AS final_level,
+                r.income AS final_income,
+                r.gold AS final_gold,
+                r.victories,
+                r.losses,
+                r.ended_at_utc,
                 COUNT(pb.battle_id) AS battle_count
             FROM {RunLogSqliteSchema.RunsTableName} AS r
-            LEFT JOIN {RunLogSqliteSchema.RunStatusTableName} AS rs
-                ON rs.run_id = r.run_id
-            LEFT JOIN {RunLogSqliteSchema.RunCheckpointsTableName} AS cp
-                ON cp.run_id = r.run_id
-            LEFT JOIN {RunLogSqliteSchema.PvpBattlesTableName} AS pb
+            LEFT JOIN {RunLogSqliteSchema.BattlesTableName} AS pb
                 ON pb.run_id = r.run_id
+               AND pb.source = 'LOCAL'
             GROUP BY
                 r.run_id,
                 r.hero,
                 r.game_mode,
                 r.started_at_utc,
+                r.last_seen_at_utc,
                 r.player_rank,
                 r.player_rating,
                 r.status,
-                rs.status,
-                rs.final_day,
-                rs.final_hour,
-                rs.max_health,
-                rs.prestige,
-                rs.level,
-                rs.income,
-                rs.gold,
-                rs.victories,
-                rs.losses,
-                rs.ended_at_utc,
-                cp.day,
-                cp.hour,
-                cp.max_health,
-                cp.prestige,
-                cp.level,
-                cp.income,
-                cp.gold,
-                cp.last_seen_at_utc
+                r.day,
+                r.hour,
+                r.final_day,
+                r.final_hour,
+                r.max_health,
+                r.prestige,
+                r.level,
+                r.income,
+                r.gold,
+                r.victories,
+                r.losses,
+                r.ended_at_utc
             ORDER BY
-                COALESCE(rs.ended_at_utc, cp.last_seen_at_utc, r.started_at_utc) DESC,
+                COALESCE(r.ended_at_utc, r.last_seen_at_utc, r.started_at_utc) DESC,
                 r.run_id DESC
             LIMIT $limit;
             """;
@@ -133,16 +118,11 @@ internal sealed class HistoryPanelRepository
             var endedAt = GetNullableDateTimeOffset(reader, "ended_at_utc");
             var victories = GetNullableInt32(reader, "victories");
             var losses = GetNullableInt32(reader, "losses");
-            var finalDay =
-                GetNullableInt32(reader, "final_day") ?? GetNullableInt32(reader, "checkpoint_day");
+            var finalDay = GetNullableInt32(reader, "final_day") ?? GetNullableInt32(reader, "day");
             var finalHour =
-                GetNullableInt32(reader, "final_hour")
-                ?? GetNullableInt32(reader, "checkpoint_hour");
-            var lastSeen =
-                endedAt ?? GetNullableDateTimeOffset(reader, "last_seen_at_utc") ?? startedAt;
-            var rawStatus =
-                GetNullableString(reader, "final_status")
-                ?? reader.GetString(reader.GetOrdinal("run_status"));
+                GetNullableInt32(reader, "final_hour") ?? GetNullableInt32(reader, "hour");
+            var lastSeen = endedAt ?? GetNullableDateTimeOffset(reader, "last_seen_at_utc") ?? startedAt;
+            var rawStatus = reader.GetString(reader.GetOrdinal("run_status"));
 
             records.Add(
                 new HistoryRunRecord(
@@ -154,16 +134,11 @@ internal sealed class HistoryPanelRepository
                     lastSeen,
                     finalDay,
                     finalHour,
-                    GetNullableInt32(reader, "final_max_health")
-                        ?? GetNullableInt32(reader, "checkpoint_max_health"),
-                    GetNullableInt32(reader, "final_prestige")
-                        ?? GetNullableInt32(reader, "checkpoint_prestige"),
-                    GetNullableInt32(reader, "final_level")
-                        ?? GetNullableInt32(reader, "checkpoint_level"),
-                    GetNullableInt32(reader, "final_income")
-                        ?? GetNullableInt32(reader, "checkpoint_income"),
-                    GetNullableInt32(reader, "final_gold")
-                        ?? GetNullableInt32(reader, "checkpoint_gold"),
+                    GetNullableInt32(reader, "final_max_health"),
+                    GetNullableInt32(reader, "final_prestige"),
+                    GetNullableInt32(reader, "final_level"),
+                    GetNullableInt32(reader, "final_income"),
+                    GetNullableInt32(reader, "final_gold"),
                     GetNullableString(reader, "player_rank"),
                     GetNullableInt32(reader, "player_rating"),
                     victories,
@@ -187,33 +162,36 @@ internal sealed class HistoryPanelRepository
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT
-                battle_id,
-                run_id,
-                recorded_at_utc,
-                day,
-                hour,
-                encounter_id,
-                player_hero,
-                player_rank,
-                player_rating,
-                player_level,
-                opponent_name,
-                opponent_hero,
-                opponent_rank,
-                opponent_rating,
-                opponent_level,
-                opponent_account_id,
-                combat_kind,
-                result,
-                winner_combatant_id,
-                loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json
-            FROM {RunLogSqliteSchema.PvpBattlesTableName}
-            WHERE run_id = $runId
-            ORDER BY recorded_at_utc DESC, battle_id DESC;
+                b.battle_id,
+                b.run_id,
+                b.recorded_at_utc,
+                b.day,
+                b.hour,
+                b.encounter_id,
+                b.player_hero,
+                b.player_rank,
+                b.player_rating,
+                b.player_level,
+                b.opponent_name,
+                b.opponent_hero,
+                b.opponent_rank,
+                b.opponent_rating,
+                b.opponent_level,
+                b.opponent_account_id,
+                b.combat_kind,
+                b.result,
+                b.winner_combatant_id,
+                b.loser_combatant_id,
+                s.player_hand_json,
+                s.player_skills_json,
+                s.opponent_hand_json,
+                s.opponent_skills_json
+            FROM {RunLogSqliteSchema.BattlesTableName} AS b
+            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+                ON s.battle_id = b.battle_id
+            WHERE b.run_id = $runId
+              AND b.source = 'LOCAL'
+            ORDER BY b.recorded_at_utc DESC, b.battle_id DESC;
             """;
         command.Parameters.AddWithValue("$runId", runId);
 
@@ -323,8 +301,9 @@ internal sealed class HistoryPanelRepository
                 loser_combatant_id,
                 replay_available,
                 replay_downloaded
-            FROM {RunLogSqliteSchema.GhostBattlesTableName}
-            WHERE local_player_account_id = $localPlayerAccountId
+            FROM {RunLogSqliteSchema.BattlesTableName}
+            WHERE source = 'GHOST'
+              AND local_player_account_id = $localPlayerAccountId
               AND deleted_at_utc IS NULL
             ORDER BY recorded_at_utc DESC, battle_id DESC
             LIMIT $limit;
@@ -399,8 +378,10 @@ internal sealed class HistoryPanelRepository
             insertCommand.Transaction = transaction;
             insertCommand.CommandTimeout = 2;
             insertCommand.CommandText = $"""
-                INSERT INTO {RunLogSqliteSchema.GhostBattlesTableName} (
+                INSERT INTO {RunLogSqliteSchema.BattlesTableName} (
                     battle_id,
+                    source,
+                    run_id,
                     local_player_account_id,
                     recorded_at_utc,
                     day,
@@ -425,6 +406,8 @@ internal sealed class HistoryPanelRepository
                     last_synced_at_utc
                 ) VALUES (
                     $battleId,
+                    'GHOST',
+                    NULL,
                     $localPlayerAccountId,
                     $recordedAtUtc,
                     $day,
@@ -449,6 +432,8 @@ internal sealed class HistoryPanelRepository
                     $lastSyncedAtUtc
                 )
                 ON CONFLICT(battle_id) DO UPDATE SET
+                    source = 'GHOST',
+                    run_id = NULL,
                     local_player_account_id = excluded.local_player_account_id,
                     recorded_at_utc = excluded.recorded_at_utc,
                     day = excluded.day,
@@ -476,7 +461,7 @@ internal sealed class HistoryPanelRepository
                     last_synced_at_utc = excluded.last_synced_at_utc,
                     deleted_at_utc = CASE
                         WHEN excluded.recorded_at_utc >= $staleCutoffUtc THEN NULL
-                        ELSE {RunLogSqliteSchema.GhostBattlesTableName}.deleted_at_utc
+                        ELSE {RunLogSqliteSchema.BattlesTableName}.deleted_at_utc
                     END;
                 """;
             insertCommand.Parameters.AddWithValue("$battleId", battle.BattleId);
@@ -578,9 +563,10 @@ internal sealed class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.GhostBattlesTableName}
+            UPDATE {RunLogSqliteSchema.BattlesTableName}
             SET deleted_at_utc = COALESCE(deleted_at_utc, $deletedAtUtc)
-            WHERE local_player_account_id = $localPlayerAccountId
+            WHERE source = 'GHOST'
+              AND local_player_account_id = $localPlayerAccountId
               AND replay_downloaded = 0
               AND deleted_at_utc IS NULL
               AND recorded_at_utc < $staleCutoffUtc;
@@ -603,8 +589,8 @@ internal sealed class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            SELECT last_successful_sync_at_utc
-            FROM {RunLogSqliteSchema.GhostSyncStateTableName}
+            SELECT cursor_value
+            FROM {RunLogSqliteSchema.SyncCursorsTableName}
             WHERE scope = $scope
             LIMIT 1;
             """;
@@ -625,15 +611,18 @@ internal sealed class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.GhostSyncStateTableName} (
+            INSERT INTO {RunLogSqliteSchema.SyncCursorsTableName} (
                 scope,
-                last_successful_sync_at_utc
+                cursor_value,
+                updated_at_utc
             ) VALUES (
                 $scope,
+                $syncedAtUtc,
                 $syncedAtUtc
             )
             ON CONFLICT(scope) DO UPDATE SET
-                last_successful_sync_at_utc = excluded.last_successful_sync_at_utc;
+                cursor_value = excluded.cursor_value,
+                updated_at_utc = excluded.updated_at_utc;
             """;
         command.Parameters.AddWithValue("$scope", BuildGhostSyncScope(localPlayerAccountId));
         command.Parameters.AddWithValue("$syncedAtUtc", syncedAtUtc.ToString("o"));
@@ -649,9 +638,10 @@ internal sealed class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.GhostBattlesTableName}
+            UPDATE {RunLogSqliteSchema.BattlesTableName}
             SET replay_downloaded = 1
-            WHERE local_player_account_id = $localPlayerAccountId
+            WHERE source = 'GHOST'
+              AND local_player_account_id = $localPlayerAccountId
               AND battle_id = $battleId;
             """;
         command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
@@ -669,8 +659,9 @@ internal sealed class HistoryPanelRepository
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT battle_id
-            FROM {RunLogSqliteSchema.PvpBattlesTableName}
+            FROM {RunLogSqliteSchema.BattlesTableName}
             WHERE run_id = $runId
+              AND source = 'LOCAL'
             ORDER BY recorded_at_utc DESC, battle_id DESC;
             """;
         command.Parameters.AddWithValue("$runId", runId);
@@ -692,29 +683,12 @@ internal sealed class HistoryPanelRepository
             return;
 
         using var connection = OpenConnection();
-        using var transaction = connection.BeginTransaction();
-
-        using (var deleteBattles = connection.CreateCommand())
-        {
-            deleteBattles.Transaction = transaction;
-            deleteBattles.CommandTimeout = 2;
-            deleteBattles.CommandText =
-                $"DELETE FROM {RunLogSqliteSchema.PvpBattlesTableName} WHERE run_id = $runId;";
-            deleteBattles.Parameters.AddWithValue("$runId", runId);
-            deleteBattles.ExecuteNonQuery();
-        }
-
-        using (var deleteRun = connection.CreateCommand())
-        {
-            deleteRun.Transaction = transaction;
-            deleteRun.CommandTimeout = 2;
-            deleteRun.CommandText =
-                $"DELETE FROM {RunLogSqliteSchema.RunsTableName} WHERE run_id = $runId;";
-            deleteRun.Parameters.AddWithValue("$runId", runId);
-            deleteRun.ExecuteNonQuery();
-        }
-
-        transaction.Commit();
+        using var deleteRun = connection.CreateCommand();
+        deleteRun.CommandTimeout = 2;
+        deleteRun.CommandText =
+            $"DELETE FROM {RunLogSqliteSchema.RunsTableName} WHERE run_id = $runId;";
+        deleteRun.Parameters.AddWithValue("$runId", runId);
+        deleteRun.ExecuteNonQuery();
     }
 
     private SqliteConnection OpenConnection(bool ensureSchema = false)
@@ -732,42 +706,6 @@ internal sealed class HistoryPanelRepository
             bootstrap.CommandText = RunLogSqliteSchema.BootstrapSql;
             bootstrap.ExecuteNonQuery();
         }
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.PvpBattlesTableName,
-            "player_hero",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.PvpBattlesTableName,
-            "player_level",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.GhostBattlesTableName,
-            "local_player_account_id",
-            "TEXT NOT NULL DEFAULT ''"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.GhostBattlesTableName,
-            "deleted_at_utc",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.GhostBattlesTableName,
-            "player_hero",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.GhostBattlesTableName,
-            "player_level",
-            "INTEGER NULL"
-        );
         return connection;
     }
 

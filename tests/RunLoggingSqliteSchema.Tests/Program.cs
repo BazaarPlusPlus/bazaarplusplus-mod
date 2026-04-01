@@ -6,10 +6,9 @@ var schemaType = RequireType(
 );
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 5,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 6,
     "Local database schema version mismatch."
 );
-Assert(GetStaticValue<int>(schemaType, "RowSchemaVersion") == 5, "Row schema version mismatch.");
 Assert(
     GetStaticValue<int>(schemaType, "UploadPayloadSchemaVersion") == 1,
     "Upload payload schema version mismatch."
@@ -20,20 +19,16 @@ Assert(
 );
 Assert(GetStaticValue<string>(schemaType, "RunsTableName") == "runs", "Runs table name mismatch.");
 Assert(
-    GetStaticValue<string>(schemaType, "RunEventsTableName") == "run_events",
-    "Run events table name mismatch."
+    GetStaticValue<string>(schemaType, "BattlesTableName") == "battles",
+    "Battles table name mismatch."
 );
 Assert(
-    GetStaticValue<string>(schemaType, "RunCheckpointsTableName") == "run_checkpoints",
-    "Run checkpoints table name mismatch."
+    GetStaticValue<string>(schemaType, "BattleSnapshotsTableName") == "battle_snapshots",
+    "Battle snapshots table name mismatch."
 );
 Assert(
-    GetStaticValue<string>(schemaType, "RunStatusTableName") == "run_status",
-    "Run status table name mismatch."
-);
-Assert(
-    GetStaticValue<string>(schemaType, "PvpBattlesTableName") == "pvp_battles",
-    "PVP battles table name mismatch."
+    GetStaticValue<string>(schemaType, "SyncCursorsTableName") == "sync_cursors",
+    "Sync cursors table name mismatch."
 );
 
 var bootstrapSql = GetStaticValue<string>(schemaType, "BootstrapSql");
@@ -43,7 +38,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 5;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 6;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
@@ -51,29 +46,25 @@ Assert(
     "Bootstrap SQL should define runs."
 );
 Assert(
-    bootstrapSql.Contains("run_events", StringComparison.Ordinal),
-    "Bootstrap SQL should define run_events."
+    bootstrapSql.Contains("battles", StringComparison.Ordinal),
+    "Bootstrap SQL should define battles."
 );
 Assert(
-    bootstrapSql.Contains("run_checkpoints", StringComparison.Ordinal),
-    "Bootstrap SQL should define run_checkpoints."
+    bootstrapSql.Contains("battle_snapshots", StringComparison.Ordinal),
+    "Bootstrap SQL should define battle_snapshots."
 );
 Assert(
-    bootstrapSql.Contains("run_status", StringComparison.Ordinal),
-    "Bootstrap SQL should define run_status."
+    bootstrapSql.Contains("sync_cursors", StringComparison.Ordinal),
+    "Bootstrap SQL should define sync_cursors."
 );
 Assert(
-    bootstrapSql.Contains("pvp_battles", StringComparison.Ordinal),
-    "Bootstrap SQL should define pvp_battles."
-);
-Assert(
-    !bootstrapSql.Contains("replay_id", StringComparison.Ordinal),
-    "Bootstrap SQL should not retain replay_id in pvp_battles."
+    !bootstrapSql.Contains("schema_version", StringComparison.Ordinal),
+    "Bootstrap SQL should not keep row-level schema_version columns."
 );
 Assert(
     bootstrapSql.Contains("player_rank", StringComparison.Ordinal)
         && bootstrapSql.Contains("player_rating", StringComparison.Ordinal),
-    "Bootstrap SQL should define player rank and rating columns."
+    "Bootstrap SQL should define run and battle rank/rating columns."
 );
 Assert(
     bootstrapSql.Contains("player_name", StringComparison.Ordinal)
@@ -87,19 +78,28 @@ Assert(
         && bootstrapSql.Contains("winner_combatant_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("loser_combatant_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("result", StringComparison.Ordinal),
-    "Bootstrap SQL should define PVP battle player identity and outcome columns."
+    "Bootstrap SQL should define unified battle identity and outcome columns."
 );
 Assert(
-    !TableContainsColumn(bootstrapSql, "ghost_battles", "player_name")
-        && !TableContainsColumn(bootstrapSql, "ghost_battles", "player_account_id"),
-    "Bootstrap SQL should not duplicate player identity columns in ghost_battles."
+    bootstrapSql.Contains("source TEXT NOT NULL", StringComparison.Ordinal)
+        && bootstrapSql.Contains("has_local_payload", StringComparison.Ordinal)
+        && bootstrapSql.Contains("replay_dirty", StringComparison.Ordinal),
+    "Bootstrap SQL should inline battle source and replay sync state."
 );
 Assert(
     bootstrapSql.Contains("player_hand_json", StringComparison.Ordinal)
         && bootstrapSql.Contains("player_skills_json", StringComparison.Ordinal)
         && bootstrapSql.Contains("opponent_hand_json", StringComparison.Ordinal)
         && bootstrapSql.Contains("opponent_skills_json", StringComparison.Ordinal),
-    "Bootstrap SQL should define snapshot capture JSON columns."
+    "Bootstrap SQL should define battle snapshot JSON columns."
+);
+Assert(
+    bootstrapSql.Contains("FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE", StringComparison.Ordinal)
+        && bootstrapSql.Contains(
+            "FOREIGN KEY (battle_id) REFERENCES battles(battle_id) ON DELETE CASCADE",
+            StringComparison.Ordinal
+        ),
+    "Bootstrap SQL should enforce run and battle cascade relationships."
 );
 
 Console.WriteLine("RunLogging SQLite schema checks passed.");
@@ -123,21 +123,4 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
-}
-
-static bool TableContainsColumn(string sql, string tableName, string columnName)
-{
-    var tableStart = sql.IndexOf(
-        $"CREATE TABLE IF NOT EXISTS {tableName} (",
-        StringComparison.Ordinal
-    );
-    if (tableStart < 0)
-        return false;
-
-    var tableEnd = sql.IndexOf(");", tableStart, StringComparison.Ordinal);
-    if (tableEnd < 0)
-        return false;
-
-    var section = sql.Substring(tableStart, tableEnd - tableStart);
-    return section.Contains(columnName, StringComparison.Ordinal);
 }

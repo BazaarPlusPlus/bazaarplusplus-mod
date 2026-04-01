@@ -37,18 +37,11 @@ internal sealed class BattleUploadSqliteStore
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.ReplaySyncStateTableName} (
-                battle_id,
-                dirty,
-                retry_count
-            ) VALUES (
-                $battleId,
-                1,
-                0
-            )
-            ON CONFLICT(battle_id) DO UPDATE SET
-                dirty = 1,
-                last_error = NULL;
+            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            SET replay_dirty = 1,
+                replay_last_error = NULL
+            WHERE battle_id = $battleId
+              AND source = 'LOCAL';
             """;
         command.Parameters.AddWithValue("$battleId", battleId);
         command.ExecuteNonQuery();
@@ -60,12 +53,11 @@ internal sealed class BattleUploadSqliteStore
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            SELECT s.battle_id
-            FROM {RunLogSqliteSchema.ReplaySyncStateTableName} AS s
-            INNER JOIN {RunLogSqliteSchema.PvpBattlesTableName} AS b
-                ON b.battle_id = s.battle_id
-            WHERE s.dirty = 1
-            ORDER BY COALESCE(s.last_attempt_at_utc, b.recorded_at_utc) ASC
+            SELECT battle_id
+            FROM {RunLogSqliteSchema.BattlesTableName}
+            WHERE source = 'LOCAL'
+              AND replay_dirty = 1
+            ORDER BY COALESCE(replay_last_attempt_at_utc, recorded_at_utc) ASC
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$limit", Math.Max(1, limit));
@@ -85,8 +77,9 @@ internal sealed class BattleUploadSqliteStore
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT 1
-            FROM {RunLogSqliteSchema.ReplaySyncStateTableName}
-            WHERE dirty = 1
+            FROM {RunLogSqliteSchema.BattlesTableName}
+            WHERE source = 'LOCAL'
+              AND replay_dirty = 1
             LIMIT 1;
             """;
         return command.ExecuteScalar() != null;
@@ -98,11 +91,12 @@ internal sealed class BattleUploadSqliteStore
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.ReplaySyncStateTableName}
-            SET last_attempt_at_utc = $attemptedAtUtc,
-                retry_count = retry_count + 1,
-                last_error = $error
-            WHERE battle_id = $battleId;
+            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            SET replay_last_attempt_at_utc = $attemptedAtUtc,
+                replay_retry_count = replay_retry_count + 1,
+                replay_last_error = $error
+            WHERE battle_id = $battleId
+              AND source = 'LOCAL';
             """;
         command.Parameters.AddWithValue("$battleId", battleId);
         command.Parameters.AddWithValue("$attemptedAtUtc", attemptedAtUtc.ToString("o"));
@@ -120,12 +114,13 @@ internal sealed class BattleUploadSqliteStore
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.ReplaySyncStateTableName}
-            SET dirty = 0,
-                last_attempt_at_utc = $attemptedAtUtc,
-                retry_count = retry_count + 1,
-                last_error = $error
-            WHERE battle_id = $battleId;
+            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            SET replay_dirty = 0,
+                replay_last_attempt_at_utc = $attemptedAtUtc,
+                replay_retry_count = replay_retry_count + 1,
+                replay_last_error = $error
+            WHERE battle_id = $battleId
+              AND source = 'LOCAL';
             """;
         command.Parameters.AddWithValue("$battleId", battleId);
         command.Parameters.AddWithValue("$attemptedAtUtc", attemptedAtUtc.ToString("o"));
@@ -139,13 +134,14 @@ internal sealed class BattleUploadSqliteStore
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.ReplaySyncStateTableName}
-            SET dirty = 0,
-                last_attempt_at_utc = $uploadedAtUtc,
-                last_uploaded_at_utc = $uploadedAtUtc,
-                retry_count = 0,
-                last_error = NULL
-            WHERE battle_id = $battleId;
+            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            SET replay_dirty = 0,
+                replay_last_attempt_at_utc = $uploadedAtUtc,
+                replay_last_uploaded_at_utc = $uploadedAtUtc,
+                replay_retry_count = 0,
+                replay_last_error = NULL
+            WHERE battle_id = $battleId
+              AND source = 'LOCAL';
             """;
         command.Parameters.AddWithValue("$battleId", battleId);
         command.Parameters.AddWithValue("$uploadedAtUtc", uploadedAtUtc.ToString("o"));

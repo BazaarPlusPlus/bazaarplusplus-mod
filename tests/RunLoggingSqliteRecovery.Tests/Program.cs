@@ -155,9 +155,9 @@ try
     {
         connection.Open();
         Assert(
-            GetString(connection, "SELECT status FROM run_status WHERE run_id = $runId;", runId)
+            GetString(connection, "SELECT status FROM runs WHERE run_id = $runId;", runId)
                 == "abandoned",
-            "run_status should mark the run abandoned."
+            "runs should mark the run abandoned."
         );
     }
 

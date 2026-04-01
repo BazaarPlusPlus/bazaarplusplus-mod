@@ -30,7 +30,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
             throw new ArgumentException("Database path is required.", nameof(databasePath));
 
         _databasePath = databasePath;
-
         var directory = Path.GetDirectoryName(_databasePath);
         if (!string.IsNullOrWhiteSpace(directory))
             Directory.CreateDirectory(directory);
@@ -40,102 +39,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var command = CreateCommand(connection);
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunsTableName,
-            "player_rank",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunsTableName,
-            "player_rating",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunCheckpointsTableName,
-            "pending_selection_json",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunCheckpointsTableName,
-            "max_health",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunCheckpointsTableName,
-            "prestige",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunCheckpointsTableName,
-            "level",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunCheckpointsTableName,
-            "income",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunCheckpointsTableName,
-            "gold",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "max_health",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "prestige",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "level",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "income",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "gold",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "final_player_rank",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "final_player_rating",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "final_player_rating_delta",
-            "INTEGER NULL"
-        );
     }
 
     public RunLogSessionState? TryResumeActiveRun()
@@ -160,51 +63,55 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.CommandText = $"""
             INSERT INTO {RunLogSqliteSchema.RunsTableName} (
                 run_id,
-                schema_version,
                 started_at_utc,
+                last_seen_at_utc,
+                status,
+                completed,
                 hero,
                 game_mode,
+                seed,
                 player_rank,
                 player_rating,
                 day,
                 hour,
-                seed,
-                status
+                last_seq
             ) VALUES (
                 $runId,
-                $schemaVersion,
                 $startedAtUtc,
+                $lastSeenAtUtc,
+                $status,
+                0,
                 $hero,
                 $gameMode,
+                $seed,
                 $playerRank,
                 $playerRating,
                 $day,
                 $hour,
-                $seed,
-                $status
+                0
             )
             ON CONFLICT(run_id) DO UPDATE SET
-                schema_version = excluded.schema_version,
                 hero = excluded.hero,
                 game_mode = excluded.game_mode,
-                player_rank = COALESCE(excluded.player_rank, player_rank),
-                player_rating = COALESCE(excluded.player_rating, player_rating),
-                day = COALESCE(excluded.day, day),
-                hour = COALESCE(excluded.hour, hour),
-                seed = COALESCE(excluded.seed, seed),
-                status = excluded.status;
+                seed = COALESCE(excluded.seed, {RunLogSqliteSchema.RunsTableName}.seed),
+                player_rank = COALESCE(excluded.player_rank, {RunLogSqliteSchema.RunsTableName}.player_rank),
+                player_rating = COALESCE(excluded.player_rating, {RunLogSqliteSchema.RunsTableName}.player_rating),
+                day = COALESCE({RunLogSqliteSchema.RunsTableName}.day, excluded.day),
+                hour = COALESCE({RunLogSqliteSchema.RunsTableName}.hour, excluded.hour),
+                status = excluded.status,
+                completed = 0;
             """;
         command.Parameters.AddWithValue("$runId", request.RunId);
-        command.Parameters.AddWithValue("$schemaVersion", request.SchemaVersion);
         command.Parameters.AddWithValue("$startedAtUtc", request.StartedAtUtc.ToString("o"));
+        command.Parameters.AddWithValue("$lastSeenAtUtc", request.StartedAtUtc.ToString("o"));
+        command.Parameters.AddWithValue("$status", request.Status);
         command.Parameters.AddWithValue("$hero", request.Hero);
         command.Parameters.AddWithValue("$gameMode", request.GameMode);
+        AddNullableInt32(command, "$seed", request.Seed);
         AddNullableString(command, "$playerRank", request.PlayerRank);
         AddNullableInt32(command, "$playerRating", request.PlayerRating);
         AddNullableInt32(command, "$day", request.Day);
         AddNullableInt32(command, "$hour", request.Hour);
-        AddNullableInt32(command, "$seed", request.Seed);
-        command.Parameters.AddWithValue("$status", request.Status);
         command.ExecuteNonQuery();
 
         var session =
@@ -221,7 +128,9 @@ public sealed class SqliteRunLogStore : IRunLogStore
     {
         var payloadJson = JsonConvert.SerializeObject(entry, SerializerSettings);
         using var connection = OpenConnection();
-        using var command = CreateCommand(connection);
+        using var transaction = connection.BeginTransaction();
+
+        using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
             INSERT INTO {RunLogSqliteSchema.RunEventsTableName} (
                 run_id,
@@ -243,75 +152,51 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.Parameters.AddWithValue("$kind", entry.Kind);
         command.Parameters.AddWithValue("$payloadJson", payloadJson);
         command.ExecuteNonQuery();
+
+        using var updateRun = CreateCommand(connection, transaction);
+        updateRun.CommandText = $"""
+            UPDATE {RunLogSqliteSchema.RunsTableName}
+            SET last_seq = MAX(last_seq, $seq),
+                last_seen_at_utc = MAX(last_seen_at_utc, $tsUtc),
+                day = COALESCE($day, day),
+                hour = COALESCE($hour, hour)
+            WHERE run_id = $runId;
+            """;
+        updateRun.Parameters.AddWithValue("$runId", runId);
+        updateRun.Parameters.AddWithValue("$seq", entry.Seq);
+        updateRun.Parameters.AddWithValue("$tsUtc", entry.Ts.ToString("o"));
+        AddNullableInt32(updateRun, "$day", entry.Day);
+        AddNullableInt32(updateRun, "$hour", entry.Hour);
+        updateRun.ExecuteNonQuery();
+
+        transaction.Commit();
     }
 
     public void SaveCheckpoint(string runId, RunLogCheckpoint checkpoint)
     {
         using var connection = OpenConnection();
-        using var transaction = connection.BeginTransaction();
-
-        using var command = CreateCommand(connection, transaction);
+        using var command = CreateCommand(connection);
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.RunCheckpointsTableName} (
-                run_id,
-                schema_version,
-                last_seq,
-                last_seen_at_utc,
-                day,
-                hour,
-                max_health,
-                prestige,
-                level,
-                income,
-                gold,
-                state,
-                current_encounter_id,
-                last_state_fingerprint,
-                last_selection_fingerprint,
-                pending_selection_seq,
-                pending_selection_json,
-                completed
-            ) VALUES (
-                $runId,
-                $schemaVersion,
-                $lastSeq,
-                $lastSeenAtUtc,
-                $day,
-                $hour,
-                $maxHealth,
-                $prestige,
-                $level,
-                $income,
-                $gold,
-                $state,
-                $currentEncounterId,
-                $lastStateFingerprint,
-                $lastSelectionFingerprint,
-                $pendingSelectionSeq,
-                $pendingSelectionJson,
-                $completed
-            )
-            ON CONFLICT(run_id) DO UPDATE SET
-                schema_version = excluded.schema_version,
-                last_seq = excluded.last_seq,
-                last_seen_at_utc = excluded.last_seen_at_utc,
-                day = excluded.day,
-                hour = excluded.hour,
-                max_health = excluded.max_health,
-                prestige = excluded.prestige,
-                level = excluded.level,
-                income = excluded.income,
-                gold = excluded.gold,
-                state = excluded.state,
-                current_encounter_id = excluded.current_encounter_id,
-                last_state_fingerprint = excluded.last_state_fingerprint,
-                last_selection_fingerprint = excluded.last_selection_fingerprint,
-                pending_selection_seq = excluded.pending_selection_seq,
-                pending_selection_json = excluded.pending_selection_json,
-                completed = excluded.completed;
+            UPDATE {RunLogSqliteSchema.RunsTableName}
+            SET last_seq = $lastSeq,
+                last_seen_at_utc = $lastSeenAtUtc,
+                day = $day,
+                hour = $hour,
+                max_health = $maxHealth,
+                prestige = $prestige,
+                level = $level,
+                income = $income,
+                gold = $gold,
+                state = $state,
+                current_encounter_id = $currentEncounterId,
+                last_state_fingerprint = $lastStateFingerprint,
+                last_selection_fingerprint = $lastSelectionFingerprint,
+                pending_selection_seq = $pendingSelectionSeq,
+                pending_selection_json = $pendingSelectionJson,
+                completed = $completed
+            WHERE run_id = $runId;
             """;
         command.Parameters.AddWithValue("$runId", runId);
-        command.Parameters.AddWithValue("$schemaVersion", checkpoint.SchemaVersion);
         command.Parameters.AddWithValue("$lastSeq", checkpoint.LastSeq);
         command.Parameters.AddWithValue("$lastSeenAtUtc", checkpoint.LastSeenAtUtc.ToString("o"));
         AddNullableInt32(command, "$day", checkpoint.Day);
@@ -337,27 +222,12 @@ public sealed class SqliteRunLogStore : IRunLogStore
         );
         command.Parameters.AddWithValue("$completed", checkpoint.Completed ? 1 : 0);
         command.ExecuteNonQuery();
-
-        using var updateRun = CreateCommand(connection, transaction);
-        updateRun.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.RunsTableName}
-            SET day = $day,
-                hour = $hour
-            WHERE run_id = $runId;
-            """;
-        updateRun.Parameters.AddWithValue("$runId", runId);
-        AddNullableInt32(updateRun, "$day", checkpoint.Day);
-        AddNullableInt32(updateRun, "$hour", checkpoint.Hour);
-        updateRun.ExecuteNonQuery();
-
-        transaction.Commit();
     }
 
     public void CompleteRun(string runId, RunLogCompletion completion)
     {
         WriteTerminalStatus(
             runId,
-            completion.SchemaVersion,
             completion.Status,
             completion.EndedAtUtc,
             completion.FinalDay,
@@ -380,7 +250,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
     {
         WriteTerminalStatus(
             runId,
-            abandonment.SchemaVersion,
             abandonment.Status,
             abandonment.EndedAtUtc,
             abandonment.FinalDay,
@@ -401,7 +270,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
 
     private void WriteTerminalStatus(
         string runId,
-        int schemaVersion,
         string status,
         DateTimeOffset endedAtUtc,
         int? finalDay,
@@ -428,63 +296,28 @@ public sealed class SqliteRunLogStore : IRunLogStore
 
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.RunStatusTableName} (
-                run_id,
-                schema_version,
-                status,
-                ended_at_utc,
-                final_day,
-                final_hour,
-                max_health,
-                prestige,
-                level,
-                income,
-                gold,
-                victories,
-                losses,
-                final_player_rank,
-                final_player_rating,
-                final_player_rating_delta,
-                reason
-            ) VALUES (
-                $runId,
-                $schemaVersion,
-                $status,
-                $endedAtUtc,
-                $finalDay,
-                $finalHour,
-                $maxHealth,
-                $prestige,
-                $level,
-                $income,
-                $gold,
-                $victories,
-                $losses,
-                $finalPlayerRank,
-                $finalPlayerRating,
-                $finalPlayerRatingDelta,
-                $reason
-            )
-            ON CONFLICT(run_id) DO UPDATE SET
-                schema_version = excluded.schema_version,
-                status = excluded.status,
-                ended_at_utc = excluded.ended_at_utc,
-                final_day = excluded.final_day,
-                final_hour = excluded.final_hour,
-                max_health = excluded.max_health,
-                prestige = excluded.prestige,
-                level = excluded.level,
-                income = excluded.income,
-                gold = excluded.gold,
-                victories = excluded.victories,
-                losses = excluded.losses,
-                final_player_rank = excluded.final_player_rank,
-                final_player_rating = excluded.final_player_rating,
-                final_player_rating_delta = excluded.final_player_rating_delta,
-                reason = excluded.reason;
+            UPDATE {RunLogSqliteSchema.RunsTableName}
+            SET status = $status,
+                completed = 1,
+                ended_at_utc = $endedAtUtc,
+                final_day = $finalDay,
+                final_hour = $finalHour,
+                day = COALESCE($finalDay, day),
+                hour = COALESCE($finalHour, hour),
+                max_health = COALESCE($maxHealth, max_health),
+                prestige = COALESCE($prestige, prestige),
+                level = COALESCE($level, level),
+                income = COALESCE($income, income),
+                gold = COALESCE($gold, gold),
+                victories = $victories,
+                losses = $losses,
+                final_player_rank = $finalPlayerRank,
+                final_player_rating = $finalPlayerRating,
+                final_player_rating_delta = $finalPlayerRatingDelta,
+                reason = $reason
+            WHERE run_id = $runId;
             """;
         command.Parameters.AddWithValue("$runId", runId);
-        command.Parameters.AddWithValue("$schemaVersion", schemaVersion);
         command.Parameters.AddWithValue("$status", status);
         command.Parameters.AddWithValue("$endedAtUtc", endedAtUtc.ToString("o"));
         AddNullableInt32(command, "$finalDay", finalDay);
@@ -501,29 +334,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
         AddNullableInt32(command, "$finalPlayerRatingDelta", resolvedFinalPlayerRatingDelta);
         AddNullableString(command, "$reason", reason);
         command.ExecuteNonQuery();
-
-        using var updateRun = CreateCommand(connection, transaction);
-        updateRun.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.RunsTableName}
-            SET status = $status,
-                day = COALESCE($finalDay, day),
-                hour = COALESCE($finalHour, hour)
-            WHERE run_id = $runId;
-            """;
-        updateRun.Parameters.AddWithValue("$runId", runId);
-        updateRun.Parameters.AddWithValue("$status", status);
-        AddNullableInt32(updateRun, "$finalDay", finalDay);
-        AddNullableInt32(updateRun, "$finalHour", finalHour);
-        updateRun.ExecuteNonQuery();
-
-        using var completeCheckpoint = CreateCommand(connection, transaction);
-        completeCheckpoint.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.RunCheckpointsTableName}
-            SET completed = 1
-            WHERE run_id = $runId;
-            """;
-        completeCheckpoint.Parameters.AddWithValue("$runId", runId);
-        completeCheckpoint.ExecuteNonQuery();
 
         transaction.Commit();
     }
@@ -561,13 +371,14 @@ public sealed class SqliteRunLogStore : IRunLogStore
     {
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
-            SELECT 1
-            FROM {RunLogSqliteSchema.RunStatusTableName}
+            SELECT completed
+            FROM {RunLogSqliteSchema.RunsTableName}
             WHERE run_id = $runId
             LIMIT 1;
             """;
         command.Parameters.AddWithValue("$runId", runId);
-        return command.ExecuteScalar() != null;
+        var value = command.ExecuteScalar();
+        return value != null && value is not DBNull && Convert.ToInt32(value) == 1;
     }
 
     private static RunLogSessionState? TryReadActiveRun(
@@ -580,67 +391,17 @@ public sealed class SqliteRunLogStore : IRunLogStore
         command.CommandText =
             runId == null
                 ? $"""
-                    SELECT
-                        r.run_id,
-                        r.schema_version,
-                        r.started_at_utc,
-                        r.day AS run_day,
-                        r.hour AS run_hour,
-                        cp.last_seq,
-                        cp.last_seen_at_utc,
-                        cp.day AS checkpoint_day,
-                        cp.hour AS checkpoint_hour,
-                        cp.max_health,
-                        cp.prestige,
-                        cp.level,
-                        cp.income,
-                        cp.gold,
-                        cp.state,
-                        cp.current_encounter_id,
-                        cp.last_state_fingerprint,
-                        cp.last_selection_fingerprint,
-                        cp.pending_selection_seq,
-                        cp.pending_selection_json,
-                        cp.completed
-                    FROM {RunLogSqliteSchema.RunsTableName} AS r
-                    LEFT JOIN {RunLogSqliteSchema.RunCheckpointsTableName} AS cp
-                        ON cp.run_id = r.run_id
-                    LEFT JOIN {RunLogSqliteSchema.RunStatusTableName} AS rs
-                        ON rs.run_id = r.run_id
-                    WHERE rs.run_id IS NULL
-                    ORDER BY COALESCE(cp.last_seen_at_utc, r.started_at_utc) DESC
+                    SELECT *
+                    FROM {RunLogSqliteSchema.RunsTableName}
+                    WHERE completed = 0
+                    ORDER BY last_seen_at_utc DESC
                     LIMIT 1;
                     """
                 : $"""
-                    SELECT
-                        r.run_id,
-                        r.schema_version,
-                        r.started_at_utc,
-                        r.day AS run_day,
-                        r.hour AS run_hour,
-                        cp.last_seq,
-                        cp.last_seen_at_utc,
-                        cp.day AS checkpoint_day,
-                        cp.hour AS checkpoint_hour,
-                        cp.max_health,
-                        cp.prestige,
-                        cp.level,
-                        cp.income,
-                        cp.gold,
-                        cp.state,
-                        cp.current_encounter_id,
-                        cp.last_state_fingerprint,
-                        cp.last_selection_fingerprint,
-                        cp.pending_selection_seq,
-                        cp.pending_selection_json,
-                        cp.completed
-                    FROM {RunLogSqliteSchema.RunsTableName} AS r
-                    LEFT JOIN {RunLogSqliteSchema.RunCheckpointsTableName} AS cp
-                        ON cp.run_id = r.run_id
-                    LEFT JOIN {RunLogSqliteSchema.RunStatusTableName} AS rs
-                        ON rs.run_id = r.run_id
-                    WHERE rs.run_id IS NULL
-                        AND r.run_id = $runId
+                    SELECT *
+                    FROM {RunLogSqliteSchema.RunsTableName}
+                    WHERE completed = 0
+                      AND run_id = $runId
                     LIMIT 1;
                     """;
         if (runId != null)
@@ -655,28 +416,25 @@ public sealed class SqliteRunLogStore : IRunLogStore
 
     private static RunLogSessionState? ReadSessionState(SqliteDataReader reader)
     {
-        var checkpointCompleted = GetNullableInt64(reader, "completed");
-        if (checkpointCompleted == 1)
+        if (GetNullableInt64(reader, "completed") == 1)
             return null;
 
         var startedAtUtc = DateTimeOffset.Parse(
             reader.GetString(reader.GetOrdinal("started_at_utc"))
         );
-        var lastSeenAtUtcText = GetNullableString(reader, "last_seen_at_utc");
-        var lastSeenAtUtc = string.IsNullOrWhiteSpace(lastSeenAtUtcText)
-            ? startedAtUtc
-            : DateTimeOffset.Parse(lastSeenAtUtcText);
+        var lastSeenAtUtc = DateTimeOffset.Parse(
+            reader.GetString(reader.GetOrdinal("last_seen_at_utc"))
+        );
 
         return new RunLogSessionState
         {
             RunId = reader.GetString(reader.GetOrdinal("run_id")),
-            SchemaVersion = reader.GetInt32(reader.GetOrdinal("schema_version")),
+            SchemaVersion = RunLogSqliteSchema.CurrentSchemaVersion,
             StartedAtUtc = startedAtUtc,
             LastSeenAtUtc = lastSeenAtUtc,
             LastSeq = GetNullableInt64(reader, "last_seq") ?? 0,
-            Day = GetNullableInt32(reader, "checkpoint_day") ?? GetNullableInt32(reader, "run_day"),
-            Hour =
-                GetNullableInt32(reader, "checkpoint_hour") ?? GetNullableInt32(reader, "run_hour"),
+            Day = GetNullableInt32(reader, "day"),
+            Hour = GetNullableInt32(reader, "hour"),
             MaxHealth = GetNullableInt32(reader, "max_health"),
             Prestige = GetNullableInt32(reader, "prestige"),
             Level = GetNullableInt32(reader, "level"),
@@ -700,14 +458,12 @@ public sealed class SqliteRunLogStore : IRunLogStore
         try
         {
             connection.Open();
-
             using var command = CreateCommand(connection);
             command.CommandText = """
                 PRAGMA foreign_keys = ON;
                 PRAGMA busy_timeout = 2000;
                 """;
             command.ExecuteNonQuery();
-
             return connection;
         }
         catch
@@ -733,35 +489,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var command = CreateCommand(connection);
         command.CommandText = "PRAGMA journal_mode = WAL;";
         command.ExecuteNonQuery();
-    }
-
-    private static void EnsureColumnExists(
-        SqliteConnection connection,
-        string tableName,
-        string columnName,
-        string columnDefinition
-    )
-    {
-        using var command = CreateCommand(connection);
-        command.CommandText = $"PRAGMA table_info({tableName});";
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            if (
-                string.Equals(
-                    reader.GetString(reader.GetOrdinal("name")),
-                    columnName,
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                return;
-            }
-        }
-
-        using var alter = CreateCommand(connection);
-        alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
-        alter.ExecuteNonQuery();
     }
 
     private static string? SerializePendingSelection(RunLogPendingSelectionState? pendingSelection)

@@ -14,6 +14,21 @@ var replayRoot = Path.Combine(tempRoot, "CombatReplays");
 
 try
 {
+    var runStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.SqliteRunLogStore");
+    var runStore =
+        Activator.CreateInstance(runStoreType, dbPath)
+        ?? throw new InvalidOperationException("Failed to create SqliteRunLogStore.");
+    var createRunRequestType = RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCreateRequest");
+    var createRunRequest = Activator.CreateInstance(createRunRequestType)!;
+    createRunRequestType.GetProperty("RunId")!.SetValue(createRunRequest, "server-run-001");
+    createRunRequestType
+        .GetProperty("StartedAtUtc")!
+        .SetValue(createRunRequest, new DateTimeOffset(2026, 3, 28, 0, 0, 0, TimeSpan.Zero));
+    createRunRequestType.GetProperty("Hero")!.SetValue(createRunRequest, "Vanessa");
+    createRunRequestType.GetProperty("GameMode")!.SetValue(createRunRequest, "Ranked");
+    createRunRequestType.GetProperty("Status")!.SetValue(createRunRequest, "active");
+    InvokeVoid(runStoreType, runStore, "CreateRun", [createRunRequest]);
+
     var storeType = RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadSqliteStore");
     var serviceType = RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService");
     Assert(
@@ -59,10 +74,10 @@ try
         Assert(
             GetInt64(
                 connection,
-                "SELECT dirty FROM replay_sync_state WHERE battle_id = $battleId;",
+                "SELECT replay_dirty FROM battles WHERE battle_id = $battleId;",
                 "battle-upload-001"
             ) == 1,
-            "MarkReplayDirty should set replay_sync_state.dirty."
+            "MarkReplayDirty should set battles.replay_dirty."
         );
     }
 
@@ -125,15 +140,15 @@ try
         Assert(
             GetInt64(
                 connection,
-                "SELECT dirty FROM replay_sync_state WHERE battle_id = $battleId;",
+                "SELECT replay_dirty FROM battles WHERE battle_id = $battleId;",
                 "battle-upload-001"
             ) == 0,
-            "MarkReplayUploaded should clear replay_sync_state.dirty."
+            "MarkReplayUploaded should clear battles.replay_dirty."
         );
         Assert(
-            !ColumnExists(connection, "replay_sync_state", "payload_sha256")
-                && !ColumnExists(connection, "replay_sync_state", "object_key"),
-            "Replay sync state should no longer persist upload object metadata."
+            !ColumnExists(connection, "battles", "payload_sha256")
+                && !ColumnExists(connection, "battles", "object_key"),
+            "Battle replay sync should not persist upload object metadata."
         );
     }
 
@@ -198,7 +213,7 @@ try
         Assert(
             GetInt64(
                 connection,
-                "SELECT dirty FROM replay_sync_state WHERE battle_id = $battleId;",
+                "SELECT replay_dirty FROM battles WHERE battle_id = $battleId;",
                 "battle-upload-001"
             ) == 0,
             "Missing local replay payloads should stop retrying instead of staying dirty forever."
@@ -206,7 +221,7 @@ try
         Assert(
             GetString(
                 connection,
-                "SELECT last_error FROM replay_sync_state WHERE battle_id = $battleId;",
+                "SELECT replay_last_error FROM battles WHERE battle_id = $battleId;",
                 "battle-upload-001"
             ) == "replay_snapshot_not_found",
             "Missing local replay payloads should still persist a terminal error reason."

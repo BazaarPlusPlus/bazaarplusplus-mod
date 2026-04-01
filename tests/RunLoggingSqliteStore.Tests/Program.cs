@@ -28,7 +28,6 @@ try
         [
             new RunLogCreateRequest
             {
-                SchemaVersion = 1,
                 RunId = runId,
                 StartedAtUtc = startedAt,
                 Hero = "Vanessa",
@@ -52,7 +51,6 @@ try
             runId,
             new RunLogEvent
             {
-                SchemaVersion = 1,
                 RunId = runId,
                 Seq = 1,
                 Ts = startedAt,
@@ -72,7 +70,6 @@ try
             runId,
             new RunLogEvent
             {
-                SchemaVersion = 1,
                 RunId = runId,
                 Seq = 2,
                 Ts = startedAt.AddSeconds(5),
@@ -93,7 +90,6 @@ try
             runId,
             new RunLogCheckpoint
             {
-                SchemaVersion = 1,
                 RunId = runId,
                 LastSeq = 2,
                 LastSeenAtUtc = startedAt.AddSeconds(5),
@@ -130,7 +126,6 @@ try
             runId,
             new RunLogCompletion
             {
-                SchemaVersion = 1,
                 RunId = runId,
                 Status = "completed",
                 EndedAtUtc = startedAt.AddMinutes(15),
@@ -167,64 +162,55 @@ try
             "runs should persist the player's rating snapshot."
         );
         Assert(
-            CountRows(connection, "run_events") == 2,
-            "run_events should contain exactly two rows."
-        );
-        Assert(
-            GetInt64(connection, "SELECT MIN(seq) FROM run_events WHERE run_id = $runId;", runId)
-                == 1,
-            "run_events should persist seq=1."
-        );
-        Assert(
-            GetInt64(connection, "SELECT MAX(seq) FROM run_events WHERE run_id = $runId;", runId)
+            GetInt64(connection, "SELECT last_seq FROM runs WHERE run_id = $runId;", runId)
                 == 2,
-            "run_events should persist seq=2."
+            "runs should inline the latest observed sequence."
         );
         Assert(
             GetInt64(
                 connection,
-                "SELECT last_seq FROM run_checkpoints WHERE run_id = $runId;",
+                "SELECT completed FROM runs WHERE run_id = $runId;",
                 runId
-            ) == 2,
-            "run_checkpoints should persist the checkpoint last_seq."
+            ) == 1,
+            "runs should mark terminal runs as completed."
         );
         Assert(
             GetString(
                     connection,
-                    "SELECT pending_selection_json FROM run_checkpoints WHERE run_id = $runId;",
+                    "SELECT pending_selection_json FROM runs WHERE run_id = $runId;",
                     runId
                 )
                 .Contains("template-a", StringComparison.Ordinal),
-            "run_checkpoints should persist pending selection payload JSON."
+            "runs should persist pending selection payload JSON."
         );
         Assert(
-            GetString(connection, "SELECT status FROM run_status WHERE run_id = $runId;", runId)
+            GetString(connection, "SELECT status FROM runs WHERE run_id = $runId;", runId)
                 == "completed",
-            "run_status should persist terminal status."
+            "runs should persist terminal status."
         );
         Assert(
             GetString(
                 connection,
-                "SELECT final_player_rank FROM run_status WHERE run_id = $runId;",
+                "SELECT final_player_rank FROM runs WHERE run_id = $runId;",
                 runId
             ) == "Legendary",
-            "run_status should persist the final player rank snapshot."
+            "runs should persist the final player rank snapshot."
         );
         Assert(
             GetInt64(
                 connection,
-                "SELECT final_player_rating FROM run_status WHERE run_id = $runId;",
+                "SELECT final_player_rating FROM runs WHERE run_id = $runId;",
                 runId
             ) == 1436,
-            "run_status should persist the final player rating snapshot."
+            "runs should persist the final player rating snapshot."
         );
         Assert(
             GetInt64(
                 connection,
-                "SELECT final_player_rating_delta FROM run_status WHERE run_id = $runId;",
+                "SELECT final_player_rating_delta FROM runs WHERE run_id = $runId;",
                 runId
             ) == 16,
-            "run_status should persist the final player rating delta."
+            "runs should persist the final player rating delta."
         );
 
         const string abandonedRunId = "server-run-456";
@@ -235,7 +221,6 @@ try
             [
                 new RunLogCreateRequest
                 {
-                    SchemaVersion = 1,
                     RunId = abandonedRunId,
                     StartedAtUtc = startedAt.AddHours(1),
                     Hero = "Pygmalien",
@@ -253,7 +238,6 @@ try
                 abandonedRunId,
                 new RunLogCompletion
                 {
-                    SchemaVersion = 1,
                     RunId = abandonedRunId,
                     Status = "abandoned",
                     EndedAtUtc = startedAt.AddHours(1).AddMinutes(5),
@@ -266,10 +250,10 @@ try
         Assert(
             GetString(
                 connection,
-                "SELECT status FROM run_status WHERE run_id = $runId;",
+                "SELECT status FROM runs WHERE run_id = $runId;",
                 abandonedRunId
             ) == "abandoned",
-            "run_status should preserve interrupted/abandoned terminal statuses."
+            "runs should preserve interrupted/abandoned terminal statuses."
         );
 
         const string olderActiveRunId = "server-run-older";
@@ -284,7 +268,6 @@ try
             [
                 new RunLogCreateRequest
                 {
-                    SchemaVersion = 1,
                     RunId = olderActiveRunId,
                     StartedAtUtc = olderStartedAt,
                     Hero = "Vanessa",
@@ -304,7 +287,6 @@ try
                 olderActiveRunId,
                 new RunLogCheckpoint
                 {
-                    SchemaVersion = 1,
                     RunId = olderActiveRunId,
                     LastSeq = 4,
                     LastSeenAtUtc = olderStartedAt.AddMinutes(5),
@@ -323,7 +305,6 @@ try
             [
                 new RunLogCreateRequest
                 {
-                    SchemaVersion = 1,
                     RunId = newerActiveRunId,
                     StartedAtUtc = newerStartedAt,
                     Hero = "Dooley",
@@ -341,7 +322,6 @@ try
                 newerActiveRunId,
                 new RunLogCheckpoint
                 {
-                    SchemaVersion = 1,
                     RunId = newerActiveRunId,
                     LastSeq = 2,
                     LastSeenAtUtc = newerStartedAt.AddMinutes(10),
@@ -360,7 +340,6 @@ try
             [
                 new RunLogCreateRequest
                 {
-                    SchemaVersion = 1,
                     RunId = olderActiveRunId,
                     StartedAtUtc = olderStartedAt.AddMinutes(30),
                     Hero = "Vanessa",

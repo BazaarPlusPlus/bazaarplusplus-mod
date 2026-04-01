@@ -53,9 +53,8 @@ internal sealed class RunUploadSqliteStore
             FROM {RunLogSqliteSchema.RunSyncStateTableName} AS s
             INNER JOIN {RunLogSqliteSchema.RunsTableName} AS r
                 ON r.run_id = s.run_id
-            INNER JOIN {RunLogSqliteSchema.RunStatusTableName} AS rs
-                ON rs.run_id = s.run_id
             WHERE s.dirty = 1
+              AND r.completed = 1
             ORDER BY COALESCE(s.last_attempt_at_utc, r.started_at_utc) ASC
             LIMIT $limit;
             """;
@@ -77,9 +76,10 @@ internal sealed class RunUploadSqliteStore
         command.CommandText = $"""
             SELECT 1
             FROM {RunLogSqliteSchema.RunSyncStateTableName} AS s
-            INNER JOIN {RunLogSqliteSchema.RunStatusTableName} AS rs
-                ON rs.run_id = s.run_id
+            INNER JOIN {RunLogSqliteSchema.RunsTableName} AS r
+                ON r.run_id = s.run_id
             WHERE s.dirty = 1
+              AND r.completed = 1
             LIMIT 1;
             """;
         return command.ExecuteScalar() != null;
@@ -139,11 +139,10 @@ internal sealed class RunUploadSqliteStore
     {
         using var connection = OpenConnection();
 
-        using var metaCommand = connection.CreateCommand();
-        metaCommand.CommandTimeout = 2;
-        metaCommand.CommandText = $"""
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 2;
+        command.CommandText = $"""
             SELECT
-                schema_version,
                 run_id,
                 started_at_utc,
                 hero,
@@ -153,54 +152,10 @@ internal sealed class RunUploadSqliteStore
                 day,
                 hour,
                 seed,
-                status
-            FROM {RunLogSqliteSchema.RunsTableName}
-            WHERE run_id = $runId;
-            """;
-        metaCommand.Parameters.AddWithValue("$runId", runId);
-
-        JObject meta;
-        using (var metaReader = metaCommand.ExecuteReader())
-        {
-            if (!metaReader.Read())
-                return null;
-
-            meta = ReadObject(
-                metaReader,
-                "schema_version",
-                "run_id",
-                "started_at_utc",
-                "hero",
-                "game_mode",
-                "player_rank",
-                "player_rating",
-                "day",
-                "hour",
-                "seed",
-                "status"
-            );
-        }
-
-        using var eventsCommand = connection.CreateCommand();
-        eventsCommand.CommandTimeout = 2;
-        eventsCommand.CommandText = $"""
-            SELECT COALESCE(MAX(seq), 0)
-            FROM {RunLogSqliteSchema.RunEventsTableName}
-            WHERE run_id = $runId;
-            """;
-        eventsCommand.Parameters.AddWithValue("$runId", runId);
-        var lastSeq = Convert.ToInt64(eventsCommand.ExecuteScalar() ?? 0L);
-
-        var checkpoint = ReadSingleObject(
-            connection,
-            $"""
-            SELECT
-                schema_version,
-                run_id,
+                status,
+                completed,
                 last_seq,
                 last_seen_at_utc,
-                day,
-                hour,
                 max_health,
                 prestige,
                 level,
@@ -212,53 +167,91 @@ internal sealed class RunUploadSqliteStore
                 last_selection_fingerprint,
                 pending_selection_seq,
                 pending_selection_json,
-                completed
-            FROM {RunLogSqliteSchema.RunCheckpointsTableName}
-            WHERE run_id = $runId;
-            """,
-            runId
-        );
-        if (
-            checkpoint != null
-            && checkpoint.TryGetValue("pending_selection_json", out var pendingJson)
-        )
-        {
-            checkpoint.Remove("pending_selection_json");
-            if (pendingJson.Type == JTokenType.String)
-                checkpoint["pending_selection"] = JToken.Parse(pendingJson.Value<string>()!);
-        }
-
-        var status = ReadSingleObject(
-            connection,
-            $"""
-            SELECT
-                schema_version,
-                run_id,
-                status,
                 ended_at_utc,
                 final_day,
                 final_hour,
-                max_health,
-                prestige,
-                level,
-                income,
-                gold,
                 victories,
                 losses,
                 final_player_rank,
                 final_player_rating,
                 final_player_rating_delta,
                 reason
-            FROM {RunLogSqliteSchema.RunStatusTableName}
+            FROM {RunLogSqliteSchema.RunsTableName}
             WHERE run_id = $runId;
-            """,
-            runId
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var meta = ReadObject(
+            reader,
+            "run_id",
+            "started_at_utc",
+            "hero",
+            "game_mode",
+            "player_rank",
+            "player_rating",
+            "day",
+            "hour",
+            "seed",
+            "status"
         );
+        var checkpoint = ReadObject(
+            reader,
+            "run_id",
+            "last_seq",
+            "last_seen_at_utc",
+            "day",
+            "hour",
+            "max_health",
+            "prestige",
+            "level",
+            "income",
+            "gold",
+            "state",
+            "current_encounter_id",
+            "last_state_fingerprint",
+            "last_selection_fingerprint",
+            "pending_selection_seq",
+            "pending_selection_json",
+            "completed"
+        );
+        if (checkpoint.TryGetValue("pending_selection_json", out var pendingJson))
+        {
+            checkpoint.Remove("pending_selection_json");
+            if (pendingJson.Type == JTokenType.String)
+                checkpoint["pending_selection"] = JToken.Parse(pendingJson.Value<string>()!);
+        }
+
+        var status = ReadObject(
+            reader,
+            "run_id",
+            "status",
+            "ended_at_utc",
+            "final_day",
+            "final_hour",
+            "max_health",
+            "prestige",
+            "level",
+            "income",
+            "gold",
+            "victories",
+            "losses",
+            "final_player_rank",
+            "final_player_rating",
+            "final_player_rating_delta",
+            "reason"
+        );
+
+        var lastSeqOrdinal = reader.GetOrdinal("last_seq");
+        var lastSeq = reader.IsDBNull(lastSeqOrdinal) ? 0L : reader.GetInt64(lastSeqOrdinal);
 
         return new RunUploadSnapshot
         {
             LastSeq = lastSeq,
-            UploadedStatus = status?["status"]?.Value<string>(),
+            UploadedStatus = status["status"]?.Value<string>(),
             Payload = new RunUploadPayload
             {
                 SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
@@ -281,60 +274,6 @@ internal sealed class RunUploadSqliteStore
         command.CommandTimeout = 2;
         command.CommandText = RunLogSqliteSchema.BootstrapSql;
         command.ExecuteNonQuery();
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunsTableName,
-            "player_rank",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunsTableName,
-            "player_rating",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.PvpBattlesTableName,
-            "player_hero",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.PvpBattlesTableName,
-            "player_rank",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.PvpBattlesTableName,
-            "player_rating",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.PvpBattlesTableName,
-            "player_level",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "final_player_rank",
-            "TEXT NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "final_player_rating",
-            "INTEGER NULL"
-        );
-        EnsureColumnExists(
-            connection,
-            RunLogSqliteSchema.RunStatusTableName,
-            "final_player_rating_delta",
-            "INTEGER NULL"
-        );
     }
 
     private SqliteConnection OpenConnection()
@@ -359,28 +298,6 @@ internal sealed class RunUploadSqliteStore
         }
     }
 
-    private static JObject? ReadSingleObject(SqliteConnection connection, string sql, string runId)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
-        command.CommandText = sql;
-        command.Parameters.AddWithValue("$runId", runId);
-        using var reader = command.ExecuteReader();
-        if (!reader.Read())
-            return null;
-
-        var payload = new JObject();
-        for (var i = 0; i < reader.FieldCount; i++)
-        {
-            if (reader.IsDBNull(i))
-                continue;
-
-            payload[reader.GetName(i)] = JToken.FromObject(reader.GetValue(i));
-        }
-
-        return payload;
-    }
-
     private static JObject ReadObject(SqliteDataReader reader, params string[] columns)
     {
         var payload = new JObject();
@@ -394,36 +311,5 @@ internal sealed class RunUploadSqliteStore
         }
 
         return payload;
-    }
-
-    private static void EnsureColumnExists(
-        SqliteConnection connection,
-        string tableName,
-        string columnName,
-        string columnDefinition
-    )
-    {
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
-        command.CommandText = $"PRAGMA table_info({tableName});";
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            if (
-                string.Equals(
-                    reader.GetString(reader.GetOrdinal("name")),
-                    columnName,
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                return;
-            }
-        }
-
-        using var alter = connection.CreateCommand();
-        alter.CommandTimeout = 2;
-        alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
-        alter.ExecuteNonQuery();
     }
 }

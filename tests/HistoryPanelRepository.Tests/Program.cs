@@ -33,10 +33,6 @@ try
         InsertRun(connection, "run-2", "completed");
         InsertRunEvent(connection, "run-1", 1);
         InsertRunEvent(connection, "run-2", 1);
-        InsertCheckpoint(connection, "run-1");
-        InsertCheckpoint(connection, "run-2");
-        InsertStatus(connection, "run-1");
-        InsertStatus(connection, "run-2");
 
         InsertBattle(
             connection,
@@ -59,9 +55,9 @@ try
             opponentSkillsJson: "{\"items\":[]}"
         );
         Assert(
-            !ColumnExists(connection, "ghost_battles", "player_name")
-                && !ColumnExists(connection, "ghost_battles", "player_account_id"),
-            "Ghost battle cache should not keep local copies of player identity fields."
+            ColumnExists(connection, "battles", "source")
+                && ColumnExists(connection, "battle_snapshots", "player_hand_json"),
+            "Unified battle storage should expose battle source and snapshot tables."
         );
     }
 
@@ -159,6 +155,7 @@ try
         "SaveGhostSyncCheckpointUtc",
         [typeof(string), typeof(DateTimeOffset)]
     )!;
+    var nowUtc = DateTimeOffset.UtcNow;
 
     Assert(
         getGhostSyncCheckpoint.Invoke(repository, ["player-account-a"]) == null,
@@ -181,7 +178,11 @@ try
         repository,
         [
             "player-account-a",
-            CreateGhostImports(ghostImportType, "ghost-1", "2026-03-16T10:00:00.0000000+00:00"),
+            CreateGhostImports(
+                ghostImportType,
+                "ghost-1",
+                nowUtc.AddHours(-2).ToString("o")
+            ),
         ]
     );
     markGhostReplayDownloaded.Invoke(repository, ["player-account-a", "ghost-1"]);
@@ -193,9 +194,9 @@ try
             CreateGhostImports(
                 ghostImportType,
                 "ghost-1",
-                "2026-03-16T10:05:00.0000000+00:00",
+                nowUtc.AddHours(-1).ToString("o"),
                 "ghost-2",
-                "2026-03-16T10:10:00.0000000+00:00"
+                nowUtc.AddMinutes(-30).ToString("o")
             ),
         ]
     );
@@ -229,7 +230,11 @@ try
         repository,
         [
             "player-account-a",
-            CreateGhostImports(ghostImportType, "ghost-2", "2026-03-16T10:10:00.0000000+00:00"),
+            CreateGhostImports(
+                ghostImportType,
+                "ghost-2",
+                nowUtc.AddMinutes(-30).ToString("o")
+            ),
         ]
     );
     ghostRecords = (
@@ -256,7 +261,7 @@ try
         repository,
         [
             "player-account-b",
-            CreateGhostImports(ghostImportType, "ghost-3", "2026-03-16T11:00:00.0000000+00:00"),
+            CreateGhostImports(ghostImportType, "ghost-3", nowUtc.AddMinutes(-15).ToString("o")),
         ]
     );
     var playerBGhostRecords = (
@@ -282,9 +287,9 @@ try
             CreateGhostImports(
                 ghostImportType,
                 "ghost-stale-undownloaded",
-                "2026-03-01T08:00:00.0000000+00:00",
+                nowUtc.AddDays(-20).ToString("o"),
                 "ghost-stale-downloaded",
-                "2026-03-01T09:00:00.0000000+00:00"
+                nowUtc.AddDays(-20).AddHours(1).ToString("o")
             ),
         ]
     );
@@ -293,7 +298,7 @@ try
         .GetMethod("MarkOldUndownloadedGhostBattlesDeleted")!
         .Invoke(
             repository,
-            ["player-account-a", new DateTimeOffset(2026, 3, 16, 0, 0, 0, TimeSpan.Zero)]
+            ["player-account-a", nowUtc]
         );
     ghostRecords = (
         (System.Collections.IEnumerable)
@@ -337,16 +342,16 @@ try
         "DeleteRun should cascade run event rows."
     );
     Assert(
-        CountRows(verificationConnection, "run_checkpoints", "run_id = 'run-1'") == 0,
-        "DeleteRun should cascade checkpoint rows."
+        CountRows(verificationConnection, "battles", "run_id = 'run-1'") == 0,
+        "DeleteRun should cascade linked local battle rows."
     );
     Assert(
-        CountRows(verificationConnection, "run_status", "run_id = 'run-1'") == 0,
-        "DeleteRun should cascade terminal status rows."
-    );
-    Assert(
-        CountRows(verificationConnection, "pvp_battles", "run_id = 'run-1'") == 0,
-        "DeleteRun should explicitly remove linked PVP battle rows."
+        CountRows(
+            verificationConnection,
+            "battle_snapshots",
+            "battle_id IN ('battle-bad', 'battle-good')"
+        ) == 0,
+        "DeleteRun should cascade linked local battle snapshots."
     );
     Assert(
         CountRows(verificationConnection, "runs", "run_id = 'run-2'") == 1,
@@ -375,21 +380,29 @@ static void InsertRun(SqliteConnection connection, string runId, string status)
     command.CommandText = """
         INSERT INTO runs (
             run_id,
-            schema_version,
             started_at_utc,
+            last_seen_at_utc,
             hero,
             game_mode,
             player_rank,
             player_rating,
+            completed,
+            ended_at_utc,
+            final_day,
+            final_hour,
             status
         ) VALUES (
             $runId,
-            1,
             '2026-03-15T11:00:00.0000000+00:00',
+            '2026-03-15T11:10:00.0000000+00:00',
             'Vanessa',
             'Ranked',
             'Gold 2',
             1420,
+            1,
+            '2026-03-15T11:10:00.0000000+00:00',
+            3,
+            1,
             $status
         );
         """;
@@ -421,48 +434,6 @@ static void InsertRunEvent(SqliteConnection connection, string runId, int seq)
     command.ExecuteNonQuery();
 }
 
-static void InsertCheckpoint(SqliteConnection connection, string runId)
-{
-    using var command = connection.CreateCommand();
-    command.CommandText = """
-        INSERT INTO run_checkpoints (
-            run_id,
-            schema_version,
-            last_seq,
-            last_seen_at_utc,
-            completed
-        ) VALUES (
-            $runId,
-            1,
-            1,
-            '2026-03-15T11:05:00.0000000+00:00',
-            1
-        );
-        """;
-    command.Parameters.AddWithValue("$runId", runId);
-    command.ExecuteNonQuery();
-}
-
-static void InsertStatus(SqliteConnection connection, string runId)
-{
-    using var command = connection.CreateCommand();
-    command.CommandText = """
-        INSERT INTO run_status (
-            run_id,
-            schema_version,
-            status,
-            ended_at_utc
-        ) VALUES (
-            $runId,
-            1,
-            'completed',
-            '2026-03-15T11:10:00.0000000+00:00'
-        );
-        """;
-    command.Parameters.AddWithValue("$runId", runId);
-    command.ExecuteNonQuery();
-}
-
 static void InsertBattle(
     SqliteConnection connection,
     string battleId,
@@ -476,38 +447,51 @@ static void InsertBattle(
 {
     using var command = connection.CreateCommand();
     command.CommandText = """
-        INSERT INTO pvp_battles (
+        INSERT INTO battles (
             battle_id,
+            source,
             run_id,
             recorded_at_utc,
             combat_kind,
             player_rank,
-            player_rating,
+            player_rating
+        ) VALUES (
+            $battleId,
+            'LOCAL',
+            $runId,
+            $recordedAtUtc,
+            'PVPCombat',
+            'Diamond 1',
+            1777
+        );
+        """;
+    command.Parameters.AddWithValue("$battleId", battleId);
+    command.Parameters.AddWithValue("$runId", runId);
+    command.Parameters.AddWithValue("$recordedAtUtc", recordedAtUtc);
+    command.ExecuteNonQuery();
+
+    using var snapshotCommand = connection.CreateCommand();
+    snapshotCommand.CommandText = """
+        INSERT INTO battle_snapshots (
+            battle_id,
             player_hand_json,
             player_skills_json,
             opponent_hand_json,
             opponent_skills_json
         ) VALUES (
             $battleId,
-            $runId,
-            $recordedAtUtc,
-            'PVPCombat',
-            'Diamond 1',
-            1777,
             $playerHandJson,
             $playerSkillsJson,
             $opponentHandJson,
             $opponentSkillsJson
         );
         """;
-    command.Parameters.AddWithValue("$battleId", battleId);
-    command.Parameters.AddWithValue("$runId", runId);
-    command.Parameters.AddWithValue("$recordedAtUtc", recordedAtUtc);
-    command.Parameters.AddWithValue("$playerHandJson", playerHandJson);
-    command.Parameters.AddWithValue("$playerSkillsJson", playerSkillsJson);
-    command.Parameters.AddWithValue("$opponentHandJson", opponentHandJson);
-    command.Parameters.AddWithValue("$opponentSkillsJson", opponentSkillsJson);
-    command.ExecuteNonQuery();
+    snapshotCommand.Parameters.AddWithValue("$battleId", battleId);
+    snapshotCommand.Parameters.AddWithValue("$playerHandJson", playerHandJson);
+    snapshotCommand.Parameters.AddWithValue("$playerSkillsJson", playerSkillsJson);
+    snapshotCommand.Parameters.AddWithValue("$opponentHandJson", opponentHandJson);
+    snapshotCommand.Parameters.AddWithValue("$opponentSkillsJson", opponentSkillsJson);
+    snapshotCommand.ExecuteNonQuery();
 }
 
 static object CreateGhostImports(Type ghostImportType, params string[] battlePairs)
