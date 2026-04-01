@@ -129,6 +129,8 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     public void RefreshGhostData()
     {
         ClearTransientStatus();
+        _state.GhostBattles.Clear();
+        InvalidateFilteredGhostBattles();
         if (
             !_dataService.TryLoadGhostBattles(
                 100,
