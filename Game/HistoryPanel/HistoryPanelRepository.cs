@@ -76,11 +76,21 @@ internal sealed class HistoryPanelRepository
                 r.victories,
                 r.losses,
                 r.ended_at_utc,
-                COUNT(pb.battle_id) AS battle_count
+                COUNT(s.battle_id) AS battle_count
             FROM {RunLogSqliteSchema.RunsTableName} AS r
             LEFT JOIN {RunLogSqliteSchema.BattlesTableName} AS pb
                 ON pb.run_id = r.run_id
                AND pb.source = 'LOCAL'
+            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+                ON s.battle_id = pb.battle_id
+               AND s.player_hand_json IS NOT NULL
+               AND s.player_skills_json IS NOT NULL
+               AND s.opponent_hand_json IS NOT NULL
+               AND s.opponent_skills_json IS NOT NULL
+               AND json_valid(s.player_hand_json) = 1
+               AND json_valid(s.player_skills_json) = 1
+               AND json_valid(s.opponent_hand_json) = 1
+               AND json_valid(s.opponent_skills_json) = 1
             GROUP BY
                 r.run_id,
                 r.hero,

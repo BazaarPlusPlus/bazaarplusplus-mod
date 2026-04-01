@@ -70,20 +70,30 @@ try
         .Cast<object>()
         .ToList();
     Assert(recentRuns.Count == 2, "ListRecentRuns should return the inserted runs.");
+    var runOneRecord = recentRuns.Single(run =>
+        (string)run.GetType().GetProperty("RunId")!.GetValue(run)! == "run-1"
+    );
     var recentPlayerRank = (string?)(
-        recentRuns[0].GetType().GetProperty("PlayerRank")!.GetValue(recentRuns[0])
+        runOneRecord.GetType().GetProperty("PlayerRank")!.GetValue(runOneRecord)
     );
     var recentPlayerRating = (int?)(
-        recentRuns[0].GetType().GetProperty("PlayerRating")!.GetValue(recentRuns[0])
+        runOneRecord.GetType().GetProperty("PlayerRating")!.GetValue(runOneRecord)
     );
     var recentGameMode = (string?)(
-        recentRuns[0].GetType().GetProperty("GameMode")!.GetValue(recentRuns[0])
+        runOneRecord.GetType().GetProperty("GameMode")!.GetValue(runOneRecord)
+    );
+    var recentBattleCount = (int)(
+        runOneRecord.GetType().GetProperty("BattleCount")!.GetValue(runOneRecord)!
     );
     Assert(
         recentPlayerRank == "Gold 2" && recentPlayerRating == 1420,
         "ListRecentRuns should surface the persisted player rank and rating snapshot."
     );
     Assert(recentGameMode == "Ranked", "ListRecentRuns should surface the persisted game mode.");
+    Assert(
+        recentBattleCount == 1,
+        "ListRecentRuns should count only battles whose snapshots are readable by HistoryPanel."
+    );
 
     var records = (System.Collections.IEnumerable)(
         repositoryType.GetMethod("ListBattlesByRun")!.Invoke(repository, ["run-1"])!
