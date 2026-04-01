@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using BazaarGameClient.Domain.Models.Cards;
-using BazaarPlusPlus;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Input;
 using TheBazaar;
@@ -30,13 +29,19 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
 
     private void Update()
     {
-        var mode = GetCurrentMode();
-        if (mode == _lastMode)
-            return;
+        try
+        {
+            var mode = GetCurrentMode();
+            if (mode == _lastMode)
+                return;
 
-        _lastMode = mode;
-        BppLog.Info("TooltipPreview", $"ModeChanged mode={mode}");
-        TryRefreshCurrentItemTooltip();
+            _lastMode = mode;
+            TryRefreshCurrentItemTooltip();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("TooltipPreview", "Tooltip modifier update failed", ex);
+        }
     }
 
     private TooltipModifierMode GetCurrentMode()
@@ -55,66 +60,66 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
     {
         var tooltipParent = Data.TooltipParentComponent;
         if (tooltipParent == null)
-        {
-            BppLog.Info(
-                "TooltipPreview",
-                "RefreshSkipped reason=no-tooltip-parent"
-            );
             return;
-        }
 
         if (tooltipParent.HasAnyLockedTooltipControllers())
-        {
-            BppLog.Info("TooltipPreview", "RefreshSkipped reason=tooltip-locked");
             return;
-        }
 
-        if (!TooltipPreviewTargetResolver.TryResolveCurrentPrimaryItemTooltip(tooltipParent, out var target))
-        {
-            BppLog.Info(
-                "TooltipPreview",
-                "RefreshSkipped reason=no-active-primary-item-tooltip"
-            );
+        if (!TryResolveRefreshTarget(tooltipParent, out var target))
             return;
-        }
 
-        BppLog.Info(
-            "TooltipPreview",
-            $"PrimaryTooltipFound card={DescribeCard(target.Card)}"
-        );
-
-        var refreshedTooltipData = new CardTooltipData(
+        var refreshedTooltipData = CardTooltipDataFactory.Create(
             target.Card,
-            target.TooltipData.CardTemplate
+            target.TooltipData
         );
+
         tooltipParent.HideCardTooltipController();
         tooltipParent.ShowCardTooltipController(
             target.Controller.transform,
             target.Controller.TooltipOffset,
             refreshedTooltipData
         );
-
-        var scheduled = UpgradePreviewTooltipPatch.TryScheduleUpgradeTooltip(
-            target.Controller,
-            refreshedTooltipData
-        );
-        BppLog.Info(
-            "TooltipPreview",
-            $"UpgradeScheduleAttempted card={DescribeCard(target.Card)} scheduled={scheduled}"
-        );
-
-        return;
+        UpgradePreviewTooltipPatch.TryScheduleUpgradeTooltip(target.Controller, refreshedTooltipData);
     }
 
-    private static string DescribeCard(Card card)
+    private static bool TryResolveRefreshTarget(
+        TooltipParentComponent tooltipParent,
+        out TooltipPreviewTargetResolver.TooltipRefreshTarget target
+    )
     {
-        if (card == null)
-            return "null";
+        if (TooltipPreviewTargetResolver.TryResolveCurrentPrimaryItemTooltip(tooltipParent, out target))
+            return true;
 
-        var templateName = card.Template?.InternalName;
-        if (!string.IsNullOrWhiteSpace(templateName))
-            return templateName;
+        var lookup = Data.CardAndSkillLookup;
+        if (lookup == null)
+        {
+            target = default;
+            return false;
+        }
 
-        return card.TemplateId.ToString();
+        foreach (var controller in lookup.CardControllerDictionary.Values)
+        {
+            if (controller?.CardData is not ItemCard itemCard)
+                continue;
+
+            if (!controller.IsCursorOverCard && !controller.IsHovering)
+                continue;
+
+            if (tooltipParent.GetCardTooltipController(itemCard) == null)
+                continue;
+
+            if (controller.GetTooltipData() is not CardTooltipData tooltipData)
+                continue;
+
+            target = new TooltipPreviewTargetResolver.TooltipRefreshTarget(
+                controller,
+                itemCard,
+                tooltipData
+            );
+            return true;
+        }
+
+        target = default;
+        return false;
     }
 }

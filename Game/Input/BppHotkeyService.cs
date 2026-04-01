@@ -49,6 +49,9 @@ internal static class BppHotkeyService
     private static readonly HashSet<string> LoggedUnresolvedBindingPaths = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private static readonly HashSet<string> LoggedModifierDisagreements = new(
+        StringComparer.OrdinalIgnoreCase
+    );
 
     internal static bool IsHeld(
         BppHotkeyActionId actionId,
@@ -101,10 +104,16 @@ internal static class BppHotkeyService
             return false;
 
         if (string.Equals(normalized, CtrlAliasPath, StringComparison.OrdinalIgnoreCase))
-            return KeyBindings.Modifiers.IsCtrlPressed(keyboard);
+            return IsModifierPressed(
+                normalized,
+                () => KeyBindings.Modifiers.IsCtrlPressed(keyboard)
+            );
 
         if (string.Equals(normalized, ShiftAliasPath, StringComparison.OrdinalIgnoreCase))
-            return KeyBindings.Modifiers.IsShiftPressed(keyboard);
+            return IsModifierPressed(
+                normalized,
+                () => KeyBindings.Modifiers.IsShiftPressed(keyboard)
+            );
 
         if (TryFindSupportedMouseButton(normalized, mouse, out var button))
             return button.isPressed;
@@ -244,6 +253,21 @@ internal static class BppHotkeyService
         action.Enable();
         CachedActions[normalized] = action;
         return action;
+    }
+
+    private static bool IsModifierPressed(string normalizedBindingPath, Func<bool> legacyCheck)
+    {
+        var legacyPressed = legacyCheck();
+        var actionPressed = GetOrCreateAction(normalizedBindingPath).IsPressed();
+        if (legacyPressed != actionPressed && LoggedModifierDisagreements.Add(normalizedBindingPath))
+        {
+            BppLog.Info(
+                "BppHotkeyService",
+                $"Modifier disagreement binding={normalizedBindingPath} legacy={legacyPressed} action={actionPressed}"
+            );
+        }
+
+        return legacyPressed || actionPressed;
     }
 
     private static string NormalizeBindingPath(string? bindingPath)

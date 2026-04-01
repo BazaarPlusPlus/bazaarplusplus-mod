@@ -49,28 +49,9 @@ internal static class UpgradePreviewTooltipPatch
         if (Data.TooltipParentComponent == null)
             return false;
 
-        if (
-            tooltipData == null
-            && !TooltipPreviewTargetSelection.ShouldAllowImplicitUpgradeSchedule(
-                card,
-                controller.IsCursorOverCard,
-                controller.IsHovering,
-                TooltipPreviewTargetResolver.TryResolveCurrentPrimaryCard(
-                    Data.TooltipParentComponent
-                )
-            )
-        )
-        {
-            return false;
-        }
-
         if (!PendingControllers.Add(controller))
             return false;
 
-        BppLog.Info(
-            "TooltipPreview",
-            $"UpgradeScheduleQueued card={DescribeCard(card)} source={(tooltipData == null ? "controller" : "refresh")}"
-        );
         controller.StartCoroutine(
             RefreshUpgradePreviewWhenReady(controller, card, resolvedTooltipData)
         );
@@ -90,7 +71,7 @@ internal static class UpgradePreviewTooltipPatch
             {
                 if (
                     controller == null
-                    || !TooltipPreviewTargetSelection.AreSameCard(controller.CardData, card)
+                    || controller.CardData != card
                     || !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview)
                 )
                 {
@@ -112,10 +93,6 @@ internal static class UpgradePreviewTooltipPatch
                 yield return null;
             }
 
-            BppLog.Info(
-                "TooltipPreview",
-                $"UpgradeScheduleTimedOut card={DescribeCard(card)}"
-            );
         }
         finally
         {
@@ -136,98 +113,23 @@ internal static class UpgradePreviewTooltipPatch
         if (tooltipParent.GetCardTooltipController(card) == null)
             return;
 
+        var refreshedTooltipData = CardTooltipDataFactory.Create(card, tooltipData);
+        tooltipParent.HideCardTooltipController();
+
         if (
             controller == null
-            || !TooltipPreviewTargetSelection.AreSameCard(controller.CardData, card)
+            || controller.CardData != card
             || !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview)
         )
         {
             return;
         }
 
-        tooltipParent.DisplayUpgradeTooltips(
+        controller.EnterUpgradePreview();
+        tooltipParent.ShowCardTooltipController(
             controller.transform,
             controller.TooltipOffset,
-            new CardTooltipData(card, tooltipData.CardTemplate)
+            refreshedTooltipData
         );
-    }
-
-    private static string DescribeCard(Card? card)
-    {
-        if (card == null)
-            return "null";
-
-        var templateName = card.Template?.InternalName;
-        if (!string.IsNullOrWhiteSpace(templateName))
-            return templateName;
-
-        return card.TemplateId.ToString();
-    }
-}
-
-[HarmonyPatch(typeof(TooltipParentComponent), "DisplayUpgradeTooltips")]
-internal static class UpgradePreviewTooltipDiagnosticsPatch
-{
-    [HarmonyPrefix]
-    private static void Prefix(ITooltipData tooltipData)
-    {
-        if (tooltipData is not CardTooltipData cardTooltipData)
-            return;
-
-        BppLog.Info(
-            "TooltipPreview",
-            $"DisplayUpgradeTooltips card={DescribeCard(cardTooltipData.CardInstance)}"
-        );
-    }
-
-    [HarmonyPatch(typeof(TooltipParentComponent), "HandleUpgradePreview")]
-    [HarmonyPostfix]
-    private static void HandleUpgradePreviewPostfix(
-        TooltipParentComponent __instance,
-        ITooltipData tooltipData
-    )
-    {
-        if (tooltipData is not CardTooltipData cardTooltipData)
-            return;
-
-        var primary = Traverse
-            .Create(__instance)
-            .Property("CardTooltipController")
-            .GetValue<CardTooltipController>();
-        var secondary = Traverse
-            .Create(__instance)
-            .Property("SecondaryCardTooltipController")
-            .GetValue<CardTooltipController>();
-
-        BppLog.Info(
-            "TooltipPreview",
-            $"HandleUpgradePreview card={DescribeCard(cardTooltipData.CardInstance)} primaryMode={DescribeDisplayMode(primary)} primaryCard={DescribeTooltipCard(primary)} secondaryMode={DescribeDisplayMode(secondary)} secondaryCard={DescribeTooltipCard(secondary)}"
-        );
-    }
-
-    private static string DescribeTooltipCard(CardTooltipController? controller)
-    {
-        if (controller == null)
-            return "null";
-
-        var currentCard = controller.CurrentCard;
-        return DescribeCard(currentCard);
-    }
-
-    private static string DescribeDisplayMode(CardTooltipController? controller)
-    {
-        return controller == null ? "null" : controller.GetDisplayMode().ToString();
-    }
-
-    private static string DescribeCard(Card? card)
-    {
-        if (card == null)
-            return "null";
-
-        var templateName = card.Template?.InternalName;
-        if (!string.IsNullOrWhiteSpace(templateName))
-            return templateName;
-
-        return card.TemplateId.ToString();
     }
 }
