@@ -24,7 +24,7 @@ internal sealed class BppConfig : IBppConfig
         UseNativeMonsterPreviewConfig = config.Bind(
             "MonsterPreview",
             "UseNativePreview",
-            false,
+            true,
             "Whether monster preview should use the game's native preview instead of the BazaarPlusPlus overlay. Does not affect history panel battle previews."
         );
         EnableNameOverrideConfig = config.Bind(
