@@ -16,18 +16,3 @@ migrations_dir = "migrations"
 [[r2_buckets]]
 binding = "PVP_BATTLE_BUCKET"
 bucket_name = "bazaarplusplus-pvp-battles"
-
-[observability]
-enabled = false
-head_sampling_rate = 1
-
-[observability.logs]
-enabled = true
-head_sampling_rate = 1
-persist = false
-invocation_logs = false
-
-[observability.traces]
-enabled = false
-persist = true
-head_sampling_rate = 1
