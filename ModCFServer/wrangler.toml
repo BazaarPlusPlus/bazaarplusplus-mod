@@ -10,7 +10,7 @@ custom_domain = true
 [[d1_databases]]
 binding = "DB"
 database_name = "bazaarplusplus-mod-api-db"
-database_id = "e112f7e4-b1f0-4512-a224-7b1975c17fbf"
+database_id = "5f3e98a7-e6e5-474c-897d-7ef0bf59c14e"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
