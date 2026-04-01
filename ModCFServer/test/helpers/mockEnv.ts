@@ -367,17 +367,21 @@ export class MockD1Database {
 
     if (sql.includes("FROM battles AS b")) {
       const opponentAccountId = String(params[0] ?? "");
+      const fromUtc = String(params[1] ?? "");
+      const limit = Number(params[2] ?? Number.MAX_SAFE_INTEGER);
       return {
         results: Array.from(this.battles.values())
           .filter(
             (row) =>
               row.opponent_account_id === opponentAccountId &&
-              row.combat_kind === "PVPCombat",
+              row.combat_kind === "PVPCombat" &&
+              row.recorded_at_utc >= fromUtc,
           )
           .sort((left, right) =>
             right.recorded_at_utc.localeCompare(left.recorded_at_utc) ||
             right.battle_id.localeCompare(left.battle_id),
           )
+          .slice(0, limit)
           .map((row) => row as T),
       };
     }

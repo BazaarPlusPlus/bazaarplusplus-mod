@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
-using Newtonsoft.Json.Linq;
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal sealed class RunUploadSqliteStore
@@ -178,61 +177,21 @@ internal sealed class RunUploadSqliteStore
         if (!reader.Read())
             return null;
 
-        var meta = ReadObject(
-            reader,
-            "run_id",
-            "started_at_utc",
-            "hero",
-            "game_mode",
-            "player_rank",
-            "player_rating",
-            "day",
-            "hour",
-            "seed",
-            "status"
-        );
-        var checkpoint = ReadObject(
-            reader,
-            "run_id",
-            "last_seq",
-            "last_seen_at_utc",
-            "day",
-            "hour",
-            "max_health",
-            "prestige",
-            "level",
-            "income",
-            "gold",
-            "completed"
-        );
-
-        var status = ReadObject(
-            reader,
-            "run_id",
-            "status",
-            "ended_at_utc",
-            "final_day",
-            "final_hour",
-            "max_health",
-            "prestige",
-            "level",
-            "income",
-            "gold",
-            "victories",
-            "losses",
-            "final_player_rank",
-            "final_player_rating",
-            "final_player_rating_delta",
-            "reason"
-        );
-
         var lastSeqOrdinal = reader.GetOrdinal("last_seq");
         var lastSeq = reader.IsDBNull(lastSeqOrdinal) ? 0L : reader.GetInt64(lastSeqOrdinal);
+        var statusOrdinal = reader.GetOrdinal("status");
+        var startedAtUtc = GetNullableString(reader, "started_at_utc");
+        var endedAtUtc = GetNullableString(reader, "ended_at_utc") ?? string.Empty;
+        var finalDay = GetNullableInt32(reader, "final_day") ?? GetNullableInt32(reader, "day");
+        var finalWins = GetNullableInt32(reader, "victories");
+        var finalLosses = GetNullableInt32(reader, "losses");
+        var mmr = GetNullableInt32(reader, "final_player_rating");
+        var heroName = GetNullableString(reader, "hero");
 
         return new RunSummaryUploadSnapshot
         {
             LastSeq = lastSeq,
-            UploadedStatus = status["status"]?.Value<string>(),
+            UploadedStatus = reader.IsDBNull(statusOrdinal) ? null : reader.GetString(statusOrdinal),
             Payload = new RunSummaryUploadPayload
             {
                 SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
@@ -241,9 +200,15 @@ internal sealed class RunUploadSqliteStore
                 PluginVersion = BppPluginVersion.Current,
                 SubmittedAtUtc = DateTimeOffset.UtcNow,
                 RunId = runId,
-                Meta = meta,
-                Checkpoint = checkpoint,
-                Status = status,
+                Status = reader.IsDBNull(statusOrdinal) ? string.Empty : reader.GetString(statusOrdinal),
+                HeroId = null,
+                HeroName = heroName,
+                StartedAtUtc = startedAtUtc,
+                EndedAtUtc = endedAtUtc,
+                FinalDay = finalDay,
+                FinalWins = finalWins,
+                FinalLosses = finalLosses,
+                Mmr = mmr,
             },
         };
     }
@@ -279,18 +244,15 @@ internal sealed class RunUploadSqliteStore
         }
     }
 
-    private static JObject ReadObject(SqliteDataReader reader, params string[] columns)
+    private static string? GetNullableString(SqliteDataReader reader, string column)
     {
-        var payload = new JObject();
-        foreach (var column in columns)
-        {
-            var ordinal = reader.GetOrdinal(column);
-            if (reader.IsDBNull(ordinal))
-                continue;
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+    }
 
-            payload[column] = JToken.FromObject(reader.GetValue(ordinal));
-        }
-
-        return payload;
+    private static int? GetNullableInt32(SqliteDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
     }
 }

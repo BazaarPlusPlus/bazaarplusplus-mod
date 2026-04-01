@@ -47,6 +47,10 @@ function buildSignedRequest(
   });
 }
 
+function isoDaysAgo(daysAgo: number): string {
+  return new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
+}
+
 test("queries ghost battles against the currently bound player account", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
@@ -110,9 +114,141 @@ test("queries ghost battles against the currently bound player account", async (
   );
 
   assert.equal(response.status, 200);
-  const json = (await response.json()) as { battles: Array<{ battle_id: string }> };
+  const json = (await response.json()) as {
+    battles: Array<{ battle_id: string; replay?: { available?: boolean } }>;
+  };
   assert.equal(json.battles.length, 1);
   assert.equal(json.battles[0]?.battle_id, "battle-001");
+  assert.equal(json.battles[0]?.replay?.available, true);
+});
+
+test("queries ghost battles within the requested lookback window and limit", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  const clientId = "client-ghost-002";
+  const installId = "install-ghost-002";
+  env.DB.clients.set(clientId, {
+    client_id: clientId,
+    install_id: installId,
+    modulus_b64: modulusB64,
+    exponent_b64: exponentB64,
+    plugin_version: "1.9.0",
+    registered_at_utc: new Date().toISOString(),
+    last_seen_at_utc: null,
+    revoked_at_utc: null,
+  });
+  env.DB.playerLinks.set(clientId, {
+    client_id: clientId,
+    player_account_id: "me-account",
+    bound_at_utc: new Date().toISOString(),
+    last_confirmed_at_utc: new Date().toISOString(),
+  });
+  env.DB.battles.set("battle-recent-001", {
+    battle_id: "battle-recent-001",
+    run_id: "run-recent-001",
+    client_id: "uploader-client",
+    uploader_player_account_id: "uploader-account",
+    recorded_at_utc: isoDaysAgo(1),
+    day: 10,
+    hour: 5,
+    player_name: "Uploader",
+    player_account_id: "uploader-account",
+    player_hero: "Dooley",
+    player_rank: "Legendary",
+    player_rating: 1820,
+    player_level: 12,
+    opponent_name: "Me",
+    opponent_account_id: "me-account",
+    opponent_hero: "Vanessa",
+    opponent_rank: "Legendary",
+    opponent_rating: 1810,
+    opponent_level: 12,
+    combat_kind: "PVPCombat",
+    result: "win",
+    winner_combatant_id: "Player",
+    loser_combatant_id: "Opponent",
+    replay_schema_version: 2,
+    replay_object_key: "battle-replays/uploader/battle-recent-001/hash.json",
+    replay_size_bytes: 128,
+    created_at_utc: isoDaysAgo(1),
+    updated_at_utc: isoDaysAgo(1),
+  });
+  env.DB.battles.set("battle-recent-002", {
+    battle_id: "battle-recent-002",
+    run_id: "run-recent-002",
+    client_id: "uploader-client",
+    uploader_player_account_id: "uploader-account",
+    recorded_at_utc: isoDaysAgo(2),
+    day: 10,
+    hour: 4,
+    player_name: "Uploader",
+    player_account_id: "uploader-account",
+    player_hero: "Dooley",
+    player_rank: "Legendary",
+    player_rating: 1820,
+    player_level: 12,
+    opponent_name: "Me",
+    opponent_account_id: "me-account",
+    opponent_hero: "Vanessa",
+    opponent_rank: "Legendary",
+    opponent_rating: 1810,
+    opponent_level: 12,
+    combat_kind: "PVPCombat",
+    result: "loss",
+    winner_combatant_id: "Opponent",
+    loser_combatant_id: "Player",
+    replay_schema_version: 2,
+    replay_object_key: "battle-replays/uploader/battle-recent-002/hash.json",
+    replay_size_bytes: 128,
+    created_at_utc: isoDaysAgo(2),
+    updated_at_utc: isoDaysAgo(2),
+  });
+  env.DB.battles.set("battle-old-001", {
+    battle_id: "battle-old-001",
+    run_id: "run-old-001",
+    client_id: "uploader-client",
+    uploader_player_account_id: "uploader-account",
+    recorded_at_utc: isoDaysAgo(10),
+    day: 8,
+    hour: 2,
+    player_name: "Uploader",
+    player_account_id: "uploader-account",
+    player_hero: "Dooley",
+    player_rank: "Legendary",
+    player_rating: 1820,
+    player_level: 12,
+    opponent_name: "Me",
+    opponent_account_id: "me-account",
+    opponent_hero: "Vanessa",
+    opponent_rank: "Legendary",
+    opponent_rating: 1810,
+    opponent_level: 12,
+    combat_kind: "PVPCombat",
+    result: "win",
+    winner_combatant_id: "Player",
+    loser_combatant_id: "Opponent",
+    replay_schema_version: 2,
+    replay_object_key: "battle-replays/uploader/battle-old-001/hash.json",
+    replay_size_bytes: 128,
+    created_at_utc: isoDaysAgo(10),
+    updated_at_utc: isoDaysAgo(10),
+  });
+
+  const response = await worker.fetch(
+    buildSignedRequest(
+      "https://example.com/players/me/ghost-battles?days=3&limit=1",
+      clientId,
+      installId,
+      privateKey,
+    ),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  const json = (await response.json()) as { battles: Array<{ battle_id: string }> };
+  assert.deepEqual(json.battles.map((battle) => battle.battle_id), [
+    "battle-recent-001",
+  ]);
 });
 
 test("creates a replay token and downloads the stored replay payload", async () => {

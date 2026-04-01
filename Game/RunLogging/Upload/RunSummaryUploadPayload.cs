@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
-using Newtonsoft.Json.Linq;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
@@ -19,11 +18,23 @@ internal class RunSummaryUploadPayload
 
     public string RunId { get; set; } = string.Empty;
 
-    public JObject Meta { get; set; } = new();
+    public string Status { get; set; } = string.Empty;
 
-    public JObject? Checkpoint { get; set; }
+    public string? HeroId { get; set; }
 
-    public JObject? Status { get; set; }
+    public string? HeroName { get; set; }
+
+    public string? StartedAtUtc { get; set; }
+
+    public string EndedAtUtc { get; set; } = string.Empty;
+
+    public int? FinalDay { get; set; }
+
+    public int? FinalWins { get; set; }
+
+    public int? FinalLosses { get; set; }
+
+    public int? Mmr { get; set; }
 }
 
 internal class RunSummaryUploadSnapshot

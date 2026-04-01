@@ -185,22 +185,26 @@ try
         payloadType.GetProperty("Events") == null && payloadType.GetProperty("PvpBattles") == null,
         "Upload payload should not expose legacy events or PVP battle arrays."
     );
-    var status = (JObject?)payloadType.GetProperty("Status")!.GetValue(payload);
     Assert(
-        status?["status"]?.Value<string>() == "completed",
-        "Upload payload should include the terminal run status."
+        payloadType.GetProperty("Meta") == null && payloadType.GetProperty("Checkpoint") == null,
+        "Upload payload should not expose nested meta/checkpoint wrappers."
     );
     Assert(
-        status?["final_player_rank"]?.Value<string>() == "Legendary",
-        "Upload payload should include the final player rank snapshot."
+        (string?)payloadType.GetProperty("Status")!.GetValue(payload) == "completed",
+        "Upload payload should include the terminal run status as a top-level field."
     );
     Assert(
-        status?["final_player_rating"]?.Value<int>() == 1436,
-        "Upload payload should include the final player rating snapshot."
+        (string?)payloadType.GetProperty("HeroName")!.GetValue(payload) == "Vanessa",
+        "Upload payload should include the hero name as a top-level field."
     );
     Assert(
-        status?["final_player_rating_delta"]?.Value<int>() == 0,
-        "Upload payload should default the final player rating delta to 0 when the starting rating snapshot is unavailable."
+        (int?)payloadType.GetProperty("FinalDay")!.GetValue(payload) == 3,
+        "Upload payload should include the final day as a top-level field."
+    );
+    Assert(
+        (string?)payloadType.GetProperty("EndedAtUtc")!.GetValue(payload)
+            == startedAt.AddMinutes(10).ToString("o"),
+        "Upload payload should include the end timestamp as a top-level field."
     );
 
     InvokeVoid(
