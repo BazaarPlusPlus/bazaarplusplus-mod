@@ -261,14 +261,20 @@ internal sealed class GhostBattleApiClient
         if (string.IsNullOrWhiteSpace(result))
             return result;
 
-        return result.Trim() switch
-        {
-            "Win" => "Loss",
-            "Won" => "Lost",
-            "Loss" => "Win",
-            "Lost" => "Won",
-            _ => result,
-        };
+        var trimmed = result.Trim();
+        if (
+            string.Equals(trimmed, "Win", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(trimmed, "Won", StringComparison.OrdinalIgnoreCase)
+        )
+            return "Lost";
+
+        if (
+            string.Equals(trimmed, "Loss", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(trimmed, "Lost", StringComparison.OrdinalIgnoreCase)
+        )
+            return "Won";
+
+        return trimmed;
     }
 
     private static string? FlipCombatantId(string? combatantId)

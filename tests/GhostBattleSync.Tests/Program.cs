@@ -4,6 +4,12 @@ using System.Reflection;
 using Newtonsoft.Json.Linq;
 
 var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleSyncService");
+var apiClientType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleApiClient");
+var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleRecord");
+var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
+var coordinatorOutcomeType = RequireType(
+    "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator+GhostBattleOutcome"
+);
 var shouldAdvanceCheckpoint = syncServiceType.GetMethod(
     "ShouldAdvanceCheckpoint",
     BindingFlags.NonPublic | BindingFlags.Static
@@ -19,6 +25,22 @@ Assert(
 Assert(
     shouldTreatGhostErrorAsBindingFailure != null,
     "GhostBattleSyncService should expose binding-related ghost error classification logic."
+);
+var flipBattleResult = apiClientType.GetMethod(
+    "FlipBattleResult",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
+var resolveGhostBattleOutcome = coordinatorType.GetMethod(
+    "ResolveGhostBattleOutcome",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
+Assert(
+    flipBattleResult != null,
+    "GhostBattleApiClient should expose battle-result normalization logic."
+);
+Assert(
+    resolveGhostBattleOutcome != null,
+    "HistoryPanelCoordinator should expose ghost-outcome resolution logic."
 );
 
 Assert(
@@ -57,6 +79,27 @@ Assert(
             ["http_404:{\"error\":\"battle_not_found\"}"]
         )!,
     "Non-binding ghost request failures should keep their original error."
+);
+
+Assert(
+    (string?)flipBattleResult!.Invoke(null, ["won"]) == "Lost",
+    "Ghost battle result flipping should be case-insensitive for remote lower-case payloads."
+);
+Assert(
+    (string?)flipBattleResult.Invoke(null, ["LOSS"]) == "Won",
+    "Ghost battle result flipping should normalize equivalent loss variants."
+);
+
+var conflictingBattle = CreateHistoryBattleRecord(
+    battleRecordType,
+    result: "won",
+    winnerCombatantId: "Player"
+);
+var resolvedOutcome = resolveGhostBattleOutcome!.Invoke(null, [conflictingBattle]);
+var lostOutcome = Enum.Parse(coordinatorOutcomeType, "Lost");
+Assert(
+    Equals(resolvedOutcome, lostOutcome),
+    "Ghost battle filtering should prefer winner_combatant_id over result when the stored fields disagree."
 );
 
 var tempRoot = Path.Combine(
@@ -207,6 +250,46 @@ static void InvokeVoid(Type type, object instance, string name, object?[] args)
         throw new InvalidOperationException($"Method not found: {type.FullName}.{name}");
 
     method.Invoke(instance, args);
+}
+
+static object CreateHistoryBattleRecord(Type battleRecordType, string? result, string? winnerCombatantId)
+{
+    var previewDataType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattlePreviewData");
+    var previewBoardModelType = RequireType("BazaarPlusPlus.Game.MonsterPreview.PreviewBoardModel");
+    var historyBattleSourceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleSource");
+    var emptyBoard = Activator.CreateInstance(previewBoardModelType)!;
+    var previewData = Activator.CreateInstance(previewDataType, [emptyBoard, emptyBoard])!;
+    var ghostSource = Enum.Parse(historyBattleSourceType, "Ghost");
+    var ctor = battleRecordType.GetConstructors().Single();
+    return ctor.Invoke(
+        [
+            "battle-1",
+            string.Empty,
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "Opponent",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "PVPCombat",
+            result,
+            winnerCombatantId,
+            null,
+            string.Empty,
+            previewData,
+            ghostSource,
+            false,
+            false,
+        ]
+    );
 }
 
 static int GetFreePort()

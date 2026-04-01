@@ -539,48 +539,52 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     private bool MatchesGhostFilter(HistoryBattleRecord battle)
     {
+        var outcome = ResolveGhostBattleOutcome(battle);
         return _state.GhostBattleFilter switch
         {
-            GhostBattleFilter.IWon => IsGhostOutcomeIWon(battle),
-            GhostBattleFilter.ILost => IsGhostOutcomeILost(battle),
+            GhostBattleFilter.IWon => outcome == GhostBattleOutcome.Won,
+            GhostBattleFilter.ILost => outcome == GhostBattleOutcome.Lost,
             _ => true,
         };
     }
 
-    private static bool IsGhostOutcomeIWon(HistoryBattleRecord battle)
+    private static GhostBattleOutcome ResolveGhostBattleOutcome(HistoryBattleRecord battle)
     {
-        var result = battle.Result?.Trim();
         if (
-            string.Equals(result, "Loss", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(result, "Lost", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            return true;
-        }
-
-        return string.Equals(
-            battle.WinnerCombatantId,
+            string.Equals(
+                battle.WinnerCombatantId,
             "Opponent",
             StringComparison.OrdinalIgnoreCase
-        );
-    }
+            )
+        )
+            return GhostBattleOutcome.Won;
 
-    private static bool IsGhostOutcomeILost(HistoryBattleRecord battle)
-    {
+        if (
+            string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase)
+        )
+            return GhostBattleOutcome.Lost;
+
         var result = battle.Result?.Trim();
         if (
             string.Equals(result, "Win", StringComparison.OrdinalIgnoreCase)
             || string.Equals(result, "Won", StringComparison.OrdinalIgnoreCase)
         )
-        {
-            return true;
-        }
+            return GhostBattleOutcome.Won;
 
-        return string.Equals(
-            battle.WinnerCombatantId,
-            "Player",
-            StringComparison.OrdinalIgnoreCase
-        );
+        if (
+            string.Equals(result, "Loss", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(result, "Lost", StringComparison.OrdinalIgnoreCase)
+        )
+            return GhostBattleOutcome.Lost;
+
+        return GhostBattleOutcome.Unknown;
+    }
+
+    private enum GhostBattleOutcome
+    {
+        Unknown,
+        Won,
+        Lost,
     }
 
     private void BeginPanelSession()
