@@ -92,7 +92,6 @@ try
                 LastSeenAtUtc = startedAt,
                 Day = 1,
                 Hour = 1,
-                State = "Encounter",
                 Completed = false,
             },
         ]

@@ -32,7 +32,6 @@ public class Plugin : BaseUnityPlugin
             var configFile = CreateConfigFile();
             var runtime = InstallRuntimeHost(configFile);
             var services = runtime.Services;
-            var lifecycleModule = runtime.LifecycleModule;
             var combatReplayRuntime = runtime.CombatReplayRuntime;
             BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
 
@@ -41,7 +40,7 @@ public class Plugin : BaseUnityPlugin
             BppLog.Info("Plugin", "Harmony patches applied");
 
             BppLog.Info("Plugin", "Attaching runtime components");
-            AttachRuntimeComponents(services, lifecycleModule, () => combatReplayRuntime);
+            AttachRuntimeComponents(services, () => combatReplayRuntime);
             BppLog.Info("Plugin", "Runtime components attached");
 
             BppLog.Info("Plugin", "Plugin components attached");
@@ -88,14 +87,9 @@ public class Plugin : BaseUnityPlugin
 
     private void AttachRuntimeComponents(
         BppRuntimeServices services,
-        RunLifecycleModule lifecycleModule,
         Func<CombatReplayRuntime?> combatReplayRuntimeAccessor
     )
     {
-        BppLog.Info("Plugin", "Adding RunStateSyncController");
-        var runStateSyncController = gameObject.AddComponent<RunStateSyncController>();
-        runStateSyncController.Initialize(services.EventBus, lifecycleModule);
-
         BppLog.Info("Plugin", "Adding RunLoggingController");
         gameObject.AddComponent<RunLoggingController>();
         BppLog.Info("Plugin", "Adding RunUploadController");

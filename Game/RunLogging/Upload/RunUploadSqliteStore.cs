@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json.Linq;
-
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal sealed class RunUploadSqliteStore
@@ -161,12 +160,6 @@ internal sealed class RunUploadSqliteStore
                 level,
                 income,
                 gold,
-                state,
-                current_encounter_id,
-                last_state_fingerprint,
-                last_selection_fingerprint,
-                pending_selection_seq,
-                pending_selection_json,
                 ended_at_utc,
                 final_day,
                 final_hour,
@@ -210,20 +203,8 @@ internal sealed class RunUploadSqliteStore
             "level",
             "income",
             "gold",
-            "state",
-            "current_encounter_id",
-            "last_state_fingerprint",
-            "last_selection_fingerprint",
-            "pending_selection_seq",
-            "pending_selection_json",
             "completed"
         );
-        if (checkpoint.TryGetValue("pending_selection_json", out var pendingJson))
-        {
-            checkpoint.Remove("pending_selection_json");
-            if (pendingJson.Type == JTokenType.String)
-                checkpoint["pending_selection"] = JToken.Parse(pendingJson.Value<string>()!);
-        }
 
         var status = ReadObject(
             reader,

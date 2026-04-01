@@ -60,40 +60,6 @@ public sealed class RunLogSessionManager
     {
         var session =
             ActiveSession ?? throw new InvalidOperationException("No active run session.");
-        if (
-            RunLogEventKinds.IsSelectionSeenKind(entry.Kind)
-            && !string.IsNullOrWhiteSpace(entry.SelectionFingerprint)
-            && string.Equals(
-                entry.SelectionFingerprint,
-                session.LastSelectionFingerprint,
-                StringComparison.Ordinal
-            )
-        )
-        {
-            return null;
-        }
-
-        if (
-            string.Equals(entry.Kind, "state_seen", StringComparison.Ordinal)
-            && !string.IsNullOrWhiteSpace(entry.StateFingerprint)
-            && string.Equals(
-                entry.StateFingerprint,
-                session.LastStateFingerprint,
-                StringComparison.Ordinal
-            )
-        )
-        {
-            return null;
-        }
-
-        if (RunLogEventKinds.IsChoiceMadeKind(entry.Kind))
-        {
-            if (
-                !session.PendingSelectionSeq.HasValue
-                || entry.SelectionSeq != session.PendingSelectionSeq
-            )
-                return null;
-        }
 
         entry.SchemaVersion =
             entry.SchemaVersion == 0 ? session.SchemaVersion : entry.SchemaVersion;
@@ -107,25 +73,6 @@ public sealed class RunLogSessionManager
         session.LastSeenAtUtc = entry.Ts;
         session.Day = entry.Day ?? session.Day;
         session.Hour = entry.Hour ?? session.Hour;
-        session.State = entry.State ?? session.State;
-        session.CurrentEncounterId = ResolveCurrentEncounterId(entry) ?? session.CurrentEncounterId;
-
-        if (!string.IsNullOrWhiteSpace(entry.StateFingerprint))
-            session.LastStateFingerprint = entry.StateFingerprint;
-
-        if (!string.IsNullOrWhiteSpace(entry.SelectionFingerprint))
-            session.LastSelectionFingerprint = entry.SelectionFingerprint;
-
-        if (RunLogEventKinds.IsSelectionSeenKind(entry.Kind))
-        {
-            session.PendingSelectionSeq = entry.Seq;
-            session.PendingSelection = RunLogPendingSelectionState.FromEvent(entry);
-        }
-        else if (RunLogEventKinds.ClearsPendingSelectionKind(entry.Kind))
-        {
-            session.PendingSelectionSeq = null;
-            session.PendingSelection = null;
-        }
 
         return entry;
     }
@@ -156,12 +103,6 @@ public sealed class RunLogSessionManager
             Level = session.Level,
             Income = session.Income,
             Gold = session.Gold,
-            State = session.State,
-            CurrentEncounterId = session.CurrentEncounterId,
-            LastStateFingerprint = session.LastStateFingerprint,
-            LastSelectionFingerprint = session.LastSelectionFingerprint,
-            PendingSelectionSeq = session.PendingSelectionSeq,
-            PendingSelection = session.PendingSelection,
             Completed = session.Completed,
         };
 
@@ -204,13 +145,5 @@ public sealed class RunLogSessionManager
         _store.MarkRunAbandoned(session.RunId, abandonment);
         session.Completed = true;
         ActiveSession = null;
-    }
-
-    private static string? ResolveCurrentEncounterId(RunLogEvent entry)
-    {
-        if (string.Equals(entry.Kind, "encounter_selected", StringComparison.Ordinal))
-            return entry.SelectedEncounterId ?? entry.EncounterId;
-
-        return entry.EncounterId;
     }
 }

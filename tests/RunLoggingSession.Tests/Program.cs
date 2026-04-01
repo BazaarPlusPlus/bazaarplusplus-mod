@@ -1,6 +1,5 @@
 #nullable enable
 using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
@@ -32,185 +31,24 @@ Invoke<RunLogSessionState>(managerType, manager, "EnsureActiveSession", [request
 Invoke<RunLogSessionState>(managerType, manager, "EnsureActiveSession", [request]);
 Assert(fakeStore.CreateRunCalls == 1, "EnsureActiveSession should create a run only once.");
 
-var firstSelection = Invoke<RunLogEvent?>(
+var combatEvent = Invoke<RunLogEvent?>(
     managerType,
     manager,
     "AppendEvent",
     [
         new RunLogEvent
         {
-            Kind = "selection_seen",
-            Day = 1,
-            Hour = 1,
-            State = "Encounter",
-            SelectionFingerprint = "selection-fp-1",
-        },
-    ]
-);
-Assert(firstSelection != null, "The first selection_seen event should be recorded.");
-Assert(firstSelection!.Seq == 1, "The first recorded event should get seq=1.");
-Assert(fakeStore.AppendedEvents.Count == 1, "The first selection event should be persisted.");
-Assert(
-    fakeStore.ResumeState?.PendingSelection?.SelectionSeq == 1,
-    "selection_seen should persist the pending selection payload."
-);
-
-var duplicateSelection = Invoke<RunLogEvent?>(
-    managerType,
-    manager,
-    "AppendEvent",
-    [
-        new RunLogEvent
-        {
-            Kind = "selection_seen",
-            Day = 1,
-            Hour = 1,
-            State = "Encounter",
-            SelectionFingerprint = "selection-fp-1",
-        },
-    ]
-);
-Assert(duplicateSelection == null, "Duplicate selection_seen fingerprints should be suppressed.");
-Assert(fakeStore.AppendedEvents.Count == 1, "Duplicate selection_seen should not be persisted.");
-
-var firstStateEvent = Invoke<RunLogEvent?>(
-    managerType,
-    manager,
-    "AppendEvent",
-    [
-        new RunLogEvent
-        {
-            Kind = "state_seen",
-            Day = 1,
-            Hour = 1,
-            State = "Encounter",
-            StateFingerprint = "state-fp-1",
-        },
-    ]
-);
-Assert(firstStateEvent != null, "The first state_seen event should be recorded.");
-
-var duplicateStateEvent = Invoke<RunLogEvent?>(
-    managerType,
-    manager,
-    "AppendEvent",
-    [
-        new RunLogEvent
-        {
-            Kind = "state_seen",
-            Day = 1,
-            Hour = 1,
-            State = "Encounter",
-            StateFingerprint = "state-fp-1",
-        },
-    ]
-);
-Assert(duplicateStateEvent == null, "Duplicate state_seen fingerprints should be suppressed.");
-Assert(
-    fakeStore.AppendedEvents.Count(e => e.Kind == "state_seen") == 1,
-    "Duplicate state_seen should not be persisted."
-);
-
-var progressEvent = Invoke<RunLogEvent?>(
-    managerType,
-    manager,
-    "AppendEvent",
-    [
-        new RunLogEvent
-        {
-            Kind = "run_progress",
+            Kind = "pvp_combat_recorded",
             Day = 1,
             Hour = 2,
+            EncounterId = "encounter-pvp-1",
+            BattleId = "battle-123",
         },
     ]
 );
-Assert(progressEvent != null, "A non-duplicate event should be persisted.");
-Assert(progressEvent!.Seq == 3, "Sequence numbers should remain monotonic after suppression.");
-Assert(fakeStore.AppendedEvents.Count == 3, "Three unique events should be persisted.");
-
-var choiceEvent = Invoke<RunLogEvent?>(
-    managerType,
-    manager,
-    "AppendEvent",
-    [
-        new RunLogEvent
-        {
-            Kind = "choice_made",
-            SelectionSeq = 1,
-            SelectedInstanceId = "instance-a",
-            SelectedTemplateId = "template-a",
-            SelectedName = "Frost Street",
-        },
-    ]
-);
-Assert(choiceEvent != null, "choice_made should be accepted for the pending selection.");
-Assert(choiceEvent!.Seq == 4, "choice_made should advance the sequence.");
-Assert(
-    fakeStore.ResumeState?.PendingSelectionSeq == null,
-    "choice_made should clear pending_selection_seq."
-);
-Assert(
-    fakeStore.ResumeState?.PendingSelection == null,
-    "choice_made should clear the pending selection payload."
-);
-
-var secondSelection = Invoke<RunLogEvent?>(
-    managerType,
-    manager,
-    "AppendEvent",
-    [
-        new RunLogEvent
-        {
-            Kind = "choice_options_seen",
-            Day = 1,
-            Hour = 2,
-            State = "Choice",
-            SelectionFingerprint = "selection-fp-2",
-        },
-    ]
-);
-Assert(secondSelection != null, "A second selection should be recorded.");
-
-var abandonedSelection = Invoke<RunLogEvent?>(
-    managerType,
-    manager,
-    "AppendEvent",
-    [
-        new RunLogEvent
-        {
-            Kind = "selection_abandoned",
-            Day = 1,
-            Hour = 2,
-            State = "Choice",
-            SelectionSeq = secondSelection!.Seq,
-            AbandonedReason = "superseded_by_new_selection",
-        },
-    ]
-);
-Assert(abandonedSelection != null, "selection_abandoned should be recorded.");
-Assert(
-    fakeStore.ResumeState?.PendingSelectionSeq == null
-        && fakeStore.ResumeState?.PendingSelection == null,
-    "selection_abandoned should clear the pending selection state."
-);
-
-var staleChoiceEvent = Invoke<RunLogEvent?>(
-    managerType,
-    manager,
-    "AppendEvent",
-    [
-        new RunLogEvent
-        {
-            Kind = "choice_made",
-            SelectionSeq = secondSelection!.Seq,
-            SelectedInstanceId = "instance-a",
-        },
-    ]
-);
-Assert(
-    staleChoiceEvent == null,
-    "A duplicate/stale choice_made should be suppressed once the pending selection is cleared."
-);
+Assert(combatEvent != null, "A pvp_combat_recorded event should be persisted.");
+Assert(combatEvent!.Seq == 1, "The first recorded event should get seq=1.");
+Assert(fakeStore.AppendedEvents.Count == 1, "Only the combat event should be persisted.");
 
 Assert(fakeStore.ResumeState != null, "The fake store should retain the active session.");
 fakeStore.ResumeState!.Day = 6;
@@ -258,113 +96,46 @@ fakeStore.ResumeState = new RunLogSessionState
     LastSeq = 41,
     Day = 4,
     Hour = 2,
-    State = "Choice",
-    LastSelectionFingerprint = "selection-fp-prev",
-    PendingSelectionSeq = 40,
-    PendingSelection = new RunLogPendingSelectionState
-    {
-        Day = 4,
-        Hour = 2,
-        State = "Choice",
-        EncounterId = "enc-40",
-        ParentEncounterId = "enc-40",
-        SelectionSeq = 40,
-        Options =
-        [
-            new RunLogOptionSnapshot
-            {
-                InstanceId = "instance-prev",
-                TemplateId = "template-prev",
-                Name = "Recovered Choice",
-            },
-        ],
-    },
 };
 
-var resumedManager = ctor.Invoke([fakeStore, new Func<DateTimeOffset>(() => now.AddMinutes(20))]);
-var resumedState = Invoke<RunLogSessionState>(
+var restoredManager = ctor.Invoke([fakeStore, new Func<DateTimeOffset>(() => now.AddMinutes(12))]);
+Invoke<RunLogSessionState?>(managerType, restoredManager, "RestoreActiveSession", []);
+Assert(GetProperty<bool>(managerType, restoredManager, "HasActiveSession"), "RestoreActiveSession should restore the active run.");
+
+InvokeVoid(
     managerType,
-    resumedManager,
-    "EnsureActiveSession",
-    [request]
+    restoredManager,
+    "MarkRunAbandoned",
+    [new RunLogAbandonment { Status = "abandoned", EndedAtUtc = now.AddMinutes(15) }]
 );
+Assert(fakeStore.MarkRunAbandonedCalls == 1, "MarkRunAbandoned should call the store exactly once.");
 Assert(
-    resumedState.RunId == request.RunId,
-    "EnsureActiveSession should prefer the resumable run when the server run id matches."
+    !GetProperty<bool>(managerType, restoredManager, "HasActiveSession"),
+    "MarkRunAbandoned should clear the active session."
 );
-Assert(fakeStore.CreateRunCalls == 1, "Resuming should not create a second run.");
 
-var resumedEvent = Invoke<RunLogEvent?>(
-    managerType,
-    resumedManager,
-    "AppendEvent",
-    [
-        new RunLogEvent
-        {
-            Kind = "run_progress",
-            Day = 4,
-            Hour = 3,
-        },
-    ]
-);
-Assert(resumedEvent != null, "Resumed manager should accept events.");
-Assert(resumedEvent!.RunId == request.RunId, "Resumed events should target the restored run id.");
-Assert(resumedEvent.Seq == 42, "Resumed sequencing should continue from the persisted last_seq.");
-
-fakeStore.ResumeState = new RunLogSessionState
+var mismatchStore = new FakeRunLogStore();
+mismatchStore.ResumeState = new RunLogSessionState
 {
     RunId = "server-run-old",
     SchemaVersion = 1,
     StartedAtUtc = now,
-    LastSeenAtUtc = now.AddMinutes(6),
-    LastSeq = 7,
-    Day = 3,
-    Hour = 2,
-};
-
-var replacementRequest = new RunLogCreateRequest
-{
-    SchemaVersion = 1,
-    RunId = "server-run-new",
-    StartedAtUtc = now.AddMinutes(30),
-    Hero = "Vanessa",
-    GameMode = "Ranked",
+    LastSeenAtUtc = now.AddMinutes(2),
+    LastSeq = 5,
     Day = 1,
     Hour = 1,
 };
-var replacementManager = ctor.Invoke([
-    fakeStore,
-    new Func<DateTimeOffset>(() => now.AddMinutes(30)),
-]);
-var replacementState = Invoke<RunLogSessionState>(
-    managerType,
-    replacementManager,
-    "EnsureActiveSession",
-    [replacementRequest]
-);
-Assert(
-    replacementState.RunId == "server-run-new",
-    "EnsureActiveSession should replace a restored session when the server run id changes."
-);
-Assert(fakeStore.MarkRunAbandonedCalls == 1, "A mismatched restored session should be abandoned.");
-Assert(fakeStore.CreateRunCalls == 2, "A mismatched restored session should create a fresh run.");
-
-var queuedStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.QueuedRunLogStore");
-var slowStore = new SlowRunLogStore();
-var queuedStore =
-    Activator.CreateInstance(queuedStoreType, slowStore)
-    ?? throw new InvalidOperationException("Failed to create QueuedRunLogStore.");
-
+var mismatchManager = ctor.Invoke([mismatchStore, new Func<DateTimeOffset>(() => now.AddMinutes(20))]);
 Invoke<RunLogSessionState>(
-    queuedStoreType,
-    queuedStore,
-    "CreateRun",
+    managerType,
+    mismatchManager,
+    "EnsureActiveSession",
     [
         new RunLogCreateRequest
         {
             SchemaVersion = 1,
-            RunId = "queued-run-001",
-            StartedAtUtc = now,
+            RunId = "server-run-new",
+            StartedAtUtc = now.AddMinutes(20),
             Hero = "Vanessa",
             GameMode = "Ranked",
             Day = 1,
@@ -372,73 +143,17 @@ Invoke<RunLogSessionState>(
         },
     ]
 );
-
-slowStore.BlockAppend = true;
-InvokeVoid(
-    queuedStoreType,
-    queuedStore,
-    "AppendEvent",
-    [
-        "queued-run-001",
-        new RunLogEvent
-        {
-            SchemaVersion = 1,
-            RunId = "queued-run-001",
-            Seq = 1,
-            Ts = now,
-            Kind = "run_started",
-        },
-    ]
-);
+Assert(mismatchStore.MarkRunAbandonedCalls == 1, "A mismatched restored session should be abandoned.");
 Assert(
-    slowStore.AppendEntered.Wait(TimeSpan.FromSeconds(2)),
-    "QueuedRunLogStore should process queued append operations on the worker."
+    mismatchStore.LastAbandonment?.Reason == "session_mismatch",
+    "Mismatched sessions should be abandoned with the session_mismatch reason."
 );
-
-var completionTask = Task.Run(() =>
-    InvokeVoid(
-        queuedStoreType,
-        queuedStore,
-        "CompleteRun",
-        [
-            "queued-run-001",
-            new RunLogCompletion
-            {
-                SchemaVersion = 1,
-                RunId = "queued-run-001",
-                Status = "completed",
-                EndedAtUtc = now.AddMinutes(5),
-            },
-        ]
-    )
-);
-Thread.Sleep(150);
-Assert(
-    slowStore.CompleteRunCalls == 0,
-    "QueuedRunLogStore should not write terminal status before earlier queued work completes."
-);
-slowStore.AllowAppend.Set();
-Assert(
-    completionTask.Wait(TimeSpan.FromSeconds(2)),
-    "QueuedRunLogStore should unblock CompleteRun after pending writes drain."
-);
-Assert(
-    slowStore.CompleteRunCalls == 1,
-    "QueuedRunLogStore should write terminal status once pending writes have drained."
-);
-Assert(
-    slowStore.OperationLog.SequenceEqual(["create", "append", "complete"]),
-    "QueuedRunLogStore should preserve write ordering across queued operations and synchronous completion."
-);
-
-((IDisposable)queuedStore).Dispose();
 
 Console.WriteLine("RunLogging session checks passed.");
 
 static Type RequireType(string fullName)
 {
-    return Type.GetType($"{fullName}, BazaarPlusPlus")
-        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+    return Assembly.Load("BazaarPlusPlus").GetType(fullName, throwOnError: true)!;
 }
 
 static T Invoke<T>(Type type, object instance, string name, object?[] args)
@@ -484,9 +199,11 @@ file sealed class FakeRunLogStore : IRunLogStore
 
     public List<RunLogEvent> AppendedEvents { get; } = [];
 
+    public RunLogSessionState? ResumeState { get; set; }
+
     public RunLogCompletion? LastCompletion { get; private set; }
 
-    public RunLogSessionState? ResumeState { get; set; }
+    public RunLogAbandonment? LastAbandonment { get; private set; }
 
     public RunLogSessionState? TryResumeActiveRun()
     {
@@ -505,12 +222,6 @@ file sealed class FakeRunLogStore : IRunLogStore
             LastSeq = 0,
             Day = request.Day,
             Hour = request.Hour,
-            MaxHealth = 90,
-            Prestige = 7,
-            Level = 5,
-            Income = 3,
-            Gold = 12,
-            Completed = false,
         };
         return ResumeState;
     }
@@ -524,28 +235,23 @@ file sealed class FakeRunLogStore : IRunLogStore
             ResumeState.LastSeenAtUtc = entry.Ts;
             ResumeState.Day = entry.Day;
             ResumeState.Hour = entry.Hour;
-            ResumeState.State = entry.State;
-            if (!string.IsNullOrWhiteSpace(entry.SelectionFingerprint))
-                ResumeState.LastSelectionFingerprint = entry.SelectionFingerprint;
         }
     }
 
     public void SaveCheckpoint(string runId, RunLogCheckpoint checkpoint)
     {
-        if (ResumeState != null)
-        {
-            ResumeState.LastSeq = checkpoint.LastSeq;
-            ResumeState.LastSeenAtUtc = checkpoint.LastSeenAtUtc;
-            ResumeState.Day = checkpoint.Day;
-            ResumeState.Hour = checkpoint.Hour;
-            ResumeState.State = checkpoint.State;
-            ResumeState.CurrentEncounterId = checkpoint.CurrentEncounterId;
-            ResumeState.LastStateFingerprint = checkpoint.LastStateFingerprint;
-            ResumeState.LastSelectionFingerprint = checkpoint.LastSelectionFingerprint;
-            ResumeState.PendingSelectionSeq = checkpoint.PendingSelectionSeq;
-            ResumeState.PendingSelection = checkpoint.PendingSelection;
-            ResumeState.Completed = checkpoint.Completed;
-        }
+        if (ResumeState == null)
+            return;
+
+        ResumeState.LastSeq = checkpoint.LastSeq;
+        ResumeState.LastSeenAtUtc = checkpoint.LastSeenAtUtc;
+        ResumeState.Day = checkpoint.Day;
+        ResumeState.Hour = checkpoint.Hour;
+        ResumeState.MaxHealth = checkpoint.MaxHealth;
+        ResumeState.Prestige = checkpoint.Prestige;
+        ResumeState.Level = checkpoint.Level;
+        ResumeState.Income = checkpoint.Income;
+        ResumeState.Gold = checkpoint.Gold;
     }
 
     public void CompleteRun(string runId, RunLogCompletion completion)
@@ -558,55 +264,7 @@ file sealed class FakeRunLogStore : IRunLogStore
     public void MarkRunAbandoned(string runId, RunLogAbandonment abandonment)
     {
         MarkRunAbandonedCalls++;
+        LastAbandonment = abandonment;
         ResumeState = null;
     }
-}
-
-file sealed class SlowRunLogStore : IRunLogStore
-{
-    public ManualResetEventSlim AppendEntered { get; } = new(false);
-
-    public ManualResetEventSlim AllowAppend { get; } = new(false);
-
-    public bool BlockAppend { get; set; }
-
-    public int CompleteRunCalls { get; private set; }
-
-    public List<string> OperationLog { get; } = [];
-
-    public RunLogSessionState? TryResumeActiveRun()
-    {
-        return null;
-    }
-
-    public RunLogSessionState CreateRun(RunLogCreateRequest request)
-    {
-        OperationLog.Add("create");
-        return new RunLogSessionState
-        {
-            RunId = request.RunId,
-            SchemaVersion = request.SchemaVersion,
-            StartedAtUtc = request.StartedAtUtc,
-            LastSeenAtUtc = request.StartedAtUtc,
-        };
-    }
-
-    public void AppendEvent(string runId, RunLogEvent entry)
-    {
-        AppendEntered.Set();
-        if (BlockAppend)
-            AllowAppend.Wait(TimeSpan.FromSeconds(2));
-
-        OperationLog.Add("append");
-    }
-
-    public void SaveCheckpoint(string runId, RunLogCheckpoint checkpoint) { }
-
-    public void CompleteRun(string runId, RunLogCompletion completion)
-    {
-        CompleteRunCalls++;
-        OperationLog.Add("complete");
-    }
-
-    public void MarkRunAbandoned(string runId, RunLogAbandonment abandonment) { }
 }

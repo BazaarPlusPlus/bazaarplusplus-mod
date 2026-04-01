@@ -530,8 +530,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void DrainPersistenceResults()
     {
+        var processedAny = false;
         while (_persistenceQueue?.TryDequeueResult(out var result) == true)
         {
+            processedAny = true;
             if (!result.Succeeded)
             {
                 BppLog.Error(
@@ -547,6 +549,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 "CombatReplayRuntime",
                 $"Saved combat replay {result.Manifest.BattleId} for run={result.Manifest.RunId ?? "unknown"}"
             );
+        }
+
+        if (processedAny && _persistenceQueue?.HasPendingPersistence == false)
+        {
+            BppRuntimeHost.EventBus.Publish(new CombatReplayPersistenceDrained());
         }
     }
 

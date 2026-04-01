@@ -16,17 +16,6 @@ namespace BazaarPlusPlus.Game.RunLogging;
 
 internal static class RunLoggingGameDataReader
 {
-    public static string? GetParentEncounterId(string? state)
-    {
-        return state switch
-        {
-            "Choice" => Data.CurrentEncounterId?.ToString(),
-            "Loot" => Data.CurrentEncounterId?.ToString(),
-            "Pedestal" => Data.CurrentEncounterId?.ToString(),
-            _ => null,
-        };
-    }
-
     public static bool TryCreateRunLogCreateRequest(out RunLogCreateRequest request)
     {
         request = null!;
@@ -66,22 +55,6 @@ internal static class RunLoggingGameDataReader
         }
     }
 
-    public static bool TryBuildRunLogRunProgressInput(out RunLogRunProgressInput input)
-    {
-        input = null!;
-        if (Data.Run == null)
-            return false;
-
-        input = new RunLogRunProgressInput
-        {
-            Day = (int?)Data.Run.Day,
-            Hour = GetCurrentRunHour(),
-            Victories = unchecked((int)Data.Run.Victories),
-            Losses = unchecked((int)Data.Run.Losses),
-        };
-        return true;
-    }
-
     public static bool TryBuildRunLogPlayerStats(out RunLogPlayerStatsSnapshot stats)
     {
         stats = null!;
@@ -95,24 +68,6 @@ internal static class RunLoggingGameDataReader
             Level = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.Level),
             Income = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.Income),
             Gold = Data.Run.Player.GetAttributeValue(EPlayerAttributeType.Gold),
-        };
-        return true;
-    }
-
-    public static bool TryBuildRunLogStateSnapshot(out RunLogStateSnapshotInput input)
-    {
-        input = null!;
-        var state = Data.CurrentState;
-        if (state == null)
-            return false;
-
-        input = new RunLogStateSnapshotInput
-        {
-            Day = Data.Run == null ? null : (int?)Data.Run.Day,
-            Hour = GetCurrentRunHour(),
-            State = state.StateName.ToString(),
-            EncounterId = Data.CurrentEncounterId?.ToString(),
-            ParentEncounterId = GetParentEncounterId(state.StateName.ToString()),
         };
         return true;
     }
@@ -141,6 +96,19 @@ internal static class RunLoggingGameDataReader
             Losses = Data.Run == null ? null : unchecked((int)Data.Run.Losses),
             FinalPlayerRank = finalPlayerRank,
             FinalPlayerRating = finalPlayerRating,
+            Reason = reason,
+        };
+    }
+
+    public static RunLogAbandonment BuildRunLogAbandonment(string reason)
+    {
+        return new RunLogAbandonment
+        {
+            SchemaVersion = Persistence.Sqlite.RunLogSqliteSchema.RowSchemaVersion,
+            Status = "abandoned",
+            EndedAtUtc = DateTimeOffset.UtcNow,
+            FinalDay = Data.Run == null ? null : (int?)Data.Run.Day,
+            FinalHour = GetCurrentRunHour(),
             Reason = reason,
         };
     }

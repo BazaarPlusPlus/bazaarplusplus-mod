@@ -18,14 +18,17 @@ internal sealed class RunLoggingModule
     private readonly RunLoggingControllerCore _core;
     private readonly Func<bool> _hasPendingReplayPersistence;
     private readonly Func<RunLogSessionState?> _ensureActiveRunFromGame;
-    private IDisposable? _syncSubscription;
     private IDisposable? _runLifecycleSubscription;
     private IDisposable? _pvpBattleSubscription;
+    private IDisposable? _runInitializedSubscription;
+    private IDisposable? _replayPersistenceDrainedSubscription;
     private RunLogCompletion? _deferredRunCompletion;
     private string? _deferredRunCompletionRunId;
     private DateTime? _deferredRunCompletionDeadlineUtc;
+    private string? _pendingInterruptedRunId;
     private readonly Func<DateTime> _utcNow;
     private readonly Func<string, RunLogCompletion> _buildRunLogCompletion;
+    private readonly Func<string, RunLogAbandonment> _buildRunLogAbandonment;
 
     public RunLoggingModule(
         IBppEventBus eventBus,
@@ -34,7 +37,8 @@ internal sealed class RunLoggingModule
         Func<bool> hasPendingReplayPersistence,
         Func<RunLogSessionState?> ensureActiveRunFromGame,
         Func<DateTime>? utcNow = null,
-        Func<string, RunLogCompletion>? buildRunLogCompletion = null
+        Func<string, RunLogCompletion>? buildRunLogCompletion = null,
+        Func<string, RunLogAbandonment>? buildRunLogAbandonment = null
     )
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
@@ -49,13 +53,20 @@ internal sealed class RunLoggingModule
         _utcNow = utcNow ?? (() => DateTime.UtcNow);
         _buildRunLogCompletion =
             buildRunLogCompletion ?? RunLoggingGameDataReader.BuildRunLogCompletion;
+        _buildRunLogAbandonment =
+            buildRunLogAbandonment ?? RunLoggingGameDataReader.BuildRunLogAbandonment;
     }
 
     public void Start()
     {
-        _syncSubscription = _eventBus.Subscribe<RunLoggingSyncRequested>(OnRunLoggingSyncRequested);
         _runLifecycleSubscription = _eventBus.Subscribe<RunLifecycleChanged>(OnRunLifecycleChanged);
         _pvpBattleSubscription = _eventBus.Subscribe<PvpBattleRecorded>(OnPvpBattleRecorded);
+        _runInitializedSubscription = _eventBus.Subscribe<RunInitializedObserved>(
+            OnRunInitializedObserved
+        );
+        _replayPersistenceDrainedSubscription = _eventBus.Subscribe<CombatReplayPersistenceDrained>(
+            OnCombatReplayPersistenceDrained
+        );
     }
 
     public void Stop()
@@ -76,52 +87,29 @@ internal sealed class RunLoggingModule
         }
 
         ClearDeferredRunCompletion();
+        ClearPendingInterruptedRun();
+        _replayPersistenceDrainedSubscription?.Dispose();
+        _replayPersistenceDrainedSubscription = null;
+        _runInitializedSubscription?.Dispose();
+        _runInitializedSubscription = null;
         _pvpBattleSubscription?.Dispose();
         _pvpBattleSubscription = null;
         _runLifecycleSubscription?.Dispose();
         _runLifecycleSubscription = null;
-        _syncSubscription?.Dispose();
-        _syncSubscription = null;
     }
 
-    private void OnRunLoggingSyncRequested(RunLoggingSyncRequested request)
+    private void OnRunInitializedObserved(RunInitializedObserved observed)
     {
-        var inRun = BppRuntimeHost.RunContext.IsInGameRun;
-        var completionAttempted = false;
-        var completionSucceeded = false;
         try
         {
-            if (inRun)
-            {
-                CancelDeferredRunExitIfRunResumed();
-                var session = _ensureActiveRunFromGame();
-                if (session != null)
-                {
-                    if (RunLoggingGameDataReader.TryBuildRunLogStateSnapshot(out var stateInput))
-                        _core.AcceptStateSnapshot(stateInput);
-                }
-            }
-            else if (_deferredRunCompletion != null && _sessionManager.HasActiveSession)
-            {
-                completionAttempted = true;
-                var replayPersistencePending = _hasPendingReplayPersistence();
-                if (replayPersistencePending && _deferredRunCompletionDeadlineUtc == null)
-                {
-                    _deferredRunCompletionDeadlineUtc =
-                        _utcNow() + ReplayPersistenceCompletionGracePeriod;
-                }
+            if (!BppRuntimeHost.RunContext.IsInGameRun)
+                return;
 
-                completionSucceeded = TryCompleteDeferredRunExit();
-            }
+            HandleRunActivation(observed.RunId);
         }
         catch (Exception ex)
         {
-            BppLog.Error("RunLoggingModule", $"Sync failed: {ex}");
-        }
-        finally
-        {
-            _ = completionAttempted;
-            _ = completionSucceeded;
+            BppLog.Error("RunLoggingModule", $"Run initialization handling failed: {ex}");
         }
     }
 
@@ -129,18 +117,32 @@ internal sealed class RunLoggingModule
     {
         try
         {
-            if (change.IsInGameRun || !_sessionManager.HasActiveSession)
+            if (change.IsInGameRun)
+            {
+                HandleRunActivation(BppRuntimeHost.RunContext.CurrentServerRunId);
                 return;
+            }
 
-            if (!IsExplicitTerminalTransition(change))
+            if (!_sessionManager.HasActiveSession)
                 return;
 
             var activeSession = _sessionManager.ActiveSession;
             if (activeSession == null)
                 return;
 
+            if (IsInterruptedTransition(change))
+            {
+                _pendingInterruptedRunId = activeSession.RunId;
+                return;
+            }
+
+            if (!IsCompletedTransition(change))
+                return;
+
+            ClearPendingInterruptedRun();
             _deferredRunCompletionRunId = activeSession.RunId;
             _deferredRunCompletion = _buildRunLogCompletion("run_state_exit");
+            TryCompleteDeferredRunExit();
         }
         catch (Exception ex)
         {
@@ -184,6 +186,49 @@ internal sealed class RunLoggingModule
         {
             BppLog.Error("RunLoggingModule", $"PVP battle capture failed: {ex}");
         }
+    }
+
+    private void OnCombatReplayPersistenceDrained(CombatReplayPersistenceDrained drained)
+    {
+        try
+        {
+            if (!BppRuntimeHost.RunContext.IsInGameRun)
+                TryCompleteDeferredRunExit();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error(
+                "RunLoggingModule",
+                $"Replay persistence drain handling failed: {ex}"
+            );
+        }
+    }
+
+    private void HandleRunActivation(string? runId)
+    {
+        if (string.IsNullOrWhiteSpace(runId))
+            return;
+
+        var activeSession = _sessionManager.ActiveSession;
+        if (
+            !string.IsNullOrWhiteSpace(_pendingInterruptedRunId)
+            && activeSession != null
+            && string.Equals(activeSession.RunId, _pendingInterruptedRunId, StringComparison.Ordinal)
+        )
+        {
+            if (string.Equals(runId, _pendingInterruptedRunId, StringComparison.Ordinal))
+            {
+                ClearPendingInterruptedRun();
+            }
+            else
+            {
+                _sessionManager.MarkRunAbandoned(_buildRunLogAbandonment("run_interrupted"));
+                ClearPendingInterruptedRun();
+            }
+        }
+
+        CancelDeferredRunExitIfRunResumed();
+        _ensureActiveRunFromGame();
     }
 
     private bool TryResolveReplayTargetSession(PvpBattleManifest manifest, bool inRun)
@@ -312,9 +357,18 @@ internal sealed class RunLoggingModule
         _deferredRunCompletionDeadlineUtc = null;
     }
 
-    private static bool IsExplicitTerminalTransition(RunLifecycleChanged change)
+    private void ClearPendingInterruptedRun()
     {
-        return string.Equals(change.Reason, "Run ended", StringComparison.Ordinal)
-            || string.Equals(change.Reason, "Run interrupted", StringComparison.Ordinal);
+        _pendingInterruptedRunId = null;
+    }
+
+    private static bool IsCompletedTransition(RunLifecycleChanged change)
+    {
+        return string.Equals(change.Reason, "Run ended", StringComparison.Ordinal);
+    }
+
+    private static bool IsInterruptedTransition(RunLifecycleChanged change)
+    {
+        return string.Equals(change.Reason, "Run interrupted", StringComparison.Ordinal);
     }
 }

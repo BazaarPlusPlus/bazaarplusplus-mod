@@ -425,7 +425,7 @@ static void InsertRunEvent(SqliteConnection connection, string runId, int seq)
             $runId,
             $seq,
             '2026-03-15T11:01:00.0000000+00:00',
-            'run_progress',
+            'run_started',
             '{}'
         );
         """;

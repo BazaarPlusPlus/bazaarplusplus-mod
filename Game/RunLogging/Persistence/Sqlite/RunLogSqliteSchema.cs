@@ -3,9 +3,9 @@ namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int LocalDatabaseSchemaVersion => 6;
+    public static int LocalDatabaseSchemaVersion => 7;
 
-    public static int RowSchemaVersion => 6;
+    public static int RowSchemaVersion => 7;
 
     public static int UploadPayloadSchemaVersion => 1;
 
@@ -61,12 +61,6 @@ public static class RunLogSqliteSchema
                 income INTEGER NULL,
                 gold INTEGER NULL,
                 last_seq INTEGER NOT NULL DEFAULT 0,
-                state TEXT NULL,
-                current_encounter_id TEXT NULL,
-                last_state_fingerprint TEXT NULL,
-                last_selection_fingerprint TEXT NULL,
-                pending_selection_seq INTEGER NULL,
-                pending_selection_json TEXT NULL,
                 ended_at_utc TEXT NULL,
                 final_day INTEGER NULL,
                 final_hour INTEGER NULL,

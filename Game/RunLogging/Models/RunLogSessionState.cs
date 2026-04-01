@@ -30,17 +30,5 @@ public sealed class RunLogSessionState
 
     public int? Gold { get; set; }
 
-    public string? State { get; set; }
-
-    public string? CurrentEncounterId { get; set; }
-
-    public string? LastStateFingerprint { get; set; }
-
-    public string? LastSelectionFingerprint { get; set; }
-
-    public long? PendingSelectionSeq { get; set; }
-
-    public RunLogPendingSelectionState? PendingSelection { get; set; }
-
     public bool Completed { get; set; }
 }

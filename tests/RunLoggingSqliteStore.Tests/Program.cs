@@ -73,11 +73,11 @@ try
                 RunId = runId,
                 Seq = 2,
                 Ts = startedAt.AddSeconds(5),
-                Kind = "run_progress",
+                Kind = "pvp_combat_recorded",
                 Day = 1,
                 Hour = 2,
-                Victories = 1,
-                Losses = 0,
+                BattleId = "battle-001",
+                OpponentName = "Test Rival",
             },
         ]
     );
@@ -95,24 +95,6 @@ try
                 LastSeenAtUtc = startedAt.AddSeconds(5),
                 Day = 1,
                 Hour = 2,
-                State = "Encounter",
-                PendingSelectionSeq = 2,
-                PendingSelection = new RunLogPendingSelectionState
-                {
-                    Day = 1,
-                    Hour = 2,
-                    State = "Encounter",
-                    SelectionSeq = 2,
-                    Options =
-                    [
-                        new RunLogOptionSnapshot
-                        {
-                            InstanceId = "instance-a",
-                            TemplateId = "template-a",
-                            Name = "Frost Street",
-                        },
-                    ],
-                },
                 Completed = false,
             },
         ]
@@ -173,15 +155,6 @@ try
                 runId
             ) == 1,
             "runs should mark terminal runs as completed."
-        );
-        Assert(
-            GetString(
-                    connection,
-                    "SELECT pending_selection_json FROM runs WHERE run_id = $runId;",
-                    runId
-                )
-                .Contains("template-a", StringComparison.Ordinal),
-            "runs should persist pending selection payload JSON."
         );
         Assert(
             GetString(connection, "SELECT status FROM runs WHERE run_id = $runId;", runId)
@@ -292,7 +265,6 @@ try
                     LastSeenAtUtc = olderStartedAt.AddMinutes(5),
                     Day = 2,
                     Hour = 4,
-                    State = "Encounter",
                     Completed = false,
                 },
             ]
@@ -327,7 +299,6 @@ try
                     LastSeenAtUtc = newerStartedAt.AddMinutes(10),
                     Day = 3,
                     Hour = 2,
-                    State = "Choice",
                     Completed = false,
                 },
             ]

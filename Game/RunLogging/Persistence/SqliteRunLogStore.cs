@@ -187,12 +187,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
                 level = $level,
                 income = $income,
                 gold = $gold,
-                state = $state,
-                current_encounter_id = $currentEncounterId,
-                last_state_fingerprint = $lastStateFingerprint,
-                last_selection_fingerprint = $lastSelectionFingerprint,
-                pending_selection_seq = $pendingSelectionSeq,
-                pending_selection_json = $pendingSelectionJson,
                 completed = $completed
             WHERE run_id = $runId;
             """;
@@ -206,20 +200,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
         AddNullableInt32(command, "$level", checkpoint.Level);
         AddNullableInt32(command, "$income", checkpoint.Income);
         AddNullableInt32(command, "$gold", checkpoint.Gold);
-        AddNullableString(command, "$state", checkpoint.State);
-        AddNullableString(command, "$currentEncounterId", checkpoint.CurrentEncounterId);
-        AddNullableString(command, "$lastStateFingerprint", checkpoint.LastStateFingerprint);
-        AddNullableString(
-            command,
-            "$lastSelectionFingerprint",
-            checkpoint.LastSelectionFingerprint
-        );
-        AddNullableInt64(command, "$pendingSelectionSeq", checkpoint.PendingSelectionSeq);
-        AddNullableString(
-            command,
-            "$pendingSelectionJson",
-            SerializePendingSelection(checkpoint.PendingSelection)
-        );
         command.Parameters.AddWithValue("$completed", checkpoint.Completed ? 1 : 0);
         command.ExecuteNonQuery();
     }
@@ -440,14 +420,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
             Level = GetNullableInt32(reader, "level"),
             Income = GetNullableInt32(reader, "income"),
             Gold = GetNullableInt32(reader, "gold"),
-            State = GetNullableString(reader, "state"),
-            CurrentEncounterId = GetNullableString(reader, "current_encounter_id"),
-            LastStateFingerprint = GetNullableString(reader, "last_state_fingerprint"),
-            LastSelectionFingerprint = GetNullableString(reader, "last_selection_fingerprint"),
-            PendingSelectionSeq = GetNullableInt64(reader, "pending_selection_seq"),
-            PendingSelection = DeserializePendingSelection(
-                GetNullableString(reader, "pending_selection_json")
-            ),
             Completed = false,
         };
     }
@@ -489,27 +461,6 @@ public sealed class SqliteRunLogStore : IRunLogStore
         using var command = CreateCommand(connection);
         command.CommandText = "PRAGMA journal_mode = WAL;";
         command.ExecuteNonQuery();
-    }
-
-    private static string? SerializePendingSelection(RunLogPendingSelectionState? pendingSelection)
-    {
-        if (pendingSelection == null)
-            return null;
-
-        return JsonConvert.SerializeObject(pendingSelection, SerializerSettings);
-    }
-
-    private static RunLogPendingSelectionState? DeserializePendingSelection(
-        string? pendingSelectionJson
-    )
-    {
-        if (string.IsNullOrWhiteSpace(pendingSelectionJson))
-            return null;
-
-        return JsonConvert.DeserializeObject<RunLogPendingSelectionState>(
-            pendingSelectionJson,
-            SerializerSettings
-        );
     }
 
     private static void AddNullableInt32(SqliteCommand command, string name, int? value)

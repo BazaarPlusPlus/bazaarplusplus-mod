@@ -6,7 +6,7 @@ var schemaType = RequireType(
 );
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 6,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 7,
     "Local database schema version mismatch."
 );
 Assert(
@@ -38,7 +38,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 6;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 7;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
@@ -65,6 +65,12 @@ Assert(
     bootstrapSql.Contains("player_rank", StringComparison.Ordinal)
         && bootstrapSql.Contains("player_rating", StringComparison.Ordinal),
     "Bootstrap SQL should define run and battle rank/rating columns."
+);
+Assert(
+    !bootstrapSql.Contains("pending_selection_json", StringComparison.Ordinal)
+        && !bootstrapSql.Contains("last_state_fingerprint", StringComparison.Ordinal)
+        && !bootstrapSql.Contains("last_selection_fingerprint", StringComparison.Ordinal),
+    "Bootstrap SQL should not define removed run process-state columns."
 );
 Assert(
     bootstrapSql.Contains("player_name", StringComparison.Ordinal)

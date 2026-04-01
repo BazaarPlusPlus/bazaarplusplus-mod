@@ -38,7 +38,8 @@ internal sealed class RunLoggingController : MonoBehaviour
             _sessionManager,
             _core,
             () => CombatReplayRuntime.Instance?.HasPendingPersistence == true,
-            EnsureActiveRunFromGame
+            EnsureActiveRunFromGame,
+            buildRunLogAbandonment: RunLoggingGameDataReader.BuildRunLogAbandonment
         );
         _module.Start();
         BppLog.Info(
@@ -78,31 +79,6 @@ internal sealed class RunLoggingController : MonoBehaviour
     public void MarkRunAbandoned(RunLogAbandonment abandonment)
     {
         RequireSessionManager().MarkRunAbandoned(abandonment);
-    }
-
-    public RunLogEvent AcceptRunProgress(RunLogRunProgressInput input)
-    {
-        return RequireCore().AcceptRunProgress(input);
-    }
-
-    public RunLogEvent? AcceptStateSnapshot(RunLogStateSnapshotInput input)
-    {
-        return RequireCore().AcceptStateSnapshot(input);
-    }
-
-    public RunLogEvent? AcceptSelectionSnapshot(RunLogSelectionSnapshotInput input)
-    {
-        return RequireCore().AcceptSelectionSnapshot(input);
-    }
-
-    public RunLogEvent? AcceptChoiceMade(RunLogEvent entry)
-    {
-        return RequireCore().AcceptChoiceMade(entry);
-    }
-
-    public RunLogEvent? AcceptSelectionAbandoned(RunLogEvent entry)
-    {
-        return RequireCore().AcceptSelectionAbandoned(entry);
     }
 
     private RunLogSessionState? EnsureActiveRunFromGame()
@@ -163,55 +139,6 @@ internal sealed class RunLoggingControllerCore
         _sessionManager.SaveCheckpoint();
         _startedEventRunId = session.RunId;
         return session;
-    }
-
-    public RunLogEvent AcceptRunProgress(RunLogRunProgressInput input)
-    {
-        var runEvent =
-            _sessionManager.AppendEvent(_captureService.BuildRunProgressEvent(input))
-            ?? throw new InvalidOperationException(
-                "Run progress event was unexpectedly suppressed."
-            );
-        _sessionManager.SaveCheckpoint();
-        return runEvent;
-    }
-
-    public RunLogEvent? AcceptStateSnapshot(RunLogStateSnapshotInput input)
-    {
-        var stateEvent = _sessionManager.AppendEvent(_captureService.BuildStateSeenEvent(input));
-        if (stateEvent != null)
-            _sessionManager.SaveCheckpoint();
-
-        return stateEvent;
-    }
-
-    public RunLogEvent? AcceptSelectionSnapshot(RunLogSelectionSnapshotInput input)
-    {
-        var selectionEvent = _sessionManager.AppendEvent(
-            _captureService.BuildSelectionSeenEvent(input)
-        );
-        if (selectionEvent != null)
-            _sessionManager.SaveCheckpoint();
-
-        return selectionEvent;
-    }
-
-    public RunLogEvent? AcceptChoiceMade(RunLogEvent entry)
-    {
-        var choiceEvent = _sessionManager.AppendEvent(entry);
-        if (choiceEvent != null)
-            _sessionManager.SaveCheckpoint();
-
-        return choiceEvent;
-    }
-
-    public RunLogEvent? AcceptSelectionAbandoned(RunLogEvent entry)
-    {
-        var abandonedEvent = _sessionManager.AppendEvent(entry);
-        if (abandonedEvent != null)
-            _sessionManager.SaveCheckpoint();
-
-        return abandonedEvent;
     }
 
     public RunLogEvent AcceptCombatReplay(RunLogPvpBattleInput input)

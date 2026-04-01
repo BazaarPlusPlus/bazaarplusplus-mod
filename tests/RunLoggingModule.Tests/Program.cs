@@ -1,5 +1,6 @@
 #nullable enable
 using System.Reflection;
+using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
@@ -8,10 +9,12 @@ var assembly = Assembly.Load("BazaarPlusPlus");
 var eventBusType = RequireType("BazaarPlusPlus.Core.Events.InMemoryBppEventBus");
 var coreType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingControllerCore");
 var moduleType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingModule");
+var combatReplayPersistenceDrainedType = RequireType(
+    "BazaarPlusPlus.Core.Events.CombatReplayPersistenceDrained"
+);
+var runInitializedObservedType = RequireType("BazaarPlusPlus.Core.Events.RunInitializedObserved");
 var runtimeHostType = RequireType("BazaarPlusPlus.Core.Runtime.BppRuntimeHost");
-var runLoggingSyncRequestedType = RequireType("BazaarPlusPlus.Core.Events.RunLoggingSyncRequested");
 var captureServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCaptureService");
-var inferenceServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogInferenceService");
 var runLifecycleChangedType = RequireType("BazaarPlusPlus.Core.Events.RunLifecycleChanged");
 var runExitKindType = RequireType("BazaarPlusPlus.Core.RunContext.RunExitKind");
 
@@ -36,12 +39,40 @@ var eventBus =
 var captureService =
     Activator.CreateInstance(captureServiceType)
     ?? throw new InvalidOperationException("Failed to construct RunLogCaptureService.");
-var inferenceService =
-    Activator.CreateInstance(inferenceServiceType)
-    ?? throw new InvalidOperationException("Failed to construct RunLogInferenceService.");
 var core =
     Activator.CreateInstance(coreType, [manager, captureService])
     ?? throw new InvalidOperationException("Failed to construct RunLoggingControllerCore.");
+var runContext = runtimeHostType.GetProperty("RunContext", BindingFlags.Public | BindingFlags.Static)!
+    .GetValue(null)!;
+var pendingReplayPersistence = false;
+
+RunLogCreateRequest EnsureActiveRunFromGame()
+{
+    var currentRunId = (string?)GetProperty(runContext.GetType(), runContext, "CurrentServerRunId");
+    if (string.IsNullOrWhiteSpace(currentRunId))
+        throw new InvalidOperationException("CurrentServerRunId should be set before activation.");
+
+    return new RunLogCreateRequest
+    {
+        SchemaVersion = 1,
+        RunId = currentRunId,
+        StartedAtUtc = now,
+        Hero = "Vanessa",
+        GameMode = "Ranked",
+        Day = 1,
+        Hour = 1,
+    };
+}
+
+RunLogSessionState? EnsureActiveSessionFromGame()
+{
+    var ensureRunStarted = coreType.GetMethod("EnsureRunStarted", BindingFlags.Public | BindingFlags.Instance);
+    if (ensureRunStarted == null)
+        throw new InvalidOperationException("RunLoggingControllerCore.EnsureRunStarted should exist.");
+
+    return (RunLogSessionState?)ensureRunStarted.Invoke(core, [EnsureActiveRunFromGame()]);
+}
+
 var module =
     Activator.CreateInstance(
         moduleType,
@@ -49,9 +80,8 @@ var module =
             eventBus,
             manager,
             core,
-            inferenceService,
-            new Func<bool>(() => false),
-            new Func<RunLogSessionState?>(() => null),
+            new Func<bool>(() => pendingReplayPersistence),
+            new Func<RunLogSessionState?>(EnsureActiveSessionFromGame),
             new Func<DateTime>(() => now.UtcDateTime),
             new Func<string, RunLogCompletion>(reason => new RunLogCompletion
             {
@@ -60,47 +90,104 @@ var module =
                 EndedAtUtc = now,
                 Reason = reason,
             }),
+            new Func<string, RunLogAbandonment>(reason => new RunLogAbandonment
+            {
+                SchemaVersion = 1,
+                Status = "abandoned",
+                EndedAtUtc = now,
+                Reason = reason,
+            }),
         ]
     )
     ?? throw new InvalidOperationException("Failed to construct RunLoggingModule.");
 
-var runContext = runtimeHostType.GetProperty("RunContext", BindingFlags.Public | BindingFlags.Static)!
-    .GetValue(null)!;
-
 SetProperty(runContext, "CurrentServerRunId", request.RunId);
 SetProperty(runContext, "IsInGameRun", false);
-InvokeVoid(moduleType, module, "OnRunLoggingSyncRequested", [Activator.CreateInstance(runLoggingSyncRequestedType)!]);
 
-Assert(store.CompleteRunCalls == 0, "Transient run exit should not complete the run immediately.");
+var interruptedExit = Activator.CreateInstance(runLifecycleChangedType)!;
+SetProperty(interruptedExit, "IsInGameRun", false);
+SetProperty(interruptedExit, "LastRunExitKind", Enum.Parse(runExitKindType, "Interrupted"));
+SetProperty(interruptedExit, "Reason", "Run interrupted");
+InvokeVoid(moduleType, module, "OnRunLifecycleChanged", [interruptedExit]);
+
+Assert(store.MarkRunAbandonedCalls == 0, "Run interruption should not abandon immediately.");
 Assert(
-    GetField(module, "_deferredRunCompletion") == null,
-    "Transient run exit should not create deferred completion without an explicit terminal signal."
+    Equals(GetField(module, "_pendingInterruptedRunId"), request.RunId),
+    "Run interruption should enter interrupted-pending state for the active run."
 );
 
+SetProperty(runContext, "CurrentServerRunId", request.RunId);
 SetProperty(runContext, "IsInGameRun", true);
-InvokeVoid(moduleType, module, "OnRunLoggingSyncRequested", [Activator.CreateInstance(runLoggingSyncRequestedType)!]);
+var resumedRun = Activator.CreateInstance(runInitializedObservedType)!;
+SetProperty(resumedRun, "RunId", request.RunId);
+InvokeVoid(moduleType, module, "OnRunInitializedObserved", [resumedRun]);
 
 Assert(
-    GetField(module, "_deferredRunCompletion") == null,
-    "Resuming the same run should keep deferred completion empty."
+    GetField(module, "_pendingInterruptedRunId") == null,
+    "Resuming the same run id should clear interrupted-pending state."
 );
-Assert(store.CompleteRunCalls == 0, "Resuming the same run should not complete the run.");
+Assert(store.MarkRunAbandonedCalls == 0, "Resuming the same run should not abandon it.");
+
+InvokeVoid(moduleType, module, "OnRunLifecycleChanged", [interruptedExit]);
+SetProperty(runContext, "CurrentServerRunId", "run-module-test-2");
+SetProperty(runContext, "IsInGameRun", true);
+var newRun = Activator.CreateInstance(runInitializedObservedType)!;
+SetProperty(newRun, "RunId", "run-module-test-2");
+InvokeVoid(moduleType, module, "OnRunInitializedObserved", [newRun]);
+
+Assert(store.MarkRunAbandonedCalls == 1, "A new run id after interruption should abandon the old run.");
+Assert(
+    manager.ActiveSession?.RunId == "run-module-test-2",
+    "A new run id should start a fresh active session."
+);
+
+var pendingReplayModule =
+    Activator.CreateInstance(
+        moduleType,
+        [
+            eventBus,
+            manager,
+            core,
+            new Func<bool>(() => pendingReplayPersistence),
+            new Func<RunLogSessionState?>(EnsureActiveSessionFromGame),
+            new Func<DateTime>(() => now.UtcDateTime),
+            new Func<string, RunLogCompletion>(reason => new RunLogCompletion
+            {
+                SchemaVersion = 1,
+                Status = "completed",
+                EndedAtUtc = now,
+                Reason = reason,
+            }),
+            new Func<string, RunLogAbandonment>(reason => new RunLogAbandonment
+            {
+                SchemaVersion = 1,
+                Status = "abandoned",
+                EndedAtUtc = now,
+                Reason = reason,
+            }),
+        ]
+    )
+    ?? throw new InvalidOperationException("Failed to construct deferred RunLoggingModule.");
 
 var completedExit = Activator.CreateInstance(runLifecycleChangedType)!;
 SetProperty(completedExit, "IsInGameRun", false);
 SetProperty(completedExit, "LastRunExitKind", Enum.Parse(runExitKindType, "Completed"));
 SetProperty(completedExit, "Reason", "Run ended");
-InvokeVoid(moduleType, module, "OnRunLifecycleChanged", [completedExit]);
+pendingReplayPersistence = true;
+InvokeVoid(moduleType, pendingReplayModule, "OnRunLifecycleChanged", [completedExit]);
 
 Assert(
-    GetField(module, "_deferredRunCompletion") != null,
-    "Explicit run end should create deferred completion."
+    GetField(pendingReplayModule, "_deferredRunCompletion") != null,
+    "Run end with pending replay persistence should create deferred completion."
 );
+Assert(store.CompleteRunCalls == 0, "Deferred completion should wait for replay persistence to drain.");
 
+pendingReplayPersistence = false;
 SetProperty(runContext, "IsInGameRun", false);
-InvokeVoid(moduleType, module, "OnRunLoggingSyncRequested", [Activator.CreateInstance(runLoggingSyncRequestedType)!]);
+var persistenceDrained = Activator.CreateInstance(combatReplayPersistenceDrainedType)!;
+InvokeVoid(moduleType, pendingReplayModule, "OnCombatReplayPersistenceDrained", [persistenceDrained]);
 
-Assert(store.CompleteRunCalls == 1, "An explicit run end should complete the run on sync.");
+Assert(store.CompleteRunCalls == 1, "Draining replay persistence should complete the deferred run.");
 
 Console.WriteLine("RunLogging module checks passed.");
 
@@ -127,6 +214,15 @@ static object? GetField(object instance, string name)
     return field.GetValue(instance);
 }
 
+static object? GetProperty(Type type, object instance, string name)
+{
+    var property = type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+    if (property == null)
+        throw new InvalidOperationException($"Property not found: {type.FullName}.{name}");
+
+    return property.GetValue(instance);
+}
+
 static void SetProperty(object instance, string name, object? value)
 {
     var property = instance.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
@@ -147,6 +243,8 @@ static void Assert(bool condition, string message)
 file sealed class FakeRunLogStore : IRunLogStore
 {
     public int CompleteRunCalls { get; private set; }
+
+    public int MarkRunAbandonedCalls { get; private set; }
 
     public RunLogSessionState? ActiveState { get; private set; }
 
@@ -200,6 +298,7 @@ file sealed class FakeRunLogStore : IRunLogStore
 
     public void MarkRunAbandoned(string runId, RunLogAbandonment abandonment)
     {
+        MarkRunAbandonedCalls++;
         ActiveState = null;
     }
 }

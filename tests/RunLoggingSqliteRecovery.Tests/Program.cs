@@ -73,29 +73,6 @@ try
                 LastSeenAtUtc = startedAt.AddSeconds(10),
                 Day = 2,
                 Hour = 1,
-                State = "Choice",
-                CurrentEncounterId = "encounter-123",
-                LastStateFingerprint = "state-fp-1",
-                LastSelectionFingerprint = "selection-fp-1",
-                PendingSelectionSeq = 1,
-                PendingSelection = new RunLogPendingSelectionState
-                {
-                    Day = 2,
-                    Hour = 1,
-                    State = "Choice",
-                    EncounterId = "encounter-123",
-                    ParentEncounterId = "encounter-123",
-                    SelectionSeq = 1,
-                    Options =
-                    [
-                        new RunLogOptionSnapshot
-                        {
-                            InstanceId = "instance-a",
-                            TemplateId = "template-a",
-                            Name = "Recovered Choice",
-                        },
-                    ],
-                },
                 Completed = false,
             },
         ]
@@ -109,28 +86,6 @@ try
     Assert(resumed.LastSeq == 1, "Recovered session should preserve last_seq.");
     Assert(resumed.Day == 2, "Recovered session should preserve checkpoint day.");
     Assert(resumed.Hour == 1, "Recovered session should preserve checkpoint hour.");
-    Assert(resumed.State == "Choice", "Recovered session should preserve checkpoint state.");
-    Assert(
-        resumed.CurrentEncounterId == "encounter-123",
-        "Recovered session should preserve encounter id."
-    );
-    Assert(
-        resumed.LastStateFingerprint == "state-fp-1",
-        "Recovered session should preserve state dedupe anchor."
-    );
-    Assert(
-        resumed.LastSelectionFingerprint == "selection-fp-1",
-        "Recovered session should preserve selection dedupe anchor."
-    );
-    Assert(
-        resumed.PendingSelectionSeq == 1,
-        "Recovered session should preserve pending selection sequence."
-    );
-    Assert(
-        resumed.PendingSelection?.Options.Count == 1
-            && resumed.PendingSelection.Options[0].TemplateId == "template-a",
-        "Recovered session should preserve pending selection payload."
-    );
 
     InvokeVoid(
         storeType,
