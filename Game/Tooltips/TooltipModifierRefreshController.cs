@@ -36,7 +36,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
 
         _lastMode = mode;
         BppLog.Info("TooltipPreview", $"ModeChanged mode={mode}");
-        TryRefreshHoveredCardTooltip();
+        TryRefreshCurrentItemTooltip();
     }
 
     private TooltipModifierMode GetCurrentMode()
@@ -51,15 +51,14 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         return TooltipModifierMode.Normal;
     }
 
-    private static void TryRefreshHoveredCardTooltip()
+    private static void TryRefreshCurrentItemTooltip()
     {
         var tooltipParent = Data.TooltipParentComponent;
-        var lookup = Data.CardAndSkillLookup;
-        if (tooltipParent == null || lookup == null)
+        if (tooltipParent == null)
         {
             BppLog.Info(
                 "TooltipPreview",
-                $"RefreshSkipped reason={(tooltipParent == null ? "no-tooltip-parent" : "no-card-lookup")}"
+                "RefreshSkipped reason=no-tooltip-parent"
             );
             return;
         }
@@ -70,68 +69,41 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             return;
         }
 
-        foreach (var controller in lookup.CardControllerDictionary.Values)
+        if (!TooltipPreviewTargetResolver.TryResolveCurrentPrimaryItemTooltip(tooltipParent, out var target))
         {
-            if (controller == null || controller.CardData == null)
-                continue;
-
-            var card = controller.CardData;
-            if (card is not ItemCard)
-                continue;
-
-            if (!controller.IsCursorOverCard && !controller.IsHovering)
-                continue;
-
             BppLog.Info(
                 "TooltipPreview",
-                $"HoveredItemFound card={DescribeCard(card)} hovered={(controller.IsCursorOverCard ? "cursor" : "hover")}"
+                "RefreshSkipped reason=no-active-primary-item-tooltip"
             );
-            var tooltipController = tooltipParent.GetCardTooltipController(card);
-            if (tooltipController == null)
-            {
-                BppLog.Info(
-                    "TooltipPreview",
-                    $"PrimaryTooltipMissing card={DescribeCard(card)}"
-                );
-                continue;
-            }
-
-            BppLog.Info(
-                "TooltipPreview",
-                $"PrimaryTooltipFound card={DescribeCard(card)}"
-            );
-
-            var tooltipData = controller.GetTooltipData();
-            if (tooltipData is not CardTooltipData cardTooltipData)
-            {
-                BppLog.Info(
-                    "TooltipPreview",
-                    $"RefreshSkipped card={DescribeCard(card)} reason=non-card-tooltip-data"
-                );
-                continue;
-            }
-
-            var refreshedTooltipData = new CardTooltipData(card, cardTooltipData.CardTemplate);
-            tooltipParent.HideCardTooltipController();
-            tooltipParent.ShowCardTooltipController(
-                controller.transform,
-                controller.TooltipOffset,
-                refreshedTooltipData
-            );
-
-            var scheduled = UpgradePreviewTooltipPatch.TryScheduleUpgradeTooltip(
-                controller,
-                refreshedTooltipData
-            );
-            BppLog.Info(
-                "TooltipPreview",
-                $"UpgradeScheduleAttempted card={DescribeCard(card)} scheduled={scheduled}"
-            );
-
             return;
         }
 
-        BppLog.Info("TooltipPreview", "RefreshSkipped reason=no-hovered-item");
+        BppLog.Info(
+            "TooltipPreview",
+            $"PrimaryTooltipFound card={DescribeCard(target.Card)}"
+        );
+
+        var refreshedTooltipData = new CardTooltipData(
+            target.Card,
+            target.TooltipData.CardTemplate
+        );
+        tooltipParent.HideCardTooltipController();
+        tooltipParent.ShowCardTooltipController(
+            target.Controller.transform,
+            target.Controller.TooltipOffset,
+            refreshedTooltipData
+        );
+
+        var scheduled = UpgradePreviewTooltipPatch.TryScheduleUpgradeTooltip(
+            target.Controller,
+            refreshedTooltipData
+        );
+        BppLog.Info(
+            "TooltipPreview",
+            $"UpgradeScheduleAttempted card={DescribeCard(target.Card)} scheduled={scheduled}"
+        );
+
+        return;
     }
 
     private static string DescribeCard(Card card)

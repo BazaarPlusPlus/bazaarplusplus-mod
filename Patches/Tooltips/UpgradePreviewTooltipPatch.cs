@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Game.Tooltips;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
@@ -48,12 +49,16 @@ internal static class UpgradePreviewTooltipPatch
         if (Data.TooltipParentComponent == null)
             return false;
 
-        // The ShowTooltips postfix can run for cards that are not the actively hovered card.
-        // Only allow those implicit calls to schedule upgrade preview for the hovered controller.
         if (
             tooltipData == null
-            && !controller.IsCursorOverCard
-            && !controller.IsHovering
+            && !TooltipPreviewTargetSelection.ShouldAllowImplicitUpgradeSchedule(
+                card,
+                controller.IsCursorOverCard,
+                controller.IsHovering,
+                TooltipPreviewTargetResolver.TryResolveCurrentPrimaryCard(
+                    Data.TooltipParentComponent
+                )
+            )
         )
         {
             return false;
@@ -85,7 +90,7 @@ internal static class UpgradePreviewTooltipPatch
             {
                 if (
                     controller == null
-                    || controller.CardData != card
+                    || !TooltipPreviewTargetSelection.AreSameCard(controller.CardData, card)
                     || !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview)
                 )
                 {
@@ -133,7 +138,7 @@ internal static class UpgradePreviewTooltipPatch
 
         if (
             controller == null
-            || controller.CardData != card
+            || !TooltipPreviewTargetSelection.AreSameCard(controller.CardData, card)
             || !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview)
         )
         {
