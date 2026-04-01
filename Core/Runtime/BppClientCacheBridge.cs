@@ -44,17 +44,6 @@ internal static class BppClientCacheBridge
         return ReadStringMember(profile, "Username");
     }
 
-    public static int? TryGetLeaderboardPosition()
-    {
-        if (!TryGetObservableValue("Leaderboard", out var hasData, out var value) || !hasData)
-            return null;
-
-        if (value is LeaderboardPositionResponse response)
-            return response.position;
-
-        return ReadNullableIntMember(value, "position");
-    }
-
     public static bool TryGetPlayerRankSnapshot(
         out string? rank,
         out int? rating,
