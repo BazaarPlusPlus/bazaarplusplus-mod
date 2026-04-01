@@ -2,6 +2,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.ModApi;
 using BazaarPlusPlus.Game.Upload;
@@ -14,6 +15,8 @@ internal sealed class RunUploadController : MonoBehaviour
     private RunSummaryUploadService? _uploadService;
     private CancellationTokenSource? _shutdown;
     private StartupUploadAttemptGate? _startupGate;
+    private IDisposable? _runLifecycleSubscription;
+    private IDisposable? _replayPersistenceDrainedSubscription;
     private readonly StartupUploadAttemptRunner _startupRunner = new(
         "RunUploadController",
         "Skipping startup run upload because a live run is active.",
@@ -34,6 +37,7 @@ internal sealed class RunUploadController : MonoBehaviour
             var privateKeyPath = BppRuntimeHost.Paths.RunUploadPrivateKeyPath;
 
             var startupDelaySeconds = Math.Max(5, ModApiDefaults.StartupDelaySeconds);
+            var retryIntervalSeconds = Math.Max(1, ModApiDefaults.IntervalSeconds);
             var batchSize = Math.Max(1, ModApiDefaults.BatchSize);
             var requestTimeoutSeconds = Math.Max(10, ModApiDefaults.RequestTimeoutSeconds);
             var context = ModApiBootstrapContext.TryCreate(
@@ -64,10 +68,19 @@ internal sealed class RunUploadController : MonoBehaviour
                 timeout: TimeSpan.FromSeconds(requestTimeoutSeconds)
             );
             _shutdown = new CancellationTokenSource();
-            _startupGate = new StartupUploadAttemptGate(Time.unscaledTime + startupDelaySeconds);
+            _startupGate = new StartupUploadAttemptGate(
+                Time.unscaledTime + startupDelaySeconds,
+                retryIntervalSeconds
+            );
+            _runLifecycleSubscription = BppRuntimeHost.EventBus.Subscribe<RunLifecycleChanged>(
+                OnRunLifecycleChanged
+            );
+            _replayPersistenceDrainedSubscription = BppRuntimeHost.EventBus.Subscribe<
+                CombatReplayPersistenceDrained
+            >(OnCombatReplayPersistenceDrained);
             BppLog.Info(
                 "RunUploadController",
-                $"Startup run upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}, startup_delay={startupDelaySeconds}s."
+                $"Startup run upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}, startup_delay={startupDelaySeconds}s, retry_interval={retryIntervalSeconds}s."
             );
         }
         catch (Exception ex)
@@ -80,7 +93,7 @@ internal sealed class RunUploadController : MonoBehaviour
     {
         if (_uploadService == null || _shutdown == null || _startupGate == null)
             return;
-            _startupRunner.Tick(
+        _startupRunner.Tick(
             _startupGate,
             Time.unscaledTime,
             BppRuntimeHost.RunContext.IsInGameRun,
@@ -91,6 +104,11 @@ internal sealed class RunUploadController : MonoBehaviour
 
     private void OnDestroy()
     {
+        _replayPersistenceDrainedSubscription?.Dispose();
+        _replayPersistenceDrainedSubscription = null;
+        _runLifecycleSubscription?.Dispose();
+        _runLifecycleSubscription = null;
+
         if (_shutdown != null)
         {
             _shutdown.Cancel();
@@ -100,5 +118,21 @@ internal sealed class RunUploadController : MonoBehaviour
 
         _uploadService?.Dispose();
         _uploadService = null;
+    }
+
+    private void OnRunLifecycleChanged(RunLifecycleChanged change)
+    {
+        if (change.IsInGameRun)
+            return;
+
+        _startupGate?.ArmImmediateAttempt(Time.unscaledTime);
+    }
+
+    private void OnCombatReplayPersistenceDrained(CombatReplayPersistenceDrained _)
+    {
+        if (BppRuntimeHost.RunContext.IsInGameRun)
+            return;
+
+        _startupGate?.ArmImmediateAttempt(Time.unscaledTime);
     }
 }

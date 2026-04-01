@@ -14,7 +14,7 @@ var runner = Activator.CreateInstance(
 );
 Assert(runner != null, "StartupUploadAttemptRunner should be constructible.");
 
-var gate = Activator.CreateInstance(gateType, 5f);
+var gate = Activator.CreateInstance(gateType, 5f, 10f);
 Assert(gate != null, "StartupUploadAttemptGate should be constructible.");
 
 var tickMethod = runnerType.GetMethod(
@@ -47,11 +47,17 @@ Assert(
 );
 
 tickMethod.Invoke(runner, [gate, 6f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]);
-Assert(startCount == 1, "Runner should not restart the upload after the gate resolves.");
+Assert(startCount == 1, "Runner should not restart the upload before the retry interval elapses.");
 Assert(
     !(bool)(hasPendingTaskProperty.GetValue(runner) ?? true),
     "Runner should clear the pending task after processing completion."
 );
+
+tickMethod.Invoke(runner, [gate, 14f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]);
+Assert(startCount == 1, "Runner should continue waiting until the retry interval elapses.");
+
+tickMethod.Invoke(runner, [gate, 15f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]);
+Assert(startCount == 2, "Runner should restart the upload when the retry interval elapses.");
 
 var liveRunRunner = Activator.CreateInstance(
     runnerType,
@@ -60,7 +66,7 @@ var liveRunRunner = Activator.CreateInstance(
     "Starting startup upload attempt.",
     "Startup upload failed"
 )!;
-var liveRunGate = Activator.CreateInstance(gateType, 0f)!;
+var liveRunGate = Activator.CreateInstance(gateType, 0f, 10f)!;
 var liveRunStarts = 0;
 Task StartLiveRunAsync(CancellationToken _)
 {
@@ -77,8 +83,8 @@ tickMethod.Invoke(
     [liveRunGate, 1f, false, (Func<CancellationToken, Task>)StartLiveRunAsync, CancellationToken.None]
 );
 Assert(
-    liveRunStarts == 0,
-    "Runner should not start after the gate resolves to SkipLiveRun."
+    liveRunStarts == 1,
+    "Runner should retry once the live run ends instead of consuming the startup opportunity."
 );
 
 Console.WriteLine("Startup upload runner tests passed.");

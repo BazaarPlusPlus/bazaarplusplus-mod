@@ -406,7 +406,7 @@ try
     var startupGateType = RequireType(
         "BazaarPlusPlus.Game.Upload.StartupUploadAttemptGate"
     );
-    var gate = Activator.CreateInstance(startupGateType, 5f)
+    var gate = Activator.CreateInstance(startupGateType, 5f, 10f)
         ?? throw new InvalidOperationException("Failed to create StartupUploadAttemptGate.");
     var waitDecision = Invoke<object>(startupGateType, gate, "Poll", [4f, false]).ToString();
     Assert(
@@ -418,13 +418,18 @@ try
         firstStartDecision == "Start",
         "Startup upload gate should trigger a single upload attempt once the startup delay elapses."
     );
-    var secondStartDecision = Invoke<object>(startupGateType, gate, "Poll", [30f, false]).ToString();
+    var secondStartDecision = Invoke<object>(startupGateType, gate, "Poll", [14f, false]).ToString();
     Assert(
-        secondStartDecision == "Done",
-        "Startup upload gate should not schedule repeated uploads after the first startup attempt."
+        secondStartDecision == "Wait",
+        "Startup upload gate should wait until the retry interval elapses."
+    );
+    var thirdStartDecision = Invoke<object>(startupGateType, gate, "Poll", [15f, false]).ToString();
+    Assert(
+        thirdStartDecision == "Start",
+        "Startup upload gate should schedule repeated uploads after the retry interval elapses."
     );
 
-    gate = Activator.CreateInstance(startupGateType, 5f)
+    gate = Activator.CreateInstance(startupGateType, 5f, 10f)
         ?? throw new InvalidOperationException("Failed to recreate StartupUploadAttemptGate.");
     var skippedDecision = Invoke<object>(startupGateType, gate, "Poll", [5f, true]).ToString();
     Assert(
@@ -433,8 +438,8 @@ try
     );
     var afterSkipDecision = Invoke<object>(startupGateType, gate, "Poll", [30f, false]).ToString();
     Assert(
-        afterSkipDecision == "Done",
-        "Startup upload gate should not retry after the startup window was skipped by a live run."
+        afterSkipDecision == "Start",
+        "Startup upload gate should retry after the live run ends."
     );
 }
 finally
