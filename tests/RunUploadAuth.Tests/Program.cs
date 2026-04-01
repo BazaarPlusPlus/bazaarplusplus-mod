@@ -21,7 +21,7 @@ var clientStatePath = Path.Combine(tempRoot, "client.json");
 var privateKeyPath = Path.Combine(tempRoot, "key.json");
 
 var errorFormatterType = RequireType(
-    "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadErrorFormatter"
+    "BazaarPlusPlus.Game.ModApi.ModApiErrorFormatter"
 );
 var formatHttpFailureMethod = errorFormatterType.GetMethod(
     "FormatHttpFailure",
@@ -29,7 +29,7 @@ var formatHttpFailureMethod = errorFormatterType.GetMethod(
 );
 Assert(
     formatHttpFailureMethod != null,
-    "RunUploadErrorFormatter should expose HTTP error formatting for client-visible errors."
+    "ModApiErrorFormatter should expose HTTP error formatting for client-visible errors."
 );
 Assert(
     string.Equals(
@@ -107,7 +107,7 @@ var requestsHandled = Task.Run(async () =>
             continue;
         }
 
-        if (request.Url?.AbsolutePath == "/runs/upload")
+        if (request.Url?.AbsolutePath == "/runs")
         {
             Assert(
                 request.Headers["X-BPP-Client-Id"] == "client-test-001",
@@ -203,29 +203,94 @@ try
         ?? throw new InvalidOperationException("Failed to create ReplicatedRunLogStore.");
 
     SeedCompletedRun(replicatedStoreType, replicatedStore, runId, startedAt);
-    var identityStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore"
-    );
+    var identityStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiIdentityStore");
     var identityStore =
         Activator.CreateInstance(identityStoreType, installIdPath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiIdentityStore.");
     var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
+        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
     );
     var clientStateStore =
         Activator.CreateInstance(clientStateStoreType, clientStatePath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
-    var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
+        ?? throw new InvalidOperationException("Failed to create ModApiClientStateStore.");
+    var keyStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiKeyStore");
     var keyStore =
         Activator.CreateInstance(keyStoreType, privateKeyPath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
-    var endpointSetType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadEndpointSet");
-    var endpoint = Activator.CreateInstance(endpointSetType)!;
-    endpointSetType
-        .GetProperty("RegistrationEndpoint")!
-        .SetValue(endpoint, $"{prefix}clients/register");
-    endpointSetType.GetProperty("UploadEndpoint")!.SetValue(endpoint, $"{prefix}runs/upload");
-    var serviceType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadService");
+        ?? throw new InvalidOperationException("Failed to create ModApiKeyStore.");
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore") == null,
+        "RunUploadIdentityStore compatibility wrapper should be removed."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore")
+            == null,
+        "RunUploadClientStateStore compatibility wrapper should be removed."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore") == null,
+        "RunUploadKeyStore compatibility wrapper should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.ModApi.ModApiRequestSigner") != null,
+        "ModApiRequestSigner should exist as the primary signing abstraction."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.ModApi.ModApiRegistrationClient") != null,
+        "ModApiRegistrationClient should exist as the primary registration abstraction."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.ModApi.ModApiAuthenticatedSession") != null,
+        "ModApiAuthenticatedSession should exist as the primary authenticated session abstraction."
+    );
+    var routesType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiRoutes");
+    var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
+    Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
+    var routes =
+        tryCreateRoutes!.Invoke(null, [$"{prefix}"])
+        ?? throw new InvalidOperationException("Failed to create ModApiRoutes.");
+    Assert(
+        RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadPayload") != null,
+        "RunSummaryUploadPayload should exist as the primary run upload payload type."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadPayload") == null,
+        "RunUploadPayload compatibility type should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadSnapshot") != null,
+        "RunSummaryUploadSnapshot should exist as the primary run upload snapshot type."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadSnapshot") == null,
+        "RunUploadSnapshot compatibility type should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadCycleResult") != null,
+        "RunSummaryUploadCycleResult should exist as the primary run upload cycle result type."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadCycleResult") == null,
+        "RunUploadCycleResult compatibility type should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadApiClient") != null,
+        "RunSummaryUploadApiClient should exist as the primary run upload API client."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadApiClient") == null,
+        "RunUploadApiClient compatibility type should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadService") != null,
+        "RunSummaryUploadService should exist as the primary run upload service."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadService") == null,
+        "RunUploadService compatibility type should be removed."
+    );
+    var serviceType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadService"
+    );
     var service =
         Activator.CreateInstance(
             serviceType,
@@ -233,13 +298,18 @@ try
             identityStore,
             clientStateStore,
             keyStore,
-            endpoint,
+            routes,
             3,
             TimeSpan.FromSeconds(10)
-        ) ?? throw new InvalidOperationException("Failed to create RunUploadService.");
+        ) ?? throw new InvalidOperationException("Failed to create RunSummaryUploadService.");
 
     var uploadTask = (Task)
-        Invoke<object>(serviceType, service, "UploadPendingRunsAsync", [CancellationToken.None]);
+        Invoke<object>(
+            serviceType,
+            service,
+            "UploadPendingRunSummariesAsync",
+            [CancellationToken.None]
+        );
     await uploadTask.ConfigureAwait(false);
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -254,23 +324,21 @@ try
 
     var clientState = JObject.Parse(File.ReadAllText(clientStatePath));
     Assert(
-        clientState["client_ids"]?["Runs"]?.Value<string>() == "client-test-001",
-        "Client registration should persist route-scoped client_id locally."
+        clientState["client_id"]?.Value<string>() == "client-test-001",
+        "Client registration should persist a single client_id locally."
     );
 
     File.WriteAllText(
         clientStatePath,
         """
         {
-          "client_ids": {
-            "Runs": "client-stale-001"
-          }
+          "client_id": "client-stale-001"
         }
         """
     );
     clientStateStore =
         Activator.CreateInstance(clientStateStoreType, clientStatePath)
-        ?? throw new InvalidOperationException("Failed to recreate RunUploadClientStateStore.");
+        ?? throw new InvalidOperationException("Failed to recreate ModApiClientStateStore.");
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
     {
         connection.Open();
@@ -331,7 +399,7 @@ try
                     continue;
                 }
 
-                if (request.Url?.AbsolutePath == "/runs/upload")
+                if (request.Url?.AbsolutePath == "/runs")
                 {
                     uploadAttemptCount++;
                     if (uploadAttemptCount == 1)
@@ -435,12 +503,9 @@ try
 
     try
     {
-        endpointSetType
-            .GetProperty("RegistrationEndpoint")!
-            .SetValue(endpoint, $"{recoveryPrefix}clients/register");
-        endpointSetType
-            .GetProperty("UploadEndpoint")!
-            .SetValue(endpoint, $"{recoveryPrefix}runs/upload");
+        routes =
+            tryCreateRoutes!.Invoke(null, [$"{recoveryPrefix}"])
+            ?? throw new InvalidOperationException("Failed to recreate ModApiRoutes.");
         service =
             Activator.CreateInstance(
                 serviceType,
@@ -448,16 +513,16 @@ try
                 identityStore,
                 clientStateStore,
                 keyStore,
-                endpoint,
+                routes,
                 3,
                 TimeSpan.FromSeconds(10)
-            ) ?? throw new InvalidOperationException("Failed to recreate RunUploadService.");
+            ) ?? throw new InvalidOperationException("Failed to recreate RunSummaryUploadService.");
 
         uploadTask = (Task)
             Invoke<object>(
                 serviceType,
                 service,
-                "UploadPendingRunsAsync",
+                "UploadPendingRunSummariesAsync",
                 [CancellationToken.None]
             );
         await uploadTask.ConfigureAwait(false);
@@ -481,8 +546,8 @@ try
 
     clientState = JObject.Parse(File.ReadAllText(clientStatePath));
     Assert(
-        clientState["client_ids"]?["Runs"]?.Value<string>() == "client-test-002",
-        "Re-registration should replace the stale route-scoped client id."
+        clientState["client_id"]?.Value<string>() == "client-test-002",
+        "Re-registration should replace the stale client id."
     );
     Assert(reRegisterCount == 1, "A stale client id should trigger exactly one re-registration.");
     Assert(uploadAttemptCount == 2, "Recovery should retry the upload after re-registration.");
@@ -639,4 +704,9 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+static Type? ResolveTypeOrNull(string fullName)
+{
+    return Type.GetType($"{fullName}, BazaarPlusPlus");
 }

@@ -3,7 +3,7 @@ using System.Net;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
 
-var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.GhostBattleSyncService");
+var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleSyncService");
 var shouldAdvanceCheckpoint = syncServiceType.GetMethod(
     "ShouldAdvanceCheckpoint",
     BindingFlags.NonPublic | BindingFlags.Static
@@ -78,7 +78,7 @@ var requestsHandled = Task.Run(async () =>
     try
     {
         var context = await listener.GetContextAsync();
-        if (context.Request.Url?.AbsolutePath == "/clients/bind")
+        if (context.Request.Url?.AbsolutePath == "/clients/bind-player")
         {
             bindRequestCount++;
             var responseBytes = System.Text.Encoding.UTF8.GetBytes(
@@ -101,41 +101,37 @@ var requestsHandled = Task.Run(async () =>
 try
 {
     var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
-    var identityStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore"
-    );
+    var identityStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiIdentityStore");
     var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
+        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
     );
-    var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
-    var endpointSetType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadEndpointSet");
-    var bindingResultType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadBindingResult"
-    );
+    var keyStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiKeyStore");
+    var routesType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiRoutes");
+    var bindingResultType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiPlayerBindingResult");
 
     var repository =
         Activator.CreateInstance(repositoryType, Path.Combine(tempRoot, "history.db"))
         ?? throw new InvalidOperationException("Failed to create HistoryPanelRepository.");
     var identityStore =
         Activator.CreateInstance(identityStoreType, Path.Combine(tempRoot, "install-id.txt"))
-        ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiIdentityStore.");
     var clientStateStore =
         Activator.CreateInstance(clientStateStoreType, Path.Combine(tempRoot, "client-state.json"))
-        ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiClientStateStore.");
     var keyStore =
         Activator.CreateInstance(keyStoreType, Path.Combine(tempRoot, "key.json"))
-        ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
-    var endpoint = Activator.CreateInstance(endpointSetType)!;
-    endpointSetType
-        .GetProperty("RegistrationEndpoint")!
-        .SetValue(endpoint, $"{prefix}clients/register");
-    endpointSetType.GetProperty("UploadEndpoint")!.SetValue(endpoint, $"{prefix}runs/upload");
+        ?? throw new InvalidOperationException("Failed to create ModApiKeyStore.");
+    var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
+    Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
+    var routes =
+        tryCreateRoutes!.Invoke(null, [$"{prefix}"])
+        ?? throw new InvalidOperationException("Failed to create ModApiRoutes.");
 
     InvokeVoid(
         clientStateStoreType,
         clientStateStore,
-        "SaveScopedBoundPlayerAccountId",
-        ["Runs", "runs-client-001", "player-account-001"]
+        "SaveBoundPlayerAccountId",
+        ["player-account-001"]
     );
 
     var syncService =
@@ -145,7 +141,7 @@ try
             identityStore,
             clientStateStore,
             keyStore,
-            endpoint,
+            routes,
             TimeSpan.FromSeconds(10)
         ) ?? throw new InvalidOperationException("Failed to create GhostBattleSyncService.");
 
@@ -175,7 +171,7 @@ try
     Assert(succeeded, "Ghost battle binding refresh should succeed when the bind route succeeds.");
     Assert(
         bindRequestCount == 1,
-        "Ghost battle binding refresh should hit /clients/bind even when the local cache already matches."
+        "Ghost battle binding refresh should hit /clients/bind-player even when the local cache already matches."
     );
 }
 finally

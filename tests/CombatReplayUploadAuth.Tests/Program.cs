@@ -53,7 +53,7 @@ var requestsHandled = Task.Run(async () =>
             continue;
         }
 
-        if (request.Url?.AbsolutePath == "/battles/upload")
+        if (request.Url?.AbsolutePath == "/battles")
         {
             Assert(
                 request.Headers["X-BPP-Client-Id"] == "client-replay-001",
@@ -207,23 +207,82 @@ try
         ?? throw new InvalidOperationException("Failed to create BattleUploadSqliteStore.");
     InvokeVoid(storeType, store, "MarkReplayDirty", ["battle-auth-001"]);
 
-    var identityStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore"
-    );
+    var identityStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiIdentityStore");
     var identityStore =
         Activator.CreateInstance(identityStoreType, installIdPath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiIdentityStore.");
     var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
+        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
     );
     var clientStateStore =
         Activator.CreateInstance(clientStateStoreType, clientStatePath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
-    var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
+        ?? throw new InvalidOperationException("Failed to create ModApiClientStateStore.");
+    var keyStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiKeyStore");
     var keyStore =
         Activator.CreateInstance(keyStoreType, privateKeyPath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
-    var serviceType = RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService");
+        ?? throw new InvalidOperationException("Failed to create ModApiKeyStore.");
+    var routesType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiRoutes");
+    var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
+    Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
+    var routes =
+        tryCreateRoutes!.Invoke(null, [$"{prefix}"])
+        ?? throw new InvalidOperationException("Failed to create ModApiRoutes.");
+    Assert(
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadPayload") != null,
+        "BattleArtifactUploadPayload should exist as the primary battle upload payload type."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadPayload") == null,
+        "BattleUploadPayload compatibility type should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadSnapshot") != null,
+        "BattleArtifactUploadSnapshot should exist as the primary battle upload snapshot type."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadSnapshot") == null,
+        "BattleUploadSnapshot compatibility type should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadCycleResult") != null,
+        "BattleArtifactUploadCycleResult should exist as the primary battle upload cycle result type."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadCycleResult")
+            == null,
+        "BattleUploadCycleResult compatibility type should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadRequestSigner")
+            != null,
+        "BattleArtifactUploadRequestSigner should exist as the primary battle upload signer."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadRequestSigner")
+            == null,
+        "BattleUploadRequestSigner compatibility type should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadApiClient")
+            != null,
+        "BattleArtifactUploadApiClient should exist as the primary battle upload API client."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadApiClient")
+            == null,
+        "BattleUploadApiClient compatibility type should be removed."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadService") != null,
+        "BattleArtifactUploadService should exist as the primary battle upload service."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService") == null,
+        "BattleUploadService compatibility type should be removed."
+    );
+    var serviceType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadService"
+    );
     var service =
         Activator.CreateInstance(
             serviceType,
@@ -231,14 +290,18 @@ try
             identityStore,
             clientStateStore,
             keyStore,
-            $"{prefix}clients/register",
-            $"{prefix}battles/upload",
+            routes,
             3,
             TimeSpan.FromSeconds(10)
-        ) ?? throw new InvalidOperationException("Failed to create BattleUploadService.");
+        ) ?? throw new InvalidOperationException("Failed to create BattleArtifactUploadService.");
 
     var uploadTask = (Task)
-        Invoke<object>(serviceType, service, "UploadPendingBattlesAsync", [CancellationToken.None]);
+        Invoke<object>(
+            serviceType,
+            service,
+            "UploadPendingBattleArtifactsAsync",
+            [CancellationToken.None]
+        );
     await uploadTask.ConfigureAwait(false);
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -261,8 +324,8 @@ try
 
     var clientState = JObject.Parse(File.ReadAllText(clientStatePath));
     Assert(
-        clientState["client_ids"]?["ReplayCloudflare"]?.Value<string>() == "client-replay-001",
-        "Replay registration should persist a replay-scoped client id without using the run route keys."
+        clientState["client_id"]?.Value<string>() == "client-replay-001",
+        "Replay registration should persist the shared ModApi client id."
     );
 }
 finally
@@ -384,4 +447,9 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+static Type? ResolveTypeOrNull(string fullName)
+{
+    return Type.GetType($"{fullName}, BazaarPlusPlus");
 }

@@ -30,10 +30,28 @@ try
     InvokeVoid(runStoreType, runStore, "CreateRun", [createRunRequest]);
 
     var storeType = RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadSqliteStore");
-    var serviceType = RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService");
+    var serviceType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadService"
+    );
     Assert(
         storeType != null && serviceType != null,
-        "Battle upload store and service should exist."
+        "Battle artifact upload store and service should exist."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadPayload") != null,
+        "BattleArtifactUploadPayload should exist as the primary battle upload payload type."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadSnapshot") != null,
+        "BattleArtifactUploadSnapshot should exist as the primary battle upload snapshot type."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadCycleResult") != null,
+        "BattleArtifactUploadCycleResult should exist as the primary battle upload cycle result type."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadService") == null,
+        "BattleUploadService compatibility wrapper should be removed."
     );
 
     var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
@@ -91,7 +109,7 @@ try
     var snapshot = Invoke<object>(
         storeType,
         store,
-        "TryBuildSnapshot",
+        "TryBuildBattleArtifactSnapshot",
         ["battle-upload-001", "install-123", null]
     );
     Assert(snapshot != null, "BattleUploadSqliteStore should build an upload snapshot.");
@@ -163,34 +181,36 @@ try
         clientStatePath,
         """
         {
-          "client_ids": {
-            "Runs": "client-existing-001"
-          }
+          "client_id": "client-existing-001"
         }
         """
     );
-    var identityStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore"
-    );
+    var identityStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiIdentityStore");
     var identityStore =
         Activator.CreateInstance(identityStoreType, Path.Combine(tempRoot, "install-id.txt"))
-        ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiIdentityStore.");
     var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
+        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
     );
     var clientStateStore =
         Activator.CreateInstance(clientStateStoreType, clientStatePath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiClientStateStore.");
     InvokeVoid(
         clientStateStoreType,
         clientStateStore,
-        "SaveScopedClientId",
-        ["Runs", "run-client-001"]
+        "SaveClientId",
+        ["run-client-001"]
     );
-    var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
+    var keyStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiKeyStore");
     var keyStore =
         Activator.CreateInstance(keyStoreType, Path.Combine(tempRoot, "key.json"))
-        ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiKeyStore.");
+    var routesType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiRoutes");
+    var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
+    Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
+    var routes =
+        tryCreateRoutes!.Invoke(null, ["https://cloudflare.example"])
+        ?? throw new InvalidOperationException("Failed to create ModApiRoutes.");
     var service =
         Activator.CreateInstance(
             serviceType,
@@ -198,13 +218,17 @@ try
             identityStore,
             clientStateStore,
             keyStore,
-            "https://cloudflare.example/clients/register",
-            "https://cloudflare.example/battles/upload",
+            routes,
             1,
             TimeSpan.FromSeconds(10)
-        ) ?? throw new InvalidOperationException("Failed to create BattleUploadService.");
+        ) ?? throw new InvalidOperationException("Failed to create BattleArtifactUploadService.");
     var uploadTask = (Task)
-        Invoke<object>(serviceType, service, "UploadPendingBattlesAsync", [CancellationToken.None]);
+        Invoke<object>(
+            serviceType,
+            service,
+            "UploadPendingBattleArtifactsAsync",
+            [CancellationToken.None]
+        );
     uploadTask.GetAwaiter().GetResult();
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -230,9 +254,8 @@ try
 
     var persistedClientState = File.ReadAllText(clientStatePath);
     Assert(
-        persistedClientState.Contains("\"Runs\": \"run-client-001\"", StringComparison.Ordinal)
-            && !persistedClientState.Contains("\"ReplayCloudflare\"", StringComparison.Ordinal),
-        "Replay upload verification should keep the pre-existing run client id untouched when replay registration never starts."
+        persistedClientState.Contains("\"client_id\": \"run-client-001\"", StringComparison.Ordinal),
+        "Replay upload verification should keep the pre-existing client id untouched when replay registration never starts."
     );
 }
 finally
@@ -320,4 +343,9 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+static Type? ResolveTypeOrNull(string fullName)
+{
+    return Type.GetType($"{fullName}, BazaarPlusPlus");
 }

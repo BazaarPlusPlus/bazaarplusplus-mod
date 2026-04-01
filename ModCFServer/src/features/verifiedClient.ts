@@ -5,13 +5,12 @@ import { json } from "../http/json";
 import { absolutePath, trimString } from "../http/request";
 import { logWarn } from "../observability";
 import { getRegisteredClient } from "../persistence/clients";
-import type { UploadPurpose } from "../types/api";
-import type { RegisteredClientRow } from "../types/db";
+import type { ClientRow } from "../types/db";
 
 const MAX_TIMESTAMP_SKEW_MS = 10 * 60 * 1000;
 
 export type VerifiedClientRequest = {
-  client: RegisteredClientRow;
+  client: ClientRow;
   payload: ArrayBuffer;
   payloadHash: string;
   timestamp: string;
@@ -20,7 +19,6 @@ export type VerifiedClientRequest = {
 export async function requireVerifiedClient(
   request: Request,
   env: Env,
-  purpose: UploadPurpose,
 ): Promise<VerifiedClientRequest | Response> {
   const clientId = trimString(request.headers.get("x-bpp-client-id"));
   const installId = trimString(request.headers.get("x-bpp-install-id"));
@@ -33,7 +31,6 @@ export async function requireVerifiedClient(
     logWarn("auth.rejected", {
       route: absolutePath(request),
       status,
-      purpose,
       error_code: error,
       client_id: clientId,
       install_id: installId,
@@ -58,7 +55,7 @@ export async function requireVerifiedClient(
   }
 
   const client = await getRegisteredClient(env, clientId);
-  if (!client || client.install_id !== installId || client.purpose !== purpose) {
+  if (!client || client.install_id !== installId || client.revoked_at_utc != null) {
     return reject(404, "unknown_client");
   }
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;

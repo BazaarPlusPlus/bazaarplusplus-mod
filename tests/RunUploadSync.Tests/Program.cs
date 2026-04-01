@@ -151,12 +151,28 @@ try
     var snapshot = Invoke<object>(
         uploadStoreType,
         uploadStore,
-        "TryBuildSnapshot",
+        "TryBuildRunSummarySnapshot",
         [runId, "install-123", null]
     );
     Assert(
         snapshot != null,
         "RunUploadSqliteStore should build an upload snapshot for a completed run."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadPayload") != null,
+        "RunSummaryUploadPayload should exist as the primary run upload payload type."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadSnapshot") != null,
+        "RunSummaryUploadSnapshot should exist as the primary run upload snapshot type."
+    );
+    Assert(
+        RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadCycleResult") != null,
+        "RunSummaryUploadCycleResult should exist as the primary run upload cycle result type."
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadPayload") == null,
+        "RunUploadPayload compatibility wrapper should be removed."
     );
     var payload =
         snapshot!.GetType().GetProperty("Payload")!.GetValue(snapshot)
@@ -212,103 +228,105 @@ try
         );
     }
 
-    var identityStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore"
+    var identityStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiIdentityStore");
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadIdentityStore") == null,
+        "RunUploadIdentityStore compatibility wrapper should be removed."
     );
     var identityStore =
         Activator.CreateInstance(identityStoreType, installIdPath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadIdentityStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiIdentityStore.");
     var installId1 = (string)
         Invoke<object>(identityStoreType, identityStore, "GetOrCreateInstallId", []);
     var installId2 = (string)
         Invoke<object>(identityStoreType, identityStore, "GetOrCreateInstallId", []);
     Assert(
         !string.IsNullOrWhiteSpace(installId1) && installId1 == installId2,
-        "RunUploadIdentityStore should persist a stable install id."
+        "ModApiIdentityStore should persist a stable install id."
     );
     Assert(
         File.Exists(installIdPath) && File.ReadAllText(installIdPath).Trim() == installId1,
-        "RunUploadIdentityStore should write the install id to disk."
+        "ModApiIdentityStore should write the install id to disk."
     );
 
     var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore"
+        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
+    );
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore")
+            == null,
+        "RunUploadClientStateStore compatibility wrapper should be removed."
     );
     var clientStateStore =
         Activator.CreateInstance(clientStateStoreType, clientStatePath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadClientStateStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiClientStateStore.");
     Assert(
-        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"])
-            == null,
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetClientId", []) == null,
         "Client state store should return null before registration."
     );
-    InvokeVoid(
-        clientStateStoreType,
-        clientStateStore,
-        "SaveScopedClientId",
-        ["Runs", "client-abc"]
-    );
+    InvokeVoid(clientStateStoreType, clientStateStore, "SaveClientId", ["client-abc"]);
     Assert(
-        (string)
-            Invoke<object>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"])
+        (string)Invoke<object>(clientStateStoreType, clientStateStore, "TryGetClientId", [])
             == "client-abc",
         "Client state store should persist client id."
     );
     Assert(
-        Invoke<object?>(
-            clientStateStoreType,
-            clientStateStore,
-            "TryGetScopedBoundPlayerAccountId",
-            ["Runs", "client-abc"]
-        ) == null,
-        "Client state store should return null before a scoped bound player account is saved."
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetBoundPlayerAccountId", [])
+            == null,
+        "Client state store should return null before a bound player account is saved."
     );
     InvokeVoid(
         clientStateStoreType,
         clientStateStore,
-        "SaveScopedBoundPlayerAccountId",
-        ["Runs", "client-abc", "player-account-001"]
+        "SaveBoundPlayerAccountId",
+        ["player-account-001"]
     );
     Assert(
         (string)
             Invoke<object>(
                 clientStateStoreType,
                 clientStateStore,
-                "TryGetScopedBoundPlayerAccountId",
-                ["Runs", "client-abc"]
+                "TryGetBoundPlayerAccountId",
+                []
             ) == "player-account-001",
-        "Client state store should persist a bound player account per scope and client id."
+        "Client state store should persist the bound player account."
     );
+    clientStateStore =
+        Activator.CreateInstance(clientStateStoreType, clientStatePath)
+        ?? throw new InvalidOperationException("Failed to recreate ModApiClientStateStore.");
     Assert(
-        Invoke<object?>(
-            clientStateStoreType,
-            clientStateStore,
-            "TryGetScopedBoundPlayerAccountId",
-            ["Runs", "client-other"]
-        ) == null,
-        "Client state store should not reuse a bound player account across different client ids."
+        (string)
+            Invoke<object>(
+                clientStateStoreType,
+                clientStateStore,
+                "TryGetBoundPlayerAccountId",
+                []
+            ) == "player-account-001",
+        "Client state store should persist the bound player account across restarts."
     );
-    InvokeVoid(clientStateStoreType, clientStateStore, "ClearScopedClientId", ["Runs"]);
+    InvokeVoid(clientStateStoreType, clientStateStore, "ClearClientId", []);
     Assert(
-        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"])
-            == null,
-        "Client state store should clear a route-scoped client id."
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetClientId", []) == null,
+        "Client state store should clear the persisted client id."
     );
 
     File.WriteAllText(clientStatePath, "{ not-valid-json");
     clientStateStore =
         Activator.CreateInstance(clientStateStoreType, clientStatePath)
-        ?? throw new InvalidOperationException("Failed to recreate RunUploadClientStateStore.");
+        ?? throw new InvalidOperationException("Failed to recreate ModApiClientStateStore.");
     Assert(
-        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetScopedClientId", ["Runs"])
-            == null,
+        Invoke<object?>(clientStateStoreType, clientStateStore, "TryGetClientId", []) == null,
         "Client state store should recover from corrupted JSON by treating it as empty state."
     );
 
-    var keyStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore");
+    var keyStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiKeyStore");
+    Assert(
+        ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadKeyStore") == null,
+        "RunUploadKeyStore compatibility wrapper should be removed."
+    );
     var keyStore =
         Activator.CreateInstance(keyStoreType, privateKeyPath)
-        ?? throw new InvalidOperationException("Failed to create RunUploadKeyStore.");
+        ?? throw new InvalidOperationException("Failed to create ModApiKeyStore.");
     var keyMaterial1 = Invoke<object>(keyStoreType, keyStore, "GetOrCreateKeyMaterial", []);
     var keyMaterial2 = Invoke<object>(keyStoreType, keyStore, "GetOrCreateKeyMaterial", []);
     var fingerprintProperty =
@@ -328,7 +346,7 @@ try
     File.WriteAllText(privateKeyPath, "{ not-valid-json");
     keyStore =
         Activator.CreateInstance(keyStoreType, privateKeyPath)
-        ?? throw new InvalidOperationException("Failed to recreate RunUploadKeyStore.");
+        ?? throw new InvalidOperationException("Failed to recreate ModApiKeyStore.");
     var recoveredKeyMaterial = Invoke<object>(keyStoreType, keyStore, "GetOrCreateKeyMaterial", []);
     var recoveredFingerprint = (string)fingerprintProperty.GetValue(recoveredKeyMaterial)!;
     var recoveredSignature = (string)
@@ -362,7 +380,7 @@ try
     );
     keyStore =
         Activator.CreateInstance(keyStoreType, privateKeyPath)
-        ?? throw new InvalidOperationException("Failed to recreate RunUploadKeyStore.");
+        ?? throw new InvalidOperationException("Failed to recreate ModApiKeyStore.");
     var recoveredFromMalformedJsonKey = Invoke<object>(
         keyStoreType,
         keyStore,
@@ -383,7 +401,7 @@ try
     );
 
     var startupGateType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.StartupUploadAttemptGate"
+        "BazaarPlusPlus.Game.Upload.StartupUploadAttemptGate"
     );
     var gate = Activator.CreateInstance(startupGateType, 5f)
         ?? throw new InvalidOperationException("Failed to create StartupUploadAttemptGate.");
@@ -431,6 +449,11 @@ static Type RequireType(string fullName)
 {
     return Type.GetType($"{fullName}, BazaarPlusPlus")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static Type? ResolveTypeOrNull(string fullName)
+{
+    return Type.GetType($"{fullName}, BazaarPlusPlus");
 }
 
 static T Invoke<T>(Type type, object instance, string name, object?[] args)

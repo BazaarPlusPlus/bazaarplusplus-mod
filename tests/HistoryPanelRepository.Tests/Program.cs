@@ -134,7 +134,7 @@ try
         "ListBattleIdsByRun should return all linked battles ordered from newest to oldest."
     );
 
-    var ghostImportType = RequireType("BazaarPlusPlus.Game.HistoryPanel.GhostBattleImportRecord");
+    var ghostImportType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleImportRecord");
     var replaceGhostBattles = repositoryType.GetMethod(
         "ReplaceGhostBattles",
         [typeof(string), typeof(IReadOnlyList<>).MakeGenericType(ghostImportType)]

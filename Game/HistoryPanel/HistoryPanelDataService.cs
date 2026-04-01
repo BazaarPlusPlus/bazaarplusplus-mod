@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;

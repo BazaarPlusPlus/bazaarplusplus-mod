@@ -1,9 +1,9 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using BazaarPlusPlus.Game.ModApi;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
-using BazaarPlusPlus.Game.RunLogging.Upload;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json;
 
@@ -148,7 +148,7 @@ internal sealed class BattleUploadSqliteStore
         command.ExecuteNonQuery();
     }
 
-    public BattleUploadSnapshot? TryBuildSnapshot(
+    public BattleArtifactUploadSnapshot? TryBuildBattleArtifactSnapshot(
         string battleId,
         string installId,
         string? clientId = null
@@ -162,7 +162,7 @@ internal sealed class BattleUploadSqliteStore
         if (replayPayload == null)
             return null;
 
-        var payload = new BattleUploadPayload
+        var payload = new BattleArtifactUploadPayload
         {
             SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
             InstallId = installId,
@@ -174,13 +174,13 @@ internal sealed class BattleUploadSqliteStore
             BattleManifest = manifest,
             ReplayPayload = replayPayload,
         };
-        var json = JsonConvert.SerializeObject(payload, RunUploadSerialization.SerializerSettings);
+        var json = JsonConvert.SerializeObject(payload, ModApiSerialization.SerializerSettings);
 
-        return new BattleUploadSnapshot
+        return new BattleArtifactUploadSnapshot
         {
             Payload = payload,
             Json = json,
-            PayloadSha256 = RunUploadRequestSigner.ComputeBodyHash(json),
+            PayloadSha256 = ModApiRequestSigner.ComputeBodyHash(json),
         };
     }
 

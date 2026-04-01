@@ -1,11 +1,79 @@
 export type ClientRow = {
   client_id: string;
   install_id: string;
-  purpose: string;
   modulus_b64: string;
   exponent_b64: string;
   plugin_version: string | null;
   registered_at_utc: string;
+  last_seen_at_utc?: string | null;
+  revoked_at_utc?: string | null;
+};
+
+export type PlayerLinkRow = {
+  client_id: string;
+  player_account_id: string;
+  bound_at_utc: string;
+  last_confirmed_at_utc: string;
+};
+
+export type RunRow = {
+  run_id: string;
+  client_id: string;
+  player_account_id: string | null;
+  status: string;
+  hero_id: string | null;
+  hero_name: string | null;
+  started_at_utc: string | null;
+  ended_at_utc: string;
+  final_day: number | null;
+  final_wins: number | null;
+  final_losses: number | null;
+  mmr: number | null;
+  summary_schema_version: number | null;
+  summary_object_key: string | null;
+  created_at_utc: string;
+  updated_at_utc: string;
+};
+
+export type BattleRow = {
+  battle_id: string;
+  run_id: string | null;
+  client_id: string;
+  uploader_player_account_id: string | null;
+  recorded_at_utc: string;
+  day: number | null;
+  hour: number | null;
+  player_name: string | null;
+  player_account_id: string | null;
+  player_hero: string | null;
+  player_rank: string | null;
+  player_rating: number | null;
+  player_level: number | null;
+  opponent_name: string | null;
+  opponent_account_id: string | null;
+  opponent_hero: string | null;
+  opponent_rank: string | null;
+  opponent_rating: number | null;
+  opponent_level: number | null;
+  combat_kind: string;
+  result: string | null;
+  winner_combatant_id: string | null;
+  loser_combatant_id: string | null;
+  replay_schema_version: number;
+  replay_object_key: string;
+  replay_size_bytes: number;
+  created_at_utc: string;
+  updated_at_utc: string;
+};
+
+export type ReplayTokenRow = {
+  token: string;
+  battle_id: string;
+  requested_by_player_account_id: string;
+  expires_at_utc: string;
+  created_at_utc: string;
+  used_at_utc: string | null;
+  revoked_at_utc: string | null;
 };
 
 export type RunUploadRow = {
@@ -118,6 +186,10 @@ class MockD1Statement {
 
 export class MockD1Database {
   public readonly clients = new Map<string, ClientRow>();
+  public readonly playerLinks = new Map<string, PlayerLinkRow>();
+  public readonly runs = new Map<string, RunRow>();
+  public readonly battles = new Map<string, BattleRow>();
+  public readonly replayTokens = new Map<string, ReplayTokenRow>();
   public readonly runUploads = new Map<string, RunUploadRow>();
   public readonly clientUidBindings = new Map<string, ClientUidBindingRow>();
   public readonly clientPlayerAccountBindings = new Map<
@@ -147,9 +219,24 @@ export class MockD1Database {
   }
 
   first<T>(sql: string, params: unknown[]): T | null {
-    if (sql.includes("FROM registered_clients")) {
+    if (sql.includes("FROM clients")) {
       const clientId = String(params[0] ?? "");
       return (this.clients.get(clientId) as T | undefined) ?? null;
+    }
+
+    if (sql.includes("FROM player_links")) {
+      const clientId = String(params[0] ?? "");
+      return (this.playerLinks.get(clientId) as T | undefined) ?? null;
+    }
+
+    if (sql.includes("FROM battles") && sql.includes("WHERE battle_id = ?")) {
+      const battleId = String(params[0] ?? "");
+      return (this.battles.get(battleId) as T | undefined) ?? null;
+    }
+
+    if (sql.includes("FROM replay_tokens")) {
+      const token = String(params[0] ?? "");
+      return (this.replayTokens.get(token) as T | undefined) ?? null;
     }
 
     if (sql.includes("FROM client_uid_bindings")) {
@@ -278,26 +365,129 @@ export class MockD1Database {
       };
     }
 
+    if (sql.includes("FROM battles AS b")) {
+      const opponentAccountId = String(params[0] ?? "");
+      return {
+        results: Array.from(this.battles.values())
+          .filter(
+            (row) =>
+              row.opponent_account_id === opponentAccountId &&
+              row.combat_kind === "PVPCombat",
+          )
+          .sort((left, right) =>
+            right.recorded_at_utc.localeCompare(left.recorded_at_utc) ||
+            right.battle_id.localeCompare(left.battle_id),
+          )
+          .map((row) => row as T),
+      };
+    }
+
     return { results: [] };
   }
 
   run(sql: string, params: unknown[]): { changes: number } {
-    if (sql.includes("INSERT INTO registered_clients")) {
+    if (sql.includes("INSERT INTO clients")) {
       const clientId = String(params[0]);
       if (this.clients.has(clientId) && !sql.includes("ON CONFLICT")) {
-        throw new Error("SQLITE_CONSTRAINT: registered_clients.client_id");
+        throw new Error("SQLITE_CONSTRAINT: clients.client_id");
       }
 
       const row = {
         client_id: clientId,
         install_id: String(params[1]),
-        purpose: String(params[2]),
-        modulus_b64: String(params[3]),
-        exponent_b64: String(params[4]),
-        plugin_version: params[5] == null ? null : String(params[5]),
-        registered_at_utc: String(params[6]),
+        modulus_b64: String(params[2]),
+        exponent_b64: String(params[3]),
+        plugin_version: params[4] == null ? null : String(params[4]),
+        registered_at_utc: String(params[5]),
+        last_seen_at_utc: params[6] == null ? null : String(params[6]),
+        revoked_at_utc: params[7] == null ? null : String(params[7]),
       } satisfies ClientRow;
       this.clients.set(row.client_id, row);
+      return { changes: 1 };
+    }
+
+    if (sql.includes("INSERT INTO player_links")) {
+      const clientId = String(params[0] ?? "");
+      this.playerLinks.set(clientId, {
+        client_id: clientId,
+        player_account_id: String(params[1] ?? ""),
+        bound_at_utc: String(params[2] ?? ""),
+        last_confirmed_at_utc: String(params[3] ?? ""),
+      });
+      return { changes: 1 };
+    }
+
+    if (sql.includes("INSERT INTO runs")) {
+      const runId = String(params[0] ?? "");
+      const existing = this.runs.get(runId);
+      this.runs.set(runId, {
+        run_id: runId,
+        client_id: String(params[1] ?? ""),
+        player_account_id: params[2] == null ? null : String(params[2]),
+        status: String(params[3] ?? ""),
+        hero_id: params[4] == null ? null : String(params[4]),
+        hero_name: params[5] == null ? null : String(params[5]),
+        started_at_utc: params[6] == null ? null : String(params[6]),
+        ended_at_utc: String(params[7] ?? ""),
+        final_day: params[8] == null ? null : Number(params[8]),
+        final_wins: params[9] == null ? null : Number(params[9]),
+        final_losses: params[10] == null ? null : Number(params[10]),
+        mmr: params[11] == null ? null : Number(params[11]),
+        summary_schema_version: params[12] == null ? null : Number(params[12]),
+        summary_object_key: params[13] == null ? null : String(params[13]),
+        created_at_utc: existing?.created_at_utc ?? String(params[14] ?? ""),
+        updated_at_utc: String(params[15] ?? ""),
+      });
+      return { changes: 1 };
+    }
+
+    if (sql.includes("INSERT INTO battles")) {
+      const battleId = String(params[0] ?? "");
+      const existing = this.battles.get(battleId);
+      this.battles.set(battleId, {
+        battle_id: battleId,
+        run_id: params[1] == null ? null : String(params[1]),
+        client_id: String(params[2] ?? ""),
+        uploader_player_account_id: params[3] == null ? null : String(params[3]),
+        recorded_at_utc: String(params[4] ?? ""),
+        day: params[5] == null ? null : Number(params[5]),
+        hour: params[6] == null ? null : Number(params[6]),
+        player_name: params[7] == null ? null : String(params[7]),
+        player_account_id: params[8] == null ? null : String(params[8]),
+        player_hero: params[9] == null ? null : String(params[9]),
+        player_rank: params[10] == null ? null : String(params[10]),
+        player_rating: params[11] == null ? null : Number(params[11]),
+        player_level: params[12] == null ? null : Number(params[12]),
+        opponent_name: params[13] == null ? null : String(params[13]),
+        opponent_account_id: params[14] == null ? null : String(params[14]),
+        opponent_hero: params[15] == null ? null : String(params[15]),
+        opponent_rank: params[16] == null ? null : String(params[16]),
+        opponent_rating: params[17] == null ? null : Number(params[17]),
+        opponent_level: params[18] == null ? null : Number(params[18]),
+        combat_kind: String(params[19] ?? ""),
+        result: params[20] == null ? null : String(params[20]),
+        winner_combatant_id: params[21] == null ? null : String(params[21]),
+        loser_combatant_id: params[22] == null ? null : String(params[22]),
+        replay_schema_version: Number(params[23] ?? 0),
+        replay_object_key: String(params[24] ?? ""),
+        replay_size_bytes: Number(params[25] ?? 0),
+        created_at_utc: existing?.created_at_utc ?? String(params[26] ?? ""),
+        updated_at_utc: String(params[27] ?? ""),
+      });
+      return { changes: 1 };
+    }
+
+    if (sql.includes("INSERT INTO replay_tokens")) {
+      const token = String(params[0] ?? "");
+      this.replayTokens.set(token, {
+        token,
+        battle_id: String(params[1] ?? ""),
+        requested_by_player_account_id: String(params[2] ?? ""),
+        expires_at_utc: String(params[3] ?? ""),
+        created_at_utc: String(params[4] ?? ""),
+        used_at_utc: params[5] == null ? null : String(params[5]),
+        revoked_at_utc: params[6] == null ? null : String(params[6]),
+      });
       return { changes: 1 };
     }
 

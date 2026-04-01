@@ -3,17 +3,23 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.ModApi;
+using BazaarPlusPlus.Game.Upload;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal sealed class RunUploadController : MonoBehaviour
 {
-    private RunUploadService? _uploadService;
+    private RunSummaryUploadService? _uploadService;
     private CancellationTokenSource? _shutdown;
-    private Task<RunUploadCycleResult>? _uploadTask;
     private StartupUploadAttemptGate? _startupGate;
-    private bool _waitingForRunExitLogged;
+    private readonly StartupUploadAttemptRunner _startupRunner = new(
+        "RunUploadController",
+        "Skipping startup run upload because a live run is active.",
+        "Starting startup run upload attempt.",
+        "Startup upload failed"
+    );
 
     private void Awake()
     {
@@ -22,50 +28,38 @@ internal sealed class RunUploadController : MonoBehaviour
             if (BppRuntimeHost.Config.EnableRunUploadConfig?.Value != true)
                 return;
 
-            var uploadEndpoint = RunUploadDefaults.UploadEndpoint;
-            var registrationEndpoint = RunUploadDefaults.RegistrationEndpoint;
             var databasePath = BppRuntimeHost.Paths.RunLogDatabasePath;
             var identityPath = BppRuntimeHost.Paths.RunUploadInstallIdentityPath;
             var clientStatePath = BppRuntimeHost.Paths.RunUploadClientStatePath;
             var privateKeyPath = BppRuntimeHost.Paths.RunUploadPrivateKeyPath;
 
-            if (
-                string.IsNullOrWhiteSpace(databasePath)
-                || string.IsNullOrWhiteSpace(identityPath)
-                || string.IsNullOrWhiteSpace(clientStatePath)
-                || string.IsNullOrWhiteSpace(privateKeyPath)
-            )
+            var startupDelaySeconds = Math.Max(5, ModApiDefaults.StartupDelaySeconds);
+            var batchSize = Math.Max(1, ModApiDefaults.BatchSize);
+            var requestTimeoutSeconds = Math.Max(10, ModApiDefaults.RequestTimeoutSeconds);
+            var context = ModApiBootstrapContext.TryCreate(
+                databasePath,
+                replayRootPath: null,
+                identityPath,
+                clientStatePath,
+                privateKeyPath,
+                ModApiDefaults.ApiBaseUrl
+            );
+            if (context == null)
             {
                 BppLog.Warn(
                     "RunUploadController",
-                    "Run upload is enabled but local auth/state paths are missing."
+                    "Run upload is enabled but local auth/state paths or endpoints are invalid."
                 );
                 return;
             }
 
-            var startupDelaySeconds = Math.Max(5, RunUploadDefaults.StartupDelaySeconds);
-            var batchSize = Math.Max(1, RunUploadDefaults.BatchSize);
-            var requestTimeoutSeconds = Math.Max(10, RunUploadDefaults.RequestTimeoutSeconds);
-            var endpoint = TryBuildEndpointSet(registrationEndpoint, uploadEndpoint);
-            if (endpoint == null)
-            {
-                BppLog.Warn(
-                    "RunUploadController",
-                    "Run upload is enabled but the registration/upload endpoint pair is not configured."
-                );
-                return;
-            }
-
-            var uploadStore = new RunUploadSqliteStore(databasePath);
-            var identityStore = new RunUploadIdentityStore(identityPath);
-            var clientStateStore = new RunUploadClientStateStore(clientStatePath);
-            var keyStore = new RunUploadKeyStore(privateKeyPath);
-            _uploadService = new RunUploadService(
+            var uploadStore = new RunUploadSqliteStore(context.DatabasePath);
+            _uploadService = new RunSummaryUploadService(
                 uploadStore,
-                identityStore,
-                clientStateStore,
-                keyStore,
-                endpoint,
+                context.CreateIdentityStore(),
+                context.CreateClientStateStore(),
+                context.CreateKeyStore(),
+                context.Routes,
                 batchSize,
                 timeout: TimeSpan.FromSeconds(requestTimeoutSeconds)
             );
@@ -86,54 +80,13 @@ internal sealed class RunUploadController : MonoBehaviour
     {
         if (_uploadService == null || _shutdown == null || _startupGate == null)
             return;
-
-        if (_uploadTask != null)
-        {
-            if (!_uploadTask.IsCompleted)
-                return;
-
-            try
-            {
-                _uploadTask.GetAwaiter().GetResult();
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception ex)
-            {
-                BppLog.Error("RunUploadController", $"Startup upload failed: {ex}");
-            }
-            finally
-            {
-                _uploadTask = null;
-            }
-
-            return;
-        }
-
-        switch (_startupGate.Poll(Time.unscaledTime, BppRuntimeHost.RunContext.IsInGameRun))
-        {
-            case StartupUploadAttemptDecision.Wait:
-                return;
-            case StartupUploadAttemptDecision.SkipLiveRun:
-                if (!_waitingForRunExitLogged)
-                {
-                    BppLog.Info(
-                        "RunUploadController",
-                        "Skipping startup run upload because a live run is active."
-                    );
-                    _waitingForRunExitLogged = true;
-                }
-                return;
-            case StartupUploadAttemptDecision.Done:
-                return;
-            case StartupUploadAttemptDecision.Start:
-                break;
-        }
-
-        _waitingForRunExitLogged = false;
-        BppLog.Info("RunUploadController", "Starting startup run upload attempt.");
-        _uploadTask = _uploadService.UploadPendingRunsAsync(_shutdown.Token);
+            _startupRunner.Tick(
+            _startupGate,
+            Time.unscaledTime,
+            BppRuntimeHost.RunContext.IsInGameRun,
+            _uploadService.UploadPendingRunSummariesAsync,
+            _shutdown.Token
+        );
     }
 
     private void OnDestroy()
@@ -147,40 +100,5 @@ internal sealed class RunUploadController : MonoBehaviour
 
         _uploadService?.Dispose();
         _uploadService = null;
-    }
-
-    private static RunUploadEndpointSet? TryBuildEndpointSet(
-        string? registrationEndpoint,
-        string? uploadEndpoint
-    )
-    {
-        if (
-            string.IsNullOrWhiteSpace(registrationEndpoint)
-            || string.IsNullOrWhiteSpace(uploadEndpoint)
-        )
-        {
-            return null;
-        }
-
-        if (
-            !Uri.TryCreate(registrationEndpoint, UriKind.Absolute, out var registrationUri)
-            || !Uri.TryCreate(uploadEndpoint, UriKind.Absolute, out var uploadUri)
-            || !IsSupportedScheme(registrationUri)
-            || !IsSupportedScheme(uploadUri)
-        )
-        {
-            return null;
-        }
-
-        return new RunUploadEndpointSet
-        {
-            RegistrationEndpoint = registrationUri.ToString(),
-            UploadEndpoint = uploadUri.ToString(),
-        };
-    }
-
-    private static bool IsSupportedScheme(Uri uri)
-    {
-        return uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp;
     }
 }

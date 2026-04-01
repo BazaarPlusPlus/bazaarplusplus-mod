@@ -131,7 +131,7 @@ internal sealed class RunUploadSqliteStore
         command.ExecuteNonQuery();
     }
 
-    public RunUploadSnapshot? TryBuildSnapshot(
+    public RunSummaryUploadSnapshot? TryBuildRunSummarySnapshot(
         string runId,
         string installId,
         string? clientId = null
@@ -248,11 +248,11 @@ internal sealed class RunUploadSqliteStore
         var lastSeqOrdinal = reader.GetOrdinal("last_seq");
         var lastSeq = reader.IsDBNull(lastSeqOrdinal) ? 0L : reader.GetInt64(lastSeqOrdinal);
 
-        return new RunUploadSnapshot
+        return new RunSummaryUploadSnapshot
         {
             LastSeq = lastSeq,
             UploadedStatus = status["status"]?.Value<string>(),
-            Payload = new RunUploadPayload
+            Payload = new RunSummaryUploadPayload
             {
                 SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
                 InstallId = installId,

@@ -1,14 +1,12 @@
 import type { Env } from "./env";
-import { handleBindClient } from "./features/bindClient";
-import {
-  handleGhostBattleReplayDownloadLink,
-  handleGhostBattlesAgainstMe,
-  handleReplayDownload,
-} from "./features/ghostBattles";
+import { handleBindPlayer } from "./features/bindPlayer";
+import { handleCreateReplayLink } from "./features/createReplayLink";
+import { handleDownloadReplay } from "./features/downloadReplay";
+import { handleQueryGhostBattles } from "./features/queryGhostBattles";
+import { handleUploadBattleArtifact } from "./features/uploadBattleArtifact";
+import { handleUploadRunSummary } from "./features/uploadRunSummary";
 import { json } from "./http/json";
 import { registerClient } from "./features/registerClient";
-import { handleRunUpload } from "./features/uploadRun";
-import { handleBattleUpload } from "./features/uploadBattle";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -22,35 +20,40 @@ export default {
       return registerClient(request, env);
     }
 
-    if (request.method === "POST" && url.pathname === "/clients/bind") {
-      return handleBindClient(request, env);
+    if (request.method === "POST" && url.pathname === "/clients/bind-player") {
+      return handleBindPlayer(request, env);
     }
 
-    if (request.method === "POST" && url.pathname === "/runs/upload") {
-      return handleRunUpload(request, env);
+    if (request.method === "POST" && url.pathname === "/runs") {
+      return handleUploadRunSummary(request, env);
     }
 
-    if (request.method === "POST" && url.pathname === "/battles/upload") {
-      return handleBattleUpload(request, env);
+    if (request.method === "POST" && url.pathname === "/battles") {
+      return handleUploadBattleArtifact(request, env);
     }
 
-    if (request.method === "GET" && url.pathname === "/me/pvp-battles/against-me") {
-      return handleGhostBattlesAgainstMe(request, env);
+    if (request.method === "GET" && url.pathname === "/players/me/ghost-battles") {
+      return handleQueryGhostBattles(request, env);
     }
 
     const replayDownloadMatch = url.pathname.match(
-      /^\/me\/pvp-battles\/([^/]+)\/replay-download-link$/,
+      /^\/players\/me\/ghost-battles\/([^/]+)\/replay-link$/,
     );
     if (request.method === "POST" && replayDownloadMatch) {
-      return handleGhostBattleReplayDownloadLink(
+      return handleCreateReplayLink(
         request,
         env,
         decodeURIComponent(replayDownloadMatch[1] ?? ""),
       );
     }
 
-    if (request.method === "GET" && url.pathname === "/replays/download") {
-      return handleReplayDownload(request, env);
+    const replayTokenMatch = url.pathname.match(/^\/replays\/([^/]+)$/);
+    if (request.method === "GET" && replayTokenMatch) {
+      return handleDownloadReplay(
+        request,
+        env,
+        decodeURIComponent(replayTokenMatch[1] ?? ""),
+      );
     }
 
     return json({ error: "not_found" }, { status: 404 });

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.PvpBattles;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
