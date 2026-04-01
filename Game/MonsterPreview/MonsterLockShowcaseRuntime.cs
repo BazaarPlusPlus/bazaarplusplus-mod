@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.EncounterTracking;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -190,10 +189,10 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         if (card == null || !BppRuntimeHost.RunContext.IsInGameRun)
             return false;
 
-        if (BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(card.TemplateId.ToString(), out _))
-            return true;
-
-        return FindEncounterPreview(card) != null;
+        return BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(
+            card.TemplateId.ToString(),
+            out _
+        );
     }
 
     private static bool TryBuildPreview(
@@ -231,34 +230,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             return cards.Count > 0 || skillCards.Count > 0;
         }
 
-        var preview = FindEncounterPreview(card);
-        if (preview == null)
-            return false;
-
-        var cachedCards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.BoardCards);
-        var cachedSkillCards = EncounterPreviewSpecConverter.BuildCachedSpecs(preview.Skills);
-        var filteredCards = PreviewCardSpecFilter.FilterLocallyRenderable(cachedCards);
-        var filteredSkillCards = PreviewCardSpecFilter.FilterLocallyRenderable(cachedSkillCards);
-        source = "encounter_tracker_cache";
-        previewModel = new PreviewBoardModel
-        {
-            Title = string.IsNullOrWhiteSpace(preview.Title)
-                ? card.Template?.InternalName ?? string.Empty
-                : preview.Title,
-            ItemCards = filteredCards,
-            SkillCards = filteredSkillCards,
-            Metadata = BuildEncounterPreviewMetadata(preview, source),
-        };
-        previewModel.Signature = PreviewBoardSignature.Build(previewModel);
-        LogFilteredPreviewCounts(
-            card,
-            source,
-            cachedCards.Count,
-            filteredCards.Count,
-            cachedSkillCards.Count,
-            filteredSkillCards.Count
-        );
-        return filteredCards.Count > 0 || filteredSkillCards.Count > 0;
+        return false;
     }
 
     private static void LogFilteredPreviewCounts(
@@ -274,37 +246,6 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             "MonsterLockShowcaseRuntime",
             $"Preview filter source={source} encounter={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={filteredItemCount}/{originalItemCount} skills={filteredSkillCount}/{originalSkillCount}"
         );
-    }
-
-    private static RunInfo.MonsterPreview FindEncounterPreview(Card card)
-    {
-        var previews = EncounterTracker.SelectionQuery.GetSnapshot().EncounterMonsterPreviews;
-        if (previews == null || previews.Count == 0)
-            return null;
-
-        var internalName = card.Template?.InternalName;
-        foreach (var preview in previews)
-        {
-            if (preview == null)
-                continue;
-
-            if (preview.EncounterTemplateId == card.TemplateId)
-                return preview;
-
-            if (
-                !string.IsNullOrWhiteSpace(internalName)
-                && string.Equals(
-                    preview.EncounterName,
-                    internalName,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                return preview;
-            }
-        }
-
-        return null;
     }
 
     private PreviewBoardRequest CreateShowcaseRequest(

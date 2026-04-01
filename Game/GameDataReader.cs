@@ -6,7 +6,6 @@ using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.EncounterTracking;
 using TheBazaar;
 
 namespace BazaarPlusPlus;
@@ -21,10 +20,8 @@ internal static class GameDataReader
             return new RunInfo
             {
                 Name = BppClientCacheBridge.TryGetProfileUsername(),
-                AvailableEncounters =
-                    GetSelectionSnapshot().AvailableEncounters ?? new List<RunInfo.CardInfo>(),
-                CurrentEncounterChoices =
-                    GetSelectionSnapshot().CurrentEncounterChoices ?? new List<RunInfo.CardInfo>(),
+                AvailableEncounters = new List<RunInfo.CardInfo>(),
+                CurrentEncounterChoices = new List<RunInfo.CardInfo>(),
             };
         }
 
@@ -64,10 +61,8 @@ internal static class GameDataReader
             OppLevel = Data.Run.Opponent?.GetAttributeValue(EPlayerAttributeType.Level),
             OppPrestige = Data.Run.Opponent?.GetAttributeValue(EPlayerAttributeType.Prestige),
             PlayMode = Data.SelectedPlayMode == EPlayMode.Ranked,
-            AvailableEncounters =
-                GetSelectionSnapshot().AvailableEncounters ?? new List<RunInfo.CardInfo>(),
-            CurrentEncounterChoices =
-                GetSelectionSnapshot().CurrentEncounterChoices ?? new List<RunInfo.CardInfo>(),
+            AvailableEncounters = new List<RunInfo.CardInfo>(),
+            CurrentEncounterChoices = new List<RunInfo.CardInfo>(),
         };
     }
 
@@ -133,10 +128,5 @@ internal static class GameDataReader
             );
         }
         return cardInfos;
-    }
-
-    private static EncounterSelectionSnapshot GetSelectionSnapshot()
-    {
-        return EncounterTracker.SelectionQuery.GetSnapshot();
     }
 }

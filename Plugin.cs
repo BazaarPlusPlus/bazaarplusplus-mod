@@ -44,8 +44,6 @@ public class Plugin : BaseUnityPlugin
             AttachRuntimeComponents(services, lifecycleModule, () => combatReplayRuntime);
             BppLog.Info("Plugin", "Runtime components attached");
 
-            BppLog.Info("Plugin", "Attaching debug components");
-            AttachDebugComponents();
             BppLog.Info("Plugin", "Plugin components attached");
         }
         catch (Exception ex)
@@ -128,13 +126,5 @@ public class Plugin : BaseUnityPlugin
             gameObject.AddComponent<TooltipModifierRefreshController>();
         tooltipModifierRefreshController.Initialize(services.Config);
         BppLog.Info("Plugin", "TooltipModifierRefreshController initialized");
-    }
-
-    private void AttachDebugComponents()
-    {
-        if (!BppBuild.IsDebug)
-            return;
-
-        gameObject.AddComponent<DebugPanel>();
     }
 }

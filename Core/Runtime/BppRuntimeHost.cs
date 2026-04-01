@@ -10,7 +10,6 @@ using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
-using BazaarPlusPlus.Game.EncounterTracking;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -38,7 +37,6 @@ internal sealed class BppRuntimeHost
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
-    private readonly EncounterTrackingFeature _encounterTrackingFeature;
     private readonly BppFeatureRegistry _featureRegistry;
 
     public BppRuntimeHost(
@@ -80,17 +78,10 @@ internal sealed class BppRuntimeHost
             combatReplayRuntimeAccessor
         );
         _combatStatusBarModule = new CombatStatusBarModule(Services.EventBus, Services.RunContext);
-        _encounterTrackingFeature = new EncounterTrackingFeature(
-            Services.EventBus,
-            Services.RunContext,
-            Services.MonsterCatalog
-        );
-        EncounterTracker.AttachFeature(_encounterTrackingFeature);
         _featureRegistry = new BppFeatureRegistry();
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
         _featureRegistry.Register(_combatStatusBarModule);
-        _featureRegistry.Register(_encounterTrackingFeature);
     }
 
     public static BppRuntimeHost? Current { get; private set; }
@@ -135,7 +126,6 @@ internal sealed class BppRuntimeHost
     public void Stop()
     {
         _featureRegistry.Stop();
-        EncounterTracker.DetachFeature();
         if (ReferenceEquals(Current, this))
             Current = null;
     }

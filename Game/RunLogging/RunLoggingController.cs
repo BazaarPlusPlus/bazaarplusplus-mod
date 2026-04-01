@@ -14,7 +14,6 @@ internal sealed class RunLoggingController : MonoBehaviour
     private IRunLogStore? _store;
     private RunLogSessionManager? _sessionManager;
     private RunLogCaptureService? _captureService;
-    private RunLogInferenceService? _inferenceService;
     private RunLoggingControllerCore? _core;
     private RunLoggingModule? _module;
 
@@ -33,13 +32,11 @@ internal sealed class RunLoggingController : MonoBehaviour
         _sessionManager = new RunLogSessionManager(_store);
         _sessionManager.RestoreActiveSession();
         _captureService = new RunLogCaptureService();
-        _inferenceService = new RunLogInferenceService();
         _core = new RunLoggingControllerCore(_sessionManager, _captureService);
         _module = new RunLoggingModule(
             BppRuntimeHost.EventBus,
             _sessionManager,
             _core,
-            _inferenceService,
             () => CombatReplayRuntime.Instance?.HasPendingPersistence == true,
             EnsureActiveRunFromGame
         );

@@ -9,7 +9,6 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.EncounterTracking;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using TheBazaar;
 
@@ -100,18 +99,6 @@ internal static class RunLoggingGameDataReader
         return true;
     }
 
-    public static IList<string> GetCurrentSelectionSetInstanceIds()
-    {
-        var state = Data.CurrentState;
-        if (state?.SelectionSet == null || state.SelectionSet.Count == 0)
-            return new List<string>();
-
-        return state
-            .SelectionSet.SelectMany(ResolveSelectionInstanceIds)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-    }
-
     public static bool TryBuildRunLogStateSnapshot(out RunLogStateSnapshotInput input)
     {
         input = null!;
@@ -126,31 +113,6 @@ internal static class RunLoggingGameDataReader
             State = state.StateName.ToString(),
             EncounterId = Data.CurrentEncounterId?.ToString(),
             ParentEncounterId = GetParentEncounterId(state.StateName.ToString()),
-        };
-        return true;
-    }
-
-    public static bool TryBuildRunLogSelectionSnapshot(out RunLogSelectionSnapshotInput input)
-    {
-        input = null!;
-        var state = Data.CurrentState;
-        if (state == null || !EncounterTracker.IsSupportedSelectionState(state.StateName))
-            return false;
-
-        var selectionSnapshot = EncounterTracker.SelectionQuery.GetSnapshot();
-        var source =
-            selectionSnapshot.AvailableEncounters ?? selectionSnapshot.CurrentEncounterChoices;
-        if (source == null || source.Count == 0)
-            return false;
-
-        input = new RunLogSelectionSnapshotInput
-        {
-            Day = Data.Run == null ? null : (int?)Data.Run.Day,
-            Hour = GetCurrentRunHour(),
-            State = state.StateName.ToString(),
-            EncounterId = Data.CurrentEncounterId?.ToString(),
-            ParentEncounterId = GetParentEncounterId(state.StateName.ToString()),
-            Options = source.Select(ToSelectionOption).ToList(),
         };
         return true;
     }
@@ -196,40 +158,5 @@ internal static class RunLoggingGameDataReader
     private static int? GetCurrentPlayerRating()
     {
         return TryGetPlayerRankSnapshot(out _, out var rating) ? rating : null;
-    }
-
-    private static RunLogSelectionOptionInput ToSelectionOption(RunInfo.CardInfo card)
-    {
-        return new RunLogSelectionOptionInput
-        {
-            InstanceId = card.Instance.ToString(),
-            TemplateId = card.TemplateId.ToString(),
-            Name = card.Name,
-            Tier = card.Tier.ToString(),
-            Enchant = card.Enchant,
-            Tags = card.Tags?.Select(tag => tag.ToString()).ToList() ?? new List<string>(),
-            Attributes =
-                card.Attributes?.ToDictionary(
-                    entry => entry.Key.ToString(),
-                    entry => (object?)entry.Value
-                )
-                ?? new Dictionary<string, object?>(),
-        };
-    }
-
-    private static IEnumerable<string> ResolveSelectionInstanceIds(string selectionId)
-    {
-        if (string.IsNullOrWhiteSpace(selectionId))
-            yield break;
-
-        yield return selectionId;
-
-        var entity = Data.Entities.GetValueOrDefault(new InstanceId(selectionId));
-        if (entity is not Card card)
-            yield break;
-
-        var cardInstanceId = card.GetInstanceId().ToString();
-        if (!string.IsNullOrWhiteSpace(cardInstanceId))
-            yield return cardInstanceId;
     }
 }
