@@ -381,6 +381,40 @@ try
         Directory.GetFiles(tempRoot, "key.json.corrupt-*").Length == 2,
         "Key store should also preserve valid-JSON corrupted key payloads before regenerating."
     );
+
+    var startupGateType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Upload.StartupUploadAttemptGate"
+    );
+    var gate = Activator.CreateInstance(startupGateType, 5f)
+        ?? throw new InvalidOperationException("Failed to create StartupUploadAttemptGate.");
+    var waitDecision = Invoke<object>(startupGateType, gate, "Poll", [4f, false]).ToString();
+    Assert(
+        waitDecision == "Wait",
+        "Startup upload gate should wait until the startup delay elapses."
+    );
+    var firstStartDecision = Invoke<object>(startupGateType, gate, "Poll", [5f, false]).ToString();
+    Assert(
+        firstStartDecision == "Start",
+        "Startup upload gate should trigger a single upload attempt once the startup delay elapses."
+    );
+    var secondStartDecision = Invoke<object>(startupGateType, gate, "Poll", [30f, false]).ToString();
+    Assert(
+        secondStartDecision == "Done",
+        "Startup upload gate should not schedule repeated uploads after the first startup attempt."
+    );
+
+    gate = Activator.CreateInstance(startupGateType, 5f)
+        ?? throw new InvalidOperationException("Failed to recreate StartupUploadAttemptGate.");
+    var skippedDecision = Invoke<object>(startupGateType, gate, "Poll", [5f, true]).ToString();
+    Assert(
+        skippedDecision == "SkipLiveRun",
+        "Startup upload gate should skip the startup upload when a live run is active."
+    );
+    var afterSkipDecision = Invoke<object>(startupGateType, gate, "Poll", [30f, false]).ToString();
+    Assert(
+        afterSkipDecision == "Done",
+        "Startup upload gate should not retry after the startup window was skipped by a live run."
+    );
 }
 finally
 {
