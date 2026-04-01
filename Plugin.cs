@@ -98,14 +98,13 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<BattleUploadController>();
         BppLog.Info("Plugin", "Adding HistoryPanel");
         var historyPanel = gameObject.AddComponent<HistoryPanel>();
-        historyPanel.Configure(
-            new HistoryPanelRuntime(
-                services.RunContext,
-                services.Paths.RunLogDatabasePath,
-                services.Paths.CombatReplayDirectoryPath,
-                combatReplayRuntimeAccessor
-            )
+        var historyPanelRuntime = new HistoryPanelRuntime(
+            services.RunContext,
+            services.Paths.RunLogDatabasePath,
+            services.Paths.CombatReplayDirectoryPath,
+            combatReplayRuntimeAccessor
         );
+        historyPanel.Configure(HistoryPanelFactory.Create(historyPanelRuntime));
         BppLog.Info("Plugin", "Adding CombatStatusBar");
         gameObject.AddComponent<CombatStatusBar>();
         BppLog.Info("Plugin", "Adding MonsterPreviewController");

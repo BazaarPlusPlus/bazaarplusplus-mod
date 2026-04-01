@@ -2,9 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.CombatReplay;
-using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -15,52 +12,18 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed partial class HistoryPanel : MonoBehaviour
 {
-    private enum PreviewSelectionMode
-    {
-        Run,
-        Battle,
-    }
-
-    private enum HistorySectionMode
-    {
-        Runs,
-        Ghost,
-    }
-
-    private enum GhostBattleFilter
-    {
-        All,
-        IWon,
-        ILost,
-    }
-
     internal static HistoryPanel? Instance { get; private set; }
 
-    private readonly List<HistoryRunRecord> _runs = new List<HistoryRunRecord>();
-    private readonly List<HistoryBattleRecord> _battles = new List<HistoryBattleRecord>();
-    private readonly List<HistoryBattleRecord> _ghostBattles = new List<HistoryBattleRecord>();
-    private readonly List<HistoryBattleRecord> _filteredGhostBattles =
-        new List<HistoryBattleRecord>();
-    private int _selectedRunIndex;
-    private int _selectedBattleIndex;
-    private int _selectedGhostBattleIndex;
-    private GhostBattleFilter _ghostBattleFilter = GhostBattleFilter.All;
+    private readonly HistoryPanelState _state = new();
+    private HistoryPanelDependencies? _dependencies;
+    private HistoryPanelCoordinator? _coordinator;
     private HistoryPanelDataService _dataService = null!;
     private HistoryPanelReplayService _replayService = null!;
-    private GhostBattleSyncService? _ghostSyncService;
     private HistoryPanelPreviewRenderer? _previewRenderer;
     private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
-    private string? _statusMessage;
     private float _previewDebugOverlayUntil;
-    private string? _deleteRunConfirmationRunId;
-    private float _deleteRunConfirmationUntil;
-    private PreviewSelectionMode _previewSelectionMode = PreviewSelectionMode.Run;
-    private HistorySectionMode _sectionMode = HistorySectionMode.Runs;
     private string _lastSceneToken = string.Empty;
-    private bool _ghostSyncInProgress;
-    private bool _replayActionInProgress;
-    private bool _filteredGhostBattlesDirty = true;
     private bool _initialized;
 
     public static bool IsVisible { get; private set; }
@@ -85,37 +48,112 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private IReadOnlyList<HistoryBattleRecord> FilteredGhostBattles => GetFilteredGhostBattles();
 
+    private System.Collections.Generic.List<HistoryRunRecord> _runs => _state.Runs;
+
+    private System.Collections.Generic.List<HistoryBattleRecord> _battles => _state.Battles;
+
+    private System.Collections.Generic.List<HistoryBattleRecord> _ghostBattles => _state.GhostBattles;
+
+    private System.Collections.Generic.List<HistoryBattleRecord> _filteredGhostBattles =>
+        _state.FilteredGhostBattles;
+
+    private int _selectedRunIndex
+    {
+        get => _state.SelectedRunIndex;
+        set => _state.SelectedRunIndex = value;
+    }
+
+    private int _selectedBattleIndex
+    {
+        get => _state.SelectedBattleIndex;
+        set => _state.SelectedBattleIndex = value;
+    }
+
+    private int _selectedGhostBattleIndex
+    {
+        get => _state.SelectedGhostBattleIndex;
+        set => _state.SelectedGhostBattleIndex = value;
+    }
+
+    private GhostBattleFilter _ghostBattleFilter
+    {
+        get => _state.GhostBattleFilter;
+        set => _state.GhostBattleFilter = value;
+    }
+
+    private string? _statusMessage
+    {
+        get => _state.StatusMessage;
+        set => _state.StatusMessage = value;
+    }
+
+    private string? _deleteRunConfirmationRunId
+    {
+        get => _state.DeleteRunConfirmationRunId;
+        set => _state.DeleteRunConfirmationRunId = value;
+    }
+
+    private float _deleteRunConfirmationUntil
+    {
+        get => _state.DeleteRunConfirmationUntil;
+        set => _state.DeleteRunConfirmationUntil = value;
+    }
+
+    private PreviewSelectionMode _previewSelectionMode
+    {
+        get => _state.PreviewSelectionMode;
+        set => _state.PreviewSelectionMode = value;
+    }
+
+    private HistorySectionMode _sectionMode
+    {
+        get => _state.SectionMode;
+        set => _state.SectionMode = value;
+    }
+
+    private bool _ghostSyncInProgress
+    {
+        get => _state.GhostSyncInProgress;
+        set => _state.GhostSyncInProgress = value;
+    }
+
+    private bool _replayActionInProgress
+    {
+        get => _state.ReplayActionInProgress;
+        set => _state.ReplayActionInProgress = value;
+    }
+
+    private bool _filteredGhostBattlesDirty
+    {
+        get => _state.FilteredGhostBattlesDirty;
+        set => _state.FilteredGhostBattlesDirty = value;
+    }
+
     private void Awake()
     {
         EnsureInitialized("Awake");
     }
 
-    internal void Configure(IHistoryPanelRuntime runtime)
+    internal void Configure(HistoryPanelDependencies dependencies)
     {
         EnsureInitialized("Configure");
-        _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
-
-        HistoryPanelRepository? repository = null;
-        if (!string.IsNullOrWhiteSpace(_runtime.RunLogDatabasePath))
-            repository = new HistoryPanelRepository(_runtime.RunLogDatabasePath);
-
-        _ghostSyncService = TryCreateGhostSyncService(repository);
-        _dataService = new HistoryPanelDataService(
-            repository,
-            _ghostSyncService,
-            TryGetCurrentPlayerAccountId
-        );
-        _replayService = new HistoryPanelReplayService(
-            _runtime.CombatReplayRuntimeAccessor,
-            () => _runtime.CombatReplayDirectoryPath,
-            _ghostSyncService
+        _dependencies = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
+        _runtime = dependencies.Runtime;
+        _dataService = dependencies.DataService;
+        _replayService = dependencies.ReplayService;
+        _coordinator = new HistoryPanelCoordinator(
+            _state,
+            dependencies,
+            RefreshUi,
+            RefreshSelectedBattlePreview,
+            SetHistoryVisible
         );
     }
 
     private void OnDisable()
     {
         IsVisible = false;
-        ClearDeleteRunConfirmation();
+        _coordinator?.OnPanelHidden();
         StopPreviewRender();
         _previewRenderer?.Hide();
         SetUiVisible(false);
@@ -126,16 +164,19 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (ReferenceEquals(Instance, this))
             Instance = null;
 
-        StopPreviewRender();
-        _previewRenderer?.Dispose();
-        _ghostSyncService?.Dispose();
-        _ghostSyncService = null;
+        _coordinator?.Dispose();
+        DisposePreviewRenderer();
+        _dependencies?.GhostSyncService?.Dispose();
+        _dependencies = null;
         DisposeUi();
     }
 
     private void Update()
     {
         DetectSceneChange();
+
+        if (IsVisible)
+            _coordinator?.Tick(Time.unscaledTime);
 
         var keyboard = Keyboard.current;
         if (keyboard == null)
@@ -161,12 +202,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         IsVisible = visible;
         if (visible)
-            RefreshSectionOnEntry();
+            _coordinator?.OnPanelShown();
         else
         {
-            ClearDeleteRunConfirmation();
-            StopPreviewRender();
-            _previewRenderer?.Dispose();
+            _coordinator?.OnPanelHidden();
+            DisposePreviewRenderer();
         }
 
         SetUiVisible(visible);
@@ -203,15 +243,23 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         OpenFromDockEntryInternal();
     }
 
-    private static string? TryGetCurrentPlayerAccountId()
+    private void OpenFromDockEntryInternal()
     {
+        EnsureInitialized("OpenFromDockEntry");
+
+        if (_runtime?.IsInGameRun == true)
+        {
+            BppLog.Warn("HistoryPanel", "Ignored dock open request while in game run.");
+            return;
+        }
+
         try
         {
-            return BppClientCacheBridge.TryGetProfileAccountId();
+            SetHistoryVisible(true);
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            BppLog.Error("HistoryPanel", "OpenFromDockEntry failed", ex);
         }
     }
 
@@ -225,6 +273,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             return;
         }
 
+        EnsurePreviewRenderer();
         if (_previewRenderer == null || _previewSurface == null || _previewStatusText == null)
             return;
 
@@ -250,6 +299,18 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _previewCoroutine = null;
     }
 
+    private void EnsurePreviewRenderer()
+    {
+        _previewRenderer ??= new HistoryPanelPreviewRenderer();
+    }
+
+    private void DisposePreviewRenderer()
+    {
+        StopPreviewRender();
+        _previewRenderer?.Dispose();
+        _previewRenderer = null;
+    }
+
     private void EnsureInitialized(string source)
     {
         if (_initialized)
@@ -258,7 +319,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _initialized = true;
         Instance = this;
         _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
-        _previewRenderer ??= new HistoryPanelPreviewRenderer();
         EnsureUi();
         SetUiVisible(false);
     }
@@ -273,49 +333,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (IsVisible && _runtime?.IsInGameRun == true)
             SetHistoryVisible(false);
 
-        StopPreviewRender();
-        _previewRenderer?.Dispose();
-    }
-
-    private void OpenFromDockEntryInternal()
-    {
-        EnsureInitialized("OpenFromDockEntry");
-
-        if (_runtime?.IsInGameRun == true)
-        {
-            BppLog.Warn("HistoryPanel", "Ignored dock open request while in game run.");
-            return;
-        }
-
-        try
-        {
-            SetHistoryVisible(true);
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("HistoryPanel", "OpenFromDockEntry failed", ex);
-        }
+        DisposePreviewRenderer();
     }
 
     private IReadOnlyList<HistoryBattleRecord> GetFilteredGhostBattles()
     {
-        if (!_filteredGhostBattlesDirty)
-            return _filteredGhostBattles;
-
-        _filteredGhostBattles.Clear();
-        foreach (var battle in _ghostBattles)
-        {
-            if (MatchesGhostFilter(battle))
-                _filteredGhostBattles.Add(battle);
-        }
-
-        _filteredGhostBattlesDirty = false;
-        return _filteredGhostBattles;
-    }
-
-    private void InvalidateFilteredGhostBattles()
-    {
-        _filteredGhostBattlesDirty = true;
+        return _coordinator?.GetFilteredGhostBattles() ?? _filteredGhostBattles;
     }
 
     private static string GetSceneToken(Scene scene)
@@ -334,6 +357,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         if (enabled)
         {
+            EnsurePreviewRenderer();
             _previewRenderer?.RenderLiveFrame(_previewSurface);
             return;
         }
@@ -444,55 +468,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             .ThenByDescending(battle => battle.Hour ?? int.MinValue)
             .ThenByDescending(battle => battle.RecordedAtUtc)
             .FirstOrDefault();
-    }
-
-    private bool MatchesGhostFilter(HistoryBattleRecord battle)
-    {
-        if (battle == null)
-            return false;
-
-        return _ghostBattleFilter switch
-        {
-            GhostBattleFilter.IWon => IsGhostOutcomeIWon(battle),
-            GhostBattleFilter.ILost => IsGhostOutcomeILost(battle),
-            _ => true,
-        };
-    }
-
-    private static bool IsGhostOutcomeIWon(HistoryBattleRecord battle)
-    {
-        var result = battle.Result?.Trim();
-        if (
-            string.Equals(result, "Loss", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(result, "Lost", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            return true;
-        }
-
-        return string.Equals(
-            battle.WinnerCombatantId,
-            "Opponent",
-            StringComparison.OrdinalIgnoreCase
-        );
-    }
-
-    private static bool IsGhostOutcomeILost(HistoryBattleRecord battle)
-    {
-        var result = battle.Result?.Trim();
-        if (
-            string.Equals(result, "Win", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(result, "Won", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            return true;
-        }
-
-        return string.Equals(
-            battle.WinnerCombatantId,
-            "Player",
-            StringComparison.OrdinalIgnoreCase
-        );
     }
 
     private readonly struct PreviewRequest

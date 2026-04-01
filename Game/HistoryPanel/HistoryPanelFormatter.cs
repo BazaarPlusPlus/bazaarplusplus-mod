@@ -42,7 +42,7 @@ internal static class HistoryPanelFormatter
         if (wins >= 4)
             return "BRONZE";
 
-        return "UNFORTUNE";
+        return "MISFORTUNE";
     }
 
     public static string FormatRunStatus(string? rawStatus)
