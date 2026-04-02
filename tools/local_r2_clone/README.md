@@ -42,12 +42,49 @@ tools/local_r2_clone/
 - 若要执行同步，需要已安装并配置好 `rclone`
 - `--remote` 需要使用 `rclone` 语法，例如 `remote-name:bucket`
 
+## 配置 rclone 访问 R2
+
+先在 Cloudflare R2 为目标 bucket 创建一组 S3 API 凭据，至少准备好：
+
+- `Access Key ID`
+- `Secret Access Key`
+- `S3 API endpoint`，格式通常为 `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
+
+然后执行：
+
+```bash
+rclone config
+```
+
+按下面的值创建一个 remote，这里示例名称用 `r2`：
+
+```text
+n
+name> r2
+Storage> s3
+provider> Cloudflare
+env_auth> false
+access_key_id> <YOUR_ACCESS_KEY_ID>
+secret_access_key> <YOUR_SECRET_ACCESS_KEY>
+region> auto
+endpoint> https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+y/n> n
+y/e/d> y
+```
+
+配置完成后，建议先验证 remote 是否可读：
+
+```bash
+rclone lsf r2:
+rclone lsf r2:bazaarplusplus-pvp-battles
+```
+
 ## 常用命令
 
 同步远端 R2 并增量更新本地投影：
 
 ```bash
-python -m tools.local_r2_clone.sync_local_r2_data --remote remote-name:bucket
+python -m tools.local_r2_clone.sync_local_r2_data --remote r2:bazaarplusplus-pvp-battles
 ```
 
 只基于现有本地镜像重建元数据：
@@ -61,7 +98,7 @@ python -m tools.local_r2_clone.rebuild_local_r2_metadata
 ```bash
 python -m tools.local_r2_clone.sync_local_r2_data \
   --base-dir tools/local_r2_clone \
-  --remote remote-name:bucket
+  --remote r2:bazaarplusplus-pvp-battles
 ```
 
 ## 产物说明
