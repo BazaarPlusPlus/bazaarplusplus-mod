@@ -448,7 +448,7 @@ export class MockD1Database {
     if (sql.includes("INSERT INTO battles")) {
       const battleId = String(params[0] ?? "");
       const existing = this.battles.get(battleId);
-      this.battles.set(battleId, {
+      const nextRow = {
         battle_id: battleId,
         run_id: params[1] == null ? null : String(params[1]),
         client_id: String(params[2] ?? ""),
@@ -477,7 +477,45 @@ export class MockD1Database {
         replay_size_bytes: Number(params[25] ?? 0),
         created_at_utc: existing?.created_at_utc ?? String(params[26] ?? ""),
         updated_at_utc: String(params[27] ?? ""),
-      });
+      } satisfies BattleRow;
+
+      if (!existing) {
+        this.battles.set(battleId, nextRow);
+        return { changes: 1 };
+      }
+
+      const hasMeaningfulChange =
+        existing.run_id !== nextRow.run_id ||
+        existing.client_id !== nextRow.client_id ||
+        existing.uploader_player_account_id !== nextRow.uploader_player_account_id ||
+        existing.recorded_at_utc !== nextRow.recorded_at_utc ||
+        existing.day !== nextRow.day ||
+        existing.hour !== nextRow.hour ||
+        existing.player_name !== nextRow.player_name ||
+        existing.player_account_id !== nextRow.player_account_id ||
+        existing.player_hero !== nextRow.player_hero ||
+        existing.player_rank !== nextRow.player_rank ||
+        existing.player_rating !== nextRow.player_rating ||
+        existing.player_level !== nextRow.player_level ||
+        existing.opponent_name !== nextRow.opponent_name ||
+        existing.opponent_account_id !== nextRow.opponent_account_id ||
+        existing.opponent_hero !== nextRow.opponent_hero ||
+        existing.opponent_rank !== nextRow.opponent_rank ||
+        existing.opponent_rating !== nextRow.opponent_rating ||
+        existing.opponent_level !== nextRow.opponent_level ||
+        existing.combat_kind !== nextRow.combat_kind ||
+        existing.result !== nextRow.result ||
+        existing.winner_combatant_id !== nextRow.winner_combatant_id ||
+        existing.loser_combatant_id !== nextRow.loser_combatant_id ||
+        existing.replay_schema_version !== nextRow.replay_schema_version ||
+        existing.replay_object_key !== nextRow.replay_object_key ||
+        existing.replay_size_bytes !== nextRow.replay_size_bytes;
+
+      if (!hasMeaningfulChange) {
+        return { changes: 0 };
+      }
+
+      this.battles.set(battleId, nextRow);
       return { changes: 1 };
     }
 

@@ -92,6 +92,32 @@ export async function upsertBattle(
         replay_object_key = excluded.replay_object_key,
         replay_size_bytes = excluded.replay_size_bytes,
         updated_at_utc = excluded.updated_at_utc
+      WHERE
+        battles.run_id IS NOT excluded.run_id OR
+        battles.client_id IS NOT excluded.client_id OR
+        battles.uploader_player_account_id IS NOT excluded.uploader_player_account_id OR
+        battles.recorded_at_utc IS NOT excluded.recorded_at_utc OR
+        battles.day IS NOT excluded.day OR
+        battles.hour IS NOT excluded.hour OR
+        battles.player_name IS NOT excluded.player_name OR
+        battles.player_account_id IS NOT excluded.player_account_id OR
+        battles.player_hero IS NOT excluded.player_hero OR
+        battles.player_rank IS NOT excluded.player_rank OR
+        battles.player_rating IS NOT excluded.player_rating OR
+        battles.player_level IS NOT excluded.player_level OR
+        battles.opponent_name IS NOT excluded.opponent_name OR
+        battles.opponent_account_id IS NOT excluded.opponent_account_id OR
+        battles.opponent_hero IS NOT excluded.opponent_hero OR
+        battles.opponent_rank IS NOT excluded.opponent_rank OR
+        battles.opponent_rating IS NOT excluded.opponent_rating OR
+        battles.opponent_level IS NOT excluded.opponent_level OR
+        battles.combat_kind IS NOT excluded.combat_kind OR
+        battles.result IS NOT excluded.result OR
+        battles.winner_combatant_id IS NOT excluded.winner_combatant_id OR
+        battles.loser_combatant_id IS NOT excluded.loser_combatant_id OR
+        battles.replay_schema_version IS NOT excluded.replay_schema_version OR
+        battles.replay_object_key IS NOT excluded.replay_object_key OR
+        battles.replay_size_bytes IS NOT excluded.replay_size_bytes
     `,
   )
     .bind(

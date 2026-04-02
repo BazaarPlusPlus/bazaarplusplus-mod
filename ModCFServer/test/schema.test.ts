@@ -13,6 +13,11 @@ function readMigrationSql(): string {
   return readFileSync(migrationPath, "utf8");
 }
 
+function readFollowupMigrationSql(filename: string): string {
+  const migrationPath = path.join(import.meta.dirname, "..", "migrations", filename);
+  return readFileSync(migrationPath, "utf8");
+}
+
 function getTableSection(sql: string, tableName: string): string {
   const section = sql.match(
     new RegExp(
@@ -66,4 +71,12 @@ test("migration defines replay token lifecycle columns", () => {
   assert.match(replayTokensSection, /\bexpires_at_utc\b/);
   assert.match(replayTokensSection, /\bused_at_utc\b/);
   assert.match(replayTokensSection, /\brevoked_at_utc\b/);
+});
+
+test("follow-up migration drops the unused battles indexes", () => {
+  const sql = readFollowupMigrationSql("0002_drop_unused_battles_indexes.sql");
+
+  assert.match(sql, /\bDROP INDEX IF EXISTS idx_battles_player_recorded\b/);
+  assert.match(sql, /\bDROP INDEX IF EXISTS idx_battles_run_recorded\b/);
+  assert.match(sql, /\bDROP INDEX IF EXISTS idx_battles_client_recorded\b/);
 });
