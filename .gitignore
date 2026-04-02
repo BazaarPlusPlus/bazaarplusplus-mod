@@ -31,3 +31,4 @@ Thumbs.db
 .dotnet
 .build-verify
 .sandbox-home
+tools/local_r2_clone/runtime/
