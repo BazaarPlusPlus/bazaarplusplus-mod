@@ -230,6 +230,166 @@ def query_replay_size_buckets(connection: sqlite3.Connection) -> list[tuple[str,
     return buckets
 
 
+def side_win_case(side: str) -> str:
+    if side == "player":
+        return "CASE WHEN result = 'win' THEN 1 ELSE 0 END"
+    if side == "opponent":
+        return "CASE WHEN result = 'loss' THEN 1 ELSE 0 END"
+    raise ValueError(f"Unsupported side: {side}")
+
+
+def query_top_cards(
+    connection: sqlite3.Connection,
+    *,
+    side: str,
+    limit: int = 12,
+) -> list[tuple[str, str, str, int, int, int, int, float]]:
+    win_case = side_win_case(side)
+    return [
+        (
+            row["card_name"],
+            row["enchant"],
+            row["tier"],
+            int(row["days_seen"]),
+            int(row["deduped_battles"]),
+            int(row["occurrences"]),
+            int(row["wins"]),
+            float(row["win_rate_pct"] or 0.0),
+        )
+        for row in fetch_all(
+            connection,
+            f"""
+            WITH card_battles AS (
+              SELECT
+                side,
+                battle_day,
+                card_name,
+                enchant,
+                tier,
+                battle_card_key,
+                MAX(CASE WHEN result IN ('win', 'loss') THEN 1 ELSE 0 END) AS has_decision,
+                MAX({win_case}) AS win_flag,
+                COUNT(*) AS occurrences_in_battle
+              FROM battle_replay_cards
+              WHERE side = ?
+              GROUP BY side, battle_day, card_name, enchant, tier, battle_card_key
+            )
+            SELECT
+              card_name,
+              enchant,
+              tier,
+              COUNT(DISTINCT battle_day) AS days_seen,
+              COUNT(*) AS deduped_battles,
+              SUM(occurrences_in_battle) AS occurrences,
+              SUM(CASE WHEN has_decision = 1 THEN win_flag ELSE 0 END) AS wins,
+              COALESCE(
+                ROUND(
+                  100.0 * SUM(CASE WHEN has_decision = 1 THEN win_flag ELSE 0 END)
+                  / NULLIF(SUM(CASE WHEN has_decision = 1 THEN 1 ELSE 0 END), 0),
+                  2
+                ),
+                0
+              ) AS win_rate_pct
+            FROM card_battles
+            GROUP BY card_name, enchant, tier
+            ORDER BY deduped_battles DESC, win_rate_pct DESC, card_name ASC, enchant ASC, tier ASC
+            LIMIT ?
+            """,
+            (side, limit),
+        )
+    ]
+
+
+def query_card_win_rates_by_day(
+    connection: sqlite3.Connection,
+    *,
+    side: str,
+    limit_per_day: int = 8,
+) -> list[tuple[int, str, str, str, int, int, int, float]]:
+    win_case = side_win_case(side)
+    return [
+        (
+            int(row["battle_day"]),
+            row["card_name"],
+            row["enchant"],
+            row["tier"],
+            int(row["deduped_battles"]),
+            int(row["occurrences"]),
+            int(row["wins"]),
+            float(row["win_rate_pct"] or 0.0),
+        )
+        for row in fetch_all(
+            connection,
+            f"""
+            WITH card_battles AS (
+              SELECT
+                battle_day,
+                card_name,
+                enchant,
+                tier,
+                battle_card_key,
+                MAX(CASE WHEN result IN ('win', 'loss') THEN 1 ELSE 0 END) AS has_decision,
+                MAX({win_case}) AS win_flag,
+                COUNT(*) AS occurrences_in_battle
+              FROM battle_replay_cards
+              WHERE side = ?
+                AND battle_day IS NOT NULL
+              GROUP BY battle_day, card_name, enchant, tier, battle_card_key
+            ),
+            aggregated AS (
+              SELECT
+                battle_day,
+                card_name,
+                enchant,
+                tier,
+                COUNT(*) AS deduped_battles,
+                SUM(occurrences_in_battle) AS occurrences,
+                SUM(CASE WHEN has_decision = 1 THEN win_flag ELSE 0 END) AS wins,
+                COALESCE(
+                  ROUND(
+                    100.0 * SUM(CASE WHEN has_decision = 1 THEN win_flag ELSE 0 END)
+                    / NULLIF(SUM(CASE WHEN has_decision = 1 THEN 1 ELSE 0 END), 0),
+                    2
+                  ),
+                  0
+                ) AS win_rate_pct
+              FROM card_battles
+              GROUP BY battle_day, card_name, enchant, tier
+            ),
+            ranked AS (
+              SELECT
+                battle_day,
+                card_name,
+                enchant,
+                tier,
+                deduped_battles,
+                occurrences,
+                wins,
+                win_rate_pct,
+                ROW_NUMBER() OVER (
+                  PARTITION BY battle_day
+                  ORDER BY deduped_battles DESC, win_rate_pct DESC, card_name ASC, enchant ASC, tier ASC
+                ) AS row_num
+              FROM aggregated
+            )
+            SELECT
+              battle_day,
+              card_name,
+              enchant,
+              tier,
+              deduped_battles,
+              occurrences,
+              wins,
+              win_rate_pct
+            FROM ranked
+            WHERE row_num <= ?
+            ORDER BY battle_day ASC, deduped_battles DESC, win_rate_pct DESC, card_name ASC, enchant ASC, tier ASC
+            """,
+            (side, limit_per_day),
+        )
+    ]
+
+
 def human_bytes(value: int) -> str:
     if value < 1024:
         return f"{value} B"
@@ -397,6 +557,10 @@ def build_report_html(connection: sqlite3.Connection) -> str:
     hero_matchup_win_rates = query_hero_matchup_win_rates(connection)
     rank_matchup_win_rates = query_rank_matchup_win_rates(connection)
     replay_buckets = query_replay_size_buckets(connection)
+    top_player_cards = query_top_cards(connection, side="player")
+    top_opponent_cards = query_top_cards(connection, side="opponent")
+    player_cards_by_day = query_card_win_rates_by_day(connection, side="player")
+    opponent_cards_by_day = query_card_win_rates_by_day(connection, side="opponent")
 
     sections = [
         render_kpis(kpis),
@@ -439,6 +603,38 @@ def build_report_html(connection: sqlite3.Connection) -> str:
             "Rank Win Rate Details",
             ("Rank", "Battles", "Win Rate %"),
             ((rank, count, f"{rate:.2f}") for rank, count, rate in rank_win_rates),
+        ),
+        render_table(
+            "Top Player Cards",
+            ("Card", "Enchant", "Tier", "Days Seen", "Battles", "Occurrences", "Wins", "Win Rate %"),
+            (
+                (name, enchant, tier, days_seen, battles, occurrences, wins, f"{rate:.2f}")
+                for name, enchant, tier, days_seen, battles, occurrences, wins, rate in top_player_cards
+            ),
+        ),
+        render_table(
+            "Top Opponent Cards",
+            ("Card", "Enchant", "Tier", "Days Seen", "Battles", "Occurrences", "Wins", "Win Rate %"),
+            (
+                (name, enchant, tier, days_seen, battles, occurrences, wins, f"{rate:.2f}")
+                for name, enchant, tier, days_seen, battles, occurrences, wins, rate in top_opponent_cards
+            ),
+        ),
+        render_table(
+            "Player Card Win Rates By Day",
+            ("Day", "Card", "Enchant", "Tier", "Battles", "Occurrences", "Wins", "Win Rate %"),
+            (
+                (day, name, enchant, tier, battles, occurrences, wins, f"{rate:.2f}")
+                for day, name, enchant, tier, battles, occurrences, wins, rate in player_cards_by_day
+            ),
+        ),
+        render_table(
+            "Opponent Card Win Rates By Day",
+            ("Day", "Card", "Enchant", "Tier", "Battles", "Occurrences", "Wins", "Win Rate %"),
+            (
+                (day, name, enchant, tier, battles, occurrences, wins, f"{rate:.2f}")
+                for day, name, enchant, tier, battles, occurrences, wins, rate in opponent_cards_by_day
+            ),
         ),
         render_table(
             "Top Hero Matchups",
