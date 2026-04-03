@@ -242,6 +242,80 @@ class RenderBattlesReportTests(unittest.TestCase):
                 },
             },
         )
+        write_json(
+            self.paths.mirror_dir / "battle-replays/client-3/battle-4/hash-d.json",
+            {
+                "battle_id": "battle-4",
+                "run_id": "run-3",
+                "schema_version": 3,
+                "battle_manifest": {
+                    "battle_id": "battle-4",
+                    "run_id": "run-3",
+                    "recorded_at_utc": "2026-04-02T09:15:00.000Z",
+                    "day": 7,
+                    "hour": 9,
+                    "combat_kind": "PVPCombat",
+                    "participants": {
+                        "player_name": "Echo",
+                        "player_account_id": "player-e",
+                        "player_hero": "Vanessa",
+                        "player_rank": "Silver",
+                        "player_rating": 1125,
+                        "player_level": 6,
+                        "opponent_name": "Foxtrot",
+                        "opponent_account_id": "player-f",
+                        "opponent_hero": "Dooley",
+                        "opponent_rank": "Silver",
+                        "opponent_rating": 1105,
+                        "opponent_level": 6,
+                    },
+                    "outcome": {
+                        "result": "loss",
+                        "winner_combatant_id": "Opponent",
+                        "loser_combatant_id": "Player",
+                    },
+                    "snapshots": {
+                        "player_hand": {
+                            "items": [
+                                {
+                                    "name": "Fiery Cutlass",
+                                    "enchant": "Burning",
+                                    "tier": "Silver",
+                                },
+                                {"name": "Storm Lantern", "tier": "Gold"},
+                            ]
+                        },
+                        "player_skills": {
+                            "items": [
+                                {"name": "Quick Thinking", "tier": "Gold"},
+                            ]
+                        },
+                        "opponent_hand": {
+                            "items": [
+                                {
+                                    "name": "Shield Wall",
+                                    "enchant": "Heavy",
+                                    "tier": "Bronze",
+                                },
+                                {"name": "Steam Lance", "tier": "Bronze"},
+                            ]
+                        },
+                        "opponent_skills": {
+                            "items": [
+                                {"name": "Emergency Repairs", "tier": "Silver"},
+                            ]
+                        },
+                    },
+                },
+                "replay_payload": {
+                    "battle_id": "battle-4",
+                    "version": 7,
+                    "spawn_message_base64": "aaaa",
+                    "combat_message_base64": "bbbb",
+                    "despawn_message_base64": "cccc",
+                },
+            },
+        )
 
         rebuild_metadata(self.paths)
 
@@ -310,6 +384,33 @@ class RenderBattlesReportTests(unittest.TestCase):
         self.assertIn("Fiery Cutlass", html)
         self.assertIn("Shield Wall", html)
         self.assertIn(">4<", html)
+        self.assertIn("50.00", html)
+
+    def test_render_battles_report_includes_global_top_card_trend_sections(self) -> None:
+        self.seed_projection()
+
+        report_path = render_battles_report(self.paths)
+        html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("Top Player Cards Across Days", html)
+        self.assertIn("Top Opponent Cards Across Days", html)
+        self.assertIn("Fiery Cutlass | Burning | Silver", html)
+        self.assertIn("Shield Wall | Heavy | Bronze", html)
+        self.assertIn("Day 4", html)
+        self.assertIn("Day 7", html)
+
+    def test_render_battles_report_includes_day_card_heatmaps_and_day_leaders(self) -> None:
+        self.seed_projection()
+
+        report_path = render_battles_report(self.paths)
+        html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("Player Day-Card Heatmap", html)
+        self.assertIn("Opponent Day-Card Heatmap", html)
+        self.assertIn("Player Day Leaders", html)
+        self.assertIn("Opponent Day Leaders", html)
+        self.assertIn("Storm Lantern", html)
+        self.assertIn("Steam Lance", html)
         self.assertIn("50.00", html)
 
 
