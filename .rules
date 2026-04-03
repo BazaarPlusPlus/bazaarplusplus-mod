@@ -2,15 +2,14 @@
 
 - Choose verification proportional to the change:
   - Docs-only changes do not require `BuildAll`
-  - Targeted code changes should run the smallest relevant test project or build first, not the whole repo by default
   - Run the full `BuildAll` target when touching build logic, packaging, or before release-oriented validation
+  - Targeted code changes should run the smallest relevant test project or build first, not the whole repo by default
   - If there is no meaningful automated test seam for a change, it is acceptable to ship without adding a new test
   - Do not add tests whose primary purpose is demonstrating coverage or asserting mock call sequences — these are considered invalid tests
   - Do not add source-text tests that only assert exact code snippets or lines exist in a file; those are not meaningful verification
 - The main mod project and most test projects resolve game assemblies through `ManagedPath`; if auto-detection does not match the local install, pass `ManagedPath` explicitly instead of changing project references or treating the failure as a code regression
-- Write paths as relative paths from the project root
-- On Windows, require PowerShell 7.6.0 or later before proceeding; check `PSVersionTable.PSVersion.ToString()` to confirm the installed version
 - Do not edit files under `decompiled/`; treat them as read-only reference code for understanding game behavior and APIs
+- On Windows, require PowerShell 7.6.0 or later before proceeding; check `PSVersionTable.PSVersion.ToString()` to confirm the installed version
 - Preserve the build-and-copy behavior in `BazaarPlusPlus.csproj`; do not change the Debug `BepInEx/plugins` copy flow or the Release installer copy flow unless the task is explicitly about packaging
 - Keep agent-authored docs minimal; do not add or rewrite README-style files unless the task explicitly requires user-facing documentation
 
