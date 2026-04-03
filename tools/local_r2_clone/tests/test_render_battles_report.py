@@ -57,7 +57,40 @@ class RenderBattlesReportTests(unittest.TestCase):
                         "winner_combatant_id": "Player",
                         "loser_combatant_id": "Opponent",
                     },
-                    "snapshots": {"start": {}, "end": {}},
+                    "snapshots": {
+                        "player_hand": {
+                            "items": [
+                                {
+                                    "name": "Fiery Cutlass",
+                                    "enchant": "Burning",
+                                    "tier": "Silver",
+                                },
+                                {
+                                    "name": "Fiery Cutlass",
+                                    "tier": "Silver",
+                                },
+                            ]
+                        },
+                        "player_skills": {
+                            "items": [
+                                {"name": "Quick Thinking", "tier": "Gold"},
+                            ]
+                        },
+                        "opponent_hand": {
+                            "items": [
+                                {
+                                    "name": "Shield Wall",
+                                    "enchant": "Heavy",
+                                    "tier": "Bronze",
+                                }
+                            ]
+                        },
+                        "opponent_skills": {
+                            "items": [
+                                {"name": "Emergency Repairs", "tier": "Silver"},
+                            ]
+                        },
+                    },
                 },
                 "replay_payload": {
                     "battle_id": "battle-1",
@@ -100,7 +133,41 @@ class RenderBattlesReportTests(unittest.TestCase):
                         "winner_combatant_id": "Opponent",
                         "loser_combatant_id": "Player",
                     },
-                    "snapshots": {"start": {}, "end": {}},
+                    "snapshots": {
+                        "player_hand": {
+                            "items": [
+                                {
+                                    "name": "Fiery Cutlass",
+                                    "enchant": "Burning",
+                                    "tier": "Silver",
+                                }
+                            ]
+                        },
+                        "player_skills": {
+                            "items": [
+                                {"name": "Quick Thinking", "tier": "Gold"},
+                            ]
+                        },
+                        "opponent_hand": {
+                            "items": [
+                                {
+                                    "name": "Shield Wall",
+                                    "enchant": "Heavy",
+                                    "tier": "Bronze",
+                                },
+                                {
+                                    "name": "Shield Wall",
+                                    "enchant": "Heavy",
+                                    "tier": "Bronze",
+                                },
+                            ]
+                        },
+                        "opponent_skills": {
+                            "items": [
+                                {"name": "Emergency Repairs", "tier": "Silver"},
+                            ]
+                        },
+                    },
                 },
                 "replay_payload": {
                     "battle_id": "battle-2",
@@ -143,7 +210,28 @@ class RenderBattlesReportTests(unittest.TestCase):
                         "winner_combatant_id": "Player",
                         "loser_combatant_id": "Opponent",
                     },
-                    "snapshots": {"start": {}, "end": {}},
+                    "snapshots": {
+                        "player_hand": {
+                            "items": [
+                                {"name": "Chrono Shield", "tier": "Gold"},
+                            ]
+                        },
+                        "player_skills": {
+                            "items": [
+                                {"name": "Time Dilation", "tier": "Silver"},
+                            ]
+                        },
+                        "opponent_hand": {
+                            "items": [
+                                {"name": "Steam Lance", "tier": "Bronze"},
+                            ]
+                        },
+                        "opponent_skills": {
+                            "items": [
+                                {"name": "Backup Battery", "tier": "Silver"},
+                            ]
+                        },
+                    },
                 },
                 "replay_payload": {
                     "battle_id": "battle-3",
@@ -174,9 +262,17 @@ class RenderBattlesReportTests(unittest.TestCase):
         self.assertIn("Top Hero Matchups", html)
         self.assertIn("Hero Matchup Win Rates", html)
         self.assertIn("Replay Size Distribution", html)
+        self.assertIn("Top Player Cards", html)
+        self.assertIn("Top Opponent Cards", html)
+        self.assertIn("Player Card Win Rates By Day", html)
+        self.assertIn("Opponent Card Win Rates By Day", html)
         self.assertIn("2026-04-01", html)
         self.assertIn("Vanessa", html)
         self.assertIn("Dooley", html)
+        self.assertIn("Fiery Cutlass", html)
+        self.assertIn("Shield Wall", html)
+        self.assertIn("Burning", html)
+        self.assertIn("Silver", html)
 
     def test_render_battles_report_includes_summary_kpis(self) -> None:
         self.seed_projection()
@@ -202,6 +298,19 @@ class RenderBattlesReportTests(unittest.TestCase):
         self.assertIn("50.00", html)
         self.assertIn("Hero Matchup Win Rates", html)
         self.assertIn("Vanessa vs Dooley", html)
+
+    def test_render_battles_report_includes_day_based_card_analytics(self) -> None:
+        self.seed_projection()
+
+        report_path = render_battles_report(self.paths)
+        html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("Player Card Win Rates By Day", html)
+        self.assertIn("Opponent Card Win Rates By Day", html)
+        self.assertIn("Fiery Cutlass", html)
+        self.assertIn("Shield Wall", html)
+        self.assertIn(">4<", html)
+        self.assertIn("50.00", html)
 
 
 if __name__ == "__main__":
