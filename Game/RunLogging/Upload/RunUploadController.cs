@@ -28,7 +28,7 @@ internal sealed class RunUploadController : MonoBehaviour
     {
         try
         {
-            if (BppRuntimeHost.Config.EnableRunUploadConfig?.Value != true)
+            if (BppRuntimeHost.Config.EnableCommunityContributionConfig?.Value != true)
                 return;
 
             var databasePath = BppRuntimeHost.Paths.RunLogDatabasePath;

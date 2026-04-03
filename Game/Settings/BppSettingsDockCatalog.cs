@@ -5,6 +5,7 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.RunLogging.Upload;
 using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
@@ -18,10 +19,21 @@ internal static class BppSettingsDockCatalog
         new(
             "GameHistory",
             HistoryPanelLabel.Resolve,
-            _ => HistoryPanelFeature.IsVisible ? "OPEN" : "VIEW",
-            () => HistoryPanelFeature.IsVisible,
+            _ =>
+                ReadCommunityContributionEnabled()
+                    ? (HistoryPanelFeature.IsVisible ? "OPEN" : "VIEW")
+                    : "OFF",
+            () => ReadCommunityContributionEnabled() && HistoryPanelFeature.IsVisible,
             HistoryPanelFeature.OpenFromDockEntry,
             collapseAfterActivate: true
+        ),
+        new(
+            "CommunityContribution",
+            RunUploadSettingsMenuLabel.Resolve,
+            new SettingsMenuToggleBridge(
+                ReadCommunityContributionEnabled,
+                WriteCommunityContributionEnabled
+            )
         ),
         new(
             "NameOverride",
@@ -59,6 +71,18 @@ internal static class BppSettingsDockCatalog
     private static bool ReadNameOverrideEnabled()
     {
         return BppRuntimeHost.Config.EnableNameOverrideConfig?.Value ?? false;
+    }
+
+    private static bool ReadCommunityContributionEnabled()
+    {
+        return BppRuntimeHost.Config.EnableCommunityContributionConfig?.Value ?? true;
+    }
+
+    private static void WriteCommunityContributionEnabled(bool enabled)
+    {
+        var config = BppRuntimeHost.Config.EnableCommunityContributionConfig;
+        if (config != null)
+            config.Value = enabled;
     }
 
     private static void WriteNameOverrideEnabled(bool enabled)

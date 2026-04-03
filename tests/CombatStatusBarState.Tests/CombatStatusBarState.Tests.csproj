@@ -62,6 +62,14 @@
       Include="..\..\Game\NameOverride\NameOverride.SettingsMenuLabel.cs"
       Link="NameOverride.SettingsMenuLabel.cs"
     />
+    <Compile
+      Include="..\..\Game\HistoryPanel\HistoryPanelAccessPolicy.cs"
+      Link="HistoryPanelAccessPolicy.cs"
+    />
+    <Compile
+      Include="..\..\Game\RunLogging\Upload\RunUpload.SettingsMenuLabel.cs"
+      Link="RunUpload.SettingsMenuLabel.cs"
+    />
     <Compile Include="..\..\Core\Events\IBppEventBus.cs" Link="IBppEventBus.cs" />
     <Compile Include="..\..\Core\Events\InMemoryBppEventBus.cs" Link="InMemoryBppEventBus.cs" />
   </ItemGroup>

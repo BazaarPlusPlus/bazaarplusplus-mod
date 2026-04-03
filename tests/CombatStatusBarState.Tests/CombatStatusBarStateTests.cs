@@ -1,6 +1,8 @@
 using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Settings;
 using System.Reflection;
 using Xunit;
@@ -243,6 +245,36 @@ public sealed class CombatStatusBarStateTests : IDisposable
     )
     {
         var result = EnchantPreviewSettingsMenuLabel.Resolve(languageCode);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("zh-Hans", "参与社区数据共建")]
+    [InlineData("zh-CN", "参与社区数据共建")]
+    [InlineData("en", "Contribute Community Data")]
+    [InlineData("", "Contribute Community Data")]
+    public void RunUploadSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
+        string languageCode,
+        string expected
+    )
+    {
+        var result = RunUploadSettingsMenuLabel.Resolve(languageCode);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, false)]
+    public void HistoryPanelAccessPolicy_RequiresCommunityContributionAndLobbyState(
+        bool isInGameRun,
+        bool communityContributionEnabled,
+        bool expected
+    )
+    {
+        var result = HistoryPanelAccessPolicy.CanOpen(isInGameRun, communityContributionEnabled);
 
         Assert.Equal(expected, result);
     }

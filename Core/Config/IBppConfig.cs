@@ -17,5 +17,5 @@ internal interface IBppConfig
 
     ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; }
 
-    ConfigEntry<bool>? EnableRunUploadConfig { get; }
+    ConfigEntry<bool>? EnableCommunityContributionConfig { get; }
 }

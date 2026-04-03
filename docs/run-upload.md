@@ -6,7 +6,7 @@
 
 - 本地 SQLite 仍然是 source of truth。
 - 默认开启。
-- 仅当 `RunUpload.Enabled = true` 时启用。
+- 仅当 `CommunityContribution.Enabled = true` 时启用。
 - 仅在玩家不处于 live run 时执行。
 - 当前代码只实现单路由注册与上传，没有文档化的多区域自动路由逻辑。
 
@@ -29,7 +29,7 @@
 `BazaarPlusPlus.cfg`
 
 ```ini
-[RunUpload]
+[CommunityContribution]
 Enabled = true
 ```
 

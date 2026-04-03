@@ -217,6 +217,9 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         EnsureInitialized("ToggleFromHotkey");
 
+        if (!CanOpenHistoryReview())
+            return;
+
         try
         {
             SetHistoryVisible(!IsVisible);
@@ -247,9 +250,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         EnsureInitialized("OpenFromDockEntry");
 
-        if (_runtime?.IsInGameRun == true)
+        if (!CanOpenHistoryReview())
         {
-            BppLog.Warn("HistoryPanel", "Ignored dock open request while in game run.");
+            BppLog.Warn(
+                "HistoryPanel",
+                "Ignored History Review open request because community contribution is disabled or a live run is active."
+            );
             return;
         }
 
@@ -261,6 +267,15 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         {
             BppLog.Error("HistoryPanel", "OpenFromDockEntry failed", ex);
         }
+    }
+
+    private bool CanOpenHistoryReview()
+    {
+        return HistoryPanelAccessPolicy.CanOpen(
+            _runtime?.IsInGameRun == true,
+            BazaarPlusPlus.Core.Runtime.BppRuntimeHost.Config.EnableCommunityContributionConfig
+                ?.Value ?? true
+        );
     }
 
     private void RefreshSelectedBattlePreview()

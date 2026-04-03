@@ -106,7 +106,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **账号绑定**：`POST /clients/bind`（用于「对战过我」等查询身份）
 - **Ghost 战斗**：`GET /me/pvp-battles/against-me` 等；按需签发短期 replay 下载链接
 
-模组侧：**默认开启** run 上传（`[RunUpload] Enabled`），仅在**非 live run** 时执行上传扫描；replay 上传由 `BattleUploadController` 等协调。信任模型与安全限制见 `docs/run-upload.md` 与 `ModCFServer/README.md`。
+模组侧：**默认开启**社区数据共建（`[CommunityContribution] Enabled`），仅在**非 live run** 时执行上传扫描；replay 上传由 `BattleUploadController` 等协调。信任模型与安全限制见 `docs/run-upload.md` 与 `ModCFServer/README.md`。
 
 ## 配置摘要（BazaarPlusPlus.cfg）
 

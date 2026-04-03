@@ -36,7 +36,10 @@ internal static class HistoryPanelFactory
         HistoryPanelRepository? repository
     )
     {
-        if (repository == null || BppRuntimeHost.Config.EnableRunUploadConfig?.Value != true)
+        if (
+            repository == null
+            || BppRuntimeHost.Config.EnableCommunityContributionConfig?.Value != true
+        )
             return null;
 
         var identityPath = BppRuntimeHost.Paths.RunUploadInstallIdentityPath;

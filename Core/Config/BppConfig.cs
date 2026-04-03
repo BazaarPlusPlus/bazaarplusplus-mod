@@ -17,7 +17,7 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; private set; }
 
-    public ConfigEntry<bool>? EnableRunUploadConfig { get; private set; }
+    public ConfigEntry<bool>? EnableCommunityContributionConfig { get; private set; }
 
     public void Initialize(ConfigFile config)
     {
@@ -57,11 +57,11 @@ internal sealed class BppConfig : IBppConfig
             "<Keyboard>/shift",
             "Binding path for upgrade preview tooltip mode."
         );
-        EnableRunUploadConfig = config.Bind(
-            "RunUpload",
+        EnableCommunityContributionConfig = config.Bind(
+            "CommunityContribution",
             "Enabled",
             true,
-            "Whether completed run logs should be uploaded in the background while not in a live run."
+            "Whether to participate in BazaarPlusPlus community data contribution features, including background uploads and History Review access while out of a live run."
         );
     }
 }
