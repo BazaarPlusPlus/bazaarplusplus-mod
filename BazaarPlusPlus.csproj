@@ -4,7 +4,7 @@
     <AssemblyName>BazaarPlusPlus</AssemblyName>
     <Description>BazaarPlusPlus - Game Enhancement Mod</Description>
     <RootNamespace>BazaarPlusPlus</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <LangVersion>12</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TargetFramework>netstandard2.1</TargetFramework>
@@ -201,7 +201,7 @@
     <Message Text="[BazaarPlusPlus] Building for Release" Importance="high" />
     <WriteLinesToFile
       File="$(TargetDir)$(TargetName).version"
-      Lines="$(Version).preview"
+      Lines="$(Version).prod"
       Overwrite="true"
     />
     <ItemGroup>
