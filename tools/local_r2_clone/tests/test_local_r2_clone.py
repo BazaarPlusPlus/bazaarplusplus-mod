@@ -55,6 +55,7 @@ class LocalR2CloneTests(unittest.TestCase):
                       'sync_run_errors',
                       'r2_objects',
                       'battle_replays',
+                      'battle_replay_cards',
                       'run_summaries',
                       'run_summaries_latest'
                     )
@@ -66,6 +67,7 @@ class LocalR2CloneTests(unittest.TestCase):
         self.assertEqual(objects["sync_run_errors"], "table")
         self.assertEqual(objects["r2_objects"], "table")
         self.assertEqual(objects["battle_replays"], "table")
+        self.assertEqual(objects["battle_replay_cards"], "table")
         self.assertEqual(objects["run_summaries"], "table")
         self.assertEqual(objects["run_summaries_latest"], "view")
 
@@ -171,6 +173,254 @@ class LocalR2CloneTests(unittest.TestCase):
         self.assertEqual(latest_row["final_day"], 5)
         self.assertEqual(latest_row["mmr"], 1200)
 
+    def test_rebuild_projects_battle_card_rows_and_normalizes_card_identity(self) -> None:
+        object_key = "battle-replays/client-1/battle-1/hash-a.json"
+        write_json(
+            self.paths.mirror_dir / object_key,
+            {
+                "battle_id": "battle-1",
+                "run_id": "run-1",
+                "schema_version": 3,
+                "battle_manifest": {
+                    "battle_id": "battle-1",
+                    "run_id": "run-1",
+                    "recorded_at_utc": "2026-04-01T01:00:00.000Z",
+                    "day": 4,
+                    "hour": 1,
+                    "combat_kind": "PVPCombat",
+                    "participants": {
+                        "player_name": "Alpha",
+                        "player_account_id": "player-a",
+                        "opponent_name": "Beta",
+                        "opponent_account_id": "player-b",
+                    },
+                    "outcome": {
+                        "result": "win",
+                        "winner_combatant_id": "Player",
+                        "loser_combatant_id": "Opponent",
+                    },
+                    "snapshots": {
+                        "player_hand": {
+                            "items": [
+                                {
+                                    "name": "Fiery Cutlass",
+                                    "enchant": "Burning",
+                                    "tier": "Silver",
+                                },
+                                {
+                                    "name": "Fiery Cutlass",
+                                    "tier": "Silver",
+                                },
+                                {
+                                    "name": "Spare Dagger",
+                                },
+                            ]
+                        },
+                        "player_skills": {
+                            "items": [
+                                {
+                                    "name": "Quick Thinking",
+                                    "enchant": "",
+                                    "tier": "Gold",
+                                }
+                            ]
+                        },
+                        "opponent_hand": {
+                            "items": [
+                                {
+                                    "name": "Shield Wall",
+                                    "enchant": "Heavy",
+                                    "tier": "Bronze",
+                                }
+                            ]
+                        },
+                        "opponent_skills": {
+                            "items": [
+                                {
+                                    "tier": "Silver",
+                                }
+                            ]
+                        },
+                    },
+                },
+                "replay_payload": {
+                    "battle_id": "battle-1",
+                    "version": 7,
+                    "spawn_message_base64": "a",
+                    "combat_message_base64": "b",
+                    "despawn_message_base64": "c",
+                },
+            },
+        )
+
+        rebuild_metadata(self.paths)
+
+        with self.open_db() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                  side,
+                  card_group,
+                  card_name,
+                  enchant,
+                  tier,
+                  slot_index,
+                  battle_card_key,
+                  result,
+                  battle_day
+                FROM battle_replay_cards
+                WHERE object_key = ?
+                ORDER BY side, card_group, slot_index
+                """,
+                (object_key,),
+            ).fetchall()
+
+        self.assertEqual(len(rows), 5)
+
+        row_by_identity = {
+            (row["side"], row["card_group"], row["card_name"], row["slot_index"]): row for row in rows
+        }
+        first_cutlass = row_by_identity[("player", "hand", "Fiery Cutlass", 0)]
+        second_cutlass = row_by_identity[("player", "hand", "Fiery Cutlass", 1)]
+        spare_dagger = row_by_identity[("player", "hand", "Spare Dagger", 2)]
+        quick_thinking = row_by_identity[("player", "skills", "Quick Thinking", 0)]
+        shield_wall = row_by_identity[("opponent", "hand", "Shield Wall", 0)]
+
+        self.assertEqual(first_cutlass["enchant"], "Burning")
+        self.assertEqual(first_cutlass["tier"], "Silver")
+        self.assertEqual(second_cutlass["enchant"], "None")
+        self.assertEqual(second_cutlass["tier"], "Silver")
+        self.assertEqual(second_cutlass["battle_card_key"], "battle-1|player|Fiery Cutlass|None|Silver")
+        self.assertEqual(spare_dagger["enchant"], "None")
+        self.assertEqual(spare_dagger["tier"], "Unknown")
+        self.assertEqual(quick_thinking["enchant"], "None")
+        self.assertEqual(quick_thinking["tier"], "Gold")
+        self.assertEqual(shield_wall["enchant"], "Heavy")
+        self.assertEqual(shield_wall["tier"], "Bronze")
+
+        player_rows = [row for row in rows if row["side"] == "player"]
+        self.assertTrue(all(row["battle_day"] == 4 for row in rows))
+        self.assertTrue(all(row["result"] == "win" for row in rows))
+        self.assertEqual(len(player_rows), 4)
+        self.assertFalse(any(row["card_group"] == "skills" and row["side"] == "opponent" for row in rows))
+
+    def test_rebuild_replaces_existing_battle_card_rows_for_same_object_key(self) -> None:
+        object_path = self.paths.mirror_dir / "battle-replays/client-1/battle-1/hash-a.json"
+
+        write_json(
+            object_path,
+            {
+                "battle_id": "battle-1",
+                "run_id": "run-1",
+                "schema_version": 3,
+                "battle_manifest": {
+                    "battle_id": "battle-1",
+                    "run_id": "run-1",
+                    "recorded_at_utc": "2026-04-01T01:00:00.000Z",
+                    "day": 4,
+                    "hour": 1,
+                    "combat_kind": "PVPCombat",
+                    "participants": {
+                        "player_name": "Alpha",
+                        "player_account_id": "player-a",
+                        "opponent_name": "Beta",
+                        "opponent_account_id": "player-b",
+                    },
+                    "outcome": {
+                        "result": "win",
+                        "winner_combatant_id": "Player",
+                        "loser_combatant_id": "Opponent",
+                    },
+                    "snapshots": {
+                        "player_hand": {
+                            "items": [
+                                {"name": "Old Blade", "tier": "Silver"},
+                                {"name": "Old Shield", "tier": "Bronze"},
+                            ]
+                        }
+                    },
+                },
+                "replay_payload": {
+                    "battle_id": "battle-1",
+                    "version": 7,
+                    "spawn_message_base64": "a",
+                    "combat_message_base64": "b",
+                    "despawn_message_base64": "c",
+                },
+            },
+        )
+
+        rebuild_metadata(self.paths)
+
+        write_json(
+            object_path,
+            {
+                "battle_id": "battle-1",
+                "run_id": "run-1",
+                "schema_version": 3,
+                "battle_manifest": {
+                    "battle_id": "battle-1",
+                    "run_id": "run-1",
+                    "recorded_at_utc": "2026-04-01T01:00:00.000Z",
+                    "day": 4,
+                    "hour": 1,
+                    "combat_kind": "PVPCombat",
+                    "participants": {
+                        "player_name": "Alpha",
+                        "player_account_id": "player-a",
+                        "opponent_name": "Beta",
+                        "opponent_account_id": "player-b",
+                    },
+                    "outcome": {
+                        "result": "win",
+                        "winner_combatant_id": "Player",
+                        "loser_combatant_id": "Opponent",
+                    },
+                    "snapshots": {
+                        "player_hand": {
+                            "items": [
+                                {"name": "New Blade", "tier": "Gold"},
+                            ]
+                        }
+                    },
+                },
+                "replay_payload": {
+                    "battle_id": "battle-1",
+                    "version": 7,
+                    "spawn_message_base64": "aa",
+                    "combat_message_base64": "bb",
+                    "despawn_message_base64": "cc",
+                },
+            },
+        )
+
+        rebuild_metadata(self.paths)
+
+        with self.open_db() as connection:
+            row_count = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM battle_replay_cards
+                WHERE object_key = ?
+                """,
+                ("battle-replays/client-1/battle-1/hash-a.json",),
+            ).fetchone()[0]
+            names = [
+                row["card_name"]
+                for row in connection.execute(
+                    """
+                    SELECT card_name
+                    FROM battle_replay_cards
+                    WHERE object_key = ?
+                    ORDER BY card_name
+                    """,
+                    ("battle-replays/client-1/battle-1/hash-a.json",),
+                ).fetchall()
+            ]
+
+        self.assertEqual(row_count, 1)
+        self.assertEqual(names, ["New Blade"])
+
     def test_sync_removes_objects_not_seen_in_current_mirror(self) -> None:
         first_summary = self.paths.mirror_dir / "run-summaries/client-1/run-1/hash-old.json"
         write_json(
@@ -235,9 +485,9 @@ class LocalR2CloneTests(unittest.TestCase):
                 "NOTICE",
                 "--fast-list",
                 "--transfers",
-                "16",
-                "--checkers",
                 "32",
+                "--checkers",
+                "64",
                 "remote-name:bucket",
                 str(self.paths.mirror_dir),
             ]],
