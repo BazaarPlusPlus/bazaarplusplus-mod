@@ -6,7 +6,7 @@ namespace BazaarPlusPlus.Game.RunLogging.Upload;
 internal static class RunUploadSettingsMenuLabel
 {
     private static readonly LocalizedTextSet Labels = new(
-        "Contribute Community Data",
+        "Community Contribution",
         "参与社区数据共建",
         "Community-Daten beitragen",
         "Contribuir com dados da comunidade",

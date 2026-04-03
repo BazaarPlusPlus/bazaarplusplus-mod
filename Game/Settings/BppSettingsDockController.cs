@@ -1,8 +1,10 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using BazaarPlusPlus.Game.Input;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.Settings;
@@ -313,6 +315,9 @@ internal sealed class BppSettingsDockController : MonoBehaviour
 
     private void ActivateDefinition(BppSettingsDockDefinition definition)
     {
+        if (definition.RequiresCtrlToActivate && !IsCtrlHeld())
+            return;
+
         definition.Activate();
         if (definition.CollapseAfterActivate)
             SetExpanded(false);
@@ -579,6 +584,11 @@ internal sealed class BppSettingsDockController : MonoBehaviour
     private static string ResolveHeader(string languageCode)
     {
         return "BazaarPlusPlus";
+    }
+
+    private static bool IsCtrlHeld()
+    {
+        return KeyBindings.Modifiers.IsCtrlPressed(Keyboard.current);
     }
 
     private sealed class DockSettingRowView

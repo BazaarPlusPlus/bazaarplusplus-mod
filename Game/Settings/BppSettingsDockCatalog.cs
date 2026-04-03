@@ -28,14 +28,6 @@ internal static class BppSettingsDockCatalog
             collapseAfterActivate: true
         ),
         new(
-            "CommunityContribution",
-            RunUploadSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                ReadCommunityContributionEnabled,
-                WriteCommunityContributionEnabled
-            )
-        ),
-        new(
             "NameOverride",
             NameOverrideSettingsMenuLabel.Resolve,
             new NameOverrideSettingsMenuBridge(
@@ -65,6 +57,15 @@ internal static class BppSettingsDockCatalog
                 WriteUseNativeMonsterPreview,
                 MonsterPreviewModeSwitchCoordinator.Apply
             )
+        ),
+        new(
+            "CommunityContribution",
+            RunUploadSettingsMenuLabel.Resolve,
+            _ => ReadCommunityContributionEnabled() ? "ON" : "OFF",
+            ReadCommunityContributionEnabled,
+            () => WriteCommunityContributionEnabled(!ReadCommunityContributionEnabled()),
+            collapseAfterActivate: false,
+            requiresCtrlToActivate: true
         ),
     ];
 
