@@ -704,12 +704,24 @@ export class MockD1Database {
 }
 
 export class MockR2Bucket {
-  public readonly objects = new Map<string, Uint8Array>();
+  public readonly objects = new Map<
+    string,
+    {
+      body: Uint8Array;
+      httpMetadata?: { contentType?: string; contentEncoding?: string };
+      customMetadata?: Record<string, string>;
+      readError?: Error;
+    }
+  >();
 
   async put(
     key: string,
     value: ArrayBuffer | ArrayBufferView,
-    _options?: unknown,
+    options?: {
+      httpMetadata?: { contentType?: string; contentEncoding?: string };
+      customMetadata?: Record<string, string>;
+      readError?: Error;
+    },
   ): Promise<void> {
     const buffer =
       value instanceof ArrayBuffer
@@ -720,18 +732,32 @@ export class MockR2Bucket {
               value.byteOffset + value.byteLength,
             ),
           );
-    this.objects.set(key, buffer);
+    this.objects.set(key, {
+      body: buffer,
+      httpMetadata: options?.httpMetadata,
+      customMetadata: options?.customMetadata,
+      readError: options?.readError,
+    });
   }
 
-  async get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null> {
-    const value = this.objects.get(key);
-    if (!value) {
+  async get(key: string): Promise<{
+    httpMetadata?: { contentType?: string; contentEncoding?: string };
+    customMetadata?: Record<string, string>;
+    arrayBuffer(): Promise<ArrayBuffer>;
+  } | null> {
+    const object = this.objects.get(key);
+    if (!object) {
       return null;
     }
 
     return {
+      httpMetadata: object.httpMetadata,
+      customMetadata: object.customMetadata,
       arrayBuffer: async () => {
-        const copy = new Uint8Array(value);
+        if (object.readError) {
+          throw object.readError;
+        }
+        const copy = new Uint8Array(object.body);
         return copy.buffer as ArrayBuffer;
       },
     };

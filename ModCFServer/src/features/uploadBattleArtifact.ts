@@ -3,8 +3,22 @@ import type { Env } from "../env";
 import { json } from "../http/json";
 import { getPlayerLink } from "../persistence/playerLinks";
 import { upsertBattle } from "../persistence/battles";
+import { gzipBytes } from "./replayCompression";
 import { parseBattleUploadBody } from "./uploadBattlePayload";
 import { requireVerifiedClient } from "./verifiedClient";
+
+function tryReadBattleIdFromPayload(payload: ArrayBuffer): string | null {
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(payload)) as {
+      battle_id?: unknown;
+    };
+    return typeof parsed.battle_id === "string" && parsed.battle_id.trim()
+      ? parsed.battle_id.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function handleUploadBattleArtifact(
   request: Request,
@@ -15,21 +29,25 @@ export async function handleUploadBattleArtifact(
     return verified;
   }
 
-  const parsed = parseBattleUploadBody(verified.payload, request.headers.get("x-bpp-battle-id") ?? JSON.parse(new TextDecoder().decode(verified.payload)).battle_id);
+  const headerBattleId =
+    request.headers.get("x-bpp-battle-id") ?? tryReadBattleIdFromPayload(verified.payload);
+  const parsed = parseBattleUploadBody(verified.payload, headerBattleId ?? "");
   if (parsed instanceof Response) {
     return parsed;
   }
 
   const replayPayloadBytes = new TextEncoder().encode(parsed.battlePayloadJson);
-  const replayPayloadBuffer = replayPayloadBytes.buffer.slice(
-    replayPayloadBytes.byteOffset,
-    replayPayloadBytes.byteOffset + replayPayloadBytes.byteLength,
-  ) as ArrayBuffer;
-  const replayPayloadHash = await sha256Base64(replayPayloadBuffer);
+  const replayPayloadHash = await sha256Base64(replayPayloadBytes);
+  const compressedReplayPayloadBytes = await gzipBytes(replayPayloadBytes);
   const objectKey = `battle-replays/${verified.client.client_id}/${parsed.battleId}/${replayPayloadHash}.json`;
-  await env.PVP_BATTLE_BUCKET.put(objectKey, replayPayloadBytes, {
+  await env.PVP_BATTLE_BUCKET.put(objectKey, compressedReplayPayloadBytes, {
     httpMetadata: {
       contentType: "application/json; charset=utf-8",
+      contentEncoding: "gzip",
+    },
+    customMetadata: {
+      "bpp-storage-codec": "gzip",
+      "bpp-compressed-size-bytes": String(compressedReplayPayloadBytes.byteLength),
     },
   });
 

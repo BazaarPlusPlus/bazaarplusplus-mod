@@ -154,11 +154,21 @@
 Worker 在验签成功后：
 
 1. 解析 replay JSON
-2. 对 replay JSON bytes 执行 `gzip`
-3. 将压缩后的 bytes 写入 `R2`
-4. 为对象写入明确的 codec metadata
+2. 记录 `originalSizeBytes = replayJsonBytes.byteLength`
+3. 对 replay JSON bytes 执行 `gzip`
+4. 记录 `compressedSizeBytes = compressedReplayBytes.byteLength`
+5. 将压缩后的 bytes 写入 `R2`
+6. 为对象写入明确的 codec metadata
 
 `battle-replays/...` 的对象 key 可以保持不变，不需要为了这次改造调整目录结构。
+
+`payload_hash` 应继续基于原始 replay JSON 计算，而不是基于压缩后 bytes 计算。
+
+原因：
+
+- hash 表示 replay 业务内容，而不是存储编码
+- 同一份 replay 不应因为压缩实现或压缩级别变化而生成不同 object key
+- 压缩只改变 `R2` 中的对象表示，不改变 replay 内容标识和去重语义
 
 ### Download Path
 
@@ -171,8 +181,24 @@ Worker 在验签成功后：
 Worker 读取对象时：
 
 1. 先读取对象 metadata
-2. 如果对象声明 `gzip` codec，则先解压
-3. 如果没有 codec metadata，则按老对象原样返回
+2. 如果对象声明了不支持的 codec，则直接失败，不按老对象回退
+3. 读取对象 body bytes
+4. 如果对象声明 `gzip` codec，则先解压
+5. 如果没有 codec metadata，则按老对象原样返回
+6. 如果对象 body 读取失败或 codec 解压失败，则返回稳定错误码，并在 Worker 日志中记录 `battle_id` 与 `replay_object_key`
+
+构造客户端响应时：
+
+- 不应透传 `R2` 对象的 `contentEncoding`
+- 应由 Worker 显式设置 `Content-Type: application/json; charset=utf-8`
+
+建议错误处理约定：
+
+- 对象 body 读取失败：`502` + `{ "error": "replay_read_failed" }`
+- codec 不支持或解压失败：`502` + `{ "error": "replay_decode_failed" }`
+- Worker 日志：记录对象 key、battle id、codec 和异常信息
+
+不建议在 codec 不支持或解压失败时 fallback 到原样返回，因为这会把损坏或不可解释的 bytes 当作 JSON 下发给客户端。
 
 ### Object Metadata
 
@@ -181,13 +207,21 @@ Worker 读取对象时：
 建议为新对象写入：
 
 - `httpMetadata.contentType = application/json; charset=utf-8`
+- `httpMetadata.contentEncoding = gzip`
 - `customMetadata["bpp-storage-codec"] = "gzip"`
+- `customMetadata["bpp-compressed-size-bytes"] = <压缩后对象大小>`
 
 可选扩展：
 
 - `customMetadata["bpp-original-size-bytes"] = <原始 replay JSON 大小>`
 
-读取时以 `bpp-storage-codec` 为主判断依据。
+说明：
+
+- `contentType` 继续表达对象解压后的媒体类型
+- `contentEncoding` 表达对象实际存储时采用的编码
+- `bpp-storage-codec` 作为服务端内部显式判断依据，避免读取逻辑依赖文件后缀或内容猜测
+
+读取时以 `bpp-storage-codec` 为主判断依据，`contentEncoding` 作为补充和运维可见信息。
 
 ### Compatibility Model
 
@@ -231,7 +265,9 @@ Worker 读取对象时：
   - 平均压缩耗时：约 `1.19 ms`
   - 平均解压耗时：约 `0.15 ms`
 
-这些数据来自本地 Node 基准，不直接等价于 Worker 运行时，但足以说明：
+这些数据来自本地 Node 基准，不直接等价于 Worker 运行时。最终线上表现取决于实际选用的 Worker 压缩 API 与运行时实现，因此这些数字只应作为量级参考，不应被当作部署后的精确预期。
+
+这些数据仍然足以说明：
 
 - 上传侧新增的 CPU 成本在毫秒级
 - 下载侧解压成本远低于上传侧压缩
@@ -253,7 +289,7 @@ Worker 读取对象时：
 - 该字段更接近业务上“下载给客户端的 replay 体积”
 - 避免已有监控或展示含义发生漂移
 
-如果后续需要更细的存储观测，再新增“压缩后大小”字段，而不是直接改写旧字段语义。
+压缩后对象大小本次通过 `R2 customMetadata["bpp-compressed-size-bytes"]` 暴露，不在当前设计里新增 `D1` 字段。
 
 ## Risks
 
@@ -273,10 +309,22 @@ Worker 运行环境必须能稳定提供压缩和解压能力。
 缓解方式：
 
 - 把 `bpp-storage-codec` 作为写入必填 metadata
+- 同时写入 `contentEncoding = gzip`
 - 下载测试明确校验“压缩对象必须先解压”
 - 如有必要，可增加 gzip magic number 的兜底判断，但不作为主逻辑
 
-### 3. Operational visibility risk
+### 3. Read/decode failure risk
+
+如果对象 body 读取失败、codec 不受支持，或对象内容损坏/被误写，下载路径会失败。
+
+缓解方式：
+
+- 下载路径把对象读取错误与 codec/解压错误分开处理
+- 对对象读取失败返回 `replay_read_failed`
+- 对 codec 不支持或解压失败返回 `replay_decode_failed`
+- 在 Worker 端记录 battle id、object key、codec 和异常信息
+
+### 4. Operational visibility risk
 
 对象 key 仍然使用 `.json` 后缀，但内部内容已变为压缩 bytes，排查时可能造成误解。
 
@@ -285,13 +333,14 @@ Worker 运行环境必须能稳定提供压缩和解压能力。
 - 通过 metadata 明确标识
 - 在运维文档中说明 replay 对象已改为压缩存储
 
-### 4. Partial rollout risk
+### 5. Partial rollout risk
 
 上线后一段时间内，新旧对象会混存。
 
 缓解方式：
 
-- 下载逻辑先做兼容，再上线上传压缩
+- 单次部署同时上线下载兼容与上传压缩
+- 在实现和测试阶段先保证下载逻辑可兼容新旧对象
 - 不要求一次性迁移历史对象
 
 ## Migration Difficulty
@@ -325,12 +374,13 @@ Worker 运行环境必须能稳定提供压缩和解压能力。
 
 ## Rollout Plan
 
-建议按以下顺序上线：
+通过 `wrangler deploy` 单次部署，上传压缩和下载兼容逻辑同时上线。
 
-1. 先实现下载路径对新旧对象的兼容读取
-2. 再实现上传路径对新对象的压缩写入
+1. 实现下载路径对新旧对象的兼容读取
+2. 实现上传路径对新对象的压缩写入
 3. 补齐上传与下载测试
-4. 观察对象大小、错误率和 replay 下载成功率
+4. 单次部署
+5. 观察对象大小、错误率和 replay 下载成功率
 
 ## Non-Goals
 
