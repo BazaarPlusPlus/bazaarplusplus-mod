@@ -163,7 +163,7 @@ def query_hero_matchup_win_rates(connection: sqlite3.Connection) -> list[tuple[s
               AND opponent_hero IS NOT NULL
               AND result IN ('win', 'loss')
             GROUP BY player_hero, opponent_hero
-            ORDER BY battle_count DESC, win_rate_pct DESC, player_hero ASC, opponent_hero ASC
+            ORDER BY win_rate_pct DESC, battle_count DESC, player_hero ASC, opponent_hero ASC
             LIMIT 12
             """,
         )
@@ -537,6 +537,12 @@ def query_day_leaders(
     return query_card_win_rates_by_day(connection, side=side, limit_per_day=limit_per_day)
 
 
+def query_card_projection_status(connection: sqlite3.Connection) -> tuple[int, int]:
+    battle_count = int(connection.execute("SELECT COUNT(*) FROM battle_replays").fetchone()[0])
+    card_count = int(connection.execute("SELECT COUNT(*) FROM battle_replay_cards").fetchone()[0])
+    return battle_count, card_count
+
+
 def human_bytes(value: int) -> str:
     if value < 1024:
         return f"{value} B"
@@ -818,6 +824,15 @@ def render_heatmap_section(
     )
 
 
+def render_notice_section(title: str, body: str) -> str:
+    return (
+        '<section class="notice-section">'
+        f"<h2>{escape(title)}</h2>"
+        f"<p>{escape(body)}</p>"
+        "</section>"
+    )
+
+
 def build_trend_chart(
     title: str,
     trend_rows: Sequence[tuple[int, str, int, int, float]],
@@ -892,6 +907,7 @@ def build_report_html(connection: sqlite3.Connection) -> str:
         "Top Opponent Cards Across Days",
         opponent_trends,
     )
+    battle_count, card_count = query_card_projection_status(connection)
     player_heatmap_rows, player_heatmap_columns, player_heatmap_values = build_heatmap_inputs(
         player_heatmap
     )
@@ -911,6 +927,17 @@ def build_report_html(connection: sqlite3.Connection) -> str:
             "Battle count by recorded hour.",
             render_bar_chart("Hourly Battle Distribution", hourly),
         ),
+    ]
+
+    if battle_count > 0 and card_count == 0:
+        sections.append(
+            render_notice_section(
+                "Card Analytics Metadata Is Empty",
+                "Card analytics metadata is empty for the current clone database. Rebuild the local projection with rebuild_local_r2_metadata.py to backfill battle_replay_cards for existing mirrored battles.",
+            )
+        )
+
+    sections.extend([
         render_chart_section(
             "Hero Win Rates",
             "Win rate by player hero for battles with known results.",
@@ -1043,7 +1070,7 @@ def build_report_html(connection: sqlite3.Connection) -> str:
                 color="#7c3aed",
             ),
         ),
-    ]
+    ])
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -1231,6 +1258,11 @@ def build_report_html(connection: sqlite3.Connection) -> str:
       margin-top: 4px;
       font-size: 0.78rem;
       color: var(--muted);
+    }}
+
+    .notice-section {{
+      background: linear-gradient(180deg, #fff9ee 0%, #f8edd9 100%);
+      border-color: #d7b778;
     }}
 
     @media (max-width: 720px) {{

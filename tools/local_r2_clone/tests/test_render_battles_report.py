@@ -413,6 +413,37 @@ class RenderBattlesReportTests(unittest.TestCase):
         self.assertIn("Steam Lance", html)
         self.assertIn("50.00", html)
 
+    def test_render_battles_report_warns_when_card_projection_is_missing(self) -> None:
+        self.seed_projection()
+
+        self.assertTrue(self.paths.db_path.exists())
+
+        import sqlite3
+
+        connection = sqlite3.connect(self.paths.db_path)
+        try:
+            connection.execute("DELETE FROM battle_replay_cards")
+            connection.commit()
+        finally:
+            connection.close()
+
+        report_path = render_battles_report(self.paths)
+        html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("Card analytics metadata is empty", html)
+        self.assertIn("rebuild_local_r2_metadata.py", html)
+
+    def test_render_battles_report_sorts_hero_matchups_by_metric_before_volume(self) -> None:
+        self.seed_projection()
+
+        report_path = render_battles_report(self.paths)
+        html = report_path.read_text(encoding="utf-8")
+
+        self.assertLess(
+            html.index("Dooley vs Vanessa"),
+            html.index("Vanessa vs Dooley"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
