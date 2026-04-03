@@ -459,6 +459,84 @@ def query_top_card_trends(
     ]
 
 
+def query_day_card_heatmap(
+    connection: sqlite3.Connection,
+    *,
+    side: str,
+    limit_per_day: int = 5,
+) -> list[tuple[int, str, int, float]]:
+    win_case = side_win_case(side)
+    return [
+        (
+            int(row["battle_day"]),
+            row["card_label"],
+            int(row["deduped_battles"]),
+            float(row["win_rate_pct"] or 0.0),
+        )
+        for row in fetch_all(
+            connection,
+            f"""
+            WITH card_battles AS (
+              SELECT
+                battle_day,
+                card_name,
+                enchant,
+                tier,
+                battle_card_key,
+                MAX(CASE WHEN result IN ('win', 'loss') THEN 1 ELSE 0 END) AS has_decision,
+                MAX({win_case}) AS win_flag
+              FROM battle_replay_cards
+              WHERE side = ?
+                AND battle_day IS NOT NULL
+              GROUP BY battle_day, card_name, enchant, tier, battle_card_key
+            ),
+            aggregated AS (
+              SELECT
+                battle_day,
+                card_name || ' | ' || enchant || ' | ' || tier AS card_label,
+                COUNT(*) AS deduped_battles,
+                COALESCE(
+                  ROUND(
+                    100.0 * SUM(CASE WHEN has_decision = 1 THEN win_flag ELSE 0 END)
+                    / NULLIF(SUM(CASE WHEN has_decision = 1 THEN 1 ELSE 0 END), 0),
+                    2
+                  ),
+                  0
+                ) AS win_rate_pct
+              FROM card_battles
+              GROUP BY battle_day, card_label
+            ),
+            ranked AS (
+              SELECT
+                battle_day,
+                card_label,
+                deduped_battles,
+                win_rate_pct,
+                ROW_NUMBER() OVER (
+                  PARTITION BY battle_day
+                  ORDER BY deduped_battles DESC, win_rate_pct DESC, card_label ASC
+                ) AS row_num
+              FROM aggregated
+            )
+            SELECT battle_day, card_label, deduped_battles, win_rate_pct
+            FROM ranked
+            WHERE row_num <= ?
+            ORDER BY battle_day ASC, deduped_battles DESC, win_rate_pct DESC, card_label ASC
+            """,
+            (side, limit_per_day),
+        )
+    ]
+
+
+def query_day_leaders(
+    connection: sqlite3.Connection,
+    *,
+    side: str,
+    limit_per_day: int = 5,
+) -> list[tuple[int, str, str, str, int, int, int, float]]:
+    return query_card_win_rates_by_day(connection, side=side, limit_per_day=limit_per_day)
+
+
 def human_bytes(value: int) -> str:
     if value < 1024:
         return f"{value} B"
@@ -684,6 +762,62 @@ def render_table(title: str, headers: Sequence[str], rows: Iterable[Sequence[obj
     )
 
 
+def heatmap_cell_color(win_rate_pct: float) -> str:
+    if win_rate_pct >= 75:
+        return "#bfe3c0"
+    if win_rate_pct >= 50:
+        return "#efe7d8"
+    if win_rate_pct > 0:
+        return "#f1d8c8"
+    return "#f6e6de"
+
+
+def render_heatmap_section(
+    title: str,
+    description: str,
+    rows: Sequence[str],
+    columns: Sequence[str],
+    values: dict[tuple[str, str], tuple[float, int]],
+) -> str:
+    if not rows or not columns:
+        return (
+            "<section>"
+            f"<h2>{escape(title)}</h2>"
+            f"<p>{escape(description)}</p>"
+            f"{render_empty_chart(title)}"
+            "</section>"
+        )
+
+    header_html = "".join(f"<th>{escape(column)}</th>" for column in columns)
+    body_rows = []
+    for row_label in rows:
+        cells = [f"<th>{escape(row_label)}</th>"]
+        for column in columns:
+            value = values.get((row_label, column))
+            if value is None:
+                cells.append('<td class="heatmap-empty">-</td>')
+                continue
+            win_rate_pct, battles = value
+            cells.append(
+                f'<td class="heatmap-cell" style="background:{heatmap_cell_color(win_rate_pct)};">'
+                f'<div class="heatmap-rate">{escape(f"{win_rate_pct:.2f}%")}</div>'
+                f'<div class="heatmap-count">{escape(f"{battles} battles")}</div>'
+                "</td>"
+            )
+        body_rows.append(f"<tr>{''.join(cells)}</tr>")
+
+    return (
+        "<section class=\"table-section\">"
+        f"<h2>{escape(title)}</h2>"
+        f"<p>{escape(description)}</p>"
+        "<table class=\"heatmap-table\">"
+        f"<thead><tr><th>Card</th>{header_html}</tr></thead>"
+        f"<tbody>{''.join(body_rows)}</tbody>"
+        "</table>"
+        "</section>"
+    )
+
+
 def build_trend_chart(
     title: str,
     trend_rows: Sequence[tuple[int, str, int, int, float]],
@@ -713,6 +847,22 @@ def build_trend_chart(
     )
 
 
+def build_heatmap_inputs(
+    heatmap_rows: Sequence[tuple[int, str, int, float]],
+) -> tuple[list[str], list[str], dict[tuple[str, str], tuple[float, int]]]:
+    if not heatmap_rows:
+        return [], [], {}
+
+    day_numbers = sorted({battle_day for battle_day, _, _, _ in heatmap_rows})
+    columns = [f"Day {day}" for day in day_numbers]
+    rows = sorted({card_label for _, card_label, _, _ in heatmap_rows})
+    values = {
+        (card_label, f"Day {battle_day}"): (win_rate_pct, deduped_battles)
+        for battle_day, card_label, deduped_battles, win_rate_pct in heatmap_rows
+    }
+    return rows, columns, values
+
+
 def build_report_html(connection: sqlite3.Connection) -> str:
     kpis = query_kpis(connection)
     daily = query_daily_battles(connection)
@@ -729,6 +879,10 @@ def build_report_html(connection: sqlite3.Connection) -> str:
     opponent_cards_by_day = query_card_win_rates_by_day(connection, side="opponent")
     player_trends = query_top_card_trends(connection, side="player")
     opponent_trends = query_top_card_trends(connection, side="opponent")
+    player_heatmap = query_day_card_heatmap(connection, side="player")
+    opponent_heatmap = query_day_card_heatmap(connection, side="opponent")
+    player_day_leaders = query_day_leaders(connection, side="player")
+    opponent_day_leaders = query_day_leaders(connection, side="opponent")
 
     player_trend_chart = build_trend_chart(
         "Top Player Cards Across Days",
@@ -737,6 +891,12 @@ def build_report_html(connection: sqlite3.Connection) -> str:
     opponent_trend_chart = build_trend_chart(
         "Top Opponent Cards Across Days",
         opponent_trends,
+    )
+    player_heatmap_rows, player_heatmap_columns, player_heatmap_values = build_heatmap_inputs(
+        player_heatmap
+    )
+    opponent_heatmap_rows, opponent_heatmap_columns, opponent_heatmap_values = build_heatmap_inputs(
+        opponent_heatmap
     )
 
     sections = [
@@ -791,6 +951,20 @@ def build_report_html(connection: sqlite3.Connection) -> str:
             "Win-rate trends for the most common opponent-side cards across battle days.",
             opponent_trend_chart,
         ),
+        render_heatmap_section(
+            "Player Day-Card Heatmap",
+            "Per-day top player-side cards with win-rate intensity and deduped battle counts.",
+            player_heatmap_rows,
+            player_heatmap_columns,
+            player_heatmap_values,
+        ),
+        render_heatmap_section(
+            "Opponent Day-Card Heatmap",
+            "Per-day top opponent-side cards with win-rate intensity and deduped battle counts.",
+            opponent_heatmap_rows,
+            opponent_heatmap_columns,
+            opponent_heatmap_values,
+        ),
         render_table(
             "Top Player Cards",
             ("Card", "Enchant", "Tier", "Days Seen", "Battles", "Occurrences", "Wins", "Win Rate %"),
@@ -821,6 +995,22 @@ def build_report_html(connection: sqlite3.Connection) -> str:
             (
                 (day, name, enchant, tier, battles, occurrences, wins, f"{rate:.2f}")
                 for day, name, enchant, tier, battles, occurrences, wins, rate in opponent_cards_by_day
+            ),
+        ),
+        render_table(
+            "Player Day Leaders",
+            ("Day", "Card", "Enchant", "Tier", "Battles", "Occurrences", "Wins", "Win Rate %"),
+            (
+                (day, name, enchant, tier, battles, occurrences, wins, f"{rate:.2f}")
+                for day, name, enchant, tier, battles, occurrences, wins, rate in player_day_leaders
+            ),
+        ),
+        render_table(
+            "Opponent Day Leaders",
+            ("Day", "Card", "Enchant", "Tier", "Battles", "Occurrences", "Wins", "Win Rate %"),
+            (
+                (day, name, enchant, tier, battles, occurrences, wins, f"{rate:.2f}")
+                for day, name, enchant, tier, battles, occurrences, wins, rate in opponent_day_leaders
             ),
         ),
         render_table(
@@ -1014,6 +1204,33 @@ def build_report_html(connection: sqlite3.Connection) -> str:
       font-size: 0.82rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
+    }}
+
+    .heatmap-table th:first-child {{
+      min-width: 230px;
+    }}
+
+    .heatmap-cell {{
+      min-width: 110px;
+      text-align: center;
+      vertical-align: middle;
+    }}
+
+    .heatmap-empty {{
+      color: var(--muted);
+      text-align: center;
+      background: #fbf5ec;
+    }}
+
+    .heatmap-rate {{
+      font-weight: 700;
+      color: var(--text);
+    }}
+
+    .heatmap-count {{
+      margin-top: 4px;
+      font-size: 0.78rem;
+      color: var(--muted);
     }}
 
     @media (max-width: 720px) {{
