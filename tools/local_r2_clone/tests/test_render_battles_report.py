@@ -316,6 +316,54 @@ class RenderBattlesReportTests(unittest.TestCase):
                 },
             },
         )
+        write_json(
+            self.paths.mirror_dir / "run-summaries/client-1/run-10/hash-a.json",
+            {
+                "run_id": "run-10",
+                "status": "completed",
+                "hero_id": "hero-vanessa",
+                "hero_name": "Vanessa",
+                "started_at_utc": "2026-04-01T00:00:00.000Z",
+                "ended_at_utc": "2026-04-01T01:00:00.000Z",
+                "final_day": 10,
+                "final_wins": 10,
+                "final_losses": 1,
+                "mmr": 1300,
+                "schema_version": 2,
+            },
+        )
+        write_json(
+            self.paths.mirror_dir / "run-summaries/client-1/run-11/hash-b.json",
+            {
+                "run_id": "run-11",
+                "status": "completed",
+                "hero_id": "hero-dooley",
+                "hero_name": "Dooley",
+                "started_at_utc": "2026-04-02T00:00:00.000Z",
+                "ended_at_utc": "2026-04-02T01:00:00.000Z",
+                "final_day": 8,
+                "final_wins": 8,
+                "final_losses": 2,
+                "mmr": 1210,
+                "schema_version": 2,
+            },
+        )
+        write_json(
+            self.paths.mirror_dir / "run-summaries/client-1/run-12/hash-c.json",
+            {
+                "run_id": "run-12",
+                "status": "active",
+                "hero_id": "hero-vanessa",
+                "hero_name": "Vanessa",
+                "started_at_utc": "2026-04-03T00:00:00.000Z",
+                "ended_at_utc": "2026-04-03T00:30:00.000Z",
+                "final_day": 7,
+                "final_wins": 7,
+                "final_losses": 1,
+                "mmr": 1250,
+                "schema_version": 2,
+            },
+        )
 
         rebuild_metadata(self.paths)
 
@@ -443,6 +491,28 @@ class RenderBattlesReportTests(unittest.TestCase):
             html.index("Dooley vs Vanessa"),
             html.index("Vanessa vs Dooley"),
         )
+
+    def test_render_battles_report_includes_hero_ten_win_rate_sections(self) -> None:
+        self.seed_projection()
+
+        report_path = render_battles_report(self.paths)
+        html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("Hero 10-Win Rates", html)
+        self.assertIn("Hero 10-Win Rate Details", html)
+        self.assertIn("Vanessa", html)
+        self.assertIn("Dooley", html)
+        self.assertIn("100.00", html)
+
+    def test_render_battles_report_uses_completed_runs_for_hero_ten_win_rates(self) -> None:
+        self.seed_projection()
+
+        report_path = render_battles_report(self.paths)
+        html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("Hero 10-Win Rate Details", html)
+        self.assertIn("<td>Vanessa</td><td>1</td><td>1</td><td>100.00</td>", html)
+        self.assertIn("<td>Dooley</td><td>1</td><td>0</td><td>0.00</td>", html)
 
 
 if __name__ == "__main__":

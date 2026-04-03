@@ -118,6 +118,36 @@ def query_rank_win_rates(connection: sqlite3.Connection) -> list[tuple[str, int,
     ]
 
 
+def query_hero_ten_win_rates(connection: sqlite3.Connection) -> list[tuple[str, int, int, float]]:
+    return [
+        (
+            row["hero_name"],
+            int(row["completed_runs"]),
+            int(row["ten_win_runs"]),
+            float(row["ten_win_rate_pct"]),
+        )
+        for row in fetch_all(
+            connection,
+            """
+            SELECT
+              hero_name,
+              COUNT(*) AS completed_runs,
+              SUM(CASE WHEN COALESCE(final_wins, 0) >= 10 THEN 1 ELSE 0 END) AS ten_win_runs,
+              ROUND(
+                100.0 * SUM(CASE WHEN COALESCE(final_wins, 0) >= 10 THEN 1 ELSE 0 END) / COUNT(*),
+                2
+              ) AS ten_win_rate_pct
+            FROM run_summaries_latest
+            WHERE status = 'completed'
+              AND hero_name IS NOT NULL
+            GROUP BY hero_name
+            ORDER BY ten_win_rate_pct DESC, completed_runs DESC, hero_name ASC
+            LIMIT 8
+            """,
+        )
+    ]
+
+
 def query_top_matchups(connection: sqlite3.Connection) -> list[tuple[str, str, int]]:
     return [
         (row["player_hero"], row["opponent_hero"], int(row["battle_count"]))
@@ -884,6 +914,7 @@ def build_report_html(connection: sqlite3.Connection) -> str:
     hourly = query_hourly_battles(connection)
     hero_win_rates = query_hero_win_rates(connection)
     rank_win_rates = query_rank_win_rates(connection)
+    hero_ten_win_rates = query_hero_ten_win_rates(connection)
     matchups = query_top_matchups(connection)
     hero_matchup_win_rates = query_hero_matchup_win_rates(connection)
     rank_matchup_win_rates = query_rank_matchup_win_rates(connection)
@@ -967,6 +998,24 @@ def build_report_html(connection: sqlite3.Connection) -> str:
             "Rank Win Rate Details",
             ("Rank", "Battles", "Win Rate %"),
             ((rank, count, f"{rate:.2f}") for rank, count, rate in rank_win_rates),
+        ),
+        render_chart_section(
+            "Hero 10-Win Rates",
+            "Completed-run rate of reaching the 10-win cap for each hero.",
+            render_bar_chart(
+                "Hero 10-Win Rates",
+                [(hero, rate) for hero, _, _, rate in hero_ten_win_rates],
+                value_formatter="{value}%",
+                color="#0f766e",
+            ),
+        ),
+        render_table(
+            "Hero 10-Win Rate Details",
+            ("Hero", "Completed Runs", "10-Win Runs", "10-Win Rate %"),
+            (
+                (hero, completed_runs, ten_win_runs, f"{rate:.2f}")
+                for hero, completed_runs, ten_win_runs, rate in hero_ten_win_rates
+            ),
         ),
         render_chart_section(
             "Top Player Cards Across Days",
