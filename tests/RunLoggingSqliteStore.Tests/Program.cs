@@ -144,16 +144,11 @@ try
             "runs should persist the player's rating snapshot."
         );
         Assert(
-            GetInt64(connection, "SELECT last_seq FROM runs WHERE run_id = $runId;", runId)
-                == 2,
+            GetInt64(connection, "SELECT last_seq FROM runs WHERE run_id = $runId;", runId) == 2,
             "runs should inline the latest observed sequence."
         );
         Assert(
-            GetInt64(
-                connection,
-                "SELECT completed FROM runs WHERE run_id = $runId;",
-                runId
-            ) == 1,
+            GetInt64(connection, "SELECT completed FROM runs WHERE run_id = $runId;", runId) == 1,
             "runs should mark terminal runs as completed."
         );
         Assert(
@@ -221,11 +216,8 @@ try
             ]
         );
         Assert(
-            GetString(
-                connection,
-                "SELECT status FROM runs WHERE run_id = $runId;",
-                abandonedRunId
-            ) == "abandoned",
+            GetString(connection, "SELECT status FROM runs WHERE run_id = $runId;", abandonedRunId)
+                == "abandoned",
             "runs should preserve interrupted/abandoned terminal statuses."
         );
 
@@ -336,18 +328,27 @@ try
             "CreateRun should preserve the persisted checkpoint hour when resuming."
         );
         Assert(
-            GetInt64(connection, "SELECT COUNT(*) FROM runs WHERE run_id = $runId;", olderActiveRunId)
-                == 1,
+            GetInt64(
+                connection,
+                "SELECT COUNT(*) FROM runs WHERE run_id = $runId;",
+                olderActiveRunId
+            ) == 1,
             "CreateRun should not duplicate an existing active run row."
         );
         Assert(
-            GetString(connection, "SELECT player_rank FROM runs WHERE run_id = $runId;", olderActiveRunId)
-                == "Gold 1",
+            GetString(
+                connection,
+                "SELECT player_rank FROM runs WHERE run_id = $runId;",
+                olderActiveRunId
+            ) == "Gold 1",
             "CreateRun should refresh the stored player rank snapshot on conflict."
         );
         Assert(
-            GetInt64(connection, "SELECT player_rating FROM runs WHERE run_id = $runId;", olderActiveRunId)
-                == 1333,
+            GetInt64(
+                connection,
+                "SELECT player_rating FROM runs WHERE run_id = $runId;",
+                olderActiveRunId
+            ) == 1333,
             "CreateRun should refresh the stored player rating snapshot on conflict."
         );
     }

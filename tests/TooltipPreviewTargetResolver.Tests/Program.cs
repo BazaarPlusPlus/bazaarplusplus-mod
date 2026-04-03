@@ -22,7 +22,8 @@ Assert(
 );
 
 Assert(
-    TooltipPreviewTargetSelection.ResolveCurrentPrimaryItemTooltipData(itemTooltipData, null) == null,
+    TooltipPreviewTargetSelection.ResolveCurrentPrimaryItemTooltipData(itemTooltipData, null)
+        == null,
     "Missing current card should be rejected."
 );
 
@@ -34,8 +35,10 @@ var otherItemCard = new ItemCard
 };
 
 Assert(
-    TooltipPreviewTargetSelection.ResolveCurrentPrimaryItemTooltipData(itemTooltipData, otherItemCard)
-        == null,
+    TooltipPreviewTargetSelection.ResolveCurrentPrimaryItemTooltipData(
+        itemTooltipData,
+        otherItemCard
+    ) == null,
     "Mismatched current card should be rejected."
 );
 
@@ -48,15 +51,14 @@ var clonedItemCard = new ItemCard
 itemCard.InstanceId = new InstanceId("same-item");
 
 Assert(
-    TooltipPreviewTargetSelection.ResolveCurrentPrimaryItemTooltipData(itemTooltipData, clonedItemCard)
-        == itemTooltipData,
+    TooltipPreviewTargetSelection.ResolveCurrentPrimaryItemTooltipData(
+        itemTooltipData,
+        clonedItemCard
+    ) == itemTooltipData,
     "Cards with the same instance id should be treated as the same tooltip target."
 );
 
-var nonItemCard = new Card
-{
-    Type = ECardType.Skill,
-};
+var nonItemCard = new Card { Type = ECardType.Skill };
 var nonItemTooltipData = CreateTooltipData(nonItemCard);
 
 Assert(
@@ -123,10 +125,7 @@ static TheBazaar.Tooltips.CardTooltipData CreateTooltipData(Card card)
         .SetValue(tooltipData, card);
     typeof(TheBazaar.Tooltips.CardTooltipData)
         .GetField("_cardTemplate", BindingFlags.Instance | BindingFlags.NonPublic)!
-        .SetValue(
-            tooltipData,
-            card is ItemCard ? new TCardItem() : new TCardSkill()
-        );
+        .SetValue(tooltipData, card is ItemCard ? new TCardItem() : new TCardSkill());
     return tooltipData;
 }
 

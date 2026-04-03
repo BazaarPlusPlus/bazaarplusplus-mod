@@ -44,10 +44,7 @@ internal sealed class ModApiRegistrationClient
         var existingClientId = _clientStateStore.TryGetClientId();
         if (!string.IsNullOrWhiteSpace(existingClientId))
         {
-            BppLog.Info(
-                "ModApiRegistrationClient",
-                $"Using cached client id: {existingClientId}."
-            );
+            BppLog.Info("ModApiRegistrationClient", $"Using cached client id: {existingClientId}.");
             return existingClientId;
         }
 
@@ -104,10 +101,7 @@ internal sealed class ModApiRegistrationClient
             }
 
             _clientStateStore.SaveClientId(clientId);
-            BppLog.Info(
-                "ModApiRegistrationClient",
-                $"Client registration succeeded: {clientId}."
-            );
+            BppLog.Info("ModApiRegistrationClient", $"Client registration succeeded: {clientId}.");
             return clientId;
         }
         catch (OperationCanceledException)

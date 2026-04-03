@@ -100,7 +100,10 @@ Assert(
     "Bootstrap SQL should define battle snapshot JSON columns."
 );
 Assert(
-    bootstrapSql.Contains("FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE", StringComparison.Ordinal)
+    bootstrapSql.Contains(
+        "FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE",
+        StringComparison.Ordinal
+    )
         && bootstrapSql.Contains(
             "FOREIGN KEY (battle_id) REFERENCES battles(battle_id) ON DELETE CASCADE",
             StringComparison.Ordinal

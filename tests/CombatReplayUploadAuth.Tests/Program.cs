@@ -163,7 +163,9 @@ try
     var runStore =
         Activator.CreateInstance(runStoreType, dbPath)
         ?? throw new InvalidOperationException("Failed to create SqliteRunLogStore.");
-    var createRunRequestType = RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCreateRequest");
+    var createRunRequestType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Models.RunLogCreateRequest"
+    );
     var createRunRequest = Activator.CreateInstance(createRunRequestType)!;
     createRunRequestType.GetProperty("RunId")!.SetValue(createRunRequest, "server-run-auth-001");
     createRunRequestType
@@ -211,9 +213,7 @@ try
     var identityStore =
         Activator.CreateInstance(identityStoreType, installIdPath)
         ?? throw new InvalidOperationException("Failed to create ModApiIdentityStore.");
-    var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
-    );
+    var clientStateStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiClientStateStore");
     var clientStateStore =
         Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to create ModApiClientStateStore.");
@@ -222,7 +222,10 @@ try
         Activator.CreateInstance(keyStoreType, privateKeyPath)
         ?? throw new InvalidOperationException("Failed to create ModApiKeyStore.");
     var routesType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiRoutes");
-    var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
+    var tryCreateRoutes = routesType.GetMethod(
+        "TryCreate",
+        BindingFlags.Public | BindingFlags.Static
+    );
     Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
     var routes =
         tryCreateRoutes!.Invoke(null, [$"{prefix}"])
@@ -244,7 +247,8 @@ try
         "BattleUploadSnapshot compatibility type should be removed."
     );
     Assert(
-        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadCycleResult") != null,
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadCycleResult")
+            != null,
         "BattleArtifactUploadCycleResult should exist as the primary battle upload cycle result type."
     );
     Assert(
@@ -268,8 +272,7 @@ try
         "BattleArtifactUploadApiClient should exist as the primary battle upload API client."
     );
     Assert(
-        ResolveTypeOrNull("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadApiClient")
-            == null,
+        ResolveTypeOrNull("BazaarPlusPlus.Game.CombatReplay.Upload.BattleUploadApiClient") == null,
         "BattleUploadApiClient compatibility type should be removed."
     );
     Assert(

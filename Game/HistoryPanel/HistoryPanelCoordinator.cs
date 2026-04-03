@@ -33,7 +33,8 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _runtime = dependencies.Runtime;
         _dataService = dependencies.DataService;
         _replayService = dependencies.ReplayService;
-        _requestUiRefresh = requestUiRefresh ?? throw new ArgumentNullException(nameof(requestUiRefresh));
+        _requestUiRefresh =
+            requestUiRefresh ?? throw new ArgumentNullException(nameof(requestUiRefresh));
         _requestPreviewRefresh =
             requestPreviewRefresh ?? throw new ArgumentNullException(nameof(requestPreviewRefresh));
         _requestVisibilityChange =
@@ -214,9 +215,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     public void SelectBattle(int index)
     {
-        var source = _state.SectionMode == HistorySectionMode.Ghost
-            ? GetFilteredGhostBattles()
-            : (IReadOnlyList<HistoryBattleRecord>)_state.Battles;
+        var source =
+            _state.SectionMode == HistorySectionMode.Ghost
+                ? GetFilteredGhostBattles()
+                : (IReadOnlyList<HistoryBattleRecord>)_state.Battles;
         if (index < 0 || index >= source.Count)
             return;
 
@@ -229,7 +231,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _requestPreviewRefresh();
     }
 
-    public bool CanReplaySelectedBattle(HistoryBattleRecord? activeSelectedBattle, out string reason)
+    public bool CanReplaySelectedBattle(
+        HistoryBattleRecord? activeSelectedBattle,
+        out string reason
+    )
     {
         return _replayService.CanReplayBattle(activeSelectedBattle, out reason);
     }
@@ -256,7 +261,11 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         if (
             _runtime.IsInGameRun
-            && string.Equals(_runtime.CurrentServerRunId, selectedRun.RunId, StringComparison.Ordinal)
+            && string.Equals(
+                _runtime.CurrentServerRunId,
+                selectedRun.RunId,
+                StringComparison.Ordinal
+            )
         )
         {
             reason = "The currently active gameplay run cannot be deleted.";
@@ -550,18 +559,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     private static GhostBattleOutcome ResolveGhostBattleOutcome(HistoryBattleRecord battle)
     {
-        if (
-            string.Equals(
-                battle.WinnerCombatantId,
-            "Opponent",
-            StringComparison.OrdinalIgnoreCase
-            )
-        )
+        if (string.Equals(battle.WinnerCombatantId, "Opponent", StringComparison.OrdinalIgnoreCase))
             return GhostBattleOutcome.Won;
 
-        if (
-            string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase)
-        )
+        if (string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase))
             return GhostBattleOutcome.Lost;
 
         var result = battle.Result?.Trim();

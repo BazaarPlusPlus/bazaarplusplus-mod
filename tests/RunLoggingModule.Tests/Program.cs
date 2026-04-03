@@ -42,7 +42,8 @@ var captureService =
 var core =
     Activator.CreateInstance(coreType, [manager, captureService])
     ?? throw new InvalidOperationException("Failed to construct RunLoggingControllerCore.");
-var runContext = runtimeHostType.GetProperty("RunContext", BindingFlags.Public | BindingFlags.Static)!
+var runContext = runtimeHostType
+    .GetProperty("RunContext", BindingFlags.Public | BindingFlags.Static)!
     .GetValue(null)!;
 var pendingReplayPersistence = false;
 
@@ -66,9 +67,14 @@ RunLogCreateRequest EnsureActiveRunFromGame()
 
 RunLogSessionState? EnsureActiveSessionFromGame()
 {
-    var ensureRunStarted = coreType.GetMethod("EnsureRunStarted", BindingFlags.Public | BindingFlags.Instance);
+    var ensureRunStarted = coreType.GetMethod(
+        "EnsureRunStarted",
+        BindingFlags.Public | BindingFlags.Instance
+    );
     if (ensureRunStarted == null)
-        throw new InvalidOperationException("RunLoggingControllerCore.EnsureRunStarted should exist.");
+        throw new InvalidOperationException(
+            "RunLoggingControllerCore.EnsureRunStarted should exist."
+        );
 
     return (RunLogSessionState?)ensureRunStarted.Invoke(core, [EnsureActiveRunFromGame()]);
 }
@@ -98,8 +104,7 @@ var module =
                 Reason = reason,
             }),
         ]
-    )
-    ?? throw new InvalidOperationException("Failed to construct RunLoggingModule.");
+    ) ?? throw new InvalidOperationException("Failed to construct RunLoggingModule.");
 
 SetProperty(runContext, "CurrentServerRunId", request.RunId);
 SetProperty(runContext, "IsInGameRun", false);
@@ -135,7 +140,10 @@ var newRun = Activator.CreateInstance(runInitializedObservedType)!;
 SetProperty(newRun, "RunId", "run-module-test-2");
 InvokeVoid(moduleType, module, "OnRunInitializedObserved", [newRun]);
 
-Assert(store.MarkRunAbandonedCalls == 1, "A new run id after interruption should abandon the old run.");
+Assert(
+    store.MarkRunAbandonedCalls == 1,
+    "A new run id after interruption should abandon the old run."
+);
 Assert(
     manager.ActiveSession?.RunId == "run-module-test-2",
     "A new run id should start a fresh active session."
@@ -166,8 +174,7 @@ var pendingReplayModule =
                 Reason = reason,
             }),
         ]
-    )
-    ?? throw new InvalidOperationException("Failed to construct deferred RunLoggingModule.");
+    ) ?? throw new InvalidOperationException("Failed to construct deferred RunLoggingModule.");
 
 var completedExit = Activator.CreateInstance(runLifecycleChangedType)!;
 SetProperty(completedExit, "IsInGameRun", false);
@@ -180,14 +187,25 @@ Assert(
     GetField(pendingReplayModule, "_deferredRunCompletion") != null,
     "Run end with pending replay persistence should create deferred completion."
 );
-Assert(store.CompleteRunCalls == 0, "Deferred completion should wait for replay persistence to drain.");
+Assert(
+    store.CompleteRunCalls == 0,
+    "Deferred completion should wait for replay persistence to drain."
+);
 
 pendingReplayPersistence = false;
 SetProperty(runContext, "IsInGameRun", false);
 var persistenceDrained = Activator.CreateInstance(combatReplayPersistenceDrainedType)!;
-InvokeVoid(moduleType, pendingReplayModule, "OnCombatReplayPersistenceDrained", [persistenceDrained]);
+InvokeVoid(
+    moduleType,
+    pendingReplayModule,
+    "OnCombatReplayPersistenceDrained",
+    [persistenceDrained]
+);
 
-Assert(store.CompleteRunCalls == 1, "Draining replay persistence should complete the deferred run.");
+Assert(
+    store.CompleteRunCalls == 1,
+    "Draining replay persistence should complete the deferred run."
+);
 
 Console.WriteLine("RunLogging module checks passed.");
 
@@ -209,7 +227,9 @@ static object? GetField(object instance, string name)
 {
     var field = instance.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance);
     if (field == null)
-        throw new InvalidOperationException($"Field not found: {instance.GetType().FullName}.{name}");
+        throw new InvalidOperationException(
+            $"Field not found: {instance.GetType().FullName}.{name}"
+        );
 
     return field.GetValue(instance);
 }
@@ -225,7 +245,9 @@ static object? GetProperty(Type type, object instance, string name)
 
 static void SetProperty(object instance, string name, object? value)
 {
-    var property = instance.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+    var property = instance
+        .GetType()
+        .GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
     if (property == null)
         throw new InvalidOperationException(
             $"Property not found: {instance.GetType().FullName}.{name}"

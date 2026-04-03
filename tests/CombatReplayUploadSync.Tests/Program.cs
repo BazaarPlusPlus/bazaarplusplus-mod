@@ -18,7 +18,9 @@ try
     var runStore =
         Activator.CreateInstance(runStoreType, dbPath)
         ?? throw new InvalidOperationException("Failed to create SqliteRunLogStore.");
-    var createRunRequestType = RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCreateRequest");
+    var createRunRequestType = RequireType(
+        "BazaarPlusPlus.Game.RunLogging.Models.RunLogCreateRequest"
+    );
     var createRunRequest = Activator.CreateInstance(createRunRequestType)!;
     createRunRequestType.GetProperty("RunId")!.SetValue(createRunRequest, "server-run-001");
     createRunRequestType
@@ -46,7 +48,8 @@ try
         "BattleArtifactUploadSnapshot should exist as the primary battle upload snapshot type."
     );
     Assert(
-        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadCycleResult") != null,
+        RequireType("BazaarPlusPlus.Game.CombatReplay.Upload.BattleArtifactUploadCycleResult")
+            != null,
         "BattleArtifactUploadCycleResult should exist as the primary battle upload cycle result type."
     );
     Assert(
@@ -189,24 +192,20 @@ try
     var identityStore =
         Activator.CreateInstance(identityStoreType, Path.Combine(tempRoot, "install-id.txt"))
         ?? throw new InvalidOperationException("Failed to create ModApiIdentityStore.");
-    var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
-    );
+    var clientStateStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiClientStateStore");
     var clientStateStore =
         Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to create ModApiClientStateStore.");
-    InvokeVoid(
-        clientStateStoreType,
-        clientStateStore,
-        "SaveClientId",
-        ["run-client-001"]
-    );
+    InvokeVoid(clientStateStoreType, clientStateStore, "SaveClientId", ["run-client-001"]);
     var keyStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiKeyStore");
     var keyStore =
         Activator.CreateInstance(keyStoreType, Path.Combine(tempRoot, "key.json"))
         ?? throw new InvalidOperationException("Failed to create ModApiKeyStore.");
     var routesType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiRoutes");
-    var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
+    var tryCreateRoutes = routesType.GetMethod(
+        "TryCreate",
+        BindingFlags.Public | BindingFlags.Static
+    );
     Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
     var routes =
         tryCreateRoutes!.Invoke(null, ["https://cloudflare.example"])
@@ -254,7 +253,10 @@ try
 
     var persistedClientState = File.ReadAllText(clientStatePath);
     Assert(
-        persistedClientState.Contains("\"client_id\": \"run-client-001\"", StringComparison.Ordinal),
+        persistedClientState.Contains(
+            "\"client_id\": \"run-client-001\"",
+            StringComparison.Ordinal
+        ),
         "Replay upload verification should keep the pre-existing client id untouched when replay registration never starts."
     );
 }

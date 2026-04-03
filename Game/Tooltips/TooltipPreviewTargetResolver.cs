@@ -1,10 +1,10 @@
 #nullable enable
-using BazaarGameClient.Domain.Models.Cards;
 using System.Collections.Generic;
+using BazaarGameClient.Domain.Models.Cards;
+using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
-using HarmonyLib;
 
 namespace BazaarPlusPlus.Game.Tooltips;
 
@@ -12,7 +12,11 @@ internal static class TooltipPreviewTargetResolver
 {
     internal readonly struct TooltipRefreshTarget
     {
-        public TooltipRefreshTarget(CardController controller, ItemCard card, CardTooltipData tooltipData)
+        public TooltipRefreshTarget(
+            CardController controller,
+            ItemCard card,
+            CardTooltipData tooltipData
+        )
         {
             Controller = controller;
             Card = card;
@@ -122,7 +126,10 @@ internal static class TooltipPreviewTargetResolver
             if (TooltipPreviewTargetSelection.AreSameCard(entry.Key, tooltipCard))
                 return entry.Value;
 
-            if (currentCard != null && TooltipPreviewTargetSelection.AreSameCard(entry.Key, currentCard))
+            if (
+                currentCard != null
+                && TooltipPreviewTargetSelection.AreSameCard(entry.Key, currentCard)
+            )
                 return entry.Value;
         }
 

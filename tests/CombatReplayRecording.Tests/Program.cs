@@ -42,10 +42,7 @@ Assert(
 );
 
 Assert(manifestType.GetProperty("BattleId") != null, "Manifest should expose BattleId.");
-Assert(
-    manifestType.GetProperty("RecordedAtUtc") != null,
-    "Manifest should expose RecordedAtUtc."
-);
+Assert(manifestType.GetProperty("RecordedAtUtc") != null, "Manifest should expose RecordedAtUtc.");
 Assert(
     manifestType.GetProperty("SavedAtUtc") == null,
     "Manifest should not expose SavedAtUtc once replay timestamps follow the server contract directly."

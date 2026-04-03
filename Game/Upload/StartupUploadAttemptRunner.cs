@@ -62,9 +62,7 @@ internal sealed class StartupUploadAttemptRunner
             {
                 _task.GetAwaiter().GetResult();
             }
-            catch (OperationCanceledException)
-            {
-            }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 BppLog.Error(_logScope, $"{_failureMessage}: {ex}");

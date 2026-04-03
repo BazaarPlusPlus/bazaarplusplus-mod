@@ -96,9 +96,7 @@ internal sealed class HistoryPanelReplayService
                 $"Replay rejected for battle {battle.BattleId}."
             );
 
-        return HistoryPanelReplayAttemptResult.Success(
-            $"Starting replay for {battle.BattleId}."
-        );
+        return HistoryPanelReplayAttemptResult.Success($"Starting replay for {battle.BattleId}.");
     }
 
     private async Task<HistoryPanelReplayAttemptResult> ReplayGhostBattleAsync(

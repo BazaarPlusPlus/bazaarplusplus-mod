@@ -259,7 +259,10 @@ internal static class BppHotkeyService
     {
         var legacyPressed = legacyCheck();
         var actionPressed = GetOrCreateAction(normalizedBindingPath).IsPressed();
-        if (legacyPressed != actionPressed && LoggedModifierDisagreements.Add(normalizedBindingPath))
+        if (
+            legacyPressed != actionPressed
+            && LoggedModifierDisagreements.Add(normalizedBindingPath)
+        )
         {
             BppLog.Info(
                 "BppHotkeyService",

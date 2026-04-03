@@ -189,10 +189,7 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         if (card == null || !BppRuntimeHost.RunContext.IsInGameRun)
             return false;
 
-        return BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(
-            card.TemplateId.ToString(),
-            out _
-        );
+        return BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(card.TemplateId.ToString(), out _);
     }
 
     private static bool TryBuildPreview(

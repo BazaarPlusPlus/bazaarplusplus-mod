@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
+
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal sealed class RunUploadSqliteStore
@@ -191,7 +192,9 @@ internal sealed class RunUploadSqliteStore
         return new RunSummaryUploadSnapshot
         {
             LastSeq = lastSeq,
-            UploadedStatus = reader.IsDBNull(statusOrdinal) ? null : reader.GetString(statusOrdinal),
+            UploadedStatus = reader.IsDBNull(statusOrdinal)
+                ? null
+                : reader.GetString(statusOrdinal),
             Payload = new RunSummaryUploadPayload
             {
                 SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
@@ -200,7 +203,9 @@ internal sealed class RunUploadSqliteStore
                 PluginVersion = BppPluginVersion.Current,
                 SubmittedAtUtc = DateTimeOffset.UtcNow,
                 RunId = runId,
-                Status = reader.IsDBNull(statusOrdinal) ? string.Empty : reader.GetString(statusOrdinal),
+                Status = reader.IsDBNull(statusOrdinal)
+                    ? string.Empty
+                    : reader.GetString(statusOrdinal),
                 HeroId = null,
                 HeroName = heroName,
                 StartedAtUtc = startedAtUtc,

@@ -289,7 +289,6 @@ internal sealed class GhostBattleApiClient
             _ => combatantId,
         };
     }
-
 }
 
 internal readonly struct GhostBattleApiResult : IModApiAuthenticatedResult

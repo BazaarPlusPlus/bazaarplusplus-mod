@@ -17,10 +17,7 @@ Assert(runner != null, "StartupUploadAttemptRunner should be constructible.");
 var gate = Activator.CreateInstance(gateType, 5f, 10f);
 Assert(gate != null, "StartupUploadAttemptGate should be constructible.");
 
-var tickMethod = runnerType.GetMethod(
-    "Tick",
-    BindingFlags.Public | BindingFlags.Instance
-);
+var tickMethod = runnerType.GetMethod("Tick", BindingFlags.Public | BindingFlags.Instance);
 Assert(tickMethod != null, "StartupUploadAttemptRunner should expose Tick.");
 
 var hasPendingTaskProperty = runnerType.GetProperty("HasPendingTask");
@@ -30,33 +27,48 @@ Assert(
 );
 
 var startCount = 0;
-    Task StartAsync(CancellationToken _)
+Task StartAsync(CancellationToken _)
 {
     startCount++;
     return Task.CompletedTask;
 }
 
-tickMethod!.Invoke(runner, [gate, 3f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]);
+tickMethod!.Invoke(
+    runner,
+    [gate, 3f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]
+);
 Assert(startCount == 0, "Runner should wait until the startup gate becomes eligible.");
 
-tickMethod.Invoke(runner, [gate, 5f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]);
+tickMethod.Invoke(
+    runner,
+    [gate, 5f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]
+);
 Assert(startCount == 1, "Runner should start the upload attempt once when eligible.");
 Assert(
     (bool)(hasPendingTaskProperty!.GetValue(runner) ?? false),
     "Runner should retain the in-flight task until a completion tick processes it."
 );
 
-tickMethod.Invoke(runner, [gate, 6f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]);
+tickMethod.Invoke(
+    runner,
+    [gate, 6f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]
+);
 Assert(startCount == 1, "Runner should not restart the upload before the retry interval elapses.");
 Assert(
     !(bool)(hasPendingTaskProperty.GetValue(runner) ?? true),
     "Runner should clear the pending task after processing completion."
 );
 
-tickMethod.Invoke(runner, [gate, 14f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]);
+tickMethod.Invoke(
+    runner,
+    [gate, 14f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]
+);
 Assert(startCount == 1, "Runner should continue waiting until the retry interval elapses.");
 
-tickMethod.Invoke(runner, [gate, 15f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]);
+tickMethod.Invoke(
+    runner,
+    [gate, 15f, false, (Func<CancellationToken, Task>)StartAsync, CancellationToken.None]
+);
 Assert(startCount == 2, "Runner should restart the upload when the retry interval elapses.");
 
 var liveRunRunner = Activator.CreateInstance(
@@ -76,11 +88,23 @@ Task StartLiveRunAsync(CancellationToken _)
 
 tickMethod.Invoke(
     liveRunRunner,
-    [liveRunGate, 0f, true, (Func<CancellationToken, Task>)StartLiveRunAsync, CancellationToken.None]
+    [
+        liveRunGate,
+        0f,
+        true,
+        (Func<CancellationToken, Task>)StartLiveRunAsync,
+        CancellationToken.None,
+    ]
 );
 tickMethod.Invoke(
     liveRunRunner,
-    [liveRunGate, 1f, false, (Func<CancellationToken, Task>)StartLiveRunAsync, CancellationToken.None]
+    [
+        liveRunGate,
+        1f,
+        false,
+        (Func<CancellationToken, Task>)StartLiveRunAsync,
+        CancellationToken.None,
+    ]
 );
 Assert(
     liveRunStarts == 1,

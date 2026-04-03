@@ -145,9 +145,7 @@ try
 {
     var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
     var identityStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiIdentityStore");
-    var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
-    );
+    var clientStateStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiClientStateStore");
     var keyStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiKeyStore");
     var routesType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiRoutes");
     var bindingResultType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiPlayerBindingResult");
@@ -164,7 +162,10 @@ try
     var keyStore =
         Activator.CreateInstance(keyStoreType, Path.Combine(tempRoot, "key.json"))
         ?? throw new InvalidOperationException("Failed to create ModApiKeyStore.");
-    var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
+    var tryCreateRoutes = routesType.GetMethod(
+        "TryCreate",
+        BindingFlags.Public | BindingFlags.Static
+    );
     Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
     var routes =
         tryCreateRoutes!.Invoke(null, [$"{prefix}"])
@@ -252,44 +253,48 @@ static void InvokeVoid(Type type, object instance, string name, object?[] args)
     method.Invoke(instance, args);
 }
 
-static object CreateHistoryBattleRecord(Type battleRecordType, string? result, string? winnerCombatantId)
+static object CreateHistoryBattleRecord(
+    Type battleRecordType,
+    string? result,
+    string? winnerCombatantId
+)
 {
     var previewDataType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattlePreviewData");
     var previewBoardModelType = RequireType("BazaarPlusPlus.Game.MonsterPreview.PreviewBoardModel");
-    var historyBattleSourceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleSource");
+    var historyBattleSourceType = RequireType(
+        "BazaarPlusPlus.Game.HistoryPanel.HistoryBattleSource"
+    );
     var emptyBoard = Activator.CreateInstance(previewBoardModelType)!;
     var previewData = Activator.CreateInstance(previewDataType, [emptyBoard, emptyBoard])!;
     var ghostSource = Enum.Parse(historyBattleSourceType, "Ghost");
     var ctor = battleRecordType.GetConstructors().Single();
-    return ctor.Invoke(
-        [
-            "battle-1",
-            string.Empty,
-            DateTimeOffset.UtcNow,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            "Opponent",
-            null,
-            null,
-            null,
-            null,
-            null,
-            "PVPCombat",
-            result,
-            winnerCombatantId,
-            null,
-            string.Empty,
-            previewData,
-            ghostSource,
-            false,
-            false,
-        ]
-    );
+    return ctor.Invoke([
+        "battle-1",
+        string.Empty,
+        DateTimeOffset.UtcNow,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        "Opponent",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "PVPCombat",
+        result,
+        winnerCombatantId,
+        null,
+        string.Empty,
+        previewData,
+        ghostSource,
+        false,
+        false,
+    ]);
 }
 
 static int GetFreePort()

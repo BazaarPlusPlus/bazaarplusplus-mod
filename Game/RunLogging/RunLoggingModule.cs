@@ -197,10 +197,7 @@ internal sealed class RunLoggingModule
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                "RunLoggingModule",
-                $"Replay persistence drain handling failed: {ex}"
-            );
+            BppLog.Error("RunLoggingModule", $"Replay persistence drain handling failed: {ex}");
         }
     }
 
@@ -213,7 +210,11 @@ internal sealed class RunLoggingModule
         if (
             !string.IsNullOrWhiteSpace(_pendingInterruptedRunId)
             && activeSession != null
-            && string.Equals(activeSession.RunId, _pendingInterruptedRunId, StringComparison.Ordinal)
+            && string.Equals(
+                activeSession.RunId,
+                _pendingInterruptedRunId,
+                StringComparison.Ordinal
+            )
         )
         {
             if (string.Equals(runId, _pendingInterruptedRunId, StringComparison.Ordinal))
@@ -302,8 +303,7 @@ internal sealed class RunLoggingModule
         if (!forceCompletion && _hasPendingReplayPersistence())
         {
             var deadline =
-                _deferredRunCompletionDeadlineUtc
-                ?? (now + ReplayPersistenceCompletionGracePeriod);
+                _deferredRunCompletionDeadlineUtc ?? (now + ReplayPersistenceCompletionGracePeriod);
             _deferredRunCompletionDeadlineUtc = deadline;
             if (now < deadline)
                 return false;

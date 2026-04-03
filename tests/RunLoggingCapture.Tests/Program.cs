@@ -43,13 +43,17 @@ Assert(
     "RunLogSelectionOptionInput should be removed."
 );
 Assert(
-    captureServiceType.GetMethod("BuildRunProgressEvent", BindingFlags.Public | BindingFlags.Instance)
-        == null,
+    captureServiceType.GetMethod(
+        "BuildRunProgressEvent",
+        BindingFlags.Public | BindingFlags.Instance
+    ) == null,
     "RunLogCaptureService should no longer expose BuildRunProgressEvent."
 );
 Assert(
-    captureServiceType.GetMethod("BuildSelectionSeenEvent", BindingFlags.Public | BindingFlags.Instance)
-        == null,
+    captureServiceType.GetMethod(
+        "BuildSelectionSeenEvent",
+        BindingFlags.Public | BindingFlags.Instance
+    ) == null,
     "RunLogCaptureService should no longer expose BuildSelectionSeenEvent."
 );
 Assert(
@@ -68,8 +72,10 @@ Assert(
     "RunLoggingControllerCore should no longer expose AcceptStateSnapshot."
 );
 Assert(
-    controllerCoreType.GetMethod("AcceptSelectionSnapshot", BindingFlags.Public | BindingFlags.Instance)
-        == null,
+    controllerCoreType.GetMethod(
+        "AcceptSelectionSnapshot",
+        BindingFlags.Public | BindingFlags.Instance
+    ) == null,
     "RunLoggingControllerCore should no longer expose AcceptSelectionSnapshot."
 );
 Assert(
@@ -78,8 +84,10 @@ Assert(
     "RunLoggingControllerCore should no longer expose AcceptChoiceMade."
 );
 Assert(
-    controllerCoreType.GetMethod("AcceptSelectionAbandoned", BindingFlags.Public | BindingFlags.Instance)
-        == null,
+    controllerCoreType.GetMethod(
+        "AcceptSelectionAbandoned",
+        BindingFlags.Public | BindingFlags.Instance
+    ) == null,
     "RunLoggingControllerCore should no longer expose AcceptSelectionAbandoned."
 );
 

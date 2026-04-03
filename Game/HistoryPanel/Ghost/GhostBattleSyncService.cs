@@ -263,10 +263,7 @@ internal sealed class GhostBattleSyncService : IDisposable
             _keyStore,
             _routes.RegisterClient
         );
-        return new ModApiAuthenticatedSession(
-            registrationClient,
-            _clientStateStore
-        );
+        return new ModApiAuthenticatedSession(registrationClient, _clientStateStore);
     }
 
     private static int CalculateLookbackDays(DateTimeOffset? checkpointUtc, DateTimeOffset nowUtc)
@@ -306,6 +303,7 @@ internal sealed class GhostBattleSyncService : IDisposable
             return null;
         }
     }
+
     private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)
     {
         var parentDirectory = System.IO.Path.GetDirectoryName(replayDirectoryPath);

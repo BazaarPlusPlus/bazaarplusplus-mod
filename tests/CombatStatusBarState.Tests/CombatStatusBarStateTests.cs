@@ -1,10 +1,10 @@
+using System.Reflection;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Settings;
-using System.Reflection;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests;
@@ -86,7 +86,12 @@ public sealed class CombatStatusBarStateTests : IDisposable
             "StepCombatSpeed",
         };
         var allMemberNames = typeof(CombatStatusBar)
-            .GetMembers(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .GetMembers(
+                BindingFlags.Static
+                    | BindingFlags.Instance
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+            )
             .Select(member => member.Name)
             .ToHashSet();
 

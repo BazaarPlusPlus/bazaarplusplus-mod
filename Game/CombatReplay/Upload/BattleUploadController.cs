@@ -80,9 +80,10 @@ internal sealed class BattleUploadController : MonoBehaviour
             _runLifecycleSubscription = BppRuntimeHost.EventBus.Subscribe<RunLifecycleChanged>(
                 OnRunLifecycleChanged
             );
-            _replayPersistenceDrainedSubscription = BppRuntimeHost.EventBus.Subscribe<
-                CombatReplayPersistenceDrained
-            >(OnCombatReplayPersistenceDrained);
+            _replayPersistenceDrainedSubscription =
+                BppRuntimeHost.EventBus.Subscribe<CombatReplayPersistenceDrained>(
+                    OnCombatReplayPersistenceDrained
+                );
             BppLog.Info(
                 "BattleUploadController",
                 $"Startup battle upload armed. timeout={requestTimeoutSeconds}s, batch_size={batchSize}, startup_delay={startupDelaySeconds}s, retry_interval={retryIntervalSeconds}s."

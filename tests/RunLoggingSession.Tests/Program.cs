@@ -100,7 +100,10 @@ fakeStore.ResumeState = new RunLogSessionState
 
 var restoredManager = ctor.Invoke([fakeStore, new Func<DateTimeOffset>(() => now.AddMinutes(12))]);
 Invoke<RunLogSessionState?>(managerType, restoredManager, "RestoreActiveSession", []);
-Assert(GetProperty<bool>(managerType, restoredManager, "HasActiveSession"), "RestoreActiveSession should restore the active run.");
+Assert(
+    GetProperty<bool>(managerType, restoredManager, "HasActiveSession"),
+    "RestoreActiveSession should restore the active run."
+);
 
 InvokeVoid(
     managerType,
@@ -108,7 +111,10 @@ InvokeVoid(
     "MarkRunAbandoned",
     [new RunLogAbandonment { Status = "abandoned", EndedAtUtc = now.AddMinutes(15) }]
 );
-Assert(fakeStore.MarkRunAbandonedCalls == 1, "MarkRunAbandoned should call the store exactly once.");
+Assert(
+    fakeStore.MarkRunAbandonedCalls == 1,
+    "MarkRunAbandoned should call the store exactly once."
+);
 Assert(
     !GetProperty<bool>(managerType, restoredManager, "HasActiveSession"),
     "MarkRunAbandoned should clear the active session."
@@ -125,7 +131,10 @@ mismatchStore.ResumeState = new RunLogSessionState
     Day = 1,
     Hour = 1,
 };
-var mismatchManager = ctor.Invoke([mismatchStore, new Func<DateTimeOffset>(() => now.AddMinutes(20))]);
+var mismatchManager = ctor.Invoke([
+    mismatchStore,
+    new Func<DateTimeOffset>(() => now.AddMinutes(20)),
+]);
 Invoke<RunLogSessionState>(
     managerType,
     mismatchManager,
@@ -143,7 +152,10 @@ Invoke<RunLogSessionState>(
         },
     ]
 );
-Assert(mismatchStore.MarkRunAbandonedCalls == 1, "A mismatched restored session should be abandoned.");
+Assert(
+    mismatchStore.MarkRunAbandonedCalls == 1,
+    "A mismatched restored session should be abandoned."
+);
 Assert(
     mismatchStore.LastAbandonment?.Reason == "session_mismatch",
     "Mismatched sessions should be abandoned with the session_mismatch reason."

@@ -191,9 +191,6 @@ internal sealed class RunSummaryUploadService : IDisposable
             _keyStore,
             _routes.RegisterClient
         );
-        return new ModApiAuthenticatedSession(
-            registrationClient,
-            _clientStateStore
-        );
+        return new ModApiAuthenticatedSession(registrationClient, _clientStateStore);
     }
 }

@@ -2,14 +2,8 @@
 using System.Reflection;
 
 var contextType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiBootstrapContext");
-var tryCreateMethod = contextType.GetMethod(
-    "TryCreate",
-    BindingFlags.Public | BindingFlags.Static
-);
-Assert(
-    tryCreateMethod != null,
-    "ModApiBootstrapContext should expose a static TryCreate factory."
-);
+var tryCreateMethod = contextType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
+Assert(tryCreateMethod != null, "ModApiBootstrapContext should expose a static TryCreate factory.");
 
 var validContext = tryCreateMethod!.Invoke(
     null,
@@ -106,14 +100,7 @@ Assert(
 
 var missingCredentialPathContext = tryCreateMethod.Invoke(
     null,
-    [
-        "/tmp/run-logs.db",
-        null,
-        "",
-        "/tmp/client.json",
-        "/tmp/key.json",
-        "https://example.com",
-    ]
+    ["/tmp/run-logs.db", null, "", "/tmp/client.json", "/tmp/key.json", "https://example.com"]
 );
 Assert(
     missingCredentialPathContext == null,
@@ -131,10 +118,7 @@ var invalidEndpointContext = tryCreateMethod.Invoke(
         "ftp://example.com",
     ]
 );
-Assert(
-    invalidEndpointContext == null,
-    "TryCreate should reject non-http(s) API base URLs."
-);
+Assert(invalidEndpointContext == null, "TryCreate should reject non-http(s) API base URLs.");
 
 Console.WriteLine("RunUpload bootstrap tests passed.");
 

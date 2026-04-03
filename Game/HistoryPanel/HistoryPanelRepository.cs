@@ -132,7 +132,8 @@ internal sealed class HistoryPanelRepository
             var finalDay = GetNullableInt32(reader, "final_day") ?? GetNullableInt32(reader, "day");
             var finalHour =
                 GetNullableInt32(reader, "final_hour") ?? GetNullableInt32(reader, "hour");
-            var lastSeen = endedAt ?? GetNullableDateTimeOffset(reader, "last_seen_at_utc") ?? startedAt;
+            var lastSeen =
+                endedAt ?? GetNullableDateTimeOffset(reader, "last_seen_at_utc") ?? startedAt;
             var rawStatus = reader.GetString(reader.GetOrdinal("run_status"));
 
             records.Add(

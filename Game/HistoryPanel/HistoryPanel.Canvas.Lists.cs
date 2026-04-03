@@ -61,39 +61,41 @@ internal sealed partial class HistoryPanel
         if (_runs.Count == 0)
             return "runs:empty";
 
-        return "runs:" + string.Join(
-            "|",
-            _runs.ConvertAll(run =>
-                string.Join(
-                    "~",
-                    run.RunId,
-                    run.Hero ?? string.Empty,
-                    run.RawStatus ?? string.Empty,
-                    run.GameMode ?? string.Empty,
-                    run.LastSeenAtUtc.ToUnixTimeSeconds(),
-                    run.FinalDay?.ToString() ?? string.Empty,
-                    run.BattleCount,
-                    run.Victories?.ToString() ?? string.Empty,
-                    run.Losses?.ToString() ?? string.Empty,
-                    run.PlayerRank ?? string.Empty,
-                    run.PlayerRating?.ToString() ?? string.Empty,
-                    run.MaxHealth?.ToString() ?? string.Empty,
-                    run.Prestige?.ToString() ?? string.Empty,
-                    run.Level?.ToString() ?? string.Empty,
-                    run.Income?.ToString() ?? string.Empty,
-                    run.Gold?.ToString() ?? string.Empty,
-                    run.StartedAtUtc.ToUnixTimeSeconds(),
-                    run.EndedAtUtc?.ToUnixTimeSeconds().ToString() ?? string.Empty
+        return "runs:"
+            + string.Join(
+                "|",
+                _runs.ConvertAll(run =>
+                    string.Join(
+                        "~",
+                        run.RunId,
+                        run.Hero ?? string.Empty,
+                        run.RawStatus ?? string.Empty,
+                        run.GameMode ?? string.Empty,
+                        run.LastSeenAtUtc.ToUnixTimeSeconds(),
+                        run.FinalDay?.ToString() ?? string.Empty,
+                        run.BattleCount,
+                        run.Victories?.ToString() ?? string.Empty,
+                        run.Losses?.ToString() ?? string.Empty,
+                        run.PlayerRank ?? string.Empty,
+                        run.PlayerRating?.ToString() ?? string.Empty,
+                        run.MaxHealth?.ToString() ?? string.Empty,
+                        run.Prestige?.ToString() ?? string.Empty,
+                        run.Level?.ToString() ?? string.Empty,
+                        run.Income?.ToString() ?? string.Empty,
+                        run.Gold?.ToString() ?? string.Empty,
+                        run.StartedAtUtc.ToUnixTimeSeconds(),
+                        run.EndedAtUtc?.ToUnixTimeSeconds().ToString() ?? string.Empty
+                    )
                 )
-            )
-        );
+            );
     }
 
     private string BuildBattleListSignature()
     {
-        var visibleBattles = _sectionMode == HistorySectionMode.Ghost
-            ? FilteredGhostBattles
-            : (IReadOnlyList<HistoryBattleRecord>)_battles;
+        var visibleBattles =
+            _sectionMode == HistorySectionMode.Ghost
+                ? FilteredGhostBattles
+                : (IReadOnlyList<HistoryBattleRecord>)_battles;
         if (visibleBattles.Count == 0)
             return $"{_sectionMode}:empty:{SelectedRun?.RunId ?? string.Empty}";
 
@@ -126,7 +128,9 @@ internal sealed partial class HistoryPanel
 
     private int GetCurrentBattleSelectionIndex()
     {
-        return _sectionMode == HistorySectionMode.Ghost ? _selectedGhostBattleIndex : _selectedBattleIndex;
+        return _sectionMode == HistorySectionMode.Ghost
+            ? _selectedGhostBattleIndex
+            : _selectedBattleIndex;
     }
 
     private void UpdateRunItemSelectionStates()
@@ -147,9 +151,10 @@ internal sealed partial class HistoryPanel
 
     private void UpdateBattleItemSelectionStates()
     {
-        var visibleBattles = _sectionMode == HistorySectionMode.Ghost
-            ? FilteredGhostBattles
-            : (IReadOnlyList<HistoryBattleRecord>)_battles;
+        var visibleBattles =
+            _sectionMode == HistorySectionMode.Ghost
+                ? FilteredGhostBattles
+                : (IReadOnlyList<HistoryBattleRecord>)_battles;
         var selectedIndex = GetCurrentBattleSelectionIndex();
         foreach (var itemView in _battleItemViews)
         {

@@ -25,7 +25,10 @@ internal static class TooltipPreviewTargetSelection
         if (currentTooltipData is not CardTooltipData { CardInstance: ItemCard } cardTooltipData)
             return null;
 
-        if (currentCard is ItemCard itemCard && !AreSameCard(cardTooltipData.CardInstance, itemCard))
+        if (
+            currentCard is ItemCard itemCard
+            && !AreSameCard(cardTooltipData.CardInstance, itemCard)
+        )
             return null;
 
         return cardTooltipData;

@@ -20,9 +20,7 @@ var installIdPath = Path.Combine(tempRoot, "install-id.txt");
 var clientStatePath = Path.Combine(tempRoot, "client.json");
 var privateKeyPath = Path.Combine(tempRoot, "key.json");
 
-var errorFormatterType = RequireType(
-    "BazaarPlusPlus.Game.ModApi.ModApiErrorFormatter"
-);
+var errorFormatterType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiErrorFormatter");
 var formatHttpFailureMethod = errorFormatterType.GetMethod(
     "FormatHttpFailure",
     BindingFlags.Public | BindingFlags.Static
@@ -207,9 +205,7 @@ try
     var identityStore =
         Activator.CreateInstance(identityStoreType, installIdPath)
         ?? throw new InvalidOperationException("Failed to create ModApiIdentityStore.");
-    var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
-    );
+    var clientStateStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiClientStateStore");
     var clientStateStore =
         Activator.CreateInstance(clientStateStoreType, clientStatePath)
         ?? throw new InvalidOperationException("Failed to create ModApiClientStateStore.");
@@ -243,7 +239,10 @@ try
         "ModApiAuthenticatedSession should exist as the primary authenticated session abstraction."
     );
     var routesType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiRoutes");
-    var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
+    var tryCreateRoutes = routesType.GetMethod(
+        "TryCreate",
+        BindingFlags.Public | BindingFlags.Static
+    );
     Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
     var routes =
         tryCreateRoutes!.Invoke(null, [$"{prefix}"])
@@ -288,9 +287,7 @@ try
         ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadService") == null,
         "RunUploadService compatibility type should be removed."
     );
-    var serviceType = RequireType(
-        "BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadService"
-    );
+    var serviceType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunSummaryUploadService");
     var service =
         Activator.CreateInstance(
             serviceType,
@@ -575,15 +572,7 @@ static string BuildCanonical(
 {
     return string.Join(
         "\n",
-        new[]
-        {
-            method.ToUpperInvariant(),
-            absolutePath,
-            clientId,
-            installId,
-            timestamp,
-            bodyHash,
-        }
+        new[] { method.ToUpperInvariant(), absolutePath, clientId, installId, timestamp, bodyHash }
     );
 }
 

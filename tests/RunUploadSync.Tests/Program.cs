@@ -125,11 +125,7 @@ try
             "QueuedRunLogStore should flush pending run events before CompleteRun returns."
         );
         Assert(
-            GetInt64(
-                connection,
-                "SELECT last_seq FROM runs WHERE run_id = $runId;",
-                runId
-            ) == 1,
+            GetInt64(connection, "SELECT last_seq FROM runs WHERE run_id = $runId;", runId) == 1,
             "QueuedRunLogStore should flush the inline run checkpoint state before CompleteRun returns."
         );
         Assert(
@@ -252,9 +248,7 @@ try
         "ModApiIdentityStore should write the install id to disk."
     );
 
-    var clientStateStoreType = RequireType(
-        "BazaarPlusPlus.Game.ModApi.ModApiClientStateStore"
-    );
+    var clientStateStoreType = RequireType("BazaarPlusPlus.Game.ModApi.ModApiClientStateStore");
     Assert(
         ResolveTypeOrNull("BazaarPlusPlus.Game.RunLogging.Upload.RunUploadClientStateStore")
             == null,
@@ -286,12 +280,8 @@ try
     );
     Assert(
         (string)
-            Invoke<object>(
-                clientStateStoreType,
-                clientStateStore,
-                "TryGetBoundPlayerAccountId",
-                []
-            ) == "player-account-001",
+            Invoke<object>(clientStateStoreType, clientStateStore, "TryGetBoundPlayerAccountId", [])
+            == "player-account-001",
         "Client state store should persist the bound player account."
     );
     clientStateStore =
@@ -299,12 +289,8 @@ try
         ?? throw new InvalidOperationException("Failed to recreate ModApiClientStateStore.");
     Assert(
         (string)
-            Invoke<object>(
-                clientStateStoreType,
-                clientStateStore,
-                "TryGetBoundPlayerAccountId",
-                []
-            ) == "player-account-001",
+            Invoke<object>(clientStateStoreType, clientStateStore, "TryGetBoundPlayerAccountId", [])
+            == "player-account-001",
         "Client state store should persist the bound player account across restarts."
     );
     InvokeVoid(clientStateStoreType, clientStateStore, "ClearClientId", []);
@@ -403,10 +389,9 @@ try
         "Key store should also preserve valid-JSON corrupted key payloads before regenerating."
     );
 
-    var startupGateType = RequireType(
-        "BazaarPlusPlus.Game.Upload.StartupUploadAttemptGate"
-    );
-    var gate = Activator.CreateInstance(startupGateType, 5f, 10f)
+    var startupGateType = RequireType("BazaarPlusPlus.Game.Upload.StartupUploadAttemptGate");
+    var gate =
+        Activator.CreateInstance(startupGateType, 5f, 10f)
         ?? throw new InvalidOperationException("Failed to create StartupUploadAttemptGate.");
     var waitDecision = Invoke<object>(startupGateType, gate, "Poll", [4f, false]).ToString();
     Assert(
@@ -418,7 +403,8 @@ try
         firstStartDecision == "Start",
         "Startup upload gate should trigger a single upload attempt once the startup delay elapses."
     );
-    var secondStartDecision = Invoke<object>(startupGateType, gate, "Poll", [14f, false]).ToString();
+    var secondStartDecision = Invoke<object>(startupGateType, gate, "Poll", [14f, false])
+        .ToString();
     Assert(
         secondStartDecision == "Wait",
         "Startup upload gate should wait until the retry interval elapses."
@@ -429,7 +415,8 @@ try
         "Startup upload gate should schedule repeated uploads after the retry interval elapses."
     );
 
-    gate = Activator.CreateInstance(startupGateType, 5f, 10f)
+    gate =
+        Activator.CreateInstance(startupGateType, 5f, 10f)
         ?? throw new InvalidOperationException("Failed to recreate StartupUploadAttemptGate.");
     var skippedDecision = Invoke<object>(startupGateType, gate, "Poll", [5f, true]).ToString();
     Assert(

@@ -47,10 +47,7 @@ internal static class CardTooltipDataFactory
         BindingFlags.Instance | BindingFlags.NonPublic
     )!;
 
-    internal static CardTooltipData Create(
-        Card card,
-        CardTooltipData source
-    )
+    internal static CardTooltipData Create(Card card, CardTooltipData source)
     {
         if (card == null)
             throw new ArgumentNullException(nameof(card));

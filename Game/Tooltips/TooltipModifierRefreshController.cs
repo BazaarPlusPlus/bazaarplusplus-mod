@@ -68,10 +68,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         if (!TryResolveRefreshTarget(tooltipParent, out var target))
             return;
 
-        var refreshedTooltipData = CardTooltipDataFactory.Create(
-            target.Card,
-            target.TooltipData
-        );
+        var refreshedTooltipData = CardTooltipDataFactory.Create(target.Card, target.TooltipData);
 
         tooltipParent.HideCardTooltipController();
         tooltipParent.ShowCardTooltipController(
@@ -79,7 +76,10 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             target.Controller.TooltipOffset,
             refreshedTooltipData
         );
-        UpgradePreviewTooltipPatch.TryScheduleUpgradeTooltip(target.Controller, refreshedTooltipData);
+        UpgradePreviewTooltipPatch.TryScheduleUpgradeTooltip(
+            target.Controller,
+            refreshedTooltipData
+        );
     }
 
     private static bool TryResolveRefreshTarget(
@@ -87,7 +87,12 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         out TooltipPreviewTargetResolver.TooltipRefreshTarget target
     )
     {
-        if (TooltipPreviewTargetResolver.TryResolveCurrentPrimaryItemTooltip(tooltipParent, out target))
+        if (
+            TooltipPreviewTargetResolver.TryResolveCurrentPrimaryItemTooltip(
+                tooltipParent,
+                out target
+            )
+        )
             return true;
 
         var lookup = Data.CardAndSkillLookup;

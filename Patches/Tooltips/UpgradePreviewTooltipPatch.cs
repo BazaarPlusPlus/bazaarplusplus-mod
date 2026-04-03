@@ -92,7 +92,6 @@ internal static class UpgradePreviewTooltipPatch
 
                 yield return null;
             }
-
         }
         finally
         {

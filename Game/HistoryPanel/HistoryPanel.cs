@@ -52,7 +52,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private System.Collections.Generic.List<HistoryBattleRecord> _battles => _state.Battles;
 
-    private System.Collections.Generic.List<HistoryBattleRecord> _ghostBattles => _state.GhostBattles;
+    private System.Collections.Generic.List<HistoryBattleRecord> _ghostBattles =>
+        _state.GhostBattles;
 
     private System.Collections.Generic.List<HistoryBattleRecord> _filteredGhostBattles =>
         _state.FilteredGhostBattles;
@@ -273,8 +274,14 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         return HistoryPanelAccessPolicy.CanOpen(
             _runtime?.IsInGameRun == true,
-            BazaarPlusPlus.Core.Runtime.BppRuntimeHost.Config.EnableCommunityContributionConfig
-                ?.Value ?? true
+            BazaarPlusPlus
+                .Core
+                .Runtime
+                .BppRuntimeHost
+                .Config
+                .EnableCommunityContributionConfig
+                ?.Value
+                ?? true
         );
     }
 

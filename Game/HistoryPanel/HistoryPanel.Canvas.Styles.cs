@@ -646,8 +646,7 @@ internal sealed partial class HistoryPanel
 
     private static string ShortenBattleId(string battleId)
     {
-        return string.IsNullOrWhiteSpace(battleId)
-            ? "-"
+        return string.IsNullOrWhiteSpace(battleId) ? "-"
             : battleId.Length <= 12 ? battleId
             : battleId[..12];
     }

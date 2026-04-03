@@ -70,10 +70,7 @@ internal sealed class BattleArtifactUploadService : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             var attemptedAtUtc = DateTimeOffset.UtcNow;
-            BppLog.Info(
-                "BattleArtifactUploadService",
-                $"Preparing upload for battle {battleId}."
-            );
+            BppLog.Info("BattleArtifactUploadService", $"Preparing upload for battle {battleId}.");
             var preflightSnapshot = _store.TryBuildBattleArtifactSnapshot(
                 battleId,
                 installId,
@@ -239,9 +236,6 @@ internal sealed class BattleArtifactUploadService : IDisposable
             _keyStore,
             _routes.RegisterClient
         );
-        return new ModApiAuthenticatedSession(
-            registrationClient,
-            _clientStateStore
-        );
+        return new ModApiAuthenticatedSession(registrationClient, _clientStateStore);
     }
 }

@@ -117,7 +117,8 @@ internal static class BppClientCacheBridge
 
     private static object? ReadStaticMember(Type type, string memberName)
     {
-        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+        const BindingFlags flags =
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
         return type.GetProperty(memberName, flags)?.GetValue(null, null)
             ?? type.GetField(memberName, flags)?.GetValue(null);
     }
@@ -129,7 +130,10 @@ internal static class BppClientCacheBridge
 
         var type = instance.GetType();
         const BindingFlags flags =
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+            BindingFlags.Public
+            | BindingFlags.NonPublic
+            | BindingFlags.Instance
+            | BindingFlags.Static;
         return type.GetProperty(memberName, flags)?.GetValue(instance, null)
             ?? type.GetField(memberName, flags)?.GetValue(instance);
     }
@@ -145,7 +149,9 @@ internal static class BppClientCacheBridge
         if (value is bool boolValue)
             return boolValue;
 
-        return value == null ? null : bool.TryParse(value.ToString(), out var parsed) ? parsed : null;
+        return value == null ? null
+            : bool.TryParse(value.ToString(), out var parsed) ? parsed
+            : null;
     }
 
     private static int? ReadNullableIntMember(object? instance, string memberName)
@@ -154,6 +160,8 @@ internal static class BppClientCacheBridge
         if (value is int intValue)
             return intValue;
 
-        return value == null ? null : int.TryParse(value.ToString(), out var parsed) ? parsed : null;
+        return value == null ? null
+            : int.TryParse(value.ToString(), out var parsed) ? parsed
+            : null;
     }
 }

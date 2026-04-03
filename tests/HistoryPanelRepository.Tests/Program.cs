@@ -144,7 +144,9 @@ try
         "ListBattleIdsByRun should return all linked battles ordered from newest to oldest."
     );
 
-    var ghostImportType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleImportRecord");
+    var ghostImportType = RequireType(
+        "BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleImportRecord"
+    );
     var replaceGhostBattles = repositoryType.GetMethod(
         "ReplaceGhostBattles",
         [typeof(string), typeof(IReadOnlyList<>).MakeGenericType(ghostImportType)]
@@ -188,11 +190,7 @@ try
         repository,
         [
             "player-account-a",
-            CreateGhostImports(
-                ghostImportType,
-                "ghost-1",
-                nowUtc.AddHours(-2).ToString("o")
-            ),
+            CreateGhostImports(ghostImportType, "ghost-1", nowUtc.AddHours(-2).ToString("o")),
         ]
     );
     markGhostReplayDownloaded.Invoke(repository, ["player-account-a", "ghost-1"]);
@@ -240,11 +238,7 @@ try
         repository,
         [
             "player-account-a",
-            CreateGhostImports(
-                ghostImportType,
-                "ghost-2",
-                nowUtc.AddMinutes(-30).ToString("o")
-            ),
+            CreateGhostImports(ghostImportType, "ghost-2", nowUtc.AddMinutes(-30).ToString("o")),
         ]
     );
     ghostRecords = (
@@ -306,10 +300,7 @@ try
     markGhostReplayDownloaded.Invoke(repository, ["player-account-a", "ghost-stale-downloaded"]);
     repositoryType
         .GetMethod("MarkOldUndownloadedGhostBattlesDeleted")!
-        .Invoke(
-            repository,
-            ["player-account-a", nowUtc]
-        );
+        .Invoke(repository, ["player-account-a", nowUtc]);
     ghostRecords = (
         (System.Collections.IEnumerable)
             listRecentGhostBattles.Invoke(repository, ["player-account-a", 20])!

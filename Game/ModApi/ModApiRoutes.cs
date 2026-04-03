@@ -56,7 +56,9 @@ internal sealed class ModApiRoutes
             return null;
         }
 
-        return new ModApiRoutes(new UriBuilder(apiBaseUri) { Path = string.Empty, Query = string.Empty }.Uri);
+        return new ModApiRoutes(
+            new UriBuilder(apiBaseUri) { Path = string.Empty, Query = string.Empty }.Uri
+        );
     }
 
     private string BuildAbsolute(string path)
