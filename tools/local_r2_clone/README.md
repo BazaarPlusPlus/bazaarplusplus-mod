@@ -93,6 +93,12 @@ python -m tools.local_r2_clone.sync_local_r2_data --remote r2:bazaarplusplus-pvp
 python -m tools.local_r2_clone.rebuild_local_r2_metadata
 ```
 
+基于 `clone.db` 生成 battles 分析图表报表：
+
+```bash
+python -m tools.local_r2_clone.render_battles_charts
+```
+
 如果不想把工作区写到默认目录，可以显式指定：
 
 ```bash
@@ -106,6 +112,7 @@ python -m tools.local_r2_clone.sync_local_r2_data \
 - `runtime/r2/`: 远端对象的本地镜像
 - `runtime/meta/clone.db`: 分析用 `SQLite` 数据库
 - `runtime/meta/sync_state.json`: 最近一次运行状态摘要
+- `runtime/reports/index.html`: battles 图表报表
 
 `clone.db` 里的主要表和视图：
 
@@ -281,4 +288,11 @@ WHERE rs.object_key = (
 ```bash
 sqlite3 tools/local_r2_clone/runtime/meta/clone.db \
   "SELECT run_id, status, hero_name, ended_at_utc FROM run_summaries_latest ORDER BY ended_at_utc DESC LIMIT 20;"
+```
+
+如果要直接看图表报表，运行：
+
+```bash
+python -m tools.local_r2_clone.render_battles_charts
+open tools/local_r2_clone/runtime/reports/index.html
 ```
