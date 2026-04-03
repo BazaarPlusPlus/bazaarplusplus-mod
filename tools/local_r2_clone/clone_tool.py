@@ -439,6 +439,7 @@ def process_object(
         stats.parsed_file_count += 1
     except Exception as exc:
         connection.execute("DELETE FROM battle_replays WHERE object_key = ?", (object_key,))
+        connection.execute("DELETE FROM battle_replay_cards WHERE object_key = ?", (object_key,))
         connection.execute("DELETE FROM run_summaries WHERE object_key = ?", (object_key,))
         upsert_r2_object(
             connection,
@@ -524,9 +525,12 @@ def upsert_battle_replay(
     manifest = expect_mapping(payload.get("battle_manifest"), "battle_manifest")
     participants = expect_mapping(manifest.get("participants"), "battle_manifest.participants")
     outcome = expect_mapping(manifest.get("outcome") or {}, "battle_manifest.outcome")
+    snapshots = expect_mapping(manifest.get("snapshots") or {}, "battle_manifest.snapshots")
     replay_payload = expect_mapping(payload.get("replay_payload"), "replay_payload")
     battle_id = expect_text(payload.get("battle_id"), "battle_id")
     recorded_at_utc = expect_text(manifest.get("recorded_at_utc"), "battle_manifest.recorded_at_utc")
+    battle_day = number_or_none(manifest.get("day"))
+    result = text_or_none(outcome.get("result"))
     connection.execute(
         """
         INSERT INTO battle_replays (
@@ -588,7 +592,7 @@ def upsert_battle_replay(
             text_or_none(payload.get("run_id")),
             client_id,
             recorded_at_utc,
-            number_or_none(manifest.get("day")),
+            battle_day,
             number_or_none(manifest.get("hour")),
             text_or_none(participants.get("player_name")),
             text_or_none(participants.get("player_account_id")),
@@ -603,11 +607,22 @@ def upsert_battle_replay(
             number_or_none(participants.get("opponent_rating")),
             number_or_none(participants.get("opponent_level")),
             text_or_none(manifest.get("combat_kind")),
-            text_or_none(outcome.get("result")),
+            result,
             text_or_none(outcome.get("winner_combatant_id")),
             text_or_none(outcome.get("loser_combatant_id")),
             number_or_none(replay_payload.get("version")),
             replay_size_bytes,
+        ),
+    )
+    replace_battle_replay_cards(
+        connection,
+        object_key,
+        build_snapshot_rows(
+            battle_id,
+            recorded_at_utc,
+            battle_day,
+            result,
+            snapshots,
         ),
     )
 
@@ -676,6 +691,97 @@ def classify_object_key(object_key: str) -> str | None:
     if object_key.startswith("run-summaries/"):
         return "run_summary"
     return None
+
+
+def build_snapshot_rows(
+    battle_id: str,
+    recorded_at_utc: str,
+    battle_day: int | None,
+    result: str | None,
+    snapshots: dict[str, Any],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for side, card_group, snapshot_key in (
+        ("player", "hand", "player_hand"),
+        ("player", "skills", "player_skills"),
+        ("opponent", "hand", "opponent_hand"),
+        ("opponent", "skills", "opponent_skills"),
+    ):
+        capture = snapshots.get(snapshot_key)
+        if not isinstance(capture, dict):
+            continue
+        items = capture.get("items")
+        if not isinstance(items, list):
+            continue
+
+        for slot_index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+
+            card_name = text_or_none(item.get("name"))
+            if card_name is None:
+                continue
+
+            enchant = text_or_none(item.get("enchant")) or "None"
+            tier = text_or_none(item.get("tier")) or "Unknown"
+            rows.append(
+                {
+                    "battle_id": battle_id,
+                    "battle_day": battle_day,
+                    "recorded_at_utc": recorded_at_utc,
+                    "side": side,
+                    "card_group": card_group,
+                    "result": result,
+                    "card_name": card_name,
+                    "enchant": enchant,
+                    "tier": tier,
+                    "slot_index": slot_index,
+                    "battle_card_key": "|".join((battle_id, side, card_name, enchant, tier)),
+                }
+            )
+
+    return rows
+
+
+def replace_battle_replay_cards(
+    connection: sqlite3.Connection,
+    object_key: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    connection.execute("DELETE FROM battle_replay_cards WHERE object_key = ?", (object_key,))
+    for row in rows:
+        connection.execute(
+            """
+            INSERT INTO battle_replay_cards (
+              object_key,
+              battle_id,
+              battle_day,
+              recorded_at_utc,
+              side,
+              card_group,
+              result,
+              card_name,
+              enchant,
+              tier,
+              slot_index,
+              battle_card_key
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                object_key,
+                row["battle_id"],
+                row["battle_day"],
+                row["recorded_at_utc"],
+                row["side"],
+                row["card_group"],
+                row["result"],
+                row["card_name"],
+                row["enchant"],
+                row["tier"],
+                row["slot_index"],
+                row["battle_card_key"],
+            ),
+        )
 
 
 def expect_mapping(value: Any, field_name: str) -> dict[str, Any]:

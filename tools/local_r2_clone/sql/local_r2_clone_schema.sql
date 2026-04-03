@@ -79,6 +79,31 @@ CREATE INDEX IF NOT EXISTS idx_battle_replays_opponent
 CREATE INDEX IF NOT EXISTS idx_battle_replays_run
   ON battle_replays(run_id);
 
+CREATE TABLE IF NOT EXISTS battle_replay_cards (
+  object_key TEXT NOT NULL,
+  battle_id TEXT NOT NULL,
+  battle_day INTEGER NULL,
+  recorded_at_utc TEXT NOT NULL,
+  side TEXT NOT NULL,
+  card_group TEXT NOT NULL,
+  result TEXT NULL,
+  card_name TEXT NOT NULL,
+  enchant TEXT NOT NULL,
+  tier TEXT NOT NULL,
+  slot_index INTEGER NOT NULL,
+  battle_card_key TEXT NOT NULL,
+  FOREIGN KEY (object_key) REFERENCES r2_objects(object_key) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_replay_cards_side_day
+  ON battle_replay_cards(side, battle_day);
+
+CREATE INDEX IF NOT EXISTS idx_battle_replay_cards_card_lookup
+  ON battle_replay_cards(side, card_name, enchant, tier);
+
+CREATE INDEX IF NOT EXISTS idx_battle_replay_cards_battle
+  ON battle_replay_cards(battle_id);
+
 CREATE TABLE IF NOT EXISTS run_summaries (
   object_key TEXT PRIMARY KEY,
   run_id TEXT NOT NULL,
