@@ -390,6 +390,75 @@ def query_card_win_rates_by_day(
     ]
 
 
+def query_top_card_trends(
+    connection: sqlite3.Connection,
+    *,
+    side: str,
+    limit: int = 5,
+) -> list[tuple[int, str, int, int, float]]:
+    win_case = side_win_case(side)
+    return [
+        (
+            int(row["battle_day"]),
+            row["card_label"],
+            int(row["deduped_battles"]),
+            int(row["wins"]),
+            float(row["win_rate_pct"] or 0.0),
+        )
+        for row in fetch_all(
+            connection,
+            f"""
+            WITH card_battles AS (
+              SELECT
+                side,
+                battle_day,
+                card_name,
+                enchant,
+                tier,
+                battle_card_key,
+                MAX(CASE WHEN result IN ('win', 'loss') THEN 1 ELSE 0 END) AS has_decision,
+                MAX({win_case}) AS win_flag
+              FROM battle_replay_cards
+              WHERE side = ?
+                AND battle_day IS NOT NULL
+              GROUP BY side, battle_day, card_name, enchant, tier, battle_card_key
+            ),
+            top_cards AS (
+              SELECT
+                card_name,
+                enchant,
+                tier
+              FROM card_battles
+              GROUP BY card_name, enchant, tier
+              ORDER BY COUNT(*) DESC, card_name ASC, enchant ASC, tier ASC
+              LIMIT ?
+            )
+            SELECT
+              cb.battle_day,
+              cb.card_name || ' | ' || cb.enchant || ' | ' || cb.tier AS card_label,
+              COUNT(*) AS deduped_battles,
+              SUM(CASE WHEN cb.has_decision = 1 THEN cb.win_flag ELSE 0 END) AS wins,
+              COALESCE(
+                ROUND(
+                  100.0 * SUM(CASE WHEN cb.has_decision = 1 THEN cb.win_flag ELSE 0 END)
+                  / NULLIF(SUM(CASE WHEN cb.has_decision = 1 THEN 1 ELSE 0 END), 0),
+                  2
+                ),
+                0
+              ) AS win_rate_pct
+            FROM card_battles cb
+            JOIN top_cards tc
+              ON tc.card_name = cb.card_name
+             AND tc.enchant = cb.enchant
+             AND tc.tier = cb.tier
+            GROUP BY cb.battle_day, card_label
+            ORDER BY cb.battle_day ASC, card_label ASC
+            """,
+            (side, limit),
+        )
+    ]
+
+
 def human_bytes(value: int) -> str:
     if value < 1024:
         return f"{value} B"
@@ -508,6 +577,74 @@ def render_line_chart(
     return "\n".join(parts)
 
 
+def render_multi_series_line_chart(
+    title: str,
+    x_labels: Sequence[str],
+    series: Sequence[tuple[str, Sequence[float | int]]],
+    *,
+    value_formatter: str = "{value}",
+    width: int = 720,
+    height: int = 360,
+) -> str:
+    if not x_labels or not series:
+        return render_empty_chart(title)
+
+    left = 56
+    right = 20
+    top = 24
+    bottom = 72
+    legend_height = 20 + 20 * len(series)
+    inner_width = width - left - right
+    inner_height = height - top - bottom - legend_height
+    max_value = max(float(value) for _, values in series for value in values) or 1.0
+    step_x = inner_width / max(len(x_labels) - 1, 1)
+    palette = ("#b45309", "#15803d", "#2563eb", "#dc2626", "#7c3aed", "#0f766e")
+
+    parts = [
+        f'<svg viewBox="0 0 {width} {height}" class="chart" role="img" aria-label="{escape(title)}">'
+    ]
+    for tick in range(5):
+        y = top + inner_height * tick / 4
+        value = max_value * (4 - tick) / 4
+        parts.append(
+            f'<line x1="{left}" y1="{y:.1f}" x2="{width - right}" y2="{y:.1f}" class="grid" />'
+        )
+        parts.append(
+            f'<text x="{left - 8}" y="{y + 4:.1f}" class="axis-label axis-value">{escape(value_formatter.format(value=round(value, 2)))}</text>'
+        )
+
+    for index, label in enumerate(x_labels):
+        x = left + index * step_x
+        parts.append(
+            f'<text x="{x:.1f}" y="{top + inner_height + 24:.1f}" class="axis-label x-label">{escape(label)}</text>'
+        )
+
+    for series_index, (series_label, values) in enumerate(series):
+        color = palette[series_index % len(palette)]
+        points: list[str] = []
+        for value_index, raw_value in enumerate(values):
+            value = float(raw_value)
+            x = left + value_index * step_x
+            y = top + inner_height - (0 if max_value == 0 else inner_height * value / max_value)
+            points.append(f"{x:.1f},{y:.1f}")
+            parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{color}" />')
+
+        parts.append(
+            f'<polyline fill="none" stroke="{color}" stroke-width="3" points="{" ".join(points)}" />'
+        )
+
+        legend_y = top + inner_height + 40 + 20 * series_index
+        parts.append(
+            f'<line x1="{left:.1f}" y1="{legend_y:.1f}" x2="{left + 18:.1f}" y2="{legend_y:.1f}" stroke="{color}" stroke-width="3" />'
+        )
+        parts.append(
+            f'<text x="{left + 26:.1f}" y="{legend_y + 4:.1f}" class="axis-label">{escape(series_label)}</text>'
+        )
+
+    parts.append("</svg>")
+    return "\n".join(parts)
+
+
 def render_empty_chart(title: str) -> str:
     return (
         f'<div class="empty-chart" aria-label="{escape(title)}">'
@@ -547,6 +684,35 @@ def render_table(title: str, headers: Sequence[str], rows: Iterable[Sequence[obj
     )
 
 
+def build_trend_chart(
+    title: str,
+    trend_rows: Sequence[tuple[int, str, int, int, float]],
+) -> str:
+    if not trend_rows:
+        return render_empty_chart(title)
+
+    days = sorted({battle_day for battle_day, _, _, _, _ in trend_rows})
+    x_labels = [f"Day {day}" for day in days]
+    labels = sorted({card_label for _, card_label, _, _, _ in trend_rows})
+    trend_map = {
+        (battle_day, card_label): win_rate_pct
+        for battle_day, card_label, _, _, win_rate_pct in trend_rows
+    }
+    series = [
+        (
+            card_label,
+            [trend_map.get((day, card_label), 0.0) for day in days],
+        )
+        for card_label in labels
+    ]
+    return render_multi_series_line_chart(
+        title,
+        x_labels,
+        series,
+        value_formatter="{value}%",
+    )
+
+
 def build_report_html(connection: sqlite3.Connection) -> str:
     kpis = query_kpis(connection)
     daily = query_daily_battles(connection)
@@ -561,6 +727,17 @@ def build_report_html(connection: sqlite3.Connection) -> str:
     top_opponent_cards = query_top_cards(connection, side="opponent")
     player_cards_by_day = query_card_win_rates_by_day(connection, side="player")
     opponent_cards_by_day = query_card_win_rates_by_day(connection, side="opponent")
+    player_trends = query_top_card_trends(connection, side="player")
+    opponent_trends = query_top_card_trends(connection, side="opponent")
+
+    player_trend_chart = build_trend_chart(
+        "Top Player Cards Across Days",
+        player_trends,
+    )
+    opponent_trend_chart = build_trend_chart(
+        "Top Opponent Cards Across Days",
+        opponent_trends,
+    )
 
     sections = [
         render_kpis(kpis),
@@ -603,6 +780,16 @@ def build_report_html(connection: sqlite3.Connection) -> str:
             "Rank Win Rate Details",
             ("Rank", "Battles", "Win Rate %"),
             ((rank, count, f"{rate:.2f}") for rank, count, rate in rank_win_rates),
+        ),
+        render_chart_section(
+            "Top Player Cards Across Days",
+            "Win-rate trends for the most common player-side cards across battle days.",
+            player_trend_chart,
+        ),
+        render_chart_section(
+            "Top Opponent Cards Across Days",
+            "Win-rate trends for the most common opponent-side cards across battle days.",
+            opponent_trend_chart,
         ),
         render_table(
             "Top Player Cards",
