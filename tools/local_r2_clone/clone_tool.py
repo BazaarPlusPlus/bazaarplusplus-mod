@@ -14,10 +14,15 @@ from typing import Any, Callable
 MODULE_DIR = Path(__file__).resolve().parent
 SQL_DIR = MODULE_DIR / "sql"
 DEFAULT_BASE_DIR = MODULE_DIR
+PROJECTION_PROGRESS_INTERVAL = 500
 
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def cli_log(message: str) -> None:
+    print(f"[local_r2_clone] {utc_now()} {message}", flush=True)
 
 
 @dataclass(frozen=True)
@@ -163,16 +168,39 @@ def run_sync(
         with connect_db(paths.db_path) as connection:
             start_sync_run(connection, sync_run_id, "sync", started_at_utc)
 
+        cli_log(
+            f"starting sync run_id={sync_run_id} remote={remote} mirror_dir={paths.mirror_dir}"
+        )
+        rclone_args = [
+            "rclone",
+            "sync",
+            "--progress",
+            "--stats",
+            "5s",
+            "-vv",
+            remote,
+            str(paths.mirror_dir),
+        ]
+        cli_log(f"running rclone sync remote={remote} target={paths.mirror_dir}")
+
         result = rclone_runner(
-            ["rclone", "sync", remote, str(paths.mirror_dir)],
+            rclone_args,
             check=False,
         )
+        cli_log(f"rclone sync finished exit_code={getattr(result, 'returncode', 0)}")
         if getattr(result, "returncode", 0) != 0:
             raise RuntimeError(f"rclone sync failed with exit code {result.returncode}")
         rclone_success = True
 
         with connect_db(paths.db_path) as connection:
-            stats = project_mirror(connection, paths, sync_run_id, cleanup_missing=True)
+            cli_log(f"starting metadata projection run_id={sync_run_id}")
+            stats = project_mirror(
+                connection,
+                paths,
+                sync_run_id,
+                cleanup_missing=True,
+                progress_logger=cli_log,
+            )
             finish_sync_run(
                 connection,
                 sync_run_id,
@@ -181,10 +209,16 @@ def run_sync(
                 stats=stats,
                 error_message=None,
             )
+        cli_log(
+            "projection finished "
+            f"scanned={stats.scanned_file_count} changed={stats.changed_file_count} "
+            f"parsed={stats.parsed_file_count} errors={stats.error_count}"
+        )
         final_status = "succeeded"
         return sync_run_id
     except Exception as exc:
         error_message = str(exc)
+        cli_log(f"sync failed run_id={sync_run_id} error={error_message}")
         raise
     finally:
         finished_at_utc = utc_now()
@@ -207,6 +241,10 @@ def run_sync(
                 sync_run_id=sync_run_id,
                 last_rclone_success=rclone_success,
             ),
+        )
+        cli_log(
+            f"sync finished run_id={sync_run_id} status={final_status} "
+            f"last_rclone_success={str(rclone_success).lower()}"
         )
 
 
@@ -284,6 +322,7 @@ def project_mirror(
     sync_run_id: str,
     *,
     cleanup_missing: bool,
+    progress_logger: Callable[[str], None] | None = None,
 ) -> ProjectionStats:
     stats = ProjectionStats()
     for file_path in sorted(paths.mirror_dir.rglob("*.json")):
@@ -303,6 +342,15 @@ def project_mirror(
             sync_run_id,
             stats,
         )
+        if (
+            progress_logger is not None
+            and stats.scanned_file_count % PROJECTION_PROGRESS_INTERVAL == 0
+        ):
+            progress_logger(
+                "projection progress "
+                f"scanned={stats.scanned_file_count} changed={stats.changed_file_count} "
+                f"parsed={stats.parsed_file_count} errors={stats.error_count}"
+            )
 
     if cleanup_missing:
         connection.execute(

@@ -4,6 +4,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from io import StringIO
 from pathlib import Path
 from unittest import mock
 
@@ -224,13 +225,39 @@ class LocalR2CloneTests(unittest.TestCase):
 
         self.assertEqual(
             calls,
-            [["rclone", "sync", "remote-name:bucket", str(self.paths.mirror_dir)]],
+            [[
+                "rclone",
+                "sync",
+                "--progress",
+                "--stats",
+                "5s",
+                "-vv",
+                "remote-name:bucket",
+                str(self.paths.mirror_dir),
+            ]],
         )
 
         state = json.loads(self.paths.sync_state_path.read_text(encoding="utf-8"))
         self.assertEqual(state["last_sync_status"], "succeeded")
         self.assertTrue(state["last_rclone_success"])
         self.assertTrue(state["last_sync_run_id"])
+
+    def test_sync_logs_stage_progress_to_stdout(self) -> None:
+        stdout = StringIO()
+
+        with mock.patch("sys.stdout", stdout):
+            run_sync(
+                self.paths,
+                remote="remote-name:bucket",
+                rclone_runner=lambda args, **kwargs: mock.Mock(returncode=0),
+            )
+
+        output = stdout.getvalue()
+        self.assertIn("starting sync run_id=", output)
+        self.assertIn("running rclone sync remote=remote-name:bucket", output)
+        self.assertIn("rclone sync finished exit_code=0", output)
+        self.assertIn("starting metadata projection", output)
+        self.assertIn("projection finished", output)
 
 
 if __name__ == "__main__":
