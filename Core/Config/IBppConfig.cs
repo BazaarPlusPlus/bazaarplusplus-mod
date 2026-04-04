@@ -13,6 +13,8 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? EnableCombatStatusBarConfig { get; }
 
+    ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; }
+
     ConfigEntry<string>? EnchantPreviewHotkeyPathConfig { get; }
 
     ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; }

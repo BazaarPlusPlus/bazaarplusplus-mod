@@ -29,6 +29,16 @@ internal sealed partial class CombatStatusBar
     private Text? _frameValue;
     private Image? _frameBackground;
 
+    private Text? _speedLabel;
+    private Button? _decrementButton;
+    private Text? _decrementButtonText;
+    private Image? _decrementButtonBackground;
+    private Button? _incrementButton;
+    private Text? _incrementButtonText;
+    private Image? _incrementButtonBackground;
+    private Image? _speedDot;
+    private Image? _speedBackground;
+
     private Text? _pauseLabel;
     private Button? _pauseButton;
     private Text? _pauseButtonText;
@@ -37,6 +47,7 @@ internal sealed partial class CombatStatusBar
 
     private Image? _timeDivider;
     private Image? _frameDivider;
+    private Image? _speedDivider;
 
     private void EnsureUi()
     {
@@ -79,7 +90,7 @@ internal sealed partial class CombatStatusBar
         _barRoot.anchorMax = new Vector2(0.5f, 0f);
         _barRoot.pivot = new Vector2(0.5f, 0f);
         _barRoot.anchoredPosition = new Vector2(0f, BarBottomMargin);
-        _barRoot.sizeDelta = new Vector2(368f, BarHeight);
+        _barRoot.sizeDelta = new Vector2(462f, BarHeight);
 
         _barBackground = AddImage(_barRoot.gameObject, new Color(0.06f, 0.07f, 0.09f, 0.90f));
         _barGlow = AddChildImage("BarGlow", _barRoot, new Color(0.28f, 0.22f, 0.12f, 0.10f));
@@ -119,6 +130,18 @@ internal sealed partial class CombatStatusBar
 
         _frameDivider = CreateDivider(_barRoot);
 
+        var speedSegment = CreateInteractiveSegment(
+            "SpeedSegment",
+            _barRoot,
+            84f,
+            out _speedBackground,
+            out _speedLabel
+        );
+        SetLabel(_speedLabel, "Speed");
+        CreateSpeedContent(speedSegment);
+
+        _speedDivider = CreateDivider(_barRoot);
+
         var pauseSegment = CreateInteractiveSegment(
             "PauseSegment",
             _barRoot,
@@ -147,6 +170,15 @@ internal sealed partial class CombatStatusBar
         _frameLabel = null;
         _frameValue = null;
         _frameBackground = null;
+        _speedLabel = null;
+        _decrementButton = null;
+        _decrementButtonText = null;
+        _decrementButtonBackground = null;
+        _incrementButton = null;
+        _incrementButtonText = null;
+        _incrementButtonBackground = null;
+        _speedDot = null;
+        _speedBackground = null;
         _pauseLabel = null;
         _pauseButton = null;
         _pauseButtonText = null;
@@ -154,6 +186,7 @@ internal sealed partial class CombatStatusBar
         _pauseBackground = null;
         _timeDivider = null;
         _frameDivider = null;
+        _speedDivider = null;
     }
 
     private void SetUiVisible(bool visible)
@@ -207,12 +240,15 @@ internal sealed partial class CombatStatusBar
         SetImageColor(_barGlow, glowColor);
         SetImageColor(_timeBackground, segmentColor);
         SetImageColor(_frameBackground, segmentColor);
+        SetImageColor(_speedBackground, segmentColor);
         SetImageColor(_pauseBackground, segmentColor);
         SetImageColor(_timeDivider, dividerColor);
         SetImageColor(_frameDivider, dividerColor);
+        SetImageColor(_speedDivider, dividerColor);
 
         SetTextColor(_timeLabel, labelColor);
         SetTextColor(_frameLabel, labelColor);
+        SetTextColor(_speedLabel, labelColor);
         SetTextColor(_pauseLabel, labelColor);
         SetTextColor(_timeValue, valueColor);
         SetTextColor(_frameValue, valueColor);
@@ -222,6 +258,39 @@ internal sealed partial class CombatStatusBar
             _timeValue.text = GetDisplayedTimeText();
         if (_frameValue != null)
             _frameValue.text = GetDisplayedFrameText();
+
+        var speedButtonColor = Color.Lerp(
+            new Color(0.26f, 0.30f, 0.36f, 0.92f),
+            new Color(0.48f, 0.33f, 0.13f, 0.95f),
+            _visualBlend
+        );
+        var speedButtonPressedColor = Color.Lerp(
+            new Color(0.35f, 0.39f, 0.46f, 1f),
+            new Color(0.66f, 0.47f, 0.16f, 1f),
+            _visualBlend
+        );
+        var speedButtonDisabledColor = new Color(0.22f, 0.24f, 0.28f, 0.45f);
+        ApplyButtonColors(
+            _decrementButton,
+            _decrementButtonBackground,
+            _decrementButtonText,
+            CanStepCombatSpeed(-1),
+            speedButtonColor,
+            speedButtonPressedColor,
+            speedButtonDisabledColor,
+            valueColor
+        );
+        ApplyButtonColors(
+            _incrementButton,
+            _incrementButtonBackground,
+            _incrementButtonText,
+            CanStepCombatSpeed(1),
+            speedButtonColor,
+            speedButtonPressedColor,
+            speedButtonDisabledColor,
+            valueColor
+        );
+        RefreshSpeedDot();
 
         var pauseInteractable = CanToggleCombatPause();
         var pauseBaseColor = IsCombatPaused
@@ -259,6 +328,68 @@ internal sealed partial class CombatStatusBar
         );
         if (_pauseButtonText != null)
             _pauseButtonText.text = IsCombatPaused ? ">" : "||";
+    }
+
+    private void CreateSpeedContent(RectTransform parent)
+    {
+        var row = CreateRect("SpeedRow", parent);
+        row.anchorMin = Vector2.zero;
+        row.anchorMax = Vector2.one;
+        row.offsetMin = new Vector2(8f, 8f);
+        row.offsetMax = new Vector2(-8f, -22f);
+
+        var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 5f;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        (_decrementButton, _decrementButtonBackground, _decrementButtonText) = CreateButton(
+            "DecrementButton",
+            row,
+            "<",
+            22f
+        );
+
+        var dotContainer = CreateRect("SpeedDotContainer", row);
+        var dotLayout = dotContainer.gameObject.AddComponent<LayoutElement>();
+        dotLayout.minWidth = 14f;
+        dotLayout.preferredWidth = 14f;
+        dotLayout.minHeight = 14f;
+        dotLayout.preferredHeight = 14f;
+        dotLayout.flexibleWidth = 0f;
+        dotLayout.flexibleHeight = 0f;
+
+        _speedDot = AddChildImage("SpeedDot", dotContainer, Color.white);
+        _speedDot.rectTransform.offsetMin = Vector2.zero;
+        _speedDot.rectTransform.offsetMax = Vector2.zero;
+
+        (_incrementButton, _incrementButtonBackground, _incrementButtonText) = CreateButton(
+            "IncrementButton",
+            row,
+            ">",
+            22f
+        );
+
+        _decrementButton.onClick.AddListener(() => StepCombatSpeed(-1));
+        _incrementButton.onClick.AddListener(() => StepCombatSpeed(1));
+    }
+
+    private void RefreshSpeedDot()
+    {
+        if (_speedDot == null)
+            return;
+
+        var color = Mathf.RoundToInt(CombatSpeedMultiplier * 100f) switch
+        {
+            50 => new Color(0.46f, 0.30f, 0.16f, 0.98f),
+            67 => new Color(0.58f, 0.44f, 0.24f, 0.98f),
+            _ => new Color(0.42f, 0.78f, 0.36f, 0.98f),
+        };
+
+        _speedDot.color = color;
     }
 
     private void CreatePauseContent(RectTransform parent)

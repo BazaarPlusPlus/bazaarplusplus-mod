@@ -72,14 +72,13 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void CombatStatusBarState_DoesNotExposeSpeedControlMembers()
+    public void CombatStatusBarState_ExposesExpectedSpeedControlMembers()
     {
-        var forbiddenMemberNames = new[]
+        var requiredMemberNames = new[]
         {
             "CombatSpeedMultiplier",
             "CombatSpeedSteps",
             "CanStepCombatSpeed",
-            "FormatCombatSpeedLabel",
             "NormalizeConfiguredDefaultSpeed",
             "SetCombatSpeed",
             "ShouldOverrideCombatSpeed",
@@ -95,8 +94,45 @@ public sealed class CombatStatusBarStateTests : IDisposable
             .Select(member => member.Name)
             .ToHashSet();
 
-        foreach (var memberName in forbiddenMemberNames)
-            Assert.DoesNotContain(memberName, allMemberNames);
+        foreach (var memberName in requiredMemberNames)
+            Assert.Contains(memberName, allMemberNames);
+    }
+
+    [Fact]
+    public void CombatSpeed_UsesRequestedDiscreteSteps()
+    {
+        Assert.Equal(1f, CombatStatusBar.CombatSpeedMultiplier, 3);
+        Assert.Equal(1f, CombatStatusBar.NormalizeConfiguredDefaultSpeed(1f), 3);
+        Assert.Equal(1f, CombatStatusBar.NormalizeConfiguredDefaultSpeed(1.25f), 3);
+
+        CombatStatusBar.SetCombatSpeed(0.67f);
+        Assert.Equal(0.67f, CombatStatusBar.CombatSpeedMultiplier, 3);
+
+        CombatStatusBar.StepCombatSpeed(-1);
+        Assert.Equal(0.5f, CombatStatusBar.CombatSpeedMultiplier, 3);
+
+        CombatStatusBar.StepCombatSpeed(1);
+        CombatStatusBar.StepCombatSpeed(1);
+        Assert.Equal(1f, CombatStatusBar.CombatSpeedMultiplier, 3);
+    }
+
+    [Fact]
+    public void CombatSpeed_CanStepWithinBounds_AndOnlyOverridesDuringPlayback()
+    {
+        Assert.False(CombatStatusBar.ShouldOverrideCombatSpeed(1f));
+
+        CombatStatusBar.SetCombatSpeed(0.5f);
+        Assert.False(CombatStatusBar.CanStepCombatSpeed(-1));
+        Assert.True(CombatStatusBar.CanStepCombatSpeed(1));
+
+        CombatStatusBar.BeginCombatPlayback();
+
+        Assert.True(CombatStatusBar.ShouldOverrideCombatSpeed(1f));
+        Assert.False(CombatStatusBar.ShouldOverrideCombatSpeed(1.2f));
+
+        CombatStatusBar.SetCombatSpeed(1f);
+        Assert.True(CombatStatusBar.CanStepCombatSpeed(-1));
+        Assert.False(CombatStatusBar.CanStepCombatSpeed(1));
     }
 
     [Fact]
