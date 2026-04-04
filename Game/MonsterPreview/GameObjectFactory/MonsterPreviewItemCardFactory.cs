@@ -258,7 +258,73 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
         // Pooled item cards can retain stale frame/back/material state. Reset then rerun setup
         // so the preview reflects the current CardData and does not poison the shared item pool.
         itemController.Cleanup();
+        ResetItemVfx(itemController);
         await itemController.Setup(card);
+        ApplyPreviewStatusVfx(itemController, card);
+    }
+
+    private static void ResetItemVfx(ItemController itemController)
+    {
+        if (itemController == null)
+            return;
+
+        InvokeItemVfxMethod(itemController, "DisableAllVFX");
+        InvokeItemVfxMethod(itemController, "UpdateHeatedVFX", 0f);
+        InvokeItemVfxMethod(itemController, "UpdateChilledVFX", 0f);
+        InvokeItemVfxMethod(itemController, "UpdateFreezeVFX", 0f);
+    }
+
+    private static void ApplyPreviewStatusVfx(ItemController itemController, ItemCard card)
+    {
+        if (itemController == null || card?.Attributes == null)
+            return;
+
+        var freezeValue = GetPreviewAttributeValue(card, ECardAttributeType.Freeze);
+        var heatedValue = GetPreviewAttributeValue(card, ECardAttributeType.Heated);
+        var chilledValue = GetPreviewAttributeValue(card, ECardAttributeType.Chilled);
+
+        InvokeItemVfxMethod(itemController, "UpdateFreezeVFX", (float)freezeValue);
+        InvokeItemVfxMethod(itemController, "UpdateHeatedVFX", (float)heatedValue);
+        InvokeItemVfxMethod(itemController, "UpdateChilledVFX", (float)chilledValue);
+    }
+
+    private static int GetPreviewAttributeValue(ItemCard card, ECardAttributeType attributeType)
+    {
+        if (card?.Attributes == null)
+            return 0;
+
+        return card.Attributes.TryGetValue(attributeType, out var value) ? value : 0;
+    }
+
+    private static void InvokeItemVfxMethod(
+        ItemController itemController,
+        string methodName,
+        params object[] args
+    )
+    {
+        var cardVfxController = itemController?.CardVFXController;
+        if (cardVfxController == null || string.IsNullOrWhiteSpace(methodName))
+            return;
+
+        try
+        {
+            var parameterTypes =
+                args?.Select(argument => argument?.GetType() ?? typeof(object)).ToArray()
+                ?? Type.EmptyTypes;
+            var method = cardVfxController
+                .GetType()
+                .GetMethod(
+                    methodName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null,
+                    parameterTypes,
+                    null
+                );
+            method?.Invoke(cardVfxController, args);
+        }
+        catch
+        {
+        }
     }
 
     private bool EnsureApi(AssetLoader loader)
