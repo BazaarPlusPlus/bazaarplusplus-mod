@@ -132,7 +132,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             BindReplayBoardUiController(bindings.PlayerController, registerPlayerHealthBar: true);
 
         if (bindings.OpponentController != null)
-            BindReplayBoardUiController(bindings.OpponentController, registerPlayerHealthBar: false);
+            BindReplayBoardUiController(
+                bindings.OpponentController,
+                registerPlayerHealthBar: false
+            );
 
         await Task.Delay(150);
         return bindings;
@@ -176,7 +179,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         return healthBar?.gameObject.activeInHierarchy == true;
     }
 
-    private static float GetControllerAnchorDistance(BoardUIController controller, Transform? anchor)
+    private static float GetControllerAnchorDistance(
+        BoardUIController controller,
+        Transform? anchor
+    )
     {
         if (anchor == null)
             return float.MaxValue;
@@ -238,7 +244,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                     "Attributes",
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
                 );
-            if (attributesProperty?.GetValue(player) is not System.Collections.IDictionary attributes)
+            if (
+                attributesProperty?.GetValue(player)
+                is not System.Collections.IDictionary attributes
+            )
                 return;
 
             if (attributes.Contains(EPlayerAttributeType.HealthMax))
