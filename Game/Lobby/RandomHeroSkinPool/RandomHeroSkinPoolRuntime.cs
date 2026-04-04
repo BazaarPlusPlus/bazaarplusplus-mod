@@ -40,7 +40,8 @@ internal static class RandomHeroSkinPoolRuntime
             return Array.Empty<BazaarSaleItem>();
 
         return collectionType == BazaarInventoryTypes.ECollectionType.HeroSkins
-            ? collectionManager.GetPlayerHeroSkins(hero, includeDefault: true) ?? Array.Empty<BazaarSaleItem>()
+            ? collectionManager.GetPlayerHeroSkins(hero, includeDefault: true)
+                ?? Array.Empty<BazaarSaleItem>()
             : collectionManager.GetPlayerCollectables(collectionType, includeDefault: true)
                 ?? Array.Empty<BazaarSaleItem>();
     }
@@ -113,7 +114,11 @@ internal static class RandomHeroSkinPoolRuntime
             return;
 
         var nextState = state.SetSelected(collectionItemId, isSelected: true);
-        RandomHeroSkinPoolPlayerPrefs.SaveSelectedIds(hero, collectionType, nextState.SelectedSkinIds);
+        RandomHeroSkinPoolPlayerPrefs.SaveSelectedIds(
+            hero,
+            collectionType,
+            nextState.SelectedSkinIds
+        );
     }
 
     private static void ApplySelection(

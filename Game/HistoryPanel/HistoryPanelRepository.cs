@@ -26,8 +26,10 @@ internal sealed class HistoryPanelRepository
     private const string RecentGhostSyncScopePrefix = "recent_against_me";
     private static readonly TimeSpan GhostRetentionWindow = TimeSpan.FromDays(14);
     private static readonly object SocketEffectTemplateLock = new();
-    private static readonly Dictionary<(Guid TemplateId, int Tier), ECardAttributeType?>
-        SocketEffectAttributeTypeCache = new();
+    private static readonly Dictionary<
+        (Guid TemplateId, int Tier),
+        ECardAttributeType?
+    > SocketEffectAttributeTypeCache = new();
     private static object? _staticGameData;
 
     private static readonly JsonSerializerSettings SerializerSettings = new()
@@ -944,9 +946,10 @@ internal sealed class HistoryPanelRepository
         };
     }
 
-    private static IReadOnlyDictionary<EContainerSocketId, HashSet<ECardAttributeType>> BuildSocketEffectMap(
-        IEnumerable<CombatReplayCardSnapshot>? snapshots
-    )
+    private static IReadOnlyDictionary<
+        EContainerSocketId,
+        HashSet<ECardAttributeType>
+    > BuildSocketEffectMap(IEnumerable<CombatReplayCardSnapshot>? snapshots)
     {
         var result = new Dictionary<EContainerSocketId, HashSet<ECardAttributeType>>();
         if (snapshots == null)
@@ -1048,8 +1051,10 @@ internal sealed class HistoryPanelRepository
                 {
                     if (
                         aura?.Action is TAuraActionCardModifyAttribute action
-                        && (action.AttributeType == ECardAttributeType.Heated
-                            || action.AttributeType == ECardAttributeType.Chilled)
+                        && (
+                            action.AttributeType == ECardAttributeType.Heated
+                            || action.AttributeType == ECardAttributeType.Chilled
+                        )
                     )
                     {
                         resolvedType = action.AttributeType;
@@ -1058,9 +1063,7 @@ internal sealed class HistoryPanelRepository
                 }
             }
         }
-        catch
-        {
-        }
+        catch { }
 
         lock (SocketEffectTemplateLock)
             SocketEffectAttributeTypeCache[cacheKey] = resolvedType;

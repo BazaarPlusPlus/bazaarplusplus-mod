@@ -71,8 +71,7 @@ internal static class RandomHeroSkinPoolPlayerPrefs
 
     private static void SaveIdCollection(string key, IEnumerable<string> ids)
     {
-        var normalized = ids
-            .Where(id => !string.IsNullOrWhiteSpace(id))
+        var normalized = ids.Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
@@ -93,14 +92,12 @@ internal static class RandomHeroSkinPoolPlayerPrefs
         BazaarInventoryTypes.ECollectionType collectionType
     )
     {
-        return
-            $"{SelectedPoolPrefsKeyPrefix}.{Uri.EscapeDataString(collectionType.ToString())}.{Uri.EscapeDataString(hero.ToString())}.{ResolveAccountScopeForPrefs()}";
+        return $"{SelectedPoolPrefsKeyPrefix}.{Uri.EscapeDataString(collectionType.ToString())}.{Uri.EscapeDataString(hero.ToString())}.{ResolveAccountScopeForPrefs()}";
     }
 
     private static string BuildLegacyHeroSkinPrefsKey(EHero hero)
     {
-        return
-            $"{LegacyHeroSkinPoolPrefsKeyPrefix}.{Uri.EscapeDataString(hero.ToString())}.{ResolveAccountScopeForPrefs()}";
+        return $"{LegacyHeroSkinPoolPrefsKeyPrefix}.{Uri.EscapeDataString(hero.ToString())}.{ResolveAccountScopeForPrefs()}";
     }
 
     private static string ResolveAccountScopeForPrefs()

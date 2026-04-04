@@ -54,8 +54,9 @@ internal sealed class RandomHeroSkinPoolPanelController : MonoBehaviour
     private RandomHeroSkinPoolState? _state;
     private BazaarSaleItem[] _availableSkins = Array.Empty<BazaarSaleItem>();
     private string? _focusedCollectionItemId;
-    private BazaarInventoryTypes.ECollectionType _currentCosmeticType =
-        BazaarInventoryTypes.ECollectionType.Invalid;
+    private BazaarInventoryTypes.ECollectionType _currentCosmeticType = BazaarInventoryTypes
+        .ECollectionType
+        .Invalid;
     private EHero _currentHero = EHero.Common;
     private bool _subscribedToEvents;
     private bool _warnedMissingScrollRectField;
@@ -147,7 +148,11 @@ internal sealed class RandomHeroSkinPoolPanelController : MonoBehaviour
         if (!TryReadScrollRect(view, out var scrollRect))
             return;
 
-        if (ReferenceEquals(_view, view) && ReferenceEquals(_scrollRect, scrollRect) && _panelRoot != null)
+        if (
+            ReferenceEquals(_view, view)
+            && ReferenceEquals(_scrollRect, scrollRect)
+            && _panelRoot != null
+        )
             return;
 
         _view = view;
@@ -221,7 +226,10 @@ internal sealed class RandomHeroSkinPoolPanelController : MonoBehaviour
             _headerLabel = existingPanel.Find(HeaderObjectName)?.GetComponent<TextMeshProUGUI>();
             _entriesRoot = existingPanel.Find(EntriesRootObjectName) as RectTransform;
             _emptyLabel = existingPanel.Find(EmptyLabelObjectName)?.GetComponent<TextMeshProUGUI>();
-            return _panelRoot != null && _headerLabel != null && _entriesRoot != null && _emptyLabel != null;
+            return _panelRoot != null
+                && _headerLabel != null
+                && _entriesRoot != null
+                && _emptyLabel != null;
         }
 
         var panelObject = new GameObject(
@@ -337,9 +345,10 @@ internal sealed class RandomHeroSkinPoolPanelController : MonoBehaviour
             cosmeticType,
             hero
         );
-        _state = _availableSkins.Length == 0
-            ? null
-            : RandomHeroSkinPoolRuntime.ResolveState(hero, cosmeticType, _availableSkins);
+        _state =
+            _availableSkins.Length == 0
+                ? null
+                : RandomHeroSkinPoolRuntime.ResolveState(hero, cosmeticType, _availableSkins);
 
         RebuildEntries();
         RebindEntries();

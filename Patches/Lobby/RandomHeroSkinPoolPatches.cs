@@ -3,8 +3,8 @@
 using System;
 using BazaarGameShared;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.Lobby.RandomHeroSkinPool;
 using BazaarGameShared.TempoNet.Models;
+using BazaarPlusPlus.Game.Lobby.RandomHeroSkinPool;
 using HarmonyLib;
 using TheBazaar;
 
@@ -26,7 +26,10 @@ internal static class RandomHeroSkinPoolRefreshViewPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroSkinPool", $"Failed to refresh random collectible pool UI: {ex}");
+            BppLog.Warn(
+                "RandomHeroSkinPool",
+                $"Failed to refresh random collectible pool UI: {ex}"
+            );
         }
     }
 }

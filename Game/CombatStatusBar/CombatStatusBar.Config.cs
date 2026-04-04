@@ -14,7 +14,8 @@ internal sealed partial class CombatStatusBar
             return;
 
         _configStateInitialized = true;
-        CombatSpeedMultiplier = BppRuntimeHost.Config.CombatStatusBarSpeedMultiplierConfig?.Value ?? 1f;
+        CombatSpeedMultiplier =
+            BppRuntimeHost.Config.CombatStatusBarSpeedMultiplierConfig?.Value ?? 1f;
         BppLog.Info(
             "CombatStatusBar",
             $"Combat config initialized: enabled={IsEnabled()}, speed={CombatSpeedMultiplier:F2}x"

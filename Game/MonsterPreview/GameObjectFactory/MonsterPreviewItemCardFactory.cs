@@ -322,9 +322,7 @@ internal sealed class MonsterPreviewItemCardFactory : IPreviewCardFactory
                 );
             method?.Invoke(cardVfxController, args);
         }
-        catch
-        {
-        }
+        catch { }
     }
 
     private bool EnsureApi(AssetLoader loader)
