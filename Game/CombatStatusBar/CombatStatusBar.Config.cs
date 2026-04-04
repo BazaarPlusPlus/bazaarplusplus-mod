@@ -14,7 +14,12 @@ internal sealed partial class CombatStatusBar
             return;
 
         _configStateInitialized = true;
-        BppLog.Info("CombatStatusBar", $"Combat config initialized: enabled={IsEnabled()}");
+        CombatSpeedMultiplier =
+            BppRuntimeHost.Config.CombatStatusBarSpeedMultiplierConfig?.Value ?? 1f;
+        BppLog.Info(
+            "CombatStatusBar",
+            $"Combat config initialized: enabled={IsEnabled()}, speed={CombatSpeedMultiplier:F2}x"
+        );
     }
 
     internal static bool IsEnabled()
@@ -32,5 +37,12 @@ internal sealed partial class CombatStatusBar
         var config = BppRuntimeHost.Config.EnableCombatStatusBarConfig;
         if (config != null)
             config.Value = enabled;
+    }
+
+    static partial void PersistCombatSpeed(float speed)
+    {
+        var config = BppRuntimeHost.Config.CombatStatusBarSpeedMultiplierConfig;
+        if (config != null)
+            config.Value = speed;
     }
 }

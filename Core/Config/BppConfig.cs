@@ -13,6 +13,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
 
+    public ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; private set; }
+
     public ConfigEntry<string>? EnchantPreviewHotkeyPathConfig { get; private set; }
 
     public ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; private set; }
@@ -43,7 +45,13 @@ internal sealed class BppConfig : IBppConfig
             "CombatStatusBar",
             "Enabled",
             false,
-            "Whether to show the combat status bar with elapsed time and pause controls"
+            "Whether to show the combat status bar with elapsed time, speed controls, and pause controls"
+        );
+        CombatStatusBarSpeedMultiplierConfig = config.Bind(
+            "CombatStatusBar",
+            "SpeedMultiplier",
+            1.0f,
+            "Default combat playback speed multiplier. The speed buttons cycle between 0.50, 0.67, and 1.00."
         );
         EnchantPreviewHotkeyPathConfig = config.Bind(
             "Hotkeys",

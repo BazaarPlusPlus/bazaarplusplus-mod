@@ -19,11 +19,8 @@ internal static class BppSettingsDockCatalog
         new(
             "GameHistory",
             HistoryPanelLabel.Resolve,
-            _ =>
-                ReadCommunityContributionEnabled()
-                    ? (HistoryPanelFeature.IsVisible ? "OPEN" : "VIEW")
-                    : "OFF",
-            () => ReadCommunityContributionEnabled() && HistoryPanelFeature.IsVisible,
+            ResolveHistoryPanelStatus,
+            IsHistoryPanelActionable,
             HistoryPanelFeature.OpenFromDockEntry,
             collapseAfterActivate: true
         ),
@@ -72,6 +69,24 @@ internal static class BppSettingsDockCatalog
     private static bool ReadNameOverrideEnabled()
     {
         return BppRuntimeHost.Config.EnableNameOverrideConfig?.Value ?? false;
+    }
+
+    private static string ResolveHistoryPanelStatus(string languageCode)
+    {
+        if (!ReadCommunityContributionEnabled())
+            return "OFF";
+
+        if (BppRuntimeHost.RunContext.IsInGameRun)
+            return HistoryPanelLabel.ResolveInRunStatus(languageCode);
+
+        return HistoryPanelFeature.IsVisible
+            ? HistoryPanelLabel.ResolveOpenStatus(languageCode)
+            : HistoryPanelLabel.ResolveViewStatus(languageCode);
+    }
+
+    private static bool IsHistoryPanelActionable()
+    {
+        return ReadCommunityContributionEnabled() && !BppRuntimeHost.RunContext.IsInGameRun;
     }
 
     private static bool ReadCommunityContributionEnabled()

@@ -559,10 +559,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     private static GhostBattleOutcome ResolveGhostBattleOutcome(HistoryBattleRecord battle)
     {
-        if (string.Equals(battle.WinnerCombatantId, "Opponent", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase))
             return GhostBattleOutcome.Won;
 
-        if (string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(battle.WinnerCombatantId, "Opponent", StringComparison.OrdinalIgnoreCase))
             return GhostBattleOutcome.Lost;
 
         var result = battle.Result?.Trim();

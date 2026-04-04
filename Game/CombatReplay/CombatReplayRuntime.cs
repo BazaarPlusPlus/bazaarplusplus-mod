@@ -13,6 +13,9 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
+using BazaarGameShared.Infra.Messages.GameSimEvents;
+using BazaarGameShared.TempoNet.Enums;
+using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay.Upload;
@@ -51,6 +54,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private bool _bootstrappedReplayActive;
     private bool _isReplayStartInProgress;
     private bool _savedReplayPlaybackActive;
+    private EncounterController? _replayTemporaryOpponentPortrait;
+    private EHero? _replayOriginalSelectedHero;
+    private bool _replaySelectedHeroOverridden;
 
     public static CombatReplayRuntime? Instance { get; private set; }
 
@@ -86,6 +92,17 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public static void EnsureOpponentPortraitVisible()
     {
+        var replayPortrait = Instance?._replayTemporaryOpponentPortrait;
+        if (replayPortrait != null)
+        {
+            if (Data.CurrentEncounterController != null)
+                Data.CurrentEncounterController.ShowCard(show: false);
+
+            replayPortrait.gameObject.SetActive(true);
+            replayPortrait.ShowCard(show: true);
+            return;
+        }
+
         var encounterController = Data.CurrentEncounterController;
         if (encounterController?.gameObject == null)
             return;
@@ -96,10 +113,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public static async Task PrepareReplayHealthBarsAsync()
     {
-        var controllers = await RefreshReplayHealthBarBindingsAsync();
-        ShowReplayPlayerHealthBar(
-            controllers.FirstOrDefault(controller => controller.combatantId == ECombatantId.Player)
-        );
+        var bindings = await RefreshReplayHealthBarBindingsAsync();
+        ShowReplayPlayerHealthBar(bindings.PlayerController);
         Data.PlayerExperienceBar?.ToggleExperienceBarAndText(isVisible: false);
         Events.TryShowEmptyOpponentHealthBar.Trigger();
     }
@@ -109,16 +124,21 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         Events.TryRefillOpponentHealthBar.Trigger();
     }
 
-    private static async Task<List<BoardUIController>> RefreshReplayHealthBarBindingsAsync()
+    private static async Task<ReplayBoardUiBindings> RefreshReplayHealthBarBindingsAsync()
     {
-        var controllers = GetSceneBoardUiControllers().ToList();
-        foreach (var controller in controllers)
-        {
-            BindReplayBoardUiController(controller);
-        }
+        var bindings = ResolveReplayBoardUiControllers();
+
+        if (bindings.PlayerController != null)
+            BindReplayBoardUiController(bindings.PlayerController, registerPlayerHealthBar: true);
+
+        if (bindings.OpponentController != null)
+            BindReplayBoardUiController(
+                bindings.OpponentController,
+                registerPlayerHealthBar: false
+            );
 
         await Task.Delay(150);
-        return controllers;
+        return bindings;
     }
 
     private static IEnumerable<BoardUIController> GetSceneBoardUiControllers()
@@ -128,12 +148,59 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             .Where(controller => controller != null && controller.gameObject.scene.rootCount > 0);
     }
 
-    private static void BindReplayBoardUiController(BoardUIController controller)
+    private static ReplayBoardUiBindings ResolveReplayBoardUiControllers()
+    {
+        var controllers = GetSceneBoardUiControllers().ToList();
+        return new ReplayBoardUiBindings(
+            SelectReplayBoardUiController(controllers, ECombatantId.Player, AnchorSide.Player),
+            SelectReplayBoardUiController(controllers, ECombatantId.Opponent, AnchorSide.Opponent)
+        );
+    }
+
+    private static BoardUIController? SelectReplayBoardUiController(
+        IEnumerable<BoardUIController> controllers,
+        ECombatantId combatantId,
+        AnchorSide anchorSide
+    )
+    {
+        var anchor = Singleton<BoardManager>.Instance?.GetAnchor(anchorSide, AnchorType.Portrait);
+        return controllers
+            .Where(controller => controller.combatantId == combatantId)
+            .OrderByDescending(controller => controller.gameObject.activeInHierarchy)
+            .ThenByDescending(controller => controller.isActiveAndEnabled)
+            .ThenByDescending(HasActiveHealthBar)
+            .ThenBy(controller => GetControllerAnchorDistance(controller, anchor))
+            .FirstOrDefault();
+    }
+
+    private static bool HasActiveHealthBar(BoardUIController controller)
+    {
+        var healthBar = GetBoardUiHealthBar(controller) as Component;
+        return healthBar?.gameObject.activeInHierarchy == true;
+    }
+
+    private static float GetControllerAnchorDistance(
+        BoardUIController controller,
+        Transform? anchor
+    )
+    {
+        if (anchor == null)
+            return float.MaxValue;
+
+        return Vector3.SqrMagnitude(controller.transform.position - anchor.position);
+    }
+
+    private static void BindReplayBoardUiController(
+        BoardUIController controller,
+        bool registerPlayerHealthBar
+    )
     {
         var player =
             controller.combatantId == ECombatantId.Player ? Data.Run?.Player : Data.Run?.Opponent;
         if (player == null)
             return;
+
+        EnsureReplayHealthAttributes(player, controller.combatantId);
 
         if (InitializedReplayBoardUiControllers.Add(controller.GetInstanceID()))
             InvokeBoardUiMethod(controller, "Init", player);
@@ -145,7 +212,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         ApplyBoardUiDividerConfig(controller);
         InitializeBoardUiHealthBar(controller, player);
 
-        if (controller.combatantId == ECombatantId.Player)
+        if (registerPlayerHealthBar && controller.combatantId == ECombatantId.Player)
             Data.RegisterPlayerHealthBar(controller);
     }
 
@@ -153,6 +220,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         if (playerController != null)
         {
+            if (Data.Run?.Player != null)
+                EnsureReplayHealthAttributes(Data.Run.Player, ECombatantId.Player);
+
             InvokeBoardUiMethod(playerController, "SetBattlePlayer", Data.Run?.Player);
             InitializeBoardUiHealthBar(playerController, Data.Run?.Player);
             playerController.ShowEmptyPlayerHealthBar();
@@ -164,18 +234,49 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         Data.PlayerHealthBar?.ShowEmptyPlayerHealthBar();
     }
 
+    private static void EnsureReplayHealthAttributes(object player, ECombatantId combatantId)
+    {
+        try
+        {
+            var attributesProperty = player
+                .GetType()
+                .GetProperty(
+                    "Attributes",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                );
+            if (
+                attributesProperty?.GetValue(player)
+                is not System.Collections.IDictionary attributes
+            )
+                return;
+
+            if (attributes.Contains(EPlayerAttributeType.HealthMax))
+                return;
+
+            if (!attributes.Contains(EPlayerAttributeType.Health))
+                return;
+
+            var healthValue = Convert.ToInt32(attributes[EPlayerAttributeType.Health]);
+            if (healthValue <= 0)
+                return;
+
+            attributes[EPlayerAttributeType.HealthMax] = healthValue;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Failed to backfill replay HealthMax for {combatantId}: {ex.Message}"
+            );
+        }
+    }
+
     private static void RecalculateHealthBarDividers(BoardUIController controller, object? player)
     {
         if (player == null)
             return;
 
-        var healthBarField = controller
-            .GetType()
-            .GetField(
-                "HealthBar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        var healthBar = healthBarField?.GetValue(controller);
+        var healthBar = GetBoardUiHealthBar(controller);
         if (healthBar == null)
             return;
 
@@ -219,13 +320,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (player == null)
             return;
 
-        var healthBarField = controller
-            .GetType()
-            .GetField(
-                "HealthBar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        var healthBar = healthBarField?.GetValue(controller);
+        var healthBar = GetBoardUiHealthBar(controller);
         if (healthBar == null)
             return;
 
@@ -265,13 +360,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (dividerConfig == null)
             return;
 
-        var healthBarField = controller
-            .GetType()
-            .GetField(
-                "HealthBar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        var healthBar = healthBarField?.GetValue(controller);
+        var healthBar = GetBoardUiHealthBar(controller);
         if (healthBar == null)
             return;
 
@@ -322,19 +411,24 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static void RevealBoardUiHealthBar(BoardUIController controller, bool showStatusNumbers)
     {
-        var healthBarField = controller
-            .GetType()
-            .GetField(
-                "HealthBar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        var healthBar = healthBarField?.GetValue(controller);
+        var healthBar = GetBoardUiHealthBar(controller);
         if (healthBar == null)
             return;
 
         InvokeOptionalMethod(healthBar, "ToggleBarParent", true);
         InvokeOptionalMethod(healthBar, "ToggleStatusNumbers", showStatusNumbers);
         InvokeOptionalMethod(healthBar, "RefillHealthBar", 1f);
+    }
+
+    private static object? GetBoardUiHealthBar(BoardUIController controller)
+    {
+        return controller
+            .GetType()
+            .GetField(
+                "HealthBar",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )
+            ?.GetValue(controller);
     }
 
     private static void InvokeOptionalMethod(object target, string methodName, object argument)
@@ -663,12 +757,16 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         {
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
+            CleanupReplayOpponentPortrait();
+            ApplyReplaySelectedHeroOverride(manifest);
             Data.ResetRunData();
             BppRuntimeHost.RunLifecycle.RefreshRunStateFromCurrentState();
             attemptedBootstrapFromLobby = !IsReplayBootstrapReady();
             var bootstrappedFromLobby = await EnsureReplayBootstrapReadyAsync();
             _returnToMenuAfterReplay = bootstrappedFromLobby;
             var bootstrapContext = ResolveReplayDependencies();
+            EnsureReplayOpponentIdentity(manifest, sequence.SpawnMessage);
+            await EnsureReplayTemporaryOpponentPortraitAsync(manifest);
             await TryInjectSavedReplayAsync(bootstrapContext, manifest, sequence, battleId);
             _bootstrappedReplayActive = bootstrappedFromLobby;
             BppLog.Info("CombatReplayRuntime", $"Started replay for saved combat {battleId}");
@@ -678,6 +776,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
             _savedReplayPlaybackActive = false;
+            CleanupReplayOpponentPortrait();
+            RestoreReplaySelectedHeroOverride();
             BppLog.Error("CombatReplayRuntime", $"Failed to start replay {battleId}: {ex}");
             if (attemptedBootstrapFromLobby)
                 await RollbackReplayBootstrapAsync();
@@ -1656,16 +1756,22 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void OnStateChanged(StateChangedEvent data)
     {
-        if (!_returnToMenuAfterReplay || !_bootstrappedReplayActive || data == null)
+        if (data == null)
             return;
 
         if (data.PreviousState is not ReplayState || data.CurrentState is ReplayState)
             return;
 
+        RestoreReplaySelectedHeroOverride();
+        _savedReplayPlaybackActive = false;
+        CleanupReplayOpponentPortrait();
+        InitializedReplayBoardUiControllers.Clear();
+
+        if (!_returnToMenuAfterReplay || !_bootstrappedReplayActive)
+            return;
+
         _returnToMenuAfterReplay = false;
         _bootstrappedReplayActive = false;
-        _savedReplayPlaybackActive = false;
-        InitializedReplayBoardUiControllers.Clear();
 
         try
         {
@@ -1845,38 +1951,266 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 );
 
             Data.UpdateFromGameSimAsync(spawnMessage);
-            await EnsureReplayEncounterPortraitAsync();
             MarkGameSimMessageHandled(gameSimHandler, spawnMessage.MessageId);
         };
     }
 
-    private static async Task EnsureReplayEncounterPortraitAsync()
+    private async Task EnsureReplayTemporaryOpponentPortraitAsync(PvpBattleManifest manifest)
     {
-        var encounterId = Data.CurrentEncounterId;
-        if (!encounterId.HasValue)
+        if (_replayTemporaryOpponentPortrait != null)
+        {
+            _replayTemporaryOpponentPortrait.gameObject.SetActive(true);
+            _replayTemporaryOpponentPortrait.ShowCard(show: true);
             return;
+        }
 
         var boardManager = Singleton<BoardManager>.Instance;
         if (boardManager == null)
-            return;
-
-        var encounterCard = Data.Entities.Values.FirstOrDefault(card =>
-            card.TemplateId == encounterId
-        );
-        if (encounterCard == null)
         {
-            encounterCard = DTOUtils.CreateCard(
-                encounterId.Value.ToString(),
-                ECardType.EventEncounter
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Replay temp portrait: board manager unavailable for battle={manifest.BattleId}"
             );
-            encounterCard.LeftSocketId = EContainerSocketId.Socket_5;
-            Data.Entities[encounterCard.InstanceId] = encounterCard;
+            return;
         }
 
-        await boardManager.TryLoadCurrentEncounterSO();
-        Events.EncounterPlacedSimEvent.Trigger(
-            new EncounterPlacedEvent(encounterId.Value.ToString())
+        var hero = Data.SimPvpOpponent?.Hero;
+        if (!hero.HasValue || hero.Value == EHero.Common)
+        {
+            if (!TryParseHeroName(manifest.Participants.OpponentHero, out var parsedHero))
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    $"Replay temp portrait: opponent hero unavailable for battle={manifest.BattleId}"
+                );
+                return;
+            }
+
+            hero = parsedHero;
+        }
+
+        var collectionManager = Services.Get<CollectionManager>();
+        if (collectionManager == null)
+            throw new InvalidOperationException("CollectionManager is unavailable.");
+
+        var loadout =
+            Data.SimPvpOpponent?.PlayerLoadout
+            ?? new BazaarCollectionLoadout
+            {
+                accountId = manifest.Participants.OpponentAccountId ?? string.Empty,
+                heroSkinIds = Array.Empty<string>(),
+                cardSkinIds = Array.Empty<string>(),
+            };
+
+        var skinData =
+            await collectionManager.GetEquippedHeroSkin(hero.Value, loadout)
+            ?? await collectionManager.GetEquippedHeroSkin(hero.Value);
+        if (skinData == null)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Replay temp portrait: skin load returned null for hero={hero.Value} battle={manifest.BattleId}"
+            );
+            return;
+        }
+
+        var anchor = boardManager.GetAnchor(AnchorSide.Opponent, AnchorType.Portrait);
+        var portraitController = await LoadReplayHeroPortraitAsync(
+            skinData,
+            ResolveReplayPortraitTier(manifest),
+            anchor
         );
+        if (portraitController == null)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Replay temp portrait: portrait load failed for hero={hero.Value} battle={manifest.BattleId}"
+            );
+            return;
+        }
+
+        if (Data.CurrentEncounterController != null)
+            Data.CurrentEncounterController.ShowCard(show: false);
+
+        portraitController.gameObject.name = "ReplayOpponentPortrait";
+        portraitController.gameObject.SetActive(true);
+        portraitController.ShowCard(show: true);
+        _replayTemporaryOpponentPortrait = portraitController;
+    }
+
+    private void CleanupReplayOpponentPortrait()
+    {
+        if (_replayTemporaryOpponentPortrait != null)
+        {
+            try
+            {
+                Destroy(_replayTemporaryOpponentPortrait.gameObject);
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    $"Replay temp portrait cleanup failed: {ex.Message}"
+                );
+            }
+
+            _replayTemporaryOpponentPortrait = null;
+        }
+
+        if (Data.CurrentEncounterController != null)
+        {
+            Data.CurrentEncounterController.gameObject.SetActive(true);
+            Data.CurrentEncounterController.ShowCard(show: true);
+        }
+    }
+
+    private static async Task<EncounterController?> LoadReplayHeroPortraitAsync(
+        SkinAssetDataSO skinData,
+        ETier tier,
+        Transform parent
+    )
+    {
+        var boardBuilderType = typeof(BoardBuilder);
+        var loadMethod = boardBuilderType.GetMethod(
+            "LoadHeroPortraitAsync",
+            BindingFlags.Static | BindingFlags.NonPublic
+        );
+        if (loadMethod == null)
+            throw new MissingMethodException(boardBuilderType.FullName, "LoadHeroPortraitAsync");
+
+        var taskObject = loadMethod.Invoke(null, new object?[] { skinData, tier, parent, false });
+        if (taskObject is Task<EncounterController> typedTask)
+            return await typedTask;
+
+        if (taskObject is not Task task)
+            return taskObject as EncounterController;
+
+        await task;
+        return task.GetType()
+                .GetProperty("Result", BindingFlags.Instance | BindingFlags.Public)
+                ?.GetValue(task) as EncounterController;
+    }
+
+    private static ETier ResolveReplayPortraitTier(PvpBattleManifest manifest)
+    {
+        if (
+            !string.IsNullOrWhiteSpace(manifest?.Participants?.OpponentRank)
+            && Enum.TryParse(manifest.Participants.OpponentRank.Trim(), true, out ETier tier)
+        )
+            return tier;
+
+        return ETier.Bronze;
+    }
+
+    private void ApplyReplaySelectedHeroOverride(PvpBattleManifest manifest)
+    {
+        if (manifest?.Participants == null)
+            return;
+
+        if (!TryParseHeroName(manifest.Participants.PlayerHero, out var replayHero))
+            return;
+
+        _replayOriginalSelectedHero = Data.SelectedHero;
+        if (_replayOriginalSelectedHero.Value == replayHero)
+        {
+            _replaySelectedHeroOverridden = false;
+            _replayOriginalSelectedHero = null;
+            return;
+        }
+
+        SetReplaySelectedHero(replayHero);
+        _replaySelectedHeroOverridden = true;
+    }
+
+    private void RestoreReplaySelectedHeroOverride()
+    {
+        if (!_replaySelectedHeroOverridden || !_replayOriginalSelectedHero.HasValue)
+            return;
+
+        SetReplaySelectedHero(_replayOriginalSelectedHero.Value);
+        _replaySelectedHeroOverridden = false;
+        _replayOriginalSelectedHero = null;
+    }
+
+    private static void SetReplaySelectedHero(EHero hero)
+    {
+        var clientCacheType = typeof(Data).Assembly.GetType("TheBazaar.ClientCache", false);
+        var runConfigField = clientCacheType?.GetField(
+            "RunConfig",
+            BindingFlags.Static | BindingFlags.Public
+        );
+        var runConfig = runConfigField?.GetValue(null);
+        var setSelectedHeroMethod = runConfig
+            ?.GetType()
+            .GetMethod("SetSelectedHero", BindingFlags.Instance | BindingFlags.Public);
+        if (setSelectedHeroMethod == null)
+            throw new MissingMethodException("TheBazaar.RunConfigurationCache", "SetSelectedHero");
+
+        setSelectedHeroMethod.Invoke(runConfig, new object[] { hero });
+    }
+
+    private static void EnsureReplayOpponentIdentity(
+        PvpBattleManifest manifest,
+        NetMessageGameSim spawnMessage
+    )
+    {
+        if (manifest?.Participants == null)
+            return;
+
+        if (spawnMessage?.Data?.CurrentState?.PvpOpponent != null)
+            return;
+
+        if (!TryParseHeroName(manifest.Participants.OpponentHero, out var opponentHero))
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Replay opponent hero was unavailable for battle {manifest.BattleId}."
+            );
+            return;
+        }
+
+        var opponentLoadout = new BazaarCollectionLoadout
+        {
+            accountId = manifest.Participants.OpponentAccountId ?? string.Empty,
+            heroSkinIds = Array.Empty<string>(),
+            cardSkinIds = Array.Empty<string>(),
+        };
+
+        Data.SimPvpOpponent = new SimPvpOpponent(
+            manifest.Participants.OpponentName,
+            null,
+            null,
+            TryParseRank(manifest.Participants.OpponentRank),
+            manifest.Participants.OpponentRating ?? 0,
+            null,
+            null,
+            null,
+            manifest.Participants.OpponentLevel,
+            opponentHero,
+            opponentLoadout,
+            null
+        );
+    }
+
+    private static bool TryParseHeroName(string? heroName, out EHero hero)
+    {
+        if (!string.IsNullOrWhiteSpace(heroName))
+        {
+            var trimmed = heroName.Trim();
+            if (Enum.TryParse(trimmed, ignoreCase: true, out hero))
+                return true;
+        }
+
+        hero = default;
+        return false;
+    }
+
+    private static ERank? TryParseRank(string? rank)
+    {
+        if (!string.IsNullOrWhiteSpace(rank) && Enum.TryParse(rank.Trim(), true, out ERank parsed))
+            return parsed;
+
+        return null;
     }
 
     private static void MarkGameSimMessageHandled(GameSimHandler gameSimHandler, string messageId)
@@ -1980,6 +2314,22 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         public Func<NetMessageGameSim, Task> HandleSpawnMessageAsync { get; }
 
         public Action TriggerCombatSequenceCreated { get; }
+    }
+
+    private sealed class ReplayBoardUiBindings
+    {
+        public ReplayBoardUiBindings(
+            BoardUIController? playerController,
+            BoardUIController? opponentController
+        )
+        {
+            PlayerController = playerController;
+            OpponentController = opponentController;
+        }
+
+        public BoardUIController? PlayerController { get; }
+
+        public BoardUIController? OpponentController { get; }
     }
 
     private static void HideObjectsOfType<T>()
