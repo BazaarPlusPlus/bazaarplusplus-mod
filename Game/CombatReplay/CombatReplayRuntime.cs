@@ -113,10 +113,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public static async Task PrepareReplayHealthBarsAsync()
     {
-        var controllers = await RefreshReplayHealthBarBindingsAsync();
-        ShowReplayPlayerHealthBar(
-            controllers.FirstOrDefault(controller => controller.combatantId == ECombatantId.Player)
-        );
+        var bindings = await RefreshReplayHealthBarBindingsAsync();
+        ShowReplayPlayerHealthBar(bindings.PlayerController);
         Data.PlayerExperienceBar?.ToggleExperienceBarAndText(isVisible: false);
         Events.TryShowEmptyOpponentHealthBar.Trigger();
     }
@@ -126,16 +124,18 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         Events.TryRefillOpponentHealthBar.Trigger();
     }
 
-    private static async Task<List<BoardUIController>> RefreshReplayHealthBarBindingsAsync()
+    private static async Task<ReplayBoardUiBindings> RefreshReplayHealthBarBindingsAsync()
     {
-        var controllers = GetSceneBoardUiControllers().ToList();
-        foreach (var controller in controllers)
-        {
-            BindReplayBoardUiController(controller);
-        }
+        var bindings = ResolveReplayBoardUiControllers();
+
+        if (bindings.PlayerController != null)
+            BindReplayBoardUiController(bindings.PlayerController, registerPlayerHealthBar: true);
+
+        if (bindings.OpponentController != null)
+            BindReplayBoardUiController(bindings.OpponentController, registerPlayerHealthBar: false);
 
         await Task.Delay(150);
-        return controllers;
+        return bindings;
     }
 
     private static IEnumerable<BoardUIController> GetSceneBoardUiControllers()
@@ -145,12 +145,56 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             .Where(controller => controller != null && controller.gameObject.scene.rootCount > 0);
     }
 
-    private static void BindReplayBoardUiController(BoardUIController controller)
+    private static ReplayBoardUiBindings ResolveReplayBoardUiControllers()
+    {
+        var controllers = GetSceneBoardUiControllers().ToList();
+        return new ReplayBoardUiBindings(
+            SelectReplayBoardUiController(controllers, ECombatantId.Player, AnchorSide.Player),
+            SelectReplayBoardUiController(controllers, ECombatantId.Opponent, AnchorSide.Opponent)
+        );
+    }
+
+    private static BoardUIController? SelectReplayBoardUiController(
+        IEnumerable<BoardUIController> controllers,
+        ECombatantId combatantId,
+        AnchorSide anchorSide
+    )
+    {
+        var anchor = Singleton<BoardManager>.Instance?.GetAnchor(anchorSide, AnchorType.Portrait);
+        return controllers
+            .Where(controller => controller.combatantId == combatantId)
+            .OrderByDescending(controller => controller.gameObject.activeInHierarchy)
+            .ThenByDescending(controller => controller.isActiveAndEnabled)
+            .ThenByDescending(HasActiveHealthBar)
+            .ThenBy(controller => GetControllerAnchorDistance(controller, anchor))
+            .FirstOrDefault();
+    }
+
+    private static bool HasActiveHealthBar(BoardUIController controller)
+    {
+        var healthBar = GetBoardUiHealthBar(controller) as Component;
+        return healthBar?.gameObject.activeInHierarchy == true;
+    }
+
+    private static float GetControllerAnchorDistance(BoardUIController controller, Transform? anchor)
+    {
+        if (anchor == null)
+            return float.MaxValue;
+
+        return Vector3.SqrMagnitude(controller.transform.position - anchor.position);
+    }
+
+    private static void BindReplayBoardUiController(
+        BoardUIController controller,
+        bool registerPlayerHealthBar
+    )
     {
         var player =
             controller.combatantId == ECombatantId.Player ? Data.Run?.Player : Data.Run?.Opponent;
         if (player == null)
             return;
+
+        EnsureReplayHealthAttributes(player, controller.combatantId);
 
         if (InitializedReplayBoardUiControllers.Add(controller.GetInstanceID()))
             InvokeBoardUiMethod(controller, "Init", player);
@@ -162,7 +206,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         ApplyBoardUiDividerConfig(controller);
         InitializeBoardUiHealthBar(controller, player);
 
-        if (controller.combatantId == ECombatantId.Player)
+        if (registerPlayerHealthBar && controller.combatantId == ECombatantId.Player)
             Data.RegisterPlayerHealthBar(controller);
     }
 
@@ -170,6 +214,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         if (playerController != null)
         {
+            if (Data.Run?.Player != null)
+                EnsureReplayHealthAttributes(Data.Run.Player, ECombatantId.Player);
+
             InvokeBoardUiMethod(playerController, "SetBattlePlayer", Data.Run?.Player);
             InitializeBoardUiHealthBar(playerController, Data.Run?.Player);
             playerController.ShowEmptyPlayerHealthBar();
@@ -181,18 +228,46 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         Data.PlayerHealthBar?.ShowEmptyPlayerHealthBar();
     }
 
+    private static void EnsureReplayHealthAttributes(object player, ECombatantId combatantId)
+    {
+        try
+        {
+            var attributesProperty = player
+                .GetType()
+                .GetProperty(
+                    "Attributes",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                );
+            if (attributesProperty?.GetValue(player) is not System.Collections.IDictionary attributes)
+                return;
+
+            if (attributes.Contains(EPlayerAttributeType.HealthMax))
+                return;
+
+            if (!attributes.Contains(EPlayerAttributeType.Health))
+                return;
+
+            var healthValue = Convert.ToInt32(attributes[EPlayerAttributeType.Health]);
+            if (healthValue <= 0)
+                return;
+
+            attributes[EPlayerAttributeType.HealthMax] = healthValue;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Failed to backfill replay HealthMax for {combatantId}: {ex.Message}"
+            );
+        }
+    }
+
     private static void RecalculateHealthBarDividers(BoardUIController controller, object? player)
     {
         if (player == null)
             return;
 
-        var healthBarField = controller
-            .GetType()
-            .GetField(
-                "HealthBar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        var healthBar = healthBarField?.GetValue(controller);
+        var healthBar = GetBoardUiHealthBar(controller);
         if (healthBar == null)
             return;
 
@@ -236,13 +311,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (player == null)
             return;
 
-        var healthBarField = controller
-            .GetType()
-            .GetField(
-                "HealthBar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        var healthBar = healthBarField?.GetValue(controller);
+        var healthBar = GetBoardUiHealthBar(controller);
         if (healthBar == null)
             return;
 
@@ -282,13 +351,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (dividerConfig == null)
             return;
 
-        var healthBarField = controller
-            .GetType()
-            .GetField(
-                "HealthBar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        var healthBar = healthBarField?.GetValue(controller);
+        var healthBar = GetBoardUiHealthBar(controller);
         if (healthBar == null)
             return;
 
@@ -339,19 +402,24 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static void RevealBoardUiHealthBar(BoardUIController controller, bool showStatusNumbers)
     {
-        var healthBarField = controller
-            .GetType()
-            .GetField(
-                "HealthBar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        var healthBar = healthBarField?.GetValue(controller);
+        var healthBar = GetBoardUiHealthBar(controller);
         if (healthBar == null)
             return;
 
         InvokeOptionalMethod(healthBar, "ToggleBarParent", true);
         InvokeOptionalMethod(healthBar, "ToggleStatusNumbers", showStatusNumbers);
         InvokeOptionalMethod(healthBar, "RefillHealthBar", 1f);
+    }
+
+    private static object? GetBoardUiHealthBar(BoardUIController controller)
+    {
+        return controller
+            .GetType()
+            .GetField(
+                "HealthBar",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )
+            ?.GetValue(controller);
     }
 
     private static void InvokeOptionalMethod(object target, string methodName, object argument)
@@ -2237,6 +2305,22 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         public Func<NetMessageGameSim, Task> HandleSpawnMessageAsync { get; }
 
         public Action TriggerCombatSequenceCreated { get; }
+    }
+
+    private sealed class ReplayBoardUiBindings
+    {
+        public ReplayBoardUiBindings(
+            BoardUIController? playerController,
+            BoardUIController? opponentController
+        )
+        {
+            PlayerController = playerController;
+            OpponentController = opponentController;
+        }
+
+        public BoardUIController? PlayerController { get; }
+
+        public BoardUIController? OpponentController { get; }
     }
 
     private static void HideObjectsOfType<T>()
