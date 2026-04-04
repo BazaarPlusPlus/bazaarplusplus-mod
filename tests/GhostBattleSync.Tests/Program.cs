@@ -96,9 +96,9 @@ var conflictingBattle = CreateHistoryBattleRecord(
     winnerCombatantId: "Player"
 );
 var resolvedOutcome = resolveGhostBattleOutcome!.Invoke(null, [conflictingBattle]);
-var lostOutcome = Enum.Parse(coordinatorOutcomeType, "Lost");
+var wonOutcome = Enum.Parse(coordinatorOutcomeType, "Won");
 Assert(
-    Equals(resolvedOutcome, lostOutcome),
+    Equals(resolvedOutcome, wonOutcome),
     "Ghost battle filtering should prefer winner_combatant_id over result when the stored fields disagree."
 );
 
