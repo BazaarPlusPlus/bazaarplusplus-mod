@@ -634,11 +634,6 @@ internal sealed partial class HistoryPanel
         };
     }
 
-    private static string GetDynamicPreviewButtonLabel(bool enabled)
-    {
-        return enabled ? "Live" : "Still";
-    }
-
     private static string GetDeleteRunButtonLabel(bool confirming)
     {
         return confirming ? "Sure?" : "Delete";

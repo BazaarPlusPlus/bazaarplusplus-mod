@@ -81,23 +81,6 @@ internal sealed partial class HistoryPanel
             32f
         );
         _ghostTabButton.onClick.AddListener(() => SetSectionMode(HistorySectionMode.Ghost));
-        (_syncGhostButton, _syncGhostButtonBackground, _syncGhostButtonLabel) = CreateStyledButton(
-            "SyncGhostButton",
-            chipsRow,
-            "Sync Ghost",
-            114f,
-            32f
-        );
-        _syncGhostButton.onClick.AddListener(TrySyncGhostBattles);
-        (_dynamicPreviewButton, _dynamicPreviewButtonBackground, _dynamicPreviewButtonLabel) =
-            CreateStyledButton(
-                "DynamicPreviewButton",
-                chipsRow,
-                GetDynamicPreviewButtonLabel(false),
-                120f,
-                32f
-            );
-        _dynamicPreviewButton.onClick.AddListener(ToggleDynamicPreviewFromUi);
         CreateActionButton("CloseButton", chipsRow, "Close", 86f, () => SetHistoryVisible(false));
 
         _statusText = CreateText(

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -189,8 +190,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (_previewDebugText != null)
             _previewDebugText.gameObject.SetActive(Time.unscaledTime < _previewDebugOverlayUntil);
 
-        if (HistoryPanelPreviewSettings.DynamicPreviewEnabled)
-            _previewRenderer?.RenderLiveFrame(_previewSurface);
+        _previewRenderer?.RenderLiveFrame(_previewSurface);
 
         if (TryHandlePreviewDebugHotkeys(keyboard))
             return;
@@ -368,25 +368,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         return $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
     }
 
-    private void ToggleDynamicPreviewFromUi()
-    {
-        var enabled = HistoryPanelPreviewSettings.ToggleDynamicPreviewEnabled();
-        _statusMessage = enabled ? "Dynamic preview enabled." : "Dynamic preview disabled.";
-        RefreshUi();
-
-        if (!IsVisible)
-            return;
-
-        if (enabled)
-        {
-            EnsurePreviewRenderer();
-            _previewRenderer?.RenderLiveFrame(_previewSurface);
-            return;
-        }
-
-        RefreshSelectedBattlePreview();
-    }
-
     private bool TryHandlePreviewDebugHotkeys(Keyboard keyboard)
     {
         if (_previewRenderer == null)
@@ -462,9 +443,13 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         if (_previewSelectionMode == PreviewSelectionMode.Battle && ActiveSelectedBattle != null)
         {
+            var previewData =
+                _sectionMode == HistorySectionMode.Ghost
+                    ? ResolveGhostPreviewData(ActiveSelectedBattle)
+                    : ActiveSelectedBattle.PreviewData.OpponentHandOnly();
             return new PreviewRequest(
                 $"battle:{ActiveSelectedBattle.BattleId}",
-                ActiveSelectedBattle.PreviewData.OpponentHandOnly()
+                previewData
             );
         }
 
@@ -478,6 +463,37 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         }
 
         return new PreviewRequest(null, null);
+    }
+
+    private HistoryBattlePreviewData ResolveGhostPreviewData(HistoryBattleRecord battle)
+    {
+        if (battle.Source != HistoryBattleSource.Ghost)
+            return battle.PreviewData;
+
+        if (battle.PreviewData.HasRenderableCards)
+            return battle.PreviewData.PlayerHandOnly();
+
+        var replayDirectoryPath = _runtime?.CombatReplayDirectoryPath;
+        if (string.IsNullOrWhiteSpace(replayDirectoryPath))
+            return battle.PreviewData.PlayerHandOnly();
+
+        var ghostPayloadStore = new GhostBattlePayloadStore(
+            BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
+        );
+        var ghostPayload = ghostPayloadStore.Load(battle.BattleId);
+        var snapshots = ghostPayload?.BattleManifest?.Snapshots;
+        if (snapshots == null)
+            return battle.PreviewData.PlayerHandOnly();
+
+        return HistoryPanelRepository.BuildPreviewData(snapshots).PlayerHandOnly();
+    }
+
+    private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)
+    {
+        var parentDirectory = System.IO.Path.GetDirectoryName(replayDirectoryPath);
+        return string.IsNullOrWhiteSpace(parentDirectory)
+            ? System.IO.Path.Combine(replayDirectoryPath, "GhostBattlePayloads")
+            : System.IO.Path.Combine(parentDirectory, "GhostBattlePayloads");
     }
 
     private HistoryBattleRecord? GetRunPreviewBattle()

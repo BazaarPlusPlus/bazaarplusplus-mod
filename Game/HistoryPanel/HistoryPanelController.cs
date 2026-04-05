@@ -94,9 +94,4 @@ internal sealed partial class HistoryPanel
         return _coordinator?.GetDatabaseChipText() ?? "Unavailable";
     }
 
-    private void TrySyncGhostBattles()
-    {
-        if (_coordinator != null)
-            _ = _coordinator.TrySyncGhostBattlesAsync();
-    }
 }

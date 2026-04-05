@@ -53,9 +53,6 @@ internal sealed partial class HistoryPanel
     private Button? _ghostTabButton;
     private Image? _ghostTabButtonBackground;
     private TextMeshProUGUI? _ghostTabButtonLabel;
-    private Button? _syncGhostButton;
-    private Image? _syncGhostButtonBackground;
-    private TextMeshProUGUI? _syncGhostButtonLabel;
     private Button? _ghostFilterAllButton;
     private Image? _ghostFilterAllButtonBackground;
     private TextMeshProUGUI? _ghostFilterAllButtonLabel;
@@ -65,9 +62,6 @@ internal sealed partial class HistoryPanel
     private Button? _ghostFilterILostButton;
     private Image? _ghostFilterILostButtonBackground;
     private TextMeshProUGUI? _ghostFilterILostButtonLabel;
-    private Button? _dynamicPreviewButton;
-    private Image? _dynamicPreviewButtonBackground;
-    private TextMeshProUGUI? _dynamicPreviewButtonLabel;
     private Button? _replayButton;
     private Image? _replayButtonBackground;
     private TextMeshProUGUI? _replayButtonLabel;
@@ -209,9 +203,6 @@ internal sealed partial class HistoryPanel
         _ghostTabButton = null;
         _ghostTabButtonBackground = null;
         _ghostTabButtonLabel = null;
-        _syncGhostButton = null;
-        _syncGhostButtonBackground = null;
-        _syncGhostButtonLabel = null;
         _ghostFilterAllButton = null;
         _ghostFilterAllButtonBackground = null;
         _ghostFilterAllButtonLabel = null;
@@ -221,9 +212,6 @@ internal sealed partial class HistoryPanel
         _ghostFilterILostButton = null;
         _ghostFilterILostButtonBackground = null;
         _ghostFilterILostButtonLabel = null;
-        _dynamicPreviewButton = null;
-        _dynamicPreviewButtonBackground = null;
-        _dynamicPreviewButtonLabel = null;
         _replayButton = null;
         _replayButtonBackground = null;
         _replayButtonLabel = null;
@@ -356,18 +344,6 @@ internal sealed partial class HistoryPanel
                 ? new Color(0.10f, 0.07f, 0.03f, 1f)
                 : Color.white
         );
-        RefreshActionButton(
-            _syncGhostButton,
-            _syncGhostButtonBackground,
-            _syncGhostButtonLabel,
-            _dataService.CanSyncGhostBattles && !_ghostSyncInProgress,
-            new Color(0.23f, 0.27f, 0.32f, 0.98f),
-            new Color(0.35f, 0.39f, 0.44f, 1f),
-            new Color(0.24f, 0.26f, 0.30f, 0.50f),
-            Color.white
-        );
-        if (_syncGhostButtonLabel != null)
-            _syncGhostButtonLabel.text = _ghostSyncInProgress ? "Syncing..." : "Sync Ghost";
         RefreshGhostFilterButton(
             _ghostFilterAllButton,
             _ghostFilterAllButtonBackground,
@@ -387,34 +363,12 @@ internal sealed partial class HistoryPanel
             GhostBattleFilter.ILost
         );
 
-        if (_dynamicPreviewButtonLabel != null)
-        {
-            _dynamicPreviewButtonLabel.text = GetDynamicPreviewButtonLabel(
-                HistoryPanelPreviewSettings.DynamicPreviewEnabled
-            );
-        }
-
         if (_replayButtonLabel != null)
         {
             _replayButtonLabel.text = _replayActionInProgress
                 ? "Working..."
                 : _replayService.GetReplayActionLabel(ActiveSelectedBattle);
         }
-
-        RefreshActionButton(
-            _dynamicPreviewButton,
-            _dynamicPreviewButtonBackground,
-            _dynamicPreviewButtonLabel,
-            true,
-            HistoryPanelPreviewSettings.DynamicPreviewEnabled
-                ? new Color(0.30f, 0.47f, 0.29f, 0.98f)
-                : new Color(0.23f, 0.27f, 0.32f, 0.98f),
-            HistoryPanelPreviewSettings.DynamicPreviewEnabled
-                ? new Color(0.39f, 0.59f, 0.37f, 1f)
-                : new Color(0.35f, 0.39f, 0.44f, 1f),
-            new Color(0.24f, 0.26f, 0.30f, 0.50f),
-            Color.white
-        );
 
         RefreshActionButton(
             _replayButton,

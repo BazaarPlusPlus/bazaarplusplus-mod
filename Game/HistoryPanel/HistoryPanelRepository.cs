@@ -790,7 +790,7 @@ internal sealed class HistoryPanelRepository
         };
     }
 
-    private static string BuildSnapshotSummary(
+    internal static string BuildSnapshotSummary(
         PvpBattleCardSetCapture playerHand,
         PvpBattleCardSetCapture playerSkills,
         PvpBattleCardSetCapture opponentHand,
@@ -810,7 +810,7 @@ internal sealed class HistoryPanelRepository
         return count == 1 ? singular : plural;
     }
 
-    private static HistoryBattlePreviewData BuildEmptyPreviewData()
+    internal static HistoryBattlePreviewData BuildEmptyPreviewData()
     {
         return new HistoryBattlePreviewData(
             new PreviewBoardModel
@@ -830,7 +830,7 @@ internal sealed class HistoryPanelRepository
         );
     }
 
-    private static HistoryBattlePreviewData BuildPreviewData(
+    internal static HistoryBattlePreviewData BuildPreviewData(
         PvpBattleCardSetCapture playerHand,
         PvpBattleCardSetCapture playerSkills,
         PvpBattleCardSetCapture opponentHand,
@@ -840,6 +840,19 @@ internal sealed class HistoryPanelRepository
         var playerBoard = BuildPreviewBoard(playerHand, playerSkills);
         var opponentBoard = BuildPreviewBoard(opponentHand, opponentSkills);
         return new HistoryBattlePreviewData(playerBoard, opponentBoard);
+    }
+
+    internal static HistoryBattlePreviewData BuildPreviewData(PvpBattleSnapshots snapshots)
+    {
+        if (snapshots == null)
+            return BuildEmptyPreviewData();
+
+        return BuildPreviewData(
+            snapshots.PlayerHand,
+            snapshots.PlayerSkills,
+            snapshots.OpponentHand,
+            snapshots.OpponentSkills
+        );
     }
 
     private static PreviewBoardModel BuildPreviewBoard(
