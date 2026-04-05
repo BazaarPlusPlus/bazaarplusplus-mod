@@ -13,6 +13,8 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed partial class HistoryPanel : MonoBehaviour
 {
+    private const string ToggleHistoryPanelBindingPath = "<Keyboard>/f8";
+
     internal static HistoryPanel? Instance { get; private set; }
 
     private readonly HistoryPanelState _state = new();
@@ -184,6 +186,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         if (IsVisible)
             _coordinator?.Tick(Time.unscaledTime);
+
+        if (BppHotkeyService.WasPressedThisFrame(ToggleHistoryPanelBindingPath))
+        {
+            ToggleFromHotkey();
+            return;
+        }
 
         var keyboard = Keyboard.current;
         if (keyboard == null)

@@ -311,10 +311,6 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         chipRow.Add(_runsTabButton);
         _ghostTabButton.style.marginLeft = 8f;
         chipRow.Add(_ghostTabButton);
-        var closeButton = CreateButton(HistoryPanelText.Close(), _close, 72f, 32f);
-        StyleButton(closeButton, new Color(0.29f, 0.20f, 0.20f, 0.98f), new Color(0.98f, 0.92f, 0.90f, 1f));
-        closeButton.style.marginLeft = 8f;
-        chipRow.Add(closeButton);
     }
 
     private void BuildContent(VisualElement parent)
@@ -452,11 +448,15 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
 
         _deleteButton = CreateButton(HistoryPanelText.Delete(), _delete, 130f, 36f);
         _replayButton = CreateButton(HistoryPanelText.Replay(), _replay, 120f, 36f);
+        var closeButton = CreateButton(HistoryPanelText.Close(), _close, 96f, 36f);
         StyleButton(_deleteButton, new Color(0.40f, 0.24f, 0.20f, 0.98f), new Color(1f, 0.93f, 0.90f, 1f));
         StyleButton(_replayButton, new Color(0.19f, 0.31f, 0.39f, 0.98f), new Color(0.88f, 0.95f, 1f, 1f));
+        StyleButton(closeButton, new Color(0.29f, 0.20f, 0.20f, 0.98f), new Color(0.98f, 0.92f, 0.90f, 1f));
         actions.Add(_deleteButton);
         _replayButton.style.marginLeft = 10f;
         actions.Add(_replayButton);
+        closeButton.style.marginLeft = 10f;
+        actions.Add(closeButton);
     }
 
     private ListView CreateRunList()
