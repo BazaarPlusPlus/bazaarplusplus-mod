@@ -524,17 +524,16 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         var timeLabel = CreateRowCornerLabel(topRow, 11);
 
         var statRow = CreateInfoChipRow(content, 6f, 6f);
-        statRow.style.justifyContent = Justify.SpaceBetween;
         var healthChip = CreateInfoChip(statRow, HistoryPanelText.StatHealthShort(), 54f);
-        SetStretchChipWidth(healthChip);
+        SetEqualChipWidth(healthChip);
         var prestigeChip = CreateInfoChip(statRow, HistoryPanelText.StatPrestigeShort(), 54f);
-        SetStretchChipWidth(prestigeChip);
+        SetEqualChipWidth(prestigeChip);
         var levelChip = CreateInfoChip(statRow, HistoryPanelText.StatLevelShort(), 54f);
-        SetStretchChipWidth(levelChip);
+        SetEqualChipWidth(levelChip);
         var incomeChip = CreateInfoChip(statRow, HistoryPanelText.StatIncomeShort(), 54f);
-        SetStretchChipWidth(incomeChip);
+        SetEqualChipWidth(incomeChip);
         var goldChip = CreateInfoChip(statRow, HistoryPanelText.StatGoldShort(), 54f);
-        SetStretchChipWidth(goldChip);
+        SetEqualChipWidth(goldChip, isLast: true);
         var refs = new RunRowRefs(
             row,
             accent,
@@ -1074,11 +1073,13 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         pill.style.width = width;
     }
 
-    private static void SetStretchChipWidth(Label chip)
+    private static void SetEqualChipWidth(Label chip, bool isLast = false)
     {
         chip.style.flexGrow = 1f;
         chip.style.flexShrink = 1f;
+        chip.style.flexBasis = 0f;
         chip.style.minWidth = 0f;
+        chip.style.marginRight = isLast ? 0f : 6f;
     }
 
     private static Label CreateDayBubble(VisualElement parent)

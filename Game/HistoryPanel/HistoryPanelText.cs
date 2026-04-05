@@ -160,8 +160,8 @@ internal static class HistoryPanelText
     );
 
     private static readonly LocalizedTextSet UnrankedText = new(
-        "Unrank",
-        "未定级"
+        "Normal",
+        "普通对局"
     );
 
     private static readonly LocalizedTextSet UnknownRunText = new(
