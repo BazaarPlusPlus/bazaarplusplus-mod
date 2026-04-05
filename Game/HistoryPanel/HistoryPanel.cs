@@ -485,7 +485,9 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (snapshots == null)
             return battle.PreviewData.PlayerHandOnly();
 
-        return HistoryPanelRepository.BuildPreviewData(snapshots).PlayerHandOnly();
+        // Ghost replay payload snapshots stay in the uploader's original perspective.
+        // For the local "against me" view, our board is stored on the opponent side.
+        return HistoryPanelRepository.BuildPreviewData(snapshots).OpponentHandOnly();
     }
 
     private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)
