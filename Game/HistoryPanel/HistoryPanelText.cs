@@ -49,6 +49,16 @@ internal static class HistoryPanelText
         "回放"
     );
 
+    private static readonly LocalizedTextSet ReplayUnavailableText = new(
+        "Unavailable",
+        "不可用"
+    );
+
+    private static readonly LocalizedTextSet ReplayDisabledInRunText = new(
+        "In Run",
+        "对局中禁用"
+    );
+
     private static readonly LocalizedTextSet DownloadReplayText = new(
         "Download Replay",
         "下载回放"
@@ -206,6 +216,8 @@ internal static class HistoryPanelText
     internal static string Battles() => Resolve(BattlesText);
     internal static string Close() => Resolve(CloseText);
     internal static string Replay() => Resolve(ReplayText);
+    internal static string ReplayUnavailable() => Resolve(ReplayUnavailableText);
+    internal static string ReplayDisabledInRun() => Resolve(ReplayDisabledInRunText);
     internal static string DownloadReplay() => Resolve(DownloadReplayText);
     internal static string Delete() => Resolve(DeleteText);
     internal static string DeleteConfirm() => Resolve(DeleteConfirmText);

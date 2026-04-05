@@ -81,11 +81,9 @@ internal sealed partial class HistoryPanel
         var battleSummary =
             ActiveSelectedBattle == null
                 ? HistoryPanelText.SelectBattleForFooter()
-                : canReplaySelectedBattle
-                    ? string.IsNullOrWhiteSpace(ActiveSelectedBattle.SnapshotSummary)
-                        ? selectedBattleTimestampText
-                        : $"{selectedBattleTimestampText} | {ActiveSelectedBattle.SnapshotSummary}"
-                    : $"{selectedBattleTimestampText} | {HistoryPanelText.PreviewUnavailablePrefix()} {replayUnavailableReason}";
+                : string.IsNullOrWhiteSpace(ActiveSelectedBattle.SnapshotSummary)
+                    ? selectedBattleTimestampText
+                    : $"{selectedBattleTimestampText} | {ActiveSelectedBattle.SnapshotSummary}";
         var footerSecondaryText = string.IsNullOrWhiteSpace(_statusMessage)
             ? battleSummary
             : $"{_statusMessage} | {battleSummary}";
@@ -119,7 +117,11 @@ internal sealed partial class HistoryPanel
                     : $"{SelectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(SelectedRun.FinalDay)}",
             ReplayButtonText = _replayActionInProgress
                 ? HistoryPanelText.Working()
-                : _replayService.GetReplayActionLabel(ActiveSelectedBattle),
+                : GetReplayButtonLabel(
+                    ActiveSelectedBattle,
+                    canReplaySelectedBattle,
+                    replayUnavailableReason
+                ),
             ReplayButtonEnabled = canReplaySelectedBattle && !_replayActionInProgress,
             DeleteButtonText = GetDeleteRunButtonLabel(
                 _sectionMode == HistorySectionMode.Runs
@@ -135,6 +137,23 @@ internal sealed partial class HistoryPanel
     private static string GetDeleteRunButtonLabel(bool confirming)
     {
         return confirming ? HistoryPanelText.DeleteConfirm() : HistoryPanelText.Delete();
+    }
+
+    private string GetReplayButtonLabel(
+        HistoryBattleRecord? battle,
+        bool canReplaySelectedBattle,
+        string replayUnavailableReason
+    )
+    {
+        if (canReplaySelectedBattle)
+            return _replayService.GetReplayActionLabel(battle);
+
+        if (_runtime?.IsInGameRun == true)
+            return HistoryPanelText.ReplayDisabledInRun();
+
+        return string.IsNullOrWhiteSpace(replayUnavailableReason)
+            ? _replayService.GetReplayActionLabel(battle)
+            : HistoryPanelText.ReplayUnavailable();
     }
 }
 

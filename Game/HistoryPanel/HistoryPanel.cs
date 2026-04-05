@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
+using TheBazaar;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -184,6 +185,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         DetectSceneChange();
 
+        if (IsVisible && Data.IsInCombat)
+        {
+            SetHistoryVisible(false);
+            return;
+        }
+
         if (IsVisible)
             _coordinator?.Tick(Time.unscaledTime);
 
@@ -266,7 +273,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         {
             BppLog.Warn(
                 "HistoryPanel",
-                "Ignored History Review open request because community contribution is disabled or a live run is active."
+                "Ignored History Review open request because community contribution is disabled or combat is active."
             );
             return;
         }
@@ -284,7 +291,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private bool CanOpenHistoryReview()
     {
         return HistoryPanelAccessPolicy.CanOpen(
-            _runtime?.IsInGameRun == true,
+            Data.IsInCombat,
             BazaarPlusPlus
                 .Core
                 .Runtime
@@ -366,7 +373,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _lastSceneToken = currentSceneToken;
         _uiFontPrewarmedForScene = false;
         PrewarmUiFontState("scene-change");
-        if (IsVisible && _runtime?.IsInGameRun == true)
+        if (IsVisible && Data.IsInCombat)
             SetHistoryVisible(false);
 
         DisposePreviewRenderer();

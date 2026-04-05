@@ -76,7 +76,7 @@ internal static class BppSettingsDockCatalog
         if (!ReadCommunityContributionEnabled())
             return "OFF";
 
-        if (BppRuntimeHost.RunContext.IsInGameRun)
+        if (TheBazaar.Data.IsInCombat)
             return HistoryPanelLabel.ResolveInRunStatus(languageCode);
 
         return HistoryPanelFeature.IsVisible
@@ -86,7 +86,7 @@ internal static class BppSettingsDockCatalog
 
     private static bool IsHistoryPanelActionable()
     {
-        return ReadCommunityContributionEnabled() && !BppRuntimeHost.RunContext.IsInGameRun;
+        return ReadCommunityContributionEnabled() && !TheBazaar.Data.IsInCombat;
     }
 
     private static bool ReadCommunityContributionEnabled()
