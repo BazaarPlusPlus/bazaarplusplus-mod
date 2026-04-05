@@ -69,9 +69,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         )
             return;
 
+        var shouldClearStatus = _state.ShouldClearStatusWhenDeleteConfirmationExpires();
         ClearDeleteRunConfirmation();
-        if (_state.ShouldClearStatusWhenDeleteConfirmationExpires())
-            _state.StatusMessage = null;
+        if (shouldClearStatus)
+            SetStatusMessage(null);
         _requestUiRefresh();
     }
 
@@ -100,7 +101,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         if (!_dataService.TryLoadRecentRuns(40, out var runs, out var statusMessage, out var error))
         {
-            _state.StatusMessage = statusMessage;
+            SetStatusMessage(statusMessage);
             if (error != null)
             {
                 BppLog.Error("HistoryPanel", "Failed to load history page data", error);
@@ -121,7 +122,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         );
         LoadBattlesForSelectedRun();
         _state.PreviewSelectionMode = PreviewSelectionMode.Run;
-        _state.StatusMessage = statusMessage;
+        SetStatusMessage(statusMessage);
 
         _requestUiRefresh();
         _requestPreviewRefresh();
@@ -141,7 +142,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             )
         )
         {
-            _state.StatusMessage = statusMessage;
+            SetStatusMessage(statusMessage);
             if (error != null)
             {
                 BppLog.Error("HistoryPanel", "Failed to load ghost battle data", error);
@@ -162,7 +163,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             Mathf.Max(0, GetFilteredGhostBattles().Count - 1)
         );
         _state.PreviewSelectionMode = PreviewSelectionMode.Battle;
-        _state.StatusMessage = statusMessage;
+        SetStatusMessage(statusMessage);
 
         _requestUiRefresh();
         _requestPreviewRefresh();
@@ -243,19 +244,19 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     {
         if (_state.SectionMode == HistorySectionMode.Ghost)
         {
-            reason = "Ghost battles cannot be deleted from this panel yet.";
+            reason = HistoryPanelText.GhostDeleteUnavailable();
             return false;
         }
 
         if (selectedRun == null)
         {
-            reason = "Select a run to delete.";
+            reason = HistoryPanelText.SelectRunToDelete();
             return false;
         }
 
         if (string.Equals(selectedRun.RawStatus, "active", StringComparison.OrdinalIgnoreCase))
         {
-            reason = "Active runs cannot be deleted.";
+            reason = HistoryPanelText.ActiveRunDeleteUnavailable();
             return false;
         }
 
@@ -268,13 +269,13 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             )
         )
         {
-            reason = "The currently active gameplay run cannot be deleted.";
+            reason = HistoryPanelText.CurrentGameplayRunDeleteUnavailable();
             return false;
         }
 
         if (!_dataService.IsAvailable)
         {
-            reason = "Run log repository is unavailable.";
+            reason = HistoryPanelText.RunLogRepositoryUnavailable();
             return false;
         }
 
@@ -290,23 +291,24 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         if (_state.ReplayActionInProgress)
         {
-            _state.StatusMessage = "Replay action is already running.";
+            SetStatusMessage(HistoryPanelText.ReplayActionAlreadyRunning());
             _requestUiRefresh();
             return;
         }
 
         if (!CanReplaySelectedBattle(battle, out var replayUnavailableReason))
         {
-            _state.StatusMessage = replayUnavailableReason;
+            SetStatusMessage(replayUnavailableReason);
             _requestUiRefresh();
             return;
         }
 
         _state.ReplayActionInProgress = true;
-        _state.StatusMessage =
+        SetStatusMessage(
             battle.Source == HistoryBattleSource.Ghost && !battle.ReplayDownloaded
-                ? "Downloading ghost replay..."
-                : "Starting replay...";
+                ? HistoryPanelText.DownloadingGhostReplay()
+                : HistoryPanelText.StartingReplay()
+        );
         _requestUiRefresh();
 
         var token = GetCurrentSessionToken();
@@ -322,7 +324,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 return;
 
             _state.ReplayActionInProgress = false;
-            _state.StatusMessage = null;
+            SetStatusMessage(null);
             _requestUiRefresh();
             return;
         }
@@ -332,7 +334,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 return;
 
             _state.ReplayActionInProgress = false;
-            _state.StatusMessage = $"Replay failed: {ex.Message}";
+            SetStatusMessage(HistoryPanelText.ReplayFailed(ex.Message));
             BppLog.Error("HistoryPanel", "Failed to replay selected battle", ex);
             _requestUiRefresh();
             return;
@@ -342,7 +344,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
 
         _state.ReplayActionInProgress = false;
-        _state.StatusMessage = replayResult.StatusMessage;
+        SetStatusMessage(replayResult.StatusMessage);
         if (!replayResult.Succeeded)
         {
             _requestUiRefresh();
@@ -361,7 +363,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (!CanDeleteSelectedRun(run, out var reason))
         {
             ClearDeleteRunConfirmation();
-            _state.StatusMessage = reason;
+            SetStatusMessage(reason);
             _requestUiRefresh();
             return;
         }
@@ -370,8 +372,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         {
             _state.DeleteRunConfirmationRunId = run.RunId;
             _state.DeleteRunConfirmationUntil = Time.unscaledTime + 5f;
-            _state.StatusMessage =
-                $"Click Delete Run again within 5s to remove {HistoryPanelFormatter.ShortenRunId(run.RunId)}.";
+            SetStatusMessage(
+                HistoryPanelText.DeleteRunConfirm(HistoryPanelFormatter.ShortenRunId(run.RunId)),
+                isDeleteConfirmation: true
+            );
             _requestUiRefresh();
             return;
         }
@@ -380,7 +384,9 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         if (!_dataService.TryDeleteRun(run.RunId, out var battleIds, out var error))
         {
-            _state.StatusMessage = $"Run delete failed: {error?.Message ?? "Unknown error"}";
+            SetStatusMessage(
+                HistoryPanelText.RunDeleteFailed(error?.Message ?? HistoryPanelText.Unknown())
+            );
             BppLog.Error(
                 "HistoryPanel",
                 $"Failed to delete run {run.RunId}",
@@ -391,41 +397,43 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         }
 
         _replayService.CleanupReplayPayloads(battleIds);
-        var deletedMessage =
-            battleIds.Count > 0
-                ? $"Deleted run {HistoryPanelFormatter.ShortenRunId(run.RunId)} and cleaned {battleIds.Count} linked battle records."
-                : $"Deleted run {HistoryPanelFormatter.ShortenRunId(run.RunId)}.";
+        var deletedMessage = HistoryPanelText.DeletedRun(
+            HistoryPanelFormatter.ShortenRunId(run.RunId),
+            battleIds.Count
+        );
         RefreshData();
-        _state.StatusMessage = deletedMessage;
+        SetStatusMessage(deletedMessage);
         _requestUiRefresh();
     }
 
     public string GetDatabaseChipText()
     {
         if (!_dataService.IsAvailable)
-            return "Unavailable";
+            return HistoryPanelText.DatabaseUnavailable();
 
-        return _dataService.DatabaseExists ? "Connected" : "Missing";
+        return _dataService.DatabaseExists
+            ? HistoryPanelText.DatabaseConnected()
+            : HistoryPanelText.DatabaseMissing();
     }
 
     public async Task TrySyncGhostBattlesAsync()
     {
         if (_state.GhostSyncInProgress)
         {
-            _state.StatusMessage = "Ghost sync is already running.";
+            SetStatusMessage(HistoryPanelText.GhostSyncAlreadyRunning());
             _requestUiRefresh();
             return;
         }
 
         if (!_dataService.CanSyncGhostBattles)
         {
-            _state.StatusMessage = "Ghost sync is unavailable.";
+            SetStatusMessage(HistoryPanelText.GhostSyncUnavailable());
             _requestUiRefresh();
             return;
         }
 
         _state.GhostSyncInProgress = true;
-        _state.StatusMessage = "Syncing ghost battles...";
+        SetStatusMessage(HistoryPanelText.SyncingGhostBattles());
         _requestUiRefresh();
 
         var token = GetCurrentSessionToken();
@@ -441,7 +449,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 return;
 
             _state.GhostSyncInProgress = false;
-            _state.StatusMessage = null;
+            SetStatusMessage(null);
             _requestUiRefresh();
             return;
         }
@@ -451,7 +459,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 return;
 
             _state.GhostSyncInProgress = false;
-            _state.StatusMessage = $"Ghost sync failed: {ex.Message}";
+            SetStatusMessage(HistoryPanelText.GhostSyncFailed(ex.Message));
             BppLog.Error("HistoryPanel", "Failed to sync ghost battles", ex);
             _requestUiRefresh();
             return;
@@ -461,7 +469,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
 
         _state.GhostSyncInProgress = false;
-        _state.StatusMessage = syncResult.StatusMessage;
+        SetStatusMessage(syncResult.StatusMessage);
         if (!syncResult.Succeeded)
         {
             if (syncResult.Error != null)
@@ -473,7 +481,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (_state.SectionMode == HistorySectionMode.Ghost)
         {
             RefreshGhostData();
-            _state.StatusMessage = syncResult.StatusMessage;
+            SetStatusMessage(syncResult.StatusMessage);
             _requestUiRefresh();
         }
         else
@@ -517,7 +525,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         if (error != null && run != null)
         {
-            _state.StatusMessage = $"Battle load failed: {error.Message}";
+            SetStatusMessage(HistoryPanelText.BattleLoadFailed(error.Message));
             BppLog.Error("HistoryPanel", $"Failed to load battles for run {run.RunId}", error);
         }
     }
@@ -533,12 +541,20 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     {
         _state.DeleteRunConfirmationRunId = null;
         _state.DeleteRunConfirmationUntil = 0f;
+        _state.DeleteRunConfirmationStatusActive = false;
     }
 
     private void ClearTransientStatus()
     {
         if (!_state.ReplayActionInProgress && !_state.GhostSyncInProgress)
-            _state.StatusMessage = null;
+            SetStatusMessage(null);
+    }
+
+    private void SetStatusMessage(string? statusMessage, bool isDeleteConfirmation = false)
+    {
+        _state.StatusMessage = statusMessage;
+        _state.DeleteRunConfirmationStatusActive =
+            isDeleteConfirmation && !string.IsNullOrWhiteSpace(statusMessage);
     }
 
     private void InvalidateFilteredGhostBattles()

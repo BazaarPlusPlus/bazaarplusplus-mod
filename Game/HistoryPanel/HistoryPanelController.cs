@@ -49,7 +49,7 @@ internal sealed partial class HistoryPanel
     {
         if (_coordinator == null)
         {
-            reason = "History panel is unavailable.";
+            reason = HistoryPanelText.PanelUnavailable();
             return false;
         }
 
@@ -60,7 +60,7 @@ internal sealed partial class HistoryPanel
     {
         if (_coordinator == null)
         {
-            reason = "History panel is unavailable.";
+            reason = HistoryPanelText.PanelUnavailable();
             return false;
         }
 
@@ -91,7 +91,7 @@ internal sealed partial class HistoryPanel
 
     private string GetDatabaseChipText()
     {
-        return _coordinator?.GetDatabaseChipText() ?? "Unavailable";
+        return _coordinator?.GetDatabaseChipText() ?? HistoryPanelText.DatabaseUnavailable();
     }
 
 }

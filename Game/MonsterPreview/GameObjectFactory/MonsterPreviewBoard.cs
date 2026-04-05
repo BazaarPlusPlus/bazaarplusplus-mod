@@ -511,7 +511,11 @@ internal sealed class MonsterPreviewBoard : IDisposable
         var centerX = (GetBoardSlotCenterX(startSlot) + GetBoardSlotCenterX(endSlot)) * 0.5f;
         var spacing = _presentation.CardSpacing;
 
-        anchor.transform.localPosition = new Vector3(centerX, spacing.y * index, spacing.z * index);
+        anchor.transform.localPosition = new Vector3(
+            centerX * spacing.x,
+            spacing.y * index,
+            spacing.z * index
+        );
         anchor.transform.localRotation = Quaternion.identity;
         anchor.transform.localScale = Vector3.one;
     }

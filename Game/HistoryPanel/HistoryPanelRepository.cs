@@ -801,13 +801,12 @@ internal sealed class HistoryPanelRepository
         var playerSkillCount = CountSnapshotItems(playerSkills);
         var opponentItems = CountSnapshotItems(opponentHand);
         var opponentSkillCount = CountSnapshotItems(opponentSkills);
-        return $"YOU {playerItems} {Pluralize(playerItems, "item", "items")} · {playerSkillCount} {Pluralize(playerSkillCount, "skill", "skills")}"
-            + $"  |  OPP {opponentItems} {Pluralize(opponentItems, "item", "items")} · {opponentSkillCount} {Pluralize(opponentSkillCount, "skill", "skills")}";
-    }
-
-    private static string Pluralize(int count, string singular, string plural)
-    {
-        return count == 1 ? singular : plural;
+        return HistoryPanelText.SnapshotSummary(
+            playerItems,
+            playerSkillCount,
+            opponentItems,
+            opponentSkillCount
+        );
     }
 
     internal static HistoryBattlePreviewData BuildEmptyPreviewData()

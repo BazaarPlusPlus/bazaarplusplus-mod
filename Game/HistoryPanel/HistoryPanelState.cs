@@ -47,6 +47,8 @@ internal sealed class HistoryPanelState
 
     public float DeleteRunConfirmationUntil { get; set; }
 
+    public bool DeleteRunConfirmationStatusActive { get; set; }
+
     public PreviewSelectionMode PreviewSelectionMode { get; set; } = PreviewSelectionMode.Run;
 
     public HistorySectionMode SectionMode { get; set; } = HistorySectionMode.Runs;
@@ -61,10 +63,6 @@ internal sealed class HistoryPanelState
 
     public bool ShouldClearStatusWhenDeleteConfirmationExpires()
     {
-        return StatusMessage != null
-            && StatusMessage.StartsWith(
-                "Click Delete Run again within 5s to remove ",
-                StringComparison.Ordinal
-            );
+        return DeleteRunConfirmationStatusActive;
     }
 }

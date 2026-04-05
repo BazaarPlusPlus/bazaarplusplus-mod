@@ -26,6 +26,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private float _previewDebugOverlayUntil;
     private string _lastSceneToken = string.Empty;
     private bool _initialized;
+    private bool _uiFontPrewarmedForScene;
 
     public static bool IsVisible { get; private set; }
 
@@ -86,7 +87,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private string? _statusMessage
     {
         get => _state.StatusMessage;
-        set => _state.StatusMessage = value;
+        set
+        {
+            _state.StatusMessage = value;
+            _state.DeleteRunConfirmationStatusActive = false;
+        }
     }
 
     private string? _deleteRunConfirmationRunId
@@ -187,10 +192,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (!IsVisible)
             return;
 
-        if (_previewDebugText != null)
-            _previewDebugText.gameObject.SetActive(Time.unscaledTime < _previewDebugOverlayUntil);
-
-        _previewRenderer?.RenderLiveFrame(_previewSurface);
+        _previewRenderer?.RenderLiveFrame();
+        UpdatePreviewUiTick(Time.unscaledTime < _previewDebugOverlayUntil);
 
         if (TryHandlePreviewDebugHotkeys(keyboard))
             return;
@@ -296,7 +299,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         }
 
         EnsurePreviewRenderer();
-        if (_previewRenderer == null || _previewSurface == null || _previewStatusText == null)
+        if (_previewRenderer == null)
             return;
 
         var previewRequest = BuildPreviewRequest();
@@ -304,8 +307,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             _previewRenderer.RenderPreview(
                 previewRequest.RenderId,
                 previewRequest.PreviewData,
-                _previewSurface,
-                _previewStatusText
+                SetPreviewStatus,
+                () => UpdatePreviewUiTick(Time.unscaledTime < _previewDebugOverlayUntil)
             )
         );
     }
@@ -341,6 +344,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _initialized = true;
         Instance = this;
         _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
+        PrewarmUiFontState($"init:{source}");
         EnsureUi();
         SetUiVisible(false);
     }
@@ -352,6 +356,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             return;
 
         _lastSceneToken = currentSceneToken;
+        _uiFontPrewarmedForScene = false;
+        PrewarmUiFontState("scene-change");
         if (IsVisible && _runtime?.IsInGameRun == true)
             SetHistoryVisible(false);
 
@@ -366,6 +372,18 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private static string GetSceneToken(Scene scene)
     {
         return $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
+    }
+
+    private void PrewarmUiFontState(string reason)
+    {
+        if (_uiFontPrewarmedForScene)
+            return;
+
+        BppLog.Info(
+            "HistoryPanel",
+            $"[UiToolkit] PrewarmUiFontState noop reason={reason} scene='{_lastSceneToken}'."
+        );
+        _uiFontPrewarmedForScene = true;
     }
 
     private bool TryHandlePreviewDebugHotkeys(Keyboard keyboard)
@@ -420,9 +438,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             return false;
 
         _statusMessage =
-            "Preview tune: "
-            + _previewRenderer.GetDebugSummary()
-            + " | Ctrl+Left/Right board spacing, Ctrl+[ / ] card spacing, Ctrl+Up/Down zoom, Ctrl+PgUp/PgDn vertical, Ctrl+Q/E or Home/End card width, Ctrl+Alt+Q/E or Home/End card height, Ctrl+-/= FOV, Ctrl+Backspace reset.";
+            $"{HistoryPanelText.PreviewTuneStatus(_previewRenderer.GetDebugSummary())} | {HistoryPanelText.PreviewTuneHelp()}";
         ShowPreviewDebugOverlay(_previewRenderer.GetDebugSummary());
         RefreshUi();
         RefreshSelectedBattlePreview();
@@ -431,11 +447,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void ShowPreviewDebugOverlay(string summary)
     {
-        if (_previewDebugText == null)
-            return;
-
-        _previewDebugText.text = summary;
-        _previewDebugText.gameObject.SetActive(true);
+        SetPreviewDebugText(summary, true);
         _previewDebugOverlayUntil = Time.unscaledTime + 6f;
     }
 

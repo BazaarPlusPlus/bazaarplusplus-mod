@@ -4,6 +4,9 @@ namespace BazaarPlusPlus.Game.Settings;
 
 internal readonly struct LocalizedTextSet
 {
+    internal LocalizedTextSet(string english, string simplifiedChinese)
+        : this(english, simplifiedChinese, english, english, english, english) { }
+
     internal LocalizedTextSet(
         string english,
         string simplifiedChinese,
@@ -14,8 +17,7 @@ internal readonly struct LocalizedTextSet
     )
     {
         English = english ?? throw new ArgumentNullException(nameof(english));
-        SimplifiedChinese =
-            simplifiedChinese ?? throw new ArgumentNullException(nameof(simplifiedChinese));
+        SimplifiedChinese = simplifiedChinese ?? throw new ArgumentNullException(nameof(simplifiedChinese));
         German = german ?? throw new ArgumentNullException(nameof(german));
         Portuguese = portuguese ?? throw new ArgumentNullException(nameof(portuguese));
         Korean = korean ?? throw new ArgumentNullException(nameof(korean));
@@ -38,12 +40,16 @@ internal readonly struct LocalizedTextSet
     {
         if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
             return SimplifiedChinese;
+
         if (LanguageCodeMatcher.IsGerman(languageCode))
             return German;
+
         if (LanguageCodeMatcher.IsPortuguese(languageCode))
             return Portuguese;
+
         if (LanguageCodeMatcher.IsKorean(languageCode))
             return Korean;
+
         if (LanguageCodeMatcher.IsItalian(languageCode))
             return Italian;
 

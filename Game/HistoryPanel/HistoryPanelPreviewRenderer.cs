@@ -1,20 +1,22 @@
 #nullable enable
+using System;
 using System.Collections;
 using System.Linq;
 using System.Threading.Tasks;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Game.MonsterPreview;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
+using Object = UnityEngine.Object;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class HistoryPanelPreviewRenderer
 {
+    // Temporary manual tuning entrypoint for HistoryPanel preview.
+    // Change these defaults directly, rebuild, then verify in game.
     private const int PreviewLayer = 30;
-    private const int TextureWidth = 1536;
-    private const int TextureHeight = 768;
+    private const int TextureWidth = 2688;
+    private const int TextureHeight = 640;
     private const int PreviewSettleFrames = 6;
     private const float BackdropHeight = 0.02f;
     private const float BackdropPaddingX = 0.45f;
@@ -22,13 +24,13 @@ internal sealed class HistoryPanelPreviewRenderer
     private const float BackdropDepthOffset = 0.08f;
     private const float DefaultBoardHorizontalOffset = 0.5f;
     private const float DefaultBoardDepth = 6f;
-    private const float DefaultBoardVerticalOffset = 0.1f;
-    private const float DefaultCameraDepth = 14.00f;
-    private const float DefaultCameraVerticalCenter = 0.3f;
-    private const float DefaultCameraFieldOfView = 58f;
-    private const float DefaultCardWidthScale = 0.88f;
-    private const float DefaultCardHeightScale = 2.3f;
-    private const float DefaultCardSpacingX = 1.1f;
+    private const float DefaultBoardVerticalOffset = -0.10f;
+    private const float DefaultCameraDepth = 9.95f;
+    private const float DefaultCameraVerticalCenter = 0.08f;
+    private const float DefaultCameraFieldOfView = 54f;
+    private const float DefaultCardWidthScale = 0.92f;
+    private const float DefaultCardHeightScale = 0.96f;
+    private const float DefaultCardSpacingX = 0.92f;
 
     private GameObject? _rootObject;
     private Camera? _camera;
@@ -49,6 +51,8 @@ internal sealed class HistoryPanelPreviewRenderer
     private float _cardWidthScale = DefaultCardWidthScale;
     private float _cardHeightScale = DefaultCardHeightScale;
     private float _cardSpacingX = DefaultCardSpacingX;
+
+    public Texture? CurrentTexture => _texture;
 
     public void CancelPending()
     {
@@ -122,11 +126,10 @@ internal sealed class HistoryPanelPreviewRenderer
         return $"boardSpacing={_boardHorizontalOffset:0.00}, cardSpacingX={_cardSpacingX:0.00}, camDepth={_cameraDepth:0.00}, camZ={_cameraVerticalCenter:0.00}, fov={_cameraFieldOfView:0.0}, cardW={_cardWidthScale:0.00}, cardH={_cardHeightScale:0.00}";
     }
 
-    public void RenderLiveFrame(RawImage? target)
+    public void RenderLiveFrame()
     {
         if (
-            target == null
-            || _camera == null
+            _camera == null
             || _texture == null
             || _rootObject == null
             || !_rootObject.activeSelf
@@ -145,9 +148,6 @@ internal sealed class HistoryPanelPreviewRenderer
         ApplyLayerRecursively(_playerBoard?.RootTransform, PreviewLayer);
         ApplyLayerRecursively(_opponentBoard?.RootTransform, PreviewLayer);
         _camera.Render();
-        if (target.texture != _texture)
-            target.texture = _texture;
-        target.color = Color.white;
     }
 
     public void Hide()
@@ -199,31 +199,26 @@ internal sealed class HistoryPanelPreviewRenderer
     public IEnumerator RenderPreview(
         string? renderId,
         HistoryBattlePreviewData? previewData,
-        RawImage? target,
-        TextMeshProUGUI? status
+        Action<string?, bool> setStatus,
+        Action? onRendered = null
     )
     {
         CancelPending();
         var generation = _generation;
 
-        if (target == null || status == null)
-            yield break;
-
         if (string.IsNullOrWhiteSpace(renderId) || previewData == null)
         {
-            ClearTarget(target, status, "Select a run or battle to preview recorded cards.");
+            setStatus(HistoryPanelText.PreviewSelectRunOrBattle(), true);
             Hide();
+            onRendered?.Invoke();
             yield break;
         }
 
         if (!previewData.HasRenderableCards)
         {
-            ClearTarget(
-                target,
-                status,
-                "No locally renderable cards were recorded for this selection."
-            );
+            setStatus(HistoryPanelText.NoLocallyRenderableCards(), true);
             Hide();
+            onRendered?.Invoke();
             yield break;
         }
 
@@ -231,22 +226,18 @@ internal sealed class HistoryPanelPreviewRenderer
         EnsureRenderTexture();
         if (_camera == null || _texture == null || _playerBoard == null || _opponentBoard == null)
         {
-            ClearTarget(target, status, "Preview renderer failed to initialize.");
+            setStatus(HistoryPanelText.PreviewRendererInitFailed(), true);
             yield break;
         }
 
         if (_renderedBattleId == renderId)
         {
-            target.texture = _texture;
-            target.color = Color.white;
-            status.gameObject.SetActive(false);
+            setStatus(null, false);
+            onRendered?.Invoke();
             yield break;
         }
 
-        status.text = "Loading preview...";
-        status.gameObject.SetActive(true);
-        target.texture = null;
-        target.color = new Color(1f, 1f, 1f, 0.18f);
+        setStatus(HistoryPanelText.LoadingPreview(), true);
 
         _rootObject!.SetActive(true);
         var layout = ConfigureBoards(previewData);
@@ -274,8 +265,9 @@ internal sealed class HistoryPanelPreviewRenderer
 
         if (playerTask.IsFaulted || opponentTask.IsFaulted)
         {
-            ClearTarget(target, status, "Failed to build the selected battle preview.");
+            setStatus(HistoryPanelText.PreviewBuildFailed(), true);
             Hide();
+            onRendered?.Invoke();
             yield break;
         }
 
@@ -298,9 +290,8 @@ internal sealed class HistoryPanelPreviewRenderer
         ApplyLayerRecursively(_opponentBoard.RootTransform, PreviewLayer);
         _camera.Render();
         _renderedBattleId = renderId;
-        target.texture = _texture;
-        target.color = Color.white;
-        status.gameObject.SetActive(false);
+        setStatus(null, false);
+        onRendered?.Invoke();
     }
 
     private void EnsureInitialized()
@@ -495,6 +486,8 @@ internal sealed class HistoryPanelPreviewRenderer
             (_cardWidthScale + _cardHeightScale) * 0.5f,
             _cardHeightScale
         );
+        presentation.BoardSize = new Vector2(16.0f, 2.65f);
+        presentation.SkillBoardWidth = 1.55f;
         return presentation;
     }
 
@@ -517,14 +510,6 @@ internal sealed class HistoryPanelPreviewRenderer
             BorderThickness = source.BorderThickness,
             BorderHeight = source.BorderHeight,
         };
-    }
-
-    private static void ClearTarget(RawImage target, TextMeshProUGUI status, string message)
-    {
-        target.texture = null;
-        target.color = new Color(1f, 1f, 1f, 0.12f);
-        status.text = message;
-        status.gameObject.SetActive(true);
     }
 
     private static void ApplyLayerRecursively(Transform? root, int layer)

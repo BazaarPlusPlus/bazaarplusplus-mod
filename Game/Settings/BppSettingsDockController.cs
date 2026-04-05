@@ -41,6 +41,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
     private TMP_FontAsset? _uiFont;
     private Material? _uiFontMaterial;
     private bool _isExpanded;
+    private static bool _fontResolutionLogged;
 
     internal static void Attach(Button anchorButton)
     {
@@ -525,12 +526,17 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         if (_anchorButton == null)
             return;
 
+        TextMeshProUGUI? templateSource = null;
         var template = FindTemplateText(_anchorButton.transform);
+        templateSource = template;
         if (template == null)
         {
             var hostRect = _anchorButton.transform.parent;
             if (hostRect != null)
+            {
                 template = FindTemplateText(hostRect);
+                templateSource = template;
+            }
         }
 
         if (template == null)
@@ -540,6 +546,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
                 if (candidate != null && candidate.font != null)
                 {
                     template = candidate;
+                    templateSource = candidate;
                     break;
                 }
             }
@@ -550,6 +557,15 @@ internal sealed class BppSettingsDockController : MonoBehaviour
 
         _uiFont = template.font;
         _uiFontMaterial = template.fontSharedMaterial;
+
+        if (!_fontResolutionLogged && _uiFont != null)
+        {
+            _fontResolutionLogged = true;
+            BppLog.Info(
+                LogCategory,
+                $"Resolved TMP font '{_uiFont.name}' material '{_uiFontMaterial?.name ?? "<null>"}' from '{BuildTransformPath(templateSource?.transform)}' text='{templateSource?.text ?? string.Empty}'."
+            );
+        }
     }
 
     private static TextMeshProUGUI? FindTemplateText(Transform root)
@@ -561,6 +577,22 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static string BuildTransformPath(Transform? transform)
+    {
+        if (transform == null)
+            return "<unknown>";
+
+        var segments = new Stack<string>();
+        var current = transform;
+        while (current != null)
+        {
+            segments.Push(current.name);
+            current = current.parent;
+        }
+
+        return string.Join("/", segments);
     }
 
     private void ApplyTextStyle(TextMeshProUGUI text)

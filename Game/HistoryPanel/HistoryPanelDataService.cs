@@ -45,7 +45,7 @@ internal sealed class HistoryPanelDataService
 
         if (_repository == null)
         {
-            statusMessage = "Run log database path is unavailable.";
+            statusMessage = HistoryPanelText.RunLogDatabasePathUnavailable();
             return false;
         }
 
@@ -53,13 +53,13 @@ internal sealed class HistoryPanelDataService
         {
             runs = _repository.ListRecentRuns(limit);
             statusMessage = _repository.DatabaseExists
-                ? $"Loaded {runs.Count} runs from sqlite."
-                : "Database file does not exist yet.";
+                ? HistoryPanelText.LoadedRuns(runs.Count)
+                : HistoryPanelText.DatabaseFileMissing();
             return true;
         }
         catch (Exception ex)
         {
-            statusMessage = $"History load failed: {ex.Message}";
+            statusMessage = HistoryPanelText.HistoryLoadFailed(ex.Message);
             error = ex;
             return false;
         }
@@ -100,7 +100,7 @@ internal sealed class HistoryPanelDataService
 
         if (_repository == null)
         {
-            error = new InvalidOperationException("Run log repository is unavailable.");
+            error = new InvalidOperationException(HistoryPanelText.RunLogRepositoryUnavailable());
             return false;
         }
 
@@ -132,7 +132,7 @@ internal sealed class HistoryPanelDataService
 
         if (_repository == null)
         {
-            statusMessage = "Run log database path is unavailable.";
+            statusMessage = HistoryPanelText.RunLogDatabasePathUnavailable();
             return false;
         }
 
@@ -141,17 +141,17 @@ internal sealed class HistoryPanelDataService
             var localPlayerAccountId = _currentPlayerAccountIdAccessor();
             if (string.IsNullOrWhiteSpace(localPlayerAccountId))
             {
-                statusMessage = "Current player account is unavailable.";
+                statusMessage = HistoryPanelText.CurrentPlayerAccountUnavailable();
                 return false;
             }
 
             battles = _repository.ListRecentGhostBattles(localPlayerAccountId, limit);
-            statusMessage = $"Loaded {battles.Count} ghost battles from sqlite.";
+            statusMessage = HistoryPanelText.LoadedGhostBattles(battles.Count);
             return true;
         }
         catch (Exception ex)
         {
-            statusMessage = $"Ghost history load failed: {ex.Message}";
+            statusMessage = HistoryPanelText.GhostHistoryLoadFailed(ex.Message);
             error = ex;
             return false;
         }
@@ -162,24 +162,26 @@ internal sealed class HistoryPanelDataService
     )
     {
         if (_ghostSyncService == null)
-            return HistoryPanelGhostSyncAttemptResult.Failure("Ghost sync is unavailable.");
+            return HistoryPanelGhostSyncAttemptResult.Failure(
+                HistoryPanelText.GhostSyncUnavailable()
+            );
 
         try
         {
             var result = await _ghostSyncService.SyncRecentBattlesAsync(cancellationToken);
             if (!result.Succeeded)
                 return HistoryPanelGhostSyncAttemptResult.Failure(
-                    $"Ghost sync failed: {result.Error ?? "unknown_error"}"
+                    HistoryPanelText.GhostSyncFailed(result.Error ?? HistoryPanelText.Unknown())
                 );
 
             return HistoryPanelGhostSyncAttemptResult.Success(
-                $"Synced {result.ImportedCount} ghost battles."
+                HistoryPanelText.GhostSyncSucceeded(result.ImportedCount)
             );
         }
         catch (Exception ex)
         {
             return HistoryPanelGhostSyncAttemptResult.Failure(
-                $"Ghost sync failed: {ex.Message}",
+                HistoryPanelText.GhostSyncFailed(ex.Message),
                 ex
             );
         }

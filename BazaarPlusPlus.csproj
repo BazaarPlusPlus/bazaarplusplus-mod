@@ -35,6 +35,10 @@
     <Compile Remove="ModCFServer/**" />
     <EmbeddedResource Remove="ModCFServer/**" />
     <None Remove="ModCFServer/**" />
+    <Compile Remove="Game/HistoryPanel/HistoryPanel.Canvas.cs" />
+    <Compile Remove="Game/HistoryPanel/HistoryPanel.Canvas.Layout.cs" />
+    <Compile Remove="Game/HistoryPanel/HistoryPanel.Canvas.Lists.cs" />
+    <Compile Remove="Game/HistoryPanel/HistoryPanel.Canvas.Styles.cs" />
   </ItemGroup>
   <!-- Project paths -->
   <PropertyGroup>
@@ -122,6 +126,15 @@
     </Reference>
     <Reference Include="UnityEngine.UI">
       <HintPath>$(ManagedPath)\UnityEngine.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIElementsModule">
+      <HintPath>$(ManagedPath)\UnityEngine.UIElementsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextCoreTextEngineModule">
+      <HintPath>$(ManagedPath)\UnityEngine.TextCoreTextEngineModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextCoreFontEngineModule">
+      <HintPath>$(ManagedPath)\UnityEngine.TextCoreFontEngineModule.dll</HintPath>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>$(ManagedPath)\Unity.TextMeshPro.dll</HintPath>
