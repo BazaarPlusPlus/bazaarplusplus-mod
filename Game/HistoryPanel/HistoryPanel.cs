@@ -260,6 +260,14 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         Instance.OpenFromDockEntryInternal();
     }
 
+    internal static void RefreshLocalization()
+    {
+        if (Instance == null || !IsVisible)
+            return;
+
+        Instance.RefreshLocalizationInternal();
+    }
+
     internal void OpenFromUiEntry()
     {
         OpenFromDockEntryInternal();
@@ -286,6 +294,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         {
             BppLog.Error("HistoryPanel", "OpenFromDockEntry failed", ex);
         }
+    }
+
+    private void RefreshLocalizationInternal()
+    {
+        RefreshUi();
+        UpdatePreviewUiTick(Time.unscaledTime < _previewDebugOverlayUntil);
     }
 
     private bool CanOpenHistoryReview()

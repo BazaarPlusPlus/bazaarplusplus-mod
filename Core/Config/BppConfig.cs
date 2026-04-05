@@ -21,6 +21,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableCommunityContributionConfig { get; private set; }
 
+    public ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; private set; }
+
     public void Initialize(ConfigFile config)
     {
         UseNativeMonsterPreviewConfig = config.Bind(
@@ -70,6 +72,12 @@ internal sealed class BppConfig : IBppConfig
             "Enabled",
             true,
             "Whether to participate in BazaarPlusPlus community data contribution features, including background uploads and History Review access while out of a live run."
+        );
+        ChineseLocaleModeConfig = config.Bind(
+            "Localization",
+            "ChineseLocaleMode",
+            BppChineseLocaleMode.Mainland,
+            "Chinese locale variant for BazaarPlusPlus UI when the game language is Chinese. Cycles between Mainland, Taiwan, and HongKong."
         );
     }
 }

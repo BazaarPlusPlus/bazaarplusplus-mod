@@ -16,37 +16,51 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet TitleText = new(
         "Game History",
-        "对局历史"
+        "对局历史",
+        "對局歷史",
+        "對局歷史"
     );
 
     private static readonly LocalizedTextSet SubtitleText = new(
         "Review runs, inspect ghost battles, and jump back into any replay you want. Support BazaarPlusPlus at bazaarplusplus.com. -- Xinyu YANG",
-        "查看对局、检查幽灵战斗，并快速回放你想看的任意一场。欢迎前往 bazaarplusplus.com 支持 BazaarPlusPlus。-- Xinyu YANG"
+        "查看对局、检查幽灵战斗，并快速回放你想看的任意一场。欢迎前往 bazaarplusplus.com 支持 BazaarPlusPlus。-- Xinyu YANG",
+        "檢視對局、檢查幽靈戰鬥，並快速重播你想看的任意一場。歡迎前往 bazaarplusplus.com 支持 BazaarPlusPlus。-- Xinyu YANG",
+        "檢視對局、檢查幽靈戰鬥，並快速重播你想看的任意一場。歡迎前往 bazaarplusplus.com 支持 BazaarPlusPlus。-- Xinyu YANG"
     );
 
     private static readonly LocalizedTextSet RunsTabText = new(
         "Runs",
-        "对局"
+        "对局",
+        "對局",
+        "對局"
     );
 
     private static readonly LocalizedTextSet GhostTabText = new(
         "Ghost",
-        "幽灵"
+        "幽灵",
+        "幽靈",
+        "幽靈"
     );
 
     private static readonly LocalizedTextSet BattlesText = new(
         "Battles",
-        "战斗"
+        "战斗",
+        "戰鬥",
+        "戰鬥"
     );
 
     private static readonly LocalizedTextSet CloseText = new(
         "Close",
-        "关闭"
+        "关闭",
+        "關閉",
+        "關閉"
     );
 
     private static readonly LocalizedTextSet ReplayText = new(
         "Replay",
-        "回放"
+        "回放",
+        "重播",
+        "重播"
     );
 
     private static readonly LocalizedTextSet ReplayUnavailableText = new(
@@ -61,7 +75,9 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet DownloadReplayText = new(
         "Download Replay",
-        "下载回放"
+        "下载回放",
+        "下載重播",
+        "下載重播"
     );
 
     private static readonly LocalizedTextSet DeleteText = new(
@@ -81,12 +97,16 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet RunsSectionSubtitleText = new(
         "Choose one run to see its recorded battles.",
-        "选择一个 run 查看记录到的战斗。"
+        "选择一个 run 查看记录到的战斗。",
+        "選擇一個 run 檢視記錄到的戰鬥。",
+        "選擇一個 run 檢視記錄到的戰鬥。"
     );
 
     private static readonly LocalizedTextSet SelectRunSubtitleText = new(
         "Select a run to inspect its recorded battles.",
-        "选择一个 run 查看其记录战斗。"
+        "选择一个 run 查看其记录战斗。",
+        "選擇一個 run 檢視其記錄戰鬥。",
+        "選擇一個 run 檢視其記錄戰鬥。"
     );
 
     private static readonly LocalizedTextSet NoBattleSelectedText = new(
@@ -101,7 +121,9 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet SelectBattleForFooterText = new(
         "Select one battle to inspect it, then use Replay when you want to jump back into it.",
-        "选择一场战斗进行查看，想重新进入时再使用回放。"
+        "选择一场战斗进行查看，想重新进入时再使用回放。",
+        "選擇一場戰鬥進行檢視，想重新進入時再使用重播。",
+        "選擇一場戰鬥進行檢視，想重新進入時再使用重播。"
     );
 
     private static readonly LocalizedTextSet PreviewUnavailablePrefixText = new(
@@ -111,7 +133,9 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet PreviewSelectBattleText = new(
         "Select a battle to preview its recorded cards.",
-        "选择一场战斗以预览其记录卡牌。"
+        "选择一场战斗以预览其记录卡牌。",
+        "選擇一場戰鬥以預覽其記錄卡牌。",
+        "選擇一場戰鬥以預覽其記錄卡牌。"
     );
 
     private static readonly LocalizedTextSet NoRunsFoundText = new(
@@ -121,7 +145,9 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet NoGhostBattlesText = new(
         "No ghost battles synced yet.",
-        "还没有同步到幽灵战斗。"
+        "还没有同步到幽灵战斗。",
+        "還沒有同步到幽靈戰鬥。",
+        "還沒有同步到幽靈戰鬥。"
     );
 
     private static readonly LocalizedTextSet SelectRunFirstText = new(
@@ -151,7 +177,9 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet DatabasePrefixText = new(
         "DB",
-        "数据库"
+        "数据库",
+        "資料庫",
+        "資料庫"
     );
 
     private static readonly LocalizedTextSet DatabaseUnavailableText = new(
@@ -171,7 +199,9 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet UnrankedText = new(
         "Normal",
-        "普通对局"
+        "普通对局",
+        "普通對局",
+        "普通對局"
     );
 
     private static readonly LocalizedTextSet UnknownRunText = new(
@@ -181,17 +211,23 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet CompletedText = new(
         "Completed",
+        "已完成",
+        "已完成",
         "已完成"
     );
 
     private static readonly LocalizedTextSet AbandonedText = new(
         "Abandoned",
-        "已放弃"
+        "已放弃",
+        "已放棄",
+        "已放棄"
     );
 
     private static readonly LocalizedTextSet ActiveText = new(
         "Active",
-        "进行中"
+        "进行中",
+        "進行中",
+        "進行中"
     );
 
     private static readonly LocalizedTextSet UnknownText = new(
@@ -201,12 +237,16 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet WinText = new(
         "Win",
-        "胜利"
+        "胜利",
+        "勝利",
+        "勝利"
     );
 
     private static readonly LocalizedTextSet LossText = new(
         "Loss",
-        "失败"
+        "失败",
+        "失敗",
+        "失敗"
     );
 
     internal static string Title() => Resolve(TitleText);
@@ -254,39 +294,47 @@ internal static class HistoryPanelText
     internal static string DatabaseChip(string status) => $"{Resolve(DatabasePrefixText)} {status}";
     internal static string RunBattles(int count) => FormatCount(count, Battles());
     internal static string StatHealthShort() => FormatSimple("HP", "生命");
-    internal static string StatPrestigeShort() => FormatSimple("PRE", "声望");
-    internal static string StatLevelShort() => FormatSimple("LVL", "等级");
-    internal static string StatIncomeShort() => FormatSimple("INC", "收入");
-    internal static string StatGoldShort() => FormatSimple("GLD", "金币");
-    internal static string PlayerSideShort() => FormatSimple("YOU", "我方");
-    internal static string OpponentSideShort() => FormatSimple("OPP", "对手");
-    internal static string HourBadge(int? hour) => FormatSimple(hour.HasValue ? $"H{hour.Value}" : "H?", hour.HasValue ? $"{hour.Value}时" : "?时");
-    internal static string DayBadge(int? day) => FormatSimple(day.HasValue ? $"D{day.Value}" : "D?", day.HasValue ? $"{day.Value}天" : "?天");
+    internal static string StatPrestigeShort() => FormatSimple("PRE", "声望", "聲望", "聲望");
+    internal static string StatLevelShort() => FormatSimple("LVL", "等级", "等級", "等級");
+    internal static string StatIncomeShort() => FormatSimple("INC", "收入", "收入", "收入");
+    internal static string StatGoldShort() => FormatSimple("GLD", "金币", "金幣", "金幣");
+    internal static string PlayerSideShort() => FormatSimple("YOU", "我方", "我方", "我方");
+    internal static string OpponentSideShort() => FormatSimple("OPP", "对手", "對手", "對手");
+    internal static string HourBadge(int? hour) => FormatSimple(hour.HasValue ? $"H{hour.Value}" : "H?", hour.HasValue ? $"{hour.Value}时" : "?时", hour.HasValue ? $"{hour.Value}時" : "?時", hour.HasValue ? $"{hour.Value}時" : "?時");
+    internal static string DayBadge(int? day) => FormatSimple(day.HasValue ? $"D{day.Value}" : "D?", day.HasValue ? $"{day.Value}天" : "?天", day.HasValue ? $"{day.Value}天" : "?天", day.HasValue ? $"{day.Value}天" : "?天");
     internal static string DayHourBadge(int? day, int? hour) => $"{DayBadge(day)} {HourBadge(hour)}";
     internal static string RunOutcomeBubbleLabel(RunOutcomeTier tier)
     {
         return tier switch
         {
             RunOutcomeTier.Diamond => FormatSimple("DIA", "钻石"),
-            RunOutcomeTier.Gold => FormatSimple("GLD", "黄金"),
-            RunOutcomeTier.Silver => FormatSimple("SLV", "白银"),
-            RunOutcomeTier.Bronze => FormatSimple("BRZ", "青铜"),
-            _ => FormatSimple("MIS", "惨淡"),
+            RunOutcomeTier.Gold => FormatSimple("GLD", "黄金", "黃金", "黃金"),
+            RunOutcomeTier.Silver => FormatSimple("SLV", "白银", "白銀", "白銀"),
+            RunOutcomeTier.Bronze => FormatSimple("BRZ", "青铜", "青銅", "青銅"),
+            _ => FormatSimple("MIS", "惨淡", "慘淡", "慘淡"),
         };
     }
     internal static string BoardSummary(int items, int skills)
     {
         var languageCode = GetLanguageCode();
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
-            return $"{items} 物品 · {skills} 技能";
+        if (LanguageCodeMatcher.IsChinese(languageCode))
+            return ResolveChinese(
+                $"{items} 物品 · {skills} 技能",
+                $"{items} 物品 · {skills} 技能",
+                $"{items} 物品 · {skills} 技能"
+            );
 
         return $"{items} {Pluralize(items, "item", "items")} · {skills} {Pluralize(skills, "skill", "skills")}";
     }
     internal static string RunRecord(int wins, int losses)
     {
         var languageCode = GetLanguageCode();
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
-            return $"{wins}胜 - {losses}负";
+        if (LanguageCodeMatcher.IsChinese(languageCode))
+            return ResolveChinese(
+                $"{wins}胜 - {losses}负",
+                $"{wins}勝 - {losses}負",
+                $"{wins}勝 - {losses}負"
+            );
 
         return $"{wins}W - {losses}L";
     }
@@ -297,16 +345,16 @@ internal static class HistoryPanelText
 
         var normalized = rank.Trim();
         if (string.Equals(normalized, "Legendary", StringComparison.OrdinalIgnoreCase))
-            return rating?.ToString() ?? FormatSimple("LEG", "传说");
+            return rating?.ToString() ?? FormatSimple("LEG", "传说", "傳說", "傳說");
 
-        if (LanguageCodeMatcher.IsSimplifiedChinese(GetLanguageCode()))
+        if (LanguageCodeMatcher.IsChinese(GetLanguageCode()))
         {
             return normalized switch
             {
-                "Bronze" => "青铜",
-                "Silver" => "白银",
-                "Gold" => "黄金",
-                "Diamond" => "钻石",
+                "Bronze" => FormatSimple("BRZ", "青铜", "青銅", "青銅"),
+                "Silver" => FormatSimple("SLV", "白银", "白銀", "白銀"),
+                "Gold" => FormatSimple("GLD", "黄金", "黃金", "黃金"),
+                "Diamond" => FormatSimple("DIA", "钻石", "鑽石", "鑽石"),
                 _ => normalized,
             };
         }
@@ -317,8 +365,8 @@ internal static class HistoryPanelText
     internal static string RunWins(int count)
     {
         var languageCode = GetLanguageCode();
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
-            return $"{count} 胜";
+        if (LanguageCodeMatcher.IsChinese(languageCode))
+            return ResolveChinese($"{count} 胜", $"{count} 勝", $"{count} 勝");
 
         return $"{count} wins";
     }
@@ -326,8 +374,8 @@ internal static class HistoryPanelText
     internal static string PlayerHeroPill(string shortCode)
     {
         var languageCode = GetLanguageCode();
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
-            return $"我方 {shortCode}";
+        if (LanguageCodeMatcher.IsChinese(languageCode))
+            return ResolveChinese($"我方 {shortCode}", $"我方 {shortCode}", $"我方 {shortCode}");
 
         return $"YOU {shortCode}";
     }
@@ -340,8 +388,14 @@ internal static class HistoryPanelText
     )
     {
         var languageCode = GetLanguageCode();
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
-            return $"我方 {playerHero} Lv{playerLevel}  |  对手 {opponentHero} Lv{opponentLevel}";
+        if (LanguageCodeMatcher.IsChinese(languageCode))
+        {
+            return ResolveChinese(
+                $"我方 {playerHero} Lv{playerLevel}  |  对手 {opponentHero} Lv{opponentLevel}",
+                $"我方 {playerHero} Lv{playerLevel}  |  對手 {opponentHero} Lv{opponentLevel}",
+                $"我方 {playerHero} Lv{playerLevel}  |  對手 {opponentHero} Lv{opponentLevel}"
+            );
+        }
 
         return $"YOU {playerHero} Lv{playerLevel}  |  OPP {opponentHero} Lv{opponentLevel}";
     }
@@ -354,9 +408,13 @@ internal static class HistoryPanelText
     )
     {
         var languageCode = GetLanguageCode();
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
+        if (LanguageCodeMatcher.IsChinese(languageCode))
         {
-            return $"我方 {playerItems} 件物品 · {playerSkills} 个技能  |  对手 {opponentItems} 件物品 · {opponentSkills} 个技能";
+            return ResolveChinese(
+                $"我方 {playerItems} 件物品 · {playerSkills} 个技能  |  对手 {opponentItems} 件物品 · {opponentSkills} 个技能",
+                $"我方 {playerItems} 件物品 · {playerSkills} 個技能  |  對手 {opponentItems} 件物品 · {opponentSkills} 個技能",
+                $"我方 {playerItems} 件物品 · {playerSkills} 個技能  |  對手 {opponentItems} 件物品 · {opponentSkills} 個技能"
+            );
         }
 
         return $"YOU {playerItems} {Pluralize(playerItems, "item", "items")} · {playerSkills} {Pluralize(playerSkills, "skill", "skills")}  |  OPP {opponentItems} {Pluralize(opponentItems, "item", "items")} · {opponentSkills} {Pluralize(opponentSkills, "skill", "skills")}";
@@ -796,22 +854,48 @@ internal static class HistoryPanelText
     private static string FormatCount(int count, string noun)
     {
         var languageCode = GetLanguageCode();
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
+        if (LanguageCodeMatcher.IsChinese(languageCode))
             return $"{noun} {count}";
 
         return $"{count} {noun}";
     }
 
+    private static string FormatSimple(string english, string chineseMainland)
+    {
+        return FormatSimple(english, chineseMainland, null, null);
+    }
+
     private static string FormatSimple(
         string english,
-        string simplifiedChinese
+        string chineseMainland,
+        string? chineseTaiwan,
+        string? chineseHongKong
     )
     {
         var languageCode = GetLanguageCode();
-        if (LanguageCodeMatcher.IsSimplifiedChinese(languageCode))
-            return simplifiedChinese;
+        if (LanguageCodeMatcher.IsChinese(languageCode))
+        {
+            return BppChineseLocalization.ResolveChineseText(
+                chineseMainland,
+                chineseTaiwan,
+                chineseHongKong
+            );
+        }
 
         return english;
+    }
+
+    private static string ResolveChinese(
+        string chineseMainland,
+        string? chineseTaiwan,
+        string? chineseHongKong
+    )
+    {
+        return BppChineseLocalization.ResolveChineseText(
+            chineseMainland,
+            chineseTaiwan,
+            chineseHongKong
+        );
     }
 
     private static string Pluralize(int count, string singular, string plural)

@@ -20,4 +20,6 @@ internal interface IBppConfig
     ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; }
 
     ConfigEntry<bool>? EnableCommunityContributionConfig { get; }
+
+    ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; }
 }

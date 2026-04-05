@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.MonsterPreview;
@@ -54,6 +55,14 @@ internal static class BppSettingsDockCatalog
                 WriteUseNativeMonsterPreview,
                 MonsterPreviewModeSwitchCoordinator.Apply
             )
+        ),
+        new(
+            "ChineseLocaleMode",
+            ResolveChineseLocaleModeLabel,
+            _ => BppChineseLocalization.ResolveModeStatus(ReadChineseLocaleMode()),
+            IsChineseLocaleOverrideActive,
+            CycleChineseLocaleMode,
+            collapseAfterActivate: false
         ),
         new(
             "CommunityContribution",
@@ -130,5 +139,29 @@ internal static class BppSettingsDockCatalog
         var config = BppRuntimeHost.Config.UseNativeMonsterPreviewConfig;
         if (config != null)
             config.Value = enabled;
+    }
+
+    private static string ResolveChineseLocaleModeLabel(string languageCode)
+    {
+        return new LocalizedTextSet("Chinese Locale", "中文模式").Resolve(languageCode);
+    }
+
+    private static BppChineseLocaleMode ReadChineseLocaleMode()
+    {
+        return BppRuntimeHost.Config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland;
+    }
+
+    private static void CycleChineseLocaleMode()
+    {
+        var config = BppRuntimeHost.Config.ChineseLocaleModeConfig;
+        if (config != null)
+            config.Value = BppChineseLocalization.GetNextMode(config.Value);
+
+        HistoryPanelFeature.RefreshLocalization();
+    }
+
+    private static bool IsChineseLocaleOverrideActive()
+    {
+        return ReadChineseLocaleMode() != BppChineseLocaleMode.Mainland;
     }
 }

@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 using System;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.HistoryPanel;
 using HarmonyLib;
 
 namespace BazaarPlusPlus;
@@ -16,6 +17,7 @@ internal static class OptionsDialogLanguageRefreshPatch
             BppSettingsDockController.RefreshAll();
             BppKeybindSettingsAwakePatch.RefreshLanguage(__instance);
             NativeKeybindLabelAwakePatch.TryUpdateLabels(__instance);
+            HistoryPanel.RefreshLocalization();
         }
         catch (Exception ex)
         {
