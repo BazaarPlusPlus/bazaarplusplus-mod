@@ -1,11 +1,27 @@
 import { sha256Base64 } from "../crypto/hash";
 import type { Env } from "../env";
 import { json } from "../http/json";
+import { logInfo } from "../observability";
 import { getPlayerLink } from "../persistence/playerLinks";
 import { upsertBattle } from "../persistence/battles";
 import { gzipBytes } from "./replayCompression";
 import { parseBattleUploadBody } from "./uploadBattlePayload";
 import { requireVerifiedClient } from "./verifiedClient";
+
+function shouldDiscardBattleUpload(input: {
+  day: number | null;
+  playerRating: number | null;
+}): boolean {
+  if (input.playerRating != null && input.playerRating > 700) {
+    return false;
+  }
+
+  if (input.day != null && input.day >= 10) {
+    return false;
+  }
+
+  return true;
+}
 
 function tryReadBattleIdFromPayload(payload: ArrayBuffer): string | null {
   try {
@@ -34,6 +50,27 @@ export async function handleUploadBattleArtifact(
   const parsed = parseBattleUploadBody(verified.payload, headerBattleId ?? "");
   if (parsed instanceof Response) {
     return parsed;
+  }
+
+  if (
+    shouldDiscardBattleUpload({
+      day: parsed.manifest.day,
+      playerRating: parsed.manifest.playerRating,
+    })
+  ) {
+    logInfo("battle.discarded", {
+      battle_id: parsed.battleId,
+      run_id: parsed.runId,
+      client_id: verified.client.client_id,
+      day: parsed.manifest.day,
+      player_rating: parsed.manifest.playerRating,
+      reason: "low_mmr_before_day_10",
+    });
+    return json({
+      status: "accepted",
+      discarded: true,
+      reason: "low_mmr_before_day_10",
+    });
   }
 
   const replayPayloadBytes = new TextEncoder().encode(parsed.battlePayloadJson);
@@ -82,6 +119,16 @@ export async function handleUploadBattleArtifact(
     replaySizeBytes: replayPayloadBytes.byteLength,
     createdAtUtc: uploadedAtUtc,
     updatedAtUtc: uploadedAtUtc,
+  });
+
+  logInfo("battle.accepted", {
+    battle_id: parsed.battleId,
+    run_id: parsed.runId,
+    client_id: verified.client.client_id,
+    uploader_player_account_id: playerLink?.player_account_id ?? null,
+    day: parsed.manifest.day,
+    player_rating: parsed.manifest.playerRating,
+    replay_object_key: objectKey,
   });
 
   return json({
