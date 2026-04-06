@@ -16,7 +16,7 @@ function shouldDiscardBattleUpload(input: {
     return false;
   }
 
-  if (input.day != null && input.day >= 10) {
+  if (input.day != null && input.day > 11) {
     return false;
   }
 
