@@ -11,6 +11,8 @@ internal sealed class BppPathService : IPathService
 
     public string? CombatReplayDirectoryPath { get; private set; }
 
+    public string? ScreenshotsDirectoryPath { get; private set; }
+
     public string? RunUploadInstallIdentityPath { get; private set; }
 
     public string? RunUploadClientStatePath { get; private set; }
@@ -29,6 +31,11 @@ internal sealed class BppPathService : IPathService
             BepInEx.Paths.GameRootPath,
             "BazaarPlusPlus",
             "CombatReplays"
+        );
+        ScreenshotsDirectoryPath = System.IO.Path.Combine(
+            BepInEx.Paths.GameRootPath,
+            "BazaarPlusPlus",
+            "Screenshots"
         );
         RunUploadInstallIdentityPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,

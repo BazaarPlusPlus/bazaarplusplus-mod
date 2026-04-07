@@ -9,6 +9,8 @@ internal interface IPathService
 
     string? CombatReplayDirectoryPath { get; }
 
+    string? ScreenshotsDirectoryPath { get; }
+
     string? RunUploadInstallIdentityPath { get; }
 
     string? RunUploadClientStatePath { get; }

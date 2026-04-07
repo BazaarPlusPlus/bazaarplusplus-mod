@@ -11,6 +11,7 @@ using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Upload;
+using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Tooltips;
 using BepInEx;
 using BepInEx.Configuration;
@@ -113,6 +114,8 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<MonsterPreviewWarmupController>();
         BppLog.Info("Plugin", "Adding MonsterLockShowcaseRuntime");
         gameObject.AddComponent<MonsterLockShowcaseRuntime>();
+        BppLog.Info("Plugin", "Adding EndOfRunScreenshotController");
+        gameObject.AddComponent<EndOfRunScreenshotController>();
 
         BppLog.Info("Plugin", "Adding TooltipModifierRefreshController");
         var tooltipModifierRefreshController =
