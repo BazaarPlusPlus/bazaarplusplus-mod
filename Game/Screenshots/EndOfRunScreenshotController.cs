@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.Input;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
@@ -12,6 +13,7 @@ namespace BazaarPlusPlus.Game.Screenshots;
 
 internal sealed class EndOfRunScreenshotController : MonoBehaviour
 {
+    private const string ManualScreenshotBindingPath = "<Keyboard>/f9";
     private static readonly System.Reflection.MethodInfo ContinueClickMethod = AccessTools.Method(
         typeof(EndOfRunScreenController),
         "OnContinueClick"
@@ -59,6 +61,17 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     {
         if (ReferenceEquals(_current, this))
             _current = null;
+    }
+
+    private void Update()
+    {
+        if (_screenshotService == null)
+            return;
+
+        if (!BppHotkeyService.WasPressedThisFrame(ManualScreenshotBindingPath))
+            return;
+
+        _screenshotService.CaptureCurrentFrame(ResolveRunId());
     }
 
     private void OnRunStarted()

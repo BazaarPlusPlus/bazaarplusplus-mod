@@ -5,6 +5,7 @@
 | Hotkey | Function | Scope | Rebindable |
 | --- | --- | --- | --- |
 | `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No |
+| `F9` | Save a screenshot | Global | No |
 | `Ctrl` | Show enchant preview | Tooltip hover | Yes |
 | `Shift` | Show upgrade preview | Tooltip hover | Yes |
 
@@ -47,6 +48,7 @@
 
 - `Game/Input/KeyBindings.cs`
 - `Game/Input/BppHotkeyService.cs`
+- `Game/Screenshots/EndOfRunScreenshotController.cs`
 - `Game/HistoryPanel/HistoryPanel.cs`
 - `Game/DebugPanel/DebugPanel.cs`
 - `Patches/Settings/BppKeybindSettingsPatch.cs`
