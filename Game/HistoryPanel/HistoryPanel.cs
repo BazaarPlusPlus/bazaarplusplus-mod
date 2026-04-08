@@ -6,6 +6,7 @@ using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using TheBazaar;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using Coroutine = UnityEngine.Coroutine;
@@ -15,6 +16,14 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed partial class HistoryPanel : MonoBehaviour
 {
     private const string ToggleHistoryPanelBindingPath = "<Keyboard>/f8";
+    private static readonly HashSet<string> UiDiagnosticScenes = new(
+        StringComparer.Ordinal
+    )
+    {
+        "CollectionUIScene",
+        "CollectionWheelScene",
+        "ChestSelectScene",
+    };
 
     internal static HistoryPanel? Instance { get; private set; }
 
@@ -387,6 +396,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _lastSceneToken = currentSceneToken;
         _uiFontPrewarmedForScene = false;
         PrewarmUiFontState("scene-change");
+        LogEventSystemDiagnostics(SceneManager.GetActiveScene());
         if (IsVisible && Data.IsInCombat)
             SetHistoryVisible(false);
 
@@ -413,6 +423,54 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             $"[UiToolkit] PrewarmUiFontState noop reason={reason} scene='{_lastSceneToken}'."
         );
         _uiFontPrewarmedForScene = true;
+    }
+
+    private static void LogEventSystemDiagnostics(Scene scene)
+    {
+        if (!UiDiagnosticScenes.Contains(scene.name))
+            return;
+
+        try
+        {
+            var eventSystems = Resources.FindObjectsOfTypeAll<EventSystem>();
+            if (eventSystems == null || eventSystems.Length == 0)
+            {
+                BppLog.Warn(
+                    "HistoryPanel",
+                    $"[Diag][EventSystem] scene='{GetSceneToken(scene)}' found no EventSystem instances."
+                );
+                return;
+            }
+
+            var summaries = eventSystems.Select((eventSystem, index) =>
+                DescribeEventSystem(eventSystem, index)
+            );
+            var currentSummary = DescribeEventSystem(EventSystem.current, null);
+            BppLog.Info(
+                "HistoryPanel",
+                $"[Diag][EventSystem] scene='{GetSceneToken(scene)}' count={eventSystems.Length} current={currentSummary} entries={string.Join(" || ", summaries)}"
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("HistoryPanel", "[Diag][EventSystem] Enumeration failed", ex);
+        }
+    }
+
+    private static string DescribeEventSystem(EventSystem? eventSystem, int? index)
+    {
+        var prefix = index.HasValue ? $"#{index.Value}:" : string.Empty;
+        if (eventSystem == null)
+            return $"{prefix}<null>";
+
+        var modules = eventSystem
+            .GetComponents<BaseInputModule>()
+            .Select(module =>
+                $"{module.GetType().Name}(enabled={module.enabled},active={module.isActiveAndEnabled})"
+            );
+
+        return
+            $"{prefix}{eventSystem.GetType().Name}(name='{eventSystem.name}',activeSelf={eventSystem.gameObject.activeSelf},activeInHierarchy={eventSystem.gameObject.activeInHierarchy},enabled={eventSystem.enabled},isCurrent={ReferenceEquals(EventSystem.current, eventSystem)},scene='{eventSystem.gameObject.scene.name}',modules=[{string.Join(", ", modules)}])";
     }
 
     private bool TryHandlePreviewDebugHotkeys(Keyboard keyboard)

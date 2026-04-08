@@ -2,6 +2,29 @@
 
 The mod does not directly patch any `TheBazaar.Feature.Chest` classes, but several Harmony patches target generic game classes (`CardController`, `CardTooltipController`, `NetMessageProcessor`) that are also used by the chest scene. This document lists the suspected interference points.
 
+## Updated Findings From 2026-04-08 Log Review
+
+- `HistoryPanel` is attached during plugin startup, not lazily when the collection UI opens. The repeated `PrewarmUiFontState noop` lines are scene-change diagnostics from the always-on component, not evidence that the panel is being opened in those scenes.
+- The `There can be only one active Event System` warning happens while entering the collection flow. Bazaar++ does not explicitly create a Unity `EventSystem`, but the always-on hidden `HistoryPanel` UIToolkit root is still a plausible indirect contributor to duplicated input-system state.
+- The chest-scene DOTween failures occur on the game's native `CollectionUIController` animation path (`DOFade`, `DOAnchorPosX`) during the transition into `ChestSelectScene`. There is still no evidence that Bazaar++ directly patches that code path.
+- The most likely Bazaar++ contribution remains indirect interference: input-system duplication, cross-scene preview objects, or click/raycast interception. The DOTween exception itself still looks more like a native UI reference becoming null or destroyed before the tween starts.
+
+## Temporary Diagnostics Added
+
+To narrow this down during manual testing, the mod now logs two temporary diagnostic groups:
+
+1. Scene-scoped `EventSystem` enumeration
+   - Triggered when the active scene changes to `CollectionUIScene`, `CollectionWheelScene`, or `ChestSelectScene`
+   - Logs the count of `EventSystem` instances, which one is `EventSystem.current`, each object's scene/active state, and attached input modules
+2. Chest `StateSelect.Enter` UI snapshot
+   - Triggered right after `TheBazaar.Feature.Chest.Scene.States.StateSelect.Enter`
+   - Logs the resolved `CollectionUIController` and the native tween targets most likely involved in the warnings: `eventSystem`, `fadeOverlay`, `leftAnchor`, `rightAnchor`, `backButtonRect`, plus `collectionsController` and `activeChestController`
+
+These diagnostics are intended to answer two specific questions:
+
+- Is the collection/chest flow running with multiple live `EventSystem` objects, and does one appear to come from a persistent mod-owned UI root?
+- Which native chest/collection tween target is null or destroyed at the moment `StateSelect` becomes active?
+
 ## Chest Scene Overview
 
 The chest scene is driven by `ChestSceneController` (a state machine) with states defined under `TheBazaar.Feature.Chest.Scene.States`:
@@ -83,11 +106,20 @@ Check BepInEx logs for exceptions during chest opening. Add defensive try-catch 
 ## Debugging Checklist
 
 1. Reproduce the freeze and immediately check `BepInEx/LogOutput.log` for exceptions or error-level messages.
-2. Determine the freeze type:
+2. Search for the temporary diagnostics added on 2026-04-08:
+   - `[BPP][HistoryPanel] [Diag][EventSystem]`
+   - `[BPP][ChestUiDiagnostics] [Diag][ChestSelect]`
+3. For the `EventSystem` diagnostic:
+   - If count is greater than 1 in `CollectionUIScene` or `ChestSelectScene`, inspect which object is mod-owned versus native scene-owned.
+   - If only one `EventSystem` exists but the Unity warning still fires, the duplicate may be created and destroyed before this snapshot; reproduce again and capture a fuller BepInEx log window.
+4. For the chest select snapshot:
+   - If `fadeOverlay`, `leftAnchor`, `rightAnchor`, or `backButtonRect` is `<null>`, the DOTween warning is very likely native-scene reference breakage.
+   - If all tween targets are valid, the next suspicion is that one becomes destroyed between snapshot and tween startup; add later-frame logging around the same objects.
+5. Determine the freeze type:
    - **Hard freeze** (UI completely unresponsive, Unity stops rendering) — likely an infinite loop or main-thread deadlock.
    - **Soft freeze** (UI renders but clicks do nothing) — likely one of the interaction-blocking patches above.
    - **Async hang** (UI responsive but chest animation never completes) — likely a network message or async task issue.
-3. Temporarily disable individual patches to isolate the cause:
+6. Temporarily disable individual patches to isolate the cause:
    - Comment out `ShowcaseCardClickPatch` and `PreviewBoardSurfaceBlocksUnderlyingCardsPatch` first (highest suspicion).
    - Then try disabling `MonsterLockShowcaseRuntime` by skipping `AddComponent<MonsterLockShowcaseRuntime>()` in `Plugin.cs`.
-4. If the issue is intermittent, check whether it correlates with having viewed a monster preview before opening chests.
+7. If the issue is intermittent, check whether it correlates with having viewed a monster preview before opening chests.
