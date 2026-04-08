@@ -614,6 +614,16 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
             var payload = artifact.Payload;
             var manifest = artifact.Manifest;
+            if (string.Equals(manifest.CombatKind, "PVPCombat", StringComparison.Ordinal))
+            {
+                BppRuntimeHost.EventBus.Publish(
+                    new PvpBattleScreenshotContextAvailable
+                    {
+                        BattleId = manifest.BattleId,
+                        RunId = manifest.RunId,
+                    }
+                );
+            }
             _persistenceQueue.Enqueue(payload, manifest);
         }
         catch (Exception ex)

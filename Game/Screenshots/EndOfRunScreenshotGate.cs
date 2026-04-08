@@ -47,4 +47,9 @@ internal sealed class EndOfRunScreenshotGate
         _allowNextContinuePassthrough = false;
         return true;
     }
+
+    public bool IsAttemptInFlight()
+    {
+        return _attemptInFlight;
+    }
 }

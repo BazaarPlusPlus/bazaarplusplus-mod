@@ -21,6 +21,8 @@ internal static class EndOfRunScreenshotPatch
     {
         if (EndOfRunScreenshotController.TryConsumeContinuePassthrough())
             return true;
+        if (EndOfRunScreenshotController.ShouldSuppressContinueWhileCaptureInFlight())
+            return false;
 
         if (TransitionCountField == null)
         {

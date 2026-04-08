@@ -3,9 +3,9 @@ namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int LocalDatabaseSchemaVersion => 7;
+    public static int LocalDatabaseSchemaVersion => 8;
 
-    public static int RowSchemaVersion => 7;
+    public static int RowSchemaVersion => 8;
 
     public static int UploadPayloadSchemaVersion => 1;
 
@@ -20,6 +20,8 @@ public static class RunLogSqliteSchema
     public static string BattlesTableName => "battles";
 
     public static string BattleSnapshotsTableName => "battle_snapshots";
+
+    public static string RunScreenshotsTableName => "run_screenshots";
 
     public static string SyncCursorsTableName => "sync_cursors";
 
@@ -133,6 +135,21 @@ public static class RunLogSqliteSchema
                 FOREIGN KEY (battle_id) REFERENCES {BattlesTableName}(battle_id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS {RunScreenshotsTableName} (
+                screenshot_id TEXT PRIMARY KEY,
+                run_id TEXT NULL,
+                battle_id TEXT NULL,
+                capture_source TEXT NOT NULL,
+                is_primary INTEGER NOT NULL DEFAULT 0,
+                image_relative_path TEXT NOT NULL,
+                captured_at_local TEXT NOT NULL,
+                captured_at_utc TEXT NOT NULL,
+                day INTEGER NULL,
+                player_rank TEXT NULL,
+                player_rating INTEGER NULL,
+                victories_at_capture INTEGER NULL
+            );
+
             CREATE TABLE IF NOT EXISTS {SyncCursorsTableName} (
                 scope TEXT PRIMARY KEY,
                 cursor_value TEXT NOT NULL,
@@ -174,5 +191,16 @@ public static class RunLogSqliteSchema
 
             CREATE INDEX IF NOT EXISTS idx_{RunSyncStateTableName}_dirty
                 ON {RunSyncStateTableName}(dirty, last_attempt_at_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_{RunScreenshotsTableName}_run_id_captured_at_utc
+                ON {RunScreenshotsTableName}(run_id, captured_at_utc DESC);
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_battle_id
+                ON {RunScreenshotsTableName}(battle_id)
+                WHERE battle_id IS NOT NULL;
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
+                ON {RunScreenshotsTableName}(run_id)
+                WHERE is_primary = 1 AND run_id IS NOT NULL;
             """;
 }

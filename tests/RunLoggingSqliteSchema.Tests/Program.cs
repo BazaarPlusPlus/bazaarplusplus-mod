@@ -6,7 +6,7 @@ var schemaType = RequireType(
 );
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 7,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 8,
     "Local database schema version mismatch."
 );
 Assert(
@@ -27,6 +27,10 @@ Assert(
     "Battle snapshots table name mismatch."
 );
 Assert(
+    GetStaticValue<string>(schemaType, "RunScreenshotsTableName") == "run_screenshots",
+    "Run screenshots table name mismatch."
+);
+Assert(
     GetStaticValue<string>(schemaType, "SyncCursorsTableName") == "sync_cursors",
     "Sync cursors table name mismatch."
 );
@@ -38,7 +42,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 7;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 8;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
@@ -52,6 +56,10 @@ Assert(
 Assert(
     bootstrapSql.Contains("battle_snapshots", StringComparison.Ordinal),
     "Bootstrap SQL should define battle_snapshots."
+);
+Assert(
+    bootstrapSql.Contains("run_screenshots", StringComparison.Ordinal),
+    "Bootstrap SQL should define run_screenshots."
 );
 Assert(
     bootstrapSql.Contains("sync_cursors", StringComparison.Ordinal),
@@ -100,6 +108,16 @@ Assert(
     "Bootstrap SQL should define battle snapshot JSON columns."
 );
 Assert(
+    bootstrapSql.Contains("screenshot_id TEXT PRIMARY KEY", StringComparison.Ordinal)
+        && bootstrapSql.Contains("capture_source TEXT NOT NULL", StringComparison.Ordinal)
+        && bootstrapSql.Contains("image_relative_path TEXT NOT NULL", StringComparison.Ordinal)
+        && bootstrapSql.Contains("captured_at_local", StringComparison.Ordinal)
+        && bootstrapSql.Contains("captured_at_utc", StringComparison.Ordinal)
+        && bootstrapSql.Contains("battle_id TEXT NULL", StringComparison.Ordinal)
+        && bootstrapSql.Contains("is_primary INTEGER NOT NULL DEFAULT 0", StringComparison.Ordinal),
+    "Bootstrap SQL should define screenshot metadata columns."
+);
+Assert(
     bootstrapSql.Contains(
         "FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE",
         StringComparison.Ordinal
@@ -109,6 +127,17 @@ Assert(
             StringComparison.Ordinal
         ),
     "Bootstrap SQL should enforce run and battle cascade relationships."
+);
+Assert(
+    bootstrapSql.Contains(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_battle_id",
+        StringComparison.Ordinal
+    )
+        && bootstrapSql.Contains(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run",
+            StringComparison.Ordinal
+        ),
+    "Bootstrap SQL should define screenshot uniqueness indexes."
 );
 
 Console.WriteLine("RunLogging SQLite schema checks passed.");

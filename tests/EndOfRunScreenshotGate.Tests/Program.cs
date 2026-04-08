@@ -66,6 +66,10 @@ var pathBuilderType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.ScreenshotPathBuilder",
     throwOnError: true
 )!;
+var captureSourceType = assembly.GetType(
+    "BazaarPlusPlus.Game.Screenshots.RunScreenshotCaptureSource",
+    throwOnError: true
+)!;
 var screenshotPath = InvokeBuildRelativePath(
     pathBuilderType,
     runId: "Run-42/Final",
@@ -84,6 +88,24 @@ var fallbackPath = InvokeBuildRelativePath(
 Assert(
     fallbackPath == Path.Combine("2026-04-07", "anonymous-090504000.png"),
     $"Expected anonymous fallback path, got: {fallbackPath}"
+);
+
+var metadataPath = InvokeBuildRelativePathWithMetadata(
+    pathBuilderType,
+    captureSourceType,
+    runId: "Run-42/Final",
+    capturedAtLocal: new DateTimeOffset(2026, 4, 7, 21, 30, 15, TimeSpan.FromHours(8)),
+    captureSource: "PvpBattleNextDay",
+    screenshotId: "shot-001",
+    battleId: "battle-42"
+);
+Assert(
+    metadataPath
+        == Path.Combine(
+            "2026-04-07",
+            "run-42final-pvp_battle_nextday-battle-42-213015000-shot-001.png"
+        ),
+    $"Unexpected metadata screenshot path: {metadataPath}"
 );
 
 Console.WriteLine("End-of-run screenshot gate checks passed.");
@@ -175,7 +197,8 @@ static string InvokeBuildRelativePath(Type type, string? runId, DateTimeOffset c
 {
     var method = type.GetMethod(
         "BuildRelativePath",
-        BindingFlags.Public | BindingFlags.Static
+        BindingFlags.Public | BindingFlags.Static,
+        [typeof(string), typeof(DateTimeOffset)]
     );
     if (method == null)
         throw new InvalidOperationException(
@@ -184,6 +207,40 @@ static string InvokeBuildRelativePath(Type type, string? runId, DateTimeOffset c
 
     return (string?)method.Invoke(null, [runId, capturedAtLocal])
         ?? throw new InvalidOperationException("BuildRelativePath returned null.");
+}
+
+static string InvokeBuildRelativePathWithMetadata(
+    Type pathBuilderType,
+    Type captureSourceType,
+    string? runId,
+    DateTimeOffset capturedAtLocal,
+    string captureSource,
+    string screenshotId,
+    string? battleId
+)
+{
+    var method = pathBuilderType.GetMethod(
+        "BuildRelativePath",
+        BindingFlags.Public | BindingFlags.Static,
+        [
+            typeof(string),
+            typeof(DateTimeOffset),
+            captureSourceType,
+            typeof(string),
+            typeof(string),
+        ]
+    );
+    if (method == null)
+    {
+        throw new InvalidOperationException(
+            $"Method not found: {pathBuilderType.FullName}.BuildRelativePath(string, DateTimeOffset, RunScreenshotCaptureSource, string, string)"
+        );
+    }
+
+    return (string?)method.Invoke(
+        null,
+        [runId, capturedAtLocal, Enum.Parse(captureSourceType, captureSource), screenshotId, battleId]
+    ) ?? throw new InvalidOperationException("Metadata BuildRelativePath returned null.");
 }
 
 static void Assert(bool condition, string message)
