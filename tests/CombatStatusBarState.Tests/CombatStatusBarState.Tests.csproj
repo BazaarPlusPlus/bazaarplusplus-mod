@@ -24,6 +24,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile
+      Include="..\..\Game\Screenshots\ScreenshotUiSuppressionScope.cs"
+      Link="ScreenshotUiSuppressionScope.cs"
+    />
     <Compile Include="..\..\Game\Settings\LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
     <Compile Include="..\..\Game\Settings\LocalizedTextSet.cs" Link="LocalizedTextSet.cs" />
     <Compile

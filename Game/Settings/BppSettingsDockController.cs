@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Game.Screenshots;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -14,12 +15,19 @@ internal sealed class BppSettingsDockController : MonoBehaviour
     private const string LogCategory = "BppSettingsDock";
     private const string DockButtonObjectName = "BPP_SettingsDockButton";
     private const string DockButtonLabelObjectName = "BPP_SettingsDockButtonLabel";
+    private const string CameraButtonObjectName = "BPP_ScreenshotButton";
+    private const string CameraButtonLabelObjectName = "BPP_ScreenshotButtonLabel";
     private const string PanelObjectName = "BPP_SettingsDockPanel";
     private const string HeaderObjectName = "BPP_SettingsDockHeader";
     private const float DockButtonWidth = 124f;
     private const float DockButtonHeight = 44f;
     private const float DockButtonOffsetX = -20f;
     private const float DockButtonOffsetY = 100f;
+    private const float CameraButtonWidth = 50f;
+    private const float CameraButtonHeight = 36f;
+    private const float CameraButtonOffsetX = -20f;
+    private const float CameraButtonOffsetY = 148f;
+    private const float ScreenshotFeedbackDuration = 0.85f;
     private const float PanelWidth = 456f;
     private const float PanelPadding = 18f;
     private const float PanelTopPadding = 16f;
@@ -36,11 +44,16 @@ internal sealed class BppSettingsDockController : MonoBehaviour
     private Button? _anchorButton;
     private Button? _dockButton;
     private RectTransform? _dockButtonRect;
+    private Button? _cameraButton;
+    private RectTransform? _cameraButtonRect;
+    private TextMeshProUGUI? _cameraButtonLabel;
     private RectTransform? _panelRoot;
     private TextMeshProUGUI? _headerLabel;
     private TMP_FontAsset? _uiFont;
     private Material? _uiFontMaterial;
     private bool _isExpanded;
+    private float _screenshotFeedbackRemaining;
+    private int _screenshotSuppressionCount;
     private static bool _fontResolutionLogged;
 
     internal static void Attach(Button anchorButton)
@@ -54,6 +67,21 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         controller.Initialize(anchorButton);
     }
 
+    internal static IDisposable? BeginScreenshotSuppression()
+    {
+        var controllers = UnityEngine.Object.FindObjectsOfType<BppSettingsDockController>(
+            includeInactive: true
+        );
+        if (controllers.Length == 0)
+            return null;
+
+        var suppressionActions = new Func<IDisposable?>[controllers.Length];
+        for (var index = 0; index < controllers.Length; index++)
+            suppressionActions[index] = controllers[index].BeginInstanceScreenshotSuppression;
+
+        return ScreenshotUiSuppressionScope.Begin(suppressionActions);
+    }
+
     internal static void RefreshAll()
     {
         foreach (
@@ -64,11 +92,20 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             controller.RefreshView();
     }
 
+    internal static void NotifyScreenshotCaptured()
+    {
+        foreach (var controller in UnityEngine.Object.FindObjectsOfType<BppSettingsDockController>())
+            controller.TriggerScreenshotFeedback();
+    }
+
     private void Initialize(Button anchorButton)
     {
         _anchorButton = anchorButton;
         ResolveTextStyle();
         if (!TryEnsureDockButton())
+            return;
+
+        if (!TryEnsureCameraButton())
             return;
 
         if (!TryEnsurePanel())
@@ -80,12 +117,25 @@ internal sealed class BppSettingsDockController : MonoBehaviour
 
     private void OnEnable()
     {
+        ApplyScreenshotSuppressionVisibility();
         RefreshView();
     }
 
     private void OnDisable()
     {
         SetExpanded(false);
+    }
+
+    private void Update()
+    {
+        if (_screenshotFeedbackRemaining <= 0f)
+            return;
+
+        _screenshotFeedbackRemaining = Mathf.Max(
+            0f,
+            _screenshotFeedbackRemaining - Time.unscaledDeltaTime
+        );
+        UpdateCameraButtonVisual();
     }
 
     private bool TryEnsureDockButton()
@@ -114,6 +164,7 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             ConfigureDockButtonRect(existingRect);
             ConfigureDockButtonVisual(existingRect.gameObject);
             SyncDockButtonPlacement();
+            ApplyScreenshotSuppressionVisibility();
             return true;
         }
 
@@ -138,7 +189,88 @@ internal sealed class BppSettingsDockController : MonoBehaviour
 
         CreateDockButtonLabel(dockRect);
         SyncDockButtonPlacement();
+        ApplyScreenshotSuppressionVisibility();
         return true;
+    }
+
+    private bool TryEnsureCameraButton()
+    {
+        if (_anchorButton == null)
+            return false;
+
+        var hostRect = _anchorButton.transform.parent as RectTransform;
+        if (hostRect == null)
+            return false;
+
+        var existingRect = hostRect.Find(CameraButtonObjectName) as RectTransform;
+        if (existingRect != null)
+        {
+            _cameraButtonRect = existingRect;
+            _cameraButton = existingRect.GetComponent<Button>();
+            if (_cameraButton == null)
+                return false;
+
+            _cameraButtonLabel = existingRect.Find(CameraButtonLabelObjectName)?.GetComponent<TextMeshProUGUI>();
+            if (_cameraButtonLabel == null)
+                CreateCameraButtonLabel(existingRect);
+
+            _cameraButton.onClick.RemoveListener(OnCameraButtonClicked);
+            _cameraButton.onClick.AddListener(OnCameraButtonClicked);
+            ConfigureCameraButtonRect(existingRect);
+            UpdateCameraButtonVisual();
+            SyncDockButtonPlacement();
+            ApplyScreenshotSuppressionVisibility();
+            return true;
+        }
+
+        var cameraButtonObject = new GameObject(
+            CameraButtonObjectName,
+            typeof(RectTransform),
+            typeof(Image),
+            typeof(Button),
+            typeof(Outline)
+        );
+        var cameraRect = cameraButtonObject.GetComponent<RectTransform>();
+        cameraRect.SetParent(hostRect, worldPositionStays: false);
+        ConfigureCameraButtonRect(cameraRect);
+
+        _cameraButtonRect = cameraRect;
+        _cameraButton = cameraButtonObject.GetComponent<Button>();
+        _cameraButton.transition = Selectable.Transition.ColorTint;
+        _cameraButton.navigation = new Navigation { mode = Navigation.Mode.None };
+        _cameraButton.targetGraphic = cameraButtonObject.GetComponent<Image>();
+        _cameraButton.onClick.AddListener(OnCameraButtonClicked);
+
+        CreateCameraButtonLabel(cameraRect);
+        UpdateCameraButtonVisual();
+        SyncDockButtonPlacement();
+        ApplyScreenshotSuppressionVisibility();
+        return true;
+    }
+
+    private IDisposable BeginInstanceScreenshotSuppression()
+    {
+        _screenshotSuppressionCount++;
+        ApplyScreenshotSuppressionVisibility();
+        return new ScreenshotSuppressionLease(this);
+    }
+
+    private void EndInstanceScreenshotSuppression()
+    {
+        if (_screenshotSuppressionCount > 0)
+            _screenshotSuppressionCount--;
+
+        ApplyScreenshotSuppressionVisibility();
+    }
+
+    private void ApplyScreenshotSuppressionVisibility()
+    {
+        var shouldBeVisible = _screenshotSuppressionCount == 0;
+        if (_dockButtonRect != null && _dockButtonRect.gameObject.activeSelf != shouldBeVisible)
+            _dockButtonRect.gameObject.SetActive(shouldBeVisible);
+
+        if (_cameraButtonRect != null && _cameraButtonRect.gameObject.activeSelf != shouldBeVisible)
+            _cameraButtonRect.gameObject.SetActive(shouldBeVisible);
     }
 
     private bool TryEnsurePanel()
@@ -295,6 +427,13 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         SetExpanded(!_isExpanded);
     }
 
+    private void OnCameraButtonClicked()
+    {
+        EndOfRunScreenshotController.RequestManualScreenshot(
+            RunScreenshotCaptureSource.SettingsDockCameraButton
+        );
+    }
+
     private void OnRectTransformDimensionsChange()
     {
         SyncDockButtonPlacement();
@@ -381,28 +520,55 @@ internal sealed class BppSettingsDockController : MonoBehaviour
 
     private void SyncDockButtonPlacement()
     {
-        if (_dockButtonRect == null || _anchorButton == null)
+        if (_anchorButton == null)
             return;
 
-        var parentRect = _dockButtonRect.parent as RectTransform;
+        var referenceRect = _dockButtonRect ?? _cameraButtonRect;
+        if (referenceRect == null)
+            return;
+
+        var parentRect = referenceRect.parent as RectTransform;
         var anchorRect = _anchorButton.transform as RectTransform;
         if (parentRect == null || anchorRect == null)
             return;
-
-        _dockButtonRect.anchorMin = new Vector2(0.5f, 0.5f);
-        _dockButtonRect.anchorMax = new Vector2(0.5f, 0.5f);
-        _dockButtonRect.pivot = new Vector2(0.5f, 0.5f);
-        _dockButtonRect.localScale = Vector3.one;
-        _dockButtonRect.localRotation = Quaternion.identity;
 
         var corners = new Vector3[4];
         anchorRect.GetWorldCorners(corners);
         var anchorCenterWorld = (corners[0] + corners[2]) * 0.5f;
         var anchorCenterLocal = parentRect.InverseTransformPoint(anchorCenterWorld);
-        _dockButtonRect.localPosition = new Vector3(
-            anchorCenterLocal.x + DockButtonOffsetX,
-            anchorCenterLocal.y + DockButtonOffsetY,
-            _dockButtonRect.localPosition.z
+        SyncFloatingButton(
+            _dockButtonRect,
+            anchorCenterLocal,
+            DockButtonOffsetX,
+            DockButtonOffsetY
+        );
+        SyncFloatingButton(
+            _cameraButtonRect,
+            anchorCenterLocal,
+            CameraButtonOffsetX,
+            CameraButtonOffsetY
+        );
+    }
+
+    private static void SyncFloatingButton(
+        RectTransform? rectTransform,
+        Vector3 anchorCenterLocal,
+        float offsetX,
+        float offsetY
+    )
+    {
+        if (rectTransform == null)
+            return;
+
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.localScale = Vector3.one;
+        rectTransform.localRotation = Quaternion.identity;
+        rectTransform.localPosition = new Vector3(
+            anchorCenterLocal.x + offsetX,
+            anchorCenterLocal.y + offsetY,
+            rectTransform.localPosition.z
         );
     }
 
@@ -415,6 +581,17 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         rectTransform.localRotation = Quaternion.identity;
         rectTransform.sizeDelta = new Vector2(DockButtonWidth, DockButtonHeight);
         rectTransform.anchoredPosition = new Vector2(DockButtonOffsetX, DockButtonOffsetY);
+    }
+
+    private static void ConfigureCameraButtonRect(RectTransform rectTransform)
+    {
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.localScale = Vector3.one;
+        rectTransform.localRotation = Quaternion.identity;
+        rectTransform.sizeDelta = new Vector2(CameraButtonWidth, CameraButtonHeight);
+        rectTransform.anchoredPosition = new Vector2(CameraButtonOffsetX, CameraButtonOffsetY);
     }
 
     private static void ConfigurePanelRect(RectTransform rectTransform)
@@ -478,6 +655,35 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         outline.useGraphicAlpha = true;
     }
 
+    private void UpdateCameraButtonVisual()
+    {
+        if (_cameraButtonRect == null)
+            return;
+
+        var image = _cameraButtonRect.GetComponent<Image>();
+        var outline = _cameraButtonRect.GetComponent<Outline>();
+        if (image == null || outline == null)
+            return;
+
+        var progress = ScreenshotFeedbackDuration <= 0f
+            ? 0f
+            : Mathf.Clamp01(_screenshotFeedbackRemaining / ScreenshotFeedbackDuration);
+        var baseColor = new Color(0.18f, 0.18f, 0.20f, 0.96f);
+        var pulseColor = new Color(0.78f, 0.39f, 0.14f, 0.98f);
+        var baseOutline = new Color(0f, 0f, 0f, 0.52f);
+        var pulseOutline = new Color(0.98f, 0.86f, 0.54f, 0.86f);
+        var labelBase = new Color(0.96f, 0.93f, 0.86f, 1f);
+        var labelPulse = new Color(1f, 0.97f, 0.90f, 1f);
+
+        image.color = Color.Lerp(baseColor, pulseColor, progress);
+        outline.effectColor = Color.Lerp(baseOutline, pulseOutline, progress);
+        outline.effectDistance = new Vector2(1f, -1f);
+        outline.useGraphicAlpha = true;
+
+        if (_cameraButtonLabel != null)
+            _cameraButtonLabel.color = Color.Lerp(labelBase, labelPulse, progress);
+    }
+
     private void CreateDockButtonLabel(Transform parent)
     {
         var label = CreateText(
@@ -498,6 +704,34 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         label.text = "BazaarPlusPlus";
         label.textWrappingMode = TextWrappingModes.NoWrap;
         label.overflowMode = TextOverflowModes.Ellipsis;
+    }
+
+    private void CreateCameraButtonLabel(Transform parent)
+    {
+        _cameraButtonLabel = CreateText(
+            CameraButtonLabelObjectName,
+            parent,
+            13f,
+            TextAlignmentOptions.Center,
+            new Color(0.96f, 0.93f, 0.86f, 1f)
+        );
+        if (_cameraButtonLabel == null)
+            return;
+
+        var labelRect = _cameraButtonLabel.rectTransform;
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+        _cameraButtonLabel.text = "CAM";
+        _cameraButtonLabel.textWrappingMode = TextWrappingModes.NoWrap;
+        _cameraButtonLabel.overflowMode = TextOverflowModes.Ellipsis;
+    }
+
+    private void TriggerScreenshotFeedback()
+    {
+        _screenshotFeedbackRemaining = ScreenshotFeedbackDuration;
+        UpdateCameraButtonVisual();
     }
 
     private TextMeshProUGUI? CreateText(
@@ -653,5 +887,20 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         internal TextMeshProUGUI Label { get; }
 
         internal TextMeshProUGUI Status { get; }
+    }
+
+    private sealed class ScreenshotSuppressionLease(BppSettingsDockController controller)
+        : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            controller.EndInstanceScreenshotSuppression();
+        }
     }
 }

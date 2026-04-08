@@ -93,13 +93,35 @@ try
         ]
     );
 
+    saveMethod.Invoke(
+        store,
+        [
+            CreateRecord(
+                recordType,
+                sourceType,
+                screenshotId: "shot-dock-camera-001",
+                runId: "run-001",
+                battleId: null,
+                captureSource: "SettingsDockCameraButton",
+                isPrimary: false,
+                relativePath: Path.Combine("2026-04-08", "run-001-settings_dock_camera_button-213015000-shot-dock-camera-001.png"),
+                localCapturedAt.AddSeconds(40),
+                utcCapturedAt.AddSeconds(40),
+                day: 6,
+                playerRank: "Gold 1",
+                playerRating: 1450,
+                victoriesAtCapture: 5
+            ),
+        ]
+    );
+
     Assert(File.Exists(dbPath), "RunScreenshotSqliteStore should initialize the SQLite database file.");
 
     using var connection = new SqliteConnection($"Data Source={dbPath}");
     connection.Open();
 
     Assert(
-        CountRows(connection, "run_screenshots") == 3,
+        CountRows(connection, "run_screenshots") == 4,
         "run_screenshots should persist all inserted screenshot rows."
     );
     Assert(
@@ -133,6 +155,14 @@ try
             "shot-battle-001"
         ) == 3,
         "run_screenshots should persist victories_at_capture."
+    );
+    Assert(
+        GetString(
+            connection,
+            "SELECT capture_source FROM run_screenshots WHERE screenshot_id = $id;",
+            "shot-dock-camera-001"
+        ) == "settings_dock_camera_button",
+        "run_screenshots should serialize settings dock camera screenshots with a dedicated source."
     );
 
     ExpectSqliteConstraint(

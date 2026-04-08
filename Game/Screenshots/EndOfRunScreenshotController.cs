@@ -4,11 +4,13 @@ using System.Collections;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Screenshots.Persistence;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
 using UnityEngine;
+using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 
 namespace BazaarPlusPlus.Game.Screenshots;
 
@@ -93,15 +95,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         if (!BppHotkeyService.WasPressedThisFrame(ManualScreenshotBindingPath))
             return;
 
-        PersistCapture(
-            _screenshotService.CaptureCurrentFrame(
-                new ScreenshotCaptureRequest
-                {
-                    RunId = ResolveRunId(),
-                    CaptureSource = RunScreenshotCaptureSource.ManualF9,
-                }
-            )
-        );
+        StartManualScreenshotCapture(RunScreenshotCaptureSource.ManualF9);
     }
 
     private void OnRunStarted()
@@ -175,9 +169,32 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         return _current?.GetShouldSuppressPvpBattleContinueWhileCaptureInFlight() == true;
     }
 
+    public static void RequestManualScreenshot(
+        RunScreenshotCaptureSource source = RunScreenshotCaptureSource.ManualF9
+    )
+    {
+        _current?.StartManualScreenshotCapture(source);
+    }
+
     private bool ConsumeContinuePassthrough()
     {
         return _gate.ConsumeContinuePassthrough();
+    }
+
+    private void StartManualScreenshotCapture(RunScreenshotCaptureSource source)
+    {
+        if (_screenshotService == null)
+            return;
+
+        StartCoroutine(
+            CaptureManualScreenshot(
+                new ScreenshotCaptureRequest
+                {
+                    RunId = ResolveRunId(),
+                    CaptureSource = source,
+                }
+            )
+        );
     }
 
     private bool GetShouldSuppressContinueWhileCaptureInFlight()
@@ -196,19 +213,24 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private IEnumerator CaptureAndContinue(EndOfRunScreenController controller)
     {
-        yield return new WaitForEndOfFrame();
-        var capture = _screenshotService?.CaptureCurrentFrame(
-            new ScreenshotCaptureRequest
-            {
-                RunId = ResolveRunId(),
-                CaptureSource = RunScreenshotCaptureSource.EndOfRunAuto,
-            }
-        );
+        ScreenshotCaptureResult? capture = null;
+        using (BeginUiSuppression())
+        {
+            yield return new WaitForEndOfFrame();
+            capture = _screenshotService?.CaptureCurrentFrame(
+                new ScreenshotCaptureRequest
+                {
+                    RunId = ResolveRunId(),
+                    CaptureSource = RunScreenshotCaptureSource.EndOfRunAuto,
+                }
+            );
+        }
         var screenshotQueued = capture != null;
         if (screenshotQueued)
         {
             PersistCapture(capture, isPrimary: true);
             _gate.MarkAttemptCompleted();
+            BppSettingsDockController.NotifyScreenshotCaptured();
         }
         else
         {
@@ -246,19 +268,24 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         PvpBattlePendingScreenshotContext context
     )
     {
-        yield return new WaitForEndOfFrame();
-        var capture = _screenshotService?.CaptureCurrentFrame(
-            new ScreenshotCaptureRequest
-            {
-                RunId = !string.IsNullOrWhiteSpace(context.RunId) ? context.RunId : ResolveRunId(),
-                BattleId = context.BattleId,
-                CaptureSource = RunScreenshotCaptureSource.PvpBattleNextDay,
-            }
-        );
+        ScreenshotCaptureResult? capture = null;
+        using (BeginUiSuppression())
+        {
+            yield return new WaitForEndOfFrame();
+            capture = _screenshotService?.CaptureCurrentFrame(
+                new ScreenshotCaptureRequest
+                {
+                    RunId = !string.IsNullOrWhiteSpace(context.RunId) ? context.RunId : ResolveRunId(),
+                    BattleId = context.BattleId,
+                    CaptureSource = RunScreenshotCaptureSource.PvpBattleNextDay,
+                }
+            );
+        }
         if (capture != null)
         {
             PersistCapture(capture);
             context.Captured = true;
+            BppSettingsDockController.NotifyScreenshotCaptured();
         }
         else
         {
@@ -316,5 +343,27 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         return !string.IsNullOrWhiteSpace(_currentRunId)
             ? _currentRunId
             : BppRuntimeHost.RunContext.CurrentServerRunId;
+    }
+
+    private IEnumerator CaptureManualScreenshot(ScreenshotCaptureRequest request)
+    {
+        ScreenshotCaptureResult? capture = null;
+        using (BeginUiSuppression())
+        {
+            yield return new WaitForEndOfFrame();
+            capture = _screenshotService?.CaptureCurrentFrame(request);
+        }
+
+        PersistCapture(capture);
+        if (capture != null)
+            BppSettingsDockController.NotifyScreenshotCaptured();
+    }
+
+    private static IDisposable? BeginUiSuppression()
+    {
+        return ScreenshotUiSuppressionScope.Begin(
+            BppSettingsDockController.BeginScreenshotSuppression,
+            CombatStatusBarFeature.BeginScreenshotSuppression
+        );
     }
 }
