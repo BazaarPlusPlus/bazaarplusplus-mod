@@ -73,7 +73,7 @@ internal sealed class MonsterPreviewOverlayCoordinator
         _renderTarget.SetVisible(_visible);
         BppLog.Info(
             "MonsterPreviewOverlayCoordinator",
-            $"ShowRequest visible={_visible} hasExternalRequest={_externalRequest != null}"
+            $"ShowRequest visible={_visible} hasExternalRequest={_externalRequest != null} dataSource={request?.DataSource?.GetType().Name ?? "null"} anchor={request?.AnchorStrategy?.GetType().Name ?? "null"}"
         );
     }
 
@@ -98,7 +98,12 @@ internal sealed class MonsterPreviewOverlayCoordinator
         if (!_visible)
             return;
 
-        _session.Show(BuildRequestForCurrentMode());
+        var request = BuildRequestForCurrentMode();
+        BppLog.Debug(
+            "MonsterPreviewOverlayCoordinator",
+            $"Tick visible={_visible} externalRequest={_externalRequest != null} dataSource={request?.DataSource?.GetType().Name ?? "null"}"
+        );
+        _session.Show(request);
         _session.Tick();
     }
 

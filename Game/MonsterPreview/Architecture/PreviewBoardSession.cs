@@ -37,7 +37,10 @@ internal sealed class PreviewBoardSession
     public void Tick()
     {
         if (_request == null)
+        {
+            BppLog.Debug("PreviewBoardSession", "Tick skipped because there is no active request");
             return;
+        }
 
         var visible = _request.Presentation?.Visible ?? false;
         _renderTarget.SetVisible(visible);
@@ -53,7 +56,7 @@ internal sealed class PreviewBoardSession
         {
             BppLog.Debug(
                 "PreviewBoardSession",
-                $"Tick skipped modelNull={model == null} poseNull={pose == null}"
+                $"Tick skipped modelNull={model == null} poseNull={pose == null} dataSource={_request.DataSource?.GetType().Name ?? "null"} anchor={_request.AnchorStrategy?.GetType().Name ?? "null"}"
             );
             return;
         }
@@ -96,8 +99,18 @@ internal sealed class PreviewBoardSession
             && request.DataSource.TryBuild(out var model)
             && model != null
         )
+        {
+            BppLog.Debug(
+                "PreviewBoardSession",
+                $"ResolveModel built from data source type={request.DataSource.GetType().Name} signature={model.Signature} items={model.ItemCards?.Count ?? 0} skills={model.SkillCards?.Count ?? 0}"
+            );
             return model;
+        }
 
+        BppLog.Debug(
+            "PreviewBoardSession",
+            $"ResolveModel fell back to initial model signature={request.InitialModel?.Signature ?? string.Empty} dataSource={request.DataSource?.GetType().Name ?? "null"}"
+        );
         return request.InitialModel;
     }
 

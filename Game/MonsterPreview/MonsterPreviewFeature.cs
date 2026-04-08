@@ -10,5 +10,5 @@ internal static class MonsterPreviewFeature
     public static bool UseNativePreview =>
         BppRuntimeHost.Config.UseNativeMonsterPreviewConfig?.Value ?? false;
 
-    public static bool UseCustomLivePreview => !UseNativePreview;
+    public static bool UseBoardOnlyNativePreview => !UseNativePreview;
 }

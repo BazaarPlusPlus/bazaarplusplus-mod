@@ -12,6 +12,7 @@ namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 {
+    private const string ShowcaseSurfaceName = "MonsterPreviewShowcaseSurface";
     private readonly MonsterLockShowcaseController _controller =
         new MonsterLockShowcaseController();
     private readonly FixedAnchorStrategy _anchorStrategy = new FixedAnchorStrategy(
@@ -21,7 +22,9 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         MonsterPreviewDefaults.CreateShowcasePresentation();
     private readonly MonsterPreviewDebugTuner _tuner;
 
-    private MonsterPreviewController _overlayController;
+    private IBoardRenderTarget _renderTarget;
+    private PreviewBoardSession _session;
+    private PreviewBoardRequest _activeRequest;
     private Card _lockedCard;
     private bool _closeOnNextClickArmed;
     private int _closeOnNextClickArmedFrame = -1;
@@ -43,15 +46,19 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        _overlayController = GetComponent<MonsterPreviewController>();
+        EnsureRenderPipeline("awake");
         BppLog.Info(
             "MonsterLockShowcaseRuntime",
-            $"Awake overlayControllerFound={_overlayController != null}"
+            $"Awake renderTarget={_renderTarget?.GetType().Name ?? "null"} sessionCreated={_session != null}"
         );
     }
 
     private void OnDestroy()
     {
+        _renderTarget?.Dispose();
+        _renderTarget = null;
+        _session = null;
+        _activeRequest = null;
         if (ReferenceEquals(Instance, this))
             Instance = null;
     }
@@ -83,13 +90,17 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
                 reason: "next global right click"
             );
         }
+
+        if (IsPreviewActive && _activeRequest != null)
+        {
+            EnsureRenderPipeline("update_tick");
+            _session.Show(_activeRequest);
+            _session.Tick();
+        }
     }
 
     public bool HandleLockToggle(Card card)
     {
-        if (_overlayController == null)
-            return false;
-
         if (
             TryConsumeNextClickToClosePreview(
                 isLeftClick: false,
@@ -110,22 +121,29 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         var isShowcaseCard = card != null && IsShowcaseCard(card);
         var isMonsterCard = card != null && IsMonsterSourceCard(card);
         if (!_controller.ShouldShowForLock(card?.TemplateId, isShowcaseCard, isMonsterCard))
+        {
+            BppLog.Debug(
+                "MonsterLockShowcaseRuntime",
+                $"HandleLockToggle ignored by controller card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} showcase={isShowcaseCard} monster={isMonsterCard}"
+            );
             return false;
+        }
 
-        if (!TryBuildPreview(card, out var previewModel, out var source))
+        if (!TryCreateShowcaseRequest(card, out var request, out var source))
             return false;
 
         _lockedCard = card;
         _anchorStrategy.SetPose(MonsterPreviewDefaults.DefaultAnchorPose);
         CopyPresentation(MonsterPreviewDefaults.CreateShowcasePresentation(), _presentation);
-        _overlayController.ShowRequest(
-            CreateShowcaseRequest(previewModel, card?.Template?.InternalName ?? source, source)
-        );
+        EnsureRenderPipeline("handle_lock_toggle");
+        _activeRequest = request;
+        _session.Show(request);
+        _session.Tick();
         _closeOnNextClickArmed = true;
         _closeOnNextClickArmedFrame = Time.frameCount;
         BppLog.Info(
             "MonsterLockShowcaseRuntime",
-            $"Activated BPP showcase mode source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={previewModel?.ItemCards?.Count ?? 0} skills={previewModel?.SkillCards?.Count ?? 0} armedFrame={_closeOnNextClickArmedFrame}"
+            $"Activated showcase via PreviewBoardSurface source={source} card={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} requestDataSource={request.DataSource?.GetType().Name ?? "null"} armedFrame={_closeOnNextClickArmedFrame}"
         );
         return true;
     }
@@ -155,11 +173,8 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         _lockedCard = null;
         _closeOnNextClickArmed = false;
         _closeOnNextClickArmedFrame = -1;
-        if (_overlayController == null)
-            return;
-
-        _overlayController.ClearCards();
-        _overlayController.HidePreview();
+        _activeRequest = null;
+        _session?.Hide();
         BppLog.Info("MonsterLockShowcaseRuntime", $"Hiding preview: {reason}");
     }
 
@@ -171,9 +186,6 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
     public bool ShouldInterceptLockToggle(Card card)
     {
-        if (_overlayController == null)
-            return false;
-
         var isShowcaseCard = card != null && IsShowcaseCard(card);
         var isMonsterCard = card != null && IsMonsterSourceCard(card);
         return _controller.ShouldInterceptLockToggle(
@@ -192,78 +204,21 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
         return BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(card.TemplateId.ToString(), out _);
     }
 
-    private static bool TryBuildPreview(
-        Card card,
-        out PreviewBoardModel previewModel,
+    private PreviewBoardRequest CreateShowcaseRequest(
+        IPreviewDataSource dataSource,
+        PreviewBoardModel previewModel,
+        string title,
         out string source
     )
     {
-        previewModel = null;
-        source = string.Empty;
-
-        if (card == null || !BppRuntimeHost.RunContext.IsInGameRun)
-            return false;
-
-        if (
-            BppRuntimeHost.MonsterCatalog.TryGetByEncounterId(
-                card.TemplateId.ToString(),
-                out var monster
-            )
-        )
-        {
-            var sourceModel = MonsterPreviewProjector.BuildModel(monster, "monster_db");
-            var cards = PreviewCardSpecFilter.FilterLocallyRenderable(sourceModel.ItemCards);
-            var skillCards = PreviewCardSpecFilter.FilterLocallyRenderable(sourceModel.SkillCards);
-            source = $"monster_db:{monster.EncounterShortId}";
-            previewModel = CreateFilteredPreviewModel(sourceModel, cards, skillCards);
-            LogFilteredPreviewCounts(
-                card,
-                source,
-                sourceModel.ItemCards?.Count ?? 0,
-                cards.Count,
-                sourceModel.SkillCards?.Count ?? 0,
-                skillCards.Count
-            );
-            return cards.Count > 0 || skillCards.Count > 0;
-        }
-
-        return false;
-    }
-
-    private static void LogFilteredPreviewCounts(
-        Card card,
-        string source,
-        int originalItemCount,
-        int filteredItemCount,
-        int originalSkillCount,
-        int filteredSkillCount
-    )
-    {
-        BppLog.Info(
-            "MonsterLockShowcaseRuntime",
-            $"Preview filter source={source} encounter={card?.Template?.InternalName ?? "-"} templateId={card?.TemplateId} items={filteredItemCount}/{originalItemCount} skills={filteredSkillCount}/{originalSkillCount}"
-        );
-    }
-
-    private PreviewBoardRequest CreateShowcaseRequest(
-        PreviewBoardModel previewModel,
-        string title,
-        string source
-    )
-    {
-        var dataSource = new InMemoryPreviewDataSource();
         previewModel ??= new PreviewBoardModel();
-        dataSource.SetCards(previewModel.ItemCards, previewModel.SkillCards);
-        var metadata = new Dictionary<string, string>(
-            previewModel.Metadata ?? new Dictionary<string, string>()
-        )
-        {
-            ["source"] = source,
-        };
-        dataSource.SetMetadata(
-            string.IsNullOrWhiteSpace(previewModel.Title) ? title : previewModel.Title,
-            metadata
-        );
+        var effectiveTitle = string.IsNullOrWhiteSpace(previewModel.Title) ? title : previewModel.Title;
+        source =
+            previewModel.Metadata != null
+            && previewModel.Metadata.TryGetValue("source", out var metadataSource)
+            && !string.IsNullOrWhiteSpace(metadataSource)
+                ? metadataSource
+                : "monster_db";
         var presentation = ClonePresentation(_presentation);
         if (!presentation.Visible)
         {
@@ -274,6 +229,11 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             presentation.Visible = true;
         }
 
+        BppLog.Info(
+            "MonsterLockShowcaseRuntime",
+            $"CreateShowcaseRequest title={effectiveTitle} source={source} items={previewModel.ItemCards?.Count ?? 0} skills={previewModel.SkillCards?.Count ?? 0} signature={previewModel.Signature} dataSource={dataSource?.GetType().Name ?? "null"}"
+        );
+
         return new PreviewBoardRequest
         {
             DataSource = dataSource,
@@ -281,6 +241,57 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             Presentation = presentation,
             Debug = new PreviewBoardDebugOptions(),
         };
+    }
+
+    private bool TryCreateShowcaseRequest(
+        Card card,
+        out PreviewBoardRequest request,
+        out string source
+    )
+    {
+        request = null;
+        source = string.Empty;
+
+        if (card == null)
+        {
+            BppLog.Warn("MonsterLockShowcaseRuntime", "TryCreateShowcaseRequest aborted because card is null");
+            return false;
+        }
+
+        if (!BppRuntimeHost.RunContext.IsInGameRun)
+        {
+            BppLog.Warn(
+                "MonsterLockShowcaseRuntime",
+                $"TryCreateShowcaseRequest aborted because run context is not in-game card={card.Template?.InternalName ?? "-"} templateId={card.TemplateId}"
+            );
+            return false;
+        }
+
+        var encounterId = card.TemplateId.ToString();
+        var dataSource = new MonsterDatabasePreviewDataSource(
+            encounterId,
+            $"lock_showcase:{card.Template?.InternalName ?? encounterId}"
+        );
+        if (!dataSource.TryBuild(out var previewModel) || previewModel == null)
+        {
+            BppLog.Warn(
+                "MonsterLockShowcaseRuntime",
+                $"TryCreateShowcaseRequest could not build renderable model card={card.Template?.InternalName ?? "-"} templateId={card.TemplateId} encounterId={encounterId}"
+            );
+            return false;
+        }
+
+        request = CreateShowcaseRequest(
+            dataSource,
+            previewModel,
+            card.Template?.InternalName ?? encounterId,
+            out source
+        );
+        BppLog.Info(
+            "MonsterLockShowcaseRuntime",
+            $"TryCreateShowcaseRequest prepared request card={card.Template?.InternalName ?? "-"} templateId={card.TemplateId} source={source} signature={previewModel.Signature}"
+        );
+        return true;
     }
 
     private bool TryConsumeNextClickToClosePreview(
@@ -312,25 +323,6 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
         HideOverlay(reason);
         return true;
-    }
-
-    private static PreviewBoardModel CreateFilteredPreviewModel(
-        PreviewBoardModel sourceModel,
-        IReadOnlyList<PreviewCardSpec> cards,
-        IReadOnlyList<PreviewCardSpec> skillCards
-    )
-    {
-        var model = new PreviewBoardModel
-        {
-            Title = sourceModel?.Title ?? string.Empty,
-            ItemCards = cards ?? new List<PreviewCardSpec>(),
-            SkillCards = skillCards ?? new List<PreviewCardSpec>(),
-            Metadata = new Dictionary<string, string>(
-                sourceModel?.Metadata ?? new Dictionary<string, string>()
-            ),
-        };
-        model.Signature = PreviewBoardSignature.Build(model);
-        return model;
     }
 
     private static IReadOnlyDictionary<string, string> BuildEncounterPreviewMetadata(
@@ -381,5 +373,30 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
             BorderThickness = presentation.BorderThickness,
             BorderHeight = presentation.BorderHeight,
         };
+    }
+
+    private void EnsureRenderPipeline(string reason)
+    {
+        if (_renderTarget != null && _renderTarget.IsAlive && _session != null)
+            return;
+
+        if (_renderTarget != null && !_renderTarget.IsAlive)
+        {
+            BppLog.Warn(
+                "MonsterLockShowcaseRuntime",
+                $"Showcase render pipeline was dead; recreating reason={reason}"
+            );
+        }
+
+        _renderTarget?.Dispose();
+        _renderTarget = PreviewBoardRenderTargetFactory.Create(ShowcaseSurfaceName);
+        _session = new PreviewBoardSession(_renderTarget);
+        if (_activeRequest != null)
+            _session.Show(_activeRequest);
+
+        BppLog.Info(
+            "MonsterLockShowcaseRuntime",
+            $"Showcase render pipeline ready reason={reason} renderTarget={_renderTarget?.GetType().Name ?? "null"} surfaceName={ShowcaseSurfaceName}"
+        );
     }
 }

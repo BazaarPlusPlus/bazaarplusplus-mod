@@ -7,6 +7,8 @@ internal sealed class BppConfig : IBppConfig
 {
     public ConfigEntry<bool>? UseNativeMonsterPreviewConfig { get; private set; }
 
+    public ConfigEntry<string>? ItemBoardAnchoredPositionConfig { get; private set; }
+
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
 
     public ConfigEntry<bool>? EnchantPreviewAlwaysShowConfig { get; private set; }
@@ -30,6 +32,12 @@ internal sealed class BppConfig : IBppConfig
             "UseNativePreview",
             true,
             "Whether monster preview should use the game's native preview instead of the BazaarPlusPlus overlay. Does not affect history panel battle previews."
+        );
+        ItemBoardAnchoredPositionConfig = config.Bind(
+            "ItemBoard",
+            "AnchoredPosition",
+            "auto",
+            "Anchored position override for the standalone item board overlay. Use 'auto' to follow the source tooltip, or 'x,y' such as '320,-40'."
         );
         EnableNameOverrideConfig = config.Bind(
             "StreamerMode",

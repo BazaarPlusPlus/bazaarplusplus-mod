@@ -21,34 +21,25 @@ internal static class MonsterPreviewModeSwitchCoordinator
 
     internal static void Apply(bool useNativePreview)
     {
-        if (useNativePreview)
-        {
-            MonsterLockShowcaseRuntime.Instance?.HandlePreviewModeChanged(useNativePreview: true);
-            return;
-        }
+        MonsterPreviewItemBoardRuntime.Instance?.HandlePreviewModeChanged();
 
         var tooltipParent = Data.TooltipParentComponent;
         var tooltipController = GetPrimaryTooltipController(tooltipParent);
-        var currentCard = GetCurrentCard(tooltipController);
         var wasLocked =
             tooltipParent != null
             && tooltipController != null
             && tooltipParent.IsCardTooltipControllerLocked(tooltipController);
 
         if (wasLocked)
-        {
             tooltipParent!.UnlockCardTooltipController();
-            tooltipParent.HideCardTooltipController();
-        }
 
-        var runtime = MonsterLockShowcaseRuntime.Instance;
-        if (
-            currentCard != null
-            && runtime != null
-            && runtime.ShouldInterceptLockToggle(currentCard)
-        )
+        if (tooltipParent != null && tooltipController != null)
+            tooltipParent.HideCardTooltipController();
+
+        if (useNativePreview)
         {
-            runtime.HandleLockToggle(currentCard);
+            MonsterLockShowcaseRuntime.Instance?.HandlePreviewModeChanged(useNativePreview: true);
+            return;
         }
     }
 

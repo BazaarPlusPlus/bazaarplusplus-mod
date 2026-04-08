@@ -108,12 +108,10 @@ public class Plugin : BaseUnityPlugin
         historyPanel.Configure(HistoryPanelFactory.Create(historyPanelRuntime));
         BppLog.Info("Plugin", "Adding CombatStatusBar");
         gameObject.AddComponent<CombatStatusBar>();
-        BppLog.Info("Plugin", "Adding MonsterPreviewController");
-        gameObject.AddComponent<MonsterPreviewController>();
         BppLog.Info("Plugin", "Adding MonsterPreviewWarmupController");
         gameObject.AddComponent<MonsterPreviewWarmupController>();
-        BppLog.Info("Plugin", "Adding MonsterLockShowcaseRuntime");
-        gameObject.AddComponent<MonsterLockShowcaseRuntime>();
+        BppLog.Info("Plugin", "Adding MonsterPreviewItemBoardRuntime");
+        gameObject.AddComponent<MonsterPreviewItemBoardRuntime>();
         BppLog.Info("Plugin", "Adding EndOfRunScreenshotController");
         gameObject.AddComponent<EndOfRunScreenshotController>();
 

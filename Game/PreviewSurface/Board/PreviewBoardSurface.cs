@@ -138,6 +138,10 @@ internal sealed class PreviewBoardSurface : IPreviewBoardSurface
             return;
 
         model ??= new PreviewBoardModel();
+        BppLog.Info(
+            "PreviewBoardSurface",
+            $"RenderAsync start root='{_boardRoot.name}' signature={model.Signature} items={model.ItemCards?.Count ?? 0} skills={model.SkillCards?.Count ?? 0}"
+        );
         Clear();
 
         var metadata = model?.Metadata;
@@ -149,6 +153,10 @@ internal sealed class PreviewBoardSurface : IPreviewBoardSurface
         await RebuildItemsAsync(model.ItemCards, cancellationToken);
         if (cancellationToken.IsCancellationRequested)
         {
+            BppLog.Warn(
+                "PreviewBoardSurface",
+                $"RenderAsync cancelled after items root='{_boardRoot.name}' signature={model.Signature}"
+            );
             Clear();
             return;
         }
@@ -156,11 +164,19 @@ internal sealed class PreviewBoardSurface : IPreviewBoardSurface
         await RebuildSkillsAsync(model.SkillCards, cancellationToken);
         if (cancellationToken.IsCancellationRequested)
         {
+            BppLog.Warn(
+                "PreviewBoardSurface",
+                $"RenderAsync cancelled after skills root='{_boardRoot.name}' signature={model.Signature}"
+            );
             Clear();
             return;
         }
 
         RefreshLayout();
+        BppLog.Info(
+            "PreviewBoardSurface",
+            $"RenderAsync completed root='{_boardRoot.name}' signature={model.Signature} cards={_cards.Count} skillCards={_skillCards.Count}"
+        );
     }
 
     public void SetVisible(bool visible)
@@ -189,6 +205,8 @@ internal sealed class PreviewBoardSurface : IPreviewBoardSurface
         if (!IsAlive)
             return;
 
+        var clearedItemCount = _cards.Count;
+        var clearedSkillCount = _skillCards.Count;
         foreach (var cardObject in _cards)
         {
             if (cardObject != null)
@@ -217,6 +235,10 @@ internal sealed class PreviewBoardSurface : IPreviewBoardSurface
                 _skillFactory.Destroy(skillObject);
         }
         _skillCards.Clear();
+        BppLog.Debug(
+            "PreviewBoardSurface",
+            $"Clear root='{_boardRoot.name}' clearedItems={clearedItemCount} clearedSkills={clearedSkillCount}"
+        );
     }
 
     public void Dispose()

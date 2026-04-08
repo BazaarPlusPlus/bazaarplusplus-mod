@@ -7,6 +7,7 @@ namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal sealed class MonsterPreviewController : MonoBehaviour
 {
+    private const string SurfaceName = "MonsterPreviewBoard";
     private readonly List<PreviewCardSpec> _cards = new List<PreviewCardSpec>();
     private readonly List<PreviewCardSpec> _skillCards = new List<PreviewCardSpec>();
 
@@ -14,6 +15,7 @@ internal sealed class MonsterPreviewController : MonoBehaviour
     private IBoardRenderTarget _renderTarget;
     private IBoardAnchorStrategy _anchorStrategy;
     private PreviewBoardPresentation _presentation;
+    private PreviewBoardDebugOptions _debugOptions = new PreviewBoardDebugOptions();
     private bool _visible;
 
     public bool Visible => _visible;
@@ -21,12 +23,10 @@ internal sealed class MonsterPreviewController : MonoBehaviour
     private void Awake()
     {
         _presentation = new PreviewBoardPresentation();
-        _renderTarget = PreviewBoardRenderTargetFactory.Create("MonsterPreviewBoard");
-        _coordinator = new MonsterPreviewOverlayCoordinator(_renderTarget);
-        _coordinator.SetPresentation(_presentation);
+        EnsureRenderPipeline("awake");
         BppLog.Info(
             "MonsterPreviewController",
-            "Awake completed; render target and coordinator created"
+            $"Awake completed; renderTarget={_renderTarget?.GetType().Name ?? "null"} coordinatorCreated={_coordinator != null}"
         );
     }
 
@@ -38,12 +38,15 @@ internal sealed class MonsterPreviewController : MonoBehaviour
             return;
         }
 
+        EnsureRenderPipeline("late_update_visible");
         _coordinator?.Tick();
     }
 
     public void SetAnchorStrategy(IBoardAnchorStrategy anchorStrategy)
     {
         _anchorStrategy = anchorStrategy;
+        if (_visible)
+            EnsureRenderPipeline("set_anchor_strategy");
         _coordinator?.SetAnchorStrategy(anchorStrategy);
         BppLog.Debug(
             "MonsterPreviewController",
@@ -54,6 +57,8 @@ internal sealed class MonsterPreviewController : MonoBehaviour
     public void SetPresentation(PreviewBoardPresentation presentation)
     {
         _presentation = presentation ?? new PreviewBoardPresentation();
+        if (_visible)
+            EnsureRenderPipeline("set_presentation");
         _coordinator?.SetPresentation(_presentation);
         BppLog.Debug(
             "MonsterPreviewController",
@@ -71,6 +76,8 @@ internal sealed class MonsterPreviewController : MonoBehaviour
             "MonsterPreviewController",
             $"SetCards count={_cards.Count}, visible={_visible}"
         );
+        if (_visible)
+            EnsureRenderPipeline("set_cards");
         _coordinator?.SetCards(_cards);
     }
 
@@ -84,20 +91,26 @@ internal sealed class MonsterPreviewController : MonoBehaviour
             "MonsterPreviewController",
             $"SetSkillCards count={_skillCards.Count}, visible={_visible}"
         );
+        if (_visible)
+            EnsureRenderPipeline("set_skill_cards");
         _coordinator?.SetSkillCards(_skillCards);
     }
 
     public void SetDebugOptions(PreviewBoardDebugOptions debugOptions)
     {
-        _coordinator?.SetDebugOptions(debugOptions);
+        _debugOptions = debugOptions ?? new PreviewBoardDebugOptions();
+        if (_visible)
+            EnsureRenderPipeline("set_debug_options");
+        _coordinator?.SetDebugOptions(_debugOptions);
     }
 
     public void ShowRequest(PreviewBoardRequest request)
     {
+        EnsureRenderPipeline("show_request");
         _visible = request?.Presentation?.Visible ?? false;
         BppLog.Info(
             "MonsterPreviewController",
-            $"ShowRequest visible={_visible} items={request?.InitialModel?.ItemCards?.Count ?? -1} skills={request?.InitialModel?.SkillCards?.Count ?? -1} hasDataSource={request?.DataSource != null} hasAnchor={request?.AnchorStrategy != null}"
+            $"ShowRequest visible={_visible} dataSource={request?.DataSource?.GetType().Name ?? "null"} initialSignature={request?.InitialModel?.Signature ?? string.Empty} hasAnchor={request?.AnchorStrategy != null} presentationVisible={request?.Presentation?.Visible ?? false}"
         );
         _coordinator?.ShowRequest(request);
     }
@@ -133,16 +146,19 @@ internal sealed class MonsterPreviewController : MonoBehaviour
             return;
         }
 
+        EnsureRenderPipeline("set_visible_true");
         _coordinator?.SetVisible(true);
         if (_anchorStrategy != null)
             _coordinator?.SetAnchorStrategy(_anchorStrategy);
         _coordinator?.SetPresentation(_presentation);
+        _coordinator?.SetDebugOptions(_debugOptions);
         _coordinator?.SetCards(_cards);
         _coordinator?.SetSkillCards(_skillCards);
     }
 
     public void Refresh()
     {
+        EnsureRenderPipeline("refresh");
         _coordinator?.Refresh();
     }
 
@@ -169,5 +185,40 @@ internal sealed class MonsterPreviewController : MonoBehaviour
                         : new Dictionary<int, int>(),
             })
             .ToList();
+    }
+
+    private void EnsureRenderPipeline(string reason)
+    {
+        if (_renderTarget != null && _renderTarget.IsAlive && _coordinator != null)
+            return;
+
+        if (_renderTarget != null && !_renderTarget.IsAlive)
+        {
+            BppLog.Warn(
+                "MonsterPreviewController",
+                $"Render pipeline was dead; recreating reason={reason}"
+            );
+        }
+
+        _renderTarget?.Dispose();
+        _renderTarget = PreviewBoardRenderTargetFactory.Create(SurfaceName);
+        _coordinator = new MonsterPreviewOverlayCoordinator(_renderTarget);
+        _coordinator.SetPresentation(_presentation ?? new PreviewBoardPresentation());
+        _coordinator.SetDebugOptions(_debugOptions ?? new PreviewBoardDebugOptions());
+        if (_anchorStrategy != null)
+            _coordinator.SetAnchorStrategy(_anchorStrategy);
+
+        if (_cards.Count > 0)
+            _coordinator.SetCards(_cards);
+        if (_skillCards.Count > 0)
+            _coordinator.SetSkillCards(_skillCards);
+
+        if (!_visible)
+            _coordinator.SetVisible(false);
+
+        BppLog.Info(
+            "MonsterPreviewController",
+            $"Render pipeline ready reason={reason} renderTarget={_renderTarget?.GetType().Name ?? "null"} visible={_visible}"
+        );
     }
 }
