@@ -752,10 +752,20 @@ internal sealed class RunBundleUploadRequestV2
 
 `RunProjectionV2` 还应至少包含：
 
-- `Rating`
-- `Rank`
+- `PlayerRank`
+- `PlayerRating`
+- `PlayerPosition`
+- `FinalPlayerRank`
+- `FinalPlayerRating`
+- `FinalPlayerPosition`
 
-不要只采 run 级 `rating`，遗漏 run 级 rank 信息。
+不要只采单个 run 级 `rating`。
+
+字段语义应固定为：
+
+- `PlayerRank` / `FinalPlayerRank` 只采 rank 名字
+- `PlayerRating` / `FinalPlayerRating` 使用 `rating` 命名，不再使用 `mmr`
+- `PlayerPosition` / `FinalPlayerPosition` 只在 rank 为 `Legendary` 且 leaderboard cache 有值时采集，否则为 `null`
 
 其中 `RunArtifactBattleV2` 应至少包含：
 

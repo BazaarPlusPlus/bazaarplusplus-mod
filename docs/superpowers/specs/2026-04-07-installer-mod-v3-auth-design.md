@@ -630,21 +630,29 @@ RunProjectionV2
 - status: string
 - hero_id: string?
 - hero_name: string?
-- rank: string?
-- rating: int?
+- player_rank: string?
+- player_rating: int?
+- player_position: int?
 - started_at_utc: string?
 - ended_at_utc: string
 - final_day: int?
 - final_wins: int?
 - final_losses: int?
+- final_player_rank: string?
+- final_player_rating: int?
+- final_player_position: int?
 ```
 
 这是 `runs` 表的直接来源。
 
 其中：
 
-- `rank` 表示 run 级 rank 名字
-- run projection 不应只采 `rating`，还应同步采集 run 级 rank 信息
+- `player_rank` / `final_player_rank` 只表示 run 级 rank 名字，例如 `Gold`
+- `player_rating` / `final_player_rating` 表示 run 级 rating
+- `player_position` / `final_player_position` 表示传奇排行榜名次
+- `position` 只在 rank 为 `Legendary` 且 leaderboard cache 有值时采集；其他情况必须为 `null`
+- 不要继续使用 `mmr` 这个旧名字；V3 的规范字段名统一为 `rating`
+- run projection 不应只采终局 `rating`，而应同时采 opening 和 final 两组 run 级 rank/rating/position 快照
 
 ### Battle projections
 
@@ -869,13 +877,17 @@ UNIQUE (installation_id, run_id, payload_hash)
 - status
 - hero_id
 - hero_name
-- rank
-- rating
+- player_rank
+- player_rating
+- player_position
 - started_at_utc
 - ended_at_utc
 - final_day
 - final_wins
 - final_losses
+- final_player_rank
+- final_player_rating
+- final_player_position
 - updated_at_utc
 ```
 
@@ -921,8 +933,12 @@ V3 首版建议先不要额外创建以下索引：
 - `battles(day, ...)`
 - `battles(player_rank, ...)`
 - `battles(player_rating, ...)`
-- `runs(rank, ...)`
-- `runs(rating, ...)`
+- `runs(player_rank, ...)`
+- `runs(player_rating, ...)`
+- `runs(player_position, ...)`
+- `runs(final_player_rank, ...)`
+- `runs(final_player_rating, ...)`
+- `runs(final_player_position, ...)`
 
 等对应查询真正落地后，再按实际访问路径补充。
 
