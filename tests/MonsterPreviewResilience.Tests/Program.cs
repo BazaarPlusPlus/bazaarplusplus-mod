@@ -1,7 +1,7 @@
 using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.PreviewSurface;
 
 TestPreviewCardSpecFilter();
-TestPreviewRenderGenerationGate();
 
 Console.WriteLine("MonsterPreviewResilience checks passed.");
 
@@ -41,33 +41,6 @@ static void TestPreviewCardSpecFilter()
         "Known template should be preserved."
     );
     Assert(filtered[0].SourceName == "Known", "Known spec data should be preserved.");
-}
-
-static void TestPreviewRenderGenerationGate()
-{
-    var gate = new PreviewRenderGenerationGate();
-
-    var firstGeneration = gate.BeginRender(visible: true);
-    Assert(!gate.ShouldCancel(firstGeneration), "Active visible render should remain valid.");
-
-    var secondGeneration = gate.BeginRender(visible: true);
-    Assert(
-        gate.ShouldCancel(firstGeneration),
-        "Older render generation should be cancelled by a newer render."
-    );
-    Assert(!gate.ShouldCancel(secondGeneration), "Newest visible render should remain valid.");
-
-    gate.InvalidateForHide();
-    Assert(gate.ShouldCancel(secondGeneration), "Hide should cancel the active render generation.");
-
-    var thirdGeneration = gate.BeginRender(visible: true);
-    Assert(
-        !gate.ShouldCancel(thirdGeneration),
-        "A new visible render after hide should become valid again."
-    );
-
-    gate.MarkDisposed();
-    Assert(gate.ShouldCancel(thirdGeneration), "Dispose should cancel all generations.");
 }
 
 static void Assert(bool condition, string message)

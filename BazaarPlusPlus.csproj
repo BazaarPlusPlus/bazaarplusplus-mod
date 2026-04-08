@@ -39,6 +39,14 @@
     <Compile Remove="Game/HistoryPanel/HistoryPanel.Canvas.Layout.cs" />
     <Compile Remove="Game/HistoryPanel/HistoryPanel.Canvas.Lists.cs" />
     <Compile Remove="Game/HistoryPanel/HistoryPanel.Canvas.Styles.cs" />
+    <Compile Remove="Game/MonsterPreview/Architecture/PreviewBoardModel.cs" />
+    <Compile Remove="Game/MonsterPreview/Architecture/PreviewCardSpec.cs" />
+    <Compile Remove="Game/MonsterPreview/Architecture/PreviewBoardPresentation.cs" />
+    <Compile Remove="Game/MonsterPreview/GameObjectFactory/IPreviewCardFactory.cs" />
+    <Compile Remove="Game/MonsterPreview/GameObjectFactory/MonsterPreviewItemCardFactory.cs" />
+    <Compile Remove="Game/MonsterPreview/GameObjectFactory/MonsterPreviewSkillCardFactory.cs" />
+    <Compile Remove="Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoard.cs" />
+    <Compile Remove="Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoardRenderTarget.cs" />
   </ItemGroup>
   <!-- Project paths -->
   <PropertyGroup>

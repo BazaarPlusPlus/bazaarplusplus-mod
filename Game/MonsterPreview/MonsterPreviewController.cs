@@ -11,7 +11,7 @@ internal sealed class MonsterPreviewController : MonoBehaviour
     private readonly List<PreviewCardSpec> _skillCards = new List<PreviewCardSpec>();
 
     private MonsterPreviewOverlayCoordinator _coordinator;
-    private MonsterPreviewBoardRenderTarget _renderTarget;
+    private IBoardRenderTarget _renderTarget;
     private IBoardAnchorStrategy _anchorStrategy;
     private PreviewBoardPresentation _presentation;
     private bool _visible;
@@ -21,7 +21,7 @@ internal sealed class MonsterPreviewController : MonoBehaviour
     private void Awake()
     {
         _presentation = new PreviewBoardPresentation();
-        _renderTarget = new MonsterPreviewBoardRenderTarget();
+        _renderTarget = PreviewBoardRenderTargetFactory.Create("MonsterPreviewBoard");
         _coordinator = new MonsterPreviewOverlayCoordinator(_renderTarget);
         _coordinator.SetPresentation(_presentation);
         BppLog.Info(
