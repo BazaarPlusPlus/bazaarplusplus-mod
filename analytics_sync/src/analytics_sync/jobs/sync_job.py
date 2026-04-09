@@ -9,10 +9,10 @@ from analytics_sync.config import SyncConfig
 from analytics_sync.compat.v3_models import RunBundleUploadRequestV2
 from analytics_sync.jobs.result import SyncJobResult
 from analytics_sync.load.battle_repository import BattleRepository
+from analytics_sync.load.provider import build_sql_client
 from analytics_sync.load.run_repository import RunRepository
 from analytics_sync.load.sync_job_run_repository import SyncJobRunRepository
 from analytics_sync.load.run_task_repository import RunTaskRepository
-from analytics_sync.load.sqlite_client import SqliteClient
 from analytics_sync.load.sync_checkpoint_repository import SyncCheckpointRepository
 from analytics_sync.load.template_repository import TemplateRepository
 from analytics_sync.source.base import RunBundleProvider, SourceRunBundleItem
@@ -216,16 +216,12 @@ def run_sync_job(
 ) -> SyncJobResult:
     started_at = _utc_now()
     started_monotonic = time.monotonic()
-    sqlite_client = None
-    if config.sql_provider == "sqlite" and config.sqlite_path is not None:
-        sqlite_client = SqliteClient(config.sqlite_path)
-        if not dry_run:
-            sqlite_client.initialize_schema()
-    if sqlite_client is None:
-        return SyncJobResult(runs_seen=0, runs_written=0, battles_seen=0, battles_written=0, skipped_runs=0)
+    sql_client = build_sql_client(config)
+    if not dry_run:
+        sql_client.initialize_schema()
 
-    checkpoint_repository = SyncCheckpointRepository(sqlite_client)
-    job_run_repository = SyncJobRunRepository(sqlite_client) if not dry_run else None
+    checkpoint_repository = SyncCheckpointRepository(sql_client)
+    job_run_repository = SyncJobRunRepository(sql_client) if not dry_run else None
     cursor = checkpoint_repository.get_cursor(RUNS_SOURCE)
     checkpoint_updated_at = cursor.updated_at
     checkpoint_entity_id = cursor.entity_id
@@ -254,26 +250,31 @@ def run_sync_job(
             for item in items:
                 battles_seen += len(item.bundle.battle_projections)
         else:
-            run_repository = RunRepository(sqlite_client)
-            template_repository = TemplateRepository(sqlite_client)
-            battle_repository = BattleRepository(sqlite_client)
-            task_repository = RunTaskRepository(sqlite_client)
+            with sql_client.transaction() as write_session:
+                task_repository = RunTaskRepository(write_session)
+                if discovered_refs:
+                    task_repository.upsert_tasks(
+                        [
+                            (TASK_TYPE_SYNC_RUN, ref.run_id, "pending", ref.source_updated_at)
+                            for ref in discovered_refs
+                        ]
+                    )
 
-            for ref in discovered_refs:
-                task_repository.upsert_task(TASK_TYPE_SYNC_RUN, ref.run_id, "pending", ref.source_updated_at)
+                    last_ref = discovered_refs[-1]
+                    checkpoint_updated_at = last_ref.source_updated_at
+                    checkpoint_entity_id = last_ref.source_entity_id
+                    SyncCheckpointRepository(write_session).upsert_cursor(
+                        RUNS_SOURCE,
+                        checkpoint_updated_at,
+                        checkpoint_entity_id,
+                    )
 
-            if discovered_refs:
-                last_ref = discovered_refs[-1]
-                checkpoint_updated_at = last_ref.source_updated_at
-                checkpoint_entity_id = last_ref.source_entity_id
-                checkpoint_repository.upsert_cursor(RUNS_SOURCE, checkpoint_updated_at, checkpoint_entity_id)
-
-            claimed_run_ids = task_repository.claim_run_ids(
-                TASK_TYPE_SYNC_RUN,
-                RUNS_PAGE_SIZE,
-                claimed_at=_utc_now(),
-                stale_before=_utc_before(RUNNING_TASK_STALE_AFTER),
-            )
+                claimed_run_ids = task_repository.claim_run_ids(
+                    TASK_TYPE_SYNC_RUN,
+                    RUNS_PAGE_SIZE,
+                    claimed_at=_utc_now(),
+                    stale_before=_utc_before(RUNNING_TASK_STALE_AFTER),
+                )
             _emit_progress(progress, f"phase=execute claimed_runs={len(claimed_run_ids)}")
             items = provider.fetch_run_bundles(claimed_run_ids)
             items_by_run_id: dict[str, SourceRunBundleItem] = {}
@@ -283,37 +284,43 @@ def run_sync_job(
                     items_by_run_id[bundle_run_id] = bundle_item
 
             total_claimed = len(claimed_run_ids)
-            for index, run_id in enumerate(claimed_run_ids, start=1):
-                claimed_item = items_by_run_id.get(run_id)
-                if claimed_item is None:
-                    task_repository.mark_failed(TASK_TYPE_SYNC_RUN, run_id, _utc_now(), "bundle missing")
-                    skipped_runs += 1
+            with sql_client.transaction() as write_session:
+                run_repository = RunRepository(write_session)
+                template_repository = TemplateRepository(write_session)
+                battle_repository = BattleRepository(write_session)
+                task_repository = RunTaskRepository(write_session)
+
+                for index, run_id in enumerate(claimed_run_ids, start=1):
+                    claimed_item = items_by_run_id.get(run_id)
+                    if claimed_item is None:
+                        task_repository.mark_failed(TASK_TYPE_SYNC_RUN, run_id, _utc_now(), "bundle missing")
+                        skipped_runs += 1
+                        if index == 1 or index == total_claimed or index % 10 == 0:
+                            _emit_progress(
+                                progress,
+                                f"phase=execute processed_runs={index}/{total_claimed} runs_written={runs_written} battles_written={battles_written} skipped_runs={skipped_runs}",
+                            )
+                        continue
+                    battles_seen += len(claimed_item.bundle.battle_projections)
+                    written_for_run, skipped_for_run = _process_bundle(
+                        item=claimed_item,
+                        run_repository=run_repository,
+                        template_repository=template_repository,
+                        battle_repository=battle_repository,
+                        task_repository=task_repository,
+                    )
+                    battles_written += written_for_run
+                    if skipped_for_run == 0:
+                        runs_written += 1
+                    skipped_runs += skipped_for_run
                     if index == 1 or index == total_claimed or index % 10 == 0:
                         _emit_progress(
                             progress,
                             f"phase=execute processed_runs={index}/{total_claimed} runs_written={runs_written} battles_written={battles_written} skipped_runs={skipped_runs}",
                         )
-                    continue
-                battles_seen += len(claimed_item.bundle.battle_projections)
-                written_for_run, skipped_for_run = _process_bundle(
-                    item=claimed_item,
-                    run_repository=run_repository,
-                    template_repository=template_repository,
-                    battle_repository=battle_repository,
-                    task_repository=task_repository,
-                )
-                battles_written += written_for_run
-                if skipped_for_run == 0:
-                    runs_written += 1
-                skipped_runs += skipped_for_run
-                if index == 1 or index == total_claimed or index % 10 == 0:
-                    _emit_progress(
-                        progress,
-                        f"phase=execute processed_runs={index}/{total_claimed} runs_written={runs_written} battles_written={battles_written} skipped_runs={skipped_runs}",
-                    )
 
-            pending_tasks = task_repository.count_by_status(TASK_TYPE_SYNC_RUN, "pending")
-            failed_tasks = task_repository.count_by_status(TASK_TYPE_SYNC_RUN, "failed")
+                pending_tasks = task_repository.count_by_status(TASK_TYPE_SYNC_RUN, "pending")
+                failed_tasks = task_repository.count_by_status(TASK_TYPE_SYNC_RUN, "failed")
 
         result = SyncJobResult(
             runs_seen=runs_seen,

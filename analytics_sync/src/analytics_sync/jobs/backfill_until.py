@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from analytics_sync.config import SyncConfig
 from analytics_sync.jobs.result import SyncJobResult
 from analytics_sync.jobs.sync_job import RUNS_SOURCE, run_sync_job
-from analytics_sync.load.sqlite_client import SqliteClient
+from analytics_sync.load.provider import build_sql_client
 from analytics_sync.load.sync_checkpoint_repository import SyncCheckpointRepository
 
 
@@ -25,10 +25,11 @@ def _parse_utc_timestamp(value: str) -> datetime:
     return datetime.fromisoformat(normalized).astimezone(UTC)
 
 
-def _read_checkpoint_from_sqlite(config: SyncConfig) -> tuple[str, str]:
-    if config.sqlite_path is None:
-        return ("1970-01-01T00:00:00Z", "")
-    cursor = SyncCheckpointRepository(SqliteClient(config.sqlite_path)).get_cursor(RUNS_SOURCE)
+def _read_checkpoint(config: SyncConfig) -> tuple[str, str]:
+    client = build_sql_client(config)
+    if config.sql_provider != "sqlite":
+        client.initialize_schema()
+    cursor = SyncCheckpointRepository(client).get_cursor(RUNS_SOURCE)
     return (cursor.updated_at, cursor.entity_id)
 
 
@@ -41,7 +42,7 @@ def run_backfill_until(
     read_checkpoint: Callable[[], tuple[str, str]] | None = None,
     run_once: Callable[[], SyncJobResult] | None = None,
 ) -> BackfillUntilResult:
-    read_checkpoint_fn = read_checkpoint or (lambda: _read_checkpoint_from_sqlite(config))
+    read_checkpoint_fn = read_checkpoint or (lambda: _read_checkpoint(config))
     run_once_fn = run_once or (lambda: run_sync_job(config, dry_run=dry_run, progress=progress))
 
     target = _parse_utc_timestamp(until_updated_at)

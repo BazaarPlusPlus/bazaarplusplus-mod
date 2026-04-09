@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-from analytics_sync.load.sqlite_client import SqliteClient
+from datetime import UTC, datetime
+
+from analytics_sync.load.provider import SqlExecutor
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 class RunTaskRepository:
-    def __init__(self, client: SqliteClient) -> None:
+    def __init__(self, client: SqlExecutor) -> None:
         self._client = client
 
     def upsert_task(
@@ -14,8 +20,24 @@ class RunTaskRepository:
         status: str,
         next_run_at: str,
     ) -> None:
-        self._client.execute(
+        self.upsert_tasks([(task_type, run_id, status, next_run_at)])
+
+    def upsert_tasks(self, rows: list[tuple[str, str, str, str]]) -> None:
+        if not rows:
+            return
+        now = _utc_now()
+        if self._client.dialect == "mysql":
+            sql = """
+            INSERT INTO sync_run_tasks (
+                task_type, run_id, status, attempt_count, next_run_at, last_error, created_at, updated_at
+            ) VALUES (?, ?, ?, 0, ?, NULL, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                status = VALUES(status),
+                next_run_at = VALUES(next_run_at),
+                updated_at = VALUES(updated_at)
             """
+        else:
+            sql = """
             INSERT INTO sync_run_tasks (
                 task_type, run_id, status, attempt_count, next_run_at, last_error, created_at, updated_at
             ) VALUES (?, ?, ?, 0, ?, NULL, ?, ?)
@@ -23,8 +45,10 @@ class RunTaskRepository:
                 status = excluded.status,
                 next_run_at = excluded.next_run_at,
                 updated_at = excluded.updated_at
-            """,
-            [task_type, run_id, status, next_run_at, next_run_at, next_run_at],
+            """
+        self._client.executemany(
+            sql,
+            [[task_type, run_id, status, next_run_at, now, now] for task_type, run_id, status, next_run_at in rows],
         )
 
     def list_run_ids(

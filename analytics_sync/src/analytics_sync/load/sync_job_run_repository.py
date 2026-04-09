@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from analytics_sync.load.sqlite_client import SqliteClient
+from analytics_sync.load.provider import SqlExecutor
 
 
 class SyncJobRunRepository:
-    def __init__(self, client: SqliteClient) -> None:
+    def __init__(self, client: SqlExecutor) -> None:
         self._client = client
 
     def insert_job_run(self, row: dict[str, object]) -> None:
+        created_at_sql = "UTC_TIMESTAMP(6)" if self._client.dialect == "mysql" else "datetime('now')"
         self._client.execute(
-            """
+            f"""
             INSERT INTO sync_job_runs (
                 job_name,
                 provider,
@@ -30,7 +31,7 @@ class SyncJobRunRepository:
                 checkpoint_entity_id,
                 error_message,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {created_at_sql})
             """,
             [
                 row["job_name"],

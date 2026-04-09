@@ -60,3 +60,61 @@ def test_battle_repository_writes_battle_details(tmp_path: Path):
 
     assert client.fetch_all("SELECT battle_id FROM battles WHERE battle_id = ?", ["battle-1"])
     assert client.fetch_all("SELECT battle_id FROM battle_cards WHERE battle_id = ?", ["battle-1"])
+
+
+class _FakeExecutor:
+    dialect = "sqlite"
+
+    def __init__(self) -> None:
+        self.execute_calls: list[tuple[str, list[object]]] = []
+        self.executemany_calls: list[tuple[str, list[list[object]]]] = []
+
+    def execute(self, sql: str, params: list[object] | None = None) -> None:
+        self.execute_calls.append((sql, params or []))
+
+    def executemany(self, sql: str, params_seq: list[list[object]]) -> None:
+        self.executemany_calls.append((sql, params_seq))
+
+
+def test_battle_repository_batches_detail_writes_with_executemany():
+    from analytics_sync.load.battle_repository import BattleRepository
+
+    executor = _FakeExecutor()
+    repository = BattleRepository(executor)
+
+    repository.upsert_battle(
+        battle_row={
+            "battle_id": "battle-1",
+            "run_id": "run-1",
+            "recorded_at_utc": "2026-04-09T00:00:00Z",
+        },
+        card_rows=[
+            {
+                "battle_id": "battle-1",
+                "side": "player",
+                "slot_index": 0,
+                "card_template_id": 1,
+                "card_tier": 2,
+                "enchant_code": "burning",
+            }
+        ],
+        skill_rows=[
+            {
+                "battle_id": "battle-1",
+                "side": "player",
+                "slot_index": 0,
+                "skill_template_id": 2,
+                "skill_tier": 4,
+            }
+        ],
+        temperature_rows=[
+            {
+                "battle_id": "battle-1",
+                "side": "player",
+                "slot_index": 0,
+                "temperature_state": "high",
+            }
+        ],
+    )
+
+    assert len(executor.executemany_calls) == 3

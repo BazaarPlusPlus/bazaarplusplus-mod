@@ -1,3 +1,6 @@
+import threading
+import time
+
 from analytics_sync.compat.v3_models import RunBundleUploadRequestV2
 from analytics_sync.load.sync_checkpoint_repository import SyncCursor
 from analytics_sync.source.base import SourceRunRef
@@ -109,3 +112,32 @@ def test_legacy_cloudflare_provider_skips_runs_without_player_account_id():
     items = provider.fetch_run_bundles(["run-missing-account"])
 
     assert items == []
+
+
+class _TrackingR2Client:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.in_flight = 0
+        self.max_in_flight = 0
+
+    def get_bytes(self, ref) -> bytes:
+        with self._lock:
+            self.in_flight += 1
+            self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        try:
+            time.sleep(0.02)
+            return _FakeR2Client().get_bytes(ref)
+        finally:
+            with self._lock:
+                self.in_flight -= 1
+
+
+def test_legacy_cloudflare_provider_fetches_r2_objects_concurrently():
+    d1 = _FakeD1Client()
+    r2 = _TrackingR2Client()
+    provider = LegacyCloudflareRunBundleProvider(d1_client=d1, r2_client=r2, bucket="bucket", max_workers=4)
+
+    items = provider.fetch_run_bundles(["run-1", "run-2"])
+
+    assert len(items) == 2
+    assert r2.max_in_flight > 1

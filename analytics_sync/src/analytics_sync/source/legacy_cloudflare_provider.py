@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 import json
 
 from cloudflare import Cloudflare
@@ -26,10 +27,18 @@ def _group_battles_by_run_id(battle_rows: list[dict[str, object]]) -> dict[str, 
 
 
 class LegacyCloudflareRunBundleProvider:
-    def __init__(self, *, d1_client: D1Client, r2_client: R2Client, bucket: str) -> None:
+    def __init__(
+        self,
+        *,
+        d1_client: D1Client,
+        r2_client: R2Client,
+        bucket: str,
+        max_workers: int = 8,
+    ) -> None:
         self._d1_client = d1_client
         self._r2_client = r2_client
         self._bucket = bucket
+        self._max_workers = max_workers
 
     @classmethod
     def from_config(cls, config: SyncConfig) -> "LegacyCloudflareRunBundleProvider":
@@ -41,6 +50,21 @@ class LegacyCloudflareRunBundleProvider:
             secret_access_key=config.r2.secret_access_key,
         )
         return cls(d1_client=d1_client, r2_client=r2_client, bucket=config.r2.bucket)
+
+    def _fetch_decoded_json_objects(self, keys: set[str]) -> dict[str, dict[str, object]]:
+        if not keys:
+            return {}
+
+        def fetch_one(key: str) -> tuple[str, dict[str, object]]:
+            payload = decode_artifact_bytes(self._r2_client.get_bytes(R2ObjectRef(bucket=self._bucket, key=key)))
+            decoded = json.loads(payload)
+            if not isinstance(decoded, dict):
+                raise ValueError(f"Expected JSON object for {key}")
+            return (key, decoded)
+
+        with ThreadPoolExecutor(max_workers=min(self._max_workers, len(keys))) as executor:
+            pairs = list(executor.map(fetch_one, sorted(keys)))
+        return dict(pairs)
 
     def discover_run_refs(self, cursor: SyncCursor, limit: int) -> list[SourceRunRef]:
         runs = self._d1_client.fetch_rows(
@@ -79,6 +103,17 @@ class LegacyCloudflareRunBundleProvider:
             else []
         )
         battles_by_run_id = _group_battles_by_run_id(battle_rows)
+        object_keys = {
+            key
+            for run in runs
+            if isinstance((key := run.get("summary_object_key")), str)
+        }
+        object_keys.update(
+            replay_key
+            for battle in battle_rows
+            if isinstance((replay_key := battle.get("replay_object_key")), str)
+        )
+        decoded_objects = self._fetch_decoded_json_objects(object_keys)
 
         items: list[SourceRunBundleItem] = []
         for run_row in runs:
@@ -92,20 +127,18 @@ class LegacyCloudflareRunBundleProvider:
             player_account_id = filled_run.get("player_account_id")
             if not isinstance(player_account_id, str):
                 continue
-            run_summary = json.loads(
-                decode_artifact_bytes(self._r2_client.get_bytes(R2ObjectRef(bucket=self._bucket, key=summary_key)))
-            )
+            run_summary = decoded_objects.get(summary_key)
+            if run_summary is None:
+                continue
             battle_artifacts: dict[str, dict[str, object]] = {}
             for battle_row in battles:
                 battle_id = battle_row.get("battle_id")
                 replay_key = battle_row.get("replay_object_key")
                 if not isinstance(battle_id, str) or not isinstance(replay_key, str):
                     continue
-                battle_artifacts[battle_id] = json.loads(
-                    decode_artifact_bytes(
-                        self._r2_client.get_bytes(R2ObjectRef(bucket=self._bucket, key=replay_key))
-                    )
-                )
+                artifact = decoded_objects.get(replay_key)
+                if artifact is not None:
+                    battle_artifacts[battle_id] = artifact
 
             items.append(
                 SourceRunBundleItem(
