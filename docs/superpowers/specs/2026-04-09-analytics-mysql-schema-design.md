@@ -107,7 +107,7 @@
 
 - `run_id` `VARCHAR(64)` `PRIMARY KEY`
 - `installation_id` `VARCHAR(64)` `NULL`
-- `player_account_id` `VARCHAR(64)` `NULL`
+- `player_account_id` `VARCHAR(64)` `NOT NULL`
 - `plugin_version` `VARCHAR(32)` `NULL`
 - `game_version` `VARCHAR(32)` `NULL`
 - `submitted_at_utc` `DATETIME(6)` `NULL`
@@ -138,7 +138,7 @@
 
 - 保留 `hero_name` 是可接受的，因为 run 摘要级读取经常直接展示该字段，且行数远小于明细表
 - `installation_id` 来自兼容层；旧数据没有时允许为 `NULL`
-- `player_account_id` 应优先直接从 run summary 读取；如果旧 run 缺失该字段但存在关联 battle，则允许兼容层从 battle 侧做 best-effort 回填；仍无法可靠确定时保留 `NULL`
+- `player_account_id` 必须在进入分析库前由前置兼容层补齐；兼容层应优先直接从 run summary 读取，缺失时再从关联 battle 回填；仍无法可靠确定时，该 run 不入库
 
 ### `battles`
 
