@@ -4,6 +4,7 @@ using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
+using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLogging.Upload;
@@ -62,6 +63,14 @@ internal static class BppSettingsDockCatalog
             _ => BppChineseLocalization.ResolveModeStatus(ReadChineseLocaleMode()),
             IsChineseLocaleOverrideActive,
             CycleChineseLocaleMode,
+            collapseAfterActivate: false
+        ),
+        new(
+            "LegendaryPositionDisplay",
+            LegendaryPositionSettingsMenuLabel.Resolve,
+            _ => ResolveLegendaryPositionDisplayStatus(ReadLegendaryPositionDisplayMode()),
+            IsLegendaryPositionDisplayOverrideActive,
+            CycleLegendaryPositionDisplayMode,
             collapseAfterActivate: false
         ),
         new(
@@ -163,5 +172,43 @@ internal static class BppSettingsDockCatalog
     private static bool IsChineseLocaleOverrideActive()
     {
         return ReadChineseLocaleMode() != BppChineseLocaleMode.Mainland;
+    }
+
+    private static LegendaryPositionDisplayMode ReadLegendaryPositionDisplayMode()
+    {
+        return BppRuntimeHost.Config.LegendaryPositionDisplayModeConfig?.Value
+            ?? LegendaryPositionDisplayMode.Default;
+    }
+
+    private static void CycleLegendaryPositionDisplayMode()
+    {
+        var config = BppRuntimeHost.Config.LegendaryPositionDisplayModeConfig;
+        if (config == null)
+            return;
+
+        config.Value = config.Value switch
+        {
+            LegendaryPositionDisplayMode.Default => LegendaryPositionDisplayMode.Blank,
+            LegendaryPositionDisplayMode.Blank => LegendaryPositionDisplayMode.Fixed999999,
+            LegendaryPositionDisplayMode.Fixed999999 => LegendaryPositionDisplayMode.PositionWithRating,
+            _ => LegendaryPositionDisplayMode.Default,
+        };
+    }
+
+    private static bool IsLegendaryPositionDisplayOverrideActive()
+    {
+        return ReadLegendaryPositionDisplayMode() != LegendaryPositionDisplayMode.Default;
+    }
+
+    private static string ResolveLegendaryPositionDisplayStatus(LegendaryPositionDisplayMode mode)
+    {
+        return mode switch
+        {
+            LegendaryPositionDisplayMode.Default => "DEF",
+            LegendaryPositionDisplayMode.Blank => "BLANK",
+            LegendaryPositionDisplayMode.Fixed999999 => "999999",
+            LegendaryPositionDisplayMode.PositionWithRating => "P|R",
+            _ => "DEF",
+        };
     }
 }

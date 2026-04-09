@@ -24,4 +24,6 @@ internal interface IBppConfig
     ConfigEntry<bool>? EnableCommunityContributionConfig { get; }
 
     ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; }
+
+    ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig { get; }
 }

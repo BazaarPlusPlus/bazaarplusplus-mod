@@ -25,6 +25,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; private set; }
 
+    public ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig { get; private set; }
+
     public void Initialize(ConfigFile config)
     {
         UseNativeMonsterPreviewConfig = config.Bind(
@@ -86,6 +88,12 @@ internal sealed class BppConfig : IBppConfig
             "ChineseLocaleMode",
             BppChineseLocaleMode.Mainland,
             "Chinese locale variant for BazaarPlusPlus UI when the game language is Chinese. Cycles between Mainland, Taiwan, and HongKong."
+        );
+        LegendaryPositionDisplayModeConfig = config.Bind(
+            "LegendaryPositionDisplay",
+            "Mode",
+            LegendaryPositionDisplayMode.Default,
+            "How BazaarPlusPlus should rewrite native Legendary leaderboard position labels. Default keeps the original value, Blank clears it, Fixed999999 forces 999999, and PositionWithRating shows '#position | rating'."
         );
     }
 }
