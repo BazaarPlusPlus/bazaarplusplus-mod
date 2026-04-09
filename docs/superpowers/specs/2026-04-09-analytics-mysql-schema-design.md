@@ -107,7 +107,7 @@
 
 - `run_id` `VARCHAR(64)` `PRIMARY KEY`
 - `installation_id` `VARCHAR(64)` `NULL`
-- `player_account_id` `VARCHAR(64)` `NOT NULL`
+- `player_account_id` `VARCHAR(64)` `NULL`
 - `plugin_version` `VARCHAR(32)` `NULL`
 - `game_version` `VARCHAR(32)` `NULL`
 - `submitted_at_utc` `DATETIME(6)` `NULL`
@@ -138,6 +138,7 @@
 
 - 保留 `hero_name` 是可接受的，因为 run 摘要级读取经常直接展示该字段，且行数远小于明细表
 - `installation_id` 来自兼容层；旧数据没有时允许为 `NULL`
+- `player_account_id` 应优先直接从 run summary 读取；如果旧 run 缺失该字段但存在关联 battle，则允许兼容层从 battle 侧做 best-effort 回填；仍无法可靠确定时保留 `NULL`
 
 ### `battles`
 
@@ -299,12 +300,13 @@
 
 字段语义：
 
-- `temperature_state` 取值固定为 `normal` / `high` / `low`
+- `temperature_state` 取值固定为 `high` / `low`
 
 说明：
 
 - 这是槽位环境状态，不是卡牌字段
 - 单独建表是为了避免把战场状态耦合进 `battle_cards`
+- 缺失记录表示该槽位按默认 `normal` 处理
 
 ## Why Not JSON-only Loadouts
 
@@ -400,6 +402,7 @@
 - `temperature_state`
 
 如果该 battle 或该 side 不存在温度语义，则不写 `battle_slot_temperatures`。
+缺失记录按 `normal` 解释，而不是落一行 `normal`。
 
 ## Nullability Policy
 
