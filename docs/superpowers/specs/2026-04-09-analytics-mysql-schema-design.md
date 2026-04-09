@@ -104,12 +104,19 @@
 - `card_templates`
 - `skill_templates`
 
+同步控制表：
+
+- `sync_checkpoints`
+- `sync_run_tasks`
+
 整体边界：
 
 - `runs` / `battles` 存局级事实
 - `battle_cards` / `battle_skills` 存最小可复原构筑
 - `battle_slot_temperatures` 存厨师槽位环境
 - `card_templates` / `skill_templates` 负责模板去重
+- `sync_checkpoints` 负责增量发现游标
+- `sync_run_tasks` 负责 run 级任务调度、重试和排障
 
 ## Table Definitions
 
@@ -455,6 +462,62 @@
 - 行级幂等键必须一致
 - SQLite provider 允许在类型上做最小映射，例如 `DATETIME(6)` -> `TEXT`
 
+## Sync Control Tables
+
+### `sync_checkpoints`
+
+记录每类上游源已经扫描到的增量游标。
+
+字段：
+
+- `source_name` `VARCHAR(64)` `PRIMARY KEY`
+- `cursor_updated_at` `DATETIME(6)` `NOT NULL`
+- `cursor_entity_id` `VARCHAR(64)` `NOT NULL`
+- `updated_at` `DATETIME(6)` `NOT NULL`
+
+建议 source：
+
+- `runs_d1`
+- `battles_d1`
+
+说明：
+
+- 不只用时间戳做游标，而是使用 `(cursor_updated_at, cursor_entity_id)` 二元组
+- 这样可以避免同一时间戳下的数据遗漏
+
+### `sync_run_tasks`
+
+记录以 `run` 为主体的同步任务。
+
+字段：
+
+- `id` `BIGINT UNSIGNED` `PRIMARY KEY AUTO_INCREMENT`
+- `task_type` `VARCHAR(32)` `NOT NULL`
+- `run_id` `VARCHAR(64)` `NOT NULL`
+- `status` `VARCHAR(32)` `NOT NULL`
+- `attempt_count` `INT` `NOT NULL`
+- `next_run_at` `DATETIME(6)` `NOT NULL`
+- `last_error` `TEXT` `NULL`
+- `created_at` `DATETIME(6)` `NOT NULL`
+- `updated_at` `DATETIME(6)` `NOT NULL`
+
+约束与索引：
+
+- `UNIQUE KEY (task_type, run_id)`
+- `(status, next_run_at)`
+- `(run_id)`
+
+字段语义：
+
+- `task_type` 第一版固定为 `sync_run`
+- `status` 取值固定为 `pending` / `running` / `succeeded` / `failed` / `skipped`
+
+说明：
+
+- `sync_checkpoints` 只回答“发现到哪里了”
+- `sync_run_tasks` 只回答“这些 run 处理到哪一步了”
+- 两者职责不应混用
+
 ## Write Strategy
 
 建议按 battle / run 幂等 upsert：
@@ -465,6 +528,8 @@
 - `battle_skills` 以 `(battle_id, side, slot_index)` 为幂等键
 - `battle_slot_temperatures` 以 `(battle_id, side, slot_index)` 为幂等键
 - `card_templates` / `skill_templates` 以 `template_id` 为幂等键
+- `sync_checkpoints` 以 `source_name` 为幂等键
+- `sync_run_tasks` 以 `(task_type, run_id)` 为幂等键
 
 对于单个 battle 的明细重建，允许采用：
 
@@ -473,6 +538,14 @@
 3. 插入该 battle 当前清洗出的完整明细
 
 这样简单且稳定，避免局部 diff 带来的复杂性。
+
+同步调度建议：
+
+1. D1 增量扫描只负责发现 changed runs / battles
+2. 将受影响的 `run_id` 放入 `sync_run_tasks`
+3. worker 从 `sync_run_tasks` 认领到期任务
+4. 成功后标记 `succeeded`
+5. 失败后增加 `attempt_count`，写回 `last_error` 和新的 `next_run_at`
 
 ## Deferred Decisions
 
@@ -483,6 +556,7 @@
 - replay 相关表
 - 通用化的战场槽位状态模型
 - 大规模冷热分层或归档策略
+- 更复杂的优先级调度或分布式任务抢占
 
 ## Recommended Next Step
 

@@ -78,6 +78,8 @@
 - Create: `analytics_sync/src/analytics_sync/load/battle_repository.py`
 - Create: `analytics_sync/src/analytics_sync/load/checkpoint_repository.py`
   - 增量游标持久化
+- Create: `analytics_sync/src/analytics_sync/load/run_task_repository.py`
+  - run 级任务持久化
 
 ### Jobs layer
 
@@ -99,6 +101,7 @@
 - Create: `analytics_sync/tests/transform/test_project_battle.py`
 - Create: `analytics_sync/tests/load/test_mysql_schema.py`
 - Create: `analytics_sync/tests/load/test_sqlite_schema.py`
+- Create: `analytics_sync/tests/load/test_run_task_repository.py`
 - Create: `analytics_sync/tests/jobs/test_sync_job.py`
 - Create: `analytics_sync/tests/fixtures/*.json`
   - 旧 `D1` / `R2` 样本
@@ -263,17 +266,19 @@ git add analytics_sync
 git commit -m "Scaffold analytics sync uv project"
 ```
 
-## Task 2: Define dual-provider schema and checkpoint model
+## Task 2: Define dual-provider schema, checkpoint model, and run task table
 
 **Files:**
 - Create: `analytics_sync/src/analytics_sync/load/mysql_schema.py`
 - Create: `analytics_sync/src/analytics_sync/load/sqlite_schema.py`
 - Create: `analytics_sync/src/analytics_sync/load/provider.py`
 - Create: `analytics_sync/src/analytics_sync/load/checkpoint_repository.py`
+- Create: `analytics_sync/src/analytics_sync/load/run_task_repository.py`
 - Create: `analytics_sync/tests/load/test_mysql_schema.py`
 - Create: `analytics_sync/tests/load/test_sqlite_schema.py`
+- Create: `analytics_sync/tests/load/test_run_task_repository.py`
 
-- [ ] **Step 1: 先写 schema 测试，固定七张业务表和检查点表**
+- [ ] **Step 1: 先写 schema 测试，固定七张业务表、检查点表和 run 任务表**
 
 在 `analytics_sync/tests/load/test_mysql_schema.py` 先写：
 
@@ -292,6 +297,7 @@ def test_schema_contains_core_tables():
     assert "CREATE TABLE battle_skills" in ddl_blob
     assert "CREATE TABLE battle_slot_temperatures" in ddl_blob
     assert "CREATE TABLE sync_checkpoints" in ddl_blob
+    assert "CREATE TABLE sync_run_tasks" in ddl_blob
 ```
 
 在 `analytics_sync/tests/load/test_sqlite_schema.py` 再写：
@@ -333,14 +339,33 @@ Expected:
 - `battle_skills`
 - `battle_slot_temperatures`
 - `sync_checkpoints`
+- `sync_run_tasks`
 
 其中 `sync_checkpoints` 最小字段：
 
 ```sql
 CREATE TABLE sync_checkpoints (
   source_name VARCHAR(64) PRIMARY KEY,
-  cursor_value VARCHAR(255) NOT NULL,
+  cursor_updated_at DATETIME(6) NOT NULL,
+  cursor_entity_id VARCHAR(64) NOT NULL,
   updated_at DATETIME(6) NOT NULL
+)
+```
+
+以及 `sync_run_tasks`：
+
+```sql
+CREATE TABLE sync_run_tasks (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  task_type VARCHAR(32) NOT NULL,
+  run_id VARCHAR(64) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  attempt_count INT NOT NULL,
+  next_run_at DATETIME(6) NOT NULL,
+  last_error TEXT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uk_sync_run_tasks_task_type_run_id (task_type, run_id)
 )
 ```
 
@@ -754,9 +779,11 @@ git commit -m "Add analytics projection layer"
 - Create: `analytics_sync/src/analytics_sync/load/run_repository.py`
 - Create: `analytics_sync/src/analytics_sync/load/battle_repository.py`
 - Modify: `analytics_sync/src/analytics_sync/load/checkpoint_repository.py`
+- Create: `analytics_sync/src/analytics_sync/load/run_task_repository.py`
 - Create: `analytics_sync/tests/load/test_template_repository.py`
 - Create: `analytics_sync/tests/load/test_battle_repository.py`
 - Create: `analytics_sync/tests/load/test_sqlite_provider.py`
+- Create: `analytics_sync/tests/load/test_run_task_repository.py`
 
 - [ ] **Step 1: 先写 battle 明细重建策略测试**
 
@@ -803,6 +830,10 @@ Expected:
   - 插入当前完整明细
 - `checkpoint_repository.py`
   - 读写 `sync_checkpoints`
+- `run_task_repository.py`
+  - upsert `sync_run_tasks`
+  - claim due tasks
+  - mark success / failure / skipped
 
 要求：
 
@@ -817,6 +848,7 @@ Run:
 cd /Users/yxinyu/codes/bpp_codes/bazaarplusplus-mod/analytics_sync
 uv run pytest tests/load/test_battle_repository.py tests/load/test_template_repository.py -q
 uv run pytest tests/load/test_sqlite_provider.py -q
+uv run pytest tests/load/test_run_task_repository.py -q
 ```
 
 Expected:
@@ -839,6 +871,7 @@ git commit -m "Implement analytics MySQL repositories"
 - Create: `analytics_sync/src/analytics_sync/jobs/result.py`
 - Modify: `analytics_sync/src/analytics_sync/cli.py`
 - Create: `analytics_sync/tests/jobs/test_sync_job.py`
+- Create: `analytics_sync/tests/jobs/test_scheduler.py`
 
 - [ ] **Step 1: 先写单次同步流程测试**
 
@@ -871,14 +904,18 @@ Expected:
 `sync_job.py` 最小流程：
 
 1. 读取 checkpoint
-2. 分页查询 D1 runs
-3. 拉取 run summary R2 对象
-4. 读取关联 battles
-5. 拉取 battle artifact R2 对象
-6. 走兼容层补齐 V3 语义对象
-7. 走投影层生成 MySQL 行
-8. 事务写入模板、run、battle、明细
-9. 更新 checkpoint
+2. 分页查询 D1 runs / battles
+3. 计算受影响的 `run_id`
+4. upsert `sync_run_tasks`
+5. 更新 checkpoint
+6. claim 到期 `sync_run_tasks`
+7. 拉取 run summary R2 对象
+8. 读取关联 battles
+9. 拉取 battle artifact R2 对象
+10. 走兼容层补齐 V3 语义对象
+11. 走投影层生成数据库行
+12. 事务写入模板、run、battle、明细
+13. 标记任务成功或失败
 
 - [ ] **Step 4: 实现定时循环**
 
@@ -894,6 +931,7 @@ def run_forever(interval_seconds: int) -> None:
 - 每轮执行一次 `sync_job`
 - 失败时记录异常并等待下一轮
 - 不在 scheduler 中做复杂退避策略
+- 不直接以“最近一小时”作为唯一同步边界，而是依赖 checkpoint + task table
 
 - [ ] **Step 5: 更新 CLI**
 
@@ -968,6 +1006,7 @@ Expected:
 
 - `once --dry-run` 时完成：
   - D1 查询
+  - 任务表入队
   - R2 下载
   - 兼容层补齐
   - 投影层生成行模型
@@ -1025,6 +1064,7 @@ git commit -m "Add analytics dry run mode"
   - R2 下载: Task 4
   - 旧格式 -> V3 语义兼容层: Task 5
   - SQLite / MySQL 双 provider: Task 2, 7, 9
+  - checkpoint + run task 双层同步控制: Task 2, 7, 8
   - `player_account_id` 前置补齐责任边界: Task 5, 6
   - scheduler / once 模式: Task 8
   - 可验证 dry-run: Task 9
