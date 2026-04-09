@@ -2,7 +2,7 @@
 
 ## Goal
 
-在 mod 仓库根目录新增一个独立的 Python 数据清洗项目，定时从现有 Cloudflare `D1 + R2` 拉取上传数据，将旧 `ModCFServer` 数据拼接成以 `RunBundleUploadRequestV2` 语义为标准的中间事实，再清洗入用户自有的 MySQL 分析库。
+在 mod 仓库根目录新增一个独立的 Python 数据清洗项目，定时从现有 Cloudflare `D1 + R2` 拉取上传数据，将旧 `ModCFServer` 数据拼接成以 `RunBundleUploadRequestV2` 语义为标准的中间事实，再清洗入用户自有的分析库。线上正式环境使用远程 MySQL，本地测试环境使用 SQLite。
 
 本设计当前只定义分析库的目标 schema 和清洗映射边界，不定义最终统计宽表，也不开始实现具体 Python 代码。
 
@@ -15,6 +15,7 @@
 - MySQL 分析库的核心表结构
 - `run`、`battle`、`card`、`skill`、厨师温度槽位状态的保留策略
 - 模板维表与最小可复原字段的取舍
+- SQLite / MySQL 双 provider 的边界
 
 本设计不覆盖：
 
@@ -75,6 +76,19 @@
 
 厨师高温 / 低温位置不是卡牌自身属性，而是战场槽位状态；这类状态不能塞进 `battle_cards`，应单独建表。
 
+### 8. 逻辑 schema 与 provider 解耦
+
+分析库的逻辑 schema 只有一套，但底层 provider 需要支持两种实现：
+
+- 本地开发 / 测试：SQLite
+- 线上正式环境：远程 MySQL
+
+这意味着：
+
+- 表和字段语义以统一逻辑模型为准
+- provider 差异只体现在 DDL 方言、参数占位符、连接方式和少量 upsert 语法
+- 兼容层、投影层和业务 repository 接口不应直接耦合某个数据库方言
+
 ## Chosen Model
 
 核心业务表：
@@ -98,6 +112,12 @@
 - `card_templates` / `skill_templates` 负责模板去重
 
 ## Table Definitions
+
+以下定义描述的是统一逻辑 schema。SQLite 和 MySQL provider 都应实现同一组表语义；其中：
+
+- MySQL 是线上 canonical 存储
+- SQLite 是本地验证 provider
+- 某些 DDL 细节如自增主键、时间类型、upsert 语法可以按 provider 分别实现
 
 ### `runs`
 
@@ -414,6 +434,26 @@
 - 不为了“看起来完整”而做推断填充
 
 这是有意的产品边界，不是临时妥协。
+
+## Provider Strategy
+
+建议将底层数据库能力抽象为单独 provider：
+
+- `sqlite` provider:
+  - 面向本地开发和测试
+  - 使用 SQLite 文件库
+  - 用于快速验证 DDL、upsert、重建逻辑和 dry-run 后的真实写入
+- `mysql` provider:
+  - 面向线上正式运行
+  - 使用远程 MySQL
+  - 作为生产事实库
+
+统一要求：
+
+- 两种 provider 暴露相同 repository 接口
+- 两种 provider 的表字段语义必须一致
+- 行级幂等键必须一致
+- SQLite provider 允许在类型上做最小映射，例如 `DATETIME(6)` -> `TEXT`
 
 ## Write Strategy
 
