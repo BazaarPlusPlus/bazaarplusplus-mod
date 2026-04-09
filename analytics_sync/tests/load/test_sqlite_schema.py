@@ -7,3 +7,4 @@ def test_sqlite_schema_contains_runs_and_battles():
     assert "CREATE TABLE runs" in ddl_blob
     assert "CREATE TABLE battles" in ddl_blob
     assert "CREATE TABLE battle_cards" in ddl_blob
+    assert "CREATE TABLE sync_job_runs" in ddl_blob

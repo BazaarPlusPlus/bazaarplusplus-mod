@@ -35,23 +35,7 @@ class ParsedBattleComponents:
 
 
 @dataclass(frozen=True)
-class RunProjection:
-    run_id: str
-    player_account_id: str
-    status: str
-    hero_id: str | None
-    ended_at_utc: str
-
-
-@dataclass(frozen=True)
-class BattleProjection:
-    battle_id: str
-    run_id: str
-    recorded_at_utc: str
-
-
-@dataclass(frozen=True)
-class V3SemanticBundle:
-    run_projection: RunProjection
-    battle_projections: list[BattleProjection]
+class RunBundleUploadRequestV2:
+    run_projection: dict[str, object]
+    battle_projections: list[dict[str, object]]
     battle_components: dict[str, ParsedBattleComponents]

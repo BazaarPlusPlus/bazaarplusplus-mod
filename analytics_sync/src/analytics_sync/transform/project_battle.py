@@ -21,8 +21,9 @@ def project_battle_rows(
     if not isinstance(recorded_at_utc, str):
         raise ValueError("recorded_at_utc is required")
 
-    card_rows = [
-        {
+    deduped_card_rows: dict[tuple[object, object], dict[str, object]] = {}
+    for card in cards:
+        deduped_card_rows[(card["side"], card["slot_index"])] = {
             "battle_id": battle_id,
             "side": card["side"],
             "slot_index": card["slot_index"],
@@ -30,27 +31,28 @@ def project_battle_rows(
             "card_tier": card.get("card_tier"),
             "enchant_code": card.get("enchant_code"),
         }
-        for card in cards
-    ]
-    skill_rows = [
-        {
+    card_rows = list(deduped_card_rows.values())
+
+    deduped_skill_rows: dict[tuple[object, object], dict[str, object]] = {}
+    for skill in skills:
+        deduped_skill_rows[(skill["side"], skill["slot_index"])] = {
             "battle_id": battle_id,
             "side": skill["side"],
             "slot_index": skill["slot_index"],
             "template_id": skill["template_id"],
             "skill_tier": skill.get("skill_tier"),
         }
-        for skill in skills
-    ]
-    temperature_rows = [
-        {
+    skill_rows = list(deduped_skill_rows.values())
+
+    deduped_temperature_rows: dict[tuple[object, object], dict[str, object]] = {}
+    for temperature in temperatures:
+        deduped_temperature_rows[(temperature["side"], temperature["slot_index"])] = {
             "battle_id": battle_id,
             "side": temperature["side"],
             "slot_index": temperature["slot_index"],
             "temperature_state": temperature["temperature_state"],
         }
-        for temperature in temperatures
-    ]
+    temperature_rows = list(deduped_temperature_rows.values())
 
     return ProjectedBattleRows(
         battle_row={

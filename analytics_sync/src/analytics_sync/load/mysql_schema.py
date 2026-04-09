@@ -123,4 +123,28 @@ TABLE_DDLS = [
       UNIQUE KEY uk_sync_run_tasks_task_type_run_id (task_type, run_id)
     )
     """.strip(),
+    """
+    CREATE TABLE sync_job_runs (
+      id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      job_name VARCHAR(32) NOT NULL,
+      provider VARCHAR(16) NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      dry_run TINYINT(1) NOT NULL,
+      started_at DATETIME(6) NOT NULL,
+      finished_at DATETIME(6) NOT NULL,
+      duration_ms BIGINT NOT NULL,
+      runs_seen INT NOT NULL,
+      runs_written INT NOT NULL,
+      battles_seen INT NOT NULL,
+      battles_written INT NOT NULL,
+      skipped_runs INT NOT NULL,
+      pending_tasks INT NOT NULL,
+      failed_tasks INT NOT NULL,
+      checkpoint_source VARCHAR(64) NULL,
+      checkpoint_updated_at DATETIME(6) NULL,
+      checkpoint_entity_id VARCHAR(64) NULL,
+      error_message TEXT NULL,
+      created_at DATETIME(6) NOT NULL
+    )
+    """.strip(),
 ]

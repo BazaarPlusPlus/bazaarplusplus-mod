@@ -13,3 +13,4 @@ def test_schema_contains_core_tables():
     assert "CREATE TABLE battle_slot_temperatures" in ddl_blob
     assert "CREATE TABLE sync_checkpoints" in ddl_blob
     assert "CREATE TABLE sync_run_tasks" in ddl_blob
+    assert "CREATE TABLE sync_job_runs" in ddl_blob

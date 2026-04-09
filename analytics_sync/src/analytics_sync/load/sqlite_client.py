@@ -18,7 +18,7 @@ class SqliteClient:
     def initialize_schema(self) -> None:
         with self.connect() as connection:
             for ddl in TABLE_DDLS:
-                connection.execute(ddl)
+                connection.execute(ddl.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ", 1))
 
     def execute(self, sql: str, params: list[object] | None = None) -> None:
         with self.connect() as connection:

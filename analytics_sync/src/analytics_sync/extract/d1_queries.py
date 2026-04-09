@@ -26,3 +26,19 @@ def build_battles_query() -> str:
     ORDER BY updated_at_utc, battle_id
     LIMIT ?
     """.strip()
+
+
+def build_battles_for_run_ids_query(run_count: int) -> str:
+    if run_count <= 0:
+        raise ValueError("run_count must be positive")
+
+    placeholders = ",".join("?" for _ in range(run_count))
+    return f"""
+    SELECT battle_id, run_id, recorded_at_utc, day,
+           player_name, player_account_id, player_hero, player_rank, player_rating, player_level,
+           opponent_name, opponent_account_id, opponent_hero, opponent_rank, opponent_rating, opponent_level,
+           result, replay_object_key, created_at_utc, updated_at_utc
+    FROM battles
+    WHERE run_id IN ({placeholders})
+    ORDER BY run_id, recorded_at_utc, battle_id
+    """.strip()

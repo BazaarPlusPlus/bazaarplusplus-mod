@@ -18,17 +18,13 @@ analytics-sync = "analytics_sync.cli:main"
 
 [dependency-groups]
 dev = [
-    "mypy>=1.15.0",
     "pytest>=8.3.0",
     "ruff>=0.11.0",
+    "ty>=0.0.1a19",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
-[[tool.mypy.overrides]]
-module = ["boto3", "botocore", "botocore.client"]
-ignore_missing_imports = true
 
 [build-system]
 requires = ["uv_build>=0.11.2,<0.12.0"]
