@@ -12,7 +12,7 @@ function shouldDiscardBattleUpload(input: {
   day: number | null;
   playerRating: number | null;
 }): boolean {
-  if (input.playerRating != null && input.playerRating > 700) {
+  if (input.playerRating != null) {
     return false;
   }
 
