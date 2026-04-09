@@ -76,7 +76,8 @@ var screenshotPath = InvokeBuildRelativePath(
     capturedAtLocal: new DateTimeOffset(2026, 4, 7, 21, 30, 15, TimeSpan.FromHours(8))
 );
 Assert(
-    screenshotPath == Path.Combine("2026-04-07", "run-42final-213015000.png"),
+    screenshotPath
+        == Path.Combine("2026-04-07", "2026-04-07_21-30-15-000_capture_run-run-42final.png"),
     $"Unexpected screenshot path: {screenshotPath}"
 );
 
@@ -86,7 +87,8 @@ var fallbackPath = InvokeBuildRelativePath(
     capturedAtLocal: new DateTimeOffset(2026, 4, 7, 9, 5, 4, TimeSpan.FromHours(-7))
 );
 Assert(
-    fallbackPath == Path.Combine("2026-04-07", "anonymous-090504000.png"),
+    fallbackPath
+        == Path.Combine("2026-04-07", "2026-04-07_09-05-04-000_capture_run-anonymous.png"),
     $"Expected anonymous fallback path, got: {fallbackPath}"
 );
 
@@ -103,7 +105,7 @@ Assert(
     metadataPath
         == Path.Combine(
             "2026-04-07",
-            "run-42final-pvp_battle_nextday-battle-42-213015000-shot-001.png"
+            "2026-04-07_21-30-15-000_battle_run-run-42final_battle-battle-42.png"
         ),
     $"Unexpected metadata screenshot path: {metadataPath}"
 );

@@ -10,7 +10,8 @@ internal static class ScreenshotPathBuilder
     public static string BuildRelativePath(string? runId, DateTimeOffset capturedAtLocal)
     {
         var dayFolder = capturedAtLocal.ToString("yyyy-MM-dd");
-        var fileName = $"{SanitizeRunId(runId)}-{capturedAtLocal:HHmmssfff}.png";
+        var fileName =
+            $"{capturedAtLocal:yyyy-MM-dd_HH-mm-ss-fff}_capture_run-{SanitizeRunId(runId)}.png";
         return Path.Combine(dayFolder, fileName);
     }
 
@@ -27,15 +28,15 @@ internal static class ScreenshotPathBuilder
         var sanitizedBattleId = string.IsNullOrWhiteSpace(battleId) ? null : SanitizeRunId(battleId);
         var sourceToken = captureSource switch
         {
-            RunScreenshotCaptureSource.ManualF9 => "manual_f9",
-            RunScreenshotCaptureSource.SettingsDockCameraButton => "settings_dock_camera_button",
-            RunScreenshotCaptureSource.PvpBattleNextDay => "pvp_battle_nextday",
-            RunScreenshotCaptureSource.EndOfRunAuto => "end_of_run_auto",
-            _ => "unknown",
+            RunScreenshotCaptureSource.ManualF9 => "manual",
+            RunScreenshotCaptureSource.SettingsDockCameraButton => "manual",
+            RunScreenshotCaptureSource.PvpBattleNextDay => "battle",
+            RunScreenshotCaptureSource.EndOfRunAuto => "final",
+            _ => "capture",
         };
         var fileName = sanitizedBattleId == null
-            ? $"{sanitizedRunId}-{sourceToken}-{capturedAtLocal:HHmmssfff}-{SanitizeRunId(screenshotId)}.png"
-            : $"{sanitizedRunId}-{sourceToken}-{sanitizedBattleId}-{capturedAtLocal:HHmmssfff}-{SanitizeRunId(screenshotId)}.png";
+            ? $"{capturedAtLocal:yyyy-MM-dd_HH-mm-ss-fff}_{sourceToken}_run-{sanitizedRunId}.png"
+            : $"{capturedAtLocal:yyyy-MM-dd_HH-mm-ss-fff}_{sourceToken}_run-{sanitizedRunId}_battle-{sanitizedBattleId}.png";
         return Path.Combine(dayFolder, fileName);
     }
 

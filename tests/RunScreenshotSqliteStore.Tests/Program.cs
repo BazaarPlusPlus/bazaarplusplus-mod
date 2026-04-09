@@ -38,7 +38,7 @@ try
                 battleId: null,
                 captureSource: "ManualF9",
                 isPrimary: false,
-                relativePath: Path.Combine("2026-04-08", "run-001-manual_f9-213015000-shot-manual-001.png"),
+                relativePath: Path.Combine("2026-04-08", "2026-04-08_21-30-15-000_manual_run-run-001.png"),
                 localCapturedAt,
                 utcCapturedAt,
                 day: 5,
@@ -60,7 +60,7 @@ try
                 battleId: null,
                 captureSource: "EndOfRunAuto",
                 isPrimary: true,
-                relativePath: Path.Combine("2026-04-08", "run-001-end_of_run_auto-213015000-shot-primary-001.png"),
+                relativePath: Path.Combine("2026-04-08", "2026-04-08_21-30-25-000_final_run-run-001.png"),
                 localCapturedAt.AddSeconds(10),
                 utcCapturedAt.AddSeconds(10),
                 day: 10,
@@ -82,7 +82,10 @@ try
                 battleId: "battle-001",
                 captureSource: "PvpBattleNextDay",
                 isPrimary: false,
-                relativePath: Path.Combine("2026-04-08", "run-001-pvp_battle_nextday-battle-001-213015000-shot-battle-001.png"),
+                relativePath: Path.Combine(
+                    "2026-04-08",
+                    "2026-04-08_21-30-35-000_battle_run-run-001_battle-battle-001.png"
+                ),
                 localCapturedAt.AddSeconds(20),
                 utcCapturedAt.AddSeconds(20),
                 day: 4,
@@ -104,7 +107,10 @@ try
                 battleId: null,
                 captureSource: "SettingsDockCameraButton",
                 isPrimary: false,
-                relativePath: Path.Combine("2026-04-08", "run-001-settings_dock_camera_button-213015000-shot-dock-camera-001.png"),
+                relativePath: Path.Combine(
+                    "2026-04-08",
+                    "2026-04-08_21-30-55-000_manual_run-run-001.png"
+                ),
                 localCapturedAt.AddSeconds(40),
                 utcCapturedAt.AddSeconds(40),
                 day: 6,
