@@ -1,0 +1,31 @@
+[project]
+name = "analytics-sync"
+version = "0.1.0"
+description = "Sync Bazaar++ analytics data from Cloudflare into SQL providers"
+authors = [
+    { name = "Xinyu Yang", email = "8@cau.edu.cn" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.39.0",
+    "cloudflare>=4.3.1",
+    "mysql-connector-python>=9.0.0",
+    "pydantic>=2.11.0",
+]
+
+[project.scripts]
+analytics-sync = "analytics_sync.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.11.0",
+    "ty>=0.0.1a19",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"

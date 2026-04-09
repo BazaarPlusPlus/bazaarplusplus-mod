@@ -1,0 +1,468 @@
+version = 1
+revision = 3
+requires-python = ">=3.12"
+
+[[package]]
+name = "analytics-sync"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "boto3" },
+    { name = "cloudflare" },
+    { name = "mysql-connector-python" },
+    { name = "pydantic" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", specifier = ">=1.39.0" },
+    { name = "cloudflare", specifier = ">=4.3.1" },
+    { name = "mysql-connector-python", specifier = ">=9.0.0" },
+    { name = "pydantic", specifier = ">=2.11.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.3.0" },
+    { name = "ruff", specifier = ">=0.11.0" },
+    { name = "ty", specifier = ">=0.0.1a19" },
+]
+
+[[package]]
+name = "annotated-types"
+version = "0.7.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/annotated-types/annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/annotated-types/annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53" },
+]
+
+[[package]]
+name = "anyio"
+version = "4.13.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "idna" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/anyio/anyio-4.13.0.tar.gz", hash = "sha256:334b70e641fd2221c1505b3890c69882fe4a2df910cba14d97019b90b24439dc" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/anyio/anyio-4.13.0-py3-none-any.whl", hash = "sha256:08b310f9e24a9594186fd75b4f73f4a4152069e3853f1ed8bfbf58369f4ad708" },
+]
+
+[[package]]
+name = "boto3"
+version = "1.42.75"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "botocore" },
+    { name = "jmespath" },
+    { name = "s3transfer" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/boto3/boto3-1.42.75.tar.gz", hash = "sha256:3c7fd95a50c69271bd7707b7eda07dcfddb30e961a392613010f7ee81d91acb3" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/boto3/boto3-1.42.75-py3-none-any.whl", hash = "sha256:16bc657d16403ee8e11c8b6920c245629e37a36ea60352b919da566f82b4cb4c" },
+]
+
+[[package]]
+name = "botocore"
+version = "1.42.75"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "jmespath" },
+    { name = "python-dateutil" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/botocore/botocore-1.42.75.tar.gz", hash = "sha256:95c8e716b6be903ee1601531caa4f50217400aa877c18fe9a2c3047d2945d477" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/botocore/botocore-1.42.75-py3-none-any.whl", hash = "sha256:915e43b7ac8f50cf3dbc937ba713de5acb999ea48ad8fecd1589d92ad415f787" },
+]
+
+[[package]]
+name = "certifi"
+version = "2026.2.25"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/certifi/certifi-2026.2.25.tar.gz", hash = "sha256:e887ab5cee78ea814d3472169153c2d12cd43b14bd03329a39a9c6e2e80bfba7" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/certifi/certifi-2026.2.25-py3-none-any.whl", hash = "sha256:027692e4402ad994f1c42e52a4997a9763c646b73e4096e4d5d6db8af1d6f0fa" },
+]
+
+[[package]]
+name = "cloudflare"
+version = "4.3.1"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/cloudflare/cloudflare-4.3.1.tar.gz", hash = "sha256:b1e1c6beeb8d98f63bfe0a1cba874fc4e22e000bcc490544f956c689b3b5b258" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/cloudflare/cloudflare-4.3.1-py3-none-any.whl", hash = "sha256:6927135a5ee5633d6e2e1952ca0484745e933727aeeb189996d2ad9d292071c6" },
+]
+
+[[package]]
+name = "colorama"
+version = "0.4.6"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/colorama/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/colorama/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6" },
+]
+
+[[package]]
+name = "distro"
+version = "1.9.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/distro/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/distro/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2" },
+]
+
+[[package]]
+name = "h11"
+version = "0.16.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/h11/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/h11/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86" },
+]
+
+[[package]]
+name = "httpcore"
+version = "1.0.9"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "certifi" },
+    { name = "h11" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/httpcore/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/httpcore/httpcore-1.0.9-py3-none-any.whl", hash = "sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55" },
+]
+
+[[package]]
+name = "httpx"
+version = "0.28.1"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "anyio" },
+    { name = "certifi" },
+    { name = "httpcore" },
+    { name = "idna" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/httpx/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/httpx/httpx-0.28.1-py3-none-any.whl", hash = "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad" },
+]
+
+[[package]]
+name = "idna"
+version = "3.11"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/idna/idna-3.11.tar.gz", hash = "sha256:795dafcc9c04ed0c1fb032c2aa73654d8e8c5023a7df64a53f39190ada629902" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/idna/idna-3.11-py3-none-any.whl", hash = "sha256:771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea" },
+]
+
+[[package]]
+name = "iniconfig"
+version = "2.3.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/iniconfig/iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/iniconfig/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12" },
+]
+
+[[package]]
+name = "jmespath"
+version = "1.1.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/jmespath/jmespath-1.1.0.tar.gz", hash = "sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/jmespath/jmespath-1.1.0-py3-none-any.whl", hash = "sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64" },
+]
+
+[[package]]
+name = "mysql-connector-python"
+version = "9.6.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0.tar.gz", hash = "sha256:c453bb55347174d87504b534246fb10c589daf5d057515bf615627198a3c7ef1" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:9664e217c72dd6fb700f4c8512af90261f72d2f5d7c00c4e13e4c1e09bfa3d5e" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp312-cp312-macosx_14_0_x86_64.whl", hash = "sha256:1ed4b5c4761e5333035293e746683890e4ef2e818e515d14023fd80293bc31fa" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:5095758dcb89a6bce2379f349da336c268c407129002b595c5dba82ce387e2a5" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:4ae4e7780fad950a4f267dea5851048d160f5b71314a342cdbf30b154f1c74f7" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp312-cp312-win_amd64.whl", hash = "sha256:c180e0b4100d7402e03993bfac5c97d18e01d7ca9d198d742fffc245077f8ffe" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:e86e45a7b540ca09af8a18ecfa761e0cdeccfdb62818331614ec030ae44bfd26" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp313-cp313-macosx_14_0_x86_64.whl", hash = "sha256:8d3e9252384e1b7f95b07020664f2673d9c29c5e95eeda2e048b3331e190b9d4" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:0fa18ead33cb699ea92005695077cef09aa494eebf51164ee30c891c3eaea90c" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:a26490cb029bf7b18a1d2093101105b3526a1036b51ad01553d30138f5beb8d2" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp313-cp313-win_amd64.whl", hash = "sha256:3460ed976e1b88b7284335d9397a3c519dff56d71580ca1f76ff1c0c7714c813" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:e2cc13cd3dcdb845d636e52c4e7a9509b63da09bec6ce1b3696be53a79847e2d" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp314-cp314-macosx_14_0_x86_64.whl", hash = "sha256:a08c2149d4b52a010c4353f18c84716d18114a4ecd00b466ea34138de2c640f2" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:b00228b985edd208b20f45c5e684c54e08e31e01bc1d8c3c18a36641c3be5bf7" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:4617ef5216da7ca32dd46afda61a1552807762434127413bba46fbe4379f59d4" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-cp314-cp314-win_amd64.whl", hash = "sha256:bc782f64ca00b6b933d4c6a35568f1349d115cc4434c849b5b9edc015bee3e62" },
+    { url = "https://bytedpypi.byted.org/packages/mysql-connector-python/mysql_connector_python-9.6.0-py2.py3-none-any.whl", hash = "sha256:44b0fb57207ebc6ae05b5b21b7968a9ed33b29187fe87b38951bad2a334d75d5" },
+]
+
+[[package]]
+name = "packaging"
+version = "26.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/packaging/packaging-26.0.tar.gz", hash = "sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/packaging/packaging-26.0-py3-none-any.whl", hash = "sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529" },
+]
+
+[[package]]
+name = "pluggy"
+version = "1.6.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/pluggy/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/pluggy/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746" },
+]
+
+[[package]]
+name = "pydantic"
+version = "2.12.5"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "annotated-types" },
+    { name = "pydantic-core" },
+    { name = "typing-extensions" },
+    { name = "typing-inspection" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/pydantic/pydantic-2.12.5.tar.gz", hash = "sha256:4d351024c75c0f085a9febbb665ce8c0c6ec5d30e903bdb6394b7ede26aebb49" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/pydantic/pydantic-2.12.5-py3-none-any.whl", hash = "sha256:e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d" },
+]
+
+[[package]]
+name = "pydantic-core"
+version = "2.41.5"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5.tar.gz", hash = "sha256:08daa51ea16ad373ffd5e7606252cc32f07bc72b28284b6bc9c6df804816476e" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:f41a7489d32336dbf2199c8c0a215390a751c5b014c2c1c5366e817202e9cdf7" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:070259a8818988b9a84a449a2a7337c7f430a22acc0859c6b110aa7212a6d9c0" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e96cea19e34778f8d59fe40775a7a574d95816eb150850a85a7a4c8f4b94ac69" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:ed2e99c456e3fadd05c991f8f437ef902e00eedf34320ba2b0842bd1c3ca3a75" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:65840751b72fbfd82c3c640cff9284545342a4f1eb1586ad0636955b261b0b05" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:e536c98a7626a98feb2d3eaf75944ef6f3dbee447e1f841eae16f2f0a72d8ddc" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:eceb81a8d74f9267ef4081e246ffd6d129da5d87e37a77c9bde550cb04870c1c" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:d38548150c39b74aeeb0ce8ee1d8e82696f4a4e16ddc6de7b1d8823f7de4b9b5" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:c23e27686783f60290e36827f9c626e63154b82b116d7fe9adba1fda36da706c" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-musllinux_1_1_armv7l.whl", hash = "sha256:482c982f814460eabe1d3bb0adfdc583387bd4691ef00b90575ca0d2b6fe2294" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:bfea2a5f0b4d8d43adf9d7b8bf019fb46fdd10a2e5cde477fbcb9d1fa08c68e1" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-win32.whl", hash = "sha256:b74557b16e390ec12dca509bce9264c3bbd128f8a2c376eaa68003d7f327276d" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-win_amd64.whl", hash = "sha256:1962293292865bca8e54702b08a4f26da73adc83dd1fcf26fbc875b35d81c815" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp312-cp312-win_arm64.whl", hash = "sha256:1746d4a3d9a794cacae06a5eaaccb4b8643a131d45fbc9af23e353dc0a5ba5c3" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:941103c9be18ac8daf7b7adca8228f8ed6bb7a1849020f643b3a14d15b1924d9" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:112e305c3314f40c93998e567879e887a3160bb8689ef3d2c04b6cc62c33ac34" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0cbaad15cb0c90aa221d43c00e77bb33c93e8d36e0bf74760cd00e732d10a6a0" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:03ca43e12fab6023fc79d28ca6b39b05f794ad08ec2feccc59a339b02f2b3d33" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:dc799088c08fa04e43144b164feb0c13f9a0bc40503f8df3e9fde58a3c0c101e" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:97aeba56665b4c3235a0e52b2c2f5ae9cd071b8a8310ad27bddb3f7fb30e9aa2" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:406bf18d345822d6c21366031003612b9c77b3e29ffdb0f612367352aab7d586" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:b93590ae81f7010dbe380cdeab6f515902ebcbefe0b9327cc4804d74e93ae69d" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-musllinux_1_1_aarch64.whl", hash = "sha256:01a3d0ab748ee531f4ea6c3e48ad9dac84ddba4b0d82291f87248f2f9de8d740" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-musllinux_1_1_armv7l.whl", hash = "sha256:6561e94ba9dacc9c61bce40e2d6bdc3bfaa0259d3ff36ace3b1e6901936d2e3e" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:915c3d10f81bec3a74fbd4faebe8391013ba61e5a1a8d48c4455b923bdda7858" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-win32.whl", hash = "sha256:650ae77860b45cfa6e2cdafc42618ceafab3a2d9a3811fcfbd3bbf8ac3c40d36" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-win_amd64.whl", hash = "sha256:79ec52ec461e99e13791ec6508c722742ad745571f234ea6255bed38c6480f11" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp313-cp313-win_arm64.whl", hash = "sha256:3f84d5c1b4ab906093bdc1ff10484838aca54ef08de4afa9de0f5f14d69639cd" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:3f37a19d7ebcdd20b96485056ba9e8b304e27d9904d233d7b1015db320e51f0a" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:1d1d9764366c73f996edd17abb6d9d7649a7eb690006ab6adbda117717099b14" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:25e1c2af0fce638d5f1988b686f3b3ea8cd7de5f244ca147c777769e798a9cd1" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:506d766a8727beef16b7adaeb8ee6217c64fc813646b424d0804d67c16eddb66" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:4819fa52133c9aa3c387b3328f25c1facc356491e6135b459f1de698ff64d869" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:2b761d210c9ea91feda40d25b4efe82a1707da2ef62901466a42492c028553a2" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:22f0fb8c1c583a3b6f24df2470833b40207e907b90c928cc8d3594b76f874375" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:2782c870e99878c634505236d81e5443092fba820f0373997ff75f90f68cd553" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-musllinux_1_1_aarch64.whl", hash = "sha256:0177272f88ab8312479336e1d777f6b124537d47f2123f89cb37e0accea97f90" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-musllinux_1_1_armv7l.whl", hash = "sha256:63510af5e38f8955b8ee5687740d6ebf7c2a0886d15a6d65c32814613681bc07" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-musllinux_1_1_x86_64.whl", hash = "sha256:e56ba91f47764cc14f1daacd723e3e82d1a89d783f0f5afe9c364b8bb491ccdb" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-win32.whl", hash = "sha256:aec5cf2fd867b4ff45b9959f8b20ea3993fc93e63c7363fe6851424c8a7e7c23" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-win_amd64.whl", hash = "sha256:8e7c86f27c585ef37c35e56a96363ab8de4e549a95512445b85c96d3e2f7c1bf" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314-win_arm64.whl", hash = "sha256:e672ba74fbc2dc8eea59fb6d4aed6845e6905fc2a8afe93175d94a83ba2a01a0" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-macosx_10_12_x86_64.whl", hash = "sha256:8566def80554c3faa0e65ac30ab0932b9e3a5cd7f8323764303d468e5c37595a" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:b80aa5095cd3109962a298ce14110ae16b8c1aece8b72f9dafe81cf597ad80b3" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3006c3dd9ba34b0c094c544c6006cc79e87d8612999f1a5d43b769b89181f23c" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:72f6c8b11857a856bcfa48c86f5368439f74453563f951e473514579d44aa612" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:5cb1b2f9742240e4bb26b652a5aeb840aa4b417c7748b6f8387927bc6e45e40d" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:bd3d54f38609ff308209bd43acea66061494157703364ae40c951f83ba99a1a9" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2ff4321e56e879ee8d2a879501c8e469414d948f4aba74a2d4593184eb326660" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:d0d2568a8c11bf8225044aa94409e21da0cb09dcdafe9ecd10250b2baad531a9" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-musllinux_1_1_aarch64.whl", hash = "sha256:a39455728aabd58ceabb03c90e12f71fd30fa69615760a075b9fec596456ccc3" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-musllinux_1_1_armv7l.whl", hash = "sha256:239edca560d05757817c13dc17c50766136d21f7cd0fac50295499ae24f90fdf" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-musllinux_1_1_x86_64.whl", hash = "sha256:2a5e06546e19f24c6a96a129142a75cee553cc018ffee48a460059b1185f4470" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-win32.whl", hash = "sha256:b4ececa40ac28afa90871c2cc2b9ffd2ff0bf749380fbdf57d165fd23da353aa" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-win_amd64.whl", hash = "sha256:80aa89cad80b32a912a65332f64a4450ed00966111b6615ca6816153d3585a8c" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-cp314-cp314t-win_arm64.whl", hash = "sha256:35b44f37a3199f771c3eaa53051bc8a70cd7b54f333531c59e29fd4db5d15008" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-graalpy312-graalpy250_312_native-macosx_10_12_x86_64.whl", hash = "sha256:7da7087d756b19037bc2c06edc6c170eeef3c3bafcb8f532ff17d64dc427adfd" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-graalpy312-graalpy250_312_native-macosx_11_0_arm64.whl", hash = "sha256:aabf5777b5c8ca26f7824cb4a120a740c9588ed58df9b2d196ce92fba42ff8dc" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-graalpy312-graalpy250_312_native-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c007fe8a43d43b3969e8469004e9845944f1a80e6acd47c150856bb87f230c56" },
+    { url = "https://bytedpypi.byted.org/packages/pydantic-core/pydantic_core-2.41.5-graalpy312-graalpy250_312_native-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:76d0819de158cd855d1cbb8fcafdf6f5cf1eb8e470abe056d5d161106e38062b" },
+]
+
+[[package]]
+name = "pygments"
+version = "2.19.2"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/pygments/pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/pygments/pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b" },
+]
+
+[[package]]
+name = "pytest"
+version = "9.0.2"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "iniconfig" },
+    { name = "packaging" },
+    { name = "pluggy" },
+    { name = "pygments" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/pytest/pytest-9.0.2.tar.gz", hash = "sha256:75186651a92bd89611d1d9fc20f0b4345fd827c41ccd5c299a868a05d70edf11" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/pytest/pytest-9.0.2-py3-none-any.whl", hash = "sha256:711ffd45bf766d5264d487b917733b453d917afd2b0ad65223959f59089f875b" },
+]
+
+[[package]]
+name = "python-dateutil"
+version = "2.9.0.post0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/python-dateutil/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/python-dateutil/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427" },
+]
+
+[[package]]
+name = "ruff"
+version = "0.15.7"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7.tar.gz", hash = "sha256:04f1ae61fc20fe0b148617c324d9d009b5f63412c0b16474f3d5f1a1a665f7ac" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-linux_armv6l.whl", hash = "sha256:a81cc5b6910fb7dfc7c32d20652e50fa05963f6e13ead3c5915c41ac5d16668e" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:722d165bd52403f3bdabc0ce9e41fc47070ac56d7a91b4e0d097b516a53a3477" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-macosx_11_0_arm64.whl", hash = "sha256:7fbc2448094262552146cbe1b9643a92f66559d3761f1ad0656d4991491af49e" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6b39329b60eba44156d138275323cc726bbfbddcec3063da57caa8a8b1d50adf" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:87768c151808505f2bfc93ae44e5f9e7c8518943e5074f76ac21558ef5627c85" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:fb0511670002c6c529ec66c0e30641c976c8963de26a113f3a30456b702468b0" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:e0d19644f801849229db8345180a71bee5407b429dd217f853ec515e968a6912" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:4806d8e09ef5e84eb19ba833d0442f7e300b23fe3f0981cae159a248a10f0036" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dce0896488562f09a27b9c91b1f58a097457143931f3c4d519690dea54e624c5" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-manylinux_2_31_riscv64.whl", hash = "sha256:1852ce241d2bc89e5dc823e03cff4ce73d816b5c6cdadd27dbfe7b03217d2a12" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:5f3e4b221fb4bd293f79912fc5e93a9063ebd6d0dcbd528f91b89172a9b8436c" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-musllinux_1_2_armv7l.whl", hash = "sha256:b15e48602c9c1d9bdc504b472e90b90c97dc7d46c7028011ae67f3861ceba7b4" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-musllinux_1_2_i686.whl", hash = "sha256:1b4705e0e85cedc74b0a23cf6a179dbb3df184cb227761979cc76c0440b5ab0d" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:112c1fa316a558bb34319282c1200a8bf0495f1b735aeb78bfcb2991e6087580" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-win32.whl", hash = "sha256:6d39e2d3505b082323352f733599f28169d12e891f7dd407f2d4f54b4c2886de" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-win_amd64.whl", hash = "sha256:4d53d712ddebcd7dace1bc395367aec12c057aacfe9adbb6d832302575f4d3a1" },
+    { url = "https://bytedpypi.byted.org/packages/ruff/ruff-0.15.7-py3-none-win_arm64.whl", hash = "sha256:18e8d73f1c3fdf27931497972250340f92e8c861722161a9caeb89a58ead6ed2" },
+]
+
+[[package]]
+name = "s3transfer"
+version = "0.16.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "botocore" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/s3transfer/s3transfer-0.16.0.tar.gz", hash = "sha256:8e990f13268025792229cd52fa10cb7163744bf56e719e0b9cb925ab79abf920" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/s3transfer/s3transfer-0.16.0-py3-none-any.whl", hash = "sha256:18e25d66fed509e3868dc1572b3f427ff947dd2c56f844a5bf09481ad3f3b2fe" },
+]
+
+[[package]]
+name = "six"
+version = "1.17.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/six/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/six/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274" },
+]
+
+[[package]]
+name = "sniffio"
+version = "1.3.1"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/sniffio/sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/sniffio/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2" },
+]
+
+[[package]]
+name = "ty"
+version = "0.0.25"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25.tar.gz", hash = "sha256:8ae3891be17dfb6acab51a2df3a8f8f6c551eb60ea674c10946dc92aae8d4401" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-linux_armv6l.whl", hash = "sha256:26d6d5aede5d54fb055779460f896d9c1473c6fb996716bd11cb90f027d8fee7" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:aedcfbc7b6b96dbc55b0da78fa02bd049373ff3d8a827f613dadd8bd17d10758" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-macosx_11_0_arm64.whl", hash = "sha256:0a8fb3c1e28f73618941811e2568dca195178a1a6314651d4ee97086a4497253" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:814870b7f347b5d0276304cddb98a0958f08de183bf159abc920ebe321247ad4" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:781150e23825dc110cd5e1f50ca3d61664f7a5db5b4a55d5dbf7d3b1e246b917" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:ffc81ff2a0143911321251dc81d1c259fa5cdc56d043019a733c845d55409e2a" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:f03c5c5b5c10355ea030cbe3cd93b2e759b9492c66688288ea03a68086069f2e" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:7fc1ef49cd6262eb9223ccf6e258ac899aaa53e7dc2151ba65a2c9fa248dfa75" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7ad98da1393161096235a387cc36abecd31861060c68416761eccdb7c1bc326b" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:2d4336aa5381eb4eab107c3dec75fe22943a648ef6646f5a8431ef1c8cdabb66" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-musllinux_1_2_armv7l.whl", hash = "sha256:e10ed39564227de2b7bd89398250b65daaedbef15a25cef8eee70078f5d9e0b2" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-musllinux_1_2_i686.whl", hash = "sha256:aca04e9ed9b61c706064a1c0b71a247c3f92f373d0222103f3bc54b649421796" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:18a5443e4ef339c1bd8c57fc13112c22080617ea582bfc22b497d82d65361325" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-win32.whl", hash = "sha256:a685b9a611b69195b5a557e05dbb7ebcd12815f6c32fb27fdf15edeb1fa33d8f" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-win_amd64.whl", hash = "sha256:0d4d37a1f1ab7f2669c941c38c65144ff223eb51ececd7ccfc0d623afbc0f729" },
+    { url = "https://bytedpypi.byted.org/packages/ty/ty-0.0.25-py3-none-win_arm64.whl", hash = "sha256:d80b8cd965cbacbfd887ac2d985f5b6da09b7aa3569371e2894e0b30b26b89cd" },
+]
+
+[[package]]
+name = "typing-extensions"
+version = "4.15.0"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/typing-extensions/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/typing-extensions/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548" },
+]
+
+[[package]]
+name = "typing-inspection"
+version = "0.4.2"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://bytedpypi.byted.org/packages/typing-inspection/typing_inspection-0.4.2.tar.gz", hash = "sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/typing-inspection/typing_inspection-0.4.2-py3-none-any.whl", hash = "sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7" },
+]
+
+[[package]]
+name = "urllib3"
+version = "2.6.3"
+source = { registry = "https://bytedpypi.byted.org/simple/" }
+sdist = { url = "https://bytedpypi.byted.org/packages/urllib3/urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed" }
+wheels = [
+    { url = "https://bytedpypi.byted.org/packages/urllib3/urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4" },
+]
