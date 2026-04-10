@@ -1,11 +1,14 @@
 #nullable enable
+using System;
+using Microsoft.Data.Sqlite;
+
 namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int LocalDatabaseSchemaVersion => 8;
+    public static int LocalDatabaseSchemaVersion => 9;
 
-    public static int RowSchemaVersion => 8;
+    public static int RowSchemaVersion => 9;
 
     public static int UploadPayloadSchemaVersion => 1;
 
@@ -147,6 +150,7 @@ public static class RunLogSqliteSchema
                 day INTEGER NULL,
                 player_rank TEXT NULL,
                 player_rating INTEGER NULL,
+                player_position INTEGER NULL,
                 victories_at_capture INTEGER NULL
             );
 
@@ -203,4 +207,58 @@ public static class RunLogSqliteSchema
                 ON {RunScreenshotsTableName}(run_id)
                 WHERE is_primary = 1 AND run_id IS NOT NULL;
             """;
+
+    public static void EnsureInitialized(SqliteConnection connection)
+    {
+        if (connection == null)
+            throw new ArgumentNullException(nameof(connection));
+
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = BootstrapSql;
+            command.ExecuteNonQuery();
+        }
+
+        EnsureColumnExists(connection, RunScreenshotsTableName, "player_position", "INTEGER NULL");
+    }
+
+    private static void EnsureColumnExists(
+        SqliteConnection connection,
+        string tableName,
+        string columnName,
+        string columnDefinition
+    )
+    {
+        using (var exists = connection.CreateCommand())
+        {
+            exists.CommandText =
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $tableName LIMIT 1;";
+            exists.Parameters.AddWithValue("$tableName", tableName);
+            if (exists.ExecuteScalar() == null)
+                return;
+        }
+
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = $"PRAGMA table_info({tableName});";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (
+                    string.Equals(
+                        reader.GetString(reader.GetOrdinal("name")),
+                        columnName,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    return;
+                }
+            }
+        }
+
+        using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+        alter.ExecuteNonQuery();
+    }
 }

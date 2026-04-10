@@ -39,9 +39,7 @@ internal sealed class PvpBattleSqliteStore
 
         using var connection = OpenConnection();
         EnableWriteAheadLogging(connection);
-        using var command = CreateCommand(connection);
-        command.CommandText = RunLogSqliteSchema.BootstrapSql;
-        command.ExecuteNonQuery();
+        RunLogSqliteSchema.EnsureInitialized(connection);
     }
 
     public void Save(PvpBattleManifest manifest)

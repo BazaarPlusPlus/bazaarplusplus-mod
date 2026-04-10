@@ -129,6 +129,8 @@ PVP battle 的截图不是“任意继续都截”，而是：
   - 截图当时读取到的 rank
 - `player_rating`
   - 截图当时读取到的 rating
+- `player_position`
+  - 截图当时读取到的 leaderboard position
 - `victories_at_capture`
   - 截图当时的胜场数
 
@@ -161,7 +163,7 @@ PVP battle 的截图不是“任意继续都截”，而是：
 
 这样做的原因是 battle persistence 本身是异步的，截图入口不能依赖 “battle row 已经先写进 SQLite”。
 
-### Rank / Rating / Day / Wins
+### Rank / Rating / Position / Day / Wins
 
 截图元数据读取时机统一是“截图排队当下”。
 
@@ -169,10 +171,17 @@ PVP battle 的截图不是“任意继续都截”，而是：
 
 - `player_rank` / `player_rating`
   - `RunLoggingGameDataReader.TryGetPlayerRankSnapshot(...)`
+- `player_position`
+  - `BppClientCacheBridge.TryGetPlayerLeaderboardPosition(...)`
 - `day`
   - `Data.Run.Day`
 - `victories_at_capture`
   - `Data.Run.Victories`
+
+补充：
+
+- 对已有本地库，`run_screenshots.player_position` 会在 schema 初始化时自动补列
+- 不要求用户删除旧的 `bazaarplusplus.db`
 
 ## Capture Flow
 

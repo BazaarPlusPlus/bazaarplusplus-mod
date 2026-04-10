@@ -6,7 +6,7 @@ var schemaType = RequireType(
 );
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 8,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 9,
     "Local database schema version mismatch."
 );
 Assert(
@@ -42,7 +42,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 8;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 9;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
@@ -114,6 +114,7 @@ Assert(
         && bootstrapSql.Contains("captured_at_local", StringComparison.Ordinal)
         && bootstrapSql.Contains("captured_at_utc", StringComparison.Ordinal)
         && bootstrapSql.Contains("battle_id TEXT NULL", StringComparison.Ordinal)
+        && bootstrapSql.Contains("player_position INTEGER NULL", StringComparison.Ordinal)
         && bootstrapSql.Contains("is_primary INTEGER NOT NULL DEFAULT 0", StringComparison.Ordinal),
     "Bootstrap SQL should define screenshot metadata columns."
 );

@@ -353,10 +353,7 @@ internal sealed class RunBundleUploadStore
     private void EnsureSchema()
     {
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
-        command.CommandText = RunLogSqliteSchema.BootstrapSql;
-        command.ExecuteNonQuery();
+        RunLogSqliteSchema.EnsureInitialized(connection);
     }
 
     private SqliteConnection OpenConnection()

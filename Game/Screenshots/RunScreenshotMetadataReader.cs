@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.RunLogging;
 using TheBazaar;
 
@@ -12,6 +13,7 @@ internal static class RunScreenshotMetadataReader
     )
     {
         RunLoggingGameDataReader.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
+        BppClientCacheBridge.TryGetPlayerLeaderboardPosition(out var playerPosition);
 
         return new RunScreenshotRecord
         {
@@ -26,6 +28,7 @@ internal static class RunScreenshotMetadataReader
             Day = Data.Run == null ? null : (int?)Data.Run.Day,
             PlayerRank = playerRank,
             PlayerRating = playerRating,
+            PlayerPosition = playerPosition,
             VictoriesAtCapture = Data.Run == null ? null : unchecked((int)Data.Run.Victories),
         };
     }

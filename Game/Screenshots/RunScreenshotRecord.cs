@@ -27,5 +27,7 @@ internal sealed class RunScreenshotRecord
 
     public int? PlayerRating { get; set; }
 
+    public int? PlayerPosition { get; set; }
+
     public int? VictoriesAtCapture { get; set; }
 }

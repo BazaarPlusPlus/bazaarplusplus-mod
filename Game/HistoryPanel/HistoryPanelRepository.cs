@@ -736,10 +736,7 @@ internal sealed class HistoryPanelRepository
         pragma.ExecuteNonQuery();
         if (ensureSchema)
         {
-            using var bootstrap = connection.CreateCommand();
-            bootstrap.CommandTimeout = 2;
-            bootstrap.CommandText = RunLogSqliteSchema.BootstrapSql;
-            bootstrap.ExecuteNonQuery();
+            RunLogSqliteSchema.EnsureInitialized(connection);
         }
         return connection;
     }

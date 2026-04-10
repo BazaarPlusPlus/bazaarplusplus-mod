@@ -22,9 +22,7 @@ internal sealed class RunScreenshotSqliteStore
 
         using var connection = OpenConnection();
         EnableWriteAheadLogging(connection);
-        using var command = connection.CreateCommand();
-        command.CommandText = RunLogSqliteSchema.BootstrapSql;
-        command.ExecuteNonQuery();
+        RunLogSqliteSchema.EnsureInitialized(connection);
     }
 
     public void Save(RunScreenshotRecord record)
@@ -51,6 +49,7 @@ internal sealed class RunScreenshotSqliteStore
                 day,
                 player_rank,
                 player_rating,
+                player_position,
                 victories_at_capture
             ) VALUES (
                 $screenshotId,
@@ -64,6 +63,7 @@ internal sealed class RunScreenshotSqliteStore
                 $day,
                 $playerRank,
                 $playerRating,
+                $playerPosition,
                 $victoriesAtCapture
             );
             """;
@@ -78,6 +78,7 @@ internal sealed class RunScreenshotSqliteStore
         AddNullableInt32(command, "$day", record.Day);
         command.Parameters.AddWithValue("$playerRank", (object?)record.PlayerRank ?? DBNull.Value);
         AddNullableInt32(command, "$playerRating", record.PlayerRating);
+        AddNullableInt32(command, "$playerPosition", record.PlayerPosition);
         AddNullableInt32(command, "$victoriesAtCapture", record.VictoriesAtCapture);
         command.ExecuteNonQuery();
     }
