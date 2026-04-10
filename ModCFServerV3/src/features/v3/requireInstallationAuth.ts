@@ -12,6 +12,7 @@ type InstallationRow = {
   player_account_id: string;
   public_key: string;
   status: string;
+  last_seen_at_utc: string | null;
   revoked_at_utc: string | null;
 };
 
@@ -40,6 +41,7 @@ export async function requireInstallationAuth(
         player_account_id,
         public_key,
         status,
+        last_seen_at_utc,
         revoked_at_utc
       FROM installations
       WHERE installation_id = ?
@@ -89,6 +91,16 @@ export async function requireInstallationAuth(
   if (!verified) {
     return json({ error: "invalid_signature" }, { status: 401 });
   }
+
+  await env.DB.prepare(
+    `
+      UPDATE installations
+      SET last_seen_at_utc = ?
+      WHERE installation_id = ?
+    `,
+  )
+    .bind(new Date().toISOString(), installation.installation_id)
+    .run();
 
   return {
     installationId: installation.installation_id,

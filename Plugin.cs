@@ -6,6 +6,7 @@ using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
+using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
@@ -94,6 +95,8 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<RunLoggingController>();
         BppLog.Info("Plugin", "Adding RunUploadController");
         gameObject.AddComponent<RunUploadController>();
+        BppLog.Info("Plugin", "Adding PlayerObservationController");
+        gameObject.AddComponent<PlayerObservationController>();
         BppLog.Info("Plugin", "Adding HistoryPanel");
         var historyPanel = gameObject.AddComponent<HistoryPanel>();
         var historyPanelRuntime = new HistoryPanelRuntime(
@@ -107,6 +110,8 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<CombatStatusBar>();
         BppLog.Info("Plugin", "Adding MonsterPreviewWarmupController");
         gameObject.AddComponent<MonsterPreviewWarmupController>();
+        BppLog.Info("Plugin", "Adding CardSetPreviewRuntime");
+        gameObject.AddComponent<CardSetPreviewRuntime>();
         BppLog.Info("Plugin", "Adding MonsterPreviewItemBoardRuntime");
         gameObject.AddComponent<MonsterPreviewItemBoardRuntime>();
         BppLog.Info("Plugin", "Adding EndOfRunScreenshotController");

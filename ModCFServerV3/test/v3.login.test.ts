@@ -11,6 +11,12 @@ test("login returns installer session for matching password", async () => {
     player_account_id: "player-account-001",
     player_username: "player-one",
     password_hash: await hashPassword("hunter2"),
+    stream_platform: null,
+    stream_channel_id: null,
+    stream_url: null,
+    created_at_utc: "2026-04-10T00:00:00.000Z",
+    updated_at_utc: "2026-04-10T00:00:00.000Z",
+    last_login_at_utc: null,
   });
 
   const response = await worker.fetch(
@@ -31,6 +37,7 @@ test("login returns installer session for matching password", async () => {
   };
   assert.match(json.session_token, /^sess_/);
   assert.equal(env.DB.v3InstallationSessions.size, 1);
+  assert.ok(env.DB.v3Users.get("player-account-001")?.last_login_at_utc);
 });
 
 test("login rejects invalid password", async () => {
@@ -39,6 +46,12 @@ test("login rejects invalid password", async () => {
     player_account_id: "player-account-001",
     player_username: "player-one",
     password_hash: await hashPassword("hunter2"),
+    stream_platform: null,
+    stream_channel_id: null,
+    stream_url: null,
+    created_at_utc: "2026-04-10T00:00:00.000Z",
+    updated_at_utc: "2026-04-10T00:00:00.000Z",
+    last_login_at_utc: null,
   });
 
   const response = await worker.fetch(
@@ -56,5 +69,6 @@ test("login rejects invalid password", async () => {
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), { error: "invalid_credentials" });
   assert.equal(env.DB.v3InstallationSessions.size, 0);
+  assert.equal(env.DB.v3Users.get("player-account-001")?.last_login_at_utc, null);
 });
 

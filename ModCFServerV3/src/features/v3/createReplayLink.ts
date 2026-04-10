@@ -1,3 +1,4 @@
+import { allowUnauthenticatedReplayLinks } from "../../config/v3";
 import type { Env } from "../../env";
 import { json } from "../../http/json";
 import { requireInstallationAuth } from "./requireInstallationAuth";
@@ -7,9 +8,14 @@ export async function handleCreateReplayLink(
   env: Env,
   battleId: string,
 ): Promise<Response> {
-  const auth = await requireInstallationAuth(request, env);
-  if (auth instanceof Response) {
-    return auth;
+  let requesterPlayerAccountId: string | null = null;
+  if (!allowUnauthenticatedReplayLinks(env)) {
+    const auth = await requireInstallationAuth(request, env);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
+    requesterPlayerAccountId = auth.playerAccountId;
   }
 
   const battle = await env.DB.prepare(
@@ -29,7 +35,15 @@ export async function handleCreateReplayLink(
   if (!battle) {
     return json({ error: "battle_not_found" }, { status: 404 });
   }
-  if (battle.opponent_account_id !== auth.playerAccountId) {
+  if (
+    requesterPlayerAccountId != null &&
+    battle.opponent_account_id !== requesterPlayerAccountId
+  ) {
+    return json({ error: "battle_forbidden" }, { status: 403 });
+  }
+
+  const tokenOwnerPlayerAccountId = requesterPlayerAccountId ?? battle.opponent_account_id;
+  if (!tokenOwnerPlayerAccountId) {
     return json({ error: "battle_forbidden" }, { status: 403 });
   }
 
@@ -53,7 +67,7 @@ export async function handleCreateReplayLink(
     .bind(
       token,
       battleId,
-      auth.playerAccountId,
+      tokenOwnerPlayerAccountId,
       expiresAtUtc,
       createdAtUtc,
       null,

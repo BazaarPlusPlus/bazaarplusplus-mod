@@ -46,7 +46,7 @@ npx wrangler d1 migrations apply bazaarplusplus-mod-api-v3-db
 3. 创建 R2 bucket：
 
 ```powershell
-npx wrangler r2 bucket create bazaarplusplus-pvp-battles-v3
+npx wrangler r2 bucket create bazaarplusplus-run-bundles-v3
 ```
 
 4. 部署 Worker：
@@ -83,5 +83,5 @@ curl https://mod-api-v3.bazaarplusplus.com/health
 
 - D1 schema 由 Wrangler migration 管理，见 `ModCFServerV3/migrations/0001_initial_schema.sql`。
 - replay 对象与 token 行为由 `createReplayLink` / `downloadReplay` 路由负责。
-- 当前 V3 预期资源名为 `bazaarplusplus-mod-api-v3`、`mod-api-v3.bazaarplusplus.com`、`bazaarplusplus-mod-api-v3-db`、`bazaarplusplus-pvp-battles-v3`。
+- 当前 V3 预期资源名为 `bazaarplusplus-mod-api-v3`、`mod-api-v3.bazaarplusplus.com`、`bazaarplusplus-mod-api-v3-db`、`bazaarplusplus-run-bundles-v3`。
 - 如果生产环境已存在实际资源名，以 `ModCFServerV3/wrangler.toml` 为准。

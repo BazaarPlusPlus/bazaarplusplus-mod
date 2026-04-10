@@ -10,7 +10,7 @@ import {
 } from "./helpers/crypto";
 import { buildEnv } from "./helpers/mockEnv";
 
-test("ghost-battles honors the caller days parameter after server clamping", async () => {
+test("ghost-battles ignores caller days and uses the server lookback window", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   env.DB.v3Installations.set("inst_ghost", {
@@ -107,10 +107,7 @@ test("ghost-battles honors the caller days parameter after server clamping", asy
   const json = (await response.json()) as {
     battles: Array<{ battle_id: string }>;
   };
-  assert.deepEqual(json.battles.map((battle) => battle.battle_id), [
-    "battle-recent",
-    "battle-old",
-  ]);
+  assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-recent"]);
 });
 
 test("ghost-battles honors the caller limit parameter after server clamping", async () => {
@@ -204,7 +201,7 @@ test("ghost-battles honors the caller limit parameter after server clamping", as
 
   const timestamp = new Date().toISOString();
   const bodyHash = sha256Base64("");
-  const query = "days=14&limit=1";
+  const query = "limit=1";
   const signature = signCanonical(
     privateKey,
     canonicalRequestV3({

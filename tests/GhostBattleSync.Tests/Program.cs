@@ -70,15 +70,11 @@ Assert(
 );
 
 Assert(
-    !(bool)shouldAdvanceCheckpoint!.Invoke(null, [200, 200, 3])!,
+    !(bool)shouldAdvanceCheckpoint!.Invoke(null, [200, 200])!,
     "Ghost sync should not advance the checkpoint when the returned batch hits the limit."
 );
 Assert(
-    (bool)shouldAdvanceCheckpoint.Invoke(null, [12, 200, 14])!,
-    "Ghost sync should advance the checkpoint after a non-truncated fetch even when the requested window was clamped."
-);
-Assert(
-    (bool)shouldAdvanceCheckpoint.Invoke(null, [12, 200, 3])!,
+    (bool)shouldAdvanceCheckpoint.Invoke(null, [12, 200])!,
     "Ghost sync should advance the checkpoint after a non-truncated incremental fetch."
 );
 

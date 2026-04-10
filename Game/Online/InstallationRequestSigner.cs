@@ -116,13 +116,13 @@ internal sealed class InstallationRequestSigner
                     var parts = segment.Split('=', 2);
                     var key = Uri.UnescapeDataString(parts[0]);
                     var value = parts.Length > 1 ? Uri.UnescapeDataString(parts[1]) : string.Empty;
-                    return new KeyValuePair<string, string>(key, value);
+                    var encodedKey = Uri.EscapeDataString(key);
+                    var encodedValue = Uri.EscapeDataString(value);
+                    return new KeyValuePair<string, string>(encodedKey, encodedValue);
                 })
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .ThenBy(pair => pair.Value, StringComparer.Ordinal)
-                .Select(pair =>
-                    $"{Uri.EscapeDataString(pair.Key)}={Uri.EscapeDataString(pair.Value)}"
-                )
+                .Select(pair => $"{pair.Key}={pair.Value}")
         );
     }
 

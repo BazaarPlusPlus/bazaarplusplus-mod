@@ -141,7 +141,7 @@ test("run bundle upload stores one artifact object and projection rows", async (
   );
 
   assert.equal(response.status, 200);
-  assert.equal(env.PVP_BATTLE_BUCKET.objects.size, 1);
+  assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
   assert.equal(env.DB.v3RunBundles.size, 1);
   assert.equal(env.DB.v3Runs.size, 1);
   assert.equal(env.DB.v3Battles.size, 2);
@@ -312,7 +312,7 @@ test("run bundle upload applies configured artifact retention", async () => {
   );
 
   assert.equal(response.status, 200);
-  assert.equal(env.PVP_BATTLE_BUCKET.lastPutOptions?.customMetadata?.retention_days, "5");
+  assert.equal(env.RUN_BUNDLE_BUCKET.lastPutOptions?.customMetadata?.retention_days, "5");
 });
 
 test("run bundle upload only projects battles that pass ingest gate", async () => {
@@ -478,7 +478,7 @@ test("run bundle upload accepts duplicate payload retries idempotently", async (
   };
   assert.equal(secondJson.bundle_id, firstJson.bundle_id);
   assert.equal(secondJson.object_key, firstJson.object_key);
-  assert.equal(env.PVP_BATTLE_BUCKET.objects.size, 1);
+  assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
   assert.equal(env.DB.v3RunBundles.size, 1);
   assert.equal(env.DB.v3Runs.size, 1);
   assert.equal(env.DB.v3Battles.size, 1);

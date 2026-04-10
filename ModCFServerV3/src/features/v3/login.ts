@@ -41,19 +41,28 @@ export async function handleLogin(
   const expiresAtUtc = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   const sessionToken = `sess_${crypto.randomUUID().replace(/-/g, "")}`;
 
-  await env.DB.prepare(
-    `
-      INSERT INTO installation_sessions (
-        session_id,
-        player_account_id,
-        created_at_utc,
-        expires_at_utc,
-        revoked_at_utc
-      ) VALUES (?, ?, ?, ?, ?)
-    `,
-  )
-    .bind(sessionToken, user.player_account_id, nowUtc, expiresAtUtc, null)
-    .run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `
+        INSERT INTO installation_sessions (
+          session_id,
+          player_account_id,
+          created_at_utc,
+          expires_at_utc,
+          revoked_at_utc
+        ) VALUES (?, ?, ?, ?, ?)
+      `,
+    ).bind(sessionToken, user.player_account_id, nowUtc, expiresAtUtc, null),
+    env.DB.prepare(
+      `
+        UPDATE users
+        SET
+          last_login_at_utc = ?,
+          updated_at_utc = ?
+        WHERE player_account_id = ?
+      `,
+    ).bind(nowUtc, nowUtc, user.player_account_id),
+  ]);
 
   return json({
     session_token: sessionToken,

@@ -160,7 +160,7 @@ export async function handleUploadRunBundle(
   const payloadHash = await sha256Base64(artifactBytes);
   const objectKey =
     `run-bundles/${playerAccountId}/${installationId}/${runId}/${payloadHash}.mpack.gz`;
-  await env.PVP_BATTLE_BUCKET.put(objectKey, artifactBytes, {
+  await env.RUN_BUNDLE_BUCKET.put(objectKey, artifactBytes, {
     httpMetadata: {
       contentType: artifactCodec,
     },

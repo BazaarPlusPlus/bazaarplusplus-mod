@@ -13,6 +13,12 @@ export type V3UserRow = {
   player_account_id: string;
   player_username: string;
   password_hash: string;
+  stream_platform?: string | null;
+  stream_channel_id?: string | null;
+  stream_url?: string | null;
+  created_at_utc?: string;
+  updated_at_utc?: string;
+  last_login_at_utc?: string | null;
 };
 
 export type V3InstallationRow = {
@@ -586,8 +592,43 @@ export class MockD1Database {
         player_account_id: String(params[0] ?? ""),
         player_username: String(params[1] ?? ""),
         password_hash: String(params[2] ?? ""),
+        stream_platform: params[3] == null ? null : String(params[3]),
+        stream_channel_id: params[4] == null ? null : String(params[4]),
+        stream_url: params[5] == null ? null : String(params[5]),
+        created_at_utc: String(params[6] ?? ""),
+        updated_at_utc: String(params[7] ?? ""),
+        last_login_at_utc: params[8] == null ? null : String(params[8]),
       } satisfies V3UserRow;
       this.v3Users.set(row.player_account_id, row);
+      return { changes: 1 };
+    }
+
+    if (sql.includes("UPDATE users")) {
+      const playerAccountId = String(params[2] ?? "");
+      const existing = this.v3Users.get(playerAccountId);
+      if (!existing) {
+        return { changes: 0 };
+      }
+
+      this.v3Users.set(playerAccountId, {
+        ...existing,
+        last_login_at_utc: params[0] == null ? null : String(params[0]),
+        updated_at_utc: params[1] == null ? existing.updated_at_utc : String(params[1]),
+      });
+      return { changes: 1 };
+    }
+
+    if (sql.includes("UPDATE installations")) {
+      const installationId = String(params[1] ?? "");
+      const existing = this.v3Installations.get(installationId);
+      if (!existing) {
+        return { changes: 0 };
+      }
+
+      this.v3Installations.set(installationId, {
+        ...existing,
+        last_seen_at_utc: params[0] == null ? null : String(params[0]),
+      });
       return { changes: 1 };
     }
 
@@ -644,6 +685,20 @@ export class MockD1Database {
         revoked_at_utc: params[6] == null ? null : String(params[6]),
       } satisfies V3ReplayTokenRow;
       this.v3ReplayTokens.set(row.token, row);
+      return { changes: 1 };
+    }
+
+    if (sql.includes("UPDATE replay_tokens")) {
+      const token = String(params[1] ?? "");
+      const existing = this.v3ReplayTokens.get(token);
+      if (!existing) {
+        return { changes: 0 };
+      }
+
+      this.v3ReplayTokens.set(token, {
+        ...existing,
+        used_at_utc: params[0] == null ? null : String(params[0]),
+      });
       return { changes: 1 };
     }
 
@@ -1118,7 +1173,9 @@ export class MockR2Bucket {
 export function buildEnv() {
   return {
     DB: new MockD1Database(),
-    PVP_BATTLE_BUCKET: new MockR2Bucket(),
+    RUN_BUNDLE_BUCKET: new MockR2Bucket(),
     REPLAY_DOWNLOAD_SECRET: "test-replay-download-secret",
+    ALLOW_UNAUTHENTICATED_REPLAY_LINKS: "false",
+    ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS: "false",
   };
 }

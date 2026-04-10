@@ -38,6 +38,12 @@ test("activate rejects already-claimed player_account_id", async () => {
     player_account_id: "player-account-claimed",
     player_username: "claimed-user",
     password_hash: "existing-hash",
+    stream_platform: null,
+    stream_channel_id: null,
+    stream_url: null,
+    created_at_utc: "2026-04-10T00:00:00.000Z",
+    updated_at_utc: "2026-04-10T00:00:00.000Z",
+    last_login_at_utc: null,
   });
 
   const response = await worker.fetch(
@@ -66,6 +72,12 @@ test("activate rejects already-claimed player_username", async () => {
     player_account_id: "player-account-001",
     player_username: "claimed-user",
     password_hash: "existing-hash",
+    stream_platform: null,
+    stream_channel_id: null,
+    stream_url: null,
+    created_at_utc: "2026-04-10T00:00:00.000Z",
+    updated_at_utc: "2026-04-10T00:00:00.000Z",
+    last_login_at_utc: null,
   });
 
   const response = await worker.fetch(

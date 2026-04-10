@@ -13,9 +13,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
 internal sealed class GhostBattleSyncService : IDisposable
 {
-    private static readonly TimeSpan CheckpointLookbackPadding = TimeSpan.FromHours(24);
-    private const int InitialSyncLookbackDays = 3;
-    private const int MaxSyncLookbackDays = 14;
     private const int MaxSyncBattleLimit = 200;
 
     private readonly HistoryPanelRepository _repository;
@@ -53,11 +50,8 @@ internal sealed class GhostBattleSyncService : IDisposable
             _routes
         );
         var syncStartedAtUtc = DateTimeOffset.UtcNow;
-        var checkpointUtc = _repository.TryGetGhostSyncCheckpointUtc(localPlayerAccountId);
-        var lookbackDays = CalculateLookbackDays(checkpointUtc, syncStartedAtUtc);
         var queryResult = await apiClient.QueryAgainstMeAsync(
             installation,
-            lookbackDays,
             MaxSyncBattleLimit,
             cancellationToken
         );
@@ -68,7 +62,7 @@ internal sealed class GhostBattleSyncService : IDisposable
 
         _repository.UpsertGhostBattles(localPlayerAccountId, queryResult.Battles);
         _repository.MarkOldUndownloadedGhostBattlesDeleted(localPlayerAccountId, syncStartedAtUtc);
-        if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit, lookbackDays))
+        if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit))
             _repository.SaveGhostSyncCheckpointUtc(localPlayerAccountId, syncStartedAtUtc);
         return GhostBattleSyncResult.Success(queryResult.Battles.Count);
     }
@@ -109,6 +103,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         var payloadResult = await apiClient.DownloadReplayPayloadAsync(
             battleId,
             linkResult.DownloadUrl!,
+            installation,
             cancellationToken
         );
         if (!payloadResult.Succeeded || payloadResult.Payload?.ReplayPayload == null)
@@ -141,20 +136,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         _httpClient.Dispose();
     }
 
-    private static int CalculateLookbackDays(DateTimeOffset? checkpointUtc, DateTimeOffset nowUtc)
-    {
-        if (checkpointUtc == null)
-            return InitialSyncLookbackDays;
-
-        var fromUtc = checkpointUtc.Value - CheckpointLookbackPadding;
-        var totalDays = Math.Ceiling((nowUtc - fromUtc).TotalDays);
-        if (double.IsNaN(totalDays) || double.IsInfinity(totalDays))
-            return MaxSyncLookbackDays;
-
-        return Math.Clamp((int)Math.Max(1, totalDays), 1, MaxSyncLookbackDays);
-    }
-
-    private static bool ShouldAdvanceCheckpoint(int importedCount, int limit, int lookbackDays)
+    private static bool ShouldAdvanceCheckpoint(int importedCount, int limit)
     {
         return importedCount < limit;
     }

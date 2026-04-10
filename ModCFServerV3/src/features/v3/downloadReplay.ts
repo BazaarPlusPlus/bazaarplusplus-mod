@@ -1,10 +1,14 @@
+import { allowUnauthenticatedReplayDownloads } from "../../config/v3";
 import type { Env } from "../../env";
 import { json } from "../../http/json";
+import { requireInstallationAuth } from "./requireInstallationAuth";
 
 type ReplayTokenRow = {
   token: string;
   battle_id: string;
+  requested_by_player_account_id: string;
   expires_at_utc: string;
+  used_at_utc: string | null;
   revoked_at_utc: string | null;
 };
 
@@ -17,16 +21,28 @@ type RunBundleRow = {
 };
 
 export async function handleDownloadReplay(
-  _request: Request,
+  request: Request,
   env: Env,
   token: string,
 ): Promise<Response> {
+  let requesterPlayerAccountId: string | null = null;
+  if (!allowUnauthenticatedReplayDownloads(env)) {
+    const auth = await requireInstallationAuth(request, env);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
+    requesterPlayerAccountId = auth.playerAccountId;
+  }
+
   const replayToken = await env.DB.prepare(
     `
       SELECT
         token,
         battle_id,
+        requested_by_player_account_id,
         expires_at_utc,
+        used_at_utc,
         revoked_at_utc
       FROM replay_tokens
       WHERE token = ?
@@ -39,6 +55,12 @@ export async function handleDownloadReplay(
   }
   if (Date.parse(replayToken.expires_at_utc) < Date.now()) {
     return json({ error: "replay_token_expired" }, { status: 410 });
+  }
+  if (
+    requesterPlayerAccountId != null &&
+    replayToken.requested_by_player_account_id !== requesterPlayerAccountId
+  ) {
+    return json({ error: "replay_token_forbidden" }, { status: 403 });
   }
 
   const battle = await env.DB.prepare(
@@ -69,9 +91,21 @@ export async function handleDownloadReplay(
     return json({ error: "artifact_expired" }, { status: 410 });
   }
 
-  const object = await env.PVP_BATTLE_BUCKET.get(runBundle.object_key);
+  const object = await env.RUN_BUNDLE_BUCKET.get(runBundle.object_key);
   if (!object) {
     return json({ error: "artifact_expired" }, { status: 410 });
+  }
+
+  if (replayToken.used_at_utc == null) {
+    await env.DB.prepare(
+      `
+        UPDATE replay_tokens
+        SET used_at_utc = ?
+        WHERE token = ?
+      `,
+    )
+      .bind(new Date().toISOString(), replayToken.token)
+      .run();
   }
 
   return new Response(await object.arrayBuffer(), {

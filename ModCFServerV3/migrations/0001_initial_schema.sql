@@ -111,23 +111,5 @@ CREATE TABLE IF NOT EXISTS replay_tokens (
   revoked_at_utc TEXT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_installations_player
-  ON installations(player_account_id);
-
-CREATE INDEX IF NOT EXISTS idx_installation_sessions_player
-  ON installation_sessions(player_account_id, expires_at_utc DESC);
-
-CREATE INDEX IF NOT EXISTS idx_installation_observations_installation
-  ON installation_observations(installation_id, observed_at_utc DESC);
-
-CREATE INDEX IF NOT EXISTS idx_run_bundles_player_run
-  ON run_bundles(player_account_id, run_id);
-
 CREATE INDEX IF NOT EXISTS idx_battles_opponent_recorded
-  ON battles(opponent_account_id, recorded_at_utc DESC);
-
-CREATE INDEX IF NOT EXISTS idx_battles_run_recorded
-  ON battles(run_id, recorded_at_utc DESC);
-
-CREATE INDEX IF NOT EXISTS idx_replay_tokens_expires
-  ON replay_tokens(expires_at_utc);
+  ON battles(opponent_account_id, recorded_at_utc DESC, battle_id DESC);

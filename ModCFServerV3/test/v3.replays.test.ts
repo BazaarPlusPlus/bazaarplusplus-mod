@@ -81,8 +81,68 @@ test("replay-link requires battle ownership", async () => {
   assert.deepEqual(await response.json(), { error: "battle_forbidden" });
 });
 
+test("replay-link allows unauthenticated creation when configured", async () => {
+  const env = buildEnv();
+  env.ALLOW_UNAUTHENTICATED_REPLAY_LINKS = "true";
+  env.DB.v3Battles.set("battle-public-link", {
+    battle_id: "battle-public-link",
+    run_id: "run-public-link",
+    installation_id: "inst_remote",
+    player_account_id: "remote-player",
+    bundle_id: "bundle-public-link",
+    recorded_at_utc: new Date().toISOString(),
+    day: 8,
+    player_name: "Remote",
+    player_account_id_in_payload: "remote-player",
+    player_hero: "HeroA",
+    player_rank: "Gold",
+    player_rating: 1500,
+    player_level: 10,
+    opponent_name: "Local",
+    opponent_account_id: "player-account-001",
+    opponent_hero: "HeroB",
+    opponent_rank: "Gold",
+    opponent_rating: 1510,
+    opponent_level: 11,
+    result: "Won",
+    replay_available: 1,
+    updated_at_utc: new Date().toISOString(),
+  });
+
+  const response = await worker.fetch(
+    new Request("https://example.com/ghost-battles/battle-public-link/replay-link", {
+      method: "POST",
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  const payload = (await response.json()) as { download_url: string };
+  assert.match(payload.download_url, /^https:\/\/example\.com\/replays\/replay_/);
+
+  const token = payload.download_url.split("/").pop();
+  assert.ok(token);
+  assert.equal(
+    env.DB.v3ReplayTokens.get(token ?? "")?.requested_by_player_account_id,
+    "player-account-001",
+  );
+});
+
 test("download replay accepts valid short-lived token", async () => {
   const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  env.DB.v3Installations.set("inst_replay", {
+    installation_id: "inst_replay",
+    player_account_id: "player-account-001",
+    public_key: JSON.stringify({
+      modulus_b64: modulusB64,
+      exponent_b64: exponentB64,
+    }),
+    status: "active",
+    created_at_utc: new Date().toISOString(),
+    last_seen_at_utc: null,
+    revoked_at_utc: null,
+  });
   env.DB.v3ReplayTokens.set("token-valid", {
     token: "token-valid",
     battle_id: "battle-owned",
@@ -129,7 +189,7 @@ test("download replay accepts valid short-lived token", async () => {
     submitted_at_utc: new Date().toISOString(),
     created_at_utc: new Date().toISOString(),
   });
-  await env.PVP_BATTLE_BUCKET.put(
+  await env.RUN_BUNDLE_BUCKET.put(
     "run-bundles/remote-player/inst_replay/run-owned/payload-hash.mpack.gz",
     new TextEncoder().encode('{"battle_id":"battle-owned"}'),
     {
@@ -137,9 +197,29 @@ test("download replay accepts valid short-lived token", async () => {
     },
   );
 
+  const timestamp = new Date().toISOString();
+  const bodyHash = sha256Base64("");
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequestV3({
+      method: "GET",
+      path: "/replays/token-valid",
+      query: "",
+      installationId: "inst_replay",
+      timestamp,
+      bodyHash,
+    }),
+  );
+
   const response = await worker.fetch(
     new Request("https://example.com/replays/token-valid", {
       method: "GET",
+      headers: {
+        "x-bpp-installation-id": "inst_replay",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature": signature,
+      },
     }),
     env as never,
   );
@@ -150,6 +230,19 @@ test("download replay accepts valid short-lived token", async () => {
 
 test("download replay returns artifact_expired when artifact is no longer available", async () => {
   const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  env.DB.v3Installations.set("inst_replay", {
+    installation_id: "inst_replay",
+    player_account_id: "player-account-001",
+    public_key: JSON.stringify({
+      modulus_b64: modulusB64,
+      exponent_b64: exponentB64,
+    }),
+    status: "active",
+    created_at_utc: new Date().toISOString(),
+    last_seen_at_utc: null,
+    revoked_at_utc: null,
+  });
   env.DB.v3ReplayTokens.set("token-expired-artifact", {
     token: "token-expired-artifact",
     battle_id: "battle-expired",
@@ -197,13 +290,181 @@ test("download replay returns artifact_expired when artifact is no longer availa
     created_at_utc: new Date().toISOString(),
   });
 
+  const timestamp = new Date().toISOString();
+  const bodyHash = sha256Base64("");
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequestV3({
+      method: "GET",
+      path: "/replays/token-expired-artifact",
+      query: "",
+      installationId: "inst_replay",
+      timestamp,
+      bodyHash,
+    }),
+  );
+
   const response = await worker.fetch(
     new Request("https://example.com/replays/token-expired-artifact", {
       method: "GET",
+      headers: {
+        "x-bpp-installation-id": "inst_replay",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature": signature,
+      },
     }),
     env as never,
   );
 
   assert.equal(response.status, 410);
   assert.deepEqual(await response.json(), { error: "artifact_expired" });
+});
+
+test("download replay rejects a token created for another player", async () => {
+  const env = buildEnv();
+  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
+  env.DB.v3Installations.set("inst_replay", {
+    installation_id: "inst_replay",
+    player_account_id: "player-account-001",
+    public_key: JSON.stringify({
+      modulus_b64: modulusB64,
+      exponent_b64: exponentB64,
+    }),
+    status: "active",
+    created_at_utc: new Date().toISOString(),
+    last_seen_at_utc: null,
+    revoked_at_utc: null,
+  });
+  env.DB.v3ReplayTokens.set("token-foreign", {
+    token: "token-foreign",
+    battle_id: "battle-owned",
+    requested_by_player_account_id: "other-player",
+    expires_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    created_at_utc: new Date().toISOString(),
+    used_at_utc: null,
+    revoked_at_utc: null,
+  });
+  env.DB.v3Battles.set("battle-owned", {
+    battle_id: "battle-owned",
+    run_id: "run-owned",
+    installation_id: "inst_replay",
+    player_account_id: "remote-player",
+    bundle_id: "bundle-owned",
+    recorded_at_utc: new Date().toISOString(),
+    day: 9,
+    player_name: "Remote",
+    player_account_id_in_payload: "remote-player",
+    player_hero: "HeroA",
+    player_rank: "Gold",
+    player_rating: 1600,
+    player_level: 10,
+    opponent_name: "Local",
+    opponent_account_id: "player-account-001",
+    opponent_hero: "HeroB",
+    opponent_rank: "Gold",
+    opponent_rating: 1610,
+    opponent_level: 11,
+    result: "Won",
+    replay_available: 1,
+    updated_at_utc: new Date().toISOString(),
+  });
+
+  const timestamp = new Date().toISOString();
+  const bodyHash = sha256Base64("");
+  const signature = signCanonical(
+    privateKey,
+    canonicalRequestV3({
+      method: "GET",
+      path: "/replays/token-foreign",
+      query: "",
+      installationId: "inst_replay",
+      timestamp,
+      bodyHash,
+    }),
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/replays/token-foreign", {
+      method: "GET",
+      headers: {
+        "x-bpp-installation-id": "inst_replay",
+        "x-bpp-timestamp": timestamp,
+        "x-bpp-content-sha256": bodyHash,
+        "x-bpp-signature": signature,
+      },
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "replay_token_forbidden" });
+});
+
+test("download replay allows bearer-token access when unauthenticated downloads are enabled", async () => {
+  const env = buildEnv();
+  env.ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS = "true";
+  env.DB.v3ReplayTokens.set("token-public", {
+    token: "token-public",
+    battle_id: "battle-public",
+    requested_by_player_account_id: "other-player",
+    expires_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    created_at_utc: new Date().toISOString(),
+    used_at_utc: null,
+    revoked_at_utc: null,
+  });
+  env.DB.v3Battles.set("battle-public", {
+    battle_id: "battle-public",
+    run_id: "run-public",
+    installation_id: "inst_remote",
+    player_account_id: "remote-player",
+    bundle_id: "bundle-public",
+    recorded_at_utc: new Date().toISOString(),
+    day: 9,
+    player_name: "Remote",
+    player_account_id_in_payload: "remote-player",
+    player_hero: "HeroA",
+    player_rank: "Gold",
+    player_rating: 1600,
+    player_level: 10,
+    opponent_name: "Local",
+    opponent_account_id: "player-account-001",
+    opponent_hero: "HeroB",
+    opponent_rank: "Gold",
+    opponent_rating: 1610,
+    opponent_level: 11,
+    result: "Won",
+    replay_available: 1,
+    updated_at_utc: new Date().toISOString(),
+  });
+  env.DB.v3RunBundles.set("bundle-public", {
+    bundle_id: "bundle-public",
+    installation_id: "inst_remote",
+    player_account_id: "remote-player",
+    run_id: "run-public",
+    payload_hash: "payload-hash-public",
+    schema_version: 3,
+    object_key: "run-bundles/remote-player/inst_remote/run-public/payload-hash-public.mpack.gz",
+    codec: "application/json",
+    size_bytes: 12,
+    submitted_at_utc: new Date().toISOString(),
+    created_at_utc: new Date().toISOString(),
+  });
+  await env.RUN_BUNDLE_BUCKET.put(
+    "run-bundles/remote-player/inst_remote/run-public/payload-hash-public.mpack.gz",
+    new TextEncoder().encode('{"battle_id":"battle-public"}'),
+    {
+      httpMetadata: { contentType: "application/json" },
+    },
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/replays/token-public", {
+      method: "GET",
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), '{"battle_id":"battle-public"}');
 });

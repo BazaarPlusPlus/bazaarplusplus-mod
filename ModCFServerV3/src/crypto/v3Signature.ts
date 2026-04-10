@@ -3,16 +3,24 @@ import { sha256Base64 } from "./hash";
 
 export function normalizeQueryString(searchParams: URLSearchParams): string {
   return Array.from(searchParams.entries())
-    .sort(([leftKey, leftValue], [rightKey, rightValue]) => {
-      if (leftKey !== rightKey) {
-        return leftKey.localeCompare(rightKey);
+    .map(([key, value]) => ({
+      encodedKey: encodeURIComponent(key),
+      encodedValue: encodeURIComponent(value),
+    }))
+    .sort((left, right) => {
+      if (left.encodedKey !== right.encodedKey) {
+        return left.encodedKey < right.encodedKey ? -1 : 1;
       }
 
-      return leftValue.localeCompare(rightValue);
+      if (left.encodedValue !== right.encodedValue) {
+        return left.encodedValue < right.encodedValue ? -1 : 1;
+      }
+
+      return 0;
     })
     .map(
-      ([key, value]) =>
-        `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
+      ({ encodedKey, encodedValue }) =>
+        `${encodedKey}=${encodedValue}`,
     )
     .join("&");
 }

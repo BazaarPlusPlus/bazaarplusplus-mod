@@ -51,12 +51,7 @@ export async function handleQueryGhostBattles(
   }
 
   const url = new URL(request.url);
-  const lookbackDays = parseClampedInt(
-    url.searchParams.get("days"),
-    getGhostQueryLookbackDays(),
-    1,
-    14,
-  );
+  const lookbackDays = getGhostQueryLookbackDays();
   const limit = parseClampedInt(url.searchParams.get("limit"), 200, 1, 200);
   const fromUtc = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
 

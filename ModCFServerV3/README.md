@@ -21,7 +21,7 @@ It accepts installation-authenticated uploads from the mod, stores compressed ru
 Bindings defined in `wrangler.toml`:
 
 - `DB`: D1 database
-- `PVP_BATTLE_BUCKET`: R2 bucket for uploaded V3 run bundle payloads
+- `RUN_BUNDLE_BUCKET`: R2 bucket for uploaded V3 run bundle artifacts
 
 ## HTTP Routes
 
@@ -47,6 +47,7 @@ V3 uses installation-based authentication.
 - `/login` creates an installer session.
 - `/installations` binds an installation public key to the player account.
 - Installation-authenticated routes verify the installation signature and player/account match before accepting writes.
+- Replay link minting and replay downloads can be temporarily opened for unauthenticated clients through `ALLOW_UNAUTHENTICATED_REPLAY_LINKS` and `ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS` during early rollout. These two flags should normally be switched together.
 
 ## Data Flow
 
@@ -72,9 +73,9 @@ V3 uses installation-based authentication.
 ### Replay downloads
 
 1. The client requests `/ghost-battles/:battleId/replay-link`.
-2. The worker checks that the battle belongs to the signed player account.
+2. The worker checks that the battle belongs to the signed player account, unless anonymous replay-link minting is temporarily enabled.
 3. It returns a short-lived tokenized URL for `/replays/:token`.
-4. `/replays/:token` loads the owning run bundle from R2 and returns the replay payload for that battle.
+4. `/replays/:token` loads the owning run bundle from R2 and returns the replay payload for that battle, with installation auth required unless anonymous replay downloads are temporarily enabled.
 
 ## Local Development
 

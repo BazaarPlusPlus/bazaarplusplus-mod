@@ -34,7 +34,6 @@ internal sealed class GhostBattleApiClient
 
     public async Task<GhostBattleApiResult> QueryAgainstMeAsync(
         InstallationRecord installation,
-        int lookbackDays,
         int limit,
         CancellationToken cancellationToken
     )
@@ -43,7 +42,7 @@ internal sealed class GhostBattleApiClient
         {
             var endpoint = new UriBuilder(_routes.QueryGhostBattles)
             {
-                Query = $"days={Math.Clamp(lookbackDays, 1, 14)}&limit={Math.Clamp(limit, 1, 200)}",
+                Query = $"limit={Math.Clamp(limit, 1, 200)}",
             }.Uri.ToString();
             using var request = _requestSigner.CreateSignedRequest(
                 HttpMethod.Get,
@@ -162,13 +161,21 @@ internal sealed class GhostBattleApiClient
     public async Task<GhostBattleReplayPayloadResult> DownloadReplayPayloadAsync(
         string battleId,
         string downloadUrl,
+        InstallationRecord installation,
         CancellationToken cancellationToken
     )
     {
         try
         {
+            using var request = _requestSigner.CreateSignedRequest(
+                HttpMethod.Get,
+                downloadUrl,
+                null,
+                installation,
+                DateTimeOffset.UtcNow.ToString("o")
+            );
             using var response = await _httpClient.SendAsync(
-                new HttpRequestMessage(HttpMethod.Get, downloadUrl),
+                request,
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken
             );
