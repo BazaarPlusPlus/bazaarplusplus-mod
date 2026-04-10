@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-BazaarPlusPlus is a BepInEx mod for *The Bazaar*. It adds combat UI enhancements, monster and tooltip previews, run logging, an in-game history panel, local combat replay playback, and optional background upload features.
+BazaarPlusPlus is a BepInEx mod for *The Bazaar*. It adds combat UI enhancements, monster and tooltip previews, run logging, an in-game history panel, local combat replay playback, and background upload features.
 
 This repository only keeps documentation that still matches the current implementation. If any document conflicts with the code, treat `Plugin.cs`, `Core/`, `Game/`, `Patches/`, and `Data/` as the source of truth.
 
@@ -13,7 +13,7 @@ This repository only keeps documentation that still matches the current implemen
 - Enchant / upgrade preview: appends enchant text to the native tooltip flow and enters the native upgrade preview path while the upgrade modifier key is held.
 - Run Logging and HistoryPanel: active runs are written to SQLite; the in-game panel can browse runs, PvP battles, ghost battles, and saved board snapshots.
 - Combat replay: saves local PvP replay payloads; `HistoryPanel` and the debug panel can replay saved battles when the required conditions are met.
-- Background upload: optional run and replay upload, performed only while the client is outside a live run.
+- Background upload: run and replay upload, performed only while the client is outside a live run.
 - Anonymous Mode: replaces the local player name with `Anonymous`.
 
 ## Installation And Configuration
@@ -43,7 +43,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 ## Data And Network Behavior
 
 - Run logging and combat replay store local SQLite data and replay payloads.
-- Background upload is optional and only scans for uploads while the client is outside a live run.
+- Background upload only scans for uploads while the client is outside a live run.
 - The `ModCFServerV3/` directory contains the current Cloudflare Worker backend used for uploads, ghost battles, and replay download links.
 
 ## Repository Layout
@@ -53,7 +53,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - `tests/`: feature-focused test projects.
 - `scripts/`: build helpers and utility scripts.
 - `docs/README.md`: documentation index.
-- `ModCFServerV3/`: optional cloud sync backend.
+- `ModCFServerV3/`: cloud sync backend.
 
 ## Documentation Entry Points
 

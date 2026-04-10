@@ -9,7 +9,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 战斗与 UI 增强（状态条、怪物预览、附魔/升级 tooltip、展示柜 tooltip 互通等）
 - **Run logging**：活跃对局写入本地 SQLite，供历史面板与离线脚本使用
 - **PVP 战斗回放**：本地录制与在 HistoryPanel / Debug 下条件回放
-- **可选云同步**：在**非 live run** 时后台上传 V3 `run-bundle` 与 ghost/replay 数据，对接 **ModCFServerV3**（Cloudflare Worker）
+- **云同步**：在**非 live run** 时后台上传 V3 `run-bundle` 与 ghost/replay 数据，对接 **ModCFServerV3**（Cloudflare Worker）
 - 大厅与展示类小功能（随机英雄池面板、主菜单版本号、Legendary 段位展示文案等）
 - **Anonymous Mode**：可选将显示名改为 `Anonymous`
 
@@ -105,7 +105,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **Observation 上传**：installer / mod 可写 `POST /installations/observations`
 - **Ghost 战斗**：`GET /ghost-battles` 查询 against-me 列表；按需签发 `POST /ghost-battles/:battleId/replay-link`
 
-模组侧：**默认开启**社区数据共建（`[CommunityContribution] Enabled`），仅在**非 live run** 时执行上传扫描；`RunUploadController` 统一调度 run-bundle 上传。信任模型与安全限制见 `docs/run-upload.md`。
+模组侧仅在**非 live run** 时执行上传扫描；`RunUploadController` 统一调度 run-bundle 上传。信任模型与安全限制见 `docs/run-upload.md`。
 
 ## 配置摘要（BazaarPlusPlus.cfg）
 
@@ -118,7 +118,6 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | EnchantPreview / AlwaysShow | 附魔 tooltip 是否始终显示 |
 | Hotkeys / EnchantPreview, UpgradePreview | 附魔/升级预览按键路径 |
 | CombatStatusBar / Enabled | 战斗状态条开关 |
-| RunUpload / Enabled | 是否后台上传 completed runs |
 
 HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings`）。
 

@@ -2,11 +2,9 @@
 
 ## Scope
 
-当前上传实现是一个可选的后台同步层，建立在本地 SQLite、combat replay payload 和 installer 写入的 V3 identity 文件之上。
+当前上传实现是后台同步层，建立在本地 SQLite、combat replay payload 和 installer 写入的 V3 identity 文件之上。
 
 - 本地 SQLite 仍然是 source of truth。
-- 默认开启。
-- 仅当 `CommunityContribution.Enabled = true` 时启用。
 - 仅在玩家不处于 live run 时执行。
 - 上传协议已经切到 V3 installation-signed `run-bundle`，不再使用旧 `client_id / bind-player` 链路。
 
@@ -22,15 +20,6 @@
 6. `RunBundleUploadStore` 组装 run projection、battle projections 和 replay artifact。
 7. `RunBundleUploadService` 对请求进行 installation 签名，并上传到 `POST /run-bundles`。
 8. 上传成功后清除 run 和关联 replay 的 dirty 标记。
-
-## 当前配置
-
-`BazaarPlusPlus.cfg`
-
-```ini
-[CommunityContribution]
-Enabled = true
-```
 
 ## 当前实现文件
 

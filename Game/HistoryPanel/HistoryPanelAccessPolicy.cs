@@ -4,8 +4,8 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal static class HistoryPanelAccessPolicy
 {
-    internal static bool CanOpen(bool isInCombat, bool communityContributionEnabled)
+    internal static bool CanOpen(bool isInCombat)
     {
-        return !isInCombat && communityContributionEnabled;
+        return !isInCombat;
     }
 }

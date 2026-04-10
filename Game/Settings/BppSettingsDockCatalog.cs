@@ -7,7 +7,6 @@ using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.NameOverride;
-using BazaarPlusPlus.Game.RunLogging.Upload;
 using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
@@ -73,15 +72,6 @@ internal static class BppSettingsDockCatalog
             CycleLegendaryPositionDisplayMode,
             collapseAfterActivate: false
         ),
-        new(
-            "CommunityContribution",
-            RunUploadSettingsMenuLabel.Resolve,
-            _ => ReadCommunityContributionEnabled() ? "ON" : "OFF",
-            ReadCommunityContributionEnabled,
-            () => WriteCommunityContributionEnabled(!ReadCommunityContributionEnabled()),
-            collapseAfterActivate: false,
-            requiresCtrlToActivate: true
-        ),
     ];
 
     private static bool ReadNameOverrideEnabled()
@@ -91,9 +81,6 @@ internal static class BppSettingsDockCatalog
 
     private static string ResolveHistoryPanelStatus(string languageCode)
     {
-        if (!ReadCommunityContributionEnabled())
-            return "OFF";
-
         if (TheBazaar.Data.IsInCombat)
             return HistoryPanelLabel.ResolveInRunStatus(languageCode);
 
@@ -104,19 +91,7 @@ internal static class BppSettingsDockCatalog
 
     private static bool IsHistoryPanelActionable()
     {
-        return ReadCommunityContributionEnabled() && !TheBazaar.Data.IsInCombat;
-    }
-
-    private static bool ReadCommunityContributionEnabled()
-    {
-        return BppRuntimeHost.Config.EnableCommunityContributionConfig?.Value ?? true;
-    }
-
-    private static void WriteCommunityContributionEnabled(bool enabled)
-    {
-        var config = BppRuntimeHost.Config.EnableCommunityContributionConfig;
-        if (config != null)
-            config.Value = enabled;
+        return !TheBazaar.Data.IsInCombat;
     }
 
     private static void WriteNameOverrideEnabled(bool enabled)

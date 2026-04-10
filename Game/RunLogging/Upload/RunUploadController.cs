@@ -29,9 +29,6 @@ internal sealed class RunUploadController : MonoBehaviour
     {
         try
         {
-            if (BppRuntimeHost.Config.EnableCommunityContributionConfig?.Value != true)
-                return;
-
             var databasePath = BppRuntimeHost.Paths.RunLogDatabasePath;
             var replayRootPath = BppRuntimeHost.Paths.CombatReplayDirectoryPath;
             var installationRecordPath = BppRuntimeHost.Paths.InstallationRecordPath;
@@ -95,7 +92,8 @@ internal sealed class RunUploadController : MonoBehaviour
     {
         if (_uploadService == null || _shutdown == null || _startupGate == null)
             return;
-            _startupRunner.Tick(
+
+        _startupRunner.Tick(
             _startupGate,
             Time.unscaledTime,
             BppRuntimeHost.RunContext.IsInGameRun,

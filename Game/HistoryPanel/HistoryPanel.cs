@@ -288,7 +288,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         {
             BppLog.Warn(
                 "HistoryPanel",
-                "Ignored History Review open request because community contribution is disabled or combat is active."
+                "Ignored History Review open request because combat is active."
             );
             return;
         }
@@ -311,17 +311,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private bool CanOpenHistoryReview()
     {
-        return HistoryPanelAccessPolicy.CanOpen(
-            Data.IsInCombat,
-            BazaarPlusPlus
-                .Core
-                .Runtime
-                .BppRuntimeHost
-                .Config
-                .EnableCommunityContributionConfig
-                ?.Value
-                ?? true
-        );
+        return HistoryPanelAccessPolicy.CanOpen(Data.IsInCombat);
     }
 
     private void RefreshSelectedBattlePreview()

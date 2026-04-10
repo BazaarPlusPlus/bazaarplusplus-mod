@@ -37,10 +37,7 @@ internal static class HistoryPanelFactory
         HistoryPanelRepository? repository
     )
     {
-        if (
-            repository == null
-            || BppRuntimeHost.Config.EnableCommunityContributionConfig?.Value != true
-        )
+        if (repository == null)
             return null;
 
         var installationRecordPath = BppRuntimeHost.Paths.InstallationRecordPath;

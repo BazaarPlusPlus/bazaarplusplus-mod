@@ -21,8 +21,6 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; private set; }
 
-    public ConfigEntry<bool>? EnableCommunityContributionConfig { get; private set; }
-
     public ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; private set; }
 
     public ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig
@@ -80,12 +78,6 @@ internal sealed class BppConfig : IBppConfig
             "UpgradePreview",
             "<Keyboard>/shift",
             "Binding path for upgrade preview tooltip mode."
-        );
-        EnableCommunityContributionConfig = config.Bind(
-            "CommunityContribution",
-            "Enabled",
-            true,
-            "Whether to participate in BazaarPlusPlus community data contribution features, including background uploads and History Review access while out of a live run."
         );
         ChineseLocaleModeConfig = config.Bind(
             "Localization",

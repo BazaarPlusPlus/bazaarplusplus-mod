@@ -2,7 +2,6 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.NameOverride;
-using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Settings;
 using Xunit;
 
@@ -263,16 +262,14 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, true, true)]
-    [InlineData(true, true, false)]
-    [InlineData(false, false, false)]
-    public void HistoryPanelAccessPolicy_RequiresCommunityContributionAndLobbyState(
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void HistoryPanelAccessPolicy_RequiresLobbyState(
         bool isInGameRun,
-        bool communityContributionEnabled,
         bool expected
     )
     {
-        var result = HistoryPanelAccessPolicy.CanOpen(isInGameRun, communityContributionEnabled);
+        var result = HistoryPanelAccessPolicy.CanOpen(isInGameRun);
 
         Assert.Equal(expected, result);
     }

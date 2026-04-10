@@ -2,7 +2,7 @@
 
 [English](README_en.md)
 
-BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 UI 增强、怪物与 tooltip 预览、run logging、历史面板、本地战斗回放，以及可选的后台上传能力。
+BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 UI 增强、怪物与 tooltip 预览、run logging、历史面板、本地战斗回放，以及后台上传能力。
 
 当前仓库只保留与现有实现仍然一致的说明文档；如果文档与代码冲突，以 `Plugin.cs`、`Core/`、`Game/`、`Patches/`、`Data/` 中的实际实现为准。
 
@@ -13,7 +13,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 - 附魔 / 升级预览：在原生 tooltip 路径上追加附魔文本，或在按住升级预览热键时进入原生 upgrade preview。
 - Run Logging 与 HistoryPanel：活跃 run 写入 SQLite；游戏内可浏览 runs、PVP battles、ghost battles，并预览保存的战斗快照。
 - 战斗回放：本地保存 PVP replay payload；`HistoryPanel` 和 debug 面板可在条件满足时回放已保存战斗。
-- 后台上传：可选的 run / replay 后台上传，仅在未处于 live run 时执行。
+- 后台上传：run / replay 后台上传，仅在未处于 live run 时执行。
 - Anonymous Mode：将本地玩家名替换为 `Anonymous`。
 
 ## 安装与配置
@@ -43,7 +43,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 ## 数据与网络行为
 
 - run logging 与战斗回放会在本地保存 SQLite 数据和 replay payload。
-- 后台上传是可选能力，并且只会在非 live run 状态下执行上传扫描。
+- 后台上传会在非 live run 状态下执行上传扫描。
 - `ModCFServerV3/` 目录包含当前上传、ghost battles、replay 下载相关的 Cloudflare Worker 后端实现。
 
 ## 仓库结构
@@ -53,7 +53,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - `tests/`：按特性拆分的测试项目。
 - `scripts/`：构建和辅助脚本。
 - `docs/README.md`：文档索引。
-- `ModCFServerV3/`：可选云同步后端。
+- `ModCFServerV3/`：云同步后端。
 
 ## 文档入口
 
