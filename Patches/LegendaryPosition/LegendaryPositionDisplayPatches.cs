@@ -1,11 +1,11 @@
 #pragma warning disable CS0436
 #nullable enable
-using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarGameShared.TempoNet.Enums;
+using BazaarPlusPlus.Game.LegendaryPosition;
 using HarmonyLib;
-using TMPro;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
+using TMPro;
 using UnityEngine.Playables;
 
 namespace BazaarPlusPlus.Patches.LegendaryPosition;
@@ -38,10 +38,7 @@ internal static class EndOfRunSetLeaderboardPositionPatch
 
     internal static void ApplyRankLabelOverrides(EndOfRunRankController controller, int? position)
     {
-        var formatted = LegendaryPositionDisplayFormatter.Format(
-            position?.ToString(),
-            position
-        );
+        var formatted = LegendaryPositionDisplayFormatter.Format(position?.ToString(), position);
         SetRankDisplayLabel(controller, "bigDisplay", formatted);
         SetRankDisplayLabel(controller, "currentDisplay", formatted);
         SetRankDisplayLabel(controller, "nextDisplay", formatted);
@@ -70,7 +67,10 @@ internal static class EndOfRunSetLeaderboardPositionPatch
 internal static class EndOfRunRankUpCompletedPatch
 {
     [HarmonyPostfix]
-    private static void Postfix(EndOfRunRankController __instance, PlayableDirector playableDirector)
+    private static void Postfix(
+        EndOfRunRankController __instance,
+        PlayableDirector playableDirector
+    )
     {
         _ = playableDirector;
 

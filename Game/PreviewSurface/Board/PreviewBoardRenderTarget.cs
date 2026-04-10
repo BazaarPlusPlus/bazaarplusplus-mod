@@ -70,7 +70,9 @@ internal sealed class PreviewBoardRenderTarget : IBoardRenderTarget, IDisposable
             LogInfo(
                 $"QueueRenderAsync signature={queuedModel.Data?.Signature ?? string.Empty} visible={queuedModel.Presentation?.Visible ?? false} items={queuedModel.Data?.ItemCards?.Count ?? 0} skills={queuedModel.Data?.SkillCards?.Count ?? 0}"
             );
-            _surfaceWork = EnqueueSurfaceWorkAsync(() => RenderSurfaceAsync(queuedModel, cts.Token));
+            _surfaceWork = EnqueueSurfaceWorkAsync(() =>
+                RenderSurfaceAsync(queuedModel, cts.Token)
+            );
             return _surfaceWork;
         }
     }
@@ -129,7 +131,10 @@ internal sealed class PreviewBoardRenderTarget : IBoardRenderTarget, IDisposable
             LogInfo(
                 $"RenderSurfaceAsync start signature={renderModel.Data?.Signature ?? string.Empty} pose={pose.Position}"
             );
-            await _surface.RenderAsync(renderModel.Data ?? new PreviewBoardModel(), cancellationToken);
+            await _surface.RenderAsync(
+                renderModel.Data ?? new PreviewBoardModel(),
+                cancellationToken
+            );
             LogInfo(
                 $"RenderSurfaceAsync completed signature={renderModel.Data?.Signature ?? string.Empty}"
             );

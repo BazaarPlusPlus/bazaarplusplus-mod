@@ -74,9 +74,11 @@ internal static class ChestUiDiagnosticsPatch
             var fadeOverlay = FadeOverlayField?.GetValue(collectionUiController) as Image;
             var leftAnchor = LeftAnchorField?.GetValue(collectionUiController) as RectTransform;
             var rightAnchor = RightAnchorField?.GetValue(collectionUiController) as RectTransform;
-            var backButtonRect = BackButtonRectField?.GetValue(collectionUiController) as RectTransform;
+            var backButtonRect =
+                BackButtonRectField?.GetValue(collectionUiController) as RectTransform;
             var activeChestController =
-                ActiveChestControllerField?.GetValue(collectionUiController) as ChestSceneController;
+                ActiveChestControllerField?.GetValue(collectionUiController)
+                as ChestSceneController;
 
             BppLog.Info(
                 "ChestUiDiagnostics",
@@ -101,19 +103,19 @@ internal static class ChestUiDiagnosticsPatch
             return "<null>";
 
         var modules = eventSystem.GetComponents<BaseInputModule>();
-        var moduleSummary = modules.Length == 0
-            ? string.Empty
-            : string.Join(
-                ", ",
-                Array.ConvertAll(
-                    modules,
-                    module =>
-                        $"{module.GetType().Name}(enabled={module.enabled},active={module.isActiveAndEnabled})"
-                )
-            );
+        var moduleSummary =
+            modules.Length == 0
+                ? string.Empty
+                : string.Join(
+                    ", ",
+                    Array.ConvertAll(
+                        modules,
+                        module =>
+                            $"{module.GetType().Name}(enabled={module.enabled},active={module.isActiveAndEnabled})"
+                    )
+                );
 
-        return
-            $"{DescribeUnityObject(eventSystem)} enabled={eventSystem.enabled} isCurrent={ReferenceEquals(EventSystem.current, eventSystem)} modules=[{moduleSummary}]";
+        return $"{DescribeUnityObject(eventSystem)} enabled={eventSystem.enabled} isCurrent={ReferenceEquals(EventSystem.current, eventSystem)} modules=[{moduleSummary}]";
     }
 
     private static string DescribeGraphic(Graphic? graphic)
@@ -121,8 +123,7 @@ internal static class ChestUiDiagnosticsPatch
         if (graphic == null)
             return "<null>";
 
-        return
-            $"{DescribeUnityObject(graphic)} enabled={graphic.enabled} colorA={graphic.color.a:0.###}";
+        return $"{DescribeUnityObject(graphic)} enabled={graphic.enabled} colorA={graphic.color.a:0.###}";
     }
 
     private static string DescribeRectTransform(RectTransform? rectTransform)
@@ -130,8 +131,7 @@ internal static class ChestUiDiagnosticsPatch
         if (rectTransform == null)
             return "<null>";
 
-        return
-            $"{DescribeUnityObject(rectTransform)} anchoredPosition={rectTransform.anchoredPosition} sizeDelta={rectTransform.sizeDelta}";
+        return $"{DescribeUnityObject(rectTransform)} anchoredPosition={rectTransform.anchoredPosition} sizeDelta={rectTransform.sizeDelta}";
     }
 
     private static string DescribeUnityObject(UnityEngine.Object? obj)
@@ -141,14 +141,12 @@ internal static class ChestUiDiagnosticsPatch
 
         if (obj is Component component)
         {
-            return
-                $"{component.GetType().Name}(name='{component.name}',activeSelf={component.gameObject.activeSelf},activeInHierarchy={component.gameObject.activeInHierarchy},scene='{component.gameObject.scene.name}')";
+            return $"{component.GetType().Name}(name='{component.name}',activeSelf={component.gameObject.activeSelf},activeInHierarchy={component.gameObject.activeInHierarchy},scene='{component.gameObject.scene.name}')";
         }
 
         if (obj is GameObject gameObject)
         {
-            return
-                $"{gameObject.GetType().Name}(name='{gameObject.name}',activeSelf={gameObject.activeSelf},activeInHierarchy={gameObject.activeInHierarchy},scene='{gameObject.scene.name}')";
+            return $"{gameObject.GetType().Name}(name='{gameObject.name}',activeSelf={gameObject.activeSelf},activeInHierarchy={gameObject.activeInHierarchy},scene='{gameObject.scene.name}')";
         }
 
         return $"{obj.GetType().Name}(name='{obj.name}')";

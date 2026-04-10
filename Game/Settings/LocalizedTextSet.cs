@@ -6,16 +6,7 @@ namespace BazaarPlusPlus.Game.Settings;
 internal readonly struct LocalizedTextSet
 {
     internal LocalizedTextSet(string english, string chineseMainland)
-        : this(
-            english,
-            chineseMainland,
-            null,
-            null,
-            english,
-            english,
-            english,
-            english
-        ) { }
+        : this(english, chineseMainland, null, null, english, english, english, english) { }
 
     internal LocalizedTextSet(
         string english,
@@ -42,16 +33,7 @@ internal readonly struct LocalizedTextSet
         string korean,
         string italian
     )
-        : this(
-            english,
-            chineseMainland,
-            null,
-            null,
-            german,
-            portuguese,
-            korean,
-            italian
-        ) { }
+        : this(english, chineseMainland, null, null, german, portuguese, korean, italian) { }
 
     internal LocalizedTextSet(
         string english,

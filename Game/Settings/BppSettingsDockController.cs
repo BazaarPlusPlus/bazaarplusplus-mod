@@ -94,7 +94,9 @@ internal sealed class BppSettingsDockController : MonoBehaviour
 
     internal static void NotifyScreenshotCaptured()
     {
-        foreach (var controller in UnityEngine.Object.FindObjectsOfType<BppSettingsDockController>())
+        foreach (
+            var controller in UnityEngine.Object.FindObjectsOfType<BppSettingsDockController>()
+        )
             controller.TriggerScreenshotFeedback();
     }
 
@@ -210,7 +212,9 @@ internal sealed class BppSettingsDockController : MonoBehaviour
             if (_cameraButton == null)
                 return false;
 
-            _cameraButtonLabel = existingRect.Find(CameraButtonLabelObjectName)?.GetComponent<TextMeshProUGUI>();
+            _cameraButtonLabel = existingRect
+                .Find(CameraButtonLabelObjectName)
+                ?.GetComponent<TextMeshProUGUI>();
             if (_cameraButtonLabel == null)
                 CreateCameraButtonLabel(existingRect);
 
@@ -665,9 +669,10 @@ internal sealed class BppSettingsDockController : MonoBehaviour
         if (image == null || outline == null)
             return;
 
-        var progress = ScreenshotFeedbackDuration <= 0f
-            ? 0f
-            : Mathf.Clamp01(_screenshotFeedbackRemaining / ScreenshotFeedbackDuration);
+        var progress =
+            ScreenshotFeedbackDuration <= 0f
+                ? 0f
+                : Mathf.Clamp01(_screenshotFeedbackRemaining / ScreenshotFeedbackDuration);
         var baseColor = new Color(0.18f, 0.18f, 0.20f, 0.96f);
         var pulseColor = new Color(0.78f, 0.39f, 0.14f, 0.98f);
         var baseOutline = new Color(0f, 0f, 0f, 0.52f);

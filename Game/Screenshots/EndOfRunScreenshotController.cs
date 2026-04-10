@@ -4,8 +4,8 @@ using System.Collections;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Input;
-using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Screenshots.Persistence;
+using BazaarPlusPlus.Game.Settings;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
@@ -65,9 +65,10 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         _runInitializedSubscription = BppRuntimeHost.EventBus.Subscribe<RunInitializedObserved>(
             OnRunInitializedObserved
         );
-        _battleScreenshotContextSubscription = BppRuntimeHost.EventBus.Subscribe<PvpBattleScreenshotContextAvailable>(
-            OnPvpBattleScreenshotContextAvailable
-        );
+        _battleScreenshotContextSubscription =
+            BppRuntimeHost.EventBus.Subscribe<PvpBattleScreenshotContextAvailable>(
+                OnPvpBattleScreenshotContextAvailable
+            );
     }
 
     private void OnDisable()
@@ -122,7 +123,9 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         _currentRunId = string.IsNullOrWhiteSpace(observed.RunId) ? null : observed.RunId;
     }
 
-    private void OnPvpBattleScreenshotContextAvailable(PvpBattleScreenshotContextAvailable available)
+    private void OnPvpBattleScreenshotContextAvailable(
+        PvpBattleScreenshotContextAvailable available
+    )
     {
         if (string.IsNullOrWhiteSpace(available.BattleId))
             return;
@@ -188,11 +191,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
         StartCoroutine(
             CaptureManualScreenshot(
-                new ScreenshotCaptureRequest
-                {
-                    RunId = ResolveRunId(),
-                    CaptureSource = source,
-                }
+                new ScreenshotCaptureRequest { RunId = ResolveRunId(), CaptureSource = source }
             )
         );
     }
@@ -202,7 +201,10 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         return _gate.IsAttemptInFlight();
     }
 
-    private bool CaptureFirstContinue(EndOfRunScreenController controller, bool isInteractionBlocked)
+    private bool CaptureFirstContinue(
+        EndOfRunScreenController controller,
+        bool isInteractionBlocked
+    )
     {
         if (_screenshotService == null || !_gate.ShouldCaptureOnContinue(isInteractionBlocked))
             return false;
@@ -275,7 +277,9 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             capture = _screenshotService?.CaptureCurrentFrame(
                 new ScreenshotCaptureRequest
                 {
-                    RunId = !string.IsNullOrWhiteSpace(context.RunId) ? context.RunId : ResolveRunId(),
+                    RunId = !string.IsNullOrWhiteSpace(context.RunId)
+                        ? context.RunId
+                        : ResolveRunId(),
                     BattleId = context.BattleId,
                     CaptureSource = RunScreenshotCaptureSource.PvpBattleNextDay,
                 }

@@ -31,7 +31,9 @@ internal sealed class ItemBoardOverlay : IDisposable
             : null;
 
     private static readonly MethodInfo? AddCardMethod =
-        MonsterBoardTooltipType != null ? AccessTools.Method(MonsterBoardTooltipType, "AddCard") : null;
+        MonsterBoardTooltipType != null
+            ? AccessTools.Method(MonsterBoardTooltipType, "AddCard")
+            : null;
 
     private static readonly MethodInfo? SetCarpetMethod =
         MonsterBoardTooltipType != null
@@ -39,10 +41,14 @@ internal sealed class ItemBoardOverlay : IDisposable
             : null;
 
     private static readonly MethodInfo? ShowMethod =
-        MonsterBoardTooltipType != null ? AccessTools.Method(MonsterBoardTooltipType, "Show") : null;
+        MonsterBoardTooltipType != null
+            ? AccessTools.Method(MonsterBoardTooltipType, "Show")
+            : null;
 
     private static readonly MethodInfo? HideMethod =
-        MonsterBoardTooltipType != null ? AccessTools.Method(MonsterBoardTooltipType, "Hide") : null;
+        MonsterBoardTooltipType != null
+            ? AccessTools.Method(MonsterBoardTooltipType, "Hide")
+            : null;
 
     private static readonly FieldInfo? SkillParentField =
         MonsterBoardTooltipType != null
@@ -77,7 +83,10 @@ internal sealed class ItemBoardOverlay : IDisposable
         var sourceView = MonsterBoardTooltipField?.GetValue(controller) as Component;
         if (sourceView == null)
         {
-            BppLog.Warn("ItemBoardOverlay", "Ensure failed because source MonsterBoardTooltip was null");
+            BppLog.Warn(
+                "ItemBoardOverlay",
+                "Ensure failed because source MonsterBoardTooltip was null"
+            );
             return false;
         }
 
@@ -212,9 +221,10 @@ internal sealed class ItemBoardOverlay : IDisposable
 
         _viewRect.sizeDelta = sourceRect.rect.size;
         var canvas = _hostRoot.GetComponent<Canvas>();
-        var camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
-            ? canvas.worldCamera
-            : null;
+        var camera =
+            canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera
+                : null;
         var screenPoint = RectTransformUtility.WorldToScreenPoint(camera, sourceRect.position);
         if (
             RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -257,7 +267,10 @@ internal sealed class ItemBoardOverlay : IDisposable
         }
     }
 
-    private static void HideHealthVisuals(Transform? healthTextTransform, Transform? carpetTransform)
+    private static void HideHealthVisuals(
+        Transform? healthTextTransform,
+        Transform? carpetTransform
+    )
     {
         if (healthTextTransform == null)
             return;

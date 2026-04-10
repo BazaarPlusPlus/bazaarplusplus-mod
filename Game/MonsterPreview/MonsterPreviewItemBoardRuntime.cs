@@ -106,7 +106,12 @@ internal sealed class MonsterPreviewItemBoardRuntime : MonoBehaviour
 
         if (
             tooltipController == null
-            || !TryBuildPayload(tooltipController, out var currentCard, out var monster, out var carpet)
+            || !TryBuildPayload(
+                tooltipController,
+                out var currentCard,
+                out var monster,
+                out var carpet
+            )
             || currentCard == null
             || monster == null
             || !_itemBoard.EnsureHost(tooltipController)
@@ -142,7 +147,10 @@ internal sealed class MonsterPreviewItemBoardRuntime : MonoBehaviour
         if (!IsPreviewActive || !_closeOnNextClickArmed)
             return false;
 
-        if (button != PointerEventData.InputButton.Left && button != PointerEventData.InputButton.Right)
+        if (
+            button != PointerEventData.InputButton.Left
+            && button != PointerEventData.InputButton.Right
+        )
             return false;
 
         if (!NextClickCloseFrameGate.CanConsume(_closeOnNextClickArmedFrame, Time.frameCount))
@@ -248,6 +256,8 @@ internal sealed class MonsterPreviewItemBoardRuntime : MonoBehaviour
             return null;
 
         var encounterData = CurrentEncounterDataObjectProperty?.GetValue(encounterController);
-        return encounterData != null ? EncounterCarpetField?.GetValue(encounterData) as CarpetAssetDataSO : null;
+        return encounterData != null
+            ? EncounterCarpetField?.GetValue(encounterData) as CarpetAssetDataSO
+            : null;
     }
 }

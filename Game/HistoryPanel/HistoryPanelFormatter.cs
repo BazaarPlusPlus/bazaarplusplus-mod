@@ -71,10 +71,8 @@ internal static class HistoryPanelFormatter
         if (string.IsNullOrWhiteSpace(battle.Result))
             return HistoryPanelText.Unknown();
 
-        return IsBattleWin(battle)
-                ? HistoryPanelText.Win()
-            : IsBattleLoss(battle)
-                ? HistoryPanelText.Loss()
+        return IsBattleWin(battle) ? HistoryPanelText.Win()
+            : IsBattleLoss(battle) ? HistoryPanelText.Loss()
             : battle.Result;
     }
 

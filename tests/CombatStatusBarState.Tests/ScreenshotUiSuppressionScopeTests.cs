@@ -15,17 +15,11 @@ public sealed class ScreenshotUiSuppressionScopeTests
             () => CreateLease("combat", events)
         );
 
-        Assert.Equal(
-            ["apply:dock", "apply:combat"],
-            events
-        );
+        Assert.Equal(["apply:dock", "apply:combat"], events);
 
         scope.Dispose();
 
-        Assert.Equal(
-            ["apply:dock", "apply:combat", "restore:combat", "restore:dock"],
-            events
-        );
+        Assert.Equal(["apply:dock", "apply:combat", "restore:combat", "restore:dock"], events);
     }
 
     [Fact]
@@ -33,19 +27,15 @@ public sealed class ScreenshotUiSuppressionScopeTests
     {
         var events = new List<string>();
 
-        var exception = Assert.Throws<InvalidOperationException>(
-            () =>
-                ScreenshotUiSuppressionScope.Begin(
-                    () => CreateLease("dock", events),
-                    () => throw new InvalidOperationException("boom")
-                )
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ScreenshotUiSuppressionScope.Begin(
+                () => CreateLease("dock", events),
+                () => throw new InvalidOperationException("boom")
+            )
         );
 
         Assert.Equal("boom", exception.Message);
-        Assert.Equal(
-            ["apply:dock", "restore:dock"],
-            events
-        );
+        Assert.Equal(["apply:dock", "restore:dock"], events);
     }
 
     private static IDisposable CreateLease(string name, ICollection<string> events)

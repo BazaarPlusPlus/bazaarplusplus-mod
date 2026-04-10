@@ -93,5 +93,4 @@ internal sealed partial class HistoryPanel
     {
         return _coordinator?.GetDatabaseChipText() ?? HistoryPanelText.DatabaseUnavailable();
     }
-
 }

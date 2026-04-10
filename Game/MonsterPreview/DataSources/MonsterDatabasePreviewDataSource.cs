@@ -9,7 +9,10 @@ internal sealed class MonsterDatabasePreviewDataSource : IPreviewDataSource
     private readonly string _encounterId;
     private readonly string _logContext;
 
-    public MonsterDatabasePreviewDataSource(string encounterId, string logContext = "monster_preview")
+    public MonsterDatabasePreviewDataSource(
+        string encounterId,
+        string logContext = "monster_preview"
+    )
     {
         _encounterId = encounterId ?? string.Empty;
         _logContext = string.IsNullOrWhiteSpace(logContext) ? "monster_preview" : logContext;
@@ -37,8 +40,12 @@ internal sealed class MonsterDatabasePreviewDataSource : IPreviewDataSource
         }
 
         var sourceModel = MonsterPreviewProjector.BuildModel(monster, "monster_db");
-        var filteredItemCards = PreviewCardSpecFilter.FilterLocallyRenderable(sourceModel.ItemCards);
-        var filteredSkillCards = PreviewCardSpecFilter.FilterLocallyRenderable(sourceModel.SkillCards);
+        var filteredItemCards = PreviewCardSpecFilter.FilterLocallyRenderable(
+            sourceModel.ItemCards
+        );
+        var filteredSkillCards = PreviewCardSpecFilter.FilterLocallyRenderable(
+            sourceModel.SkillCards
+        );
         model = new PreviewBoardModel
         {
             Title = sourceModel.Title ?? string.Empty,

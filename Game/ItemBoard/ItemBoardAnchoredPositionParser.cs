@@ -27,8 +27,18 @@ internal static class ItemBoardAnchoredPositionParser
             return false;
 
         if (
-            !float.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
-            || !float.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var y)
+            !float.TryParse(
+                parts[0].Trim(),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var x
+            )
+            || !float.TryParse(
+                parts[1].Trim(),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var y
+            )
         )
         {
             return false;

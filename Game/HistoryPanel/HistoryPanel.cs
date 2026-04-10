@@ -2,8 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
+using BazaarPlusPlus.Game.Input;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -16,9 +16,7 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed partial class HistoryPanel : MonoBehaviour
 {
     private const string ToggleHistoryPanelBindingPath = "<Keyboard>/f8";
-    private static readonly HashSet<string> UiDiagnosticScenes = new(
-        StringComparer.Ordinal
-    )
+    private static readonly HashSet<string> UiDiagnosticScenes = new(StringComparer.Ordinal)
     {
         "CollectionUIScene",
         "CollectionWheelScene",
@@ -442,8 +440,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
                 return;
             }
 
-            var summaries = eventSystems.Select((eventSystem, index) =>
-                DescribeEventSystem(eventSystem, index)
+            var summaries = eventSystems.Select(
+                (eventSystem, index) => DescribeEventSystem(eventSystem, index)
             );
             var currentSummary = DescribeEventSystem(EventSystem.current, null);
             BppLog.Info(
@@ -469,8 +467,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
                 $"{module.GetType().Name}(enabled={module.enabled},active={module.isActiveAndEnabled})"
             );
 
-        return
-            $"{prefix}{eventSystem.GetType().Name}(name='{eventSystem.name}',activeSelf={eventSystem.gameObject.activeSelf},activeInHierarchy={eventSystem.gameObject.activeInHierarchy},enabled={eventSystem.enabled},isCurrent={ReferenceEquals(EventSystem.current, eventSystem)},scene='{eventSystem.gameObject.scene.name}',modules=[{string.Join(", ", modules)}])";
+        return $"{prefix}{eventSystem.GetType().Name}(name='{eventSystem.name}',activeSelf={eventSystem.gameObject.activeSelf},activeInHierarchy={eventSystem.gameObject.activeInHierarchy},enabled={eventSystem.enabled},isCurrent={ReferenceEquals(EventSystem.current, eventSystem)},scene='{eventSystem.gameObject.scene.name}',modules=[{string.Join(", ", modules)}])";
     }
 
     private bool TryHandlePreviewDebugHotkeys(Keyboard keyboard)
@@ -546,10 +543,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
                 _sectionMode == HistorySectionMode.Ghost
                     ? ResolveGhostPreviewData(ActiveSelectedBattle)
                     : ActiveSelectedBattle.PreviewData.OpponentHandOnly();
-            return new PreviewRequest(
-                $"battle:{ActiveSelectedBattle.BattleId}",
-                previewData
-            );
+            return new PreviewRequest($"battle:{ActiveSelectedBattle.BattleId}", previewData);
         }
 
         var runPreviewBattle = GetRunPreviewBattle();

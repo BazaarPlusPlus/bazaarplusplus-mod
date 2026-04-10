@@ -131,12 +131,7 @@ internal sealed class HistoryPanelPreviewRenderer
 
     public void RenderLiveFrame()
     {
-        if (
-            _camera == null
-            || _texture == null
-            || _rootObject == null
-            || !_rootObject.activeSelf
-        )
+        if (_camera == null || _texture == null || _rootObject == null || !_rootObject.activeSelf)
             return;
 
         if (string.IsNullOrWhiteSpace(_renderedBattleId))

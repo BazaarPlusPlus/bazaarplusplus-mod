@@ -79,11 +79,10 @@ internal sealed partial class HistoryPanel
                 : HistoryPanelFormatter.FormatTimestamp(ActiveSelectedBattle.RecordedAtUtc);
         var selectedBattleTimestampText = selectedBattleTimestamp ?? string.Empty;
         var battleSummary =
-            ActiveSelectedBattle == null
-                ? HistoryPanelText.SelectBattleForFooter()
-                : string.IsNullOrWhiteSpace(ActiveSelectedBattle.SnapshotSummary)
-                    ? selectedBattleTimestampText
-                    : $"{selectedBattleTimestampText} | {ActiveSelectedBattle.SnapshotSummary}";
+            ActiveSelectedBattle == null ? HistoryPanelText.SelectBattleForFooter()
+            : string.IsNullOrWhiteSpace(ActiveSelectedBattle.SnapshotSummary)
+                ? selectedBattleTimestampText
+            : $"{selectedBattleTimestampText} | {ActiveSelectedBattle.SnapshotSummary}";
         var footerSecondaryText = string.IsNullOrWhiteSpace(_statusMessage)
             ? battleSummary
             : $"{_statusMessage} | {battleSummary}";

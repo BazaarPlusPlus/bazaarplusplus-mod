@@ -54,7 +54,10 @@ static async Task TestHideClearsAndCancelsAsync()
 
     Assert(surface.ClearCallCount == 1, "Hide should clear the board surface.");
     Assert(surface.CancelledRenderCount == 1, "Hide should cancel the in-flight render.");
-    Assert(surface.VisibleStates.Count >= 1 && surface.VisibleStates[^1] == false, "Hide should update visibility.");
+    Assert(
+        surface.VisibleStates.Count >= 1 && surface.VisibleStates[^1] == false,
+        "Hide should update visibility."
+    );
 }
 
 static async Task TestCancelledRenderCannotClearReplacementAsync()
@@ -79,7 +82,10 @@ static async Task TestCancelledRenderCannotClearReplacementAsync()
     await surface.WaitForRenderCompletionCountAsync(1);
     await surface.WaitForRenderCompletionCountAsync(2);
 
-    Assert(surface.LastRenderedSignature == "second", "Cancelled render should not clear the replacement render.");
+    Assert(
+        surface.LastRenderedSignature == "second",
+        "Cancelled render should not clear the replacement render."
+    );
 }
 
 static void Assert(bool condition, string message)
@@ -159,12 +165,19 @@ internal sealed class ReplacementSensitiveBoardSurface : IPreviewBoardSurface
         return EnsureSource(_renderCompletions, count).Task;
     }
 
-    private TaskCompletionSource<bool> EnsureSource(List<TaskCompletionSource<bool>> list, int count)
+    private TaskCompletionSource<bool> EnsureSource(
+        List<TaskCompletionSource<bool>> list,
+        int count
+    )
     {
         lock (_sync)
         {
             while (list.Count < count)
-                list.Add(new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously));
+                list.Add(
+                    new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    )
+                );
 
             return list[count - 1];
         }
@@ -252,12 +265,19 @@ internal sealed class RecordingBoardSurface : IPreviewBoardSurface
         return EnsureSource(_clearCompletions, count).Task;
     }
 
-    private TaskCompletionSource<bool> EnsureSource(List<TaskCompletionSource<bool>> list, int count)
+    private TaskCompletionSource<bool> EnsureSource(
+        List<TaskCompletionSource<bool>> list,
+        int count
+    )
     {
         lock (_sync)
         {
             while (list.Count < count)
-                list.Add(new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously));
+                list.Add(
+                    new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    )
+                );
 
             return list[count - 1];
         }

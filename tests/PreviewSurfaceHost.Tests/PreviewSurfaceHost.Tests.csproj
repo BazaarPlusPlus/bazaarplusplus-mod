@@ -9,15 +9,39 @@
 
   <ItemGroup>
     <Compile Include="../../GlobalUsings.cs" Link="GlobalUsings.cs" />
-    <Compile Include="../../Game/PreviewSurface/Models/PreviewBoardModel.cs" Link="PreviewBoardModel.cs" />
-    <Compile Include="../../Game/PreviewSurface/Models/PreviewCardSpec.cs" Link="PreviewCardSpec.cs" />
-    <Compile Include="../../Game/PreviewSurface/Models/PreviewBoardPresentation.cs" Link="PreviewBoardPresentation.cs" />
-    <Compile Include="../../Game/PreviewSurface/Board/IPreviewBoardSurface.cs" Link="IPreviewBoardSurface.cs" />
-    <Compile Include="../../Game/PreviewSurface/Board/PreviewBoardRenderTarget.cs" Link="PreviewBoardRenderTarget.cs" />
-    <Compile Include="../../Game/MonsterPreview/Architecture/PreviewBoardDebugOptions.cs" Link="PreviewBoardDebugOptions.cs" />
+    <Compile
+      Include="../../Game/PreviewSurface/Models/PreviewBoardModel.cs"
+      Link="PreviewBoardModel.cs"
+    />
+    <Compile
+      Include="../../Game/PreviewSurface/Models/PreviewCardSpec.cs"
+      Link="PreviewCardSpec.cs"
+    />
+    <Compile
+      Include="../../Game/PreviewSurface/Models/PreviewBoardPresentation.cs"
+      Link="PreviewBoardPresentation.cs"
+    />
+    <Compile
+      Include="../../Game/PreviewSurface/Board/IPreviewBoardSurface.cs"
+      Link="IPreviewBoardSurface.cs"
+    />
+    <Compile
+      Include="../../Game/PreviewSurface/Board/PreviewBoardRenderTarget.cs"
+      Link="PreviewBoardRenderTarget.cs"
+    />
+    <Compile
+      Include="../../Game/MonsterPreview/Architecture/PreviewBoardDebugOptions.cs"
+      Link="PreviewBoardDebugOptions.cs"
+    />
     <Compile Include="../../Game/MonsterPreview/Architecture/BoardPose.cs" Link="BoardPose.cs" />
-    <Compile Include="../../Game/MonsterPreview/Architecture/BoardRenderModel.cs" Link="BoardRenderModel.cs" />
-    <Compile Include="../../Game/MonsterPreview/Architecture/IBoardRenderTarget.cs" Link="IBoardRenderTarget.cs" />
+    <Compile
+      Include="../../Game/MonsterPreview/Architecture/BoardRenderModel.cs"
+      Link="BoardRenderModel.cs"
+    />
+    <Compile
+      Include="../../Game/MonsterPreview/Architecture/IBoardRenderTarget.cs"
+      Link="IBoardRenderTarget.cs"
+    />
     <Compile Include="TestUnityStubs.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>

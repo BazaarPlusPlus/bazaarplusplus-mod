@@ -20,7 +20,11 @@ internal static class NativeMonsterTooltipAugmenter
     )
     {
         augmentedTooltipData = null;
-        if (card == null || tooltipData == null || CardTooltipDataFactory.GetMonster(tooltipData) != null)
+        if (
+            card == null
+            || tooltipData == null
+            || CardTooltipDataFactory.GetMonster(tooltipData) != null
+        )
             return false;
 
         if (!TryResolveMonster(card, out var monster, out var reason))
@@ -40,11 +44,7 @@ internal static class NativeMonsterTooltipAugmenter
         return true;
     }
 
-    internal static bool TryResolveMonster(
-        Card card,
-        out TMonster? monster,
-        out string reason
-    )
+    internal static bool TryResolveMonster(Card card, out TMonster? monster, out string reason)
     {
         monster = null;
 
@@ -87,9 +87,9 @@ internal static class NativeMonsterTooltipAugmenter
 
         var getMonsterByIdMethod =
             AccessTools.Method(staticData.GetType(), "GetMonsterById")
-            ?? staticData.GetType()
-                .GetMethod("GetMonsterById", new[] { typeof(Guid) });
-        monster = getMonsterByIdMethod?.Invoke(staticData, new object[] { combatant.MonsterTemplateId })
+            ?? staticData.GetType().GetMethod("GetMonsterById", new[] { typeof(Guid) });
+        monster =
+            getMonsterByIdMethod?.Invoke(staticData, new object[] { combatant.MonsterTemplateId })
             as TMonster;
         if (monster == null)
         {

@@ -13,9 +13,8 @@ internal static class MonsterPreviewItemBoardShowTooltipsPatch
     [HarmonyPrefix]
     private static bool Prefix(CardController __instance)
     {
-        return !MonsterPreviewItemBoardRuntime.Instance?.ShouldSuppressTooltip(
-            __instance?.CardData
-        ) ?? true;
+        return !MonsterPreviewItemBoardRuntime.Instance?.ShouldSuppressTooltip(__instance?.CardData)
+            ?? true;
     }
 }
 

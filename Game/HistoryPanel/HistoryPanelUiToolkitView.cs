@@ -137,9 +137,18 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         RefreshTabButton(_ghostTabButton!, model.SectionMode == HistorySectionMode.Ghost);
         _ghostFilterRow!.style.display =
             model.SectionMode == HistorySectionMode.Ghost ? DisplayStyle.Flex : DisplayStyle.None;
-        RefreshGhostFilterButton(_ghostAllButton!, model.GhostBattleFilter == GhostBattleFilter.All);
-        RefreshGhostFilterButton(_ghostWonButton!, model.GhostBattleFilter == GhostBattleFilter.IWon);
-        RefreshGhostFilterButton(_ghostLostButton!, model.GhostBattleFilter == GhostBattleFilter.ILost);
+        RefreshGhostFilterButton(
+            _ghostAllButton!,
+            model.GhostBattleFilter == GhostBattleFilter.All
+        );
+        RefreshGhostFilterButton(
+            _ghostWonButton!,
+            model.GhostBattleFilter == GhostBattleFilter.IWon
+        );
+        RefreshGhostFilterButton(
+            _ghostLostButton!,
+            model.GhostBattleFilter == GhostBattleFilter.ILost
+        );
 
         _replayButton!.text = model.ReplayButtonText;
         _replayButton.SetEnabled(model.ReplayButtonEnabled);
@@ -156,7 +165,8 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         try
         {
             _runsList.selectedIndex = model.Runs.Count == 0 ? -1 : model.SelectedRunIndex;
-            _battleList.selectedIndex = model.VisibleBattles.Count == 0 ? -1 : model.SelectedBattleIndex;
+            _battleList.selectedIndex =
+                model.VisibleBattles.Count == 0 ? -1 : model.SelectedBattleIndex;
             _runsList.RefreshItems();
             _battleList.RefreshItems();
         }
@@ -306,8 +316,18 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         chipRow.Add(_statusLabel);
         chipRow.Add(CreateSpacer());
 
-        _runsTabButton = CreateButton(HistoryPanelText.RunsTab(), () => _setSectionMode(HistorySectionMode.Runs), 72f, 32f);
-        _ghostTabButton = CreateButton(HistoryPanelText.GhostTab(), () => _setSectionMode(HistorySectionMode.Ghost), 72f, 32f);
+        _runsTabButton = CreateButton(
+            HistoryPanelText.RunsTab(),
+            () => _setSectionMode(HistorySectionMode.Runs),
+            72f,
+            32f
+        );
+        _ghostTabButton = CreateButton(
+            HistoryPanelText.GhostTab(),
+            () => _setSectionMode(HistorySectionMode.Ghost),
+            72f,
+            32f
+        );
         chipRow.Add(_runsTabButton);
         _ghostTabButton.style.marginLeft = 8f;
         chipRow.Add(_ghostTabButton);
@@ -355,9 +375,24 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         _ghostFilterRow.style.display = DisplayStyle.None;
         _battlesSection.Add(_ghostFilterRow);
 
-        _ghostAllButton = CreateButton(HistoryPanelText.FilterAll(), () => _setGhostFilter(GhostBattleFilter.All), 70f, 24f);
-        _ghostWonButton = CreateButton(HistoryPanelText.FilterIWon(), () => _setGhostFilter(GhostBattleFilter.IWon), 78f, 24f);
-        _ghostLostButton = CreateButton(HistoryPanelText.FilterILost(), () => _setGhostFilter(GhostBattleFilter.ILost), 78f, 24f);
+        _ghostAllButton = CreateButton(
+            HistoryPanelText.FilterAll(),
+            () => _setGhostFilter(GhostBattleFilter.All),
+            70f,
+            24f
+        );
+        _ghostWonButton = CreateButton(
+            HistoryPanelText.FilterIWon(),
+            () => _setGhostFilter(GhostBattleFilter.IWon),
+            78f,
+            24f
+        );
+        _ghostLostButton = CreateButton(
+            HistoryPanelText.FilterILost(),
+            () => _setGhostFilter(GhostBattleFilter.ILost),
+            78f,
+            24f
+        );
         _ghostFilterRow.Add(_ghostAllButton);
         _ghostWonButton.style.marginLeft = 8f;
         _ghostFilterRow.Add(_ghostWonButton);
@@ -368,7 +403,11 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         _battlesTitle = CreateSectionTitle(HistoryPanelText.Battles());
         _battlesTitle.style.marginTop = 0f;
         _battlesSection.Add(_battlesTitle);
-        _runsBattleSubtitle = CreateLabel(12, FontStyle.Normal, new Color(0.72f, 0.77f, 0.84f, 0.92f));
+        _runsBattleSubtitle = CreateLabel(
+            12,
+            FontStyle.Normal,
+            new Color(0.72f, 0.77f, 0.84f, 0.92f)
+        );
         _runsBattleSubtitle.style.marginTop = 4f;
         _runsBattleSubtitle.style.display = DisplayStyle.None;
         _battlesSection.Add(_runsBattleSubtitle);
@@ -400,7 +439,11 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         _previewImage.style.bottom = 10f;
         _previewContainer.Add(_previewImage);
 
-        _previewStatusLabel = CreateLabel(13, FontStyle.Normal, new Color(0.82f, 0.87f, 0.93f, 0.96f));
+        _previewStatusLabel = CreateLabel(
+            13,
+            FontStyle.Normal,
+            new Color(0.82f, 0.87f, 0.93f, 0.96f)
+        );
         _previewStatusLabel.style.position = Position.Absolute;
         _previewStatusLabel.style.left = 28f;
         _previewStatusLabel.style.right = 28f;
@@ -449,9 +492,21 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         _deleteButton = CreateButton(HistoryPanelText.Delete(), _delete, 130f, 36f);
         _replayButton = CreateButton(HistoryPanelText.Replay(), _replay, 140f, 36f);
         var closeButton = CreateButton(HistoryPanelText.Close(), _close, 96f, 36f);
-        StyleButton(_deleteButton, new Color(0.40f, 0.24f, 0.20f, 0.98f), new Color(1f, 0.93f, 0.90f, 1f));
-        StyleButton(_replayButton, new Color(0.19f, 0.31f, 0.39f, 0.98f), new Color(0.88f, 0.95f, 1f, 1f));
-        StyleButton(closeButton, new Color(0.29f, 0.20f, 0.20f, 0.98f), new Color(0.98f, 0.92f, 0.90f, 1f));
+        StyleButton(
+            _deleteButton,
+            new Color(0.40f, 0.24f, 0.20f, 0.98f),
+            new Color(1f, 0.93f, 0.90f, 1f)
+        );
+        StyleButton(
+            _replayButton,
+            new Color(0.19f, 0.31f, 0.39f, 0.98f),
+            new Color(0.88f, 0.95f, 1f, 1f)
+        );
+        StyleButton(
+            closeButton,
+            new Color(0.29f, 0.20f, 0.20f, 0.98f),
+            new Color(0.98f, 0.92f, 0.90f, 1f)
+        );
         actions.Add(_deleteButton);
         _replayButton.style.marginLeft = 10f;
         actions.Add(_replayButton);
@@ -561,7 +616,11 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
 
     private void BindRunRow(VisualElement element, int index)
     {
-        if (_runsList?.itemsSource is not List<HistoryRunRecord> items || index < 0 || index >= items.Count)
+        if (
+            _runsList?.itemsSource is not List<HistoryRunRecord> items
+            || index < 0
+            || index >= items.Count
+        )
             return;
 
         var run = items[index];
@@ -591,7 +650,13 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
             else if (!string.IsNullOrWhiteSpace(rank))
             {
                 var palette = GetRankBadgePalette(rank);
-                ConfigurePill(refs.RankPill, HistoryPanelText.RankLabel(rank), palette.Background, palette.Text, true);
+                ConfigurePill(
+                    refs.RankPill,
+                    HistoryPanelText.RankLabel(rank),
+                    palette.Background,
+                    palette.Text,
+                    true
+                );
             }
             else
             {
@@ -632,11 +697,36 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
             new Color(0.89f, 0.94f, 1f, 1f),
             true
         );
-        ConfigureInfoChip(refs.HealthChip, HistoryPanelText.StatHealthShort(), run.MaxHealth?.ToString() ?? "--", new Color(0.63f, 0.98f, 0.35f, 1f));
-        ConfigureInfoChip(refs.PrestigeChip, HistoryPanelText.StatPrestigeShort(), run.Prestige?.ToString() ?? "--", new Color(1f, 0.65f, 0.13f, 1f));
-        ConfigureInfoChip(refs.LevelChip, HistoryPanelText.StatLevelShort(), run.Level?.ToString() ?? "--", new Color(0.36f, 0.79f, 1f, 1f));
-        ConfigureInfoChip(refs.IncomeChip, HistoryPanelText.StatIncomeShort(), run.Income?.ToString() ?? "--", new Color(1f, 0.86f, 0.10f, 1f));
-        ConfigureInfoChip(refs.GoldChip, HistoryPanelText.StatGoldShort(), run.Gold?.ToString() ?? "--", new Color(1f, 0.86f, 0.10f, 1f));
+        ConfigureInfoChip(
+            refs.HealthChip,
+            HistoryPanelText.StatHealthShort(),
+            run.MaxHealth?.ToString() ?? "--",
+            new Color(0.63f, 0.98f, 0.35f, 1f)
+        );
+        ConfigureInfoChip(
+            refs.PrestigeChip,
+            HistoryPanelText.StatPrestigeShort(),
+            run.Prestige?.ToString() ?? "--",
+            new Color(1f, 0.65f, 0.13f, 1f)
+        );
+        ConfigureInfoChip(
+            refs.LevelChip,
+            HistoryPanelText.StatLevelShort(),
+            run.Level?.ToString() ?? "--",
+            new Color(0.36f, 0.79f, 1f, 1f)
+        );
+        ConfigureInfoChip(
+            refs.IncomeChip,
+            HistoryPanelText.StatIncomeShort(),
+            run.Income?.ToString() ?? "--",
+            new Color(1f, 0.86f, 0.10f, 1f)
+        );
+        ConfigureInfoChip(
+            refs.GoldChip,
+            HistoryPanelText.StatGoldShort(),
+            run.Gold?.ToString() ?? "--",
+            new Color(1f, 0.86f, 0.10f, 1f)
+        );
         ApplyRunRowState(refs, _runsList?.selectedIndex == index);
     }
 
@@ -678,7 +768,11 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         var opponentRow = CreateInfoChipRow(content, 6f, 6f);
         var opponentHeroPill = CreateInlinePill(opponentRow, 64f);
         SetFixedPillWidth(opponentHeroPill, 80f);
-        var opponentSummaryChip = CreateInfoChip(opponentRow, HistoryPanelText.OpponentSideShort(), 100f);
+        var opponentSummaryChip = CreateInfoChip(
+            opponentRow,
+            HistoryPanelText.OpponentSideShort(),
+            100f
+        );
         opponentSummaryChip.style.marginRight = 0f;
         opponentSummaryChip.style.marginLeft = 8f;
         var opponentName = CreateInlineText(opponentRow, 12, new Color(0.76f, 0.80f, 0.87f, 0.92f));
@@ -708,7 +802,11 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
 
     private void BindBattleRow(VisualElement element, int index)
     {
-        if (_battleList?.itemsSource is not List<HistoryBattleRecord> items || index < 0 || index >= items.Count)
+        if (
+            _battleList?.itemsSource is not List<HistoryBattleRecord> items
+            || index < 0
+            || index >= items.Count
+        )
             return;
 
         var battle = items[index];
@@ -740,8 +838,9 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
             new Color(0.96f, 0.77f, 0.39f, 1f)
         );
         refs.OpponentName.text = battle.OpponentName ?? string.Empty;
-        refs.OpponentName.style.display =
-            string.IsNullOrWhiteSpace(refs.OpponentName.text) ? DisplayStyle.None : DisplayStyle.Flex;
+        refs.OpponentName.style.display = string.IsNullOrWhiteSpace(refs.OpponentName.text)
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
         ApplyBattleRowState(refs, _battleList?.selectedIndex == index, battle);
     }
 
@@ -834,10 +933,7 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
 
     private static Button CreateButton(string text, Action onClick, float width, float height)
     {
-        var button = new Button(() => onClick())
-        {
-            text = text,
-        };
+        var button = new Button(() => onClick()) { text = text };
         button.style.width = width;
         button.style.minWidth = width;
         button.style.maxWidth = width;
@@ -1010,7 +1106,11 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         return label;
     }
 
-    private static VisualElement CreateInfoChipRow(VisualElement parent, float spacing, float marginTop)
+    private static VisualElement CreateInfoChipRow(
+        VisualElement parent,
+        float spacing,
+        float marginTop
+    )
     {
         var row = new VisualElement();
         row.style.flexDirection = FlexDirection.Row;
@@ -1146,15 +1246,15 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         var background =
             string.Equals(rawStatus, "completed", StringComparison.OrdinalIgnoreCase)
                 ? new Color(0.16f, 0.30f, 0.24f, 0.74f)
-                : string.Equals(rawStatus, "abandoned", StringComparison.OrdinalIgnoreCase)
-                    ? new Color(0.31f, 0.22f, 0.15f, 0.72f)
-                    : new Color(0.18f, 0.24f, 0.33f, 0.72f);
+            : string.Equals(rawStatus, "abandoned", StringComparison.OrdinalIgnoreCase)
+                ? new Color(0.31f, 0.22f, 0.15f, 0.72f)
+            : new Color(0.18f, 0.24f, 0.33f, 0.72f);
         var text =
             string.Equals(rawStatus, "completed", StringComparison.OrdinalIgnoreCase)
                 ? new Color(0.82f, 0.98f, 0.90f, 0.90f)
-                : string.Equals(rawStatus, "abandoned", StringComparison.OrdinalIgnoreCase)
-                    ? new Color(0.99f, 0.90f, 0.85f, 0.88f)
-                    : new Color(0.84f, 0.92f, 1f, 0.88f);
+            : string.Equals(rawStatus, "abandoned", StringComparison.OrdinalIgnoreCase)
+                ? new Color(0.99f, 0.90f, 0.85f, 0.88f)
+            : new Color(0.84f, 0.92f, 1f, 0.88f);
         ConfigurePill(pill, status, background, text, true);
     }
 
@@ -1176,7 +1276,13 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         var rank = HistoryPanelFormatter.NormalizeRank(rawRank);
         if (string.Equals(rank, "Legendary", StringComparison.OrdinalIgnoreCase))
         {
-            ConfigurePill(pill, HistoryPanelText.RankLabel(rank, rating), ColorFromRgb(241, 54, 41), Color.white, true);
+            ConfigurePill(
+                pill,
+                HistoryPanelText.RankLabel(rank, rating),
+                ColorFromRgb(241, 54, 41),
+                Color.white,
+                true
+            );
             return;
         }
 
@@ -1187,7 +1293,13 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         }
 
         var palette = GetRankBadgePalette(rank);
-        ConfigurePill(pill, HistoryPanelText.RankLabel(rank), palette.Background, palette.Text, true);
+        ConfigurePill(
+            pill,
+            HistoryPanelText.RankLabel(rank),
+            palette.Background,
+            palette.Text,
+            true
+        );
     }
 
     private static void BindRunOutcomeBubble(Label bubble, HistoryRunRecord run)
@@ -1234,7 +1346,11 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
     {
         if (selected)
         {
-            StyleButton(button, new Color(0.78f, 0.60f, 0.24f, 0.98f), new Color(0.10f, 0.07f, 0.03f, 1f));
+            StyleButton(
+                button,
+                new Color(0.78f, 0.60f, 0.24f, 0.98f),
+                new Color(0.10f, 0.07f, 0.03f, 1f)
+            );
             return;
         }
 
@@ -1245,7 +1361,11 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
     {
         if (selected)
         {
-            StyleButton(button, new Color(0.78f, 0.60f, 0.24f, 0.98f), new Color(0.10f, 0.07f, 0.03f, 1f));
+            StyleButton(
+                button,
+                new Color(0.78f, 0.60f, 0.24f, 0.98f),
+                new Color(0.10f, 0.07f, 0.03f, 1f)
+            );
             return;
         }
 
@@ -1254,16 +1374,28 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
 
     private static void RefreshDeleteButton(Button button, string text, bool enabled)
     {
-        var isConfirmState = string.Equals(text, HistoryPanelText.DeleteConfirm(), StringComparison.Ordinal);
+        var isConfirmState = string.Equals(
+            text,
+            HistoryPanelText.DeleteConfirm(),
+            StringComparison.Ordinal
+        );
         if (isConfirmState)
         {
-            StyleButton(button, new Color(0.60f, 0.19f, 0.16f, 0.98f), new Color(1f, 0.94f, 0.92f, 1f));
+            StyleButton(
+                button,
+                new Color(0.60f, 0.19f, 0.16f, 0.98f),
+                new Color(1f, 0.94f, 0.92f, 1f)
+            );
             return;
         }
 
         if (!enabled)
         {
-            StyleButton(button, new Color(0.28f, 0.20f, 0.19f, 0.88f), new Color(0.86f, 0.82f, 0.80f, 0.88f));
+            StyleButton(
+                button,
+                new Color(0.28f, 0.20f, 0.19f, 0.88f),
+                new Color(0.86f, 0.82f, 0.80f, 0.88f)
+            );
             return;
         }
 
@@ -1272,11 +1404,9 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
 
     private static string ShortenBattleId(string battleId)
     {
-        return string.IsNullOrWhiteSpace(battleId)
-            ? "-"
-            : battleId.Length <= 12
-                ? battleId
-                : battleId[..12];
+        return string.IsNullOrWhiteSpace(battleId) ? "-"
+            : battleId.Length <= 12 ? battleId
+            : battleId[..12];
     }
 
     private static void ApplyRunRowState(RunRowRefs refs, bool selected)
@@ -1301,36 +1431,43 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         refs.OutcomeBubble.style.opacity = selected ? 1f : 0.96f;
     }
 
-    private static void ApplyBattleRowState(BattleRowRefs refs, bool selected, HistoryBattleRecord battle)
+    private static void ApplyBattleRowState(
+        BattleRowRefs refs,
+        bool selected,
+        HistoryBattleRecord battle
+    )
     {
         var isWin = HistoryPanelFormatter.IsBattleWin(battle);
         var isLoss = HistoryPanelFormatter.IsBattleLoss(battle);
 
-        refs.Root.style.backgroundColor =
-            selected
-                ? isWin ? new Color(0.13f, 0.23f, 0.22f, 0.99f) :
-                  isLoss ? new Color(0.24f, 0.18f, 0.16f, 0.99f) :
-                  new Color(0.18f, 0.24f, 0.31f, 0.99f)
-                : isWin ? new Color(0.10f, 0.15f, 0.16f, 0.98f) :
-                  isLoss ? new Color(0.15f, 0.13f, 0.15f, 0.98f) :
-                  new Color(0.13f, 0.15f, 0.18f, 0.98f);
+        refs.Root.style.backgroundColor = selected
+            ? isWin
+                ? new Color(0.13f, 0.23f, 0.22f, 0.99f)
+                : isLoss
+                    ? new Color(0.24f, 0.18f, 0.16f, 0.99f)
+                    : new Color(0.18f, 0.24f, 0.31f, 0.99f)
+            : isWin
+                ? new Color(0.10f, 0.15f, 0.16f, 0.98f)
+                : isLoss
+                    ? new Color(0.15f, 0.13f, 0.15f, 0.98f)
+                    : new Color(0.13f, 0.15f, 0.18f, 0.98f);
 
         refs.Accent.style.backgroundColor =
-            isWin ? new Color(0.23f, 0.54f, 0.47f, 0.95f) :
-            isLoss ? new Color(0.63f, 0.36f, 0.24f, 0.95f) :
-            new Color(0.34f, 0.47f, 0.64f, 0.95f);
+            isWin ? new Color(0.23f, 0.54f, 0.47f, 0.95f)
+            : isLoss ? new Color(0.63f, 0.36f, 0.24f, 0.95f)
+            : new Color(0.34f, 0.47f, 0.64f, 0.95f);
         var borderColor =
-            isWin ? new Color(0.22f, 0.44f, 0.40f, 0.42f) :
-            isLoss ? new Color(0.44f, 0.27f, 0.20f, 0.42f) :
-            new Color(0.24f, 0.31f, 0.41f, 0.42f);
+            isWin ? new Color(0.22f, 0.44f, 0.40f, 0.42f)
+            : isLoss ? new Color(0.44f, 0.27f, 0.20f, 0.42f)
+            : new Color(0.24f, 0.31f, 0.41f, 0.42f);
         refs.Root.style.borderLeftColor = borderColor;
         refs.Root.style.borderRightColor = borderColor;
         refs.Root.style.borderTopColor = borderColor;
         refs.Root.style.borderBottomColor = borderColor;
         refs.DayBubble.style.backgroundColor =
-            isWin ? new Color(0.13f, 0.28f, 0.23f, 0.98f) :
-            isLoss ? new Color(0.33f, 0.20f, 0.15f, 0.98f) :
-            new Color(0.18f, 0.23f, 0.31f, 0.98f);
+            isWin ? new Color(0.13f, 0.28f, 0.23f, 0.98f)
+            : isLoss ? new Color(0.33f, 0.20f, 0.15f, 0.98f)
+            : new Color(0.18f, 0.23f, 0.31f, 0.98f);
         refs.DayBubble.style.borderLeftColor = borderColor;
         refs.DayBubble.style.borderRightColor = borderColor;
         refs.DayBubble.style.borderTopColor = borderColor;

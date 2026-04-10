@@ -36,7 +36,8 @@ internal static class LegendaryPositionDisplayFormatter
 
     private static int? ResolvePosition(int? fallbackPosition)
     {
-        return BppClientCacheBridge.TryGetPlayerLeaderboardPosition(out var cachedPosition)
+        return
+            BppClientCacheBridge.TryGetPlayerLeaderboardPosition(out var cachedPosition)
             && cachedPosition.HasValue
             ? cachedPosition
             : fallbackPosition;

@@ -87,8 +87,7 @@ var fallbackPath = InvokeBuildRelativePath(
     capturedAtLocal: new DateTimeOffset(2026, 4, 7, 9, 5, 4, TimeSpan.FromHours(-7))
 );
 Assert(
-    fallbackPath
-        == Path.Combine("2026-04-07", "2026-04-07_09-05-04-000_capture_run-anonymous.png"),
+    fallbackPath == Path.Combine("2026-04-07", "2026-04-07_09-05-04-000_capture_run-anonymous.png"),
     $"Expected anonymous fallback path, got: {fallbackPath}"
 );
 
@@ -137,12 +136,11 @@ static void InvokeResetForNewRun(Type type, object instance)
 
 static void InvokeMarkAttemptAborted(Type type, object instance)
 {
-    var method = type.GetMethod(
-        "MarkAttemptAborted",
-        BindingFlags.Public | BindingFlags.Instance
-    );
+    var method = type.GetMethod("MarkAttemptAborted", BindingFlags.Public | BindingFlags.Instance);
     if (method == null)
-        throw new InvalidOperationException($"Method not found: {type.FullName}.MarkAttemptAborted");
+        throw new InvalidOperationException(
+            $"Method not found: {type.FullName}.MarkAttemptAborted"
+        );
 
     method.Invoke(instance, []);
 }
@@ -203,9 +201,7 @@ static string InvokeBuildRelativePath(Type type, string? runId, DateTimeOffset c
         [typeof(string), typeof(DateTimeOffset)]
     );
     if (method == null)
-        throw new InvalidOperationException(
-            $"Method not found: {type.FullName}.BuildRelativePath"
-        );
+        throw new InvalidOperationException($"Method not found: {type.FullName}.BuildRelativePath");
 
     return (string?)method.Invoke(null, [runId, capturedAtLocal])
         ?? throw new InvalidOperationException("BuildRelativePath returned null.");
@@ -224,13 +220,7 @@ static string InvokeBuildRelativePathWithMetadata(
     var method = pathBuilderType.GetMethod(
         "BuildRelativePath",
         BindingFlags.Public | BindingFlags.Static,
-        [
-            typeof(string),
-            typeof(DateTimeOffset),
-            captureSourceType,
-            typeof(string),
-            typeof(string),
-        ]
+        [typeof(string), typeof(DateTimeOffset), captureSourceType, typeof(string), typeof(string)]
     );
     if (method == null)
     {
@@ -239,10 +229,18 @@ static string InvokeBuildRelativePathWithMetadata(
         );
     }
 
-    return (string?)method.Invoke(
-        null,
-        [runId, capturedAtLocal, Enum.Parse(captureSourceType, captureSource), screenshotId, battleId]
-    ) ?? throw new InvalidOperationException("Metadata BuildRelativePath returned null.");
+    return (string?)
+            method.Invoke(
+                null,
+                [
+                    runId,
+                    capturedAtLocal,
+                    Enum.Parse(captureSourceType, captureSource),
+                    screenshotId,
+                    battleId,
+                ]
+            )
+        ?? throw new InvalidOperationException("Metadata BuildRelativePath returned null.");
 }
 
 static void Assert(bool condition, string message)

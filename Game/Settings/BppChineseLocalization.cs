@@ -459,7 +459,8 @@ internal static class BppChineseLocalization
 
     internal static BppChineseLocaleMode GetCurrentMode()
     {
-        return BppRuntimeHost.Config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland;
+        return BppRuntimeHost.Config.ChineseLocaleModeConfig?.Value
+            ?? BppChineseLocaleMode.Mainland;
     }
 
     internal static BppChineseLocaleMode GetNextMode(BppChineseLocaleMode mode)
@@ -472,11 +473,7 @@ internal static class BppChineseLocalization
         };
     }
 
-    internal static string ResolveChineseText(
-        string mainland,
-        string? taiwan,
-        string? hongKong
-    )
+    internal static string ResolveChineseText(string mainland, string? taiwan, string? hongKong)
     {
         return ResolveChineseText(mainland, taiwan, hongKong, GetCurrentMode());
     }
@@ -538,15 +535,13 @@ internal static class BppChineseLocalization
 
     private static string ApplyTaiwanTerms(string text)
     {
-        return text
-            .Replace("數據庫", "資料庫", StringComparison.Ordinal)
+        return text.Replace("數據庫", "資料庫", StringComparison.Ordinal)
             .Replace("查看", "檢視", StringComparison.Ordinal);
     }
 
     private static string ApplyHongKongTerms(string text)
     {
-        return text
-            .Replace("數據庫", "資料庫", StringComparison.Ordinal)
+        return text.Replace("數據庫", "資料庫", StringComparison.Ordinal)
             .Replace("查看", "檢視", StringComparison.Ordinal);
     }
 }

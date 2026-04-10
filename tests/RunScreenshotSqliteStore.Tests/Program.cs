@@ -7,7 +7,10 @@ var sourceType = RequireType("BazaarPlusPlus.Game.Screenshots.RunScreenshotCaptu
 var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Persistence.RunScreenshotSqliteStore");
 
 var ctor = storeType.GetConstructor([typeof(string)]);
-Assert(ctor != null, "RunScreenshotSqliteStore should expose a constructor taking the database path.");
+Assert(
+    ctor != null,
+    "RunScreenshotSqliteStore should expose a constructor taking the database path."
+);
 
 var tempRoot = Path.Combine(
     Path.GetTempPath(),
@@ -38,7 +41,10 @@ try
                 battleId: null,
                 captureSource: "ManualF9",
                 isPrimary: false,
-                relativePath: Path.Combine("2026-04-08", "2026-04-08_21-30-15-000_manual_run-run-001.png"),
+                relativePath: Path.Combine(
+                    "2026-04-08",
+                    "2026-04-08_21-30-15-000_manual_run-run-001.png"
+                ),
                 localCapturedAt,
                 utcCapturedAt,
                 day: 5,
@@ -60,7 +66,10 @@ try
                 battleId: null,
                 captureSource: "EndOfRunAuto",
                 isPrimary: true,
-                relativePath: Path.Combine("2026-04-08", "2026-04-08_21-30-25-000_final_run-run-001.png"),
+                relativePath: Path.Combine(
+                    "2026-04-08",
+                    "2026-04-08_21-30-25-000_final_run-run-001.png"
+                ),
                 localCapturedAt.AddSeconds(10),
                 utcCapturedAt.AddSeconds(10),
                 day: 10,
@@ -121,7 +130,10 @@ try
         ]
     );
 
-    Assert(File.Exists(dbPath), "RunScreenshotSqliteStore should initialize the SQLite database file.");
+    Assert(
+        File.Exists(dbPath),
+        "RunScreenshotSqliteStore should initialize the SQLite database file."
+    );
 
     using var connection = new SqliteConnection($"Data Source={dbPath}");
     connection.Open();
@@ -229,9 +241,7 @@ finally
     {
         Directory.Delete(tempRoot, recursive: true);
     }
-    catch
-    {
-    }
+    catch { }
 }
 
 Console.WriteLine("Run screenshot SQLite store checks passed.");

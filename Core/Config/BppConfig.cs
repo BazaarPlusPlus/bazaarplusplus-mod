@@ -25,7 +25,11 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; private set; }
 
-    public ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig { get; private set; }
+    public ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig
+    {
+        get;
+        private set;
+    }
 
     public void Initialize(ConfigFile config)
     {

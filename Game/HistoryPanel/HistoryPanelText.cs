@@ -28,50 +28,19 @@ internal static class HistoryPanelText
         "檢視對局、檢查幽靈戰鬥，並快速重播你想看的任意一場。歡迎前往 bazaarplusplus.com 支持 BazaarPlusPlus。-- Xinyu YANG"
     );
 
-    private static readonly LocalizedTextSet RunsTabText = new(
-        "Runs",
-        "对局",
-        "對局",
-        "對局"
-    );
+    private static readonly LocalizedTextSet RunsTabText = new("Runs", "对局", "對局", "對局");
 
-    private static readonly LocalizedTextSet GhostTabText = new(
-        "Ghost",
-        "幽灵",
-        "幽靈",
-        "幽靈"
-    );
+    private static readonly LocalizedTextSet GhostTabText = new("Ghost", "幽灵", "幽靈", "幽靈");
 
-    private static readonly LocalizedTextSet BattlesText = new(
-        "Battles",
-        "战斗",
-        "戰鬥",
-        "戰鬥"
-    );
+    private static readonly LocalizedTextSet BattlesText = new("Battles", "战斗", "戰鬥", "戰鬥");
 
-    private static readonly LocalizedTextSet CloseText = new(
-        "Close",
-        "关闭",
-        "關閉",
-        "關閉"
-    );
+    private static readonly LocalizedTextSet CloseText = new("Close", "关闭", "關閉", "關閉");
 
-    private static readonly LocalizedTextSet ReplayText = new(
-        "Replay",
-        "回放",
-        "重播",
-        "重播"
-    );
+    private static readonly LocalizedTextSet ReplayText = new("Replay", "回放", "重播", "重播");
 
-    private static readonly LocalizedTextSet ReplayUnavailableText = new(
-        "Unavailable",
-        "不可用"
-    );
+    private static readonly LocalizedTextSet ReplayUnavailableText = new("Unavailable", "不可用");
 
-    private static readonly LocalizedTextSet ReplayDisabledInRunText = new(
-        "In Run",
-        "对局中禁用"
-    );
+    private static readonly LocalizedTextSet ReplayDisabledInRunText = new("In Run", "对局中禁用");
 
     private static readonly LocalizedTextSet DownloadReplayText = new(
         "Download Replay",
@@ -80,20 +49,11 @@ internal static class HistoryPanelText
         "下載重播"
     );
 
-    private static readonly LocalizedTextSet DeleteText = new(
-        "Delete",
-        "删除"
-    );
+    private static readonly LocalizedTextSet DeleteText = new("Delete", "删除");
 
-    private static readonly LocalizedTextSet DeleteConfirmText = new(
-        "Sure?",
-        "确认？"
-    );
+    private static readonly LocalizedTextSet DeleteConfirmText = new("Sure?", "确认？");
 
-    private static readonly LocalizedTextSet WorkingText = new(
-        "Working...",
-        "处理中..."
-    );
+    private static readonly LocalizedTextSet WorkingText = new("Working...", "处理中...");
 
     private static readonly LocalizedTextSet RunsSectionSubtitleText = new(
         "Choose one run to see its recorded battles.",
@@ -160,20 +120,11 @@ internal static class HistoryPanelText
         "这个 run 没有记录到战斗。"
     );
 
-    private static readonly LocalizedTextSet AllFilterText = new(
-        "All",
-        "全部"
-    );
+    private static readonly LocalizedTextSet AllFilterText = new("All", "全部");
 
-    private static readonly LocalizedTextSet IWonFilterText = new(
-        "I Won",
-        "我赢了"
-    );
+    private static readonly LocalizedTextSet IWonFilterText = new("I Won", "我赢了");
 
-    private static readonly LocalizedTextSet ILostFilterText = new(
-        "I Lost",
-        "我输了"
-    );
+    private static readonly LocalizedTextSet ILostFilterText = new("I Lost", "我输了");
 
     private static readonly LocalizedTextSet DatabasePrefixText = new(
         "DB",
@@ -182,20 +133,11 @@ internal static class HistoryPanelText
         "資料庫"
     );
 
-    private static readonly LocalizedTextSet DatabaseUnavailableText = new(
-        "Unavailable",
-        "不可用"
-    );
+    private static readonly LocalizedTextSet DatabaseUnavailableText = new("Unavailable", "不可用");
 
-    private static readonly LocalizedTextSet DatabaseConnectedText = new(
-        "Connected",
-        "已连接"
-    );
+    private static readonly LocalizedTextSet DatabaseConnectedText = new("Connected", "已连接");
 
-    private static readonly LocalizedTextSet DatabaseMissingText = new(
-        "Missing",
-        "缺失"
-    );
+    private static readonly LocalizedTextSet DatabaseMissingText = new("Missing", "缺失");
 
     private static readonly LocalizedTextSet UnrankedText = new(
         "Normal",
@@ -204,10 +146,7 @@ internal static class HistoryPanelText
         "普通對局"
     );
 
-    private static readonly LocalizedTextSet UnknownRunText = new(
-        "Unknown Run",
-        "未知 Run"
-    );
+    private static readonly LocalizedTextSet UnknownRunText = new("Unknown Run", "未知 Run");
 
     private static readonly LocalizedTextSet CompletedText = new(
         "Completed",
@@ -230,79 +169,131 @@ internal static class HistoryPanelText
         "進行中"
     );
 
-    private static readonly LocalizedTextSet UnknownText = new(
-        "Unknown",
-        "未知"
-    );
+    private static readonly LocalizedTextSet UnknownText = new("Unknown", "未知");
 
-    private static readonly LocalizedTextSet WinText = new(
-        "Win",
-        "胜利",
-        "勝利",
-        "勝利"
-    );
+    private static readonly LocalizedTextSet WinText = new("Win", "胜利", "勝利", "勝利");
 
-    private static readonly LocalizedTextSet LossText = new(
-        "Loss",
-        "失败",
-        "失敗",
-        "失敗"
-    );
+    private static readonly LocalizedTextSet LossText = new("Loss", "失败", "失敗", "失敗");
 
     internal static string Title() => Resolve(TitleText);
+
     internal static string Subtitle() => Resolve(SubtitleText);
+
     internal static string RunsTab() => Resolve(RunsTabText);
+
     internal static string GhostTab() => Resolve(GhostTabText);
+
     internal static string Battles() => Resolve(BattlesText);
+
     internal static string Close() => Resolve(CloseText);
+
     internal static string Replay() => Resolve(ReplayText);
+
     internal static string ReplayUnavailable() => Resolve(ReplayUnavailableText);
+
     internal static string ReplayDisabledInRun() => Resolve(ReplayDisabledInRunText);
+
     internal static string DownloadReplay() => Resolve(DownloadReplayText);
+
     internal static string Delete() => Resolve(DeleteText);
+
     internal static string DeleteConfirm() => Resolve(DeleteConfirmText);
+
     internal static string Working() => Resolve(WorkingText);
+
     internal static string RunsSectionSubtitle() => Resolve(RunsSectionSubtitleText);
+
     internal static string SelectRunSubtitle() => Resolve(SelectRunSubtitleText);
+
     internal static string NoBattleSelected() => Resolve(NoBattleSelectedText);
+
     internal static string UnknownOpponent() => Resolve(UnknownOpponentText);
+
     internal static string SelectBattleForFooter() => Resolve(SelectBattleForFooterText);
+
     internal static string PreviewUnavailablePrefix() => Resolve(PreviewUnavailablePrefixText);
+
     internal static string PreviewSelectBattle() => Resolve(PreviewSelectBattleText);
+
     internal static string NoRunsFound() => Resolve(NoRunsFoundText);
+
     internal static string NoGhostBattles() => Resolve(NoGhostBattlesText);
+
     internal static string SelectRunFirst() => Resolve(SelectRunFirstText);
+
     internal static string NoRecordedBattles() => Resolve(NoRecordedBattlesText);
+
     internal static string FilterAll() => Resolve(AllFilterText);
+
     internal static string FilterIWon() => Resolve(IWonFilterText);
+
     internal static string FilterILost() => Resolve(ILostFilterText);
+
     internal static string DatabaseUnavailable() => Resolve(DatabaseUnavailableText);
+
     internal static string DatabaseConnected() => Resolve(DatabaseConnectedText);
+
     internal static string DatabaseMissing() => Resolve(DatabaseMissingText);
+
     internal static string Unranked() => Resolve(UnrankedText);
+
     internal static string UnknownRun() => Resolve(UnknownRunText);
+
     internal static string Completed() => Resolve(CompletedText);
+
     internal static string Abandoned() => Resolve(AbandonedText);
+
     internal static string Active() => Resolve(ActiveText);
+
     internal static string Unknown() => Resolve(UnknownText);
+
     internal static string Win() => Resolve(WinText);
+
     internal static string Loss() => Resolve(LossText);
 
     internal static string CountGhost(int count) => FormatCount(count, GhostTab());
+
     internal static string CountRuns(int count) => FormatCount(count, RunsTab());
+
     internal static string CountBattles(int count) => FormatCount(count, Battles());
+
     internal static string DatabaseChip(string status) => $"{Resolve(DatabasePrefixText)} {status}";
+
     internal static string RunBattles(int count) => FormatCount(count, Battles());
+
     internal static string StatHealthShort() => FormatSimple("HP", "生命");
+
     internal static string StatPrestigeShort() => FormatSimple("PRE", "声望", "聲望", "聲望");
+
     internal static string StatLevelShort() => FormatSimple("LVL", "等级", "等級", "等級");
+
     internal static string StatIncomeShort() => FormatSimple("INC", "收入", "收入", "收入");
+
     internal static string StatGoldShort() => FormatSimple("GLD", "金币", "金幣", "金幣");
+
     internal static string PlayerSideShort() => FormatSimple("YOU", "我方", "我方", "我方");
+
     internal static string OpponentSideShort() => FormatSimple("OPP", "对手", "對手", "對手");
-    internal static string HourBadge(int? hour) => FormatSimple(hour.HasValue ? $"H{hour.Value}" : "H?", hour.HasValue ? $"{hour.Value}时" : "?时", hour.HasValue ? $"{hour.Value}時" : "?時", hour.HasValue ? $"{hour.Value}時" : "?時");
-    internal static string DayBadge(int? day) => FormatSimple(day.HasValue ? $"D{day.Value}" : "D?", day.HasValue ? $"{day.Value}天" : "?天", day.HasValue ? $"{day.Value}天" : "?天", day.HasValue ? $"{day.Value}天" : "?天");
-    internal static string DayHourBadge(int? day, int? hour) => $"{DayBadge(day)} {HourBadge(hour)}";
+
+    internal static string HourBadge(int? hour) =>
+        FormatSimple(
+            hour.HasValue ? $"H{hour.Value}" : "H?",
+            hour.HasValue ? $"{hour.Value}时" : "?时",
+            hour.HasValue ? $"{hour.Value}時" : "?時",
+            hour.HasValue ? $"{hour.Value}時" : "?時"
+        );
+
+    internal static string DayBadge(int? day) =>
+        FormatSimple(
+            day.HasValue ? $"D{day.Value}" : "D?",
+            day.HasValue ? $"{day.Value}天" : "?天",
+            day.HasValue ? $"{day.Value}天" : "?天",
+            day.HasValue ? $"{day.Value}天" : "?天"
+        );
+
+    internal static string DayHourBadge(int? day, int? hour) =>
+        $"{DayBadge(day)} {HourBadge(hour)}";
+
     internal static string RunOutcomeBubbleLabel(RunOutcomeTier tier)
     {
         return tier switch
@@ -314,6 +305,7 @@ internal static class HistoryPanelText
             _ => FormatSimple("MIS", "惨淡", "慘淡", "慘淡"),
         };
     }
+
     internal static string BoardSummary(int items, int skills)
     {
         var languageCode = GetLanguageCode();
@@ -326,6 +318,7 @@ internal static class HistoryPanelText
 
         return $"{items} {Pluralize(items, "item", "items")} · {skills} {Pluralize(skills, "skill", "skills")}";
     }
+
     internal static string RunRecord(int wins, int losses)
     {
         var languageCode = GetLanguageCode();
@@ -338,6 +331,7 @@ internal static class HistoryPanelText
 
         return $"{wins}W - {losses}L";
     }
+
     internal static string RankLabel(string? rank, int? rating = null)
     {
         if (string.IsNullOrWhiteSpace(rank))
@@ -422,50 +416,32 @@ internal static class HistoryPanelText
 
     internal static string RunLogDatabasePathUnavailable()
     {
-        return FormatSimple(
-            "History data is unavailable.",
-            "对局数据暂不可用。"
-        );
+        return FormatSimple("History data is unavailable.", "对局数据暂不可用。");
     }
 
     internal static string LoadedRuns(int count)
     {
-        return FormatSimple(
-            $"{count} runs loaded.",
-            $"已载入 {count} 场对局。"
-        );
+        return FormatSimple($"{count} runs loaded.", $"已载入 {count} 场对局。");
     }
 
     internal static string DatabaseFileMissing()
     {
-        return FormatSimple(
-            "No history data yet.",
-            "暂未找到对局数据。"
-        );
+        return FormatSimple("No history data yet.", "暂未找到对局数据。");
     }
 
     internal static string HistoryLoadFailed(string details)
     {
-        return FormatSimple(
-            $"Couldn't load history: {details}",
-            $"载入对局失败：{details}"
-        );
+        return FormatSimple($"Couldn't load history: {details}", $"载入对局失败：{details}");
     }
 
     internal static string CurrentPlayerAccountUnavailable()
     {
-        return FormatSimple(
-            "Current player account is unavailable.",
-            "当前玩家账号不可用。"
-        );
+        return FormatSimple("Current player account is unavailable.", "当前玩家账号不可用。");
     }
 
     internal static string LoadedGhostBattles(int count)
     {
-        return FormatSimple(
-            $"{count} ghost battles loaded.",
-            $"已载入 {count} 场幽灵对战。"
-        );
+        return FormatSimple($"{count} ghost battles loaded.", $"已载入 {count} 场幽灵对战。");
     }
 
     internal static string GhostHistoryLoadFailed(string details)
@@ -478,34 +454,22 @@ internal static class HistoryPanelText
 
     internal static string GhostSyncUnavailable()
     {
-        return FormatSimple(
-            "Ghost sync is unavailable right now.",
-            "幽灵同步暂不可用。"
-        );
+        return FormatSimple("Ghost sync is unavailable right now.", "幽灵同步暂不可用。");
     }
 
     internal static string GhostSyncFailed(string details)
     {
-        return FormatSimple(
-            $"Couldn't sync ghost battles: {details}",
-            $"幽灵同步失败：{details}"
-        );
+        return FormatSimple($"Couldn't sync ghost battles: {details}", $"幽灵同步失败：{details}");
     }
 
     internal static string GhostSyncSucceeded(int count)
     {
-        return FormatSimple(
-            $"{count} ghost battles synced.",
-            $"已同步 {count} 场幽灵对战。"
-        );
+        return FormatSimple($"{count} ghost battles synced.", $"已同步 {count} 场幽灵对战。");
     }
 
     internal static string PanelUnavailable()
     {
-        return FormatSimple(
-            "History panel is unavailable.",
-            "历史面板不可用。"
-        );
+        return FormatSimple("History panel is unavailable.", "历史面板不可用。");
     }
 
     internal static string GhostDeleteUnavailable()
@@ -518,18 +482,12 @@ internal static class HistoryPanelText
 
     internal static string SelectRunToDelete()
     {
-        return FormatSimple(
-            "Select a run to delete.",
-            "请选择要删除的对局。"
-        );
+        return FormatSimple("Select a run to delete.", "请选择要删除的对局。");
     }
 
     internal static string ActiveRunDeleteUnavailable()
     {
-        return FormatSimple(
-            "Active runs cannot be deleted.",
-            "进行中的 run 不能删除。"
-        );
+        return FormatSimple("Active runs cannot be deleted.", "进行中的 run 不能删除。");
     }
 
     internal static string CurrentGameplayRunDeleteUnavailable()
@@ -542,42 +500,27 @@ internal static class HistoryPanelText
 
     internal static string RunLogRepositoryUnavailable()
     {
-        return FormatSimple(
-            "Run log repository is unavailable.",
-            "Run log 仓库不可用。"
-        );
+        return FormatSimple("Run log repository is unavailable.", "Run log 仓库不可用。");
     }
 
     internal static string ReplayActionAlreadyRunning()
     {
-        return FormatSimple(
-            "Replay is already being prepared.",
-            "正在准备回放。"
-        );
+        return FormatSimple("Replay is already being prepared.", "正在准备回放。");
     }
 
     internal static string DownloadingGhostReplay()
     {
-        return FormatSimple(
-            "Fetching replay data...",
-            "正在获取回放数据..."
-        );
+        return FormatSimple("Fetching replay data...", "正在获取回放数据...");
     }
 
     internal static string StartingReplay()
     {
-        return FormatSimple(
-            "Opening replay...",
-            "正在启动回放..."
-        );
+        return FormatSimple("Opening replay...", "正在启动回放...");
     }
 
     internal static string ReplayFailed(string details)
     {
-        return FormatSimple(
-            $"Couldn't start replay: {details}",
-            $"回放失败：{details}"
-        );
+        return FormatSimple($"Couldn't start replay: {details}", $"回放失败：{details}");
     }
 
     internal static string DeleteRunConfirm(string shortRunId)
@@ -590,10 +533,7 @@ internal static class HistoryPanelText
 
     internal static string RunDeleteFailed(string details)
     {
-        return FormatSimple(
-            $"Couldn't delete run: {details}",
-            $"删除对局失败：{details}"
-        );
+        return FormatSimple($"Couldn't delete run: {details}", $"删除对局失败：{details}");
     }
 
     internal static string DeletedRun(string shortRunId, int battleCount)
@@ -606,50 +546,32 @@ internal static class HistoryPanelText
             );
         }
 
-        return FormatSimple(
-            $"Removed run {shortRunId}.",
-            $"已删除对局 {shortRunId}。"
-        );
+        return FormatSimple($"Removed run {shortRunId}.", $"已删除对局 {shortRunId}。");
     }
 
     internal static string GhostSyncAlreadyRunning()
     {
-        return FormatSimple(
-            "Ghost sync is already in progress.",
-            "幽灵同步进行中。"
-        );
+        return FormatSimple("Ghost sync is already in progress.", "幽灵同步进行中。");
     }
 
     internal static string SyncingGhostBattles()
     {
-        return FormatSimple(
-            "Syncing ghost battles...",
-            "正在同步幽灵对战..."
-        );
+        return FormatSimple("Syncing ghost battles...", "正在同步幽灵对战...");
     }
 
     internal static string BattleLoadFailed(string details)
     {
-        return FormatSimple(
-            $"Couldn't load battles: {details}",
-            $"载入战斗失败：{details}"
-        );
+        return FormatSimple($"Couldn't load battles: {details}", $"载入战斗失败：{details}");
     }
 
     internal static string SelectBattleToReplay()
     {
-        return FormatSimple(
-            "Select a battle to replay.",
-            "选择一场战斗进行回放。"
-        );
+        return FormatSimple("Select a battle to replay.", "选择一场战斗进行回放。");
     }
 
     internal static string CombatReplayRuntimeUnavailable()
     {
-        return FormatSimple(
-            "Combat replay runtime is unavailable.",
-            "战斗回放运行时不可用。"
-        );
+        return FormatSimple("Combat replay runtime is unavailable.", "战斗回放运行时不可用。");
     }
 
     internal static string GhostReplayPayloadUnavailable()
@@ -670,10 +592,7 @@ internal static class HistoryPanelText
 
     internal static string StartingReplayForBattle(string battleId)
     {
-        return FormatSimple(
-            $"Starting replay for {battleId}.",
-            $"正在为 {battleId} 启动回放。"
-        );
+        return FormatSimple($"Starting replay for {battleId}.", $"正在为 {battleId} 启动回放。");
     }
 
     internal static string CombatReplayDirectoryUnavailable()
@@ -686,10 +605,7 @@ internal static class HistoryPanelText
 
     internal static string GhostReplayDownloadUnavailable()
     {
-        return FormatSimple(
-            "Ghost replay download is unavailable.",
-            "幽灵回放下载不可用。"
-        );
+        return FormatSimple("Ghost replay download is unavailable.", "幽灵回放下载不可用。");
     }
 
     internal static string FailedToDownloadGhostReplay(string details)
@@ -742,10 +658,7 @@ internal static class HistoryPanelText
 
     internal static string PreviewTuneStatus(string summary)
     {
-        return FormatSimple(
-            "Preview tune: " + summary,
-            "预览调参：" + summary
-        );
+        return FormatSimple("Preview tune: " + summary, "预览调参：" + summary);
     }
 
     internal static string PreviewSelectRunOrBattle()
@@ -766,26 +679,17 @@ internal static class HistoryPanelText
 
     internal static string PreviewRendererInitFailed()
     {
-        return FormatSimple(
-            "Preview renderer failed to initialize.",
-            "预览渲染器初始化失败。"
-        );
+        return FormatSimple("Preview renderer failed to initialize.", "预览渲染器初始化失败。");
     }
 
     internal static string LoadingPreview()
     {
-        return FormatSimple(
-            "Loading preview...",
-            "正在加载预览..."
-        );
+        return FormatSimple("Loading preview...", "正在加载预览...");
     }
 
     internal static string FontProbeSample()
     {
-        return FormatSimple(
-            "Game History Replay",
-            "对局历史回放"
-        );
+        return FormatSimple("Game History Replay", "对局历史回放");
     }
 
     internal static string FontAtlasSample()
@@ -826,9 +730,7 @@ internal static class HistoryPanelText
             }
         }
 
-        var sample = deduped.Count > 0
-            ? new string(deduped.ToArray())
-            : FontProbeSample();
+        var sample = deduped.Count > 0 ? new string(deduped.ToArray()) : FontProbeSample();
         FontAtlasSampleCache[languageCode] = sample;
         return sample;
     }

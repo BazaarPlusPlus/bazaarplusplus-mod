@@ -63,10 +63,11 @@ internal static class NativeMonsterPreviewGetTooltipDataPatch
         if (__result is not CardTooltipData)
             return;
 
-        var augmentedTooltipData = NativeMonsterPreviewShowTooltipsPatch.TryAugmentCachedTooltipData(
-            __instance,
-            "get_tooltip_data"
-        );
+        var augmentedTooltipData =
+            NativeMonsterPreviewShowTooltipsPatch.TryAugmentCachedTooltipData(
+                __instance,
+                "get_tooltip_data"
+            );
         if (augmentedTooltipData != null)
             __result = augmentedTooltipData;
     }

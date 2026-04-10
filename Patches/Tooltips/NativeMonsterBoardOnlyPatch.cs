@@ -37,10 +37,7 @@ internal static class NativeMonsterBoardOnlyMobileLockPatch
     }
 }
 
-[HarmonyPatch(
-    typeof(DesktopLockModeController),
-    "RefreshLockedLegendVisibility"
-)]
+[HarmonyPatch(typeof(DesktopLockModeController), "RefreshLockedLegendVisibility")]
 internal static class NativeMonsterBoardOnlyDesktopLegendRefreshPatch
 {
     [HarmonyPostfix]
@@ -50,10 +47,7 @@ internal static class NativeMonsterBoardOnlyDesktopLegendRefreshPatch
     }
 }
 
-[HarmonyPatch(
-    typeof(MobileLockModeController),
-    "RefreshLockedLegendVisibility"
-)]
+[HarmonyPatch(typeof(MobileLockModeController), "RefreshLockedLegendVisibility")]
 internal static class NativeMonsterBoardOnlyMobileLegendRefreshPatch
 {
     [HarmonyPostfix]

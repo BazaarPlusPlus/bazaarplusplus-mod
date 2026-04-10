@@ -212,7 +212,9 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
     )
     {
         previewModel ??= new PreviewBoardModel();
-        var effectiveTitle = string.IsNullOrWhiteSpace(previewModel.Title) ? title : previewModel.Title;
+        var effectiveTitle = string.IsNullOrWhiteSpace(previewModel.Title)
+            ? title
+            : previewModel.Title;
         source =
             previewModel.Metadata != null
             && previewModel.Metadata.TryGetValue("source", out var metadataSource)
@@ -254,7 +256,10 @@ internal sealed class MonsterLockShowcaseRuntime : MonoBehaviour
 
         if (card == null)
         {
-            BppLog.Warn("MonsterLockShowcaseRuntime", "TryCreateShowcaseRequest aborted because card is null");
+            BppLog.Warn(
+                "MonsterLockShowcaseRuntime",
+                "TryCreateShowcaseRequest aborted because card is null"
+            );
             return false;
         }
 

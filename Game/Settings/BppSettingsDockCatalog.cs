@@ -1,7 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
-using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
@@ -157,7 +157,8 @@ internal static class BppSettingsDockCatalog
 
     private static BppChineseLocaleMode ReadChineseLocaleMode()
     {
-        return BppRuntimeHost.Config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland;
+        return BppRuntimeHost.Config.ChineseLocaleModeConfig?.Value
+            ?? BppChineseLocaleMode.Mainland;
     }
 
     private static void CycleChineseLocaleMode()
@@ -190,7 +191,8 @@ internal static class BppSettingsDockCatalog
         {
             LegendaryPositionDisplayMode.Default => LegendaryPositionDisplayMode.Blank,
             LegendaryPositionDisplayMode.Blank => LegendaryPositionDisplayMode.Fixed999999,
-            LegendaryPositionDisplayMode.Fixed999999 => LegendaryPositionDisplayMode.PositionWithRating,
+            LegendaryPositionDisplayMode.Fixed999999 =>
+                LegendaryPositionDisplayMode.PositionWithRating,
             _ => LegendaryPositionDisplayMode.Default,
         };
     }

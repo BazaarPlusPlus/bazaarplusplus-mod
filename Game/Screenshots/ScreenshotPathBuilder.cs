@@ -25,7 +25,9 @@ internal static class ScreenshotPathBuilder
     {
         var dayFolder = capturedAtLocal.ToString("yyyy-MM-dd");
         var sanitizedRunId = SanitizeRunId(runId);
-        var sanitizedBattleId = string.IsNullOrWhiteSpace(battleId) ? null : SanitizeRunId(battleId);
+        var sanitizedBattleId = string.IsNullOrWhiteSpace(battleId)
+            ? null
+            : SanitizeRunId(battleId);
         var sourceToken = captureSource switch
         {
             RunScreenshotCaptureSource.ManualF9 => "manual",
@@ -34,9 +36,10 @@ internal static class ScreenshotPathBuilder
             RunScreenshotCaptureSource.EndOfRunAuto => "final",
             _ => "capture",
         };
-        var fileName = sanitizedBattleId == null
-            ? $"{capturedAtLocal:yyyy-MM-dd_HH-mm-ss-fff}_{sourceToken}_run-{sanitizedRunId}.png"
-            : $"{capturedAtLocal:yyyy-MM-dd_HH-mm-ss-fff}_{sourceToken}_run-{sanitizedRunId}_battle-{sanitizedBattleId}.png";
+        var fileName =
+            sanitizedBattleId == null
+                ? $"{capturedAtLocal:yyyy-MM-dd_HH-mm-ss-fff}_{sourceToken}_run-{sanitizedRunId}.png"
+                : $"{capturedAtLocal:yyyy-MM-dd_HH-mm-ss-fff}_{sourceToken}_run-{sanitizedRunId}_battle-{sanitizedBattleId}.png";
         return Path.Combine(dayFolder, fileName);
     }
 

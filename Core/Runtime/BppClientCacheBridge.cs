@@ -88,7 +88,8 @@ internal static class BppClientCacheBridge
         if (!TryGetObservableValue("Leaderboard", out var hasData, out var value) || !hasData)
             return false;
 
-        position = ReadNullableIntMember(value, "position") ?? ReadNullableIntMember(value, "Position");
+        position =
+            ReadNullableIntMember(value, "position") ?? ReadNullableIntMember(value, "Position");
         return position.HasValue;
     }
 
