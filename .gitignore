@@ -35,6 +35,3 @@ Thumbs.db
 report-ui
 tools
 .claude
-
-# Local analytics sync secrets
-analytics_sync/.env
