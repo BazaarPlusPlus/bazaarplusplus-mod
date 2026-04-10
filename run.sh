@@ -9,10 +9,12 @@ RESET='\033[0m'
 case "$(uname -s)" in
     Darwin)
         PLATFORM="macOS"
+        GAME_ROOT="$HOME/Library/Application Support/Steam/steamapps/common/The Bazaar"
         MANAGED="$HOME/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed"
         ;;
     MINGW*|MSYS*|CYGWIN*)
         PLATFORM="Windows (Git Bash)"
+        GAME_ROOT="/c/Program Files (x86)/Steam/steamapps/common/The Bazaar"
         MANAGED="/c/Program Files (x86)/Steam/steamapps/common/The Bazaar/TheBazaar_Data/Managed"
         ;;
     *)
@@ -23,12 +25,28 @@ esac
 
 echo -e "${CYAN}== Building on ${GREEN}${PLATFORM}${CYAN} ==${RESET}"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALLER_SQLITE="$SCRIPT_DIR/../bazaarplusplus-installer/src-tauri/resources/SourceForBuild/macos/BepInEx/plugins/libe_sqlite3.dylib"
+GAME_SQLITE="$GAME_ROOT/BepInEx/plugins/libe_sqlite3.dylib"
+
+clear_macos_sqlite_quarantine() {
+    [[ "$PLATFORM" == "macOS" ]] || return 0
+
+    local target
+    for target in "$INSTALLER_SQLITE" "$GAME_SQLITE"; do
+        [[ -f "$target" ]] || continue
+        xattr -d com.apple.quarantine "$target" 2>/dev/null || true
+    done
+}
+
 build() {
     dotnet build -verbosity detailed
 }
 
 build_all() {
+    clear_macos_sqlite_quarantine
     dotnet build -t:BuildAll -verbosity detailed
+    clear_macos_sqlite_quarantine
 }
 
 format() {
