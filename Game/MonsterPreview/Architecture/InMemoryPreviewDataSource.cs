@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 using System.Collections.Generic;
 using System.Linq;
+using BazaarPlusPlus.Game.PreviewSurface;
 
 namespace BazaarPlusPlus.Game.MonsterPreview;
 

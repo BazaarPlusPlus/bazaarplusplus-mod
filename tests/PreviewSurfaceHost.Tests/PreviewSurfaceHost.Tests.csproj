@@ -8,7 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="../../GlobalUsings.cs" Link="GlobalUsings.cs" />
     <Compile
       Include="../../Game/PreviewSurface/Models/PreviewBoardModel.cs"
       Link="PreviewBoardModel.cs"

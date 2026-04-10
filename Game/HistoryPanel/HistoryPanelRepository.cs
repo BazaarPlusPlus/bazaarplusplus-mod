@@ -11,6 +11,7 @@ using BazaarPlusPlus;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.PreviewSurface;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.PreviewSurface;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
