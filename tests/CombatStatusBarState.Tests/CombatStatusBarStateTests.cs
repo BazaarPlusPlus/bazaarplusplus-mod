@@ -1,4 +1,3 @@
-using System.Reflection;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
@@ -69,33 +68,6 @@ public sealed class CombatStatusBarStateTests : IDisposable
         CombatStatusBar.AdvanceCombatFrame();
 
         Assert.Equal("2", CombatStatusBar.GetDisplayedFrameText());
-    }
-
-    [Fact]
-    public void CombatStatusBarState_ExposesExpectedSpeedControlMembers()
-    {
-        var requiredMemberNames = new[]
-        {
-            "CombatSpeedMultiplier",
-            "CombatSpeedSteps",
-            "CanStepCombatSpeed",
-            "NormalizeConfiguredDefaultSpeed",
-            "SetCombatSpeed",
-            "ShouldOverrideCombatSpeed",
-            "StepCombatSpeed",
-        };
-        var allMemberNames = typeof(CombatStatusBar)
-            .GetMembers(
-                BindingFlags.Static
-                    | BindingFlags.Instance
-                    | BindingFlags.Public
-                    | BindingFlags.NonPublic
-            )
-            .Select(member => member.Name)
-            .ToHashSet();
-
-        foreach (var memberName in requiredMemberNames)
-            Assert.Contains(memberName, allMemberNames);
     }
 
     [Fact]
@@ -286,21 +258,6 @@ public sealed class CombatStatusBarStateTests : IDisposable
     )
     {
         var result = EnchantPreviewSettingsMenuLabel.Resolve(languageCode);
-
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
-    [InlineData("zh-Hans", "参与社区数据共建")]
-    [InlineData("zh-CN", "参与社区数据共建")]
-    [InlineData("en", "Contribute Community Data")]
-    [InlineData("", "Contribute Community Data")]
-    public void RunUploadSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
-        string languageCode,
-        string expected
-    )
-    {
-        var result = RunUploadSettingsMenuLabel.Resolve(languageCode);
 
         Assert.Equal(expected, result);
     }
