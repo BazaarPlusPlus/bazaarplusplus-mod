@@ -40,7 +40,7 @@ internal sealed class ScreenshotService
             if (!string.IsNullOrWhiteSpace(directoryPath))
                 Directory.CreateDirectory(directoryPath);
 
-            WriteCurrentFrameToFile(filePath);
+            WriteCurrentFrameToFile(filePath, request.CaptureSource);
             BppLog.Info("ScreenshotService", $"Saved screenshot: {filePath}");
             return new ScreenshotCaptureResult
             {
@@ -61,8 +61,17 @@ internal sealed class ScreenshotService
         }
     }
 
-    private static void WriteCurrentFrameToFile(string filePath)
+    private static void WriteCurrentFrameToFile(
+        string filePath,
+        RunScreenshotCaptureSource captureSource
+    )
     {
+        if (captureSource == RunScreenshotCaptureSource.PvpBattleStart)
+        {
+            if (TryCaptureMainCameraRenderToFile(filePath))
+                return;
+        }
+
         var width = Screen.width;
         var height = Screen.height;
         if (width <= 0 || height <= 0)
@@ -77,7 +86,6 @@ internal sealed class ScreenshotService
             texture = new Texture2D(width, height, TextureFormat.RGB24, mipChain: false);
             texture.ReadPixels(new Rect(0f, 0f, width, height), 0, 0, recalculateMipMaps: false);
             texture.Apply(updateMipmaps: false, makeNoLongerReadable: false);
-
             var pngBytes = texture.EncodeToPNG();
             if (pngBytes == null || pngBytes.Length == 0)
                 throw new InvalidOperationException("Screenshot PNG encoding returned no data.");
@@ -87,6 +95,52 @@ internal sealed class ScreenshotService
         finally
         {
             RenderTexture.active = previousActive;
+            if (texture != null)
+                UnityEngine.Object.Destroy(texture);
+        }
+    }
+
+    private static bool TryCaptureMainCameraRenderToFile(string filePath)
+    {
+        var mainCamera = Camera.main;
+        if (mainCamera == null)
+            return false;
+
+        var width = mainCamera.scaledPixelWidth > 0 ? mainCamera.scaledPixelWidth : Screen.width;
+        var height = mainCamera.scaledPixelHeight > 0 ? mainCamera.scaledPixelHeight : Screen.height;
+        if (width <= 0 || height <= 0)
+            return false;
+
+        Texture2D? texture = null;
+        RenderTexture? renderTexture = null;
+        var previousActive = RenderTexture.active;
+        var previousTargetTexture = mainCamera.targetTexture;
+        var previousRect = mainCamera.rect;
+        try
+        {
+            renderTexture = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
+            mainCamera.targetTexture = renderTexture;
+            mainCamera.rect = new Rect(0f, 0f, 1f, 1f);
+            RenderTexture.active = renderTexture;
+            mainCamera.Render();
+
+            texture = new Texture2D(width, height, TextureFormat.RGB24, mipChain: false);
+            texture.ReadPixels(new Rect(0f, 0f, width, height), 0, 0, recalculateMipMaps: false);
+            texture.Apply(updateMipmaps: false, makeNoLongerReadable: false);
+            var pngBytes = texture.EncodeToPNG();
+            if (pngBytes == null || pngBytes.Length == 0)
+                throw new InvalidOperationException("Screenshot PNG encoding returned no data.");
+
+            File.WriteAllBytes(filePath, pngBytes);
+            return true;
+        }
+        finally
+        {
+            mainCamera.targetTexture = previousTargetTexture;
+            mainCamera.rect = previousRect;
+            RenderTexture.active = previousActive;
+            if (renderTexture != null)
+                RenderTexture.ReleaseTemporary(renderTexture);
             if (texture != null)
                 UnityEngine.Object.Destroy(texture);
         }

@@ -107,7 +107,7 @@ internal sealed class RunScreenshotSqliteStore
         {
             RunScreenshotCaptureSource.ManualF9 => "manual_f9",
             RunScreenshotCaptureSource.SettingsDockCameraButton => "settings_dock_camera_button",
-            RunScreenshotCaptureSource.PvpBattleNextDay => "pvp_battle_nextday",
+            RunScreenshotCaptureSource.PvpBattleStart => "pvp_battle_start",
             RunScreenshotCaptureSource.EndOfRunAuto => "end_of_run_auto",
             _ => "unknown",
         };

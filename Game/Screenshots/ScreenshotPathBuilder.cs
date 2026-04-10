@@ -32,7 +32,7 @@ internal static class ScreenshotPathBuilder
         {
             RunScreenshotCaptureSource.ManualF9 => "manual",
             RunScreenshotCaptureSource.SettingsDockCameraButton => "manual",
-            RunScreenshotCaptureSource.PvpBattleNextDay => "battle",
+            RunScreenshotCaptureSource.PvpBattleStart => "battle",
             RunScreenshotCaptureSource.EndOfRunAuto => "final",
             _ => "capture",
         };

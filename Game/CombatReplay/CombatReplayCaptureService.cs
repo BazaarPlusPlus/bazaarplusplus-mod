@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Core.Events;
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Game.PvpBattles;
 
@@ -53,6 +54,22 @@ internal sealed class CombatReplayCaptureService
             NetMessageGameSim gameSimMessage => AcceptGameSim(gameSimMessage, runId),
             NetMessageCombatSim combatSimMessage => AcceptCombatSim(combatSimMessage, runId),
             _ => null,
+        };
+    }
+
+    public PvpBattleScreenshotContextAvailable? GetPendingBattleScreenshotContext()
+    {
+        if (
+            string.IsNullOrWhiteSpace(_candidate.BattleId)
+            || _candidate.SpawnMessage == null
+            || !_matcher.IsPvpCombatOpeningMessage(_candidate.SpawnMessage)
+        )
+            return null;
+
+        return new PvpBattleScreenshotContextAvailable
+        {
+            BattleId = _candidate.BattleId,
+            RunId = _candidate.RunId,
         };
     }
 
@@ -124,7 +141,7 @@ internal sealed class CombatReplayCaptureService
         CaptureLiveSnapshots(candidate);
 
         var snapshots = _collector.BuildSnapshots(candidate);
-        var battleId = _manifestFactory.CreateBattleId();
+        var battleId = candidate.BattleId ?? _manifestFactory.CreateBattleId();
         var manifest = _manifestFactory.Create(
             battleId,
             sequenceWindow,
@@ -143,7 +160,9 @@ internal sealed class CombatReplayCaptureService
         string? runId
     )
     {
-        return _collector.CreateOpeningCandidate(message, runId);
+        var candidate = _collector.CreateOpeningCandidate(message, runId);
+        candidate.BattleId = _manifestFactory.CreateBattleId();
+        return candidate;
     }
 
     private void CaptureLiveSnapshots(CombatReplaySequenceCandidate candidate)

@@ -96,7 +96,7 @@ var metadataPath = InvokeBuildRelativePathWithMetadata(
     captureSourceType,
     runId: "Run-42/Final",
     capturedAtLocal: new DateTimeOffset(2026, 4, 7, 21, 30, 15, TimeSpan.FromHours(8)),
-    captureSource: "PvpBattleNextDay",
+    captureSource: "PvpBattleStart",
     screenshotId: "shot-001",
     battleId: "battle-42"
 );

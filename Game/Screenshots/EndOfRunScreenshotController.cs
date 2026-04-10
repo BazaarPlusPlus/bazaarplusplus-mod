@@ -21,14 +21,10 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         typeof(EndOfRunScreenController),
         "OnContinueClick"
     )!;
-    private static readonly System.Reflection.MethodInfo BattleContinueMethod = AccessTools.Method(
-        typeof(BoardRecapReplayButtonsController),
-        "Continue"
-    )!;
     private static EndOfRunScreenshotController? _current;
     private readonly EndOfRunScreenshotGate _gate = new();
     private bool _battleCaptureInFlight;
-    private bool _allowNextBattleContinuePassthrough;
+    private bool _isCombatActive;
     private ScreenshotService? _screenshotService;
     private RunScreenshotSqliteStore? _screenshotStore;
     private IDisposable? _runInitializedSubscription;
@@ -62,6 +58,8 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         Events.RunStarted.AddListener(OnRunStarted, this);
         Events.RunEnded.AddListener(OnRunEnded, this);
         Events.RunInterrupted.AddListener(OnRunInterrupted, this);
+        Events.CombatStarted.AddListener(OnCombatStarted, this);
+        Events.CombatEnded.AddListener(OnCombatEnded, this);
         _runInitializedSubscription = BppRuntimeHost.EventBus.Subscribe<RunInitializedObserved>(
             OnRunInitializedObserved
         );
@@ -76,6 +74,8 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         Events.RunStarted.RemoveListener(OnRunStarted);
         Events.RunEnded.RemoveListener(OnRunEnded);
         Events.RunInterrupted.RemoveListener(OnRunInterrupted);
+        Events.CombatStarted.RemoveListener(OnCombatStarted);
+        Events.CombatEnded.RemoveListener(OnCombatEnded);
         _runInitializedSubscription?.Dispose();
         _runInitializedSubscription = null;
         _battleScreenshotContextSubscription?.Dispose();
@@ -118,6 +118,17 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         ClearPendingBattleScreenshot();
     }
 
+    private void OnCombatStarted()
+    {
+        _isCombatActive = true;
+        TryStartBattleScreenshotCapture();
+    }
+
+    private void OnCombatEnded()
+    {
+        _isCombatActive = false;
+    }
+
     private void OnRunInitializedObserved(RunInitializedObserved observed)
     {
         _currentRunId = string.IsNullOrWhiteSpace(observed.RunId) ? null : observed.RunId;
@@ -135,14 +146,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             BattleId = available.BattleId,
             RunId = string.IsNullOrWhiteSpace(available.RunId) ? null : available.RunId,
         };
-    }
-
-    public static bool TryCaptureFirstContinue(
-        EndOfRunScreenController controller,
-        bool isInteractionBlocked
-    )
-    {
-        return _current?.CaptureFirstContinue(controller, isInteractionBlocked) == true;
+        TryStartBattleScreenshotCapture();
     }
 
     public static bool TryConsumeContinuePassthrough()
@@ -153,23 +157,6 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     public static bool ShouldSuppressContinueWhileCaptureInFlight()
     {
         return _current?.GetShouldSuppressContinueWhileCaptureInFlight() == true;
-    }
-
-    public static bool TryCapturePvpBattleNextDayContinue(
-        BoardRecapReplayButtonsController controller
-    )
-    {
-        return _current?.CapturePvpBattleNextDayContinue(controller) == true;
-    }
-
-    public static bool TryConsumePvpBattleContinuePassthrough()
-    {
-        return _current?.ConsumePvpBattleContinuePassthrough() == true;
-    }
-
-    public static bool ShouldSuppressPvpBattleContinueWhileCaptureInFlight()
-    {
-        return _current?.GetShouldSuppressPvpBattleContinueWhileCaptureInFlight() == true;
     }
 
     public static void RequestManualScreenshot(
@@ -199,6 +186,14 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private bool GetShouldSuppressContinueWhileCaptureInFlight()
     {
         return _gate.IsAttemptInFlight();
+    }
+
+    public static bool TryCaptureFirstContinue(
+        EndOfRunScreenController controller,
+        bool isInteractionBlocked
+    )
+    {
+        return _current?.CaptureFirstContinue(controller, isInteractionBlocked) == true;
     }
 
     private bool CaptureFirstContinue(
@@ -249,31 +244,26 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         ContinueClickMethod.Invoke(controller, []);
     }
 
-    private bool CapturePvpBattleNextDayContinue(BoardRecapReplayButtonsController controller)
+    private bool TryStartBattleScreenshotCapture()
     {
         if (_screenshotService == null)
             return false;
-        if (_battleCaptureInFlight)
+        var pendingBattleScreenshot = _pendingBattleScreenshot;
+        if (!_isCombatActive || _battleCaptureInFlight)
             return false;
-        if (_pendingBattleScreenshot == null || _pendingBattleScreenshot.Captured)
-            return false;
-        if (Data.NewDayTransitionController?.HasPendingDayChanged != true)
+        if (pendingBattleScreenshot == null || pendingBattleScreenshot.Captured)
             return false;
 
         _battleCaptureInFlight = true;
-        StartCoroutine(CaptureBattleAndContinue(controller, _pendingBattleScreenshot));
+        StartCoroutine(CaptureBattleStartScreenshot(pendingBattleScreenshot!));
         return true;
     }
 
-    private IEnumerator CaptureBattleAndContinue(
-        BoardRecapReplayButtonsController controller,
-        PvpBattlePendingScreenshotContext context
-    )
+    private IEnumerator CaptureBattleStartScreenshot(PvpBattlePendingScreenshotContext context)
     {
         ScreenshotCaptureResult? capture = null;
         using (BeginUiSuppression())
         {
-            yield return new WaitForEndOfFrame();
             capture = _screenshotService?.CaptureCurrentFrame(
                 new ScreenshotCaptureRequest
                 {
@@ -281,7 +271,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                         ? context.RunId
                         : ResolveRunId(),
                     BattleId = context.BattleId,
-                    CaptureSource = RunScreenshotCaptureSource.PvpBattleNextDay,
+                    CaptureSource = RunScreenshotCaptureSource.PvpBattleStart,
                 }
             );
         }
@@ -295,29 +285,12 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         {
             BppLog.Warn(
                 "BattleScreenshot",
-                $"Failed to queue next-day screenshot for battle {context.BattleId}."
+                $"Failed to queue combat-start screenshot for battle {context.BattleId}."
             );
         }
 
         _battleCaptureInFlight = false;
-        yield return null;
-
-        _allowNextBattleContinuePassthrough = true;
-        BattleContinueMethod.Invoke(controller, []);
-    }
-
-    private bool ConsumePvpBattleContinuePassthrough()
-    {
-        if (!_allowNextBattleContinuePassthrough)
-            return false;
-
-        _allowNextBattleContinuePassthrough = false;
-        return true;
-    }
-
-    private bool GetShouldSuppressPvpBattleContinueWhileCaptureInFlight()
-    {
-        return _battleCaptureInFlight;
+        yield break;
     }
 
     private void PersistCapture(ScreenshotCaptureResult? capture, bool isPrimary = false)
@@ -339,7 +312,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     {
         _pendingBattleScreenshot = null;
         _battleCaptureInFlight = false;
-        _allowNextBattleContinuePassthrough = false;
+        _isCombatActive = false;
     }
 
     private string? ResolveRunId()

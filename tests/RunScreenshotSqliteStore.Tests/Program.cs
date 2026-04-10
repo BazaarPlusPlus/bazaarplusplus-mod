@@ -89,7 +89,7 @@ try
                 screenshotId: "shot-battle-001",
                 runId: "run-001",
                 battleId: "battle-001",
-                captureSource: "PvpBattleNextDay",
+                captureSource: "PvpBattleStart",
                 isPrimary: false,
                 relativePath: Path.Combine(
                     "2026-04-08",
@@ -182,6 +182,14 @@ try
         ) == "settings_dock_camera_button",
         "run_screenshots should serialize settings dock camera screenshots with a dedicated source."
     );
+    Assert(
+        GetString(
+            connection,
+            "SELECT capture_source FROM run_screenshots WHERE screenshot_id = $id;",
+            "shot-battle-001"
+        ) == "pvp_battle_start",
+        "run_screenshots should serialize battle-start screenshots with a dedicated source."
+    );
 
     ExpectSqliteConstraint(
         () =>
@@ -194,7 +202,7 @@ try
                         screenshotId: "shot-battle-002",
                         runId: "run-001",
                         battleId: "battle-001",
-                        captureSource: "PvpBattleNextDay",
+                        captureSource: "PvpBattleStart",
                         isPrimary: false,
                         relativePath: Path.Combine("2026-04-08", "duplicate-battle.png"),
                         localCapturedAt.AddSeconds(25),

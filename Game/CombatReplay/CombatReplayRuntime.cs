@@ -50,6 +50,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
     private CombatReplayCaptureService? _captureService;
     private CombatReplayLoader? _loader;
     private CombatReplayController? _controller;
+    private string? _lastPublishedBattleScreenshotContextId;
     private bool _returnToMenuAfterReplay;
     private bool _bootstrappedReplayActive;
     private bool _isReplayStartInProgress;
@@ -184,21 +185,28 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
                 message,
                 BppRuntimeHost.RunContext.CurrentServerRunId
             );
+            var pendingBattleScreenshotContext =
+                _captureService.GetPendingBattleScreenshotContext();
+            if (pendingBattleScreenshotContext == null)
+            {
+                _lastPublishedBattleScreenshotContextId = null;
+            }
+            else if (
+                !string.Equals(
+                    _lastPublishedBattleScreenshotContextId,
+                    pendingBattleScreenshotContext.BattleId,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                _lastPublishedBattleScreenshotContextId = pendingBattleScreenshotContext.BattleId;
+                BppRuntimeHost.EventBus.Publish(pendingBattleScreenshotContext);
+            }
             if (artifact == null)
                 return;
 
             var payload = artifact.Payload;
             var manifest = artifact.Manifest;
-            if (string.Equals(manifest.CombatKind, "PVPCombat", StringComparison.Ordinal))
-            {
-                BppRuntimeHost.EventBus.Publish(
-                    new PvpBattleScreenshotContextAvailable
-                    {
-                        BattleId = manifest.BattleId,
-                        RunId = manifest.RunId,
-                    }
-                );
-            }
             _persistenceQueue.Enqueue(payload, manifest);
         }
         catch (Exception ex)

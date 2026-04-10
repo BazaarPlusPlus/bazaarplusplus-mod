@@ -5,6 +5,6 @@ internal enum RunScreenshotCaptureSource
 {
     ManualF9,
     SettingsDockCameraButton,
-    PvpBattleNextDay,
+    PvpBattleStart,
     EndOfRunAuto,
 }
