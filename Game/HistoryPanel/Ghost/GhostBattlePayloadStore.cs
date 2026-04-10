@@ -1,13 +1,12 @@
 #nullable enable
 using System;
 using System.IO;
-using BazaarPlusPlus.Game.ModApi;
-using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
 internal sealed class GhostBattlePayloadStore
 {
+    private const string FileSuffix = ".ghost.mpack.gz";
     private readonly string _rootPath;
 
     public GhostBattlePayloadStore(string rootPath)
@@ -26,10 +25,7 @@ internal sealed class GhostBattlePayloadStore
         if (string.IsNullOrWhiteSpace(payload.BattleId))
             throw new ArgumentException("Battle id is required.", nameof(payload));
 
-        File.WriteAllText(
-            GetFilePath(payload.BattleId),
-            JsonConvert.SerializeObject(payload, ModApiSerialization.SerializerSettings)
-        );
+        File.WriteAllBytes(GetFilePath(payload.BattleId), GhostBattlePayloadCodec.Serialize(payload));
     }
 
     public GhostBattlePayload? Load(string battleId)
@@ -43,10 +39,7 @@ internal sealed class GhostBattlePayloadStore
 
         try
         {
-            return JsonConvert.DeserializeObject<GhostBattlePayload>(
-                File.ReadAllText(filePath),
-                ModApiSerialization.SerializerSettings
-            );
+            return GhostBattlePayloadCodec.Deserialize(File.ReadAllBytes(filePath));
         }
         catch (Exception ex)
         {
@@ -70,6 +63,6 @@ internal sealed class GhostBattlePayloadStore
 
     private string GetFilePath(string battleId)
     {
-        return Path.Combine(_rootPath, $"{battleId}.ghost.json");
+        return Path.Combine(_rootPath, $"{battleId}{FileSuffix}");
     }
 }

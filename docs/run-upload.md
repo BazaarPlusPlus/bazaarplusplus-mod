@@ -2,27 +2,26 @@
 
 ## Scope
 
-当前上传实现是一个可选的后台同步层，建立在本地 SQLite 之上。
+当前上传实现是一个可选的后台同步层，建立在本地 SQLite、combat replay payload 和 installer 写入的 V3 identity 文件之上。
 
 - 本地 SQLite 仍然是 source of truth。
 - 默认开启。
 - 仅当 `CommunityContribution.Enabled = true` 时启用。
 - 仅在玩家不处于 live run 时执行。
-- 当前代码只实现单路由注册与上传，没有文档化的多区域自动路由逻辑。
+- 上传协议已经切到 V3 installation-signed `run-bundle`，不再使用旧 `client_id / bind-player` 链路。
 
 ## Client Flow
 
 1. 正常 run logging 持续写入本地 SQLite。
-2. `ReplicatedRunLogStore` 在完成 run 后把 `run_sync_state` 标记为 dirty。
-3. `RunUploadController` 在启动延迟后扫描待上传 completed runs。
-4. 客户端按需读取或创建：
-   - `install-id.txt`
-   - `run-upload-client.json`
-   - `run-upload-rsa.json`
-5. 若当前 route scope 没有 `client_id`，先调用 `POST /clients/register`。
-6. 随后把 completed run snapshot 签名后上传到 `POST /runs/upload`。
-
-`BattleUploadController` 复用同一套身份与注册信息，并从 run upload endpoint 推导 `POST /battles/upload`。
+2. `ReplicatedRunLogStore` 把 `run_sync_state` 标记为 dirty。
+3. combat replay 持久化完成后把关联 battle 的 `replay_dirty` 标记为 dirty。
+4. `RunUploadController` 在启动延迟后扫描待上传 completed runs。
+5. 客户端读取 installer 写入的：
+   - `installation.bpp`
+   - `installation.key`
+6. `RunBundleUploadStore` 组装 run projection、battle projections 和 replay artifact。
+7. `RunBundleUploadService` 对请求进行 installation 签名，并上传到 `POST /run-bundles`。
+8. 上传成功后清除 run 和关联 replay 的 dirty 标记。
 
 ## 当前配置
 
@@ -35,26 +34,22 @@ Enabled = true
 
 ## 当前实现文件
 
+- `Game/Identity/InstallationRecordStore.cs`
+- `Game/Online/InstallationRequestSigner.cs`
+- `Game/Online/V3Routes.cs`
 - `Game/RunLogging/Persistence/ReplicatedRunLogStore.cs`
+- `Game/RunLogging/Upload/RunSyncStateSqliteStore.cs`
+- `Game/RunLogging/Upload/RunBundleUploadStore.cs`
+- `Game/RunLogging/Upload/RunBundleUploadService.cs`
 - `Game/RunLogging/Upload/RunUploadController.cs`
-- `Game/RunLogging/Upload/RunUploadService.cs`
-- `Game/RunLogging/Upload/RunUploadSqliteStore.cs`
-- `Game/RunLogging/Upload/RunUploadRegistrationClient.cs`
-- `Game/RunLogging/Upload/RunUploadApiClient.cs`
-- `Game/RunLogging/Upload/RunUploadRequestSigner.cs`
-- `Game/RunLogging/Upload/RunUploadIdentityStore.cs`
-- `Game/RunLogging/Upload/RunUploadKeyStore.cs`
-- `Game/CombatReplay/Upload/BattleUploadController.cs`
-- `Game/CombatReplay/Upload/BattleUploadService.cs`
+- `Game/CombatReplay/Upload/BattleReplaySyncStateStore.cs`
 
 ## Notes
 
-- 当前 `ModCFServer` 的上传/ghost 链路采用“已注册并能正确签名的客户端默认诚实”的轻量信任模型，不是强鉴权设计。
-- 已知限制：
-  - `POST /clients/bind` 当前信任客户端上报的 `player_account_id`，服务端不会独立证明该账号归属。
-  - `POST /runs/upload` 当前会直接投影上传体里的 battle 身份字段，默认这些字段由客户端诚实提供。
-  - `POST /battles/upload` 当前只校验签名和 battle/run 标识自一致性，不校验该客户端是否真的拥有该 battle；注册为 `replays` 的客户端仍可构造任意 `battle_manifest` / `opponent_account_id` 并写入 `pvp_battles`，因此 ghost 列表默认建立在“已注册客户端会诚实上报”的假设上。
-  - `POST /battles/upload` 以 `battle_id` 为幂等键并允许 `ON CONFLICT` 覆盖；已知 `battle_id` 的客户端仍可能覆盖已有 battle 行与 replay object metadata，服务端当前不会阻止跨客户端改写。
-- 以上风险当前按项目体量接受，优先保持实现简单；如果后续出现滥用，再考虑补更强的账号归属证明、battle 所有权校验或禁用覆盖写入。
-- 旧的未来态 identity / binding / dual-backend 设计文档已移除，避免与当前实现混淆。
-- 如果后续重新引入多路由或账号绑定，应以新的实现为准重新写文档，而不是恢复旧设计稿。
+- 当前 `ModCFServerV3` 以 `installation_id + RSA` 作为 mod 侧身份，服务端不再维护旧 `client_id` 注册和 `bind-player` 状态。
+- ghost 查询与 replay-link 现在是：
+  - `GET /ghost-battles`
+  - `POST /ghost-battles/:battleId/replay-link`
+  - `GET /replays/:token`
+- `POST /run-bundles` 会同时携带 projection 和 artifact；首版接受轻量一致性策略，不要求服务端完整解包 replay artifact。
+- battle gate 仍然允许“artifact 已收但 battle 不可查询”的设计，这是当前接受的产品取舍，不是实现遗漏。

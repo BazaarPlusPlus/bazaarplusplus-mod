@@ -13,11 +13,13 @@ internal sealed class BppPathService : IPathService
 
     public string? ScreenshotsDirectoryPath { get; private set; }
 
-    public string? RunUploadInstallIdentityPath { get; private set; }
+    public string? IdentityDirectoryPath { get; private set; }
 
-    public string? RunUploadClientStatePath { get; private set; }
+    public string? PlayerObservationPath { get; private set; }
 
-    public string? RunUploadPrivateKeyPath { get; private set; }
+    public string? InstallationRecordPath { get; private set; }
+
+    public string? InstallationPrivateKeyPath { get; private set; }
 
     public void Initialize()
     {
@@ -37,20 +39,22 @@ internal sealed class BppPathService : IPathService
             "BazaarPlusPlus",
             "Screenshots"
         );
-        RunUploadInstallIdentityPath = System.IO.Path.Combine(
+        IdentityDirectoryPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
             "BazaarPlusPlus",
-            "install-id.txt"
+            "Identity"
         );
-        RunUploadClientStatePath = System.IO.Path.Combine(
-            BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
-            "run-upload-client.json"
+        PlayerObservationPath = System.IO.Path.Combine(
+            IdentityDirectoryPath,
+            "player-observation.bpp"
         );
-        RunUploadPrivateKeyPath = System.IO.Path.Combine(
-            BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
-            "run-upload-rsa.json"
+        InstallationRecordPath = System.IO.Path.Combine(
+            IdentityDirectoryPath,
+            "installation.bpp"
+        );
+        InstallationPrivateKeyPath = System.IO.Path.Combine(
+            IdentityDirectoryPath,
+            "installation.key"
         );
     }
 }

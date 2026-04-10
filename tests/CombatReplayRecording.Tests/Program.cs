@@ -207,24 +207,9 @@ try
     Assert(payload != null, "PvpReplayPayload should be constructible.");
     SetProperty(payloadType, payload!, "BattleId", "battle-001");
     SetProperty(payloadType, payload!, "Version", 1);
-    SetProperty(
-        payloadType,
-        payload!,
-        "SpawnMessageBase64",
-        Convert.ToBase64String(new byte[] { 1, 2, 3 })
-    );
-    SetProperty(
-        payloadType,
-        payload!,
-        "CombatMessageBase64",
-        Convert.ToBase64String(new byte[] { 4, 5, 6 })
-    );
-    SetProperty(
-        payloadType,
-        payload!,
-        "DespawnMessageBase64",
-        Convert.ToBase64String(new byte[] { 7, 8, 9 })
-    );
+    SetProperty(payloadType, payload!, "SpawnMessageBytes", new byte[] { 1, 2, 3 });
+    SetProperty(payloadType, payload!, "CombatMessageBytes", new byte[] { 4, 5, 6 });
+    SetProperty(payloadType, payload!, "DespawnMessageBytes", new byte[] { 7, 8, 9 });
     Invoke(payloadStoreType, payloadStore!, "Save", new object?[] { payload! });
     Assert(
         Equals(
@@ -241,11 +226,8 @@ try
     );
     Assert(loadedPayload != null, "Payload store should load a saved payload by battle id.");
     Assert(
-        string.Equals(
-            (string?)GetProperty(payloadType, loadedPayload!, "CombatMessageBase64"),
-            Convert.ToBase64String(new byte[] { 4, 5, 6 }),
-            StringComparison.Ordinal
-        ),
+        ((byte[]?)GetProperty(payloadType, loadedPayload!, "CombatMessageBytes"))
+            ?.SequenceEqual(new byte[] { 4, 5, 6 }) == true,
         "Payload store should preserve the serialized combat payload."
     );
 
@@ -600,21 +582,15 @@ try
         "Completed battle manifests should preserve the opening encounter id."
     );
     Assert(
-        !string.IsNullOrWhiteSpace(
-            (string?)GetProperty(payloadType, completedPayload!, "SpawnMessageBase64")
-        ),
+        ((byte[]?)GetProperty(payloadType, completedPayload!, "SpawnMessageBytes"))?.Length > 0,
         "Completed replay payloads should serialize the opening GameSim."
     );
     Assert(
-        !string.IsNullOrWhiteSpace(
-            (string?)GetProperty(payloadType, completedPayload!, "CombatMessageBase64")
-        ),
+        ((byte[]?)GetProperty(payloadType, completedPayload!, "CombatMessageBytes"))?.Length > 0,
         "Completed replay payloads should serialize the CombatSim."
     );
     Assert(
-        !string.IsNullOrWhiteSpace(
-            (string?)GetProperty(payloadType, completedPayload!, "DespawnMessageBase64")
-        ),
+        ((byte[]?)GetProperty(payloadType, completedPayload!, "DespawnMessageBytes"))?.Length > 0,
         "Completed replay payloads should serialize the closing GameSim."
     );
     Assert(

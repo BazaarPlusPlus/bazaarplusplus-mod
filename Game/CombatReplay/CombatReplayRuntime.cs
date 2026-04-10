@@ -45,7 +45,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
 
     private PvpBattleCatalog? _battleCatalog;
     private CombatReplayPayloadStore? _payloadStore;
-    private BattleUploadSqliteStore? _uploadStore;
+    private BattleReplaySyncStateStore? _replaySyncStateStore;
     private CombatReplayPersistenceQueue? _persistenceQueue;
     private CombatReplayCaptureService? _captureService;
     private CombatReplayLoader? _loader;
@@ -83,7 +83,10 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
             );
         _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
-        _uploadStore = new BattleUploadSqliteStore(runLogDatabasePath, combatReplayDirectoryPath);
+        _replaySyncStateStore = new BattleReplaySyncStateStore(
+            runLogDatabasePath,
+            combatReplayDirectoryPath
+        );
         _persistenceQueue = new CombatReplayPersistenceQueue(
             _payloadStore.Save,
             _battleCatalog.Save,
@@ -231,7 +234,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
             }
 
             BppRuntimeHost.EventBus.Publish(new PvpBattleRecorded { Manifest = result.Manifest });
-            _uploadStore?.MarkReplayDirty(result.Manifest.BattleId);
+            _replaySyncStateStore?.MarkReplayDirty(result.Manifest.BattleId);
             BppLog.Info(
                 "CombatReplayRuntime",
                 $"Saved combat replay {result.Manifest.BattleId} for run={result.Manifest.RunId ?? "unknown"}"

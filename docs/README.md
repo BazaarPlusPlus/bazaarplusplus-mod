@@ -10,7 +10,7 @@
 - `monster-preview-design.md`: 怪物预览运行时路径
 - `run-logging.md`: run logging、history panel、ghost battles
 - `run-upload.md`: 当前 run / replay 后台上传实现
-- `mod-cf-server-deploy.md`: `ModCFServer` 部署与验证
+- `mod-cf-server-deploy.md`: `ModCFServerV3` 部署与验证
 
 ## Reference
 

@@ -27,7 +27,7 @@ internal sealed class RunLoggingController : MonoBehaviour
             BppRuntimeHost.Paths.RunLogDatabasePath
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
         var sqliteStore = new SqliteRunLogStore(runLogDatabasePath);
-        var uploadStore = new RunUploadSqliteStore(runLogDatabasePath);
+        var uploadStore = new RunSyncStateSqliteStore(runLogDatabasePath);
         _store = new QueuedRunLogStore(new ReplicatedRunLogStore(sqliteStore, uploadStore));
         _sessionManager = new RunLogSessionManager(_store);
         _sessionManager.RestoreActiveSession();

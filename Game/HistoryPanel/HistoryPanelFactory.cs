@@ -2,7 +2,8 @@
 using System;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
-using BazaarPlusPlus.Game.ModApi;
+using BazaarPlusPlus.Game.Identity;
+using BazaarPlusPlus.Game.Online;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -42,26 +43,24 @@ internal static class HistoryPanelFactory
         )
             return null;
 
-        var identityPath = BppRuntimeHost.Paths.RunUploadInstallIdentityPath;
-        var clientStatePath = BppRuntimeHost.Paths.RunUploadClientStatePath;
-        var privateKeyPath = BppRuntimeHost.Paths.RunUploadPrivateKeyPath;
-        var context = ModApiBootstrapContext.TryCreate(
-            runtime.RunLogDatabasePath,
-            runtime.CombatReplayDirectoryPath,
-            identityPath,
-            clientStatePath,
-            privateKeyPath,
-            ModApiDefaults.ApiBaseUrl
-        );
-        if (context == null)
+        var installationRecordPath = BppRuntimeHost.Paths.InstallationRecordPath;
+        var installationPrivateKeyPath = BppRuntimeHost.Paths.InstallationPrivateKeyPath;
+        if (
+            string.IsNullOrWhiteSpace(installationRecordPath)
+            || string.IsNullOrWhiteSpace(installationPrivateKeyPath)
+        )
+        {
+            return null;
+        }
+
+        var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
+        if (routes == null)
             return null;
 
         return new GhostBattleSyncService(
             repository,
-            context.CreateIdentityStore(),
-            context.CreateClientStateStore(),
-            context.CreateKeyStore(),
-            context.Routes,
+            new InstallationRecordStore(installationRecordPath, installationPrivateKeyPath),
+            routes,
             timeout: TimeSpan.FromSeconds(10)
         );
     }

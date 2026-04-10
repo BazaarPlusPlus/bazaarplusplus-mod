@@ -11,7 +11,7 @@
 ## Storage
 
 - payload 文件目录：`<GameRoot>/BazaarPlusPlus/CombatReplays`
-- payload 文件格式：`<battle_id>.payload.json`
+- payload 文件格式：`<battle_id>.payload.mpack.gz`
 - battle metadata：SQLite `pvp_battles`
 
 `pvp_battles` 保存 battle manifest，包含 battle identity、player/opponent identity、结果，以及 history preview / replay bootstrap 需要的 board snapshot。

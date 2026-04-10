@@ -1,0 +1,110 @@
+#nullable enable
+using System;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using BazaarPlusPlus.Game.Identity;
+using BazaarPlusPlus.Game.Online;
+
+namespace BazaarPlusPlus.Game.RunLogging.Upload;
+
+internal sealed class RunBundleUploadService : IDisposable
+{
+    private readonly RunBundleUploadStore _store;
+    private readonly InstallationRecordStore _installationStore;
+    private readonly V3Routes _routes;
+    private readonly HttpClient _httpClient;
+
+    public RunBundleUploadService(
+        RunBundleUploadStore store,
+        InstallationRecordStore installationStore,
+        V3Routes routes,
+        TimeSpan timeout
+    )
+    {
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _installationStore =
+            installationStore ?? throw new ArgumentNullException(nameof(installationStore));
+        _routes = routes ?? throw new ArgumentNullException(nameof(routes));
+        _httpClient = new HttpClient { Timeout = timeout };
+    }
+
+    public async Task<RunBundleUploadCycleResult> UploadPendingRunBundlesAsync(
+        CancellationToken cancellationToken
+    )
+    {
+        var pendingRunIds = _store.GetPendingCompletedRunIds(3);
+        if (pendingRunIds.Count == 0)
+        {
+            BppLog.Info("RunBundleUploadService", "No completed runs are waiting for bundle upload.");
+            return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
+        }
+
+        if (!_installationStore.TryLoad(out var installation) || installation == null)
+        {
+            BppLog.Warn("RunBundleUploadService", "Skipping upload because installation identity is unavailable.");
+            return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: true);
+        }
+
+        var uploadedCount = 0;
+        var client = new RunBundleClient(
+            _httpClient,
+            _installationStore,
+            _routes,
+            new InstallationRequestSigner(_installationStore)
+        );
+        foreach (var runId in pendingRunIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var attemptedAtUtc = DateTimeOffset.UtcNow;
+            try
+            {
+                var snapshot = _store.TryBuildRunBundleSnapshot(
+                    runId,
+                    installation.InstallationId,
+                    installation.PlayerAccountId
+                );
+                if (snapshot == null)
+                {
+                    _store.MarkRunUploadFailed(runId, attemptedAtUtc, "run_bundle_not_ready");
+                    continue;
+                }
+
+                var result = await client.UploadRunBundleAsync(snapshot.Payload, cancellationToken);
+                if (!result.Succeeded)
+                {
+                    _store.MarkRunUploadFailed(
+                        runId,
+                        attemptedAtUtc,
+                        result.Error ?? "run_bundle_upload_failed"
+                    );
+                    continue;
+                }
+
+                _store.MarkRunUploaded(
+                    runId,
+                    snapshot.LastSeq,
+                    snapshot.UploadedStatus,
+                    snapshot.BattleIds,
+                    DateTimeOffset.UtcNow
+                );
+                uploadedCount++;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _store.MarkRunUploadFailed(runId, attemptedAtUtc, ex.Message);
+            }
+        }
+
+        return new RunBundleUploadCycleResult(uploadedCount, _store.HasMorePendingCompletedRuns());
+    }
+
+    public void Dispose()
+    {
+        _httpClient.Dispose();
+    }
+}

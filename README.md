@@ -44,7 +44,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 - run logging 与战斗回放会在本地保存 SQLite 数据和 replay payload。
 - 后台上传是可选能力，并且只会在非 live run 状态下执行上传扫描。
-- `ModCFServer/` 目录包含与上传、ghost battles、replay 下载相关的 Cloudflare Worker 后端实现。
+- `ModCFServerV3/` 目录包含当前上传、ghost battles、replay 下载相关的 Cloudflare Worker 后端实现。
 
 ## 仓库结构
 
@@ -53,7 +53,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - `tests/`：按特性拆分的测试项目。
 - `scripts/`：构建和辅助脚本。
 - `docs/README.md`：文档索引。
-- `ModCFServer/`：可选云同步后端。
+- `ModCFServerV3/`：可选云同步后端。
 
 ## 文档入口
 

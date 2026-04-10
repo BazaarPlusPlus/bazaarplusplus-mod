@@ -350,7 +350,7 @@ CREATE INDEX idx_pvp_battles_recorded_at_utc
   - `status`
   - `source`
 - 这张表保存的是历史展示与导出所需的 manifest 投影
-- replay 原始 payload 单独存到 `CombatReplays/<battle_id>.payload.json`，不在 SQLite 里
+- replay 原始 payload 单独存到 `CombatReplays/<battle_id>.payload.mpack.gz`，不在 SQLite 里
 
 ## 7. 当前索引清单
 
@@ -400,7 +400,7 @@ CREATE INDEX idx_pvp_battles_recorded_at_utc
 
 2. replay payload
    - 不进 SQLite
-   - 落到 `CombatReplays/<battle_id>.payload.json`
+   - 落到 `CombatReplays/<battle_id>.payload.mpack.gz`
 
 ## 9. 读路径与字段依赖
 

@@ -1,27 +1,30 @@
-# ModCFServer Deployment
+# ModCFServerV3 Deployment
 
-本文描述 `ModCFServer` 的首次正式部署流程，基于 `ModCFServer/wrangler.toml`、`ModCFServer/migrations/0001_initial_schema.sql`、`ModCFServer/package.json` 和当前 Worker 路由实现。
+本文描述 `ModCFServerV3` 的部署要点，基于 `ModCFServerV3/wrangler.toml`、`ModCFServerV3/migrations/0001_initial_schema.sql`、`ModCFServerV3/package.json` 和当前 Worker 路由实现。
 
 ## Targets
 
-- Worker name: `bazaarplusplus-mod-api`
-- Custom domain: `mod-api.bazaarplusplus.com`
-- D1 database: `bazaarplusplus-mod-api-db`
-- D1 migrations dir: `ModCFServer/migrations`
-- R2 bucket: `bazaarplusplus-replays`
-- Cron trigger: every 6 hours
+- Worker config: `ModCFServerV3/wrangler.toml`
+- D1 migrations dir: `ModCFServerV3/migrations`
+- Runtime entry: `ModCFServerV3/src/index.ts`
 
-当前首发方案使用单个 R2 bucket，同时承载：
+当前 Worker 路由包括：
 
-- `runs/{client_id}/{run_id}/{payload_sha256}.json`
-- `replays/{client_id}/{battle_id}/{payload_sha256}.json`
+- `POST /activate`
+- `POST /login`
+- `POST /installations`
+- `POST /installations/observations`
+- `POST /run-bundles`
+- `GET /ghost-battles`
+- `POST /ghost-battles/:battleId/replay-link`
+- `GET /replays/:token`
 
 ## First Deploy
 
 从仓库根目录：
 
 ```powershell
-cd ModCFServer
+cd ModCFServerV3
 npm install
 npx wrangler login
 ```
@@ -29,30 +32,24 @@ npx wrangler login
 1. 创建 D1：
 
 ```powershell
-npx wrangler d1 create bazaarplusplus-mod-api-db
+npx wrangler d1 create bazaarplusplus-mod-api-v3-db
 ```
 
-把返回的 `database_id` 写回 `ModCFServer/wrangler.toml` 的 `[[d1_databases]]` 配置。
+把返回的 `database_id` 写回 `ModCFServerV3/wrangler.toml` 的 `[[d1_databases]]` 配置，替换占位值 `REPLACE_WITH_V3_DATABASE_ID`。
 
 2. 应用初始 schema：
 
 ```powershell
-npx wrangler d1 migrations apply bazaarplusplus-mod-api-db
+npx wrangler d1 migrations apply bazaarplusplus-mod-api-v3-db
 ```
 
 3. 创建 R2 bucket：
 
 ```powershell
-npx wrangler r2 bucket create bazaarplusplus-replays
+npx wrangler r2 bucket create bazaarplusplus-pvp-battles-v3
 ```
 
-4. 写入回放下载签名密钥：
-
-```powershell
-npx wrangler secret put REPLAY_DOWNLOAD_SECRET
-```
-
-5. 部署 Worker：
+4. 部署 Worker：
 
 ```powershell
 npm run deploy
@@ -63,7 +60,7 @@ npm run deploy
 健康检查：
 
 ```powershell
-curl https://mod-api.bazaarplusplus.com/health
+curl https://mod-api-v3.bazaarplusplus.com/health
 ```
 
 预期响应：
@@ -72,23 +69,19 @@ curl https://mod-api.bazaarplusplus.com/health
 {"ok":true}
 ```
 
-首发 smoke test 至少覆盖：
+建议 smoke test 至少覆盖：
 
-- `POST /clients/register`
-- `POST /clients/bind`
-- `POST /runs/upload`
-- `POST /battles/upload`
-- `GET /me/pvp-battles/against-me`
-
-建议使用已注册并验签的测试客户端，确认：
-
-- `client_player_account_bindings` 写入 active binding
-- run payload 落到 `runs/...`
-- battle payload 落到 `replays/...`
-- ghost battle 查询能返回 `replay.available`
+- `POST /activate`
+- `POST /login`
+- `POST /installations`
+- `POST /installations/observations`
+- `POST /run-bundles`
+- `GET /ghost-battles`
+- `POST /ghost-battles/:battleId/replay-link`
 
 ## Notes
 
-- 当前入口 `ModCFServer/src/index.ts` 不负责按请求懒建表。
-- D1 schema 由 Wrangler migration 管理，见 `ModCFServer/migrations/0001_initial_schema.sql`。
-- 当前部署不再依赖 nonce 去重表，也不需要定时清理任务。
+- D1 schema 由 Wrangler migration 管理，见 `ModCFServerV3/migrations/0001_initial_schema.sql`。
+- replay 对象与 token 行为由 `createReplayLink` / `downloadReplay` 路由负责。
+- 当前 V3 预期资源名为 `bazaarplusplus-mod-api-v3`、`mod-api-v3.bazaarplusplus.com`、`bazaarplusplus-mod-api-v3-db`、`bazaarplusplus-pvp-battles-v3`。
+- 如果生产环境已存在实际资源名，以 `ModCFServerV3/wrangler.toml` 为准。

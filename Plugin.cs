@@ -4,7 +4,6 @@ using System;
 using System.IO;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
-using BazaarPlusPlus.Game.CombatReplay.Upload;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.MonsterPreview;
@@ -95,8 +94,6 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<RunLoggingController>();
         BppLog.Info("Plugin", "Adding RunUploadController");
         gameObject.AddComponent<RunUploadController>();
-        BppLog.Info("Plugin", "Adding BattleUploadController");
-        gameObject.AddComponent<BattleUploadController>();
         BppLog.Info("Plugin", "Adding HistoryPanel");
         var historyPanel = gameObject.AddComponent<HistoryPanel>();
         var historyPanelRuntime = new HistoryPanelRuntime(

@@ -40,4 +40,9 @@ internal sealed class PvpBattleCatalog : IPvpBattleCatalog
     {
         return _store.ListRecentBattles(limit);
     }
+
+    public IReadOnlyList<PvpBattleManifest> ListByRunId(string runId)
+    {
+        return _store.ListByRunId(runId);
+    }
 }

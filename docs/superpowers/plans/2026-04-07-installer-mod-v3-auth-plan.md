@@ -10,6 +10,22 @@
 
 ---
 
+## Recommended Start Order
+
+先不要在第一步就物理删除 mod 中的旧 API 实现。推荐顺序是：
+
+1. 先落地 `ModCFServerV3`
+2. 再落地 installer 的激活与 `.bpp` 文件读写
+3. 再在 mod 中补齐 `ModOnlineClient`、installation signer、V3 DTO 和 `.bpp` stores
+4. 然后把 ghost/replay/run upload 的调用点切到 V3
+5. 最后删除 `Game/ModApi/` 下的旧 `client_id / bind-player` 链路
+
+这样做的原因是：
+
+- 当前 ghost sync、run upload、battle upload 都直接依赖旧 `ModApi` 抽象
+- 如果一开始就删除旧链路，切换任务会和“证明 V3 可替代”耦在一起，回归面太大
+- 先做“新增 V3 -> 切调用点 -> 删除旧实现”更容易通过 focused tests 逐步验收
+
 ## File Map
 
 ### Server (`ModCFServerV3/`)
@@ -98,21 +114,21 @@
 - Create: `Game/Identity/InstallationRecordStore.cs`
 - Create: `Game/Online/ModOnlineClient.cs`
 - Create: `Game/Online/InstallationRequestSigner.cs`
-- Create: `Game/Online/V2Routes.cs`
+- Create: `Game/Online/V3Routes.cs`
 - Create: `Game/Online/ObservationClient.cs`
 - Create: `Game/Online/RunBundleClient.cs`
 - Create: `Game/Online/GhostBattleClient.cs`
 - Create: `Game/Online/ReplayClient.cs`
-- Create: `Game/Online/Models/RunBundleUploadRequestV2.cs`
-- Create: `Game/Online/Models/RunProjectionV2.cs`
-- Create: `Game/Online/Models/BattleProjectionV2.cs`
-- Create: `Game/Online/Models/RunArtifactV2.cs`
-- Create: `Game/Online/Models/RunArtifactBattleV2.cs`
-- Create: `Game/Online/Models/BattleManifestArtifactV2.cs`
-- Create: `Game/Online/Models/BattleParticipantsArtifactV2.cs`
-- Create: `Game/Online/Models/BattleSnapshotsArtifactV2.cs`
-- Create: `Game/Online/Models/CardSetCaptureArtifactV2.cs`
-- Create: `Game/Online/Models/ReplayPayloadArtifactV2.cs`
+- Create: `Game/Online/Models/RunBundleUploadRequestV3.cs`
+- Create: `Game/Online/Models/RunProjectionV3.cs`
+- Create: `Game/Online/Models/BattleProjectionV3.cs`
+- Create: `Game/Online/Models/RunArtifactV3.cs`
+- Create: `Game/Online/Models/RunArtifactBattleV3.cs`
+- Create: `Game/Online/Models/BattleManifestArtifactV3.cs`
+- Create: `Game/Online/Models/BattleParticipantsArtifactV3.cs`
+- Create: `Game/Online/Models/BattleSnapshotsArtifactV3.cs`
+- Create: `Game/Online/Models/CardSetCaptureArtifactV3.cs`
+- Create: `Game/Online/Models/ReplayPayloadArtifactV3.cs`
 - Modify: `Plugin.cs`
   - 挂载新的在线层 bootstrap
 - Modify: `Game/HistoryPanel/Ghost/GhostBattleSyncService.cs`
@@ -122,8 +138,8 @@
 - Modify: `Game/CombatReplay/Upload/BattleUploadController.cs`
 - Modify: `Game/CombatReplay/Upload/BattleArtifactUploadService.cs`
   - 旧上传路径退役或改走 V3 run-bundle/upload client
-- Create: `tests/GhostBattleSync.Tests/V2IdentityBootstrapTests.cs`
-- Create: `tests/RunUploadAuth.Tests/V2InstallationRequestSignerTests.cs`
+- Create: `tests/GhostBattleSync.Tests/V3IdentityBootstrapTests.cs`
+- Create: `tests/RunUploadAuth.Tests/V3InstallationRequestSignerTests.cs`
 - Create: `tests/RunUploadBootstrap.Tests/InstallationRecordStoreTests.cs`
 
 ## Task 1: 建立 V3 服务端 Schema 与路由骨架
@@ -149,7 +165,7 @@
 
 - [ ] **Step 1: 创建 `ModCFServerV3/` 最小脚手架**
 
-从现有 `ModCFServer/` 复制最小运行骨架到新目录，但不要把旧 feature 代码直接当成 V3 实现沿用。
+在 `ModCFServerV3/` 中创建最小运行骨架，不复用旧后端目录或旧 feature 代码。
 
 至少准备：
 
@@ -168,10 +184,7 @@
 ```bash
 cd /Users/yxinyu/codes/bpp_codes/bazaarplusplus-mod
 mkdir -p ModCFServerV3
-rsync -a ModCFServer/ ModCFServerV3/ \
-  --exclude node_modules \
-  --exclude .wrangler \
-  --exclude dist
+mkdir -p ModCFServerV3/src/http ModCFServerV3/src/crypto ModCFServerV3/test/helpers
 ```
 
 然后立即删除或清空旧 feature 入口，避免后续误用：
@@ -662,20 +675,20 @@ Expected:
 - Create: `Game/Identity/InstallationRecordStore.cs`
 - Create: `Game/Online/ModOnlineClient.cs`
 - Create: `Game/Online/InstallationRequestSigner.cs`
-- Create: `Game/Online/V2Routes.cs`
+- Create: `Game/Online/V3Routes.cs`
 - Create: `Game/Online/ObservationClient.cs`
 - Create: `Game/Online/RunBundleClient.cs`
-- Create: `Game/Online/Models/RunBundleUploadRequestV2.cs`
-- Create: `Game/Online/Models/RunProjectionV2.cs`
-- Create: `Game/Online/Models/BattleProjectionV2.cs`
-- Create: `Game/Online/Models/RunArtifactV2.cs`
-- Create: `Game/Online/Models/RunArtifactBattleV2.cs`
-- Create: `Game/Online/Models/BattleManifestArtifactV2.cs`
-- Create: `Game/Online/Models/BattleParticipantsArtifactV2.cs`
-- Create: `Game/Online/Models/BattleSnapshotsArtifactV2.cs`
-- Create: `Game/Online/Models/CardSetCaptureArtifactV2.cs`
-- Create: `Game/Online/Models/ReplayPayloadArtifactV2.cs`
-- Test: `tests/RunUploadAuth.Tests/V2InstallationRequestSignerTests.cs`
+- Create: `Game/Online/Models/RunBundleUploadRequestV3.cs`
+- Create: `Game/Online/Models/RunProjectionV3.cs`
+- Create: `Game/Online/Models/BattleProjectionV3.cs`
+- Create: `Game/Online/Models/RunArtifactV3.cs`
+- Create: `Game/Online/Models/RunArtifactBattleV3.cs`
+- Create: `Game/Online/Models/BattleManifestArtifactV3.cs`
+- Create: `Game/Online/Models/BattleParticipantsArtifactV3.cs`
+- Create: `Game/Online/Models/BattleSnapshotsArtifactV3.cs`
+- Create: `Game/Online/Models/CardSetCaptureArtifactV3.cs`
+- Create: `Game/Online/Models/ReplayPayloadArtifactV3.cs`
+- Test: `tests/RunUploadAuth.Tests/V3InstallationRequestSignerTests.cs`
 - Test: `tests/RunUploadBootstrap.Tests/InstallationRecordStoreTests.cs`
 
 - [ ] **Step 1: 写 envelope/store 测试**
@@ -738,19 +751,19 @@ internal sealed class ModOnlineClient
 新增模型至少包括：
 
 ```csharp
-internal sealed class RunBundleUploadRequestV2
+internal sealed class RunBundleUploadRequestV3
 {
     public int SchemaVersion { get; init; }
     public string InstallationId { get; init; } = string.Empty;
     public string PlayerAccountId { get; init; } = string.Empty;
     public RunProjectionV3 RunProjection { get; init; } = new();
-    public IReadOnlyList<BattleProjectionV2> BattleProjections { get; init; } = Array.Empty<BattleProjectionV2>();
+    public IReadOnlyList<BattleProjectionV3> BattleProjections { get; init; } = Array.Empty<BattleProjectionV3>();
     public string ArtifactCodec { get; init; } = string.Empty;
     public byte[] ArtifactBytes { get; init; } = Array.Empty<byte>();
 }
 ```
 
-`RunProjectionV2` 还应至少包含：
+`RunProjectionV3` 还应至少包含：
 
 - `PlayerRank`
 - `PlayerRating`
@@ -767,10 +780,10 @@ internal sealed class RunBundleUploadRequestV2
 - `PlayerRating` / `FinalPlayerRating` 使用 `rating` 命名，不再使用 `mmr`
 - `PlayerPosition` / `FinalPlayerPosition` 只在 rank 为 `Legendary` 且 leaderboard cache 有值时采集，否则为 `null`
 
-其中 `RunArtifactBattleV2` 应至少包含：
+其中 `RunArtifactBattleV3` 应至少包含：
 
 ```csharp
-internal sealed class RunArtifactBattleV2
+internal sealed class RunArtifactBattleV3
 {
     public string BattleId { get; init; } = string.Empty;
     public BattleManifestArtifactV3 Manifest { get; init; } = new();
@@ -778,7 +791,7 @@ internal sealed class RunArtifactBattleV2
 }
 ```
 
-`BattleManifestArtifactV2` 应包含完整 manifest 信息，包括：
+`BattleManifestArtifactV3` 应包含完整 manifest 信息，包括：
 
 - participants
 - result
@@ -805,7 +818,7 @@ Expected:
 
 - PASS
 
-## Task 7: 用 `ModOnlineClient` 接管 ghost/query 与上传路径
+## Task 7: 用 `ModOnlineClient` 接管 ghost/query 与上传路径，并删除旧 mod API 链路
 
 **Files:**
 - Modify: `Game/HistoryPanel/Ghost/GhostBattleSyncService.cs`
@@ -870,10 +883,29 @@ CreateAuthenticatedRouteClient()
 
 - 优先走 `/run-bundles`
 - 不再依赖旧 `client_id` 与 `bind-player`
-- 按 spec 组装 `RunBundleUploadRequestV2`，其中查询字段放进 `run_projection` / `battle_projections`，完整回放内容只进入 `artifact`
+- 按 spec 组装 `RunBundleUploadRequestV3`，其中查询字段放进 `run_projection` / `battle_projections`，完整回放内容只进入 `artifact`
 - 当 installation 未激活时保持安全降级，不伪造身份
 
-- [ ] **Step 7: 跑 focused tests 和最小相关检查**
+- [ ] **Step 7: 删除旧 `Game/ModApi/` 链路并更新相关测试**
+
+删除范围至少包括：
+
+- `Game/ModApi/ModApiAuthenticatedSession.cs`
+- `Game/ModApi/ModApiBootstrapContext.cs`
+- `Game/ModApi/ModApiClientStateStore.cs`
+- `Game/ModApi/ModApiDefaults.cs`
+- `Game/ModApi/ModApiErrorFormatter.cs`
+- `Game/ModApi/ModApiIdentityStore.cs`
+- `Game/ModApi/ModApiKeyStore.cs`
+- `Game/ModApi/ModApiPlayerBindingClient.cs`
+- `Game/ModApi/ModApiRegistrationClient.cs`
+- `Game/ModApi/ModApiRequestSigner.cs`
+- `Game/ModApi/ModApiRoutes.cs`
+- `Game/ModApi/ModApiSerialization.cs`
+
+同时把 focused tests 中对旧 endpoint 和旧 header 语义的断言迁移到 V3 installation-signed 请求。
+
+- [ ] **Step 8: 跑 focused tests 和最小相关检查**
 
 Run:
 

@@ -385,6 +385,58 @@ internal sealed class PvpBattleSqliteStore
         return manifests;
     }
 
+    public IReadOnlyList<PvpBattleManifest> ListByRunId(string runId)
+    {
+        if (string.IsNullOrWhiteSpace(runId))
+            return Array.Empty<PvpBattleManifest>();
+
+        using var connection = OpenConnection();
+        using var command = CreateCommand(connection);
+        command.CommandText = $"""
+            SELECT
+                b.battle_id,
+                b.run_id,
+                b.recorded_at_utc,
+                b.day,
+                b.hour,
+                b.encounter_id,
+                b.player_name,
+                b.player_account_id,
+                b.player_hero,
+                b.player_rank,
+                b.player_rating,
+                b.player_level,
+                b.opponent_name,
+                b.opponent_hero,
+                b.opponent_rank,
+                b.opponent_rating,
+                b.opponent_level,
+                b.opponent_account_id,
+                b.combat_kind,
+                b.result,
+                b.winner_combatant_id,
+                b.loser_combatant_id,
+                s.player_hand_json,
+                s.player_skills_json,
+                s.opponent_hand_json,
+                s.opponent_skills_json
+            FROM {RunLogSqliteSchema.BattlesTableName} AS b
+            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+                ON s.battle_id = b.battle_id
+            WHERE b.source = 'LOCAL'
+              AND b.run_id = $runId
+            ORDER BY b.recorded_at_utc ASC, b.battle_id ASC;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        var manifests = new List<PvpBattleManifest>();
+        while (reader.Read())
+            manifests.Add(ReadManifest(reader));
+
+        return manifests;
+    }
+
     private SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection($"Data Source={_databasePath}");

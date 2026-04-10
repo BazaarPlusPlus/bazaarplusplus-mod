@@ -127,6 +127,20 @@ mod 会从游戏运行时读取：
 - `revoked`
 - `stale`
 
+状态语义：
+
+- `active` 表示 installation 当前可用于运行时签名请求
+- `revoked` 表示 installation 已被服务端显式吊销，后续请求必须直接鉴权失败
+- `stale` 表示 installation 仍被保留用于审计，但已不应继续作为新的运行时授权材料发放
+
+首版行为约束：
+
+- 运行时鉴权只接受 `active`
+- `revoked` 与 `stale` 都不能通过运行时鉴权
+- mod 读取到非 `active` 的本地 installation 状态时，应停止发起需要 V3 身份的在线请求，并将其视为需要重新激活
+- `revoked` 只能由服务端显式写入
+- `stale` 由服务端按部署策略写入；V3 首版不要求客户端区分 `revoked` 与 `stale` 的恢复路径，统一走重新激活即可
+
 ### `installation_observations`
 
 建议字段：
@@ -432,6 +446,29 @@ mod 应提供一个统一的运行时服务层，例如：
 
 签名逻辑不能依赖临时性的序列化输出，也不能依赖传输层 header 的排列顺序。
 
+canonical request string 规范必须固定为：
+
+- 共 6 行，以 `\n` 连接，不额外附加末尾空行
+- method 使用大写
+- route path 必须是绝对 path；空 path 视为 `/`
+- route path 保留 URL 解码前的标准 HTTP path 形式；不在签名阶段做大小写折叠
+- query string 必须使用不含前导 `?` 的规范化结果
+- query 参数按 key 的字节序升序排序；同 key 多值时按 value 的字节序升序排序
+- 空 query string 使用空字符串占位，因此 canonical request 中第 3 行仍然存在但内容为空
+- key 与 value 使用传输中最终参与请求的 percent-encoded 形式
+- `installation_id`、timestamp、content hash 使用去首尾空白后的文本值
+
+即：
+
+```text
+METHOD
+/normalized/path
+normalized=query&string
+installation_id
+timestamp
+content_hash
+```
+
 建议校验流程：
 
 1. 解析 `installation_id`
@@ -525,6 +562,15 @@ installer 与 mod 的 V3 配置都应只指向这个域名。
 
 服务端解析出对应的 `player_account_id`，并返回一个正常的 installer session。
 
+installer session 最小语义应固定为：
+
+- session 仅供 installer 使用，不供 mod 运行时复用
+- session 表示“某个已登录用户正在当前 installer 进程中执行激活类操作”的短期服务端会话
+- session 必须有明确过期时间
+- session 失效后，installer 需要重新登录，不能继续调用 `POST /installations`
+- session 的载体可以是 cookie 或 bearer token，但同一版协议中必须固定为一种
+- V3 首版不要求 refresh token；session 过期后重新登录即可
+
 ### `POST /installations`
 
 用途：
@@ -560,7 +606,7 @@ installer 与 mod 的 V3 配置都应只指向这个域名。
 
 用途：
 
-- 记录 mod 观察到的身份声明，用于审计和 installer UX
+- 记录 mod 观察到的身份声明，用于服务端审计和后续排障
 
 规则：
 
@@ -569,6 +615,8 @@ installer 与 mod 的 V3 配置都应只指向这个域名。
 - 这个路由本身不会完成激活
 
 bootstrap observation 的来源是本地 `player-observation.bpp`，而不是这个服务端接口。
+
+installer 首次激活与显式确认 UI 不依赖这个服务端 observation 接口。
 
 ### `POST /run-bundles`
 
@@ -607,7 +655,7 @@ V3 RunBundle 上传请求不是单一 opaque blob，而是一个 indexed bundle 
 ### 顶层请求模型
 
 ```text
-RunBundleUploadRequestV2
+RunBundleUploadRequestV3
 - schema_version: int
 - installation_id: string
 - player_account_id: string
@@ -615,8 +663,8 @@ RunBundleUploadRequestV2
 - game_version: string?
 - submitted_at_utc: string
 
-- run_projection: RunProjectionV2
-- battle_projections: BattleProjectionV2[]
+- run_projection: RunProjectionV3
+- battle_projections: BattleProjectionV3[]
 
 - artifact_codec: string
 - artifact_bytes: byte[]
@@ -625,7 +673,7 @@ RunBundleUploadRequestV2
 ### Run projection
 
 ```text
-RunProjectionV2
+RunProjectionV3
 - run_id: string
 - status: string
 - hero_id: string?
@@ -657,7 +705,7 @@ RunProjectionV2
 ### Battle projections
 
 ```text
-BattleProjectionV2
+BattleProjectionV3
 - battle_id: string
 - run_id: string
 - recorded_at_utc: string
@@ -707,37 +755,37 @@ application/x-bpp-runbundle+msgpack+gzip
 `artifact_bytes` 的内容建议为：
 
 ```text
-gzip(messagepack(RunArtifactV2))
+gzip(messagepack(RunArtifactV3))
 ```
 
-`RunArtifactV2` 应包含每个 battle 回放所需的完整 artifact，而不只是 replay 三消息。
+`RunArtifactV3` 应包含每个 battle 回放所需的完整 artifact，而不只是 replay 三消息。
 
 ```text
-RunArtifactV2
+RunArtifactV3
 - schema_version: int
 - run_id: string
-- battles: RunArtifactBattleV2[]
+- battles: RunArtifactBattleV3[]
 ```
 
 ```text
-RunArtifactBattleV2
+RunArtifactBattleV3
 - battle_id: string
-- manifest: BattleManifestArtifactV2
-- replay: ReplayPayloadArtifactV2
+- manifest: BattleManifestArtifactV3
+- replay: ReplayPayloadArtifactV3
 ```
 
 ```text
-BattleManifestArtifactV2
+BattleManifestArtifactV3
 - run_id: string?
 - recorded_at_utc: string
 - day: int?
 - result: string?
-- participants: BattleParticipantsArtifactV2
-- snapshots: BattleSnapshotsArtifactV2
+- participants: BattleParticipantsArtifactV3
+- snapshots: BattleSnapshotsArtifactV3
 ```
 
 ```text
-BattleParticipantsArtifactV2
+BattleParticipantsArtifactV3
 - player_name: string?
 - player_account_id: string?
 - player_hero: string?
@@ -758,15 +806,15 @@ BattleParticipantsArtifactV2
 - `player_level` / `opponent_level` 表示玩家等级
 
 ```text
-BattleSnapshotsArtifactV2
-- player_hand: CardSetCaptureArtifactV2
-- player_skills: CardSetCaptureArtifactV2
-- opponent_hand: CardSetCaptureArtifactV2
-- opponent_skills: CardSetCaptureArtifactV2
+BattleSnapshotsArtifactV3
+- player_hand: CardSetCaptureArtifactV3
+- player_skills: CardSetCaptureArtifactV3
+- opponent_hand: CardSetCaptureArtifactV3
+- opponent_skills: CardSetCaptureArtifactV3
 ```
 
 ```text
-ReplayPayloadArtifactV2
+ReplayPayloadArtifactV3
 - version: int
 - spawn_message: byte[]
 - combat_message: byte[]
@@ -789,9 +837,9 @@ ReplayPayloadArtifactV2
 2. 从本地 battle manifest 读取 `battle_projections`
 3. 从本地 battle manifest 读取完整 manifest artifact，包括 participants、result、snapshots
 4. 从 replay payload 文件读取完整 replay
-5. 组装 `RunArtifactV2`
+5. 组装 `RunArtifactV3`
 6. 序列化并压缩得到 `artifact_bytes`
-7. 组装 `RunBundleUploadRequestV2`
+7. 组装 `RunBundleUploadRequestV3`
 8. 对最终请求体做 hash 和 installation 请求签名
 
 ### 本地存储

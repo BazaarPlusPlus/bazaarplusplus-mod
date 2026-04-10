@@ -9,7 +9,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 战斗与 UI 增强（状态条、怪物预览、附魔/升级 tooltip、展示柜 tooltip 互通等）
 - **Run logging**：活跃对局写入本地 SQLite，供历史面板与离线脚本使用
 - **PVP 战斗回放**：本地录制与在 HistoryPanel / Debug 下条件回放
-- **可选云同步**：在**非 live run** 时后台上传 run 快照与 replay，对接 **ModCFServer**（Cloudflare Worker）
+- **可选云同步**：在**非 live run** 时后台上传 V3 `run-bundle` 与 ghost/replay 数据，对接 **ModCFServerV3**（Cloudflare Worker）
 - 大厅与展示类小功能（随机英雄池面板、主菜单版本号、Legendary 段位展示文案等）
 - **Anonymous Mode**：可选将显示名改为 `Anonymous`
 
@@ -21,7 +21,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `Core/Runtime/BppRuntimeHost.cs` | 统一初始化配置、事件总线、路径、`MonsterDatabase`、Run 上下文探测；注册 **RunLifecycle**、**CombatReplay**、**CombatStatusBar**、**EncounterTracking** 等模块 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
-主要挂在游戏对象上的组件见 `Plugin.AttachRuntimeComponents()`：`RunStateSyncController`、`RunLoggingController`、`RunUploadController`、`BattleUploadController`、`HistoryPanel`、`CombatStatusBar`、怪物预览相关、`TooltipModifierRefreshController` 等。
+主要挂在游戏对象上的组件见 `Plugin.AttachRuntimeComponents()`：`RunStateSyncController`、`RunLoggingController`、`RunUploadController`、`HistoryPanel`、`CombatStatusBar`、怪物预览相关、`TooltipModifierRefreshController` 等。
 
 ## 游戏内功能模块
 
@@ -96,17 +96,16 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 - `BppBuild.IsDebug` 时额外挂载 **DebugPanel**，用于开发调试（非 Release 行为）
 
-## 云同步与 ModCFServer
+## 云同步与 ModCFServerV3
 
-面向 **ModCFServer**（`ModCFServer/`，Cloudflare Workers + D1 + R2）：
+面向 **ModCFServerV3**（`ModCFServerV3/`，Cloudflare Workers + D1 + R2）：
 
-- **客户端注册**：RSA 公钥注册为 `runs` / `replays` 用途
-- **Run 上传**：已完成 run 的签名 JSON → `POST /runs/upload`
-- **Replay 上传**：签名 replay bundle → `POST /battles/upload`
-- **账号绑定**：`POST /clients/bind`（用于「对战过我」等查询身份）
-- **Ghost 战斗**：`GET /me/pvp-battles/against-me` 等；按需签发短期 replay 下载链接
+- **Installation 身份**：installer 写入 `installation.bpp` / `installation.key`，mod 直接读取并签名请求
+- **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`
+- **Observation 上传**：installer / mod 可写 `POST /installations/observations`
+- **Ghost 战斗**：`GET /ghost-battles` 查询 against-me 列表；按需签发 `POST /ghost-battles/:battleId/replay-link`
 
-模组侧：**默认开启**社区数据共建（`[CommunityContribution] Enabled`），仅在**非 live run** 时执行上传扫描；replay 上传由 `BattleUploadController` 等协调。信任模型与安全限制见 `docs/run-upload.md` 与 `ModCFServer/README.md`。
+模组侧：**默认开启**社区数据共建（`[CommunityContribution] Enabled`），仅在**非 live run** 时执行上传扫描；`RunUploadController` 统一调度 run-bundle 上传。信任模型与安全限制见 `docs/run-upload.md`。
 
 ## 配置摘要（BazaarPlusPlus.cfg）
 

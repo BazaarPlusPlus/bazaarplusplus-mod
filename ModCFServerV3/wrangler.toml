@@ -1,0 +1,26 @@
+name = "bazaarplusplus-mod-api-v3"
+main = "src/index.ts"
+compatibility_date = "2026-03-28"
+workers_dev = false
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 0.2
+
+[[routes]]
+pattern = "mod-api-v3.bazaarplusplus.com"
+custom_domain = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bazaarplusplus-mod-api-v3-db"
+database_id = "REPLACE_WITH_V3_DATABASE_ID"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "PVP_BATTLE_BUCKET"
+bucket_name = "bazaarplusplus-pvp-battles-v3"

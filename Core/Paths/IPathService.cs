@@ -11,9 +11,12 @@ internal interface IPathService
 
     string? ScreenshotsDirectoryPath { get; }
 
-    string? RunUploadInstallIdentityPath { get; }
+    string? IdentityDirectoryPath { get; }
 
-    string? RunUploadClientStatePath { get; }
+    string? PlayerObservationPath { get; }
 
-    string? RunUploadPrivateKeyPath { get; }
+    string? InstallationRecordPath { get; }
+
+    string? InstallationPrivateKeyPath { get; }
+
 }

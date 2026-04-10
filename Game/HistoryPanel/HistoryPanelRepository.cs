@@ -308,6 +308,8 @@ internal sealed class HistoryPanelRepository
                 day,
                 hour,
                 encounter_id,
+                player_name,
+                player_account_id,
                 player_hero,
                 player_rank,
                 player_rating,
@@ -340,30 +342,26 @@ internal sealed class HistoryPanelRepository
         {
             var battleId = SafeGetNullableString(reader, "battle_id") ?? "unknown";
             records.Add(
-                new HistoryBattleRecord(
+                GhostBattleLocalProjector.CreateHistoryBattleRecord(
                     battleId,
-                    string.Empty,
                     DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
                     GetNullableInt32(reader, "day"),
                     GetNullableInt32(reader, "hour"),
                     GetNullableString(reader, "encounter_id"),
+                    GetNullableString(reader, "player_name"),
+                    GetNullableString(reader, "player_account_id"),
                     GetNullableString(reader, "player_hero"),
                     GetNullableString(reader, "player_rank"),
                     GetNullableInt32(reader, "player_rating"),
                     GetNullableInt32(reader, "player_level"),
-                    GetNullableString(reader, "opponent_name"),
                     GetNullableString(reader, "opponent_hero"),
                     GetNullableString(reader, "opponent_rank"),
                     GetNullableInt32(reader, "opponent_rating"),
                     GetNullableInt32(reader, "opponent_level"),
-                    GetNullableString(reader, "opponent_account_id"),
                     GetNullableString(reader, "combat_kind"),
                     GetNullableString(reader, "result"),
                     GetNullableString(reader, "winner_combatant_id"),
                     GetNullableString(reader, "loser_combatant_id"),
-                    string.Empty,
-                    BuildEmptyPreviewData(),
-                    HistoryBattleSource.Ghost,
                     replayAvailable: GetNullableInt32(reader, "replay_available") == 1,
                     replayDownloaded: GetNullableInt32(reader, "replay_downloaded") == 1
                 )
@@ -410,6 +408,8 @@ internal sealed class HistoryPanelRepository
                     day,
                     hour,
                     encounter_id,
+                    player_name,
+                    player_account_id,
                     player_hero,
                     player_rank,
                     player_rating,
@@ -436,6 +436,8 @@ internal sealed class HistoryPanelRepository
                     $day,
                     $hour,
                     $encounterId,
+                    $playerName,
+                    $playerAccountId,
                     $playerHero,
                     $playerRank,
                     $playerRating,
@@ -462,6 +464,8 @@ internal sealed class HistoryPanelRepository
                     day = excluded.day,
                     hour = excluded.hour,
                     encounter_id = excluded.encounter_id,
+                    player_name = excluded.player_name,
+                    player_account_id = excluded.player_account_id,
                     player_hero = excluded.player_hero,
                     player_rank = excluded.player_rank,
                     player_rating = excluded.player_rating,
@@ -502,6 +506,14 @@ internal sealed class HistoryPanelRepository
             insertCommand.Parameters.AddWithValue(
                 "$encounterId",
                 (object?)battle.EncounterId ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerName",
+                (object?)battle.PlayerName ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerAccountId",
+                (object?)battle.PlayerAccountId ?? DBNull.Value
             );
             insertCommand.Parameters.AddWithValue(
                 "$playerHero",

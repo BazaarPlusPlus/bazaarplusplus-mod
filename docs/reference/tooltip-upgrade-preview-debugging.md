@@ -139,7 +139,7 @@
 日志中还有几个高频问题，会淹没 tooltip 线索，也可能影响体感性能：
 
 - `RunLoggingModule`: `Run ... already has terminal status and cannot be recreated`
-- `BattleUploadController` / `BattleUploadService`: 每 5 秒重复失败上传 battle
+- `RunUploadController`: 在非 live run 时扫描并上传失败的 run-bundle
 - `MonsterPreviewBoardRenderTarget`: board 丢失后反复重建
 
 其中 monster preview 的一部分高频 `Info` 日志已降为 `Debug`。

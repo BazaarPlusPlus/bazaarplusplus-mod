@@ -44,7 +44,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 - Run logging and combat replay store local SQLite data and replay payloads.
 - Background upload is optional and only scans for uploads while the client is outside a live run.
-- The `ModCFServer/` directory contains the Cloudflare Worker backend used for uploads, ghost battles, and replay download links.
+- The `ModCFServerV3/` directory contains the current Cloudflare Worker backend used for uploads, ghost battles, and replay download links.
 
 ## Repository Layout
 
@@ -53,7 +53,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - `tests/`: feature-focused test projects.
 - `scripts/`: build helpers and utility scripts.
 - `docs/README.md`: documentation index.
-- `ModCFServer/`: optional cloud sync backend.
+- `ModCFServerV3/`: optional cloud sync backend.
 
 ## Documentation Entry Points
 

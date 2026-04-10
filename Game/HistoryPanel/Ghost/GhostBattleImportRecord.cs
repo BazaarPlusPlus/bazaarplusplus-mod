@@ -15,6 +15,10 @@ internal sealed class GhostBattleImportRecord
 
     public string? EncounterId { get; set; }
 
+    public string? PlayerName { get; set; }
+
+    public string? PlayerAccountId { get; set; }
+
     public string? PlayerHero { get; set; }
 
     public string? PlayerRank { get; set; }
