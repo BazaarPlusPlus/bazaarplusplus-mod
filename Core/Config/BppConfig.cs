@@ -13,6 +13,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
 
+    public ConfigEntry<bool>? EnableBattleStartScreenshotConfig { get; private set; }
+
     public ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; private set; }
 
     public ConfigEntry<string>? EnchantPreviewHotkeyPathConfig { get; private set; }
@@ -52,6 +54,12 @@ internal sealed class BppConfig : IBppConfig
             "Enabled",
             false,
             "Whether to show the combat status bar with elapsed time, speed controls, and pause controls"
+        );
+        EnableBattleStartScreenshotConfig = config.Bind(
+            "Screenshots",
+            "EnableBattleStartScreenshot",
+            true,
+            "Whether to automatically capture a screenshot when each PVP battle starts."
         );
         CombatStatusBarSpeedMultiplierConfig = config.Bind(
             "CombatStatusBar",

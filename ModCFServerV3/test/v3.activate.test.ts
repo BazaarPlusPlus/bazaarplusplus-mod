@@ -32,6 +32,58 @@ test("activate creates user and first installation atomically", async () => {
   assert.equal(env.DB.v3Installations.size, 1);
 });
 
+test("activate persists stream profile fields when provided", async () => {
+  const env = buildEnv();
+
+  const response = await worker.fetch(
+    new Request("https://example.com/activate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        player_account_id: "player-account-stream",
+        player_username: "stream-player",
+        password: "hunter2",
+        stream_platform: "bilibili",
+        stream_channel_id: "123456",
+        stream_url: "https://live.bilibili.com/123456",
+        installation_public_key: "public-key-stream",
+      }),
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  const user = env.DB.v3Users.get("player-account-stream");
+  assert.ok(user);
+  assert.equal(user.stream_platform, "bilibili");
+  assert.equal(user.stream_channel_id, "123456");
+  assert.equal(user.stream_url, "https://live.bilibili.com/123456");
+});
+
+test("activate rejects incomplete stream profile payloads", async () => {
+  const env = buildEnv();
+
+  const response = await worker.fetch(
+    new Request("https://example.com/activate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        player_account_id: "player-account-bad-stream",
+        player_username: "bad-stream-player",
+        password: "hunter2",
+        stream_platform: "bilibili",
+        installation_public_key: "public-key-bad-stream",
+      }),
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid_activate_request" });
+  assert.equal(env.DB.v3Users.size, 0);
+  assert.equal(env.DB.v3Installations.size, 0);
+});
+
 test("activate rejects already-claimed player_account_id", async () => {
   const env = buildEnv();
   env.DB.v3Users.set("player-account-claimed", {

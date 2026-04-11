@@ -249,6 +249,8 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         if (_screenshotService == null)
             return false;
         var pendingBattleScreenshot = _pendingBattleScreenshot;
+        if (!IsBattleStartScreenshotEnabled())
+            return false;
         if (!_isCombatActive || _battleCaptureInFlight)
             return false;
         if (pendingBattleScreenshot == null || pendingBattleScreenshot.Captured)
@@ -320,6 +322,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         return !string.IsNullOrWhiteSpace(_currentRunId)
             ? _currentRunId
             : BppRuntimeHost.RunContext.CurrentServerRunId;
+    }
+
+    private static bool IsBattleStartScreenshotEnabled()
+    {
+        return BppRuntimeHost.Config.EnableBattleStartScreenshotConfig?.Value ?? true;
     }
 
     private IEnumerator CaptureManualScreenshot(ScreenshotCaptureRequest request)

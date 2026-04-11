@@ -4,6 +4,17 @@ import { json, readJson } from "../../http/json";
 import { trimString } from "../../http/request";
 import type { ActivateRequest } from "../../types/api";
 
+const ALLOWED_STREAM_PLATFORMS = new Set(["bilibili", "twitch"]);
+
+function isValidStreamUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export async function handleActivate(
   request: Request,
   env: Env,
@@ -12,10 +23,24 @@ export async function handleActivate(
   const playerAccountId = trimString(body.player_account_id);
   const playerUsername = trimString(body.player_username);
   const password = trimString(body.password);
+  const streamPlatform = trimString(body.stream_platform);
+  const streamChannelId = trimString(body.stream_channel_id);
+  const streamUrl = trimString(body.stream_url);
   const installationPublicKey = trimString(body.installation_public_key);
 
   if (!playerAccountId || !playerUsername || !password || !installationPublicKey) {
     return json({ error: "invalid_activate_request" }, { status: 400 });
+  }
+
+  const hasAnyStreamField = Boolean(streamPlatform || streamChannelId || streamUrl);
+  if (hasAnyStreamField) {
+    if (!streamPlatform || !streamChannelId || !streamUrl) {
+      return json({ error: "invalid_activate_request" }, { status: 400 });
+    }
+
+    if (!ALLOWED_STREAM_PLATFORMS.has(streamPlatform) || !isValidStreamUrl(streamUrl)) {
+      return json({ error: "invalid_activate_request" }, { status: 400 });
+    }
   }
 
   const existingUser = await env.DB.prepare(
@@ -59,9 +84,9 @@ export async function handleActivate(
       playerAccountId,
       playerUsername,
       passwordHash,
-      null,
-      null,
-      null,
+      streamPlatform || null,
+      streamChannelId || null,
+      streamUrl || null,
       nowUtc,
       nowUtc,
       null,

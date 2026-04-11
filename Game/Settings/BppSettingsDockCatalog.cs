@@ -6,6 +6,7 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.Screenshots;
 using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
@@ -44,6 +45,14 @@ internal static class BppSettingsDockCatalog
             new CombatStatusBarSettingsMenuBridge(
                 CombatStatusBarFeature.GetEnabledSettingValue,
                 CombatStatusBarFeature.SetEnabledSettingValue
+            )
+        ),
+        new(
+            "BattleStartScreenshot",
+            BattleStartScreenshotSettingsMenuLabel.Resolve,
+            new SettingsMenuToggleBridge(
+                ReadBattleStartScreenshotEnabled,
+                WriteBattleStartScreenshotEnabled
             )
         ),
         new(
@@ -96,9 +105,21 @@ internal static class BppSettingsDockCatalog
         return BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig?.Value ?? false;
     }
 
+    private static bool ReadBattleStartScreenshotEnabled()
+    {
+        return BppRuntimeHost.Config.EnableBattleStartScreenshotConfig?.Value ?? true;
+    }
+
     private static void WriteEnchantPreviewEnabled(bool enabled)
     {
         var config = BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig;
+        if (config != null)
+            config.Value = enabled;
+    }
+
+    private static void WriteBattleStartScreenshotEnabled(bool enabled)
+    {
+        var config = BppRuntimeHost.Config.EnableBattleStartScreenshotConfig;
         if (config != null)
             config.Value = enabled;
     }
