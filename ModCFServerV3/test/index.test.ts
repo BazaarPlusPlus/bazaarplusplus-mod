@@ -8,12 +8,23 @@ test("responds to the health endpoint", async () => {
   const response = await worker.fetch(
     new Request("https://example.com/health", {
       method: "GET",
+      headers: {
+        origin: "https://frontend.example.com",
+      },
     }),
     buildEnv() as never,
   );
 
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true });
+  assert.equal(
+    response.headers.get("access-control-allow-origin"),
+    "https://frontend.example.com",
+  );
+  assert.equal(
+    response.headers.get("access-control-allow-headers"),
+    "authorization, content-type, x-bpp-installation-id, x-bpp-timestamp, x-bpp-content-sha256, x-bpp-signature",
+  );
 });
 
 test("activate route is wired and validates request payload", async () => {
@@ -42,4 +53,32 @@ test("returns not_found for unsupported routes", async () => {
 
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), { error: "not_found" });
+});
+
+test("responds to CORS preflight for browser requests", async () => {
+  const response = await worker.fetch(
+    new Request("https://example.com/installations", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://frontend.example.com",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization, content-type",
+      },
+    }),
+    buildEnv() as never,
+  );
+
+  assert.equal(response.status, 204);
+  assert.equal(
+    response.headers.get("access-control-allow-origin"),
+    "https://frontend.example.com",
+  );
+  assert.equal(
+    response.headers.get("access-control-allow-methods"),
+    "GET, POST, OPTIONS",
+  );
+  assert.equal(
+    response.headers.get("access-control-allow-headers"),
+    "authorization, content-type, x-bpp-installation-id, x-bpp-timestamp, x-bpp-content-sha256, x-bpp-signature",
+  );
 });
