@@ -1,7 +1,7 @@
 #nullable enable
 namespace BazaarPlusPlus.Game.PvpBattles;
 
-internal sealed class PvpReplayPayload
+public sealed class PvpReplayPayload
 {
     public string BattleId { get; set; } = string.Empty;
 

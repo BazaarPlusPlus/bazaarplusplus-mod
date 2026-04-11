@@ -43,7 +43,16 @@ internal sealed class CombatReplayPayloadStore
 
         try
         {
-            return PvpReplayPayloadCodec.Deserialize(File.ReadAllBytes(filePath));
+            var payloadBytes = File.ReadAllBytes(filePath);
+            var payload = PvpReplayPayloadCodec.Deserialize(payloadBytes);
+            if (payload != null)
+                return payload;
+
+            BppLog.Warn(
+                "CombatReplayPayloadStore",
+                $"Replay payload '{filePath}' could not be decoded as gzip-compressed MessagePack."
+            );
+            return null;
         }
         catch (Exception ex)
         {

@@ -204,7 +204,13 @@ internal sealed class RunBundleUploadStore
 
             var payload = _payloadStore.Load(manifest.BattleId);
             if (payload == null)
+            {
+                BppLog.Warn(
+                    "RunBundleUploadStore",
+                    $"Run bundle build for run={runId} is waiting on replay payload battle={manifest.BattleId}."
+                );
                 return null;
+            }
 
             battleIds.Add(manifest.BattleId);
             battleProjections.Add(BuildBattleProjection(manifest));

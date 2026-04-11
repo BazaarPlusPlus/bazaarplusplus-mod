@@ -140,7 +140,7 @@ internal sealed class BattleProjectionV3
     public bool ReplayAvailable { get; set; }
 }
 
-internal sealed class RunArtifactV3
+public sealed class RunArtifactV3
 {
     [JsonProperty("run_id")]
     public string RunId { get; set; } = string.Empty;
@@ -149,7 +149,7 @@ internal sealed class RunArtifactV3
     public List<RunArtifactBattleV3> Battles { get; set; } = new();
 }
 
-internal sealed class RunArtifactBattleV3
+public sealed class RunArtifactBattleV3
 {
     [JsonProperty("battle_id")]
     public string BattleId { get; set; } = string.Empty;
@@ -167,7 +167,7 @@ internal sealed class RunArtifactBattleV3
     public ReplayPayloadArtifactV3 ReplayPayload { get; set; } = new();
 }
 
-internal sealed class BattleManifestArtifactV3
+public sealed class BattleManifestArtifactV3
 {
     [JsonProperty("battle_id")]
     public string? BattleId { get; set; }
@@ -197,7 +197,7 @@ internal sealed class BattleManifestArtifactV3
     public string? LoserCombatantId { get; set; }
 }
 
-internal sealed class BattleParticipantsArtifactV3
+public sealed class BattleParticipantsArtifactV3
 {
     [JsonProperty("player_name")]
     public string? PlayerName { get; set; }
@@ -236,13 +236,13 @@ internal sealed class BattleParticipantsArtifactV3
     public int? OpponentLevel { get; set; }
 }
 
-internal sealed class BattleSnapshotsArtifactV3
+public sealed class BattleSnapshotsArtifactV3
 {
     [JsonProperty("card_sets")]
     public List<CardSetCaptureArtifactV3> CardSets { get; set; } = new();
 }
 
-internal sealed class CardSetCaptureArtifactV3
+public sealed class CardSetCaptureArtifactV3
 {
     [JsonProperty("label")]
     public string Label { get; set; } = string.Empty;
@@ -257,7 +257,7 @@ internal sealed class CardSetCaptureArtifactV3
     public List<CombatReplayCardSnapshot> Items { get; set; } = new();
 }
 
-internal sealed class ReplayPayloadArtifactV3
+public sealed class ReplayPayloadArtifactV3
 {
     [JsonProperty("battle_id")]
     public string BattleId { get; set; } = string.Empty;

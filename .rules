@@ -12,6 +12,7 @@
 - On Windows, require PowerShell 7.6.0 or later before proceeding; check `PSVersionTable.PSVersion.ToString()` to confirm the installed version
 - Preserve the build-and-copy behavior in `BazaarPlusPlus.csproj`; do not change the Debug `BepInEx/plugins` copy flow or the Release installer copy flow unless the task is explicitly about packaging
 - Keep agent-authored docs minimal; do not add or rewrite README-style files unless the task explicitly requires user-facing documentation
+- When a model is serialized with MessagePack in the Unity/Mono runtime, keep the serialized DTO graph `public`; `internal` DTOs can still fail at runtime with `MethodAccessException` even when their properties are public
 
 # Pull Request Hygiene
 

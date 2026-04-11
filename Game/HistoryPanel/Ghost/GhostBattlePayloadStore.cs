@@ -42,7 +42,16 @@ internal sealed class GhostBattlePayloadStore
 
         try
         {
-            return GhostBattlePayloadCodec.Deserialize(File.ReadAllBytes(filePath));
+            var payloadBytes = File.ReadAllBytes(filePath);
+            var payload = GhostBattlePayloadCodec.Deserialize(payloadBytes);
+            if (payload != null)
+                return payload;
+
+            BppLog.Warn(
+                "GhostBattlePayloadStore",
+                $"Ghost replay payload '{filePath}' could not be decoded as gzip-compressed MessagePack."
+            );
+            return null;
         }
         catch (Exception ex)
         {
