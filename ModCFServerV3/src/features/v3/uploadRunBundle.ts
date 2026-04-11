@@ -151,17 +151,12 @@ export async function handleUploadRunBundle(
     return json({ error: "installation_player_mismatch" }, { status: 403 });
   }
 
-  const seenBattleIds = new Set<string>();
   for (const battle of battleProjections) {
     const battleId = asString(battle.battle_id);
     const battleRunId = asString(battle.run_id);
     if (!battleId) {
       return json({ error: "battle_id_required" }, { status: 400 });
     }
-    if (seenBattleIds.has(battleId)) {
-      return json({ error: "duplicate_battle_id" }, { status: 400 });
-    }
-    seenBattleIds.add(battleId);
 
     if (!battleRunId || battleRunId !== runId) {
       return json({ error: "battle_run_id_mismatch" }, { status: 400 });
@@ -298,42 +293,59 @@ export async function handleUploadRunBundle(
     )
     .run();
 
-  await env.DB.prepare(`DELETE FROM battles WHERE run_id = ?`).bind(runId).run();
-
-  for (const battle of battleProjections) {
-    if (!shouldProjectBattle(battle)) {
-      continue;
-    }
-
-    await env.DB.prepare(
-      `
-        INSERT INTO battles (
-          battle_id,
-          run_id,
-          installation_id,
-          player_account_id,
-          bundle_id,
-          recorded_at_utc,
-          day,
-          player_name,
-          player_account_id_in_payload,
-          player_hero,
-          player_rank,
-          player_rating,
-          player_level,
-          opponent_name,
-          opponent_account_id,
-          opponent_hero,
-          opponent_rank,
-          opponent_rating,
-          opponent_level,
-          result,
-          replay_available,
-          updated_at_utc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    )
-      .bind(
+  const battleStatements = battleProjections
+    .filter((battle) => shouldProjectBattle(battle))
+    .map((battle) =>
+      env.DB.prepare(
+        `
+          INSERT INTO battles (
+            battle_id,
+            run_id,
+            installation_id,
+            player_account_id,
+            bundle_id,
+            recorded_at_utc,
+            day,
+            player_name,
+            player_account_id_in_payload,
+            player_hero,
+            player_rank,
+            player_rating,
+            player_level,
+            opponent_name,
+            opponent_account_id,
+            opponent_hero,
+            opponent_rank,
+            opponent_rating,
+            opponent_level,
+            result,
+            replay_available,
+            updated_at_utc
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(battle_id) DO UPDATE SET
+            run_id = excluded.run_id,
+            installation_id = excluded.installation_id,
+            player_account_id = excluded.player_account_id,
+            bundle_id = excluded.bundle_id,
+            recorded_at_utc = excluded.recorded_at_utc,
+            day = excluded.day,
+            player_name = excluded.player_name,
+            player_account_id_in_payload = excluded.player_account_id_in_payload,
+            player_hero = excluded.player_hero,
+            player_rank = excluded.player_rank,
+            player_rating = excluded.player_rating,
+            player_level = excluded.player_level,
+            opponent_name = excluded.opponent_name,
+            opponent_account_id = excluded.opponent_account_id,
+            opponent_hero = excluded.opponent_hero,
+            opponent_rank = excluded.opponent_rank,
+            opponent_rating = excluded.opponent_rating,
+            opponent_level = excluded.opponent_level,
+            result = excluded.result,
+            replay_available = excluded.replay_available,
+            updated_at_utc = excluded.updated_at_utc
+        `,
+      ).bind(
         asString(battle.battle_id),
         runId,
         persistedInstallationId,
@@ -356,8 +368,11 @@ export async function handleUploadRunBundle(
         asString(battle.result),
         battle.replay_available === true ? 1 : 0,
         createdAtUtc,
-      )
-      .run();
+      ),
+    );
+
+  if (battleStatements.length > 0) {
+    await env.DB.batch(battleStatements);
   }
 
   return json({ status: "accepted", bundle_id: bundleId, object_key: persistedObjectKey });

@@ -746,16 +746,6 @@ export class MockD1Database {
       return { changes: 1 };
     }
 
-    if (sql.includes("DELETE FROM battles WHERE run_id = ?")) {
-      const runId = String(params[0] ?? "");
-      for (const [battleId, row] of this.v3Battles.entries()) {
-        if (row.run_id === runId) {
-          this.v3Battles.delete(battleId);
-        }
-      }
-      return { changes: 1 };
-    }
-
     if (sql.includes("INSERT INTO battles")) {
       const row = {
         battle_id: String(params[0] ?? ""),

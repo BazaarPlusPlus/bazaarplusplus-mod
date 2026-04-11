@@ -279,63 +279,6 @@ test("run bundle upload accepts requests without player account id", async () =>
   assert.match(bundle?.object_key ?? "", /run-bundles\/anonymous-player\//);
 });
 
-test("run bundle upload rejects duplicated battle ids in battle_projections", async () => {
-  const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_bundle", {
-    installation_id: "inst_bundle",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
-
-  const body = JSON.stringify({
-    schema_version: 3,
-    installation_id: "inst_bundle",
-    player_account_id: "player-account-001",
-    submitted_at_utc: new Date().toISOString(),
-    artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
-    artifact_bytes: [1],
-    run_projection: {
-      run_id: "run-dup",
-      status: "completed",
-      ended_at_utc: "2026-04-10T01:00:00.000Z",
-    },
-    battle_projections: [
-      { battle_id: "battle-dup", run_id: "run-dup", recorded_at_utc: "2026-04-10T00:00:00.000Z" },
-      { battle_id: "battle-dup", run_id: "run-dup", recorded_at_utc: "2026-04-10T00:01:00.000Z" },
-    ],
-  });
-  const signed = buildSignedRequest({
-    body,
-    installationId: "inst_bundle",
-    privateKey,
-  });
-
-  const response = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-bpp-installation-id": "inst_bundle",
-        "x-bpp-timestamp": signed.timestamp,
-        "x-bpp-content-sha256": signed.bodyHash,
-        "x-bpp-signature": signed.signature,
-      },
-      body,
-    }),
-    env as never,
-  );
-
-  assert.equal(response.status, 400);
-});
-
 test("run bundle upload rejects mismatched battle run ids", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
