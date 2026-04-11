@@ -230,13 +230,7 @@ internal sealed class GhostBattleApiClient
         {
             var artifact = V3RunBundleArtifactCodec.Deserialize(responseBytes);
             if (artifact == null)
-            {
-                BppLog.Warn(
-                    "GhostBattleApiClient",
-                    $"Replay artifact for battle {battleId} could not be decoded as gzip-compressed MessagePack."
-                );
                 return null;
-            }
 
             var battle = artifact?.Battles?.FirstOrDefault(candidate =>
                 string.Equals(candidate.BattleId, battleId, StringComparison.Ordinal)
@@ -274,12 +268,8 @@ internal sealed class GhostBattleApiClient
                 ReplayPayload = replayPayload,
             };
         }
-        catch (Exception ex)
+        catch
         {
-            BppLog.Warn(
-                "GhostBattleApiClient",
-                $"Failed to extract replay payload for battle {battleId}: {ex.Message}"
-            );
             return null;
         }
     }
