@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
+using BazaarPlusPlus.Game.Identity;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -189,14 +190,7 @@ internal sealed class HistoryPanelDataService
 
     private static string? TryGetCurrentPlayerAccountId()
     {
-        try
-        {
-            return BppClientCacheBridge.TryGetProfileAccountId();
-        }
-        catch
-        {
-            return null;
-        }
+        return PlayerAccountIdResolver.ResolveCurrent();
     }
 }
 

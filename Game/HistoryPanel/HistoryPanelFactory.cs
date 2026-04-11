@@ -18,11 +18,12 @@ internal static class HistoryPanelFactory
         if (!string.IsNullOrWhiteSpace(runtime.RunLogDatabasePath))
             repository = new HistoryPanelRepository(runtime.RunLogDatabasePath);
 
-        var ghostSyncService = CreateGhostSyncService(runtime, repository);
+        var installationStore = CreateInstallationStore();
+        var ghostSyncService = CreateGhostSyncService(runtime, repository, installationStore);
         var dataService = new HistoryPanelDataService(
             repository,
             ghostSyncService,
-            TryGetCurrentPlayerAccountId
+            () => PlayerAccountIdResolver.ResolveCurrent(installationStore)
         );
         var replayService = new HistoryPanelReplayService(
             runtime.CombatReplayRuntimeAccessor,
@@ -34,12 +35,27 @@ internal static class HistoryPanelFactory
 
     private static GhostBattleSyncService? CreateGhostSyncService(
         IHistoryPanelRuntime runtime,
-        HistoryPanelRepository? repository
+        HistoryPanelRepository? repository,
+        InstallationRecordStore? installationStore
     )
     {
-        if (repository == null)
+        if (repository == null || installationStore == null)
             return null;
 
+        var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
+        if (routes == null)
+            return null;
+
+        return new GhostBattleSyncService(
+            repository,
+            installationStore,
+            routes,
+            timeout: TimeSpan.FromSeconds(10)
+        );
+    }
+
+    private static InstallationRecordStore? CreateInstallationStore()
+    {
         var installationRecordPath = BppRuntimeHost.Paths.InstallationRecordPath;
         var installationPrivateKeyPath = BppRuntimeHost.Paths.InstallationPrivateKeyPath;
         if (
@@ -50,27 +66,6 @@ internal static class HistoryPanelFactory
             return null;
         }
 
-        var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
-        if (routes == null)
-            return null;
-
-        return new GhostBattleSyncService(
-            repository,
-            new InstallationRecordStore(installationRecordPath, installationPrivateKeyPath),
-            routes,
-            timeout: TimeSpan.FromSeconds(10)
-        );
-    }
-
-    private static string? TryGetCurrentPlayerAccountId()
-    {
-        try
-        {
-            return BppClientCacheBridge.TryGetProfileAccountId();
-        }
-        catch
-        {
-            return null;
-        }
+        return new InstallationRecordStore(installationRecordPath, installationPrivateKeyPath);
     }
 }

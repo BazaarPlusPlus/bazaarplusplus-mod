@@ -38,7 +38,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         CancellationToken cancellationToken
     )
     {
-        var localPlayerAccountId = TryGetCurrentPlayerAccountId();
+        var localPlayerAccountId = ResolveCurrentPlayerAccountId();
         if (string.IsNullOrWhiteSpace(localPlayerAccountId))
             return GhostBattleSyncResult.Failure("player_account_id_unavailable");
 
@@ -75,7 +75,7 @@ internal sealed class GhostBattleSyncService : IDisposable
             return GhostBattleReplayDownloadResult.Failure("battle_id_required");
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
             return GhostBattleReplayDownloadResult.Failure("replay_directory_required");
-        var localPlayerAccountId = TryGetCurrentPlayerAccountId();
+        var localPlayerAccountId = ResolveCurrentPlayerAccountId();
         if (string.IsNullOrWhiteSpace(localPlayerAccountId))
             return GhostBattleReplayDownloadResult.Failure("player_account_id_unavailable");
         if (!_installationStore.TryLoad(out var installation) || installation == null)
@@ -139,16 +139,9 @@ internal sealed class GhostBattleSyncService : IDisposable
         return importedCount < limit;
     }
 
-    private static string? TryGetCurrentPlayerAccountId()
+    private string? ResolveCurrentPlayerAccountId()
     {
-        try
-        {
-            return BppClientCacheBridge.TryGetProfileAccountId();
-        }
-        catch
-        {
-            return null;
-        }
+        return PlayerAccountIdResolver.ResolveCurrent(_installationStore);
     }
 
     private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)

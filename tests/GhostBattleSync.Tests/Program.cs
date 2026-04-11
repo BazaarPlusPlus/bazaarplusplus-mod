@@ -8,6 +8,9 @@ var apiClientType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBat
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleRecord");
 var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
+var playerAccountResolverType = RequireType("BazaarPlusPlus.Game.Identity.PlayerAccountIdResolver");
+var installationRecordType = RequireType("BazaarPlusPlus.Game.Identity.InstallationRecord");
+var installationStoreType = RequireType("BazaarPlusPlus.Game.Identity.InstallationRecordStore");
 var coordinatorOutcomeType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator+GhostBattleOutcome"
 );
@@ -46,6 +49,10 @@ var tryParseBattle = apiClientType.GetMethod(
     "TryParseBattle",
     BindingFlags.NonPublic | BindingFlags.Static
 );
+var resolvePlayerAccountId = playerAccountResolverType.GetMethod(
+    "Resolve",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
 var serializeArtifact = artifactCodecType.GetMethod(
     "Serialize",
     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
@@ -68,6 +75,10 @@ Assert(
     resolveGhostBattleOutcome != null,
     "HistoryPanelCoordinator should expose ghost-outcome resolution logic."
 );
+Assert(
+    resolvePlayerAccountId != null,
+    "PlayerAccountIdResolver should expose account-id fallback logic."
+);
 
 Assert(
     !(bool)shouldAdvanceCheckpoint!.Invoke(null, [200, 200])!,
@@ -77,6 +88,47 @@ Assert(
     (bool)shouldAdvanceCheckpoint.Invoke(null, [12, 200])!,
     "Ghost sync should advance the checkpoint after a non-truncated incremental fetch."
 );
+
+var installationRoot = Path.Combine(
+    Path.GetTempPath(),
+    "bpp-player-account-resolver-tests",
+    Guid.NewGuid().ToString("N")
+);
+Directory.CreateDirectory(installationRoot);
+try
+{
+    var installationStore = Activator.CreateInstance(
+        installationStoreType,
+        Path.Combine(installationRoot, "installation.bpp"),
+        Path.Combine(installationRoot, "installation.key")
+    ) ?? throw new InvalidOperationException("InstallationRecordStore should be constructible.");
+    var installationRecord = Activator.CreateInstance(installationRecordType)
+        ?? throw new InvalidOperationException("InstallationRecord should be constructible.");
+    installationRecordType.GetProperty("PlayerAccountId")!.SetValue(installationRecord, "player-installation-001");
+    installationRecordType.GetProperty("InstallationId")!.SetValue(installationRecord, "installation-001");
+    installationRecordType.GetProperty("ApiBaseUrl")!.SetValue(installationRecord, "https://mod-api-v3.bazaarplusplus.com");
+    InvokeVoid(
+        installationStoreType,
+        installationStore,
+        "Save",
+        [installationRecord, new byte[] { 48, 130, 1, 0 }]
+    );
+    Assert(
+        (string?)resolvePlayerAccountId!.Invoke(null, [null, installationStore])
+            == "player-installation-001",
+        "PlayerAccountIdResolver should fall back to the installation record when the runtime cache is unavailable."
+    );
+    Assert(
+        (string?)resolvePlayerAccountId.Invoke(null, [" player-cache-001 ", installationStore])
+            == "player-cache-001",
+        "PlayerAccountIdResolver should prefer the trimmed runtime cache account id."
+    );
+}
+finally
+{
+    if (Directory.Exists(installationRoot))
+        Directory.Delete(installationRoot, recursive: true);
+}
 
 var artifact = Activator.CreateInstance(runArtifactType)
     ?? throw new InvalidOperationException("RunArtifactV3 should be constructible.");
