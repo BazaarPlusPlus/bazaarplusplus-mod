@@ -64,6 +64,7 @@ type ExistingRunBundleRow = {
 };
 
 const AnonymousInstallationId = "anonymous";
+const AnonymousPlayerAccountId = "anonymous-player";
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -125,10 +126,11 @@ export async function handleUploadRunBundle(
     : [];
 
   const persistedInstallationId = installationId ?? auth?.installationId ?? AnonymousInstallationId;
+  const persistedPlayerAccountId =
+    playerAccountId ?? auth?.playerAccountId ?? AnonymousPlayerAccountId;
 
   if (
     schemaVersion == null ||
-    !playerAccountId ||
     !submittedAtUtc ||
     !artifactCodec ||
     !artifactBytes ||
@@ -143,7 +145,7 @@ export async function handleUploadRunBundle(
     auth != null
     && (
       (installationId != null && installationId !== auth.installationId)
-      || playerAccountId !== auth.playerAccountId
+      || (playerAccountId != null && playerAccountId !== auth.playerAccountId)
     )
   ) {
     return json({ error: "installation_player_mismatch" }, { status: 403 });
@@ -168,7 +170,7 @@ export async function handleUploadRunBundle(
 
   const payloadHash = await sha256Base64(artifactBytes);
   const objectKey =
-    `run-bundles/${playerAccountId}/${persistedInstallationId}/${runId}/${payloadHash}.mpack.gz`;
+    `run-bundles/${persistedPlayerAccountId}/${persistedInstallationId}/${runId}/${payloadHash}.mpack.gz`;
   await env.RUN_BUNDLE_BUCKET.put(objectKey, artifactBytes, {
     httpMetadata: {
       contentType: artifactCodec,
@@ -216,7 +218,7 @@ export async function handleUploadRunBundle(
       .bind(
         bundleId,
         persistedInstallationId,
-        playerAccountId,
+        persistedPlayerAccountId,
         runId,
         payloadHash,
         schemaVersion,
@@ -276,7 +278,7 @@ export async function handleUploadRunBundle(
     .bind(
       runId,
       persistedInstallationId,
-      playerAccountId,
+      persistedPlayerAccountId,
       bundleId,
       runStatus,
       asString(body.run_projection?.hero_id),
@@ -335,7 +337,7 @@ export async function handleUploadRunBundle(
         asString(battle.battle_id),
         runId,
         persistedInstallationId,
-        playerAccountId,
+        persistedPlayerAccountId,
         bundleId,
         asString(battle.recorded_at_utc),
         asNumber(battle.day),

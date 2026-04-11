@@ -11,6 +11,8 @@ namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal sealed class RunBundleUploadService : IDisposable
 {
+    private const string AnonymousPlayerAccountId = "anonymous-player";
+
     private readonly RunBundleUploadStore _store;
     private readonly InstallationRecordStore _installationStore;
     private readonly V3Routes _routes;
@@ -52,8 +54,7 @@ internal sealed class RunBundleUploadService : IDisposable
 
         if (string.IsNullOrWhiteSpace(playerAccountId))
         {
-            BppLog.Warn("RunBundleUploadService", "Skipping upload because player account id is unavailable.");
-            return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: true);
+            playerAccountId = AnonymousPlayerAccountId;
         }
 
         var uploadedCount = 0;

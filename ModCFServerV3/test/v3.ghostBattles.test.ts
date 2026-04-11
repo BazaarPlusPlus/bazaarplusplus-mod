@@ -2,29 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import worker from "../src/index";
-import {
-  canonicalRequestV3,
-  generateClientKeyPair,
-  sha256Base64,
-  signCanonical,
-} from "./helpers/crypto";
 import { buildEnv } from "./helpers/mockEnv";
 
 test("ghost-battles ignores caller days and uses the server lookback window", async () => {
   const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_ghost", {
-    installation_id: "inst_ghost",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
 
   env.DB.v3Battles.set("battle-recent", {
     battle_id: "battle-recent",
@@ -75,30 +56,11 @@ test("ghost-battles ignores caller days and uses the server lookback window", as
     updated_at_utc: new Date().toISOString(),
   });
 
-  const timestamp = new Date().toISOString();
-  const bodyHash = sha256Base64("");
-  const query = "days=99&limit=200";
-  const signature = signCanonical(
-    privateKey,
-    canonicalRequestV3({
-      method: "GET",
-      path: "/ghost-battles",
-      query,
-      installationId: "inst_ghost",
-      timestamp,
-      bodyHash,
-    }),
-  );
+  const query = "player_account_id=player-account-001&days=99&limit=200";
 
   const response = await worker.fetch(
     new Request(`https://example.com/ghost-battles?${query}`, {
       method: "GET",
-      headers: {
-        "x-bpp-installation-id": "inst_ghost",
-        "x-bpp-timestamp": timestamp,
-        "x-bpp-content-sha256": bodyHash,
-        "x-bpp-signature": signature,
-      },
     }),
     env as never,
   );
@@ -112,19 +74,6 @@ test("ghost-battles ignores caller days and uses the server lookback window", as
 
 test("ghost-battles honors the caller limit parameter after server clamping", async () => {
   const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_ghost", {
-    installation_id: "inst_ghost",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
 
   env.DB.v3Battles.set("battle-003", {
     battle_id: "battle-003",
@@ -199,30 +148,11 @@ test("ghost-battles honors the caller limit parameter after server clamping", as
     updated_at_utc: new Date().toISOString(),
   });
 
-  const timestamp = new Date().toISOString();
-  const bodyHash = sha256Base64("");
-  const query = "limit=1";
-  const signature = signCanonical(
-    privateKey,
-    canonicalRequestV3({
-      method: "GET",
-      path: "/ghost-battles",
-      query,
-      installationId: "inst_ghost",
-      timestamp,
-      bodyHash,
-    }),
-  );
+  const query = "player_account_id=player-account-001&limit=1";
 
   const response = await worker.fetch(
     new Request(`https://example.com/ghost-battles?${query}`, {
       method: "GET",
-      headers: {
-        "x-bpp-installation-id": "inst_ghost",
-        "x-bpp-timestamp": timestamp,
-        "x-bpp-content-sha256": bodyHash,
-        "x-bpp-signature": signature,
-      },
     }),
     env as never,
   );
@@ -234,20 +164,8 @@ test("ghost-battles honors the caller limit parameter after server clamping", as
   assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-003"]);
 });
 
-test("ghost-battles accepts unsigned installation requests", async () => {
+test("ghost-battles reads player_account_id from query", async () => {
   const env = buildEnv();
-  env.DB.v3Installations.set("inst_unsigned", {
-    installation_id: "inst_unsigned",
-    player_account_id: "player-account-unsigned",
-    public_key: JSON.stringify({
-      modulus_b64: "unused",
-      exponent_b64: "unused",
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
 
   env.DB.v3Battles.set("battle-unsigned", {
     battle_id: "battle-unsigned",
@@ -275,11 +193,8 @@ test("ghost-battles accepts unsigned installation requests", async () => {
   });
 
   const response = await worker.fetch(
-    new Request("https://example.com/ghost-battles?limit=5", {
+    new Request("https://example.com/ghost-battles?player_account_id=player-account-unsigned&limit=5", {
       method: "GET",
-      headers: {
-        "x-bpp-installation-id": "inst_unsigned",
-      },
     }),
     env as never,
   );
@@ -289,4 +204,18 @@ test("ghost-battles accepts unsigned installation requests", async () => {
     battles: Array<{ battle_id: string }>;
   };
   assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-unsigned"]);
+});
+
+test("ghost-battles requires player_account_id query parameter", async () => {
+  const env = buildEnv();
+
+  const response = await worker.fetch(
+    new Request("https://example.com/ghost-battles?limit=5", {
+      method: "GET",
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "player_account_id_required" });
 });

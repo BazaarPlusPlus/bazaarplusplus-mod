@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Events;
@@ -40,13 +41,11 @@ internal sealed class RunUploadController : MonoBehaviour
             if (
                 string.IsNullOrWhiteSpace(databasePath)
                 || string.IsNullOrWhiteSpace(replayRootPath)
-                || string.IsNullOrWhiteSpace(installationRecordPath)
-                || string.IsNullOrWhiteSpace(installationPrivateKeyPath)
             )
             {
                 BppLog.Warn(
                     "RunUploadController",
-                    "Run bundle upload is enabled but local V3 identity or replay paths are invalid."
+                    "Run bundle upload is enabled but local replay or database paths are invalid."
                 );
                 return;
             }
@@ -58,7 +57,8 @@ internal sealed class RunUploadController : MonoBehaviour
             var uploadStore = new RunBundleUploadStore(databasePath, replayRootPath);
             _uploadService = new RunBundleUploadService(
                 uploadStore,
-                new InstallationRecordStore(
+                CreateInstallationStore(
+                    replayRootPath,
                     installationRecordPath,
                     installationPrivateKeyPath
                 ),
@@ -134,5 +134,20 @@ internal sealed class RunUploadController : MonoBehaviour
             return;
 
         _startupGate?.ArmImmediateAttempt(Time.unscaledTime);
+    }
+
+    private static InstallationRecordStore CreateInstallationStore(
+        string replayRootPath,
+        string? installationRecordPath,
+        string? installationPrivateKeyPath
+    )
+    {
+        var recordPath = string.IsNullOrWhiteSpace(installationRecordPath)
+            ? Path.Combine(replayRootPath, ".bpp-anonymous-installation.bpp")
+            : installationRecordPath;
+        var privateKeyPath = string.IsNullOrWhiteSpace(installationPrivateKeyPath)
+            ? Path.Combine(replayRootPath, ".bpp-anonymous-installation.key")
+            : installationPrivateKeyPath;
+        return new InstallationRecordStore(recordPath, privateKeyPath);
     }
 }

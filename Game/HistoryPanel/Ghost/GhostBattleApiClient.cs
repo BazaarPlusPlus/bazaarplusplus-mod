@@ -33,24 +33,28 @@ internal sealed class GhostBattleApiClient
     }
 
     public async Task<GhostBattleApiResult> QueryAgainstMeAsync(
-        InstallationRecord installation,
+        string playerAccountId,
         int limit,
         CancellationToken cancellationToken
     )
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(playerAccountId))
+            {
+                return GhostBattleApiResult.Failure(
+                    "player_account_id_required",
+                    shouldFallback: false,
+                    shouldReRegister: false
+                );
+            }
+
             var endpoint = new UriBuilder(_routes.QueryGhostBattles)
             {
-                Query = $"limit={Math.Clamp(limit, 1, 200)}",
+                Query =
+                    $"player_account_id={Uri.EscapeDataString(playerAccountId.Trim())}&limit={Math.Clamp(limit, 1, 200)}",
             }.Uri.ToString();
-            using var request = _requestSigner.CreateRequest(
-                HttpMethod.Get,
-                endpoint,
-                null,
-                installation,
-                DateTimeOffset.UtcNow.ToString("o")
-            );
+            using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,

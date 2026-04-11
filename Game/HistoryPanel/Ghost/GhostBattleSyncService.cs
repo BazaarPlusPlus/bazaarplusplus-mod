@@ -41,8 +41,6 @@ internal sealed class GhostBattleSyncService : IDisposable
         var localPlayerAccountId = TryGetCurrentPlayerAccountId();
         if (string.IsNullOrWhiteSpace(localPlayerAccountId))
             return GhostBattleSyncResult.Failure("player_account_id_unavailable");
-        if (!_installationStore.TryLoad(out var installation) || installation == null)
-            return GhostBattleSyncResult.Failure("installation_unavailable");
 
         var apiClient = new GhostBattleApiClient(
             _httpClient,
@@ -51,7 +49,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         );
         var syncStartedAtUtc = DateTimeOffset.UtcNow;
         var queryResult = await apiClient.QueryAgainstMeAsync(
-            installation,
+            localPlayerAccountId,
             MaxSyncBattleLimit,
             cancellationToken
         );

@@ -237,6 +237,48 @@ test("run bundle upload accepts requests without installation id", async () => {
   assert.match(bundle?.object_key ?? "", /run-bundles\/player-account-no-installation\/anonymous\//);
 });
 
+test("run bundle upload accepts requests without player account id", async () => {
+  const env = buildEnv();
+
+  const body = JSON.stringify({
+    schema_version: 3,
+    submitted_at_utc: new Date().toISOString(),
+    artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
+    artifact_bytes: [7, 8, 9],
+    run_projection: {
+      run_id: "run-no-player-account",
+      status: "completed",
+      ended_at_utc: "2026-04-10T01:00:00.000Z",
+    },
+    battle_projections: [
+      {
+        battle_id: "battle-no-player-account",
+        run_id: "run-no-player-account",
+        recorded_at_utc: "2026-04-10T00:30:00.000Z",
+        day: 10,
+        player_rating: 1700,
+        replay_available: true,
+      },
+    ],
+  });
+
+  const response = await worker.fetch(
+    new Request("https://example.com/run-bundles", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  const bundle = Array.from(env.DB.v3RunBundles.values())[0];
+  assert.equal(bundle?.player_account_id, "anonymous-player");
+  assert.match(bundle?.object_key ?? "", /run-bundles\/anonymous-player\//);
+});
+
 test("run bundle upload rejects duplicated battle ids in battle_projections", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
