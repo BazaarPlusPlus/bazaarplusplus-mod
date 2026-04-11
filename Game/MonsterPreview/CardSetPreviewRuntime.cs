@@ -104,7 +104,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         var keyboard = Keyboard.current;
 
         if (
-            keyboard?.qKey.wasPressedThisFrame == true
+            keyboard?.capsLockKey.wasPressedThisFrame == true
             && keyboard.ctrlKey.isPressed == false
             && keyboard.altKey.isPressed == false
             && keyboard.shiftKey.isPressed == false
@@ -206,12 +206,29 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         if (WasDisplayModeKeyPressed(keyboard.digit3Key, keyboard.numpad3Key))
             return TrySetDisplayMode(CardSetBuildRecommendationMode.FinalBuild);
 
+        if (keyboard.tabKey.wasPressedThisFrame && keyboard.shiftKey.isPressed == false)
+            return TrySetDisplayMode(GetNextDisplayMode(_displayMode));
+
         return false;
     }
 
     private static bool WasDisplayModeKeyPressed(KeyControl? primaryKey, KeyControl? alternateKey)
     {
         return primaryKey?.wasPressedThisFrame == true || alternateKey?.wasPressedThisFrame == true;
+    }
+
+    private static CardSetBuildRecommendationMode GetNextDisplayMode(
+        CardSetBuildRecommendationMode currentMode
+    )
+    {
+        return currentMode switch
+        {
+            CardSetBuildRecommendationMode.SelectedSet =>
+                CardSetBuildRecommendationMode.WinnerBuild,
+            CardSetBuildRecommendationMode.WinnerBuild =>
+                CardSetBuildRecommendationMode.FinalBuild,
+            _ => CardSetBuildRecommendationMode.SelectedSet,
+        };
     }
 
     private bool TrySetDisplayMode(CardSetBuildRecommendationMode nextMode)

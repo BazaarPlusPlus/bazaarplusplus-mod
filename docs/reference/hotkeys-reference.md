@@ -29,6 +29,19 @@
 | `4` | `Replays` |
 | `Tab` | Toggle All / Single section view |
 
+## Card Set Preview
+
+以下热键仅在卡组预览选择模式下生效：
+
+| Hotkey | Function |
+| --- | --- |
+| `Caps Lock` | Toggle selection mode |
+| `1` | Switch to `Selected Set` |
+| `2` | Switch to `Winner Build` |
+| `3` | Switch to `Ten-Win Build` |
+| `Tab` | Cycle `Selected Set` -> `Winner Build` -> `Ten-Win Build` |
+| `Up / Down` | Browse matched build candidates |
+
 ## HistoryPanel Preview Tuning
 
 以下热键仅在 `HistoryPanel` 打开且按住 `Ctrl` 时生效：
