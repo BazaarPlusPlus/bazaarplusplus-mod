@@ -67,6 +67,11 @@ internal sealed class ItemBoardOverlay : IDisposable
             ? AccessTools.Field(MonsterBoardTooltipType, "_skillParent")
             : null;
 
+    private static readonly FieldInfo? SocketsField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_sockets")
+            : null;
+
     private static readonly FieldInfo? HealthTextField =
         MonsterBoardTooltipType != null
             ? AccessTools.Field(MonsterBoardTooltipType, "_healthText")
@@ -83,6 +88,30 @@ internal sealed class ItemBoardOverlay : IDisposable
 
     private static readonly MethodInfo? CardPreviewShowMethod =
         CardPreviewBaseType != null ? AccessTools.Method(CardPreviewBaseType, "Show") : null;
+    private static readonly FieldInfo? SmallItemPoolField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_smallItemPool")
+            : null;
+    private static readonly FieldInfo? MediumItemPoolField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_mediumItemPool")
+            : null;
+    private static readonly FieldInfo? LargeItemPoolField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_largeItemPool")
+            : null;
+    private static readonly FieldInfo? SkillPoolField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_skillPool")
+            : null;
+    private static readonly FieldInfo? ActiveCardsField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_activeCards")
+            : null;
+    private static readonly FieldInfo? ActiveSkillsField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_activeSkills")
+            : null;
     private static readonly object SponsorDebugSyncRoot = new();
     private static Vector2 _sponsorPanelDebugOffset = DefaultSponsorPanelOffset;
     private static float _sponsorPanelDebugScale = DefaultSponsorPanelScale;
@@ -145,6 +174,7 @@ internal sealed class ItemBoardOverlay : IDisposable
 
         var monster = input.Monster;
         ConfigureItemsOnlyVisuals();
+        FlushRenderedCards();
         HandlePoolingMethod?.Invoke(_view, null);
         RenderItems(monster.Player.Hand.Items);
         if (input.Carpet != null)
@@ -403,6 +433,65 @@ internal sealed class ItemBoardOverlay : IDisposable
         var carpetTransform = (CarpetImageField?.GetValue(_view) as Component)?.transform;
         if (HealthTextField?.GetValue(_view) is TMP_Text healthText)
             HideHealthVisuals(healthText.transform, carpetTransform);
+    }
+
+    private void FlushRenderedCards()
+    {
+        if (_view == null)
+            return;
+
+        FlushPool(SmallItemPoolField);
+        FlushPool(MediumItemPoolField);
+        FlushPool(LargeItemPoolField);
+        FlushPool(SkillPoolField);
+        ClearListField(ActiveCardsField);
+        ClearListField(ActiveSkillsField);
+
+        if (SocketsField?.GetValue(_view) is RectTransform[] sockets)
+        {
+            foreach (var socket in sockets)
+                FlushChildren(socket);
+        }
+
+        if (SkillParentField?.GetValue(_view) is RectTransform skillParent)
+            FlushChildren(skillParent);
+    }
+
+    private void FlushPool(FieldInfo? poolField)
+    {
+        if (poolField?.GetValue(_view) is not System.Collections.IEnumerable pool)
+            return;
+
+        foreach (var entry in pool)
+        {
+            if (entry is not Component component)
+                continue;
+
+            component.transform.localScale = Vector3.one;
+            component.gameObject.SetActive(false);
+        }
+    }
+
+    private void ClearListField(FieldInfo? listField)
+    {
+        if (listField?.GetValue(_view) is System.Collections.IList list)
+            list.Clear();
+    }
+
+    private static void FlushChildren(Transform? parent)
+    {
+        if (parent == null)
+            return;
+
+        for (var index = 0; index < parent.childCount; index++)
+        {
+            var child = parent.GetChild(index);
+            if (child == null)
+                continue;
+
+            child.localScale = Vector3.one;
+            child.gameObject.SetActive(false);
+        }
     }
 
     private void RenderItems(IEnumerable<TCardInstanceItem>? items)
