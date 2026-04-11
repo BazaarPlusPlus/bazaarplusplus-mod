@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-10T23:09:05Z",
+  "generatedAt": "2026-04-11T01:33:41Z",
   "heroes": {
     "Dooley": {
       "days": {
@@ -124202,27 +124202,28 @@
               "setSignature": "3c9438a9-78a6-4cb3-b1d8-a6410693a879|7317d6a2-adea-442c-9e97-7f7bbf64ae99|82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f|cb16b205-785f-4ebe-80ae-c69f95942023",
               "playerCards": [
                 {
-                  "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
+                  "cardId": "7317d6a2-adea-442c-9e97-7f7bbf64ae99",
                   "slot": 2,
-                  "tier": 2
+                  "tier": 1
                 },
                 {
-                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
+                  "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
                   "slot": 4,
                   "tier": 1
                 },
                 {
-                  "cardId": "7317d6a2-adea-442c-9e97-7f7bbf64ae99",
-                  "slot": 5,
-                  "tier": 1
+                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
+                  "slot": 6,
+                  "tier": 1,
+                  "enchant": "Turbo"
                 },
                 {
                   "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
                   "slot": 7,
-                  "tier": 1,
-                  "enchant": "Mossy"
+                  "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 14,
               "runCount": 14,
               "avgWinnerRating": 674.7143,
@@ -124243,26 +124244,28 @@
               "setSignature": "19e85fa6-95a1-46bd-9ac9-37ad71861475|3c9438a9-78a6-4cb3-b1d8-a6410693a879|7317d6a2-adea-442c-9e97-7f7bbf64ae99|cda40a45-8703-4347-8f4e-7fd460b2ac57",
               "playerCards": [
                 {
-                  "cardId": "19e85fa6-95a1-46bd-9ac9-37ad71861475",
+                  "cardId": "7317d6a2-adea-442c-9e97-7f7bbf64ae99",
                   "slot": 2,
                   "tier": 1
                 },
                 {
-                  "cardId": "7317d6a2-adea-442c-9e97-7f7bbf64ae99",
-                  "slot": 3,
-                  "tier": 2
-                },
-                {
-                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
-                  "slot": 5,
+                  "cardId": "19e85fa6-95a1-46bd-9ac9-37ad71861475",
+                  "slot": 4,
                   "tier": 1
                 },
                 {
                   "cardId": "cda40a45-8703-4347-8f4e-7fd460b2ac57",
-                  "slot": 6,
+                  "slot": 5,
                   "tier": 1
+                },
+                {
+                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
+                  "slot": 7,
+                  "tier": 1,
+                  "enchant": "Mossy"
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 14,
               "runCount": 14,
               "avgWinnerRating": 721.9286,
@@ -128888,27 +128891,27 @@
               "setSignature": "26f84927-811c-485a-b13f-0100a7e5cdd1|3c9438a9-78a6-4cb3-b1d8-a6410693a879|9046606f-3f26-4fe4-b2b3-5666839e549b|cda40a45-8703-4347-8f4e-7fd460b2ac57",
               "playerCards": [
                 {
-                  "cardId": "9046606f-3f26-4fe4-b2b3-5666839e549b",
+                  "cardId": "26f84927-811c-485a-b13f-0100a7e5cdd1",
                   "slot": 2,
                   "tier": 1
                 },
                 {
-                  "cardId": "26f84927-811c-485a-b13f-0100a7e5cdd1",
-                  "slot": 4,
-                  "tier": 1,
-                  "enchant": "Restorative"
+                  "cardId": "9046606f-3f26-4fe4-b2b3-5666839e549b",
+                  "slot": 3,
+                  "tier": 2
                 },
                 {
-                  "cardId": "cda40a45-8703-4347-8f4e-7fd460b2ac57",
+                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
                   "slot": 5,
                   "tier": 1
                 },
                 {
-                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
-                  "slot": 7,
+                  "cardId": "cda40a45-8703-4347-8f4e-7fd460b2ac57",
+                  "slot": 6,
                   "tier": 1
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 4,
               "runCount": 4,
               "avgWinnerRating": 667.75,
@@ -129336,15 +129339,15 @@
               "setSignature": "826bc5e7-6342-4e8b-9143-9090d91453da|9046606f-3f26-4fe4-b2b3-5666839e549b|9e1173c2-c44d-4aa5-9aa3-10271be80943|cda40a45-8703-4347-8f4e-7fd460b2ac57",
               "playerCards": [
                 {
-                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
-                  "slot": 2,
-                  "tier": 1
-                },
-                {
                   "cardId": "9e1173c2-c44d-4aa5-9aa3-10271be80943",
-                  "slot": 3,
+                  "slot": 2,
                   "tier": 1,
                   "enchant": "Restorative"
+                },
+                {
+                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
+                  "slot": 3,
+                  "tier": 2
                 },
                 {
                   "cardId": "cda40a45-8703-4347-8f4e-7fd460b2ac57",
@@ -129357,6 +129360,7 @@
                   "tier": 1
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 4,
               "runCount": 4,
               "avgWinnerRating": 709,
@@ -133683,6 +133687,7 @@
                   "tier": 1
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 852,
@@ -134977,6 +134982,7 @@
                   "tier": 1
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 673.5,
@@ -135501,6 +135507,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 711.5,
@@ -136187,25 +136194,25 @@
                 {
                   "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
                   "slot": 2,
-                  "tier": 1,
-                  "enchant": "Heavy"
-                },
-                {
-                  "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
-                  "slot": 3,
                   "tier": 2
                 },
                 {
                   "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
-                  "slot": 4,
-                  "tier": 2
+                  "slot": 3,
+                  "tier": 1
                 },
                 {
                   "cardId": "cda40a45-8703-4347-8f4e-7fd460b2ac57",
-                  "slot": 6,
+                  "slot": 5,
+                  "tier": 1
+                },
+                {
+                  "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
+                  "slot": 7,
                   "tier": 1
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 880,
@@ -140641,6 +140648,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 34,
               "runCount": 34,
               "avgWinnerRating": 605.2941,
@@ -140662,33 +140670,36 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|b2b2665e-6614-412b-8e49-dfa62fa5fe49|b8167003-4e4c-4405-8986-0efaaf77665f|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
                   "slot": 0,
                   "tier": 3,
-                  "enchant": "Restorative"
+                  "enchant": "Radiant"
+                },
+                {
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "slot": 2,
+                  "tier": 3,
+                  "enchant": "Toxic"
                 },
                 {
                   "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 2,
-                  "tier": 2,
-                  "enchant": "Deadly"
-                },
-                {
-                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-                  "slot": 5,
-                  "tier": 2
-                },
-                {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
-                  "slot": 7,
-                  "tier": 2
+                  "slot": 4,
+                  "tier": 4,
+                  "enchant": "Turbo"
                 },
                 {
                   "cardId": "b8167003-4e4c-4405-8986-0efaaf77665f",
-                  "slot": 9,
-                  "tier": 1
+                  "slot": 7,
+                  "tier": 3,
+                  "enchant": "Shielded"
+                },
+                {
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "slot": 8,
+                  "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 27,
               "runCount": 27,
               "avgWinnerRating": 675.4444,
@@ -143205,6 +143216,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 3,
               "runCount": 3,
               "avgWinnerRating": 646.6667,
@@ -147885,6 +147897,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 879.5,
@@ -156376,32 +156389,33 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
                   "slot": 0,
-                  "tier": 2,
-                  "enchant": "Deadly"
+                  "tier": 4
+                },
+                {
+                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
+                  "slot": 2,
+                  "tier": 4
                 },
                 {
                   "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
                   "slot": 3,
-                  "tier": 4
+                  "tier": 3,
+                  "enchant": "Turbo"
                 },
                 {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
                   "slot": 5,
                   "tier": 3
                 },
                 {
                   "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-                  "slot": 7,
-                  "tier": 4
-                },
-                {
-                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
-                  "slot": 9,
-                  "tier": 4
+                  "slot": 8,
+                  "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 42,
               "runCount": 42,
               "avgWinnerRating": 629.8333,
@@ -156533,30 +156547,32 @@
                 {
                   "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
                   "slot": 0,
-                  "tier": 2
+                  "tier": 4
                 },
                 {
                   "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
                   "slot": 2,
                   "tier": 4,
-                  "enchant": "Fiery"
+                  "enchant": "Toxic"
                 },
                 {
                   "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
                   "slot": 4,
-                  "tier": 3
+                  "tier": 3,
+                  "enchant": "Heavy"
                 },
                 {
                   "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
                   "slot": 7,
-                  "tier": 3
+                  "tier": 4
                 },
                 {
                   "cardId": "b8167003-4e4c-4405-8986-0efaaf77665f",
                   "slot": 9,
-                  "tier": 3
+                  "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 29,
               "runCount": 29,
               "avgWinnerRating": 646,
@@ -158256,6 +158272,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 6,
               "runCount": 6,
               "avgWinnerRating": 626.1667,
@@ -161429,6 +161446,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 755.5,
@@ -162215,6 +162233,7 @@
                   "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 3,
               "runCount": 3,
               "avgWinnerRating": 676.6667,
@@ -170550,23 +170569,23 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
                   "slot": 0,
-                  "tier": 2
+                  "tier": 3
                 },
                 {
                   "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
                   "slot": 2,
-                  "tier": 2
-                },
-                {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
-                  "slot": 5,
-                  "tier": 4,
-                  "enchant": "Fiery"
+                  "tier": 3,
+                  "enchant": "Radiant"
                 },
                 {
                   "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
+                  "slot": 5,
+                  "tier": 3
+                },
+                {
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
                   "slot": 7,
                   "tier": 3
                 },
@@ -170576,6 +170595,7 @@
                   "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 80,
               "runCount": 80,
               "avgWinnerRating": 632.8875,
@@ -170813,33 +170833,34 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|b2b2665e-6614-412b-8e49-dfa62fa5fe49|b8167003-4e4c-4405-8986-0efaaf77665f|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
                   "slot": 0,
+                  "tier": 4
+                },
+                {
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "slot": 2,
                   "tier": 4,
-                  "enchant": "Restorative"
+                  "enchant": "Toxic"
                 },
                 {
                   "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 2,
-                  "tier": 2,
-                  "enchant": "Deadly"
-                },
-                {
-                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-                  "slot": 5,
-                  "tier": 2
+                  "slot": 4,
+                  "tier": 3,
+                  "enchant": "Heavy"
                 },
                 {
                   "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
                   "slot": 7,
-                  "tier": 2
+                  "tier": 4
                 },
                 {
                   "cardId": "b8167003-4e4c-4405-8986-0efaaf77665f",
                   "slot": 9,
-                  "tier": 1
+                  "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 23,
               "runCount": 23,
               "avgWinnerRating": 679.8261,
@@ -171308,38 +171329,40 @@
               "setSignature": "24d7f9f3-a1a4-456d-a877-5a8f7f4d58b8|6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|b8167003-4e4c-4405-8986-0efaaf77665f",
               "playerCards": [
                 {
-                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
-                  "slot": 0,
-                  "tier": 4
-                },
-                {
                   "cardId": "b8167003-4e4c-4405-8986-0efaaf77665f",
-                  "slot": 1,
-                  "tier": 1
+                  "slot": 0,
+                  "tier": 2,
+                  "enchant": "Turbo"
                 },
                 {
                   "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
-                  "slot": 2,
-                  "tier": 4
+                  "slot": 1,
+                  "tier": 3
                 },
                 {
-                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 4,
-                  "tier": 2,
-                  "enchant": "Shielded"
-                },
-                {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
-                  "slot": 7,
-                  "tier": 2,
-                  "enchant": "Fiery"
+                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
+                  "slot": 3,
+                  "tier": 4,
+                  "enchant": "Turbo"
                 },
                 {
                   "cardId": "24d7f9f3-a1a4-456d-a877-5a8f7f4d58b8",
-                  "slot": 9,
-                  "tier": 2
+                  "slot": 4,
+                  "tier": 3
+                },
+                {
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "slot": 5,
+                  "tier": 4,
+                  "enchant": "Toxic"
+                },
+                {
+                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+                  "slot": 7,
+                  "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 6,
               "runCount": 6,
               "avgWinnerRating": 659.6667,
@@ -172132,6 +172155,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 9,
               "runCount": 9,
               "avgWinnerRating": 687.6667,
@@ -175880,6 +175904,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 3,
               "runCount": 3,
               "avgWinnerRating": 707.6667,
@@ -177721,6 +177746,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 3,
               "runCount": 3,
               "avgWinnerRating": 641,
@@ -178087,6 +178113,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 671.5,
@@ -181703,6 +181730,7 @@
                   "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 728,
@@ -187682,23 +187710,23 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
                   "slot": 0,
-                  "tier": 2
+                  "tier": 4
                 },
                 {
                   "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
                   "slot": 2,
-                  "tier": 2
-                },
-                {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
-                  "slot": 5,
-                  "tier": 4,
-                  "enchant": "Fiery"
+                  "tier": 3,
+                  "enchant": "Radiant"
                 },
                 {
                   "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
+                  "slot": 5,
+                  "tier": 3
+                },
+                {
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
                   "slot": 7,
                   "tier": 3
                 },
@@ -187708,6 +187736,7 @@
                   "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 84,
               "runCount": 84,
               "avgWinnerRating": 634.2381,
@@ -188267,33 +188296,34 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|b2b2665e-6614-412b-8e49-dfa62fa5fe49|b8167003-4e4c-4405-8986-0efaaf77665f|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "cardId": "b8167003-4e4c-4405-8986-0efaaf77665f",
                   "slot": 0,
-                  "tier": 4,
-                  "enchant": "Restorative"
-                },
-                {
-                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 2,
-                  "tier": 3,
-                  "enchant": "Deadly"
-                },
-                {
-                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-                  "slot": 5,
                   "tier": 2
                 },
                 {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
-                  "slot": 7,
-                  "tier": 3
+                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
+                  "slot": 1,
+                  "tier": 4
                 },
                 {
-                  "cardId": "b8167003-4e4c-4405-8986-0efaaf77665f",
-                  "slot": 9,
-                  "tier": 1
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "slot": 3,
+                  "tier": 4,
+                  "enchant": "Toxic"
+                },
+                {
+                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+                  "slot": 5,
+                  "tier": 3,
+                  "enchant": "Heavy"
+                },
+                {
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "slot": 8,
+                  "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 15,
               "runCount": 15,
               "avgWinnerRating": 666.0667,
@@ -188698,38 +188728,40 @@
               "setSignature": "24d7f9f3-a1a4-456d-a877-5a8f7f4d58b8|6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|b8167003-4e4c-4405-8986-0efaaf77665f",
               "playerCards": [
                 {
-                  "cardId": "24d7f9f3-a1a4-456d-a877-5a8f7f4d58b8",
-                  "slot": 0,
-                  "tier": 2
-                },
-                {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
-                  "slot": 1,
-                  "tier": 2,
-                  "enchant": "Fiery"
-                },
-                {
-                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 3,
-                  "tier": 2,
-                  "enchant": "Shielded"
-                },
-                {
-                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
-                  "slot": 6,
-                  "tier": 4
-                },
-                {
                   "cardId": "b8167003-4e4c-4405-8986-0efaaf77665f",
-                  "slot": 7,
-                  "tier": 1
+                  "slot": 0,
+                  "tier": 2,
+                  "enchant": "Turbo"
                 },
                 {
                   "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
-                  "slot": 8,
+                  "slot": 1,
+                  "tier": 3
+                },
+                {
+                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
+                  "slot": 3,
+                  "tier": 4,
+                  "enchant": "Turbo"
+                },
+                {
+                  "cardId": "24d7f9f3-a1a4-456d-a877-5a8f7f4d58b8",
+                  "slot": 4,
+                  "tier": 3
+                },
+                {
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "slot": 5,
+                  "tier": 4,
+                  "enchant": "Toxic"
+                },
+                {
+                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+                  "slot": 7,
                   "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 10,
               "runCount": 10,
               "avgWinnerRating": 678.1,
@@ -189899,6 +189931,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 5,
               "runCount": 5,
               "avgWinnerRating": 715.2,
@@ -194302,6 +194335,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 740,
@@ -198563,34 +198597,34 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
                   "slot": 0,
-                  "tier": 4,
-                  "enchant": "Restorative"
-                },
-                {
-                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 2,
-                  "tier": 3,
-                  "enchant": "Deadly"
+                  "tier": 3
                 },
                 {
                   "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-                  "slot": 5,
+                  "slot": 1,
                   "tier": 4
                 },
                 {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
-                  "slot": 7,
-                  "tier": 2
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "slot": 3,
+                  "tier": 4,
+                  "enchant": "Toxic"
                 },
                 {
-                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
-                  "slot": 9,
+                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+                  "slot": 5,
                   "tier": 4,
-                  "enchant": "Turbo"
+                  "enchant": "Heavy"
+                },
+                {
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "slot": 8,
+                  "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 53,
               "runCount": 53,
               "avgWinnerRating": 659.0755,
@@ -198860,6 +198894,7 @@
                   "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 8,
               "runCount": 8,
               "avgWinnerRating": 693.875,
@@ -199877,6 +199912,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 740,
@@ -200290,6 +200326,7 @@
                   "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 3,
               "runCount": 3,
               "avgWinnerRating": 688.3333,
@@ -202929,32 +202966,34 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
                   "slot": 0,
-                  "tier": 4
-                },
-                {
-                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 2,
-                  "tier": 2,
-                  "enchant": "Deadly"
-                },
-                {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
-                  "slot": 5,
-                  "tier": 4
+                  "tier": 3
                 },
                 {
                   "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-                  "slot": 7,
+                  "slot": 1,
                   "tier": 4
                 },
                 {
-                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
-                  "slot": 9,
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "slot": 3,
+                  "tier": 4,
+                  "enchant": "Toxic"
+                },
+                {
+                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+                  "slot": 5,
+                  "tier": 4,
+                  "enchant": "Heavy"
+                },
+                {
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "slot": 8,
                   "tier": 4
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 24,
               "runCount": 24,
               "avgWinnerRating": 716.4583,
@@ -203529,6 +203568,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 644.5,
@@ -205149,33 +205189,34 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
                   "slot": 0,
-                  "tier": 4
+                  "tier": 4,
+                  "enchant": "Turbo"
                 },
                 {
                   "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
-                  "slot": 2,
-                  "tier": 4,
-                  "enchant": "Radiant"
-                },
-                {
-                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 4,
+                  "slot": 1,
                   "tier": 4
                 },
                 {
-                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-                  "slot": 7,
-                  "tier": 3
+                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+                  "slot": 3,
+                  "tier": 3,
+                  "enchant": "Radiant"
                 },
                 {
-                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
-                  "slot": 9,
-                  "tier": 4,
-                  "enchant": "Turbo"
+                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
+                  "slot": 6,
+                  "tier": 4
+                },
+                {
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "slot": 8,
+                  "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 8,
               "runCount": 8,
               "avgWinnerRating": 677.25,
@@ -206317,25 +206358,25 @@
               "setSignature": "3c9438a9-78a6-4cb3-b1d8-a6410693a879|7317d6a2-adea-442c-9e97-7f7bbf64ae99|82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f|cb16b205-785f-4ebe-80ae-c69f95942023|cda40a45-8703-4347-8f4e-7fd460b2ac57",
               "playerCards": [
                 {
-                  "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
+                  "cardId": "7317d6a2-adea-442c-9e97-7f7bbf64ae99",
                   "slot": 1,
-                  "tier": 3
+                  "tier": 1
                 },
                 {
                   "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
-                  "slot": 2,
+                  "slot": 3,
                   "tier": 1
+                },
+                {
+                  "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
+                  "slot": 5,
+                  "tier": 2
                 },
                 {
                   "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
-                  "slot": 4,
+                  "slot": 6,
                   "tier": 2,
-                  "enchant": "Mossy"
-                },
-                {
-                  "cardId": "7317d6a2-adea-442c-9e97-7f7bbf64ae99",
-                  "slot": 5,
-                  "tier": 1
+                  "enchant": "Turbo"
                 },
                 {
                   "cardId": "cda40a45-8703-4347-8f4e-7fd460b2ac57",
@@ -206343,6 +206384,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 10,
               "runCount": 10,
               "avgWinnerRating": 663.8,
@@ -207113,6 +207155,7 @@
                   "tier": 1
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 4,
               "runCount": 4,
               "avgWinnerRating": 672.5,
@@ -208134,37 +208177,38 @@
               "setSignature": "19e85fa6-95a1-46bd-9ac9-37ad71861475|26f84927-811c-485a-b13f-0100a7e5cdd1|3c9438a9-78a6-4cb3-b1d8-a6410693a879|826bc5e7-6342-4e8b-9143-9090d91453da|9046606f-3f26-4fe4-b2b3-5666839e549b|cda40a45-8703-4347-8f4e-7fd460b2ac57",
               "playerCards": [
                 {
-                  "cardId": "19e85fa6-95a1-46bd-9ac9-37ad71861475",
+                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
                   "slot": 1,
-                  "tier": 1
+                  "tier": 2
                 },
                 {
                   "cardId": "26f84927-811c-485a-b13f-0100a7e5cdd1",
                   "slot": 2,
-                  "tier": 1,
-                  "enchant": "Restorative"
-                },
-                {
-                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
-                  "slot": 3,
-                  "tier": 2
-                },
-                {
-                  "cardId": "cda40a45-8703-4347-8f4e-7fd460b2ac57",
-                  "slot": 4,
-                  "tier": 1
-                },
-                {
-                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
-                  "slot": 6,
                   "tier": 1
                 },
                 {
                   "cardId": "9046606f-3f26-4fe4-b2b3-5666839e549b",
-                  "slot": 7,
+                  "slot": 3,
+                  "tier": 2
+                },
+                {
+                  "cardId": "19e85fa6-95a1-46bd-9ac9-37ad71861475",
+                  "slot": 5,
                   "tier": 1
+                },
+                {
+                  "cardId": "cda40a45-8703-4347-8f4e-7fd460b2ac57",
+                  "slot": 6,
+                  "tier": 2
+                },
+                {
+                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
+                  "slot": 8,
+                  "tier": 1,
+                  "enchant": "Mossy"
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 3,
               "runCount": 3,
               "avgWinnerRating": 757.3333,
@@ -213920,6 +213964,7 @@
                   "tier": 1
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 669,
@@ -217626,6 +217671,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 708.5,
@@ -231588,6 +231634,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 790,
@@ -231758,6 +231805,7 @@
                   "enchant": "Mossy"
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 746.5,
@@ -242289,6 +242337,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 5,
               "runCount": 5,
               "avgWinnerRating": 682.4,
@@ -248067,6 +248116,7 @@
                   "tier": 1
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 705,
@@ -249038,6 +249088,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 790,
@@ -262140,6 +262191,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 4,
               "runCount": 4,
               "avgWinnerRating": 735.75,
@@ -262339,18 +262391,17 @@
                 {
                   "cardId": "b9a59fba-b266-478d-8bef-ae183e4f79d5",
                   "slot": 0,
-                  "tier": 2
+                  "tier": 1
                 },
                 {
                   "cardId": "77538c26-6234-4db2-8eef-3414849272e9",
                   "slot": 2,
-                  "tier": 3
+                  "tier": 2
                 },
                 {
                   "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
                   "slot": 4,
-                  "tier": 2,
-                  "enchant": "Shielded"
+                  "tier": 2
                 },
                 {
                   "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
@@ -262363,6 +262414,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 4,
               "runCount": 4,
               "avgWinnerRating": 742.5,
@@ -263377,37 +263429,37 @@
               "setSignature": "1bfdb3c5-dece-4a67-a9ed-255fbc060f4e|3c9438a9-78a6-4cb3-b1d8-a6410693a879|7317d6a2-adea-442c-9e97-7f7bbf64ae99|826bc5e7-6342-4e8b-9143-9090d91453da|82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f|cb16b205-785f-4ebe-80ae-c69f95942023",
               "playerCards": [
                 {
-                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
+                  "cardId": "1bfdb3c5-dece-4a67-a9ed-255fbc060f4e",
                   "slot": 0,
-                  "tier": 2,
-                  "enchant": "Deadly"
-                },
-                {
-                  "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
-                  "slot": 1,
-                  "tier": 2
-                },
-                {
-                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
-                  "slot": 3,
                   "tier": 2
                 },
                 {
                   "cardId": "7317d6a2-adea-442c-9e97-7f7bbf64ae99",
-                  "slot": 4,
-                  "tier": 3
+                  "slot": 3,
+                  "tier": 2
                 },
                 {
-                  "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
+                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
+                  "slot": 5,
+                  "tier": 2
+                },
+                {
+                  "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
                   "slot": 6,
                   "tier": 2
                 },
                 {
-                  "cardId": "1bfdb3c5-dece-4a67-a9ed-255fbc060f4e",
-                  "slot": 7,
+                  "cardId": "3c9438a9-78a6-4cb3-b1d8-a6410693a879",
+                  "slot": 8,
+                  "tier": 1
+                },
+                {
+                  "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
+                  "slot": 9,
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 915,
@@ -279059,18 +279111,17 @@
                 {
                   "cardId": "b9a59fba-b266-478d-8bef-ae183e4f79d5",
                   "slot": 0,
-                  "tier": 2
+                  "tier": 1
                 },
                 {
                   "cardId": "77538c26-6234-4db2-8eef-3414849272e9",
                   "slot": 2,
-                  "tier": 3
+                  "tier": 2
                 },
                 {
                   "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
                   "slot": 4,
-                  "tier": 2,
-                  "enchant": "Shielded"
+                  "tier": 2
                 },
                 {
                   "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
@@ -279083,6 +279134,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 3,
               "runCount": 3,
               "avgWinnerRating": 723.6667,
@@ -280175,6 +280227,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 4,
               "runCount": 4,
               "avgWinnerRating": 735.75,
@@ -287658,6 +287711,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 690.5,
@@ -296555,6 +296609,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 850,
@@ -297771,6 +297826,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 4,
               "runCount": 4,
               "avgWinnerRating": 802.5,
@@ -297900,7 +297956,7 @@
                 {
                   "cardId": "b9a59fba-b266-478d-8bef-ae183e4f79d5",
                   "slot": 0,
-                  "tier": 3
+                  "tier": 1
                 },
                 {
                   "cardId": "77538c26-6234-4db2-8eef-3414849272e9",
@@ -297915,15 +297971,15 @@
                 {
                   "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
                   "slot": 5,
-                  "tier": 3,
-                  "enchant": "Deadly"
+                  "tier": 2
                 },
                 {
                   "cardId": "1bfdb3c5-dece-4a67-a9ed-255fbc060f4e",
                   "slot": 7,
-                  "tier": 2
+                  "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 4,
               "runCount": 4,
               "avgWinnerRating": 758.5,
@@ -300095,6 +300151,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 3,
               "runCount": 3,
               "avgWinnerRating": 795.3333,
@@ -311092,12 +311149,12 @@
                 {
                   "cardId": "4f5887cd-a382-40aa-adb0-e9df7f960857",
                   "slot": 4,
-                  "tier": 3
+                  "tier": 2
                 },
                 {
                   "cardId": "77538c26-6234-4db2-8eef-3414849272e9",
                   "slot": 5,
-                  "tier": 3
+                  "tier": 2
                 },
                 {
                   "cardId": "1bfdb3c5-dece-4a67-a9ed-255fbc060f4e",
@@ -311105,6 +311162,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 15,
               "runCount": 15,
               "avgWinnerRating": 644.8,
@@ -320121,36 +320179,35 @@
                 {
                   "cardId": "1bfdb3c5-dece-4a67-a9ed-255fbc060f4e",
                   "slot": 0,
-                  "tier": 3,
-                  "enchant": "Deadly"
+                  "tier": 2
                 },
                 {
-                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
+                  "cardId": "38e563e6-7420-443e-ab2f-0ae61aac1227",
                   "slot": 3,
                   "tier": 2
                 },
                 {
+                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
+                  "slot": 5,
+                  "tier": 3
+                },
+                {
                   "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
-                  "slot": 4,
+                  "slot": 6,
                   "tier": 2
                 },
                 {
                   "cardId": "dd1a8882-4326-4545-88c7-e063d789f4ad",
-                  "slot": 6,
-                  "tier": 3
-                },
-                {
-                  "cardId": "38e563e6-7420-443e-ab2f-0ae61aac1227",
-                  "slot": 7,
+                  "slot": 8,
                   "tier": 3
                 },
                 {
                   "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
                   "slot": 9,
-                  "tier": 3,
-                  "enchant": "Restorative"
+                  "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 867,
@@ -327354,32 +327411,33 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
                   "slot": 0,
                   "tier": 3
                 },
                 {
-                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 2,
-                  "tier": 3
-                },
-                {
-                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-                  "slot": 5,
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "slot": 1,
                   "tier": 4
                 },
                 {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
-                  "slot": 7,
-                  "tier": 3,
-                  "enchant": "Shielded"
+                  "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+                  "slot": 3,
+                  "tier": 2,
+                  "enchant": "Deadly"
                 },
                 {
-                  "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
-                  "slot": 9,
+                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
+                  "slot": 6,
+                  "tier": 2
+                },
+                {
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "slot": 8,
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 19,
               "runCount": 19,
               "avgWinnerRating": 615.1053,
@@ -327735,33 +327793,35 @@
               "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|b2b2665e-6614-412b-8e49-dfa62fa5fe49|b8167003-4e4c-4405-8986-0efaaf77665f|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "playerCards": [
                 {
-                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
                   "slot": 0,
+                  "tier": 3
+                },
+                {
+                  "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+                  "slot": 2,
                   "tier": 3,
-                  "enchant": "Restorative"
+                  "enchant": "Toxic"
                 },
                 {
                   "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-                  "slot": 2,
-                  "tier": 2,
-                  "enchant": "Deadly"
-                },
-                {
-                  "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-                  "slot": 5,
-                  "tier": 2
-                },
-                {
-                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
-                  "slot": 7,
-                  "tier": 2
+                  "slot": 4,
+                  "tier": 4,
+                  "enchant": "Turbo"
                 },
                 {
                   "cardId": "b8167003-4e4c-4405-8986-0efaaf77665f",
-                  "slot": 9,
-                  "tier": 1
+                  "slot": 7,
+                  "tier": 2,
+                  "enchant": "Shielded"
+                },
+                {
+                  "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+                  "slot": 8,
+                  "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 17,
               "runCount": 17,
               "avgWinnerRating": 676.1176,
@@ -329435,6 +329495,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 5,
               "runCount": 5,
               "avgWinnerRating": 619.4,
@@ -332040,6 +332101,7 @@
                   "enchant": "Deadly"
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 4,
               "runCount": 4,
               "avgWinnerRating": 712,
@@ -334104,6 +334166,7 @@
                   "tier": 2
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 676,
@@ -334798,6 +334861,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 661.5,
@@ -337197,37 +337261,35 @@
                 {
                   "cardId": "1bfdb3c5-dece-4a67-a9ed-255fbc060f4e",
                   "slot": 0,
-                  "tier": 3,
-                  "enchant": "Deadly"
+                  "tier": 2
                 },
                 {
-                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
+                  "cardId": "38e563e6-7420-443e-ab2f-0ae61aac1227",
                   "slot": 3,
                   "tier": 2
                 },
                 {
-                  "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
-                  "slot": 4,
-                  "tier": 2,
-                  "enchant": "Shielded"
-                },
-                {
-                  "cardId": "dd1a8882-4326-4545-88c7-e063d789f4ad",
-                  "slot": 6,
+                  "cardId": "826bc5e7-6342-4e8b-9143-9090d91453da",
+                  "slot": 5,
                   "tier": 3
                 },
                 {
-                  "cardId": "38e563e6-7420-443e-ab2f-0ae61aac1227",
-                  "slot": 7,
+                  "cardId": "cb16b205-785f-4ebe-80ae-c69f95942023",
+                  "slot": 6,
+                  "tier": 2
+                },
+                {
+                  "cardId": "dd1a8882-4326-4545-88c7-e063d789f4ad",
+                  "slot": 8,
                   "tier": 3
                 },
                 {
                   "cardId": "82cdc29a-cb0e-40e4-b2b8-d4ea79d3555f",
                   "slot": 9,
-                  "tier": 3,
-                  "enchant": "Restorative"
+                  "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 867,
@@ -338459,6 +338521,7 @@
                   "tier": 3
                 }
               ],
+              "source": "漆昼之夜",
               "winCount": 2,
               "runCount": 2,
               "avgWinnerRating": 836.5,

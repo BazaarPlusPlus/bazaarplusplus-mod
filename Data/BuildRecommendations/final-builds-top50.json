@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-10T23:09:05Z",
+  "generatedAt": "2026-04-11T01:33:41Z",
   "heroes": {
     "Dooley": {
       "distinctBuildCount": 1359,
@@ -10092,32 +10092,34 @@
           "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
           "playerCards": [
             {
-              "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+              "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
               "slot": 0,
-              "tier": 2
-            },
-            {
-              "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-              "slot": 2,
-              "tier": 2
-            },
-            {
-              "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
-              "slot": 5,
-              "tier": 4,
-              "enchant": "Fiery"
-            },
-            {
-              "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-              "slot": 7,
               "tier": 3
             },
             {
-              "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
-              "slot": 9,
+              "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
+              "slot": 1,
+              "tier": 4
+            },
+            {
+              "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+              "slot": 3,
+              "tier": 4,
+              "enchant": "Toxic"
+            },
+            {
+              "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+              "slot": 5,
+              "tier": 4,
+              "enchant": "Heavy"
+            },
+            {
+              "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
+              "slot": 8,
               "tier": 4
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 85,
           "avgFinalDay": 13.6118,
           "p75FinalDay": 15,
@@ -10651,38 +10653,40 @@
           "setSignature": "24d7f9f3-a1a4-456d-a877-5a8f7f4d58b8|6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|a4281e9f-7889-4ac1-a140-9152ab54bc6b|b2b2665e-6614-412b-8e49-dfa62fa5fe49|b8167003-4e4c-4405-8986-0efaaf77665f",
           "playerCards": [
             {
-              "cardId": "24d7f9f3-a1a4-456d-a877-5a8f7f4d58b8",
-              "slot": 0,
-              "tier": 2
-            },
-            {
-              "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
-              "slot": 1,
-              "tier": 2,
-              "enchant": "Fiery"
-            },
-            {
-              "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
-              "slot": 3,
-              "tier": 2,
-              "enchant": "Shielded"
-            },
-            {
-              "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
-              "slot": 6,
-              "tier": 4
-            },
-            {
               "cardId": "b8167003-4e4c-4405-8986-0efaaf77665f",
-              "slot": 7,
-              "tier": 1
+              "slot": 0,
+              "tier": 2,
+              "enchant": "Turbo"
             },
             {
               "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
-              "slot": 8,
+              "slot": 1,
+              "tier": 3
+            },
+            {
+              "cardId": "a4281e9f-7889-4ac1-a140-9152ab54bc6b",
+              "slot": 3,
+              "tier": 4,
+              "enchant": "Turbo"
+            },
+            {
+              "cardId": "24d7f9f3-a1a4-456d-a877-5a8f7f4d58b8",
+              "slot": 4,
+              "tier": 3
+            },
+            {
+              "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
+              "slot": 5,
+              "tier": 4,
+              "enchant": "Toxic"
+            },
+            {
+              "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+              "slot": 7,
               "tier": 4
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 12,
           "avgFinalDay": 13.4167,
           "p75FinalDay": 14,
@@ -11413,6 +11417,7 @@
               "tier": 3
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 8,
           "avgFinalDay": 13.125,
           "p75FinalDay": 13,
@@ -12891,6 +12896,7 @@
               "tier": 4
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 3,
           "avgFinalDay": 13,
           "p75FinalDay": 15,
@@ -14822,6 +14828,7 @@
               "tier": 3
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 2,
           "avgFinalDay": 14.5,
           "p75FinalDay": 15,
@@ -14840,34 +14847,34 @@
           "setSignature": "6e633f92-81a3-4157-912c-bcdb1b9e28f1|84edf515-c3bc-43f4-becb-b53b59e4abcc|b2b2665e-6614-412b-8e49-dfa62fa5fe49|d641c57b-ab42-4b2f-b4f4-addd18eb7100|f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
           "playerCards": [
             {
-              "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+              "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
               "slot": 0,
-              "tier": 2
+              "tier": 4,
+              "enchant": "Radiant"
             },
             {
               "cardId": "b2b2665e-6614-412b-8e49-dfa62fa5fe49",
-              "slot": 3,
+              "slot": 2,
               "tier": 4,
-              "enchant": "Shielded"
+              "enchant": "Toxic"
             },
             {
-              "cardId": "d641c57b-ab42-4b2f-b4f4-addd18eb7100",
-              "slot": 5,
+              "cardId": "84edf515-c3bc-43f4-becb-b53b59e4abcc",
+              "slot": 4,
               "tier": 3
             },
             {
-              "cardId": "f718a14b-e8bd-4ee6-b9a9-63f15de5f242",
-              "slot": 6,
-              "tier": 4,
-              "enchant": "Fiery"
+              "cardId": "d641c57b-ab42-4b2f-b4f4-addd18eb7100",
+              "slot": 7,
+              "tier": 4
             },
             {
               "cardId": "6e633f92-81a3-4157-912c-bcdb1b9e28f1",
               "slot": 8,
-              "tier": 4,
-              "enchant": "Heavy"
+              "tier": 4
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 2,
           "avgFinalDay": 14,
           "p75FinalDay": 15,
@@ -14912,6 +14919,7 @@
               "tier": 4
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 2,
           "avgFinalDay": 14,
           "p75FinalDay": 15,
@@ -15297,6 +15305,7 @@
               "tier": 4
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 2,
           "avgFinalDay": 14,
           "p75FinalDay": 14,
@@ -15748,6 +15757,7 @@
               "enchant": "Deadly"
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 2,
           "avgFinalDay": 13.5,
           "p75FinalDay": 14,
@@ -18686,6 +18696,7 @@
               "tier": 4
             }
           ],
+          "source": "漆昼之夜",
           "runCount": 2,
           "avgFinalDay": 11.5,
           "p75FinalDay": 12,
