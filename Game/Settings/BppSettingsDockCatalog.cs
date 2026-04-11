@@ -5,7 +5,6 @@ using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
-using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.NameOverride;
 using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
@@ -45,15 +44,6 @@ internal static class BppSettingsDockCatalog
             new CombatStatusBarSettingsMenuBridge(
                 CombatStatusBarFeature.GetEnabledSettingValue,
                 CombatStatusBarFeature.SetEnabledSettingValue
-            )
-        ),
-        new(
-            "NativeMonsterPreview",
-            MonsterPreviewSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                ReadUseNativeMonsterPreview,
-                WriteUseNativeMonsterPreview,
-                MonsterPreviewModeSwitchCoordinator.Apply
             )
         ),
         new(
@@ -109,18 +99,6 @@ internal static class BppSettingsDockCatalog
     private static void WriteEnchantPreviewEnabled(bool enabled)
     {
         var config = BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig;
-        if (config != null)
-            config.Value = enabled;
-    }
-
-    private static bool ReadUseNativeMonsterPreview()
-    {
-        return BppRuntimeHost.Config.UseNativeMonsterPreviewConfig?.Value ?? false;
-    }
-
-    private static void WriteUseNativeMonsterPreview(bool enabled)
-    {
-        var config = BppRuntimeHost.Config.UseNativeMonsterPreviewConfig;
         if (config != null)
             config.Value = enabled;
     }

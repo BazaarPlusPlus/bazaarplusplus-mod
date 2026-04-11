@@ -5,8 +5,6 @@ namespace BazaarPlusPlus.Core.Config;
 
 internal interface IBppConfig
 {
-    ConfigEntry<bool>? UseNativeMonsterPreviewConfig { get; }
-
     ConfigEntry<string>? ItemBoardAnchoredPositionConfig { get; }
 
     ConfigEntry<bool>? EnableNameOverrideConfig { get; }

@@ -5,8 +5,6 @@ namespace BazaarPlusPlus.Core.Config;
 
 internal sealed class BppConfig : IBppConfig
 {
-    public ConfigEntry<bool>? UseNativeMonsterPreviewConfig { get; private set; }
-
     public ConfigEntry<string>? ItemBoardAnchoredPositionConfig { get; private set; }
 
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
@@ -31,12 +29,6 @@ internal sealed class BppConfig : IBppConfig
 
     public void Initialize(ConfigFile config)
     {
-        UseNativeMonsterPreviewConfig = config.Bind(
-            "MonsterPreview",
-            "UseNativePreview",
-            true,
-            "Whether monster preview should use the game's native preview instead of the BazaarPlusPlus overlay. Does not affect history panel battle previews."
-        );
         ItemBoardAnchoredPositionConfig = config.Bind(
             "ItemBoard",
             "AnchoredPosition",
