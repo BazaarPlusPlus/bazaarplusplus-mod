@@ -61,6 +61,12 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         "已進入選擇模式",
         "已進入選擇模式"
     );
+    private static readonly LocalizedTextSet DataFromLabel = new(
+        "Data from",
+        "数据来自",
+        "資料來自",
+        "資料來自"
+    );
 
     private sealed class SelectedCardEntry
     {
@@ -298,14 +304,21 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             out var modeLabel,
             out var hasRecommendation,
             out var resultIndex,
-            out var resultCount
+            out var resultCount,
+            out var recommendationSource
         );
         return new ItemBoardTemplateSetRequest
         {
             Items = items,
             AnchoredPosition = DefaultOverlayAnchoredPosition,
             Scale = DefaultOverlayScale,
-            SponsorText = BuildOverlayLabel(modeLabel, hasRecommendation, resultIndex, resultCount),
+            SponsorText = BuildOverlayLabel(
+                modeLabel,
+                hasRecommendation,
+                resultIndex,
+                resultCount,
+                recommendationSource
+            ),
             SponsorName = _currentSponsor.Name,
             SponsorTier = _currentSponsor.Tier,
             CandidateIndex = resultIndex,
@@ -318,7 +331,8 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         out string modeLabel,
         out bool hasRecommendation,
         out int resultIndex,
-        out int resultCount
+        out int resultCount,
+        out string recommendationSource
     )
     {
         var selectedItems = _selectedCards.Select(card => card.Item.Clone()).ToList();
@@ -326,6 +340,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         hasRecommendation = false;
         resultIndex = 0;
         resultCount = 0;
+        recommendationSource = string.Empty;
         if (_displayMode == CardSetBuildRecommendationMode.SelectedSet)
             return selectedItems;
 
@@ -339,6 +354,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         modeLabel = recommendation.ModeLabel;
         resultIndex = recommendation.ResultIndex;
         resultCount = recommendation.ResultCount;
+        recommendationSource = recommendation.Source;
         return recommendation.Items.Select(item => item.Clone()).ToList();
     }
 
@@ -362,7 +378,8 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         string modeLabel,
         bool hasRecommendation,
         int resultIndex,
-        int resultCount
+        int resultCount,
+        string recommendationSource
     )
     {
         if (!hasRecommendation && _displayMode != CardSetBuildRecommendationMode.SelectedSet)
@@ -372,9 +389,13 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         if (hasRecommendation && resultCount > 1)
             status = $"{status} | {ResolveCandidateLabel()} {resultIndex + 1}/{resultCount}";
 
-        return string.IsNullOrWhiteSpace(_currentSponsor.Text)
+        var label = string.IsNullOrWhiteSpace(_currentSponsor.Text)
             ? status
             : $"{status} | {_currentSponsor.Text}";
+        if (hasRecommendation && !string.IsNullOrWhiteSpace(recommendationSource))
+            label = $"{label} | {ResolveDataFromLabel()} {recommendationSource}";
+
+        return label;
     }
 
     private void ShowModeIndicator()
@@ -426,6 +447,11 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
     private static string ResolveModeEnabledLabel()
     {
         return ModeEnabledLabel.Resolve(PlayerPreferences.Data?.LanguageCode ?? string.Empty);
+    }
+
+    private static string ResolveDataFromLabel()
+    {
+        return DataFromLabel.Resolve(PlayerPreferences.Data?.LanguageCode ?? string.Empty);
     }
 
     private bool TryAdd(SelectedCardEntry entry)

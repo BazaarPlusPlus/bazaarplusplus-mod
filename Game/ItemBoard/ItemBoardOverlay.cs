@@ -24,7 +24,7 @@ internal sealed class ItemBoardOverlay : IDisposable
     private const string SponsorPanelObjectName = "BppItemBoardSponsorPanel";
     private const string SponsorTextObjectName = "BppItemBoardSponsorText";
     private const float SponsorPanelFontSize = 17f;
-    private static readonly Vector2 DefaultSponsorPanelSize = new(320f, 34f);
+    private static readonly Vector2 DefaultSponsorPanelSize = new(440f, 34f);
     private static readonly Vector2 DefaultSponsorPanelOffset = new(-325f, -315f);
     private const float DefaultSponsorPanelScale = 2f;
 

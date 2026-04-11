@@ -250,6 +250,7 @@ internal sealed class CardSetBuildDataRepository
             .Select((candidate, index) => new CardSetBuildRecommendation
             {
                 ModeLabel = modeLabel,
+                Source = candidate.Build!.Source ?? string.Empty,
                 SetSignature = candidate.Build!.SetSignature ?? string.Empty,
                 GoldScore = candidate.Build.GoldScore,
                 ResultIndex = index,
@@ -336,6 +337,9 @@ internal sealed class CardSetBuildDataRepository
 
     private sealed class BuildRecord
     {
+        [JsonProperty("source")]
+        public string? Source { get; set; }
+
         [JsonProperty("setSignature")]
         public string? SetSignature { get; set; }
 
