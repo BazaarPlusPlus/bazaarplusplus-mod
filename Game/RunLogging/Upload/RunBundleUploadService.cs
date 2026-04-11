@@ -3,6 +3,7 @@ using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.Online;
 
@@ -40,9 +41,18 @@ internal sealed class RunBundleUploadService : IDisposable
             return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
         }
 
-        if (!_installationStore.TryLoad(out var installation) || installation == null)
+        var installationId = string.Empty;
+        var playerAccountId = ResolvePlayerAccountId();
+        if (_installationStore.TryLoad(out var installation) && installation != null)
         {
-            BppLog.Warn("RunBundleUploadService", "Skipping upload because installation identity is unavailable.");
+            installationId = installation.InstallationId ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(playerAccountId))
+                playerAccountId = installation.PlayerAccountId;
+        }
+
+        if (string.IsNullOrWhiteSpace(playerAccountId))
+        {
+            BppLog.Warn("RunBundleUploadService", "Skipping upload because player account id is unavailable.");
             return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: true);
         }
 
@@ -61,8 +71,8 @@ internal sealed class RunBundleUploadService : IDisposable
             {
                 var snapshot = _store.TryBuildRunBundleSnapshot(
                     runId,
-                    installation.InstallationId,
-                    installation.PlayerAccountId
+                    installationId,
+                    playerAccountId
                 );
                 if (snapshot == null)
                 {
@@ -106,5 +116,17 @@ internal sealed class RunBundleUploadService : IDisposable
     public void Dispose()
     {
         _httpClient.Dispose();
+    }
+
+    private static string? ResolvePlayerAccountId()
+    {
+        try
+        {
+            return BppClientCacheBridge.TryGetProfileAccountId()?.Trim();
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

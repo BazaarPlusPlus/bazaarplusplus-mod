@@ -11,6 +11,8 @@ namespace BazaarPlusPlus.Game.Online;
 
 internal sealed class RunBundleClient
 {
+    private static readonly UriKind EndpointUriKind = UriKind.Absolute;
+
     private readonly HttpClient _httpClient;
     private readonly InstallationRecordStore _installationStore;
     private readonly V3Routes _routes;
@@ -35,22 +37,13 @@ internal sealed class RunBundleClient
         CancellationToken cancellationToken
     )
     {
-        if (!_installationStore.TryLoad(out var installation) || installation == null)
-            return RunBundleUploadResult.Failure("installation_unavailable");
-
         var bodyBytes = Encoding.UTF8.GetBytes(
             JsonConvert.SerializeObject(
                 payload,
                 V3Serialization.SerializerSettings
             )
         );
-        using var request = _requestSigner.CreateRequest(
-            HttpMethod.Post,
-            _routes.UploadRunBundle,
-            bodyBytes,
-            installation,
-            DateTimeOffset.UtcNow.ToString("o")
-        );
+        using var request = CreateUploadRequest(bodyBytes);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (response.IsSuccessStatusCode)
             return RunBundleUploadResult.Success();
@@ -62,6 +55,30 @@ internal sealed class RunBundleClient
                 responseBody
             )
         );
+    }
+
+    private HttpRequestMessage CreateUploadRequest(byte[] bodyBytes)
+    {
+        if (_installationStore.TryLoad(out var installation) && installation != null)
+        {
+            return _requestSigner.CreateRequest(
+                HttpMethod.Post,
+                _routes.UploadRunBundle,
+                bodyBytes,
+                installation,
+                DateTimeOffset.UtcNow.ToString("o")
+            );
+        }
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            new Uri(_routes.UploadRunBundle, EndpointUriKind)
+        )
+        {
+            Content = new ByteArrayContent(bodyBytes),
+        };
+        request.Content.Headers.ContentType = new("application/json");
+        return request;
     }
 }
 

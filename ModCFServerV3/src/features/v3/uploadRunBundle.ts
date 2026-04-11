@@ -63,6 +63,8 @@ type ExistingRunBundleRow = {
   object_key: string;
 };
 
+const AnonymousInstallationId = "anonymous";
+
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -122,9 +124,10 @@ export async function handleUploadRunBundle(
     ? body.battle_projections
     : [];
 
+  const persistedInstallationId = installationId ?? auth?.installationId ?? AnonymousInstallationId;
+
   if (
     schemaVersion == null ||
-    !installationId ||
     !playerAccountId ||
     !submittedAtUtc ||
     !artifactCodec ||
@@ -138,7 +141,10 @@ export async function handleUploadRunBundle(
 
   if (
     auth != null
-    && (installationId !== auth.installationId || playerAccountId !== auth.playerAccountId)
+    && (
+      (installationId != null && installationId !== auth.installationId)
+      || playerAccountId !== auth.playerAccountId
+    )
   ) {
     return json({ error: "installation_player_mismatch" }, { status: 403 });
   }
@@ -162,7 +168,7 @@ export async function handleUploadRunBundle(
 
   const payloadHash = await sha256Base64(artifactBytes);
   const objectKey =
-    `run-bundles/${playerAccountId}/${installationId}/${runId}/${payloadHash}.mpack.gz`;
+    `run-bundles/${playerAccountId}/${persistedInstallationId}/${runId}/${payloadHash}.mpack.gz`;
   await env.RUN_BUNDLE_BUCKET.put(objectKey, artifactBytes, {
     httpMetadata: {
       contentType: artifactCodec,
@@ -184,7 +190,7 @@ export async function handleUploadRunBundle(
         AND payload_hash = ?
     `,
   )
-    .bind(installationId, runId, payloadHash)
+    .bind(persistedInstallationId, runId, payloadHash)
     .first<ExistingRunBundleRow>();
   const bundleId = existingBundle?.bundle_id ?? `bundle_${crypto.randomUUID().replace(/-/g, "")}`;
   const persistedObjectKey = existingBundle?.object_key ?? objectKey;
@@ -209,7 +215,7 @@ export async function handleUploadRunBundle(
     )
       .bind(
         bundleId,
-        installationId,
+        persistedInstallationId,
         playerAccountId,
         runId,
         payloadHash,
@@ -269,7 +275,7 @@ export async function handleUploadRunBundle(
   )
     .bind(
       runId,
-      installationId,
+      persistedInstallationId,
       playerAccountId,
       bundleId,
       runStatus,
@@ -328,7 +334,7 @@ export async function handleUploadRunBundle(
       .bind(
         asString(battle.battle_id),
         runId,
-        installationId,
+        persistedInstallationId,
         playerAccountId,
         bundleId,
         asString(battle.recorded_at_utc),
