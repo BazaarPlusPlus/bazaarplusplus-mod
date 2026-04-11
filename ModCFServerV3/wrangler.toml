@@ -24,7 +24,7 @@ custom_domain = true
 [[d1_databases]]
 binding = "DB"
 database_name = "bazaarplusplus-mod-api-v3-db"
-database_id = "REPLACE_WITH_V3_DATABASE_ID"
+database_id = "4d0b4bee-1e4f-4302-b7f2-8bb58e7dd46b"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
