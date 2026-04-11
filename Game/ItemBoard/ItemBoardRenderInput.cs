@@ -13,5 +13,7 @@ internal sealed class ItemBoardRenderInput
 
     public Vector2? AnchoredPosition { get; set; }
 
+    public float Scale { get; set; } = 1f;
+
     public float ShowTime { get; set; } = 0.18f;
 }

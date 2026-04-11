@@ -21,6 +21,27 @@ internal sealed class ItemBoardService : IDisposable
         _overlay.Render(input);
     }
 
+    public bool ShowTemplateSet(
+        CardTooltipController? tooltipController,
+        ItemBoardTemplateSetRequest request
+    )
+    {
+        if (!EnsureHost(tooltipController))
+            return false;
+
+        _overlay.RenderTemplateSet(request);
+        return true;
+    }
+
+    public bool ShowTemplateSet(ItemBoardTemplateSetRequest request)
+    {
+        if (!IsAlive)
+            return false;
+
+        _overlay.RenderTemplateSet(request);
+        return true;
+    }
+
     public void SetAnchoredPosition(Vector2 anchoredPosition)
     {
         _overlay.SetAnchoredPosition(anchoredPosition);

@@ -19,6 +19,8 @@
   <!-- Embedded resources -->
   <ItemGroup>
     <EmbeddedResource Include="Data\monsters_bazaardb.json" />
+    <EmbeddedResource Include="tmp\final-builds-top50.json" />
+    <EmbeddedResource Include="tmp\winner-builds-top50.json" />
   </ItemGroup>
 
   <!-- Exclude decompiled and installer files -->
