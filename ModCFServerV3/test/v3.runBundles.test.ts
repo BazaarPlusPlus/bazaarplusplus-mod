@@ -147,6 +147,52 @@ test("run bundle upload stores one artifact object and projection rows", async (
   assert.equal(env.DB.v3Battles.size, 2);
 });
 
+test("run bundle upload accepts unsigned uploads without installation auth", async () => {
+  const env = buildEnv();
+
+  const body = JSON.stringify({
+    schema_version: 3,
+    installation_id: "inst_unsigned",
+    player_account_id: "player-account-unsigned",
+    submitted_at_utc: new Date().toISOString(),
+    artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
+    artifact_bytes: [1, 2, 3],
+    run_projection: {
+      run_id: "run-unsigned",
+      status: "completed",
+      ended_at_utc: "2026-04-10T01:00:00.000Z",
+    },
+    battle_projections: [
+      {
+        battle_id: "battle-unsigned",
+        run_id: "run-unsigned",
+        recorded_at_utc: "2026-04-10T00:30:00.000Z",
+        day: 10,
+        player_rating: 1700,
+        opponent_account_id: "player-account-unsigned",
+        replay_available: true,
+      },
+    ],
+  });
+
+  const response = await worker.fetch(
+    new Request("https://example.com/run-bundles", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
+  assert.equal(env.DB.v3RunBundles.size, 1);
+  assert.equal(env.DB.v3Runs.size, 1);
+  assert.equal(env.DB.v3Battles.size, 1);
+});
+
 test("run bundle upload rejects duplicated battle ids in battle_projections", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();

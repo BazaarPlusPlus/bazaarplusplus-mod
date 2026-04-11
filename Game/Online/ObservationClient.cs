@@ -44,7 +44,7 @@ internal sealed class ObservationClient
                 V3Serialization.SerializerSettings
             )
         );
-        using var request = _requestSigner.CreateSignedRequest(
+        using var request = _requestSigner.CreateRequest(
             HttpMethod.Post,
             _routes.PublishObservation,
             bodyBytes,

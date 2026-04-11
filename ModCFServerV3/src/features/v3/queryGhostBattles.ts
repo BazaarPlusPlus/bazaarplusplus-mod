@@ -49,6 +49,9 @@ export async function handleQueryGhostBattles(
   if (auth instanceof Response) {
     return auth;
   }
+  if (auth == null) {
+    return json({ error: "installation_auth_required" }, { status: 401 });
+  }
 
   const url = new URL(request.url);
   const lookbackDays = getGhostQueryLookbackDays();

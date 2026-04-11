@@ -14,6 +14,9 @@ export async function handleCreateReplayLink(
     if (auth instanceof Response) {
       return auth;
     }
+    if (auth == null) {
+      return json({ error: "installation_auth_required" }, { status: 401 });
+    }
 
     requesterPlayerAccountId = auth.playerAccountId;
   }

@@ -44,7 +44,7 @@ internal sealed class GhostBattleApiClient
             {
                 Query = $"limit={Math.Clamp(limit, 1, 200)}",
             }.Uri.ToString();
-            using var request = _requestSigner.CreateSignedRequest(
+            using var request = _requestSigner.CreateRequest(
                 HttpMethod.Get,
                 endpoint,
                 null,
@@ -108,7 +108,7 @@ internal sealed class GhostBattleApiClient
         try
         {
             var endpoint = _routes.CreateReplayLink(battleId);
-            using var request = _requestSigner.CreateSignedRequest(
+            using var request = _requestSigner.CreateRequest(
                 HttpMethod.Post,
                 endpoint,
                 null,
@@ -167,7 +167,7 @@ internal sealed class GhostBattleApiClient
     {
         try
         {
-            using var request = _requestSigner.CreateSignedRequest(
+            using var request = _requestSigner.CreateRequest(
                 HttpMethod.Get,
                 downloadUrl,
                 null,

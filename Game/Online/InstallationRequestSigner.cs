@@ -75,6 +75,43 @@ internal sealed class InstallationRequestSigner
         return request;
     }
 
+    public HttpRequestMessage CreateRequest(
+        HttpMethod method,
+        string endpoint,
+        byte[]? bodyBytes,
+        InstallationRecord installation,
+        string timestamp,
+        string? contentType = null
+    )
+    {
+        try
+        {
+            return CreateSignedRequest(
+                method,
+                endpoint,
+                bodyBytes,
+                installation,
+                timestamp,
+                contentType
+            );
+        }
+        catch (InvalidOperationException)
+        {
+            var request = new HttpRequestMessage(method, endpoint);
+            if (bodyBytes != null)
+            {
+                request.Content = new ByteArrayContent(bodyBytes);
+                request.Content.Headers.ContentType = new(contentType ?? "application/json");
+            }
+
+            request.Headers.TryAddWithoutValidation(
+                "X-BPP-Installation-Id",
+                installation.InstallationId
+            );
+            return request;
+        }
+    }
+
     internal static string BuildCanonicalRequest(
         string method,
         string absolutePath,

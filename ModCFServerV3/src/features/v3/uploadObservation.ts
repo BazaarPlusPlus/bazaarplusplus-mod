@@ -11,6 +11,9 @@ export async function handleUploadObservation(
   if (auth instanceof Response) {
     return auth;
   }
+  if (auth == null) {
+    return json({ error: "installation_auth_required" }, { status: 401 });
+  }
 
   const body = (await readJson(request)) as {
     observed_player_account_id?: unknown;

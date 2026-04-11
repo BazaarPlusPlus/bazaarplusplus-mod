@@ -103,7 +103,7 @@ export async function handleUploadRunBundle(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  const auth = await requireInstallationAuth(request, env);
+  const auth = await requireInstallationAuth(request, env, { allowMissingAuth: true });
   if (auth instanceof Response) {
     return auth;
   }
@@ -136,7 +136,10 @@ export async function handleUploadRunBundle(
     return json({ error: "invalid_run_bundle_request" }, { status: 400 });
   }
 
-  if (installationId !== auth.installationId || playerAccountId !== auth.playerAccountId) {
+  if (
+    auth != null
+    && (installationId !== auth.installationId || playerAccountId !== auth.playerAccountId)
+  ) {
     return json({ error: "installation_player_mismatch" }, { status: 403 });
   }
 

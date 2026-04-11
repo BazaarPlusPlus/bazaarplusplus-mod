@@ -233,3 +233,60 @@ test("ghost-battles honors the caller limit parameter after server clamping", as
   };
   assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-003"]);
 });
+
+test("ghost-battles accepts unsigned installation requests", async () => {
+  const env = buildEnv();
+  env.DB.v3Installations.set("inst_unsigned", {
+    installation_id: "inst_unsigned",
+    player_account_id: "player-account-unsigned",
+    public_key: JSON.stringify({
+      modulus_b64: "unused",
+      exponent_b64: "unused",
+    }),
+    status: "active",
+    created_at_utc: new Date().toISOString(),
+    last_seen_at_utc: null,
+    revoked_at_utc: null,
+  });
+
+  env.DB.v3Battles.set("battle-unsigned", {
+    battle_id: "battle-unsigned",
+    run_id: "run-unsigned",
+    installation_id: "inst_unsigned",
+    player_account_id: "remote-player",
+    bundle_id: "bundle-unsigned",
+    recorded_at_utc: new Date().toISOString(),
+    day: 8,
+    player_name: "RemoteUnsigned",
+    player_account_id_in_payload: "remote-player",
+    player_hero: "HeroA",
+    player_rank: "Gold",
+    player_rating: 1500,
+    player_level: 10,
+    opponent_name: "LocalUnsigned",
+    opponent_account_id: "player-account-unsigned",
+    opponent_hero: "HeroB",
+    opponent_rank: "Gold",
+    opponent_rating: 1510,
+    opponent_level: 11,
+    result: "Won",
+    replay_available: 1,
+    updated_at_utc: new Date().toISOString(),
+  });
+
+  const response = await worker.fetch(
+    new Request("https://example.com/ghost-battles?limit=5", {
+      method: "GET",
+      headers: {
+        "x-bpp-installation-id": "inst_unsigned",
+      },
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  const json = (await response.json()) as {
+    battles: Array<{ battle_id: string }>;
+  };
+  assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-unsigned"]);
+});

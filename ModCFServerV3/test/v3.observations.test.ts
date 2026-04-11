@@ -64,3 +64,41 @@ test("installation-signed observation is accepted once", async () => {
   assert.deepEqual(await response.json(), { status: "accepted" });
   assert.equal(env.DB.v3InstallationObservations.size, 1);
 });
+
+test("unsigned observation is accepted when installation id is provided", async () => {
+  const env = buildEnv();
+  env.DB.v3Installations.set("inst_unsigned", {
+    installation_id: "inst_unsigned",
+    player_account_id: "player-account-unsigned",
+    public_key: JSON.stringify({
+      modulus_b64: "unused",
+      exponent_b64: "unused",
+    }),
+    status: "active",
+    created_at_utc: new Date().toISOString(),
+    last_seen_at_utc: null,
+    revoked_at_utc: null,
+  });
+
+  const body = JSON.stringify({
+    observed_player_account_id: "player-account-unsigned",
+    observed_player_username: "player-unsigned",
+    observed_at_utc: "2026-04-10T00:00:00.000Z",
+  });
+
+  const response = await worker.fetch(
+    new Request("https://example.com/installations/observations", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-bpp-installation-id": "inst_unsigned",
+      },
+      body,
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: "accepted" });
+  assert.equal(env.DB.v3InstallationObservations.size, 1);
+});

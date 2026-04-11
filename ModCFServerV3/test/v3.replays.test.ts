@@ -468,3 +468,139 @@ test("download replay allows bearer-token access when unauthenticated downloads 
   assert.equal(response.status, 200);
   assert.equal(await response.text(), '{"battle_id":"battle-public"}');
 });
+
+test("replay-link accepts unsigned installation requests", async () => {
+  const env = buildEnv();
+  env.DB.v3Installations.set("inst_unsigned", {
+    installation_id: "inst_unsigned",
+    player_account_id: "player-account-unsigned",
+    public_key: JSON.stringify({
+      modulus_b64: "unused",
+      exponent_b64: "unused",
+    }),
+    status: "active",
+    created_at_utc: new Date().toISOString(),
+    last_seen_at_utc: null,
+    revoked_at_utc: null,
+  });
+  env.DB.v3Battles.set("battle-owned-unsigned", {
+    battle_id: "battle-owned-unsigned",
+    run_id: "run-owned-unsigned",
+    installation_id: "inst_remote",
+    player_account_id: "remote-player",
+    bundle_id: "bundle-owned-unsigned",
+    recorded_at_utc: new Date().toISOString(),
+    day: 9,
+    player_name: "Remote",
+    player_account_id_in_payload: "remote-player",
+    player_hero: "HeroA",
+    player_rank: "Gold",
+    player_rating: 1600,
+    player_level: 10,
+    opponent_name: "Local",
+    opponent_account_id: "player-account-unsigned",
+    opponent_hero: "HeroB",
+    opponent_rank: "Gold",
+    opponent_rating: 1610,
+    opponent_level: 11,
+    result: "Won",
+    replay_available: 1,
+    updated_at_utc: new Date().toISOString(),
+  });
+
+  const response = await worker.fetch(
+    new Request("https://example.com/ghost-battles/battle-owned-unsigned/replay-link", {
+      method: "POST",
+      headers: {
+        "x-bpp-installation-id": "inst_unsigned",
+      },
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  const payload = (await response.json()) as { download_url: string };
+  assert.match(payload.download_url, /^https:\/\/example\.com\/replays\/replay_/);
+});
+
+test("download replay accepts unsigned installation requests", async () => {
+  const env = buildEnv();
+  env.DB.v3Installations.set("inst_unsigned", {
+    installation_id: "inst_unsigned",
+    player_account_id: "player-account-unsigned",
+    public_key: JSON.stringify({
+      modulus_b64: "unused",
+      exponent_b64: "unused",
+    }),
+    status: "active",
+    created_at_utc: new Date().toISOString(),
+    last_seen_at_utc: null,
+    revoked_at_utc: null,
+  });
+  env.DB.v3ReplayTokens.set("token-unsigned", {
+    token: "token-unsigned",
+    battle_id: "battle-owned-unsigned",
+    requested_by_player_account_id: "player-account-unsigned",
+    expires_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    created_at_utc: new Date().toISOString(),
+    used_at_utc: null,
+    revoked_at_utc: null,
+  });
+  env.DB.v3Battles.set("battle-owned-unsigned", {
+    battle_id: "battle-owned-unsigned",
+    run_id: "run-owned-unsigned",
+    installation_id: "inst_remote",
+    player_account_id: "remote-player",
+    bundle_id: "bundle-owned-unsigned",
+    recorded_at_utc: new Date().toISOString(),
+    day: 9,
+    player_name: "Remote",
+    player_account_id_in_payload: "remote-player",
+    player_hero: "HeroA",
+    player_rank: "Gold",
+    player_rating: 1600,
+    player_level: 10,
+    opponent_name: "Local",
+    opponent_account_id: "player-account-unsigned",
+    opponent_hero: "HeroB",
+    opponent_rank: "Gold",
+    opponent_rating: 1610,
+    opponent_level: 11,
+    result: "Won",
+    replay_available: 1,
+    updated_at_utc: new Date().toISOString(),
+  });
+  env.DB.v3RunBundles.set("bundle-owned-unsigned", {
+    bundle_id: "bundle-owned-unsigned",
+    installation_id: "inst_remote",
+    player_account_id: "remote-player",
+    run_id: "run-owned-unsigned",
+    payload_hash: "payload-hash-unsigned",
+    schema_version: 3,
+    object_key: "run-bundles/remote-player/inst_remote/run-owned-unsigned/payload-hash-unsigned.mpack.gz",
+    codec: "application/json",
+    size_bytes: 12,
+    submitted_at_utc: new Date().toISOString(),
+    created_at_utc: new Date().toISOString(),
+  });
+  await env.RUN_BUNDLE_BUCKET.put(
+    "run-bundles/remote-player/inst_remote/run-owned-unsigned/payload-hash-unsigned.mpack.gz",
+    new TextEncoder().encode('{"battle_id":"battle-owned-unsigned"}'),
+    {
+      httpMetadata: { contentType: "application/json" },
+    },
+  );
+
+  const response = await worker.fetch(
+    new Request("https://example.com/replays/token-unsigned", {
+      method: "GET",
+      headers: {
+        "x-bpp-installation-id": "inst_unsigned",
+      },
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), '{"battle_id":"battle-owned-unsigned"}');
+});

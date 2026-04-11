@@ -21,16 +21,66 @@ export type InstallationAuthContext = {
   playerAccountId: string;
 };
 
+type RequireInstallationAuthOptions = {
+  allowMissingAuth?: boolean;
+};
+
 export async function requireInstallationAuth(
   request: Request,
   env: Env,
-): Promise<InstallationAuthContext | Response> {
+  options?: RequireInstallationAuthOptions,
+): Promise<InstallationAuthContext | null | Response> {
   const installationId = request.headers.get("x-bpp-installation-id")?.trim() ?? "";
   const timestamp = request.headers.get("x-bpp-timestamp")?.trim() ?? "";
   const bodyHash = request.headers.get("x-bpp-content-sha256")?.trim() ?? "";
   const signature = request.headers.get("x-bpp-signature")?.trim() ?? "";
+  const allowMissingAuth = options?.allowMissingAuth === true;
 
-  if (!installationId || !timestamp || !bodyHash || !signature) {
+  if (!installationId) {
+    if (allowMissingAuth) {
+      return null;
+    }
+
+    return json({ error: "installation_auth_required" }, { status: 401 });
+  }
+
+  if (!signature) {
+    const installation = await env.DB.prepare(
+      `
+      SELECT
+        installation_id,
+        player_account_id,
+        public_key,
+        status,
+        last_seen_at_utc,
+        revoked_at_utc
+      FROM installations
+      WHERE installation_id = ?
+    `,
+    )
+      .bind(installationId)
+      .first<InstallationRow>();
+    if (!installation || installation.status !== "active" || installation.revoked_at_utc != null) {
+      return json({ error: "installation_not_active" }, { status: 403 });
+    }
+
+    await env.DB.prepare(
+      `
+        UPDATE installations
+        SET last_seen_at_utc = ?
+        WHERE installation_id = ?
+      `,
+    )
+      .bind(new Date().toISOString(), installation.installation_id)
+      .run();
+
+    return {
+      installationId: installation.installation_id,
+      playerAccountId: installation.player_account_id,
+    };
+  }
+
+  if (!timestamp || !bodyHash) {
     return json({ error: "installation_auth_required" }, { status: 401 });
   }
 
