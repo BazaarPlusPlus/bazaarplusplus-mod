@@ -6,7 +6,6 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
-using BazaarPlusPlus.Game.Screenshots;
 using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
@@ -35,6 +34,18 @@ internal static class BppSettingsDockCatalog
             )
         ),
         new(
+            "LegendaryPositionDisplay",
+            LegendaryPositionSettingsMenuLabel.Resolve,
+            languageCode =>
+                ResolveLegendaryPositionDisplayStatus(
+                    ReadLegendaryPositionDisplayMode(),
+                    languageCode
+                ),
+            IsLegendaryPositionDisplayOverrideActive,
+            CycleLegendaryPositionDisplayMode,
+            collapseAfterActivate: false
+        ),
+        new(
             "EnchantPreview",
             EnchantPreviewSettingsMenuLabel.Resolve,
             new SettingsMenuToggleBridge(ReadEnchantPreviewEnabled, WriteEnchantPreviewEnabled)
@@ -48,27 +59,11 @@ internal static class BppSettingsDockCatalog
             )
         ),
         new(
-            "BattleStartScreenshot",
-            BattleStartScreenshotSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                ReadBattleStartScreenshotEnabled,
-                WriteBattleStartScreenshotEnabled
-            )
-        ),
-        new(
             "ChineseLocaleMode",
             ResolveChineseLocaleModeLabel,
             _ => BppChineseLocalization.ResolveModeStatus(ReadChineseLocaleMode()),
             IsChineseLocaleOverrideActive,
             CycleChineseLocaleMode,
-            collapseAfterActivate: false
-        ),
-        new(
-            "LegendaryPositionDisplay",
-            LegendaryPositionSettingsMenuLabel.Resolve,
-            _ => ResolveLegendaryPositionDisplayStatus(ReadLegendaryPositionDisplayMode()),
-            IsLegendaryPositionDisplayOverrideActive,
-            CycleLegendaryPositionDisplayMode,
             collapseAfterActivate: false
         ),
     ];
@@ -105,21 +100,9 @@ internal static class BppSettingsDockCatalog
         return BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig?.Value ?? false;
     }
 
-    private static bool ReadBattleStartScreenshotEnabled()
-    {
-        return BppRuntimeHost.Config.EnableBattleStartScreenshotConfig?.Value ?? true;
-    }
-
     private static void WriteEnchantPreviewEnabled(bool enabled)
     {
         var config = BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig;
-        if (config != null)
-            config.Value = enabled;
-    }
-
-    private static void WriteBattleStartScreenshotEnabled(bool enabled)
-    {
-        var config = BppRuntimeHost.Config.EnableBattleStartScreenshotConfig;
         if (config != null)
             config.Value = enabled;
     }
@@ -169,6 +152,8 @@ internal static class BppSettingsDockCatalog
                 LegendaryPositionDisplayMode.PositionWithRating,
             _ => LegendaryPositionDisplayMode.Default,
         };
+
+        LegendaryPositionUiRefresh.TryRefreshVisibleDisplays();
     }
 
     private static bool IsLegendaryPositionDisplayOverrideActive()
@@ -176,8 +161,23 @@ internal static class BppSettingsDockCatalog
         return ReadLegendaryPositionDisplayMode() != LegendaryPositionDisplayMode.Default;
     }
 
-    private static string ResolveLegendaryPositionDisplayStatus(LegendaryPositionDisplayMode mode)
+    private static string ResolveLegendaryPositionDisplayStatus(
+        LegendaryPositionDisplayMode mode,
+        string languageCode
+    )
     {
+        if (LanguageCodeMatcher.IsChinese(languageCode))
+        {
+            return mode switch
+            {
+                LegendaryPositionDisplayMode.Default => "默认",
+                LegendaryPositionDisplayMode.Blank => "无人知晓",
+                LegendaryPositionDisplayMode.Fixed999999 => "战力爆表",
+                LegendaryPositionDisplayMode.PositionWithRating => "双显模式",
+                _ => "默认",
+            };
+        }
+
         return mode switch
         {
             LegendaryPositionDisplayMode.Default => "DEF",

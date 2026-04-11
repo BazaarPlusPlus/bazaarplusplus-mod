@@ -63,6 +63,14 @@ Assert(
         && payloadFactoryType != null,
     "The PVP battle matcher, collector, and factories should exist."
 );
+var shouldRefreshPlayerCaptureMethod = collectorType.GetMethod(
+    "ShouldRefreshPlayerCapture",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
+Assert(
+    shouldRefreshPlayerCaptureMethod != null,
+    "PvpBattleSnapshotCollector should keep player capture refresh logic testable."
+);
 Assert(
     catalogType.GetMethod("Save") != null
         && catalogType.GetMethod("TryLoad") != null
@@ -100,6 +108,30 @@ var queue = queueCtor!.Invoke([
     new Action<string>(queueHarness.DeletePayload),
 ]);
 Assert(queue != null, "Combat replay persistence queue should be constructible.");
+
+var openingEmptySnapshots = (System.Collections.IList)CreateEmptySnapshotList();
+Assert(
+    (bool)(shouldRefreshPlayerCaptureMethod!.Invoke(
+        null,
+        new object?[] { true, false, openingEmptySnapshots }
+    ) ?? false),
+    "Player snapshots captured as empty at combat opening should still be eligible for live retry."
+);
+var populatedSnapshots = (System.Collections.IList)CreateSnapshotList("refresh-1", "tpl-refresh");
+Assert(
+    !((bool)(shouldRefreshPlayerCaptureMethod.Invoke(
+        null,
+        new object?[] { true, false, populatedSnapshots }
+    ) ?? false)),
+    "Player snapshots captured with opening data should not request a redundant live retry."
+);
+Assert(
+    !((bool)(shouldRefreshPlayerCaptureMethod.Invoke(
+        null,
+        new object?[] { false, true, openingEmptySnapshots }
+    ) ?? false)),
+    "Player snapshots should not request another refresh after live retry already ran."
+);
 
 var slowPayload = Activator.CreateInstance(payloadType);
 Assert(slowPayload != null, "Slow replay payload should be constructible.");
@@ -177,6 +209,16 @@ Assert(
 );
 
 var queueResults = new List<object>();
+object? firstCompletedResult = null;
+Assert(
+    SpinWait.SpinUntil(
+        () => TryDequeuePersistenceResult(persistenceQueueType, queue!, out firstCompletedResult),
+        millisecondsTimeout: 5000
+    ),
+    "Queue disposal should eventually surface the successful in-flight replay result."
+);
+if (firstCompletedResult != null)
+    queueResults.Add(firstCompletedResult);
 while (TryDequeuePersistenceResult(persistenceQueueType, queue!, out var result))
 {
     queueResults.Add(result!);
@@ -468,6 +510,74 @@ try
             "battle_snapshots should preserve explicit missing capture semantics instead of guessing from empty lists."
         );
     }
+
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
+        using var createRun = connection.CreateCommand();
+        createRun.CommandText = """
+            INSERT INTO runs (
+                run_id,
+                started_at_utc,
+                last_seen_at_utc,
+                status,
+                completed,
+                hero,
+                game_mode,
+                last_seq
+            ) VALUES (
+                $runId,
+                $startedAtUtc,
+                $lastSeenAtUtc,
+                'active',
+                0,
+                'Vanessa',
+                'Ranked',
+                0
+            );
+            """;
+        createRun.Parameters.AddWithValue("$runId", "run-001");
+        createRun.Parameters.AddWithValue("$startedAtUtc", "2026-03-18T01:00:00.0000000+00:00");
+        createRun.Parameters.AddWithValue("$lastSeenAtUtc", "2026-03-18T01:00:00.0000000+00:00");
+        createRun.ExecuteNonQuery();
+    }
+
+    Invoke(catalogType, battleCatalog!, "AttachToRun", new object?[] { "battle-001", "run-001" });
+    var reboundManifest = Invoke(
+        catalogType,
+        battleCatalog!,
+        "TryLoad",
+        new object?[] { "battle-001" }
+    );
+    Assert(reboundManifest != null, "Catalog should still load a rebound battle manifest.");
+    Assert(
+        string.Equals(
+            (string?)GetProperty(manifestType, reboundManifest!, "RunId"),
+            "run-001",
+            StringComparison.Ordinal
+        ),
+        "AttachToRun should backfill the saved battle row once the owning run exists."
+    );
+    var reboundBattles = (
+        (System.Collections.IEnumerable)Invoke(
+            catalogType,
+            battleCatalog!,
+            "ListByRunId",
+            new object?[] { "run-001" }
+        )
+    )
+        .Cast<object>()
+        .ToList();
+    Assert(
+        reboundBattles.Any(entry =>
+            string.Equals(
+                (string?)GetProperty(manifestType, entry, "BattleId"),
+                "battle-001",
+                StringComparison.Ordinal
+            )
+        ),
+        "ListByRunId should surface battles whose run id was backfilled after persistence."
+    );
 
     var captureService = Activator.CreateInstance(captureServiceType);
     Assert(captureService != null, "CombatReplayCaptureService should be constructible.");

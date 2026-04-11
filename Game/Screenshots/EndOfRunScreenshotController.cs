@@ -326,7 +326,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private static bool IsBattleStartScreenshotEnabled()
     {
-        return BppRuntimeHost.Config.EnableBattleStartScreenshotConfig?.Value ?? true;
+        return false;
     }
 
     private IEnumerator CaptureManualScreenshot(ScreenshotCaptureRequest request)

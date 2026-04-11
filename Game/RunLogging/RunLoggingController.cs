@@ -2,6 +2,7 @@
 using System;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
 using BazaarPlusPlus.Game.RunLogging.Upload;
@@ -28,6 +29,7 @@ internal sealed class RunLoggingController : MonoBehaviour
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
         var sqliteStore = new SqliteRunLogStore(runLogDatabasePath);
         var uploadStore = new RunSyncStateSqliteStore(runLogDatabasePath);
+        var battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _store = new QueuedRunLogStore(new ReplicatedRunLogStore(sqliteStore, uploadStore));
         _sessionManager = new RunLogSessionManager(_store);
         _sessionManager.RestoreActiveSession();
@@ -39,6 +41,7 @@ internal sealed class RunLoggingController : MonoBehaviour
             _core,
             () => CombatReplayRuntime.Instance?.HasPendingPersistence == true,
             EnsureActiveRunFromGame,
+            battleCatalog.AttachToRun,
             buildRunLogAbandonment: RunLoggingGameDataReader.BuildRunLogAbandonment
         );
         _module.Start();

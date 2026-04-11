@@ -314,6 +314,31 @@ internal sealed class PvpBattleSqliteStore
         command.ExecuteNonQuery();
     }
 
+    public void AttachToRun(string battleId, string runId)
+    {
+        if (string.IsNullOrWhiteSpace(battleId) || string.IsNullOrWhiteSpace(runId))
+            return;
+
+        using var connection = OpenConnection();
+        using var command = CreateCommand(connection);
+        command.CommandText = $"""
+            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            SET run_id = $runId
+            WHERE battle_id = $battleId
+              AND source = 'LOCAL'
+              AND (run_id IS NULL OR run_id = $runId)
+              AND EXISTS (
+                  SELECT 1
+                  FROM {RunLogSqliteSchema.RunsTableName}
+                  WHERE run_id = $runId
+                  LIMIT 1
+              );
+            """;
+        command.Parameters.AddWithValue("$battleId", battleId);
+        command.Parameters.AddWithValue("$runId", runId);
+        command.ExecuteNonQuery();
+    }
+
     public IEnumerable<string> ListBattleIds()
     {
         using var connection = OpenConnection();

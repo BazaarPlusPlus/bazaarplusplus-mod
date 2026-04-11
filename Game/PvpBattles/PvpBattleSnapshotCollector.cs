@@ -61,13 +61,21 @@ internal sealed class PvpBattleSnapshotCollector
 
     public void CaptureLiveSnapshots(CombatReplaySequenceCandidate candidate)
     {
-        if (!candidate.PlayerHandCardsCapturedFromOpening && candidate.PlayerHandCards.Count == 0)
+        if (ShouldRefreshPlayerCapture(
+            candidate.PlayerHandCardsCapturedFromOpening,
+            candidate.PlayerHandCardsCapturedLive,
+            candidate.PlayerHandCards
+        ))
         {
             (candidate.PlayerHandCardsCapturedLive, candidate.PlayerHandCards) =
                 CapturePlayerHandCards();
         }
 
-        if (!candidate.PlayerSkillsCapturedFromOpening && candidate.PlayerSkills.Count == 0)
+        if (ShouldRefreshPlayerCapture(
+            candidate.PlayerSkillsCapturedFromOpening,
+            candidate.PlayerSkillsCapturedLive,
+            candidate.PlayerSkills
+        ))
         {
             (candidate.PlayerSkillsCapturedLive, candidate.PlayerSkills) = CapturePlayerSkills();
         }
@@ -178,6 +186,18 @@ internal sealed class PvpBattleSnapshotCollector
             Status = PvpBattleCaptureStatus.Missing,
             Source = PvpBattleCaptureSource.Unknown,
         };
+    }
+
+    private static bool ShouldRefreshPlayerCapture(
+        bool capturedFromOpening,
+        bool capturedLive,
+        IReadOnlyCollection<CombatReplayCardSnapshot> snapshots
+    )
+    {
+        if (capturedLive)
+            return false;
+
+        return !capturedFromOpening || snapshots.Count == 0;
     }
 
     private static (

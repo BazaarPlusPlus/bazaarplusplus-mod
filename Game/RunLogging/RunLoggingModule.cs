@@ -18,6 +18,7 @@ internal sealed class RunLoggingModule
     private readonly RunLoggingControllerCore _core;
     private readonly Func<bool> _hasPendingReplayPersistence;
     private readonly Func<RunLogSessionState?> _ensureActiveRunFromGame;
+    private readonly Action<string, string> _attachBattleToRun;
     private IDisposable? _runLifecycleSubscription;
     private IDisposable? _pvpBattleSubscription;
     private IDisposable? _runInitializedSubscription;
@@ -40,6 +41,29 @@ internal sealed class RunLoggingModule
         Func<string, RunLogCompletion>? buildRunLogCompletion = null,
         Func<string, RunLogAbandonment>? buildRunLogAbandonment = null
     )
+        : this(
+            eventBus,
+            sessionManager,
+            core,
+            hasPendingReplayPersistence,
+            ensureActiveRunFromGame,
+            static (_, _) => { },
+            utcNow,
+            buildRunLogCompletion,
+            buildRunLogAbandonment
+        ) { }
+
+    public RunLoggingModule(
+        IBppEventBus eventBus,
+        RunLogSessionManager sessionManager,
+        RunLoggingControllerCore core,
+        Func<bool> hasPendingReplayPersistence,
+        Func<RunLogSessionState?> ensureActiveRunFromGame,
+        Action<string, string> attachBattleToRun,
+        Func<DateTime>? utcNow = null,
+        Func<string, RunLogCompletion>? buildRunLogCompletion = null,
+        Func<string, RunLogAbandonment>? buildRunLogAbandonment = null
+    )
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
@@ -50,6 +74,8 @@ internal sealed class RunLoggingModule
         _ensureActiveRunFromGame =
             ensureActiveRunFromGame
             ?? throw new ArgumentNullException(nameof(ensureActiveRunFromGame));
+        _attachBattleToRun =
+            attachBattleToRun ?? throw new ArgumentNullException(nameof(attachBattleToRun));
         _utcNow = utcNow ?? (() => DateTime.UtcNow);
         _buildRunLogCompletion =
             buildRunLogCompletion ?? RunLoggingGameDataReader.BuildRunLogCompletion;
@@ -164,8 +190,13 @@ internal sealed class RunLoggingModule
                 return;
             }
 
-            if (!TryResolveReplayTargetSession(manifest, inRun))
+            var session = TryResolveReplayTargetSession(manifest, inRun);
+            if (session == null)
                 return;
+
+            manifest.RunId = session.RunId;
+            if (!string.IsNullOrWhiteSpace(manifest.BattleId))
+                _attachBattleToRun(manifest.BattleId, session.RunId);
 
             _core.AcceptCombatReplay(
                 new RunLogPvpBattleInput
@@ -232,13 +263,13 @@ internal sealed class RunLoggingModule
         _ensureActiveRunFromGame();
     }
 
-    private bool TryResolveReplayTargetSession(PvpBattleManifest manifest, bool inRun)
+    private RunLogSessionState? TryResolveReplayTargetSession(PvpBattleManifest manifest, bool inRun)
     {
         if (inRun)
         {
             var session = _ensureActiveRunFromGame();
             if (session == null)
-                return false;
+                return null;
 
             if (
                 !string.IsNullOrWhiteSpace(manifest.RunId)
@@ -249,15 +280,15 @@ internal sealed class RunLoggingModule
                     "RunLoggingModule",
                     $"Skipping replay event for run {manifest.RunId} because active in-run session is {session.RunId}."
                 );
-                return false;
+                return null;
             }
 
-            return true;
+            return session;
         }
 
         var deferredSession = _sessionManager.ActiveSession;
         if (deferredSession == null)
-            return false;
+            return null;
 
         if (string.IsNullOrWhiteSpace(manifest.RunId))
         {
@@ -265,7 +296,7 @@ internal sealed class RunLoggingModule
                 "RunLoggingModule",
                 $"Skipping deferred replay event for battle {manifest.BattleId} because manifest run id is unavailable."
             );
-            return false;
+            return null;
         }
 
         if (!string.Equals(deferredSession.RunId, manifest.RunId, StringComparison.Ordinal))
@@ -274,10 +305,10 @@ internal sealed class RunLoggingModule
                 "RunLoggingModule",
                 $"Skipping deferred replay event for run {manifest.RunId} because active deferred session is {deferredSession.RunId}."
             );
-            return false;
+            return null;
         }
 
-        return true;
+        return deferredSession;
     }
 
     private bool TryCompleteDeferredRunExit(bool forceCompletion = false)
