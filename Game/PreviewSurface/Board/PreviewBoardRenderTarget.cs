@@ -41,13 +41,17 @@ internal sealed class PreviewBoardRenderTarget : IBoardRenderTarget, IDisposable
             pendingWork.GetAwaiter().GetResult();
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            TryLogException("Dispose observed a render task failure", ex);
+        }
 
         _surface.Dispose();
     }
 
     public void Render(BoardRenderModel renderModel)
     {
-        _ = QueueRenderAsync(renderModel);
+        ObserveBackgroundTask(QueueRenderAsync(renderModel), "Render");
     }
 
     internal Task QueueRenderAsync(BoardRenderModel renderModel)
@@ -79,7 +83,7 @@ internal sealed class PreviewBoardRenderTarget : IBoardRenderTarget, IDisposable
 
     public void SetVisible(bool visible)
     {
-        _ = QueueSetVisibleAsync(visible);
+        ObserveBackgroundTask(QueueSetVisibleAsync(visible), "SetVisible");
     }
 
     internal Task QueueSetVisibleAsync(bool visible)
@@ -173,11 +177,26 @@ internal sealed class PreviewBoardRenderTarget : IBoardRenderTarget, IDisposable
     {
         try
         {
-            await previousWork;
+            await previousWork.ConfigureAwait(false);
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            TryLogException("Previous preview surface task failed; continuing with the latest request", ex);
+        }
 
-        await nextWork();
+        try
+        {
+            await nextWork().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            TryLogException("Preview surface task failed", ex);
+        }
     }
 
     private void CancelActiveRenderUnsafe()
@@ -214,5 +233,39 @@ internal sealed class PreviewBoardRenderTarget : IBoardRenderTarget, IDisposable
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static
         );
         method?.Invoke(null, new object[] { LogArea, message });
+    }
+
+    private static void TryLogException(string message, Exception ex)
+    {
+        var bppLogType = Type.GetType("BazaarPlusPlus.BppLog, BazaarPlusPlus");
+        var method = bppLogType?.GetMethod(
+            "Error",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+            null,
+            [typeof(string), typeof(string), typeof(Exception)],
+            null
+        );
+        method?.Invoke(null, new object[] { LogArea, message, ex });
+    }
+
+    private static void ObserveBackgroundTask(Task task, string operationName)
+    {
+        if (task.IsCompletedSuccessfully || task.IsCanceled)
+            return;
+
+        _ = task.ContinueWith(
+            continuation =>
+            {
+                if (continuation.IsFaulted && continuation.Exception != null)
+                {
+                    var exception = continuation.Exception.GetBaseException();
+                    if (exception is not OperationCanceledException)
+                        TryLogException($"{operationName} task failed", exception);
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default
+        );
     }
 }

@@ -25,7 +25,10 @@ internal sealed class GhostBattlePayloadStore
         if (string.IsNullOrWhiteSpace(payload.BattleId))
             throw new ArgumentException("Battle id is required.", nameof(payload));
 
-        File.WriteAllBytes(GetFilePath(payload.BattleId), GhostBattlePayloadCodec.Serialize(payload));
+        WriteAllBytesAtomically(
+            GetFilePath(payload.BattleId),
+            GhostBattlePayloadCodec.Serialize(payload)
+        );
     }
 
     public GhostBattlePayload? Load(string battleId)
@@ -64,5 +67,29 @@ internal sealed class GhostBattlePayloadStore
     private string GetFilePath(string battleId)
     {
         return Path.Combine(_rootPath, $"{battleId}{FileSuffix}");
+    }
+
+    private static void WriteAllBytesAtomically(string filePath, byte[] bytes)
+    {
+        var directoryPath =
+            Path.GetDirectoryName(filePath)
+            ?? throw new InvalidOperationException("Ghost payload path must have a parent directory.");
+        var tempPath = Path.Combine(
+            directoryPath,
+            $"{Path.GetFileName(filePath)}.{Guid.NewGuid():N}.tmp"
+        );
+        File.WriteAllBytes(tempPath, bytes);
+        try
+        {
+            if (File.Exists(filePath))
+                File.Replace(tempPath, filePath, null, ignoreMetadataErrors: true);
+            else
+                File.Move(tempPath, filePath);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
     }
 }

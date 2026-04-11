@@ -29,7 +29,7 @@ internal sealed class CombatReplayPayloadStore
 
         Directory.CreateDirectory(_rootPath);
         var filePath = GetFilePath(payload.BattleId);
-        File.WriteAllBytes(filePath, PvpReplayPayloadCodec.Serialize(payload));
+        WriteAllBytesAtomically(filePath, PvpReplayPayloadCodec.Serialize(payload));
     }
 
     public PvpReplayPayload? Load(string battleId)
@@ -92,5 +92,29 @@ internal sealed class CombatReplayPayloadStore
     private string GetFilePath(string battleId)
     {
         return Path.Combine(_rootPath, $"{battleId}{FileSuffix}");
+    }
+
+    private static void WriteAllBytesAtomically(string filePath, byte[] bytes)
+    {
+        var directoryPath =
+            Path.GetDirectoryName(filePath)
+            ?? throw new InvalidOperationException("Payload path must have a parent directory.");
+        var tempPath = Path.Combine(
+            directoryPath,
+            $"{Path.GetFileName(filePath)}.{Guid.NewGuid():N}.tmp"
+        );
+        File.WriteAllBytes(tempPath, bytes);
+        try
+        {
+            if (File.Exists(filePath))
+                File.Replace(tempPath, filePath, null, ignoreMetadataErrors: true);
+            else
+                File.Move(tempPath, filePath);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
     }
 }

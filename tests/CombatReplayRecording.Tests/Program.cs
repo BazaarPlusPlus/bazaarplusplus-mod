@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading;
@@ -129,11 +130,50 @@ Assert(
 var disposeTask = Task.Run(() =>
     Invoke(persistenceQueueType, queue!, "Dispose", Array.Empty<object?>())
 );
-Thread.Sleep(millisecondsTimeout: 650);
+var shutdownStopwatch = Stopwatch.StartNew();
+Assert(
+    disposeTask.Wait(TimeSpan.FromSeconds(2)),
+    "Disposing the persistence queue should stop waiting after the shutdown timeout instead of blocking on an in-flight replay write."
+);
+shutdownStopwatch.Stop();
+Assert(
+    shutdownStopwatch.Elapsed < TimeSpan.FromSeconds(2),
+    "Disposing the persistence queue should return on the bounded shutdown path."
+);
+
+var abandonedResults = new List<object>();
+while (TryDequeuePersistenceResult(persistenceQueueType, queue!, out var abandonedResult))
+{
+    abandonedResults.Add(abandonedResult!);
+}
+
+Assert(
+    abandonedResults.Count == 1,
+    "Timed-out shutdown should immediately surface one abandoned result for queued replay work."
+);
+Assert(
+    abandonedResults.Any(result =>
+        !(bool)GetProperty(persistenceResultType, result, "Succeeded")
+        && string.Equals(
+            (string?)GetProperty(
+                manifestType,
+                GetProperty(persistenceResultType, result, "Manifest"),
+                "BattleId"
+            ),
+            "battle-dispose-abandoned",
+            StringComparison.Ordinal
+        )
+    ),
+    "Timed-out shutdown should convert queued replay work into a completed failure result."
+);
+
 queueHarness.AllowFirstPayloadToComplete.Set();
 Assert(
-    disposeTask.Wait(TimeSpan.FromSeconds(5)),
-    "Disposing the persistence queue should return after the in-flight replay write finishes."
+    SpinWait.SpinUntil(
+        () => queueHarness.SavedManifestBattleIds.Contains("battle-dispose-slow"),
+        millisecondsTimeout: 5000
+    ),
+    "The in-flight replay write should still be allowed to finish asynchronously after shutdown returns."
 );
 
 var queueResults = new List<object>();
@@ -142,10 +182,6 @@ while (TryDequeuePersistenceResult(persistenceQueueType, queue!, out var result)
     queueResults.Add(result!);
 }
 
-Assert(
-    queueResults.Count == 2,
-    "Queue disposal should surface one result for the completed in-flight replay and one result for the abandoned pending replay."
-);
 Assert(
     queueResults.Any(result =>
         (bool)GetProperty(persistenceResultType, result, "Succeeded")
@@ -159,22 +195,7 @@ Assert(
             StringComparison.Ordinal
         )
     ),
-    "Queue disposal should preserve the successful in-flight replay result even when shutdown cancellation starts before it finishes."
-);
-Assert(
-    queueResults.Any(result =>
-        !(bool)GetProperty(persistenceResultType, result, "Succeeded")
-        && string.Equals(
-            (string?)GetProperty(
-                manifestType,
-                GetProperty(persistenceResultType, result, "Manifest"),
-                "BattleId"
-            ),
-            "battle-dispose-abandoned",
-            StringComparison.Ordinal
-        )
-    ),
-    "Queue disposal should convert abandoned pending replays into completed failure results instead of dropping them silently."
+    "Queue disposal should preserve the successful in-flight replay result even when shutdown returns before it finishes."
 );
 Assert(
     queueHarness.SavedManifestBattleIds.SequenceEqual(["battle-dispose-slow"]),
@@ -229,6 +250,37 @@ try
         ((byte[]?)GetProperty(payloadType, loadedPayload!, "CombatMessageBytes"))
             ?.SequenceEqual(new byte[] { 4, 5, 6 }) == true,
         "Payload store should preserve the serialized combat payload."
+    );
+    var payloadFilesAfterFirstSave = Directory
+        .EnumerateFiles(tempRoot, "battle-001.payload.mpack.gz*")
+        .Select(Path.GetFileName)
+        .ToArray();
+    Assert(
+        payloadFilesAfterFirstSave.SequenceEqual(["battle-001.payload.mpack.gz"]),
+        "Payload store should not leave temporary files behind after the initial atomic save."
+    );
+
+    SetProperty(payloadType, payload!, "CombatMessageBytes", new byte[] { 9, 8, 7 });
+    Invoke(payloadStoreType, payloadStore!, "Save", new object?[] { payload! });
+    var reloadedPayload = Invoke(
+        payloadStoreType,
+        payloadStore!,
+        "Load",
+        new object?[] { "battle-001" }
+    );
+    Assert(reloadedPayload != null, "Payload store should reload an overwritten payload.");
+    Assert(
+        ((byte[]?)GetProperty(payloadType, reloadedPayload!, "CombatMessageBytes"))
+            ?.SequenceEqual(new byte[] { 9, 8, 7 }) == true,
+        "Atomic overwrite should publish the latest replay payload bytes."
+    );
+    var payloadFilesAfterOverwrite = Directory
+        .EnumerateFiles(tempRoot, "battle-001.payload.mpack.gz*")
+        .Select(Path.GetFileName)
+        .ToArray();
+    Assert(
+        payloadFilesAfterOverwrite.SequenceEqual(["battle-001.payload.mpack.gz"]),
+        "Atomic overwrite should replace the target file without leaving temp artifacts behind."
     );
 
     var manifest = CreateManifestFixture(

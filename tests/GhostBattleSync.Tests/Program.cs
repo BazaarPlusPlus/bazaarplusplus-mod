@@ -434,7 +434,26 @@ try
 finally
 {
     if (Directory.Exists(tempRoot))
-        Directory.Delete(tempRoot, recursive: true);
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        try
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+        catch (IOException)
+        {
+            try
+            {
+                await Task.Delay(200);
+                Directory.Delete(tempRoot, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup on Windows when SQLite releases the file handle late.
+            }
+        }
+    }
 }
 
 var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);

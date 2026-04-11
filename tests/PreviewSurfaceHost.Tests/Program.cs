@@ -6,6 +6,7 @@ using UnityEngine;
 await TestSecondRenderCancelsFirstAsync();
 await TestHideClearsAndCancelsAsync();
 await TestCancelledRenderCannotClearReplacementAsync();
+await TestFaultedRenderDoesNotBlockReplacementAsync();
 
 Console.WriteLine("PreviewSurfaceHost checks passed.");
 
@@ -85,6 +86,34 @@ static async Task TestCancelledRenderCannotClearReplacementAsync()
     Assert(
         surface.LastRenderedSignature == "second",
         "Cancelled render should not clear the replacement render."
+    );
+}
+
+static async Task TestFaultedRenderDoesNotBlockReplacementAsync()
+{
+    var surface = new FaultingBoardSurface();
+    var target = new PreviewBoardRenderTarget(surface);
+    var firstModel = new BoardRenderModel
+    {
+        Data = new PreviewBoardModel { Signature = "fault-first" },
+        Presentation = new PreviewBoardPresentation { Visible = true },
+    };
+    var secondModel = new BoardRenderModel
+    {
+        Data = new PreviewBoardModel { Signature = "recovery-second" },
+        Presentation = new PreviewBoardPresentation { Visible = true },
+    };
+
+    target.Render(firstModel);
+    await surface.WaitForRenderCompletionCountAsync(1);
+
+    target.Render(secondModel);
+    await surface.WaitForRenderCompletionCountAsync(2);
+
+    Assert(surface.RenderCallCount == 2, "Replacement render should still run after a prior fault.");
+    Assert(
+        surface.LastRenderedSignature == "recovery-second",
+        "A faulted render should not block later render requests."
     );
 }
 
@@ -263,6 +292,76 @@ internal sealed class RecordingBoardSurface : IPreviewBoardSurface
     public Task WaitForClearCountAsync(int count)
     {
         return EnsureSource(_clearCompletions, count).Task;
+    }
+
+    private TaskCompletionSource<bool> EnsureSource(
+        List<TaskCompletionSource<bool>> list,
+        int count
+    )
+    {
+        lock (_sync)
+        {
+            while (list.Count < count)
+                list.Add(
+                    new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    )
+                );
+
+            return list[count - 1];
+        }
+    }
+}
+
+internal sealed class FaultingBoardSurface : IPreviewBoardSurface
+{
+    private readonly object _sync = new();
+    private readonly List<TaskCompletionSource<bool>> _renderCompletions = new();
+    private int _renderCallCount;
+
+    public Transform RootTransform => null!;
+
+    public bool IsAlive => true;
+
+    public int RenderCallCount => _renderCallCount;
+
+    public string LastRenderedSignature { get; private set; } = string.Empty;
+
+    public void SetPresentation(PreviewBoardPresentation presentation) { }
+
+    public void SetDebugOptions(PreviewBoardDebugOptions debugOptions) { }
+
+    public void SetVisible(bool visible) { }
+
+    public void UpdateAnchor(Vector3 position, Quaternion rotation) { }
+
+    public async Task RenderAsync(
+        PreviewBoardModel model,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var renderIndex = Interlocked.Increment(ref _renderCallCount);
+        try
+        {
+            await Task.Yield();
+            if (renderIndex == 1)
+                throw new InvalidOperationException("intentional render failure");
+
+            LastRenderedSignature = model?.Signature ?? string.Empty;
+        }
+        finally
+        {
+            EnsureSource(_renderCompletions, renderIndex).TrySetResult(true);
+        }
+    }
+
+    public void Clear() { }
+
+    public void Dispose() { }
+
+    public Task WaitForRenderCompletionCountAsync(int count)
+    {
+        return EnsureSource(_renderCompletions, count).Task;
     }
 
     private TaskCompletionSource<bool> EnsureSource(
