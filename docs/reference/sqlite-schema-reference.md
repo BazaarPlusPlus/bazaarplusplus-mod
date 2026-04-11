@@ -1,93 +1,181 @@
-# SQLite Schema Reference
+# SQLite And V3 Data Schema Reference
 
 ## Scope
 
-这份文档只给出当前 schema 的紧凑摘要。完整事实来源是：
+This document describes the current data model used by BazaarPlusPlus as of the V3 run-bundle flow.
+
+It covers two separate storage layers:
+
+1. Local client storage in `bazaarplusplus.db`
+2. V3 server-side projection tables in `ModCFServerV3`
+
+These two layers have different responsibilities:
+
+- The local SQLite database is the source of truth for in-game capture, local history UI, screenshot metadata, ghost sync state, and upload staging.
+- The V3 service stores uploaded run-bundle artifacts in object storage and keeps query-friendly projection tables in SQL.
+
+## Source Of Truth
+
+Current facts in this document come from:
 
 - `Game/RunLogging/Persistence/Sqlite/RunLogSqliteSchema.cs`
 - `Game/RunLogging/Persistence/SqliteRunLogStore.cs`
 - `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
+- `Game/Screenshots/Persistence/RunScreenshotSqliteStore.cs`
 - `Game/HistoryPanel/HistoryPanelRepository.cs`
+- `Game/RunLogging/Upload/RunBundleUploadStore.cs`
+- `Game/Online/Models/RunBundleUploadRequestV3.cs`
+- `Game/Online/V3RunBundleArtifactCodec.cs`
+- `ModCFServerV3/migrations/0001_initial_schema.sql`
+- `ModCFServerV3/src/features/v3/uploadRunBundle.ts`
 
-## Current Version
+## Part 1: Local Client SQLite
 
-- database file: `bazaarplusplus.db`
-- default path: `<GameRoot>/BazaarPlusPlus/bazaarplusplus.db`
-- local schema version: `4`
-- row schema version: `4`
-- upload payload schema version: `1`
-- uses `PRAGMA user_version`
+### Overview
 
-## Current Tables
+- Database file: `bazaarplusplus.db`
+- Default path: `<GameRoot>/BazaarPlusPlus/bazaarplusplus.db`
+- Local schema version: `9`
+- Row schema version: `9`
+- Upload payload schema version: `1`
+- Runtime pragmas:
+  - `PRAGMA foreign_keys = ON`
+  - `PRAGMA user_version = 9`
+  - `PRAGMA busy_timeout = 2000`
+  - `PRAGMA journal_mode = WAL`
+
+### Current Local Tables
 
 - `runs`
 - `run_events`
-- `run_checkpoints`
-- `run_status`
-- `pvp_battles`
-- `ghost_battles`
+- `battles`
+- `battle_snapshots`
+- `run_screenshots`
+- `sync_cursors`
 - `run_sync_state`
-- `replay_sync_state`
 
-## Runtime SQLite Setup
+### Important Model Notes
 
-- `PRAGMA foreign_keys = ON`
-- `PRAGMA user_version = 4`
-- `PRAGMA busy_timeout = 2000`
-- `PRAGMA journal_mode = WAL`
-- command timeout is kept short
+- Older docs and older code paths referred to logical names like `run_checkpoints`, `run_status`, `pvp_battles`, `ghost_battles`, and `replay_sync_state`.
+- In the current implementation, those are no longer separate tables.
+- Their data is now folded into `runs`, `battles`, or `sync_cursors`.
 
-## Relationships
+### Relationship Summary
 
 ```mermaid
 erDiagram
-    runs ||--o{ run_events : "run_id (FK)"
-    runs ||--o| run_checkpoints : "run_id (FK)"
-    runs ||--o| run_status : "run_id (FK)"
-    pvp_battles }o--|| runs : "run_id (logical link)"
-    run_sync_state ||--|| runs : "run_id (FK)"
-    replay_sync_state ||--|| pvp_battles : "battle_id (FK)"
+    runs ||--o{ run_events : "run_id"
+    runs ||--o{ battles : "run_id"
+    battles ||--o| battle_snapshots : "battle_id"
+    runs ||--o| run_sync_state : "run_id"
+    runs ||--o{ run_screenshots : "run_id (logical)"
+    battles ||--o| run_screenshots : "battle_id (logical unique)"
+    sync_cursors {
+        string scope PK
+    }
 ```
 
-## Table Roles
+### Table: `runs`
 
-- `runs`: run 级主表
-- `run_events`: append-only 事件流
-- `run_checkpoints`: 最近可恢复 checkpoint
-- `run_status`: run 终态摘要
-- `pvp_battles`: 本地 battle manifest 与快照
-- `ghost_battles`: 从服务端同步的 ghost battle 摘要
-- `run_sync_state`: run 上传状态
-- `replay_sync_state`: replay 上传状态
+Role:
 
-## Read / Write Owners
+- One row per locally observed run
+- Stores active-run state, final run summary, and fields previously split across checkpoint/status tables
+- Acts as the root row for run uploads and history UI
 
-- run write path: `Game/RunLogging/Persistence/SqliteRunLogStore.cs`
-- battle write path: `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
-- history read path: `Game/HistoryPanel/HistoryPanelRepository.cs`
-- export path: `scripts/export_run_log.py`
-- `run_checkpoints` 是“最近一次可恢复状态”
-- `run_status` 是终态快照
-- `pvp_battles` 是 PVP battle 的 manifest 投影，不是 replay payload 本体
-
-### 4.2 DDL 摘要
-
-下面这段是“当前有效 schema”的摘要版，表达的是新库初始化后、再叠加运行时补列/迁移后的最终形状。
+DDL:
 
 ```sql
-CREATE TABLE runs (
+CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY,
-    schema_version INTEGER NOT NULL,
     started_at_utc TEXT NOT NULL,
+    last_seen_at_utc TEXT NOT NULL,
+    status TEXT NOT NULL,
+    completed INTEGER NOT NULL DEFAULT 0,
     hero TEXT NOT NULL,
     game_mode TEXT NOT NULL,
+    seed INTEGER NULL,
+    player_rank TEXT NULL,
+    player_rating INTEGER NULL,
     day INTEGER NULL,
     hour INTEGER NULL,
-    seed INTEGER NULL,
-    status TEXT NOT NULL
+    max_health INTEGER NULL,
+    prestige INTEGER NULL,
+    level INTEGER NULL,
+    income INTEGER NULL,
+    gold INTEGER NULL,
+    last_seq INTEGER NOT NULL DEFAULT 0,
+    ended_at_utc TEXT NULL,
+    final_day INTEGER NULL,
+    final_hour INTEGER NULL,
+    victories INTEGER NULL,
+    losses INTEGER NULL,
+    final_player_rank TEXT NULL,
+    final_player_rating INTEGER NULL,
+    final_player_rating_delta INTEGER NULL,
+    reason TEXT NULL
 );
+```
 
-CREATE TABLE run_events (
+Fields:
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `run_id` | `TEXT` | No | Stable run identifier. Primary key. |
+| `started_at_utc` | `TEXT` | No | Run start timestamp in ISO-8601 UTC string form. |
+| `last_seen_at_utc` | `TEXT` | No | Latest time the local client observed this run state. |
+| `status` | `TEXT` | No | Current or terminal run status. Typical values are `active`, `completed`, `abandoned`. |
+| `completed` | `INTEGER` | No | Boolean flag stored as `0/1`. `1` means the run has terminal state. |
+| `hero` | `TEXT` | No | Hero name captured for the run. |
+| `game_mode` | `TEXT` | No | Game mode for the run. |
+| `seed` | `INTEGER` | Yes | Run seed when available. |
+| `player_rank` | `TEXT` | Yes | Player rank observed near run start. |
+| `player_rating` | `INTEGER` | Yes | Player rating observed near run start. |
+| `day` | `INTEGER` | Yes | Latest known run day while active, or final day when completed. |
+| `hour` | `INTEGER` | Yes | Latest known run hour while active, or final hour when completed. |
+| `max_health` | `INTEGER` | Yes | Latest or final max health captured from player stats. |
+| `prestige` | `INTEGER` | Yes | Latest or final prestige value. |
+| `level` | `INTEGER` | Yes | Latest or final player level. |
+| `income` | `INTEGER` | Yes | Latest or final income value. |
+| `gold` | `INTEGER` | Yes | Latest or final gold value. |
+| `last_seq` | `INTEGER` | No | Highest `run_events.seq` persisted for this run. |
+| `ended_at_utc` | `TEXT` | Yes | Terminal timestamp for completed or abandoned runs. |
+| `final_day` | `INTEGER` | Yes | Final day at run exit. |
+| `final_hour` | `INTEGER` | Yes | Final hour at run exit. |
+| `victories` | `INTEGER` | Yes | Final win count. |
+| `losses` | `INTEGER` | Yes | Final loss count. |
+| `final_player_rank` | `TEXT` | Yes | Player rank at run end. |
+| `final_player_rating` | `INTEGER` | Yes | Player rating at run end. |
+| `final_player_rating_delta` | `INTEGER` | Yes | Final rating minus initial rating when resolvable. |
+| `reason` | `TEXT` | Yes | Terminal reason such as `run_state_exit`, `run_interrupted`, or another completion/abandonment reason. |
+
+Write paths:
+
+- `SqliteRunLogStore.CreateRun`
+- `SqliteRunLogStore.AppendEvent`
+- `SqliteRunLogStore.SaveCheckpoint`
+- `SqliteRunLogStore.CompleteRun`
+- `SqliteRunLogStore.MarkRunAbandoned`
+
+Read paths:
+
+- active run restore
+- history panel run list
+- run bundle upload staging
+
+### Table: `run_events`
+
+Role:
+
+- Append-only event log for each run
+- Keeps the fact stream used for debugging, export, and future derivations
+- Not uploaded directly in the V3 bundle request
+- Currently acts as a lightweight timeline, not as the primary source for history UI or V3 server projections
+
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS run_events (
     run_id TEXT NOT NULL,
     seq INTEGER NOT NULL,
     ts_utc TEXT NOT NULL,
@@ -96,440 +184,828 @@ CREATE TABLE run_events (
     PRIMARY KEY (run_id, seq),
     FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
 );
+```
 
-CREATE TABLE run_checkpoints (
-    run_id TEXT PRIMARY KEY,
-    schema_version INTEGER NOT NULL,
-    last_seq INTEGER NOT NULL,
-    last_seen_at_utc TEXT NOT NULL,
-    day INTEGER NULL,
-    hour INTEGER NULL,
-    max_health INTEGER NULL,
-    prestige INTEGER NULL,
-    level INTEGER NULL,
-    income INTEGER NULL,
-    gold INTEGER NULL,
-    state TEXT NULL,
-    current_encounter_id TEXT NULL,
-    last_state_fingerprint TEXT NULL,
-    last_selection_fingerprint TEXT NULL,
-    pending_selection_seq INTEGER NULL,
-    pending_selection_json TEXT NULL,
-    completed INTEGER NOT NULL,
-    FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
-);
+Fields:
 
-CREATE TABLE run_status (
-    run_id TEXT PRIMARY KEY,
-    schema_version INTEGER NOT NULL,
-    status TEXT NOT NULL,
-    ended_at_utc TEXT NOT NULL,
-    final_day INTEGER NULL,
-    final_hour INTEGER NULL,
-    max_health INTEGER NULL,
-    prestige INTEGER NULL,
-    level INTEGER NULL,
-    income INTEGER NULL,
-    gold INTEGER NULL,
-    victories INTEGER NULL,
-    losses INTEGER NULL,
-    reason TEXT NULL,
-    FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
-);
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `run_id` | `TEXT` | No | Parent run id. Foreign key to `runs.run_id`. |
+| `seq` | `INTEGER` | No | Monotonic per-run event sequence number. |
+| `ts_utc` | `TEXT` | No | Event timestamp in ISO-8601 UTC string form. |
+| `kind` | `TEXT` | No | Event type name. |
+| `payload_json` | `TEXT` | No | Full serialized event payload in snake_case JSON. |
 
-CREATE TABLE pvp_battles (
+Write path:
+
+- `SqliteRunLogStore.AppendEvent`
+
+Read paths:
+
+- export/debug flows
+- any future replay or analysis logic that wants the raw event stream
+
+Current practical status:
+
+- The current runtime writes only a small subset of event kinds into this table.
+- In practice it is mainly used to preserve a local fact trail such as run start, run resume, and local PVP-combat capture markers.
+- The history panel does not read from `run_events`.
+- The V3 upload path does not upload `run_events` rows directly.
+- The authoritative inputs for V3 upload are `runs`, `battles`, `battle_snapshots`, and replay payload files on disk.
+- `run_events` should be understood as local diagnostic/timeline data that is useful to keep, but is no longer the core projection table for the modern V3 flow.
+
+### Table: `battles`
+
+Role:
+
+- Unified local projection table for both locally captured battles and remotely synced ghost battles
+- Replaces older logical tables such as `pvp_battles`, `ghost_battles`, and replay sync state
+- Stores upload state for local battle replay payloads
+
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS battles (
     battle_id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
     run_id TEXT NULL,
+    local_player_account_id TEXT NULL,
     recorded_at_utc TEXT NOT NULL,
     day INTEGER NULL,
     hour INTEGER NULL,
     encounter_id TEXT NULL,
+    combat_kind TEXT NOT NULL,
     player_name TEXT NULL,
     player_account_id TEXT NULL,
+    player_hero TEXT NULL,
+    player_rank TEXT NULL,
+    player_rating INTEGER NULL,
+    player_level INTEGER NULL,
     opponent_name TEXT NULL,
+    opponent_account_id TEXT NULL,
     opponent_hero TEXT NULL,
     opponent_rank TEXT NULL,
     opponent_rating INTEGER NULL,
     opponent_level INTEGER NULL,
-    opponent_account_id TEXT NULL,
-    combat_kind TEXT NOT NULL,
     result TEXT NULL,
     winner_combatant_id TEXT NULL,
     loser_combatant_id TEXT NULL,
+    replay_available INTEGER NOT NULL DEFAULT 0,
+    replay_downloaded INTEGER NOT NULL DEFAULT 0,
+    has_local_payload INTEGER NOT NULL DEFAULT 0,
+    replay_dirty INTEGER NOT NULL DEFAULT 0,
+    replay_last_attempt_at_utc TEXT NULL,
+    replay_last_uploaded_at_utc TEXT NULL,
+    replay_retry_count INTEGER NOT NULL DEFAULT 0,
+    replay_last_error TEXT NULL,
+    last_synced_at_utc TEXT NULL,
+    deleted_at_utc TEXT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE,
+    CHECK (
+        (source = 'LOCAL') OR
+        (source = 'GHOST' AND run_id IS NULL)
+    )
+);
+```
+
+Fields:
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `battle_id` | `TEXT` | No | Stable battle identifier. Primary key. |
+| `source` | `TEXT` | No | Battle source. Current values are `LOCAL` and `GHOST`. |
+| `run_id` | `TEXT` | Yes | Parent run id for local battles. Must be `NULL` for ghost rows. |
+| `local_player_account_id` | `TEXT` | Yes | Local player account id used for ghost sync scoping. |
+| `recorded_at_utc` | `TEXT` | No | Battle timestamp in ISO-8601 UTC string form. |
+| `day` | `INTEGER` | Yes | Day at which the battle occurred. |
+| `hour` | `INTEGER` | Yes | Hour at which the battle occurred. |
+| `encounter_id` | `TEXT` | Yes | Encounter id if available. |
+| `combat_kind` | `TEXT` | No | Combat type such as `PVPCombat`. |
+| `player_name` | `TEXT` | Yes | Player display name from the manifest. |
+| `player_account_id` | `TEXT` | Yes | Player account id from the manifest payload. |
+| `player_hero` | `TEXT` | Yes | Player hero name. |
+| `player_rank` | `TEXT` | Yes | Player rank at battle time. |
+| `player_rating` | `INTEGER` | Yes | Player rating at battle time. |
+| `player_level` | `INTEGER` | Yes | Player level at battle time. |
+| `opponent_name` | `TEXT` | Yes | Opponent display name. |
+| `opponent_account_id` | `TEXT` | Yes | Opponent account id. |
+| `opponent_hero` | `TEXT` | Yes | Opponent hero name. |
+| `opponent_rank` | `TEXT` | Yes | Opponent rank. |
+| `opponent_rating` | `INTEGER` | Yes | Opponent rating. |
+| `opponent_level` | `INTEGER` | Yes | Opponent level. |
+| `result` | `TEXT` | Yes | Battle result such as `win` or `loss`. |
+| `winner_combatant_id` | `TEXT` | Yes | Winner combatant id from the manifest. |
+| `loser_combatant_id` | `TEXT` | Yes | Loser combatant id from the manifest. |
+| `replay_available` | `INTEGER` | No | Boolean `0/1`. For ghost rows this means server replay availability. |
+| `replay_downloaded` | `INTEGER` | No | Boolean `0/1`. Tracks whether a ghost replay payload has been downloaded locally. |
+| `has_local_payload` | `INTEGER` | No | Boolean `0/1`. Set for local rows that have a corresponding replay payload file on disk. |
+| `replay_dirty` | `INTEGER` | No | Boolean `0/1`. Marks local battle payloads that still need upload-state reconciliation. |
+| `replay_last_attempt_at_utc` | `TEXT` | Yes | Last replay upload attempt time for local battles. |
+| `replay_last_uploaded_at_utc` | `TEXT` | Yes | Last successful replay-related upload time for local battles. |
+| `replay_retry_count` | `INTEGER` | No | Number of replay upload retries. |
+| `replay_last_error` | `TEXT` | Yes | Last replay upload error string. |
+| `last_synced_at_utc` | `TEXT` | Yes | Last ghost manifest sync timestamp. |
+| `deleted_at_utc` | `TEXT` | Yes | Soft-delete timestamp used for expiring stale undownloaded ghost rows. |
+
+Write paths:
+
+- `PvpBattleSqliteStore.Save` for local battle manifests
+- `HistoryPanelRepository.UpsertGhostBattles` for ghost manifests
+- `HistoryPanelRepository.MarkOldUndownloadedGhostBattlesDeleted`
+- `HistoryPanelRepository.MarkGhostReplayDownloaded`
+- `BattleReplaySyncStateStore.MarkReplayDirty`
+- `RunBundleUploadStore.MarkRunUploaded` for replay sync fields
+
+Read paths:
+
+- history panel local battle list
+- history panel ghost battle list
+- run bundle upload staging
+
+### Table: `battle_snapshots`
+
+Role:
+
+- Stores the JSON card-set snapshots associated with a battle row
+- Used both for local history preview rendering and for artifact construction
+
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS battle_snapshots (
+    battle_id TEXT PRIMARY KEY,
     player_hand_json TEXT NOT NULL,
     player_skills_json TEXT NOT NULL,
     opponent_hand_json TEXT NOT NULL,
-    opponent_skills_json TEXT NOT NULL
+    opponent_skills_json TEXT NOT NULL,
+    FOREIGN KEY (battle_id) REFERENCES battles(battle_id) ON DELETE CASCADE
 );
-
-CREATE INDEX idx_run_events_ts_utc
-    ON run_events(ts_utc);
-
-CREATE INDEX idx_run_checkpoints_last_seen_at_utc
-    ON run_checkpoints(last_seen_at_utc);
-
-CREATE INDEX idx_pvp_battles_run_id
-    ON pvp_battles(run_id);
-
-CREATE INDEX idx_pvp_battles_recorded_at_utc
-    ON pvp_battles(recorded_at_utc);
 ```
 
-## 5. 表级总览
+Fields:
 
-| 表名 | 主键 | 作用 | 写入方式 |
+| Column | Type | Null | Meaning |
 | --- | --- | --- | --- |
-| `runs` | `run_id` | 每局 run 的基础元数据 | `CreateRun` 插入，checkpoint/completion 会回写部分字段 |
-| `run_events` | `(run_id, seq)` | append-only 事件流 | `AppendEvent` 只插入，不更新 |
-| `run_checkpoints` | `run_id` | 每局 run 最新恢复点 | `SaveCheckpoint` upsert |
-| `run_status` | `run_id` | 每局 run 的终态快照 | `CompleteRun` / `MarkRunAbandoned` upsert |
-| `pvp_battles` | `battle_id` | PVP 战斗 manifest 与卡组快照 | `Save` 按 `battle_id` upsert |
+| `battle_id` | `TEXT` | No | Parent battle id. Primary key and foreign key to `battles.battle_id`. |
+| `player_hand_json` | `TEXT` | No | Serialized player item-hand card-set capture. |
+| `player_skills_json` | `TEXT` | No | Serialized player skill card-set capture. |
+| `opponent_hand_json` | `TEXT` | No | Serialized opponent item-hand card-set capture. |
+| `opponent_skills_json` | `TEXT` | No | Serialized opponent skill card-set capture. |
 
-## 6. 详细表结构
+Write path:
 
-### 6.1 `runs`
+- `PvpBattleSqliteStore.Save`
 
-每个 run 一行，是其他 run 相关表的根表。
+Read paths:
 
-| 列名 | 类型 | Null | 键/约束 | 含义 |
-| --- | --- | --- | --- | --- |
-| `run_id` | `TEXT` | 否 | `PRIMARY KEY` | run 唯一标识 |
-| `schema_version` | `INTEGER` | 否 |  | 行级 schema version，当前写入值为 `1` |
-| `started_at_utc` | `TEXT` | 否 |  | run 开始时间，ISO-8601 字符串 |
-| `hero` | `TEXT` | 否 |  | 英雄名 |
-| `game_mode` | `TEXT` | 否 |  | 模式，如 Ranked / Unranked |
-| `day` | `INTEGER` | 是 |  | 当前或最终 day，会被 checkpoint / completion 回写 |
-| `hour` | `INTEGER` | 是 |  | 当前或最终 hour，会被 checkpoint / completion 回写 |
-| `seed` | `INTEGER` | 是 |  | 种子 |
-| `status` | `TEXT` | 否 |  | run 当前状态，创建时默认 `active`，结束时会变成 `completed` 或 `abandoned` |
+- `PvpBattleSqliteStore.TryLoad`
+- `PvpBattleSqliteStore.ListRecentBattles`
+- `PvpBattleSqliteStore.ListByRunId`
+- `HistoryPanelRepository`
+- `RunBundleUploadStore`
 
-分析要点：
+### Table: `run_screenshots`
 
-- `runs` 并不是纯只写表，`day`、`hour`、`status` 会被后续流程更新
-- 当前 UI 查询 run 列表时，会优先结合 `run_status` / `run_checkpoints` 的信息来展示最终状态
+Role:
 
-### 6.2 `run_events`
+- Stores metadata for screenshots captured by the mod
+- Separate from battle replay payloads and separate from V3 upload state
 
-记录 run 过程中采集到的事件流，是最接近“事实日志”的表。
+DDL:
 
-| 列名 | 类型 | Null | 键/约束 | 含义 |
-| --- | --- | --- | --- | --- |
-| `run_id` | `TEXT` | 否 | `PRIMARY KEY (run_id, seq)` 的一部分；`FOREIGN KEY -> runs(run_id) ON DELETE CASCADE` | 所属 run |
-| `seq` | `INTEGER` | 否 | `PRIMARY KEY (run_id, seq)` 的一部分 | 事件序号，单 run 内递增 |
-| `ts_utc` | `TEXT` | 否 |  | 事件时间，ISO-8601 字符串 |
-| `kind` | `TEXT` | 否 |  | 事件类型 |
-| `payload_json` | `TEXT` | 否 |  | `RunLogEvent` 的完整 snake_case JSON |
+```sql
+CREATE TABLE IF NOT EXISTS run_screenshots (
+    screenshot_id TEXT PRIMARY KEY,
+    run_id TEXT NULL,
+    battle_id TEXT NULL,
+    capture_source TEXT NOT NULL,
+    is_primary INTEGER NOT NULL DEFAULT 0,
+    image_relative_path TEXT NOT NULL,
+    captured_at_local TEXT NOT NULL,
+    captured_at_utc TEXT NOT NULL,
+    day INTEGER NULL,
+    player_rank TEXT NULL,
+    player_rating INTEGER NULL,
+    player_position INTEGER NULL,
+    victories_at_capture INTEGER NULL
+);
+```
 
-索引：
+Fields:
 
-- `idx_run_events_ts_utc` on `run_events(ts_utc)`
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `screenshot_id` | `TEXT` | No | Screenshot identifier. Primary key. |
+| `run_id` | `TEXT` | Yes | Associated run id when known. |
+| `battle_id` | `TEXT` | Yes | Associated battle id when the screenshot is battle-scoped. |
+| `capture_source` | `TEXT` | No | Source such as `manual_f9`, `settings_dock_camera_button`, `pvp_battle_start`, `end_of_run_auto`. |
+| `is_primary` | `INTEGER` | No | Boolean `0/1`. Marks the primary screenshot for a run. |
+| `image_relative_path` | `TEXT` | No | Relative path under the screenshot root. |
+| `captured_at_local` | `TEXT` | No | Local timestamp string. |
+| `captured_at_utc` | `TEXT` | No | UTC timestamp string. |
+| `day` | `INTEGER` | Yes | Day at capture time. |
+| `player_rank` | `TEXT` | Yes | Player rank at capture time. |
+| `player_rating` | `INTEGER` | Yes | Player rating at capture time. |
+| `player_position` | `INTEGER` | Yes | Player leaderboard position at capture time when the client cache can resolve it. |
+| `victories_at_capture` | `INTEGER` | Yes | Victory count at capture time. |
 
-分析要点：
+Write path:
 
-- 主访问路径是 `WHERE run_id = ? ORDER BY seq`
-- 虽然表里拆出了 `ts_utc` 和 `kind`，但完整事件内容仍然保存在 `payload_json`
-- `payload_json` 对应 `RunLogEvent`，包含 `victories`、`losses`、`state`、`encounter_id`、`options`、`selection_*` 等大量上下文字段
-- 删除 `runs` 行时，`run_events` 会跟着 cascade 删除
+- `RunScreenshotSqliteStore.Save`
 
-### 6.3 `run_checkpoints`
+Read paths:
 
-每个 run 最多一行，是“恢复当前活跃 run”所需的最新状态快照。
+- screenshot consumers and external tooling
 
-| 列名 | 类型 | Null | 键/约束 | 含义 |
-| --- | --- | --- | --- | --- |
-| `run_id` | `TEXT` | 否 | `PRIMARY KEY`；`FOREIGN KEY -> runs(run_id) ON DELETE CASCADE` | 所属 run |
-| `schema_version` | `INTEGER` | 否 |  | 行级 schema version |
-| `last_seq` | `INTEGER` | 否 |  | 已落盘的最后事件序号 |
-| `last_seen_at_utc` | `TEXT` | 否 |  | 最近一次观测到 run 状态的时间 |
-| `day` | `INTEGER` | 是 |  | checkpoint 时的 day |
-| `hour` | `INTEGER` | 是 |  | checkpoint 时的 hour |
-| `max_health` | `INTEGER` | 是 |  | 玩家最大生命 |
-| `prestige` | `INTEGER` | 是 |  | Prestige |
-| `level` | `INTEGER` | 是 |  | 玩家等级 |
-| `income` | `INTEGER` | 是 |  | 收益 |
-| `gold` | `INTEGER` | 是 |  | 金币 |
-| `state` | `TEXT` | 是 |  | 当前 state 名 |
-| `current_encounter_id` | `TEXT` | 是 |  | 当前 encounter |
-| `last_state_fingerprint` | `TEXT` | 是 |  | 最近状态指纹 |
-| `last_selection_fingerprint` | `TEXT` | 是 |  | 最近选择指纹 |
-| `pending_selection_seq` | `INTEGER` | 是 |  | 尚未闭合选择链的起始事件序号 |
-| `pending_selection_json` | `TEXT` | 是 |  | `RunLogPendingSelectionState` 的 snake_case JSON |
-| `completed` | `INTEGER` | 否 |  | 布尔位，`0/1` |
+### Table: `sync_cursors`
 
-索引：
+Role:
 
-- `idx_run_checkpoints_last_seen_at_utc` on `run_checkpoints(last_seen_at_utc)`
+- Generic key-value cursor table
+- Currently used for ghost sync checkpoints
 
-分析要点：
+DDL:
 
-- `SaveCheckpoint` 对这张表使用 `INSERT ... ON CONFLICT(run_id) DO UPDATE`
-- 每次保存 checkpoint 后，还会把 `runs.day` / `runs.hour` 同步更新
-- `pending_selection_json` 用于把“已看到 options，但尚未产生最终选择结果”的状态存下来
-- `completed` 在 SQLite 里是 `INTEGER`，代码里按布尔值使用
-- 结束 run 时，`run_status` 落盘之后会把这里的 `completed` 强制改为 `1`
+```sql
+CREATE TABLE IF NOT EXISTS sync_cursors (
+    scope TEXT PRIMARY KEY,
+    cursor_value TEXT NOT NULL,
+    updated_at_utc TEXT NOT NULL
+);
+```
 
-`pending_selection_json` 的对象形状来自 `RunLogPendingSelectionState`，核心字段包括：
+Fields:
 
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `scope` | `TEXT` | No | Cursor namespace key. For ghost sync the format is `recent_against_me::<player_account_id>`. |
+| `cursor_value` | `TEXT` | No | Cursor payload. Currently stores an ISO-8601 UTC timestamp. |
+| `updated_at_utc` | `TEXT` | No | Last update timestamp for the cursor row. |
+
+Write paths:
+
+- `HistoryPanelRepository.SaveGhostSyncCheckpointUtc`
+
+Read paths:
+
+- `HistoryPanelRepository.TryGetGhostSyncCheckpointUtc`
+
+### Table: `run_sync_state`
+
+Role:
+
+- Upload queue state for run-bundle uploads
+- Tracks whether a completed run still needs to be uploaded to V3
+
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS run_sync_state (
+    run_id TEXT PRIMARY KEY,
+    dirty INTEGER NOT NULL,
+    uploaded_seq INTEGER NULL,
+    uploaded_status TEXT NULL,
+    last_attempt_at_utc TEXT NULL,
+    last_uploaded_at_utc TEXT NULL,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+);
+```
+
+Fields:
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `run_id` | `TEXT` | No | Parent run id. Primary key and foreign key to `runs.run_id`. |
+| `dirty` | `INTEGER` | No | Boolean `0/1`. `1` means the run still has upload work pending. |
+| `uploaded_seq` | `INTEGER` | Yes | Highest run event sequence known to have been included in the latest successful upload. |
+| `uploaded_status` | `TEXT` | Yes | Run status associated with the latest successful upload. |
+| `last_attempt_at_utc` | `TEXT` | Yes | Last upload attempt timestamp. |
+| `last_uploaded_at_utc` | `TEXT` | Yes | Last successful upload timestamp. |
+| `retry_count` | `INTEGER` | No | Retry counter for run uploads. |
+| `last_error` | `TEXT` | Yes | Last upload failure reason. |
+
+Write paths:
+
+- `RunSyncStateSqliteStore.MarkRunDirty`
+- `RunBundleUploadStore.MarkRunUploadFailed`
+- `RunBundleUploadStore.MarkRunUploaded`
+- `ReplicatedRunLogStore` marks runs dirty after every logical run write
+
+Read paths:
+
+- `RunBundleUploadStore.GetPendingCompletedRunIds`
+- `RunBundleUploadStore.HasMorePendingCompletedRuns`
+
+### Local Indexes
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_run_events_ts_utc
+    ON run_events(ts_utc);
+
+CREATE INDEX IF NOT EXISTS idx_runs_status_last_seen
+    ON runs(status, last_seen_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_runs_started_at_utc
+    ON runs(started_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_battles_run_id_recorded
+    ON battles(run_id, recorded_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_battles_source_recorded
+    ON battles(source, recorded_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_battles_local_player_recent
+    ON battles(local_player_account_id, recorded_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_battles_replay_dirty
+    ON battles(replay_dirty, replay_last_attempt_at_utc);
+
+CREATE INDEX IF NOT EXISTS idx_run_sync_state_dirty
+    ON run_sync_state(dirty, last_attempt_at_utc);
+
+CREATE INDEX IF NOT EXISTS idx_run_screenshots_run_id_captured_at_utc
+    ON run_screenshots(run_id, captured_at_utc DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_battle_id
+    ON run_screenshots(battle_id)
+    WHERE battle_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
+    ON run_screenshots(run_id)
+    WHERE is_primary = 1 AND run_id IS NOT NULL;
+```
+
+### Local Storage Responsibilities By Feature
+
+| Feature | Uses |
+| --- | --- |
+| Run logging | `runs`, `run_events`, `run_sync_state` |
+| Combat replay manifest projection | `battles`, `battle_snapshots` |
+| Ghost battle sync | `battles`, `sync_cursors` |
+| Screenshot metadata | `run_screenshots` |
+| History panel | `runs`, `battles`, `battle_snapshots`, `sync_cursors` |
+| Run-bundle upload staging | `runs`, `battles`, `battle_snapshots`, `run_sync_state` plus replay payload files on disk |
+
+## Part 2: V3 Upload Payload Model
+
+The V3 upload request is not just table rows. It has three layers:
+
+1. `artifact_bytes`
+2. `run_projection`
+3. `battle_projections`
+
+### `artifact_bytes`
+
+- Type: gzip-compressed MessagePack blob
+- Content type: `application/x-bpp-runbundle+msgpack+gzip`
+- Encodes `RunArtifactV3`
+- Stored in object storage, not in SQL
+
+Artifact shape:
+
+- `run_id`
+- `battles[]`
+
+Each artifact battle contains:
+
+- manifest fields
+- participant fields
+- card-set snapshots
+- raw replay payload bytes
+
+### `run_projection`
+
+Used by the service for queryable run metadata.
+
+Fields:
+
+- `run_id`
+- `status`
+- `hero_id`
+- `hero_name`
+- `player_rank`
+- `player_rating`
+- `player_position`
+- `started_at_utc`
+- `ended_at_utc`
+- `final_day`
+- `final_wins`
+- `final_losses`
+- `final_player_rank`
+- `final_player_rating`
+- `final_player_position`
+
+### `battle_projections`
+
+Used by the service for queryable battle metadata.
+
+Fields:
+
+- `battle_id`
+- `run_id`
+- `recorded_at_utc`
 - `day`
-- `hour`
-- `state`
-- `encounter_id`
-- `parent_encounter_id`
-- `selection_seq`
-- `options`
-
-### 6.4 `run_status`
-
-每个 run 最多一行，是终态信息表。
-
-| 列名 | 类型 | Null | 键/约束 | 含义 |
-| --- | --- | --- | --- | --- |
-| `run_id` | `TEXT` | 否 | `PRIMARY KEY`；`FOREIGN KEY -> runs(run_id) ON DELETE CASCADE` | 所属 run |
-| `schema_version` | `INTEGER` | 否 |  | 行级 schema version |
-| `status` | `TEXT` | 否 |  | 终态状态，当前代码会写 `completed` 或 `abandoned` |
-| `ended_at_utc` | `TEXT` | 否 |  | 结束时间 |
-| `final_day` | `INTEGER` | 是 |  | 终局 day |
-| `final_hour` | `INTEGER` | 是 |  | 终局 hour |
-| `max_health` | `INTEGER` | 是 |  | 终局最大生命 |
-| `prestige` | `INTEGER` | 是 |  | 终局 Prestige |
-| `level` | `INTEGER` | 是 |  | 终局等级 |
-| `income` | `INTEGER` | 是 |  | 终局收益 |
-| `gold` | `INTEGER` | 是 |  | 终局金币 |
-| `victories` | `INTEGER` | 是 |  | 胜场 |
-| `losses` | `INTEGER` | 是 |  | 负场 |
-| `reason` | `TEXT` | 是 |  | 终态原因，如 `run_end_event`、`interrupted` |
-
-分析要点：
-
-- `CompleteRun` 和 `MarkRunAbandoned` 最终都会走 `WriteTerminalStatus`
-- 对这张表也是 upsert，不是 append-only
-- 写入终态后，还会同步回写 `runs.status`，并尽量把 `runs.day` / `runs.hour` 提升到最终值
-- 活跃 run 可以没有 `run_status` 行
-
-### 6.5 `pvp_battles`
-
-这张表保存的是 battle manifest 和双方卡组快照，不保存 replay payload 本体。
-
-| 列名 | 类型 | Null | 键/约束 | 含义 |
-| --- | --- | --- | --- | --- |
-| `battle_id` | `TEXT` | 否 | `PRIMARY KEY` | battle 唯一标识 |
-| `run_id` | `TEXT` | 是 |  | 逻辑关联到 run；当前没有 FK |
-| `recorded_at_utc` | `TEXT` | 否 |  | battle 记录时间 |
-| `day` | `INTEGER` | 是 |  | battle 所在 day |
-| `hour` | `INTEGER` | 是 |  | battle 所在 hour |
-| `encounter_id` | `TEXT` | 是 |  | 遭遇 id |
-| `player_name` | `TEXT` | 是 |  | 玩家名 |
-| `player_account_id` | `TEXT` | 是 |  | 玩家 account id |
-| `opponent_name` | `TEXT` | 是 |  | 对手名 |
-| `opponent_hero` | `TEXT` | 是 |  | 对手英雄 |
-| `opponent_rank` | `TEXT` | 是 |  | 对手段位 |
-| `opponent_rating` | `INTEGER` | 是 |  | 对手 rating |
-| `opponent_level` | `INTEGER` | 是 |  | 对手等级 |
-| `opponent_account_id` | `TEXT` | 是 |  | 对手 account id |
-| `combat_kind` | `TEXT` | 否 |  | 战斗类型；当前只有 `PVPCombat` 才会写入 |
-| `result` | `TEXT` | 是 |  | 结果，如 `win` / `loss` |
-| `winner_combatant_id` | `TEXT` | 是 |  | 胜者 combatant id |
-| `loser_combatant_id` | `TEXT` | 是 |  | 败者 combatant id |
-| `player_hand_json` | `TEXT` | 否 |  | 玩家手牌快照 JSON |
-| `player_skills_json` | `TEXT` | 否 |  | 玩家技能快照 JSON |
-| `opponent_hand_json` | `TEXT` | 否 |  | 对手手牌快照 JSON |
-| `opponent_skills_json` | `TEXT` | 否 |  | 对手技能快照 JSON |
-
-索引：
-
-- `idx_pvp_battles_run_id` on `pvp_battles(run_id)`
-- `idx_pvp_battles_recorded_at_utc` on `pvp_battles(recorded_at_utc)`
-
-分析要点：
-
-- `Save(PvpBattleManifest manifest)` 使用 `INSERT ... ON CONFLICT(battle_id) DO UPDATE`
-- 只有 `combat_kind == "PVPCombat"` 时才会真正写表
-- `run_id` 只是逻辑关联，没有外键，所以手工删 `runs` 不会自动删 battle 行
-- `*_json` 四列对应 `PvpBattleCardSetCapture`，对象至少有：
-  - `items`
-  - `status`
-  - `source`
-- 这张表保存的是历史展示与导出所需的 manifest 投影
-- replay 原始 payload 单独存到 `CombatReplays/<battle_id>.payload.mpack.gz`，不在 SQLite 里
-
-## 7. 当前索引清单
-
-当前代码显式创建的索引只有 4 个：
-
-| 索引名 | 表 | 列 |
-| --- | --- | --- |
-| `idx_run_events_ts_utc` | `run_events` | `ts_utc` |
-| `idx_run_checkpoints_last_seen_at_utc` | `run_checkpoints` | `last_seen_at_utc` |
-| `idx_pvp_battles_run_id` | `pvp_battles` | `run_id` |
-| `idx_pvp_battles_recorded_at_utc` | `pvp_battles` | `recorded_at_utc` |
-
-隐式索引：
-
-- `runs(run_id)` 主键
-- `run_events(run_id, seq)` 主键
-- `run_checkpoints(run_id)` 主键
-- `run_status(run_id)` 主键
-- `pvp_battles(battle_id)` 主键
-
-## 8. 写入生命周期
-
-### 8.1 run 相关
-
-1. `CreateRun`
-   - 插入 `runs`
-   - 初始 `status = active`
-
-2. `AppendEvent`
-   - 只插入 `run_events`
-
-3. `SaveCheckpoint`
-   - upsert `run_checkpoints`
-   - 同步更新 `runs.day` / `runs.hour`
-
-4. `CompleteRun` / `MarkRunAbandoned`
-   - upsert `run_status`
-   - 更新 `runs.status`
-   - 用终局 day/hour 回写 `runs`
-   - 将 `run_checkpoints.completed` 置为 `1`
-
-### 8.2 PVP battle 相关
-
-1. `Save(PvpBattleManifest)`
-   - upsert `pvp_battles`
-   - 只处理 `PVPCombat`
-
-2. replay payload
-   - 不进 SQLite
-   - 落到 `CombatReplays/<battle_id>.payload.mpack.gz`
-
-## 9. 读路径与字段依赖
-
-### 9.1 历史面板
-
-`HistoryPanelRepository` 的 run 列表读取逻辑：
-
-- 从 `runs` 读基础信息
-- `LEFT JOIN run_status` 取终态
-- `LEFT JOIN run_checkpoints` 取未结束 run 的最新状态
-- `LEFT JOIN pvp_battles` 并按 `COUNT(pb.battle_id)` 统计 battle 数
-
-这说明：
-
-- `runs` 不是独立就能支撑 UI 的
-- `run_status` 与 `run_checkpoints` 共同构成 run 的最终展示态
-- `pvp_battles` 已经是面向查询的 projection，而不是只为导出存在
-
-### 9.2 导出脚本
-
-`scripts/export_run_log.py` 会导出：
-
-- `runs -> meta.json`
-- `run_events -> events.ndjson`
-- `run_events -> decision_chain.ndjson`（派生读模型，不是直接原样 dump）
-- `run_checkpoints -> checkpoint.json`
-- `run_status -> status.json`
-- `pvp_battles -> pvp_battles.ndjson`
-
-说明当前 schema 已经不仅是“游戏内缓存”，也承担调试导出格式的上游职责。
-
-## 10. 兼容与迁移
-
-当前项目没有独立 migration framework，兼容是靠 store 构造函数里的代码驱动迁移完成的。
-
-### 10.1 `SqliteRunLogStore` 的补列逻辑
-
-启动时会确保以下列存在：
-
-`run_checkpoints`
-
-- `pending_selection_json`
-- `max_health`
-- `prestige`
-- `level`
-- `income`
-- `gold`
-
-`run_status`
-
-- `max_health`
-- `prestige`
-- `level`
-- `income`
-- `gold`
-
-如果缺失，就执行 `ALTER TABLE ... ADD COLUMN ...`。
-
-### 10.2 `PvpBattleSqliteStore` 的兼容逻辑
-
-启动时会确保以下列存在：
-
+- `player_name`
+- `player_account_id`
+- `player_hero`
+- `player_rank`
+- `player_rating`
+- `player_level`
+- `opponent_name`
+- `opponent_account_id`
 - `opponent_hero`
 - `opponent_rank`
 - `opponent_rating`
 - `opponent_level`
+- `result`
+- `replay_available`
 
-同时还会处理 legacy 表：
+## Part 3: V3 Server SQL Schema
 
-- 如果 `pvp_battles` 仍然有旧列 `replay_id`
-- 就把旧表 rename 为 `_legacy`
-- 重新建当前表结构
-- 将旧数据拷贝到新表
-- 新增列以 `NULL` 补齐
-- 最后删除旧表并重建索引
+### Overview
 
-所以，真正的“当前 schema”应理解为：
+The V3 server stores:
 
-- 新库：直接执行当前 `BootstrapSql`
-- 老库：先执行 `BootstrapSql`，再运行构造函数里的补列与迁移
+- identity and installation state
+- run-bundle metadata
+- query-friendly run projections
+- query-friendly battle projections
+- replay download tokens
 
-## 11. 设计观察
+The uploaded artifact itself is stored in object storage, not inside SQL rows.
 
-### 11.1 这是事件流 + 投影的混合模型
+### Current V3 SQL Tables
 
-当前 schema 不是传统强范式业务库，而是：
+- `users`
+- `installations`
+- `installation_sessions`
+- `installation_observations`
+- `run_bundles`
+- `runs`
+- `battles`
+- `replay_tokens`
 
-- `run_events` 保存事实流
-- `run_checkpoints` 保存恢复点
-- `run_status` 保存终态投影
-- `pvp_battles` 保存 battle 查询投影
+### Table: `users`
 
-这对本地插件场景是合理的，因为读性能和恢复能力比强一致范式更重要。
+Role:
 
-### 11.2 `schema_version` 是行级标记，不是数据库 migration 版本
+- Auth/account table for players using the V3 service
 
-虽然多张表都有 `schema_version`，但当前代码：
+DDL:
 
-- 没有按它做分支 migration
-- 没有 schema history table
-- 没有 `PRAGMA user_version`
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  player_account_id TEXT PRIMARY KEY,
+  player_username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  stream_platform TEXT NULL,
+  stream_channel_id TEXT NULL,
+  stream_url TEXT NULL,
+  created_at_utc TEXT NOT NULL,
+  updated_at_utc TEXT NOT NULL,
+  last_login_at_utc TEXT NULL
+);
+```
 
-因此它更像“应用层生成版本标记”，不是完整 DB migration 机制。
+Fields:
 
-### 11.3 `pvp_battles.run_id` 没有外键
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `player_account_id` | `TEXT` | No | Stable player account id. Primary key. |
+| `player_username` | `TEXT` | No | Unique login/display username. |
+| `password_hash` | `TEXT` | No | Stored password hash. |
+| `stream_platform` | `TEXT` | Yes | Optional linked stream platform. |
+| `stream_channel_id` | `TEXT` | Yes | Optional linked channel id. |
+| `stream_url` | `TEXT` | Yes | Optional stream URL. |
+| `created_at_utc` | `TEXT` | No | Row creation timestamp. |
+| `updated_at_utc` | `TEXT` | No | Last profile update timestamp. |
+| `last_login_at_utc` | `TEXT` | Yes | Last successful login timestamp. |
 
-这意味着：
+### Table: `installations`
 
-- run 与 battle 的关系是弱约束
-- battle 可以独立存在
-- 手工清理 `runs` 不会自动清理 `pvp_battles`
+Role:
 
-这和当前“battle manifest + replay payload 分离保存”的设计是一致的，但要意识到它不是严格 referential integrity。
+- Tracks mod installations bound to a player account
 
-### 11.4 时间与 JSON 都按文本存储
+DDL:
 
-当前实现里：
+```sql
+CREATE TABLE IF NOT EXISTS installations (
+  installation_id TEXT PRIMARY KEY,
+  player_account_id TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at_utc TEXT NOT NULL,
+  last_seen_at_utc TEXT NULL,
+  revoked_at_utc TEXT NULL
+);
+```
 
-- 时间统一以 `DateTimeOffset.ToString("o")` 落成 `TEXT`
-- 结构化对象通过 Newtonsoft JSON 落成 `TEXT`
-- JSON 命名策略使用 `snake_case`
+Fields:
 
-这让调试和导出非常方便，但也意味着：
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `installation_id` | `TEXT` | No | Stable installation id. Primary key. |
+| `player_account_id` | `TEXT` | No | Owning player account id. |
+| `public_key` | `TEXT` | No | Installation public key used for request signing/auth. |
+| `status` | `TEXT` | No | Installation status. |
+| `created_at_utc` | `TEXT` | No | Installation creation time. |
+| `last_seen_at_utc` | `TEXT` | Yes | Last authenticated contact time. |
+| `revoked_at_utc` | `TEXT` | Yes | Revocation time if disabled. |
 
-- DB 约束主要依赖应用层，而不是列级强类型
-- JSON 内容的演进更多依赖兼容读取，而不是 DDL 约束
+### Table: `installation_sessions`
 
-## 12. 一页版结论
+Role:
 
-如果只保留一句话：
+- Short-lived login/session rows for installation bootstrap/auth
 
-> 当前 SQLite schema 是一套围绕 run logging 和 PVP 历史构建的本地事件库：`runs` 管 run 基础信息，`run_events` 管事实流，`run_checkpoints` 管恢复点，`run_status` 管终态，`pvp_battles` 管 PVP manifest；实际 schema 还包含启动时的代码驱动补列和 legacy 表迁移。
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS installation_sessions (
+  session_id TEXT PRIMARY KEY,
+  player_account_id TEXT NOT NULL,
+  created_at_utc TEXT NOT NULL,
+  expires_at_utc TEXT NOT NULL,
+  revoked_at_utc TEXT NULL
+);
+```
+
+Fields:
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `session_id` | `TEXT` | No | Session id. Primary key. |
+| `player_account_id` | `TEXT` | No | Player account that owns the session. |
+| `created_at_utc` | `TEXT` | No | Session creation time. |
+| `expires_at_utc` | `TEXT` | No | Session expiry time. |
+| `revoked_at_utc` | `TEXT` | Yes | Revocation time if invalidated early. |
+
+### Table: `installation_observations`
+
+Role:
+
+- Records signed installation-side player identity observations
+
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS installation_observations (
+  installation_id TEXT NOT NULL,
+  observed_player_account_id TEXT NOT NULL,
+  observed_player_username TEXT NOT NULL,
+  observed_at_utc TEXT NOT NULL,
+  signature TEXT NOT NULL,
+  status TEXT NOT NULL
+);
+```
+
+Fields:
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `installation_id` | `TEXT` | No | Installation that reported the observation. |
+| `observed_player_account_id` | `TEXT` | No | Observed account id. |
+| `observed_player_username` | `TEXT` | No | Observed username. |
+| `observed_at_utc` | `TEXT` | No | Observation timestamp. |
+| `signature` | `TEXT` | No | Signature over the observation payload. |
+| `status` | `TEXT` | No | Validation or lifecycle status for the observation. |
+
+### Table: `run_bundles`
+
+Role:
+
+- Metadata table for uploaded run-bundle artifacts
+- Points to the object-storage key where the compressed artifact was written
+
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS run_bundles (
+  bundle_id TEXT PRIMARY KEY,
+  installation_id TEXT NOT NULL,
+  player_account_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  payload_hash TEXT NOT NULL,
+  schema_version INTEGER NOT NULL,
+  object_key TEXT NOT NULL,
+  codec TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL,
+  submitted_at_utc TEXT NOT NULL,
+  created_at_utc TEXT NOT NULL,
+  UNIQUE (installation_id, run_id, payload_hash)
+);
+```
+
+Fields:
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `bundle_id` | `TEXT` | No | Run bundle id. Primary key. |
+| `installation_id` | `TEXT` | No | Uploading installation id. |
+| `player_account_id` | `TEXT` | No | Uploading player account id. |
+| `run_id` | `TEXT` | No | Run represented by the artifact. |
+| `payload_hash` | `TEXT` | No | Content hash of `artifact_bytes`. Used for dedupe. |
+| `schema_version` | `INTEGER` | No | Upload payload schema version. |
+| `object_key` | `TEXT` | No | R2/object-storage key for the artifact blob. |
+| `codec` | `TEXT` | No | Artifact content type, currently the run-bundle codec. |
+| `size_bytes` | `INTEGER` | No | Artifact size in bytes. |
+| `submitted_at_utc` | `TEXT` | No | Client-reported submission time. |
+| `created_at_utc` | `TEXT` | No | Server insert time. |
+
+### Table: `runs` (server-side)
+
+Role:
+
+- Queryable projection of uploaded run summaries
+- Rebuilt or replaced from each uploaded run-bundle request
+
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS runs (
+  run_id TEXT PRIMARY KEY,
+  installation_id TEXT NOT NULL,
+  player_account_id TEXT NOT NULL,
+  bundle_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  hero_id TEXT NULL,
+  hero_name TEXT NULL,
+  player_rank TEXT NULL,
+  player_rating INTEGER NULL,
+  player_position INTEGER NULL,
+  started_at_utc TEXT NULL,
+  ended_at_utc TEXT NOT NULL,
+  final_day INTEGER NULL,
+  final_wins INTEGER NULL,
+  final_losses INTEGER NULL,
+  final_player_rank TEXT NULL,
+  final_player_rating INTEGER NULL,
+  final_player_position INTEGER NULL,
+  updated_at_utc TEXT NOT NULL
+);
+```
+
+Fields:
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `run_id` | `TEXT` | No | Run id. Primary key. |
+| `installation_id` | `TEXT` | No | Installation that uploaded the current projection. |
+| `player_account_id` | `TEXT` | No | Player account id that owns the run. |
+| `bundle_id` | `TEXT` | No | Most recent bundle backing this projection row. |
+| `status` | `TEXT` | No | Uploaded terminal run status. |
+| `hero_id` | `TEXT` | Yes | Optional hero id. |
+| `hero_name` | `TEXT` | Yes | Hero name. |
+| `player_rank` | `TEXT` | Yes | Player rank near run start. |
+| `player_rating` | `INTEGER` | Yes | Player rating near run start. |
+| `player_position` | `INTEGER` | Yes | Optional player ladder position. |
+| `started_at_utc` | `TEXT` | Yes | Run start time if available. |
+| `ended_at_utc` | `TEXT` | No | Run end time. |
+| `final_day` | `INTEGER` | Yes | Final run day. |
+| `final_wins` | `INTEGER` | Yes | Final wins. |
+| `final_losses` | `INTEGER` | Yes | Final losses. |
+| `final_player_rank` | `TEXT` | Yes | Final rank. |
+| `final_player_rating` | `INTEGER` | Yes | Final rating. |
+| `final_player_position` | `INTEGER` | Yes | Final ladder position. |
+| `updated_at_utc` | `TEXT` | No | Projection update time on the server. |
+
+### Table: `battles` (server-side)
+
+Role:
+
+- Queryable projection of selected battle metadata from uploaded run bundles
+- Built from `battle_projections`
+
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS battles (
+  battle_id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  installation_id TEXT NOT NULL,
+  player_account_id TEXT NOT NULL,
+  bundle_id TEXT NOT NULL,
+  recorded_at_utc TEXT NOT NULL,
+  day INTEGER NULL,
+  player_name TEXT NULL,
+  player_account_id_in_payload TEXT NULL,
+  player_hero TEXT NULL,
+  player_rank TEXT NULL,
+  player_rating INTEGER NULL,
+  player_level INTEGER NULL,
+  opponent_name TEXT NULL,
+  opponent_account_id TEXT NULL,
+  opponent_hero TEXT NULL,
+  opponent_rank TEXT NULL,
+  opponent_rating INTEGER NULL,
+  opponent_level INTEGER NULL,
+  result TEXT NULL,
+  replay_available INTEGER NOT NULL,
+  updated_at_utc TEXT NOT NULL
+);
+```
+
+Fields:
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `battle_id` | `TEXT` | No | Battle id. Primary key. |
+| `run_id` | `TEXT` | No | Parent run id. |
+| `installation_id` | `TEXT` | No | Installation that uploaded the projection. |
+| `player_account_id` | `TEXT` | No | Owner player account id for the bundle. |
+| `bundle_id` | `TEXT` | No | Bundle backing this projection row. |
+| `recorded_at_utc` | `TEXT` | No | Battle timestamp. |
+| `day` | `INTEGER` | Yes | Day at battle time. |
+| `player_name` | `TEXT` | Yes | Player display name. |
+| `player_account_id_in_payload` | `TEXT` | Yes | Player account id as carried inside the uploaded battle projection payload. |
+| `player_hero` | `TEXT` | Yes | Player hero. |
+| `player_rank` | `TEXT` | Yes | Player rank. |
+| `player_rating` | `INTEGER` | Yes | Player rating. |
+| `player_level` | `INTEGER` | Yes | Player level. |
+| `opponent_name` | `TEXT` | Yes | Opponent display name. |
+| `opponent_account_id` | `TEXT` | Yes | Opponent account id. |
+| `opponent_hero` | `TEXT` | Yes | Opponent hero. |
+| `opponent_rank` | `TEXT` | Yes | Opponent rank. |
+| `opponent_rating` | `INTEGER` | Yes | Opponent rating. |
+| `opponent_level` | `INTEGER` | Yes | Opponent level. |
+| `result` | `TEXT` | Yes | Battle result. |
+| `replay_available` | `INTEGER` | No | Boolean `0/1` showing whether replay artifact data exists for this battle. |
+| `updated_at_utc` | `TEXT` | No | Projection update time. |
+
+### Table: `replay_tokens`
+
+Role:
+
+- Access-control table for replay download links
+
+DDL:
+
+```sql
+CREATE TABLE IF NOT EXISTS replay_tokens (
+  token TEXT PRIMARY KEY,
+  battle_id TEXT NOT NULL,
+  requested_by_player_account_id TEXT NOT NULL,
+  expires_at_utc TEXT NOT NULL,
+  created_at_utc TEXT NOT NULL,
+  used_at_utc TEXT NULL,
+  revoked_at_utc TEXT NULL
+);
+```
+
+Fields:
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `token` | `TEXT` | No | Replay download token. Primary key. |
+| `battle_id` | `TEXT` | No | Battle whose replay is being requested. |
+| `requested_by_player_account_id` | `TEXT` | No | Player account that requested the replay download. |
+| `expires_at_utc` | `TEXT` | No | Token expiration timestamp. |
+| `created_at_utc` | `TEXT` | No | Token creation time. |
+| `used_at_utc` | `TEXT` | Yes | Time the token was consumed. |
+| `revoked_at_utc` | `TEXT` | Yes | Time the token was revoked. |
+
+### Server Indexes
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_installations_player
+  ON installations(player_account_id);
+
+CREATE INDEX IF NOT EXISTS idx_installation_sessions_player
+  ON installation_sessions(player_account_id, expires_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_installation_observations_installation
+  ON installation_observations(installation_id, observed_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_run_bundles_player_run
+  ON run_bundles(player_account_id, run_id);
+
+CREATE INDEX IF NOT EXISTS idx_battles_opponent_recorded
+  ON battles(opponent_account_id, recorded_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_battles_run_recorded
+  ON battles(run_id, recorded_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_replay_tokens_expires
+  ON replay_tokens(expires_at_utc);
+```
+
+## Part 4: Recommended Mental Model
+
+Use this model when reasoning about the current V3 system:
+
+- Local SQLite is the client-side event/projection cache.
+- Local replay payload files are the heavy binary payload source.
+- V3 upload packages local run and battle state into one run artifact plus lightweight projections.
+- The server stores the artifact blob separately from SQL.
+- Server SQL tables are query projections, not the authoritative raw artifact body.
+
+## Part 5: Practical Summary
+
+If you only need the high-level answer:
+
+- The current local client schema is built around `runs`, `run_events`, `battles`, `battle_snapshots`, `run_screenshots`, `sync_cursors`, and `run_sync_state`.
+- The current V3 service schema is built around `users`, `installations`, `installation_sessions`, `installation_observations`, `run_bundles`, `runs`, `battles`, and `replay_tokens`.
+- V3 run artifacts are not stored in SQL tables. They are compressed blobs written to object storage, with SQL only storing metadata and query projections.
