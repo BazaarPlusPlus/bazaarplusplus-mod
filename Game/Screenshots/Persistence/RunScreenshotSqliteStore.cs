@@ -40,6 +40,7 @@ internal sealed class RunScreenshotSqliteStore
             INSERT INTO {RunLogSqliteSchema.RunScreenshotsTableName} (
                 screenshot_id,
                 run_id,
+                hero_name,
                 battle_id,
                 capture_source,
                 is_primary,
@@ -54,6 +55,7 @@ internal sealed class RunScreenshotSqliteStore
             ) VALUES (
                 $screenshotId,
                 $runId,
+                $heroName,
                 $battleId,
                 $captureSource,
                 $isPrimary,
@@ -69,6 +71,7 @@ internal sealed class RunScreenshotSqliteStore
             """;
         command.Parameters.AddWithValue("$screenshotId", record.ScreenshotId);
         command.Parameters.AddWithValue("$runId", (object?)record.RunId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$heroName", (object?)record.HeroName ?? DBNull.Value);
         command.Parameters.AddWithValue("$battleId", (object?)record.BattleId ?? DBNull.Value);
         command.Parameters.AddWithValue("$captureSource", ToStorageValue(record.CaptureSource));
         command.Parameters.AddWithValue("$isPrimary", record.IsPrimary ? 1 : 0);

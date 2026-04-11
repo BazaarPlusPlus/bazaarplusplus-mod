@@ -6,9 +6,9 @@ namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int LocalDatabaseSchemaVersion => 9;
+    public static int LocalDatabaseSchemaVersion => 10;
 
-    public static int RowSchemaVersion => 9;
+    public static int RowSchemaVersion => 10;
 
     public static int UploadPayloadSchemaVersion => 1;
 
@@ -141,6 +141,7 @@ public static class RunLogSqliteSchema
             CREATE TABLE IF NOT EXISTS {RunScreenshotsTableName} (
                 screenshot_id TEXT PRIMARY KEY,
                 run_id TEXT NULL,
+                hero_name TEXT NULL,
                 battle_id TEXT NULL,
                 capture_source TEXT NOT NULL,
                 is_primary INTEGER NOT NULL DEFAULT 0,
@@ -218,47 +219,5 @@ public static class RunLogSqliteSchema
             command.CommandText = BootstrapSql;
             command.ExecuteNonQuery();
         }
-
-        EnsureColumnExists(connection, RunScreenshotsTableName, "player_position", "INTEGER NULL");
-    }
-
-    private static void EnsureColumnExists(
-        SqliteConnection connection,
-        string tableName,
-        string columnName,
-        string columnDefinition
-    )
-    {
-        using (var exists = connection.CreateCommand())
-        {
-            exists.CommandText =
-                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $tableName LIMIT 1;";
-            exists.Parameters.AddWithValue("$tableName", tableName);
-            if (exists.ExecuteScalar() == null)
-                return;
-        }
-
-        using (var command = connection.CreateCommand())
-        {
-            command.CommandText = $"PRAGMA table_info({tableName});";
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-            {
-                if (
-                    string.Equals(
-                        reader.GetString(reader.GetOrdinal("name")),
-                        columnName,
-                        StringComparison.Ordinal
-                    )
-                )
-                {
-                    return;
-                }
-            }
-        }
-
-        using var alter = connection.CreateCommand();
-        alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
-        alter.ExecuteNonQuery();
     }
 }

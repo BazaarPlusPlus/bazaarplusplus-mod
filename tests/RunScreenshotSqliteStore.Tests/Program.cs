@@ -38,6 +38,7 @@ try
                 sourceType,
                 screenshotId: "shot-manual-001",
                 runId: "run-001",
+                heroName: "Vanessa",
                 battleId: null,
                 captureSource: "ManualF9",
                 isPrimary: false,
@@ -64,6 +65,7 @@ try
                 sourceType,
                 screenshotId: "shot-primary-001",
                 runId: "run-001",
+                heroName: "Vanessa",
                 battleId: null,
                 captureSource: "EndOfRunAuto",
                 isPrimary: true,
@@ -90,6 +92,7 @@ try
                 sourceType,
                 screenshotId: "shot-battle-001",
                 runId: "run-001",
+                heroName: "Vanessa",
                 battleId: "battle-001",
                 captureSource: "PvpBattleStart",
                 isPrimary: false,
@@ -116,6 +119,7 @@ try
                 sourceType,
                 screenshotId: "shot-dock-camera-001",
                 runId: "run-001",
+                heroName: "Vanessa",
                 battleId: null,
                 captureSource: "SettingsDockCameraButton",
                 isPrimary: false,
@@ -189,6 +193,14 @@ try
     Assert(
         GetString(
             connection,
+            "SELECT hero_name FROM run_screenshots WHERE screenshot_id = $id;",
+            "shot-primary-001"
+        ) == "Vanessa",
+        "run_screenshots should persist hero_name."
+    );
+    Assert(
+        GetString(
+            connection,
             "SELECT capture_source FROM run_screenshots WHERE screenshot_id = $id;",
             "shot-dock-camera-001"
         ) == "settings_dock_camera_button",
@@ -213,6 +225,7 @@ try
                         sourceType,
                         screenshotId: "shot-battle-002",
                         runId: "run-001",
+                        heroName: "Vanessa",
                         battleId: "battle-001",
                         captureSource: "PvpBattleStart",
                         isPrimary: false,
@@ -240,6 +253,7 @@ try
                         sourceType,
                         screenshotId: "shot-primary-002",
                         runId: "run-001",
+                        heroName: "Vanessa",
                         battleId: null,
                         captureSource: "EndOfRunAuto",
                         isPrimary: true,
@@ -257,47 +271,6 @@ try
         "only one primary screenshot should exist per run."
     );
 
-    var legacyDbPath = Path.Combine(tempRoot, "legacy-run-screenshots.db");
-    CreateLegacyScreenshotDatabase(legacyDbPath);
-
-    var migratedStore = ctor.Invoke([legacyDbPath]);
-    saveMethod.Invoke(
-        migratedStore,
-        [
-            CreateRecord(
-                recordType,
-                sourceType,
-                screenshotId: "shot-legacy-001",
-                runId: "run-legacy-001",
-                battleId: null,
-                captureSource: "ManualF9",
-                isPrimary: false,
-                relativePath: Path.Combine("2026-04-08", "legacy-manual.png"),
-                localCapturedAt,
-                utcCapturedAt,
-                day: 2,
-                playerRank: "Silver",
-                playerRating: 1201,
-                playerPosition: 999,
-                victoriesAtCapture: 1
-            ),
-        ]
-    );
-
-    using var legacyConnection = new SqliteConnection($"Data Source={legacyDbPath}");
-    legacyConnection.Open();
-    Assert(
-        ColumnExists(legacyConnection, "run_screenshots", "player_position"),
-        "RunScreenshotSqliteStore should migrate legacy run_screenshots tables to include player_position."
-    );
-    Assert(
-        GetInt64(
-            legacyConnection,
-            "SELECT player_position FROM run_screenshots WHERE screenshot_id = $id;",
-            "shot-legacy-001"
-        ) == 999,
-        "Legacy run_screenshots tables should persist player_position after migration."
-    );
 }
 finally
 {
@@ -315,6 +288,7 @@ static object CreateRecord(
     Type sourceType,
     string screenshotId,
     string? runId,
+    string? heroName,
     string? battleId,
     string captureSource,
     bool isPrimary,
@@ -334,6 +308,7 @@ static object CreateRecord(
 
     SetProperty(recordType, record, "ScreenshotId", screenshotId);
     SetProperty(recordType, record, "RunId", runId);
+    SetProperty(recordType, record, "HeroName", heroName);
     SetProperty(recordType, record, "BattleId", battleId);
     SetProperty(recordType, record, "CaptureSource", Enum.Parse(sourceType, captureSource));
     SetProperty(recordType, record, "IsPrimary", isPrimary);
@@ -378,52 +353,6 @@ static long GetInt64(SqliteConnection connection, string sql, string id)
     command.CommandText = sql;
     command.Parameters.AddWithValue("$id", id);
     return (long)(command.ExecuteScalar() ?? throw new InvalidOperationException(sql));
-}
-
-static bool ColumnExists(SqliteConnection connection, string tableName, string columnName)
-{
-    using var command = connection.CreateCommand();
-    command.CommandText = $"PRAGMA table_info({tableName});";
-    using var reader = command.ExecuteReader();
-    while (reader.Read())
-    {
-        if (
-            string.Equals(
-                reader.GetString(reader.GetOrdinal("name")),
-                columnName,
-                StringComparison.Ordinal
-            )
-        )
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static void CreateLegacyScreenshotDatabase(string dbPath)
-{
-    using var connection = new SqliteConnection($"Data Source={dbPath}");
-    connection.Open();
-    using var command = connection.CreateCommand();
-    command.CommandText = """
-        CREATE TABLE run_screenshots (
-            screenshot_id TEXT PRIMARY KEY,
-            run_id TEXT NULL,
-            battle_id TEXT NULL,
-            capture_source TEXT NOT NULL,
-            is_primary INTEGER NOT NULL DEFAULT 0,
-            image_relative_path TEXT NOT NULL,
-            captured_at_local TEXT NOT NULL,
-            captured_at_utc TEXT NOT NULL,
-            day INTEGER NULL,
-            player_rank TEXT NULL,
-            player_rating INTEGER NULL,
-            victories_at_capture INTEGER NULL
-        );
-        """;
-    command.ExecuteNonQuery();
 }
 
 static void ExpectSqliteConstraint(Action action, string message)

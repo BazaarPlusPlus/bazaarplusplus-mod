@@ -29,13 +29,14 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private RunScreenshotSqliteStore? _screenshotStore;
     private IDisposable? _runInitializedSubscription;
     private IDisposable? _battleScreenshotContextSubscription;
-    private string? _currentRunId;
+    private string? _bufferedRunId;
+    private string? _bufferedHeroName;
     private PvpBattlePendingScreenshotContext? _pendingBattleScreenshot;
 
     private void Awake()
     {
         _current = this;
-        _currentRunId = BppRuntimeHost.RunContext.CurrentServerRunId;
+        RefreshBufferedRunContext();
 
         var screenshotsDirectoryPath = BppRuntimeHost.Paths.ScreenshotsDirectoryPath;
         var runLogDatabasePath = BppRuntimeHost.Paths.RunLogDatabasePath;
@@ -102,19 +103,18 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private void OnRunStarted()
     {
         _gate.ResetForNewRun();
-        _currentRunId = null;
+        ResetBufferedRunContext();
+        RefreshBufferedRunContext();
         ClearPendingBattleScreenshot();
     }
 
     private void OnRunEnded()
     {
-        _currentRunId = null;
         ClearPendingBattleScreenshot();
     }
 
     private void OnRunInterrupted()
     {
-        _currentRunId = null;
         ClearPendingBattleScreenshot();
     }
 
@@ -131,7 +131,10 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void OnRunInitializedObserved(RunInitializedObserved observed)
     {
-        _currentRunId = string.IsNullOrWhiteSpace(observed.RunId) ? null : observed.RunId;
+        if (!string.IsNullOrWhiteSpace(observed.RunId))
+            _bufferedRunId = observed.RunId;
+
+        RefreshBufferedRunContext();
     }
 
     private void OnPvpBattleScreenshotContextAvailable(
@@ -178,7 +181,12 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
         StartCoroutine(
             CaptureManualScreenshot(
-                new ScreenshotCaptureRequest { RunId = ResolveRunId(), CaptureSource = source }
+                new ScreenshotCaptureRequest
+                {
+                    RunId = ResolveLiveRunId(),
+                    HeroName = ResolveLiveHeroName(),
+                    CaptureSource = source,
+                }
             )
         );
     }
@@ -218,6 +226,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                 new ScreenshotCaptureRequest
                 {
                     RunId = ResolveRunId(),
+                    HeroName = ResolveHeroName(),
                     CaptureSource = RunScreenshotCaptureSource.EndOfRunAuto,
                 }
             );
@@ -269,9 +278,8 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             capture = _screenshotService?.CaptureCurrentFrame(
                 new ScreenshotCaptureRequest
                 {
-                    RunId = !string.IsNullOrWhiteSpace(context.RunId)
-                        ? context.RunId
-                        : ResolveRunId(),
+                    RunId = !string.IsNullOrWhiteSpace(context.RunId) ? context.RunId : ResolveLiveRunId(),
+                    HeroName = ResolveLiveHeroName(),
                     BattleId = context.BattleId,
                     CaptureSource = RunScreenshotCaptureSource.PvpBattleStart,
                 }
@@ -319,9 +327,41 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private string? ResolveRunId()
     {
-        return !string.IsNullOrWhiteSpace(_currentRunId)
-            ? _currentRunId
-            : BppRuntimeHost.RunContext.CurrentServerRunId;
+        RefreshBufferedRunContext();
+        return _bufferedRunId;
+    }
+
+    private static string? ResolveLiveRunId()
+    {
+        return BppRuntimeHost.RunContext.CurrentServerRunId;
+    }
+
+    private string? ResolveHeroName()
+    {
+        RefreshBufferedRunContext();
+        return _bufferedHeroName;
+    }
+
+    private static string? ResolveLiveHeroName()
+    {
+        return Data.Run?.Player?.Hero.ToString();
+    }
+
+    private void ResetBufferedRunContext()
+    {
+        _bufferedRunId = null;
+        _bufferedHeroName = null;
+    }
+
+    private void RefreshBufferedRunContext()
+    {
+        var liveRunId = BppRuntimeHost.RunContext.CurrentServerRunId;
+        if (!string.IsNullOrWhiteSpace(liveRunId))
+            _bufferedRunId = liveRunId;
+
+        var liveHeroName = Data.Run?.Player?.Hero.ToString();
+        if (!string.IsNullOrWhiteSpace(liveHeroName))
+            _bufferedHeroName = liveHeroName;
     }
 
     private static bool IsBattleStartScreenshotEnabled()

@@ -46,6 +46,7 @@ internal sealed class ScreenshotService
             {
                 ScreenshotId = screenshotId,
                 RunId = request.RunId,
+                HeroName = request.HeroName,
                 BattleId = request.BattleId,
                 CaptureSource = request.CaptureSource,
                 RelativePath = relativePath,
