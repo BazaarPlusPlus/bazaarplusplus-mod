@@ -26,6 +26,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private IDisposable? _runInitializedSubscription;
     private string? _bufferedRunId;
     private string? _bufferedHeroName;
+    private bool? _lastContinueShouldBeInteractable;
 
     private void Awake()
     {
@@ -67,6 +68,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     {
         if (ReferenceEquals(_current, this))
             _current = null;
+    }
+
+    private void Update()
+    {
+        SyncEndOfRunContinueInteractivity();
     }
 
     private void OnRunStarted()
@@ -210,5 +216,25 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             BppSettingsDockController.BeginScreenshotSuppression,
             CombatStatusBarFeature.BeginScreenshotSuppression
         );
+    }
+
+    private void SyncEndOfRunContinueInteractivity()
+    {
+        var screenController = UnityEngine.Object.FindObjectOfType<EndOfRunScreenController>(
+            includeInactive: true
+        );
+        if (screenController == null)
+        {
+            _lastContinueShouldBeInteractable = null;
+            return;
+        }
+
+        var revealState = EndOfRunSummaryRevealDetector.GetRevealState(screenController);
+        var shouldAllowContinue = revealState != EndOfRunSummaryRevealState.RevealInProgress;
+        if (_lastContinueShouldBeInteractable == shouldAllowContinue)
+            return;
+
+        _lastContinueShouldBeInteractable = shouldAllowContinue;
+        EndOfRunContinueButtonFeedback.SyncInteractivity(screenController, shouldAllowContinue);
     }
 }

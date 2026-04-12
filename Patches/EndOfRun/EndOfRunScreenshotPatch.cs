@@ -39,9 +39,11 @@ internal static class EndOfRunScreenshotPatch
         }
 
         var transitionCount = (int?)TransitionCountField.GetValue(__instance) ?? 0;
+        var isInteractionBlocked =
+            transitionCount > 0 || EndOfRunSummaryRevealDetector.IsSummaryRevealInProgress(__instance);
         return !EndOfRunScreenshotController.TryCaptureFirstContinue(
             __instance,
-            transitionCount > 0
+            isInteractionBlocked
         );
     }
 }

@@ -66,6 +66,18 @@ var pathBuilderType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.ScreenshotPathBuilder",
     throwOnError: true
 )!;
+var summaryRevealDetectorType = assembly.GetType(
+    "BazaarPlusPlus.Game.Screenshots.EndOfRunSummaryRevealDetector",
+    throwOnError: true
+)!;
+var continueButtonFeedbackType = assembly.GetType(
+    "BazaarPlusPlus.Game.Screenshots.EndOfRunContinueButtonFeedback",
+    throwOnError: true
+)!;
+var summaryRevealStateType = assembly.GetType(
+    "BazaarPlusPlus.Game.Screenshots.EndOfRunSummaryRevealState",
+    throwOnError: true
+)!;
 var captureSourceType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.RunScreenshotCaptureSource",
     throwOnError: true
@@ -93,6 +105,96 @@ var fallbackPath = InvokeBuildRelativePath(
 Assert(
     fallbackPath == Path.Combine("2026-04-07", "2026-04-07_09-05-04-000_final_run-anonymous.png"),
     $"Expected anonymous fallback path, got: {fallbackPath}"
+);
+
+Assert(
+    InvokeGetSummaryRevealState(
+        summaryRevealDetectorType,
+        summaryRevealStateType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.OtherEndOfRunController()
+        )
+    ) == "NotSummary",
+    "Non-summary end-of-run screens should not be treated as summary reveal work."
+);
+Assert(
+    InvokeGetSummaryRevealState(
+        summaryRevealDetectorType,
+        summaryRevealStateType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
+                new TheBazaar.UI.EndOfRun.FakeItemController(false)
+            )
+        )
+    ) == "RevealInProgress",
+    "Summary capture should stay blocked until every loaded card is face-up."
+);
+Assert(
+    InvokeGetSummaryRevealState(
+        summaryRevealDetectorType,
+        summaryRevealStateType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
+                null,
+                new TheBazaar.UI.EndOfRun.FakeItemController(false)
+            )
+        )
+    ) == "RevealInProgress",
+    "Any unrevealed summary card should keep continue blocked even when some slots are empty."
+);
+Assert(
+    InvokeGetSummaryRevealState(
+        summaryRevealDetectorType,
+        summaryRevealStateType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
+                new TheBazaar.UI.EndOfRun.FakeItemController(true),
+                null,
+                new TheBazaar.UI.EndOfRun.FakeItemController(true)
+            )
+        )
+    ) == "RevealComplete",
+    "Summary capture should be allowed once all loaded cards are face-up."
+);
+Assert(
+    InvokeGetSummaryRevealState(
+        summaryRevealDetectorType,
+        summaryRevealStateType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController()
+        )
+    ) == "RevealComplete",
+    "Empty summary boards should not stay blocked."
+);
+Assert(
+    InvokeGetSummaryRevealState(
+        summaryRevealDetectorType,
+        summaryRevealStateType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
+                new TheBazaar.UI.EndOfRun.BadItemController()
+            )
+        )
+    ) == "DetectionFailed",
+    "Missing summary reflection members should be surfaced as detection failures."
+);
+Assert(
+    Enum.GetNames(summaryRevealStateType)
+        is ["NotSummary", "RevealInProgress", "RevealComplete", "DetectionFailed"],
+    "Summary reveal state enum should expose the expected states."
+);
+
+var screenWithButton = new TheBazaar.UI.EndOfRun.ScreenWithContinueButton();
+InvokeSyncContinueInteractable(continueButtonFeedbackType, screenWithButton, shouldAllowContinue: false);
+Assert(
+    screenWithButton.ContinueButton.SetUnInteractableCount == 1
+        && screenWithButton.ContinueButton.SetInteractableCount == 0,
+    "Blocking summary reveal should disable the continue button."
+);
+InvokeSyncContinueInteractable(continueButtonFeedbackType, screenWithButton, shouldAllowContinue: true);
+Assert(
+    screenWithButton.ContinueButton.SetInteractableCount == 1,
+    "Resolved summary reveal should re-enable the continue button."
 );
 
 Console.WriteLine("End-of-run screenshot gate checks passed.");
@@ -193,8 +295,119 @@ static string InvokeBuildRelativePath(Type type, string? runId, DateTimeOffset c
         ?? throw new InvalidOperationException("BuildRelativePath returned null.");
 }
 
+static string InvokeGetSummaryRevealState(Type detectorType, Type stateType, object screenController)
+{
+    var method = detectorType.GetMethod(
+        "GetRevealState",
+        BindingFlags.Public | BindingFlags.Static
+    );
+    if (method == null)
+    {
+        throw new InvalidOperationException(
+            $"Method not found: {detectorType.FullName}.GetRevealState"
+        );
+    }
+
+    var value = method.Invoke(null, [screenController])
+        ?? throw new InvalidOperationException("GetRevealState returned null.");
+    return Enum.GetName(stateType, value)
+        ?? throw new InvalidOperationException("Reveal state enum name was null.");
+}
+
+static void InvokeSyncContinueInteractable(Type type, object screenController, bool shouldAllowContinue)
+{
+    var method = type.GetMethod(
+        "SyncInteractivity",
+        BindingFlags.Public | BindingFlags.Static
+    );
+    if (method == null)
+    {
+        throw new InvalidOperationException(
+            $"Method not found: {type.FullName}.SyncInteractivity"
+        );
+    }
+
+    method.Invoke(null, [screenController, shouldAllowContinue]);
+}
+
 static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+namespace TheBazaar.UI.EndOfRun
+{
+    public sealed class EndOfRunScreenController
+    {
+        private readonly object? _activeController;
+
+        public EndOfRunScreenController(object? activeController)
+        {
+            _activeController = activeController;
+        }
+    }
+
+    public sealed class EndOfRunSummaryController
+    {
+        private readonly object?[] loadedCards;
+
+        public EndOfRunSummaryController(params object?[] loadedCards)
+        {
+            this.loadedCards = loadedCards;
+        }
+    }
+
+    public sealed class OtherEndOfRunController;
+
+    public sealed class FakeItemController
+    {
+        public FakeAnimator Animator { get; }
+
+        public FakeItemController(bool faceUp)
+        {
+            Animator = new FakeAnimator(faceUp);
+        }
+    }
+
+    public sealed class BadItemController;
+
+    public sealed class FakeAnimator
+    {
+        private readonly bool _faceUp;
+
+        public FakeAnimator(bool faceUp)
+        {
+            _faceUp = faceUp;
+        }
+
+        public bool GetBool(string parameterName)
+        {
+            return parameterName == "FaceUp" && _faceUp;
+        }
+    }
+
+    public sealed class ScreenWithContinueButton
+    {
+        private readonly FakeContinueButton continueButton = new();
+
+        public FakeContinueButton ContinueButton => continueButton;
+    }
+
+    public sealed class FakeContinueButton
+    {
+        public int SetInteractableCount { get; private set; }
+
+        public int SetUnInteractableCount { get; private set; }
+
+        public void SetInteractable()
+        {
+            SetInteractableCount++;
+        }
+
+        public void SetUnInteractable()
+        {
+            SetUnInteractableCount++;
+        }
+    }
 }
