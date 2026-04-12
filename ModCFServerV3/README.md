@@ -77,6 +77,16 @@ V3 uses installation-based authentication.
 3. It returns a short-lived tokenized URL for `/replays/:token`.
 4. `/replays/:token` loads the owning run bundle from R2 and returns the replay payload for that battle, with installation auth required unless anonymous replay downloads are temporarily enabled.
 
+## Artifact Retention And Cleanup
+
+- `getRunBundleRetentionDays()` currently returns `5`, and uploads write that value into R2 object `customMetadata.retention_days`.
+- The repository does not currently implement Worker-side automatic cleanup for expired R2 artifacts. There is no `scheduled` handler, alarm flow, or in-repo R2 list-and-delete job.
+- The D1 `run_bundles` table stores `object_key` and creation metadata, but it does not store an artifact `expires_at_utc` value.
+- Replay-link tokens do have an explicit TTL: `/ghost-battles/:battleId/replay-link` creates a `replay_tokens` row that expires 5 minutes after issuance.
+- Replay downloads treat missing bundle artifacts as a passive expiry condition. If the token is still valid but the referenced R2 object no longer exists, `/replays/:token` returns `410` with `artifact_expired`.
+- Because there is no in-repo cleanup job that reconciles D1 with R2, ghost battle metadata can outlive the underlying artifact. In that state, query and replay-link creation can still succeed, but the eventual replay download will fail with `artifact_expired`.
+- If production R2 objects are physically deleted on a schedule, that behavior is defined outside this repository, for example through Cloudflare-side bucket lifecycle configuration.
+
 ## Local Development
 
 Install dependencies:
