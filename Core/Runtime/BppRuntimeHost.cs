@@ -23,7 +23,6 @@ internal sealed class BppRuntimeHost
         new InMemoryBppEventBus(),
         new BppConfig(),
         new BppPathService(),
-        new EmptyMonsterCatalog(),
         new RunContextStore(),
         new GameStateProbe()
     );
@@ -31,7 +30,6 @@ internal sealed class BppRuntimeHost
     private readonly InMemoryBppEventBus _eventBus = new();
     private readonly BppConfig _config = new();
     private readonly BppPathService _paths = new();
-    private readonly MonsterDatabase _monsterCatalog = new();
     private readonly RunContextStore _runContext = new();
     private readonly GameStateProbe _gameStateProbe = new();
     private readonly RunLifecycleModule _runLifecycle;
@@ -58,13 +56,11 @@ internal sealed class BppRuntimeHost
         _logger = logger;
         _config.Initialize(configFile);
         _paths.Initialize();
-        _monsterCatalog.Initialize();
         _runContext.Reset();
         Services = new BppRuntimeServices(
             _eventBus,
             _config,
             _paths,
-            _monsterCatalog,
             _runContext,
             _gameStateProbe
         );
@@ -98,9 +94,6 @@ internal sealed class BppRuntimeHost
 
     public static IPathService Paths => Current?.Services.Paths ?? DetachedServices.Paths;
 
-    public static IMonsterCatalog MonsterCatalog =>
-        Current?.Services.MonsterCatalog ?? DetachedServices.MonsterCatalog;
-
     public static IRunContext RunContext =>
         Current?.Services.RunContext ?? DetachedServices.RunContext;
 
@@ -128,31 +121,5 @@ internal sealed class BppRuntimeHost
         _featureRegistry.Stop();
         if (ReferenceEquals(Current, this))
             Current = null;
-    }
-
-    private sealed class EmptyMonsterCatalog : IMonsterCatalog
-    {
-        public bool TryGetByEncounterId(Guid encounterId, out MonsterInfo? monster)
-        {
-            monster = null;
-            return false;
-        }
-
-        public bool TryGetByEncounterId(string encounterId, out MonsterInfo? monster)
-        {
-            monster = null;
-            return false;
-        }
-
-        public bool TryGetByEncounterIdPrefix(string encounterIdPrefix, out MonsterInfo? monster)
-        {
-            monster = null;
-            return false;
-        }
-
-        public IReadOnlyCollection<MonsterInfo> GetAll()
-        {
-            return Array.Empty<MonsterInfo>();
-        }
     }
 }

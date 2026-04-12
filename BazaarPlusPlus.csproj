@@ -18,7 +18,6 @@
 
   <!-- Embedded resources -->
   <ItemGroup>
-    <EmbeddedResource Include="Data\monsters_bazaardb.json" />
     <EmbeddedResource Include="Data\BuildRecommendations\final-builds-top50.json" />
     <EmbeddedResource Include="Data\BuildRecommendations\winner-builds-top50.json" />
   </ItemGroup>

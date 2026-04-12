@@ -18,7 +18,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | 层次 | 作用 |
 | --- | --- |
 | `Plugin.cs` | BepInEx 入口：`Harmony.PatchAll()`，创建 `BppRuntimeHost`，挂载各类 `MonoBehaviour` 控制器 |
-| `Core/Runtime/BppRuntimeHost.cs` | 统一初始化配置、事件总线、路径、`MonsterDatabase`、Run 上下文探测；注册 **RunLifecycle**、**CombatReplay**、**CombatStatusBar**、**EncounterTracking** 等模块 |
+| `Core/Runtime/BppRuntimeHost.cs` | 统一初始化配置、事件总线、路径、Run 上下文探测；注册 **RunLifecycle**、**CombatReplay**、**CombatStatusBar** 等模块 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
 主要挂在游戏对象上的组件见 `Plugin.AttachRuntimeComponents()`：`RunStateSyncController`、`RunLoggingController`、`RunUploadController`、`HistoryPanel`、`CombatStatusBar`、怪物预览相关、`TooltipModifierRefreshController` 等。
