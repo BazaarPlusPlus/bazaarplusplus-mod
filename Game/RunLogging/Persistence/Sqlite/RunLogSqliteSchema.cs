@@ -200,10 +200,6 @@ public static class RunLogSqliteSchema
             CREATE INDEX IF NOT EXISTS idx_{RunScreenshotsTableName}_run_id_captured_at_utc
                 ON {RunScreenshotsTableName}(run_id, captured_at_utc DESC);
 
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_battle_id
-                ON {RunScreenshotsTableName}(battle_id)
-                WHERE battle_id IS NOT NULL;
-
             CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
                 ON {RunScreenshotsTableName}(run_id)
                 WHERE is_primary = 1 AND run_id IS NOT NULL;

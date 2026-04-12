@@ -36,33 +36,6 @@ try
             CreateRecord(
                 recordType,
                 sourceType,
-                screenshotId: "shot-manual-001",
-                runId: "run-001",
-                heroName: "Vanessa",
-                battleId: null,
-                captureSource: "ManualF9",
-                isPrimary: false,
-                relativePath: Path.Combine(
-                    "2026-04-08",
-                    "2026-04-08_21-30-15-000_manual_run-run-001.png"
-                ),
-                localCapturedAt,
-                utcCapturedAt,
-                day: 5,
-                playerRank: "Gold 2",
-                playerRating: 1420,
-                playerPosition: 287,
-                victoriesAtCapture: 4
-            ),
-        ]
-    );
-
-    saveMethod.Invoke(
-        store,
-        [
-            CreateRecord(
-                recordType,
-                sourceType,
                 screenshotId: "shot-primary-001",
                 runId: "run-001",
                 heroName: "Vanessa",
@@ -84,60 +57,6 @@ try
         ]
     );
 
-    saveMethod.Invoke(
-        store,
-        [
-            CreateRecord(
-                recordType,
-                sourceType,
-                screenshotId: "shot-battle-001",
-                runId: "run-001",
-                heroName: "Vanessa",
-                battleId: "battle-001",
-                captureSource: "PvpBattleStart",
-                isPrimary: false,
-                relativePath: Path.Combine(
-                    "2026-04-08",
-                    "2026-04-08_21-30-35-000_battle_run-run-001_battle-battle-001.png"
-                ),
-                localCapturedAt.AddSeconds(20),
-                utcCapturedAt.AddSeconds(20),
-                day: 4,
-                playerRank: "Gold 1",
-                playerRating: 1468,
-                playerPosition: 198,
-                victoriesAtCapture: 3
-            ),
-        ]
-    );
-
-    saveMethod.Invoke(
-        store,
-        [
-            CreateRecord(
-                recordType,
-                sourceType,
-                screenshotId: "shot-dock-camera-001",
-                runId: "run-001",
-                heroName: "Vanessa",
-                battleId: null,
-                captureSource: "SettingsDockCameraButton",
-                isPrimary: false,
-                relativePath: Path.Combine(
-                    "2026-04-08",
-                    "2026-04-08_21-30-55-000_manual_run-run-001.png"
-                ),
-                localCapturedAt.AddSeconds(40),
-                utcCapturedAt.AddSeconds(40),
-                day: 6,
-                playerRank: "Gold 1",
-                playerRating: 1450,
-                playerPosition: 211,
-                victoriesAtCapture: 5
-            ),
-        ]
-    );
-
     Assert(
         File.Exists(dbPath),
         "RunScreenshotSqliteStore should initialize the SQLite database file."
@@ -147,8 +66,8 @@ try
     connection.Open();
 
     Assert(
-        CountRows(connection, "run_screenshots") == 4,
-        "run_screenshots should persist all inserted screenshot rows."
+        CountRows(connection, "run_screenshots") == 1,
+        "run_screenshots should persist the end-of-run screenshot row."
     );
     Assert(
         GetString(
@@ -167,14 +86,6 @@ try
         "run_screenshots should mark end-of-run primary screenshots."
     );
     Assert(
-        GetString(
-            connection,
-            "SELECT battle_id FROM run_screenshots WHERE screenshot_id = $id;",
-            "shot-battle-001"
-        ) == "battle-001",
-        "run_screenshots should associate battle screenshots with battle ids."
-    );
-    Assert(
         GetInt64(
             connection,
             "SELECT player_position FROM run_screenshots WHERE screenshot_id = $id;",
@@ -186,9 +97,9 @@ try
         GetInt64(
             connection,
             "SELECT victories_at_capture FROM run_screenshots WHERE screenshot_id = $id;",
-            "shot-battle-001"
-        ) == 3,
-        "run_screenshots should persist victories_at_capture."
+            "shot-primary-001"
+        ) == 10,
+        "run_screenshots should persist victories_at_capture for the end-of-run screenshot."
     );
     Assert(
         GetString(
@@ -198,51 +109,6 @@ try
         ) == "Vanessa",
         "run_screenshots should persist hero_name."
     );
-    Assert(
-        GetString(
-            connection,
-            "SELECT capture_source FROM run_screenshots WHERE screenshot_id = $id;",
-            "shot-dock-camera-001"
-        ) == "settings_dock_camera_button",
-        "run_screenshots should serialize settings dock camera screenshots with a dedicated source."
-    );
-    Assert(
-        GetString(
-            connection,
-            "SELECT capture_source FROM run_screenshots WHERE screenshot_id = $id;",
-            "shot-battle-001"
-        ) == "pvp_battle_start",
-        "run_screenshots should serialize battle-start screenshots with a dedicated source."
-    );
-
-    ExpectSqliteConstraint(
-        () =>
-            saveMethod.Invoke(
-                store,
-                [
-                    CreateRecord(
-                        recordType,
-                        sourceType,
-                        screenshotId: "shot-battle-002",
-                        runId: "run-001",
-                        heroName: "Vanessa",
-                        battleId: "battle-001",
-                        captureSource: "PvpBattleStart",
-                        isPrimary: false,
-                        relativePath: Path.Combine("2026-04-08", "duplicate-battle.png"),
-                        localCapturedAt.AddSeconds(25),
-                        utcCapturedAt.AddSeconds(25),
-                        day: 4,
-                        playerRank: "Gold 1",
-                        playerRating: 1468,
-                        playerPosition: 198,
-                        victoriesAtCapture: 3
-                    ),
-                ]
-            ),
-        "battle screenshots should be unique per battle id."
-    );
-
     ExpectSqliteConstraint(
         () =>
             saveMethod.Invoke(

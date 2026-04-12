@@ -73,7 +73,7 @@ internal sealed class RunScreenshotSqliteStore
         command.Parameters.AddWithValue("$runId", (object?)record.RunId ?? DBNull.Value);
         command.Parameters.AddWithValue("$heroName", (object?)record.HeroName ?? DBNull.Value);
         command.Parameters.AddWithValue("$battleId", (object?)record.BattleId ?? DBNull.Value);
-        command.Parameters.AddWithValue("$captureSource", ToStorageValue(record.CaptureSource));
+        command.Parameters.AddWithValue("$captureSource", GetStorageValue());
         command.Parameters.AddWithValue("$isPrimary", record.IsPrimary ? 1 : 0);
         command.Parameters.AddWithValue("$imageRelativePath", record.ImageRelativePath);
         command.Parameters.AddWithValue("$capturedAtLocal", record.CapturedAtLocal.ToString("o"));
@@ -105,15 +105,8 @@ internal sealed class RunScreenshotSqliteStore
         command.Parameters.AddWithValue(parameterName, (object?)value ?? DBNull.Value);
     }
 
-    private static string ToStorageValue(RunScreenshotCaptureSource source)
+    private static string GetStorageValue()
     {
-        return source switch
-        {
-            RunScreenshotCaptureSource.ManualF9 => "manual_f9",
-            RunScreenshotCaptureSource.SettingsDockCameraButton => "settings_dock_camera_button",
-            RunScreenshotCaptureSource.PvpBattleStart => "pvp_battle_start",
-            RunScreenshotCaptureSource.EndOfRunAuto => "end_of_run_auto",
-            _ => "unknown",
-        };
+        return "end_of_run_auto";
     }
 }

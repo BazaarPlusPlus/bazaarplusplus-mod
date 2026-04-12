@@ -666,31 +666,6 @@ try
         ) == null,
         "Combat opening GameSim should buffer until the sequence completes."
     );
-    var pendingBattleContext = Invoke(
-        captureServiceType,
-        captureService!,
-        "GetPendingBattleScreenshotContext",
-        Array.Empty<object?>()
-    );
-    Assert(
-        pendingBattleContext != null,
-        "Combat opening GameSim should expose a pending battle screenshot context before replay completion."
-    );
-    var pendingContextType = pendingBattleContext!.GetType();
-    Assert(
-        !string.IsNullOrWhiteSpace(
-            (string?)GetProperty(pendingContextType, pendingBattleContext, "BattleId")
-        ),
-        "Pending battle screenshot context should allocate a battle id as soon as PVP combat opens."
-    );
-    Assert(
-        string.Equals(
-            (string?)GetProperty(pendingContextType, pendingBattleContext, "RunId"),
-            "run-42",
-            StringComparison.Ordinal
-        ),
-        "Pending battle screenshot context should preserve the current run id."
-    );
     Assert(
         Invoke(
             captureServiceType,
@@ -760,21 +735,8 @@ try
         "Completed battle manifests should capture snapshot wrappers for both sides."
     );
     Assert(
-        string.Equals(
-            (string?)GetProperty(manifestType, completedManifest!, "BattleId"),
-            (string?)GetProperty(pendingContextType, pendingBattleContext, "BattleId"),
-            StringComparison.Ordinal
-        ),
-        "Completed battle manifests should reuse the pending battle id allocated at combat opening."
-    );
-    Assert(
-        Invoke(
-            captureServiceType,
-            captureService!,
-            "GetPendingBattleScreenshotContext",
-            Array.Empty<object?>()
-        ) == null,
-        "Pending battle screenshot context should clear after the replay sequence completes."
+        !string.IsNullOrWhiteSpace((string?)GetProperty(manifestType, completedManifest!, "BattleId")),
+        "Completed battle manifests should allocate a battle id."
     );
 
     var collector = Activator.CreateInstance(collectorType);

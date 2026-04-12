@@ -131,7 +131,7 @@ Assert(
     "Bootstrap SQL should enforce run and battle cascade relationships."
 );
 Assert(
-    bootstrapSql.Contains(
+    !bootstrapSql.Contains(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_battle_id",
         StringComparison.Ordinal
     )
@@ -139,7 +139,7 @@ Assert(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run",
             StringComparison.Ordinal
         ),
-    "Bootstrap SQL should define screenshot uniqueness indexes."
+    "Bootstrap SQL should only define the primary screenshot uniqueness index."
 );
 
 Console.WriteLine("RunLogging SQLite schema checks passed.");

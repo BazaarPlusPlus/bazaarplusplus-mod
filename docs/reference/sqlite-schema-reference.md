@@ -398,7 +398,7 @@ Fields:
 | `screenshot_id` | `TEXT` | No | Screenshot identifier. Primary key. |
 | `run_id` | `TEXT` | Yes | Associated run id when known. |
 | `battle_id` | `TEXT` | Yes | Associated battle id when the screenshot is battle-scoped. |
-| `capture_source` | `TEXT` | No | Source such as `manual_f9`, `settings_dock_camera_button`, `pvp_battle_start`, `end_of_run_auto`. |
+| `capture_source` | `TEXT` | No | Screenshot source. Current writes use `end_of_run_auto`. |
 | `is_primary` | `INTEGER` | No | Boolean `0/1`. Marks the primary screenshot for a run. |
 | `image_relative_path` | `TEXT` | No | Relative path under the screenshot root. |
 | `captured_at_local` | `TEXT` | No | Local timestamp string. |
@@ -527,10 +527,6 @@ CREATE INDEX IF NOT EXISTS idx_run_sync_state_dirty
 
 CREATE INDEX IF NOT EXISTS idx_run_screenshots_run_id_captured_at_utc
     ON run_screenshots(run_id, captured_at_utc DESC);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_battle_id
-    ON run_screenshots(battle_id)
-    WHERE battle_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
     ON run_screenshots(run_id)

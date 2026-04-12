@@ -44,17 +44,6 @@ internal sealed partial class BppSettingsDockController
         rectTransform.anchoredPosition = new Vector2(DockButtonOffsetX, DockButtonOffsetY);
     }
 
-    private static void ConfigureCameraButtonRect(RectTransform rectTransform)
-    {
-        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        rectTransform.localScale = Vector3.one;
-        rectTransform.localRotation = Quaternion.identity;
-        rectTransform.sizeDelta = new Vector2(CameraButtonWidth, CameraButtonHeight);
-        rectTransform.anchoredPosition = new Vector2(CameraButtonOffsetX, CameraButtonOffsetY);
-    }
-
     private static void ConfigurePanelRect(RectTransform rectTransform)
     {
         rectTransform.anchorMin = new Vector2(0f, 0.5f);
@@ -115,36 +104,6 @@ internal sealed partial class BppSettingsDockController
         outline.useGraphicAlpha = true;
     }
 
-    private void UpdateCameraButtonVisual()
-    {
-        if (_cameraButtonRect == null)
-            return;
-
-        var image = _cameraButtonRect.GetComponent<Image>();
-        var outline = _cameraButtonRect.GetComponent<Outline>();
-        if (image == null || outline == null)
-            return;
-
-        var progress =
-            ScreenshotFeedbackDuration <= 0f
-                ? 0f
-                : Mathf.Clamp01(_screenshotFeedbackRemaining / ScreenshotFeedbackDuration);
-        var baseColor = new Color(0.18f, 0.18f, 0.20f, 0.96f);
-        var pulseColor = new Color(0.78f, 0.39f, 0.14f, 0.98f);
-        var baseOutline = new Color(0f, 0f, 0f, 0.52f);
-        var pulseOutline = new Color(0.98f, 0.86f, 0.54f, 0.86f);
-        var labelBase = new Color(0.96f, 0.93f, 0.86f, 1f);
-        var labelPulse = new Color(1f, 0.97f, 0.90f, 1f);
-
-        image.color = Color.Lerp(baseColor, pulseColor, progress);
-        outline.effectColor = Color.Lerp(baseOutline, pulseOutline, progress);
-        outline.effectDistance = new Vector2(1f, -1f);
-        outline.useGraphicAlpha = true;
-
-        if (_cameraButtonLabel != null)
-            _cameraButtonLabel.color = Color.Lerp(labelBase, labelPulse, progress);
-    }
-
     private void CreateDockButtonLabel(Transform parent)
     {
         var label = CreateText(
@@ -165,34 +124,6 @@ internal sealed partial class BppSettingsDockController
         label.text = "BazaarPlusPlus";
         label.textWrappingMode = TextWrappingModes.NoWrap;
         label.overflowMode = TextOverflowModes.Ellipsis;
-    }
-
-    private void CreateCameraButtonLabel(Transform parent)
-    {
-        _cameraButtonLabel = CreateText(
-            CameraButtonLabelObjectName,
-            parent,
-            13f,
-            TextAlignmentOptions.Center,
-            new Color(0.96f, 0.93f, 0.86f, 1f)
-        );
-        if (_cameraButtonLabel == null)
-            return;
-
-        var labelRect = _cameraButtonLabel.rectTransform;
-        labelRect.anchorMin = Vector2.zero;
-        labelRect.anchorMax = Vector2.one;
-        labelRect.offsetMin = Vector2.zero;
-        labelRect.offsetMax = Vector2.zero;
-        _cameraButtonLabel.text = "CAM";
-        _cameraButtonLabel.textWrappingMode = TextWrappingModes.NoWrap;
-        _cameraButtonLabel.overflowMode = TextOverflowModes.Ellipsis;
-    }
-
-    private void TriggerScreenshotFeedback()
-    {
-        _screenshotFeedbackRemaining = ScreenshotFeedbackDuration;
-        UpdateCameraButtonVisual();
     }
 
     private TextMeshProUGUI? CreateText(

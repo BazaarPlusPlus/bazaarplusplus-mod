@@ -5,7 +5,6 @@
 | Hotkey | Function | Scope | Rebindable |
 | --- | --- | --- | --- |
 | `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No |
-| `F9` | Save a screenshot | Global | No |
 | `Ctrl` | Show enchant preview | Tooltip hover | Yes |
 | `Shift` | Show upgrade preview | Tooltip hover | Yes |
 

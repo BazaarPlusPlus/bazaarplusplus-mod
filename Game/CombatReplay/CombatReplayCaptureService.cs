@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Core.Events;
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Game.PvpBattles;
 
@@ -54,22 +53,6 @@ internal sealed class CombatReplayCaptureService
             NetMessageGameSim gameSimMessage => AcceptGameSim(gameSimMessage, runId),
             NetMessageCombatSim combatSimMessage => AcceptCombatSim(combatSimMessage, runId),
             _ => null,
-        };
-    }
-
-    public PvpBattleScreenshotContextAvailable? GetPendingBattleScreenshotContext()
-    {
-        if (
-            string.IsNullOrWhiteSpace(_candidate.BattleId)
-            || _candidate.SpawnMessage == null
-            || !_matcher.IsPvpCombatOpeningMessage(_candidate.SpawnMessage)
-        )
-            return null;
-
-        return new PvpBattleScreenshotContextAvailable
-        {
-            BattleId = _candidate.BattleId,
-            RunId = _candidate.RunId,
         };
     }
 
