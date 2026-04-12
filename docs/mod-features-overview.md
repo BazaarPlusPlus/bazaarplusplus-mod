@@ -129,7 +129,6 @@ HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings
 ## 进一步阅读
 
 - 仓库总览：`README.md`
-- 文档索引：`docs/README.md`
 - Run / History / SQLite：`docs/run-logging.md`
 - 上传与风险说明：`docs/run-upload.md`
 - 战斗状态条 / 怪物预览 / CF 部署：`docs/combat-status-bar.md`、`docs/monster-preview-design.md`、`docs/mod-cf-server-deploy.md`

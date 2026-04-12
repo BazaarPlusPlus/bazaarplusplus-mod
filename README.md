@@ -52,7 +52,6 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - `Core/`、`Game/`、`Patches/`、`Data/`：主要功能实现。
 - `tests/`：按特性拆分的测试项目。
 - `scripts/`：构建和辅助脚本。
-- `docs/README.md`：文档索引。
 - `ModCFServerV3/`：云同步后端。
 
 ## 文档入口

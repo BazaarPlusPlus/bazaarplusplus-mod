@@ -52,7 +52,6 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - `Core/`, `Game/`, `Patches/`, `Data/`: main feature implementation.
 - `tests/`: feature-focused test projects.
 - `scripts/`: build helpers and utility scripts.
-- `docs/README.md`: documentation index.
 - `ModCFServerV3/`: cloud sync backend.
 
 ## Documentation Entry Points
