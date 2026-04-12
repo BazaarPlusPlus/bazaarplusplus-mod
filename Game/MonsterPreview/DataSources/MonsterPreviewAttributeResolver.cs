@@ -10,7 +10,7 @@ internal static class MonsterPreviewAttributeResolver
     public static Dictionary<int, int> Build(Guid templateId, string tier)
     {
         var result = new Dictionary<int, int>();
-        foreach (var pair in ItemAttr.GetAttributes(templateId, tier))
+        foreach (var pair in CardAttributeCatalog.GetAttributes(templateId, tier))
         {
             if (!Enum.TryParse<ECardAttributeType>(pair.Key, out var attributeType))
                 continue;

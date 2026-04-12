@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace BazaarPlusPlus;
 
-internal static class ItemAttr
+internal static class CardAttributeCatalog
 {
     public static IReadOnlyDictionary<string, int> GetAttributes(Guid templateId, string tier)
     {
@@ -55,7 +55,11 @@ internal static class ItemAttr
         }
         catch (Exception ex)
         {
-            BppLog.Error("ItemAttr", "Failed to load card attributes from shared cache", ex);
+            BppLog.Error(
+                "CardAttributeCatalog",
+                "Failed to load card attributes from shared cache",
+                ex
+            );
             return false;
         }
     }

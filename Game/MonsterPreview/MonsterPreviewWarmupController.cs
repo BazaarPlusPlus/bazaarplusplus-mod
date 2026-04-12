@@ -19,7 +19,7 @@ internal sealed class MonsterPreviewWarmupController : MonoBehaviour
         await Task.Yield();
 
         var catalogReady = LocalCardTemplateCatalog.Warm();
-        var attributesReady = ItemAttr.Warm();
+        var attributesReady = CardAttributeCatalog.Warm();
         var staticDataReady = await WarmStaticDataAsync();
 
         BppLog.Info(
