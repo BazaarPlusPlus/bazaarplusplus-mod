@@ -1,6 +1,5 @@
 #pragma warning disable CS0436
 #nullable enable
-using System.Reflection;
 using BazaarPlusPlus.Game.Screenshots;
 using HarmonyLib;
 using TheBazaar.UI.EndOfRun;
@@ -10,12 +9,6 @@ namespace BazaarPlusPlus;
 [HarmonyPatch(typeof(EndOfRunScreenController), "OnContinueClick")]
 internal static class EndOfRunScreenshotPatch
 {
-    private static readonly FieldInfo? TransitionCountField = AccessTools.Field(
-        typeof(EndOfRunScreenController),
-        "_transitionCount"
-    );
-    private static bool _warnedMissingTransitionField;
-
     [HarmonyPrefix]
     private static bool Prefix(EndOfRunScreenController __instance)
     {
@@ -24,23 +17,8 @@ internal static class EndOfRunScreenshotPatch
         if (EndOfRunScreenshotController.ShouldSuppressContinueWhileCaptureInFlight())
             return false;
 
-        if (TransitionCountField == null)
-        {
-            if (!_warnedMissingTransitionField)
-            {
-                _warnedMissingTransitionField = true;
-                BppLog.Warn(
-                    "EndOfRunScreenshot",
-                    "Failed to resolve EndOfRunScreenController._transitionCount; skipping screenshot interception."
-                );
-            }
-
+        if (!EndOfRunContinueStateEvaluator.TryIsInteractionBlocked(__instance, out var isInteractionBlocked))
             return true;
-        }
-
-        var transitionCount = (int?)TransitionCountField.GetValue(__instance) ?? 0;
-        var isInteractionBlocked =
-            transitionCount > 0 || EndOfRunSummaryRevealDetector.IsSummaryRevealInProgress(__instance);
         return !EndOfRunScreenshotController.TryCaptureFirstContinue(
             __instance,
             isInteractionBlocked

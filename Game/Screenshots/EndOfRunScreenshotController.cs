@@ -229,8 +229,18 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             return;
         }
 
-        var revealState = EndOfRunSummaryRevealDetector.GetRevealState(screenController);
-        var shouldAllowContinue = revealState != EndOfRunSummaryRevealState.RevealInProgress;
+        if (
+            !EndOfRunContinueStateEvaluator.TryShouldAllowContinue(
+                screenController,
+                _gate.IsAttemptInFlight(),
+                out var shouldAllowContinue
+            )
+        )
+        {
+            _lastContinueShouldBeInteractable = null;
+            return;
+        }
+
         if (_lastContinueShouldBeInteractable == shouldAllowContinue)
             return;
 

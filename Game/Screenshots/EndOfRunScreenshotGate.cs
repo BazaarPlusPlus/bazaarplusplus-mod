@@ -25,7 +25,6 @@ internal sealed class EndOfRunScreenshotGate
 
     public void MarkAttemptCompleted()
     {
-        _attemptInFlight = false;
         _capturedForCurrentRun = true;
     }
 
@@ -45,6 +44,7 @@ internal sealed class EndOfRunScreenshotGate
             return false;
 
         _allowNextContinuePassthrough = false;
+        _attemptInFlight = false;
         return true;
     }
 

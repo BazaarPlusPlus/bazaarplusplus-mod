@@ -41,6 +41,11 @@ Assert(
 InvokeMarkAttemptCompleted(gateType, gate);
 
 Assert(
+    InvokeIsAttemptInFlight(gateType, gate),
+    "Completed screenshot attempts should keep continue suppressed until the queued passthrough executes."
+);
+
+Assert(
     !InvokeShouldCapture(gateType, gate, isInteractionBlocked: false),
     "Completed screenshot attempts should permanently consume this run's capture."
 );
@@ -61,6 +66,10 @@ Assert(
     !InvokeConsumePassthrough(gateType, gate),
     "Passthrough should be consumed after one invocation."
 );
+Assert(
+    !InvokeIsAttemptInFlight(gateType, gate),
+    "Consuming passthrough should clear the in-flight suppression state."
+);
 
 var pathBuilderType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.ScreenshotPathBuilder",
@@ -74,6 +83,10 @@ var continueButtonFeedbackType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.EndOfRunContinueButtonFeedback",
     throwOnError: true
 )!;
+var continueStateEvaluatorType = RequireType(
+    assembly,
+    "BazaarPlusPlus.Game.Screenshots.EndOfRunContinueStateEvaluator"
+);
 var summaryRevealStateType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.EndOfRunSummaryRevealState",
     throwOnError: true
@@ -184,6 +197,54 @@ Assert(
     "Summary reveal state enum should expose the expected states."
 );
 
+Assert(
+    !InvokeShouldAllowContinue(
+        continueStateEvaluatorType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(),
+            transitionCount: 1
+        ),
+        suppressWhileCaptureInFlight: false
+    ),
+    "Continue should stay disabled while the game reports an end-of-run transition in progress."
+);
+Assert(
+    !InvokeShouldAllowContinue(
+        continueStateEvaluatorType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
+                new TheBazaar.UI.EndOfRun.FakeItemController(false)
+            )
+        ),
+        suppressWhileCaptureInFlight: false
+    ),
+    "Continue should stay disabled while summary cards are still revealing."
+);
+Assert(
+    !InvokeShouldAllowContinue(
+        continueStateEvaluatorType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
+                new TheBazaar.UI.EndOfRun.FakeItemController(true)
+            )
+        ),
+        suppressWhileCaptureInFlight: true
+    ),
+    "Continue should stay disabled while an automatic screenshot is still suppressing input."
+);
+Assert(
+    InvokeShouldAllowContinue(
+        continueStateEvaluatorType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
+                new TheBazaar.UI.EndOfRun.FakeItemController(true)
+            )
+        ),
+        suppressWhileCaptureInFlight: false
+    ),
+    "Continue should re-enable once reveal is complete, no transition is active, and capture suppression is cleared."
+);
+
 var screenWithButton = new TheBazaar.UI.EndOfRun.ScreenWithContinueButton();
 InvokeSyncContinueInteractable(continueButtonFeedbackType, screenWithButton, shouldAllowContinue: false);
 Assert(
@@ -247,6 +308,17 @@ static void InvokeMarkAttemptCompleted(Type type, object instance)
     }
 
     method.Invoke(instance, []);
+}
+
+static bool InvokeIsAttemptInFlight(Type type, object instance)
+{
+    var method = type.GetMethod("IsAttemptInFlight", BindingFlags.Public | BindingFlags.Instance);
+    if (method == null)
+    {
+        throw new InvalidOperationException($"Method not found: {type.FullName}.IsAttemptInFlight");
+    }
+
+    return (bool)(method.Invoke(instance, []) ?? false);
 }
 
 static void InvokeAllowNextPassthrough(Type type, object instance)
@@ -330,6 +402,29 @@ static void InvokeSyncContinueInteractable(Type type, object screenController, b
     method.Invoke(null, [screenController, shouldAllowContinue]);
 }
 
+static bool InvokeShouldAllowContinue(
+    Type type,
+    object screenController,
+    bool suppressWhileCaptureInFlight
+)
+{
+    var method = type.GetMethod("ShouldAllowContinue", BindingFlags.Public | BindingFlags.Static);
+    if (method == null)
+    {
+        throw new InvalidOperationException(
+            $"Method not found: {type.FullName}.ShouldAllowContinue"
+        );
+    }
+
+    return (bool)(method.Invoke(null, [screenController, suppressWhileCaptureInFlight]) ?? false);
+}
+
+static Type RequireType(Assembly assembly, string fullName)
+{
+    return assembly.GetType(fullName, throwOnError: true)
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
 static void Assert(bool condition, string message)
 {
     if (!condition)
@@ -341,10 +436,12 @@ namespace TheBazaar.UI.EndOfRun
     public sealed class EndOfRunScreenController
     {
         private readonly object? _activeController;
+        private readonly int _transitionCount;
 
-        public EndOfRunScreenController(object? activeController)
+        public EndOfRunScreenController(object? activeController, int transitionCount = 0)
         {
             _activeController = activeController;
+            _transitionCount = transitionCount;
         }
     }
 
