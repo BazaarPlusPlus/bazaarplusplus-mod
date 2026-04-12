@@ -35,10 +35,10 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 ### 怪物预览（Monster Preview）
 
-- 右键锁定怪物或遭遇牌时，可显示 Bazaar++ 自定义预览（物品与技能面板）
-- 优先 `MonsterDatabase` 静态数据，缺失时回退 **EncounterTracker** 运行时缓存
-- 配置项 **Use native preview** 为 true 时走游戏原生预览（历史面板内战斗预览不受此项单独约束）
-- 与 **Showcase** 卡片 tooltip 锁、预览板表面等补丁协同（`Patches/Showcase/`）
+- 默认走游戏原生怪物预览
+- Bazaar++ 在原生 tooltip 路径上做局部增强：按需补 monster 上下文、附魔/升级预览注入、showcase tooltip 锁绕过
+- `MonsterPreviewItemBoardRuntime` / `CardSetPreviewRuntime` 会复用原生 `MonsterBoardTooltip` 来展示 Bazaar++ 自己组织的 board 内容
+- 历史面板预览继续使用共享 `PreviewSurface`，不受怪物原生预览路径切换影响
 
 详见 `docs/monster-preview-design.md`。
 

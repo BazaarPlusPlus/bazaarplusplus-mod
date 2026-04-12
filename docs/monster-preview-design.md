@@ -2,54 +2,69 @@
 
 ## Scope
 
-本文只描述当前 shipped 的怪物预览实现，不再保留旧调研和一次性设计过程。
+本文只描述当前 shipped 的怪物预览实现。
+
+2026-04 的清理中，旧的 Bazaar++ 自绘 monster showcase 路径已经删除。当前运行时保留的是：
+
+- 原生怪物 tooltip / monster board 的局部增强
+- 基于原生 `MonsterBoardTooltip` 的 Bazaar++ item-board overlay
+- `HistoryPanel` 使用的共享 `PreviewSurface`
 
 ## Runtime Entry
 
-`Plugin.cs` 当前挂载：
+`Plugin.cs` 当前挂载的怪物预览相关运行时：
 
-- `MonsterPreviewController`
 - `MonsterPreviewWarmupController`
-- `MonsterLockShowcaseRuntime`
+- `CardSetPreviewRuntime`
+- `MonsterPreviewItemBoardRuntime`
 
-主流程：
+## 当前主路径
+
+默认的野怪预览展示走游戏原生 monster preview。
+
+Bazaar++ 只在原生路径前后做局部注入：
 
 ```text
-CardTooltipController.LockTooltipToggle()
-  -> ShowcaseTooltipPatches
-  -> MonsterLockShowcaseRuntime
-  -> MonsterPreviewController
-  -> MonsterPreviewOverlayCoordinator
-  -> PreviewBoardSession
-  -> MonsterPreviewBoardRenderTarget
-  -> MonsterPreviewBoard
+CardController.ShowTooltips() / GetTooltipData()
+  -> NativeMonsterPreviewTooltipPatch
+  -> NativeMonsterTooltipAugmenter
+  -> 原生 CardTooltip / MonsterBoardTooltip
 ```
 
-## 当前行为
+这里的 augment 是兜底式补充：仅当 `CardTooltipData` 尚未带 monster 上下文时才会补，不会覆盖已有原生数据。
 
-- 右键锁定怪物 / 遭遇牌时，Bazaar++ 可拦截原生 lock-toggle，展示自定义怪物预览。
-- `MonsterLockShowcaseRuntime` 先尝试从 `MonsterDatabase` 构建预览数据。
-- 若静态数据缺失，则回退到 `EncounterTracker` + `EncounterPreviewSpecConverter` 的运行时缓存。
-- 重复触发同一目标时会走隐藏 / 下一次点击关闭的控制逻辑。
-- `UseNativeMonsterPreview` 设置开启时，运行时会让回原生预览路径。
+## 相关旁路
+
+### Item-board overlay
+
+`MonsterPreviewItemBoardRuntime` 和 `CardSetPreviewRuntime` 仍会复用游戏原生 `MonsterBoardTooltip` 作为宿主，克隆一份 tooltip view，再把 Bazaar++ 自己组织的 item set 渲染进去：
+
+```text
+CardSetPreviewRuntime / MonsterPreviewItemBoardRuntime
+  -> ItemBoardService
+  -> ItemBoardOverlay
+  -> cloned MonsterBoardTooltip
+```
+
+这条路径用于内容推荐和 board-only 展示，不是旧的 monster self-render showcase。
+
+### History Panel
+
+`HistoryPanel` 仍然使用 Bazaar++ 的自绘 preview surface，但它走的是共享的 `Game/PreviewSurface` 渲染栈，与旧 monster showcase 已经解耦。
 
 ## 关键文件
 
 - `Plugin.cs`
-- `Patches/Showcase/ShowcaseTooltipPatches.cs`
-- `Game/MonsterPreview/MonsterLockShowcaseRuntime.cs`
-- `Game/MonsterPreview/MonsterPreviewController.cs`
 - `Game/MonsterPreview/MonsterPreviewWarmupController.cs`
-- `Game/MonsterPreview/MonsterPreviewModeSwitchCoordinator.cs`
-- `Game/MonsterPreview/Architecture/MonsterPreviewOverlayCoordinator.cs`
-- `Game/MonsterPreview/Architecture/PreviewBoardSession.cs`
-- `Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoardRenderTarget.cs`
-- `Game/MonsterPreview/GameObjectFactory/MonsterPreviewBoard.cs`
-- `Game/MonsterPreview/DataSources/MonsterDatabasePreviewDataSource.cs`
-- `Game/EncounterTracker.cs`
-- `Game/EncounterPreviewSpecConverter.cs`
+- `Game/MonsterPreview/MonsterPreviewItemBoardRuntime.cs`
+- `Game/MonsterPreview/CardSetPreviewRuntime.cs`
+- `Patches/Tooltips/NativeMonsterPreviewTooltipPatch.cs`
+- `Game/Tooltips/NativeMonsterTooltipAugmenter.cs`
+- `Game/ItemBoard/ItemBoardOverlay.cs`
+- `Game/HistoryPanel/HistoryPanelPreviewRenderer.cs`
+- `Game/PreviewSurface/Board/PreviewBoardSurface.cs`
 
 ## Debug
 
-- 当前 debug build 不再单独挂载 `MonsterPreviewDebugController`。
-- 与怪物预览相关的 debug 可见性主要通过 `DebugPanel` 的 `Encounters` 区域和 `Game/MonsterPreview/Debug/MonsterPreviewDebugTuner.cs` 协助排查。
+- 怪物 tooltip / item-board 问题优先看 `NativeMonsterPreviewTooltipPatch`、`MonsterPreviewItemBoardRuntime`、`ItemBoardOverlay` 的日志。
+- `HistoryPanel` 预览问题看 `HistoryPanelPreviewRenderer` 与 `PreviewBoardRenderTarget`。

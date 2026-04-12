@@ -70,13 +70,13 @@ This preserves cancel-and-replace semantics without allowing late `Clear()` call
 
 ### 5. Runtime consumers rewired to the new boundary
 
-`MonsterPreviewController` now consumes `IBoardRenderTarget` created through `PreviewBoardRenderTargetFactory`.
+At the time of this refactor, both the monster showcase flow and `HistoryPanel` consumed the shared render-target boundary.
 
-`HistoryPanelPreviewRenderer` now uses `PreviewBoardSurface` plus `PreviewBoardRenderTarget` instead of directly driving the old monster-named board implementation. This keeps history preview on the same host/cancellation path as the main preview flow.
+Today, the monster self-render showcase path has been removed, while `HistoryPanelPreviewRenderer` still uses `PreviewBoardSurface` plus `PreviewBoardRenderTarget`. The shared host/cancellation model remains the active architecture for `HistoryPanel`.
 
-### 6. Old monster-named files left as moved placeholders
+### 6. Later cleanup
 
-The old monster-specific files were replaced with short “moved to” placeholders and excluded from compilation in `BazaarPlusPlus.csproj`. This preserves path discoverability without keeping duplicate compiled implementations.
+The old monster-specific showcase runtime, controller, projector, and request/session glue were deleted in a later cleanup once the runtime had fully converged on native monster preview plus shared `PreviewSurface` consumers.
 
 ## Verification
 
