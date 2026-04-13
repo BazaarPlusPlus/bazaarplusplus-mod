@@ -9,11 +9,11 @@ export function getRunBundleRetentionDays(): number {
 }
 
 export function getBattleIngestMinRating(): number {
-  return 1600;
+  return 500;
 }
 
 export function getBattleIngestMinDayIfBelowRating(): number {
-  return 10;
+  return 7;
 }
 
 export function allowUnauthenticatedReplayDownloads(env: Env): boolean {
