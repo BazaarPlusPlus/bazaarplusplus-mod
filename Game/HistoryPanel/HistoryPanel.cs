@@ -226,6 +226,9 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void SetHistoryVisible(bool visible)
     {
+        if (visible)
+            EnsureUi();
+
         IsVisible = visible;
         if (visible)
             _coordinator?.OnPanelShown();
@@ -371,8 +374,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         Instance = this;
         _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
         PrewarmUiFontState($"init:{source}");
-        EnsureUi();
-        SetUiVisible(false);
     }
 
     private void DetectSceneChange()
