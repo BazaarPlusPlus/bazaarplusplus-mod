@@ -38,7 +38,7 @@ internal static class EndOfRunSummaryRevealDetector
                 ActiveControllerFieldName,
                 out var activeController,
                 ref _warnedMissingActiveControllerField,
-                "Failed to resolve EndOfRunScreenController._activeController; continue button gating will fall back to the game's default behavior."
+                "Failed to resolve EndOfRunScreenController._activeController; end-of-run mouse blocking will fall back to the game's default behavior."
             ))
         {
             return EndOfRunSummaryRevealState.DetectionFailed;
@@ -52,7 +52,7 @@ internal static class EndOfRunSummaryRevealDetector
                 LoadedCardsFieldName,
                 out var loadedCardsValue,
                 ref _warnedMissingLoadedCardsField,
-                "Failed to resolve EndOfRunSummaryController.loadedCards; continue button gating will fall back to the game's default behavior."
+                "Failed to resolve EndOfRunSummaryController.loadedCards; end-of-run mouse blocking will fall back to the game's default behavior."
             ))
         {
             return EndOfRunSummaryRevealState.DetectionFailed;
@@ -69,7 +69,7 @@ internal static class EndOfRunSummaryRevealDetector
                     AnimatorPropertyName,
                     out var animator,
                     ref _warnedMissingAnimatorProperty,
-                    "Failed to resolve summary card Animator; continue button gating will fall back to the game's default behavior."
+                    "Failed to resolve summary card Animator; end-of-run mouse blocking will fall back to the game's default behavior."
                 ))
             {
                 return EndOfRunSummaryRevealState.DetectionFailed;
@@ -81,7 +81,7 @@ internal static class EndOfRunSummaryRevealDetector
                     FaceUpParamName,
                     out var isFaceUp,
                     ref _warnedMissingAnimatorGetBool,
-                    "Failed to resolve Animator.GetBool(string) for summary reveal detection; continue button gating will fall back to the game's default behavior."
+                    "Failed to resolve Animator.GetBool(string) for summary reveal detection; end-of-run mouse blocking will fall back to the game's default behavior."
                 ))
             {
                 return EndOfRunSummaryRevealState.DetectionFailed;

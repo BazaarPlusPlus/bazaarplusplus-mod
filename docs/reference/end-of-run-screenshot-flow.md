@@ -16,15 +16,17 @@
 
 ## Trigger
 
-`EndOfRunScreenController.OnContinueClick()` 会被 patch 拦截。
+终局界面出现后，Bazaar++ 会在 `EndOfRunScreenController` 上挂一个全屏透明鼠标 blocker。
 
 只有满足以下条件时，才会触发截图：
 
 1. 当前不在结束页转场中
 2. 本局还没有完成过一次终局自动截图
-3. 当前没有正在进行中的截图尝试
+3. 当前 summary reveal 已经完成
 
-截图会在当前帧末尾排队，随后下一帧放行原始 `Continue`。
+在 reveal 或转场尚未完成前，blocker 会吞掉鼠标输入。
+
+一旦 reveal 完成，截图会在当前帧末尾排队；如果截图尝试失败，这局仍允许后续再次尝试。截图完成后 blocker 会被移除。
 
 ## Storage Layout
 
@@ -87,13 +89,13 @@
 
 ## Capture Flow
 
-1. patch 拦截 `EndOfRunScreenController.OnContinueClick()`
-2. gate 判断这是不是本局第一次有效 continue
-3. 进入 `WaitForEndOfFrame`
-4. `ScreenshotService.CaptureCurrentFrame(...)` 写 PNG
-5. `RunScreenshotSqliteStore.Save(...)` 写入元数据
-6. 标记本局截图已完成
-7. 下一帧放行一次性 passthrough，恢复原始 `Continue`
+1. controller 每帧检查终局界面是否还在转场或 summary reveal 中
+2. 如果还没完成，就保持全屏透明 blocker 吞掉鼠标点击
+3. 当 reveal 完成后，gate 判断这是不是本局第一次可执行的终局截图
+4. 进入 `WaitForEndOfFrame`
+5. `ScreenshotService.CaptureCurrentFrame(...)` 写 PNG
+6. `RunScreenshotSqliteStore.Save(...)` 写入元数据
+7. 移除 blocker，恢复终局界面的鼠标点击
 
 ## UI Suppression
 

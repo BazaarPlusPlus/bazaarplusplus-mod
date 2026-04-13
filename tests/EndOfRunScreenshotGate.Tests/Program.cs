@@ -12,63 +12,49 @@ var gate =
     ?? throw new InvalidOperationException("Failed to construct EndOfRunScreenshotGate.");
 
 Assert(
-    !InvokeShouldCapture(gateType, gate, isInteractionBlocked: true),
-    "Blocked continue interactions should not trigger a screenshot."
+    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: true, nowSeconds: 0f),
+    "Blocked end-of-run states should not consume the per-run screenshot."
 );
 
 Assert(
-    InvokeShouldCapture(gateType, gate, isInteractionBlocked: false),
-    "The first available continue interaction should arm a screenshot attempt."
+    InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
+    "The first unblocked end-of-run state should trigger the screenshot."
 );
 
 Assert(
-    !InvokeShouldCapture(gateType, gate, isInteractionBlocked: false),
-    "Only one in-flight screenshot attempt should be allowed at a time."
+    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
+    "Only one capture attempt should be in flight at a time."
 );
 
-InvokeMarkAttemptAborted(gateType, gate);
+InvokeAbortCaptureAttempt(gateType, gate, retryAvailableAtSeconds: 5f);
 
 Assert(
-    InvokeShouldCapture(gateType, gate, isInteractionBlocked: false),
-    "Aborted screenshot attempts should re-open the capture opportunity."
-);
-
-Assert(
-    !InvokeShouldCapture(gateType, gate, isInteractionBlocked: false),
-    "Only one in-flight screenshot attempt should be allowed after re-arming."
-);
-
-InvokeMarkAttemptCompleted(gateType, gate);
-
-Assert(
-    InvokeIsAttemptInFlight(gateType, gate),
-    "Completed screenshot attempts should keep continue suppressed until the queued passthrough executes."
+    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 4.99f),
+    "A failed capture attempt should stay throttled until the retry window opens."
 );
 
 Assert(
-    !InvokeShouldCapture(gateType, gate, isInteractionBlocked: false),
-    "Completed screenshot attempts should permanently consume this run's capture."
+    InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 5f),
+    "A failed capture attempt should re-open the screenshot opportunity."
+);
+
+InvokeCompleteCaptureAttempt(gateType, gate);
+
+Assert(
+    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 10f),
+    "A completed screenshot should stay consumed for the rest of the run."
 );
 
 InvokeResetForNewRun(gateType, gate);
 
 Assert(
-    InvokeShouldCapture(gateType, gate, isInteractionBlocked: false),
+    InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
     "Starting a new run should re-arm the screenshot gate."
 );
 
-InvokeAllowNextPassthrough(gateType, gate);
 Assert(
-    InvokeConsumePassthrough(gateType, gate),
-    "Allowing passthrough should permit exactly one follow-up continue invocation."
-);
-Assert(
-    !InvokeConsumePassthrough(gateType, gate),
-    "Passthrough should be consumed after one invocation."
-);
-Assert(
-    !InvokeIsAttemptInFlight(gateType, gate),
-    "Consuming passthrough should clear the in-flight suppression state."
+    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
+    "Only one capture attempt should be in flight after re-arming for a new run."
 );
 
 var pathBuilderType = assembly.GetType(
@@ -77,10 +63,6 @@ var pathBuilderType = assembly.GetType(
 )!;
 var summaryRevealDetectorType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.EndOfRunSummaryRevealDetector",
-    throwOnError: true
-)!;
-var continueButtonFeedbackType = assembly.GetType(
-    "BazaarPlusPlus.Game.Screenshots.EndOfRunContinueButtonFeedback",
     throwOnError: true
 )!;
 var continueStateEvaluatorType = RequireType(
@@ -221,18 +203,6 @@ Assert(
     "Continue should stay disabled while summary cards are still revealing."
 );
 Assert(
-    !InvokeShouldAllowContinue(
-        continueStateEvaluatorType,
-        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
-            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
-                new TheBazaar.UI.EndOfRun.FakeItemController(true)
-            )
-        ),
-        suppressWhileCaptureInFlight: true
-    ),
-    "Continue should stay disabled while an automatic screenshot is still suppressing input."
-);
-Assert(
     InvokeShouldAllowContinue(
         continueStateEvaluatorType,
         new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
@@ -242,36 +212,23 @@ Assert(
         ),
         suppressWhileCaptureInFlight: false
     ),
-    "Continue should re-enable once reveal is complete, no transition is active, and capture suppression is cleared."
-);
-
-var screenWithButton = new TheBazaar.UI.EndOfRun.ScreenWithContinueButton();
-InvokeSyncContinueInteractable(continueButtonFeedbackType, screenWithButton, shouldAllowContinue: false);
-Assert(
-    screenWithButton.ContinueButton.SetUnInteractableCount == 1
-        && screenWithButton.ContinueButton.SetInteractableCount == 0,
-    "Blocking summary reveal should disable the continue button."
-);
-InvokeSyncContinueInteractable(continueButtonFeedbackType, screenWithButton, shouldAllowContinue: true);
-Assert(
-    screenWithButton.ContinueButton.SetInteractableCount == 1,
-    "Resolved summary reveal should re-enable the continue button."
+    "Mouse blocking should clear once reveal is complete and no transition is active."
 );
 
 Console.WriteLine("End-of-run screenshot gate checks passed.");
 
-static bool InvokeShouldCapture(Type type, object instance, bool isInteractionBlocked)
+static bool InvokeTryBeginCapture(Type type, object instance, bool isInteractionBlocked, float nowSeconds)
 {
     var method = type.GetMethod(
-        "ShouldCaptureOnContinue",
+        "TryBeginCapture",
         BindingFlags.Public | BindingFlags.Instance
     );
     if (method == null)
         throw new InvalidOperationException(
-            $"Method not found: {type.FullName}.ShouldCaptureOnContinue"
+            $"Method not found: {type.FullName}.TryBeginCapture"
         );
 
-    return (bool)(method.Invoke(instance, [isInteractionBlocked]) ?? false);
+    return (bool)(method.Invoke(instance, [isInteractionBlocked, nowSeconds]) ?? false);
 }
 
 static void InvokeResetForNewRun(Type type, object instance)
@@ -283,74 +240,30 @@ static void InvokeResetForNewRun(Type type, object instance)
     method.Invoke(instance, []);
 }
 
-static void InvokeMarkAttemptAborted(Type type, object instance)
+static void InvokeAbortCaptureAttempt(Type type, object instance, float retryAvailableAtSeconds)
 {
-    var method = type.GetMethod("MarkAttemptAborted", BindingFlags.Public | BindingFlags.Instance);
-    if (method == null)
-        throw new InvalidOperationException(
-            $"Method not found: {type.FullName}.MarkAttemptAborted"
-        );
-
-    method.Invoke(instance, []);
-}
-
-static void InvokeMarkAttemptCompleted(Type type, object instance)
-{
-    var method = type.GetMethod(
-        "MarkAttemptCompleted",
-        BindingFlags.Public | BindingFlags.Instance
-    );
+    var method = type.GetMethod("AbortCaptureAttempt", BindingFlags.Public | BindingFlags.Instance);
     if (method == null)
     {
         throw new InvalidOperationException(
-            $"Method not found: {type.FullName}.MarkAttemptCompleted"
+            $"Method not found: {type.FullName}.AbortCaptureAttempt"
         );
     }
 
-    method.Invoke(instance, []);
+    method.Invoke(instance, [retryAvailableAtSeconds]);
 }
 
-static bool InvokeIsAttemptInFlight(Type type, object instance)
+static void InvokeCompleteCaptureAttempt(Type type, object instance)
 {
-    var method = type.GetMethod("IsAttemptInFlight", BindingFlags.Public | BindingFlags.Instance);
-    if (method == null)
-    {
-        throw new InvalidOperationException($"Method not found: {type.FullName}.IsAttemptInFlight");
-    }
-
-    return (bool)(method.Invoke(instance, []) ?? false);
-}
-
-static void InvokeAllowNextPassthrough(Type type, object instance)
-{
-    var method = type.GetMethod(
-        "AllowNextContinuePassthrough",
-        BindingFlags.Public | BindingFlags.Instance
-    );
+    var method = type.GetMethod("CompleteCaptureAttempt", BindingFlags.Public | BindingFlags.Instance);
     if (method == null)
     {
         throw new InvalidOperationException(
-            $"Method not found: {type.FullName}.AllowNextContinuePassthrough"
+            $"Method not found: {type.FullName}.CompleteCaptureAttempt"
         );
     }
 
     method.Invoke(instance, []);
-}
-
-static bool InvokeConsumePassthrough(Type type, object instance)
-{
-    var method = type.GetMethod(
-        "ConsumeContinuePassthrough",
-        BindingFlags.Public | BindingFlags.Instance
-    );
-    if (method == null)
-    {
-        throw new InvalidOperationException(
-            $"Method not found: {type.FullName}.ConsumeContinuePassthrough"
-        );
-    }
-
-    return (bool)(method.Invoke(instance, []) ?? false);
 }
 
 static string InvokeBuildRelativePath(Type type, string? runId, DateTimeOffset capturedAtLocal)
@@ -384,22 +297,6 @@ static string InvokeGetSummaryRevealState(Type detectorType, Type stateType, obj
         ?? throw new InvalidOperationException("GetRevealState returned null.");
     return Enum.GetName(stateType, value)
         ?? throw new InvalidOperationException("Reveal state enum name was null.");
-}
-
-static void InvokeSyncContinueInteractable(Type type, object screenController, bool shouldAllowContinue)
-{
-    var method = type.GetMethod(
-        "SyncInteractivity",
-        BindingFlags.Public | BindingFlags.Static
-    );
-    if (method == null)
-    {
-        throw new InvalidOperationException(
-            $"Method not found: {type.FullName}.SyncInteractivity"
-        );
-    }
-
-    method.Invoke(null, [screenController, shouldAllowContinue]);
 }
 
 static bool InvokeShouldAllowContinue(
@@ -481,30 +378,6 @@ namespace TheBazaar.UI.EndOfRun
         public bool GetBool(string parameterName)
         {
             return parameterName == "FaceUp" && _faceUp;
-        }
-    }
-
-    public sealed class ScreenWithContinueButton
-    {
-        private readonly FakeContinueButton continueButton = new();
-
-        public FakeContinueButton ContinueButton => continueButton;
-    }
-
-    public sealed class FakeContinueButton
-    {
-        public int SetInteractableCount { get; private set; }
-
-        public int SetUnInteractableCount { get; private set; }
-
-        public void SetInteractable()
-        {
-            SetInteractableCount++;
-        }
-
-        public void SetUnInteractable()
-        {
-            SetUnInteractableCount++;
         }
     }
 }

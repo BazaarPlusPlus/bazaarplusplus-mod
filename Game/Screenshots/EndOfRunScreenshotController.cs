@@ -5,7 +5,6 @@ using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Screenshots.Persistence;
 using BazaarPlusPlus.Game.Settings;
-using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
 using UnityEngine;
@@ -15,22 +14,19 @@ namespace BazaarPlusPlus.Game.Screenshots;
 
 internal sealed class EndOfRunScreenshotController : MonoBehaviour
 {
-    private static readonly System.Reflection.MethodInfo ContinueClickMethod = AccessTools.Method(
-        typeof(EndOfRunScreenController),
-        "OnContinueClick"
-    )!;
-    private static EndOfRunScreenshotController? _current;
+    private const float CaptureRetryCooldownSeconds = 1f;
     private readonly EndOfRunScreenshotGate _gate = new();
+    private readonly EndOfRunMouseBlocker _mouseBlocker = new();
     private ScreenshotService? _screenshotService;
     private RunScreenshotSqliteStore? _screenshotStore;
     private IDisposable? _runInitializedSubscription;
+    private IDisposable? _captureSuppressionScope;
+    private Coroutine? _captureCoroutine;
     private string? _bufferedRunId;
     private string? _bufferedHeroName;
-    private bool? _lastContinueShouldBeInteractable;
 
     private void Awake()
     {
-        _current = this;
         RefreshBufferedRunContext();
 
         var screenshotsDirectoryPath = BppRuntimeHost.Paths.ScreenshotsDirectoryPath;
@@ -62,22 +58,23 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         Events.RunStarted.RemoveListener(OnRunStarted);
         _runInitializedSubscription?.Dispose();
         _runInitializedSubscription = null;
+        ResetCaptureUiState();
     }
 
     private void OnDestroy()
     {
-        if (ReferenceEquals(_current, this))
-            _current = null;
+        ResetCaptureUiState();
     }
 
     private void Update()
     {
-        SyncEndOfRunContinueInteractivity();
+        SyncEndOfRunMouseBlocker();
     }
 
     private void OnRunStarted()
     {
         _gate.ResetForNewRun();
+        ResetCaptureUiState();
         ResetBufferedRunContext();
         RefreshBufferedRunContext();
     }
@@ -90,80 +87,52 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         RefreshBufferedRunContext();
     }
 
-    public static bool TryConsumeContinuePassthrough()
-    {
-        return _current?.ConsumeContinuePassthrough() == true;
-    }
-
-    public static bool ShouldSuppressContinueWhileCaptureInFlight()
-    {
-        return _current?.GetShouldSuppressContinueWhileCaptureInFlight() == true;
-    }
-
-    private bool ConsumeContinuePassthrough()
-    {
-        return _gate.ConsumeContinuePassthrough();
-    }
-
-    private bool GetShouldSuppressContinueWhileCaptureInFlight()
-    {
-        return _gate.IsAttemptInFlight();
-    }
-
-    public static bool TryCaptureFirstContinue(
-        EndOfRunScreenController controller,
-        bool isInteractionBlocked
-    )
-    {
-        return _current?.CaptureFirstContinue(controller, isInteractionBlocked) == true;
-    }
-
-    private bool CaptureFirstContinue(
-        EndOfRunScreenController controller,
-        bool isInteractionBlocked
-    )
-    {
-        if (_screenshotService == null || !_gate.ShouldCaptureOnContinue(isInteractionBlocked))
-            return false;
-
-        StartCoroutine(CaptureAndContinue(controller));
-        return true;
-    }
-
-    private IEnumerator CaptureAndContinue(EndOfRunScreenController controller)
+    private IEnumerator CaptureEndOfRun()
     {
         ScreenshotCaptureResult? capture = null;
-        using (BeginUiSuppression())
+        try
         {
+            _captureSuppressionScope = BeginUiSuppression();
             yield return new WaitForEndOfFrame();
-            capture = _screenshotService?.CaptureCurrentFrame(
-                new ScreenshotCaptureRequest
+
+            try
+            {
+                capture = _screenshotService?.CaptureCurrentFrame(
+                    new ScreenshotCaptureRequest
+                    {
+                        RunId = ResolveRunId(),
+                        HeroName = ResolveHeroName(),
+                        CaptureSource = RunScreenshotCaptureSource.EndOfRunAuto,
+                    }
+                );
+                if (capture != null)
                 {
-                    RunId = ResolveRunId(),
-                    HeroName = ResolveHeroName(),
-                    CaptureSource = RunScreenshotCaptureSource.EndOfRunAuto,
+                    PersistCapture(capture, isPrimary: true);
+                    _gate.CompleteCaptureAttempt();
                 }
-            );
+                else
+                {
+                    _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
+                    BppLog.Warn(
+                        "EndOfRunScreenshot",
+                        "Screenshot attempt aborted before it could be queued."
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
+                BppLog.Error("EndOfRunScreenshot", "End-of-run screenshot capture failed.", ex);
+            }
         }
-        var screenshotQueued = capture != null;
-        if (screenshotQueued)
+        finally
         {
-            PersistCapture(capture, isPrimary: true);
-            _gate.MarkAttemptCompleted();
+            _captureCoroutine = null;
+            DisposeCaptureSuppressionScope();
+            if (_gate.IsCaptureAttemptInFlight())
+                _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
+            _mouseBlocker.Detach();
         }
-        else
-        {
-            _gate.MarkAttemptAborted();
-            BppLog.Warn(
-                "EndOfRunScreenshot",
-                "Screenshot attempt aborted before it could be queued."
-            );
-        }
-
-        yield return null;
-
-        _gate.AllowNextContinuePassthrough();
-        ContinueClickMethod.Invoke(controller, []);
     }
 
     private void PersistCapture(ScreenshotCaptureResult? capture, bool isPrimary = false)
@@ -218,33 +187,88 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         );
     }
 
-    private void SyncEndOfRunContinueInteractivity()
+    private void DisposeCaptureSuppressionScope()
     {
-        var screenController = UnityEngine.Object.FindObjectOfType<EndOfRunScreenController>(
+        _captureSuppressionScope?.Dispose();
+        _captureSuppressionScope = null;
+    }
+
+    private void ResetCaptureUiState()
+    {
+        if (_captureCoroutine != null)
+        {
+            StopCoroutine(_captureCoroutine);
+            _captureCoroutine = null;
+        }
+
+        DisposeCaptureSuppressionScope();
+        _gate.CancelCaptureAttempt();
+        _mouseBlocker.Detach();
+    }
+
+    private static EndOfRunScreenController? FindActiveEndOfRunScreenController()
+    {
+        var controllers = UnityEngine.Object.FindObjectsOfType<EndOfRunScreenController>(
             includeInactive: true
         );
+        foreach (var controller in controllers)
+        {
+            if (controller == null)
+                continue;
+
+            if (controller.gameObject.activeInHierarchy)
+                return controller;
+        }
+
+        return null;
+    }
+
+    private void SyncEndOfRunMouseBlocker()
+    {
+        if (_screenshotService == null)
+        {
+            _mouseBlocker.Detach();
+            return;
+        }
+
+        var screenController = FindActiveEndOfRunScreenController();
         if (screenController == null)
         {
-            _lastContinueShouldBeInteractable = null;
+            _mouseBlocker.Detach();
+            return;
+        }
+
+        if (_gate.IsCaptureAttemptInFlight())
+        {
+            _mouseBlocker.Attach(screenController);
             return;
         }
 
         if (
             !EndOfRunContinueStateEvaluator.TryShouldAllowContinue(
                 screenController,
-                _gate.IsAttemptInFlight(),
+                suppressWhileCaptureInFlight: false,
                 out var shouldAllowContinue
             )
         )
         {
-            _lastContinueShouldBeInteractable = null;
+            _mouseBlocker.Detach();
             return;
         }
 
-        if (_lastContinueShouldBeInteractable == shouldAllowContinue)
+        if (!shouldAllowContinue)
+        {
+            _mouseBlocker.Attach(screenController);
             return;
+        }
 
-        _lastContinueShouldBeInteractable = shouldAllowContinue;
-        EndOfRunContinueButtonFeedback.SyncInteractivity(screenController, shouldAllowContinue);
+        if (!_gate.TryBeginCapture(isInteractionBlocked: false, Time.unscaledTime))
+        {
+            _mouseBlocker.Detach();
+            return;
+        }
+
+        _mouseBlocker.Attach(screenController);
+        _captureCoroutine = StartCoroutine(CaptureEndOfRun());
     }
 }

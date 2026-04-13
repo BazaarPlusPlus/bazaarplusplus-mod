@@ -3,53 +3,51 @@ namespace BazaarPlusPlus.Game.Screenshots;
 
 internal sealed class EndOfRunScreenshotGate
 {
-    private bool _attemptInFlight;
-    private bool _capturedForCurrentRun;
-    private bool _allowNextContinuePassthrough;
+    private bool _captureAttemptInFlight;
+    private bool _captureConsumedForCurrentRun;
+    private float _retryAvailableAtSeconds;
 
-    public bool ShouldCaptureOnContinue(bool isInteractionBlocked)
+    public bool TryBeginCapture(bool isInteractionBlocked, float nowSeconds)
     {
-        if (isInteractionBlocked || _capturedForCurrentRun || _attemptInFlight)
+        if (
+            isInteractionBlocked
+            || _captureConsumedForCurrentRun
+            || _captureAttemptInFlight
+            || nowSeconds < _retryAvailableAtSeconds
+        )
             return false;
 
-        _attemptInFlight = true;
+        _captureAttemptInFlight = true;
         return true;
+    }
+
+    public void CompleteCaptureAttempt()
+    {
+        _captureAttemptInFlight = false;
+        _captureConsumedForCurrentRun = true;
+        _retryAvailableAtSeconds = 0f;
+    }
+
+    public void AbortCaptureAttempt(float retryAvailableAtSeconds)
+    {
+        _captureAttemptInFlight = false;
+        _retryAvailableAtSeconds = retryAvailableAtSeconds;
+    }
+
+    public void CancelCaptureAttempt()
+    {
+        _captureAttemptInFlight = false;
+    }
+
+    public bool IsCaptureAttemptInFlight()
+    {
+        return _captureAttemptInFlight;
     }
 
     public void ResetForNewRun()
     {
-        _attemptInFlight = false;
-        _capturedForCurrentRun = false;
-        _allowNextContinuePassthrough = false;
-    }
-
-    public void MarkAttemptCompleted()
-    {
-        _capturedForCurrentRun = true;
-    }
-
-    public void MarkAttemptAborted()
-    {
-        _attemptInFlight = false;
-    }
-
-    public void AllowNextContinuePassthrough()
-    {
-        _allowNextContinuePassthrough = true;
-    }
-
-    public bool ConsumeContinuePassthrough()
-    {
-        if (!_allowNextContinuePassthrough)
-            return false;
-
-        _allowNextContinuePassthrough = false;
-        _attemptInFlight = false;
-        return true;
-    }
-
-    public bool IsAttemptInFlight()
-    {
-        return _attemptInFlight;
+        _captureAttemptInFlight = false;
+        _captureConsumedForCurrentRun = false;
+        _retryAvailableAtSeconds = 0f;
     }
 }

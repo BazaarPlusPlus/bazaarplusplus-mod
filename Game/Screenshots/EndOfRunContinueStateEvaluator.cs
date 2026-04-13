@@ -74,7 +74,7 @@ internal static class EndOfRunContinueStateEvaluator
         _warnedMissingTransitionField = true;
         BppLog.Warn(
             "EndOfRunScreenshot",
-            "Failed to resolve EndOfRunScreenController._transitionCount; continue button gating will fall back to the game's default behavior."
+            "Failed to resolve EndOfRunScreenController._transitionCount; end-of-run mouse blocking will fall back to the game's default behavior."
         );
     }
 }
