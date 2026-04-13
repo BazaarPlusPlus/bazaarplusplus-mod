@@ -9,7 +9,7 @@ export function getRunBundleRetentionDays(): number {
 }
 
 export function getBattleIngestMinRating(): number {
-  return 500;
+  return 700;
 }
 
 export function getBattleIngestMinDayIfBelowRating(): number {
