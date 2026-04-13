@@ -5,6 +5,7 @@ using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Screenshots.Persistence;
 using BazaarPlusPlus.Game.Settings;
+using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
 using UnityEngine;
@@ -15,6 +16,11 @@ namespace BazaarPlusPlus.Game.Screenshots;
 internal sealed class EndOfRunScreenshotController : MonoBehaviour
 {
     private const float CaptureRetryCooldownSeconds = 1f;
+    private static readonly System.Reflection.MethodInfo ContinueClickMethod = AccessTools.Method(
+        typeof(EndOfRunScreenController),
+        "OnContinueClick"
+    )!;
+    private static EndOfRunScreenshotController? _current;
     private readonly EndOfRunScreenshotGate _gate = new();
     private readonly EndOfRunMouseBlocker _mouseBlocker = new();
     private ScreenshotService? _screenshotService;
@@ -27,6 +33,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void Awake()
     {
+        _current = this;
         RefreshBufferedRunContext();
 
         var screenshotsDirectoryPath = BppRuntimeHost.Paths.ScreenshotsDirectoryPath;
@@ -63,6 +70,9 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (ReferenceEquals(_current, this))
+            _current = null;
+
         ResetCaptureUiState();
     }
 
@@ -87,9 +97,62 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         RefreshBufferedRunContext();
     }
 
-    private IEnumerator CaptureEndOfRun()
+    public static bool TryConsumeContinuePassthrough()
+    {
+        return _current?.ConsumeContinuePassthrough() == true;
+    }
+
+    public static bool ShouldSuppressContinueWhileCaptureInFlight()
+    {
+        return _current?.ShouldBlockMouseInput() == true;
+    }
+
+    public static bool TryCaptureFirstContinue(
+        EndOfRunScreenController controller,
+        bool isInteractionBlocked
+    )
+    {
+        return _current?.CaptureFirstContinue(controller, isInteractionBlocked) == true;
+    }
+
+    private bool ConsumeContinuePassthrough()
+    {
+        return _gate.ConsumeContinuePassthrough();
+    }
+
+    private bool ShouldBlockMouseInput()
+    {
+        return _gate.IsAttemptInFlight();
+    }
+
+    private bool CaptureFirstContinue(
+        EndOfRunScreenController controller,
+        bool isInteractionBlocked
+    )
+    {
+        if (
+            _screenshotService == null
+            || !_gate.ShouldCaptureOnContinue(isInteractionBlocked, Time.unscaledTime)
+        )
+        {
+            return false;
+        }
+
+        if (_captureCoroutine != null)
+            return false;
+
+        var activeController = FindActiveEndOfRunScreenController();
+        if (activeController != null)
+            _mouseBlocker.Attach(activeController);
+
+        _captureCoroutine = StartCoroutine(CaptureAndContinue(controller));
+        return true;
+    }
+
+    private IEnumerator CaptureAndContinue(EndOfRunScreenController controller)
     {
         ScreenshotCaptureResult? capture = null;
+        var shouldPassthrough = false;
         try
         {
             _captureSuppressionScope = BeginUiSuppression();
@@ -108,7 +171,8 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                 if (capture != null)
                 {
                     PersistCapture(capture, isPrimary: true);
-                    _gate.CompleteCaptureAttempt();
+                    _gate.MarkAttemptCompleted();
+                    shouldPassthrough = true;
                 }
                 else
                 {
@@ -124,12 +188,19 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                 _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
                 BppLog.Error("EndOfRunScreenshot", "End-of-run screenshot capture failed.", ex);
             }
+
+            if (shouldPassthrough)
+            {
+                yield return null;
+                _gate.AllowNextContinuePassthrough();
+                ContinueClickMethod.Invoke(controller, []);
+            }
         }
         finally
         {
             _captureCoroutine = null;
             DisposeCaptureSuppressionScope();
-            if (_gate.IsCaptureAttemptInFlight())
+            if (_gate.IsAttemptInFlight() && !shouldPassthrough)
                 _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
             _mouseBlocker.Detach();
         }
@@ -238,16 +309,10 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             return;
         }
 
-        if (_gate.IsCaptureAttemptInFlight())
-        {
-            _mouseBlocker.Attach(screenController);
-            return;
-        }
-
         if (
             !EndOfRunContinueStateEvaluator.TryShouldAllowContinue(
                 screenController,
-                suppressWhileCaptureInFlight: false,
+                suppressWhileCaptureInFlight: _gate.IsAttemptInFlight(),
                 out var shouldAllowContinue
             )
         )
@@ -262,13 +327,6 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             return;
         }
 
-        if (!_gate.TryBeginCapture(isInteractionBlocked: false, Time.unscaledTime))
-        {
-            _mouseBlocker.Detach();
-            return;
-        }
-
-        _mouseBlocker.Attach(screenController);
-        _captureCoroutine = StartCoroutine(CaptureEndOfRun());
+        _mouseBlocker.Detach();
     }
 }

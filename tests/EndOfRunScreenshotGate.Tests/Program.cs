@@ -12,48 +12,107 @@ var gate =
     ?? throw new InvalidOperationException("Failed to construct EndOfRunScreenshotGate.");
 
 Assert(
-    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: true, nowSeconds: 0f),
-    "Blocked end-of-run states should not consume the per-run screenshot."
+    !InvokeShouldCaptureOnContinue(
+        gateType,
+        gate,
+        isInteractionBlocked: true,
+        nowSeconds: 0f
+    ),
+    "Blocked continue interactions should not trigger a screenshot."
 );
 
 Assert(
-    InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
-    "The first unblocked end-of-run state should trigger the screenshot."
+    InvokeShouldCaptureOnContinue(
+        gateType,
+        gate,
+        isInteractionBlocked: false,
+        nowSeconds: 0f
+    ),
+    "The first available continue interaction should arm a screenshot attempt."
 );
 
 Assert(
-    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
+    !InvokeShouldCaptureOnContinue(
+        gateType,
+        gate,
+        isInteractionBlocked: false,
+        nowSeconds: 0f
+    ),
     "Only one capture attempt should be in flight at a time."
 );
 
 InvokeAbortCaptureAttempt(gateType, gate, retryAvailableAtSeconds: 5f);
 
 Assert(
-    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 4.99f),
+    !InvokeShouldCaptureOnContinue(
+        gateType,
+        gate,
+        isInteractionBlocked: false,
+        nowSeconds: 4.99f
+    ),
     "A failed capture attempt should stay throttled until the retry window opens."
 );
 
 Assert(
-    InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 5f),
+    InvokeShouldCaptureOnContinue(
+        gateType,
+        gate,
+        isInteractionBlocked: false,
+        nowSeconds: 5f
+    ),
     "A failed capture attempt should re-open the screenshot opportunity."
 );
 
 InvokeCompleteCaptureAttempt(gateType, gate);
 
 Assert(
-    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 10f),
+    InvokeIsAttemptInFlight(gateType, gate),
+    "Completed screenshot attempts should keep continue suppressed until the queued passthrough executes."
+);
+
+Assert(
+    !InvokeShouldCaptureOnContinue(
+        gateType,
+        gate,
+        isInteractionBlocked: false,
+        nowSeconds: 10f
+    ),
     "A completed screenshot should stay consumed for the rest of the run."
+);
+
+InvokeAllowNextPassthrough(gateType, gate);
+Assert(
+    InvokeConsumePassthrough(gateType, gate),
+    "Allowing passthrough should permit exactly one follow-up continue invocation."
+);
+Assert(
+    !InvokeConsumePassthrough(gateType, gate),
+    "Passthrough should be consumed after one invocation."
+);
+Assert(
+    !InvokeIsAttemptInFlight(gateType, gate),
+    "Consuming passthrough should clear the in-flight suppression state."
 );
 
 InvokeResetForNewRun(gateType, gate);
 
 Assert(
-    InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
+    InvokeShouldCaptureOnContinue(
+        gateType,
+        gate,
+        isInteractionBlocked: false,
+        nowSeconds: 0f
+    ),
     "Starting a new run should re-arm the screenshot gate."
 );
 
 Assert(
-    !InvokeTryBeginCapture(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
+    !InvokeShouldCaptureOnContinue(
+        gateType,
+        gate,
+        isInteractionBlocked: false,
+        nowSeconds: 0f
+    ),
     "Only one capture attempt should be in flight after re-arming for a new run."
 );
 
@@ -203,6 +262,18 @@ Assert(
     "Continue should stay disabled while summary cards are still revealing."
 );
 Assert(
+    !InvokeShouldAllowContinue(
+        continueStateEvaluatorType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
+                new TheBazaar.UI.EndOfRun.FakeItemController(true)
+            )
+        ),
+        suppressWhileCaptureInFlight: true
+    ),
+    "Continue should stay disabled while an automatic screenshot is still suppressing input."
+);
+Assert(
     InvokeShouldAllowContinue(
         continueStateEvaluatorType,
         new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
@@ -217,15 +288,20 @@ Assert(
 
 Console.WriteLine("End-of-run screenshot gate checks passed.");
 
-static bool InvokeTryBeginCapture(Type type, object instance, bool isInteractionBlocked, float nowSeconds)
+static bool InvokeShouldCaptureOnContinue(
+    Type type,
+    object instance,
+    bool isInteractionBlocked,
+    float nowSeconds
+)
 {
     var method = type.GetMethod(
-        "TryBeginCapture",
+        "ShouldCaptureOnContinue",
         BindingFlags.Public | BindingFlags.Instance
     );
     if (method == null)
         throw new InvalidOperationException(
-            $"Method not found: {type.FullName}.TryBeginCapture"
+            $"Method not found: {type.FullName}.ShouldCaptureOnContinue"
         );
 
     return (bool)(method.Invoke(instance, [isInteractionBlocked, nowSeconds]) ?? false);
@@ -264,6 +340,49 @@ static void InvokeCompleteCaptureAttempt(Type type, object instance)
     }
 
     method.Invoke(instance, []);
+}
+
+static bool InvokeIsAttemptInFlight(Type type, object instance)
+{
+    var method = type.GetMethod("IsAttemptInFlight", BindingFlags.Public | BindingFlags.Instance);
+    if (method == null)
+    {
+        throw new InvalidOperationException($"Method not found: {type.FullName}.IsAttemptInFlight");
+    }
+
+    return (bool)(method.Invoke(instance, []) ?? false);
+}
+
+static void InvokeAllowNextPassthrough(Type type, object instance)
+{
+    var method = type.GetMethod(
+        "AllowNextContinuePassthrough",
+        BindingFlags.Public | BindingFlags.Instance
+    );
+    if (method == null)
+    {
+        throw new InvalidOperationException(
+            $"Method not found: {type.FullName}.AllowNextContinuePassthrough"
+        );
+    }
+
+    method.Invoke(instance, []);
+}
+
+static bool InvokeConsumePassthrough(Type type, object instance)
+{
+    var method = type.GetMethod(
+        "ConsumeContinuePassthrough",
+        BindingFlags.Public | BindingFlags.Instance
+    );
+    if (method == null)
+    {
+        throw new InvalidOperationException(
+            $"Method not found: {type.FullName}.ConsumeContinuePassthrough"
+        );
+    }
+
+    return (bool)(method.Invoke(instance, []) ?? false);
 }
 
 static string InvokeBuildRelativePath(Type type, string? runId, DateTimeOffset capturedAtLocal)
