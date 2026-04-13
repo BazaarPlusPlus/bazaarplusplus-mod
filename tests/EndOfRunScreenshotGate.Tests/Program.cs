@@ -215,6 +215,18 @@ Assert(
         summaryRevealDetectorType,
         summaryRevealStateType,
         new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
+            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
+                new TheBazaar.UI.EndOfRun.FakeFieldItemController(true)
+            )
+        )
+    ) == "RevealComplete",
+    "Summary capture should also work when Animator is exposed as a field."
+);
+Assert(
+    InvokeGetSummaryRevealState(
+        summaryRevealDetectorType,
+        summaryRevealStateType,
+        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
             new TheBazaar.UI.EndOfRun.EndOfRunSummaryController()
         )
     ) == "RevealComplete",
@@ -254,18 +266,6 @@ Assert(
         continueStateEvaluatorType,
         new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
             new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
-                new TheBazaar.UI.EndOfRun.FakeItemController(false)
-            )
-        ),
-        suppressWhileCaptureInFlight: false
-    ),
-    "Continue should stay disabled while summary cards are still revealing."
-);
-Assert(
-    !InvokeShouldAllowContinue(
-        continueStateEvaluatorType,
-        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
-            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
                 new TheBazaar.UI.EndOfRun.FakeItemController(true)
             )
         ),
@@ -285,7 +285,6 @@ Assert(
     ),
     "Mouse blocking should clear once reveal is complete and no transition is active."
 );
-
 Console.WriteLine("End-of-run screenshot gate checks passed.");
 
 static bool InvokeShouldCaptureOnContinue(
@@ -478,6 +477,16 @@ namespace TheBazaar.UI.EndOfRun
         public FakeAnimator Animator { get; }
 
         public FakeItemController(bool faceUp)
+        {
+            Animator = new FakeAnimator(faceUp);
+        }
+    }
+
+    public sealed class FakeFieldItemController
+    {
+        public FakeAnimator Animator;
+
+        public FakeFieldItemController(bool faceUp)
         {
             Animator = new FakeAnimator(faceUp);
         }

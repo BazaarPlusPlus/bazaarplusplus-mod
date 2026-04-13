@@ -18,6 +18,7 @@ internal static class EndOfRunSummaryRevealDetector
     private const string SummaryControllerTypeName = "TheBazaar.UI.EndOfRun.EndOfRunSummaryController";
     private const string ActiveControllerFieldName = "_activeController";
     private const string LoadedCardsFieldName = "loadedCards";
+    private const string CardRevealDelayFieldName = "cardRevealDelay";
     private const string AnimatorPropertyName = "Animator";
     private const string GetBoolMethodName = "GetBool";
     private const string FaceUpParamName = "FaceUp";
@@ -33,19 +34,11 @@ internal static class EndOfRunSummaryRevealDetector
 
     public static EndOfRunSummaryRevealState GetRevealState(object? screenController)
     {
-        if (!TryGetFieldValue(
-                screenController,
-                ActiveControllerFieldName,
-                out var activeController,
-                ref _warnedMissingActiveControllerField,
-                "Failed to resolve EndOfRunScreenController._activeController; end-of-run mouse blocking will fall back to the game's default behavior."
-            ))
-        {
+        if (!TryGetSummaryController(screenController, out var activeController))
             return EndOfRunSummaryRevealState.DetectionFailed;
-        }
         if (activeController == null)
             return EndOfRunSummaryRevealState.NotSummary;
-        if (!string.Equals(activeController.GetType().FullName, SummaryControllerTypeName, StringComparison.Ordinal))
+        if (!IsSummaryController(activeController))
             return EndOfRunSummaryRevealState.NotSummary;
         if (!TryGetFieldValue(
                 activeController,
@@ -64,7 +57,7 @@ internal static class EndOfRunSummaryRevealDetector
         {
             if (loadedCard == null)
                 continue;
-            if (!TryGetPropertyValue(
+            if (!TryGetMemberValue(
                     loadedCard,
                     AnimatorPropertyName,
                     out var animator,
@@ -93,6 +86,70 @@ internal static class EndOfRunSummaryRevealDetector
         return EndOfRunSummaryRevealState.RevealComplete;
     }
 
+    public static bool TryGetRevealTimeoutSeconds(object? screenController, out float timeoutSeconds)
+    {
+        timeoutSeconds = 0f;
+        if (!TryGetSummaryController(screenController, out var activeController) || activeController == null)
+            return false;
+        if (!IsSummaryController(activeController))
+            return false;
+
+        var field = activeController.GetType().GetField(
+            CardRevealDelayFieldName,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+        if (field == null)
+            return false;
+
+        var delayValue = field.GetValue(activeController);
+        if (delayValue == null)
+        {
+            return false;
+        }
+
+        if (delayValue is int delayMilliseconds)
+        {
+            timeoutSeconds = Math.Max(0f, delayMilliseconds / 1000f);
+            return true;
+        }
+
+        if (delayValue is float delaySeconds)
+        {
+            timeoutSeconds = Math.Max(0f, delaySeconds);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetSummaryController(object? screenController, out object? activeController)
+    {
+        activeController = null;
+        if (
+            !TryGetFieldValue(
+                screenController,
+                ActiveControllerFieldName,
+                out activeController,
+                ref _warnedMissingActiveControllerField,
+                "Failed to resolve EndOfRunScreenController._activeController; end-of-run mouse blocking will fall back to the game's default behavior."
+            )
+        )
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsSummaryController(object activeController)
+    {
+        return string.Equals(
+            activeController.GetType().FullName,
+            SummaryControllerTypeName,
+            StringComparison.Ordinal
+        );
+    }
+
     private static bool TryGetFieldValue(
         object? instance,
         string fieldName,
@@ -119,9 +176,9 @@ internal static class EndOfRunSummaryRevealDetector
         return true;
     }
 
-    private static bool TryGetPropertyValue(
+    private static bool TryGetMemberValue(
         object instance,
-        string propertyName,
+        string memberName,
         out object? value,
         ref bool warned,
         string warningMessage
@@ -129,17 +186,27 @@ internal static class EndOfRunSummaryRevealDetector
     {
         value = null;
         var property = instance.GetType().GetProperty(
-            propertyName,
+            memberName,
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
         );
-        if (property == null)
+        if (property != null)
         {
-            WarnOnce(ref warned, warningMessage);
-            return false;
+            value = property.GetValue(instance);
+            return true;
         }
 
-        value = property.GetValue(instance);
-        return true;
+        var field = instance.GetType().GetField(
+            memberName,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        );
+        if (field != null)
+        {
+            value = field.GetValue(instance);
+            return true;
+        }
+
+        WarnOnce(ref warned, warningMessage);
+        return false;
     }
 
     private static bool TryInvokeAnimatorGetBool(

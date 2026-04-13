@@ -14,15 +14,26 @@ internal static class EndOfRunScreenshotPatch
     {
         if (EndOfRunScreenshotController.TryConsumeContinuePassthrough())
             return true;
+
         if (EndOfRunScreenshotController.ShouldSuppressContinueWhileCaptureInFlight())
             return false;
 
-        if (!EndOfRunContinueStateEvaluator.TryIsInteractionBlocked(__instance, out var isInteractionBlocked))
-            return true;
+        if (EndOfRunScreenshotController.ShouldBlockContinueUntilFirstCapture(__instance))
+            return false;
 
-        return !EndOfRunScreenshotController.TryCaptureFirstContinue(
+        if (!EndOfRunContinueStateEvaluator.TryIsInteractionBlocked(__instance, out var isInteractionBlocked))
+        {
+            BppLog.Warn(
+                "EndOfRunScreenshot",
+                $"ContinuePatch action=allow-reflection-fallback frame={UnityEngine.Time.frameCount} time={UnityEngine.Time.unscaledTime:F3} {EndOfRunContinueStateEvaluator.DescribeState(__instance, EndOfRunScreenshotController.ShouldSuppressContinueWhileCaptureInFlight())}"
+            );
+            return true;
+        }
+
+        var captureIntercepted = EndOfRunScreenshotController.TryCaptureFirstContinue(
             __instance,
             isInteractionBlocked
         );
+        return !captureIntercepted;
     }
 }

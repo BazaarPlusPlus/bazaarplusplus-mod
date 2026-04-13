@@ -16,6 +16,8 @@ namespace BazaarPlusPlus.Game.Screenshots;
 internal sealed class EndOfRunScreenshotController : MonoBehaviour
 {
     private const float CaptureRetryCooldownSeconds = 1f;
+    private const float ManualContinueCooldownSeconds = 0.2f;
+    private const float FirstCaptureDelaySeconds = 10f;
     private static readonly System.Reflection.MethodInfo ContinueClickMethod = AccessTools.Method(
         typeof(EndOfRunScreenController),
         "OnContinueClick"
@@ -30,6 +32,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private Coroutine? _captureCoroutine;
     private string? _bufferedRunId;
     private string? _bufferedHeroName;
+    private bool? _lastLoggedBlockerActive;
+    private string? _lastLoggedBlockerStateSummary;
+    private float _manualContinueAllowedAtSeconds;
+    private int _trackedEndOfRunControllerId;
+    private float _endOfRunEnteredAtSeconds = -1f;
 
     private void Awake()
     {
@@ -107,12 +114,22 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         return _current?.ShouldBlockMouseInput() == true;
     }
 
+    public static void NotifyBlockerClick()
+    {
+        _current?.HandleBlockerClick();
+    }
+
     public static bool TryCaptureFirstContinue(
         EndOfRunScreenController controller,
         bool isInteractionBlocked
     )
     {
         return _current?.CaptureFirstContinue(controller, isInteractionBlocked) == true;
+    }
+
+    public static bool ShouldBlockContinueUntilFirstCapture(EndOfRunScreenController controller)
+    {
+        return _current?.ShouldBlockContinueUntilFirstCaptureInternal(controller) == true;
     }
 
     private bool ConsumeContinuePassthrough()
@@ -125,6 +142,59 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         return _gate.IsAttemptInFlight();
     }
 
+    private bool ShouldBlockContinueUntilFirstCaptureInternal(EndOfRunScreenController controller)
+    {
+        if (_screenshotService == null)
+            return false;
+
+        TrackEndOfRunEntry(controller);
+        return ShouldHoldBeforeFirstCapture(out _);
+    }
+
+    private void HandleBlockerClick()
+    {
+        var controller = FindActiveEndOfRunScreenController();
+        if (controller == null)
+        {
+            return;
+        }
+
+        TrackEndOfRunEntry(controller);
+
+        if (!_gate.HasCapturedForCurrentRun())
+        {
+            if (ShouldHoldBeforeFirstCapture(out _))
+                return;
+
+            _ = CaptureFirstContinue(controller, isInteractionBlocked: false);
+            return;
+        }
+
+        if (
+            !EndOfRunContinueStateEvaluator.TryShouldAllowContinue(
+                controller,
+                suppressWhileCaptureInFlight: _gate.IsAttemptInFlight(),
+                out var shouldAllowContinue
+            )
+        )
+        {
+            return;
+        }
+
+        if (!shouldAllowContinue)
+            return;
+
+        if (Time.unscaledTime < _manualContinueAllowedAtSeconds)
+            return;
+
+        _manualContinueAllowedAtSeconds = Time.unscaledTime + ManualContinueCooldownSeconds;
+        BppLog.Info(
+            "EndOfRunScreenshot",
+            $"BlockerClick action=invoke-continue frame={Time.frameCount} time={Time.unscaledTime:F3}"
+        );
+        ContinueClickMethod.Invoke(controller, []);
+    }
+
     private bool CaptureFirstContinue(
         EndOfRunScreenController controller,
         bool isInteractionBlocked
@@ -134,9 +204,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             _screenshotService == null
             || !_gate.ShouldCaptureOnContinue(isInteractionBlocked, Time.unscaledTime)
         )
-        {
             return false;
-        }
 
         if (_captureCoroutine != null)
             return false;
@@ -144,6 +212,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         var activeController = FindActiveEndOfRunScreenController();
         if (activeController != null)
             _mouseBlocker.Attach(activeController);
+
+        BppLog.Info(
+            "EndOfRunScreenshot",
+            $"CaptureFirstContinue action=start frame={Time.frameCount} time={Time.unscaledTime:F3} isInteractionBlocked={isInteractionBlocked} runId={ResolveRunId() ?? "<null>"} hero={ResolveHeroName() ?? "<null>"}"
+        );
 
         _captureCoroutine = StartCoroutine(CaptureAndContinue(controller));
         return true;
@@ -173,6 +246,10 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                     PersistCapture(capture, isPrimary: true);
                     _gate.MarkAttemptCompleted();
                     shouldPassthrough = true;
+                    BppLog.Info(
+                        "EndOfRunScreenshot",
+                        $"CaptureCoroutine action=captured frame={Time.frameCount} time={Time.unscaledTime:F3}"
+                    );
                 }
                 else
                 {
@@ -193,6 +270,10 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             {
                 yield return null;
                 _gate.AllowNextContinuePassthrough();
+                BppLog.Info(
+                    "EndOfRunScreenshot",
+                    $"CaptureCoroutine action=invoke-continue frame={Time.frameCount} time={Time.unscaledTime:F3}"
+                );
                 ContinueClickMethod.Invoke(controller, []);
             }
         }
@@ -274,7 +355,9 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
         DisposeCaptureSuppressionScope();
         _gate.CancelCaptureAttempt();
-        _mouseBlocker.Detach();
+        _mouseBlocker.Destroy();
+        _trackedEndOfRunControllerId = 0;
+        _endOfRunEnteredAtSeconds = -1f;
     }
 
     private static EndOfRunScreenController? FindActiveEndOfRunScreenController()
@@ -306,8 +389,13 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         if (screenController == null)
         {
             _mouseBlocker.Detach();
+            _trackedEndOfRunControllerId = 0;
+            _endOfRunEnteredAtSeconds = -1f;
             return;
         }
+
+        TrackEndOfRunEntry(screenController);
+        var shouldShowBlocker = ShouldHoldBeforeFirstCapture(out var holdReason);
 
         if (
             !EndOfRunContinueStateEvaluator.TryShouldAllowContinue(
@@ -317,16 +405,84 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             )
         )
         {
-            _mouseBlocker.Detach();
-            return;
-        }
-
-        if (!shouldAllowContinue)
-        {
+            LogBlockerStateChange(
+                isActive: true,
+                $"reason=state-detection-failed {EndOfRunContinueStateEvaluator.DescribeState(screenController, _gate.IsAttemptInFlight())}"
+            );
             _mouseBlocker.Attach(screenController);
             return;
         }
 
-        _mouseBlocker.Detach();
+        if (!shouldShowBlocker)
+            shouldShowBlocker = !shouldAllowContinue;
+
+        LogBlockerStateChange(
+            isActive: shouldShowBlocker,
+            shouldShowBlocker
+                ? (ShouldBlockMouseInput()
+                    ? $"reason=capture-in-flight {EndOfRunContinueStateEvaluator.DescribeState(screenController, _gate.IsAttemptInFlight())}"
+                    : $"reason={(holdReason.StartsWith("reason=wait-for-first-capture-window", StringComparison.Ordinal) ? "first-capture-window-blocked" : "continue-blocked")} {holdReason} {EndOfRunContinueStateEvaluator.DescribeState(screenController, _gate.IsAttemptInFlight())}")
+                : $"reason=continue-unblocked {holdReason} {EndOfRunContinueStateEvaluator.DescribeState(screenController, _gate.IsAttemptInFlight())}"
+        );
+        if (shouldShowBlocker)
+            _mouseBlocker.Attach(screenController);
+        else
+            _mouseBlocker.Detach();
+    }
+
+    private void LogBlockerStateChange(bool isActive, string stateSummary)
+    {
+        if (_lastLoggedBlockerActive == isActive && string.Equals(_lastLoggedBlockerStateSummary, stateSummary, StringComparison.Ordinal))
+            return;
+
+        _lastLoggedBlockerActive = isActive;
+        _lastLoggedBlockerStateSummary = stateSummary;
+        BppLog.Info(
+            "EndOfRunScreenshot",
+            $"BlockerState active={isActive} frame={Time.frameCount} time={Time.unscaledTime:F3} {stateSummary}"
+        );
+    }
+
+    private bool ShouldHoldBeforeFirstCapture(
+        out string holdReason
+    )
+    {
+        if (_gate.HasCapturedForCurrentRun())
+        {
+            holdReason = "reason=already-captured";
+            return false;
+        }
+
+        if (_endOfRunEnteredAtSeconds < 0f)
+        {
+            holdReason = "reason=awaiting-end-of-run-entry";
+            return true;
+        }
+
+        var elapsedSeconds = Time.unscaledTime - _endOfRunEnteredAtSeconds;
+        if (elapsedSeconds >= FirstCaptureDelaySeconds)
+        {
+            holdReason =
+                $"reason=first-capture-window-open elapsed={elapsedSeconds:F3} delay={FirstCaptureDelaySeconds:F3}";
+            return false;
+        }
+
+        holdReason =
+            $"reason=wait-for-first-capture-window elapsed={elapsedSeconds:F3} delay={FirstCaptureDelaySeconds:F3} remaining={FirstCaptureDelaySeconds - elapsedSeconds:F3}";
+        return true;
+    }
+
+    private void TrackEndOfRunEntry(EndOfRunScreenController controller)
+    {
+        var controllerId = controller.GetInstanceID();
+        if (_trackedEndOfRunControllerId == controllerId && _endOfRunEnteredAtSeconds >= 0f)
+            return;
+
+        _trackedEndOfRunControllerId = controllerId;
+        _endOfRunEnteredAtSeconds = Time.unscaledTime;
+        BppLog.Info(
+            "EndOfRunScreenshot",
+            $"EndOfRunEntry frame={Time.frameCount} time={Time.unscaledTime:F3} controller={controller.name} delay={FirstCaptureDelaySeconds:F3}"
+        );
     }
 }

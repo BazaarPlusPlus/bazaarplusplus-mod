@@ -65,6 +65,11 @@ internal sealed class EndOfRunScreenshotGate
         return _attemptInFlight;
     }
 
+    public bool HasCapturedForCurrentRun()
+    {
+        return _capturedForCurrentRun;
+    }
+
     public void ResetForNewRun()
     {
         _attemptInFlight = false;
