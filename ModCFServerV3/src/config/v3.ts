@@ -1,19 +1,39 @@
 import type { Env } from "../env";
 
-export function getGhostQueryLookbackDays(): number {
-  return 3;
+type RequiredNumericConfigKey =
+  | "GHOST_QUERY_LOOKBACK_DAYS"
+  | "RUN_BUNDLE_RETENTION_DAYS"
+  | "BATTLE_INGEST_MIN_RATING"
+  | "BATTLE_INGEST_MIN_DAY_IF_BELOW_RATING";
+
+function requireNonNegativeInteger(env: Env, key: RequiredNumericConfigKey): number {
+  const raw = env[key]?.trim();
+  if (!raw) {
+    throw new Error(`Missing required V3 config var: ${key}`);
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || String(parsed) !== raw) {
+    throw new Error(`Invalid required V3 config var: ${key}=${raw}`);
+  }
+
+  return parsed;
 }
 
-export function getRunBundleRetentionDays(): number {
-  return 5;
+export function getGhostQueryLookbackDays(env: Env): number {
+  return requireNonNegativeInteger(env, "GHOST_QUERY_LOOKBACK_DAYS");
 }
 
-export function getBattleIngestMinRating(): number {
-  return 700;
+export function getRunBundleRetentionDays(env: Env): number {
+  return requireNonNegativeInteger(env, "RUN_BUNDLE_RETENTION_DAYS");
 }
 
-export function getBattleIngestMinDayIfBelowRating(): number {
-  return 7;
+export function getBattleIngestMinRating(env: Env): number {
+  return requireNonNegativeInteger(env, "BATTLE_INGEST_MIN_RATING");
+}
+
+export function getBattleIngestMinDayIfBelowRating(env: Env): number {
+  return requireNonNegativeInteger(env, "BATTLE_INGEST_MIN_DAY_IF_BELOW_RATING");
 }
 
 export function allowUnauthenticatedReplayDownloads(env: Env): boolean {

@@ -50,7 +50,7 @@ export async function handleQueryGhostBattles(
     return json({ error: "player_account_id_required" }, { status: 400 });
   }
 
-  const lookbackDays = getGhostQueryLookbackDays();
+  const lookbackDays = getGhostQueryLookbackDays(env);
   const limit = parseClampedInt(url.searchParams.get("limit"), 200, 1, 200);
   const fromUtc = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
 

@@ -6,6 +6,7 @@ import { buildEnv } from "./helpers/mockEnv";
 
 test("ghost-battles ignores caller days and uses the server lookback window", async () => {
   const env = buildEnv();
+  env.GHOST_QUERY_LOOKBACK_DAYS = "6";
 
   env.DB.v3Battles.set("battle-recent", {
     battle_id: "battle-recent",
@@ -69,7 +70,10 @@ test("ghost-battles ignores caller days and uses the server lookback window", as
   const json = (await response.json()) as {
     battles: Array<{ battle_id: string }>;
   };
-  assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-recent"]);
+  assert.deepEqual(json.battles.map((battle) => battle.battle_id), [
+    "battle-recent",
+    "battle-old",
+  ]);
 });
 
 test("ghost-battles honors the caller limit parameter after server clamping", async () => {

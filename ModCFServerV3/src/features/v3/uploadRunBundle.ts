@@ -91,15 +91,15 @@ function asBytes(value: unknown): Uint8Array | null {
   return bytes;
 }
 
-function shouldProjectBattle(battle: BattleProjection): boolean {
+function shouldProjectBattle(battle: BattleProjection, env: Env): boolean {
   const rating = asNumber(battle.player_rating);
   const day = asNumber(battle.day);
 
-  if (rating != null && rating >= getBattleIngestMinRating()) {
+  if (rating != null && rating >= getBattleIngestMinRating(env)) {
     return true;
   }
 
-  return day != null && day >= getBattleIngestMinDayIfBelowRating();
+  return day != null && day >= getBattleIngestMinDayIfBelowRating(env);
 }
 
 export async function handleUploadRunBundle(
@@ -171,7 +171,7 @@ export async function handleUploadRunBundle(
       contentType: artifactCodec,
     },
     customMetadata: {
-      retention_days: String(getRunBundleRetentionDays()),
+      retention_days: String(getRunBundleRetentionDays(env)),
     },
   });
 
@@ -294,7 +294,7 @@ export async function handleUploadRunBundle(
     .run();
 
   const battleStatements = battleProjections
-    .filter((battle) => shouldProjectBattle(battle))
+    .filter((battle) => shouldProjectBattle(battle, env))
     .map((battle) =>
       env.DB.prepare(
         `

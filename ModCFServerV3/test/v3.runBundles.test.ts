@@ -337,6 +337,7 @@ test("run bundle upload rejects mismatched battle run ids", async () => {
 
 test("run bundle upload applies configured artifact retention", async () => {
   const env = buildEnv();
+  env.RUN_BUNDLE_RETENTION_DAYS = "9";
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   env.DB.v3Installations.set("inst_bundle", {
     installation_id: "inst_bundle",
@@ -387,11 +388,13 @@ test("run bundle upload applies configured artifact retention", async () => {
   );
 
   assert.equal(response.status, 200);
-  assert.equal(env.RUN_BUNDLE_BUCKET.lastPutOptions?.customMetadata?.retention_days, "5");
+  assert.equal(env.RUN_BUNDLE_BUCKET.lastPutOptions?.customMetadata?.retention_days, "9");
 });
 
 test("run bundle upload only projects battles that pass ingest gate", async () => {
   const env = buildEnv();
+  env.BATTLE_INGEST_MIN_RATING = "1800";
+  env.BATTLE_INGEST_MIN_DAY_IF_BELOW_RATING = "6";
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   env.DB.v3Installations.set("inst_bundle", {
     installation_id: "inst_bundle",
@@ -423,7 +426,7 @@ test("run bundle upload only projects battles that pass ingest gate", async () =
         battle_id: "battle-keep",
         run_id: "run-gated",
         recorded_at_utc: "2026-04-10T00:30:00.000Z",
-        day: 5,
+        day: 6,
         player_rating: 1700,
         opponent_account_id: "player-account-001",
         replay_available: true,
