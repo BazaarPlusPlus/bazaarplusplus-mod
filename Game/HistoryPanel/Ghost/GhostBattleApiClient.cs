@@ -105,20 +105,14 @@ internal sealed class GhostBattleApiClient
 
     public async Task<GhostBattleReplayDownloadLinkResult> RequestReplayDownloadLinkAsync(
         string battleId,
-        InstallationRecord installation,
+        InstallationRecord? installation,
         CancellationToken cancellationToken
     )
     {
         try
         {
             var endpoint = _routes.CreateReplayLink(battleId);
-            using var request = _requestSigner.CreateRequest(
-                HttpMethod.Post,
-                endpoint,
-                null,
-                installation,
-                DateTimeOffset.UtcNow.ToString("o")
-            );
+            using var request = CreateReplayRequest(HttpMethod.Post, endpoint, installation);
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -165,19 +159,13 @@ internal sealed class GhostBattleApiClient
     public async Task<GhostBattleReplayPayloadResult> DownloadReplayPayloadAsync(
         string battleId,
         string downloadUrl,
-        InstallationRecord installation,
+        InstallationRecord? installation,
         CancellationToken cancellationToken
     )
     {
         try
         {
-            using var request = _requestSigner.CreateRequest(
-                HttpMethod.Get,
-                downloadUrl,
-                null,
-                installation,
-                DateTimeOffset.UtcNow.ToString("o")
-            );
+            using var request = CreateReplayRequest(HttpMethod.Get, downloadUrl, installation);
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -220,6 +208,26 @@ internal sealed class GhostBattleApiClient
         return payload?.ReplayPayload != null
             && payload.BattleManifest != null
             && !string.IsNullOrWhiteSpace(payload.ReplayPayload.BattleId);
+    }
+
+    private HttpRequestMessage CreateReplayRequest(
+        HttpMethod method,
+        string endpoint,
+        InstallationRecord? installation
+    )
+    {
+        if (installation != null)
+        {
+            return _requestSigner.CreateRequest(
+                method,
+                endpoint,
+                null,
+                installation,
+                DateTimeOffset.UtcNow.ToString("o")
+            );
+        }
+
+        return new HttpRequestMessage(method, endpoint);
     }
 
     private static GhostBattlePayload? TryExtractPayloadFromArtifact(

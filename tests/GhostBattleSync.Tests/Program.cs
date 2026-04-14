@@ -1,5 +1,7 @@
 #nullable enable
 using System.Collections;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
 
@@ -530,6 +532,135 @@ Assert(
     "V3Routes should publish replay links under /ghost-battles/{battle_id}/replay-link."
 );
 
+var signerType = RequireType("BazaarPlusPlus.Game.Online.InstallationRequestSigner");
+var tempIdentityRoot = Path.Combine(
+    Path.GetTempPath(),
+    "bpp-ghost-anonymous-request-tests",
+    Guid.NewGuid().ToString("N")
+);
+Directory.CreateDirectory(tempIdentityRoot);
+try
+{
+    var installationStore = Activator.CreateInstance(
+        installationStoreType,
+        Path.Combine(tempIdentityRoot, "installation.bpp"),
+        Path.Combine(tempIdentityRoot, "installation.key")
+    ) ?? throw new InvalidOperationException("InstallationRecordStore should be constructible.");
+    var requestSigner = Activator.CreateInstance(signerType, installationStore)
+        ?? throw new InvalidOperationException("InstallationRequestSigner should be constructible.");
+
+    HttpRequestMessage? replayLinkRequest = null;
+    var replayLinkHandler = new RecordingHttpMessageHandler(request =>
+    {
+        replayLinkRequest = request;
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                """{"download_url":"https://mod-api-v3.bazaarplusplus.com/replays/token-public"}"""
+            ),
+        };
+    });
+    using var replayLinkHttpClient = new HttpClient(replayLinkHandler);
+    var replayLinkClient = Activator.CreateInstance(
+        apiClientType,
+        replayLinkHttpClient,
+        requestSigner,
+        routes
+    ) ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
+    var requestReplayDownloadLinkAsync = apiClientType.GetMethod(
+        "RequestReplayDownloadLinkAsync",
+        BindingFlags.Public | BindingFlags.Instance
+    );
+    Assert(
+        requestReplayDownloadLinkAsync != null,
+        "GhostBattleApiClient should expose replay-link downloads."
+    );
+    var replayLinkTask = (Task)(
+        requestReplayDownloadLinkAsync!.Invoke(
+            replayLinkClient,
+            ["battle-public", null, CancellationToken.None]
+        ) ?? throw new InvalidOperationException("Replay-link request should return a task.")
+    );
+    await replayLinkTask;
+    var replayLinkResult =
+        replayLinkTask.GetType().GetProperty("Result")?.GetValue(replayLinkTask)
+        ?? throw new InvalidOperationException("Replay-link request should produce a result.");
+    var replayLinkResultType = replayLinkResult.GetType();
+    Assert(
+        (bool)(replayLinkResultType.GetProperty("Succeeded")?.GetValue(replayLinkResult) ?? false),
+        "GhostBattleApiClient should allow replay-link requests without a local installation when the server accepts anonymous access."
+    );
+    Assert(
+        replayLinkRequest != null,
+        "Replay-link request should reach the HTTP transport."
+    );
+    Assert(
+        !replayLinkRequest!.Headers.Contains("X-BPP-Installation-Id"),
+        "Anonymous replay-link requests should not send installation headers."
+    );
+
+    HttpRequestMessage? replayPayloadRequest = null;
+    var replayPayloadHandler = new RecordingHttpMessageHandler(request =>
+    {
+        replayPayloadRequest = request;
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(artifactBytes),
+        };
+    });
+    using var replayPayloadHttpClient = new HttpClient(replayPayloadHandler);
+    var replayPayloadClient = Activator.CreateInstance(
+        apiClientType,
+        replayPayloadHttpClient,
+        requestSigner,
+        routes
+    ) ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
+    var downloadReplayPayloadAsync = apiClientType.GetMethod(
+        "DownloadReplayPayloadAsync",
+        BindingFlags.Public | BindingFlags.Instance
+    );
+    Assert(
+        downloadReplayPayloadAsync != null,
+        "GhostBattleApiClient should expose replay-payload downloads."
+    );
+    var replayPayloadTask = (Task)(
+        downloadReplayPayloadAsync!.Invoke(
+            replayPayloadClient,
+            [
+                "battle-001",
+                "https://mod-api-v3.bazaarplusplus.com/replays/token-public",
+                null,
+                CancellationToken.None,
+            ]
+        ) ?? throw new InvalidOperationException("Replay-payload request should return a task.")
+    );
+    await replayPayloadTask;
+    var replayPayloadResult =
+        replayPayloadTask.GetType().GetProperty("Result")?.GetValue(replayPayloadTask)
+        ?? throw new InvalidOperationException("Replay-payload request should produce a result.");
+    var replayPayloadResultType = replayPayloadResult.GetType();
+    Assert(
+        (bool)(
+            replayPayloadResultType.GetProperty("Succeeded")?.GetValue(replayPayloadResult)
+            ?? false
+        ),
+        "GhostBattleApiClient should allow replay payload downloads without a local installation when the server accepts anonymous access."
+    );
+    Assert(
+        replayPayloadRequest != null,
+        "Replay-payload request should reach the HTTP transport."
+    );
+    Assert(
+        !replayPayloadRequest!.Headers.Contains("X-BPP-Installation-Id"),
+        "Anonymous replay-payload requests should not send installation headers."
+    );
+}
+finally
+{
+    if (Directory.Exists(tempIdentityRoot))
+        Directory.Delete(tempIdentityRoot, recursive: true);
+}
+
 Console.WriteLine("Ghost battle sync checks passed.");
 
 static Type RequireType(string fullName)
@@ -575,4 +706,22 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+sealed class RecordingHttpMessageHandler : HttpMessageHandler
+{
+    private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
+
+    public RecordingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler)
+    {
+        _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+    }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken
+    )
+    {
+        return Task.FromResult(_handler(request));
+    }
 }

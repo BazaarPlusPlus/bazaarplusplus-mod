@@ -78,8 +78,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         var localPlayerAccountId = ResolveCurrentPlayerAccountId();
         if (string.IsNullOrWhiteSpace(localPlayerAccountId))
             return GhostBattleReplayDownloadResult.Failure("player_account_id_unavailable");
-        if (!_installationStore.TryLoad(out var installation) || installation == null)
-            return GhostBattleReplayDownloadResult.Failure("installation_unavailable");
+        _installationStore.TryLoad(out var installation);
 
         var apiClient = new GhostBattleApiClient(
             _httpClient,
