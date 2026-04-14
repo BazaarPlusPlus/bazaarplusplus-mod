@@ -16,7 +16,6 @@ namespace BazaarPlusPlus.Game.Screenshots;
 internal sealed class EndOfRunScreenshotController : MonoBehaviour
 {
     private const float CaptureRetryCooldownSeconds = 1f;
-    private const float ManualContinueCooldownSeconds = 0.2f;
     private const float FirstCaptureDelaySeconds = 10f;
     private static readonly System.Reflection.MethodInfo ContinueClickMethod = AccessTools.Method(
         typeof(EndOfRunScreenController),
@@ -34,7 +33,6 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private string? _bufferedHeroName;
     private bool? _lastLoggedBlockerActive;
     private string? _lastLoggedBlockerStateSummary;
-    private float _manualContinueAllowedAtSeconds;
     private int _trackedEndOfRunControllerId;
     private float _endOfRunEnteredAtSeconds = -1f;
 
@@ -155,44 +153,14 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     {
         var controller = FindActiveEndOfRunScreenController();
         if (controller == null)
-        {
             return;
-        }
 
         TrackEndOfRunEntry(controller);
 
-        if (!_gate.HasCapturedForCurrentRun())
-        {
-            if (ShouldHoldBeforeFirstCapture(out _))
-                return;
-
-            _ = CaptureFirstContinue(controller, isInteractionBlocked: false);
-            return;
-        }
-
-        if (
-            !EndOfRunContinueStateEvaluator.TryShouldAllowContinue(
-                controller,
-                suppressWhileCaptureInFlight: _gate.IsAttemptInFlight(),
-                out var shouldAllowContinue
-            )
-        )
-        {
-            return;
-        }
-
-        if (!shouldAllowContinue)
+        if (_gate.HasCapturedForCurrentRun() || ShouldHoldBeforeFirstCapture(out _))
             return;
 
-        if (Time.unscaledTime < _manualContinueAllowedAtSeconds)
-            return;
-
-        _manualContinueAllowedAtSeconds = Time.unscaledTime + ManualContinueCooldownSeconds;
-        BppLog.Info(
-            "EndOfRunScreenshot",
-            $"BlockerClick action=invoke-continue frame={Time.frameCount} time={Time.unscaledTime:F3}"
-        );
-        ContinueClickMethod.Invoke(controller, []);
+        _ = CaptureFirstContinue(controller, isInteractionBlocked: false);
     }
 
     private bool CaptureFirstContinue(
@@ -395,34 +363,15 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         }
 
         TrackEndOfRunEntry(screenController);
-        var shouldShowBlocker = ShouldHoldBeforeFirstCapture(out var holdReason);
-
-        if (
-            !EndOfRunContinueStateEvaluator.TryShouldAllowContinue(
-                screenController,
-                suppressWhileCaptureInFlight: _gate.IsAttemptInFlight(),
-                out var shouldAllowContinue
-            )
-        )
-        {
-            LogBlockerStateChange(
-                isActive: true,
-                $"reason=state-detection-failed {EndOfRunContinueStateEvaluator.DescribeState(screenController, _gate.IsAttemptInFlight())}"
-            );
-            _mouseBlocker.Attach(screenController);
-            return;
-        }
-
-        if (!shouldShowBlocker)
-            shouldShowBlocker = !shouldAllowContinue;
+        var shouldShowBlocker = ShouldHoldBeforeFirstCapture(out var holdReason) || ShouldBlockMouseInput();
 
         LogBlockerStateChange(
             isActive: shouldShowBlocker,
             shouldShowBlocker
                 ? (ShouldBlockMouseInput()
-                    ? $"reason=capture-in-flight {EndOfRunContinueStateEvaluator.DescribeState(screenController, _gate.IsAttemptInFlight())}"
-                    : $"reason={(holdReason.StartsWith("reason=wait-for-first-capture-window", StringComparison.Ordinal) ? "first-capture-window-blocked" : "continue-blocked")} {holdReason} {EndOfRunContinueStateEvaluator.DescribeState(screenController, _gate.IsAttemptInFlight())}")
-                : $"reason=continue-unblocked {holdReason} {EndOfRunContinueStateEvaluator.DescribeState(screenController, _gate.IsAttemptInFlight())}"
+                    ? $"reason=capture-in-flight {holdReason}"
+                    : $"reason={(holdReason.StartsWith("reason=wait-for-first-capture-window", StringComparison.Ordinal) ? "first-capture-window-blocked" : "continue-blocked")} {holdReason}")
+                : $"reason=continue-unblocked {holdReason}"
         );
         if (shouldShowBlocker)
             _mouseBlocker.Attach(screenController);

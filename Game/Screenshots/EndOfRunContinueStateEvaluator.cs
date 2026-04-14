@@ -34,13 +34,7 @@ internal static class EndOfRunContinueStateEvaluator
             return true;
         }
 
-        if (!TryIsInteractionBlocked(screenController, out var isInteractionBlocked))
-        {
-            shouldAllowContinue = true;
-            return false;
-        }
-
-        shouldAllowContinue = !isInteractionBlocked;
+        shouldAllowContinue = true;
         return true;
     }
 

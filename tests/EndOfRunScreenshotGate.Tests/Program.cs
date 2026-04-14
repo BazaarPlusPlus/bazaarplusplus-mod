@@ -251,7 +251,7 @@ Assert(
 );
 
 Assert(
-    !InvokeShouldAllowContinue(
+    InvokeShouldAllowContinue(
         continueStateEvaluatorType,
         new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
             new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(),
@@ -259,7 +259,7 @@ Assert(
         ),
         suppressWhileCaptureInFlight: false
     ),
-    "Continue should stay disabled while the game reports an end-of-run transition in progress."
+    "Continue should no longer depend on the game's end-of-run transition state once the time gate has opened."
 );
 Assert(
     !InvokeShouldAllowContinue(
