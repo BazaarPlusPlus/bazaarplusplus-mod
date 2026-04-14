@@ -281,7 +281,7 @@ internal sealed class CardSetBuildDataRepository
                 return new ItemBoardItemSpec
                 {
                     TemplateId = Guid.Parse(entry.CardId!),
-                    Tier = (ETier)Mathf.Clamp(entry.Tier ?? 0, 0, 5),
+                    Tier = MapRecommendationTier(entry.Tier),
                     SocketId = entry.Slot.HasValue
                         ? (EContainerSocketId?)Mathf.Clamp(entry.Slot.Value, 0, 9)
                         : null,
@@ -289,6 +289,17 @@ internal sealed class CardSetBuildDataRepository
                 };
             })
             .ToArray();
+    }
+
+    private static ETier MapRecommendationTier(int? rawTier)
+    {
+        // Build recommendation JSON stores Bronze..Legendary as 1..5, while ETier is 0..4.
+        var normalizedTier = rawTier.GetValueOrDefault();
+        if (normalizedTier > 0)
+            normalizedTier--;
+
+        normalizedTier = Math.Clamp(normalizedTier, (int)ETier.Bronze, (int)ETier.Legendary);
+        return (ETier)normalizedTier;
     }
 
     private static string ResolveFinalBuildLabel()
