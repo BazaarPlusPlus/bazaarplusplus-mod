@@ -11,6 +11,9 @@ internal static class Program
     {
         RunTest("Open_CreatesSchema", Open_CreatesSchema);
         RunTest("Open_IsIdempotent", Open_IsIdempotent);
+        RunTest("AuthStore_TryLoad_WhenEmpty", AuthStore_TryLoad_WhenEmpty);
+        RunTest("AuthStore_Upsert_ThenLoad", AuthStore_Upsert_ThenLoad);
+        RunTest("AuthStore_Delete_ClearsRow", AuthStore_Delete_ClearsRow);
 
         if (_failures > 0) Environment.Exit(1);
         Console.WriteLine("OK");
@@ -58,6 +61,51 @@ internal static class Program
         {
             using (var db1 = new IdentityDatabase(path)) { db1.Open(); }
             using (var db2 = new IdentityDatabase(path)) { db2.Open(); } // should not throw
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    private static void AuthStore_TryLoad_WhenEmpty()
+    {
+        var path = TempDbPath();
+        try
+        {
+            using var db = new IdentityDatabase(path);
+            db.Open();
+            var store = new AuthStore(db);
+            if (store.TryLoad(out _)) throw new Exception("expected empty store to return false");
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    private static void AuthStore_Upsert_ThenLoad()
+    {
+        var path = TempDbPath();
+        try
+        {
+            using var db = new IdentityDatabase(path);
+            db.Open();
+            var store = new AuthStore(db);
+            var rec = new AuthRecord("tok_xyz", "player_123", "alice", "2026-04-17T00:00:00Z");
+            store.Upsert(rec);
+            if (!store.TryLoad(out var loaded)) throw new Exception("load returned false");
+            if (loaded!.Token != "tok_xyz") throw new Exception("token mismatch");
+            if (loaded.PlayerAccountId != "player_123") throw new Exception("account id mismatch");
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    private static void AuthStore_Delete_ClearsRow()
+    {
+        var path = TempDbPath();
+        try
+        {
+            using var db = new IdentityDatabase(path);
+            db.Open();
+            var store = new AuthStore(db);
+            store.Upsert(new AuthRecord("t", "p", "u", "2026-04-17T00:00:00Z"));
+            store.Delete();
+            if (store.TryLoad(out _)) throw new Exception("expected empty after delete");
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }
