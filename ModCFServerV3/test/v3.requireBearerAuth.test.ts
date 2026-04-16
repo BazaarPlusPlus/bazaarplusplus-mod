@@ -9,7 +9,7 @@ describe("requireBearerAuth", () => {
     const req = new Request("https://example/any");
     const result = await requireBearerAuth(req, env);
     assert.ok(result instanceof Response);
-    assert.equal(result.status, 401);
+    assert.equal((result as Response).status, 401);
   });
 
   it("returns 401 for Bearer token not in tokens table", async () => {
@@ -19,51 +19,35 @@ describe("requireBearerAuth", () => {
     });
     const result = await requireBearerAuth(req, env);
     assert.ok(result instanceof Response);
-    assert.equal(result.status, 401);
+    assert.equal((result as Response).status, 401);
   });
 
   it("returns 401 for revoked token", async () => {
     const env = buildEnv();
     await env.DB.prepare(
-      `INSERT INTO tokens (token, player_id, installation_id, revoked_at_utc, last_used_at_utc) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO tokens (token, player_account_id, issued_at_utc, revoked_at_utc) VALUES (?, ?, ?, ?)`,
     )
-      .bind(
-        "tok_revoked",
-        "p1",
-        "inst_1",
-        "2026-01-02T00:00:00Z",
-        null,
-      )
+      .bind("tok_revoked", "p1", "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z")
       .run();
     const req = new Request("https://example/any", {
       headers: { Authorization: "Bearer tok_revoked" },
     });
     const result = await requireBearerAuth(req, env);
     assert.ok(result instanceof Response);
-    assert.equal(result.status, 401);
+    assert.equal((result as Response).status, 401);
   });
 
   it("returns auth object for active token", async () => {
     const env = buildEnv();
     await env.DB.prepare(
-      `INSERT INTO tokens (token, player_id, installation_id, revoked_at_utc, last_used_at_utc) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES (?, ?, ?)`,
     )
-      .bind(
-        "tok_active",
-        "p1",
-        "inst_1",
-        null,
-        null,
-      )
+      .bind("tok_active", "p1", "2026-01-01T00:00:00Z")
       .run();
     const req = new Request("https://example/any", {
       headers: { Authorization: "Bearer tok_active" },
     });
     const result = await requireBearerAuth(req, env);
-    assert.deepEqual(result, {
-      token: "tok_active",
-      playerId: "p1",
-      installationId: "inst_1",
-    });
+    assert.deepEqual(result, { token: "tok_active", playerAccountId: "p1" });
   });
 });

@@ -3,16 +3,13 @@ import { json } from "../../http/json";
 
 export type BearerAuth = {
   token: string;
-  playerId: string;
-  installationId: string;
+  playerAccountId: string;
 };
 
-type V3TokenRow = {
+type TokenRow = {
   token: string;
-  player_id: string;
-  installation_id: string;
+  player_account_id: string;
   revoked_at_utc: string | null;
-  last_used_at_utc: string | null;
 };
 
 export async function requireBearerAuth(
@@ -21,33 +18,29 @@ export async function requireBearerAuth(
 ): Promise<BearerAuth | Response> {
   const header = request.headers.get("Authorization") ?? "";
   const match = header.match(/^Bearer\s+(\S+)$/);
-
   if (!match) {
     return json({ error: "invalid_token" }, { status: 401 });
   }
+  const token = match[1]!;
 
-  const token = match[1];
   const row = await env.DB.prepare(
-    `SELECT * FROM tokens WHERE token = ?`,
+    `SELECT token, player_account_id, revoked_at_utc
+     FROM tokens
+     WHERE token = ?`,
   )
     .bind(token)
-    .first<V3TokenRow>();
+    .first<TokenRow>();
 
   if (!row || row.revoked_at_utc != null) {
     return json({ error: "invalid_token" }, { status: 401 });
   }
 
-  const isoNow = new Date().toISOString();
   await env.DB.prepare(
     `UPDATE tokens SET last_used_at_utc = ? WHERE token = ?`,
   )
-    .bind(isoNow, token)
+    .bind(new Date().toISOString(), token)
     .run()
     .catch(() => undefined);
 
-  return {
-    token,
-    playerId: row.player_id,
-    installationId: row.installation_id,
-  };
+  return { token: row.token, playerAccountId: row.player_account_id };
 }
