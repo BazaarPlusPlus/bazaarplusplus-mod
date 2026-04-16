@@ -41,8 +41,10 @@ export type V3InstallationSessionRow = {
 
 export type V3TokenRow = {
   token: string;
-  player_id: string;
-  installation_id: string;
+  player_account_id?: string;
+  player_id?: string;
+  installation_id?: string | null;
+  issued_at_utc?: string;
   revoked_at_utc: string | null;
   last_used_at_utc: string | null;
 };
@@ -1100,13 +1102,26 @@ export class MockD1Database {
     }
 
     if (sql.includes("INSERT INTO tokens")) {
-      const row: V3TokenRow = {
-        token: String(params[0] ?? ""),
-        player_id: String(params[1] ?? ""),
-        installation_id: String(params[2] ?? ""),
-        revoked_at_utc: params[3] == null ? null : String(params[3]),
-        last_used_at_utc: params[4] == null ? null : String(params[4]),
-      };
+      const row: V3TokenRow = sql.includes(
+        "INSERT INTO tokens (token, player_account_id, issued_at_utc)",
+      )
+        ? {
+            token: String(params[0] ?? ""),
+            player_account_id: String(params[1] ?? ""),
+            player_id: String(params[1] ?? ""),
+            installation_id: null,
+            issued_at_utc: String(params[2] ?? ""),
+            revoked_at_utc: null,
+            last_used_at_utc: null,
+          }
+        : {
+            token: String(params[0] ?? ""),
+            player_account_id: String(params[1] ?? ""),
+            player_id: String(params[1] ?? ""),
+            installation_id: params[2] == null ? null : String(params[2]),
+            revoked_at_utc: params[3] == null ? null : String(params[3]),
+            last_used_at_utc: params[4] == null ? null : String(params[4]),
+          };
       this.v3Tokens.set(row.token, row);
       return { changes: 1 };
     }
