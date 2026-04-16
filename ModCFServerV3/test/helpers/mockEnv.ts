@@ -58,7 +58,7 @@ export type V3InstallationObservationRow = {
 
 export type V3RunBundleRow = {
   bundle_id: string;
-  installation_id: string;
+  installation_id: string | null;
   player_account_id: string;
   run_id: string;
   payload_hash: string;
@@ -72,7 +72,7 @@ export type V3RunBundleRow = {
 
 export type V3RunRow = {
   run_id: string;
-  installation_id: string;
+  installation_id: string | null;
   player_account_id: string;
   bundle_id: string;
   status: string;
@@ -95,7 +95,7 @@ export type V3RunRow = {
 export type V3BattleRow = {
   battle_id: string;
   run_id: string;
-  installation_id: string;
+  installation_id: string | null;
   player_account_id: string;
   bundle_id: string;
   recorded_at_utc: string;
@@ -380,16 +380,16 @@ export class MockD1Database {
 
     if (sql.includes("FROM run_bundles")) {
       if (
-        sql.includes("WHERE installation_id = ?")
+        sql.includes("WHERE player_account_id = ?")
         && sql.includes("AND run_id = ?")
         && sql.includes("AND payload_hash = ?")
       ) {
-        const installationId = String(params[0] ?? "");
+        const playerAccountId = String(params[0] ?? "");
         const runId = String(params[1] ?? "");
         const payloadHash = String(params[2] ?? "");
         const row = Array.from(this.v3RunBundles.values()).find(
           (candidate) =>
-            candidate.installation_id === installationId
+            candidate.player_account_id === playerAccountId
             && candidate.run_id === runId
             && candidate.payload_hash === payloadHash,
         );
@@ -735,7 +735,7 @@ export class MockD1Database {
     if (sql.includes("INSERT INTO run_bundles")) {
       const row = {
         bundle_id: String(params[0] ?? ""),
-        installation_id: String(params[1] ?? ""),
+        installation_id: params[1] == null ? null : String(params[1]),
         player_account_id: String(params[2] ?? ""),
         run_id: String(params[3] ?? ""),
         payload_hash: String(params[4] ?? ""),
@@ -753,7 +753,7 @@ export class MockD1Database {
     if (sql.includes("INSERT INTO runs")) {
       const row = {
         run_id: String(params[0] ?? ""),
-        installation_id: String(params[1] ?? ""),
+        installation_id: params[1] == null ? null : String(params[1]),
         player_account_id: String(params[2] ?? ""),
         bundle_id: String(params[3] ?? ""),
         status: String(params[4] ?? ""),
@@ -780,7 +780,7 @@ export class MockD1Database {
       const row = {
         battle_id: String(params[0] ?? ""),
         run_id: String(params[1] ?? ""),
-        installation_id: String(params[2] ?? ""),
+        installation_id: params[2] == null ? null : String(params[2]),
         player_account_id: String(params[3] ?? ""),
         bundle_id: String(params[4] ?? ""),
         recorded_at_utc: String(params[5] ?? ""),

@@ -2,7 +2,6 @@ import { sha256Base64 } from "../../crypto/hash";
 import type { Env } from "../../env";
 import { json, readJson } from "../../http/json";
 import { getRunBundleRetentionDays } from "../../config/v3";
-import { requireInstallationAuth } from "./requireInstallationAuth";
 
 type RunProjection = {
   run_id?: unknown;
@@ -45,7 +44,6 @@ type BattleProjection = {
 
 type RunBundleRequest = {
   schema_version?: unknown;
-  installation_id?: unknown;
   player_account_id?: unknown;
   submitted_at_utc?: unknown;
   artifact_codec?: unknown;
@@ -59,7 +57,6 @@ type ExistingRunBundleRow = {
   object_key: string;
 };
 
-const AnonymousInstallationId = "anonymous";
 const AnonymousPlayerAccountId = "anonymous-player";
 const KnownPlayerAccountMarker = "1";
 const KnownPlayerAccountTtlSeconds = 7 * 24 * 60 * 60;
@@ -156,14 +153,8 @@ export async function handleUploadRunBundle(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  const auth = await requireInstallationAuth(request, env, { allowMissingAuth: true });
-  if (auth instanceof Response) {
-    return auth;
-  }
-
   const body = (await readJson(request)) as RunBundleRequest;
   const schemaVersion = asNumber(body.schema_version);
-  const installationId = asString(body.installation_id);
   const playerAccountId = asString(body.player_account_id);
   const submittedAtUtc = asString(body.submitted_at_utc);
   const artifactCodec = asString(body.artifact_codec);
@@ -175,9 +166,7 @@ export async function handleUploadRunBundle(
     ? body.battle_projections
     : [];
 
-  const persistedInstallationId = installationId ?? auth?.installationId ?? AnonymousInstallationId;
-  const persistedPlayerAccountId =
-    playerAccountId ?? auth?.playerAccountId ?? AnonymousPlayerAccountId;
+  const persistedPlayerAccountId = playerAccountId ?? AnonymousPlayerAccountId;
 
   if (
     schemaVersion == null ||
@@ -189,16 +178,6 @@ export async function handleUploadRunBundle(
     !endedAtUtc
   ) {
     return json({ error: "invalid_run_bundle_request" }, { status: 400 });
-  }
-
-  if (
-    auth != null
-    && (
-      (installationId != null && installationId !== auth.installationId)
-      || (playerAccountId != null && playerAccountId !== auth.playerAccountId)
-    )
-  ) {
-    return json({ error: "installation_player_mismatch" }, { status: 403 });
   }
 
   for (const battle of battleProjections) {
@@ -216,8 +195,7 @@ export async function handleUploadRunBundle(
   await rememberKnownPlayerAccountId(persistedPlayerAccountId, env);
 
   const payloadHash = await sha256Base64(artifactBytes);
-  const objectKey =
-    `run-bundles/${persistedPlayerAccountId}/${persistedInstallationId}/${runId}/${payloadHash}.mpack.gz`;
+  const objectKey = `run-bundles/${persistedPlayerAccountId}/${runId}/${payloadHash}.mpack.gz`;
   await env.RUN_BUNDLE_BUCKET.put(objectKey, artifactBytes, {
     httpMetadata: {
       contentType: artifactCodec,
@@ -234,12 +212,12 @@ export async function handleUploadRunBundle(
         bundle_id,
         object_key
       FROM run_bundles
-      WHERE installation_id = ?
+      WHERE player_account_id = ?
         AND run_id = ?
         AND payload_hash = ?
     `,
   )
-    .bind(persistedInstallationId, runId, payloadHash)
+    .bind(persistedPlayerAccountId, runId, payloadHash)
     .first<ExistingRunBundleRow>();
   const bundleId = existingBundle?.bundle_id ?? `bundle_${crypto.randomUUID().replace(/-/g, "")}`;
   const persistedObjectKey = existingBundle?.object_key ?? objectKey;
@@ -264,7 +242,7 @@ export async function handleUploadRunBundle(
     )
       .bind(
         bundleId,
-        persistedInstallationId,
+        null,
         persistedPlayerAccountId,
         runId,
         payloadHash,
@@ -324,7 +302,7 @@ export async function handleUploadRunBundle(
   )
     .bind(
       runId,
-      persistedInstallationId,
+      null,
       persistedPlayerAccountId,
       bundleId,
       runStatus,
@@ -406,7 +384,7 @@ export async function handleUploadRunBundle(
       ).bind(
         asString(battle.battle_id),
         runId,
-        persistedInstallationId,
+        null,
         persistedPlayerAccountId,
         bundleId,
         asString(battle.recorded_at_utc),

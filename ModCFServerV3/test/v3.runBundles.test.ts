@@ -2,59 +2,29 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import worker from "../src/index";
-import {
-  canonicalRequestV3,
-  generateClientKeyPair,
-  sha256Base64,
-  signCanonical,
-} from "./helpers/crypto";
+import { sha256Base64 } from "./helpers/crypto";
 import { buildEnv } from "./helpers/mockEnv";
 
-function buildSignedRequest(input: {
-  body: string;
-  installationId: string;
-  privateKey: CryptoKey | unknown;
-}) {
-  const timestamp = new Date().toISOString();
-  const bodyHash = sha256Base64(input.body);
-  const signature = signCanonical(
-    input.privateKey as never,
-    canonicalRequestV3({
-      method: "POST",
-      path: "/run-bundles",
-      query: "",
-      installationId: input.installationId,
-      timestamp,
-      bodyHash,
-    }),
-  );
+function buildUploadRequest(body: string, authorization?: string): Request {
+  const headers = new Headers({
+    "content-type": "application/json",
+  });
+  if (authorization) {
+    headers.set("Authorization", authorization);
+  }
 
-  return {
-    timestamp,
-    bodyHash,
-    signature,
-  };
+  return new Request("https://example.com/run-bundles", {
+    method: "POST",
+    headers,
+    body,
+  });
 }
 
 test("run bundle upload stores one artifact object and projection rows", async () => {
   const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_bundle", {
-    installation_id: "inst_bundle",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
-
+  const payloadHash = sha256Base64(new Uint8Array([1, 2, 3, 4]));
   const body = JSON.stringify({
     schema_version: 3,
-    installation_id: "inst_bundle",
     player_account_id: "player-account-001",
     submitted_at_utc: new Date().toISOString(),
     artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
@@ -119,44 +89,35 @@ test("run bundle upload stores one artifact object and projection rows", async (
       },
     ],
   });
-  const signed = buildSignedRequest({
-    body,
-    installationId: "inst_bundle",
-    privateKey,
-  });
 
-  const response = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-bpp-installation-id": "inst_bundle",
-        "x-bpp-timestamp": signed.timestamp,
-        "x-bpp-content-sha256": signed.bodyHash,
-        "x-bpp-signature": signed.signature,
-      },
-      body,
-    }),
-    env as never,
-  );
+  const response = await worker.fetch(buildUploadRequest(body), env as never);
 
   assert.equal(response.status, 200);
   assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
   assert.equal(env.DB.v3RunBundles.size, 1);
   assert.equal(env.DB.v3Runs.size, 1);
   assert.equal(env.DB.v3Battles.size, 2);
+  const bundle = Array.from(env.DB.v3RunBundles.values())[0];
+  const run = env.DB.v3Runs.get("run-001");
+  const battle = env.DB.v3Battles.get("battle-001");
+  assert.equal(bundle?.installation_id, null);
+  assert.equal(run?.installation_id, null);
+  assert.equal(battle?.installation_id, null);
+  assert.equal(
+    bundle?.object_key,
+    `run-bundles/player-account-001/run-001/${payloadHash}.mpack.gz`,
+  );
   assert.deepEqual(env.KNOWN_PLAYER_ACCOUNTS.entries.get("player-account-001"), {
     value: "1",
     expirationTtl: 7 * 24 * 60 * 60,
   });
 });
 
-test("run bundle upload accepts unsigned uploads without installation auth", async () => {
+test("run bundle upload accepts requests without Authorization header", async () => {
   const env = buildEnv();
 
   const body = JSON.stringify({
     schema_version: 3,
-    installation_id: "inst_unsigned",
     player_account_id: "player-account-unsigned",
     submitted_at_utc: new Date().toISOString(),
     artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
@@ -179,14 +140,44 @@ test("run bundle upload accepts unsigned uploads without installation auth", asy
     ],
   });
 
-  const response = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
+  const response = await worker.fetch(buildUploadRequest(body), env as never);
+
+  assert.equal(response.status, 200);
+  assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
+  assert.equal(env.DB.v3RunBundles.size, 1);
+  assert.equal(env.DB.v3Runs.size, 1);
+  assert.equal(env.DB.v3Battles.size, 1);
+});
+
+test("run bundle upload ignores bogus Authorization header", async () => {
+  const env = buildEnv();
+
+  const body = JSON.stringify({
+    schema_version: 3,
+    player_account_id: "player-account-garbage-auth",
+    submitted_at_utc: new Date().toISOString(),
+    artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
+    artifact_bytes: [4, 5, 6],
+    run_projection: {
+      run_id: "run-garbage-auth",
+      status: "completed",
+      ended_at_utc: "2026-04-10T01:00:00.000Z",
+    },
+    battle_projections: [
+      {
+        battle_id: "battle-garbage-auth",
+        run_id: "run-garbage-auth",
+        recorded_at_utc: "2026-04-10T00:30:00.000Z",
+        day: 10,
+        player_rating: 1700,
+        opponent_account_id: "player-account-garbage-auth",
+        replay_available: true,
       },
-      body,
-    }),
+    ],
+  });
+
+  const response = await worker.fetch(
+    buildUploadRequest(body, "Bearer garbage"),
     env as never,
   );
 
@@ -195,58 +186,11 @@ test("run bundle upload accepts unsigned uploads without installation auth", asy
   assert.equal(env.DB.v3RunBundles.size, 1);
   assert.equal(env.DB.v3Runs.size, 1);
   assert.equal(env.DB.v3Battles.size, 1);
-  assert.deepEqual(env.KNOWN_PLAYER_ACCOUNTS.entries.get("player-account-unsigned"), {
-    value: "1",
-    expirationTtl: 7 * 24 * 60 * 60,
-  });
-});
-
-test("run bundle upload accepts requests without installation id", async () => {
-  const env = buildEnv();
-
-  const body = JSON.stringify({
-    schema_version: 3,
-    player_account_id: "player-account-no-installation",
-    submitted_at_utc: new Date().toISOString(),
-    artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
-    artifact_bytes: [7, 8, 9],
-    run_projection: {
-      run_id: "run-no-installation",
-      status: "completed",
-      ended_at_utc: "2026-04-10T01:00:00.000Z",
-    },
-    battle_projections: [
-      {
-        battle_id: "battle-no-installation",
-        run_id: "run-no-installation",
-        recorded_at_utc: "2026-04-10T00:30:00.000Z",
-        day: 10,
-        player_rating: 1700,
-        opponent_account_id: "player-account-no-installation",
-        replay_available: true,
-      },
-    ],
-  });
-
-  const response = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body,
-    }),
-    env as never,
-  );
-
-  assert.equal(response.status, 200);
-  const bundle = Array.from(env.DB.v3RunBundles.values())[0];
-  assert.equal(bundle?.installation_id, "anonymous");
-  assert.match(bundle?.object_key ?? "", /run-bundles\/player-account-no-installation\/anonymous\//);
 });
 
 test("run bundle upload accepts requests without player account id", async () => {
   const env = buildEnv();
+  const payloadHash = sha256Base64(new Uint8Array([7, 8, 9]));
 
   const body = JSON.stringify({
     schema_version: 3,
@@ -270,42 +214,26 @@ test("run bundle upload accepts requests without player account id", async () =>
     ],
   });
 
-  const response = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body,
-    }),
-    env as never,
-  );
+  const response = await worker.fetch(buildUploadRequest(body), env as never);
 
   assert.equal(response.status, 200);
   const bundle = Array.from(env.DB.v3RunBundles.values())[0];
+  const run = env.DB.v3Runs.get("run-no-player-account");
   assert.equal(bundle?.player_account_id, "anonymous-player");
-  assert.match(bundle?.object_key ?? "", /run-bundles\/anonymous-player\//);
+  assert.equal(bundle?.installation_id, null);
+  assert.equal(run?.installation_id, null);
+  assert.equal(env.DB.v3Battles.size, 0);
+  assert.equal(
+    bundle?.object_key,
+    `run-bundles/anonymous-player/run-no-player-account/${payloadHash}.mpack.gz`,
+  );
 });
 
 test("run bundle upload rejects mismatched battle run ids", async () => {
   const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_bundle", {
-    installation_id: "inst_bundle",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
 
   const body = JSON.stringify({
     schema_version: 3,
-    installation_id: "inst_bundle",
     player_account_id: "player-account-001",
     submitted_at_utc: new Date().toISOString(),
     artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
@@ -319,26 +247,8 @@ test("run bundle upload rejects mismatched battle run ids", async () => {
       { battle_id: "battle-001", run_id: "run-other", recorded_at_utc: "2026-04-10T00:00:00.000Z" },
     ],
   });
-  const signed = buildSignedRequest({
-    body,
-    installationId: "inst_bundle",
-    privateKey,
-  });
 
-  const response = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-bpp-installation-id": "inst_bundle",
-        "x-bpp-timestamp": signed.timestamp,
-        "x-bpp-content-sha256": signed.bodyHash,
-        "x-bpp-signature": signed.signature,
-      },
-      body,
-    }),
-    env as never,
-  );
+  const response = await worker.fetch(buildUploadRequest(body), env as never);
 
   assert.equal(response.status, 400);
 });
@@ -346,23 +256,9 @@ test("run bundle upload rejects mismatched battle run ids", async () => {
 test("run bundle upload applies configured artifact retention", async () => {
   const env = buildEnv();
   env.RUN_BUNDLE_RETENTION_DAYS = "9";
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_bundle", {
-    installation_id: "inst_bundle",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
 
   const body = JSON.stringify({
     schema_version: 3,
-    installation_id: "inst_bundle",
     player_account_id: "player-account-001",
     submitted_at_utc: new Date().toISOString(),
     artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
@@ -374,26 +270,8 @@ test("run bundle upload applies configured artifact retention", async () => {
     },
     battle_projections: [],
   });
-  const signed = buildSignedRequest({
-    body,
-    installationId: "inst_bundle",
-    privateKey,
-  });
 
-  const response = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-bpp-installation-id": "inst_bundle",
-        "x-bpp-timestamp": signed.timestamp,
-        "x-bpp-content-sha256": signed.bodyHash,
-        "x-bpp-signature": signed.signature,
-      },
-      body,
-    }),
-    env as never,
-  );
+  const response = await worker.fetch(buildUploadRequest(body), env as never);
 
   assert.equal(response.status, 200);
   assert.equal(env.RUN_BUNDLE_BUCKET.lastPutOptions?.customMetadata?.retention_days, "9");
@@ -404,23 +282,9 @@ test("run bundle upload only projects battles whose opponent account id is known
   await env.KNOWN_PLAYER_ACCOUNTS.put("known-opponent", "1", {
     expirationTtl: 7 * 24 * 60 * 60,
   });
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_bundle", {
-    installation_id: "inst_bundle",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
 
   const body = JSON.stringify({
     schema_version: 3,
-    installation_id: "inst_bundle",
     player_account_id: "player-account-001",
     submitted_at_utc: new Date().toISOString(),
     artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
@@ -451,26 +315,8 @@ test("run bundle upload only projects battles whose opponent account id is known
       },
     ],
   });
-  const signed = buildSignedRequest({
-    body,
-    installationId: "inst_bundle",
-    privateKey,
-  });
 
-  const response = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-bpp-installation-id": "inst_bundle",
-        "x-bpp-timestamp": signed.timestamp,
-        "x-bpp-content-sha256": signed.bodyHash,
-        "x-bpp-signature": signed.signature,
-      },
-      body,
-    }),
-    env as never,
-  );
+  const response = await worker.fetch(buildUploadRequest(body), env as never);
 
   assert.equal(response.status, 200);
   assert.equal(env.DB.v3Battles.size, 1);
@@ -479,66 +325,34 @@ test("run bundle upload only projects battles whose opponent account id is known
 
 test("run bundle upload trusts the current uploader account id immediately", async () => {
   const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_bundle", {
-    installation_id: "inst_bundle",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
 
   const body = JSON.stringify({
     schema_version: 3,
-    installation_id: "inst_bundle",
     player_account_id: "player-account-001",
     submitted_at_utc: new Date().toISOString(),
     artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
     artifact_bytes: [4, 5, 6],
     run_projection: {
-      run_id: "run-signed-trust",
+      run_id: "run-uploader-trust",
       status: "completed",
       ended_at_utc: "2026-04-10T01:00:00.000Z",
     },
     battle_projections: [
       {
-        battle_id: "battle-signed-trust",
-        run_id: "run-signed-trust",
+        battle_id: "battle-uploader-trust",
+        run_id: "run-uploader-trust",
         recorded_at_utc: "2026-04-10T00:30:00.000Z",
         opponent_account_id: "player-account-001",
         replay_available: true,
       },
     ],
   });
-  const signed = buildSignedRequest({
-    body,
-    installationId: "inst_bundle",
-    privateKey,
-  });
 
-  const response = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-bpp-installation-id": "inst_bundle",
-        "x-bpp-timestamp": signed.timestamp,
-        "x-bpp-content-sha256": signed.bodyHash,
-        "x-bpp-signature": signed.signature,
-      },
-      body,
-    }),
-    env as never,
-  );
+  const response = await worker.fetch(buildUploadRequest(body), env as never);
 
   assert.equal(response.status, 200);
   assert.equal(env.DB.v3Battles.size, 1);
-  assert.ok(env.DB.v3Battles.has("battle-signed-trust"));
+  assert.ok(env.DB.v3Battles.has("battle-uploader-trust"));
   assert.deepEqual(env.KNOWN_PLAYER_ACCOUNTS.entries.get("player-account-001"), {
     value: "1",
     expirationTtl: 7 * 24 * 60 * 60,
@@ -547,23 +361,9 @@ test("run bundle upload trusts the current uploader account id immediately", asy
 
 test("run bundle upload accepts duplicate payload retries idempotently", async () => {
   const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_bundle", {
-    installation_id: "inst_bundle",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
-
+  const payloadHash = sha256Base64(new Uint8Array([1, 2, 3, 4]));
   const body = JSON.stringify({
     schema_version: 3,
-    installation_id: "inst_bundle",
     player_account_id: "player-account-001",
     submitted_at_utc: "2026-04-10T01:00:00.000Z",
     artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
@@ -585,46 +385,15 @@ test("run bundle upload accepts duplicate payload retries idempotently", async (
       },
     ],
   });
-  const signed = buildSignedRequest({
-    body,
-    installationId: "inst_bundle",
-    privateKey,
-  });
 
-  const firstResponse = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-bpp-installation-id": "inst_bundle",
-        "x-bpp-timestamp": signed.timestamp,
-        "x-bpp-content-sha256": signed.bodyHash,
-        "x-bpp-signature": signed.signature,
-      },
-      body,
-    }),
-    env as never,
-  );
+  const firstResponse = await worker.fetch(buildUploadRequest(body), env as never);
   assert.equal(firstResponse.status, 200);
   const firstJson = (await firstResponse.json()) as {
     bundle_id: string;
     object_key: string;
   };
 
-  const secondResponse = await worker.fetch(
-    new Request("https://example.com/run-bundles", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-bpp-installation-id": "inst_bundle",
-        "x-bpp-timestamp": signed.timestamp,
-        "x-bpp-content-sha256": signed.bodyHash,
-        "x-bpp-signature": signed.signature,
-      },
-      body,
-    }),
-    env as never,
-  );
+  const secondResponse = await worker.fetch(buildUploadRequest(body), env as never);
 
   assert.equal(secondResponse.status, 200);
   const secondJson = (await secondResponse.json()) as {
@@ -632,9 +401,19 @@ test("run bundle upload accepts duplicate payload retries idempotently", async (
     object_key: string;
   };
   assert.equal(secondJson.bundle_id, firstJson.bundle_id);
+  assert.equal(
+    secondJson.object_key,
+    `run-bundles/player-account-001/run-dup/${payloadHash}.mpack.gz`,
+  );
   assert.equal(secondJson.object_key, firstJson.object_key);
   assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
   assert.equal(env.DB.v3RunBundles.size, 1);
   assert.equal(env.DB.v3Runs.size, 1);
   assert.equal(env.DB.v3Battles.size, 1);
+  const bundle = Array.from(env.DB.v3RunBundles.values())[0];
+  const run = env.DB.v3Runs.get("run-dup");
+  const battle = env.DB.v3Battles.get("battle-dup");
+  assert.equal(bundle?.installation_id, null);
+  assert.equal(run?.installation_id, null);
+  assert.equal(battle?.installation_id, null);
 });
