@@ -1,11 +1,7 @@
 import { sha256Base64 } from "../../crypto/hash";
 import type { Env } from "../../env";
 import { json, readJson } from "../../http/json";
-import {
-  getBattleIngestMinDayIfBelowRating,
-  getBattleIngestMinRating,
-  getRunBundleRetentionDays,
-} from "../../config/v3";
+import { getRunBundleRetentionDays } from "../../config/v3";
 import { requireInstallationAuth } from "./requireInstallationAuth";
 
 type RunProjection = {
@@ -65,6 +61,8 @@ type ExistingRunBundleRow = {
 
 const AnonymousInstallationId = "anonymous";
 const AnonymousPlayerAccountId = "anonymous-player";
+const KnownPlayerAccountMarker = "1";
+const KnownPlayerAccountTtlSeconds = 7 * 24 * 60 * 60;
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -91,15 +89,73 @@ function asBytes(value: unknown): Uint8Array | null {
   return bytes;
 }
 
-function shouldProjectBattle(battle: BattleProjection, env: Env): boolean {
-  const rating = asNumber(battle.player_rating);
-  const day = asNumber(battle.day);
+function shouldProjectBattle(
+  battle: BattleProjection,
+  knownOpponentAccountIds: ReadonlySet<string>,
+): boolean {
+  const opponentAccountId = asString(battle.opponent_account_id);
+  return opponentAccountId != null && knownOpponentAccountIds.has(opponentAccountId);
+}
 
-  if (rating != null && rating >= getBattleIngestMinRating(env)) {
-    return true;
+async function rememberKnownPlayerAccountId(
+  playerAccountId: string,
+  env: Env,
+): Promise<void> {
+  if (!playerAccountId || playerAccountId === AnonymousPlayerAccountId) {
+    return;
   }
 
-  return day != null && day >= getBattleIngestMinDayIfBelowRating(env);
+  await env.KNOWN_PLAYER_ACCOUNTS.put(playerAccountId, KnownPlayerAccountMarker, {
+    expirationTtl: KnownPlayerAccountTtlSeconds,
+  });
+}
+
+async function loadKnownOpponentAccountIds(
+  battleProjections: BattleProjection[],
+  uploaderPlayerAccountId: string,
+  allowUploaderPlayerAccountId: boolean,
+  env: Env,
+): Promise<Set<string>> {
+  const opponentAccountIds = new Set<string>();
+  for (const battle of battleProjections) {
+    const opponentAccountId = asString(battle.opponent_account_id);
+    if (opponentAccountId) {
+      opponentAccountIds.add(opponentAccountId);
+    }
+  }
+
+  if (opponentAccountIds.size === 0) {
+    return new Set(
+      allowUploaderPlayerAccountId
+        && uploaderPlayerAccountId
+        && uploaderPlayerAccountId !== AnonymousPlayerAccountId
+        ? [uploaderPlayerAccountId]
+        : [],
+    );
+  }
+
+  const results = await Promise.all(
+    Array.from(opponentAccountIds, async (opponentAccountId) => ({
+      opponentAccountId,
+      marker: await env.KNOWN_PLAYER_ACCOUNTS.get(opponentAccountId),
+    })),
+  );
+
+  const knownOpponentAccountIds = new Set(
+    results
+      .filter(({ marker }) => typeof marker === "string" && marker.length > 0)
+      .map(({ opponentAccountId }) => opponentAccountId),
+  );
+
+  if (
+    allowUploaderPlayerAccountId
+    && uploaderPlayerAccountId
+    && uploaderPlayerAccountId !== AnonymousPlayerAccountId
+  ) {
+    knownOpponentAccountIds.add(uploaderPlayerAccountId);
+  }
+
+  return knownOpponentAccountIds;
 }
 
 export async function handleUploadRunBundle(
@@ -128,6 +184,8 @@ export async function handleUploadRunBundle(
   const persistedInstallationId = installationId ?? auth?.installationId ?? AnonymousInstallationId;
   const persistedPlayerAccountId =
     playerAccountId ?? auth?.playerAccountId ?? AnonymousPlayerAccountId;
+  const hasVerifiedInstallationSignature =
+    auth != null && Boolean(request.headers.get("x-bpp-signature")?.trim());
 
   if (
     schemaVersion == null ||
@@ -293,8 +351,15 @@ export async function handleUploadRunBundle(
     )
     .run();
 
+  const knownOpponentAccountIds = await loadKnownOpponentAccountIds(
+    battleProjections,
+    persistedPlayerAccountId,
+    hasVerifiedInstallationSignature,
+    env,
+  );
+
   const battleStatements = battleProjections
-    .filter((battle) => shouldProjectBattle(battle, env))
+    .filter((battle) => shouldProjectBattle(battle, knownOpponentAccountIds))
     .map((battle) =>
       env.DB.prepare(
         `
@@ -373,6 +438,10 @@ export async function handleUploadRunBundle(
 
   if (battleStatements.length > 0) {
     await env.DB.batch(battleStatements);
+  }
+
+  if (hasVerifiedInstallationSignature) {
+    await rememberKnownPlayerAccountId(persistedPlayerAccountId, env);
   }
 
   return json({ status: "accepted", bundle_id: bundleId, object_key: persistedObjectKey });

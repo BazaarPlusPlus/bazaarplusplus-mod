@@ -2,9 +2,7 @@ import type { Env } from "../env";
 
 type RequiredNumericConfigKey =
   | "GHOST_QUERY_LOOKBACK_DAYS"
-  | "RUN_BUNDLE_RETENTION_DAYS"
-  | "BATTLE_INGEST_MIN_RATING"
-  | "BATTLE_INGEST_MIN_DAY_IF_BELOW_RATING";
+  | "RUN_BUNDLE_RETENTION_DAYS";
 
 function requireNonNegativeInteger(env: Env, key: RequiredNumericConfigKey): number {
   const raw = env[key]?.trim();
@@ -26,14 +24,6 @@ export function getGhostQueryLookbackDays(env: Env): number {
 
 export function getRunBundleRetentionDays(env: Env): number {
   return requireNonNegativeInteger(env, "RUN_BUNDLE_RETENTION_DAYS");
-}
-
-export function getBattleIngestMinRating(env: Env): number {
-  return requireNonNegativeInteger(env, "BATTLE_INGEST_MIN_RATING");
-}
-
-export function getBattleIngestMinDayIfBelowRating(env: Env): number {
-  return requireNonNegativeInteger(env, "BATTLE_INGEST_MIN_DAY_IF_BELOW_RATING");
 }
 
 export function allowUnauthenticatedReplayDownloads(env: Env): boolean {

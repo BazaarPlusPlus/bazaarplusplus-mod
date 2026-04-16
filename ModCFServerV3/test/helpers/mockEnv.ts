@@ -1160,15 +1160,38 @@ export class MockR2Bucket {
   }
 }
 
+type MockKvEntry = {
+  value: string;
+  expirationTtl?: number;
+};
+
+export class MockKVNamespace {
+  public readonly entries = new Map<string, MockKvEntry>();
+
+  async get(key: string): Promise<string | null> {
+    return this.entries.get(key)?.value ?? null;
+  }
+
+  async put(
+    key: string,
+    value: string,
+    options?: KVNamespacePutOptions,
+  ): Promise<void> {
+    this.entries.set(key, {
+      value,
+      expirationTtl: options?.expirationTtl,
+    });
+  }
+}
+
 export function buildEnv() {
   return {
     DB: new MockD1Database(),
     RUN_BUNDLE_BUCKET: new MockR2Bucket(),
+    KNOWN_PLAYER_ACCOUNTS: new MockKVNamespace(),
     REPLAY_DOWNLOAD_SECRET: "test-replay-download-secret",
     GHOST_QUERY_LOOKBACK_DAYS: "3",
     RUN_BUNDLE_RETENTION_DAYS: "5",
-    BATTLE_INGEST_MIN_RATING: "700",
-    BATTLE_INGEST_MIN_DAY_IF_BELOW_RATING: "7",
     ALLOW_UNAUTHENTICATED_REPLAY_LINKS: "false",
     ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS: "false",
   };
