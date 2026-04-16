@@ -1,6 +1,7 @@
 import type { Env } from "../../env";
 import { getGhostQueryLookbackDays } from "../../config/v3";
 import { json } from "../../http/json";
+import { requireBearerAuth } from "./requireBearerAuth";
 
 type GhostBattleRow = {
   battle_id: string;
@@ -44,12 +45,12 @@ export async function handleQueryGhostBattles(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  const url = new URL(request.url);
-  const playerAccountId = url.searchParams.get("player_account_id")?.trim() ?? "";
-  if (!playerAccountId) {
-    return json({ error: "player_account_id_required" }, { status: 400 });
+  const auth = await requireBearerAuth(request, env);
+  if (auth instanceof Response) {
+    return auth;
   }
 
+  const url = new URL(request.url);
   const lookbackDays = getGhostQueryLookbackDays(env);
   const limit = parseClampedInt(url.searchParams.get("limit"), 200, 1, 200);
   const fromUtc = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
@@ -81,7 +82,7 @@ export async function handleQueryGhostBattles(
       LIMIT ?
     `,
   )
-    .bind(playerAccountId, fromUtc, limit)
+    .bind(auth.playerAccountId, fromUtc, limit)
     .all<GhostBattleRow>();
 
   return json({

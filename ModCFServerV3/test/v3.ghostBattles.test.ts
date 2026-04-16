@@ -2,11 +2,76 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import worker from "../src/index";
+import type { MockD1Database } from "./helpers/mockEnv";
 import { buildEnv } from "./helpers/mockEnv";
 
-test("ghost-battles ignores caller days and uses the server lookback window", async () => {
+async function insertToken(
+  db: MockD1Database,
+  token: string,
+  playerAccountId: string,
+  issuedAtUtc: string,
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES (?, ?, ?)`,
+  )
+    .bind(token, playerAccountId, issuedAtUtc)
+    .run();
+}
+
+test("ghost-battles returns 401 when Authorization header is missing", async () => {
+  const env = buildEnv();
+
+  const response = await worker.fetch(
+    new Request("https://example.com/ghost-battles?limit=5", {
+      method: "GET",
+    }),
+    env as never,
+  );
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "invalid_token" });
+});
+
+test("ghost-battles returns 401 when bearer is unknown or revoked", async () => {
+  const env = buildEnv();
+  await env.DB.prepare(
+    `INSERT INTO tokens (token, player_account_id, issued_at_utc, revoked_at_utc) VALUES (?, ?, ?, ?)`,
+  )
+    .bind("tok-revoked", "player-account-001", "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z")
+    .run();
+
+  const unknownResponse = await worker.fetch(
+    new Request("https://example.com/ghost-battles?limit=5", {
+      method: "GET",
+      headers: { Authorization: "Bearer tok-unknown" },
+    }),
+    env as never,
+  );
+
+  assert.equal(unknownResponse.status, 401);
+  assert.deepEqual(await unknownResponse.json(), { error: "invalid_token" });
+
+  const revokedResponse = await worker.fetch(
+    new Request("https://example.com/ghost-battles?limit=5", {
+      method: "GET",
+      headers: { Authorization: "Bearer tok-revoked" },
+    }),
+    env as never,
+  );
+
+  assert.equal(revokedResponse.status, 401);
+  assert.deepEqual(await revokedResponse.json(), { error: "invalid_token" });
+});
+
+test("ghost-battles returns battles for the authenticated bearer and ignores caller days", async () => {
   const env = buildEnv();
   env.GHOST_QUERY_LOOKBACK_DAYS = "6";
+  await insertToken(
+    env.DB,
+    "tok-player-001",
+    "player-account-001",
+    "2026-01-01T00:00:00Z",
+  );
 
   env.DB.v3Battles.set("battle-recent", {
     battle_id: "battle-recent",
@@ -57,11 +122,10 @@ test("ghost-battles ignores caller days and uses the server lookback window", as
     updated_at_utc: new Date().toISOString(),
   });
 
-  const query = "player_account_id=player-account-001&days=99&limit=200";
-
   const response = await worker.fetch(
-    new Request(`https://example.com/ghost-battles?${query}`, {
+    new Request("https://example.com/ghost-battles?days=99&limit=200", {
       method: "GET",
+      headers: { Authorization: "Bearer tok-player-001" },
     }),
     env as never,
   );
@@ -78,6 +142,12 @@ test("ghost-battles ignores caller days and uses the server lookback window", as
 
 test("ghost-battles honors the caller limit parameter after server clamping", async () => {
   const env = buildEnv();
+  await insertToken(
+    env.DB,
+    "tok-player-001",
+    "player-account-001",
+    "2026-01-01T00:00:00Z",
+  );
 
   env.DB.v3Battles.set("battle-003", {
     battle_id: "battle-003",
@@ -152,11 +222,10 @@ test("ghost-battles honors the caller limit parameter after server clamping", as
     updated_at_utc: new Date().toISOString(),
   });
 
-  const query = "player_account_id=player-account-001&limit=1";
-
   const response = await worker.fetch(
-    new Request(`https://example.com/ghost-battles?${query}`, {
+    new Request("https://example.com/ghost-battles?limit=1", {
       method: "GET",
+      headers: { Authorization: "Bearer tok-player-001" },
     }),
     env as never,
   );
@@ -168,25 +237,55 @@ test("ghost-battles honors the caller limit parameter after server clamping", as
   assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-003"]);
 });
 
-test("ghost-battles reads player_account_id from query", async () => {
+test("ghost-battles ignores mismatched player_account_id query parameters when bearer is valid", async () => {
   const env = buildEnv();
+  await insertToken(
+    env.DB,
+    "tok-player-001",
+    "player-account-001",
+    "2026-01-01T00:00:00Z",
+  );
 
-  env.DB.v3Battles.set("battle-unsigned", {
-    battle_id: "battle-unsigned",
-    run_id: "run-unsigned",
-    installation_id: "inst_unsigned",
+  env.DB.v3Battles.set("battle-owned", {
+    battle_id: "battle-owned",
+    run_id: "run-owned",
+    installation_id: "inst_ghost",
     player_account_id: "remote-player",
-    bundle_id: "bundle-unsigned",
+    bundle_id: "bundle-owned",
     recorded_at_utc: new Date().toISOString(),
     day: 8,
-    player_name: "RemoteUnsigned",
+    player_name: "RemoteOwned",
     player_account_id_in_payload: "remote-player",
     player_hero: "HeroA",
     player_rank: "Gold",
     player_rating: 1500,
     player_level: 10,
-    opponent_name: "LocalUnsigned",
-    opponent_account_id: "player-account-unsigned",
+    opponent_name: "LocalOwned",
+    opponent_account_id: "player-account-001",
+    opponent_hero: "HeroB",
+    opponent_rank: "Gold",
+    opponent_rating: 1510,
+    opponent_level: 11,
+    result: "Won",
+    replay_available: 1,
+    updated_at_utc: new Date().toISOString(),
+  });
+  env.DB.v3Battles.set("battle-other", {
+    battle_id: "battle-other",
+    run_id: "run-other",
+    installation_id: "inst_ghost",
+    player_account_id: "remote-player",
+    bundle_id: "bundle-other",
+    recorded_at_utc: new Date(Date.now() - 60 * 1000).toISOString(),
+    day: 8,
+    player_name: "RemoteOther",
+    player_account_id_in_payload: "remote-player",
+    player_hero: "HeroA",
+    player_rank: "Gold",
+    player_rating: 1500,
+    player_level: 10,
+    opponent_name: "LocalOther",
+    opponent_account_id: "someone-else",
     opponent_hero: "HeroB",
     opponent_rank: "Gold",
     opponent_rating: 1510,
@@ -197,9 +296,13 @@ test("ghost-battles reads player_account_id from query", async () => {
   });
 
   const response = await worker.fetch(
-    new Request("https://example.com/ghost-battles?player_account_id=player-account-unsigned&limit=5", {
-      method: "GET",
-    }),
+    new Request(
+      "https://example.com/ghost-battles?player_account_id=someone-else&limit=5",
+      {
+        method: "GET",
+        headers: { Authorization: "Bearer tok-player-001" },
+      },
+    ),
     env as never,
   );
 
@@ -207,19 +310,5 @@ test("ghost-battles reads player_account_id from query", async () => {
   const json = (await response.json()) as {
     battles: Array<{ battle_id: string }>;
   };
-  assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-unsigned"]);
-});
-
-test("ghost-battles requires player_account_id query parameter", async () => {
-  const env = buildEnv();
-
-  const response = await worker.fetch(
-    new Request("https://example.com/ghost-battles?limit=5", {
-      method: "GET",
-    }),
-    env as never,
-  );
-
-  assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "player_account_id_required" });
+  assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-owned"]);
 });
