@@ -194,8 +194,11 @@ test("run bundle upload accepts unsigned uploads without installation auth", asy
   assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
   assert.equal(env.DB.v3RunBundles.size, 1);
   assert.equal(env.DB.v3Runs.size, 1);
-  assert.equal(env.DB.v3Battles.size, 0);
-  assert.equal(env.KNOWN_PLAYER_ACCOUNTS.entries.size, 0);
+  assert.equal(env.DB.v3Battles.size, 1);
+  assert.deepEqual(env.KNOWN_PLAYER_ACCOUNTS.entries.get("player-account-unsigned"), {
+    value: "1",
+    expirationTtl: 7 * 24 * 60 * 60,
+  });
 });
 
 test("run bundle upload accepts requests without installation id", async () => {
@@ -474,7 +477,7 @@ test("run bundle upload only projects battles whose opponent account id is known
   assert.ok(env.DB.v3Battles.has("battle-keep"));
 });
 
-test("run bundle upload only trusts the current uploader for signed requests", async () => {
+test("run bundle upload trusts the current uploader account id immediately", async () => {
   const env = buildEnv();
   const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
   env.DB.v3Installations.set("inst_bundle", {

@@ -113,7 +113,6 @@ async function rememberKnownPlayerAccountId(
 async function loadKnownOpponentAccountIds(
   battleProjections: BattleProjection[],
   uploaderPlayerAccountId: string,
-  allowUploaderPlayerAccountId: boolean,
   env: Env,
 ): Promise<Set<string>> {
   const opponentAccountIds = new Set<string>();
@@ -126,8 +125,7 @@ async function loadKnownOpponentAccountIds(
 
   if (opponentAccountIds.size === 0) {
     return new Set(
-      allowUploaderPlayerAccountId
-        && uploaderPlayerAccountId
+      uploaderPlayerAccountId
         && uploaderPlayerAccountId !== AnonymousPlayerAccountId
         ? [uploaderPlayerAccountId]
         : [],
@@ -147,11 +145,7 @@ async function loadKnownOpponentAccountIds(
       .map(({ opponentAccountId }) => opponentAccountId),
   );
 
-  if (
-    allowUploaderPlayerAccountId
-    && uploaderPlayerAccountId
-    && uploaderPlayerAccountId !== AnonymousPlayerAccountId
-  ) {
+  if (uploaderPlayerAccountId && uploaderPlayerAccountId !== AnonymousPlayerAccountId) {
     knownOpponentAccountIds.add(uploaderPlayerAccountId);
   }
 
@@ -184,8 +178,6 @@ export async function handleUploadRunBundle(
   const persistedInstallationId = installationId ?? auth?.installationId ?? AnonymousInstallationId;
   const persistedPlayerAccountId =
     playerAccountId ?? auth?.playerAccountId ?? AnonymousPlayerAccountId;
-  const hasVerifiedInstallationSignature =
-    auth != null && Boolean(request.headers.get("x-bpp-signature")?.trim());
 
   if (
     schemaVersion == null ||
@@ -354,7 +346,6 @@ export async function handleUploadRunBundle(
   const knownOpponentAccountIds = await loadKnownOpponentAccountIds(
     battleProjections,
     persistedPlayerAccountId,
-    hasVerifiedInstallationSignature,
     env,
   );
 
@@ -440,9 +431,7 @@ export async function handleUploadRunBundle(
     await env.DB.batch(battleStatements);
   }
 
-  if (hasVerifiedInstallationSignature) {
-    await rememberKnownPlayerAccountId(persistedPlayerAccountId, env);
-  }
+  await rememberKnownPlayerAccountId(persistedPlayerAccountId, env);
 
   return json({ status: "accepted", bundle_id: bundleId, object_key: persistedObjectKey });
 }
