@@ -22,7 +22,8 @@ export async function handleCreateReplayLink(
     `
       SELECT
         battle_id,
-        player_account_id
+        player_account_id,
+        opponent_account_id
       FROM battles
       WHERE battle_id = ?
     `,
@@ -31,18 +32,19 @@ export async function handleCreateReplayLink(
     .first<{
       battle_id: string;
       player_account_id: string | null;
+      opponent_account_id: string | null;
     }>();
   if (!battleRow) {
     return json({ error: "battle_not_found" }, { status: 404 });
   }
   if (
     requesterPlayerAccountId != null &&
-    battleRow.player_account_id !== requesterPlayerAccountId
+    battleRow.opponent_account_id !== requesterPlayerAccountId
   ) {
     return json({ error: "replay_forbidden" }, { status: 403 });
   }
 
-  const tokenOwnerPlayerAccountId = requesterPlayerAccountId ?? battleRow.player_account_id;
+  const tokenOwnerPlayerAccountId = requesterPlayerAccountId ?? battleRow.opponent_account_id;
   if (!tokenOwnerPlayerAccountId) {
     return json({ error: "replay_forbidden" }, { status: 403 });
   }

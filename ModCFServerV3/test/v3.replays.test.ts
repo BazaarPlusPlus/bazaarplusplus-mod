@@ -81,7 +81,7 @@ test("replay-link returns 401 when bearer is unknown or revoked", async () => {
   assert.deepEqual(await revokedResponse.json(), { error: "invalid_token" });
 });
 
-test("replay-link returns 403 when battle belongs to another player", async () => {
+test("replay-link returns 403 when bearer is not the battle opponent", async () => {
   const env = buildEnv();
   await insertToken(
     env.DB,
@@ -93,18 +93,18 @@ test("replay-link returns 403 when battle belongs to another player", async () =
     battle_id: "battle-foreign",
     run_id: "run-foreign",
     installation_id: "inst_replay",
-    player_account_id: "other-player",
+    player_account_id: "player-account-001",
     bundle_id: "bundle-foreign",
     recorded_at_utc: new Date().toISOString(),
     day: 7,
-    player_name: "Remote",
-    player_account_id_in_payload: "other-player",
+    player_name: "Local",
+    player_account_id_in_payload: "player-account-001",
     player_hero: "HeroA",
     player_rank: "Gold",
     player_rating: 1500,
     player_level: 10,
-    opponent_name: "OtherLocal",
-    opponent_account_id: "player-account-001",
+    opponent_name: "Remote",
+    opponent_account_id: "other-player",
     opponent_hero: "HeroB",
     opponent_rank: "Gold",
     opponent_rating: 1510,
@@ -126,7 +126,7 @@ test("replay-link returns 403 when battle belongs to another player", async () =
   assert.deepEqual(await response.json(), { error: "replay_forbidden" });
 });
 
-test("replay-link returns download metadata when battle owner matches bearer", async () => {
+test("replay-link returns download metadata when bearer is the battle opponent", async () => {
   const env = buildEnv();
   await insertToken(
     env.DB,
@@ -138,18 +138,18 @@ test("replay-link returns download metadata when battle owner matches bearer", a
     battle_id: "battle-owned",
     run_id: "run-owned",
     installation_id: "inst_replay",
-    player_account_id: "player-account-001",
+    player_account_id: "other-player",
     bundle_id: "bundle-owned",
     recorded_at_utc: new Date().toISOString(),
     day: 8,
-    player_name: "Local",
-    player_account_id_in_payload: "different-payload-player",
+    player_name: "Remote",
+    player_account_id_in_payload: "other-player",
     player_hero: "HeroA",
     player_rank: "Gold",
     player_rating: 1500,
     player_level: 10,
-    opponent_name: "Remote",
-    opponent_account_id: "other-player",
+    opponent_name: "Local",
+    opponent_account_id: "player-account-001",
     opponent_hero: "HeroB",
     opponent_rank: "Gold",
     opponent_rating: 1510,
@@ -229,7 +229,7 @@ test("replay-link allows unauthenticated creation when configured", async () => 
   const token = payload.download_url.split("/").pop();
   assert.ok(token);
   const replayToken = env.DB.v3ReplayTokens.get(token ?? "");
-  assert.equal(replayToken?.requested_by_player_account_id, "remote-player");
+  assert.equal(replayToken?.requested_by_player_account_id, "player-account-001");
   assert.equal(replayToken?.expires_at_utc, payload.expires_at_utc);
 });
 
