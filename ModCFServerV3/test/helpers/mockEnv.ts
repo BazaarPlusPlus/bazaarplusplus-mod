@@ -39,6 +39,14 @@ export type V3InstallationSessionRow = {
   revoked_at_utc: string | null;
 };
 
+export type V3TokenRow = {
+  token: string;
+  player_id: string;
+  installation_id: string;
+  revoked_at_utc: string | null;
+  last_used_at_utc: string | null;
+};
+
 export type V3InstallationObservationRow = {
   installation_id: string;
   observed_player_account_id: string;
@@ -298,6 +306,7 @@ export class MockD1Database {
   public readonly v3Users = new Map<string, V3UserRow>();
   public readonly v3Installations = new Map<string, V3InstallationRow>();
   public readonly v3InstallationSessions = new Map<string, V3InstallationSessionRow>();
+  public readonly v3Tokens = new Map<string, V3TokenRow>();
   public readonly v3InstallationObservations = new Map<
     string,
     V3InstallationObservationRow
@@ -468,6 +477,11 @@ export class MockD1Database {
             replay_uploaded_at_utc: row.replay_uploaded_at_utc ?? null,
           } as T)
         : null;
+    }
+
+    if (sql.includes("FROM tokens WHERE token = ?")) {
+      const token = String(params[0] ?? "");
+      return (this.v3Tokens.get(token) as T | undefined) ?? null;
     }
 
     return null;
@@ -1081,6 +1095,46 @@ export class MockD1Database {
         replay_available: 1,
         replay_object_key: params[0] == null ? null : String(params[0]),
         replay_uploaded_at_utc: params[1] == null ? null : String(params[1]),
+      });
+      return { changes: 1 };
+    }
+
+    if (sql.includes("INSERT INTO tokens")) {
+      const row: V3TokenRow = {
+        token: String(params[0] ?? ""),
+        player_id: String(params[1] ?? ""),
+        installation_id: String(params[2] ?? ""),
+        revoked_at_utc: params[3] == null ? null : String(params[3]),
+        last_used_at_utc: params[4] == null ? null : String(params[4]),
+      };
+      this.v3Tokens.set(row.token, row);
+      return { changes: 1 };
+    }
+
+    if (sql.includes("UPDATE tokens SET revoked_at_utc")) {
+      const token = String(params[1] ?? "");
+      const existing = this.v3Tokens.get(token);
+      if (!existing) {
+        return { changes: 0 };
+      }
+
+      this.v3Tokens.set(token, {
+        ...existing,
+        revoked_at_utc: params[0] == null ? null : String(params[0]),
+      });
+      return { changes: 1 };
+    }
+
+    if (sql.includes("UPDATE tokens SET last_used_at_utc")) {
+      const token = String(params[1] ?? "");
+      const existing = this.v3Tokens.get(token);
+      if (!existing) {
+        return { changes: 0 };
+      }
+
+      this.v3Tokens.set(token, {
+        ...existing,
+        last_used_at_utc: params[0] == null ? null : String(params[0]),
       });
       return { changes: 1 };
     }
