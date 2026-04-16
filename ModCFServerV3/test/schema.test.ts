@@ -3,32 +3,29 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-function readMigrationSql(): string {
+function readMigration(fileName: string): string {
   const migrationPath = path.join(
     import.meta.dirname,
     "..",
     "migrations",
-    "0001_initial_schema.sql",
+    fileName,
   );
   return readFileSync(migrationPath, "utf8");
 }
 
 function getTableSection(sql: string, tableName: string): string {
   const section = sql.match(
-    new RegExp(`CREATE TABLE IF NOT EXISTS ${tableName} \\(([\\s\\S]*?)\\);`),
+    new RegExp(`CREATE TABLE(?: IF NOT EXISTS)? ${tableName} \\(([\\s\\S]*?)\\);`),
   )?.[1];
   assert.ok(section, `expected CREATE TABLE for ${tableName}`);
   return section!;
 }
 
-test("migration defines only the V3 tables", () => {
-  const sql = readMigrationSql();
+test("initial migration defines the V3 projection tables", () => {
+  const sql = readMigration("0001_initial_schema.sql");
 
   for (const tableName of [
     "users",
-    "installations",
-    "installation_sessions",
-    "installation_observations",
     "run_bundles",
     "runs",
     "battles",
@@ -41,23 +38,31 @@ test("migration defines only the V3 tables", () => {
   assert.doesNotMatch(sql, /\bplayer_links\b/);
 });
 
-test("migration stores V3 user and installation identity columns", () => {
-  const sql = readMigrationSql();
+test("initial migration stores V3 user identity columns", () => {
+  const sql = readMigration("0001_initial_schema.sql");
   const usersSection = getTableSection(sql, "users");
-  const installationsSection = getTableSection(sql, "installations");
-  const sessionsSection = getTableSection(sql, "installation_sessions");
 
   assert.match(usersSection, /\bplayer_account_id TEXT PRIMARY KEY\b/);
   assert.match(usersSection, /\bplayer_username TEXT NOT NULL UNIQUE\b/);
   assert.match(usersSection, /\bpassword_hash TEXT NOT NULL\b/);
-
-  assert.match(installationsSection, /\binstallation_id TEXT PRIMARY KEY\b/);
-  assert.match(installationsSection, /\bplayer_account_id TEXT NOT NULL\b/);
-  assert.match(installationsSection, /\bpublic_key TEXT NOT NULL\b/);
-  assert.match(installationsSection, /\bstatus TEXT NOT NULL\b/);
-
-  assert.match(sessionsSection, /\bsession_id TEXT PRIMARY KEY\b/);
-  assert.match(sessionsSection, /\bplayer_account_id TEXT NOT NULL\b/);
-  assert.match(sessionsSection, /\bexpires_at_utc TEXT NOT NULL\b/);
 });
 
+test("auth simplification migration creates tokens and drops installation tables", () => {
+  const sql = readMigration("0002_auth_simplification.sql");
+  const tokensSection = getTableSection(sql, "tokens");
+
+  assert.match(tokensSection, /\btoken\s+TEXT\s+PRIMARY KEY\b/);
+  assert.match(tokensSection, /\bplayer_account_id\s+TEXT\s+NOT NULL\b/);
+  assert.match(tokensSection, /\bissued_at_utc\s+TEXT\s+NOT NULL\b/);
+  assert.match(tokensSection, /\brevoked_at_utc\s+TEXT\s+NULL\b/);
+  assert.match(tokensSection, /\blast_used_at_utc\s+TEXT\s+NULL\b/);
+
+  assert.match(sql, /DROP TABLE IF EXISTS installation_sessions;/);
+  assert.match(sql, /DROP TABLE IF EXISTS installation_observations;/);
+  assert.match(sql, /DROP TABLE IF EXISTS installations;/);
+
+  assert.match(
+    sql,
+    /CREATE UNIQUE INDEX run_bundles_player_run_payload_unique\s+ON run_bundles\(player_account_id, run_id, payload_hash\);/,
+  );
+});
