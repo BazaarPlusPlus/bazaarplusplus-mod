@@ -1,121 +1,59 @@
 import type { Env } from "../../env";
-import { hashPassword } from "../../crypto/password";
 import { json, readJson } from "../../http/json";
-import { trimString } from "../../http/request";
-import type { ActivateRequest } from "../../types/api";
+import { hashPassword } from "../../crypto/password";
+import { generateBearerToken } from "../../token/generate";
 
-const ALLOWED_STREAM_PLATFORMS = new Set(["bilibili", "twitch"]);
+type ActivateRequest = {
+  player_account_id?: unknown;
+  player_username?: unknown;
+  password?: unknown;
+};
 
-function isValidStreamUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-export async function handleActivate(
-  request: Request,
-  env: Env,
-): Promise<Response> {
+export async function handleActivate(request: Request, env: Env): Promise<Response> {
   const body = (await readJson(request)) as ActivateRequest;
-  const playerAccountId = trimString(body.player_account_id);
-  const playerUsername = trimString(body.player_username);
-  const password = trimString(body.password);
-  const streamPlatform = trimString(body.stream_platform);
-  const streamChannelId = trimString(body.stream_channel_id);
-  const streamUrl = trimString(body.stream_url);
-  const installationPublicKey = trimString(body.installation_public_key);
+  const playerAccountId = typeof body.player_account_id === "string" ? body.player_account_id.trim() : "";
+  const playerUsername = typeof body.player_username === "string" ? body.player_username.trim() : "";
+  const password = typeof body.password === "string" ? body.password : "";
 
-  if (!playerAccountId || !playerUsername || !password || !installationPublicKey) {
-    return json({ error: "invalid_activate_request" }, { status: 400 });
+  if (!playerAccountId || !playerUsername || !password) {
+    return json({ error: "invalid_request" }, { status: 400 });
   }
 
-  const hasAnyStreamField = Boolean(streamPlatform || streamChannelId || streamUrl);
-  if (hasAnyStreamField) {
-    if (!streamPlatform || !streamChannelId || !streamUrl) {
-      return json({ error: "invalid_activate_request" }, { status: 400 });
-    }
-
-    if (!ALLOWED_STREAM_PLATFORMS.has(streamPlatform) || !isValidStreamUrl(streamUrl)) {
-      return json({ error: "invalid_activate_request" }, { status: 400 });
-    }
-  }
-
-  const existingUser = await env.DB.prepare(
-    `SELECT player_account_id FROM users WHERE player_account_id = ?`,
+  const existingAccount = await env.DB.prepare(
+    `SELECT 1 FROM users WHERE player_account_id = ?`,
   )
     .bind(playerAccountId)
-    .first<{ player_account_id: string }>();
-  if (existingUser) {
-    return json({ error: "player_account_id_claimed" }, { status: 409 });
+    .first();
+  if (existingAccount) {
+    return json({ error: "player_account_id_taken" }, { status: 409 });
   }
 
   const existingUsername = await env.DB.prepare(
-    `SELECT player_account_id FROM users WHERE player_username = ?`,
+    `SELECT 1 FROM users WHERE player_username = ?`,
   )
     .bind(playerUsername)
-    .first<{ player_account_id: string }>();
+    .first();
   if (existingUsername) {
-    return json({ error: "player_username_claimed" }, { status: 409 });
+    return json({ error: "player_username_taken" }, { status: 409 });
   }
 
-  const nowUtc = new Date().toISOString();
-  const installationId = `inst_${crypto.randomUUID().replace(/-/g, "")}`;
   const passwordHash = await hashPassword(password);
+  const token = generateBearerToken();
+  const nowUtc = new Date().toISOString();
 
   await env.DB.batch([
     env.DB.prepare(
-      `
-        INSERT INTO users (
-          player_account_id,
-          player_username,
-          password_hash,
-          stream_platform,
-          stream_channel_id,
-          stream_url,
-          created_at_utc,
-          updated_at_utc,
-          last_login_at_utc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    ).bind(
-      playerAccountId,
-      playerUsername,
-      passwordHash,
-      streamPlatform || null,
-      streamChannelId || null,
-      streamUrl || null,
-      nowUtc,
-      nowUtc,
-      null,
-    ),
+      `INSERT INTO users (player_account_id, player_username, password_hash, created_at_utc, updated_at_utc, last_login_at_utc)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(playerAccountId, playerUsername, passwordHash, nowUtc, nowUtc, nowUtc),
     env.DB.prepare(
-      `
-        INSERT INTO installations (
-          installation_id,
-          player_account_id,
-          public_key,
-          status,
-          created_at_utc,
-          last_seen_at_utc,
-          revoked_at_utc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
-    ).bind(
-      installationId,
-      playerAccountId,
-      installationPublicKey,
-      "active",
-      nowUtc,
-      null,
-      null,
-    ),
+      `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES (?, ?, ?)`,
+    ).bind(token, playerAccountId, nowUtc),
   ]);
 
   return json({
-    installation_id: installationId,
-    status: "active",
+    token,
+    player_account_id: playerAccountId,
+    player_username: playerUsername,
   });
 }

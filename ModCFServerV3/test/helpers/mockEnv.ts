@@ -602,16 +602,32 @@ export class MockD1Database {
 
   run(sql: string, params: unknown[]): { changes: number } {
     if (sql.includes("INSERT INTO users")) {
+      const usesSimplifiedActivateInsert = params.length === 6;
       const row = {
         player_account_id: String(params[0] ?? ""),
         player_username: String(params[1] ?? ""),
         password_hash: String(params[2] ?? ""),
-        stream_platform: params[3] == null ? null : String(params[3]),
-        stream_channel_id: params[4] == null ? null : String(params[4]),
-        stream_url: params[5] == null ? null : String(params[5]),
-        created_at_utc: String(params[6] ?? ""),
-        updated_at_utc: String(params[7] ?? ""),
-        last_login_at_utc: params[8] == null ? null : String(params[8]),
+        stream_platform: usesSimplifiedActivateInsert
+          ? null
+          : params[3] == null
+            ? null
+            : String(params[3]),
+        stream_channel_id: usesSimplifiedActivateInsert
+          ? null
+          : params[4] == null
+            ? null
+            : String(params[4]),
+        stream_url: usesSimplifiedActivateInsert
+          ? null
+          : params[5] == null
+            ? null
+            : String(params[5]),
+        created_at_utc: String(params[usesSimplifiedActivateInsert ? 3 : 6] ?? ""),
+        updated_at_utc: String(params[usesSimplifiedActivateInsert ? 4 : 7] ?? ""),
+        last_login_at_utc:
+          params[usesSimplifiedActivateInsert ? 5 : 8] == null
+            ? null
+            : String(params[usesSimplifiedActivateInsert ? 5 : 8]),
       } satisfies V3UserRow;
       this.v3Users.set(row.player_account_id, row);
       return { changes: 1 };
