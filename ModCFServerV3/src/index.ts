@@ -1,12 +1,11 @@
 import type { Env } from "./env";
 import { handleActivate } from "./features/v3/activate";
-import { handleCreateInstallation } from "./features/v3/createInstallation";
 import { handleCreateReplayLink } from "./features/v3/createReplayLink";
 import { handleDownloadReplay } from "./features/v3/downloadReplay";
 import { handleLogin } from "./features/v3/login";
+import { handleLogout } from "./features/v3/logout";
 import { handleQueryGhostBattles } from "./features/v3/queryGhostBattles";
 import { handleUploadRunBundle } from "./features/v3/uploadRunBundle";
-import { handleUploadObservation } from "./features/v3/uploadObservation";
 import { preflight, withCors } from "./http/cors";
 import { json } from "./http/json";
 
@@ -31,12 +30,8 @@ export default {
         return withCors(request, await handleLogin(request, _env));
       }
 
-      if (request.method === "POST" && url.pathname === "/installations") {
-        return withCors(request, await handleCreateInstallation(request, _env));
-      }
-
-      if (request.method === "POST" && url.pathname === "/installations/observations") {
-        return withCors(request, await handleUploadObservation(request, _env));
+      if (request.method === "POST" && url.pathname === "/logout") {
+        return withCors(request, await handleLogout(request, _env));
       }
 
       if (request.method === "POST" && url.pathname === "/run-bundles") {

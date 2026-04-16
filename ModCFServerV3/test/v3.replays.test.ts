@@ -3,12 +3,6 @@ import test from "node:test";
 
 import worker from "../src/index";
 import type { MockD1Database } from "./helpers/mockEnv";
-import {
-  canonicalRequestV3,
-  generateClientKeyPair,
-  sha256Base64,
-  signCanonical,
-} from "./helpers/crypto";
 import { buildEnv } from "./helpers/mockEnv";
 
 async function insertToken(
@@ -235,19 +229,7 @@ test("replay-link allows unauthenticated creation when configured", async () => 
 
 test("download replay accepts valid short-lived token", async () => {
   const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_replay", {
-    installation_id: "inst_replay",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
+  await insertToken(env.DB, "tok-player-001", "player-account-001", "2026-01-01T00:00:00Z");
   env.DB.v3ReplayTokens.set("token-valid", {
     token: "token-valid",
     battle_id: "battle-owned",
@@ -302,28 +284,11 @@ test("download replay accepts valid short-lived token", async () => {
     },
   );
 
-  const timestamp = new Date().toISOString();
-  const bodyHash = sha256Base64("");
-  const signature = signCanonical(
-    privateKey,
-    canonicalRequestV3({
-      method: "GET",
-      path: "/replays/token-valid",
-      query: "",
-      installationId: "inst_replay",
-      timestamp,
-      bodyHash,
-    }),
-  );
-
   const response = await worker.fetch(
     new Request("https://example.com/replays/token-valid", {
       method: "GET",
       headers: {
-        "x-bpp-installation-id": "inst_replay",
-        "x-bpp-timestamp": timestamp,
-        "x-bpp-content-sha256": bodyHash,
-        "x-bpp-signature": signature,
+        Authorization: "Bearer tok-player-001",
       },
     }),
     env as never,
@@ -335,19 +300,7 @@ test("download replay accepts valid short-lived token", async () => {
 
 test("download replay returns artifact_expired when artifact is no longer available", async () => {
   const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_replay", {
-    installation_id: "inst_replay",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
+  await insertToken(env.DB, "tok-player-001", "player-account-001", "2026-01-01T00:00:00Z");
   env.DB.v3ReplayTokens.set("token-expired-artifact", {
     token: "token-expired-artifact",
     battle_id: "battle-expired",
@@ -395,28 +348,11 @@ test("download replay returns artifact_expired when artifact is no longer availa
     created_at_utc: new Date().toISOString(),
   });
 
-  const timestamp = new Date().toISOString();
-  const bodyHash = sha256Base64("");
-  const signature = signCanonical(
-    privateKey,
-    canonicalRequestV3({
-      method: "GET",
-      path: "/replays/token-expired-artifact",
-      query: "",
-      installationId: "inst_replay",
-      timestamp,
-      bodyHash,
-    }),
-  );
-
   const response = await worker.fetch(
     new Request("https://example.com/replays/token-expired-artifact", {
       method: "GET",
       headers: {
-        "x-bpp-installation-id": "inst_replay",
-        "x-bpp-timestamp": timestamp,
-        "x-bpp-content-sha256": bodyHash,
-        "x-bpp-signature": signature,
+        Authorization: "Bearer tok-player-001",
       },
     }),
     env as never,
@@ -428,19 +364,7 @@ test("download replay returns artifact_expired when artifact is no longer availa
 
 test("download replay rejects a token created for another player", async () => {
   const env = buildEnv();
-  const { privateKey, modulusB64, exponentB64 } = generateClientKeyPair();
-  env.DB.v3Installations.set("inst_replay", {
-    installation_id: "inst_replay",
-    player_account_id: "player-account-001",
-    public_key: JSON.stringify({
-      modulus_b64: modulusB64,
-      exponent_b64: exponentB64,
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
+  await insertToken(env.DB, "tok-player-001", "player-account-001", "2026-01-01T00:00:00Z");
   env.DB.v3ReplayTokens.set("token-foreign", {
     token: "token-foreign",
     battle_id: "battle-owned",
@@ -475,28 +399,11 @@ test("download replay rejects a token created for another player", async () => {
     updated_at_utc: new Date().toISOString(),
   });
 
-  const timestamp = new Date().toISOString();
-  const bodyHash = sha256Base64("");
-  const signature = signCanonical(
-    privateKey,
-    canonicalRequestV3({
-      method: "GET",
-      path: "/replays/token-foreign",
-      query: "",
-      installationId: "inst_replay",
-      timestamp,
-      bodyHash,
-    }),
-  );
-
   const response = await worker.fetch(
     new Request("https://example.com/replays/token-foreign", {
       method: "GET",
       headers: {
-        "x-bpp-installation-id": "inst_replay",
-        "x-bpp-timestamp": timestamp,
-        "x-bpp-content-sha256": bodyHash,
-        "x-bpp-signature": signature,
+        Authorization: "Bearer tok-player-001",
       },
     }),
     env as never,
@@ -574,20 +481,9 @@ test("download replay allows bearer-token access when unauthenticated downloads 
   assert.equal(await response.text(), '{"battle_id":"battle-public"}');
 });
 
-test("download replay accepts unsigned installation requests", async () => {
+test("download replay accepts bearer requests without installation headers", async () => {
   const env = buildEnv();
-  env.DB.v3Installations.set("inst_unsigned", {
-    installation_id: "inst_unsigned",
-    player_account_id: "player-account-unsigned",
-    public_key: JSON.stringify({
-      modulus_b64: "unused",
-      exponent_b64: "unused",
-    }),
-    status: "active",
-    created_at_utc: new Date().toISOString(),
-    last_seen_at_utc: null,
-    revoked_at_utc: null,
-  });
+  await insertToken(env.DB, "tok-unsigned", "player-account-unsigned", "2026-01-01T00:00:00Z");
   env.DB.v3ReplayTokens.set("token-unsigned", {
     token: "token-unsigned",
     battle_id: "battle-owned-unsigned",
@@ -646,7 +542,7 @@ test("download replay accepts unsigned installation requests", async () => {
     new Request("https://example.com/replays/token-unsigned", {
       method: "GET",
       headers: {
-        "x-bpp-installation-id": "inst_unsigned",
+        Authorization: "Bearer tok-unsigned",
       },
     }),
     env as never,

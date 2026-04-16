@@ -1,7 +1,7 @@
 import { allowUnauthenticatedReplayDownloads } from "../../config/v3";
 import type { Env } from "../../env";
 import { json } from "../../http/json";
-import { requireInstallationAuth } from "./requireInstallationAuth";
+import { requireBearerAuth } from "./requireBearerAuth";
 
 type ReplayTokenRow = {
   token: string;
@@ -27,12 +27,9 @@ export async function handleDownloadReplay(
 ): Promise<Response> {
   let requesterPlayerAccountId: string | null = null;
   if (!allowUnauthenticatedReplayDownloads(env)) {
-    const auth = await requireInstallationAuth(request, env);
+    const auth = await requireBearerAuth(request, env);
     if (auth instanceof Response) {
       return auth;
-    }
-    if (auth == null) {
-      return json({ error: "installation_auth_required" }, { status: 401 });
     }
 
     requesterPlayerAccountId = auth.playerAccountId;
@@ -118,4 +115,3 @@ export async function handleDownloadReplay(
     },
   });
 }
-
