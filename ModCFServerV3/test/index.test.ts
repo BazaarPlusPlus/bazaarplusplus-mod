@@ -40,7 +40,7 @@ test("activate route is wired and validates request payload", async () => {
   );
 
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "invalid_activate_request" });
+  assert.deepEqual(await response.json(), { error: "invalid_request" });
 });
 
 test("returns not_found for unsupported routes", async () => {
