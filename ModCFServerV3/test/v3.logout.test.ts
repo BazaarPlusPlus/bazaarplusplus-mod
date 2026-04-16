@@ -7,7 +7,7 @@ describe("POST /logout", () => {
   it("returns 401 when bearer missing", async () => {
     const env = buildEnv();
     const req = new Request("https://example/logout", { method: "POST" });
-    const resp = await handleLogout(req, env);
+    const resp = await handleLogout(req, env as never);
     assert.equal(resp.status, 401);
   });
 
@@ -21,7 +21,7 @@ describe("POST /logout", () => {
       method: "POST",
       headers: { Authorization: "Bearer tok_x" }
     });
-    const resp = await handleLogout(req, env);
+    const resp = await handleLogout(req, env as never);
     assert.equal(resp.status, 204);
 
     const row = await env.DB.prepare(
@@ -41,7 +41,7 @@ describe("POST /logout", () => {
       method: "POST",
       headers: { Authorization: "Bearer tok_y" }
     });
-    const resp = await handleLogout(req, env);
+    const resp = await handleLogout(req, env as never);
     // Revoked token → requireBearerAuth returns 401 first.
     assert.equal(resp.status, 401);
   });

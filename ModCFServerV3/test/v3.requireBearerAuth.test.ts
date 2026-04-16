@@ -7,7 +7,7 @@ describe("requireBearerAuth", () => {
   it("returns 401 when Authorization header missing", async () => {
     const env = buildEnv();
     const req = new Request("https://example/any");
-    const result = await requireBearerAuth(req, env);
+    const result = await requireBearerAuth(req, env as never);
     assert.ok(result instanceof Response);
     assert.equal((result as Response).status, 401);
   });
@@ -17,7 +17,7 @@ describe("requireBearerAuth", () => {
     const req = new Request("https://example/any", {
       headers: { Authorization: "Bearer nonexistent_abc" },
     });
-    const result = await requireBearerAuth(req, env);
+    const result = await requireBearerAuth(req, env as never);
     assert.ok(result instanceof Response);
     assert.equal((result as Response).status, 401);
   });
@@ -32,7 +32,7 @@ describe("requireBearerAuth", () => {
     const req = new Request("https://example/any", {
       headers: { Authorization: "Bearer tok_revoked" },
     });
-    const result = await requireBearerAuth(req, env);
+    const result = await requireBearerAuth(req, env as never);
     assert.ok(result instanceof Response);
     assert.equal((result as Response).status, 401);
   });
@@ -47,7 +47,7 @@ describe("requireBearerAuth", () => {
     const req = new Request("https://example/any", {
       headers: { Authorization: "Bearer tok_active" },
     });
-    const result = await requireBearerAuth(req, env);
+    const result = await requireBearerAuth(req, env as never);
     assert.deepEqual(result, { token: "tok_active", playerAccountId: "p1" });
   });
 });
