@@ -213,6 +213,8 @@ export async function handleUploadRunBundle(
     }
   }
 
+  await rememberKnownPlayerAccountId(persistedPlayerAccountId, env);
+
   const payloadHash = await sha256Base64(artifactBytes);
   const objectKey =
     `run-bundles/${persistedPlayerAccountId}/${persistedInstallationId}/${runId}/${payloadHash}.mpack.gz`;
@@ -430,8 +432,6 @@ export async function handleUploadRunBundle(
   if (battleStatements.length > 0) {
     await env.DB.batch(battleStatements);
   }
-
-  await rememberKnownPlayerAccountId(persistedPlayerAccountId, env);
 
   return json({ status: "accepted", bundle_id: bundleId, object_key: persistedObjectKey });
 }
