@@ -1,7 +1,7 @@
 import { allowUnauthenticatedReplayLinks } from "../../config/v3";
 import type { Env } from "../../env";
 import { json } from "../../http/json";
-import { requireInstallationAuth } from "./requireInstallationAuth";
+import { requireBearerAuth } from "./requireBearerAuth";
 
 export async function handleCreateReplayLink(
   request: Request,
@@ -10,22 +10,19 @@ export async function handleCreateReplayLink(
 ): Promise<Response> {
   let requesterPlayerAccountId: string | null = null;
   if (!allowUnauthenticatedReplayLinks(env)) {
-    const auth = await requireInstallationAuth(request, env);
+    const auth = await requireBearerAuth(request, env);
     if (auth instanceof Response) {
       return auth;
-    }
-    if (auth == null) {
-      return json({ error: "installation_auth_required" }, { status: 401 });
     }
 
     requesterPlayerAccountId = auth.playerAccountId;
   }
 
-  const battle = await env.DB.prepare(
+  const battleRow = await env.DB.prepare(
     `
       SELECT
         battle_id,
-        opponent_account_id
+        player_account_id
       FROM battles
       WHERE battle_id = ?
     `,
@@ -33,21 +30,21 @@ export async function handleCreateReplayLink(
     .bind(battleId)
     .first<{
       battle_id: string;
-      opponent_account_id: string | null;
+      player_account_id: string | null;
     }>();
-  if (!battle) {
+  if (!battleRow) {
     return json({ error: "battle_not_found" }, { status: 404 });
   }
   if (
     requesterPlayerAccountId != null &&
-    battle.opponent_account_id !== requesterPlayerAccountId
+    battleRow.player_account_id !== requesterPlayerAccountId
   ) {
-    return json({ error: "battle_forbidden" }, { status: 403 });
+    return json({ error: "replay_forbidden" }, { status: 403 });
   }
 
-  const tokenOwnerPlayerAccountId = requesterPlayerAccountId ?? battle.opponent_account_id;
+  const tokenOwnerPlayerAccountId = requesterPlayerAccountId ?? battleRow.player_account_id;
   if (!tokenOwnerPlayerAccountId) {
-    return json({ error: "battle_forbidden" }, { status: 403 });
+    return json({ error: "replay_forbidden" }, { status: 403 });
   }
 
   const createdAtUtc = new Date().toISOString();
@@ -80,6 +77,6 @@ export async function handleCreateReplayLink(
 
   return json({
     download_url: new URL(`/replays/${token}`, request.url).toString(),
+    expires_at_utc: expiresAtUtc,
   });
 }
-
