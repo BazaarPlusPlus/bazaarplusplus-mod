@@ -167,12 +167,12 @@ git commit -m "ModCFServerV3 Add bearer token generator"
 // ModCFServerV3/test/v3.requireBearerAuth.test.ts
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createTestEnv } from "./helpers/env";  // existing helper
+import { buildEnv } from "./helpers/mockEnv";
 import { requireBearerAuth } from "../src/features/v3/requireBearerAuth";
 
 describe("requireBearerAuth", () => {
   it("returns 401 when Authorization header missing", async () => {
-    const env = await createTestEnv();
+    const env = buildEnv();
     const req = new Request("https://example/any");
     const result = await requireBearerAuth(req, env);
     assert.ok(result instanceof Response);
@@ -180,7 +180,7 @@ describe("requireBearerAuth", () => {
   });
 
   it("returns 401 for Bearer token not in tokens table", async () => {
-    const env = await createTestEnv();
+    const env = buildEnv();
     const req = new Request("https://example/any", {
       headers: { Authorization: "Bearer nonexistent_abc" }
     });
@@ -190,15 +190,10 @@ describe("requireBearerAuth", () => {
   });
 
   it("returns 401 for revoked token", async () => {
-    const env = await createTestEnv();
+    const env = buildEnv();
     await env.DB.prepare(
-      `INSERT INTO users (player_account_id, player_username, password_hash, created_at_utc, updated_at_utc)
-       VALUES ('p1', 'u1', 'h', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`
-    ).run();
-    await env.DB.prepare(
-      `INSERT INTO tokens (token, player_account_id, issued_at_utc, revoked_at_utc)
-       VALUES ('tok_revoked', 'p1', '2026-01-01T00:00:00Z', '2026-01-02T00:00:00Z')`
-    ).run();
+      `INSERT INTO tokens (token, player_account_id, issued_at_utc, revoked_at_utc) VALUES (?, ?, ?, ?)`
+    ).bind("tok_revoked", "p1", "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z").run();
     const req = new Request("https://example/any", {
       headers: { Authorization: "Bearer tok_revoked" }
     });
@@ -208,15 +203,10 @@ describe("requireBearerAuth", () => {
   });
 
   it("returns auth object for active token", async () => {
-    const env = await createTestEnv();
+    const env = buildEnv();
     await env.DB.prepare(
-      `INSERT INTO users (player_account_id, player_username, password_hash, created_at_utc, updated_at_utc)
-       VALUES ('p1', 'u1', 'h', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`
-    ).run();
-    await env.DB.prepare(
-      `INSERT INTO tokens (token, player_account_id, issued_at_utc)
-       VALUES ('tok_active', 'p1', '2026-01-01T00:00:00Z')`
-    ).run();
+      `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES (?, ?, ?)`
+    ).bind("tok_active", "p1", "2026-01-01T00:00:00Z").run();
     const req = new Request("https://example/any", {
       headers: { Authorization: "Bearer tok_active" }
     });
@@ -224,6 +214,77 @@ describe("requireBearerAuth", () => {
     assert.deepEqual(result, { token: "tok_active", playerAccountId: "p1" });
   });
 });
+```
+
+**Harness reality:** `ModCFServerV3/test/helpers/mockEnv.ts` is a hand-rolled SQL-pattern-matching mock (no real SQLite, no migrations). Tests that interact with the new `tokens` table need the mock extended to recognize the relevant SQL. Step 1.5 below covers that.
+
+- [ ] **Step 1.5: Extend `mockEnv.ts` to support `tokens` table**
+
+Add to `ModCFServerV3/test/helpers/mockEnv.ts`:
+
+1. Near the other `V3*Row` types, add:
+
+```typescript
+export type V3TokenRow = {
+  token: string;
+  player_account_id: string;
+  issued_at_utc: string;
+  revoked_at_utc: string | null;
+  last_used_at_utc: string | null;
+};
+```
+
+2. In `MockD1Database`, add alongside the other maps:
+
+```typescript
+public readonly v3Tokens = new Map<string, V3TokenRow>();
+```
+
+3. In `MockD1Database.first`, before the `return null` fallback, add:
+
+```typescript
+if (sql.includes("FROM tokens") && sql.includes("WHERE token = ?")) {
+  const token = String(params[0] ?? "");
+  return (this.v3Tokens.get(token) as T | undefined) ?? null;
+}
+```
+
+4. In `MockD1Database.run`, before the `return { changes: 0 }` fallback, add (order the 4-arg `INSERT INTO tokens` check before the 3-arg check):
+
+```typescript
+if (sql.includes("INSERT INTO tokens")) {
+  const row: V3TokenRow = {
+    token: String(params[0] ?? ""),
+    player_account_id: String(params[1] ?? ""),
+    issued_at_utc: String(params[2] ?? ""),
+    revoked_at_utc: params[3] == null ? null : String(params[3]),
+    last_used_at_utc: null,
+  };
+  this.v3Tokens.set(row.token, row);
+  return { changes: 1 };
+}
+
+if (sql.includes("UPDATE tokens") && sql.includes("SET revoked_at_utc")) {
+  const token = String(params[1] ?? "");
+  const existing = this.v3Tokens.get(token);
+  if (!existing) return { changes: 0 };
+  this.v3Tokens.set(token, {
+    ...existing,
+    revoked_at_utc: params[0] == null ? null : String(params[0]),
+  });
+  return { changes: 1 };
+}
+
+if (sql.includes("UPDATE tokens") && sql.includes("SET last_used_at_utc")) {
+  const token = String(params[1] ?? "");
+  const existing = this.v3Tokens.get(token);
+  if (!existing) return { changes: 0 };
+  this.v3Tokens.set(token, {
+    ...existing,
+    last_used_at_utc: params[0] == null ? null : String(params[0]),
+  });
+  return { changes: 1 };
+}
 ```
 
 - [ ] **Step 2: Run test to verify failure**
@@ -557,26 +618,22 @@ git commit -m "ModCFServerV3 Rewrite activate endpoint for bearer token auth"
 // ModCFServerV3/test/v3.logout.test.ts
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createTestEnv } from "./helpers/env";
+import { buildEnv } from "./helpers/mockEnv";
 import { handleLogout } from "../src/features/v3/logout";
 
 describe("POST /logout", () => {
   it("returns 401 when bearer missing", async () => {
-    const env = await createTestEnv();
+    const env = buildEnv();
     const req = new Request("https://example/logout", { method: "POST" });
     const resp = await handleLogout(req, env);
     assert.equal(resp.status, 401);
   });
 
   it("revokes the bearer token and returns 204", async () => {
-    const env = await createTestEnv();
+    const env = buildEnv();
     await env.DB.prepare(
-      `INSERT INTO users (player_account_id, player_username, password_hash, created_at_utc, updated_at_utc)
-       VALUES ('p1', 'u1', 'h', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`
-    ).run();
-    await env.DB.prepare(
-      `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES ('tok_x', 'p1', '2026-01-01T00:00:00Z')`
-    ).run();
+      `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES (?, ?, ?)`
+    ).bind("tok_x", "p1", "2026-01-01T00:00:00Z").run();
 
     const req = new Request("https://example/logout", {
       method: "POST",
@@ -593,15 +650,10 @@ describe("POST /logout", () => {
   });
 
   it("is idempotent — revoking an already-revoked token still 204s", async () => {
-    const env = await createTestEnv();
+    const env = buildEnv();
     await env.DB.prepare(
-      `INSERT INTO users (player_account_id, player_username, password_hash, created_at_utc, updated_at_utc)
-       VALUES ('p1', 'u1', 'h', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`
-    ).run();
-    await env.DB.prepare(
-      `INSERT INTO tokens (token, player_account_id, issued_at_utc, revoked_at_utc)
-       VALUES ('tok_y', 'p1', '2026-01-01T00:00:00Z', '2026-01-02T00:00:00Z')`
-    ).run();
+      `INSERT INTO tokens (token, player_account_id, issued_at_utc, revoked_at_utc) VALUES (?, ?, ?, ?)`
+    ).bind("tok_y", "p1", "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z").run();
 
     const req = new Request("https://example/logout", {
       method: "POST",
