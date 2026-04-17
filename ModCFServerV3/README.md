@@ -1,135 +1,91 @@
 # ModCFServerV3
 
-`ModCFServerV3` is the Cloudflare Worker backend for the V3 BazaarPlusPlus online flow.
+Cloudflare Worker backend for the BazaarPlusPlus mod's V3 online flow.
 
-It accepts installation-authenticated uploads from the mod, stores compressed run bundles in Cloudflare R2, projects queryable metadata into Cloudflare D1, and serves ghost battle discovery plus replay download links for the in-game history panel.
+收 mod 上传的 run bundle，把 artifact 落到 R2、把结构化投影写进 D1，并对外提供 ghost battle 查询和短时效的 replay 下载链接。
 
-## Responsibilities
+## Stack
 
-- Activate a player account and issue installer sessions.
-- Register signed installations for a player account.
-- Accept observation uploads tied to an installation.
-- Store uploaded run bundles in R2 and project runs and battles into D1.
-- Expose ghost battle queries and short-lived replay download links.
+- **Cloudflare Workers** (TypeScript, ES Modules)
+- **D1** for relational metadata
+- **R2** for run bundle artifacts
+- **KV** for the "known player" set used by battle projection filtering
 
-## Runtime
+`wrangler.toml` 中的 bindings：
 
-- Cloudflare Workers
-- Cloudflare D1 for relational metadata
-- Cloudflare R2 for uploaded run bundle artifacts
-
-Bindings defined in `wrangler.toml`:
-
-- `DB`: D1 database
-- `RUN_BUNDLE_BUCKET`: R2 bucket for uploaded V3 run bundle artifacts
-
-## HTTP Routes
-
-Routes are defined in `src/index.ts`.
-
-| Method | Path | Purpose |
+| Binding | 类型 | 用途 |
 | --- | --- | --- |
-| `GET` | `/health` | Health check |
-| `POST` | `/activate` | Activate a player account for V3 auth |
-| `POST` | `/login` | Create an installer session |
-| `POST` | `/installations` | Register a signed installation |
-| `POST` | `/installations/observations` | Upload an installation observation |
-| `POST` | `/run-bundles` | Upload a compressed run bundle and project its metadata |
-| `GET` | `/ghost-battles` | Query recent ghost battles against the signed player account |
-| `POST` | `/ghost-battles/:battleId/replay-link` | Mint a short-lived replay download URL |
-| `GET` | `/replays/:token` | Download a replay payload through a signed token |
+| `DB` | D1 database | 账户、token、runs、battles、replay tokens |
+| `RUN_BUNDLE_BUCKET` | R2 bucket | run bundle artifact |
+| `KNOWN_PLAYER_ACCOUNTS` | KV namespace | 已上传过 run 的玩家集合，TTL 7 天 |
 
-## Auth Model
+## HTTP Surface
 
-V3 uses installation-based authentication.
+完整的请求/响应契约和服务端处理细节见 [docs/api-reference.md](docs/api-reference.md)。
 
-- `/activate` creates or claims the V3 user identity.
-- `/login` creates an installer session.
-- `/installations` binds an installation public key to the player account.
-- Installation-authenticated routes verify the installation signature and player/account match before accepting writes.
-- Replay link minting and replay downloads can be temporarily opened for unauthenticated clients through `ALLOW_UNAUTHENTICATED_REPLAY_LINKS` and `ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS` during early rollout. These two flags should normally be switched together.
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/health` | 健康检查 |
+| `POST` | `/activate` | 注册账户并签发 bearer token |
+| `POST` | `/login` | 用用户名/密码换取 bearer token |
+| `POST` | `/logout` | 撤销当前 bearer token |
+| `POST` | `/run-bundles` | 上传 run bundle artifact 并投影到 D1（**当前不鉴权**） |
+| `GET` | `/ghost-battles` | 查询当前玩家作为 opponent 出现的 battle 列表 |
+| `POST` | `/ghost-battles/:battleId/replay-link` | 申请 5 分钟有效的 replay 下载 URL |
+| `GET` | `/replays/:token` | 凭 replay token 流式下载 R2 artifact |
 
-## Data Flow
+路由注册在 [src/index.ts](src/index.ts)，handler 都在 [src/features/v3/](src/features/v3)。
 
-### Activation and installation
+## Migrations
 
-1. The client activates a player account through `/activate`.
-2. The installer creates a session through `/login`.
-3. The installer posts the installation public key to `/installations`.
+D1 schema 由 `migrations/` 下的有序 SQL 维护，按文件名顺序应用：
 
-### Run bundle uploads
-
-1. The mod sends a signed run bundle to `/run-bundles`.
-2. The worker validates installation identity, bundle shape, and battle projections.
-3. The artifact is written to R2 under `run-bundles/<player_account_id>/<installation_id>/<run_id>/<sha256>.mpack.gz`.
-4. D1 inserts the `run_bundles` row and projects `runs` plus `battles`.
-
-### Ghost battle queries
-
-1. The client calls `/ghost-battles`.
-2. The worker resolves the signed installation/player context.
-3. D1 returns recent battle projections where `opponent_account_id` matches that player.
-
-### Replay downloads
-
-1. The client requests `/ghost-battles/:battleId/replay-link`.
-2. The worker checks that the battle belongs to the signed player account, unless anonymous replay-link minting is temporarily enabled.
-3. It returns a short-lived tokenized URL for `/replays/:token`.
-4. `/replays/:token` loads the owning run bundle from R2 and returns the replay payload for that battle, with installation auth required unless anonymous replay downloads are temporarily enabled.
-
-## Artifact Retention And Cleanup
-
-- `getRunBundleRetentionDays()` currently returns `5`, and uploads write that value into R2 object `customMetadata.retention_days`.
-- The repository does not currently implement Worker-side automatic cleanup for expired R2 artifacts. There is no `scheduled` handler, alarm flow, or in-repo R2 list-and-delete job.
-- The D1 `run_bundles` table stores `object_key` and creation metadata, but it does not store an artifact `expires_at_utc` value.
-- Replay-link tokens do have an explicit TTL: `/ghost-battles/:battleId/replay-link` creates a `replay_tokens` row that expires 5 minutes after issuance.
-- Replay downloads treat missing bundle artifacts as a passive expiry condition. If the token is still valid but the referenced R2 object no longer exists, `/replays/:token` returns `410` with `artifact_expired`.
-- Because there is no in-repo cleanup job that reconciles D1 with R2, ghost battle metadata can outlive the underlying artifact. In that state, query and replay-link creation can still succeed, but the eventual replay download will fail with `artifact_expired`.
-- If production R2 objects are physically deleted on a schedule, that behavior is defined outside this repository, for example through Cloudflare-side bucket lifecycle configuration.
+| 文件 | 内容 |
+| --- | --- |
+| `0001_initial_schema.sql` | 初版表结构（users、tokens、run_bundles、runs、battles、replay_tokens） |
+| `0002_auth_simplification.sql` | 移除 installation 链路，鉴权回退到 username + password + bearer token |
+| `0003_ghost_battles_covering_index.sql` | 为 `/ghost-battles` 查询建立 17 列 covering index |
 
 ## Known Limitations
 
-These behaviors are accepted trade-offs for the current rollout. Re-evaluate before opening the service to a wider audience.
+以下行为是当前 rollout 阶段的有意取舍。在面向更广用户群之前需要重新评估。
 
-- **Bearer tokens never expire.** The `tokens` table has no `expires_at_utc`. A token issued by `/activate` or `/login` stays valid until the user explicitly hits `/logout`, which sets `revoked_at_utc`. There is no time-based expiry, no idle-timeout sweep, and no rotation. A leaked token is valid indefinitely.
-- **Bearer tokens are stored in plaintext.** `tokens.token` is the primary key and is matched by `WHERE token = ?` on every authenticated request. A D1 dump is equivalent to a session-hijack of every active user.
-- **Password hashing is a single round of salted SHA-256.** Acceptable while the user base is small and traffic is trusted; not acceptable once the table holds high-value credentials. The hash format is namespaced by `v1:` so a future PBKDF2/scrypt/Argon2 scheme can be introduced without breaking existing logins.
-- **`/run-bundles` is unauthenticated.** Anyone who can reach the worker can submit a run bundle for any `player_account_id`. This is intentional during the data-collection phase. Path components used in R2 object keys are validated against `[A-Za-z0-9._-]{1,128}` to prevent prefix escape, but the data itself is trust-on-submit.
-- **Replay tokens are reusable inside their TTL.** `replay_tokens.used_at_utc` is recorded on first download but does not block subsequent downloads while `expires_at_utc` is in the future. A captured replay URL can be replayed within the 5-minute window. To make it strictly one-shot, gate downloads on `UPDATE … SET used_at_utc = ? WHERE token = ? AND used_at_utc IS NULL` and require the affected-row count to be 1.
-- **`artifact_bytes` accepts both base64 string and JSON byte array.** The legacy mod sends a JSON array; the new mod sends a base64 string (≈3× smaller on the wire). The server logs `upload_run_bundle.artifact_bytes_received` with `encoding=base64|byte-array` so the legacy share can be tracked. Drop array support once the byte-array log line goes to zero.
+- **Bearer token 不会过期。** `tokens` 表没有 `expires_at_utc`。token 一旦由 `/activate` 或 `/login` 签发，就持续有效直到用户主动 `/logout`（写入 `revoked_at_utc`）。没有时间过期、没有空闲超时清理、没有轮换。泄露的 token 永久有效。
+- **Bearer token 明文存储。** `tokens.token` 作为主键直接被 `WHERE token = ?` 匹配。一次 D1 dump 等同于所有活跃用户的会话被劫持。
+- **密码哈希是单轮 salted SHA-256。** 在用户基数小、流量可信时可接受；持有高价值凭证后不可接受。哈希格式以 `v1:` 命名空间标记，未来可在不破坏旧登录的前提下引入 PBKDF2/scrypt/Argon2。
+- **`/run-bundles` 不鉴权。** 任何能访问 worker 的客户端都能为任意 `player_account_id` 提交 bundle。这是数据收集阶段的有意设计。R2 object key 中的路径段以 `[A-Za-z0-9._-]{1,128}` 校验防止 prefix escape，但数据本身是 trust-on-submit。
+- **Replay token 在 TTL 内可复用。** `replay_tokens.used_at_utc` 在首次下载时记录，但不阻止 5 分钟窗口内的后续下载。捕获的 replay URL 在窗口内可重放。改成严格一次性的方式是把首次使用记录换成 `UPDATE … SET used_at_utc = ? WHERE token = ? AND used_at_utc IS NULL` 并要求 affected-rows == 1。
+- **`artifact_bytes` 同时接受 base64 字符串和 JSON byte array。** 旧版 mod 走数组，新版 mod 走 base64（线上体积约 1/3）。服务端在每次上传时打日志 `upload_run_bundle.artifact_bytes_received` 带 `encoding=base64|byte-array`，可在 Cloudflare 日志里跟踪迁移占比。当 byte-array 占比归零后可以删掉数组分支。
+- **CORS `Allow-Origin` 回显请求 origin。** 没有维护白名单，任意来源都能跨域调用。当前 mod 客户端是从 Unity HTTP 直发，本身不受 CORS 约束；这条限制主要影响以后浏览器场景。
+
+## Data Retention
+
+- D1 行**不会**自动删除。`run_bundles`、`runs`、`battles`、`replay_tokens` 持续累加，需要外部 GC。
+- R2 对象的清理由 **bucket lifecycle 配置**（不在本仓库）负责。`RUN_BUNDLE_RETENTION_DAYS`（当前 5 天）只是写到 object `customMetadata.retention_days` 上的提示。
+- D1 与 R2 的清理彼此独立，所以 ghost-battles 查询有可能命中一个已经被 R2 lifecycle 删掉的 artifact——这种情况下下载会返回 410 `artifact_expired`。
+- KV `KNOWN_PLAYER_ACCOUNTS` 的 entry 由 Cloudflare 按 7 天 TTL 自动过期。
 
 ## Local Development
 
-Install dependencies:
-
 ```bash
-npm install
+npm install        # 安装依赖
+npm run dev        # 本地 wrangler dev
+npm test           # vitest worker 测试套件
+npm run check      # tsc --noEmit + 严格未用变量检查
+npm run deploy     # wrangler deploy
 ```
 
-Useful commands:
+## Layout
 
-```bash
-npm run dev
-npm run check
-npm test
-npm run deploy
-```
-
-## File Map
-
-- `src/index.ts`: route table entrypoint
-- `src/features/`: HTTP handlers
-- `src/persistence/`: D1 persistence helpers
-- `src/crypto/`: request signing and verification helpers
-- `src/http/`: request and JSON helpers
-- `migrations/`: D1 schema
-- `test/`: Worker-level tests
-
-## Verification
-
-For this server package, the normal validation commands are:
-
-```bash
-npm test -- --runInBand
-npx tsc --noEmit --noUnusedLocals --noUnusedParameters
-```
+| 路径 | 内容 |
+| --- | --- |
+| `src/index.ts` | 路由表 |
+| `src/features/v3/` | HTTP handler |
+| `src/crypto/` | 密码哈希、token 生成 |
+| `src/http/` | JSON 解析、CORS、错误响应 |
+| `src/token/` | bearer token 生成 |
+| `src/config/`, `src/env.ts` | 环境变量与配置封装 |
+| `src/observability.ts` | `logInfo` / `logWarn` 包装 |
+| `migrations/` | D1 schema |
+| `test/` | Worker 集成测试 |
+| `docs/` | 接口文档 |
