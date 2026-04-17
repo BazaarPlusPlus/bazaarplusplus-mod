@@ -18,6 +18,7 @@ using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.CombatReplay.Upload;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
@@ -50,6 +51,8 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
     private CombatReplayCaptureService? _captureService;
     private CombatReplayLoader? _loader;
     private CombatReplayController? _controller;
+    private IBppServices? _services;
+    private RunLifecycleModule? _runLifecycle;
     private bool _returnToMenuAfterReplay;
     private bool _bootstrappedReplayActive;
     private bool _isReplayStartInProgress;
@@ -72,11 +75,23 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+    }
+
+    public void Initialize(IBppServices services, RunLifecycleModule runLifecycle)
+    {
+        _services = services ?? throw new ArgumentNullException(nameof(services));
+        _runLifecycle = runLifecycle ?? throw new ArgumentNullException(nameof(runLifecycle));
+        InitializeCore();
+    }
+
+    private void InitializeCore()
+    {
+        var services = _services!;
         var runLogDatabasePath =
-            BppRuntimeHost.Paths.RunLogDatabasePath
+            services.Paths.RunLogDatabasePath
             ?? throw new InvalidOperationException("Run log database path is not initialized.");
         var combatReplayDirectoryPath =
-            BppRuntimeHost.Paths.CombatReplayDirectoryPath
+            services.Paths.CombatReplayDirectoryPath
             ?? throw new InvalidOperationException(
                 "Combat replay directory path is not initialized."
             );
@@ -132,7 +147,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        if (BppRuntimeHost.RunContext.IsInGameRun)
+        if (_services!.RunContext.IsInGameRun)
         {
             reason =
                 "Saved replay playback is only available while you are outside an active gameplay session.";
@@ -185,7 +200,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
         {
             var artifact = _captureService.Accept(
                 message,
-                BppRuntimeHost.RunContext.CurrentServerRunId
+                _services!.RunContext.CurrentServerRunId
             );
             if (artifact == null)
                 return;
@@ -215,7 +230,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
                 continue;
             }
 
-            BppRuntimeHost.EventBus.Publish(new PvpBattleRecorded { Manifest = result.Manifest });
+            _services!.EventBus.Publish(new PvpBattleRecorded { Manifest = result.Manifest });
             _replaySyncStateStore?.MarkReplayDirty(result.Manifest.BattleId);
             BppLog.Info(
                 "CombatReplayRuntime",
@@ -225,7 +240,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
 
         if (processedAny && _persistenceQueue?.HasPendingPersistence == false)
         {
-            BppRuntimeHost.EventBus.Publish(new CombatReplayPersistenceDrained());
+            _services!.EventBus.Publish(new CombatReplayPersistenceDrained());
         }
     }
 
@@ -338,7 +353,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
             CleanupReplayOpponentPortrait();
             ApplyReplaySelectedHeroOverride(manifest);
             Data.ResetRunData();
-            BppRuntimeHost.RunLifecycle.RefreshRunStateFromCurrentState();
+            _runLifecycle!.RefreshRunStateFromCurrentState();
             attemptedBootstrapFromLobby = !IsReplayBootstrapReady();
             var bootstrappedFromLobby = await EnsureReplayBootstrapReadyAsync();
             _returnToMenuAfterReplay = bootstrappedFromLobby;
