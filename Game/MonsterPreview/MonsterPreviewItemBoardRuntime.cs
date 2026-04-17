@@ -33,6 +33,7 @@ internal sealed class MonsterPreviewItemBoardRuntime : MonoBehaviour
     private Card? _lockedCard;
     private bool _closeOnNextClickArmed;
     private int _closeOnNextClickArmedFrame = -1;
+    private IBppServices? _services;
 
     public static MonsterPreviewItemBoardRuntime? Instance { get; private set; }
 
@@ -48,6 +49,11 @@ internal sealed class MonsterPreviewItemBoardRuntime : MonoBehaviour
         _itemBoard.Dispose();
         if (ReferenceEquals(Instance, this))
             Instance = null;
+    }
+
+    public void Initialize(IBppServices services)
+    {
+        _services = services ?? throw new System.ArgumentNullException(nameof(services));
     }
 
     private void Update()
@@ -185,7 +191,7 @@ internal sealed class MonsterPreviewItemBoardRuntime : MonoBehaviour
 
     private Vector2? ResolveConfiguredAnchoredPosition()
     {
-        var rawValue = BppRuntimeHost.Config.ItemBoardAnchoredPositionConfig?.Value;
+        var rawValue = _services?.Config.ItemBoardAnchoredPositionConfig?.Value;
         if (string.IsNullOrWhiteSpace(rawValue))
         {
             _reportedInvalidAnchoredPositionConfig = false;
