@@ -1,5 +1,4 @@
 #nullable enable
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 namespace BazaarPlusPlus.Core.Paths;
 
@@ -23,7 +22,7 @@ internal sealed class BppPathService : IPathService
         RunLogDatabasePath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
             "BazaarPlusPlus",
-            RunLogSqliteSchema.DatabaseFileName
+            BppPathConstants.RunLogDatabaseFileName
         );
         CombatReplayDirectoryPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Core.Paths;
 using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
@@ -14,7 +15,7 @@ public static class RunLogSqliteSchema
 
     public static int CurrentSchemaVersion => LocalDatabaseSchemaVersion;
 
-    public static string DatabaseFileName => "bazaarplusplus.db";
+    public static string DatabaseFileName => BppPathConstants.RunLogDatabaseFileName;
 
     public static string RunsTableName => "runs";
 
