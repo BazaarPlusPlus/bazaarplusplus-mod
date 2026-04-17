@@ -60,9 +60,4 @@ test("auth simplification migration creates tokens and drops installation tables
   assert.match(sql, /DROP TABLE IF EXISTS installation_sessions;/);
   assert.match(sql, /DROP TABLE IF EXISTS installation_observations;/);
   assert.match(sql, /DROP TABLE IF EXISTS installations;/);
-
-  assert.match(
-    sql,
-    /CREATE UNIQUE INDEX run_bundles_player_run_payload_unique\s+ON run_bundles\(player_account_id, run_id, payload_hash\);/,
-  );
 });

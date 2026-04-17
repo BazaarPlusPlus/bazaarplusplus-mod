@@ -100,9 +100,9 @@ test("run bundle upload stores one artifact object and projection rows", async (
   const bundle = Array.from(env.DB.v3RunBundles.values())[0];
   const run = env.DB.v3Runs.get("run-001");
   const battle = env.DB.v3Battles.get("battle-001");
-  assert.equal(bundle?.installation_id, null);
-  assert.equal(run?.installation_id, null);
-  assert.equal(battle?.installation_id, null);
+  assert.equal(bundle?.installation_id, "legacy");
+  assert.equal(run?.installation_id, "legacy");
+  assert.equal(battle?.installation_id, "legacy");
   assert.equal(
     bundle?.object_key,
     `run-bundles/player-account-001/run-001/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
@@ -220,8 +220,8 @@ test("run bundle upload accepts requests without player account id", async () =>
   const bundle = Array.from(env.DB.v3RunBundles.values())[0];
   const run = env.DB.v3Runs.get("run-no-player-account");
   assert.equal(bundle?.player_account_id, "anonymous-player");
-  assert.equal(bundle?.installation_id, null);
-  assert.equal(run?.installation_id, null);
+  assert.equal(bundle?.installation_id, "legacy");
+  assert.equal(run?.installation_id, "legacy");
   assert.equal(env.DB.v3Battles.size, 0);
   assert.equal(
     bundle?.object_key,
@@ -413,7 +413,7 @@ test("run bundle upload accepts duplicate payload retries idempotently", async (
   const bundle = Array.from(env.DB.v3RunBundles.values())[0];
   const run = env.DB.v3Runs.get("run-dup");
   const battle = env.DB.v3Battles.get("battle-dup");
-  assert.equal(bundle?.installation_id, null);
-  assert.equal(run?.installation_id, null);
-  assert.equal(battle?.installation_id, null);
+  assert.equal(bundle?.installation_id, "legacy");
+  assert.equal(run?.installation_id, "legacy");
+  assert.equal(battle?.installation_id, "legacy");
 });

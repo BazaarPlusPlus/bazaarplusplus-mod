@@ -60,6 +60,7 @@ type ExistingRunBundleRow = {
 };
 
 const AnonymousPlayerAccountId = "anonymous-player";
+const LegacyInstallationId = "legacy";
 const KnownPlayerAccountMarker = "1";
 const KnownPlayerAccountTtlSeconds = 7 * 24 * 60 * 60;
 
@@ -288,7 +289,7 @@ export async function handleUploadRunBundle(
     )
       .bind(
         bundleId,
-        null,
+        LegacyInstallationId,
         persistedPlayerAccountId,
         runId,
         payloadHash,
@@ -348,7 +349,7 @@ export async function handleUploadRunBundle(
   )
     .bind(
       runId,
-      null,
+      LegacyInstallationId,
       persistedPlayerAccountId,
       bundleId,
       runStatus,
@@ -430,7 +431,7 @@ export async function handleUploadRunBundle(
       ).bind(
         asString(battle.battle_id),
         runId,
-        null,
+        LegacyInstallationId,
         persistedPlayerAccountId,
         bundleId,
         asString(battle.recorded_at_utc),
