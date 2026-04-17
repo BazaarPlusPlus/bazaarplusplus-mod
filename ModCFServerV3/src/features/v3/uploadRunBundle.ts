@@ -1,6 +1,8 @@
+import { base64ToBytes } from "../../crypto/base64";
 import { sha256Base64 } from "../../crypto/hash";
 import type { Env } from "../../env";
 import { json, readJson } from "../../http/json";
+import { logInfo, logWarn } from "../../observability";
 import { getRunBundleRetentionDays } from "../../config/v3";
 
 type RunProjection = {
@@ -61,6 +63,12 @@ const AnonymousPlayerAccountId = "anonymous-player";
 const KnownPlayerAccountMarker = "1";
 const KnownPlayerAccountTtlSeconds = 7 * 24 * 60 * 60;
 
+const ObjectKeySegmentPattern = /^[A-Za-z0-9._-]{1,128}$/;
+
+function sanitizeObjectKeySegment(value: string): string | null {
+  return ObjectKeySegmentPattern.test(value) ? value : null;
+}
+
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -69,7 +77,22 @@ function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function asBytes(value: unknown): Uint8Array | null {
+type ArtifactBytesEncoding = "base64" | "byte-array";
+
+type DecodedArtifactBytes = {
+  bytes: Uint8Array;
+  encoding: ArtifactBytesEncoding;
+};
+
+function decodeArtifactBytes(value: unknown): DecodedArtifactBytes | null {
+  if (typeof value === "string") {
+    try {
+      return { bytes: base64ToBytes(value), encoding: "base64" };
+    } catch {
+      return null;
+    }
+  }
+
   if (!Array.isArray(value)) {
     return null;
   }
@@ -83,7 +106,7 @@ function asBytes(value: unknown): Uint8Array | null {
     bytes[index] = current;
   }
 
-  return bytes;
+  return { bytes, encoding: "byte-array" };
 }
 
 function shouldProjectBattle(
@@ -158,7 +181,8 @@ export async function handleUploadRunBundle(
   const playerAccountId = asString(body.player_account_id);
   const submittedAtUtc = asString(body.submitted_at_utc);
   const artifactCodec = asString(body.artifact_codec);
-  const artifactBytes = asBytes(body.artifact_bytes);
+  const decodedArtifact = decodeArtifactBytes(body.artifact_bytes);
+  const artifactBytes = decodedArtifact?.bytes ?? null;
   const runId = asString(body.run_projection?.run_id);
   const runStatus = asString(body.run_projection?.status);
   const endedAtUtc = asString(body.run_projection?.ended_at_utc);
@@ -172,13 +196,25 @@ export async function handleUploadRunBundle(
     schemaVersion == null ||
     !submittedAtUtc ||
     !artifactCodec ||
+    !decodedArtifact ||
     !artifactBytes ||
     !runId ||
     !runStatus ||
     !endedAtUtc
   ) {
+    if (body.artifact_bytes !== undefined && decodedArtifact == null) {
+      logWarn("upload_run_bundle.artifact_bytes_decode_failed", {
+        raw_type: Array.isArray(body.artifact_bytes) ? "array" : typeof body.artifact_bytes,
+      });
+    }
     return json({ error: "invalid_run_bundle_request" }, { status: 400 });
   }
+
+  logInfo("upload_run_bundle.artifact_bytes_received", {
+    encoding: decodedArtifact.encoding,
+    decoded_bytes: artifactBytes.byteLength,
+    schema_version: schemaVersion,
+  });
 
   for (const battle of battleProjections) {
     const battleId = asString(battle.battle_id);
@@ -192,10 +228,20 @@ export async function handleUploadRunBundle(
     }
   }
 
+  const safePlayerAccountSegment = sanitizeObjectKeySegment(persistedPlayerAccountId);
+  const safeRunIdSegment = sanitizeObjectKeySegment(runId);
+  if (safePlayerAccountSegment == null || safeRunIdSegment == null) {
+    return json({ error: "invalid_run_bundle_request" }, { status: 400 });
+  }
+
   await rememberKnownPlayerAccountId(persistedPlayerAccountId, env);
 
   const payloadHash = await sha256Base64(artifactBytes);
-  const objectKey = `run-bundles/${persistedPlayerAccountId}/${runId}/${payloadHash}.mpack.gz`;
+  const payloadHashSegment = payloadHash
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  const objectKey = `run-bundles/${safePlayerAccountSegment}/${safeRunIdSegment}/${payloadHashSegment}.mpack.gz`;
   await env.RUN_BUNDLE_BUCKET.put(objectKey, artifactBytes, {
     httpMetadata: {
       contentType: artifactCodec,

@@ -629,6 +629,14 @@ export class MockD1Database {
             ? null
             : String(params[usesSimplifiedActivateInsert ? 5 : 8]),
       } satisfies V3UserRow;
+      if (this.v3Users.has(row.player_account_id)) {
+        throw new Error("UNIQUE constraint failed: users.player_account_id");
+      }
+      for (const existing of this.v3Users.values()) {
+        if (existing.player_username === row.player_username) {
+          throw new Error("UNIQUE constraint failed: users.player_username");
+        }
+      }
       this.v3Users.set(row.player_account_id, row);
       return { changes: 1 };
     }
@@ -1209,6 +1217,8 @@ export class MockR2Bucket {
   async get(key: string): Promise<{
     httpMetadata?: { contentType?: string; contentEncoding?: string };
     customMetadata?: Record<string, string>;
+    size: number;
+    body: ReadableStream<Uint8Array>;
     arrayBuffer(): Promise<ArrayBuffer>;
   } | null> {
     const object = this.objects.get(key);
@@ -1216,9 +1226,28 @@ export class MockR2Bucket {
       return null;
     }
 
+    const buildBody = (): ReadableStream<Uint8Array> => {
+      if (object.readError) {
+        return new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.error(object.readError);
+          },
+        });
+      }
+      const copy = new Uint8Array(object.body);
+      return new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(copy);
+          controller.close();
+        },
+      });
+    };
+
     return {
       httpMetadata: object.httpMetadata,
       customMetadata: object.customMetadata,
+      size: object.body.byteLength,
+      body: buildBody(),
       arrayBuffer: async () => {
         if (object.readError) {
           throw object.readError;

@@ -231,7 +231,7 @@ internal sealed class RunBundleUploadStore
                 PlayerAccountId = playerAccountId,
                 SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
                 ArtifactCodec = V3RunBundleArtifactCodec.ContentType,
-                ArtifactBytes = artifactBytes.ToList(),
+                ArtifactBytes = artifactBytes.ToArray(),
                 RunProjection = new RunProjectionV3
                 {
                     RunId = runId,

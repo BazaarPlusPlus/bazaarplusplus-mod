@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import worker from "../src/index";
-import { sha256Base64 } from "./helpers/crypto";
+import { sha256Base64, toBase64UrlSegment } from "./helpers/crypto";
 import { buildEnv } from "./helpers/mockEnv";
 
 function buildUploadRequest(body: string, authorization?: string): Request {
@@ -105,7 +105,7 @@ test("run bundle upload stores one artifact object and projection rows", async (
   assert.equal(battle?.installation_id, null);
   assert.equal(
     bundle?.object_key,
-    `run-bundles/player-account-001/run-001/${payloadHash}.mpack.gz`,
+    `run-bundles/player-account-001/run-001/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );
   assert.deepEqual(env.KNOWN_PLAYER_ACCOUNTS.entries.get("player-account-001"), {
     value: "1",
@@ -225,7 +225,7 @@ test("run bundle upload accepts requests without player account id", async () =>
   assert.equal(env.DB.v3Battles.size, 0);
   assert.equal(
     bundle?.object_key,
-    `run-bundles/anonymous-player/run-no-player-account/${payloadHash}.mpack.gz`,
+    `run-bundles/anonymous-player/run-no-player-account/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );
 });
 
@@ -403,7 +403,7 @@ test("run bundle upload accepts duplicate payload retries idempotently", async (
   assert.equal(secondJson.bundle_id, firstJson.bundle_id);
   assert.equal(
     secondJson.object_key,
-    `run-bundles/player-account-001/run-dup/${payloadHash}.mpack.gz`,
+    `run-bundles/player-account-001/run-dup/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );
   assert.equal(secondJson.object_key, firstJson.object_key);
   assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);

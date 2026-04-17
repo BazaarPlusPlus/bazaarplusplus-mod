@@ -108,10 +108,12 @@ export async function handleDownloadReplay(
       .run();
   }
 
-  return new Response(await object.arrayBuffer(), {
-    status: 200,
-    headers: {
-      "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
-    },
+  const headers = new Headers({
+    "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
   });
+  if (typeof object.size === "number") {
+    headers.set("content-length", String(object.size));
+  }
+
+  return new Response(object.body, { status: 200, headers });
 }

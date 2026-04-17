@@ -13,6 +13,10 @@ export function sha256Base64(input: string | Uint8Array): string {
   return toBase64(createHash("sha256").update(input).digest());
 }
 
+export function toBase64UrlSegment(base64: string): string {
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
 export function canonicalRequest(
   method: string,
   path: string,

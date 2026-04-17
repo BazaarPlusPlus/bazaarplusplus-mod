@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.CombatReplay;
 using Newtonsoft.Json;
@@ -22,8 +23,15 @@ internal sealed class RunBundleUploadRequestV3
     [JsonProperty("artifact_codec")]
     public string ArtifactCodec { get; set; } = "application/json";
 
+    [JsonIgnore]
+    public byte[] ArtifactBytes { get; set; } = Array.Empty<byte>();
+
     [JsonProperty("artifact_bytes")]
-    public List<byte> ArtifactBytes { get; set; } = new();
+    public string ArtifactBytesBase64
+    {
+        get => Convert.ToBase64String(ArtifactBytes);
+        set => ArtifactBytes = string.IsNullOrEmpty(value) ? Array.Empty<byte>() : Convert.FromBase64String(value);
+    }
 
     [JsonProperty("run_projection")]
     public RunProjectionV3 RunProjection { get; set; } = new();

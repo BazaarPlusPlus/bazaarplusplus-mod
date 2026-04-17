@@ -19,37 +19,30 @@ export async function handleActivate(request: Request, env: Env): Promise<Respon
     return json({ error: "invalid_request" }, { status: 400 });
   }
 
-  const existingAccount = await env.DB.prepare(
-    `SELECT 1 FROM users WHERE player_account_id = ?`,
-  )
-    .bind(playerAccountId)
-    .first();
-  if (existingAccount) {
-    return json({ error: "player_account_id_taken" }, { status: 409 });
-  }
-
-  const existingUsername = await env.DB.prepare(
-    `SELECT 1 FROM users WHERE player_username = ?`,
-  )
-    .bind(playerUsername)
-    .first();
-  if (existingUsername) {
-    return json({ error: "player_username_taken" }, { status: 409 });
-  }
-
   const passwordHash = await hashPassword(password);
   const token = generateBearerToken();
   const nowUtc = new Date().toISOString();
 
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO users (player_account_id, player_username, password_hash, created_at_utc, updated_at_utc, last_login_at_utc)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).bind(playerAccountId, playerUsername, passwordHash, nowUtc, nowUtc, nowUtc),
-    env.DB.prepare(
-      `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES (?, ?, ?)`,
-    ).bind(token, playerAccountId, nowUtc),
-  ]);
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO users (player_account_id, player_username, password_hash, created_at_utc, updated_at_utc, last_login_at_utc)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(playerAccountId, playerUsername, passwordHash, nowUtc, nowUtc, nowUtc),
+      env.DB.prepare(
+        `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES (?, ?, ?)`,
+      ).bind(token, playerAccountId, nowUtc),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/UNIQUE constraint failed:\s*users\.player_account_id/i.test(message)) {
+      return json({ error: "player_account_id_taken" }, { status: 409 });
+    }
+    if (/UNIQUE constraint failed:\s*users\.player_username/i.test(message)) {
+      return json({ error: "player_username_taken" }, { status: 409 });
+    }
+    throw error;
+  }
 
   return json({
     token,
