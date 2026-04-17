@@ -4,18 +4,11 @@ import { fileURLToPath } from "node:url";
 import {
   cloudflareTest,
   readD1Migrations,
-  type D1Migration,
 } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
 
 const RootDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationsPath = path.join(RootDir, "migrations");
-
-declare module "vitest" {
-  interface ProvidedContext {
-    migrations: D1Migration[];
-  }
-}
 
 export default defineConfig({
   plugins: [
@@ -27,7 +20,7 @@ export default defineConfig({
       miniflare: {
         bindings: {
           TEST_MIGRATIONS: await readD1Migrations(migrationsPath),
-          REPLAY_DOWNLOAD_SECRET: "test-secret",
+          REPLAY_DOWNLOAD_SECRET: "test-replay-download-secret",
           ALLOW_UNAUTHENTICATED_REPLAY_LINKS: "false",
           ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS: "false",
           GHOST_QUERY_LOOKBACK_DAYS: "3",
