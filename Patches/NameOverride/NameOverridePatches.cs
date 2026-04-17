@@ -3,6 +3,7 @@
 using System;
 using System.Reflection;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;
 
@@ -14,7 +15,7 @@ internal static class NameOverrideHelper
 
     public static bool IsEnabled()
     {
-        return BppRuntimeHost.Config.EnableNameOverrideConfig?.Value == true;
+        return BppPatchHost.Services.Config.EnableNameOverrideConfig?.Value == true;
     }
 
     public static bool TryGetDisplayNameOverride(string originalName, out string? replacementName)
