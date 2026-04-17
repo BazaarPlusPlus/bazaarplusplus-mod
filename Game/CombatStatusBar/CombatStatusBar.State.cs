@@ -79,7 +79,7 @@ internal sealed partial class CombatStatusBar
 
     internal static bool ShouldRenderForState(bool enabled)
     {
-        return enabled && BppRuntimeHost.RunContext.IsInGameRun;
+        return enabled && (_services?.RunContext.IsInGameRun ?? false);
     }
 
     internal static bool CanStepCombatSpeed(int direction)

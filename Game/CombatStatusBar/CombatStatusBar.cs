@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Screenshots;
 using TheBazaar;
 using UnityEngine;
@@ -9,6 +10,7 @@ namespace BazaarPlusPlus.Game.CombatStatusBar;
 internal sealed partial class CombatStatusBar : MonoBehaviour
 {
     private static CombatStatusBar? _current;
+    private static IBppServices? _services;
     private float _visualBlend;
     private int _screenshotSuppressionCount;
 
@@ -38,6 +40,11 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
         if (ReferenceEquals(_current, this))
             _current = null;
         DisposeUi();
+    }
+
+    public void Initialize(IBppServices services)
+    {
+        _services = services ?? throw new ArgumentNullException(nameof(services));
     }
 
     private void Update()

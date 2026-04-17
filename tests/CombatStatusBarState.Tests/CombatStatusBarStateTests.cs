@@ -17,7 +17,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
     public void Dispose()
     {
         CombatStatusBar.ResetStateForTests();
-        BazaarPlusPlus.Core.Runtime.BppRuntimeHost.TestContext.IsInGameRun = false;
+        BazaarPlusPlus.Core.Runtime.TestServices.Instance.RunContext.IsInGameRun = false;
     }
 
     [Fact]
@@ -109,10 +109,10 @@ public sealed class CombatStatusBarStateTests : IDisposable
     [Fact]
     public void ShouldRenderForState_RequiresFeatureEnabledAndInGameRun()
     {
-        BazaarPlusPlus.Core.Runtime.BppRuntimeHost.TestContext.IsInGameRun = false;
+        BazaarPlusPlus.Core.Runtime.TestServices.Instance.RunContext.IsInGameRun = false;
         Assert.False(CombatStatusBar.ShouldRenderForState(enabled: true));
 
-        BazaarPlusPlus.Core.Runtime.BppRuntimeHost.TestContext.IsInGameRun = true;
+        BazaarPlusPlus.Core.Runtime.TestServices.Instance.RunContext.IsInGameRun = true;
         Assert.True(CombatStatusBar.ShouldRenderForState(enabled: true));
         Assert.False(CombatStatusBar.ShouldRenderForState(enabled: false));
     }

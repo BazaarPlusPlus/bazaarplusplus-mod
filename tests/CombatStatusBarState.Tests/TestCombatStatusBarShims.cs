@@ -1,8 +1,15 @@
+using BazaarPlusPlus.Core.Runtime;
+
 namespace BazaarPlusPlus.Core.Runtime
 {
     internal interface IRunContext
     {
-        bool IsInGameRun { get; }
+        bool IsInGameRun { get; set; }
+    }
+
+    internal interface IBppServices
+    {
+        IRunContext RunContext { get; }
     }
 
     internal sealed class TestRunContext : IRunContext
@@ -10,17 +17,25 @@ namespace BazaarPlusPlus.Core.Runtime
         public bool IsInGameRun { get; set; }
     }
 
-    internal static class BppRuntimeHost
+    internal sealed class TestServices : IBppServices
     {
-        internal static TestRunContext TestContext { get; } = new();
+        public static TestServices Instance { get; } = new TestServices();
 
-        internal static IRunContext RunContext => TestContext;
+        public IRunContext RunContext { get; } = new TestRunContext();
     }
 }
 
 namespace BazaarPlusPlus.Game.CombatStatusBar
 {
-    internal sealed partial class CombatStatusBar { }
+    internal sealed partial class CombatStatusBar
+    {
+        private static IBppServices? _services;
+
+        static CombatStatusBar()
+        {
+            _services = TestServices.Instance;
+        }
+    }
 }
 
 namespace TheBazaar
