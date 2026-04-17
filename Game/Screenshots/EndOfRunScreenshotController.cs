@@ -35,34 +35,59 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private string? _lastLoggedBlockerStateSummary;
     private int _trackedEndOfRunControllerId;
     private float _endOfRunEnteredAtSeconds = -1f;
+    private IBppServices? _services;
 
     private void Awake()
     {
         _current = this;
+    }
+
+    public void Initialize(IBppServices services)
+    {
+        _services = services ?? throw new ArgumentNullException(nameof(services));
+        InitializeCore();
+    }
+
+    private void InitializeCore()
+    {
+        var services = _services!;
+
         RefreshBufferedRunContext();
 
-        var screenshotsDirectoryPath = BppRuntimeHost.Paths.ScreenshotsDirectoryPath;
-        var runLogDatabasePath = BppRuntimeHost.Paths.RunLogDatabasePath;
+        var screenshotsDirectoryPath = services.Paths.ScreenshotsDirectoryPath;
+        var runLogDatabasePath = services.Paths.RunLogDatabasePath;
         if (string.IsNullOrWhiteSpace(screenshotsDirectoryPath))
         {
             BppLog.Warn(
                 "EndOfRunScreenshot",
                 "Screenshot controller initialized without a screenshots directory."
             );
-            return;
+        }
+        else
+        {
+            _screenshotService = new ScreenshotService(screenshotsDirectoryPath);
+            if (!string.IsNullOrWhiteSpace(runLogDatabasePath))
+                _screenshotStore = new RunScreenshotSqliteStore(runLogDatabasePath);
         }
 
-        _screenshotService = new ScreenshotService(screenshotsDirectoryPath);
-        if (!string.IsNullOrWhiteSpace(runLogDatabasePath))
-            _screenshotStore = new RunScreenshotSqliteStore(runLogDatabasePath);
+        // Catch-up subscribe if OnEnable fired before Initialize (normal case: AddComponent → Awake → OnEnable → Initialize).
+        if (isActiveAndEnabled && _runInitializedSubscription == null)
+        {
+            _runInitializedSubscription = services.EventBus.Subscribe<RunInitializedObserved>(
+                OnRunInitializedObserved
+            );
+        }
     }
 
     private void OnEnable()
     {
         Events.RunStarted.AddListener(OnRunStarted, this);
-        _runInitializedSubscription = BppRuntimeHost.EventBus.Subscribe<RunInitializedObserved>(
-            OnRunInitializedObserved
-        );
+        if (_services != null && _runInitializedSubscription == null)
+        {
+            _runInitializedSubscription = _services.EventBus.Subscribe<RunInitializedObserved>(
+                OnRunInitializedObserved
+            );
+        }
     }
 
     private void OnDisable()
@@ -290,9 +315,12 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void RefreshBufferedRunContext()
     {
-        var liveRunId = BppRuntimeHost.RunContext.CurrentServerRunId;
-        if (!string.IsNullOrWhiteSpace(liveRunId))
-            _bufferedRunId = liveRunId;
+        if (_services != null)
+        {
+            var liveRunId = _services.RunContext.CurrentServerRunId;
+            if (!string.IsNullOrWhiteSpace(liveRunId))
+                _bufferedRunId = liveRunId;
+        }
 
         var liveHeroName = Data.Run?.Player?.Hero.ToString();
         if (!string.IsNullOrWhiteSpace(liveHeroName))
