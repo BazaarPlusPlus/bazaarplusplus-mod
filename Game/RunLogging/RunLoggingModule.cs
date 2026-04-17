@@ -268,7 +268,10 @@ internal sealed class RunLoggingModule
         _ensureActiveRunFromGame();
     }
 
-    private RunLogSessionState? TryResolveReplayTargetSession(PvpBattleManifest manifest, bool inRun)
+    private RunLogSessionState? TryResolveReplayTargetSession(
+        PvpBattleManifest manifest,
+        bool inRun
+    )
     {
         if (inRun)
         {

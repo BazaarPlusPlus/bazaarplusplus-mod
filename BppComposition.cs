@@ -38,17 +38,25 @@ internal sealed class BppComposition : IDisposable
         Func<CombatReplayRuntime?> combatReplayRuntimeAccessor
     )
     {
-        if (logger == null) throw new ArgumentNullException(nameof(logger));
-        if (configFile == null) throw new ArgumentNullException(nameof(configFile));
+        if (logger == null)
+            throw new ArgumentNullException(nameof(logger));
+        if (configFile == null)
+            throw new ArgumentNullException(nameof(configFile));
         _combatReplayRuntimeAccessor =
-            combatReplayRuntimeAccessor ?? throw new ArgumentNullException(nameof(combatReplayRuntimeAccessor));
+            combatReplayRuntimeAccessor
+            ?? throw new ArgumentNullException(nameof(combatReplayRuntimeAccessor));
 
         _config.Initialize(configFile);
         _paths.Initialize();
         _runContext.Reset();
 
         _services = new BppRuntimeServices(
-            _eventBus, _config, _paths, _runContext, _gameStateProbe, logger
+            _eventBus,
+            _config,
+            _paths,
+            _runContext,
+            _gameStateProbe,
+            logger
         );
 
         _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);

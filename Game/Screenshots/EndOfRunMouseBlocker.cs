@@ -64,7 +64,10 @@ internal sealed class EndOfRunMouseBlocker
             typeof(GraphicRaycaster)
         );
         _blockerCanvasObject.layer = screenController.gameObject.layer;
-        _blockerCanvasObject.transform.SetParent(screenController.transform, worldPositionStays: false);
+        _blockerCanvasObject.transform.SetParent(
+            screenController.transform,
+            worldPositionStays: false
+        );
 
         var blockerCanvas = _blockerCanvasObject.GetComponent<Canvas>();
         blockerCanvas.renderMode = RenderMode.ScreenSpaceOverlay;

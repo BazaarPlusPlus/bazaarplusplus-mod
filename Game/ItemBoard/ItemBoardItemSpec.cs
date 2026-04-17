@@ -27,9 +27,10 @@ internal sealed class ItemBoardItemSpec
             Tier = Tier,
             EnchantmentType = EnchantmentType,
             SocketId = SocketId,
-            Attributes = Attributes != null
-                ? new Dictionary<ECardAttributeType, int>(Attributes)
-                : new Dictionary<ECardAttributeType, int>(),
+            Attributes =
+                Attributes != null
+                    ? new Dictionary<ECardAttributeType, int>(Attributes)
+                    : new Dictionary<ECardAttributeType, int>(),
         };
     }
 }

@@ -44,8 +44,7 @@ internal sealed class RunUploadController : MonoBehaviour
             var retryIntervalSeconds = Math.Max(1, V3UploadDefaults.IntervalSeconds);
             var requestTimeoutSeconds = Math.Max(10, V3UploadDefaults.RequestTimeoutSeconds);
             if (
-                string.IsNullOrWhiteSpace(databasePath)
-                || string.IsNullOrWhiteSpace(replayRootPath)
+                string.IsNullOrWhiteSpace(databasePath) || string.IsNullOrWhiteSpace(replayRootPath)
             )
             {
                 BppLog.Warn(
@@ -73,9 +72,10 @@ internal sealed class RunUploadController : MonoBehaviour
             _runLifecycleSubscription = services.EventBus.Subscribe<RunLifecycleChanged>(
                 OnRunLifecycleChanged
             );
-            _replayPersistenceDrainedSubscription = services.EventBus.Subscribe<
-                CombatReplayPersistenceDrained
-            >(OnCombatReplayPersistenceDrained);
+            _replayPersistenceDrainedSubscription =
+                services.EventBus.Subscribe<CombatReplayPersistenceDrained>(
+                    OnCombatReplayPersistenceDrained
+                );
             BppLog.Info(
                 "RunUploadController",
                 $"Startup run-bundle upload armed. timeout={requestTimeoutSeconds}s, startup_delay={startupDelaySeconds}s, retry_interval={retryIntervalSeconds}s."
@@ -89,7 +89,12 @@ internal sealed class RunUploadController : MonoBehaviour
 
     private void Update()
     {
-        if (_uploadService == null || _shutdown == null || _startupGate == null || _services == null)
+        if (
+            _uploadService == null
+            || _shutdown == null
+            || _startupGate == null
+            || _services == null
+        )
             return;
 
         _startupRunner.Tick(

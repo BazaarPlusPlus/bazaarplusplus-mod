@@ -264,10 +264,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]
-    public void HistoryPanelAccessPolicy_RequiresLobbyState(
-        bool isInGameRun,
-        bool expected
-    )
+    public void HistoryPanelAccessPolicy_RequiresLobbyState(bool isInGameRun, bool expected)
     {
         var result = HistoryPanelAccessPolicy.CanOpen(isInGameRun);
 

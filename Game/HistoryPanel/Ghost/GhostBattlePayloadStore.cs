@@ -74,7 +74,9 @@ internal sealed class GhostBattlePayloadStore
     {
         var directoryPath =
             Path.GetDirectoryName(filePath)
-            ?? throw new InvalidOperationException("Ghost payload path must have a parent directory.");
+            ?? throw new InvalidOperationException(
+                "Ghost payload path must have a parent directory."
+            );
         var tempPath = Path.Combine(
             directoryPath,
             $"{Path.GetFileName(filePath)}.{Guid.NewGuid():N}.tmp"

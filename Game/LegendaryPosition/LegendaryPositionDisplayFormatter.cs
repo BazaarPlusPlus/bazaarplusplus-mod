@@ -13,7 +13,10 @@ internal static class LegendaryPositionDisplayFormatter
         _config = config ?? throw new ArgumentNullException(nameof(config));
 
     private static IBppConfig Config =>
-        _config ?? throw new InvalidOperationException("LegendaryPositionDisplayFormatter.Install must be called at startup.");
+        _config
+        ?? throw new InvalidOperationException(
+            "LegendaryPositionDisplayFormatter.Install must be called at startup."
+        );
 
     internal static string Format(string? currentText, int? fallbackPosition)
     {

@@ -211,11 +211,7 @@ internal sealed class RunBundleUploadStore
             artifactBattles.Add(BuildArtifactBattle(manifest, payload));
         }
 
-        var artifact = new RunArtifactV3
-        {
-            RunId = runId,
-            Battles = artifactBattles,
-        };
+        var artifact = new RunArtifactV3 { RunId = runId, Battles = artifactBattles };
         var artifactBytes = V3RunBundleArtifactCodec.Serialize(artifact);
 
         return new RunBundleUploadSnapshot
@@ -346,7 +342,9 @@ internal sealed class RunBundleUploadStore
             Label = label,
             Status = capture.Status.ToString(),
             Source = capture.Source.ToString(),
-            Items = capture.Items?.ToList() ?? new List<BazaarPlusPlus.Game.CombatReplay.CombatReplayCardSnapshot>(),
+            Items =
+                capture.Items?.ToList()
+                ?? new List<BazaarPlusPlus.Game.CombatReplay.CombatReplayCardSnapshot>(),
         };
     }
 

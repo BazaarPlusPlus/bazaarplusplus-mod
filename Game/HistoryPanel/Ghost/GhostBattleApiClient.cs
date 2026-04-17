@@ -192,9 +192,7 @@ internal sealed class GhostBattleApiClient
         }
         catch (Exception ex)
         {
-            return GhostBattleReplayPayloadResult.Failure(
-                V3ErrorFormatter.Truncate(ex.Message)
-            );
+            return GhostBattleReplayPayloadResult.Failure(V3ErrorFormatter.Truncate(ex.Message));
         }
     }
 
@@ -224,7 +222,11 @@ internal sealed class GhostBattleApiClient
         byte[] responseBytes
     )
     {
-        if (string.IsNullOrWhiteSpace(battleId) || responseBytes == null || responseBytes.Length == 0)
+        if (
+            string.IsNullOrWhiteSpace(battleId)
+            || responseBytes == null
+            || responseBytes.Length == 0
+        )
             return null;
 
         try
@@ -337,7 +339,8 @@ internal sealed class GhostBattleApiClient
         {
             Status = ParseEnum(capture?.Status, PvpBattleCaptureStatus.Missing),
             Source = ParseEnum(capture?.Source, PvpBattleCaptureSource.Unknown),
-            Items = capture?.Items?.Select(item => item.Clone()).ToList()
+            Items =
+                capture?.Items?.Select(item => item.Clone()).ToList()
                 ?? new List<CombatReplay.CombatReplayCardSnapshot>(),
         };
     }
@@ -345,7 +348,9 @@ internal sealed class GhostBattleApiClient
     private static TEnum ParseEnum<TEnum>(string? value, TEnum fallback)
         where TEnum : struct
     {
-        return !string.IsNullOrWhiteSpace(value) && Enum.TryParse<TEnum>(value.Trim(), true, out var parsed)
+        return
+            !string.IsNullOrWhiteSpace(value)
+            && Enum.TryParse<TEnum>(value.Trim(), true, out var parsed)
             ? parsed
             : fallback;
     }

@@ -51,7 +51,8 @@ public static class CardTooltipDataPassivePatch
             if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
                 return;
 
-            var alwaysShow = BppPatchHost.Services.Config.EnchantPreviewAlwaysShowConfig?.Value ?? true;
+            var alwaysShow =
+                BppPatchHost.Services.Config.EnchantPreviewAlwaysShowConfig?.Value ?? true;
             if (!alwaysShow && !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview))
                 return;
 

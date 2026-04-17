@@ -111,25 +111,35 @@ Assert(queue != null, "Combat replay persistence queue should be constructible."
 
 var openingEmptySnapshots = (System.Collections.IList)CreateEmptySnapshotList();
 Assert(
-    (bool)(shouldRefreshPlayerCaptureMethod!.Invoke(
-        null,
-        new object?[] { true, false, openingEmptySnapshots }
-    ) ?? false),
+    (bool)(
+        shouldRefreshPlayerCaptureMethod!.Invoke(
+            null,
+            new object?[] { true, false, openingEmptySnapshots }
+        ) ?? false
+    ),
     "Player snapshots captured as empty at combat opening should still be eligible for live retry."
 );
 var populatedSnapshots = (System.Collections.IList)CreateSnapshotList("refresh-1", "tpl-refresh");
 Assert(
-    !((bool)(shouldRefreshPlayerCaptureMethod.Invoke(
-        null,
-        new object?[] { true, false, populatedSnapshots }
-    ) ?? false)),
+    !(
+        (bool)(
+            shouldRefreshPlayerCaptureMethod.Invoke(
+                null,
+                new object?[] { true, false, populatedSnapshots }
+            ) ?? false
+        )
+    ),
     "Player snapshots captured with opening data should not request a redundant live retry."
 );
 Assert(
-    !((bool)(shouldRefreshPlayerCaptureMethod.Invoke(
-        null,
-        new object?[] { false, true, openingEmptySnapshots }
-    ) ?? false)),
+    !(
+        (bool)(
+            shouldRefreshPlayerCaptureMethod.Invoke(
+                null,
+                new object?[] { false, true, openingEmptySnapshots }
+            ) ?? false
+        )
+    ),
     "Player snapshots should not request another refresh after live retry already ran."
 );
 
@@ -289,8 +299,9 @@ try
     );
     Assert(loadedPayload != null, "Payload store should load a saved payload by battle id.");
     Assert(
-        ((byte[]?)GetProperty(payloadType, loadedPayload!, "CombatMessageBytes"))
-            ?.SequenceEqual(new byte[] { 4, 5, 6 }) == true,
+        ((byte[]?)GetProperty(payloadType, loadedPayload!, "CombatMessageBytes"))?.SequenceEqual(
+            new byte[] { 4, 5, 6 }
+        ) == true,
         "Payload store should preserve the serialized combat payload."
     );
     var payloadFilesAfterFirstSave = Directory
@@ -312,8 +323,9 @@ try
     );
     Assert(reloadedPayload != null, "Payload store should reload an overwritten payload.");
     Assert(
-        ((byte[]?)GetProperty(payloadType, reloadedPayload!, "CombatMessageBytes"))
-            ?.SequenceEqual(new byte[] { 9, 8, 7 }) == true,
+        ((byte[]?)GetProperty(payloadType, reloadedPayload!, "CombatMessageBytes"))?.SequenceEqual(
+            new byte[] { 9, 8, 7 }
+        ) == true,
         "Atomic overwrite should publish the latest replay payload bytes."
     );
     var payloadFilesAfterOverwrite = Directory
@@ -735,7 +747,9 @@ try
         "Completed battle manifests should capture snapshot wrappers for both sides."
     );
     Assert(
-        !string.IsNullOrWhiteSpace((string?)GetProperty(manifestType, completedManifest!, "BattleId")),
+        !string.IsNullOrWhiteSpace(
+            (string?)GetProperty(manifestType, completedManifest!, "BattleId")
+        ),
         "Completed battle manifests should allocate a battle id."
     );
 

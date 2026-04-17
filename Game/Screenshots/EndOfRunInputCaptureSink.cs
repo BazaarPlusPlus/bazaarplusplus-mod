@@ -4,30 +4,34 @@ using UnityEngine.EventSystems;
 
 namespace BazaarPlusPlus.Game.Screenshots;
 
-internal sealed class EndOfRunInputCaptureSink : MonoBehaviour,
-    IPointerClickHandler,
-    IPointerDownHandler,
-    IPointerUpHandler,
-    IPointerEnterHandler,
-    IPointerExitHandler,
-    IPointerMoveHandler,
-    IBeginDragHandler,
-    IDragHandler,
-    IEndDragHandler,
-    IDropHandler,
-    IScrollHandler,
-    IInitializePotentialDragHandler,
-    ISubmitHandler,
-    ICancelHandler,
-    IMoveHandler,
-    ISelectHandler,
-    IDeselectHandler,
-    IUpdateSelectedHandler
+internal sealed class EndOfRunInputCaptureSink
+    : MonoBehaviour,
+        IPointerClickHandler,
+        IPointerDownHandler,
+        IPointerUpHandler,
+        IPointerEnterHandler,
+        IPointerExitHandler,
+        IPointerMoveHandler,
+        IBeginDragHandler,
+        IDragHandler,
+        IEndDragHandler,
+        IDropHandler,
+        IScrollHandler,
+        IInitializePotentialDragHandler,
+        ISubmitHandler,
+        ICancelHandler,
+        IMoveHandler,
+        ISelectHandler,
+        IDeselectHandler,
+        IUpdateSelectedHandler
 {
     public void CaptureFocus()
     {
         var eventSystem = EventSystem.current;
-        if (eventSystem == null || ReferenceEquals(eventSystem.currentSelectedGameObject, gameObject))
+        if (
+            eventSystem == null
+            || ReferenceEquals(eventSystem.currentSelectedGameObject, gameObject)
+        )
             return;
 
         eventSystem.SetSelectedGameObject(gameObject);
@@ -36,7 +40,10 @@ internal sealed class EndOfRunInputCaptureSink : MonoBehaviour,
     public void ReleaseFocus()
     {
         var eventSystem = EventSystem.current;
-        if (eventSystem == null || !ReferenceEquals(eventSystem.currentSelectedGameObject, gameObject))
+        if (
+            eventSystem == null
+            || !ReferenceEquals(eventSystem.currentSelectedGameObject, gameObject)
+        )
             return;
 
         eventSystem.SetSelectedGameObject(null);

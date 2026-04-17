@@ -61,21 +61,25 @@ internal sealed class PvpBattleSnapshotCollector
 
     public void CaptureLiveSnapshots(CombatReplaySequenceCandidate candidate)
     {
-        if (ShouldRefreshPlayerCapture(
-            candidate.PlayerHandCardsCapturedFromOpening,
-            candidate.PlayerHandCardsCapturedLive,
-            candidate.PlayerHandCards
-        ))
+        if (
+            ShouldRefreshPlayerCapture(
+                candidate.PlayerHandCardsCapturedFromOpening,
+                candidate.PlayerHandCardsCapturedLive,
+                candidate.PlayerHandCards
+            )
+        )
         {
             (candidate.PlayerHandCardsCapturedLive, candidate.PlayerHandCards) =
                 CapturePlayerHandCards();
         }
 
-        if (ShouldRefreshPlayerCapture(
-            candidate.PlayerSkillsCapturedFromOpening,
-            candidate.PlayerSkillsCapturedLive,
-            candidate.PlayerSkills
-        ))
+        if (
+            ShouldRefreshPlayerCapture(
+                candidate.PlayerSkillsCapturedFromOpening,
+                candidate.PlayerSkillsCapturedLive,
+                candidate.PlayerSkills
+            )
+        )
         {
             (candidate.PlayerSkillsCapturedLive, candidate.PlayerSkills) = CapturePlayerSkills();
         }

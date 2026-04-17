@@ -11,8 +11,7 @@ internal static class ScreenshotPathBuilder
     {
         var dayFolder = capturedAtLocal.ToString("yyyy-MM-dd");
         var sanitizedRunId = SanitizeRunId(runId);
-        var fileName =
-            $"{capturedAtLocal:yyyy-MM-dd_HH-mm-ss-fff}_final_run-{sanitizedRunId}.png";
+        var fileName = $"{capturedAtLocal:yyyy-MM-dd_HH-mm-ss-fff}_final_run-{sanitizedRunId}.png";
         return Path.Combine(dayFolder, fileName);
     }
 

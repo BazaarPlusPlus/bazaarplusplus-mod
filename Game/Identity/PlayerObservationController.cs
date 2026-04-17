@@ -41,7 +41,10 @@ internal sealed class PlayerObservationController : MonoBehaviour
         {
             var playerAccountId = BppClientCacheBridge.TryGetProfileAccountId()?.Trim();
             var playerUsername = BppClientCacheBridge.TryGetProfileUsername()?.Trim();
-            if (string.IsNullOrWhiteSpace(playerAccountId) || string.IsNullOrWhiteSpace(playerUsername))
+            if (
+                string.IsNullOrWhiteSpace(playerAccountId)
+                || string.IsNullOrWhiteSpace(playerUsername)
+            )
                 return;
 
             var hasRow = _store.TryLoad(out _);

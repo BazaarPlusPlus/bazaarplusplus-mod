@@ -28,7 +28,8 @@ internal static class CardsJsonCache
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
     private static IPathService Paths =>
-        _paths ?? throw new InvalidOperationException("CardsJsonCache.Install must be called at startup.");
+        _paths
+        ?? throw new InvalidOperationException("CardsJsonCache.Install must be called at startup.");
 
     internal static bool Warm()
     {

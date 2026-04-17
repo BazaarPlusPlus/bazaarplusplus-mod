@@ -14,10 +14,9 @@ internal static class RunScreenshotMetadataReader
     {
         RunLoggingGameDataReader.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
         BppClientCacheBridge.TryGetPlayerLeaderboardPosition(out var playerPosition);
-        var heroName =
-            !string.IsNullOrWhiteSpace(capture.HeroName)
-                ? capture.HeroName
-                : Data.Run?.Player?.Hero.ToString();
+        var heroName = !string.IsNullOrWhiteSpace(capture.HeroName)
+            ? capture.HeroName
+            : Data.Run?.Player?.Hero.ToString();
 
         return new RunScreenshotRecord
         {

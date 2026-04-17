@@ -20,14 +20,16 @@ namespace BazaarPlusPlus.Game.Identity
         {
             get
             {
-                if (_connection == null) Open();
+                if (_connection == null)
+                    Open();
                 return _connection!;
             }
         }
 
         public void Open()
         {
-            if (_connection != null) return;
+            if (_connection != null)
+                return;
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
 
             _connection = new SqliteConnection($"Data Source={_filePath};Cache=Shared");
@@ -51,7 +53,8 @@ namespace BazaarPlusPlus.Game.Identity
                 version = Convert.ToInt32(cmd.ExecuteScalar());
             }
 
-            if (version == 0) MigrateTo1();
+            if (version == 0)
+                MigrateTo1();
             // Future: if (version < 2) MigrateTo2(); etc.
         }
 
@@ -60,7 +63,8 @@ namespace BazaarPlusPlus.Game.Identity
             using var tx = _connection!.BeginTransaction();
             using var cmd = _connection.CreateCommand();
             cmd.Transaction = tx;
-            cmd.CommandText = @"
+            cmd.CommandText =
+                @"
                 CREATE TABLE auth (
                   id                INTEGER PRIMARY KEY CHECK (id = 1),
                   token             TEXT    NOT NULL,

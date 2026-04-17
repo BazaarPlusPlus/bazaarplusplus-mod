@@ -13,8 +13,7 @@ internal sealed class ReplicatedRunLogStore : IRunLogStore
     public ReplicatedRunLogStore(IRunLogStore innerStore, RunSyncStateSqliteStore syncStateStore)
     {
         _innerStore = innerStore ?? throw new ArgumentNullException(nameof(innerStore));
-        _syncStateStore =
-            syncStateStore ?? throw new ArgumentNullException(nameof(syncStateStore));
+        _syncStateStore = syncStateStore ?? throw new ArgumentNullException(nameof(syncStateStore));
     }
 
     public RunLogSessionState? TryResumeActiveRun()

@@ -74,13 +74,15 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
 
         public ItemBoardItemSpec Item { get; set; } = new ItemBoardItemSpec();
     }
+
     private readonly List<SelectedCardEntry> _selectedCards = new();
     private readonly ItemBoardService _itemBoard = new();
     private readonly CardSetBuildDataRepository _buildRepository = new();
     private readonly CardSetPreviewModeIndicator _modeIndicator = new();
     private CardSetPreviewSponsorSelection _currentSponsor = new();
     private bool _modeActive;
-    private CardSetBuildRecommendationMode _displayMode = CardSetBuildRecommendationMode.SelectedSet;
+    private CardSetBuildRecommendationMode _displayMode =
+        CardSetBuildRecommendationMode.SelectedSet;
     private int _recommendationIndex;
 
     public static CardSetPreviewRuntime? Instance { get; private set; }
@@ -144,9 +146,8 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             return true;
         }
 
-        var changed = button == PointerEventData.InputButton.Left
-            ? TryAdd(entry)
-            : TryRemove(entry.Key);
+        var changed =
+            button == PointerEventData.InputButton.Left ? TryAdd(entry) : TryRemove(entry.Key);
         if (changed)
             StartRenderForSelection(controller, card);
 
@@ -225,8 +226,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         {
             CardSetBuildRecommendationMode.SelectedSet =>
                 CardSetBuildRecommendationMode.WinnerBuild,
-            CardSetBuildRecommendationMode.WinnerBuild =>
-                CardSetBuildRecommendationMode.FinalBuild,
+            CardSetBuildRecommendationMode.WinnerBuild => CardSetBuildRecommendationMode.FinalBuild,
             _ => CardSetBuildRecommendationMode.SelectedSet,
         };
     }
@@ -340,7 +340,8 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             SponsorTier = _currentSponsor.Tier,
             CandidateIndex = resultIndex,
             CandidateCount = resultCount,
-            IsAlertState = !hasRecommendation && _displayMode != CardSetBuildRecommendationMode.SelectedSet,
+            IsAlertState =
+                !hasRecommendation && _displayMode != CardSetBuildRecommendationMode.SelectedSet,
         };
     }
 
@@ -458,7 +459,9 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
 
     private static string ResolveNoCandidateWarningLabel()
     {
-        return NoCandidateWarningLabel.Resolve(PlayerPreferences.Data?.LanguageCode ?? string.Empty);
+        return NoCandidateWarningLabel.Resolve(
+            PlayerPreferences.Data?.LanguageCode ?? string.Empty
+        );
     }
 
     private static string ResolveModeEnabledLabel()
@@ -508,9 +511,10 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
                 Tier = card.Tier,
                 EnchantmentType = card.GetEnchantment(),
                 SocketId = card.LeftSocketId,
-                Attributes = card.Attributes != null
-                    ? new Dictionary<ECardAttributeType, int>(card.Attributes)
-                    : new Dictionary<ECardAttributeType, int>(),
+                Attributes =
+                    card.Attributes != null
+                        ? new Dictionary<ECardAttributeType, int>(card.Attributes)
+                        : new Dictionary<ECardAttributeType, int>(),
             },
         };
         return true;
@@ -529,7 +533,11 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         var tooltipData = controller.GetTooltipData();
         tooltipParent.HideCardTooltipController();
         if (tooltipData != null)
-            tooltipParent.ShowCardTooltipController(controller.transform, controller.TooltipOffset, tooltipData);
+            tooltipParent.ShowCardTooltipController(
+                controller.transform,
+                controller.TooltipOffset,
+                tooltipData
+            );
 
         for (var i = 0; i < maxFramesToWait; i++)
         {
@@ -543,12 +551,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
                 continue;
             }
 
-            if (
-                !_itemBoard.ShowTemplateSet(
-                    tooltipController,
-                    BuildCurrentRequest()
-                )
-            )
+            if (!_itemBoard.ShowTemplateSet(tooltipController, BuildCurrentRequest()))
             {
                 yield break;
             }

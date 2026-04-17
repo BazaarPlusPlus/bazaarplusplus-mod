@@ -12,54 +12,29 @@ var gate =
     ?? throw new InvalidOperationException("Failed to construct EndOfRunScreenshotGate.");
 
 Assert(
-    !InvokeShouldCaptureOnContinue(
-        gateType,
-        gate,
-        isInteractionBlocked: true,
-        nowSeconds: 0f
-    ),
+    !InvokeShouldCaptureOnContinue(gateType, gate, isInteractionBlocked: true, nowSeconds: 0f),
     "Blocked continue interactions should not trigger a screenshot."
 );
 
 Assert(
-    InvokeShouldCaptureOnContinue(
-        gateType,
-        gate,
-        isInteractionBlocked: false,
-        nowSeconds: 0f
-    ),
+    InvokeShouldCaptureOnContinue(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
     "The first available continue interaction should arm a screenshot attempt."
 );
 
 Assert(
-    !InvokeShouldCaptureOnContinue(
-        gateType,
-        gate,
-        isInteractionBlocked: false,
-        nowSeconds: 0f
-    ),
+    !InvokeShouldCaptureOnContinue(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
     "Only one capture attempt should be in flight at a time."
 );
 
 InvokeAbortCaptureAttempt(gateType, gate, retryAvailableAtSeconds: 5f);
 
 Assert(
-    !InvokeShouldCaptureOnContinue(
-        gateType,
-        gate,
-        isInteractionBlocked: false,
-        nowSeconds: 4.99f
-    ),
+    !InvokeShouldCaptureOnContinue(gateType, gate, isInteractionBlocked: false, nowSeconds: 4.99f),
     "A failed capture attempt should stay throttled until the retry window opens."
 );
 
 Assert(
-    InvokeShouldCaptureOnContinue(
-        gateType,
-        gate,
-        isInteractionBlocked: false,
-        nowSeconds: 5f
-    ),
+    InvokeShouldCaptureOnContinue(gateType, gate, isInteractionBlocked: false, nowSeconds: 5f),
     "A failed capture attempt should re-open the screenshot opportunity."
 );
 
@@ -71,12 +46,7 @@ Assert(
 );
 
 Assert(
-    !InvokeShouldCaptureOnContinue(
-        gateType,
-        gate,
-        isInteractionBlocked: false,
-        nowSeconds: 10f
-    ),
+    !InvokeShouldCaptureOnContinue(gateType, gate, isInteractionBlocked: false, nowSeconds: 10f),
     "A completed screenshot should stay consumed for the rest of the run."
 );
 
@@ -97,22 +67,12 @@ Assert(
 InvokeResetForNewRun(gateType, gate);
 
 Assert(
-    InvokeShouldCaptureOnContinue(
-        gateType,
-        gate,
-        isInteractionBlocked: false,
-        nowSeconds: 0f
-    ),
+    InvokeShouldCaptureOnContinue(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
     "Starting a new run should re-arm the screenshot gate."
 );
 
 Assert(
-    !InvokeShouldCaptureOnContinue(
-        gateType,
-        gate,
-        isInteractionBlocked: false,
-        nowSeconds: 0f
-    ),
+    !InvokeShouldCaptureOnContinue(gateType, gate, isInteractionBlocked: false, nowSeconds: 0f),
     "Only one capture attempt should be in flight after re-arming for a new run."
 );
 
@@ -330,7 +290,10 @@ static void InvokeAbortCaptureAttempt(Type type, object instance, float retryAva
 
 static void InvokeCompleteCaptureAttempt(Type type, object instance)
 {
-    var method = type.GetMethod("CompleteCaptureAttempt", BindingFlags.Public | BindingFlags.Instance);
+    var method = type.GetMethod(
+        "CompleteCaptureAttempt",
+        BindingFlags.Public | BindingFlags.Instance
+    );
     if (method == null)
     {
         throw new InvalidOperationException(
@@ -398,7 +361,11 @@ static string InvokeBuildRelativePath(Type type, string? runId, DateTimeOffset c
         ?? throw new InvalidOperationException("BuildRelativePath returned null.");
 }
 
-static string InvokeGetSummaryRevealState(Type detectorType, Type stateType, object screenController)
+static string InvokeGetSummaryRevealState(
+    Type detectorType,
+    Type stateType,
+    object screenController
+)
 {
     var method = detectorType.GetMethod(
         "GetRevealState",
@@ -411,7 +378,8 @@ static string InvokeGetSummaryRevealState(Type detectorType, Type stateType, obj
         );
     }
 
-    var value = method.Invoke(null, [screenController])
+    var value =
+        method.Invoke(null, [screenController])
         ?? throw new InvalidOperationException("GetRevealState returned null.");
     return Enum.GetName(stateType, value)
         ?? throw new InvalidOperationException("Reveal state enum name was null.");

@@ -47,10 +47,9 @@ static void AssertMappedTier(
 {
     var entries = Array.CreateInstance(playerCardEntryType, 1);
     var entry = Activator.CreateInstance(playerCardEntryType)!;
-    playerCardEntryType.GetProperty("CardId")!.SetValue(
-        entry,
-        "11111111-1111-1111-1111-111111111111"
-    );
+    playerCardEntryType
+        .GetProperty("CardId")!
+        .SetValue(entry, "11111111-1111-1111-1111-111111111111");
     playerCardEntryType.GetProperty("Slot")!.SetValue(entry, 0);
     playerCardEntryType.GetProperty("Tier")!.SetValue(entry, rawTier);
     entries.SetValue(entry, 0);

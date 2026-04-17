@@ -2,7 +2,12 @@ namespace BazaarPlusPlus.Game.Identity
 {
     public sealed class AuthRecord
     {
-        public AuthRecord(string token, string playerAccountId, string playerUsername, string issuedAtUtc)
+        public AuthRecord(
+            string token,
+            string playerAccountId,
+            string playerUsername,
+            string issuedAtUtc
+        )
         {
             Token = token;
             PlayerAccountId = playerAccountId;

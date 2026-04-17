@@ -13,10 +13,14 @@ var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanel
 var coordinatorOutcomeType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator+GhostBattleOutcome"
 );
-var importRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleImportRecord");
+var importRecordType = RequireType(
+    "BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleImportRecord"
+);
 var routesType = RequireType("BazaarPlusPlus.Game.Online.V3Routes");
 var artifactCodecType = RequireType("BazaarPlusPlus.Game.Online.V3RunBundleArtifactCodec");
-var ghostPayloadStoreType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattlePayloadStore");
+var ghostPayloadStoreType = RequireType(
+    "BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattlePayloadStore"
+);
 var runArtifactType = RequireType("BazaarPlusPlus.Game.Online.Models.RunArtifactV3");
 var runArtifactBattleType = RequireType("BazaarPlusPlus.Game.Online.Models.RunArtifactBattleV3");
 var battleManifestArtifactType = RequireType(
@@ -80,15 +84,18 @@ Assert(
     "Ghost sync should advance the checkpoint after a non-truncated incremental fetch."
 );
 
-var artifact = Activator.CreateInstance(runArtifactType)
+var artifact =
+    Activator.CreateInstance(runArtifactType)
     ?? throw new InvalidOperationException("RunArtifactV3 should be constructible.");
 runArtifactType.GetProperty("RunId")!.SetValue(artifact, "run-001");
 
-var battleArtifact = Activator.CreateInstance(runArtifactBattleType)
+var battleArtifact =
+    Activator.CreateInstance(runArtifactBattleType)
     ?? throw new InvalidOperationException("RunArtifactBattleV3 should be constructible.");
 runArtifactBattleType.GetProperty("BattleId")!.SetValue(battleArtifact, "battle-001");
 
-var manifestArtifact = Activator.CreateInstance(battleManifestArtifactType)
+var manifestArtifact =
+    Activator.CreateInstance(battleManifestArtifactType)
     ?? throw new InvalidOperationException("BattleManifestArtifactV3 should be constructible.");
 battleManifestArtifactType.GetProperty("BattleId")!.SetValue(manifestArtifact, "battle-001");
 battleManifestArtifactType
@@ -96,22 +103,19 @@ battleManifestArtifactType
     .SetValue(manifestArtifact, "2026-04-11T00:00:00.000Z");
 battleManifestArtifactType.GetProperty("Day")!.SetValue(manifestArtifact, 7);
 battleManifestArtifactType.GetProperty("Hour")!.SetValue(manifestArtifact, 2);
-battleManifestArtifactType
-    .GetProperty("EncounterId")!
-    .SetValue(manifestArtifact, "encounter-001");
+battleManifestArtifactType.GetProperty("EncounterId")!.SetValue(manifestArtifact, "encounter-001");
 battleManifestArtifactType.GetProperty("CombatKind")!.SetValue(manifestArtifact, "PVPCombat");
 battleManifestArtifactType.GetProperty("Result")!.SetValue(manifestArtifact, "Won");
-battleManifestArtifactType
-    .GetProperty("WinnerCombatantId")!
-    .SetValue(manifestArtifact, "Player");
-battleManifestArtifactType
-    .GetProperty("LoserCombatantId")!
-    .SetValue(manifestArtifact, "Opponent");
+battleManifestArtifactType.GetProperty("WinnerCombatantId")!.SetValue(manifestArtifact, "Player");
+battleManifestArtifactType.GetProperty("LoserCombatantId")!.SetValue(manifestArtifact, "Opponent");
 runArtifactBattleType.GetProperty("Manifest")!.SetValue(battleArtifact, manifestArtifact);
 
-var participantsArtifact = Activator.CreateInstance(battleParticipantsArtifactType)
+var participantsArtifact =
+    Activator.CreateInstance(battleParticipantsArtifactType)
     ?? throw new InvalidOperationException("BattleParticipantsArtifactV3 should be constructible.");
-battleParticipantsArtifactType.GetProperty("PlayerName")!.SetValue(participantsArtifact, "RemoteGhost");
+battleParticipantsArtifactType
+    .GetProperty("PlayerName")!
+    .SetValue(participantsArtifact, "RemoteGhost");
 battleParticipantsArtifactType
     .GetProperty("PlayerAccountId")!
     .SetValue(participantsArtifact, "remote-account-001");
@@ -131,25 +135,26 @@ battleParticipantsArtifactType
 battleParticipantsArtifactType
     .GetProperty("OpponentRank")!
     .SetValue(participantsArtifact, "Legendary");
-battleParticipantsArtifactType
-    .GetProperty("OpponentRating")!
-    .SetValue(participantsArtifact, 1500);
+battleParticipantsArtifactType.GetProperty("OpponentRating")!.SetValue(participantsArtifact, 1500);
 battleParticipantsArtifactType.GetProperty("OpponentLevel")!.SetValue(participantsArtifact, 12);
 runArtifactBattleType.GetProperty("Participants")!.SetValue(battleArtifact, participantsArtifact);
 
-var snapshotsArtifact = Activator.CreateInstance(battleSnapshotsArtifactType)
+var snapshotsArtifact =
+    Activator.CreateInstance(battleSnapshotsArtifactType)
     ?? throw new InvalidOperationException("BattleSnapshotsArtifactV3 should be constructible.");
 var cardSetListType = typeof(List<>).MakeGenericType(cardSetCaptureArtifactType);
 var cardSetList = (IList)(
     Activator.CreateInstance(cardSetListType)
     ?? throw new InvalidOperationException("Card set list should be constructible.")
 );
-var cardSetCapture = Activator.CreateInstance(cardSetCaptureArtifactType)
+var cardSetCapture =
+    Activator.CreateInstance(cardSetCaptureArtifactType)
     ?? throw new InvalidOperationException("CardSetCaptureArtifactV3 should be constructible.");
 cardSetCaptureArtifactType.GetProperty("Label")!.SetValue(cardSetCapture, "player_hand");
 cardSetCaptureArtifactType.GetProperty("Status")!.SetValue(cardSetCapture, "Captured");
 cardSetCaptureArtifactType.GetProperty("Source")!.SetValue(cardSetCapture, "LiveRetry");
-var cardSnapshot = Activator.CreateInstance(cardSnapshotType)
+var cardSnapshot =
+    Activator.CreateInstance(cardSnapshotType)
     ?? throw new InvalidOperationException("CombatReplayCardSnapshot should be constructible.");
 cardSnapshotType.GetProperty("InstanceId")!.SetValue(cardSnapshot, "card-instance-001");
 cardSnapshotType.GetProperty("TemplateId")!.SetValue(cardSnapshot, "card-template-001");
@@ -157,7 +162,9 @@ cardSnapshotType.GetProperty("Name")!.SetValue(cardSnapshot, "Test Card");
 var cardSnapshotListType = typeof(List<>).MakeGenericType(cardSnapshotType);
 var cardSnapshotList = (IList)(
     Activator.CreateInstance(cardSnapshotListType)
-    ?? throw new InvalidOperationException("Combat replay card snapshot list should be constructible.")
+    ?? throw new InvalidOperationException(
+        "Combat replay card snapshot list should be constructible."
+    )
 );
 cardSnapshotList.Add(cardSnapshot);
 cardSetCaptureArtifactType.GetProperty("Items")!.SetValue(cardSetCapture, cardSnapshotList);
@@ -165,7 +172,8 @@ cardSetList.Add(cardSetCapture);
 battleSnapshotsArtifactType.GetProperty("CardSets")!.SetValue(snapshotsArtifact, cardSetList);
 runArtifactBattleType.GetProperty("Snapshots")!.SetValue(battleArtifact, snapshotsArtifact);
 
-var replayPayloadArtifact = Activator.CreateInstance(replayPayloadArtifactType)
+var replayPayloadArtifact =
+    Activator.CreateInstance(replayPayloadArtifactType)
     ?? throw new InvalidOperationException("ReplayPayloadArtifactV3 should be constructible.");
 replayPayloadArtifactType.GetProperty("BattleId")!.SetValue(replayPayloadArtifact, "battle-001");
 replayPayloadArtifactType.GetProperty("Version")!.SetValue(replayPayloadArtifact, 1);
@@ -200,7 +208,8 @@ var extractedPayload =
     );
 var extractedPayloadType = extractedPayload.GetType();
 Assert(
-    (string?)extractedPayloadType.GetProperty("BattleId")?.GetValue(extractedPayload) == "battle-001",
+    (string?)extractedPayloadType.GetProperty("BattleId")?.GetValue(extractedPayload)
+        == "battle-001",
     "Artifact extraction should preserve the selected battle id."
 );
 var extractedReplayPayload =
@@ -254,20 +263,26 @@ var ghostPayloadStorePath = Path.Combine(
 Directory.CreateDirectory(ghostPayloadStorePath);
 try
 {
-    var ghostPayloadStore = Activator.CreateInstance(ghostPayloadStoreType, ghostPayloadStorePath)
+    var ghostPayloadStore =
+        Activator.CreateInstance(ghostPayloadStoreType, ghostPayloadStorePath)
         ?? throw new InvalidOperationException("GhostBattlePayloadStore should be constructible.");
     InvokeVoid(ghostPayloadStoreType, ghostPayloadStore, "Save", [extractedPayload]);
     var reloadedGhostPayload =
         Invoke<object?>(ghostPayloadStoreType, ghostPayloadStore, "Load", ["battle-001"])
-        ?? throw new InvalidOperationException("GhostBattlePayloadStore should reload saved payloads.");
-    var reloadedReplayPayload =
-        reloadedPayloadType(reloadedGhostPayload);
+        ?? throw new InvalidOperationException(
+            "GhostBattlePayloadStore should reload saved payloads."
+        );
+    var reloadedReplayPayload = reloadedPayloadType(reloadedGhostPayload);
     var reloadedManifest =
         reloadedGhostPayload.GetType().GetProperty("BattleManifest")?.GetValue(reloadedGhostPayload)
-        ?? throw new InvalidOperationException("Reloaded ghost payload should include battle manifest.");
+        ?? throw new InvalidOperationException(
+            "Reloaded ghost payload should include battle manifest."
+        );
     Assert(
-        ((byte[]?)replayPayloadType.GetProperty("CombatMessageBytes")?.GetValue(reloadedReplayPayload))
-            ?.SequenceEqual(new byte[] { 2 }) == true,
+        (
+            (byte[]?)
+                replayPayloadType.GetProperty("CombatMessageBytes")?.GetValue(reloadedReplayPayload)
+        )?.SequenceEqual(new byte[] { 2 }) == true,
         "Ghost payload store should preserve binary replay payload bytes."
     );
     Assert(
@@ -276,7 +291,8 @@ try
         "Ghost payload store should preserve manifest encounter metadata."
     );
     Assert(
-        (DateTimeOffset?)extractedManifestType.GetProperty("RecordedAtUtc")?.GetValue(reloadedManifest)
+        (DateTimeOffset?)
+            extractedManifestType.GetProperty("RecordedAtUtc")?.GetValue(reloadedManifest)
             == DateTimeOffset.Parse("2026-04-11T00:00:00.000Z"),
         "Ghost payload store should preserve manifest timestamps."
     );
@@ -285,12 +301,16 @@ try
         ?? throw new InvalidOperationException("Reloaded ghost payload should include snapshots.");
     var playerHandCapture =
         reloadedSnapshots.GetType().GetProperty("PlayerHand")?.GetValue(reloadedSnapshots)
-        ?? throw new InvalidOperationException("Reloaded ghost snapshots should include player hand.");
-    var playerHandItems =
-        (IEnumerable?)playerHandCapture.GetType().GetProperty("Items")?.GetValue(playerHandCapture);
+        ?? throw new InvalidOperationException(
+            "Reloaded ghost snapshots should include player hand."
+        );
+    var playerHandItems = (IEnumerable?)
+        playerHandCapture.GetType().GetProperty("Items")?.GetValue(playerHandCapture);
     var reloadedCardSnapshot =
         playerHandItems?.Cast<object>().SingleOrDefault()
-        ?? throw new InvalidOperationException("Reloaded ghost player hand should preserve card snapshots.");
+        ?? throw new InvalidOperationException(
+            "Reloaded ghost player hand should preserve card snapshots."
+        );
     Assert(
         (string?)cardSnapshotType.GetProperty("InstanceId")?.GetValue(reloadedCardSnapshot)
             == "card-instance-001",
@@ -368,8 +388,7 @@ Assert(
     "Ghost import should preserve the remote result without flipping."
 );
 Assert(
-    (string?)importRecordType.GetProperty("WinnerCombatantId")?.GetValue(importRecord)
-        == "Player",
+    (string?)importRecordType.GetProperty("WinnerCombatantId")?.GetValue(importRecord) == "Player",
     "Ghost import should preserve winner_combatant_id without flipping."
 );
 
@@ -394,14 +413,13 @@ try
         ["local-account-001", importRecords]
     );
 
-    var ghostBattles =
-        (System.Collections.IEnumerable)
-            Invoke<object>(
-                repositoryType,
-                repository,
-                "ListRecentGhostBattles",
-                ["local-account-001", 20]
-            );
+    var ghostBattles = (System.Collections.IEnumerable)
+        Invoke<object>(
+            repositoryType,
+            repository,
+            "ListRecentGhostBattles",
+            ["local-account-001", 20]
+        );
     var projectedBattle =
         ghostBattles.Cast<object>().SingleOrDefault()
         ?? throw new InvalidOperationException("Expected one projected ghost battle.");
@@ -417,8 +435,7 @@ try
         "Ghost repository reads should project the remote uploader account into OpponentAccountId."
     );
     Assert(
-        (string?)battleRecordType.GetProperty("PlayerHero")?.GetValue(projectedBattle)
-            == "Vanessa",
+        (string?)battleRecordType.GetProperty("PlayerHero")?.GetValue(projectedBattle) == "Vanessa",
         "Ghost repository reads should project the local hero from the raw opponent_hero field."
     );
     Assert(
@@ -493,11 +510,9 @@ Assert(
         };
     });
     using var replayLinkHttpClient = new HttpClient(replayLinkHandler);
-    var replayLinkClient = Activator.CreateInstance(
-        apiClientType,
-        replayLinkHttpClient,
-        routes
-    ) ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
+    var replayLinkClient =
+        Activator.CreateInstance(apiClientType, replayLinkHttpClient, routes)
+        ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
     var requestReplayDownloadLinkAsync = apiClientType.GetMethod(
         "RequestReplayDownloadLinkAsync",
         BindingFlags.Public | BindingFlags.Instance
@@ -521,10 +536,7 @@ Assert(
         (bool)(replayLinkResultType.GetProperty("Succeeded")?.GetValue(replayLinkResult) ?? false),
         "GhostBattleApiClient replay-link request should succeed on 200 with a bearer token."
     );
-    Assert(
-        replayLinkRequest != null,
-        "Replay-link request should reach the HTTP transport."
-    );
+    Assert(replayLinkRequest != null, "Replay-link request should reach the HTTP transport.");
     Assert(
         !replayLinkRequest!.Headers.Contains("X-BPP-Installation-Id"),
         "Bearer-based replay-link requests should not send installation headers."
@@ -546,11 +558,9 @@ Assert(
         };
     });
     using var emptyTokenHttpClient = new HttpClient(emptyTokenHandler);
-    var emptyTokenClient = Activator.CreateInstance(
-        apiClientType,
-        emptyTokenHttpClient,
-        routes
-    ) ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
+    var emptyTokenClient =
+        Activator.CreateInstance(apiClientType, emptyTokenHttpClient, routes)
+        ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
     var emptyTokenTask = (Task)(
         requestReplayDownloadLinkAsync!.Invoke(
             emptyTokenClient,
@@ -577,11 +587,9 @@ Assert(
         };
     });
     using var replayPayloadHttpClient = new HttpClient(replayPayloadHandler);
-    var replayPayloadClient = Activator.CreateInstance(
-        apiClientType,
-        replayPayloadHttpClient,
-        routes
-    ) ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
+    var replayPayloadClient =
+        Activator.CreateInstance(apiClientType, replayPayloadHttpClient, routes)
+        ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
     var downloadReplayPayloadAsync = apiClientType.GetMethod(
         "DownloadReplayPayloadAsync",
         BindingFlags.Public | BindingFlags.Instance
@@ -608,15 +616,11 @@ Assert(
     var replayPayloadResultType = replayPayloadResult.GetType();
     Assert(
         (bool)(
-            replayPayloadResultType.GetProperty("Succeeded")?.GetValue(replayPayloadResult)
-            ?? false
+            replayPayloadResultType.GetProperty("Succeeded")?.GetValue(replayPayloadResult) ?? false
         ),
         "GhostBattleApiClient replay-payload request should succeed on 200 with a bearer token."
     );
-    Assert(
-        replayPayloadRequest != null,
-        "Replay-payload request should reach the HTTP transport."
-    );
+    Assert(replayPayloadRequest != null, "Replay-payload request should reach the HTTP transport.");
     Assert(
         !replayPayloadRequest!.Headers.Contains("X-BPP-Installation-Id"),
         "Bearer-based replay-payload requests should not send installation headers."
@@ -654,8 +658,13 @@ static T Invoke<T>(Type type, object instance, string name, object?[] args)
 
 static object reloadedPayloadType(object reloadedGhostPayload)
 {
-    return reloadedGhostPayload.GetType().GetProperty("ReplayPayload")?.GetValue(reloadedGhostPayload)
-        ?? throw new InvalidOperationException("Reloaded ghost payload should include replay payload.");
+    return reloadedGhostPayload
+            .GetType()
+            .GetProperty("ReplayPayload")
+            ?.GetValue(reloadedGhostPayload)
+        ?? throw new InvalidOperationException(
+            "Reloaded ghost payload should include replay payload."
+        );
 }
 
 static void InvokeVoid(Type type, object instance, string name, object?[] args)

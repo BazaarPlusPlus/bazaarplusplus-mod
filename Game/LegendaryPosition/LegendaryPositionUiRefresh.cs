@@ -58,8 +58,8 @@ internal static class LegendaryPositionUiRefresh
             var currentPosition = traverse.Field("currentLeaderboardPosition").GetValue<int>();
             var postRunPosition = traverse.Field("postRunLeaderboardPosition").GetValue<int>();
 
-            int? visiblePosition = currentRank == ERank.Legendary
-                ? currentPosition
+            int? visiblePosition =
+                currentRank == ERank.Legendary ? currentPosition
                 : postRunRank == ERank.Legendary ? postRunPosition
                 : null;
 

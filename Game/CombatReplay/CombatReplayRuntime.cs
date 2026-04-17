@@ -18,10 +18,10 @@ using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.CombatReplay.Upload;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
+using BazaarPlusPlus.Game.RunLifecycle;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
@@ -381,8 +381,6 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
         }
     }
 
-
-
     private void OnStateChanged(StateChangedEvent data)
     {
         if (data == null)
@@ -583,7 +581,6 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
             MarkGameSimMessageHandled(gameSimHandler, spawnMessage.MessageId);
         };
     }
-
 
     private static void MarkGameSimMessageHandled(GameSimHandler gameSimHandler, string messageId)
     {

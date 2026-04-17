@@ -28,7 +28,10 @@ internal sealed class ScreenshotService
             var capturedAtLocal = _nowProvider();
             var capturedAtUtc = capturedAtLocal.ToUniversalTime();
             var screenshotId = Guid.NewGuid().ToString("N");
-            var relativePath = ScreenshotPathBuilder.BuildRelativePath(request.RunId, capturedAtLocal);
+            var relativePath = ScreenshotPathBuilder.BuildRelativePath(
+                request.RunId,
+                capturedAtLocal
+            );
             var filePath = Path.Combine(_directoryPath, relativePath);
             var directoryPath = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(directoryPath))

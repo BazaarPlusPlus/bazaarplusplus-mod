@@ -14,7 +14,9 @@ internal static class CardSetPreviewClickPatch
     [HarmonyPrefix]
     private static bool Prefix(CardController __instance, PointerEventData eventData)
     {
-        return !(CardSetPreviewRuntime.Instance?.TryHandleCardClick(__instance, eventData) ?? false);
+        return !(
+            CardSetPreviewRuntime.Instance?.TryHandleCardClick(__instance, eventData) ?? false
+        );
     }
 }
 
@@ -24,7 +26,9 @@ internal static class CardSetPreviewLockTogglePatch
     [HarmonyPrefix]
     private static bool Prefix(CardTooltipController __instance)
     {
-        return !(CardSetPreviewRuntime.Instance?.ShouldSuppressNativeLockToggle(__instance?.CurrentCard)
-            ?? false);
+        return !(
+            CardSetPreviewRuntime.Instance?.ShouldSuppressNativeLockToggle(__instance?.CurrentCard)
+            ?? false
+        );
     }
 }

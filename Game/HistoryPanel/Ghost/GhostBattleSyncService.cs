@@ -52,7 +52,10 @@ internal sealed class GhostBattleSyncService : IDisposable
         }
 
         _repository.UpsertGhostBattles(bearer.PlayerAccountId!, queryResult.Battles);
-        _repository.MarkOldUndownloadedGhostBattlesDeleted(bearer.PlayerAccountId!, syncStartedAtUtc);
+        _repository.MarkOldUndownloadedGhostBattlesDeleted(
+            bearer.PlayerAccountId!,
+            syncStartedAtUtc
+        );
         if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit))
             _repository.SaveGhostSyncCheckpointUtc(bearer.PlayerAccountId!, syncStartedAtUtc);
         return GhostBattleSyncResult.Success(queryResult.Battles.Count);
@@ -119,9 +122,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         return GhostBattleReplayDownloadResult.Success();
     }
 
-    public void Dispose()
-    {
-    }
+    public void Dispose() { }
 
     private static bool ShouldAdvanceCheckpoint(int importedCount, int limit)
     {

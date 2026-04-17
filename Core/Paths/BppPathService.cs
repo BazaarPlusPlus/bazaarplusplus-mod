@@ -39,9 +39,6 @@ internal sealed class BppPathService : IPathService
             "BazaarPlusPlus",
             "Identity"
         );
-        IdentityDatabasePath = System.IO.Path.Combine(
-            IdentityDirectoryPath,
-            "identity.db"
-        );
+        IdentityDatabasePath = System.IO.Path.Combine(IdentityDirectoryPath, "identity.db");
     }
 }

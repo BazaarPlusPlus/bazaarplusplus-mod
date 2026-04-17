@@ -87,7 +87,8 @@ internal sealed partial class BppSettingsDockController
 
     private static void ConfigureRowRect(RectTransform rowRect, int index)
     {
-        var rowTop = PanelTopPadding + HeaderHeight + HeaderSpacing + (index * (RowHeight + RowSpacing));
+        var rowTop =
+            PanelTopPadding + HeaderHeight + HeaderSpacing + (index * (RowHeight + RowSpacing));
         rowRect.offsetMin = new Vector2(PanelPadding, -(rowTop + RowHeight));
         rowRect.offsetMax = new Vector2(-PanelPadding, -rowTop);
     }

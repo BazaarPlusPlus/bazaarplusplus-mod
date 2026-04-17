@@ -391,14 +391,17 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         }
 
         TrackEndOfRunEntry(screenController);
-        var shouldShowBlocker = ShouldHoldBeforeFirstCapture(out var holdReason) || ShouldBlockMouseInput();
+        var shouldShowBlocker =
+            ShouldHoldBeforeFirstCapture(out var holdReason) || ShouldBlockMouseInput();
 
         LogBlockerStateChange(
             isActive: shouldShowBlocker,
             shouldShowBlocker
-                ? (ShouldBlockMouseInput()
-                    ? $"reason=capture-in-flight {holdReason}"
-                    : $"reason={(holdReason.StartsWith("reason=wait-for-first-capture-window", StringComparison.Ordinal) ? "first-capture-window-blocked" : "continue-blocked")} {holdReason}")
+                ? (
+                    ShouldBlockMouseInput()
+                        ? $"reason=capture-in-flight {holdReason}"
+                        : $"reason={(holdReason.StartsWith("reason=wait-for-first-capture-window", StringComparison.Ordinal) ? "first-capture-window-blocked" : "continue-blocked")} {holdReason}"
+                )
                 : $"reason=continue-unblocked {holdReason}"
         );
         if (shouldShowBlocker)
@@ -409,7 +412,10 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void LogBlockerStateChange(bool isActive, string stateSummary)
     {
-        if (_lastLoggedBlockerActive == isActive && string.Equals(_lastLoggedBlockerStateSummary, stateSummary, StringComparison.Ordinal))
+        if (
+            _lastLoggedBlockerActive == isActive
+            && string.Equals(_lastLoggedBlockerStateSummary, stateSummary, StringComparison.Ordinal)
+        )
             return;
 
         _lastLoggedBlockerActive = isActive;
@@ -420,9 +426,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         );
     }
 
-    private bool ShouldHoldBeforeFirstCapture(
-        out string holdReason
-    )
+    private bool ShouldHoldBeforeFirstCapture(out string holdReason)
     {
         if (_gate.HasCapturedForCurrentRun())
         {

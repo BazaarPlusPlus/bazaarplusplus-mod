@@ -68,5 +68,4 @@ internal sealed class RunSyncStateSqliteStore
             throw;
         }
     }
-
 }

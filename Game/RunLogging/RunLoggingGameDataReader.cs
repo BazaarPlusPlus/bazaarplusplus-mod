@@ -21,7 +21,10 @@ internal static class RunLoggingGameDataReader
         _runContext = runContext ?? throw new ArgumentNullException(nameof(runContext));
 
     private static IRunContext RunContext =>
-        _runContext ?? throw new InvalidOperationException("RunLoggingGameDataReader.Install must be called at startup.");
+        _runContext
+        ?? throw new InvalidOperationException(
+            "RunLoggingGameDataReader.Install must be called at startup."
+        );
 
     public static bool TryCreateRunLogCreateRequest(out RunLogCreateRequest request)
     {
@@ -86,9 +89,7 @@ internal static class RunLoggingGameDataReader
     public static RunLogCompletion BuildRunLogCompletion(string reason)
     {
         var status =
-            RunContext.LastRunExitKind == RunExitKind.Interrupted
-                ? "abandoned"
-                : "completed";
+            RunContext.LastRunExitKind == RunExitKind.Interrupted ? "abandoned" : "completed";
         TryBuildRunLogPlayerStats(out var stats);
         TryGetPlayerRankSnapshot(out var finalPlayerRank, out var finalPlayerRating);
         return new RunLogCompletion

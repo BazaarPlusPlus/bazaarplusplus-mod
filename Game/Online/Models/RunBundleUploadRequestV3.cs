@@ -30,7 +30,10 @@ internal sealed class RunBundleUploadRequestV3
     public string ArtifactBytesBase64
     {
         get => Convert.ToBase64String(ArtifactBytes);
-        set => ArtifactBytes = string.IsNullOrEmpty(value) ? Array.Empty<byte>() : Convert.FromBase64String(value);
+        set =>
+            ArtifactBytes = string.IsNullOrEmpty(value)
+                ? Array.Empty<byte>()
+                : Convert.FromBase64String(value);
     }
 
     [JsonProperty("run_projection")]

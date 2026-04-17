@@ -110,7 +110,10 @@ static async Task TestFaultedRenderDoesNotBlockReplacementAsync()
     target.Render(secondModel);
     await surface.WaitForRenderCompletionCountAsync(2);
 
-    Assert(surface.RenderCallCount == 2, "Replacement render should still run after a prior fault.");
+    Assert(
+        surface.RenderCallCount == 2,
+        "Replacement render should still run after a prior fault."
+    );
     Assert(
         surface.LastRenderedSignature == "recovery-second",
         "A faulted render should not block later render requests."

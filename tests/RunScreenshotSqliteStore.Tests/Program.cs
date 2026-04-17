@@ -136,7 +136,6 @@ try
             ),
         "only one primary screenshot should exist per run."
     );
-
 }
 finally
 {

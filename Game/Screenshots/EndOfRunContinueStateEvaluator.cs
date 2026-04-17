@@ -46,16 +46,20 @@ internal static class EndOfRunContinueStateEvaluator
         var revealState = EndOfRunSummaryRevealDetector.GetRevealState(screenController);
         if (!TryGetTransitionCount(screenController, out var transitionCount))
         {
-            return
-                $"screenController={screenController.GetType().Name} suppressWhileCaptureInFlight={suppressWhileCaptureInFlight} transitionCount=<missing> revealState={revealState}";
+            return $"screenController={screenController.GetType().Name} suppressWhileCaptureInFlight={suppressWhileCaptureInFlight} transitionCount=<missing> revealState={revealState}";
         }
 
-        var shouldAllowContinue = ShouldAllowContinue(screenController, suppressWhileCaptureInFlight);
-        return
-            $"screenController={screenController.GetType().Name} suppressWhileCaptureInFlight={suppressWhileCaptureInFlight} transitionCount={transitionCount} revealState={revealState} shouldAllowContinue={shouldAllowContinue}";
+        var shouldAllowContinue = ShouldAllowContinue(
+            screenController,
+            suppressWhileCaptureInFlight
+        );
+        return $"screenController={screenController.GetType().Name} suppressWhileCaptureInFlight={suppressWhileCaptureInFlight} transitionCount={transitionCount} revealState={revealState} shouldAllowContinue={shouldAllowContinue}";
     }
 
-    public static bool TryIsInteractionBlocked(object? screenController, out bool isInteractionBlocked)
+    public static bool TryIsInteractionBlocked(
+        object? screenController,
+        out bool isInteractionBlocked
+    )
     {
         isInteractionBlocked = false;
         if (screenController == null)
@@ -71,10 +75,12 @@ internal static class EndOfRunContinueStateEvaluator
     public static bool TryGetTransitionCount(object screenController, out int transitionCount)
     {
         transitionCount = 0;
-        var transitionCountField = screenController.GetType().GetField(
-            TransitionCountFieldName,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-        );
+        var transitionCountField = screenController
+            .GetType()
+            .GetField(
+                TransitionCountFieldName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
         if (transitionCountField == null)
         {
             WarnMissingTransitionFieldOnce();

@@ -93,7 +93,11 @@ internal sealed class CardSetPreviewModeIndicator : IDisposable
         _outline.effectDistance = new Vector2(1.2f, -1.2f);
         _outline.useGraphicAlpha = true;
 
-        var textObject = new GameObject(TextObjectName, typeof(RectTransform), typeof(TextMeshProUGUI));
+        var textObject = new GameObject(
+            TextObjectName,
+            typeof(RectTransform),
+            typeof(TextMeshProUGUI)
+        );
         var textRect = textObject.GetComponent<RectTransform>();
         textRect.SetParent(_rootRect, false);
         textRect.anchorMin = Vector2.zero;

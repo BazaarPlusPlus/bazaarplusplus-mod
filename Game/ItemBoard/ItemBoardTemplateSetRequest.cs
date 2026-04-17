@@ -31,7 +31,8 @@ internal sealed class ItemBoardTemplateSetRequest
     {
         return new ItemBoardTemplateSetRequest
         {
-            Items = Items?.Select(item => item?.Clone() ?? new ItemBoardItemSpec()).ToList()
+            Items =
+                Items?.Select(item => item?.Clone() ?? new ItemBoardItemSpec()).ToList()
                 ?? new List<ItemBoardItemSpec>(),
             AnchoredPosition = AnchoredPosition,
             Scale = Scale,

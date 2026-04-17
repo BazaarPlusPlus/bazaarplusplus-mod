@@ -182,7 +182,10 @@ internal sealed class PreviewBoardRenderTarget : IBoardRenderTarget, IDisposable
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            TryLogException("Previous preview surface task failed; continuing with the latest request", ex);
+            TryLogException(
+                "Previous preview surface task failed; continuing with the latest request",
+                ex
+            );
         }
 
         try

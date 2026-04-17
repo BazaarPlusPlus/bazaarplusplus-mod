@@ -7,8 +7,8 @@ using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
-using HarmonyLib;
 using BazaarPlusPlus.Game.Settings;
+using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using TheBazaar.UI.Tooltips;
@@ -21,6 +21,7 @@ namespace BazaarPlusPlus.Game.ItemBoard;
 internal sealed class ItemBoardOverlay : IDisposable
 {
     private sealed class OverlayRuntimeBehaviour : MonoBehaviour { }
+
     private const string SponsorPanelObjectName = "BppItemBoardSponsorPanel";
     private const string SponsorTextObjectName = "BppItemBoardSponsorText";
     private const float SponsorPanelFontSize = 17f;
@@ -209,7 +210,8 @@ internal sealed class ItemBoardOverlay : IDisposable
             return;
 
         _currentRequest = request.Clone();
-        var items = _currentRequest.Items?.Where(item => item?.TemplateId != Guid.Empty).ToList()
+        var items =
+            _currentRequest.Items?.Where(item => item?.TemplateId != Guid.Empty).ToList()
             ?? new List<ItemBoardItemSpec>();
         if (items.Count == 0)
         {
@@ -286,7 +288,9 @@ internal sealed class ItemBoardOverlay : IDisposable
 
         StopRevealCoroutine();
         _revealRevision++;
-        _revealCoroutine = _runtimeBehaviour.StartCoroutine(RevealCardsAfterFrames(_revealRevision));
+        _revealCoroutine = _runtimeBehaviour.StartCoroutine(
+            RevealCardsAfterFrames(_revealRevision)
+        );
     }
 
     private void StopRevealCoroutine()
@@ -718,7 +722,10 @@ internal sealed class ItemBoardOverlay : IDisposable
                 result = ReplaceFirst(
                     result,
                     candidateSegment,
-                    WrapWithColor(candidateSegment, ResolveCandidateTextColor(candidateIndex, candidateCount))
+                    WrapWithColor(
+                        candidateSegment,
+                        ResolveCandidateTextColor(candidateIndex, candidateCount)
+                    )
                 );
             }
         }
@@ -728,9 +735,8 @@ internal sealed class ItemBoardOverlay : IDisposable
 
     private static Color ResolveCandidateTextColor(int candidateIndex, int candidateCount)
     {
-        var normalized = candidateCount <= 1
-            ? 0f
-            : Mathf.Clamp01(candidateIndex / (float)(candidateCount - 1));
+        var normalized =
+            candidateCount <= 1 ? 0f : Mathf.Clamp01(candidateIndex / (float)(candidateCount - 1));
         return Color.Lerp(
             new Color(0.78f, 0.90f, 1f, 1f),
             new Color(0.95f, 0.98f, 1f, 1f),
@@ -959,9 +965,10 @@ internal sealed class ItemBoardOverlay : IDisposable
                     Tier = spec.Tier,
                     SocketId = spec.SocketId ?? ResolveSyntheticSocket(i),
                     EnchantmentType = spec.EnchantmentType,
-                    Attributes = spec.Attributes != null
-                        ? new Dictionary<ECardAttributeType, int>(spec.Attributes)
-                        : new Dictionary<ECardAttributeType, int>(),
+                    Attributes =
+                        spec.Attributes != null
+                            ? new Dictionary<ECardAttributeType, int>(spec.Attributes)
+                            : new Dictionary<ECardAttributeType, int>(),
                 }
             );
         }

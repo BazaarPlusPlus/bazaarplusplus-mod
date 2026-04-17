@@ -6,12 +6,14 @@ namespace BazaarPlusPlus.Game.Identity
     public sealed class AuthStore
     {
         private readonly IdentityDatabase _database;
+
         public AuthStore(IdentityDatabase database) => _database = database;
 
         public bool TryLoad(out AuthRecord? record)
         {
             using var cmd = _database.Connection.CreateCommand();
-            cmd.CommandText = "SELECT token, player_account_id, player_username, issued_at_utc FROM auth WHERE id = 1";
+            cmd.CommandText =
+                "SELECT token, player_account_id, player_username, issued_at_utc FROM auth WHERE id = 1";
             using var reader = cmd.ExecuteReader();
             if (!reader.Read())
             {
@@ -30,7 +32,8 @@ namespace BazaarPlusPlus.Game.Identity
         public void Upsert(AuthRecord record)
         {
             using var cmd = _database.Connection.CreateCommand();
-            cmd.CommandText = @"
+            cmd.CommandText =
+                @"
                 INSERT INTO auth (id, token, player_account_id, player_username, issued_at_utc)
                 VALUES (1, $t, $p, $u, $i)
                 ON CONFLICT(id) DO UPDATE SET

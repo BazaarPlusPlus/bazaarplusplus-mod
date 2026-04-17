@@ -14,7 +14,8 @@ namespace BazaarPlusPlus.Game.MonsterPreview;
 
 internal static class CardSetPreviewSponsorCatalog
 {
-    private const string SupporterListUrl = "https://bpp-static.bazaarplusplus.com/supporter-list.json";
+    private const string SupporterListUrl =
+        "https://bpp-static.bazaarplusplus.com/supporter-list.json";
     private static readonly LocalizedTextSet SupportedByPrefix = new(
         "Supported by",
         "由",
@@ -75,10 +76,7 @@ internal static class CardSetPreviewSponsorCatalog
         if (selectedBucket == null)
             return new CardSetPreviewSponsorSelection();
 
-        var selectedEntry = PickWeighted(
-            selectedBucket.Entries,
-            _ => 1f
-        );
+        var selectedEntry = PickWeighted(selectedBucket.Entries, _ => 1f);
         if (selectedEntry == null)
             return new CardSetPreviewSponsorSelection();
 
@@ -129,7 +127,9 @@ internal static class CardSetPreviewSponsorCatalog
     {
         try
         {
-            var responseBody = await HttpClient.GetStringAsync(SupporterListUrl).ConfigureAwait(false);
+            var responseBody = await HttpClient
+                .GetStringAsync(SupporterListUrl)
+                .ConfigureAwait(false);
             var parsed =
                 JsonConvert.DeserializeObject<List<SupporterEntry>>(responseBody)
                 ?? new List<SupporterEntry>();

@@ -20,7 +20,10 @@ internal static class BppSettingsDockCatalog
         _config = config ?? throw new ArgumentNullException(nameof(config));
 
     private static IBppConfig Config =>
-        _config ?? throw new InvalidOperationException("BppSettingsDockCatalog.Install must be called at startup.");
+        _config
+        ?? throw new InvalidOperationException(
+            "BppSettingsDockCatalog.Install must be called at startup."
+        );
 
     internal static IReadOnlyList<BppSettingsDockDefinition> Definitions { get; } =
     [
@@ -122,8 +125,7 @@ internal static class BppSettingsDockCatalog
 
     private static BppChineseLocaleMode ReadChineseLocaleMode()
     {
-        return Config.ChineseLocaleModeConfig?.Value
-            ?? BppChineseLocaleMode.Mainland;
+        return Config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland;
     }
 
     private static void CycleChineseLocaleMode()

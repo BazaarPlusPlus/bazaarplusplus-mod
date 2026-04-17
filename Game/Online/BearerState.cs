@@ -3,7 +3,11 @@ namespace BazaarPlusPlus.Game.Online;
 
 internal sealed class BearerState
 {
-    public BearerState(string? token = null, string? playerAccountId = null, string? playerUsername = null)
+    public BearerState(
+        string? token = null,
+        string? playerAccountId = null,
+        string? playerUsername = null
+    )
     {
         Token = token;
         PlayerAccountId = playerAccountId;

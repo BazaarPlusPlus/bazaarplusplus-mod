@@ -38,7 +38,11 @@ internal sealed class ModOnlineClient : IDisposable
 
         if (
             string.IsNullOrWhiteSpace(observedPlayerAccountId)
-            || !string.Equals(auth.PlayerAccountId, observedPlayerAccountId, StringComparison.Ordinal)
+            || !string.Equals(
+                auth.PlayerAccountId,
+                observedPlayerAccountId,
+                StringComparison.Ordinal
+            )
         )
         {
             if (_bearer.IsAvailable)

@@ -38,7 +38,8 @@ public sealed class PlayerObservationStore
             throw new ArgumentNullException(nameof(record));
 
         using var cmd = _database.Connection.CreateCommand();
-        cmd.CommandText = @"
+        cmd.CommandText =
+            @"
             INSERT INTO player_observation (id, player_account_id, player_username, observed_at_utc)
             VALUES (1, $p, $u, $t)
             ON CONFLICT(id) DO UPDATE SET

@@ -13,7 +13,10 @@ internal static class BppChineseLocalization
         _config = config ?? throw new ArgumentNullException(nameof(config));
 
     private static IBppConfig Config =>
-        _config ?? throw new InvalidOperationException("BppChineseLocalization.Install must be called at startup.");
+        _config
+        ?? throw new InvalidOperationException(
+            "BppChineseLocalization.Install must be called at startup."
+        );
 
     private static readonly Dictionary<char, string> TraditionalCharacterMap = new()
     {
@@ -466,8 +469,7 @@ internal static class BppChineseLocalization
 
     internal static BppChineseLocaleMode GetCurrentMode()
     {
-        return Config.ChineseLocaleModeConfig?.Value
-            ?? BppChineseLocaleMode.Mainland;
+        return Config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland;
     }
 
     internal static BppChineseLocaleMode GetNextMode(BppChineseLocaleMode mode)

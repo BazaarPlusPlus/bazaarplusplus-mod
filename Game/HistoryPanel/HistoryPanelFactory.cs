@@ -26,10 +26,7 @@ internal static class HistoryPanelFactory
             repository = new HistoryPanelRepository(runtime.RunLogDatabasePath);
 
         var ghostSyncService = CreateGhostSyncService(repository, onlineClient, authStore);
-        var dataService = new HistoryPanelDataService(
-            repository,
-            ghostSyncService
-        );
+        var dataService = new HistoryPanelDataService(repository, ghostSyncService);
         var replayService = new HistoryPanelReplayService(
             runtime.CombatReplayRuntimeAccessor,
             () => runtime.CombatReplayDirectoryPath,

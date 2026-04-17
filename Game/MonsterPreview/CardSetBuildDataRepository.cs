@@ -193,7 +193,10 @@ internal sealed class CardSetBuildDataRepository
         if (
             selectedCardIds.Length <= 3
             && bucket.SubsetIndex != null
-            && bucket.SubsetIndex.TryGetValue(string.Join("|", selectedCardIds), out var subsetEntry)
+            && bucket.SubsetIndex.TryGetValue(
+                string.Join("|", selectedCardIds),
+                out var subsetEntry
+            )
             && subsetEntry?.MatchedBuildIds?.Count > 0
         )
         {
@@ -219,21 +222,24 @@ internal sealed class CardSetBuildDataRepository
                     return Array.Empty<CardSetBuildRecommendation>();
             }
 
-            matchedBuildIds = intersection?
-                .OrderBy(id => id)
-                .ToArray();
+            matchedBuildIds = intersection?.OrderBy(id => id).ToArray();
         }
 
         if (matchedBuildIds == null || matchedBuildIds.Count == 0)
             return Array.Empty<CardSetBuildRecommendation>();
 
         var candidates = matchedBuildIds
-            .Select((buildId, index) => new
-            {
-                Build = buildId >= 0 && buildId < bucket.Builds.Count ? bucket.Builds[buildId] : null,
-                BuildId = buildId,
-                OriginalIndex = index,
-            })
+            .Select(
+                (buildId, index) =>
+                    new
+                    {
+                        Build = buildId >= 0 && buildId < bucket.Builds.Count
+                            ? bucket.Builds[buildId]
+                            : null,
+                        BuildId = buildId,
+                        OriginalIndex = index,
+                    }
+            )
             .Where(candidate => candidate.Build?.PlayerCards?.Count > 0)
             .ToList();
         if (candidates.Count == 0)
@@ -247,16 +253,19 @@ internal sealed class CardSetBuildDataRepository
                 .ToList();
 
         var recommendations = orderedCandidates
-            .Select((candidate, index) => new CardSetBuildRecommendation
-            {
-                ModeLabel = modeLabel,
-                Source = candidate.Build!.Source ?? string.Empty,
-                SetSignature = candidate.Build!.SetSignature ?? string.Empty,
-                GoldScore = candidate.Build.GoldScore,
-                ResultIndex = index,
-                ResultCount = orderedCandidates.Count,
-                Items = ProjectPlayerCards(candidate.Build.PlayerCards),
-            })
+            .Select(
+                (candidate, index) =>
+                    new CardSetBuildRecommendation
+                    {
+                        ModeLabel = modeLabel,
+                        Source = candidate.Build!.Source ?? string.Empty,
+                        SetSignature = candidate.Build!.SetSignature ?? string.Empty,
+                        GoldScore = candidate.Build.GoldScore,
+                        ResultIndex = index,
+                        ResultCount = orderedCandidates.Count,
+                        Items = ProjectPlayerCards(candidate.Build.PlayerCards),
+                    }
+            )
             .Where(recommendation => recommendation.Items.Count > 0)
             .ToArray();
         return recommendations;
@@ -274,7 +283,11 @@ internal sealed class CardSetBuildDataRepository
             .OrderBy(entry => entry!.Slot)
             .Select(entry =>
             {
-                Enum.TryParse<EEnchantmentType>(entry!.Enchant ?? string.Empty, true, out var enchantType);
+                Enum.TryParse<EEnchantmentType>(
+                    entry!.Enchant ?? string.Empty,
+                    true,
+                    out var enchantType
+                );
                 var hasEnchant =
                     !string.IsNullOrWhiteSpace(entry.Enchant)
                     && !string.Equals(entry.Enchant, "None", StringComparison.OrdinalIgnoreCase);

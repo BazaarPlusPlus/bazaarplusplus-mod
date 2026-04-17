@@ -16,11 +16,7 @@ internal sealed class RunBundleUploadService : IDisposable
     private readonly V3Routes _routes;
     private readonly HttpClient _httpClient;
 
-    public RunBundleUploadService(
-        RunBundleUploadStore store,
-        V3Routes routes,
-        TimeSpan timeout
-    )
+    public RunBundleUploadService(RunBundleUploadStore store, V3Routes routes, TimeSpan timeout)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
@@ -34,7 +30,10 @@ internal sealed class RunBundleUploadService : IDisposable
         var pendingRunIds = _store.GetPendingCompletedRunIds(3);
         if (pendingRunIds.Count == 0)
         {
-            BppLog.Info("RunBundleUploadService", "No completed runs are waiting for bundle upload.");
+            BppLog.Info(
+                "RunBundleUploadService",
+                "No completed runs are waiting for bundle upload."
+            );
             return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
         }
 

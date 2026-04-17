@@ -187,7 +187,6 @@ internal sealed class HistoryPanelDataService
             );
         }
     }
-
 }
 
 internal readonly struct HistoryPanelGhostSyncAttemptResult
