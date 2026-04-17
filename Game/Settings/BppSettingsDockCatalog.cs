@@ -1,7 +1,7 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
-using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
@@ -14,6 +14,14 @@ namespace BazaarPlusPlus.Game.Settings;
 
 internal static class BppSettingsDockCatalog
 {
+    private static IBppConfig? _config;
+
+    public static void Install(IBppConfig config) =>
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+
+    private static IBppConfig Config =>
+        _config ?? throw new InvalidOperationException("BppSettingsDockCatalog.Install must be called at startup.");
+
     internal static IReadOnlyList<BppSettingsDockDefinition> Definitions { get; } =
     [
         new(
@@ -70,7 +78,7 @@ internal static class BppSettingsDockCatalog
 
     private static bool ReadNameOverrideEnabled()
     {
-        return BppRuntimeHost.Config.EnableNameOverrideConfig?.Value ?? false;
+        return Config.EnableNameOverrideConfig?.Value ?? false;
     }
 
     private static string ResolveHistoryPanelStatus(string languageCode)
@@ -90,19 +98,19 @@ internal static class BppSettingsDockCatalog
 
     private static void WriteNameOverrideEnabled(bool enabled)
     {
-        var config = BppRuntimeHost.Config.EnableNameOverrideConfig;
+        var config = Config.EnableNameOverrideConfig;
         if (config != null)
             config.Value = enabled;
     }
 
     private static bool ReadEnchantPreviewEnabled()
     {
-        return BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig?.Value ?? false;
+        return Config.EnchantPreviewAlwaysShowConfig?.Value ?? false;
     }
 
     private static void WriteEnchantPreviewEnabled(bool enabled)
     {
-        var config = BppRuntimeHost.Config.EnchantPreviewAlwaysShowConfig;
+        var config = Config.EnchantPreviewAlwaysShowConfig;
         if (config != null)
             config.Value = enabled;
     }
@@ -114,13 +122,13 @@ internal static class BppSettingsDockCatalog
 
     private static BppChineseLocaleMode ReadChineseLocaleMode()
     {
-        return BppRuntimeHost.Config.ChineseLocaleModeConfig?.Value
+        return Config.ChineseLocaleModeConfig?.Value
             ?? BppChineseLocaleMode.Mainland;
     }
 
     private static void CycleChineseLocaleMode()
     {
-        var config = BppRuntimeHost.Config.ChineseLocaleModeConfig;
+        var config = Config.ChineseLocaleModeConfig;
         if (config != null)
             config.Value = BppChineseLocalization.GetNextMode(config.Value);
 
@@ -134,13 +142,13 @@ internal static class BppSettingsDockCatalog
 
     private static LegendaryPositionDisplayMode ReadLegendaryPositionDisplayMode()
     {
-        return BppRuntimeHost.Config.LegendaryPositionDisplayModeConfig?.Value
+        return Config.LegendaryPositionDisplayModeConfig?.Value
             ?? LegendaryPositionDisplayMode.Default;
     }
 
     private static void CycleLegendaryPositionDisplayMode()
     {
-        var config = BppRuntimeHost.Config.LegendaryPositionDisplayModeConfig;
+        var config = Config.LegendaryPositionDisplayModeConfig;
         if (config == null)
             return;
 

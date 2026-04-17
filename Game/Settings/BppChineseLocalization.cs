@@ -2,12 +2,19 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
-using BazaarPlusPlus.Core.Runtime;
 
 namespace BazaarPlusPlus.Game.Settings;
 
 internal static class BppChineseLocalization
 {
+    private static IBppConfig? _config;
+
+    public static void Install(IBppConfig config) =>
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+
+    private static IBppConfig Config =>
+        _config ?? throw new InvalidOperationException("BppChineseLocalization.Install must be called at startup.");
+
     private static readonly Dictionary<char, string> TraditionalCharacterMap = new()
     {
         ['与'] = "與",
@@ -459,7 +466,7 @@ internal static class BppChineseLocalization
 
     internal static BppChineseLocaleMode GetCurrentMode()
     {
-        return BppRuntimeHost.Config.ChineseLocaleModeConfig?.Value
+        return Config.ChineseLocaleModeConfig?.Value
             ?? BppChineseLocaleMode.Mainland;
     }
 

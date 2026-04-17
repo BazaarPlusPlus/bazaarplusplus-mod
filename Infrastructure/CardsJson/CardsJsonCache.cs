@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Core.Paths;
 using Newtonsoft.Json.Linq;
 
 namespace BazaarPlusPlus;
@@ -22,6 +22,13 @@ internal static class CardsJsonCache
     private static readonly object SyncRoot = new();
     private static CardsJsonSnapshot _snapshot = CardsJsonSnapshot.Empty;
     private static string? _loadedPath;
+    private static IPathService? _paths;
+
+    public static void Install(IPathService paths) =>
+        _paths = paths ?? throw new ArgumentNullException(nameof(paths));
+
+    private static IPathService Paths =>
+        _paths ?? throw new InvalidOperationException("CardsJsonCache.Install must be called at startup.");
 
     internal static bool Warm()
     {
@@ -40,7 +47,7 @@ internal static class CardsJsonCache
     internal static bool TryGetSnapshot(out CardsJsonSnapshot snapshot)
     {
         snapshot = CardsJsonSnapshot.Empty;
-        var path = BppRuntimeHost.Paths.CardsJsonPath;
+        var path = Paths.CardsJsonPath;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             return false;
 
