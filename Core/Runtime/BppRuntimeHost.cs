@@ -24,7 +24,8 @@ internal sealed class BppRuntimeHost
         new BppConfig(),
         new BppPathService(),
         new RunContextStore(),
-        new GameStateProbe()
+        new GameStateProbe(),
+        new ManualLogSource("BppDetached")
     );
     private readonly ManualLogSource _logger;
     private readonly InMemoryBppEventBus _eventBus = new();
@@ -62,7 +63,8 @@ internal sealed class BppRuntimeHost
             _config,
             _paths,
             _runContext,
-            _gameStateProbe
+            _gameStateProbe,
+            _logger
         );
         _runLifecycle = new RunLifecycleModule(
             Services.EventBus,
