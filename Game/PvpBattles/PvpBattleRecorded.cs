@@ -1,7 +1,5 @@
 #nullable enable
-using BazaarPlusPlus.Game.PvpBattles;
-
-namespace BazaarPlusPlus.Core.Events;
+namespace BazaarPlusPlus.Game.PvpBattles;
 
 internal sealed class PvpBattleRecorded
 {
