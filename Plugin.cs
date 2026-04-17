@@ -9,12 +9,16 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Identity;
+using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.Online;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots;
+using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Tooltips;
+using BazaarPlusPlus.Patches;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -26,7 +30,7 @@ namespace BazaarPlusPlus;
 public class Plugin : BaseUnityPlugin
 {
     private readonly Harmony _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
-    private BppRuntimeHost? _runtimeHost;
+    private BppComposition? _composition;
     private IdentityDatabase? _identityDatabase;
     private ModOnlineClient? _onlineClient;
     private AuthStore? _authStore;
@@ -41,12 +45,26 @@ public class Plugin : BaseUnityPlugin
             BppPluginVersion.Initialize(Info.Location);
 
             var configFile = CreatePluginConfigFile();
-            var runtime = CreateAndStartRuntime(configFile);
 
-            BuildIdentityAndOnlineServices(runtime.Services);
+            CombatReplayRuntime? combatReplayRuntime = null;
+            _composition = new BppComposition(Logger, configFile, () => combatReplayRuntime);
+
+            var services = _composition.Services;
+            BppLog.Install(services.Logger);
+            BppPatchHost.Install(services);
+
+            InstallStaticUtilities(services);
 
             ApplyHarmonyPatches();
-            AttachRuntimeComponents(runtime.Services, runtime.CombatReplayRuntime);
+
+            BppLog.Info("Plugin", "Adding CombatReplayRuntime");
+            combatReplayRuntime = gameObject.AddComponent<CombatReplayRuntime>();
+            combatReplayRuntime.Initialize(services, _composition.RunLifecycle);
+
+            _composition.Start();
+
+            BuildIdentityAndOnlineServices(services);
+            AttachRuntimeComponents(services, combatReplayRuntime);
             BppLog.Info("Plugin", "Plugin initialization completed");
         }
         catch (Exception ex)
@@ -59,10 +77,19 @@ public class Plugin : BaseUnityPlugin
 
     protected virtual void OnDestroy()
     {
-        StopRuntimeHost();
-        DisposeIdentityAndOnlineServices();
-        UnpatchHarmony();
-        BppLog.Flush();
+        try
+        {
+            DetachRuntimeComponents();
+            _composition?.Dispose();
+            _composition = null;
+            DisposeIdentityAndOnlineServices();
+            UnpatchHarmony();
+        }
+        finally
+        {
+            BppLog.Flush();
+            BppPatchHost.Reset();
+        }
     }
 
     private ConfigFile CreatePluginConfigFile()
@@ -72,31 +99,17 @@ public class Plugin : BaseUnityPlugin
         return configFile;
     }
 
-    private (BppRuntimeServices Services, CombatReplayRuntime CombatReplayRuntime) CreateAndStartRuntime(
-        ConfigFile configFile
-    )
+    private static void InstallStaticUtilities(IBppServices services)
     {
-        CombatReplayRuntime? combatReplayRuntime = null;
-        _runtimeHost = new BppRuntimeHost(
-            gameObject,
-            Logger,
-            configFile,
-            () => combatReplayRuntime
-        );
-
-        BppLog.Info("Plugin", "Installing runtime host");
-        _runtimeHost.Install();
-
-        BppLog.Info("Plugin", "Adding CombatReplayRuntime");
-        combatReplayRuntime = gameObject.AddComponent<CombatReplayRuntime>();
-
-        BppLog.Info("Plugin", "Starting runtime host");
-        _runtimeHost.Start();
-
-        return (_runtimeHost.Services, combatReplayRuntime);
+        CardsJsonCache.Install(services.Paths);
+        LegendaryPositionDisplayFormatter.Install(services.Config);
+        BppChineseLocalization.Install(services.Config);
+        BppSettingsDockCatalog.Install(services.Config);
+        BppHotkeyService.Install(services.Config);
+        RunLoggingGameDataReader.Install(services.RunContext);
     }
 
-    private void BuildIdentityAndOnlineServices(BppRuntimeServices services)
+    private void BuildIdentityAndOnlineServices(IBppServices services)
     {
         var identityDatabasePath = services.Paths.IdentityDatabasePath;
         if (string.IsNullOrWhiteSpace(identityDatabasePath))
@@ -137,20 +150,33 @@ public class Plugin : BaseUnityPlugin
     }
 
     private void AttachRuntimeComponents(
-        BppRuntimeServices services,
+        IBppServices services,
         CombatReplayRuntime combatReplayRuntime
     )
     {
         BppLog.Info("Plugin", "Attaching runtime components");
-        gameObject.AddComponent<RunLoggingController>();
-        gameObject.AddComponent<RunUploadController>();
+
+        var runLogging = gameObject.AddComponent<RunLoggingController>();
+        runLogging.Initialize(services);
+
+        var runUpload = gameObject.AddComponent<RunUploadController>();
+        runUpload.Initialize(services);
+
         AddConfiguredPlayerObservationController();
         AddConfiguredHistoryPanel(services, combatReplayRuntime);
-        gameObject.AddComponent<CombatStatusBar>();
+
+        var statusBar = gameObject.AddComponent<CombatStatusBar>();
+        statusBar.Initialize(services);
+
         gameObject.AddComponent<MonsterPreviewWarmupController>();
         gameObject.AddComponent<CardSetPreviewRuntime>();
-        gameObject.AddComponent<MonsterPreviewItemBoardRuntime>();
-        gameObject.AddComponent<EndOfRunScreenshotController>();
+
+        var itemBoardRuntime = gameObject.AddComponent<MonsterPreviewItemBoardRuntime>();
+        itemBoardRuntime.Initialize(services);
+
+        var screenshot = gameObject.AddComponent<EndOfRunScreenshotController>();
+        screenshot.Initialize(services);
+
         AddConfiguredTooltipModifierRefreshController(services.Config);
         BppLog.Info("Plugin", "Runtime components attached");
     }
@@ -171,7 +197,7 @@ public class Plugin : BaseUnityPlugin
     }
 
     private void AddConfiguredHistoryPanel(
-        BppRuntimeServices services,
+        IBppServices services,
         CombatReplayRuntime combatReplayRuntime
     )
     {
@@ -211,15 +237,10 @@ public class Plugin : BaseUnityPlugin
     private void CleanupFailedInitialization()
     {
         DetachRuntimeComponents();
-        StopRuntimeHost();
+        _composition?.Dispose();
+        _composition = null;
         DisposeIdentityAndOnlineServices();
         UnpatchHarmony();
-    }
-
-    private void StopRuntimeHost()
-    {
-        _runtimeHost?.Stop();
-        _runtimeHost = null;
     }
 
     private void DisposeIdentityAndOnlineServices()
