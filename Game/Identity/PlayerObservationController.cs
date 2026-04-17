@@ -1,7 +1,7 @@
 #nullable enable
 using System;
-using System.IO;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.Online;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.Identity;
@@ -11,40 +11,28 @@ internal sealed class PlayerObservationController : MonoBehaviour
     private const float PollIntervalSeconds = 5f;
 
     private PlayerObservationStore? _store;
-    private string? _observationPath;
+    private AuthStore? _authStore;
+    private ModOnlineClient? _onlineClient;
     private float _nextPollAt;
     private string? _lastPlayerAccountId;
     private string? _lastPlayerUsername;
 
-    private void Awake()
+    internal void Configure(
+        PlayerObservationStore store,
+        AuthStore authStore,
+        ModOnlineClient onlineClient
+    )
     {
-        try
-        {
-            _observationPath = BppRuntimeHost.Paths.PlayerObservationPath;
-            if (string.IsNullOrWhiteSpace(_observationPath))
-            {
-                BppLog.Warn(
-                    "PlayerObservationController",
-                    "Player observation writer is disabled because the observation path is unavailable."
-                );
-                return;
-            }
-
-            _store = new PlayerObservationStore(_observationPath);
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error(
-                "PlayerObservationController",
-                "Failed to initialize player observation writer.",
-                ex
-            );
-        }
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _authStore = authStore ?? throw new ArgumentNullException(nameof(authStore));
+        _onlineClient = onlineClient ?? throw new ArgumentNullException(nameof(onlineClient));
     }
 
     private void Update()
     {
-        if (_store == null || Time.unscaledTime < _nextPollAt)
+        if (_store == null || _authStore == null || _onlineClient == null)
+            return;
+        if (Time.unscaledTime < _nextPollAt)
             return;
 
         _nextPollAt = Time.unscaledTime + PollIntervalSeconds;
@@ -56,29 +44,30 @@ internal sealed class PlayerObservationController : MonoBehaviour
             if (string.IsNullOrWhiteSpace(playerAccountId) || string.IsNullOrWhiteSpace(playerUsername))
                 return;
 
+            var hasRow = _store.TryLoad(out _);
             var shouldRewrite =
                 !string.Equals(_lastPlayerAccountId, playerAccountId, StringComparison.Ordinal)
                 || !string.Equals(_lastPlayerUsername, playerUsername, StringComparison.Ordinal)
-                || string.IsNullOrWhiteSpace(_observationPath)
-                || !File.Exists(_observationPath);
-            if (!shouldRewrite)
-                return;
+                || !hasRow;
+            if (shouldRewrite)
+            {
+                _store.Save(
+                    new PlayerObservationRecord(
+                        playerAccountId,
+                        playerUsername,
+                        DateTimeOffset.UtcNow.ToString("o")
+                    )
+                );
+                BppLog.Info(
+                    "PlayerObservationController",
+                    $"Wrote player observation for account {playerAccountId} to identity.db."
+                );
+            }
 
-            _store.Save(
-                new PlayerObservationRecord
-                {
-                    PlayerAccountId = playerAccountId,
-                    PlayerUsername = playerUsername,
-                    ObservedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
-                }
-            );
+            _onlineClient.LoadBearerFrom(_authStore, playerAccountId);
 
             _lastPlayerAccountId = playerAccountId;
             _lastPlayerUsername = playerUsername;
-            BppLog.Info(
-                "PlayerObservationController",
-                $"Wrote player observation for account {playerAccountId} to {_observationPath}."
-            );
         }
         catch (Exception ex)
         {

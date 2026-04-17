@@ -1,11 +1,8 @@
 #nullable enable
 using System;
-using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.Online;
 using BazaarPlusPlus.Game.Upload;
 using UnityEngine;
@@ -32,8 +29,6 @@ internal sealed class RunUploadController : MonoBehaviour
         {
             var databasePath = BppRuntimeHost.Paths.RunLogDatabasePath;
             var replayRootPath = BppRuntimeHost.Paths.CombatReplayDirectoryPath;
-            var installationRecordPath = BppRuntimeHost.Paths.InstallationRecordPath;
-            var installationPrivateKeyPath = BppRuntimeHost.Paths.InstallationPrivateKeyPath;
 
             var startupDelaySeconds = Math.Max(5, V3UploadDefaults.StartupDelaySeconds);
             var retryIntervalSeconds = Math.Max(1, V3UploadDefaults.IntervalSeconds);
@@ -57,11 +52,6 @@ internal sealed class RunUploadController : MonoBehaviour
             var uploadStore = new RunBundleUploadStore(databasePath, replayRootPath);
             _uploadService = new RunBundleUploadService(
                 uploadStore,
-                CreateInstallationStore(
-                    replayRootPath,
-                    installationRecordPath,
-                    installationPrivateKeyPath
-                ),
                 routes,
                 timeout: TimeSpan.FromSeconds(requestTimeoutSeconds)
             );
@@ -134,20 +124,5 @@ internal sealed class RunUploadController : MonoBehaviour
             return;
 
         _startupGate?.ArmImmediateAttempt(Time.unscaledTime);
-    }
-
-    private static InstallationRecordStore CreateInstallationStore(
-        string replayRootPath,
-        string? installationRecordPath,
-        string? installationPrivateKeyPath
-    )
-    {
-        var recordPath = string.IsNullOrWhiteSpace(installationRecordPath)
-            ? Path.Combine(replayRootPath, ".bpp-anonymous-installation.bpp")
-            : installationRecordPath;
-        var privateKeyPath = string.IsNullOrWhiteSpace(installationPrivateKeyPath)
-            ? Path.Combine(replayRootPath, ".bpp-anonymous-installation.key")
-            : installationPrivateKeyPath;
-        return new InstallationRecordStore(recordPath, privateKeyPath);
     }
 }

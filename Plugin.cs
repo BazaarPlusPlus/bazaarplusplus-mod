@@ -2,6 +2,7 @@
 #nullable enable
 using System;
 using System.IO;
+using System.Net.Http;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
@@ -9,6 +10,7 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.Online;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots;
@@ -25,6 +27,10 @@ public class Plugin : BaseUnityPlugin
 {
     private readonly Harmony _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
     private BppRuntimeHost? _runtimeHost;
+    private IdentityDatabase? _identityDatabase;
+    private ModOnlineClient? _onlineClient;
+    private AuthStore? _authStore;
+    private PlayerObservationStore? _playerObservationStore;
     private bool _patchesApplied;
 
     protected virtual void Awake()
@@ -36,6 +42,8 @@ public class Plugin : BaseUnityPlugin
 
             var configFile = CreatePluginConfigFile();
             var runtime = CreateAndStartRuntime(configFile);
+
+            BuildIdentityAndOnlineServices(runtime.Services);
 
             ApplyHarmonyPatches();
             AttachRuntimeComponents(runtime.Services, runtime.CombatReplayRuntime);
@@ -52,6 +60,7 @@ public class Plugin : BaseUnityPlugin
     protected virtual void OnDestroy()
     {
         StopRuntimeHost();
+        DisposeIdentityAndOnlineServices();
         UnpatchHarmony();
         BppLog.Flush();
     }
@@ -87,6 +96,38 @@ public class Plugin : BaseUnityPlugin
         return (_runtimeHost.Services, combatReplayRuntime);
     }
 
+    private void BuildIdentityAndOnlineServices(BppRuntimeServices services)
+    {
+        var identityDatabasePath = services.Paths.IdentityDatabasePath;
+        if (string.IsNullOrWhiteSpace(identityDatabasePath))
+        {
+            BppLog.Warn(
+                "Plugin",
+                "Identity database path unavailable; online services will be inactive."
+            );
+            return;
+        }
+
+        _identityDatabase = new IdentityDatabase(identityDatabasePath);
+        _identityDatabase.Open();
+        _authStore = new AuthStore(_identityDatabase);
+        _playerObservationStore = new PlayerObservationStore(_identityDatabase);
+
+        var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
+        if (routes == null)
+        {
+            BppLog.Warn("Plugin", "V3 API base URL invalid; online services will be inactive.");
+            return;
+        }
+
+        var httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(Math.Max(10, V3UploadDefaults.RequestTimeoutSeconds)),
+        };
+        _onlineClient = new ModOnlineClient(httpClient, routes);
+        BppLog.Info("Plugin", "Identity database opened and online client ready.");
+    }
+
     private void ApplyHarmonyPatches()
     {
         BppLog.Info("Plugin", "Applying Harmony patches");
@@ -103,7 +144,7 @@ public class Plugin : BaseUnityPlugin
         BppLog.Info("Plugin", "Attaching runtime components");
         gameObject.AddComponent<RunLoggingController>();
         gameObject.AddComponent<RunUploadController>();
-        gameObject.AddComponent<PlayerObservationController>();
+        AddConfiguredPlayerObservationController();
         AddConfiguredHistoryPanel(services, combatReplayRuntime);
         gameObject.AddComponent<CombatStatusBar>();
         gameObject.AddComponent<MonsterPreviewWarmupController>();
@@ -112,6 +153,21 @@ public class Plugin : BaseUnityPlugin
         gameObject.AddComponent<EndOfRunScreenshotController>();
         AddConfiguredTooltipModifierRefreshController(services.Config);
         BppLog.Info("Plugin", "Runtime components attached");
+    }
+
+    private void AddConfiguredPlayerObservationController()
+    {
+        var controller = gameObject.AddComponent<PlayerObservationController>();
+        if (_playerObservationStore == null || _authStore == null || _onlineClient == null)
+        {
+            BppLog.Warn(
+                "Plugin",
+                "Skipping PlayerObservationController configuration; identity services unavailable."
+            );
+            return;
+        }
+
+        controller.Configure(_playerObservationStore, _authStore, _onlineClient);
     }
 
     private void AddConfiguredHistoryPanel(
@@ -128,7 +184,19 @@ public class Plugin : BaseUnityPlugin
             services.Paths.CombatReplayDirectoryPath,
             () => combatReplayRuntime
         );
-        historyPanel.Configure(HistoryPanelFactory.Create(historyPanelRuntime));
+
+        if (_onlineClient == null || _authStore == null)
+        {
+            BppLog.Warn(
+                "Plugin",
+                "Skipping HistoryPanel online wiring; identity services unavailable."
+            );
+            return;
+        }
+
+        historyPanel.Configure(
+            HistoryPanelFactory.Create(historyPanelRuntime, _onlineClient, _authStore)
+        );
     }
 
     private void AddConfiguredTooltipModifierRefreshController(IBppConfig config)
@@ -144,6 +212,7 @@ public class Plugin : BaseUnityPlugin
     {
         DetachRuntimeComponents();
         StopRuntimeHost();
+        DisposeIdentityAndOnlineServices();
         UnpatchHarmony();
     }
 
@@ -151,6 +220,16 @@ public class Plugin : BaseUnityPlugin
     {
         _runtimeHost?.Stop();
         _runtimeHost = null;
+    }
+
+    private void DisposeIdentityAndOnlineServices()
+    {
+        _onlineClient?.Dispose();
+        _onlineClient = null;
+        _authStore = null;
+        _playerObservationStore = null;
+        _identityDatabase?.Dispose();
+        _identityDatabase = null;
     }
 
     private void UnpatchHarmony()

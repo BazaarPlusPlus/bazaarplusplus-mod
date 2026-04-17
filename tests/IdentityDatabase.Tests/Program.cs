@@ -14,6 +14,9 @@ internal static class Program
         RunTest("AuthStore_TryLoad_WhenEmpty", AuthStore_TryLoad_WhenEmpty);
         RunTest("AuthStore_Upsert_ThenLoad", AuthStore_Upsert_ThenLoad);
         RunTest("AuthStore_Delete_ClearsRow", AuthStore_Delete_ClearsRow);
+        RunTest("PlayerObservationStore_TryLoad_WhenEmpty", PlayerObservationStore_TryLoad_WhenEmpty);
+        RunTest("PlayerObservationStore_SaveThenLoad", PlayerObservationStore_SaveThenLoad);
+        RunTest("PlayerObservationStore_Save_Upserts", PlayerObservationStore_Save_Upserts);
 
         if (_failures > 0) Environment.Exit(1);
         Console.WriteLine("OK");
@@ -106,6 +109,58 @@ internal static class Program
             store.Upsert(new AuthRecord("t", "p", "u", "2026-04-17T00:00:00Z"));
             store.Delete();
             if (store.TryLoad(out _)) throw new Exception("expected empty after delete");
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    private static void PlayerObservationStore_TryLoad_WhenEmpty()
+    {
+        var path = TempDbPath();
+        try
+        {
+            using var db = new IdentityDatabase(path);
+            db.Open();
+            var store = new PlayerObservationStore(db);
+            if (store.TryLoad(out _)) throw new Exception("expected empty observation store");
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    private static void PlayerObservationStore_SaveThenLoad()
+    {
+        var path = TempDbPath();
+        try
+        {
+            using var db = new IdentityDatabase(path);
+            db.Open();
+            var store = new PlayerObservationStore(db);
+            var record = new PlayerObservationRecord(
+                "player_abc",
+                "bob",
+                "2026-04-17T10:00:00Z"
+            );
+            store.Save(record);
+            if (!store.TryLoad(out var loaded)) throw new Exception("load returned false");
+            if (loaded!.PlayerAccountId != "player_abc") throw new Exception("account id mismatch");
+            if (loaded.PlayerUsername != "bob") throw new Exception("username mismatch");
+            if (loaded.ObservedAtUtc != "2026-04-17T10:00:00Z") throw new Exception("timestamp mismatch");
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    private static void PlayerObservationStore_Save_Upserts()
+    {
+        var path = TempDbPath();
+        try
+        {
+            using var db = new IdentityDatabase(path);
+            db.Open();
+            var store = new PlayerObservationStore(db);
+            store.Save(new PlayerObservationRecord("p1", "u1", "2026-04-17T10:00:00Z"));
+            store.Save(new PlayerObservationRecord("p2", "u2", "2026-04-17T11:00:00Z"));
+            if (!store.TryLoad(out var loaded)) throw new Exception("load returned false");
+            if (loaded!.PlayerAccountId != "p2") throw new Exception("expected upsert to most recent");
+            if (loaded.PlayerUsername != "u2") throw new Exception("username not updated");
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }

@@ -1,9 +1,7 @@
 #nullable enable
 using System;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.Online;
@@ -16,52 +14,47 @@ internal sealed class GhostBattleSyncService : IDisposable
     private const int MaxSyncBattleLimit = 200;
 
     private readonly HistoryPanelRepository _repository;
-    private readonly InstallationRecordStore _installationStore;
-    private readonly V3Routes _routes;
-    private readonly HttpClient _httpClient;
+    private readonly ModOnlineClient _onlineClient;
+    private readonly AuthStore _authStore;
 
     public GhostBattleSyncService(
         HistoryPanelRepository repository,
-        InstallationRecordStore installationStore,
-        V3Routes routes,
-        TimeSpan timeout
+        ModOnlineClient onlineClient,
+        AuthStore authStore
     )
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
-        _installationStore =
-            installationStore ?? throw new ArgumentNullException(nameof(installationStore));
-        _routes = routes ?? throw new ArgumentNullException(nameof(routes));
-        _httpClient = new HttpClient { Timeout = timeout };
+        _onlineClient = onlineClient ?? throw new ArgumentNullException(nameof(onlineClient));
+        _authStore = authStore ?? throw new ArgumentNullException(nameof(authStore));
     }
 
     public async Task<GhostBattleSyncResult> SyncRecentBattlesAsync(
         CancellationToken cancellationToken
     )
     {
-        var localPlayerAccountId = ResolveCurrentPlayerAccountId();
-        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
-            return GhostBattleSyncResult.Failure("player_account_id_unavailable");
+        var bearer = _onlineClient.Bearer;
+        if (!bearer.IsAvailable || string.IsNullOrWhiteSpace(bearer.PlayerAccountId))
+            return GhostBattleSyncResult.Failure("not_logged_in");
 
-        var apiClient = new GhostBattleApiClient(
-            _httpClient,
-            new InstallationRequestSigner(_installationStore),
-            _routes
-        );
+        var apiClient = new GhostBattleApiClient(_onlineClient.HttpClient, _onlineClient.Routes);
         var syncStartedAtUtc = DateTimeOffset.UtcNow;
         var queryResult = await apiClient.QueryAgainstMeAsync(
-            localPlayerAccountId,
+            bearer.PlayerAccountId!,
+            bearer.Token!,
             MaxSyncBattleLimit,
             cancellationToken
         );
         if (!queryResult.Succeeded)
         {
+            if (queryResult.ShouldReRegister)
+                _onlineClient.HandleUnauthorized(_authStore);
             return GhostBattleSyncResult.Failure(queryResult.Error ?? "ghost_sync_failed");
         }
 
-        _repository.UpsertGhostBattles(localPlayerAccountId, queryResult.Battles);
-        _repository.MarkOldUndownloadedGhostBattlesDeleted(localPlayerAccountId, syncStartedAtUtc);
+        _repository.UpsertGhostBattles(bearer.PlayerAccountId!, queryResult.Battles);
+        _repository.MarkOldUndownloadedGhostBattlesDeleted(bearer.PlayerAccountId!, syncStartedAtUtc);
         if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit))
-            _repository.SaveGhostSyncCheckpointUtc(localPlayerAccountId, syncStartedAtUtc);
+            _repository.SaveGhostSyncCheckpointUtc(bearer.PlayerAccountId!, syncStartedAtUtc);
         return GhostBattleSyncResult.Success(queryResult.Battles.Count);
     }
 
@@ -75,23 +68,21 @@ internal sealed class GhostBattleSyncService : IDisposable
             return GhostBattleReplayDownloadResult.Failure("battle_id_required");
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
             return GhostBattleReplayDownloadResult.Failure("replay_directory_required");
-        var localPlayerAccountId = ResolveCurrentPlayerAccountId();
-        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
-            return GhostBattleReplayDownloadResult.Failure("player_account_id_unavailable");
-        _installationStore.TryLoad(out var installation);
 
-        var apiClient = new GhostBattleApiClient(
-            _httpClient,
-            new InstallationRequestSigner(_installationStore),
-            _routes
-        );
+        var bearer = _onlineClient.Bearer;
+        if (!bearer.IsAvailable || string.IsNullOrWhiteSpace(bearer.PlayerAccountId))
+            return GhostBattleReplayDownloadResult.Failure("not_logged_in");
+
+        var apiClient = new GhostBattleApiClient(_onlineClient.HttpClient, _onlineClient.Routes);
         var linkResult = await apiClient.RequestReplayDownloadLinkAsync(
             battleId,
-            installation,
+            bearer.Token!,
             cancellationToken
         );
         if (!linkResult.Succeeded)
         {
+            if (linkResult.ShouldReRegister)
+                _onlineClient.HandleUnauthorized(_authStore);
             return GhostBattleReplayDownloadResult.Failure(
                 linkResult.Error ?? "ghost_replay_link_failed"
             );
@@ -100,7 +91,7 @@ internal sealed class GhostBattleSyncService : IDisposable
         var payloadResult = await apiClient.DownloadReplayPayloadAsync(
             battleId,
             linkResult.DownloadUrl!,
-            installation,
+            bearer.Token!,
             cancellationToken
         );
         if (!payloadResult.Succeeded || payloadResult.Payload?.ReplayPayload == null)
@@ -124,23 +115,17 @@ internal sealed class GhostBattleSyncService : IDisposable
             BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
         );
         payloadStore.Save(payloadResult.Payload);
-        _repository.MarkGhostReplayDownloaded(localPlayerAccountId, battleId);
+        _repository.MarkGhostReplayDownloaded(bearer.PlayerAccountId!, battleId);
         return GhostBattleReplayDownloadResult.Success();
     }
 
     public void Dispose()
     {
-        _httpClient.Dispose();
     }
 
     private static bool ShouldAdvanceCheckpoint(int importedCount, int limit)
     {
         return importedCount < limit;
-    }
-
-    private string? ResolveCurrentPlayerAccountId()
-    {
-        return PlayerAccountIdResolver.ResolveCurrent(_installationStore);
     }
 
     private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)

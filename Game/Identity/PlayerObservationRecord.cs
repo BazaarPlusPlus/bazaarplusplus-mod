@@ -1,19 +1,20 @@
 #nullable enable
-using Newtonsoft.Json;
+using System;
 
 namespace BazaarPlusPlus.Game.Identity;
 
-internal sealed class PlayerObservationRecord
+public sealed class PlayerObservationRecord
 {
-    [JsonProperty("player_account_id")]
-    public string PlayerAccountId { get; set; } = string.Empty;
+    public PlayerObservationRecord(string playerAccountId, string playerUsername, string observedAtUtc)
+    {
+        PlayerAccountId = playerAccountId ?? throw new ArgumentNullException(nameof(playerAccountId));
+        PlayerUsername = playerUsername ?? throw new ArgumentNullException(nameof(playerUsername));
+        ObservedAtUtc = observedAtUtc ?? throw new ArgumentNullException(nameof(observedAtUtc));
+    }
 
-    [JsonProperty("player_username")]
-    public string PlayerUsername { get; set; } = string.Empty;
+    public string PlayerAccountId { get; }
 
-    [JsonProperty("observed_at_utc")]
-    public string ObservedAtUtc { get; set; } = string.Empty;
+    public string PlayerUsername { get; }
 
-    [JsonProperty("installation_hint")]
-    public string? InstallationHint { get; set; }
+    public string ObservedAtUtc { get; }
 }

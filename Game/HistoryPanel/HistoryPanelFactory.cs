@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.Online;
@@ -9,21 +8,27 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal static class HistoryPanelFactory
 {
-    public static HistoryPanelDependencies Create(IHistoryPanelRuntime runtime)
+    public static HistoryPanelDependencies Create(
+        IHistoryPanelRuntime runtime,
+        ModOnlineClient onlineClient,
+        AuthStore authStore
+    )
     {
         if (runtime == null)
             throw new ArgumentNullException(nameof(runtime));
+        if (onlineClient == null)
+            throw new ArgumentNullException(nameof(onlineClient));
+        if (authStore == null)
+            throw new ArgumentNullException(nameof(authStore));
 
         HistoryPanelRepository? repository = null;
         if (!string.IsNullOrWhiteSpace(runtime.RunLogDatabasePath))
             repository = new HistoryPanelRepository(runtime.RunLogDatabasePath);
 
-        var installationStore = CreateInstallationStore();
-        var ghostSyncService = CreateGhostSyncService(runtime, repository, installationStore);
+        var ghostSyncService = CreateGhostSyncService(repository, onlineClient, authStore);
         var dataService = new HistoryPanelDataService(
             repository,
-            ghostSyncService,
-            () => PlayerAccountIdResolver.ResolveCurrent(installationStore)
+            ghostSyncService
         );
         var replayService = new HistoryPanelReplayService(
             runtime.CombatReplayRuntimeAccessor,
@@ -34,38 +39,14 @@ internal static class HistoryPanelFactory
     }
 
     private static GhostBattleSyncService? CreateGhostSyncService(
-        IHistoryPanelRuntime runtime,
         HistoryPanelRepository? repository,
-        InstallationRecordStore? installationStore
+        ModOnlineClient onlineClient,
+        AuthStore authStore
     )
     {
-        if (repository == null || installationStore == null)
+        if (repository == null)
             return null;
 
-        var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
-        if (routes == null)
-            return null;
-
-        return new GhostBattleSyncService(
-            repository,
-            installationStore,
-            routes,
-            timeout: TimeSpan.FromSeconds(10)
-        );
-    }
-
-    private static InstallationRecordStore? CreateInstallationStore()
-    {
-        var installationRecordPath = BppRuntimeHost.Paths.InstallationRecordPath;
-        var installationPrivateKeyPath = BppRuntimeHost.Paths.InstallationPrivateKeyPath;
-        if (
-            string.IsNullOrWhiteSpace(installationRecordPath)
-            || string.IsNullOrWhiteSpace(installationPrivateKeyPath)
-        )
-        {
-            return null;
-        }
-
-        return new InstallationRecordStore(installationRecordPath, installationPrivateKeyPath);
+        return new GhostBattleSyncService(repository, onlineClient, authStore);
     }
 }

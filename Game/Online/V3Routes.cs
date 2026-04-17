@@ -1,7 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace BazaarPlusPlus.Game.Online;
 
@@ -10,14 +8,11 @@ internal sealed class V3Routes
     private V3Routes(Uri apiBaseUri)
     {
         ApiBaseUri = apiBaseUri;
-        PublishObservation = BuildAbsolute("/installations/observations");
         UploadRunBundle = BuildAbsolute("/run-bundles");
         QueryGhostBattles = BuildAbsolute("/ghost-battles");
     }
 
     public Uri ApiBaseUri { get; }
-
-    public string PublishObservation { get; }
 
     public string UploadRunBundle { get; }
 

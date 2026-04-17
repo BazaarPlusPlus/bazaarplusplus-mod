@@ -10,9 +10,6 @@ var apiClientType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBat
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleRecord");
 var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
-var playerAccountResolverType = RequireType("BazaarPlusPlus.Game.Identity.PlayerAccountIdResolver");
-var installationRecordType = RequireType("BazaarPlusPlus.Game.Identity.InstallationRecord");
-var installationStoreType = RequireType("BazaarPlusPlus.Game.Identity.InstallationRecordStore");
 var coordinatorOutcomeType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator+GhostBattleOutcome"
 );
@@ -51,10 +48,6 @@ var tryParseBattle = apiClientType.GetMethod(
     "TryParseBattle",
     BindingFlags.NonPublic | BindingFlags.Static
 );
-var resolvePlayerAccountId = playerAccountResolverType.GetMethod(
-    "Resolve",
-    BindingFlags.NonPublic | BindingFlags.Static
-);
 var serializeArtifact = artifactCodecType.GetMethod(
     "Serialize",
     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
@@ -77,10 +70,6 @@ Assert(
     resolveGhostBattleOutcome != null,
     "HistoryPanelCoordinator should expose ghost-outcome resolution logic."
 );
-Assert(
-    resolvePlayerAccountId != null,
-    "PlayerAccountIdResolver should expose account-id fallback logic."
-);
 
 Assert(
     !(bool)shouldAdvanceCheckpoint!.Invoke(null, [200, 200])!,
@@ -90,47 +79,6 @@ Assert(
     (bool)shouldAdvanceCheckpoint.Invoke(null, [12, 200])!,
     "Ghost sync should advance the checkpoint after a non-truncated incremental fetch."
 );
-
-var installationRoot = Path.Combine(
-    Path.GetTempPath(),
-    "bpp-player-account-resolver-tests",
-    Guid.NewGuid().ToString("N")
-);
-Directory.CreateDirectory(installationRoot);
-try
-{
-    var installationStore = Activator.CreateInstance(
-        installationStoreType,
-        Path.Combine(installationRoot, "installation.bpp"),
-        Path.Combine(installationRoot, "installation.key")
-    ) ?? throw new InvalidOperationException("InstallationRecordStore should be constructible.");
-    var installationRecord = Activator.CreateInstance(installationRecordType)
-        ?? throw new InvalidOperationException("InstallationRecord should be constructible.");
-    installationRecordType.GetProperty("PlayerAccountId")!.SetValue(installationRecord, "player-installation-001");
-    installationRecordType.GetProperty("InstallationId")!.SetValue(installationRecord, "installation-001");
-    installationRecordType.GetProperty("ApiBaseUrl")!.SetValue(installationRecord, "https://mod-api-v3.bazaarplusplus.com");
-    InvokeVoid(
-        installationStoreType,
-        installationStore,
-        "Save",
-        [installationRecord, new byte[] { 48, 130, 1, 0 }]
-    );
-    Assert(
-        (string?)resolvePlayerAccountId!.Invoke(null, [null, installationStore])
-            == "player-installation-001",
-        "PlayerAccountIdResolver should fall back to the installation record when the runtime cache is unavailable."
-    );
-    Assert(
-        (string?)resolvePlayerAccountId.Invoke(null, [" player-cache-001 ", installationStore])
-            == "player-cache-001",
-        "PlayerAccountIdResolver should prefer the trimmed runtime cache account id."
-    );
-}
-finally
-{
-    if (Directory.Exists(installationRoot))
-        Directory.Delete(installationRoot, recursive: true);
-}
 
 var artifact = Activator.CreateInstance(runArtifactType)
     ?? throw new InvalidOperationException("RunArtifactV3 should be constructible.");
@@ -532,23 +480,7 @@ Assert(
     "V3Routes should publish replay links under /ghost-battles/{battle_id}/replay-link."
 );
 
-var signerType = RequireType("BazaarPlusPlus.Game.Online.InstallationRequestSigner");
-var tempIdentityRoot = Path.Combine(
-    Path.GetTempPath(),
-    "bpp-ghost-anonymous-request-tests",
-    Guid.NewGuid().ToString("N")
-);
-Directory.CreateDirectory(tempIdentityRoot);
-try
 {
-    var installationStore = Activator.CreateInstance(
-        installationStoreType,
-        Path.Combine(tempIdentityRoot, "installation.bpp"),
-        Path.Combine(tempIdentityRoot, "installation.key")
-    ) ?? throw new InvalidOperationException("InstallationRecordStore should be constructible.");
-    var requestSigner = Activator.CreateInstance(signerType, installationStore)
-        ?? throw new InvalidOperationException("InstallationRequestSigner should be constructible.");
-
     HttpRequestMessage? replayLinkRequest = null;
     var replayLinkHandler = new RecordingHttpMessageHandler(request =>
     {
@@ -564,7 +496,6 @@ try
     var replayLinkClient = Activator.CreateInstance(
         apiClientType,
         replayLinkHttpClient,
-        requestSigner,
         routes
     ) ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
     var requestReplayDownloadLinkAsync = apiClientType.GetMethod(
@@ -578,7 +509,7 @@ try
     var replayLinkTask = (Task)(
         requestReplayDownloadLinkAsync!.Invoke(
             replayLinkClient,
-            ["battle-public", null, CancellationToken.None]
+            ["battle-public", "bearer-token-xyz", CancellationToken.None]
         ) ?? throw new InvalidOperationException("Replay-link request should return a task.")
     );
     await replayLinkTask;
@@ -588,7 +519,7 @@ try
     var replayLinkResultType = replayLinkResult.GetType();
     Assert(
         (bool)(replayLinkResultType.GetProperty("Succeeded")?.GetValue(replayLinkResult) ?? false),
-        "GhostBattleApiClient should allow replay-link requests without a local installation when the server accepts anonymous access."
+        "GhostBattleApiClient replay-link request should succeed on 200 with a bearer token."
     );
     Assert(
         replayLinkRequest != null,
@@ -596,7 +527,44 @@ try
     );
     Assert(
         !replayLinkRequest!.Headers.Contains("X-BPP-Installation-Id"),
-        "Anonymous replay-link requests should not send installation headers."
+        "Bearer-based replay-link requests should not send installation headers."
+    );
+    Assert(
+        replayLinkRequest.Headers.Authorization != null
+            && replayLinkRequest.Headers.Authorization.Scheme == "Bearer"
+            && replayLinkRequest.Headers.Authorization.Parameter == "bearer-token-xyz",
+        "Replay-link requests should send the bearer token via the Authorization header."
+    );
+
+    HttpRequestMessage? emptyTokenRequest = null;
+    var emptyTokenHandler = new RecordingHttpMessageHandler(request =>
+    {
+        emptyTokenRequest = request;
+        return new HttpResponseMessage(HttpStatusCode.Unauthorized)
+        {
+            Content = new StringContent("{\"error\":\"unauthorized\"}"),
+        };
+    });
+    using var emptyTokenHttpClient = new HttpClient(emptyTokenHandler);
+    var emptyTokenClient = Activator.CreateInstance(
+        apiClientType,
+        emptyTokenHttpClient,
+        routes
+    ) ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
+    var emptyTokenTask = (Task)(
+        requestReplayDownloadLinkAsync!.Invoke(
+            emptyTokenClient,
+            ["battle-public", string.Empty, CancellationToken.None]
+        ) ?? throw new InvalidOperationException("Replay-link request should return a task.")
+    );
+    await emptyTokenTask;
+    Assert(
+        emptyTokenRequest != null,
+        "Replay-link request with empty bearer should still reach the transport."
+    );
+    Assert(
+        emptyTokenRequest!.Headers.Authorization == null,
+        "Replay-link requests should omit the Authorization header when no bearer token is supplied."
     );
 
     HttpRequestMessage? replayPayloadRequest = null;
@@ -612,7 +580,6 @@ try
     var replayPayloadClient = Activator.CreateInstance(
         apiClientType,
         replayPayloadHttpClient,
-        requestSigner,
         routes
     ) ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
     var downloadReplayPayloadAsync = apiClientType.GetMethod(
@@ -629,7 +596,7 @@ try
             [
                 "battle-001",
                 "https://mod-api-v3.bazaarplusplus.com/replays/token-public",
-                null,
+                "bearer-token-xyz",
                 CancellationToken.None,
             ]
         ) ?? throw new InvalidOperationException("Replay-payload request should return a task.")
@@ -644,7 +611,7 @@ try
             replayPayloadResultType.GetProperty("Succeeded")?.GetValue(replayPayloadResult)
             ?? false
         ),
-        "GhostBattleApiClient should allow replay payload downloads without a local installation when the server accepts anonymous access."
+        "GhostBattleApiClient replay-payload request should succeed on 200 with a bearer token."
     );
     Assert(
         replayPayloadRequest != null,
@@ -652,13 +619,14 @@ try
     );
     Assert(
         !replayPayloadRequest!.Headers.Contains("X-BPP-Installation-Id"),
-        "Anonymous replay-payload requests should not send installation headers."
+        "Bearer-based replay-payload requests should not send installation headers."
     );
-}
-finally
-{
-    if (Directory.Exists(tempIdentityRoot))
-        Directory.Delete(tempIdentityRoot, recursive: true);
+    Assert(
+        replayPayloadRequest.Headers.Authorization != null
+            && replayPayloadRequest.Headers.Authorization.Scheme == "Bearer"
+            && replayPayloadRequest.Headers.Authorization.Parameter == "bearer-token-xyz",
+        "Replay-payload requests should send the bearer token via the Authorization header."
+    );
 }
 
 Console.WriteLine("Ghost battle sync checks passed.");

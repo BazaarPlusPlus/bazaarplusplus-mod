@@ -3,10 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.Online;
 using BazaarPlusPlus.Game.Online.Models;
 using BazaarPlusPlus.Game.PvpBattles;
@@ -18,22 +18,17 @@ namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
 internal sealed class GhostBattleApiClient
 {
     private readonly HttpClient _httpClient;
-    private readonly InstallationRequestSigner _requestSigner;
     private readonly V3Routes _routes;
 
-    public GhostBattleApiClient(
-        HttpClient httpClient,
-        InstallationRequestSigner requestSigner,
-        V3Routes routes
-    )
+    public GhostBattleApiClient(HttpClient httpClient, V3Routes routes)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _requestSigner = requestSigner ?? throw new ArgumentNullException(nameof(requestSigner));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
     }
 
     public async Task<GhostBattleApiResult> QueryAgainstMeAsync(
         string playerAccountId,
+        string bearerToken,
         int limit,
         CancellationToken cancellationToken
     )
@@ -54,7 +49,7 @@ internal sealed class GhostBattleApiClient
                 Query =
                     $"player_account_id={Uri.EscapeDataString(playerAccountId.Trim())}&limit={Math.Clamp(limit, 1, 200)}",
             }.Uri.ToString();
-            using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            using var request = CreateBearerRequest(HttpMethod.Get, endpoint, bearerToken);
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -105,14 +100,14 @@ internal sealed class GhostBattleApiClient
 
     public async Task<GhostBattleReplayDownloadLinkResult> RequestReplayDownloadLinkAsync(
         string battleId,
-        InstallationRecord? installation,
+        string bearerToken,
         CancellationToken cancellationToken
     )
     {
         try
         {
             var endpoint = _routes.CreateReplayLink(battleId);
-            using var request = CreateReplayRequest(HttpMethod.Post, endpoint, installation);
+            using var request = CreateBearerRequest(HttpMethod.Post, endpoint, bearerToken);
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -159,13 +154,13 @@ internal sealed class GhostBattleApiClient
     public async Task<GhostBattleReplayPayloadResult> DownloadReplayPayloadAsync(
         string battleId,
         string downloadUrl,
-        InstallationRecord? installation,
+        string bearerToken,
         CancellationToken cancellationToken
     )
     {
         try
         {
-            using var request = CreateReplayRequest(HttpMethod.Get, downloadUrl, installation);
+            using var request = CreateBearerRequest(HttpMethod.Get, downloadUrl, bearerToken);
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -203,31 +198,25 @@ internal sealed class GhostBattleApiClient
         }
     }
 
+    private static HttpRequestMessage CreateBearerRequest(
+        HttpMethod method,
+        string endpoint,
+        string bearerToken
+    )
+    {
+        var request = new HttpRequestMessage(method, endpoint);
+        if (!string.IsNullOrWhiteSpace(bearerToken))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+        }
+        return request;
+    }
+
     private static bool IsValidGhostBattlePayload(GhostBattlePayload? payload)
     {
         return payload?.ReplayPayload != null
             && payload.BattleManifest != null
             && !string.IsNullOrWhiteSpace(payload.ReplayPayload.BattleId);
-    }
-
-    private HttpRequestMessage CreateReplayRequest(
-        HttpMethod method,
-        string endpoint,
-        InstallationRecord? installation
-    )
-    {
-        if (installation != null)
-        {
-            return _requestSigner.CreateRequest(
-                method,
-                endpoint,
-                null,
-                installation,
-                DateTimeOffset.UtcNow.ToString("o")
-            );
-        }
-
-        return new HttpRequestMessage(method, endpoint);
     }
 
     private static GhostBattlePayload? TryExtractPayloadFromArtifact(

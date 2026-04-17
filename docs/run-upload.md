@@ -2,11 +2,11 @@
 
 ## Scope
 
-当前上传实现是后台同步层，建立在本地 SQLite、combat replay payload 和 installer 写入的 V3 identity 文件之上。
+当前上传实现是后台同步层，建立在本地 SQLite、combat replay payload 和共享 `identity.db` 之上。
 
 - 本地 SQLite 仍然是 source of truth。
 - 仅在玩家不处于 live run 时执行。
-- 上传协议已经切到 V3 installation-signed `run-bundle`，不再使用旧 `client_id / bind-player` 链路。
+- 上传协议是未认证的 V3 `run-bundle` 上传；服务端通过受信任的 `player_account_id` KV 进行轻量门控，不使用 installation 签名。
 
 ## Client Flow
 
@@ -14,18 +14,17 @@
 2. `ReplicatedRunLogStore` 把 `run_sync_state` 标记为 dirty。
 3. combat replay 持久化完成后把关联 battle 的 `replay_dirty` 标记为 dirty。
 4. `RunUploadController` 在启动延迟后扫描待上传 completed runs。
-5. 客户端读取 installer 写入的：
-   - `installation.bpp`
-   - `installation.key`
-6. `RunBundleUploadStore` 组装 run projection、battle projections 和 replay artifact。
-7. `RunBundleUploadService` 对请求进行 installation 签名，并上传到 `POST /run-bundles`。
-8. 上传成功后清除 run 和关联 replay 的 dirty 标记。
+5. `RunBundleUploadStore` 组装 run projection、battle projections 和 replay artifact。
+6. `RunBundleUploadService` 直接 `POST /run-bundles`，不附加 Authorization 头。
+7. 上传成功后清除 run 和关联 replay 的 dirty 标记。
 
 ## 当前实现文件
 
-- `Game/Identity/InstallationRecordStore.cs`
-- `Game/Online/InstallationRequestSigner.cs`
+- `Game/Identity/IdentityDatabase.cs`
+- `Game/Identity/AuthStore.cs`
+- `Game/Identity/PlayerObservationStore.cs`
 - `Game/Online/V3Routes.cs`
+- `Game/Online/ModOnlineClient.cs`
 - `Game/RunLogging/Persistence/ReplicatedRunLogStore.cs`
 - `Game/RunLogging/Upload/RunSyncStateSqliteStore.cs`
 - `Game/RunLogging/Upload/RunBundleUploadStore.cs`
@@ -35,7 +34,7 @@
 
 ## Notes
 
-- 当前 `ModCFServerV3` 以 `installation_id + RSA` 作为 mod 侧身份，服务端不再维护旧 `client_id` 注册和 `bind-player` 状态。
+- 读类端点（ghost 查询、replay 下载）依赖 installer 写入 `identity.db` 的 `auth` 行；mod 以 `Authorization: Bearer <token>` 发起请求。写类端点（run bundle 上传）无需 token。
 - ghost 查询与 replay-link 现在是：
   - `GET /ghost-battles`
   - `POST /ghost-battles/:battleId/replay-link`

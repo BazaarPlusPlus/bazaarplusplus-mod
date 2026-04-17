@@ -15,11 +15,7 @@ internal sealed class BppPathService : IPathService
 
     public string? IdentityDirectoryPath { get; private set; }
 
-    public string? PlayerObservationPath { get; private set; }
-
-    public string? InstallationRecordPath { get; private set; }
-
-    public string? InstallationPrivateKeyPath { get; private set; }
+    public string? IdentityDatabasePath { get; private set; }
 
     public void Initialize()
     {
@@ -44,17 +40,9 @@ internal sealed class BppPathService : IPathService
             "BazaarPlusPlus",
             "Identity"
         );
-        PlayerObservationPath = System.IO.Path.Combine(
+        IdentityDatabasePath = System.IO.Path.Combine(
             IdentityDirectoryPath,
-            "player-observation.bpp"
-        );
-        InstallationRecordPath = System.IO.Path.Combine(
-            IdentityDirectoryPath,
-            "installation.bpp"
-        );
-        InstallationPrivateKeyPath = System.IO.Path.Combine(
-            IdentityDirectoryPath,
-            "installation.key"
+            "identity.db"
         );
     }
 }

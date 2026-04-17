@@ -13,10 +13,5 @@ internal interface IPathService
 
     string? IdentityDirectoryPath { get; }
 
-    string? PlayerObservationPath { get; }
-
-    string? InstallationRecordPath { get; }
-
-    string? InstallationPrivateKeyPath { get; }
-
+    string? IdentityDatabasePath { get; }
 }

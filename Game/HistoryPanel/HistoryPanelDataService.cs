@@ -25,7 +25,7 @@ internal sealed class HistoryPanelDataService
         _repository = repository;
         _ghostSyncService = ghostSyncService;
         _currentPlayerAccountIdAccessor =
-            currentPlayerAccountIdAccessor ?? TryGetCurrentPlayerAccountId;
+            currentPlayerAccountIdAccessor ?? PlayerAccountIdResolver.ResolveCurrent;
     }
 
     public bool IsAvailable => _repository != null;
@@ -188,10 +188,6 @@ internal sealed class HistoryPanelDataService
         }
     }
 
-    private static string? TryGetCurrentPlayerAccountId()
-    {
-        return PlayerAccountIdResolver.ResolveCurrent();
-    }
 }
 
 internal readonly struct HistoryPanelGhostSyncAttemptResult

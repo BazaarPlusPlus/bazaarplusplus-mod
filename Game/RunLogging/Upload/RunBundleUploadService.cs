@@ -4,7 +4,6 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.Online;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
@@ -14,20 +13,16 @@ internal sealed class RunBundleUploadService : IDisposable
     private const string AnonymousPlayerAccountId = "anonymous-player";
 
     private readonly RunBundleUploadStore _store;
-    private readonly InstallationRecordStore _installationStore;
     private readonly V3Routes _routes;
     private readonly HttpClient _httpClient;
 
     public RunBundleUploadService(
         RunBundleUploadStore store,
-        InstallationRecordStore installationStore,
         V3Routes routes,
         TimeSpan timeout
     )
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _installationStore =
-            installationStore ?? throw new ArgumentNullException(nameof(installationStore));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
         _httpClient = new HttpClient { Timeout = timeout };
     }
@@ -43,27 +38,11 @@ internal sealed class RunBundleUploadService : IDisposable
             return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
         }
 
+        var playerAccountId = ResolvePlayerAccountId() ?? AnonymousPlayerAccountId;
         var installationId = string.Empty;
-        var playerAccountId = ResolvePlayerAccountId();
-        if (_installationStore.TryLoad(out var installation) && installation != null)
-        {
-            installationId = installation.InstallationId ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(playerAccountId))
-                playerAccountId = installation.PlayerAccountId;
-        }
-
-        if (string.IsNullOrWhiteSpace(playerAccountId))
-        {
-            playerAccountId = AnonymousPlayerAccountId;
-        }
 
         var uploadedCount = 0;
-        var client = new RunBundleClient(
-            _httpClient,
-            _installationStore,
-            _routes,
-            new InstallationRequestSigner(_installationStore)
-        );
+        var client = new RunBundleClient(_httpClient, _routes);
         foreach (var runId in pendingRunIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
