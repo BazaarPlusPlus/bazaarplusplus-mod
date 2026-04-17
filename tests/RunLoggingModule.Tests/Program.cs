@@ -13,7 +13,7 @@ var combatReplayPersistenceDrainedType = RequireType(
     "BazaarPlusPlus.Core.Events.CombatReplayPersistenceDrained"
 );
 var runInitializedObservedType = RequireType("BazaarPlusPlus.Core.Events.RunInitializedObserved");
-var runtimeHostType = RequireType("BazaarPlusPlus.Core.Runtime.BppRuntimeHost");
+var runContextStoreType = RequireType("BazaarPlusPlus.Core.RunContext.RunContextStore");
 var captureServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCaptureService");
 var runLifecycleChangedType = RequireType("BazaarPlusPlus.Core.Events.RunLifecycleChanged");
 var runExitKindType = RequireType("BazaarPlusPlus.Core.RunContext.RunExitKind");
@@ -42,9 +42,9 @@ var captureService =
 var core =
     Activator.CreateInstance(coreType, [manager, captureService])
     ?? throw new InvalidOperationException("Failed to construct RunLoggingControllerCore.");
-var runContext = runtimeHostType
-    .GetProperty("RunContext", BindingFlags.Public | BindingFlags.Static)!
-    .GetValue(null)!;
+var runContext =
+    Activator.CreateInstance(runContextStoreType)
+    ?? throw new InvalidOperationException("Failed to construct RunContextStore.");
 var pendingReplayPersistence = false;
 
 RunLogCreateRequest EnsureActiveRunFromGame()
@@ -84,6 +84,7 @@ var module =
         moduleType,
         [
             eventBus,
+            runContext,
             manager,
             core,
             new Func<bool>(() => pendingReplayPersistence),
@@ -154,6 +155,7 @@ var pendingReplayModule =
         moduleType,
         [
             eventBus,
+            runContext,
             manager,
             core,
             new Func<bool>(() => pendingReplayPersistence),
