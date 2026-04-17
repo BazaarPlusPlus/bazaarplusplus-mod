@@ -1,0 +1,44 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  cloudflareTest,
+  readD1Migrations,
+  type D1Migration,
+} from "@cloudflare/vitest-pool-workers";
+import { defineConfig } from "vitest/config";
+
+const RootDir = path.dirname(fileURLToPath(import.meta.url));
+const migrationsPath = path.join(RootDir, "migrations");
+
+declare module "vitest" {
+  interface ProvidedContext {
+    migrations: D1Migration[];
+  }
+}
+
+export default defineConfig({
+  plugins: [
+    cloudflareTest(async () => ({
+      main: "./src/index.ts",
+      wrangler: {
+        configPath: "./wrangler.toml",
+      },
+      miniflare: {
+        bindings: {
+          TEST_MIGRATIONS: await readD1Migrations(migrationsPath),
+          REPLAY_DOWNLOAD_SECRET: "test-secret",
+          ALLOW_UNAUTHENTICATED_REPLAY_LINKS: "false",
+          ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS: "false",
+          GHOST_QUERY_LOOKBACK_DAYS: "3",
+          RUN_BUNDLE_RETENTION_DAYS: "5",
+        },
+        isolatedStorage: true,
+      },
+    })),
+  ],
+  test: {
+    include: ["test/**/*.test.ts"],
+    setupFiles: ["./test/apply-migrations.ts"],
+  },
+});

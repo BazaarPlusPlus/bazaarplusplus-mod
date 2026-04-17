@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { expect, test } from "vitest";
 
 import type { Env } from "../src/env";
 import { getGhostQueryLookbackDays, getRunBundleRetentionDays } from "../src/config/v3";
@@ -24,8 +23,8 @@ test("v3 config reads numeric values from env vars", () => {
     RUN_BUNDLE_RETENTION_DAYS: "9",
   });
 
-  assert.equal(getGhostQueryLookbackDays(env), 6);
-  assert.equal(getRunBundleRetentionDays(env), 9);
+  expect(getGhostQueryLookbackDays(env)).toBe(6);
+  expect(getRunBundleRetentionDays(env)).toBe(9);
 });
 
 test("v3 config rejects missing numeric env vars", () => {
@@ -33,8 +32,7 @@ test("v3 config rejects missing numeric env vars", () => {
     GHOST_QUERY_LOOKBACK_DAYS: undefined as never,
   });
 
-  assert.throws(
-    () => getGhostQueryLookbackDays(env),
+  expect(() => getGhostQueryLookbackDays(env)).toThrow(
     /GHOST_QUERY_LOOKBACK_DAYS/,
   );
 });
@@ -44,8 +42,7 @@ test("v3 config rejects invalid numeric env vars", () => {
     RUN_BUNDLE_RETENTION_DAYS: "abc",
   });
 
-  assert.throws(
-    () => getRunBundleRetentionDays(env),
+  expect(() => getRunBundleRetentionDays(env)).toThrow(
     /RUN_BUNDLE_RETENTION_DAYS/,
   );
 });

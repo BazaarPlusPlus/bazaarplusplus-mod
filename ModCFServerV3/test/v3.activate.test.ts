@@ -1,12 +1,14 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { beforeEach, expect, test } from "vitest";
+import { env } from "cloudflare:test";
 
 import worker from "../src/index";
-import { buildEnv } from "./helpers/mockEnv";
+import { countRows, insertV3User, resetTestState } from "./helpers/seed";
+
+beforeEach(async () => {
+  await resetTestState(env);
+});
 
 test("activate creates user and bearer token atomically", async () => {
-  const env = buildEnv();
-
   const response = await worker.fetch(
     new Request("https://example.com/activate", {
       method: "POST",
@@ -20,40 +22,51 @@ test("activate creates user and bearer token atomically", async () => {
     env as never,
   );
 
-  assert.equal(response.status, 200);
+  expect(response.status).toBe(200);
   const json = (await response.json()) as {
     token: string;
     player_account_id: string;
     player_username: string;
   };
-  assert.match(json.token, /^[A-Za-z0-9_-]{43}$/);
-  assert.equal(json.player_account_id, "player-account-001");
-  assert.equal(json.player_username, "player-one");
+  expect(json.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  expect(json.player_account_id).toBe("player-account-001");
+  expect(json.player_username).toBe("player-one");
 
-  const user = env.DB.v3Users.get("player-account-001");
-  assert.ok(user);
-  assert.equal(user.player_account_id, "player-account-001");
-  assert.equal(user.player_username, "player-one");
+  const user = await env.DB.prepare(
+    `
+      SELECT player_account_id, player_username
+      FROM users
+      WHERE player_account_id = ?
+    `,
+  )
+    .bind("player-account-001")
+    .first<{ player_account_id: string; player_username: string }>();
+  expect(user).toBeTruthy();
+  expect(user!.player_account_id).toBe("player-account-001");
+  expect(user!.player_username).toBe("player-one");
 
-  assert.equal(env.DB.v3Tokens.size, 1);
-  const tokenRow = env.DB.v3Tokens.get(json.token);
-  assert.ok(tokenRow);
-  assert.equal(tokenRow.player_account_id, "player-account-001");
-  assert.equal(tokenRow.revoked_at_utc, null);
+  expect(await countRows(env.DB, "tokens")).toBe(1);
+  const tokenRow = await env.DB.prepare(
+    `
+      SELECT player_account_id, revoked_at_utc
+      FROM tokens
+      WHERE token = ?
+    `,
+  )
+    .bind(json.token)
+    .first<{ player_account_id: string; revoked_at_utc: string | null }>();
+  expect(tokenRow).toBeTruthy();
+  expect(tokenRow!.player_account_id).toBe("player-account-001");
+  expect(tokenRow!.revoked_at_utc).toBeNull();
 });
 
 test("activate rejects already-taken player_account_id", async () => {
-  const env = buildEnv();
-  env.DB.v3Users.set("player-account-claimed", {
-    player_account_id: "player-account-claimed",
-    player_username: "claimed-user",
-    password_hash: "existing-hash",
-    stream_platform: null,
-    stream_channel_id: null,
-    stream_url: null,
-    created_at_utc: "2026-04-10T00:00:00.000Z",
-    updated_at_utc: "2026-04-10T00:00:00.000Z",
-    last_login_at_utc: null,
+  await insertV3User(env.DB, {
+    playerAccountId: "player-account-claimed",
+    playerUsername: "claimed-user",
+    passwordHash: "existing-hash",
+    createdAtUtc: "2026-04-10T00:00:00.000Z",
+    updatedAtUtc: "2026-04-10T00:00:00.000Z",
   });
 
   const response = await worker.fetch(
@@ -69,24 +82,19 @@ test("activate rejects already-taken player_account_id", async () => {
     env as never,
   );
 
-  assert.equal(response.status, 409);
-  assert.deepEqual(await response.json(), { error: "player_account_id_taken" });
-  assert.equal(env.DB.v3Users.size, 1);
-  assert.equal(env.DB.v3Tokens.size, 0);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({ error: "player_account_id_taken" });
+  expect(await countRows(env.DB, "users")).toBe(1);
+  expect(await countRows(env.DB, "tokens")).toBe(0);
 });
 
 test("activate rejects already-taken player_username", async () => {
-  const env = buildEnv();
-  env.DB.v3Users.set("player-account-001", {
-    player_account_id: "player-account-001",
-    player_username: "claimed-user",
-    password_hash: "existing-hash",
-    stream_platform: null,
-    stream_channel_id: null,
-    stream_url: null,
-    created_at_utc: "2026-04-10T00:00:00.000Z",
-    updated_at_utc: "2026-04-10T00:00:00.000Z",
-    last_login_at_utc: null,
+  await insertV3User(env.DB, {
+    playerAccountId: "player-account-001",
+    playerUsername: "claimed-user",
+    passwordHash: "existing-hash",
+    createdAtUtc: "2026-04-10T00:00:00.000Z",
+    updatedAtUtc: "2026-04-10T00:00:00.000Z",
   });
 
   const response = await worker.fetch(
@@ -102,8 +110,8 @@ test("activate rejects already-taken player_username", async () => {
     env as never,
   );
 
-  assert.equal(response.status, 409);
-  assert.deepEqual(await response.json(), { error: "player_username_taken" });
-  assert.equal(env.DB.v3Users.size, 1);
-  assert.equal(env.DB.v3Tokens.size, 0);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({ error: "player_username_taken" });
+  expect(await countRows(env.DB, "users")).toBe(1);
+  expect(await countRows(env.DB, "tokens")).toBe(0);
 });

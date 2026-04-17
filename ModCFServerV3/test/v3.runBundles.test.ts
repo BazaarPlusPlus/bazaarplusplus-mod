@@ -1,9 +1,13 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { beforeEach, expect, test } from "vitest";
+import { env } from "cloudflare:test";
 
 import worker from "../src/index";
 import { sha256Base64, toBase64UrlSegment } from "./helpers/crypto";
-import { buildEnv } from "./helpers/mockEnv";
+import {
+  countRows,
+  resetTestState,
+  selectFirst,
+} from "./helpers/seed";
 
 function buildUploadRequest(body: string, authorization?: string): Request {
   const headers = new Headers({
@@ -20,8 +24,16 @@ function buildUploadRequest(body: string, authorization?: string): Request {
   });
 }
 
+async function listObjectKeys(): Promise<string[]> {
+  const listing = await env.RUN_BUNDLE_BUCKET.list();
+  return listing.objects.map((object) => object.key).sort();
+}
+
+beforeEach(async () => {
+  await resetTestState(env);
+});
+
 test("run bundle upload stores one artifact object and projection rows", async () => {
-  const env = buildEnv();
   const payloadHash = sha256Base64(new Uint8Array([1, 2, 3, 4]));
   const body = JSON.stringify({
     schema_version: 3,
@@ -92,30 +104,42 @@ test("run bundle upload stores one artifact object and projection rows", async (
 
   const response = await worker.fetch(buildUploadRequest(body), env as never);
 
-  assert.equal(response.status, 200);
-  assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
-  assert.equal(env.DB.v3RunBundles.size, 1);
-  assert.equal(env.DB.v3Runs.size, 1);
-  assert.equal(env.DB.v3Battles.size, 2);
-  const bundle = Array.from(env.DB.v3RunBundles.values())[0];
-  const run = env.DB.v3Runs.get("run-001");
-  const battle = env.DB.v3Battles.get("battle-001");
-  assert.equal(bundle?.installation_id, "legacy");
-  assert.equal(run?.installation_id, "legacy");
-  assert.equal(battle?.installation_id, "legacy");
-  assert.equal(
-    bundle?.object_key,
+  expect(response.status).toBe(200);
+  expect(await listObjectKeys()).toEqual([
+    `run-bundles/player-account-001/run-001/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
+  ]);
+  expect(await countRows(env.DB, "run_bundles")).toBe(1);
+  expect(await countRows(env.DB, "runs")).toBe(1);
+  expect(await countRows(env.DB, "battles")).toBe(2);
+
+  const bundle = await selectFirst<{
+    installation_id: string;
+    object_key: string;
+  }>(
+    env.DB,
+    "SELECT installation_id, object_key FROM run_bundles WHERE run_id = ?",
+    "run-001",
+  );
+  const run = await selectFirst<{ installation_id: string }>(
+    env.DB,
+    "SELECT installation_id FROM runs WHERE run_id = ?",
+    "run-001",
+  );
+  const battle = await selectFirst<{ installation_id: string }>(
+    env.DB,
+    "SELECT installation_id FROM battles WHERE battle_id = ?",
+    "battle-001",
+  );
+  expect(bundle?.installation_id).toBe("legacy");
+  expect(run?.installation_id).toBe("legacy");
+  expect(battle?.installation_id).toBe("legacy");
+  expect(bundle?.object_key).toBe(
     `run-bundles/player-account-001/run-001/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );
-  assert.deepEqual(env.KNOWN_PLAYER_ACCOUNTS.entries.get("player-account-001"), {
-    value: "1",
-    expirationTtl: 7 * 24 * 60 * 60,
-  });
+  expect(await env.KNOWN_PLAYER_ACCOUNTS.get("player-account-001")).toBe("1");
 });
 
 test("run bundle upload accepts requests without Authorization header", async () => {
-  const env = buildEnv();
-
   const body = JSON.stringify({
     schema_version: 3,
     player_account_id: "player-account-unsigned",
@@ -142,16 +166,14 @@ test("run bundle upload accepts requests without Authorization header", async ()
 
   const response = await worker.fetch(buildUploadRequest(body), env as never);
 
-  assert.equal(response.status, 200);
-  assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
-  assert.equal(env.DB.v3RunBundles.size, 1);
-  assert.equal(env.DB.v3Runs.size, 1);
-  assert.equal(env.DB.v3Battles.size, 1);
+  expect(response.status).toBe(200);
+  expect((await listObjectKeys()).length).toBe(1);
+  expect(await countRows(env.DB, "run_bundles")).toBe(1);
+  expect(await countRows(env.DB, "runs")).toBe(1);
+  expect(await countRows(env.DB, "battles")).toBe(1);
 });
 
 test("run bundle upload ignores bogus Authorization header", async () => {
-  const env = buildEnv();
-
   const body = JSON.stringify({
     schema_version: 3,
     player_account_id: "player-account-garbage-auth",
@@ -181,15 +203,14 @@ test("run bundle upload ignores bogus Authorization header", async () => {
     env as never,
   );
 
-  assert.equal(response.status, 200);
-  assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
-  assert.equal(env.DB.v3RunBundles.size, 1);
-  assert.equal(env.DB.v3Runs.size, 1);
-  assert.equal(env.DB.v3Battles.size, 1);
+  expect(response.status).toBe(200);
+  expect((await listObjectKeys()).length).toBe(1);
+  expect(await countRows(env.DB, "run_bundles")).toBe(1);
+  expect(await countRows(env.DB, "runs")).toBe(1);
+  expect(await countRows(env.DB, "battles")).toBe(1);
 });
 
 test("run bundle upload accepts requests without player account id", async () => {
-  const env = buildEnv();
   const payloadHash = sha256Base64(new Uint8Array([7, 8, 9]));
 
   const body = JSON.stringify({
@@ -216,22 +237,35 @@ test("run bundle upload accepts requests without player account id", async () =>
 
   const response = await worker.fetch(buildUploadRequest(body), env as never);
 
-  assert.equal(response.status, 200);
-  const bundle = Array.from(env.DB.v3RunBundles.values())[0];
-  const run = env.DB.v3Runs.get("run-no-player-account");
-  assert.equal(bundle?.player_account_id, "anonymous-player");
-  assert.equal(bundle?.installation_id, "legacy");
-  assert.equal(run?.installation_id, "legacy");
-  assert.equal(env.DB.v3Battles.size, 0);
-  assert.equal(
-    bundle?.object_key,
+  expect(response.status).toBe(200);
+  const bundle = await selectFirst<{
+    player_account_id: string;
+    installation_id: string;
+    object_key: string;
+  }>(
+    env.DB,
+    `
+      SELECT player_account_id, installation_id, object_key
+      FROM run_bundles
+      WHERE run_id = ?
+    `,
+    "run-no-player-account",
+  );
+  const run = await selectFirst<{ installation_id: string }>(
+    env.DB,
+    "SELECT installation_id FROM runs WHERE run_id = ?",
+    "run-no-player-account",
+  );
+  expect(bundle?.player_account_id).toBe("anonymous-player");
+  expect(bundle?.installation_id).toBe("legacy");
+  expect(run?.installation_id).toBe("legacy");
+  expect(await countRows(env.DB, "battles")).toBe(0);
+  expect(bundle?.object_key).toBe(
     `run-bundles/anonymous-player/run-no-player-account/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );
 });
 
 test("run bundle upload rejects mismatched battle run ids", async () => {
-  const env = buildEnv();
-
   const body = JSON.stringify({
     schema_version: 3,
     player_account_id: "player-account-001",
@@ -250,11 +284,10 @@ test("run bundle upload rejects mismatched battle run ids", async () => {
 
   const response = await worker.fetch(buildUploadRequest(body), env as never);
 
-  assert.equal(response.status, 400);
+  expect(response.status).toBe(400);
 });
 
 test("run bundle upload applies configured artifact retention", async () => {
-  const env = buildEnv();
   env.RUN_BUNDLE_RETENTION_DAYS = "9";
 
   const body = JSON.stringify({
@@ -273,12 +306,13 @@ test("run bundle upload applies configured artifact retention", async () => {
 
   const response = await worker.fetch(buildUploadRequest(body), env as never);
 
-  assert.equal(response.status, 200);
-  assert.equal(env.RUN_BUNDLE_BUCKET.lastPutOptions?.customMetadata?.retention_days, "9");
+  expect(response.status).toBe(200);
+  const [objectKey] = await listObjectKeys();
+  const artifact = objectKey == null ? null : await env.RUN_BUNDLE_BUCKET.head(objectKey);
+  expect(artifact?.customMetadata?.retention_days).toBe("9");
 });
 
 test("run bundle upload only projects battles whose opponent account id is known", async () => {
-  const env = buildEnv();
   await env.KNOWN_PLAYER_ACCOUNTS.put("known-opponent", "1", {
     expirationTtl: 7 * 24 * 60 * 60,
   });
@@ -318,14 +352,18 @@ test("run bundle upload only projects battles whose opponent account id is known
 
   const response = await worker.fetch(buildUploadRequest(body), env as never);
 
-  assert.equal(response.status, 200);
-  assert.equal(env.DB.v3Battles.size, 1);
-  assert.ok(env.DB.v3Battles.has("battle-keep"));
+  expect(response.status).toBe(200);
+  expect(await countRows(env.DB, "battles")).toBe(1);
+  expect(
+    await selectFirst<{ battle_id: string }>(
+      env.DB,
+      "SELECT battle_id FROM battles WHERE battle_id = ?",
+      "battle-keep",
+    ),
+  ).toEqual({ battle_id: "battle-keep" });
 });
 
 test("run bundle upload trusts the current uploader account id immediately", async () => {
-  const env = buildEnv();
-
   const body = JSON.stringify({
     schema_version: 3,
     player_account_id: "player-account-001",
@@ -350,17 +388,19 @@ test("run bundle upload trusts the current uploader account id immediately", asy
 
   const response = await worker.fetch(buildUploadRequest(body), env as never);
 
-  assert.equal(response.status, 200);
-  assert.equal(env.DB.v3Battles.size, 1);
-  assert.ok(env.DB.v3Battles.has("battle-uploader-trust"));
-  assert.deepEqual(env.KNOWN_PLAYER_ACCOUNTS.entries.get("player-account-001"), {
-    value: "1",
-    expirationTtl: 7 * 24 * 60 * 60,
-  });
+  expect(response.status).toBe(200);
+  expect(await countRows(env.DB, "battles")).toBe(1);
+  expect(
+    await selectFirst<{ battle_id: string }>(
+      env.DB,
+      "SELECT battle_id FROM battles WHERE battle_id = ?",
+      "battle-uploader-trust",
+    ),
+  ).toEqual({ battle_id: "battle-uploader-trust" });
+  expect(await env.KNOWN_PLAYER_ACCOUNTS.get("player-account-001")).toBe("1");
 });
 
 test("run bundle upload accepts duplicate payload retries idempotently", async () => {
-  const env = buildEnv();
   const payloadHash = sha256Base64(new Uint8Array([1, 2, 3, 4]));
   const body = JSON.stringify({
     schema_version: 3,
@@ -387,7 +427,7 @@ test("run bundle upload accepts duplicate payload retries idempotently", async (
   });
 
   const firstResponse = await worker.fetch(buildUploadRequest(body), env as never);
-  assert.equal(firstResponse.status, 200);
+  expect(firstResponse.status).toBe(200);
   const firstJson = (await firstResponse.json()) as {
     bundle_id: string;
     object_key: string;
@@ -395,25 +435,37 @@ test("run bundle upload accepts duplicate payload retries idempotently", async (
 
   const secondResponse = await worker.fetch(buildUploadRequest(body), env as never);
 
-  assert.equal(secondResponse.status, 200);
+  expect(secondResponse.status).toBe(200);
   const secondJson = (await secondResponse.json()) as {
     bundle_id: string;
     object_key: string;
   };
-  assert.equal(secondJson.bundle_id, firstJson.bundle_id);
-  assert.equal(
-    secondJson.object_key,
+  expect(secondJson.bundle_id).toBe(firstJson.bundle_id);
+  expect(secondJson.object_key).toBe(
     `run-bundles/player-account-001/run-dup/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );
-  assert.equal(secondJson.object_key, firstJson.object_key);
-  assert.equal(env.RUN_BUNDLE_BUCKET.objects.size, 1);
-  assert.equal(env.DB.v3RunBundles.size, 1);
-  assert.equal(env.DB.v3Runs.size, 1);
-  assert.equal(env.DB.v3Battles.size, 1);
-  const bundle = Array.from(env.DB.v3RunBundles.values())[0];
-  const run = env.DB.v3Runs.get("run-dup");
-  const battle = env.DB.v3Battles.get("battle-dup");
-  assert.equal(bundle?.installation_id, "legacy");
-  assert.equal(run?.installation_id, "legacy");
-  assert.equal(battle?.installation_id, "legacy");
+  expect(secondJson.object_key).toBe(firstJson.object_key);
+  expect((await listObjectKeys()).length).toBe(1);
+  expect(await countRows(env.DB, "run_bundles")).toBe(1);
+  expect(await countRows(env.DB, "runs")).toBe(1);
+  expect(await countRows(env.DB, "battles")).toBe(1);
+
+  const bundle = await selectFirst<{ installation_id: string }>(
+    env.DB,
+    "SELECT installation_id FROM run_bundles WHERE bundle_id = ?",
+    firstJson.bundle_id,
+  );
+  const run = await selectFirst<{ installation_id: string }>(
+    env.DB,
+    "SELECT installation_id FROM runs WHERE run_id = ?",
+    "run-dup",
+  );
+  const battle = await selectFirst<{ installation_id: string }>(
+    env.DB,
+    "SELECT installation_id FROM battles WHERE battle_id = ?",
+    "battle-dup",
+  );
+  expect(bundle?.installation_id).toBe("legacy");
+  expect(run?.installation_id).toBe("legacy");
+  expect(battle?.installation_id).toBe("legacy");
 });

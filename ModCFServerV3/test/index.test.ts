@@ -1,8 +1,12 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { beforeEach, expect, test } from "vitest";
+import { env } from "cloudflare:test";
 
 import worker from "../src/index";
-import { buildEnv } from "./helpers/mockEnv";
+import { resetTestState } from "./helpers/seed";
+
+beforeEach(async () => {
+  await resetTestState(env);
+});
 
 test("responds to the health endpoint", async () => {
   const response = await worker.fetch(
@@ -12,17 +16,17 @@ test("responds to the health endpoint", async () => {
         origin: "https://frontend.example.com",
       },
     }),
-    buildEnv() as never,
+    env as never,
   );
 
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true });
-  assert.equal(
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ ok: true });
+  expect(
     response.headers.get("access-control-allow-origin"),
-    "https://frontend.example.com",
-  );
-  assert.equal(
+  ).toBe("https://frontend.example.com");
+  expect(
     response.headers.get("access-control-allow-headers"),
+  ).toBe(
     "authorization, content-type, x-bpp-installation-id, x-bpp-timestamp, x-bpp-content-sha256, x-bpp-signature",
   );
 });
@@ -36,11 +40,11 @@ test("activate route is wired and validates request payload", async () => {
         "content-type": "application/json",
       },
     }),
-    buildEnv() as never,
+    env as never,
   );
 
-  assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "invalid_request" });
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({ error: "invalid_request" });
 });
 
 test("returns not_found for unsupported routes", async () => {
@@ -48,11 +52,11 @@ test("returns not_found for unsupported routes", async () => {
     new Request("https://example.com/nope", {
       method: "POST",
     }),
-    buildEnv() as never,
+    env as never,
   );
 
-  assert.equal(response.status, 404);
-  assert.deepEqual(await response.json(), { error: "not_found" });
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ error: "not_found" });
 });
 
 test("responds to CORS preflight for browser requests", async () => {
@@ -65,20 +69,19 @@ test("responds to CORS preflight for browser requests", async () => {
         "access-control-request-headers": "authorization, content-type",
       },
     }),
-    buildEnv() as never,
+    env as never,
   );
 
-  assert.equal(response.status, 204);
-  assert.equal(
+  expect(response.status).toBe(204);
+  expect(
     response.headers.get("access-control-allow-origin"),
-    "https://frontend.example.com",
-  );
-  assert.equal(
+  ).toBe("https://frontend.example.com");
+  expect(
     response.headers.get("access-control-allow-methods"),
-    "GET, POST, OPTIONS",
-  );
-  assert.equal(
+  ).toBe("GET, POST, OPTIONS");
+  expect(
     response.headers.get("access-control-allow-headers"),
+  ).toBe(
     "authorization, content-type, x-bpp-installation-id, x-bpp-timestamp, x-bpp-content-sha256, x-bpp-signature",
   );
 });

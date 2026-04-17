@@ -1,26 +1,37 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { beforeEach, expect, test } from "vitest";
+import { env } from "cloudflare:test";
 
 import worker from "../src/index";
-import type { MockD1Database } from "./helpers/mockEnv";
-import { buildEnv } from "./helpers/mockEnv";
+import {
+  insertToken,
+  insertV3Battle,
+  insertV3User,
+  resetTestState,
+} from "./helpers/seed";
 
-async function insertToken(
-  db: MockD1Database,
+async function insertUserToken(
   token: string,
   playerAccountId: string,
-  issuedAtUtc: string,
 ): Promise<void> {
-  await db.prepare(
-    `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES (?, ?, ?)`,
-  )
-    .bind(token, playerAccountId, issuedAtUtc)
-    .run();
+  await insertV3User(env.DB, {
+    playerAccountId,
+    playerUsername: `${playerAccountId}-user`,
+    passwordHash: "hash",
+    createdAtUtc: "2026-01-01T00:00:00Z",
+    updatedAtUtc: "2026-01-01T00:00:00Z",
+  });
+  await insertToken(env.DB, {
+    token,
+    playerAccountId,
+    issuedAtUtc: "2026-01-01T00:00:00Z",
+  });
 }
 
-test("ghost-battles returns 401 when Authorization header is missing", async () => {
-  const env = buildEnv();
+beforeEach(async () => {
+  await resetTestState(env);
+});
 
+test("ghost-battles returns 401 when Authorization header is missing", async () => {
   const response = await worker.fetch(
     new Request("https://example.com/ghost-battles?limit=5", {
       method: "GET",
@@ -28,17 +39,24 @@ test("ghost-battles returns 401 when Authorization header is missing", async () 
     env as never,
   );
 
-  assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), { error: "invalid_token" });
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "invalid_token" });
 });
 
 test("ghost-battles returns 401 when bearer is unknown or revoked", async () => {
-  const env = buildEnv();
-  await env.DB.prepare(
-    `INSERT INTO tokens (token, player_account_id, issued_at_utc, revoked_at_utc) VALUES (?, ?, ?, ?)`,
-  )
-    .bind("tok-revoked", "player-account-001", "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z")
-    .run();
+  await insertV3User(env.DB, {
+    playerAccountId: "player-account-001",
+    playerUsername: "player-001",
+    passwordHash: "hash",
+    createdAtUtc: "2026-01-01T00:00:00Z",
+    updatedAtUtc: "2026-01-01T00:00:00Z",
+  });
+  await insertToken(env.DB, {
+    token: "tok-revoked",
+    playerAccountId: "player-account-001",
+    issuedAtUtc: "2026-01-01T00:00:00Z",
+    revokedAtUtc: "2026-01-02T00:00:00Z",
+  });
 
   const unknownResponse = await worker.fetch(
     new Request("https://example.com/ghost-battles?limit=5", {
@@ -48,8 +66,8 @@ test("ghost-battles returns 401 when bearer is unknown or revoked", async () => 
     env as never,
   );
 
-  assert.equal(unknownResponse.status, 401);
-  assert.deepEqual(await unknownResponse.json(), { error: "invalid_token" });
+  expect(unknownResponse.status).toBe(401);
+  expect(await unknownResponse.json()).toEqual({ error: "invalid_token" });
 
   const revokedResponse = await worker.fetch(
     new Request("https://example.com/ghost-battles?limit=5", {
@@ -59,67 +77,61 @@ test("ghost-battles returns 401 when bearer is unknown or revoked", async () => 
     env as never,
   );
 
-  assert.equal(revokedResponse.status, 401);
-  assert.deepEqual(await revokedResponse.json(), { error: "invalid_token" });
+  expect(revokedResponse.status).toBe(401);
+  expect(await revokedResponse.json()).toEqual({ error: "invalid_token" });
 });
 
 test("ghost-battles returns battles for the authenticated bearer and ignores caller days", async () => {
-  const env = buildEnv();
   env.GHOST_QUERY_LOOKBACK_DAYS = "6";
-  await insertToken(
-    env.DB,
-    "tok-player-001",
-    "player-account-001",
-    "2026-01-01T00:00:00Z",
-  );
+  await insertUserToken("tok-player-001", "player-account-001");
 
-  env.DB.v3Battles.set("battle-recent", {
-    battle_id: "battle-recent",
-    run_id: "run-001",
-    installation_id: "inst_ghost",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-001",
-    recorded_at_utc: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  await insertV3Battle(env.DB, {
+    battleId: "battle-recent",
+    runId: "run-001",
+    installationId: "inst_ghost",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-001",
+    recordedAtUtc: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     day: 8,
-    player_name: "Remote",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1500,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1510,
-    opponent_level: 11,
+    playerName: "Remote",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1500,
+    playerLevel: 10,
+    opponentName: "Local",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1510,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
-  env.DB.v3Battles.set("battle-old", {
-    battle_id: "battle-old",
-    run_id: "run-002",
-    installation_id: "inst_ghost",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-002",
-    recorded_at_utc: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  await insertV3Battle(env.DB, {
+    battleId: "battle-old",
+    runId: "run-002",
+    installationId: "inst_ghost",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-002",
+    recordedAtUtc: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     day: 3,
-    player_name: "RemoteOld",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Silver",
-    player_rating: 1200,
-    player_level: 7,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Silver",
-    opponent_rating: 1210,
-    opponent_level: 8,
+    playerName: "RemoteOld",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Silver",
+    playerRating: 1200,
+    playerLevel: 7,
+    opponentName: "Local",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    opponentRank: "Silver",
+    opponentRating: 1210,
+    opponentLevel: 8,
     result: "Lost",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
 
   const response = await worker.fetch(
@@ -130,96 +142,90 @@ test("ghost-battles returns battles for the authenticated bearer and ignores cal
     env as never,
   );
 
-  assert.equal(response.status, 200);
+  expect(response.status).toBe(200);
   const json = (await response.json()) as {
     battles: Array<{ battle_id: string }>;
   };
-  assert.deepEqual(json.battles.map((battle) => battle.battle_id), [
+  expect(json.battles.map((battle) => battle.battle_id)).toEqual([
     "battle-recent",
     "battle-old",
   ]);
 });
 
 test("ghost-battles honors the caller limit parameter after server clamping", async () => {
-  const env = buildEnv();
-  await insertToken(
-    env.DB,
-    "tok-player-001",
-    "player-account-001",
-    "2026-01-01T00:00:00Z",
-  );
+  await insertUserToken("tok-player-001", "player-account-001");
 
-  env.DB.v3Battles.set("battle-003", {
-    battle_id: "battle-003",
-    run_id: "run-003",
-    installation_id: "inst_ghost",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-003",
-    recorded_at_utc: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+  await insertV3Battle(env.DB, {
+    battleId: "battle-003",
+    runId: "run-003",
+    installationId: "inst_ghost",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-003",
+    recordedAtUtc: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
     day: 8,
-    player_name: "RemoteNewest",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1500,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1510,
-    opponent_level: 11,
+    playerName: "RemoteNewest",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1500,
+    playerLevel: 10,
+    opponentName: "Local",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1510,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
-  env.DB.v3Battles.set("battle-002", {
-    battle_id: "battle-002",
-    run_id: "run-002",
-    installation_id: "inst_ghost",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-002",
-    recorded_at_utc: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  await insertV3Battle(env.DB, {
+    battleId: "battle-002",
+    runId: "run-002",
+    installationId: "inst_ghost",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-002",
+    recordedAtUtc: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     day: 8,
-    player_name: "RemoteMiddle",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1500,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1510,
-    opponent_level: 11,
+    playerName: "RemoteMiddle",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1500,
+    playerLevel: 10,
+    opponentName: "Local",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1510,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
-  env.DB.v3Battles.set("battle-001", {
-    battle_id: "battle-001",
-    run_id: "run-001",
-    installation_id: "inst_ghost",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-001",
-    recorded_at_utc: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+  await insertV3Battle(env.DB, {
+    battleId: "battle-001",
+    runId: "run-001",
+    installationId: "inst_ghost",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-001",
+    recordedAtUtc: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
     day: 8,
-    player_name: "RemoteOldest",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1500,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1510,
-    opponent_level: 11,
+    playerName: "RemoteOldest",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1500,
+    playerLevel: 10,
+    opponentName: "Local",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1510,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
 
   const response = await worker.fetch(
@@ -230,69 +236,63 @@ test("ghost-battles honors the caller limit parameter after server clamping", as
     env as never,
   );
 
-  assert.equal(response.status, 200);
+  expect(response.status).toBe(200);
   const json = (await response.json()) as {
     battles: Array<{ battle_id: string }>;
   };
-  assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-003"]);
+  expect(json.battles.map((battle) => battle.battle_id)).toEqual(["battle-003"]);
 });
 
 test("ghost-battles ignores mismatched player_account_id query parameters when bearer is valid", async () => {
-  const env = buildEnv();
-  await insertToken(
-    env.DB,
-    "tok-player-001",
-    "player-account-001",
-    "2026-01-01T00:00:00Z",
-  );
+  await insertUserToken("tok-player-001", "player-account-001");
 
-  env.DB.v3Battles.set("battle-owned", {
-    battle_id: "battle-owned",
-    run_id: "run-owned",
-    installation_id: "inst_ghost",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-owned",
-    recorded_at_utc: new Date().toISOString(),
+  await insertV3Battle(env.DB, {
+    battleId: "battle-owned",
+    runId: "run-owned",
+    installationId: "inst_ghost",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-owned",
+    recordedAtUtc: new Date().toISOString(),
     day: 8,
-    player_name: "RemoteOwned",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1500,
-    player_level: 10,
-    opponent_name: "LocalOwned",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1510,
-    opponent_level: 11,
+    playerName: "RemoteOwned",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1500,
+    playerLevel: 10,
+    opponentName: "LocalOwned",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1510,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
-  env.DB.v3Battles.set("battle-other", {
-    battle_id: "battle-other",
-    run_id: "run-other",
-    installation_id: "inst_ghost",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-other",
-    recorded_at_utc: new Date(Date.now() - 60 * 1000).toISOString(),
+  await insertV3Battle(env.DB, {
+    battleId: "battle-other",
+    runId: "run-other",
+    installationId: "inst_ghost",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-other",
+    recordedAtUtc: new Date(Date.now() - 60 * 1000).toISOString(),
     day: 8,
-    player_name: "RemoteOther",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1500,
-    player_level: 10,
-    opponent_name: "LocalOther",
-    opponent_account_id: "someone-else",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1510,
-    opponent_level: 11,
+    playerName: "RemoteOther",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1500,
+    playerLevel: 10,
+    opponentName: "LocalOther",
+    opponentAccountId: "someone-else",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1510,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
 
   const response = await worker.fetch(
@@ -306,9 +306,9 @@ test("ghost-battles ignores mismatched player_account_id query parameters when b
     env as never,
   );
 
-  assert.equal(response.status, 200);
+  expect(response.status).toBe(200);
   const json = (await response.json()) as {
     battles: Array<{ battle_id: string }>;
   };
-  assert.deepEqual(json.battles.map((battle) => battle.battle_id), ["battle-owned"]);
+  expect(json.battles.map((battle) => battle.battle_id)).toEqual(["battle-owned"]);
 });

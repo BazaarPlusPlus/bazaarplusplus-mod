@@ -1,36 +1,100 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { beforeEach, expect, test } from "vitest";
+import { env } from "cloudflare:test";
 
 import worker from "../src/index";
-import type { MockD1Database } from "./helpers/mockEnv";
-import { buildEnv } from "./helpers/mockEnv";
+import {
+  insertReplayToken,
+  insertRunBundle,
+  insertToken,
+  insertV3Battle,
+  insertV3User,
+  resetTestState,
+  selectFirst,
+} from "./helpers/seed";
 
-async function insertToken(
-  db: MockD1Database,
+const JsonEncoder = new TextEncoder();
+
+async function insertUserToken(
   token: string,
   playerAccountId: string,
-  issuedAtUtc: string,
-  revokedAtUtc?: string,
 ): Promise<void> {
-  if (revokedAtUtc == null) {
-    await db.prepare(
-      `INSERT INTO tokens (token, player_account_id, issued_at_utc) VALUES (?, ?, ?)`,
-    )
-      .bind(token, playerAccountId, issuedAtUtc)
-      .run();
-    return;
-  }
-
-  await db.prepare(
-    `INSERT INTO tokens (token, player_account_id, issued_at_utc, revoked_at_utc) VALUES (?, ?, ?, ?)`,
-  )
-    .bind(token, playerAccountId, issuedAtUtc, revokedAtUtc)
-    .run();
+  await insertV3User(env.DB, {
+    playerAccountId,
+    playerUsername: `${playerAccountId}-user`,
+    passwordHash: "hash",
+    createdAtUtc: "2026-01-01T00:00:00Z",
+    updatedAtUtc: "2026-01-01T00:00:00Z",
+  });
+  await insertToken(env.DB, {
+    token,
+    playerAccountId,
+    issuedAtUtc: "2026-01-01T00:00:00Z",
+  });
 }
 
-test("replay-link returns 401 when Authorization header is missing", async () => {
-  const env = buildEnv();
+async function insertReplayArtifact(args: {
+  battleId: string;
+  bundleId: string;
+  runId: string;
+  objectKey: string;
+  opponentAccountId: string;
+  requestedByPlayerAccountId?: string;
+  bodyText?: string;
+}): Promise<void> {
+  const nowUtc = new Date().toISOString();
 
+  await insertV3Battle(env.DB, {
+    battleId: args.battleId,
+    runId: args.runId,
+    installationId: "inst_replay",
+    playerAccountId: "remote-player",
+    bundleId: args.bundleId,
+    recordedAtUtc: nowUtc,
+    day: 9,
+    playerName: "Remote",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1600,
+    playerLevel: 10,
+    opponentName: "Local",
+    opponentAccountId: args.opponentAccountId,
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1610,
+    opponentLevel: 11,
+    result: "Won",
+    replayAvailable: 1,
+    updatedAtUtc: nowUtc,
+  });
+  await insertRunBundle(env.DB, {
+    bundleId: args.bundleId,
+    installationId: "inst_replay",
+    playerAccountId: "remote-player",
+    runId: args.runId,
+    payloadHash: `${args.bundleId}-hash`,
+    schemaVersion: 3,
+    objectKey: args.objectKey,
+    codec: "application/json",
+    sizeBytes: 12,
+    submittedAtUtc: nowUtc,
+    createdAtUtc: nowUtc,
+  });
+
+  if (args.bodyText != null) {
+    await env.RUN_BUNDLE_BUCKET.put(
+      args.objectKey,
+      JsonEncoder.encode(args.bodyText),
+      { httpMetadata: { contentType: "application/json" } },
+    );
+  }
+}
+
+beforeEach(async () => {
+  await resetTestState(env);
+});
+
+test("replay-link returns 401 when Authorization header is missing", async () => {
   const response = await worker.fetch(
     new Request("https://example.com/ghost-battles/battle-no-auth/replay-link", {
       method: "POST",
@@ -38,19 +102,17 @@ test("replay-link returns 401 when Authorization header is missing", async () =>
     env as never,
   );
 
-  assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), { error: "invalid_token" });
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "invalid_token" });
 });
 
 test("replay-link returns 401 when bearer is unknown or revoked", async () => {
-  const env = buildEnv();
-  await insertToken(
-    env.DB,
-    "tok-revoked",
-    "player-account-001",
-    "2026-01-01T00:00:00Z",
-    "2026-01-02T00:00:00Z",
-  );
+  await insertUserToken("tok-revoked", "player-account-001");
+  await env.DB.prepare(
+    "UPDATE tokens SET revoked_at_utc = ? WHERE token = ?",
+  )
+    .bind("2026-01-02T00:00:00Z", "tok-revoked")
+    .run();
 
   const unknownResponse = await worker.fetch(
     new Request("https://example.com/ghost-battles/battle-foreign/replay-link", {
@@ -60,8 +122,8 @@ test("replay-link returns 401 when bearer is unknown or revoked", async () => {
     env as never,
   );
 
-  assert.equal(unknownResponse.status, 401);
-  assert.deepEqual(await unknownResponse.json(), { error: "invalid_token" });
+  expect(unknownResponse.status).toBe(401);
+  expect(await unknownResponse.json()).toEqual({ error: "invalid_token" });
 
   const revokedResponse = await worker.fetch(
     new Request("https://example.com/ghost-battles/battle-foreign/replay-link", {
@@ -71,41 +133,35 @@ test("replay-link returns 401 when bearer is unknown or revoked", async () => {
     env as never,
   );
 
-  assert.equal(revokedResponse.status, 401);
-  assert.deepEqual(await revokedResponse.json(), { error: "invalid_token" });
+  expect(revokedResponse.status).toBe(401);
+  expect(await revokedResponse.json()).toEqual({ error: "invalid_token" });
 });
 
 test("replay-link returns 403 when bearer is not the battle opponent", async () => {
-  const env = buildEnv();
-  await insertToken(
-    env.DB,
-    "tok-player-001",
-    "player-account-001",
-    "2026-01-01T00:00:00Z",
-  );
-  env.DB.v3Battles.set("battle-foreign", {
-    battle_id: "battle-foreign",
-    run_id: "run-foreign",
-    installation_id: "inst_replay",
-    player_account_id: "player-account-001",
-    bundle_id: "bundle-foreign",
-    recorded_at_utc: new Date().toISOString(),
+  await insertUserToken("tok-player-001", "player-account-001");
+  await insertV3Battle(env.DB, {
+    battleId: "battle-foreign",
+    runId: "run-foreign",
+    installationId: "inst_replay",
+    playerAccountId: "player-account-001",
+    bundleId: "bundle-foreign",
+    recordedAtUtc: new Date().toISOString(),
     day: 7,
-    player_name: "Local",
-    player_account_id_in_payload: "player-account-001",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1500,
-    player_level: 10,
-    opponent_name: "Remote",
-    opponent_account_id: "other-player",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1510,
-    opponent_level: 11,
+    playerName: "Local",
+    playerAccountIdInPayload: "player-account-001",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1500,
+    playerLevel: 10,
+    opponentName: "Remote",
+    opponentAccountId: "other-player",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1510,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
 
   const response = await worker.fetch(
@@ -116,41 +172,35 @@ test("replay-link returns 403 when bearer is not the battle opponent", async () 
     env as never,
   );
 
-  assert.equal(response.status, 403);
-  assert.deepEqual(await response.json(), { error: "replay_forbidden" });
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ error: "replay_forbidden" });
 });
 
 test("replay-link returns download metadata when bearer is the battle opponent", async () => {
-  const env = buildEnv();
-  await insertToken(
-    env.DB,
-    "tok-player-001",
-    "player-account-001",
-    "2026-01-01T00:00:00Z",
-  );
-  env.DB.v3Battles.set("battle-owned", {
-    battle_id: "battle-owned",
-    run_id: "run-owned",
-    installation_id: "inst_replay",
-    player_account_id: "other-player",
-    bundle_id: "bundle-owned",
-    recorded_at_utc: new Date().toISOString(),
+  await insertUserToken("tok-player-001", "player-account-001");
+  await insertV3Battle(env.DB, {
+    battleId: "battle-owned",
+    runId: "run-owned",
+    installationId: "inst_replay",
+    playerAccountId: "other-player",
+    bundleId: "bundle-owned",
+    recordedAtUtc: new Date().toISOString(),
     day: 8,
-    player_name: "Remote",
-    player_account_id_in_payload: "other-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1500,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1510,
-    opponent_level: 11,
+    playerName: "Remote",
+    playerAccountIdInPayload: "other-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1500,
+    playerLevel: 10,
+    opponentName: "Local",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1510,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
 
   const response = await worker.fetch(
@@ -161,47 +211,56 @@ test("replay-link returns download metadata when bearer is the battle opponent",
     env as never,
   );
 
-  assert.equal(response.status, 200);
+  expect(response.status).toBe(200);
   const payload = (await response.json()) as {
     download_url: string;
     expires_at_utc: string;
   };
-  assert.deepEqual(Object.keys(payload).sort(), ["download_url", "expires_at_utc"]);
-  assert.match(payload.download_url, /^https:\/\/example\.com\/replays\/replay_/);
-  assert.match(payload.expires_at_utc, /^\d{4}-\d{2}-\d{2}T/);
+  expect(Object.keys(payload).sort()).toEqual(["download_url", "expires_at_utc"]);
+  expect(payload.download_url).toMatch(/^https:\/\/example\.com\/replays\/replay_/);
+  expect(payload.expires_at_utc).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
-  const replayToken = env.DB.v3ReplayTokens.get(payload.download_url.split("/").pop() ?? "");
-  assert.ok(replayToken);
-  assert.equal(replayToken.requested_by_player_account_id, "player-account-001");
-  assert.equal(replayToken.expires_at_utc, payload.expires_at_utc);
+  const replayToken = await selectFirst<{
+    requested_by_player_account_id: string;
+    expires_at_utc: string;
+  }>(
+    env.DB,
+    `
+      SELECT requested_by_player_account_id, expires_at_utc
+      FROM replay_tokens
+      WHERE token = ?
+    `,
+    payload.download_url.split("/").pop() ?? "",
+  );
+  expect(replayToken?.requested_by_player_account_id).toBe("player-account-001");
+  expect(replayToken?.expires_at_utc).toBe(payload.expires_at_utc);
 });
 
 test("replay-link allows unauthenticated creation when configured", async () => {
-  const env = buildEnv();
   env.ALLOW_UNAUTHENTICATED_REPLAY_LINKS = "true";
-  env.DB.v3Battles.set("battle-public-link", {
-    battle_id: "battle-public-link",
-    run_id: "run-public-link",
-    installation_id: "inst_remote",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-public-link",
-    recorded_at_utc: new Date().toISOString(),
+  await insertV3Battle(env.DB, {
+    battleId: "battle-public-link",
+    runId: "run-public-link",
+    installationId: "inst_remote",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-public-link",
+    recordedAtUtc: new Date().toISOString(),
     day: 8,
-    player_name: "Remote",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1500,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1510,
-    opponent_level: 11,
+    playerName: "Remote",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1500,
+    playerLevel: 10,
+    opponentName: "Local",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1510,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
 
   const response = await worker.fetch(
@@ -211,78 +270,48 @@ test("replay-link allows unauthenticated creation when configured", async () => 
     env as never,
   );
 
-  assert.equal(response.status, 200);
+  expect(response.status).toBe(200);
   const payload = (await response.json()) as {
     download_url: string;
     expires_at_utc: string;
   };
-  assert.deepEqual(Object.keys(payload).sort(), ["download_url", "expires_at_utc"]);
-  assert.match(payload.download_url, /^https:\/\/example\.com\/replays\/replay_/);
-  assert.match(payload.expires_at_utc, /^\d{4}-\d{2}-\d{2}T/);
+  expect(Object.keys(payload).sort()).toEqual(["download_url", "expires_at_utc"]);
+  expect(payload.download_url).toMatch(/^https:\/\/example\.com\/replays\/replay_/);
+  expect(payload.expires_at_utc).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
-  const token = payload.download_url.split("/").pop();
-  assert.ok(token);
-  const replayToken = env.DB.v3ReplayTokens.get(token ?? "");
-  assert.equal(replayToken?.requested_by_player_account_id, "player-account-001");
-  assert.equal(replayToken?.expires_at_utc, payload.expires_at_utc);
+  const replayToken = await selectFirst<{
+    requested_by_player_account_id: string;
+    expires_at_utc: string;
+  }>(
+    env.DB,
+    `
+      SELECT requested_by_player_account_id, expires_at_utc
+      FROM replay_tokens
+      WHERE token = ?
+    `,
+    payload.download_url.split("/").pop() ?? "",
+  );
+  expect(replayToken?.requested_by_player_account_id).toBe("player-account-001");
+  expect(replayToken?.expires_at_utc).toBe(payload.expires_at_utc);
 });
 
 test("download replay accepts valid short-lived token", async () => {
-  const env = buildEnv();
-  await insertToken(env.DB, "tok-player-001", "player-account-001", "2026-01-01T00:00:00Z");
-  env.DB.v3ReplayTokens.set("token-valid", {
+  await insertUserToken("tok-player-001", "player-account-001");
+  await insertReplayToken(env.DB, {
     token: "token-valid",
-    battle_id: "battle-owned",
-    requested_by_player_account_id: "player-account-001",
-    expires_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    created_at_utc: new Date().toISOString(),
-    used_at_utc: null,
-    revoked_at_utc: null,
+    battleId: "battle-owned",
+    requestedByPlayerAccountId: "player-account-001",
+    expiresAtUtc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    createdAtUtc: new Date().toISOString(),
   });
-  env.DB.v3Battles.set("battle-owned", {
-    battle_id: "battle-owned",
-    run_id: "run-owned",
-    installation_id: "inst_replay",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-owned",
-    recorded_at_utc: new Date().toISOString(),
-    day: 9,
-    player_name: "Remote",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1600,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1610,
-    opponent_level: 11,
-    result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+  await insertReplayArtifact({
+    battleId: "battle-owned",
+    bundleId: "bundle-owned",
+    runId: "run-owned",
+    objectKey: "run-bundles/remote-player/inst_replay/run-owned/payload-hash.mpack.gz",
+    opponentAccountId: "player-account-001",
+    bodyText: '{"battle_id":"battle-owned"}',
   });
-  env.DB.v3RunBundles.set("bundle-owned", {
-    bundle_id: "bundle-owned",
-    installation_id: "inst_replay",
-    player_account_id: "remote-player",
-    run_id: "run-owned",
-    payload_hash: "payload-hash",
-    schema_version: 3,
-    object_key: "run-bundles/remote-player/inst_replay/run-owned/payload-hash.mpack.gz",
-    codec: "application/json",
-    size_bytes: 12,
-    submitted_at_utc: new Date().toISOString(),
-    created_at_utc: new Date().toISOString(),
-  });
-  await env.RUN_BUNDLE_BUCKET.put(
-    "run-bundles/remote-player/inst_replay/run-owned/payload-hash.mpack.gz",
-    new TextEncoder().encode('{"battle_id":"battle-owned"}'),
-    {
-      httpMetadata: { contentType: "application/json" },
-    },
-  );
 
   const response = await worker.fetch(
     new Request("https://example.com/replays/token-valid", {
@@ -294,58 +323,26 @@ test("download replay accepts valid short-lived token", async () => {
     env as never,
   );
 
-  assert.equal(response.status, 200);
-  assert.equal(await response.text(), '{"battle_id":"battle-owned"}');
+  expect(response.status).toBe(200);
+  expect(await response.text()).toBe('{"battle_id":"battle-owned"}');
 });
 
 test("download replay returns artifact_expired when artifact is no longer available", async () => {
-  const env = buildEnv();
-  await insertToken(env.DB, "tok-player-001", "player-account-001", "2026-01-01T00:00:00Z");
-  env.DB.v3ReplayTokens.set("token-expired-artifact", {
+  await insertUserToken("tok-player-001", "player-account-001");
+  await insertReplayToken(env.DB, {
     token: "token-expired-artifact",
-    battle_id: "battle-expired",
-    requested_by_player_account_id: "player-account-001",
-    expires_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    created_at_utc: new Date().toISOString(),
-    used_at_utc: null,
-    revoked_at_utc: null,
+    battleId: "battle-expired",
+    requestedByPlayerAccountId: "player-account-001",
+    expiresAtUtc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    createdAtUtc: new Date().toISOString(),
   });
-  env.DB.v3Battles.set("battle-expired", {
-    battle_id: "battle-expired",
-    run_id: "run-expired",
-    installation_id: "inst_replay",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-expired",
-    recorded_at_utc: new Date().toISOString(),
-    day: 9,
-    player_name: "Remote",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1600,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1610,
-    opponent_level: 11,
-    result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
-  });
-  env.DB.v3RunBundles.set("bundle-expired", {
-    bundle_id: "bundle-expired",
-    installation_id: "inst_replay",
-    player_account_id: "remote-player",
-    run_id: "run-expired",
-    payload_hash: "payload-hash-expired",
-    schema_version: 3,
-    object_key: "run-bundles/remote-player/inst_replay/run-expired/payload-hash-expired.mpack.gz",
-    codec: "application/json",
-    size_bytes: 12,
-    submitted_at_utc: new Date().toISOString(),
-    created_at_utc: new Date().toISOString(),
+  await insertReplayArtifact({
+    battleId: "battle-expired",
+    bundleId: "bundle-expired",
+    runId: "run-expired",
+    objectKey:
+      "run-bundles/remote-player/inst_replay/run-expired/payload-hash-expired.mpack.gz",
+    opponentAccountId: "player-account-001",
   });
 
   const response = await worker.fetch(
@@ -358,45 +355,42 @@ test("download replay returns artifact_expired when artifact is no longer availa
     env as never,
   );
 
-  assert.equal(response.status, 410);
-  assert.deepEqual(await response.json(), { error: "artifact_expired" });
+  expect(response.status).toBe(410);
+  expect(await response.json()).toEqual({ error: "artifact_expired" });
 });
 
 test("download replay rejects a token created for another player", async () => {
-  const env = buildEnv();
-  await insertToken(env.DB, "tok-player-001", "player-account-001", "2026-01-01T00:00:00Z");
-  env.DB.v3ReplayTokens.set("token-foreign", {
+  await insertUserToken("tok-player-001", "player-account-001");
+  await insertReplayToken(env.DB, {
     token: "token-foreign",
-    battle_id: "battle-owned",
-    requested_by_player_account_id: "other-player",
-    expires_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    created_at_utc: new Date().toISOString(),
-    used_at_utc: null,
-    revoked_at_utc: null,
+    battleId: "battle-owned",
+    requestedByPlayerAccountId: "other-player",
+    expiresAtUtc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    createdAtUtc: new Date().toISOString(),
   });
-  env.DB.v3Battles.set("battle-owned", {
-    battle_id: "battle-owned",
-    run_id: "run-owned",
-    installation_id: "inst_replay",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-owned",
-    recorded_at_utc: new Date().toISOString(),
+  await insertV3Battle(env.DB, {
+    battleId: "battle-owned",
+    runId: "run-owned",
+    installationId: "inst_replay",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-owned",
+    recordedAtUtc: new Date().toISOString(),
     day: 9,
-    player_name: "Remote",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1600,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1610,
-    opponent_level: 11,
+    playerName: "Remote",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    playerRank: "Gold",
+    playerRating: 1600,
+    playerLevel: 10,
+    opponentName: "Local",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    opponentRank: "Gold",
+    opponentRating: 1610,
+    opponentLevel: 11,
     result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+    replayAvailable: 1,
+    updatedAtUtc: new Date().toISOString(),
   });
 
   const response = await worker.fetch(
@@ -409,66 +403,28 @@ test("download replay rejects a token created for another player", async () => {
     env as never,
   );
 
-  assert.equal(response.status, 403);
-  assert.deepEqual(await response.json(), { error: "replay_token_forbidden" });
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ error: "replay_token_forbidden" });
 });
 
 test("download replay allows bearer-token access when unauthenticated downloads are enabled", async () => {
-  const env = buildEnv();
   env.ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS = "true";
-  env.DB.v3ReplayTokens.set("token-public", {
+  await insertReplayToken(env.DB, {
     token: "token-public",
-    battle_id: "battle-public",
-    requested_by_player_account_id: "other-player",
-    expires_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    created_at_utc: new Date().toISOString(),
-    used_at_utc: null,
-    revoked_at_utc: null,
+    battleId: "battle-public",
+    requestedByPlayerAccountId: "other-player",
+    expiresAtUtc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    createdAtUtc: new Date().toISOString(),
   });
-  env.DB.v3Battles.set("battle-public", {
-    battle_id: "battle-public",
-    run_id: "run-public",
-    installation_id: "inst_remote",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-public",
-    recorded_at_utc: new Date().toISOString(),
-    day: 9,
-    player_name: "Remote",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1600,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-001",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1610,
-    opponent_level: 11,
-    result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+  await insertReplayArtifact({
+    battleId: "battle-public",
+    bundleId: "bundle-public",
+    runId: "run-public",
+    objectKey:
+      "run-bundles/remote-player/inst_replay/run-public/payload-hash-public.mpack.gz",
+    opponentAccountId: "player-account-001",
+    bodyText: '{"battle_id":"battle-public"}',
   });
-  env.DB.v3RunBundles.set("bundle-public", {
-    bundle_id: "bundle-public",
-    installation_id: "inst_remote",
-    player_account_id: "remote-player",
-    run_id: "run-public",
-    payload_hash: "payload-hash-public",
-    schema_version: 3,
-    object_key: "run-bundles/remote-player/inst_remote/run-public/payload-hash-public.mpack.gz",
-    codec: "application/json",
-    size_bytes: 12,
-    submitted_at_utc: new Date().toISOString(),
-    created_at_utc: new Date().toISOString(),
-  });
-  await env.RUN_BUNDLE_BUCKET.put(
-    "run-bundles/remote-player/inst_remote/run-public/payload-hash-public.mpack.gz",
-    new TextEncoder().encode('{"battle_id":"battle-public"}'),
-    {
-      httpMetadata: { contentType: "application/json" },
-    },
-  );
 
   const response = await worker.fetch(
     new Request("https://example.com/replays/token-public", {
@@ -477,66 +433,28 @@ test("download replay allows bearer-token access when unauthenticated downloads 
     env as never,
   );
 
-  assert.equal(response.status, 200);
-  assert.equal(await response.text(), '{"battle_id":"battle-public"}');
+  expect(response.status).toBe(200);
+  expect(await response.text()).toBe('{"battle_id":"battle-public"}');
 });
 
 test("download replay accepts bearer requests without installation headers", async () => {
-  const env = buildEnv();
-  await insertToken(env.DB, "tok-unsigned", "player-account-unsigned", "2026-01-01T00:00:00Z");
-  env.DB.v3ReplayTokens.set("token-unsigned", {
+  await insertUserToken("tok-unsigned", "player-account-unsigned");
+  await insertReplayToken(env.DB, {
     token: "token-unsigned",
-    battle_id: "battle-owned-unsigned",
-    requested_by_player_account_id: "player-account-unsigned",
-    expires_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    created_at_utc: new Date().toISOString(),
-    used_at_utc: null,
-    revoked_at_utc: null,
+    battleId: "battle-owned-unsigned",
+    requestedByPlayerAccountId: "player-account-unsigned",
+    expiresAtUtc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    createdAtUtc: new Date().toISOString(),
   });
-  env.DB.v3Battles.set("battle-owned-unsigned", {
-    battle_id: "battle-owned-unsigned",
-    run_id: "run-owned-unsigned",
-    installation_id: "inst_remote",
-    player_account_id: "remote-player",
-    bundle_id: "bundle-owned-unsigned",
-    recorded_at_utc: new Date().toISOString(),
-    day: 9,
-    player_name: "Remote",
-    player_account_id_in_payload: "remote-player",
-    player_hero: "HeroA",
-    player_rank: "Gold",
-    player_rating: 1600,
-    player_level: 10,
-    opponent_name: "Local",
-    opponent_account_id: "player-account-unsigned",
-    opponent_hero: "HeroB",
-    opponent_rank: "Gold",
-    opponent_rating: 1610,
-    opponent_level: 11,
-    result: "Won",
-    replay_available: 1,
-    updated_at_utc: new Date().toISOString(),
+  await insertReplayArtifact({
+    battleId: "battle-owned-unsigned",
+    bundleId: "bundle-owned-unsigned",
+    runId: "run-owned-unsigned",
+    objectKey:
+      "run-bundles/remote-player/inst_replay/run-owned-unsigned/payload-hash-unsigned.mpack.gz",
+    opponentAccountId: "player-account-unsigned",
+    bodyText: '{"battle_id":"battle-owned-unsigned"}',
   });
-  env.DB.v3RunBundles.set("bundle-owned-unsigned", {
-    bundle_id: "bundle-owned-unsigned",
-    installation_id: "inst_remote",
-    player_account_id: "remote-player",
-    run_id: "run-owned-unsigned",
-    payload_hash: "payload-hash-unsigned",
-    schema_version: 3,
-    object_key: "run-bundles/remote-player/inst_remote/run-owned-unsigned/payload-hash-unsigned.mpack.gz",
-    codec: "application/json",
-    size_bytes: 12,
-    submitted_at_utc: new Date().toISOString(),
-    created_at_utc: new Date().toISOString(),
-  });
-  await env.RUN_BUNDLE_BUCKET.put(
-    "run-bundles/remote-player/inst_remote/run-owned-unsigned/payload-hash-unsigned.mpack.gz",
-    new TextEncoder().encode('{"battle_id":"battle-owned-unsigned"}'),
-    {
-      httpMetadata: { contentType: "application/json" },
-    },
-  );
 
   const response = await worker.fetch(
     new Request("https://example.com/replays/token-unsigned", {
@@ -548,6 +466,6 @@ test("download replay accepts bearer requests without installation headers", asy
     env as never,
   );
 
-  assert.equal(response.status, 200);
-  assert.equal(await response.text(), '{"battle_id":"battle-owned-unsigned"}');
+  expect(response.status).toBe(200);
+  expect(await response.text()).toBe('{"battle_id":"battle-owned-unsigned"}');
 });
