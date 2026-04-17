@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Core.Events;
-using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.RunLogging.Models;
 
@@ -14,6 +14,7 @@ internal sealed class RunLoggingModule
     );
 
     private readonly IBppEventBus _eventBus;
+    private readonly IRunContext _runContext;
     private readonly RunLogSessionManager _sessionManager;
     private readonly RunLoggingControllerCore _core;
     private readonly Func<bool> _hasPendingReplayPersistence;
@@ -33,6 +34,7 @@ internal sealed class RunLoggingModule
 
     public RunLoggingModule(
         IBppEventBus eventBus,
+        IRunContext runContext,
         RunLogSessionManager sessionManager,
         RunLoggingControllerCore core,
         Func<bool> hasPendingReplayPersistence,
@@ -43,6 +45,7 @@ internal sealed class RunLoggingModule
     )
         : this(
             eventBus,
+            runContext,
             sessionManager,
             core,
             hasPendingReplayPersistence,
@@ -55,6 +58,7 @@ internal sealed class RunLoggingModule
 
     public RunLoggingModule(
         IBppEventBus eventBus,
+        IRunContext runContext,
         RunLogSessionManager sessionManager,
         RunLoggingControllerCore core,
         Func<bool> hasPendingReplayPersistence,
@@ -66,6 +70,7 @@ internal sealed class RunLoggingModule
     )
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _runContext = runContext ?? throw new ArgumentNullException(nameof(runContext));
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _core = core ?? throw new ArgumentNullException(nameof(core));
         _hasPendingReplayPersistence =
@@ -128,7 +133,7 @@ internal sealed class RunLoggingModule
     {
         try
         {
-            if (!BppRuntimeHost.RunContext.IsInGameRun)
+            if (!_runContext.IsInGameRun)
                 return;
 
             HandleRunActivation(observed.RunId);
@@ -145,7 +150,7 @@ internal sealed class RunLoggingModule
         {
             if (change.IsInGameRun)
             {
-                HandleRunActivation(BppRuntimeHost.RunContext.CurrentServerRunId);
+                HandleRunActivation(_runContext.CurrentServerRunId);
                 return;
             }
 
@@ -181,7 +186,7 @@ internal sealed class RunLoggingModule
         try
         {
             var manifest = recorded.Manifest;
-            var inRun = BppRuntimeHost.RunContext.IsInGameRun;
+            var inRun = _runContext.IsInGameRun;
             if (
                 manifest == null
                 || !string.Equals(manifest.CombatKind, "PVPCombat", StringComparison.Ordinal)
@@ -223,7 +228,7 @@ internal sealed class RunLoggingModule
     {
         try
         {
-            if (!BppRuntimeHost.RunContext.IsInGameRun)
+            if (!_runContext.IsInGameRun)
                 TryCompleteDeferredRunExit();
         }
         catch (Exception ex)
@@ -365,7 +370,7 @@ internal sealed class RunLoggingModule
         )
             return;
 
-        var currentRunId = BppRuntimeHost.RunContext.CurrentServerRunId;
+        var currentRunId = _runContext.CurrentServerRunId;
         var activeSession = _sessionManager.ActiveSession;
         if (
             activeSession != null

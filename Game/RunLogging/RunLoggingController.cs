@@ -50,6 +50,7 @@ internal sealed class RunLoggingController : MonoBehaviour
         _core = new RunLoggingControllerCore(_sessionManager, _captureService);
         _module = new RunLoggingModule(
             services.EventBus,
+            services.RunContext,
             _sessionManager,
             _core,
             () => CombatReplayRuntime.Instance?.HasPendingPersistence == true,
