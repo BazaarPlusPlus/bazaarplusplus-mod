@@ -54,11 +54,6 @@ type RunBundleRequest = {
   battle_projections?: BattleProjection[];
 };
 
-type ExistingRunBundleRow = {
-  bundle_id: string;
-  object_key: string;
-};
-
 const AnonymousPlayerAccountId = "anonymous-player";
 const LegacyInstallationId = "legacy";
 const KnownPlayerAccountMarker = "1";
@@ -253,55 +248,46 @@ export async function handleUploadRunBundle(
   });
 
   const createdAtUtc = new Date().toISOString();
-  const existingBundle = await env.DB.prepare(
+  // bundle_id is deterministically the run_id: one run -> one run_bundles row.
+  // INSERT OR REPLACE absorbs three cases with zero reads:
+  //   - fresh run        -> plain INSERT
+  //   - progress update  -> PK conflict on bundle_id, replace in place
+  //   - transition row   -> UNIQUE(installation_id, run_id, payload_hash) conflict
+  //                         with a pre-existing uuid-style bundle; old row is dropped
+  //                         and the run_id-keyed row wins. Retention cleans up the
+  //                         orphan R2 object. Safe to simplify after transition.
+  const bundleId = runId;
+  await env.DB.prepare(
     `
-      SELECT
+      INSERT OR REPLACE INTO run_bundles (
         bundle_id,
-        object_key
-      FROM run_bundles
-      WHERE player_account_id = ?
-        AND run_id = ?
-        AND payload_hash = ?
+        installation_id,
+        player_account_id,
+        run_id,
+        payload_hash,
+        schema_version,
+        object_key,
+        codec,
+        size_bytes,
+        submitted_at_utc,
+        created_at_utc
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
   )
-    .bind(persistedPlayerAccountId, runId, payloadHash)
-    .first<ExistingRunBundleRow>();
-  const bundleId = existingBundle?.bundle_id ?? `bundle_${crypto.randomUUID().replace(/-/g, "")}`;
-  const persistedObjectKey = existingBundle?.object_key ?? objectKey;
-
-  if (!existingBundle) {
-    await env.DB.prepare(
-      `
-        INSERT INTO run_bundles (
-          bundle_id,
-          installation_id,
-          player_account_id,
-          run_id,
-          payload_hash,
-          schema_version,
-          object_key,
-          codec,
-          size_bytes,
-          submitted_at_utc,
-          created_at_utc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+    .bind(
+      bundleId,
+      LegacyInstallationId,
+      persistedPlayerAccountId,
+      runId,
+      payloadHash,
+      schemaVersion,
+      objectKey,
+      artifactCodec,
+      artifactBytes.byteLength,
+      submittedAtUtc,
+      createdAtUtc,
     )
-      .bind(
-        bundleId,
-        LegacyInstallationId,
-        persistedPlayerAccountId,
-        runId,
-        payloadHash,
-        schemaVersion,
-        objectKey,
-        artifactCodec,
-        artifactBytes.byteLength,
-        submittedAtUtc,
-        createdAtUtc,
-      )
-      .run();
-  }
+    .run();
 
   await env.DB.prepare(
     `
@@ -458,5 +444,5 @@ export async function handleUploadRunBundle(
     await env.DB.batch(battleStatements);
   }
 
-  return json({ status: "accepted", bundle_id: bundleId, object_key: persistedObjectKey });
+  return json({ status: "accepted", bundle_id: bundleId, object_key: objectKey });
 }
