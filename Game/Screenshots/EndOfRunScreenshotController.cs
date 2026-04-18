@@ -16,7 +16,7 @@ namespace BazaarPlusPlus.Game.Screenshots;
 internal sealed class EndOfRunScreenshotController : MonoBehaviour
 {
     private const float CaptureRetryCooldownSeconds = 1f;
-    private const float FirstCaptureDelaySeconds = 10f;
+    private const float FirstCaptureDelaySeconds = 8f;
     private static readonly System.Reflection.MethodInfo ContinueClickMethod = AccessTools.Method(
         typeof(EndOfRunScreenController),
         "OnContinueClick"
