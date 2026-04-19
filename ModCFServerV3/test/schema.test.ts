@@ -2,6 +2,8 @@ import { expect, test } from "vitest";
 
 import authSimplificationSql from "../migrations/0002_auth_simplification.sql?raw";
 import runsEndedAtIndexSql from "../migrations/0005_runs_ended_at_index.sql?raw";
+import runBundlesCreatedAtIndexSql from "../migrations/0006_run_bundles_created_at_index.sql?raw";
+import runsUpdatedAtIndexSql from "../migrations/0007_runs_updated_at_index.sql?raw";
 import initialSchemaSql from "../migrations/0001_initial_schema.sql?raw";
 
 function getTableSection(sql: string, tableName: string): string {
@@ -56,5 +58,17 @@ test("auth simplification migration creates tokens and drops installation tables
 test("runs ended_at index migration adds the mirror sync index", () => {
   expect(runsEndedAtIndexSql).toMatch(
     /CREATE INDEX IF NOT EXISTS idx_runs_ended_at\s+ON runs \(ended_at_utc, run_id\);/,
+  );
+});
+
+test("run_bundles created_at index migration adds the server-clock mirror index", () => {
+  expect(runBundlesCreatedAtIndexSql).toMatch(
+    /CREATE INDEX IF NOT EXISTS idx_run_bundles_created_at\s+ON run_bundles \(created_at_utc, bundle_id\);/,
+  );
+});
+
+test("runs updated_at index migration adds the server-clock mirror index", () => {
+  expect(runsUpdatedAtIndexSql).toMatch(
+    /CREATE INDEX IF NOT EXISTS idx_runs_updated_at\s+ON runs \(updated_at_utc, run_id\);/,
   );
 });
