@@ -12,6 +12,4 @@ internal interface IPathService
     string? ScreenshotsDirectoryPath { get; }
 
     string? IdentityDirectoryPath { get; }
-
-    string? IdentityDatabasePath { get; }
 }

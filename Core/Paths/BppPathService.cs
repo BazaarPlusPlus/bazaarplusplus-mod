@@ -14,8 +14,6 @@ internal sealed class BppPathService : IPathService
 
     public string? IdentityDirectoryPath { get; private set; }
 
-    public string? IdentityDatabasePath { get; private set; }
-
     public void Initialize()
     {
         CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
@@ -39,6 +37,5 @@ internal sealed class BppPathService : IPathService
             "BazaarPlusPlus",
             "Identity"
         );
-        IdentityDatabasePath = System.IO.Path.Combine(IdentityDirectoryPath, "identity.db");
     }
 }

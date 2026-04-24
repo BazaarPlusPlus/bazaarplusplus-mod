@@ -1,33 +1,38 @@
 #nullable enable
 using System;
-using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.Identity;
 
 public sealed class PlayerObservationStore
 {
-    private readonly IdentityDatabase _database;
+    private const int CurrentSchemaVersion = 1;
+    private readonly string _identityDirectoryPath;
 
-    public PlayerObservationStore(IdentityDatabase database)
+    public PlayerObservationStore(string identityDirectoryPath)
     {
-        _database = database ?? throw new ArgumentNullException(nameof(database));
+        _identityDirectoryPath = identityDirectoryPath
+            ?? throw new ArgumentNullException(nameof(identityDirectoryPath));
     }
 
     public bool TryLoad(out PlayerObservationRecord? record)
     {
-        using var cmd = _database.Connection.CreateCommand();
-        cmd.CommandText =
-            "SELECT player_account_id, player_username, observed_at_utc FROM player_observation WHERE id = 1";
-        using var reader = cmd.ExecuteReader();
-        if (!reader.Read())
+        record = null;
+        if (
+            !IdentityJsonFileStore.TryRead<PlayerObservationFile>(
+                IdentityJsonFileStore.ObservationPath(_identityDirectoryPath),
+                out var payload
+            )
+            || payload == null
+            || !payload.IsValid()
+        )
         {
-            record = null;
             return false;
         }
+
         record = new PlayerObservationRecord(
-            reader.GetString(0),
-            reader.GetString(1),
-            reader.GetString(2)
+            payload.PlayerAccountId!,
+            payload.PlayerUsername!,
+            payload.ObservedAtUtc!
         );
         return true;
     }
@@ -37,18 +42,33 @@ public sealed class PlayerObservationStore
         if (record == null)
             throw new ArgumentNullException(nameof(record));
 
-        using var cmd = _database.Connection.CreateCommand();
-        cmd.CommandText =
-            @"
-            INSERT INTO player_observation (id, player_account_id, player_username, observed_at_utc)
-            VALUES (1, $p, $u, $t)
-            ON CONFLICT(id) DO UPDATE SET
-              player_account_id = excluded.player_account_id,
-              player_username   = excluded.player_username,
-              observed_at_utc   = excluded.observed_at_utc";
-        cmd.Parameters.AddWithValue("$p", record.PlayerAccountId);
-        cmd.Parameters.AddWithValue("$u", record.PlayerUsername);
-        cmd.Parameters.AddWithValue("$t", record.ObservedAtUtc);
-        cmd.ExecuteNonQuery();
+        IdentityJsonFileStore.Write(
+            IdentityJsonFileStore.ObservationPath(_identityDirectoryPath),
+            new PlayerObservationFile
+            {
+                SchemaVersion = CurrentSchemaVersion,
+                PlayerAccountId = record.PlayerAccountId,
+                PlayerUsername = record.PlayerUsername,
+                ObservedAtUtc = record.ObservedAtUtc,
+            }
+        );
+        IdentityJsonFileStore.DeleteLegacyDatabaseFiles(_identityDirectoryPath);
+    }
+
+    private sealed class PlayerObservationFile
+    {
+        public int SchemaVersion { get; set; }
+
+        public string? PlayerAccountId { get; set; }
+
+        public string? PlayerUsername { get; set; }
+
+        public string? ObservedAtUtc { get; set; }
+
+        public bool IsValid() =>
+            SchemaVersion == CurrentSchemaVersion
+            && !string.IsNullOrWhiteSpace(PlayerAccountId)
+            && !string.IsNullOrWhiteSpace(PlayerUsername)
+            && !string.IsNullOrWhiteSpace(ObservedAtUtc);
     }
 }

@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using BazaarPlusPlus.Game.Identity;
-using Microsoft.Data.Sqlite;
 
 internal static class Program
 {
@@ -9,17 +8,15 @@ internal static class Program
 
     private static void Main()
     {
-        RunTest("Open_CreatesSchema", Open_CreatesSchema);
-        RunTest("Open_IsIdempotent", Open_IsIdempotent);
         RunTest("AuthStore_TryLoad_WhenEmpty", AuthStore_TryLoad_WhenEmpty);
-        RunTest("AuthStore_Upsert_ThenLoad", AuthStore_Upsert_ThenLoad);
-        RunTest("AuthStore_Delete_ClearsRow", AuthStore_Delete_ClearsRow);
+        RunTest("AuthStore_Upsert_WritesJson", AuthStore_Upsert_WritesJson);
+        RunTest("AuthStore_Delete_ClearsJsonAndLegacyFiles", AuthStore_Delete_ClearsJsonAndLegacyFiles);
         RunTest(
             "PlayerObservationStore_TryLoad_WhenEmpty",
             PlayerObservationStore_TryLoad_WhenEmpty
         );
         RunTest("PlayerObservationStore_SaveThenLoad", PlayerObservationStore_SaveThenLoad);
-        RunTest("PlayerObservationStore_Save_Upserts", PlayerObservationStore_Save_Upserts);
+        RunTest("PlayerObservationStore_Save_UpsertsJson", PlayerObservationStore_Save_UpsertsJson);
 
         if (_failures > 0)
             Environment.Exit(1);
@@ -40,145 +37,104 @@ internal static class Program
         }
     }
 
-    private static string TempDbPath() =>
-        Path.Combine(Path.GetTempPath(), $"identity-test-{Guid.NewGuid():N}.db");
+    private static string TempIdentityDirectory() =>
+        Path.Combine(Path.GetTempPath(), $"identity-json-test-{Guid.NewGuid():N}");
 
-    private static void Open_CreatesSchema()
+    private static void WithTempIdentityDirectory(Action<string> body)
     {
-        var path = TempDbPath();
+        var directory = TempIdentityDirectory();
         try
         {
-            using var db = new IdentityDatabase(path);
-            db.Open();
-            using var cmd = db.Connection.CreateCommand();
-            cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name";
-            using var reader = cmd.ExecuteReader();
-            var names = new System.Collections.Generic.List<string>();
-            while (reader.Read())
-                names.Add(reader.GetString(0));
-            if (!names.Contains("auth"))
-                throw new Exception("auth table missing");
-            if (!names.Contains("player_observation"))
-                throw new Exception("player_observation missing");
+            body(directory);
         }
         finally
         {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-    }
-
-    private static void Open_IsIdempotent()
-    {
-        var path = TempDbPath();
-        try
-        {
-            using (var db1 = new IdentityDatabase(path))
-            {
-                db1.Open();
-            }
-            using (var db2 = new IdentityDatabase(path))
-            {
-                db2.Open();
-            } // should not throw
-        }
-        finally
-        {
-            if (File.Exists(path))
-                File.Delete(path);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
         }
     }
 
     private static void AuthStore_TryLoad_WhenEmpty()
     {
-        var path = TempDbPath();
-        try
+        WithTempIdentityDirectory(directory =>
         {
-            using var db = new IdentityDatabase(path);
-            db.Open();
-            var store = new AuthStore(db);
+            var store = new AuthStore(directory);
             if (store.TryLoad(out _))
                 throw new Exception("expected empty store to return false");
-        }
-        finally
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
+        });
     }
 
-    private static void AuthStore_Upsert_ThenLoad()
+    private static void AuthStore_Upsert_WritesJson()
     {
-        var path = TempDbPath();
-        try
+        WithTempIdentityDirectory(directory =>
         {
-            using var db = new IdentityDatabase(path);
-            db.Open();
-            var store = new AuthStore(db);
+            var store = new AuthStore(directory);
             var rec = new AuthRecord("tok_xyz", "player_123", "alice", "2026-04-17T00:00:00Z");
             store.Upsert(rec);
+
+            var path = Path.Combine(directory, "auth.v1.json");
+            var json = File.ReadAllText(path);
+            if (!json.Contains("\"token\":\"tok_xyz\""))
+                throw new Exception("auth JSON token missing");
+
             if (!store.TryLoad(out var loaded))
                 throw new Exception("load returned false");
             if (loaded!.Token != "tok_xyz")
                 throw new Exception("token mismatch");
             if (loaded.PlayerAccountId != "player_123")
                 throw new Exception("account id mismatch");
-        }
-        finally
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
+        });
     }
 
-    private static void AuthStore_Delete_ClearsRow()
+    private static void AuthStore_Delete_ClearsJsonAndLegacyFiles()
     {
-        var path = TempDbPath();
-        try
+        WithTempIdentityDirectory(directory =>
         {
-            using var db = new IdentityDatabase(path);
-            db.Open();
-            var store = new AuthStore(db);
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, "identity.db"), "legacy");
+            File.WriteAllText(Path.Combine(directory, "identity.db-wal"), "legacy");
+            File.WriteAllText(Path.Combine(directory, "identity.db-shm"), "legacy");
+
+            var store = new AuthStore(directory);
             store.Upsert(new AuthRecord("t", "p", "u", "2026-04-17T00:00:00Z"));
             store.Delete();
+
             if (store.TryLoad(out _))
                 throw new Exception("expected empty after delete");
-        }
-        finally
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
+            if (File.Exists(Path.Combine(directory, "auth.v1.json")))
+                throw new Exception("auth JSON should be deleted");
+            if (File.Exists(Path.Combine(directory, "identity.db")))
+                throw new Exception("legacy identity.db should be deleted");
+            if (File.Exists(Path.Combine(directory, "identity.db-wal")))
+                throw new Exception("legacy identity.db-wal should be deleted");
+            if (File.Exists(Path.Combine(directory, "identity.db-shm")))
+                throw new Exception("legacy identity.db-shm should be deleted");
+        });
     }
 
     private static void PlayerObservationStore_TryLoad_WhenEmpty()
     {
-        var path = TempDbPath();
-        try
+        WithTempIdentityDirectory(directory =>
         {
-            using var db = new IdentityDatabase(path);
-            db.Open();
-            var store = new PlayerObservationStore(db);
+            var store = new PlayerObservationStore(directory);
             if (store.TryLoad(out _))
                 throw new Exception("expected empty observation store");
-        }
-        finally
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
+        });
     }
 
     private static void PlayerObservationStore_SaveThenLoad()
     {
-        var path = TempDbPath();
-        try
+        WithTempIdentityDirectory(directory =>
         {
-            using var db = new IdentityDatabase(path);
-            db.Open();
-            var store = new PlayerObservationStore(db);
+            var store = new PlayerObservationStore(directory);
             var record = new PlayerObservationRecord("player_abc", "bob", "2026-04-17T10:00:00Z");
             store.Save(record);
+
+            var path = Path.Combine(directory, "observation.v1.json");
+            var json = File.ReadAllText(path);
+            if (!json.Contains("\"player_account_id\":\"player_abc\""))
+                throw new Exception("observation JSON account id missing");
+
             if (!store.TryLoad(out var loaded))
                 throw new Exception("load returned false");
             if (loaded!.PlayerAccountId != "player_abc")
@@ -187,35 +143,23 @@ internal static class Program
                 throw new Exception("username mismatch");
             if (loaded.ObservedAtUtc != "2026-04-17T10:00:00Z")
                 throw new Exception("timestamp mismatch");
-        }
-        finally
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
+        });
     }
 
-    private static void PlayerObservationStore_Save_Upserts()
+    private static void PlayerObservationStore_Save_UpsertsJson()
     {
-        var path = TempDbPath();
-        try
+        WithTempIdentityDirectory(directory =>
         {
-            using var db = new IdentityDatabase(path);
-            db.Open();
-            var store = new PlayerObservationStore(db);
+            var store = new PlayerObservationStore(directory);
             store.Save(new PlayerObservationRecord("p1", "u1", "2026-04-17T10:00:00Z"));
             store.Save(new PlayerObservationRecord("p2", "u2", "2026-04-17T11:00:00Z"));
+
             if (!store.TryLoad(out var loaded))
                 throw new Exception("load returned false");
             if (loaded!.PlayerAccountId != "p2")
                 throw new Exception("expected upsert to most recent");
             if (loaded.PlayerUsername != "u2")
                 throw new Exception("username not updated");
-        }
-        finally
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
+        });
     }
 }

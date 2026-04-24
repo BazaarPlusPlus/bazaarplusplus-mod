@@ -49,6 +49,33 @@ build_all() {
     clear_macos_sqlite_quarantine
 }
 
+test_all() {
+    clear_macos_sqlite_quarantine
+
+    local project
+    local failures=()
+    while IFS= read -r project; do
+        echo -e "${CYAN}== Testing ${GREEN}${project}${CYAN} ==${RESET}"
+        if grep -q "Microsoft.NET.Test.Sdk" "$project"; then
+            if ! dotnet test "$project"; then
+                failures+=("$project")
+            fi
+        else
+            if ! dotnet run --project "$project"; then
+                failures+=("$project")
+            fi
+        fi
+    done < <(find tests -mindepth 2 -maxdepth 2 -name '*.csproj' | sort)
+
+    clear_macos_sqlite_quarantine
+
+    if ((${#failures[@]} > 0)); then
+        echo -e "${RED}Failed test projects:${RESET}" >&2
+        printf '  %s\n' "${failures[@]}" >&2
+        return 1
+    fi
+}
+
 format() {
     csharpier format .
 }
@@ -78,11 +105,12 @@ decompile_all() {
 case "$1" in
     all)  build_all ;;
     build)      build ;;
+    test)       test_all ;;
     format)     format ;;
     decompile)  decompile "$@" ;;
     decompile-all) decompile_all ;;
     *)
-        echo "Usage: $0 {all|build|format|decompile [DllName]|decompile-all}"
+        echo "Usage: $0 {all|build|test|format|decompile [DllName]|decompile-all}"
         exit 1
         ;;
 esac

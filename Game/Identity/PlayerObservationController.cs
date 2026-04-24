@@ -63,7 +63,7 @@ internal sealed class PlayerObservationController : MonoBehaviour
                 );
                 BppLog.Info(
                     "PlayerObservationController",
-                    $"Wrote player observation for account {playerAccountId} to identity.db."
+                    $"Wrote player observation for account {playerAccountId} to observation.v1.json."
                 );
             }
 

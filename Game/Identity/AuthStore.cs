@@ -1,58 +1,88 @@
 #nullable enable
-using Microsoft.Data.Sqlite;
+using System;
 
 namespace BazaarPlusPlus.Game.Identity
 {
     public sealed class AuthStore
     {
-        private readonly IdentityDatabase _database;
+        private const int CurrentSchemaVersion = 1;
+        private readonly string _identityDirectoryPath;
 
-        public AuthStore(IdentityDatabase database) => _database = database;
+        public AuthStore(string identityDirectoryPath)
+        {
+            _identityDirectoryPath = identityDirectoryPath
+                ?? throw new ArgumentNullException(nameof(identityDirectoryPath));
+        }
 
         public bool TryLoad(out AuthRecord? record)
         {
-            using var cmd = _database.Connection.CreateCommand();
-            cmd.CommandText =
-                "SELECT token, player_account_id, player_username, issued_at_utc FROM auth WHERE id = 1";
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read())
+            record = null;
+            if (
+                !IdentityJsonFileStore.TryRead<AuthRecordFile>(
+                    IdentityJsonFileStore.AuthPath(_identityDirectoryPath),
+                    out var payload
+                )
+                || payload == null
+                || !payload.IsValid()
+            )
             {
-                record = null;
                 return false;
             }
+
             record = new AuthRecord(
-                reader.GetString(0),
-                reader.GetString(1),
-                reader.GetString(2),
-                reader.GetString(3)
+                payload.Token!,
+                payload.PlayerAccountId!,
+                payload.PlayerUsername!,
+                payload.IssuedAtUtc!
             );
             return true;
         }
 
         public void Upsert(AuthRecord record)
         {
-            using var cmd = _database.Connection.CreateCommand();
-            cmd.CommandText =
-                @"
-                INSERT INTO auth (id, token, player_account_id, player_username, issued_at_utc)
-                VALUES (1, $t, $p, $u, $i)
-                ON CONFLICT(id) DO UPDATE SET
-                  token = excluded.token,
-                  player_account_id = excluded.player_account_id,
-                  player_username = excluded.player_username,
-                  issued_at_utc = excluded.issued_at_utc";
-            cmd.Parameters.AddWithValue("$t", record.Token);
-            cmd.Parameters.AddWithValue("$p", record.PlayerAccountId);
-            cmd.Parameters.AddWithValue("$u", record.PlayerUsername);
-            cmd.Parameters.AddWithValue("$i", record.IssuedAtUtc);
-            cmd.ExecuteNonQuery();
+            if (record == null)
+                throw new ArgumentNullException(nameof(record));
+
+            IdentityJsonFileStore.Write(
+                IdentityJsonFileStore.AuthPath(_identityDirectoryPath),
+                new AuthRecordFile
+                {
+                    SchemaVersion = CurrentSchemaVersion,
+                    Token = record.Token,
+                    PlayerAccountId = record.PlayerAccountId,
+                    PlayerUsername = record.PlayerUsername,
+                    IssuedAtUtc = record.IssuedAtUtc,
+                }
+            );
+            IdentityJsonFileStore.DeleteLegacyDatabaseFiles(_identityDirectoryPath);
         }
 
         public void Delete()
         {
-            using var cmd = _database.Connection.CreateCommand();
-            cmd.CommandText = "DELETE FROM auth WHERE id = 1";
-            cmd.ExecuteNonQuery();
+            IdentityJsonFileStore.DeleteIfExists(
+                IdentityJsonFileStore.AuthPath(_identityDirectoryPath)
+            );
+            IdentityJsonFileStore.DeleteLegacyDatabaseFiles(_identityDirectoryPath);
+        }
+
+        private sealed class AuthRecordFile
+        {
+            public int SchemaVersion { get; set; }
+
+            public string? Token { get; set; }
+
+            public string? PlayerAccountId { get; set; }
+
+            public string? PlayerUsername { get; set; }
+
+            public string? IssuedAtUtc { get; set; }
+
+            public bool IsValid() =>
+                SchemaVersion == CurrentSchemaVersion
+                && !string.IsNullOrWhiteSpace(Token)
+                && !string.IsNullOrWhiteSpace(PlayerAccountId)
+                && !string.IsNullOrWhiteSpace(PlayerUsername)
+                && !string.IsNullOrWhiteSpace(IssuedAtUtc);
         }
     }
 }

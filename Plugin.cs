@@ -31,7 +31,6 @@ public class Plugin : BaseUnityPlugin
 {
     private readonly Harmony _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
     private BppComposition? _composition;
-    private IdentityDatabase? _identityDatabase;
     private ModOnlineClient? _onlineClient;
     private AuthStore? _authStore;
     private PlayerObservationStore? _playerObservationStore;
@@ -111,20 +110,18 @@ public class Plugin : BaseUnityPlugin
 
     private void BuildIdentityAndOnlineServices(IBppServices services)
     {
-        var identityDatabasePath = services.Paths.IdentityDatabasePath;
-        if (string.IsNullOrWhiteSpace(identityDatabasePath))
+        var identityDirectoryPath = services.Paths.IdentityDirectoryPath;
+        if (string.IsNullOrWhiteSpace(identityDirectoryPath))
         {
             BppLog.Warn(
                 "Plugin",
-                "Identity database path unavailable; online services will be inactive."
+                "Identity directory path unavailable; online services will be inactive."
             );
             return;
         }
 
-        _identityDatabase = new IdentityDatabase(identityDatabasePath);
-        _identityDatabase.Open();
-        _authStore = new AuthStore(_identityDatabase);
-        _playerObservationStore = new PlayerObservationStore(_identityDatabase);
+        _authStore = new AuthStore(identityDirectoryPath);
+        _playerObservationStore = new PlayerObservationStore(identityDirectoryPath);
 
         var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
         if (routes == null)
@@ -138,7 +135,7 @@ public class Plugin : BaseUnityPlugin
             Timeout = TimeSpan.FromSeconds(Math.Max(10, V3UploadDefaults.RequestTimeoutSeconds)),
         };
         _onlineClient = new ModOnlineClient(httpClient, routes);
-        BppLog.Info("Plugin", "Identity database opened and online client ready.");
+        BppLog.Info("Plugin", "Identity JSON store and online client ready.");
     }
 
     private void ApplyHarmonyPatches()
@@ -249,8 +246,6 @@ public class Plugin : BaseUnityPlugin
         _onlineClient = null;
         _authStore = null;
         _playerObservationStore = null;
-        _identityDatabase?.Dispose();
-        _identityDatabase = null;
     }
 
     private void UnpatchHarmony()
