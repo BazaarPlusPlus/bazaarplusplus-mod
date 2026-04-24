@@ -487,7 +487,7 @@ internal sealed partial class CombatReplayRuntime
         public int VfxFailed;
     }
 
-    private static void WarmReplayAudioBanks()
+    private static async Task WarmReplayAudioBanksAsync()
     {
         try
         {
@@ -501,6 +501,16 @@ internal sealed partial class CombatReplayRuntime
                 return;
             }
 
+            var stats = new ReplayAudioWarmupStats();
+            var collectionManager = Services.Get<CollectionManager>();
+            if (collectionManager == null)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    "Saved replay audio warmup cannot resolve equipped board audio because CollectionManager is unavailable."
+                );
+            }
+
             var boardAssets = UnityEngine
                 .Object.FindObjectsOfType<HeroBoardController>(true)
                 .Where(controller =>
@@ -511,19 +521,33 @@ internal sealed partial class CombatReplayRuntime
                 .Distinct()
                 .ToList();
 
+            var playerBoard = await TryGetReplayPlayerBoardAsync(collectionManager);
+            AddReplayBoardAsset(boardAssets, playerBoard);
+
+            var opponentBoard = await TryGetReplayOpponentBoardAsync(collectionManager);
+            AddReplayBoardAsset(boardAssets, opponentBoard);
+
             if (boardAssets.Count == 0)
             {
                 BppLog.Warn(
                     "CombatReplayRuntime",
-                    "Saved replay audio warmup found no HeroBoardController instances in the scene."
+                    "Saved replay audio warmup found no player or opponent board assets."
                 );
-                return;
             }
 
             foreach (var boardAsset in boardAssets)
             {
-                WarmReplayAudioBank(soundManager, boardAsset!);
+                await WarmReplayBoardAudioAsync(soundManager, boardAsset!, stats);
             }
+
+            await WarmReplaySoundtracksAsync(soundManager, collectionManager, boardAssets, stats);
+
+            BppLog.Info(
+                "CombatReplayRuntime",
+                "Saved replay audio warmup finished: "
+                    + $"boardBanks(loaded={stats.BoardBanksLoaded}, alreadyLoaded={stats.BoardBanksAlreadyLoaded}, failed={stats.BoardBanksFailed}, skipped={stats.BoardBanksSkipped}) "
+                    + $"soundtrackBanks(loaded={stats.SoundtrackBanksLoaded}, alreadyLoaded={stats.SoundtrackBanksAlreadyLoaded}, failed={stats.SoundtrackBanksFailed}, skipped={stats.SoundtrackBanksSkipped})"
+            );
         }
         catch (Exception ex)
         {
@@ -531,7 +555,70 @@ internal sealed partial class CombatReplayRuntime
         }
     }
 
-    private static void WarmReplayAudioBank(SoundManager soundManager, BoardAssetDataSO boardAsset)
+    private static async Task<BoardAssetDataSO?> TryGetReplayPlayerBoardAsync(
+        CollectionManager? collectionManager
+    )
+    {
+        if (collectionManager == null)
+            return null;
+
+        try
+        {
+            return await collectionManager.GetEquippedBoard();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay audio warmup could not resolve player board audio: {ex.Message}"
+            );
+            return null;
+        }
+    }
+
+    private static async Task<BoardAssetDataSO?> TryGetReplayOpponentBoardAsync(
+        CollectionManager? collectionManager
+    )
+    {
+        var loadout = Data.SimPvpOpponent?.PlayerLoadout;
+        if (collectionManager == null || loadout == null)
+            return null;
+
+        try
+        {
+#pragma warning disable CS0618
+            return await collectionManager.GetEquippedBoard(loadout);
+#pragma warning restore CS0618
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay audio warmup could not resolve opponent board audio: {ex.Message}"
+            );
+            return null;
+        }
+    }
+
+    private static void AddReplayBoardAsset(
+        ICollection<BoardAssetDataSO> boardAssets,
+        BoardAssetDataSO? boardAsset
+    )
+    {
+        if (
+            boardAsset == null
+            || boardAssets.Any(existing => ReferenceEquals(existing, boardAsset))
+        )
+            return;
+
+        boardAssets.Add(boardAsset);
+    }
+
+    private static async Task WarmReplayBoardAudioAsync(
+        SoundManager soundManager,
+        BoardAssetDataSO boardAsset,
+        ReplayAudioWarmupStats stats
+    )
     {
         if (string.IsNullOrWhiteSpace(boardAsset.boardBank))
         {
@@ -539,6 +626,7 @@ internal sealed partial class CombatReplayRuntime
                 "CombatReplayRuntime",
                 $"Board '{boardAsset.name}' has no boardBank; replay SFX may be incomplete."
             );
+            stats.BoardBanksSkipped++;
             return;
         }
 
@@ -548,17 +636,239 @@ internal sealed partial class CombatReplayRuntime
                 "CombatReplayRuntime",
                 $"Board '{boardAsset.name}' has no boardAssetBank; replay SFX may be incomplete."
             );
+            stats.BoardBanksSkipped++;
             return;
         }
 
+        var wasMetadataLoaded = soundManager.IsBankLoaded(boardAsset.boardBank, isMetadata: false);
+        var wasAssetLoaded = soundManager.IsBankLoaded(boardAsset.boardAssetBank, isMetadata: false);
         BppLog.Info(
             "CombatReplayRuntime",
             $"Warm replay audio bank: board='{boardAsset.name}', metadata='{boardAsset.boardBank}', asset='{boardAsset.boardAssetBank}'"
         );
-        soundManager.LoadBank(
+        var loaded = await soundManager.LoadBankAsync(
             FModBank.EBankType.SFX,
             boardAsset.boardBank,
             boardAsset.boardAssetBank
         );
+        if (!loaded)
+        {
+            stats.BoardBanksFailed++;
+            return;
+        }
+
+        if (wasMetadataLoaded && wasAssetLoaded)
+            stats.BoardBanksAlreadyLoaded++;
+        else
+            stats.BoardBanksLoaded++;
+    }
+
+    private static async Task WarmReplaySoundtracksAsync(
+        SoundManager soundManager,
+        CollectionManager? collectionManager,
+        IReadOnlyCollection<BoardAssetDataSO> boardAssets,
+        ReplayAudioWarmupStats stats
+    )
+    {
+        var warmedAny = false;
+        var warmedSoundtracks = new HashSet<string>(StringComparer.Ordinal);
+        warmedAny |= await WarmReplaySoundtrackAsync(
+            soundManager,
+            await TryGetReplaySoundtrackAsync(collectionManager),
+            stats,
+            warmedSoundtracks,
+            setPlayingSoundtrack: true
+        );
+
+        foreach (var boardAsset in boardAssets)
+        {
+            warmedAny |= await WarmReplaySoundtrackAsync(
+                soundManager,
+                boardAsset.soundtrack,
+                stats,
+                warmedSoundtracks,
+                setPlayingSoundtrack: soundManager.PlayingSoundTrackSO == null
+            );
+        }
+
+        if (!warmedAny)
+        {
+            stats.SoundtrackBanksSkipped++;
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                "Saved replay audio warmup could not resolve any soundtrack; replay combat music fallback may be incomplete."
+            );
+        }
+    }
+
+    private static async Task<bool> WarmReplaySoundtrackAsync(
+        SoundManager soundManager,
+        SoundtrackSO? soundtrack,
+        ReplayAudioWarmupStats stats,
+        ISet<string> warmedSoundtracks,
+        bool setPlayingSoundtrack
+    )
+    {
+        if (soundtrack == null)
+            return false;
+
+        var key = !string.IsNullOrWhiteSpace(soundtrack.SoundtrackPath)
+            ? soundtrack.SoundtrackPath
+            : soundtrack.name;
+        if (!string.IsNullOrWhiteSpace(key) && warmedSoundtracks.Contains(key))
+            return true;
+
+        var loadedSoundtrack = await TryLoadReplaySoundtrackAssetAsync(soundtrack);
+        if (loadedSoundtrack == null)
+        {
+            stats.SoundtrackBanksFailed++;
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(key))
+            warmedSoundtracks.Add(key);
+
+        if (loadedSoundtrack.MusicTracks == null || loadedSoundtrack.MusicTracks.Length == 0)
+        {
+            stats.SoundtrackBanksSkipped++;
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay soundtrack '{loadedSoundtrack.name}' has no music tracks to warm."
+            );
+            return false;
+        }
+
+        if (setPlayingSoundtrack)
+            soundManager.PlayingSoundTrackSO = loadedSoundtrack;
+
+        for (uint trackIndex = 0; trackIndex < loadedSoundtrack.MusicTracks.Length; trackIndex++)
+        {
+            await WarmReplaySoundtrackTrackAsync(
+                soundManager,
+                loadedSoundtrack,
+                trackIndex,
+                stats
+            );
+        }
+
+        return true;
+    }
+
+    private static async Task<SoundtrackSO?> TryGetReplaySoundtrackAsync(
+        CollectionManager? collectionManager
+    )
+    {
+        if (collectionManager == null)
+            return null;
+
+        try
+        {
+            var soundtrack = await collectionManager.GetEquippedSoundtrack();
+            return soundtrack != null ? soundtrack.SoundtrackObject : null;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay audio warmup could not resolve equipped soundtrack: {ex.Message}"
+            );
+            return null;
+        }
+    }
+
+    private static async Task<SoundtrackSO?> TryLoadReplaySoundtrackAssetAsync(
+        SoundtrackSO soundtrack
+    )
+    {
+        if (string.IsNullOrWhiteSpace(soundtrack.SoundtrackPath))
+            return soundtrack;
+
+        try
+        {
+            var handle = Addressables.LoadAssetAsync<SoundtrackSO>(soundtrack.SoundtrackPath);
+            await handle.Task;
+            if (
+                handle.Status
+                == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded
+            )
+                return handle.Result;
+
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay soundtrack load failed for path '{soundtrack.SoundtrackPath}'."
+            );
+            return soundtrack;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay soundtrack load failed for path '{soundtrack.SoundtrackPath}': {ex.Message}"
+            );
+            return soundtrack;
+        }
+    }
+
+    private static async Task WarmReplaySoundtrackTrackAsync(
+        SoundManager soundManager,
+        SoundtrackSO soundtrack,
+        uint trackIndex,
+        ReplayAudioWarmupStats stats
+    )
+    {
+        var metadataBank = soundtrack.TrackBankName(trackIndex, isAssetBank: false);
+        var assetBank = soundtrack.TrackBankName(trackIndex, isAssetBank: true);
+        if (string.IsNullOrWhiteSpace(metadataBank) || string.IsNullOrWhiteSpace(assetBank))
+        {
+            stats.SoundtrackBanksSkipped++;
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay soundtrack '{soundtrack.name}' track {trackIndex} has incomplete bank metadata."
+            );
+            return;
+        }
+
+        var wasMetadataLoaded = soundManager.IsBankLoaded(metadataBank, isMetadata: false);
+        var wasAssetLoaded = soundManager.IsBankLoaded(assetBank, isMetadata: false);
+        var loaded = await soundManager.LoadBankAsync(
+            FModBank.EBankType.Music,
+            metadataBank,
+            assetBank
+        );
+        if (!loaded)
+        {
+            stats.SoundtrackBanksFailed++;
+            return;
+        }
+
+        if (wasMetadataLoaded && wasAssetLoaded)
+            stats.SoundtrackBanksAlreadyLoaded++;
+        else
+            stats.SoundtrackBanksLoaded++;
+    }
+
+    private static void EnsureReplayAudioUnpaused()
+    {
+        var gameServiceManager = Singleton<GameServiceManager>.Instance;
+        if (gameServiceManager == null || !gameServiceManager.GamePaused)
+            return;
+
+        BppLog.Info(
+            "CombatReplayRuntime",
+            "Saved replay playback found gameplay paused; unpausing audio buses before combat simulation."
+        );
+        gameServiceManager.PauseOrUnpauseGame(toPauseOrUnpause: false);
+    }
+
+    private sealed class ReplayAudioWarmupStats
+    {
+        public int BoardBanksLoaded;
+        public int BoardBanksAlreadyLoaded;
+        public int BoardBanksFailed;
+        public int BoardBanksSkipped;
+        public int SoundtrackBanksLoaded;
+        public int SoundtrackBanksAlreadyLoaded;
+        public int SoundtrackBanksFailed;
+        public int SoundtrackBanksSkipped;
     }
 }

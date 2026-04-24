@@ -129,7 +129,8 @@ internal sealed partial class CombatReplayRuntime
         Singleton<BoardManager>.Instance.ToggleOpponentPortrait(isVisible: true);
         await WaitForReplayPresentationReadyAsync();
         await WarmReplayPresentationAssetsAsync(manifest, sequence);
-        WarmReplayAudioBanks();
+        await WarmReplayAudioBanksAsync();
+        EnsureReplayAudioUnpaused();
         HideEncounterPickerOverlays();
         EnsureOpponentPortraitVisible();
         RefillReplayOpponentHealthBar();
