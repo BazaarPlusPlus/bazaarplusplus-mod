@@ -278,18 +278,6 @@ export async function selectFirst<T>(
   return db.prepare(sql).bind(...values).first<T>();
 }
 
-async function deleteAllKv(namespace: KVNamespace): Promise<void> {
-  let cursor: string | undefined;
-
-  do {
-    const page = await namespace.list({ cursor });
-    if (page.keys.length > 0) {
-      await Promise.all(page.keys.map((key) => namespace.delete(key.name)));
-    }
-    cursor = page.list_complete ? undefined : page.cursor;
-  } while (cursor != null);
-}
-
 async function deleteAllR2(bucket: R2Bucket): Promise<void> {
   let cursor: string | undefined;
 
@@ -311,7 +299,6 @@ export async function resetTestState(env: Cloudflare.Env): Promise<void> {
     env.DB.prepare("DELETE FROM tokens"),
     env.DB.prepare("DELETE FROM users"),
   ]);
-  await deleteAllKv(env.KNOWN_PLAYER_ACCOUNTS);
   await deleteAllR2(env.RUN_BUNDLE_BUCKET);
   env.ALLOW_UNAUTHENTICATED_REPLAY_LINKS = "false";
   env.ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS = "false";

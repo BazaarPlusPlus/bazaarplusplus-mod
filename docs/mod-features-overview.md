@@ -101,7 +101,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 面向 **ModCFServerV3**（`ModCFServerV3/`，Cloudflare Workers + D1 + R2）：
 
 - **共享身份存储**：installer 登录后在 `<GameRoot>/BazaarPlusPlus/Identity/identity.db` 写入 `auth` 行（bearer token）；mod 读取后用于读类请求
-- **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`（未认证；服务端依赖受信 `player_account_id` KV 门控）
+- **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`（未认证；服务端只把已注册玩家或上传者本人作为可投影 opponent）
 - **Player Observation**：mod 把观察到的 `player_account_id` 写入 `identity.db` 的 `player_observation` 行，供 installer 参考
 - **Ghost 战斗**：`GET /ghost-battles` 查询 against-me 列表（需要 `Authorization: Bearer <token>`）；按需签发 `POST /ghost-battles/:battleId/replay-link`
 

@@ -6,7 +6,7 @@
 
 - 本地 SQLite 仍然是 source of truth。
 - 仅在玩家不处于 live run 时执行。
-- 上传协议是未认证的 V3 `run-bundle` 上传；服务端通过受信任的 `player_account_id` KV 进行轻量门控，不使用 installation 签名。
+- 上传协议是未认证的 V3 `run-bundle` 上传；服务端只把已注册玩家或上传者本人作为可投影 opponent，不使用 installation 签名。
 
 ## Client Flow
 

@@ -5,6 +5,7 @@ import worker from "../src/index";
 import { sha256Base64, toBase64UrlSegment } from "./helpers/crypto";
 import {
   countRows,
+  insertV3User,
   resetTestState,
   selectFirst,
 } from "./helpers/seed";
@@ -27,6 +28,16 @@ function buildUploadRequest(body: string, authorization?: string): Request {
 async function listObjectKeys(): Promise<string[]> {
   const listing = await env.RUN_BUNDLE_BUCKET.list();
   return listing.objects.map((object) => object.key).sort();
+}
+
+async function registerPlayer(playerAccountId: string): Promise<void> {
+  await insertV3User(env.DB, {
+    playerAccountId,
+    playerUsername: `${playerAccountId}-username`,
+    passwordHash: "hash",
+    createdAtUtc: "2026-04-10T00:00:00.000Z",
+    updatedAtUtc: "2026-04-10T00:00:00.000Z",
+  });
 }
 
 beforeEach(async () => {
@@ -136,7 +147,6 @@ test("run bundle upload stores one artifact object and projection rows", async (
   expect(bundle?.object_key).toBe(
     `run-bundles/player-account-001/run-001/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );
-  expect(await env.KNOWN_PLAYER_ACCOUNTS.get("player-account-001")).toBe("1");
 });
 
 test("run bundle upload accepts requests without Authorization header", async () => {
@@ -287,6 +297,35 @@ test("run bundle upload rejects mismatched battle run ids", async () => {
   expect(response.status).toBe(400);
 });
 
+test("run bundle upload rejects more than 20 distinct opponent account ids", async () => {
+  const body = JSON.stringify({
+    schema_version: 3,
+    player_account_id: "player-account-001",
+    submitted_at_utc: new Date().toISOString(),
+    artifact_codec: "application/x-bpp-runbundle+msgpack+gzip",
+    artifact_bytes: [1],
+    run_projection: {
+      run_id: "run-too-many-opponents",
+      status: "completed",
+      ended_at_utc: "2026-04-10T01:00:00.000Z",
+    },
+    battle_projections: Array.from({ length: 21 }, (_, index) => ({
+      battle_id: `battle-too-many-opponents-${index}`,
+      run_id: "run-too-many-opponents",
+      recorded_at_utc: "2026-04-10T00:00:00.000Z",
+      opponent_account_id: `opponent-${index}`,
+      replay_available: true,
+    })),
+  });
+
+  const response = await worker.fetch(buildUploadRequest(body), env as never);
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({ error: "too_many_opponent_account_ids" });
+  expect(await countRows(env.DB, "run_bundles")).toBe(0);
+  expect((await listObjectKeys()).length).toBe(0);
+});
+
 test("run bundle upload applies configured artifact retention", async () => {
   env.RUN_BUNDLE_RETENTION_DAYS = "9";
 
@@ -312,10 +351,8 @@ test("run bundle upload applies configured artifact retention", async () => {
   expect(artifact?.customMetadata?.retention_days).toBe("9");
 });
 
-test("run bundle upload only projects battles whose opponent account id is known", async () => {
-  await env.KNOWN_PLAYER_ACCOUNTS.put("known-opponent", "1", {
-    expirationTtl: 7 * 24 * 60 * 60,
-  });
+test("run bundle upload only projects battles whose opponent account id is registered", async () => {
+  await registerPlayer("registered-opponent");
 
   const body = JSON.stringify({
     schema_version: 3,
@@ -335,7 +372,7 @@ test("run bundle upload only projects battles whose opponent account id is known
         recorded_at_utc: "2026-04-10T00:30:00.000Z",
         day: 6,
         player_rating: 1700,
-        opponent_account_id: "known-opponent",
+        opponent_account_id: "registered-opponent",
         replay_available: true,
       },
       {
@@ -397,7 +434,6 @@ test("run bundle upload trusts the current uploader account id immediately", asy
       "battle-uploader-trust",
     ),
   ).toEqual({ battle_id: "battle-uploader-trust" });
-  expect(await env.KNOWN_PLAYER_ACCOUNTS.get("player-account-001")).toBe("1");
 });
 
 test("run bundle upload accepts duplicate payload retries idempotently", async () => {

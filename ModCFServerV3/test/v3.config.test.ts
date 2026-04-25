@@ -7,7 +7,6 @@ function buildConfigEnv(overrides: Partial<Env> = {}): Env {
   return {
     DB: {} as D1Database,
     RUN_BUNDLE_BUCKET: {} as R2Bucket,
-    KNOWN_PLAYER_ACCOUNTS: {} as KVNamespace,
     REPLAY_DOWNLOAD_SECRET: "test-replay-download-secret",
     GHOST_QUERY_LOOKBACK_DAYS: "3",
     RUN_BUNDLE_RETENTION_DAYS: "5",

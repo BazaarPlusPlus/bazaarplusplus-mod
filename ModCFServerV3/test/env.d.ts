@@ -4,7 +4,6 @@ declare namespace Cloudflare {
   interface Env {
     DB: D1Database;
     RUN_BUNDLE_BUCKET: R2Bucket;
-    KNOWN_PLAYER_ACCOUNTS: KVNamespace;
     REPLAY_DOWNLOAD_SECRET: string;
     ALLOW_UNAUTHENTICATED_REPLAY_LINKS: string;
     ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS: string;

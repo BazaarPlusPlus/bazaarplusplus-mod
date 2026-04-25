@@ -29,10 +29,6 @@ database_name = "bazaarplusplus-mod-api-v3-db"
 database_id = "4d0b4bee-1e4f-4302-b7f2-8bb58e7dd46b"
 migrations_dir = "migrations"
 
-[[kv_namespaces]]
-binding = "KNOWN_PLAYER_ACCOUNTS"
-id = "a8389231a3434d9187705243586c8899"
-
 [[r2_buckets]]
 binding = "RUN_BUNDLE_BUCKET"
 bucket_name = "bazaarplusplus-run-bundles-v3"

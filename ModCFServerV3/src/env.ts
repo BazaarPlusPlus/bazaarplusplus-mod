@@ -1,7 +1,6 @@
 export interface Env {
   DB: D1Database;
   RUN_BUNDLE_BUCKET: R2Bucket;
-  KNOWN_PLAYER_ACCOUNTS: KVNamespace;
   REPLAY_DOWNLOAD_SECRET: string;
   GHOST_QUERY_LOOKBACK_DAYS: string;
   RUN_BUNDLE_RETENTION_DAYS: string;

@@ -56,8 +56,7 @@ type RunBundleRequest = {
 
 const AnonymousPlayerAccountId = "anonymous-player";
 const LegacyInstallationId = "legacy";
-const KnownPlayerAccountMarker = "1";
-const KnownPlayerAccountTtlSeconds = 7 * 24 * 60 * 60;
+const MaxDistinctOpponentAccountIds = 20;
 
 const ObjectKeySegmentPattern = /^[A-Za-z0-9._-]{1,128}$/;
 
@@ -113,56 +112,43 @@ function shouldProjectBattle(
   return opponentAccountId != null && knownOpponentAccountIds.has(opponentAccountId);
 }
 
-async function rememberKnownPlayerAccountId(
-  playerAccountId: string,
-  env: Env,
-): Promise<void> {
-  if (!playerAccountId || playerAccountId === AnonymousPlayerAccountId) {
-    return;
-  }
-
-  await env.KNOWN_PLAYER_ACCOUNTS.put(playerAccountId, KnownPlayerAccountMarker, {
-    expirationTtl: KnownPlayerAccountTtlSeconds,
-  });
-}
-
 async function loadKnownOpponentAccountIds(
   battleProjections: BattleProjection[],
   uploaderPlayerAccountId: string,
   env: Env,
 ): Promise<Set<string>> {
   const opponentAccountIds = new Set<string>();
+  const knownOpponentAccountIds = new Set<string>();
+
+  if (uploaderPlayerAccountId && uploaderPlayerAccountId !== AnonymousPlayerAccountId) {
+    knownOpponentAccountIds.add(uploaderPlayerAccountId);
+  }
+
   for (const battle of battleProjections) {
     const opponentAccountId = asString(battle.opponent_account_id);
-    if (opponentAccountId) {
+    if (opponentAccountId && opponentAccountId !== uploaderPlayerAccountId) {
       opponentAccountIds.add(opponentAccountId);
     }
   }
 
   if (opponentAccountIds.size === 0) {
-    return new Set(
-      uploaderPlayerAccountId
-        && uploaderPlayerAccountId !== AnonymousPlayerAccountId
-        ? [uploaderPlayerAccountId]
-        : [],
-    );
+    return knownOpponentAccountIds;
   }
 
-  const results = await Promise.all(
-    Array.from(opponentAccountIds, async (opponentAccountId) => ({
-      opponentAccountId,
-      marker: await env.KNOWN_PLAYER_ACCOUNTS.get(opponentAccountId),
-    })),
-  );
+  const opponentAccountIdList = Array.from(opponentAccountIds);
+  const placeholders = opponentAccountIdList.map(() => "?").join(", ");
+  const result = await env.DB.prepare(
+    `
+      SELECT player_account_id
+      FROM users
+      WHERE player_account_id IN (${placeholders})
+    `,
+  )
+    .bind(...opponentAccountIdList)
+    .all<{ player_account_id: string }>();
 
-  const knownOpponentAccountIds = new Set(
-    results
-      .filter(({ marker }) => typeof marker === "string" && marker.length > 0)
-      .map(({ opponentAccountId }) => opponentAccountId),
-  );
-
-  if (uploaderPlayerAccountId && uploaderPlayerAccountId !== AnonymousPlayerAccountId) {
-    knownOpponentAccountIds.add(uploaderPlayerAccountId);
+  for (const row of result.results) {
+    knownOpponentAccountIds.add(row.player_account_id);
   }
 
   return knownOpponentAccountIds;
@@ -212,6 +198,7 @@ export async function handleUploadRunBundle(
     schema_version: schemaVersion,
   });
 
+  const distinctOpponentAccountIds = new Set<string>();
   for (const battle of battleProjections) {
     const battleId = asString(battle.battle_id);
     const battleRunId = asString(battle.run_id);
@@ -222,6 +209,14 @@ export async function handleUploadRunBundle(
     if (!battleRunId || battleRunId !== runId) {
       return json({ error: "battle_run_id_mismatch" }, { status: 400 });
     }
+
+    const opponentAccountId = asString(battle.opponent_account_id);
+    if (opponentAccountId) {
+      distinctOpponentAccountIds.add(opponentAccountId);
+      if (distinctOpponentAccountIds.size > MaxDistinctOpponentAccountIds) {
+        return json({ error: "too_many_opponent_account_ids" }, { status: 400 });
+      }
+    }
   }
 
   const safePlayerAccountSegment = sanitizeObjectKeySegment(persistedPlayerAccountId);
@@ -229,8 +224,6 @@ export async function handleUploadRunBundle(
   if (safePlayerAccountSegment == null || safeRunIdSegment == null) {
     return json({ error: "invalid_run_bundle_request" }, { status: 400 });
   }
-
-  await rememberKnownPlayerAccountId(persistedPlayerAccountId, env);
 
   const payloadHash = await sha256Base64(artifactBytes);
   const payloadHashSegment = payloadHash

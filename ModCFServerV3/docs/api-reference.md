@@ -1,6 +1,6 @@
 # ModCFServerV3 API Reference
 
-本文档逐接口描述 **请求/响应契约** 和 **服务端处理原理**（D1、R2、KV 的具体读写）。所有路由由 [src/index.ts](../src/index.ts) 注册并分发到 `src/features/v3/` 下的 handler。
+本文档逐接口描述 **请求/响应契约** 和 **服务端处理原理**（D1、R2 的具体读写）。所有路由由 [src/index.ts](../src/index.ts) 注册并分发到 `src/features/v3/` 下的 handler。
 
 整体职责和已知限制见 [ModCFServerV3 README](../README.md)。
 
@@ -43,7 +43,7 @@ Token 没有 `expires_at_utc`，撤销路径只有 `/logout`。详见 README "Kn
 ### 1.6 健康检查
 
 - `GET /health` → 200 `{ "ok": true }`。
-- 唯一一个不需要 JSON body、不查 D1/R2/KV 的端点。给 LB 和监控用。
+- 唯一一个不需要 JSON body、不查 D1/R2 的端点。给 LB 和监控用。
 
 ---
 
@@ -189,7 +189,7 @@ Token 没有 `expires_at_utc`，撤销路径只有 `/logout`。详见 README "Kn
 ```json
 {
   "status": "accepted",
-  "bundle_id": "bundle_<uuid-no-dashes>  // 重传同一 payload 时会复用旧 bundle_id",
+  "bundle_id": "<run_id>  // 重传同一 run 时复用同一个 bundle_id",
   "object_key": "run-bundles/<player>/<run>/<hash>.mpack.gz"
 }
 ```
@@ -201,6 +201,7 @@ Token 没有 `expires_at_utc`，撤销路径只有 `/logout`。详见 README "Kn
 | 400 | `invalid_run_bundle_request` | schema/run/artifact 必填项缺失或路径段含非法字符 |
 | 400 | `battle_id_required` | 某个 battle 缺 `battle_id` |
 | 400 | `battle_run_id_mismatch` | battle 的 `run_id` 与 `run_projection.run_id` 不一致 |
+| 400 | `too_many_opponent_account_ids` | 单次上传中 distinct `opponent_account_id` 超过 20 个 |
 | 415 | (text body) | content-type 不是 application/json |
 
 **处理原理**（[uploadRunBundle.ts](../src/features/v3/uploadRunBundle.ts)）：
@@ -209,14 +210,13 @@ Token 没有 `expires_at_utc`，撤销路径只有 `/logout`。详见 README "Kn
    - `string`：当作 base64 解码（标准 base64，必须带 padding）。新版 mod 用这条路径。
    - `number[]`：旧版 mod 兼容路径，逐元素校验 0–255。
    每次成功解码都打日志 `upload_run_bundle.artifact_bytes_received` 带 `encoding=base64|byte-array`，用于在 Cloudflare 日志里跟踪迁移占比。
-2. **校验 battle_id 与 run_id 一致性**——避免一次上传把别的 run 的 battles 串进来。
+2. **校验 battle 投影边界**。每条 battle 必须有 `battle_id`，且 `battle.run_id == run_projection.run_id`，避免一次上传把别的 run 的 battles 串进来；单次上传最多接受 20 个 distinct `opponent_account_id`，防止未鉴权上传放大后续 D1 查询成本。
 3. **路径段清洗**。`player_account_id` 和 `run_id` 必须匹配 `^[A-Za-z0-9._-]{1,128}$`，否则 400。`payloadHash` 是 sha256 base64，会再转一次 base64url（`+/=` → `-_`、去 padding）以保证 R2 key 始终安全。
 4. **R2 PUT**。Object key 形如 `run-bundles/<player>/<run>/<payloadHashUrlSafe>.mpack.gz`，写 `customMetadata.retention_days`（值来自 `RUN_BUNDLE_RETENTION_DAYS` 环境变量，当前 5 天，由 R2 lifecycle 配置在外部清理）。
-5. **KV 写入"已知玩家"标记**（[KNOWN_PLAYER_ACCOUNTS](../wrangler.toml) namespace）。`persistedPlayerAccountId` 不是 anonymous 就 PUT 一个 marker `"1"`，TTL = 7 天。这是 ghost-battle 投影的过滤依据：只有"上传过自己 run 的玩家"会被当作"可投影对手"，避免 battles 表被陌生玩家信息无限膨胀。
-6. **idempotency**。`SELECT ... FROM run_bundles WHERE player_account_id=? AND run_id=? AND payload_hash=?`：如果命中，复用 `bundle_id` 和 `object_key`，跳过 `run_bundles` INSERT；R2 上同 key 直接覆盖（同一 hash 也是同一内容）。这让 mod 可以无脑重传。
-7. **runs upsert**。`INSERT ... ON CONFLICT(run_id) DO UPDATE SET ...`：每次上传都按 `run_id` upsert，让最新一次上传的 run projection 覆盖之前的。
-8. **battles 投影过滤**。对每条 battle，只在 `opponent_account_id` 是"已知玩家"（在 KV 里存在 marker）或 `opponent_account_id` 等于上传者本人时才投影。`loadKnownOpponentAccountIds` 把所有 opponent id 一次 `Promise.all` 并发查 KV，避免 N 次串行 await。
-9. **batch upsert**。被选中的 battles 用 `INSERT ... ON CONFLICT(battle_id) DO UPDATE SET ...` 拼成 prepared statements，一次 `env.DB.batch(...)` 提交。
+5. **idempotency**。`INSERT OR REPLACE INTO run_bundles` 使用 `run_id` 作为确定性 `bundle_id`，同一 run 的重传会覆盖 metadata；R2 上同 key 直接覆盖（同一 hash 也是同一内容）。这让 mod 可以无脑重传。
+6. **runs upsert**。`INSERT ... ON CONFLICT(run_id) DO UPDATE SET ...`：每次上传都按 `run_id` upsert，让最新一次上传的 run projection 覆盖之前的。
+7. **battles 投影过滤**。对每条 battle，只在 `opponent_account_id` 是已注册玩家（存在于 D1 `users.player_account_id` 主键）或 `opponent_account_id` 等于上传者本人时才投影。`loadKnownOpponentAccountIds` 把 distinct opponent id 用一条 `WHERE player_account_id IN (...)` 主键查询取回。
+8. **batch upsert**。被选中的 battles 用 `INSERT ... ON CONFLICT(battle_id) DO UPDATE SET ...` 拼成 prepared statements，一次 `env.DB.batch(...)` 提交。
 
 > 性能笔记：covering index `idx_battles_opponent_recorded_covering`（migration 0003）让 ghost-battle 读路径不再回表。批量 battle 写入时每行多写 ~17 列到该索引，但 D1 的"rows written"计费是按行而非按字节，所以 billing 不受影响。
 
@@ -351,14 +351,12 @@ Replay 链路是两步式：先 mint token，再凭 token 下载文件。中间�
 |---|---|---|
 | **D1 (`DB`)** | 关系型 metadata 主存储 | `users`、`tokens`、`run_bundles`、`runs`、`battles`、`replay_tokens` |
 | **R2 (`RUN_BUNDLE_BUCKET`)** | 大 artifact 存储 | `run-bundles/<player>/<run>/<hash>.mpack.gz` |
-| **KV (`KNOWN_PLAYER_ACCOUNTS`)** | 已知玩家集合（投影过滤用） | key = player_account_id, value = `"1"`, TTL = 7d |
 
 ### 数据保留与清理
 
 - D1 行不会自动删除。`run_bundles`、`runs`、`battles` 累加；如需清理需在外部跑 GC。
 - R2 对象的清理委托给 **bucket lifecycle 配置**（不在本仓库），`RUN_BUNDLE_RETENTION_DAYS` 只是写到 object metadata 上的提示。
 - `replay_tokens` 行不会自动删除，但用 `expires_at_utc` 做被动失效。
-- KV `KNOWN_PLAYER_ACCOUNTS` 的 entry 由 Cloudflare 按 TTL 自动过期。
 
 ### 鉴权身份谱
 

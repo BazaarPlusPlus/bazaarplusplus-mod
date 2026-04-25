@@ -9,7 +9,6 @@ Cloudflare Worker backend for the BazaarPlusPlus mod's V3 online flow.
 - **Cloudflare Workers** (TypeScript, ES Modules)
 - **D1** for relational metadata
 - **R2** for run bundle artifacts
-- **KV** for the "known player" set used by battle projection filtering
 
 `wrangler.toml` 中的 bindings：
 
@@ -17,7 +16,6 @@ Cloudflare Worker backend for the BazaarPlusPlus mod's V3 online flow.
 | --- | --- | --- |
 | `DB` | D1 database | 账户、token、runs、battles、replay tokens |
 | `RUN_BUNDLE_BUCKET` | R2 bucket | run bundle artifact |
-| `KNOWN_PLAYER_ACCOUNTS` | KV namespace | 已上传过 run 的玩家集合，TTL 7 天 |
 
 ## HTTP Surface
 
@@ -63,7 +61,6 @@ D1 schema 由 `migrations/` 下的有序 SQL 维护，按文件名顺序应用�
 - D1 行**不会**自动删除。`run_bundles`、`runs`、`battles`、`replay_tokens` 持续累加，需要外部 GC。
 - R2 对象的清理由 **bucket lifecycle 配置**（不在本仓库）负责。`RUN_BUNDLE_RETENTION_DAYS`（当前 5 天）只是写到 object `customMetadata.retention_days` 上的提示。
 - D1 与 R2 的清理彼此独立，所以 ghost-battles 查询有可能命中一个已经被 R2 lifecycle 删掉的 artifact——这种情况下下载会返回 410 `artifact_expired`。
-- KV `KNOWN_PLAYER_ACCOUNTS` 的 entry 由 Cloudflare 按 7 天 TTL 自动过期。
 
 ## Local Development
 
