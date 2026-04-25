@@ -10,6 +10,10 @@ var apiClientType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBat
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleRecord");
 var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
+var coordinatorStateType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelState");
+var coordinatorDependenciesType = RequireType(
+    "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelDependencies"
+);
 var coordinatorOutcomeType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator+GhostBattleOutcome"
 );
@@ -74,6 +78,43 @@ Assert(
     resolveGhostBattleOutcome != null,
     "HistoryPanelCoordinator should expose ghost-outcome resolution logic."
 );
+
+{
+    var state =
+        Activator.CreateInstance(coordinatorStateType)
+        ?? throw new InvalidOperationException("HistoryPanelState should be constructible.");
+    coordinatorStateType.GetProperty("GhostSyncInProgress")!.SetValue(state, true);
+    coordinatorStateType.GetProperty("ReplayActionInProgress")!.SetValue(state, true);
+    coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.SetValue(state, true);
+
+    var dependencies =
+        Activator.CreateInstance(coordinatorDependenciesType, null, null, null, null)
+        ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
+    var coordinator =
+        Activator.CreateInstance(
+            coordinatorType,
+            state,
+            dependencies,
+            (Action)(() => { }),
+            (Action)(() => { }),
+            (Action<bool>)(_ => { })
+        ) ?? throw new InvalidOperationException("HistoryPanelCoordinator should be constructible.");
+
+    InvokeVoid(coordinatorType, coordinator, "OnPanelHidden", []);
+
+    Assert(
+        coordinatorStateType.GetProperty("GhostSyncInProgress")!.GetValue(state) is false,
+        "Hiding the history panel should clear ghost sync in-progress state."
+    );
+    Assert(
+        coordinatorStateType.GetProperty("ReplayActionInProgress")!.GetValue(state) is false,
+        "Hiding the history panel should clear replay in-progress state."
+    );
+    Assert(
+        coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.GetValue(state) is false,
+        "Hiding the history panel should clear final-build refresh in-progress state."
+    );
+}
 
 Assert(
     !(bool)shouldAdvanceCheckpoint!.Invoke(null, [200, 200])!,
@@ -332,11 +373,12 @@ Assert(
     "GhostBattleImportRecord should preserve the raw remote player_account_id field."
 );
 
+var freshRecordedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("o");
 var rawBattlePayload = JObject.Parse(
-    """
+    $$"""
     {
       "battle_id": "ghost-battle-001",
-      "recorded_at_utc": "2026-04-11T00:00:00.000Z",
+      "recorded_at_utc": "{{freshRecordedAtUtc}}",
       "day": 7,
       "hour": 2,
       "encounter_id": "encounter-001",

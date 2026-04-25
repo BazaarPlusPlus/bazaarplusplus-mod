@@ -2,8 +2,10 @@ using System.Reflection;
 
 RegisterAssemblyResolution();
 TestRecommendationTierMapping();
+TestDefaultFinalBuildCachePathUsesGameRootDirectory();
 TestFreshFinalBuildCacheIsUsedWithoutRemoteDownload();
-TestExpiredFinalBuildCacheDownloadsRemotePayload();
+TestExpiredFinalBuildCacheUsesStaleCacheAndQueuesRemoteRefresh();
+TestManualFinalBuildRefreshBypassesFreshCache();
 
 Console.WriteLine("CardSetBuildRecommendationTier checks passed.");
 
@@ -38,6 +40,27 @@ static void TestRecommendationTierMapping()
     AssertMappedTier(projectMethod, playerCardEntryType, 1, "Bronze");
     AssertMappedTier(projectMethod, playerCardEntryType, 4, "Diamond");
     AssertMappedTier(projectMethod, playerCardEntryType, 5, "Legendary");
+}
+
+static void TestDefaultFinalBuildCachePathUsesGameRootDirectory()
+{
+    var repositoryType = GetRepositoryType();
+    var buildPathMethod = repositoryType.GetMethod(
+        "BuildDefaultFinalBuildsCacheFilePath",
+        BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(
+        buildPathMethod != null,
+        "Expected CardSetBuildDataRepository to expose default cache path construction."
+    );
+
+    var gameRootPath = Path.Combine(Path.GetTempPath(), $"bpp-game-root-{Guid.NewGuid():N}");
+    var cachePath = (string)buildPathMethod!.Invoke(null, [gameRootPath])!;
+
+    Assert(
+        cachePath == Path.Combine(gameRootPath, "BazaarPlusPlus", "final_builds_for_mod.json"),
+        "Final build cache should live under GameRoot/BazaarPlusPlus/final_builds_for_mod.json."
+    );
 }
 
 static void TestFreshFinalBuildCacheIsUsedWithoutRemoteDownload()
@@ -79,7 +102,7 @@ static void TestFreshFinalBuildCacheIsUsedWithoutRemoteDownload()
     }
 }
 
-static void TestExpiredFinalBuildCacheDownloadsRemotePayload()
+static void TestExpiredFinalBuildCacheUsesStaleCacheAndQueuesRemoteRefresh()
 {
     var repositoryType = GetRepositoryType();
     var now = new DateTime(2026, 04, 25, 12, 0, 0, DateTimeKind.Utc);
@@ -95,37 +118,105 @@ static void TestExpiredFinalBuildCacheDownloadsRemotePayload()
     File.SetLastWriteTimeUtc(cachePath, now.AddHours(-21));
 
     var downloaded = false;
-    string? requestedUrl = null;
+    Action? queuedRefresh = null;
+    var queuedRefreshCount = 0;
     var remotePayload = CreateFinalBuildPayload("RemoteHero", selectedCardId, "remote-download");
+    ConfigureFinalBuildRemoteWithBackgroundRefreshForTests(
+        repositoryType,
+        cachePath,
+        now,
+        _ =>
+        {
+            downloaded = true;
+            return remotePayload;
+        },
+        refresh =>
+        {
+            queuedRefreshCount++;
+            queuedRefresh = refresh;
+        }
+    );
+
+    try
+    {
+        var sources = LoadFinalBuildSources(repositoryType, "StaleHero");
+
+        Assert(!downloaded, "Expired final build cache should not block on a remote download.");
+        Assert(queuedRefreshCount == 1, "Expired final build cache should queue a background refresh.");
+        Assert(queuedRefresh != null, "Queued background refresh should be executable by the scheduler.");
+        Assert(sources.Count == 1, "Stale cached final builds should remain loadable.");
+        Assert(
+            sources[0] == "stale-cache",
+            "Stale cached final builds should be used instead of synchronously downloading remote data."
+        );
+        Assert(
+            File.ReadAllText(cachePath) != remotePayload,
+            "Normal final build loading should not rewrite the disk cache from remote data."
+        );
+
+        queuedRefresh!();
+        var refreshedSources = LoadFinalBuildSources(repositoryType, "RemoteHero");
+        Assert(downloaded, "Queued background refresh should download remote final build data.");
+        Assert(
+            refreshedSources[0] == "remote-download",
+            "Queued background refresh should replace the in-memory final build data."
+        );
+        Assert(
+            File.ReadAllText(cachePath) == remotePayload,
+            "Queued background refresh should replace the disk cache."
+        );
+    }
+    finally
+    {
+        ResetFinalBuildRemoteForTests(repositoryType);
+        TryDelete(cachePath);
+    }
+}
+
+static void TestManualFinalBuildRefreshBypassesFreshCache()
+{
+    var repositoryType = GetRepositoryType();
+    var now = new DateTime(2026, 04, 25, 12, 0, 0, DateTimeKind.Utc);
+    var cachePath = Path.Combine(
+        Path.GetTempPath(),
+        $"bpp-final-build-cache-{Guid.NewGuid():N}.json"
+    );
+    var selectedCardId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+    var cachedPayload = CreateFinalBuildPayload("ManualHero", selectedCardId, "fresh-cache");
+    File.WriteAllText(cachePath, cachedPayload);
+    File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
+
+    var downloaded = false;
+    var remotePayload = CreateFinalBuildPayload("ManualHero", selectedCardId, "manual-remote");
     ConfigureFinalBuildRemoteForTests(
         repositoryType,
         cachePath,
         now,
-        url =>
+        _ =>
         {
             downloaded = true;
-            requestedUrl = url;
             return remotePayload;
         }
     );
 
     try
     {
-        var sources = LoadFinalBuildSources(repositoryType, "RemoteHero");
+        var cachedSources = LoadFinalBuildSources(repositoryType, "ManualHero");
+        Assert(cachedSources[0] == "fresh-cache", "Fresh cache should load before manual refresh.");
+        Assert(!downloaded, "Initial load from a fresh cache should not download remote data.");
 
-        Assert(downloaded, "Expired final build cache should trigger a remote download.");
+        var refreshed = RefreshFinalBuildsFromRemote(repositoryType, out var error);
+        var refreshedSources = LoadFinalBuildSources(repositoryType, "ManualHero");
+
+        Assert(refreshed, $"Manual final build refresh should succeed: {error}");
+        Assert(downloaded, "Manual final build refresh should download remote data.");
         Assert(
-            requestedUrl == "https://bpp-metrics.bazaarplusplus.com/final_builds_for_mod.json",
-            "Final build remote download should use the metrics-hosted mod payload."
-        );
-        Assert(sources.Count == 1, "Downloaded final builds should be loadable.");
-        Assert(
-            sources[0] == "remote-download",
-            "Downloaded final builds should override stale cache data."
+            refreshedSources[0] == "manual-remote",
+            "Manual final build refresh should replace the in-memory final build data."
         );
         Assert(
             File.ReadAllText(cachePath) == remotePayload,
-            "Downloaded final builds should be persisted to the disk cache."
+            "Manual final build refresh should replace the disk cache."
         );
     }
     finally
@@ -183,9 +274,40 @@ static void ConfigureFinalBuildRemoteForTests(
     );
 }
 
+static void ConfigureFinalBuildRemoteWithBackgroundRefreshForTests(
+    Type repositoryType,
+    string cachePath,
+    DateTime utcNow,
+    Func<string, string> downloadJson,
+    Action<Action> queueBackgroundRefresh
+)
+{
+    InvokeStatic(
+        repositoryType,
+        "ConfigureFinalBuildRemoteForTests",
+        cachePath,
+        (Func<DateTime>)(() => utcNow),
+        downloadJson,
+        queueBackgroundRefresh
+    );
+}
+
 static void ResetFinalBuildRemoteForTests(Type repositoryType)
 {
     InvokeStatic(repositoryType, "ResetFinalBuildRemoteForTests");
+}
+
+static bool RefreshFinalBuildsFromRemote(Type repositoryType, out string? error)
+{
+    var method = repositoryType.GetMethod(
+        "TryRefreshFinalBuildsFromRemote",
+        BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(method != null, "Expected CardSetBuildDataRepository to expose manual refresh.");
+    object?[] parameters = [null];
+    var refreshed = (bool)method!.Invoke(null, parameters)!;
+    error = (string?)parameters[0];
+    return refreshed;
 }
 
 static List<string> LoadFinalBuildSources(Type repositoryType, string hero)
@@ -244,7 +366,11 @@ static string CreateFinalBuildPayload(string hero, Guid selectedCardId, string s
 
 static void InvokeStatic(Type type, string methodName, params object[] parameters)
 {
-    var method = type.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
+    var method = type
+        .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+        .FirstOrDefault(method =>
+            method.Name == methodName && method.GetParameters().Length == parameters.Length
+        );
     Assert(method != null, $"Expected {type.FullName}.{methodName} to exist.");
     method!.Invoke(null, parameters);
 }

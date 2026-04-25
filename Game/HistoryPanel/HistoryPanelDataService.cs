@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.Identity;
+using BazaarPlusPlus.Game.MonsterPreview;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -187,6 +188,48 @@ internal sealed class HistoryPanelDataService
             );
         }
     }
+
+    public async Task<HistoryPanelFinalBuildRefreshAttemptResult> RefreshFinalBuildsAsync(
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            var result = await Task.Run(
+                    () =>
+                    {
+                        var succeeded = CardSetBuildDataRepository.TryRefreshFinalBuildsFromRemote(
+                            out var error
+                        );
+                        return (Succeeded: succeeded, Error: error);
+                    },
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+
+            if (!result.Succeeded)
+                return HistoryPanelFinalBuildRefreshAttemptResult.Failure(
+                    HistoryPanelText.FinalBuildRefreshFailed(
+                        result.Error ?? HistoryPanelText.Unknown()
+                    )
+                );
+
+            return HistoryPanelFinalBuildRefreshAttemptResult.Success(
+                HistoryPanelText.FinalBuildRefreshSucceeded()
+            );
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return HistoryPanelFinalBuildRefreshAttemptResult.Failure(
+                HistoryPanelText.FinalBuildRefreshFailed(ex.Message),
+                ex
+            );
+        }
+    }
 }
 
 internal readonly struct HistoryPanelGhostSyncAttemptResult
@@ -212,6 +255,34 @@ internal readonly struct HistoryPanelGhostSyncAttemptResult
         new(true, statusMessage, null);
 
     public static HistoryPanelGhostSyncAttemptResult Failure(
+        string statusMessage,
+        Exception? error = null
+    ) => new(false, statusMessage, error);
+}
+
+internal readonly struct HistoryPanelFinalBuildRefreshAttemptResult
+{
+    private HistoryPanelFinalBuildRefreshAttemptResult(
+        bool succeeded,
+        string statusMessage,
+        Exception? error
+    )
+    {
+        Succeeded = succeeded;
+        StatusMessage = statusMessage;
+        Error = error;
+    }
+
+    public bool Succeeded { get; }
+
+    public string StatusMessage { get; }
+
+    public Exception? Error { get; }
+
+    public static HistoryPanelFinalBuildRefreshAttemptResult Success(string statusMessage) =>
+        new(true, statusMessage, null);
+
+    public static HistoryPanelFinalBuildRefreshAttemptResult Failure(
         string statusMessage,
         Exception? error = null
     ) => new(false, statusMessage, error);

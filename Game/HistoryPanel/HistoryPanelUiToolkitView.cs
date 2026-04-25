@@ -14,6 +14,7 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
     private readonly Action _close;
     private readonly Action _replay;
     private readonly Action _delete;
+    private readonly Action _refreshFinalBuilds;
     private readonly Action<int> _selectRun;
     private readonly Action<int> _selectBattle;
     private readonly Action<HistorySectionMode> _setSectionMode;
@@ -30,6 +31,7 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
     private Label? _databaseChip;
     private Button? _runsTabButton;
     private Button? _ghostTabButton;
+    private Button? _finalBuildRefreshButton;
     private Label? _statusLabel;
     private VisualElement? _runsSection;
     private VisualElement? _battlesSection;
@@ -56,6 +58,7 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         Action close,
         Action replay,
         Action delete,
+        Action refreshFinalBuilds,
         Action<int> selectRun,
         Action<int> selectBattle,
         Action<HistorySectionMode> setSectionMode,
@@ -66,6 +69,8 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         _close = close ?? throw new ArgumentNullException(nameof(close));
         _replay = replay ?? throw new ArgumentNullException(nameof(replay));
         _delete = delete ?? throw new ArgumentNullException(nameof(delete));
+        _refreshFinalBuilds =
+            refreshFinalBuilds ?? throw new ArgumentNullException(nameof(refreshFinalBuilds));
         _selectRun = selectRun ?? throw new ArgumentNullException(nameof(selectRun));
         _selectBattle = selectBattle ?? throw new ArgumentNullException(nameof(selectBattle));
         _setSectionMode = setSectionMode ?? throw new ArgumentNullException(nameof(setSectionMode));
@@ -135,6 +140,8 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
 
         RefreshTabButton(_runsTabButton!, model.SectionMode == HistorySectionMode.Runs);
         RefreshTabButton(_ghostTabButton!, model.SectionMode == HistorySectionMode.Ghost);
+        _finalBuildRefreshButton!.text = model.FinalBuildRefreshButtonText;
+        _finalBuildRefreshButton.SetEnabled(model.FinalBuildRefreshButtonEnabled);
         _ghostFilterRow!.style.display =
             model.SectionMode == HistorySectionMode.Ghost ? DisplayStyle.Flex : DisplayStyle.None;
         RefreshGhostFilterButton(
@@ -328,9 +335,17 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
             72f,
             32f
         );
+        _finalBuildRefreshButton = CreateButton(
+            HistoryPanelText.RefreshFinalBuilds(),
+            _refreshFinalBuilds,
+            124f,
+            32f
+        );
         chipRow.Add(_runsTabButton);
         _ghostTabButton.style.marginLeft = 8f;
         chipRow.Add(_ghostTabButton);
+        _finalBuildRefreshButton.style.marginLeft = 8f;
+        chipRow.Add(_finalBuildRefreshButton);
     }
 
     private void BuildContent(VisualElement parent)

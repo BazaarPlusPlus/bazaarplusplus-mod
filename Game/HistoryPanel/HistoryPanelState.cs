@@ -55,6 +55,8 @@ internal sealed class HistoryPanelState
 
     public bool GhostSyncInProgress { get; set; }
 
+    public bool FinalBuildRefreshInProgress { get; set; }
+
     public bool ReplayActionInProgress { get; set; }
 
     public bool FilteredGhostBattlesDirty { get; set; } = true;

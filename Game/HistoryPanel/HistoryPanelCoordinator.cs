@@ -57,6 +57,9 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     public void OnPanelHidden()
     {
         _state.IsVisible = false;
+        _state.GhostSyncInProgress = false;
+        _state.ReplayActionInProgress = false;
+        _state.FinalBuildRefreshInProgress = false;
         ClearDeleteRunConfirmation();
         EndPanelSession();
     }
@@ -488,6 +491,58 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             _requestUiRefresh();
     }
 
+    public async Task TryRefreshFinalBuildsAsync()
+    {
+        if (_state.FinalBuildRefreshInProgress)
+        {
+            SetStatusMessage(HistoryPanelText.FinalBuildRefreshAlreadyRunning());
+            _requestUiRefresh();
+            return;
+        }
+
+        _state.FinalBuildRefreshInProgress = true;
+        SetStatusMessage(HistoryPanelText.RefreshingFinalBuilds());
+        _requestUiRefresh();
+
+        var token = GetCurrentSessionToken();
+        var sessionVersion = _panelSessionVersion;
+        HistoryPanelFinalBuildRefreshAttemptResult refreshResult;
+        try
+        {
+            refreshResult = await _dataService.RefreshFinalBuildsAsync(token);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!IsSessionCurrent(sessionVersion))
+                return;
+
+            _state.FinalBuildRefreshInProgress = false;
+            SetStatusMessage(null);
+            _requestUiRefresh();
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (!IsSessionCurrent(sessionVersion))
+                return;
+
+            _state.FinalBuildRefreshInProgress = false;
+            SetStatusMessage(HistoryPanelText.FinalBuildRefreshFailed(ex.Message));
+            BppLog.Error("HistoryPanel", "Failed to refresh final builds", ex);
+            _requestUiRefresh();
+            return;
+        }
+
+        if (!IsSessionCurrent(sessionVersion))
+            return;
+
+        _state.FinalBuildRefreshInProgress = false;
+        SetStatusMessage(refreshResult.StatusMessage);
+        if (!refreshResult.Succeeded && refreshResult.Error != null)
+            BppLog.Error("HistoryPanel", "Failed to refresh final builds", refreshResult.Error);
+        _requestUiRefresh();
+    }
+
     public IReadOnlyList<HistoryBattleRecord> GetFilteredGhostBattles()
     {
         if (!_state.FilteredGhostBattlesDirty)
@@ -546,7 +601,11 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     private void ClearTransientStatus()
     {
-        if (!_state.ReplayActionInProgress && !_state.GhostSyncInProgress)
+        if (
+            !_state.ReplayActionInProgress
+            && !_state.GhostSyncInProgress
+            && !_state.FinalBuildRefreshInProgress
+        )
             SetStatusMessage(null);
     }
 
