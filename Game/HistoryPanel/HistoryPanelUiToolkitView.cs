@@ -43,6 +43,7 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
     private ListView? _battleList;
     private Label? _battlesTitle;
     private Label? _runsBattleSubtitle;
+    private Label? _ghostOpponentEliminatedNotice;
     private Image? _previewImage;
     private Label? _previewStatusLabel;
     private Label? _previewDebugLabel;
@@ -137,6 +138,11 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         _runsBattleSubtitle.style.display = DisplayStyle.None;
         _footerPrimary!.text = model.FooterPrimaryText;
         _footerSecondary!.text = model.FooterSecondaryText;
+        _ghostOpponentEliminatedNotice!.text = model.GhostOpponentEliminatedNoticeText;
+        _ghostOpponentEliminatedNotice.style.display =
+            string.IsNullOrWhiteSpace(model.GhostOpponentEliminatedNoticeText)
+                ? DisplayStyle.None
+                : DisplayStyle.Flex;
 
         RefreshTabButton(_runsTabButton!, model.SectionMode == HistorySectionMode.Runs);
         RefreshTabButton(_ghostTabButton!, model.SectionMode == HistorySectionMode.Ghost);
@@ -430,6 +436,35 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         _battleList.style.marginTop = 8f;
         _battlesSection.Add(CreateListFrame(_battleList));
 
+        _ghostOpponentEliminatedNotice = CreateLabel(
+            14,
+            FontStyle.Bold,
+            new Color(0.99f, 0.90f, 0.68f, 1f)
+        );
+        _ghostOpponentEliminatedNotice.style.height = 34f;
+        _ghostOpponentEliminatedNotice.style.minHeight = 34f;
+        _ghostOpponentEliminatedNotice.style.maxHeight = 34f;
+        _ghostOpponentEliminatedNotice.style.marginTop = 10f;
+        _ghostOpponentEliminatedNotice.style.paddingLeft = 14f;
+        _ghostOpponentEliminatedNotice.style.paddingRight = 14f;
+        _ghostOpponentEliminatedNotice.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _ghostOpponentEliminatedNotice.style.whiteSpace = WhiteSpace.NoWrap;
+        _ghostOpponentEliminatedNotice.style.backgroundColor = new Color(0.32f, 0.24f, 0.10f, 0.96f);
+        _ghostOpponentEliminatedNotice.style.borderTopLeftRadius = 8f;
+        _ghostOpponentEliminatedNotice.style.borderTopRightRadius = 8f;
+        _ghostOpponentEliminatedNotice.style.borderBottomLeftRadius = 8f;
+        _ghostOpponentEliminatedNotice.style.borderBottomRightRadius = 8f;
+        _ghostOpponentEliminatedNotice.style.borderLeftWidth = 1f;
+        _ghostOpponentEliminatedNotice.style.borderRightWidth = 1f;
+        _ghostOpponentEliminatedNotice.style.borderTopWidth = 1f;
+        _ghostOpponentEliminatedNotice.style.borderBottomWidth = 1f;
+        _ghostOpponentEliminatedNotice.style.borderLeftColor = new Color(0.94f, 0.70f, 0.28f, 0.48f);
+        _ghostOpponentEliminatedNotice.style.borderRightColor = new Color(0.94f, 0.70f, 0.28f, 0.48f);
+        _ghostOpponentEliminatedNotice.style.borderTopColor = new Color(0.94f, 0.70f, 0.28f, 0.48f);
+        _ghostOpponentEliminatedNotice.style.borderBottomColor = new Color(0.94f, 0.70f, 0.28f, 0.48f);
+        _ghostOpponentEliminatedNotice.style.display = DisplayStyle.None;
+        content.Add(_ghostOpponentEliminatedNotice);
+
         _previewContainer = new VisualElement();
         _previewContainer.style.height = 284f;
         _previewContainer.style.flexShrink = 0f;
@@ -442,7 +477,7 @@ internal sealed class HistoryPanelUiToolkitView : IDisposable
         _previewContainer.style.borderBottomRightRadius = 10f;
         _previewContainer.style.position = Position.Relative;
         _previewContainer.style.overflow = Overflow.Hidden;
-        _previewContainer.style.marginTop = 14f;
+        _previewContainer.style.marginTop = 10f;
         content.Add(_previewContainer);
 
         _previewImage = new Image();

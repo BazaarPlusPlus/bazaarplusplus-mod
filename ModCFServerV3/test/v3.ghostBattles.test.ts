@@ -312,3 +312,46 @@ test("ghost-battles ignores mismatched player_account_id query parameters when b
   };
   expect(json.battles.map((battle) => battle.battle_id)).toEqual(["battle-owned"]);
 });
+
+test("ghost-battles includes the bundle-final battle marker", async () => {
+  await insertUserToken("tok-player-001", "player-account-001");
+
+  await insertV3Battle(env.DB, {
+    battleId: "battle-final-loss",
+    runId: "run-final",
+    installationId: "inst_ghost",
+    playerAccountId: "remote-player",
+    bundleId: "bundle-final",
+    recordedAtUtc: new Date().toISOString(),
+    day: 10,
+    playerName: "RemoteFinal",
+    playerAccountIdInPayload: "remote-player",
+    playerHero: "HeroA",
+    opponentName: "LocalFinal",
+    opponentAccountId: "player-account-001",
+    opponentHero: "HeroB",
+    result: "Lost",
+    replayAvailable: 1,
+    isBundleFinalBattle: 1,
+    updatedAtUtc: new Date().toISOString(),
+  });
+
+  const response = await worker.fetch(
+    new Request("https://example.com/ghost-battles?limit=5", {
+      method: "GET",
+      headers: { Authorization: "Bearer tok-player-001" },
+    }),
+    env as never,
+  );
+
+  expect(response.status).toBe(200);
+  const json = (await response.json()) as {
+    battles: Array<{ battle_id: string; is_bundle_final_battle: boolean }>;
+  };
+  expect(json.battles).toMatchObject([
+    {
+      battle_id: "battle-final-loss",
+      is_bundle_final_battle: true,
+    },
+  ]);
+});

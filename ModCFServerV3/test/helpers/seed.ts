@@ -56,6 +56,7 @@ export type InsertV3BattleArgs = {
   opponentLevel?: number | null;
   result?: string | null;
   replayAvailable: number;
+  isBundleFinalBattle?: number;
   updatedAtUtc: string;
 };
 
@@ -201,8 +202,9 @@ export async function insertV3Battle(
         opponent_level,
         result,
         replay_available,
+        is_bundle_final_battle,
         updated_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       args.battleId,
@@ -226,6 +228,7 @@ export async function insertV3Battle(
       args.opponentLevel ?? null,
       args.result ?? null,
       args.replayAvailable,
+      args.isBundleFinalBattle ?? 0,
       args.updatedAtUtc,
     ],
   ).run();

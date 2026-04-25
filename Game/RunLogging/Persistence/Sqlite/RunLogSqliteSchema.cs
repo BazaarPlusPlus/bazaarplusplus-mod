@@ -7,9 +7,9 @@ namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int LocalDatabaseSchemaVersion => 10;
+    public static int LocalDatabaseSchemaVersion => 11;
 
-    public static int RowSchemaVersion => 10;
+    public static int RowSchemaVersion => 11;
 
     public static int UploadPayloadSchemaVersion => 1;
 
@@ -113,6 +113,7 @@ public static class RunLogSqliteSchema
                 result TEXT NULL,
                 winner_combatant_id TEXT NULL,
                 loser_combatant_id TEXT NULL,
+                is_bundle_final_battle INTEGER NOT NULL DEFAULT 0,
                 replay_available INTEGER NOT NULL DEFAULT 0,
                 replay_downloaded INTEGER NOT NULL DEFAULT 0,
                 has_local_payload INTEGER NOT NULL DEFAULT 0,

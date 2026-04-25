@@ -6,7 +6,7 @@ var schemaType = RequireType(
 );
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 10,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 11,
     "Local database schema version mismatch."
 );
 Assert(
@@ -42,7 +42,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 10;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 11;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
@@ -91,6 +91,7 @@ Assert(
         && bootstrapSql.Contains("opponent_account_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("winner_combatant_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("loser_combatant_id", StringComparison.Ordinal)
+        && bootstrapSql.Contains("is_bundle_final_battle", StringComparison.Ordinal)
         && bootstrapSql.Contains("result", StringComparison.Ordinal),
     "Bootstrap SQL should define unified battle identity and outcome columns."
 );

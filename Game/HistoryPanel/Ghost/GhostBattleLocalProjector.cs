@@ -25,6 +25,7 @@ internal static class GhostBattleLocalProjector
         string? rawResult,
         string? rawWinnerCombatantId,
         string? rawLoserCombatantId,
+        bool isBundleFinalBattle,
         bool replayAvailable,
         bool replayDownloaded
     )
@@ -52,7 +53,8 @@ internal static class GhostBattleLocalProjector
             ProjectCombatantIdToLocal(rawLoserCombatantId),
             string.Empty,
             HistoryPanelRepository.BuildEmptyPreviewData(),
-            HistoryBattleSource.Ghost,
+            isBundleFinalBattle,
+            source: HistoryBattleSource.Ghost,
             replayAvailable,
             replayDownloaded
         );

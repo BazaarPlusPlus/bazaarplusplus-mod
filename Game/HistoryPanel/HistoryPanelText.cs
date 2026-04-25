@@ -182,6 +182,13 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet LossText = new("Loss", "失败", "失敗", "失敗");
 
+    private static readonly LocalizedTextSet GhostOpponentEliminatedNoticeText = new(
+        "After this battle, the opponent is eliminated.",
+        "打完这场战斗后，对手直接出局。",
+        "打完這場戰鬥後，對手直接出局。",
+        "打完這場戰鬥後，對手直接出局。"
+    );
+
     internal static string Title() => Resolve(TitleText);
 
     internal static string Subtitle() => Resolve(SubtitleText);
@@ -259,6 +266,9 @@ internal static class HistoryPanelText
     internal static string Win() => Resolve(WinText);
 
     internal static string Loss() => Resolve(LossText);
+
+    internal static string GhostOpponentEliminatedNotice() =>
+        Resolve(GhostOpponentEliminatedNoticeText);
 
     internal static string CountGhost(int count) => FormatCount(count, GhostTab());
 

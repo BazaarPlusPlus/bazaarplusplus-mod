@@ -88,6 +88,20 @@ internal static class HistoryPanelFormatter
             || string.Equals(battle.Result, "Lost", StringComparison.OrdinalIgnoreCase);
     }
 
+    public static bool IsGhostOpponentEliminated(HistoryBattleRecord? battle)
+    {
+        if (battle == null || battle.Source != HistoryBattleSource.Ghost)
+            return false;
+
+        return battle.IsBundleFinalBattle && IsBattleWinFromLocalPerspective(battle);
+    }
+
+    private static bool IsBattleWinFromLocalPerspective(HistoryBattleRecord battle)
+    {
+        return IsBattleWin(battle)
+            || string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static string? FormatOpponentHero(string? rawHero)
     {
         if (string.IsNullOrWhiteSpace(rawHero))

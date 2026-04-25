@@ -87,6 +87,11 @@ internal sealed partial class HistoryPanel
         var footerSecondaryText = string.IsNullOrWhiteSpace(_statusMessage)
             ? battleSummary
             : $"{_statusMessage} | {battleSummary}";
+        var ghostOpponentEliminatedNoticeText = HistoryPanelFormatter.IsGhostOpponentEliminated(
+            ActiveSelectedBattle
+        )
+            ? HistoryPanelText.GhostOpponentEliminatedNotice()
+            : string.Empty;
 
         return new HistoryPanelUiToolkitModel
         {
@@ -135,6 +140,7 @@ internal sealed partial class HistoryPanel
             FinalBuildRefreshButtonEnabled = !_state.FinalBuildRefreshInProgress,
             FooterPrimaryText = footerPrimaryText,
             FooterSecondaryText = footerSecondaryText,
+            GhostOpponentEliminatedNoticeText = ghostOpponentEliminatedNoticeText,
         };
     }
 
@@ -204,4 +210,6 @@ internal sealed class HistoryPanelUiToolkitModel
     public string FooterPrimaryText { get; set; } = string.Empty;
 
     public string FooterSecondaryText { get; set; } = string.Empty;
+
+    public string GhostOpponentEliminatedNoticeText { get; set; } = string.Empty;
 }

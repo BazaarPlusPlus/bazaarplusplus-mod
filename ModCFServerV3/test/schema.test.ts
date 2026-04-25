@@ -4,6 +4,7 @@ import authSimplificationSql from "../migrations/0002_auth_simplification.sql?ra
 import runsEndedAtIndexSql from "../migrations/0005_runs_ended_at_index.sql?raw";
 import runBundlesCreatedAtIndexSql from "../migrations/0006_run_bundles_created_at_index.sql?raw";
 import runsUpdatedAtIndexSql from "../migrations/0007_runs_updated_at_index.sql?raw";
+import battlesBundleFinalFlagSql from "../migrations/0008_battles_bundle_final_flag.sql?raw";
 import initialSchemaSql from "../migrations/0001_initial_schema.sql?raw";
 
 function getTableSection(sql: string, tableName: string): string {
@@ -71,4 +72,12 @@ test("runs updated_at index migration adds the server-clock mirror index", () =>
   expect(runsUpdatedAtIndexSql).toMatch(
     /CREATE INDEX IF NOT EXISTS idx_runs_updated_at\s+ON runs \(updated_at_utc, run_id\);/,
   );
+});
+
+test("battles bundle-final migration adds the ghost display flag to the covering index", () => {
+  expect(battlesBundleFinalFlagSql).toContain(
+    "ADD COLUMN is_bundle_final_battle INTEGER NOT NULL DEFAULT 0",
+  );
+  expect(battlesBundleFinalFlagSql).toContain("idx_battles_opponent_recorded_covering");
+  expect(battlesBundleFinalFlagSql).toMatch(/is_bundle_final_battle\s*\n\s*\)/);
 });

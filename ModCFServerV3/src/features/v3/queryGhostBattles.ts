@@ -21,6 +21,7 @@ type GhostBattleRow = {
   opponent_level: number | null;
   result: string | null;
   replay_available: number;
+  is_bundle_final_battle: number;
 };
 
 function parseClampedInt(
@@ -74,7 +75,8 @@ export async function handleQueryGhostBattles(
         b.opponent_rating,
         b.opponent_level,
         b.result,
-        b.replay_available
+        b.replay_available,
+        b.is_bundle_final_battle
       FROM battles AS b
       WHERE b.opponent_account_id = ?
         AND b.recorded_at_utc >= ?
@@ -103,6 +105,7 @@ export async function handleQueryGhostBattles(
       opponent_rating: row.opponent_rating,
       opponent_level: row.opponent_level,
       result: row.result,
+      is_bundle_final_battle: row.is_bundle_final_battle === 1,
       replay: {
         available: row.replay_available === 1,
       },

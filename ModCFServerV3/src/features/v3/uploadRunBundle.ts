@@ -218,6 +218,11 @@ export async function handleUploadRunBundle(
       }
     }
   }
+  const finalBattleId = asString(
+    battleProjections.length > 0
+      ? battleProjections[battleProjections.length - 1]?.battle_id
+      : null,
+  );
 
   const safePlayerAccountSegment = sanitizeObjectKeySegment(persistedPlayerAccountId);
   const safeRunIdSegment = sanitizeObjectKeySegment(runId);
@@ -382,8 +387,9 @@ export async function handleUploadRunBundle(
             opponent_level,
             result,
             replay_available,
+            is_bundle_final_battle,
             updated_at_utc
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(battle_id) DO UPDATE SET
             run_id = excluded.run_id,
             installation_id = excluded.installation_id,
@@ -405,6 +411,7 @@ export async function handleUploadRunBundle(
             opponent_level = excluded.opponent_level,
             result = excluded.result,
             replay_available = excluded.replay_available,
+            is_bundle_final_battle = excluded.is_bundle_final_battle,
             updated_at_utc = excluded.updated_at_utc
         `,
       ).bind(
@@ -429,6 +436,7 @@ export async function handleUploadRunBundle(
         asNumber(battle.opponent_level),
         asString(battle.result),
         battle.replay_available === true ? 1 : 0,
+        asString(battle.battle_id) === finalBattleId ? 1 : 0,
         createdAtUtc,
       ),
     );

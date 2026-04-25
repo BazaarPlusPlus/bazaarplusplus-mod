@@ -269,7 +269,8 @@ internal sealed class HistoryPanelRepository
                             opponentSkills
                         ),
                         BuildPreviewData(playerHand, playerSkills, opponentHand, opponentSkills),
-                        HistoryBattleSource.Local,
+                        isBundleFinalBattle: false,
+                        source: HistoryBattleSource.Local,
                         replayAvailable: true,
                         replayDownloaded: true
                     )
@@ -324,6 +325,7 @@ internal sealed class HistoryPanelRepository
                 result,
                 winner_combatant_id,
                 loser_combatant_id,
+                is_bundle_final_battle,
                 replay_available,
                 replay_downloaded
             FROM {RunLogSqliteSchema.BattlesTableName}
@@ -362,6 +364,7 @@ internal sealed class HistoryPanelRepository
                     GetNullableString(reader, "result"),
                     GetNullableString(reader, "winner_combatant_id"),
                     GetNullableString(reader, "loser_combatant_id"),
+                    isBundleFinalBattle: GetNullableInt32(reader, "is_bundle_final_battle") == 1,
                     replayAvailable: GetNullableInt32(reader, "replay_available") == 1,
                     replayDownloaded: GetNullableInt32(reader, "replay_downloaded") == 1
                 )
@@ -424,6 +427,7 @@ internal sealed class HistoryPanelRepository
                     result,
                     winner_combatant_id,
                     loser_combatant_id,
+                    is_bundle_final_battle,
                     replay_available,
                     replay_downloaded,
                     last_synced_at_utc
@@ -452,6 +456,7 @@ internal sealed class HistoryPanelRepository
                     $result,
                     $winnerCombatantId,
                     $loserCombatantId,
+                    $isBundleFinalBattle,
                     $replayAvailable,
                     $replayDownloaded,
                     $lastSyncedAtUtc
@@ -480,6 +485,7 @@ internal sealed class HistoryPanelRepository
                     result = excluded.result,
                     winner_combatant_id = excluded.winner_combatant_id,
                     loser_combatant_id = excluded.loser_combatant_id,
+                    is_bundle_final_battle = excluded.is_bundle_final_battle,
                     replay_available = excluded.replay_available,
                     replay_downloaded = MAX(
                         {RunLogSqliteSchema.GhostBattlesTableName}.replay_downloaded,
@@ -567,6 +573,10 @@ internal sealed class HistoryPanelRepository
             insertCommand.Parameters.AddWithValue(
                 "$loserCombatantId",
                 (object?)battle.LoserCombatantId ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$isBundleFinalBattle",
+                battle.IsBundleFinalBattle ? 1 : 0
             );
             insertCommand.Parameters.AddWithValue(
                 "$replayAvailable",
@@ -737,6 +747,12 @@ internal sealed class HistoryPanelRepository
         if (ensureSchema)
         {
             RunLogSqliteSchema.EnsureInitialized(connection);
+            EnsureColumnExists(
+                connection,
+                RunLogSqliteSchema.BattlesTableName,
+                "is_bundle_final_battle",
+                "INTEGER NOT NULL DEFAULT 0"
+            );
         }
         return connection;
     }
@@ -1341,6 +1357,7 @@ internal sealed class HistoryBattleRecord
         string? loserCombatantId,
         string snapshotSummary,
         HistoryBattlePreviewData previewData,
+        bool isBundleFinalBattle,
         HistoryBattleSource source,
         bool replayAvailable,
         bool replayDownloaded
@@ -1368,6 +1385,7 @@ internal sealed class HistoryBattleRecord
         LoserCombatantId = loserCombatantId;
         SnapshotSummary = snapshotSummary;
         PreviewData = previewData;
+        IsBundleFinalBattle = isBundleFinalBattle;
         Source = source;
         ReplayAvailable = replayAvailable;
         ReplayDownloaded = replayDownloaded;
@@ -1416,6 +1434,8 @@ internal sealed class HistoryBattleRecord
     public string SnapshotSummary { get; }
 
     public HistoryBattlePreviewData PreviewData { get; }
+
+    public bool IsBundleFinalBattle { get; }
 
     public HistoryBattleSource Source { get; }
 

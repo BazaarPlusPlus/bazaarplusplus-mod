@@ -141,9 +141,21 @@ test("run bundle upload stores one artifact object and projection rows", async (
     "SELECT installation_id FROM battles WHERE battle_id = ?",
     "battle-001",
   );
+  const battleFlags = await env.DB.prepare(
+    `
+      SELECT battle_id, is_bundle_final_battle
+      FROM battles
+      WHERE battle_id IN ('battle-001', 'battle-002')
+      ORDER BY battle_id ASC
+    `,
+  ).all<{ battle_id: string; is_bundle_final_battle: number }>();
   expect(bundle?.installation_id).toBe("legacy");
   expect(run?.installation_id).toBe("legacy");
   expect(battle?.installation_id).toBe("legacy");
+  expect(battleFlags.results).toEqual([
+    { battle_id: "battle-001", is_bundle_final_battle: 0 },
+    { battle_id: "battle-002", is_bundle_final_battle: 1 },
+  ]);
   expect(bundle?.object_key).toBe(
     `run-bundles/player-account-001/run-001/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );

@@ -9,6 +9,7 @@ var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostB
 var apiClientType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleApiClient");
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleRecord");
+var formatterType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelFormatter");
 var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
 var coordinatorStateType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelState");
 var coordinatorDependenciesType = RequireType(
@@ -64,6 +65,10 @@ var resolveGhostBattleOutcome = coordinatorType.GetMethod(
     "ResolveGhostBattleOutcome",
     BindingFlags.NonPublic | BindingFlags.Static
 );
+var isGhostOpponentEliminated = formatterType.GetMethod(
+    "IsGhostOpponentEliminated",
+    BindingFlags.Public | BindingFlags.Static
+);
 Assert(
     shouldAdvanceCheckpoint != null,
     "GhostBattleSyncService should expose checkpoint advancement logic."
@@ -77,6 +82,10 @@ Assert(tryParseBattle != null, "GhostBattleApiClient should expose battle parsin
 Assert(
     resolveGhostBattleOutcome != null,
     "HistoryPanelCoordinator should expose ghost-outcome resolution logic."
+);
+Assert(
+    isGhostOpponentEliminated != null,
+    "HistoryPanelFormatter should expose ghost opponent elimination logic."
 );
 
 {
@@ -397,6 +406,7 @@ var rawBattlePayload = JObject.Parse(
       "result": "Won",
       "winner_combatant_id": "Player",
       "loser_combatant_id": "Opponent",
+      "is_bundle_final_battle": true,
       "replay": {
         "available": true
       }
@@ -433,6 +443,38 @@ Assert(
     (string?)importRecordType.GetProperty("WinnerCombatantId")?.GetValue(importRecord) == "Player",
     "Ghost import should preserve winner_combatant_id without flipping."
 );
+Assert(
+    (bool)(importRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(importRecord) ?? false),
+    "Ghost import should preserve the bundle-final battle marker."
+);
+
+var localWinRecordedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-4).ToString("o");
+var localWinBattlePayload = JObject.Parse(
+    $$"""
+    {
+      "battle_id": "ghost-battle-local-win",
+      "recorded_at_utc": "{{localWinRecordedAtUtc}}",
+      "day": 10,
+      "player_name": "RemoteFinal",
+      "player_account_id": "remote-account-002",
+      "player_hero": "Dooley",
+      "opponent_name": "LocalPlayer",
+      "opponent_account_id": "local-account-001",
+      "opponent_hero": "Vanessa",
+      "combat_kind": "PVPCombat",
+      "result": "Lost",
+      "winner_combatant_id": "Opponent",
+      "loser_combatant_id": "Player",
+      "is_bundle_final_battle": true,
+      "replay": {
+        "available": true
+      }
+    }
+    """
+);
+var localWinImportRecord =
+    tryParseBattle!.Invoke(null, [localWinBattlePayload])
+    ?? throw new InvalidOperationException("TryParseBattle should return the local-win record.");
 
 var tempRoot = Path.Combine(
     Path.GetTempPath(),
@@ -446,8 +488,9 @@ try
     var repository =
         Activator.CreateInstance(repositoryType, Path.Combine(tempRoot, "history.db"))
         ?? throw new InvalidOperationException("Failed to create HistoryPanelRepository.");
-    var importRecords = Array.CreateInstance(importRecordType, 1);
+    var importRecords = Array.CreateInstance(importRecordType, 2);
     importRecords.SetValue(importRecord, 0);
+    importRecords.SetValue(localWinImportRecord, 1);
     InvokeVoid(
         repositoryType,
         repository,
@@ -462,9 +505,19 @@ try
             "ListRecentGhostBattles",
             ["local-account-001", 20]
         );
+    var projectedBattles = ghostBattles.Cast<object>().ToList();
     var projectedBattle =
-        ghostBattles.Cast<object>().SingleOrDefault()
-        ?? throw new InvalidOperationException("Expected one projected ghost battle.");
+        projectedBattles.SingleOrDefault(battle =>
+            (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
+            == "ghost-battle-001"
+        )
+        ?? throw new InvalidOperationException("Expected the projected remote-win ghost battle.");
+    var projectedLocalWinBattle =
+        projectedBattles.SingleOrDefault(battle =>
+            (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
+            == "ghost-battle-local-win"
+        )
+        ?? throw new InvalidOperationException("Expected the projected local-win ghost battle.");
 
     Assert(
         (string?)battleRecordType.GetProperty("OpponentName")?.GetValue(projectedBattle)
@@ -483,6 +536,23 @@ try
     Assert(
         (string?)battleRecordType.GetProperty("Result")?.GetValue(projectedBattle) == "Lost",
         "Ghost repository reads should project the result into local-player perspective."
+    );
+    Assert(
+        (bool)(battleRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(projectedBattle) ?? false),
+        "Ghost repository reads should preserve the bundle-final battle marker."
+    );
+    Assert(
+        (bool)isGhostOpponentEliminated!.Invoke(null, [projectedBattle])! is false,
+        "A bundle-final ghost battle should not show elimination text when the local player lost."
+    );
+    Assert(
+        (string?)battleRecordType.GetProperty("Result")?.GetValue(projectedLocalWinBattle)
+            == "Won",
+        "Ghost repository reads should project a remote loss into a local-player win."
+    );
+    Assert(
+        (bool)isGhostOpponentEliminated.Invoke(null, [projectedLocalWinBattle])!,
+        "A bundle-final ghost battle should show elimination text when the local player won."
     );
 
     var resolvedOutcome = resolveGhostBattleOutcome!.Invoke(null, [projectedBattle]);
