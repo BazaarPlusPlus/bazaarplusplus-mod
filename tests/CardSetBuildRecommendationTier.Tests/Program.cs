@@ -95,14 +95,16 @@ static void TestExpiredFinalBuildCacheDownloadsRemotePayload()
     File.SetLastWriteTimeUtc(cachePath, now.AddHours(-21));
 
     var downloaded = false;
+    string? requestedUrl = null;
     var remotePayload = CreateFinalBuildPayload("RemoteHero", selectedCardId, "remote-download");
     ConfigureFinalBuildRemoteForTests(
         repositoryType,
         cachePath,
         now,
-        _ =>
+        url =>
         {
             downloaded = true;
+            requestedUrl = url;
             return remotePayload;
         }
     );
@@ -112,6 +114,10 @@ static void TestExpiredFinalBuildCacheDownloadsRemotePayload()
         var sources = LoadFinalBuildSources(repositoryType, "RemoteHero");
 
         Assert(downloaded, "Expired final build cache should trigger a remote download.");
+        Assert(
+            requestedUrl == "https://bpp-metrics.bazaarplusplus.com/final_builds_for_mod.json",
+            "Final build remote download should use the metrics-hosted mod payload."
+        );
         Assert(sources.Count == 1, "Downloaded final builds should be loadable.");
         Assert(
             sources[0] == "remote-download",

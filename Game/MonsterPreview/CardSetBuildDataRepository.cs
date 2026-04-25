@@ -19,7 +19,7 @@ internal sealed class CardSetBuildDataRepository
 {
     private const string FinalBuildsResourceSuffix = "final-builds-top50.json";
     private const string FinalBuildsRemoteUrl =
-        "https://bpp-static.bazaarplusplus.com/final-builds-top50.json";
+        "https://bpp-metrics.bazaarplusplus.com/final_builds_for_mod.json";
     private const string FinalBuildsCacheFileName = "final-builds-top50-cache.json";
     private static readonly LocalizedTextSet FinalBuildLabel = new(
         "Ten-Win Build",
