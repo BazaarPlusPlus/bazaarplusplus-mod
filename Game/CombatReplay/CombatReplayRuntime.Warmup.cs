@@ -809,6 +809,60 @@ internal sealed partial class CombatReplayRuntime
         }
     }
 
+    private static bool TryGetReplaySoundtrackTrackBanks(
+        SoundtrackSO soundtrack,
+        uint trackIndex,
+        out string? metadataBank,
+        out string? assetBank
+    )
+    {
+        metadataBank = null;
+        assetBank = null;
+
+        try
+        {
+            var soundtrackType = soundtrack.GetType();
+            var trackBankNameMethod = soundtrackType.GetMethod(
+                "TrackBankName",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(uint), typeof(bool) },
+                null
+            );
+            if (trackBankNameMethod != null)
+            {
+                metadataBank = trackBankNameMethod.Invoke(soundtrack, new object[] { trackIndex, false })
+                    as string;
+                assetBank = trackBankNameMethod.Invoke(soundtrack, new object[] { trackIndex, true })
+                    as string;
+                return !string.IsNullOrWhiteSpace(metadataBank)
+                    && !string.IsNullOrWhiteSpace(assetBank);
+            }
+
+            trackBankNameMethod = soundtrackType.GetMethod(
+                "TrackBankName",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(uint) },
+                null
+            );
+            if (trackBankNameMethod == null)
+                return false;
+
+            metadataBank = trackBankNameMethod.Invoke(soundtrack, new object[] { trackIndex }) as string;
+            assetBank = string.IsNullOrWhiteSpace(metadataBank) ? null : metadataBank + ".assets";
+            return !string.IsNullOrWhiteSpace(metadataBank) && !string.IsNullOrWhiteSpace(assetBank);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay soundtrack '{soundtrack.name}' track {trackIndex} bank metadata lookup failed: {ex.Message}"
+            );
+            return false;
+        }
+    }
+
     private static async Task WarmReplaySoundtrackTrackAsync(
         SoundManager soundManager,
         SoundtrackSO soundtrack,
@@ -816,9 +870,14 @@ internal sealed partial class CombatReplayRuntime
         ReplayAudioWarmupStats stats
     )
     {
-        var metadataBank = soundtrack.TrackBankName(trackIndex, isAssetBank: false);
-        var assetBank = soundtrack.TrackBankName(trackIndex, isAssetBank: true);
-        if (string.IsNullOrWhiteSpace(metadataBank) || string.IsNullOrWhiteSpace(assetBank))
+        if (
+            !TryGetReplaySoundtrackTrackBanks(
+                soundtrack,
+                trackIndex,
+                out var metadataBank,
+                out var assetBank
+            )
+        )
         {
             stats.SoundtrackBanksSkipped++;
             BppLog.Warn(
