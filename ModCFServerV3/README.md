@@ -40,9 +40,13 @@ D1 schema 由 `migrations/` 下的有序 SQL 维护，按文件名顺序应用�
 
 | 文件 | 内容 |
 | --- | --- |
-| `0001_initial_schema.sql` | 初版表结构（users、tokens、run_bundles、runs、battles、replay_tokens） |
-| `0002_auth_simplification.sql` | 移除 installation 链路，鉴权回退到 username + password + bearer token |
+| `0001_initial_schema.sql` | 初版表结构（users、installation 链路、run_bundles、runs、battles、replay_tokens） |
+| `0002_auth_simplification.sql` | 新增 `tokens`，移除 installation 链路，鉴权回退到 username + password + bearer token |
 | `0003_ghost_battles_covering_index.sql` | 为 `/ghost-battles` 查询建立 17 列 covering index |
+| `0004_run_bundles_submitted_at_index.sql` | 为按 `submitted_at_utc` 同步 run bundle 的分析任务建索引 |
+| `0005_runs_ended_at_index.sql` | 为按 `ended_at_utc` 同步 runs 的分析任务建索引 |
+| `0006_run_bundles_created_at_index.sql` | 为按服务端 `created_at_utc` 同步 run bundle 建索引 |
+| `0007_runs_updated_at_index.sql` | 为按服务端 `updated_at_utc` 同步 runs 建索引 |
 
 ## Known Limitations
 

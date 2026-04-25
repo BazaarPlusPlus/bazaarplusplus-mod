@@ -2,8 +2,10 @@
 
 Date: 2026-04-08
 Commit: `57a4412`
-Related spec: `docs/superpowers/specs/2026-04-08-preview-surface-design.md`
-Related plan: `docs/superpowers/plans/2026-04-08-preview-surface.md`
+
+This is a retained implementation note. The historical execution spec and plan
+were removed during docs cleanup because they described transient migration
+steps rather than the current codebase.
 
 ## Scope
 
@@ -17,11 +19,11 @@ The first version intentionally keeps the current `GameObject` lifecycle model. 
 
 Added neutral preview models and surface interfaces under `Game/PreviewSurface`:
 
-- `Models/PreviewBoardModel.cs`
-- `Models/PreviewCardSpec.cs`
-- `Models/PreviewBoardPresentation.cs`
-- `Board/IPreviewBoardSurface.cs`
-- `Cards/IPreviewCardSurface.cs`
+- `Game/PreviewSurface/Models/PreviewBoardModel.cs`
+- `Game/PreviewSurface/Models/PreviewCardSpec.cs`
+- `Game/PreviewSurface/Models/PreviewBoardPresentation.cs`
+- `Game/PreviewSurface/Board/IPreviewBoardSurface.cs`
+- `Game/PreviewSurface/Cards/IPreviewCardSurface.cs`
 
 These types replace the old monster-specific placement of the same concepts and give both `MonsterPreview` and `HistoryPanel` a shared surface contract.
 
@@ -29,8 +31,8 @@ These types replace the old monster-specific placement of the same concepts and 
 
 Added:
 
-- `Cards/PreviewItemCardSurface.cs`
-- `Cards/PreviewSkillCardSurface.cs`
+- `Game/PreviewSurface/Cards/PreviewItemCardSurface.cs`
+- `Game/PreviewSurface/Cards/PreviewSkillCardSurface.cs`
 
 These classes now own the concrete item/skill preview object creation details, including:
 
@@ -47,9 +49,9 @@ These classes now own the concrete item/skill preview object creation details, i
 
 Added:
 
-- `Board/PreviewBoardSurface.cs`
-- `Board/PreviewBoardRenderTarget.cs`
-- `Board/PreviewBoardRenderTargetFactory.cs`
+- `Game/PreviewSurface/Board/PreviewBoardSurface.cs`
+- `Game/PreviewSurface/Board/PreviewBoardRenderTarget.cs`
+- `Game/PreviewSurface/Board/PreviewBoardRenderTargetFactory.cs`
 
 `PreviewBoardSurface` remains responsible for board visuals, slot layout, card placement, skill placement, and clear/rebuild behavior.
 

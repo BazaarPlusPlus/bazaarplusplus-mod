@@ -42,7 +42,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## 数据与网络行为
 
-- run logging 与战斗回放会在本地保存 SQLite 数据和 replay payload。
+- run logging 与战斗回放会在本地保存 SQLite 数据和 replay payload；线上身份令牌使用 `BazaarPlusPlus/Identity/` 下的 JSON 文件。
 - 后台上传会在非 live run 状态下执行上传扫描。
 - `ModCFServerV3/` 目录包含当前上传、ghost battles、replay 下载相关的 Cloudflare Worker 后端实现。
 
@@ -51,7 +51,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - `Plugin.cs`：BepInEx 运行时入口。
 - `Core/`、`Game/`、`Patches/`、`Data/`：主要功能实现。
 - `tests/`：按特性拆分的测试项目。
-- `scripts/`：构建和辅助脚本。
+- `run.sh`：本地构建、测试、格式化和反编译入口。
 - `ModCFServerV3/`：云同步后端。
 
 ## 文档入口

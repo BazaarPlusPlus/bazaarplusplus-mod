@@ -4,8 +4,9 @@
 
 | Hotkey | Function | Scope | Rebindable |
 | --- | --- | --- | --- |
+| `F8` | Toggle `HistoryPanel` | Lobby / non-combat UI | No |
 | `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No |
-| `Ctrl` | Show enchant preview | Tooltip hover | Yes |
+| `Ctrl` | Show enchant preview when always-show is disabled | Tooltip hover | Yes |
 | `Shift` | Show upgrade preview | Tooltip hover | Yes |
 
 ## Rebindable Bazaar++ Actions
@@ -14,19 +15,6 @@
 - `HoldUpgradePreview`
 
 当前由 `Game/Input/BppHotkeyService.cs` 管理，默认值分别是 `Ctrl` 和 `Shift`，支持鼠标按键绑定，并在保存前拒绝 Bazaar++ 动作内部冲突。
-
-## DebugPanel
-
-仅在 debug build 可用：
-
-| Hotkey | Function |
-| --- | --- |
-| `F2` | Toggle `DebugPanel` |
-| `1` | `Summary` |
-| `2` | `Run` |
-| `3` | `Encounters` |
-| `4` | `Replays` |
-| `Tab` | Toggle All / Single section view |
 
 ## Card Set Preview
 
@@ -37,13 +25,13 @@
 | `Caps Lock` | Toggle selection mode |
 | `1` | Switch to `Selected Set` |
 | `2` | Switch to `Winner Build` |
-| `3` | Switch to `Ten-Win Build` |
-| `Tab` | Cycle `Selected Set` -> `Winner Build` -> `Ten-Win Build` |
+| `3` | Switch to `Final Build` |
+| `Tab` | Cycle `Selected Set` -> `Winner Build` -> `Final Build` |
 | `Up / Down` | Browse matched build candidates |
 
 ## HistoryPanel Preview Tuning
 
-以下热键仅在 `HistoryPanel` 打开且按住 `Ctrl` 时生效：
+以下热键仅在 `HistoryPanel` 打开且按住 `Ctrl` 时生效。按住 `Shift` 会使用更大的步进。
 
 | Hotkey | Function |
 | --- | --- |
@@ -60,9 +48,8 @@
 
 - `Game/Input/KeyBindings.cs`
 - `Game/Input/BppHotkeyService.cs`
-- `Game/Screenshots/EndOfRunScreenshotController.cs`
+- `Game/MonsterPreview/CardSetPreviewRuntime.cs`
 - `Game/HistoryPanel/HistoryPanel.cs`
-- `Game/DebugPanel/DebugPanel.cs`
 - `Patches/Settings/BppKeybindSettingsPatch.cs`
 - `Patches/Tooltips/ItemEnchantPreviewPatch.cs`
 - `Patches/Tooltips/UpgradePreviewTooltipPatch.cs`

@@ -42,7 +42,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## Data And Network Behavior
 
-- Run logging and combat replay store local SQLite data and replay payloads.
+- Run logging and combat replay store local SQLite data and replay payloads; online identity tokens use JSON files under `BazaarPlusPlus/Identity/`.
 - Background upload only scans for uploads while the client is outside a live run.
 - The `ModCFServerV3/` directory contains the current Cloudflare Worker backend used for uploads, ghost battles, and replay download links.
 
@@ -51,7 +51,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - `Plugin.cs`: BepInEx runtime entry point.
 - `Core/`, `Game/`, `Patches/`, `Data/`: main feature implementation.
 - `tests/`: feature-focused test projects.
-- `scripts/`: build helpers and utility scripts.
+- `run.sh`: local build, test, format, and decompile entry point.
 - `ModCFServerV3/`: cloud sync backend.
 
 ## Documentation Entry Points

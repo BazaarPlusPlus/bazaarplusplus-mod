@@ -58,7 +58,7 @@ view. `player_*` is the uploader, `opponent_*` is whoever they fought.
 
 File: [`ModCFServerV3/src/features/v3/queryGhostBattles.ts`](../../ModCFServerV3/src/features/v3/queryGhostBattles.ts)
 
-`GET /players/me/ghost-battles` returns rows where the **local player appears
+`GET /ghost-battles` returns rows where the **local player appears
 in the `opponent` slot of somebody else's upload**:
 
 ```sql
@@ -83,7 +83,10 @@ File: [`Game/HistoryPanel/Ghost/GhostBattleApiClient.cs`](../../Game/HistoryPane
 (`TryParseBattle`)
 
 Fields are deserialized into `GhostBattleImportRecord` **1:1** — the client
-does not rewrite perspective during import.
+does not rewrite perspective during import. The current server response does
+not include `hour`, `encounter_id`, `combat_kind`, `winner_combatant_id`, or
+`loser_combatant_id`, so those fields stay null/default unless a later API
+version adds them.
 
 - `PlayerName / PlayerAccountId / PlayerHero / ...` = uploader
 - `OpponentName / OpponentAccountId / OpponentHero / ...` = me
@@ -100,9 +103,8 @@ Ghost rows are written to the local SQLite `battles` table with
 `opponent_*` columns continue to carry uploader-perspective values — storage
 matches what the server returned.
 
-This is a deliberate choice documented in
-[`docs/todos/ghostmodify.md`](../todos/ghostmodify.md): the repository stores
-facts, and perspective translation happens at read time.
+This is a deliberate choice: the repository stores facts, and perspective
+translation happens at read time.
 
 ## 6. Read + Projection (Storage → UI Model)
 
@@ -183,7 +185,7 @@ is a product-level choice, not a bug.
   opponent_* = me
   result     = uploader POV
         │
-        ▼ GET /players/me/ghost-battles
+        ▼ GET /ghost-battles
         │  (WHERE opponent_account_id = me)
 [Response]  raw uploader-POV rows
         │

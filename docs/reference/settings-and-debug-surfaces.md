@@ -7,11 +7,11 @@
 当前内容：
 
 - `Game History` -> 大厅 Bazaar++ panel 内入口，打开 `HistoryPanel`
-
 - `Anonymous Mode` -> `EnableNameOverrideConfig`
+- `Legendary Position` -> `LegendaryPositionDisplayModeConfig`
 - `Enchant Preview` -> `EnchantPreviewAlwaysShowConfig`
 - `Combat Status Bar` -> `EnableCombatStatusBarConfig`
-- `Use Native Monster Preview` -> `UseNativeMonsterPreviewConfig`
+- `Chinese Locale` -> `ChineseLocaleModeConfig`
 
 ## Tooltip Keybind Rows
 
@@ -37,16 +37,11 @@
 
 ## Debug Surfaces
 
-当前 debug build 只额外挂载：
+当前仓库没有单独的 `DebugPanel` runtime。可用的调试/开发入口主要是：
 
-- `DebugPanel`
-
-当前入口：
-
-- `Bazaar++ panel -> Game History`: 打开 `HistoryPanel`
-- `F2`: toggle `DebugPanel`
-- `DebugPanel -> Replays`: 启动本地保存的 replay
-- `DebugPanel -> Encounters`: 查看当前遭遇与 monster-preview 相关状态
+- `F8` 或 `Bazaar++ panel -> Game History`: 打开 `HistoryPanel`
+- `HistoryPanel` 打开且按住 `Ctrl` 时的 preview tuning 热键
+- 运行日志中的 `BppLog` 分类输出
 
 ## Key Files
 
@@ -60,4 +55,4 @@
 - `Patches/Settings/BppKeybindSettingsPatch.cs`
 - `Patches/NameOverride/NameOverridePatches.cs`
 - `Game/Tooltips/TooltipModifierRefreshController.cs`
-- `Game/DebugPanel/DebugPanel.cs`
+- `Game/HistoryPanel/HistoryPanel.cs`

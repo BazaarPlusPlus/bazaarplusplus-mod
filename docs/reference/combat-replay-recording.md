@@ -12,9 +12,9 @@
 
 - payload 文件目录：`<GameRoot>/BazaarPlusPlus/CombatReplays`
 - payload 文件格式：`<battle_id>.payload.mpack.gz`
-- battle metadata：SQLite `pvp_battles`
+- battle metadata：SQLite `battles` / `battle_snapshots`
 
-`pvp_battles` 保存 battle manifest，包含 battle identity、player/opponent identity、结果，以及 history preview / replay bootstrap 需要的 board snapshot。
+`battles` 保存 battle manifest，`battle_snapshots` 保存 history preview / replay bootstrap 需要的 board snapshot。
 
 ## Capture Flow
 
@@ -27,7 +27,6 @@
 ## Replay Entry Points
 
 - `HistoryPanel`：本地 battle payload 存在且当前允许 bootstrap 时可回放
-- `DebugPanel -> Replays`：debug build 下的调试入口
 - ghost battle：若服务端声明 replay 可用，可先下载 payload，再走导入回放
 
 ## 关键文件

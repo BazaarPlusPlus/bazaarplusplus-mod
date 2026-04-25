@@ -4,15 +4,15 @@
 
 当前实现会在战斗期间显示一个底部 HUD。运行时职责分为两部分：
 
-- `Game/CombatStatusBar/CombatStatusBar.cs`：UI、状态与输入
+- `Game/CombatStatusBar/CombatStatusBar.cs`：UI、状态、速度和输入
 - `Game/CombatStatusBar/CombatStatusBarModule.cs`：消费 combat 事件并推进状态
 
 ## 当前行为
 
-- 仅在 `BppRuntimeHost.RunContext.IsInGameRun` 且功能开启时显示。
+- 仅在 `IBppServices.RunContext.IsInGameRun` 且功能开启时显示。
 - 展示逻辑战斗时间与已处理帧数。
-- 支持暂停。
-- 记住功能开关。
+- 支持暂停和 0.50x / 0.67x / 1.00x 速度档位。
+- 记住功能开关和默认速度档位。
 
 不支持：
 

@@ -70,7 +70,7 @@
 读取顺序：
 
 1. controller 缓存值
-2. `BppRuntimeHost.RunContext.CurrentServerRunId`
+2. `IBppServices.RunContext.CurrentServerRunId`
 
 ### Hero / Rank / Rating / Position / Day / Wins
 
