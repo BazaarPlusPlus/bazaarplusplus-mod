@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
@@ -17,15 +18,31 @@ namespace BazaarPlusPlus.Game.MonsterPreview;
 internal sealed class CardSetBuildDataRepository
 {
     private const string FinalBuildsResourceSuffix = "final-builds-top50.json";
+    private const string FinalBuildsRemoteUrl =
+        "https://bpp-static.bazaarplusplus.com/final-builds-top50.json";
+    private const string FinalBuildsCacheFileName = "final-builds-top50-cache.json";
     private static readonly LocalizedTextSet FinalBuildLabel = new(
         "Ten-Win Build",
         "十胜阵容",
         "十勝陣容",
         "十勝陣容"
     );
+    private static readonly TimeSpan FinalBuildsCacheDuration = TimeSpan.FromHours(20);
+    private static readonly HttpClient FinalBuildsHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(10),
+    };
+    private static readonly string DefaultFinalBuildsCacheFilePath = Path.Combine(
+        Path.GetTempPath(),
+        "BazaarPlusPlus",
+        FinalBuildsCacheFileName
+    );
     private static readonly object SyncRoot = new();
     private static FinalBuildRoot? _finalRoot;
     private static bool _attemptedLoad;
+    private static string _finalBuildsCacheFilePath = DefaultFinalBuildsCacheFilePath;
+    private static Func<DateTime> _utcNow = () => DateTime.UtcNow;
+    private static Func<string, string> _downloadFinalBuildJson = DownloadFinalBuildJson;
 
     public bool TryFindFinalRecommendation(
         string? hero,
@@ -66,7 +83,176 @@ internal sealed class CardSetBuildDataRepository
                 return;
 
             _attemptedLoad = true;
-            _finalRoot = LoadEmbeddedJson<FinalBuildRoot>(FinalBuildsResourceSuffix);
+            _finalRoot = LoadFinalBuildRoot();
+        }
+    }
+
+    private static FinalBuildRoot? LoadFinalBuildRoot()
+    {
+        if (TryLoadFinalBuildCache(allowExpired: false, out var freshRoot))
+            return freshRoot;
+
+        if (TryLoadRemoteFinalBuilds(out var remoteRoot))
+            return remoteRoot;
+
+        if (TryLoadFinalBuildCache(allowExpired: true, out var staleRoot))
+        {
+            BppLog.Info(
+                "CardSetBuildDataRepository",
+                "Using expired final builds cache because remote download failed."
+            );
+            return staleRoot;
+        }
+
+        return LoadEmbeddedJson<FinalBuildRoot>(FinalBuildsResourceSuffix);
+    }
+
+    private static bool TryLoadFinalBuildCache(
+        bool allowExpired,
+        out FinalBuildRoot? finalBuildRoot
+    )
+    {
+        finalBuildRoot = null;
+
+        try
+        {
+            if (!File.Exists(_finalBuildsCacheFilePath))
+                return false;
+
+            var lastWriteUtc = File.GetLastWriteTimeUtc(_finalBuildsCacheFilePath);
+            var expiresAtUtc = lastWriteUtc.Add(FinalBuildsCacheDuration);
+            if (!allowExpired && _utcNow() >= expiresAtUtc)
+                return false;
+
+            var json = File.ReadAllText(_finalBuildsCacheFilePath);
+            finalBuildRoot = DeserializeFinalBuildJson(json, "cache");
+            if (finalBuildRoot == null)
+                return false;
+
+            BppLog.Info(
+                "CardSetBuildDataRepository",
+                $"Loaded final builds from cache path={_finalBuildsCacheFilePath} "
+                    + $"expired={_utcNow() >= expiresAtUtc} expiresAtUtc={expiresAtUtc:O}"
+            );
+            return true;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CardSetBuildDataRepository",
+                $"Failed to read final builds cache {_finalBuildsCacheFilePath}: {ex.Message}"
+            );
+            return false;
+        }
+    }
+
+    private static bool TryLoadRemoteFinalBuilds(out FinalBuildRoot? finalBuildRoot)
+    {
+        finalBuildRoot = null;
+
+        try
+        {
+            var json = _downloadFinalBuildJson(FinalBuildsRemoteUrl);
+            if (string.IsNullOrWhiteSpace(json))
+                return false;
+
+            finalBuildRoot = DeserializeFinalBuildJson(json, "remote");
+            if (finalBuildRoot == null)
+                return false;
+
+            TryWriteFinalBuildCache(json);
+            BppLog.Info(
+                "CardSetBuildDataRepository",
+                $"Loaded final builds from remote url={FinalBuildsRemoteUrl}"
+            );
+            return true;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CardSetBuildDataRepository",
+                $"Failed to refresh final builds from {FinalBuildsRemoteUrl}: {ex.Message}"
+            );
+            return false;
+        }
+    }
+
+    private static FinalBuildRoot? DeserializeFinalBuildJson(string json, string source)
+    {
+        try
+        {
+            var parsed = JsonConvert.DeserializeObject<FinalBuildRoot>(json);
+            if (parsed?.Heroes == null)
+            {
+                BppLog.Warn(
+                    "CardSetBuildDataRepository",
+                    $"Final builds JSON from {source} did not contain heroes."
+                );
+                return null;
+            }
+
+            return parsed;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CardSetBuildDataRepository",
+                $"Failed to parse final builds JSON from {source}: {ex.Message}"
+            );
+            return null;
+        }
+    }
+
+    private static void TryWriteFinalBuildCache(string json)
+    {
+        try
+        {
+            var cacheDirectory = Path.GetDirectoryName(_finalBuildsCacheFilePath);
+            if (!string.IsNullOrWhiteSpace(cacheDirectory))
+                Directory.CreateDirectory(cacheDirectory);
+
+            File.WriteAllText(_finalBuildsCacheFilePath, json);
+            File.SetLastWriteTimeUtc(_finalBuildsCacheFilePath, _utcNow());
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CardSetBuildDataRepository",
+                $"Failed to write final builds cache {_finalBuildsCacheFilePath}: {ex.Message}"
+            );
+        }
+    }
+
+    private static string DownloadFinalBuildJson(string url)
+    {
+        return FinalBuildsHttpClient.GetStringAsync(url).GetAwaiter().GetResult();
+    }
+
+    private static void ConfigureFinalBuildRemoteForTests(
+        string cacheFilePath,
+        Func<DateTime> utcNow,
+        Func<string, string> downloadJson
+    )
+    {
+        lock (SyncRoot)
+        {
+            _finalRoot = null;
+            _attemptedLoad = false;
+            _finalBuildsCacheFilePath = cacheFilePath;
+            _utcNow = utcNow;
+            _downloadFinalBuildJson = downloadJson;
+        }
+    }
+
+    private static void ResetFinalBuildRemoteForTests()
+    {
+        lock (SyncRoot)
+        {
+            _finalRoot = null;
+            _attemptedLoad = false;
+            _finalBuildsCacheFilePath = DefaultFinalBuildsCacheFilePath;
+            _utcNow = () => DateTime.UtcNow;
+            _downloadFinalBuildJson = DownloadFinalBuildJson;
         }
     }
 
