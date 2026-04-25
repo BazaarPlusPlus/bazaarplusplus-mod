@@ -19,7 +19,6 @@
   <!-- Embedded resources -->
   <ItemGroup>
     <EmbeddedResource Include="Data\BuildRecommendations\final-builds-top50.json" />
-    <EmbeddedResource Include="Data\BuildRecommendations\winner-builds-top50.json" />
   </ItemGroup>
 
   <!-- Exclude decompiled and installer files -->

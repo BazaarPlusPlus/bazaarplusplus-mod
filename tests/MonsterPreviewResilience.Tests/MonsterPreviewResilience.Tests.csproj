@@ -16,6 +16,14 @@
       Include="../../Game/MonsterPreview/Architecture/PreviewCardSpecFilter.cs"
       Link="PreviewCardSpecFilter.cs"
     />
+    <Compile
+      Include="../../Game/MonsterPreview/CardSetBuildRecommendationMode.cs"
+      Link="CardSetBuildRecommendationMode.cs"
+    />
+    <Compile
+      Include="../../Game/MonsterPreview/CardSetBuildRecommendationModeFlow.cs"
+      Link="CardSetBuildRecommendationModeFlow.cs"
+    />
     <Compile Include="TestLocalCardTemplateCatalog.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>

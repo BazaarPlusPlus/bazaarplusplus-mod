@@ -17,22 +17,14 @@ namespace BazaarPlusPlus.Game.MonsterPreview;
 internal sealed class CardSetBuildDataRepository
 {
     private const string FinalBuildsResourceSuffix = "final-builds-top50.json";
-    private const string WinnerBuildsResourceSuffix = "winner-builds-top50.json";
     private static readonly LocalizedTextSet FinalBuildLabel = new(
         "Ten-Win Build",
         "十胜阵容",
         "十勝陣容",
         "十勝陣容"
     );
-    private static readonly LocalizedTextSet WinnerDayLabel = new(
-        "Winner Day",
-        "胜场第",
-        "勝場第",
-        "勝場第"
-    );
     private static readonly object SyncRoot = new();
     private static FinalBuildRoot? _finalRoot;
-    private static WinnerBuildRoot? _winnerRoot;
     private static bool _attemptedLoad;
 
     public bool TryFindFinalRecommendation(
@@ -42,18 +34,6 @@ internal sealed class CardSetBuildDataRepository
     )
     {
         var recommendations = FindFinalRecommendations(hero, templateIds);
-        recommendation = recommendations.FirstOrDefault()!;
-        return recommendation != null;
-    }
-
-    public bool TryFindWinnerRecommendation(
-        string? hero,
-        int? day,
-        IReadOnlyCollection<Guid> templateIds,
-        out CardSetBuildRecommendation recommendation
-    )
-    {
-        var recommendations = FindWinnerRecommendations(hero, day, templateIds);
         recommendation = recommendations.FirstOrDefault()!;
         return recommendation != null;
     }
@@ -72,45 +52,10 @@ internal sealed class CardSetBuildDataRepository
             : Array.Empty<CardSetBuildRecommendation>();
     }
 
-    public IReadOnlyList<CardSetBuildRecommendation> FindWinnerRecommendations(
-        string? hero,
-        int? day,
-        IReadOnlyCollection<Guid> templateIds
-    )
-    {
-        var root = EnsureWinnerRoot();
-        if (
-            root?.Heroes == null
-            || string.IsNullOrWhiteSpace(hero)
-            || !day.HasValue
-            || day.Value <= 0
-        )
-        {
-            return Array.Empty<CardSetBuildRecommendation>();
-        }
-
-        if (
-            !root.Heroes.TryGetValue(hero, out var heroBucket)
-            || heroBucket?.Days == null
-            || !heroBucket.Days.TryGetValue(day.Value.ToString(), out var dayBucket)
-        )
-        {
-            return Array.Empty<CardSetBuildRecommendation>();
-        }
-
-        return FindRecommendations(dayBucket, templateIds, ResolveWinnerDayLabel(day.Value));
-    }
-
     private static FinalBuildRoot? EnsureFinalRoot()
     {
         EnsureLoaded();
         return _finalRoot;
-    }
-
-    private static WinnerBuildRoot? EnsureWinnerRoot()
-    {
-        EnsureLoaded();
-        return _winnerRoot;
     }
 
     private static void EnsureLoaded()
@@ -122,7 +67,6 @@ internal sealed class CardSetBuildDataRepository
 
             _attemptedLoad = true;
             _finalRoot = LoadEmbeddedJson<FinalBuildRoot>(FinalBuildsResourceSuffix);
-            _winnerRoot = LoadEmbeddedJson<WinnerBuildRoot>(WinnerBuildsResourceSuffix);
         }
     }
 
@@ -320,31 +264,10 @@ internal sealed class CardSetBuildDataRepository
         return FinalBuildLabel.Resolve(PlayerPreferences.Data?.LanguageCode ?? string.Empty);
     }
 
-    private static string ResolveWinnerDayLabel(int day)
-    {
-        var languageCode = PlayerPreferences.Data?.LanguageCode ?? string.Empty;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-            return $"{WinnerDayLabel.Resolve(languageCode)} {day} 天";
-
-        return $"{WinnerDayLabel.Resolve(languageCode)} {day}";
-    }
-
     private sealed class FinalBuildRoot
     {
         [JsonProperty("heroes")]
         public Dictionary<string, BuildQueryBucket>? Heroes { get; set; }
-    }
-
-    private sealed class WinnerBuildRoot
-    {
-        [JsonProperty("heroes")]
-        public Dictionary<string, WinnerHeroBucket>? Heroes { get; set; }
-    }
-
-    private sealed class WinnerHeroBucket
-    {
-        [JsonProperty("days")]
-        public Dictionary<string, BuildQueryBucket>? Days { get; set; }
     }
 
     private sealed class BuildQueryBucket

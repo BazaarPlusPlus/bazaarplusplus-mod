@@ -25,12 +25,6 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         "當前卡組",
         "當前卡組"
     );
-    private static readonly LocalizedTextSet WinnerBuildLabel = new(
-        "Winner Build",
-        "胜场阵容",
-        "勝場陣容",
-        "勝場陣容"
-    );
     private static readonly LocalizedTextSet FinalBuildLabel = new(
         "Ten-Win Build",
         "十胜阵容",
@@ -173,7 +167,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             ShowModeIndicator();
             BppLog.Info(
                 "CardSetPreviewRuntime",
-                "Selection mode enabled. Press 1 for Selected Set, 2 for Winner Build, 3 for Final Build, and Up/Down to browse matched builds."
+                "Selection mode enabled. Press 1 for Selected Set, 2 for Final Build, and Up/Down to browse matched builds."
             );
             return;
         }
@@ -202,13 +196,10 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             return TrySetDisplayMode(CardSetBuildRecommendationMode.SelectedSet);
 
         if (WasDisplayModeKeyPressed(keyboard.digit2Key, keyboard.numpad2Key))
-            return TrySetDisplayMode(CardSetBuildRecommendationMode.WinnerBuild);
-
-        if (WasDisplayModeKeyPressed(keyboard.digit3Key, keyboard.numpad3Key))
             return TrySetDisplayMode(CardSetBuildRecommendationMode.FinalBuild);
 
         if (keyboard.tabKey.wasPressedThisFrame && keyboard.shiftKey.isPressed == false)
-            return TrySetDisplayMode(GetNextDisplayMode(_displayMode));
+            return TrySetDisplayMode(CardSetBuildRecommendationModeFlow.GetNext(_displayMode));
 
         return false;
     }
@@ -216,19 +207,6 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
     private static bool WasDisplayModeKeyPressed(KeyControl? primaryKey, KeyControl? alternateKey)
     {
         return primaryKey?.wasPressedThisFrame == true || alternateKey?.wasPressedThisFrame == true;
-    }
-
-    private static CardSetBuildRecommendationMode GetNextDisplayMode(
-        CardSetBuildRecommendationMode currentMode
-    )
-    {
-        return currentMode switch
-        {
-            CardSetBuildRecommendationMode.SelectedSet =>
-                CardSetBuildRecommendationMode.WinnerBuild,
-            CardSetBuildRecommendationMode.WinnerBuild => CardSetBuildRecommendationMode.FinalBuild,
-            _ => CardSetBuildRecommendationMode.SelectedSet,
-        };
     }
 
     private bool TrySetDisplayMode(CardSetBuildRecommendationMode nextMode)
@@ -239,7 +217,6 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         _displayMode = nextMode;
         _recommendationIndex = 0;
         var hero = Data.Run?.Player?.Hero.ToString() ?? "-";
-        var day = Data.Run == null ? (int?)null : (int)Data.Run.Day;
 
         _currentSponsor = CardSetPreviewSponsorCatalog.PickDisplay();
         if (_selectedCards.Count > 0)
@@ -248,7 +225,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
 
         BppLog.Info(
             "CardSetPreviewRuntime",
-            $"Preview display source changed to {GetDisplayModeLabel(_displayMode)} hero={hero} day={(day.HasValue ? day.Value.ToString() : "-")} selected={_selectedCards.Count}"
+            $"Preview display source changed to {GetDisplayModeLabel(_displayMode)} hero={hero} selected={_selectedCards.Count}"
         );
         return true;
     }
@@ -385,11 +362,8 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
 
         selectedItems ??= _selectedCards.Select(card => card.Item.Clone()).ToList();
         var hero = Data.Run?.Player?.Hero.ToString();
-        var day = Data.Run == null ? (int?)null : (int)Data.Run.Day;
         var selectedTemplateIds = selectedItems.Select(item => item.TemplateId).ToArray();
-        return _displayMode == CardSetBuildRecommendationMode.WinnerBuild
-            ? _buildRepository.FindWinnerRecommendations(hero, day, selectedTemplateIds)
-            : _buildRepository.FindFinalRecommendations(hero, selectedTemplateIds);
+        return _buildRepository.FindFinalRecommendations(hero, selectedTemplateIds);
     }
 
     private string BuildOverlayLabel(
@@ -441,7 +415,6 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         var languageCode = PlayerPreferences.Data?.LanguageCode ?? string.Empty;
         return mode switch
         {
-            CardSetBuildRecommendationMode.WinnerBuild => WinnerBuildLabel.Resolve(languageCode),
             CardSetBuildRecommendationMode.FinalBuild => FinalBuildLabel.Resolve(languageCode),
             _ => SelectedSetLabel.Resolve(languageCode),
         };

@@ -1,9 +1,35 @@
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.PreviewSurface;
 
+TestRecommendationModesExposeOnlyCurrentAndTenWin();
+TestRecommendationModeFlow();
 TestPreviewCardSpecFilter();
 
 Console.WriteLine("MonsterPreviewResilience checks passed.");
+
+static void TestRecommendationModesExposeOnlyCurrentAndTenWin()
+{
+    var modes = Enum.GetNames<CardSetBuildRecommendationMode>();
+
+    Assert(
+        modes.SequenceEqual(["SelectedSet", "FinalBuild"]),
+        "Recommendation preview modes should only expose selected set and ten-win build."
+    );
+}
+
+static void TestRecommendationModeFlow()
+{
+    Assert(
+        CardSetBuildRecommendationModeFlow.GetNext(CardSetBuildRecommendationMode.SelectedSet)
+            == CardSetBuildRecommendationMode.FinalBuild,
+        "Cycling from selected set should move directly to ten-win build."
+    );
+    Assert(
+        CardSetBuildRecommendationModeFlow.GetNext(CardSetBuildRecommendationMode.FinalBuild)
+            == CardSetBuildRecommendationMode.SelectedSet,
+        "Cycling from ten-win build should return to selected set."
+    );
+}
 
 static void TestPreviewCardSpecFilter()
 {
