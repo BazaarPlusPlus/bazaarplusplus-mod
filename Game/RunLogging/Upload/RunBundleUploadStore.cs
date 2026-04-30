@@ -43,6 +43,7 @@ internal sealed class RunBundleUploadStore
                 ON r.run_id = s.run_id
             WHERE s.dirty = 1
               AND r.completed = 1
+              AND r.game_mode = 'Ranked'
             ORDER BY COALESCE(s.last_attempt_at_utc, r.started_at_utc) ASC
             LIMIT $limit;
             """;
@@ -68,6 +69,7 @@ internal sealed class RunBundleUploadStore
                 ON r.run_id = s.run_id
             WHERE s.dirty = 1
               AND r.completed = 1
+              AND r.game_mode = 'Ranked'
             LIMIT 1;
             """;
         return command.ExecuteScalar() != null;
