@@ -1,6 +1,7 @@
 import type { Env } from "../../env";
 import { verifyPassword } from "../../crypto/password";
 import { json, readJson } from "../../http/json";
+import { trimString } from "../../http/request";
 import { generateBearerToken } from "../../token/generate";
 
 type LoginRequest = {
@@ -19,7 +20,7 @@ export async function handleLogin(
   env: Env,
 ): Promise<Response> {
   const body = (await readJson(request)) as LoginRequest;
-  const username = typeof body.player_username === "string" ? body.player_username.trim() : "";
+  const username = trimString(body.player_username);
   const password = typeof body.password === "string" ? body.password : "";
 
   if (!username || !password) {

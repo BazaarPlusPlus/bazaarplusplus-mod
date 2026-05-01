@@ -2,6 +2,7 @@ import { base64ToBytes } from "../../crypto/base64";
 import { sha256Base64 } from "../../crypto/hash";
 import type { Env } from "../../env";
 import { json, readJson } from "../../http/json";
+import { optionalFiniteNumber, optionalTrimmedString } from "../../http/request";
 import { logInfo, logWarn } from "../../observability";
 import { getRunBundleRetentionDays } from "../../config/v3";
 
@@ -64,14 +65,6 @@ function sanitizeObjectKeySegment(value: string): string | null {
   return ObjectKeySegmentPattern.test(value) ? value : null;
 }
 
-function asString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function asNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
 type ArtifactBytesEncoding = "base64" | "byte-array";
 
 type DecodedArtifactBytes = {
@@ -108,7 +101,7 @@ function shouldProjectBattle(
   battle: BattleProjection,
   knownOpponentAccountIds: ReadonlySet<string>,
 ): boolean {
-  const opponentAccountId = asString(battle.opponent_account_id);
+  const opponentAccountId = optionalTrimmedString(battle.opponent_account_id);
   return opponentAccountId != null && knownOpponentAccountIds.has(opponentAccountId);
 }
 
@@ -125,7 +118,7 @@ async function loadKnownOpponentAccountIds(
   }
 
   for (const battle of battleProjections) {
-    const opponentAccountId = asString(battle.opponent_account_id);
+    const opponentAccountId = optionalTrimmedString(battle.opponent_account_id);
     if (opponentAccountId && opponentAccountId !== uploaderPlayerAccountId) {
       opponentAccountIds.add(opponentAccountId);
     }
@@ -154,54 +147,14 @@ async function loadKnownOpponentAccountIds(
   return knownOpponentAccountIds;
 }
 
-export async function handleUploadRunBundle(
-  request: Request,
-  env: Env,
-): Promise<Response> {
-  const body = (await readJson(request)) as RunBundleRequest;
-  const schemaVersion = asNumber(body.schema_version);
-  const playerAccountId = asString(body.player_account_id);
-  const submittedAtUtc = asString(body.submitted_at_utc);
-  const artifactCodec = asString(body.artifact_codec);
-  const decodedArtifact = decodeArtifactBytes(body.artifact_bytes);
-  const artifactBytes = decodedArtifact?.bytes ?? null;
-  const runId = asString(body.run_projection?.run_id);
-  const runStatus = asString(body.run_projection?.status);
-  const endedAtUtc = asString(body.run_projection?.ended_at_utc);
-  const battleProjections = Array.isArray(body.battle_projections)
-    ? body.battle_projections
-    : [];
-
-  const persistedPlayerAccountId = playerAccountId ?? AnonymousPlayerAccountId;
-
-  if (
-    schemaVersion == null ||
-    !submittedAtUtc ||
-    !artifactCodec ||
-    !decodedArtifact ||
-    !artifactBytes ||
-    !runId ||
-    !runStatus ||
-    !endedAtUtc
-  ) {
-    if (body.artifact_bytes !== undefined && decodedArtifact == null) {
-      logWarn("upload_run_bundle.artifact_bytes_decode_failed", {
-        raw_type: Array.isArray(body.artifact_bytes) ? "array" : typeof body.artifact_bytes,
-      });
-    }
-    return json({ error: "invalid_run_bundle_request" }, { status: 400 });
-  }
-
-  logInfo("upload_run_bundle.artifact_bytes_received", {
-    encoding: decodedArtifact.encoding,
-    decoded_bytes: artifactBytes.byteLength,
-    schema_version: schemaVersion,
-  });
-
+function validateBattleProjections(
+  battleProjections: BattleProjection[],
+  runId: string,
+): { finalBattleId: string | null } | Response {
   const distinctOpponentAccountIds = new Set<string>();
   for (const battle of battleProjections) {
-    const battleId = asString(battle.battle_id);
-    const battleRunId = asString(battle.run_id);
+    const battleId = optionalTrimmedString(battle.battle_id);
+    const battleRunId = optionalTrimmedString(battle.run_id);
     if (!battleId) {
       return json({ error: "battle_id_required" }, { status: 400 });
     }
@@ -210,7 +163,7 @@ export async function handleUploadRunBundle(
       return json({ error: "battle_run_id_mismatch" }, { status: 400 });
     }
 
-    const opponentAccountId = asString(battle.opponent_account_id);
+    const opponentAccountId = optionalTrimmedString(battle.opponent_account_id);
     if (opponentAccountId) {
       distinctOpponentAccountIds.add(opponentAccountId);
       if (distinctOpponentAccountIds.size > MaxDistinctOpponentAccountIds) {
@@ -218,34 +171,66 @@ export async function handleUploadRunBundle(
       }
     }
   }
-  const finalBattleId = asString(
-    battleProjections.length > 0
-      ? battleProjections[battleProjections.length - 1]?.battle_id
-      : null,
-  );
 
-  const safePlayerAccountSegment = sanitizeObjectKeySegment(persistedPlayerAccountId);
-  const safeRunIdSegment = sanitizeObjectKeySegment(runId);
-  if (safePlayerAccountSegment == null || safeRunIdSegment == null) {
-    return json({ error: "invalid_run_bundle_request" }, { status: 400 });
-  }
+  return {
+    finalBattleId: optionalTrimmedString(
+      battleProjections.length > 0
+        ? battleProjections[battleProjections.length - 1]?.battle_id
+        : null,
+    ),
+  };
+}
 
-  const payloadHash = await sha256Base64(artifactBytes);
-  const payloadHashSegment = payloadHash
+function toPayloadHashSegment(payloadHash: string): string {
+  return payloadHash
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
-  const objectKey = `run-bundles/${safePlayerAccountSegment}/${safeRunIdSegment}/${payloadHashSegment}.mpack.gz`;
-  await env.RUN_BUNDLE_BUCKET.put(objectKey, artifactBytes, {
+}
+
+function buildRunBundleObjectKey(
+  playerAccountId: string,
+  runId: string,
+  payloadHash: string,
+): string | null {
+  const safePlayerAccountSegment = sanitizeObjectKeySegment(playerAccountId);
+  const safeRunIdSegment = sanitizeObjectKeySegment(runId);
+  if (safePlayerAccountSegment == null || safeRunIdSegment == null) {
+    return null;
+  }
+
+  return `run-bundles/${safePlayerAccountSegment}/${safeRunIdSegment}/${toPayloadHashSegment(payloadHash)}.mpack.gz`;
+}
+
+async function putRunBundleArtifact(args: {
+  env: Env;
+  objectKey: string;
+  artifactBytes: Uint8Array;
+  artifactCodec: string;
+}): Promise<void> {
+  await args.env.RUN_BUNDLE_BUCKET.put(args.objectKey, args.artifactBytes, {
     httpMetadata: {
-      contentType: artifactCodec,
+      contentType: args.artifactCodec,
     },
     customMetadata: {
-      retention_days: String(getRunBundleRetentionDays(env)),
+      retention_days: String(getRunBundleRetentionDays(args.env)),
     },
   });
+}
 
-  const createdAtUtc = new Date().toISOString();
+async function insertRunBundleProjection(args: {
+  env: Env;
+  bundleId: string;
+  persistedPlayerAccountId: string;
+  runId: string;
+  payloadHash: string;
+  schemaVersion: number;
+  objectKey: string;
+  artifactCodec: string;
+  sizeBytes: number;
+  submittedAtUtc: string;
+  createdAtUtc: string;
+}): Promise<void> {
   // bundle_id is deterministically the run_id: one run -> one run_bundles row.
   // INSERT OR REPLACE absorbs three cases with zero reads:
   //   - fresh run        -> plain INSERT
@@ -254,8 +239,7 @@ export async function handleUploadRunBundle(
   //                         with a pre-existing uuid-style bundle; old row is dropped
   //                         and the run_id-keyed row wins. Retention cleans up the
   //                         orphan R2 object. Safe to simplify after transition.
-  const bundleId = runId;
-  await env.DB.prepare(
+  await args.env.DB.prepare(
     `
       INSERT OR REPLACE INTO run_bundles (
         bundle_id,
@@ -273,21 +257,32 @@ export async function handleUploadRunBundle(
     `,
   )
     .bind(
-      bundleId,
+      args.bundleId,
       LegacyInstallationId,
-      persistedPlayerAccountId,
-      runId,
-      payloadHash,
-      schemaVersion,
-      objectKey,
-      artifactCodec,
-      artifactBytes.byteLength,
-      submittedAtUtc,
-      createdAtUtc,
+      args.persistedPlayerAccountId,
+      args.runId,
+      args.payloadHash,
+      args.schemaVersion,
+      args.objectKey,
+      args.artifactCodec,
+      args.sizeBytes,
+      args.submittedAtUtc,
+      args.createdAtUtc,
     )
     .run();
+}
 
-  await env.DB.prepare(
+async function upsertRunProjection(args: {
+  env: Env;
+  body: RunBundleRequest;
+  bundleId: string;
+  persistedPlayerAccountId: string;
+  runId: string;
+  runStatus: string;
+  endedAtUtc: string;
+  createdAtUtc: string;
+}): Promise<void> {
+  await args.env.DB.prepare(
     `
       INSERT INTO runs (
         run_id,
@@ -332,38 +327,43 @@ export async function handleUploadRunBundle(
     `,
   )
     .bind(
-      runId,
+      args.runId,
       LegacyInstallationId,
-      persistedPlayerAccountId,
-      bundleId,
-      runStatus,
-      asString(body.run_projection?.hero_id),
-      asString(body.run_projection?.hero_name),
-      asString(body.run_projection?.player_rank),
-      asNumber(body.run_projection?.player_rating),
-      asNumber(body.run_projection?.player_position),
-      asString(body.run_projection?.started_at_utc),
-      endedAtUtc,
-      asNumber(body.run_projection?.final_day),
-      asNumber(body.run_projection?.final_wins),
-      asNumber(body.run_projection?.final_losses),
-      asString(body.run_projection?.final_player_rank),
-      asNumber(body.run_projection?.final_player_rating),
-      asNumber(body.run_projection?.final_player_position),
-      createdAtUtc,
+      args.persistedPlayerAccountId,
+      args.bundleId,
+      args.runStatus,
+      optionalTrimmedString(args.body.run_projection?.hero_id),
+      optionalTrimmedString(args.body.run_projection?.hero_name),
+      optionalTrimmedString(args.body.run_projection?.player_rank),
+      optionalFiniteNumber(args.body.run_projection?.player_rating),
+      optionalFiniteNumber(args.body.run_projection?.player_position),
+      optionalTrimmedString(args.body.run_projection?.started_at_utc),
+      args.endedAtUtc,
+      optionalFiniteNumber(args.body.run_projection?.final_day),
+      optionalFiniteNumber(args.body.run_projection?.final_wins),
+      optionalFiniteNumber(args.body.run_projection?.final_losses),
+      optionalTrimmedString(args.body.run_projection?.final_player_rank),
+      optionalFiniteNumber(args.body.run_projection?.final_player_rating),
+      optionalFiniteNumber(args.body.run_projection?.final_player_position),
+      args.createdAtUtc,
     )
     .run();
+}
 
-  const knownOpponentAccountIds = await loadKnownOpponentAccountIds(
-    battleProjections,
-    persistedPlayerAccountId,
-    env,
-  );
-
-  const battleStatements = battleProjections
-    .filter((battle) => shouldProjectBattle(battle, knownOpponentAccountIds))
+async function upsertBattleProjections(args: {
+  env: Env;
+  battleProjections: BattleProjection[];
+  knownOpponentAccountIds: ReadonlySet<string>;
+  runId: string;
+  bundleId: string;
+  persistedPlayerAccountId: string;
+  finalBattleId: string | null;
+  createdAtUtc: string;
+}): Promise<void> {
+  const battleStatements = args.battleProjections
+    .filter((battle) => shouldProjectBattle(battle, args.knownOpponentAccountIds))
     .map((battle) =>
-      env.DB.prepare(
+      args.env.DB.prepare(
         `
           INSERT INTO battles (
             battle_id,
@@ -415,35 +415,145 @@ export async function handleUploadRunBundle(
             updated_at_utc = excluded.updated_at_utc
         `,
       ).bind(
-        asString(battle.battle_id),
-        runId,
+        optionalTrimmedString(battle.battle_id),
+        args.runId,
         LegacyInstallationId,
-        persistedPlayerAccountId,
-        bundleId,
-        asString(battle.recorded_at_utc),
-        asNumber(battle.day),
-        asString(battle.player_name),
-        asString(battle.player_account_id),
-        asString(battle.player_hero),
-        asString(battle.player_rank),
-        asNumber(battle.player_rating),
-        asNumber(battle.player_level),
-        asString(battle.opponent_name),
-        asString(battle.opponent_account_id),
-        asString(battle.opponent_hero),
-        asString(battle.opponent_rank),
-        asNumber(battle.opponent_rating),
-        asNumber(battle.opponent_level),
-        asString(battle.result),
+        args.persistedPlayerAccountId,
+        args.bundleId,
+        optionalTrimmedString(battle.recorded_at_utc),
+        optionalFiniteNumber(battle.day),
+        optionalTrimmedString(battle.player_name),
+        optionalTrimmedString(battle.player_account_id),
+        optionalTrimmedString(battle.player_hero),
+        optionalTrimmedString(battle.player_rank),
+        optionalFiniteNumber(battle.player_rating),
+        optionalFiniteNumber(battle.player_level),
+        optionalTrimmedString(battle.opponent_name),
+        optionalTrimmedString(battle.opponent_account_id),
+        optionalTrimmedString(battle.opponent_hero),
+        optionalTrimmedString(battle.opponent_rank),
+        optionalFiniteNumber(battle.opponent_rating),
+        optionalFiniteNumber(battle.opponent_level),
+        optionalTrimmedString(battle.result),
         battle.replay_available === true ? 1 : 0,
-        asString(battle.battle_id) === finalBattleId ? 1 : 0,
-        createdAtUtc,
+        optionalTrimmedString(battle.battle_id) === args.finalBattleId ? 1 : 0,
+        args.createdAtUtc,
       ),
     );
 
   if (battleStatements.length > 0) {
-    await env.DB.batch(battleStatements);
+    await args.env.DB.batch(battleStatements);
   }
+}
+
+export async function handleUploadRunBundle(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const body = (await readJson(request)) as RunBundleRequest;
+  const schemaVersion = optionalFiniteNumber(body.schema_version);
+  const playerAccountId = optionalTrimmedString(body.player_account_id);
+  const submittedAtUtc = optionalTrimmedString(body.submitted_at_utc);
+  const artifactCodec = optionalTrimmedString(body.artifact_codec);
+  const decodedArtifact = decodeArtifactBytes(body.artifact_bytes);
+  const artifactBytes = decodedArtifact?.bytes ?? null;
+  const runId = optionalTrimmedString(body.run_projection?.run_id);
+  const runStatus = optionalTrimmedString(body.run_projection?.status);
+  const endedAtUtc = optionalTrimmedString(body.run_projection?.ended_at_utc);
+  const battleProjections = Array.isArray(body.battle_projections)
+    ? body.battle_projections
+    : [];
+
+  const persistedPlayerAccountId = playerAccountId ?? AnonymousPlayerAccountId;
+
+  if (
+    schemaVersion == null ||
+    !submittedAtUtc ||
+    !artifactCodec ||
+    !decodedArtifact ||
+    !artifactBytes ||
+    !runId ||
+    !runStatus ||
+    !endedAtUtc
+  ) {
+    if (body.artifact_bytes !== undefined && decodedArtifact == null) {
+      logWarn("upload_run_bundle.artifact_bytes_decode_failed", {
+        raw_type: Array.isArray(body.artifact_bytes) ? "array" : typeof body.artifact_bytes,
+      });
+    }
+    return json({ error: "invalid_run_bundle_request" }, { status: 400 });
+  }
+
+  logInfo("upload_run_bundle.artifact_bytes_received", {
+    encoding: decodedArtifact.encoding,
+    decoded_bytes: artifactBytes.byteLength,
+    schema_version: schemaVersion,
+  });
+
+  const battleValidation = validateBattleProjections(battleProjections, runId);
+  if (battleValidation instanceof Response) {
+    return battleValidation;
+  }
+
+  const payloadHash = await sha256Base64(artifactBytes);
+  const objectKey = buildRunBundleObjectKey(
+    persistedPlayerAccountId,
+    runId,
+    payloadHash,
+  );
+  if (objectKey == null) {
+    return json({ error: "invalid_run_bundle_request" }, { status: 400 });
+  }
+
+  await putRunBundleArtifact({
+    env,
+    objectKey,
+    artifactBytes,
+    artifactCodec,
+  });
+
+  const createdAtUtc = new Date().toISOString();
+  const bundleId = runId;
+  await insertRunBundleProjection({
+    env,
+    bundleId,
+    persistedPlayerAccountId,
+    runId,
+    payloadHash,
+    schemaVersion,
+    objectKey,
+    artifactCodec,
+    sizeBytes: artifactBytes.byteLength,
+    submittedAtUtc,
+    createdAtUtc,
+  });
+
+  await upsertRunProjection({
+    env,
+    body,
+    bundleId,
+    persistedPlayerAccountId,
+    runId,
+    runStatus,
+    endedAtUtc,
+    createdAtUtc,
+  });
+
+  const knownOpponentAccountIds = await loadKnownOpponentAccountIds(
+    battleProjections,
+    persistedPlayerAccountId,
+    env,
+  );
+  await upsertBattleProjections({
+    env,
+    battleProjections,
+    knownOpponentAccountIds,
+    runId,
+    bundleId,
+    persistedPlayerAccountId,
+    finalBattleId: battleValidation.finalBattleId,
+    createdAtUtc,
+  });
 
   return json({ status: "accepted", bundle_id: bundleId, object_key: objectKey });
 }

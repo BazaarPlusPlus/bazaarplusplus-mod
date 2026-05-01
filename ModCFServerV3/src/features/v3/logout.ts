@@ -1,6 +1,4 @@
-
 import type { Env } from "../../env";
-import { json } from "../../http/json";
 import { requireBearerAuth } from "./requireBearerAuth";
 
 export async function handleLogout(request: Request, env: Env): Promise<Response> {

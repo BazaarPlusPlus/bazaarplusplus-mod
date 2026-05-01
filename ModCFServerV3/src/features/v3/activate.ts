@@ -1,5 +1,6 @@
 import type { Env } from "../../env";
 import { json, readJson } from "../../http/json";
+import { trimString } from "../../http/request";
 import { hashPassword } from "../../crypto/password";
 import { generateBearerToken } from "../../token/generate";
 
@@ -11,8 +12,8 @@ type ActivateRequest = {
 
 export async function handleActivate(request: Request, env: Env): Promise<Response> {
   const body = (await readJson(request)) as ActivateRequest;
-  const playerAccountId = typeof body.player_account_id === "string" ? body.player_account_id.trim() : "";
-  const playerUsername = typeof body.player_username === "string" ? body.player_username.trim() : "";
+  const playerAccountId = trimString(body.player_account_id);
+  const playerUsername = trimString(body.player_username);
   const password = typeof body.password === "string" ? body.password : "";
 
   if (!playerAccountId || !playerUsername || !password) {

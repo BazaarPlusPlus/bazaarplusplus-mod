@@ -1,6 +1,7 @@
 import type { Env } from "../../env";
 import { getGhostQueryLookbackDays } from "../../config/v3";
 import { json } from "../../http/json";
+import { parseClampedInteger } from "../../http/request";
 import { requireBearerAuth } from "./requireBearerAuth";
 
 type GhostBattleRow = {
@@ -24,24 +25,6 @@ type GhostBattleRow = {
   is_bundle_final_battle: number;
 };
 
-function parseClampedInt(
-  value: string | null,
-  fallback: number,
-  min: number,
-  max: number,
-): number {
-  if (!value) {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-
-  return Math.min(max, Math.max(min, parsed));
-}
-
 export async function handleQueryGhostBattles(
   request: Request,
   env: Env,
@@ -53,7 +36,7 @@ export async function handleQueryGhostBattles(
 
   const url = new URL(request.url);
   const lookbackDays = getGhostQueryLookbackDays(env);
-  const limit = parseClampedInt(url.searchParams.get("limit"), 200, 1, 200);
+  const limit = parseClampedInteger(url.searchParams.get("limit"), 200, 1, 200);
   const fromUtc = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
 
   const result = await env.DB.prepare(
