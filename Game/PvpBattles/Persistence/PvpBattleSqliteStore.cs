@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.IO;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json;
@@ -10,7 +9,7 @@ using Newtonsoft.Json.Serialization;
 
 namespace BazaarPlusPlus.Game.PvpBattles.Persistence;
 
-internal sealed class PvpBattleSqliteStore
+internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
 {
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
@@ -24,23 +23,8 @@ internal sealed class PvpBattleSqliteStore
         DateFormatString = "yyyy-MM-dd'T'HH:mm:ss.fffK",
     };
 
-    private readonly string _databasePath;
-
     public PvpBattleSqliteStore(string databasePath)
-    {
-        if (string.IsNullOrWhiteSpace(databasePath))
-            throw new ArgumentException("Database path is required.", nameof(databasePath));
-
-        _databasePath = databasePath;
-
-        var directory = Path.GetDirectoryName(_databasePath);
-        if (!string.IsNullOrWhiteSpace(directory))
-            Directory.CreateDirectory(directory);
-
-        using var connection = OpenConnection();
-        EnableWriteAheadLogging(connection);
-        RunLogSqliteSchema.EnsureInitialized(connection);
-    }
+        : base(databasePath) { }
 
     public void Save(PvpBattleManifest manifest)
     {
@@ -460,213 +444,6 @@ internal sealed class PvpBattleSqliteStore
         return manifests;
     }
 
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection($"Data Source={_databasePath}");
-        try
-        {
-            connection.Open();
-
-            using var command = CreateCommand(connection);
-            command.CommandText = """
-                PRAGMA foreign_keys = ON;
-                PRAGMA busy_timeout = 2000;
-                """;
-            command.ExecuteNonQuery();
-
-            return connection;
-        }
-        catch
-        {
-            connection.Dispose();
-            throw;
-        }
-    }
-
-    private static void MigrateLegacyReplayIdColumn(SqliteConnection connection)
-    {
-        if (!TableHasColumn(connection, RunLogSqliteSchema.PvpBattlesTableName, "replay_id"))
-            return;
-
-        using var transaction = connection.BeginTransaction();
-        using var command = CreateCommand(connection, transaction);
-        var legacyTableName = $"{RunLogSqliteSchema.PvpBattlesTableName}_legacy";
-        command.CommandText = $"""
-            ALTER TABLE {RunLogSqliteSchema.PvpBattlesTableName}
-            RENAME TO {legacyTableName};
-
-            CREATE TABLE {RunLogSqliteSchema.PvpBattlesTableName} (
-                battle_id TEXT PRIMARY KEY,
-                run_id TEXT NULL,
-                recorded_at_utc TEXT NOT NULL,
-                day INTEGER NULL,
-                hour INTEGER NULL,
-                encounter_id TEXT NULL,
-                player_name TEXT NULL,
-                player_account_id TEXT NULL,
-                player_hero TEXT NULL,
-                player_rank TEXT NULL,
-                player_rating INTEGER NULL,
-                player_level INTEGER NULL,
-                opponent_name TEXT NULL,
-                opponent_hero TEXT NULL,
-                opponent_rank TEXT NULL,
-                opponent_rating INTEGER NULL,
-                opponent_level INTEGER NULL,
-                opponent_account_id TEXT NULL,
-                combat_kind TEXT NOT NULL,
-                result TEXT NULL,
-                winner_combatant_id TEXT NULL,
-                loser_combatant_id TEXT NULL,
-                player_hand_json TEXT NOT NULL,
-                player_skills_json TEXT NOT NULL,
-                opponent_hand_json TEXT NOT NULL,
-                opponent_skills_json TEXT NOT NULL
-            );
-
-            INSERT INTO {RunLogSqliteSchema.PvpBattlesTableName} (
-                battle_id,
-                run_id,
-                recorded_at_utc,
-                day,
-                hour,
-                encounter_id,
-                player_name,
-                player_account_id,
-                player_hero,
-                player_rank,
-                player_rating,
-                player_level,
-                opponent_name,
-                opponent_hero,
-                opponent_rank,
-                opponent_rating,
-                opponent_level,
-                opponent_account_id,
-                combat_kind,
-                result,
-                winner_combatant_id,
-                loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json
-            )
-            SELECT
-                battle_id,
-                run_id,
-                recorded_at_utc,
-                day,
-                hour,
-                encounter_id,
-                player_name,
-                player_account_id,
-                NULL AS player_hero,
-                NULL AS player_rank,
-                NULL AS player_rating,
-                NULL AS player_level,
-                opponent_name,
-                NULL AS opponent_hero,
-                NULL AS opponent_rank,
-                NULL AS opponent_rating,
-                NULL AS opponent_level,
-                opponent_account_id,
-                combat_kind,
-                result,
-                winner_combatant_id,
-                loser_combatant_id,
-                player_hand_json,
-                player_skills_json,
-                opponent_hand_json,
-                opponent_skills_json
-            FROM {legacyTableName};
-
-            DROP TABLE {legacyTableName};
-
-            CREATE INDEX IF NOT EXISTS idx_{RunLogSqliteSchema.PvpBattlesTableName}_run_id
-                ON {RunLogSqliteSchema.PvpBattlesTableName}(run_id);
-
-            CREATE INDEX IF NOT EXISTS idx_{RunLogSqliteSchema.PvpBattlesTableName}_recorded_at_utc
-                ON {RunLogSqliteSchema.PvpBattlesTableName}(recorded_at_utc);
-            """;
-        command.ExecuteNonQuery();
-        transaction.Commit();
-        BppLog.Info(
-            "PvpBattleSqliteStore",
-            $"Migrated legacy {RunLogSqliteSchema.PvpBattlesTableName} schema by dropping replay_id."
-        );
-    }
-
-    private static void EnableWriteAheadLogging(SqliteConnection connection)
-    {
-        using var command = CreateCommand(connection);
-        command.CommandText = "PRAGMA journal_mode = WAL;";
-        command.ExecuteNonQuery();
-    }
-
-    private static bool TableHasColumn(
-        SqliteConnection connection,
-        string tableName,
-        string columnName
-    )
-    {
-        using var command = CreateCommand(connection);
-        command.CommandText = $"PRAGMA table_info({tableName});";
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            if (
-                string.Equals(
-                    reader.GetString(reader.GetOrdinal("name")),
-                    columnName,
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static void EnsurePvpBattleOptionalColumn(
-        SqliteConnection connection,
-        string columnName,
-        string columnTypeSql
-    )
-    {
-        if (TableHasColumn(connection, RunLogSqliteSchema.PvpBattlesTableName, columnName))
-            return;
-
-        using var command = CreateCommand(connection);
-        command.CommandText =
-            $"ALTER TABLE {RunLogSqliteSchema.PvpBattlesTableName} ADD COLUMN {columnName} {columnTypeSql};";
-        command.ExecuteNonQuery();
-    }
-
-    private static SqliteCommand CreateCommand(SqliteConnection connection)
-    {
-        var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
-        return command;
-    }
-
-    private static SqliteCommand CreateCommand(
-        SqliteConnection connection,
-        SqliteTransaction transaction
-    )
-    {
-        var command = CreateCommand(connection);
-        command.Transaction = transaction;
-        return command;
-    }
-
-    private static void AddNullableInt32(SqliteCommand command, string name, int? value)
-    {
-        command.Parameters.AddWithValue(name, value.HasValue ? value.Value : DBNull.Value);
-    }
-
     private static string SerializeCapture(PvpBattleCardSetCapture capture)
     {
         return JsonConvert.SerializeObject(capture, SerializerSettings);
@@ -728,17 +505,5 @@ internal sealed class PvpBattleSqliteStore
                 ),
             },
         };
-    }
-
-    private static string? GetNullableString(SqliteDataReader reader, string name)
-    {
-        var ordinal = reader.GetOrdinal(name);
-        return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
-    }
-
-    private static int? GetNullableInt32(SqliteDataReader reader, string name)
-    {
-        var ordinal = reader.GetOrdinal(name);
-        return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
     }
 }

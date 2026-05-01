@@ -1,29 +1,13 @@
 #nullable enable
 using System;
-using System.IO;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
-using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.Screenshots.Persistence;
 
-internal sealed class RunScreenshotSqliteStore
+internal sealed class RunScreenshotSqliteStore : SqlitePersistenceStoreBase
 {
-    private readonly string _databasePath;
-
     public RunScreenshotSqliteStore(string databasePath)
-    {
-        if (string.IsNullOrWhiteSpace(databasePath))
-            throw new ArgumentException("Database path is required.", nameof(databasePath));
-
-        _databasePath = databasePath;
-        var directory = Path.GetDirectoryName(_databasePath);
-        if (!string.IsNullOrWhiteSpace(directory))
-            Directory.CreateDirectory(directory);
-
-        using var connection = OpenConnection();
-        EnableWriteAheadLogging(connection);
-        RunLogSqliteSchema.EnsureInitialized(connection);
-    }
+        : base(databasePath) { }
 
     public void Save(RunScreenshotRecord record)
     {
@@ -35,7 +19,7 @@ internal sealed class RunScreenshotSqliteStore
             throw new ArgumentException("Image path is required.", nameof(record));
 
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
+        using var command = CreateCommand(connection);
         command.CommandText = $"""
             INSERT INTO {RunLogSqliteSchema.RunScreenshotsTableName} (
                 screenshot_id,
@@ -84,25 +68,6 @@ internal sealed class RunScreenshotSqliteStore
         AddNullableInt32(command, "$playerPosition", record.PlayerPosition);
         AddNullableInt32(command, "$victoriesAtCapture", record.VictoriesAtCapture);
         command.ExecuteNonQuery();
-    }
-
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection($"Data Source={_databasePath}");
-        connection.Open();
-        return connection;
-    }
-
-    private static void EnableWriteAheadLogging(SqliteConnection connection)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA journal_mode=WAL;";
-        command.ExecuteNonQuery();
-    }
-
-    private static void AddNullableInt32(SqliteCommand command, string parameterName, int? value)
-    {
-        command.Parameters.AddWithValue(parameterName, (object?)value ?? DBNull.Value);
     }
 
     private static string GetStorageValue()
