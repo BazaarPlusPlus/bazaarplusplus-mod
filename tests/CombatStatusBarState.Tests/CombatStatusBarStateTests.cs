@@ -58,15 +58,18 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void GetDisplayedFrameText_ReflectsStandbyAndProcessedFrames()
+    public void GetDisplayedFrameText_ReflectsStandbyAndCurrentFrameIndex()
     {
         Assert.Equal("Standby", CombatStatusBar.GetDisplayedFrameText());
 
         CombatStatusBar.BeginCombatPlayback();
-        CombatStatusBar.AdvanceCombatFrame();
-        CombatStatusBar.AdvanceCombatFrame();
+        Assert.Equal("0", CombatStatusBar.GetDisplayedFrameText());
 
-        Assert.Equal("2", CombatStatusBar.GetDisplayedFrameText());
+        CombatStatusBar.AdvanceCombatFrame();
+        Assert.Equal("0", CombatStatusBar.GetDisplayedFrameText());
+
+        CombatStatusBar.AdvanceCombatFrame();
+        Assert.Equal("1", CombatStatusBar.GetDisplayedFrameText());
     }
 
     [Fact]

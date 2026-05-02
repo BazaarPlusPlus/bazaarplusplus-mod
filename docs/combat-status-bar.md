@@ -10,7 +10,7 @@
 ## 当前行为
 
 - 仅在 `IBppServices.RunContext.IsInGameRun` 且功能开启时显示。
-- 展示逻辑战斗时间与已处理帧数。
+- 展示逻辑战斗时间与当前 frame index。
 - 支持暂停和 0.50x / 0.67x / 1.00x 速度档位。
 - 记住功能开关和默认速度档位。
 
@@ -31,7 +31,7 @@
 ## Runtime Flow
 
 1. `Patches/Combat/CombatSimulationPatches.cs` 发布 `CombatSimObserved` 和 `CombatFrameAdvanced`。
-2. `CombatStatusBarModule` 记录总帧数并同步处理进度。
+2. `CombatStatusBarModule` 记录总帧数并同步处理进度；HUD frame 文本显示 zero-based 当前帧序号。
 3. `CombatStatusBar` 在 `Update()` 中刷新 HUD。
 
 ## 关键文件
