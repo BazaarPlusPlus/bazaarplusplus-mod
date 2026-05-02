@@ -109,13 +109,16 @@ internal sealed partial class HistoryPanelRepository
     {
         var itemSnapshots = itemCapture?.Items;
         var socketEffectsBySocket = BuildSocketEffectMap(itemSnapshots);
+        var staticData = TryGetStaticGameData();
         var model = new PreviewBoardModel
         {
-            ItemCards = PreviewCardSpecFilter.FilterLocallyRenderable(
-                BuildPreviewCardSpecs(itemSnapshots, isSkill: false, socketEffectsBySocket)
+            ItemCards = PreviewCardSpecFilter.Filter(
+                BuildPreviewCardSpecs(itemSnapshots, isSkill: false, socketEffectsBySocket),
+                templateId => HasStaticCardTemplate(staticData, templateId)
             ),
-            SkillCards = PreviewCardSpecFilter.FilterLocallyRenderable(
-                BuildPreviewCardSpecs(skillCapture?.Items, isSkill: true, null)
+            SkillCards = PreviewCardSpecFilter.Filter(
+                BuildPreviewCardSpecs(skillCapture?.Items, isSkill: true, null),
+                templateId => HasStaticCardTemplate(staticData, templateId)
             ),
             Metadata = new Dictionary<string, string>(),
         };
@@ -329,6 +332,28 @@ internal sealed partial class HistoryPanelRepository
             SocketEffectAttributeTypeCache[cacheKey] = resolvedType;
 
         return resolvedType;
+    }
+
+    private static bool HasStaticCardTemplate(object? staticData, Guid templateId)
+    {
+        return templateId != Guid.Empty && GetTemplate(staticData, templateId) != null;
+    }
+
+    private static object? TryGetStaticGameData()
+    {
+        try
+        {
+            return GetStaticGameData();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error(
+                "HistoryPanelRepository",
+                "Failed to load static game data for battle preview filtering",
+                ex
+            );
+            return null;
+        }
     }
 
     private static object? GetStaticGameData()
