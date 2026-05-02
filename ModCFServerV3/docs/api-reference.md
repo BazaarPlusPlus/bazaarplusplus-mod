@@ -226,7 +226,7 @@ Token 没有 `expires_at_utc`，撤销路径只有 `/logout`。详见 README "Kn
 
 ### 4.1 `GET /ghost-battles`
 
-返回最近 N 天里别人上传的 run 中、和当前玩家对战过的所有 battle 投影。这就是 mod 内 History Panel 的"幽灵战斗"列表。
+返回 `GHOST_QUERY_LOOKBACK_DAYS` 回溯窗口内别人上传的 run 中、和当前玩家对战过的所有 battle 投影。这就是 mod 内 History Panel 的"幽灵战斗"列表。
 
 **鉴权**：必须。返回的是"`opponent_account_id == 当前 token 的 player_account_id`"的所有 battles。
 

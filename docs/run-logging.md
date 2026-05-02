@@ -42,7 +42,7 @@
 
 `HistoryPanel` 是当前读侧 UI，主要能力：
 
-- 浏览最近 runs
+- 按时间倒序浏览 runs
 - 查看选中 run 关联的本地 PVP battles
 - 预览保存的 player / opponent board 快照
 - 在条件满足时启动本地 replay

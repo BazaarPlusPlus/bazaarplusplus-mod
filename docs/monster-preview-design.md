@@ -52,6 +52,10 @@ CardSetPreviewRuntime / MonsterPreviewItemBoardRuntime
 
 `HistoryPanel` 仍然使用 Bazaar++ 的自绘 preview surface，但它走的是共享的 `Game/PreviewSurface` 渲染栈，与旧 monster showcase 已经解耦。
 
+History preview 过滤 card template 时使用游戏静态数据
+`Data.GetStatic().GetCardById(Guid)`。Bazaar++ 不再定位、解析、缓存或预热本地卡牌模板
+JSON；过期或未知的 template id 会在进入 preview surface 前被过滤掉。
+
 ## 关键文件
 
 - `Plugin.cs`
@@ -62,6 +66,7 @@ CardSetPreviewRuntime / MonsterPreviewItemBoardRuntime
 - `Game/Tooltips/NativeMonsterTooltipAugmenter.cs`
 - `Game/ItemBoard/ItemBoardOverlay.cs`
 - `Game/HistoryPanel/HistoryPanelPreviewRenderer.cs`
+- `Game/HistoryPanel/HistoryPanelRepository.Preview.cs`
 - `Game/PreviewSurface/Board/PreviewBoardSurface.cs`
 
 ## Debug
