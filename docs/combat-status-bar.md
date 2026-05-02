@@ -24,7 +24,7 @@
 
 逻辑时间定义为：
 
-`ProcessedCombatFrames * 50ms`
+`当前 zero-based frame index * 50ms`
 
 因此显示值跟随模拟进度，而不是墙钟时间；暂停不会让时间标签失真。
 

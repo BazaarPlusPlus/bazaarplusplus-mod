@@ -41,7 +41,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
 
         var result = CombatStatusBar.GetDisplayedTimeText();
 
-        Assert.Equal("0:01:25", result);
+        Assert.Equal("0:01:20", result);
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
         CombatStatusBar.EndCombatPlayback();
 
         Assert.Equal("LastCombat", CombatStatusBar.GetDisplayedTimeLabel());
-        Assert.Equal("0:01:25", CombatStatusBar.GetDisplayedTimeText());
+        Assert.Equal("0:01:20", CombatStatusBar.GetDisplayedTimeText());
     }
 
     [Fact]
@@ -70,6 +70,20 @@ public sealed class CombatStatusBarStateTests : IDisposable
 
         CombatStatusBar.AdvanceCombatFrame();
         Assert.Equal("1", CombatStatusBar.GetDisplayedFrameText());
+    }
+
+    [Fact]
+    public void DisplayedTimeText_UsesDisplayedFrameIndex()
+    {
+        CombatStatusBar.BeginCombatPlayback();
+
+        CombatStatusBar.AdvanceCombatFrame();
+        Assert.Equal("0", CombatStatusBar.GetDisplayedFrameText());
+        Assert.Equal("0:00:00", CombatStatusBar.GetDisplayedTimeText());
+
+        CombatStatusBar.AdvanceCombatFrame();
+        Assert.Equal("1", CombatStatusBar.GetDisplayedFrameText());
+        Assert.Equal("0:00:05", CombatStatusBar.GetDisplayedTimeText());
     }
 
     [Fact]
