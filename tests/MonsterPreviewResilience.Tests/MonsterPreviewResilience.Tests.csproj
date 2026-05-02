@@ -24,7 +24,6 @@
       Include="../../Game/MonsterPreview/CardSetBuildRecommendationModeFlow.cs"
       Link="CardSetBuildRecommendationModeFlow.cs"
     />
-    <Compile Include="TestLocalCardTemplateCatalog.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>
 </Project>
