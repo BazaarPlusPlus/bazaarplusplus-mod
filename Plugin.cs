@@ -100,7 +100,6 @@ public class Plugin : BaseUnityPlugin
 
     private static void InstallStaticUtilities(IBppServices services)
     {
-        CardsJsonCache.Install(services.Paths);
         LegendaryPositionDisplayFormatter.Install(services.Config);
         BppChineseLocalization.Install(services.Config);
         BppSettingsDockCatalog.Install(services.Config);

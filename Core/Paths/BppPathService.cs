@@ -4,8 +4,6 @@ namespace BazaarPlusPlus.Core.Paths;
 
 internal sealed class BppPathService : IPathService
 {
-    public string? CardsJsonPath { get; private set; }
-
     public string? RunLogDatabasePath { get; private set; }
 
     public string? CombatReplayDirectoryPath { get; private set; }
@@ -16,7 +14,6 @@ internal sealed class BppPathService : IPathService
 
     public void Initialize()
     {
-        CardsJsonPath = CardJsonPathResolver.GetCardsJsonPath();
         RunLogDatabasePath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
             "BazaarPlusPlus",
