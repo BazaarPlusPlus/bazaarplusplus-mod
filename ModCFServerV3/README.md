@@ -47,6 +47,7 @@ D1 schema 由 `migrations/` 下的有序 SQL 维护，按文件名顺序应用�
 | `0005_runs_ended_at_index.sql` | 为按 `ended_at_utc` 同步 runs 的分析任务建索引 |
 | `0006_run_bundles_created_at_index.sql` | 为按服务端 `created_at_utc` 同步 run bundle 建索引 |
 | `0007_runs_updated_at_index.sql` | 为按服务端 `updated_at_utc` 同步 runs 建索引 |
+| `0008_battles_bundle_final_flag.sql` | 为 ghost battle UI 增加 `is_bundle_final_battle` 并重建 covering index |
 
 ## Known Limitations
 

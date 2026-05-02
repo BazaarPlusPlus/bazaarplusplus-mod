@@ -82,6 +82,14 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 详见 `docs/reference/combat-replay-recording.md`。
 
+### 终局自动截图（End-of-run Screenshot）
+
+- 终局界面出现后先等待 10 秒，等待窗口内吞掉鼠标点击
+- 第一次合法 `Continue` 会先保存主截图，再放行原始按钮动作
+- PNG 保存到 `<GameRoot>/BazaarPlusPlus/Screenshots`，元数据写入 SQLite `run_screenshots`
+
+详见 `docs/reference/end-of-run-screenshot-flow.md`。
+
 ### 大厅、设置与本地化
 
 - **随机英雄池 / 皮肤池**：英雄选择界面附加面板逻辑
@@ -98,6 +106,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`（未认证；服务端只把已注册玩家或上传者本人作为可投影 opponent）
 - **Player Observation**：mod 把观察到的 `player_account_id` 写入 `observation.v1.json`，供 installer 参考
 - **Ghost 战斗**：`GET /ghost-battles` 查询 against-me 列表（需要 `Authorization: Bearer <token>`）；按需签发 `POST /ghost-battles/:battleId/replay-link`
+- **Bundle-final 标记**：服务端把上传 bundle 中最后一场 battle 在被投影时标记为 `is_bundle_final_battle`；HistoryPanel 在 ghost 视角下用它提示“这场后对手出局”
 
 模组侧仅在**非 live run** 时执行上传扫描；`RunUploadController` 统一调度 run-bundle 上传。信任模型与安全限制见 `docs/run-upload.md`。
 
@@ -128,5 +137,5 @@ HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings
 - 仓库总览：`README.md`
 - Run / History / SQLite：`docs/run-logging.md`
 - 上传与风险说明：`docs/run-upload.md`
-- 战斗状态条 / 怪物预览 / CF 部署：`docs/combat-status-bar.md`、`docs/monster-preview-design.md`、`docs/mod-cf-server-deploy.md`
+- 战斗状态条 / 怪物预览 / 终局截图 / CF 部署：`docs/combat-status-bar.md`、`docs/monster-preview-design.md`、`docs/reference/end-of-run-screenshot-flow.md`、`docs/mod-cf-server-deploy.md`
 - 热键、设置表面、SQLite schema、tooltip 实现细节：`docs/reference/`

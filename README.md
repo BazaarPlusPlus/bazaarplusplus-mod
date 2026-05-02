@@ -2,7 +2,7 @@
 
 [English](README_en.md)
 
-BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 UI 增强、怪物与 tooltip 预览、run logging、历史面板、本地战斗回放，以及后台上传能力。
+BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 UI 增强、怪物与 tooltip 预览、run logging、历史面板、本地战斗回放、终局自动截图，以及后台上传能力。
 
 当前仓库只保留与现有实现仍然一致的说明文档；如果文档与代码冲突，以 `Plugin.cs`、`Core/`、`Game/`、`Patches/`、`Data/` 中的实际实现为准。
 
@@ -13,6 +13,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 - 附魔 / 升级预览：在原生 tooltip 路径上追加附魔文本，或在按住升级预览热键时进入原生 upgrade preview。
 - Run Logging 与 HistoryPanel：活跃 run 写入 SQLite；游戏内可浏览 runs、PVP battles、ghost battles，并预览保存的战斗快照。
 - 战斗回放：本地保存 PVP replay payload；`HistoryPanel` 和 debug 面板可在条件满足时回放已保存战斗。
+- 终局自动截图：终局 `Continue` 前保存主截图和 SQLite 元数据。
 - 后台上传：run / replay 后台上传，仅在未处于 live run 时执行。
 - Anonymous Mode：将本地玩家名替换为 `Anonymous`。
 
@@ -42,7 +43,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## 数据与网络行为
 
-- run logging 与战斗回放会在本地保存 SQLite 数据和 replay payload；线上身份令牌使用 `BazaarPlusPlus/Identity/` 下的 JSON 文件。
+- run logging、战斗回放和终局截图会在本地保存 SQLite 数据、replay payload 与截图文件；线上身份令牌使用 `BazaarPlusPlus/Identity/` 下的 JSON 文件。
 - 后台上传会在非 live run 状态下执行上传扫描。
 - `ModCFServerV3/` 目录包含当前上传、ghost battles、replay 下载相关的 Cloudflare Worker 后端实现。
 
@@ -59,6 +60,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - `docs/mod-features-overview.md`：当前功能总览。
 - `docs/run-logging.md`：run logging、history panel、ghost battles。
 - `docs/run-upload.md`：上传行为、信任模型和边界。
+- `docs/reference/end-of-run-screenshot-flow.md`：终局截图触发、存储和读取契约。
 - `docs/reference/`：热键、设置表面、SQLite schema、tooltip 实现等参考文档。
 
 ## License

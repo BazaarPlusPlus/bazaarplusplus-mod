@@ -46,6 +46,7 @@ INSERT INTO battles (
   opponent_account_id,           -- whoever the uploader fought
   opponent_name, opponent_hero, opponent_rank, opponent_rating, opponent_level,
   result,                        -- from uploader's POV ("Win" = uploader won)
+  is_bundle_final_battle,         -- last battle in this uploaded bundle, if projected
   replay_available,
   ...
 )
@@ -53,6 +54,8 @@ INSERT INTO battles (
 
 **Invariant after this step**: every row on the server holds the uploader's
 view. `player_*` is the uploader, `opponent_*` is whoever they fought.
+`is_bundle_final_battle` is a bundle-level fact computed from upload order, not
+a player-perspective field.
 
 ## 3. Ghost Query (Server → Local Player's Client)
 
@@ -76,6 +79,8 @@ The response is **raw uploader-perspective data** — no flip yet:
 - `player_*` = uploader (some other player who fought my ghost)
 - `opponent_*` = me
 - `result = "Win"` means the uploader won (i.e., *I lost* my mirror match)
+- `is_bundle_final_battle` marks whether this was the uploader's final battle in
+  that run bundle and also passed the server projection gate.
 
 ## 4. Import (Client Parses Response)
 
@@ -92,6 +97,7 @@ version adds them.
 - `OpponentName / OpponentAccountId / OpponentHero / ...` = me
 - `Result` = uploader-perspective win/loss string
 - `WinnerCombatantId` ∈ { `Player`, `Opponent` } — `Player` means uploader won.
+- `IsBundleFinalBattle` = raw server boolean.
 
 ## 5. Local Persistence
 
@@ -102,6 +108,8 @@ Ghost rows are written to the local SQLite `battles` table with
 `source = 'GHOST'` and `local_player_account_id = <me>`. The `player_*` and
 `opponent_*` columns continue to carry uploader-perspective values — storage
 matches what the server returned.
+
+`is_bundle_final_battle` is also stored unchanged.
 
 This is a deliberate choice: the repository stores facts, and perspective
 translation happens at read time.
@@ -124,6 +132,7 @@ Files:
 | `Result` | `ProjectResultToLocal(result)` — `Win`↔`Lost`, `Won`↔`Lost` | My outcome |
 | `WinnerCombatantId` | `ProjectCombatantIdToLocal(...)` — `Player`↔`Opponent` | Who won from my POV |
 | `LoserCombatantId` | `ProjectCombatantIdToLocal(...)` | Who lost from my POV |
+| `IsBundleFinalBattle` | `is_bundle_final_battle` | Whether this was the uploader's final bundle battle and passed the projection gate |
 | `Source` | — | `HistoryBattleSource.Ghost` |
 | `ReplayAvailable / ReplayDownloaded` | `replay_available / replay_downloaded` | Whether replay payload can/has been fetched |
 
@@ -141,6 +150,8 @@ The history panel binds the projected record directly:
 - `refs.OpponentHeroPill` ← `battle.OpponentHero` — shows the uploader's hero.
 - `refs.OpponentName.text` ← `battle.OpponentName` — shows the uploader's name.
 - Player-side pills bind to `battle.PlayerHero` / related — show my mirror.
+- The selected-battle notice shows "opponent eliminated" only when
+  `IsBundleFinalBattle` is true and the projected local-player outcome is a win.
 
 Because projection already reframed the row into local-player perspective, the
 view has no ghost-specific branching for participant display.
@@ -184,6 +195,7 @@ is a product-level choice, not a bug.
   player_*   = uploader
   opponent_* = me
   result     = uploader POV
+  is_bundle_final_battle = raw bundle-final flag
         │
         ▼ GET /ghost-battles
         │  (WHERE opponent_account_id = me)
@@ -201,6 +213,7 @@ is a product-level choice, not a bug.
    Player* = me (mirror)
    Opponent* = uploader
    Result / WinnerCombatantId from my POV
+   IsBundleFinalBattle = raw bundle-final flag
         │
         ├─▶ History Panel list / filters (local-POV)
         │
@@ -216,6 +229,8 @@ is a product-level choice, not a bug.
 - All ghost-specific UI / filtering / summary code consumes projected
   `HistoryBattleRecord` values, not raw columns. If a new ghost feature reads
   raw columns directly, extend the projector instead.
+- `is_bundle_final_battle` stays raw through sync/persistence/projection; combine
+  it with projected local outcome only at UI decision points.
 - Replay payload + manifest are forwarded untouched; do not try to "fix"
   player/opponent labels there without also remapping the combat message
   stream.

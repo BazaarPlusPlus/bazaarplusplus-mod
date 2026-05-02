@@ -215,10 +215,11 @@ Token 没有 `expires_at_utc`，撤销路径只有 `/logout`。详见 README "Kn
 4. **R2 PUT**。Object key 形如 `run-bundles/<player>/<run>/<payloadHashUrlSafe>.mpack.gz`，写 `customMetadata.retention_days`（值来自 `RUN_BUNDLE_RETENTION_DAYS` 环境变量，当前 5 天，由 R2 lifecycle 配置在外部清理）。
 5. **idempotency**。`INSERT OR REPLACE INTO run_bundles` 使用 `run_id` 作为确定性 `bundle_id`，同一 run 的重传会覆盖 metadata；R2 上同 key 直接覆盖（同一 hash 也是同一内容）。这让 mod 可以无脑重传。
 6. **runs upsert**。`INSERT ... ON CONFLICT(run_id) DO UPDATE SET ...`：每次上传都按 `run_id` upsert，让最新一次上传的 run projection 覆盖之前的。
-7. **battles 投影过滤**。对每条 battle，只在 `opponent_account_id` 是已注册玩家（存在于 D1 `users.player_account_id` 主键）或 `opponent_account_id` 等于上传者本人时才投影。`loadKnownOpponentAccountIds` 把 distinct opponent id 用一条 `WHERE player_account_id IN (...)` 主键查询取回。
-8. **batch upsert**。被选中的 battles 用 `INSERT ... ON CONFLICT(battle_id) DO UPDATE SET ...` 拼成 prepared statements，一次 `env.DB.batch(...)` 提交。
+7. **bundle-final 标记**。服务端把 `battle_projections` 中最后一条 battle 的 `battle_id` 记为 `finalBattleId`；该 battle 被投影时写入 `is_bundle_final_battle = 1`。
+8. **battles 投影过滤**。对每条 battle，只在 `opponent_account_id` 是已注册玩家（存在于 D1 `users.player_account_id` 主键）或 `opponent_account_id` 等于上传者本人时才投影。`loadKnownOpponentAccountIds` 把 distinct opponent id 用一条 `WHERE player_account_id IN (...)` 主键查询取回。
+9. **batch upsert**。被选中的 battles 用 `INSERT ... ON CONFLICT(battle_id) DO UPDATE SET ...` 拼成 prepared statements，一次 `env.DB.batch(...)` 提交。
 
-> 性能笔记：covering index `idx_battles_opponent_recorded_covering`（migration 0003）让 ghost-battle 读路径不再回表。批量 battle 写入时每行多写 ~17 列到该索引，但 D1 的"rows written"计费是按行而非按字节，所以 billing 不受影响。
+> 性能笔记：covering index `idx_battles_opponent_recorded_covering`（migration 0003，migration 0008 追加 `is_bundle_final_battle`）让 ghost-battle 读路径不再回表。批量 battle 写入时每行多写投影列到该索引，但 D1 的"rows written"计费是按行而非按字节，所以 billing 不受影响。
 
 ---
 
@@ -248,13 +249,14 @@ Token 没有 `expires_at_utc`，撤销路径只有 `/logout`。详见 README "Kn
       "opponent_name": "...", "opponent_account_id": "...",
       "opponent_hero": "...", "opponent_rank": "...", "opponent_rating": 100, "opponent_level": 8,
       "result": "win|lose|...",
+      "is_bundle_final_battle": false,
       "replay": { "available": true }
     }
   ]
 }
 ```
 
-字段语义：返回的 `player_*` 是**对手 run 视角**下的"player"（即上传者本人），`opponent_*` 是当前 token 持有人。这是 payload 原始视角的直接保留——客户端在渲染时按这一约定还原。
+字段语义：返回的 `player_*` 是**对手 run 视角**下的"player"（即上传者本人），`opponent_*` 是当前 token 持有人。这是 payload 原始视角的直接保留——客户端在渲染时按这一约定还原。`is_bundle_final_battle` 是服务端根据上传 bundle 中最后一条 battle projection 计算的原始事实，不做视角翻转。
 
 **错误码**：401 `invalid_token`。
 
@@ -264,13 +266,13 @@ Token 没有 `expires_at_utc`，撤销路径只有 `/logout`。详见 README "Kn
 2. lookback window：`fromUtc = now - GHOST_QUERY_LOOKBACK_DAYS * 86400000`。
 3. SQL：
    ```sql
-   SELECT 17 列 FROM battles
+   SELECT 18 列 FROM battles
    WHERE opponent_account_id = ?
      AND recorded_at_utc >= ?
    ORDER BY recorded_at_utc DESC, battle_id DESC
    LIMIT ?
    ```
-4. 这条 SQL 完全命中 `idx_battles_opponent_recorded_covering`（opponent_account_id, recorded_at_utc DESC, battle_id DESC + 全部投影列）。**WHERE 用前两列定位、ORDER 用三列排序、SELECT 全部从索引页拿到**，零回表。所以单次查询的 D1 "rows read" 计费 = 实际返回行数（≤200），不会被 widening cost 翻倍。
+4. 这条 SQL 完全命中 `idx_battles_opponent_recorded_covering`（opponent_account_id, recorded_at_utc DESC, battle_id DESC + 全部投影列，包含 `is_bundle_final_battle`）。**WHERE 用前两列定位、ORDER 用三列排序、SELECT 全部从索引页拿到**，零回表。所以单次查询的 D1 "rows read" 计费 = 实际返回行数（≤200），不会被 widening cost 翻倍。
 5. 字段重命名：响应里的 `player_account_id` 来自 `battles.player_account_id_in_payload`，因为 `battles.player_account_id` 是上传者归属字段（用来做行级所有权追踪），和 payload 里的"这条战斗里 player 的 account"语义不同。
 
 ---

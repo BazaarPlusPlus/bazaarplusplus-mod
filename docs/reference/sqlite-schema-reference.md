@@ -23,10 +23,10 @@ Source of truth:
 ## Local Client SQLite
 
 - Database file: `<GameRoot>/BazaarPlusPlus/bazaarplusplus.db`
-- Local schema version: `10`
-- Row schema version: `10`
+- Local schema version: `11`
+- Row schema version: `11`
 - Upload payload schema version: `1`
-- Runtime pragmas include `foreign_keys = ON`, `user_version = 10`, `busy_timeout = 2000`, and WAL mode.
+- Runtime pragmas include `foreign_keys = ON`, `user_version = 11`, `busy_timeout = 2000`, and WAL mode.
 
 Current tables:
 
@@ -99,6 +99,7 @@ Columns:
 - player side: `player_name`, `player_account_id`, `player_hero`, `player_rank`, `player_rating`, `player_level`
 - opponent side: `opponent_name`, `opponent_account_id`, `opponent_hero`, `opponent_rank`, `opponent_rating`, `opponent_level`
 - outcome: `result`, `winner_combatant_id`, `loser_combatant_id`
+- bundle marker: `is_bundle_final_battle`
 - replay state: `replay_available`, `replay_downloaded`, `has_local_payload`, `replay_dirty`, `replay_last_attempt_at_utc`, `replay_last_uploaded_at_utc`, `replay_retry_count`, `replay_last_error`
 - sync/lifecycle: `last_synced_at_utc`, `deleted_at_utc`
 
@@ -224,6 +225,7 @@ The V3 upload request has three layers:
 - `battle_projections`: queryable battle metadata
 
 `artifact_bytes` stores the raw replay payloads and card-set snapshots inside R2. SQL stores only metadata and query projections.
+The server treats the last `battle_projection` in an accepted bundle as the bundle-final battle and writes `is_bundle_final_battle = 1` if that battle is projected into SQL.
 
 ## V3 Server D1 Schema
 
@@ -321,6 +323,7 @@ Key columns:
 - uploader side: `player_name`, `player_account_id_in_payload`, `player_hero`, `player_rank`, `player_rating`, `player_level`
 - opponent side: `opponent_name`, `opponent_account_id`, `opponent_hero`, `opponent_rank`, `opponent_rating`, `opponent_level`
 - `result TEXT NULL`
+- `is_bundle_final_battle INTEGER NOT NULL DEFAULT 0`
 - `replay_available INTEGER NOT NULL`
 - `updated_at_utc TEXT NOT NULL`
 
@@ -364,7 +367,8 @@ CREATE INDEX IF NOT EXISTS idx_battles_opponent_recorded_covering
     opponent_rating,
     opponent_level,
     result,
-    replay_available
+    replay_available,
+    is_bundle_final_battle
   );
 
 CREATE INDEX IF NOT EXISTS idx_run_bundles_submitted_at
@@ -387,3 +391,4 @@ CREATE INDEX IF NOT EXISTS idx_runs_updated_at
 - V3 upload packages local run and battle state into one artifact plus lightweight SQL projections.
 - Server SQL is for lookup and authorization. The uploaded artifact body lives in R2.
 - Current auth is bearer-token based through `tokens`, not installation-signature based.
+- `is_bundle_final_battle` is a server-computed projection flag carried through ghost sync so `HistoryPanel` can explain final-battle elimination outcomes without reading sibling battles or R2 artifacts.

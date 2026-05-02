@@ -32,7 +32,7 @@
 
 - `runs`：run 级摘要、checkpoint 和终态字段
 - `run_events`：append-only 事件流
-- `battles`：本地 PVP battle 和 ghost battle 的统一投影
+- `battles`：本地 PVP battle 和 ghost battle 的统一投影，包含 ghost UI 使用的 `is_bundle_final_battle`
 - `battle_snapshots`：battle 对应的 board snapshot
 - `sync_cursors`：ghost sync checkpoint
 - `run_sync_state`：后台 run-bundle 上传状态
@@ -47,6 +47,7 @@
 - 预览保存的 player / opponent board 快照
 - 在条件满足时启动本地 replay
 - 同步和浏览 ghost battles
+- 选中的 ghost battle 如果是上传 bundle 的最后一战，且本地视角为胜利，会显示“对手出局”提示
 - 删除 run 及其关联 battle 记录
 
 大厅内通过 Bazaar++ settings dock 的 `Game History` 入口打开，也可用 `F8` 切换。面板内部还带有 preview tuning 的调试热键，见 `docs/reference/hotkeys-reference.md`。
@@ -67,5 +68,7 @@
 - `Game/HistoryPanel/HistoryPanel.cs`
 - `Game/HistoryPanel/HistoryPanelRepository.cs`
 - `Game/HistoryPanel/Ghost/GhostBattleSyncService.cs`
+- `Game/HistoryPanel/Ghost/GhostBattleLocalProjector.cs`
 - `Game/HistoryPanel/HistoryPanelReplayService.cs`
+- `Game/HistoryPanel/HistoryPanelFormatter.cs`
 - `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
