@@ -12,7 +12,7 @@
 
 ### 1.2 序列化
 
-- 请求体：`Content-Type: application/json` 是强制的。`http/json.ts` 的 `readJson` 会对其它 content-type 直接抛 `415`。
+- 需要 JSON body 的路由必须带 `Content-Type: application/json`。`http/json.ts` 的 `readJson` 会对其它 content-type 直接抛 `415`。`/health`、`/ghost-battles`、`/logout`、replay-link 和 replay download 路由不解析 JSON body。
 - 响应体：`application/json; charset=utf-8`，`/replays/:token` 的 R2 透传响应除外（content-type 由 R2 对象元数据决定，缺省 `application/octet-stream`）。
 - 时间戳：所有 `*_at_utc` 字段一律 ISO 8601 UTC（`new Date().toISOString()` 的格式：`2026-04-17T08:30:00.000Z`）。
 
@@ -27,6 +27,8 @@
   5. 返回 `{ token, playerAccountId }` 给 handler。
 
 Token 没有 `expires_at_utc`，撤销路径只有 `/logout`。详见 README "Known Limitations"。
+
+仓库当前 `wrangler.toml` 仍把 `ALLOW_UNAUTHENTICATED_REPLAY_LINKS` 和 `ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS` 设为 `true`，所以 replay-link / replay download 在当前 early rollout 配置下允许无 bearer 调用。`/ghost-battles` 始终需要 bearer token。
 
 ### 1.4 CORS
 
@@ -285,7 +287,7 @@ Replay 链路是两步式：先 mint token，再凭 token 下载文件。中间�
 
 为某场 battle 申请一个 5 分钟有效的下载 URL。
 
-**鉴权**：默认必须。环境变量 `ALLOW_UNAUTHENTICATED_REPLAY_LINKS=true` 可关闭，与 `ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS` 配套使用，是早期 rollout 的兼容开关。
+**鉴权**：代码默认必须。环境变量 `ALLOW_UNAUTHENTICATED_REPLAY_LINKS=true` 可关闭，与 `ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS` 配套使用，是早期 rollout 的兼容开关。仓库当前 `wrangler.toml` 配置为 `true`。
 
 **Path 参数**：`battleId`，URL-encoded。
 
@@ -320,7 +322,7 @@ Replay 链路是两步式：先 mint token，再凭 token 下载文件。中间�
 
 凭 replay token 把对应 run bundle 的 R2 对象**流式**返回。
 
-**鉴权**：默认必须。可由 `ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS=true` 临时关闭。
+**鉴权**：代码默认必须。可由 `ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS=true` 临时关闭。仓库当前 `wrangler.toml` 配置为 `true`。
 
 **Path 参数**：`token`，URL-encoded（即 `createReplayLink` 返回的 `replay_<uuid>`）。
 

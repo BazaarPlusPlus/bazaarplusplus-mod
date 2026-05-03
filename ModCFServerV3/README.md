@@ -57,6 +57,7 @@ D1 schema 由 `migrations/` 下的有序 SQL 维护，按文件名顺序应用�
 - **Bearer token 明文存储。** `tokens.token` 作为主键直接被 `WHERE token = ?` 匹配。一次 D1 dump 等同于所有活跃用户的会话被劫持。
 - **密码哈希是单轮 salted SHA-256。** 在用户基数小、流量可信时可接受；持有高价值凭证后不可接受。哈希格式以 `v1:` 命名空间标记，未来可在不破坏旧登录的前提下引入 PBKDF2/scrypt/Argon2。
 - **`/run-bundles` 不鉴权。** 任何能访问 worker 的客户端都能为任意 `player_account_id` 提交 bundle。这是数据收集阶段的有意设计。R2 object key 中的路径段以 `[A-Za-z0-9._-]{1,128}` 校验防止 prefix escape，但数据本身是 trust-on-submit。
+- **Replay link / download 在当前部署配置下可无鉴权调用。** `wrangler.toml` 仍把 `ALLOW_UNAUTHENTICATED_REPLAY_LINKS` 和 `ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS` 设为 `true`，用于 early rollout 兼容；收紧时两者应成对改为 `false`。
 - **Replay token 在 TTL 内可复用。** `replay_tokens.used_at_utc` 在首次下载时记录，但不阻止 5 分钟窗口内的后续下载。捕获的 replay URL 在窗口内可重放。改成严格一次性的方式是把首次使用记录换成 `UPDATE … SET used_at_utc = ? WHERE token = ? AND used_at_utc IS NULL` 并要求 affected-rows == 1。
 - **`artifact_bytes` 同时接受 base64 字符串和 JSON byte array。** 旧版 mod 走数组，新版 mod 走 base64（线上体积约 1/3）。服务端在每次上传时打日志 `upload_run_bundle.artifact_bytes_received` 带 `encoding=base64|byte-array`，可在 Cloudflare 日志里跟踪迁移占比。当 byte-array 占比归零后可以删掉数组分支。
 - **CORS `Allow-Origin` 回显请求 origin。** 没有维护白名单，任意来源都能跨域调用。当前 mod 客户端是从 Unity HTTP 直发，本身不受 CORS 约束；这条限制主要影响以后浏览器场景。
