@@ -24,6 +24,10 @@
       Include="../../Game/MonsterPreview/CardSetBuildRecommendationModeFlow.cs"
       Link="CardSetBuildRecommendationModeFlow.cs"
     />
+    <Compile
+      Include="../../Game/MonsterPreview/CardSetPreviewHotkeys.cs"
+      Link="CardSetPreviewHotkeys.cs"
+    />
     <Compile Include="Program.cs" />
   </ItemGroup>
 </Project>

@@ -23,11 +23,10 @@
 | Hotkey | Function |
 | --- | --- |
 | `Caps Lock` | Toggle selection mode |
-| `1` | Switch to `Selected Set` |
-| `2` | Switch to `Winner Build` |
-| `3` | Switch to `Final Build` |
-| `Tab` | Cycle `Selected Set` -> `Winner Build` -> `Final Build` |
-| `Up / Down` | Browse matched build candidates |
+| `A` | Switch to `Selected Set` |
+| `D` | Switch to `Ten-Win Build` |
+| `Tab` | Cycle `Selected Set` -> `Ten-Win Build` |
+| `W / S` | Browse matched build candidates |
 
 ## HistoryPanel Preview Tuning
 

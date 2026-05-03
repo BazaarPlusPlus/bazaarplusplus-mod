@@ -3,6 +3,7 @@ using BazaarPlusPlus.Game.PreviewSurface;
 
 TestRecommendationModesExposeOnlyCurrentAndTenWin();
 TestRecommendationModeFlow();
+TestCardSetPreviewHotkeys();
 TestPreviewCardSpecFilter();
 
 Console.WriteLine("MonsterPreviewResilience checks passed.");
@@ -28,6 +29,52 @@ static void TestRecommendationModeFlow()
         CardSetBuildRecommendationModeFlow.GetNext(CardSetBuildRecommendationMode.FinalBuild)
             == CardSetBuildRecommendationMode.SelectedSet,
         "Cycling from ten-win build should return to selected set."
+    );
+}
+
+static void TestCardSetPreviewHotkeys()
+{
+    Assert(
+        CardSetPreviewHotkeys.ResolveDisplayMode(
+            currentSetPressed: true,
+            finalBuildPressed: false
+        ) == CardSetBuildRecommendationMode.SelectedSet,
+        "A should switch to the current card set."
+    );
+    Assert(
+        CardSetPreviewHotkeys.ResolveDisplayMode(
+            currentSetPressed: false,
+            finalBuildPressed: true
+        ) == CardSetBuildRecommendationMode.FinalBuild,
+        "D should switch to the ten-win build."
+    );
+    Assert(
+        CardSetPreviewHotkeys.ResolveDisplayMode(
+            currentSetPressed: true,
+            finalBuildPressed: true
+        ) == null,
+        "Pressing A and D together should not switch display modes."
+    );
+    Assert(
+        CardSetPreviewHotkeys.ResolveRecommendationDelta(
+            previousCandidatePressed: true,
+            nextCandidatePressed: false
+        ) == -1,
+        "W should move to the previous candidate."
+    );
+    Assert(
+        CardSetPreviewHotkeys.ResolveRecommendationDelta(
+            previousCandidatePressed: false,
+            nextCandidatePressed: true
+        ) == 1,
+        "S should move to the next candidate."
+    );
+    Assert(
+        CardSetPreviewHotkeys.ResolveRecommendationDelta(
+            previousCandidatePressed: true,
+            nextCandidatePressed: true
+        ) == 0,
+        "Pressing W and S together should not browse candidates."
     );
 }
 

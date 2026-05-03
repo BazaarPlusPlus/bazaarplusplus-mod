@@ -11,7 +11,6 @@ using TheBazaar;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
 
 namespace BazaarPlusPlus.Game.MonsterPreview;
 
@@ -167,7 +166,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             ShowModeIndicator();
             BppLog.Info(
                 "CardSetPreviewRuntime",
-                "Selection mode enabled. Press 1 for Selected Set, 2 for Final Build, and Up/Down to browse matched builds."
+                "Selection mode enabled. Press A for Selected Set, D for Ten-Win Build, and W/S to browse matched builds."
             );
             return;
         }
@@ -192,21 +191,17 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             return false;
         }
 
-        if (WasDisplayModeKeyPressed(keyboard.digit1Key, keyboard.numpad1Key))
-            return TrySetDisplayMode(CardSetBuildRecommendationMode.SelectedSet);
-
-        if (WasDisplayModeKeyPressed(keyboard.digit2Key, keyboard.numpad2Key))
-            return TrySetDisplayMode(CardSetBuildRecommendationMode.FinalBuild);
+        var nextMode = CardSetPreviewHotkeys.ResolveDisplayMode(
+            keyboard.aKey.wasPressedThisFrame,
+            keyboard.dKey.wasPressedThisFrame
+        );
+        if (nextMode.HasValue)
+            return TrySetDisplayMode(nextMode.Value);
 
         if (keyboard.tabKey.wasPressedThisFrame && keyboard.shiftKey.isPressed == false)
             return TrySetDisplayMode(CardSetBuildRecommendationModeFlow.GetNext(_displayMode));
 
         return false;
-    }
-
-    private static bool WasDisplayModeKeyPressed(KeyControl? primaryKey, KeyControl? alternateKey)
-    {
-        return primaryKey?.wasPressedThisFrame == true || alternateKey?.wasPressedThisFrame == true;
     }
 
     private bool TrySetDisplayMode(CardSetBuildRecommendationMode nextMode)
@@ -243,11 +238,10 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             return false;
         }
 
-        var delta = 0;
-        if (keyboard.upArrowKey.wasPressedThisFrame)
-            delta = -1;
-        else if (keyboard.downArrowKey.wasPressedThisFrame)
-            delta = 1;
+        var delta = CardSetPreviewHotkeys.ResolveRecommendationDelta(
+            keyboard.wKey.wasPressedThisFrame,
+            keyboard.sKey.wasPressedThisFrame
+        );
 
         if (delta == 0)
             return false;
