@@ -159,12 +159,12 @@ internal sealed class HistoryPanelDataService
         }
     }
 
-    public async Task<HistoryPanelGhostSyncAttemptResult> SyncGhostBattlesAsync(
+    public async Task<HistoryPanelAttemptResult> SyncGhostBattlesAsync(
         CancellationToken cancellationToken
     )
     {
         if (_ghostSyncService == null)
-            return HistoryPanelGhostSyncAttemptResult.Failure(
+            return HistoryPanelAttemptResult.Failure(
                 HistoryPanelText.GhostSyncUnavailable()
             );
 
@@ -172,24 +172,24 @@ internal sealed class HistoryPanelDataService
         {
             var result = await _ghostSyncService.SyncRecentBattlesAsync(cancellationToken);
             if (!result.Succeeded)
-                return HistoryPanelGhostSyncAttemptResult.Failure(
+                return HistoryPanelAttemptResult.Failure(
                     HistoryPanelText.GhostSyncFailed(result.Error ?? HistoryPanelText.Unknown())
                 );
 
-            return HistoryPanelGhostSyncAttemptResult.Success(
+            return HistoryPanelAttemptResult.Success(
                 HistoryPanelText.GhostSyncSucceeded(result.ImportedCount)
             );
         }
         catch (Exception ex)
         {
-            return HistoryPanelGhostSyncAttemptResult.Failure(
+            return HistoryPanelAttemptResult.Failure(
                 HistoryPanelText.GhostSyncFailed(ex.Message),
                 ex
             );
         }
     }
 
-    public async Task<HistoryPanelFinalBuildRefreshAttemptResult> RefreshFinalBuildsAsync(
+    public async Task<HistoryPanelAttemptResult> RefreshFinalBuildsAsync(
         CancellationToken cancellationToken
     )
     {
@@ -208,13 +208,13 @@ internal sealed class HistoryPanelDataService
                 .ConfigureAwait(false);
 
             if (!result.Succeeded)
-                return HistoryPanelFinalBuildRefreshAttemptResult.Failure(
+                return HistoryPanelAttemptResult.Failure(
                     HistoryPanelText.FinalBuildRefreshFailed(
                         result.Error ?? HistoryPanelText.Unknown()
                     )
                 );
 
-            return HistoryPanelFinalBuildRefreshAttemptResult.Success(
+            return HistoryPanelAttemptResult.Success(
                 HistoryPanelText.FinalBuildRefreshSucceeded()
             );
         }
@@ -224,7 +224,7 @@ internal sealed class HistoryPanelDataService
         }
         catch (Exception ex)
         {
-            return HistoryPanelFinalBuildRefreshAttemptResult.Failure(
+            return HistoryPanelAttemptResult.Failure(
                 HistoryPanelText.FinalBuildRefreshFailed(ex.Message),
                 ex
             );
@@ -232,9 +232,9 @@ internal sealed class HistoryPanelDataService
     }
 }
 
-internal readonly struct HistoryPanelGhostSyncAttemptResult
+internal readonly struct HistoryPanelAttemptResult
 {
-    private HistoryPanelGhostSyncAttemptResult(
+    private HistoryPanelAttemptResult(
         bool succeeded,
         string statusMessage,
         Exception? error
@@ -251,39 +251,12 @@ internal readonly struct HistoryPanelGhostSyncAttemptResult
 
     public Exception? Error { get; }
 
-    public static HistoryPanelGhostSyncAttemptResult Success(string statusMessage) =>
+    public static HistoryPanelAttemptResult Success(string statusMessage) =>
         new(true, statusMessage, null);
 
-    public static HistoryPanelGhostSyncAttemptResult Failure(
+    public static HistoryPanelAttemptResult Failure(
         string statusMessage,
         Exception? error = null
     ) => new(false, statusMessage, error);
 }
 
-internal readonly struct HistoryPanelFinalBuildRefreshAttemptResult
-{
-    private HistoryPanelFinalBuildRefreshAttemptResult(
-        bool succeeded,
-        string statusMessage,
-        Exception? error
-    )
-    {
-        Succeeded = succeeded;
-        StatusMessage = statusMessage;
-        Error = error;
-    }
-
-    public bool Succeeded { get; }
-
-    public string StatusMessage { get; }
-
-    public Exception? Error { get; }
-
-    public static HistoryPanelFinalBuildRefreshAttemptResult Success(string statusMessage) =>
-        new(true, statusMessage, null);
-
-    public static HistoryPanelFinalBuildRefreshAttemptResult Failure(
-        string statusMessage,
-        Exception? error = null
-    ) => new(false, statusMessage, error);
-}

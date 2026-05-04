@@ -27,24 +27,16 @@ internal sealed class BppComposition : IDisposable
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
-    private readonly Func<CombatReplayRuntime?> _combatReplayRuntimeAccessor;
 
     public IBppServices Services => _services;
     public RunLifecycleModule RunLifecycle => _runLifecycle;
 
-    public BppComposition(
-        ManualLogSource logger,
-        ConfigFile configFile,
-        Func<CombatReplayRuntime?> combatReplayRuntimeAccessor
-    )
+    public BppComposition(ManualLogSource logger, ConfigFile configFile)
     {
         if (logger == null)
             throw new ArgumentNullException(nameof(logger));
         if (configFile == null)
             throw new ArgumentNullException(nameof(configFile));
-        _combatReplayRuntimeAccessor =
-            combatReplayRuntimeAccessor
-            ?? throw new ArgumentNullException(nameof(combatReplayRuntimeAccessor));
 
         _config.Initialize(configFile);
         _paths.Initialize();
@@ -60,13 +52,16 @@ internal sealed class BppComposition : IDisposable
         );
 
         _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);
-        _combatReplayModule = new CombatReplayModule(_eventBus, _combatReplayRuntimeAccessor);
+        _combatReplayModule = new CombatReplayModule(_eventBus);
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
 
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
         _featureRegistry.Register(_combatStatusBarModule);
     }
+
+    public void AttachCombatReplayRuntime(CombatReplayRuntime runtime) =>
+        _combatReplayModule.AttachRuntime(runtime);
 
     public void Start() => _featureRegistry.Start();
 

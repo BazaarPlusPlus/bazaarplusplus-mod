@@ -59,10 +59,11 @@ internal sealed class GhostBattleApiClient
             if (!response.IsSuccessStatusCode)
             {
                 var statusCode = (int)response.StatusCode;
+                var decision = V3HttpFailureClassifier.Classify(statusCode);
                 return GhostBattleApiResult.Failure(
                     V3ErrorFormatter.FormatHttpFailure(statusCode, responseBody),
-                    shouldFallback: statusCode >= 500 || statusCode == 429,
-                    shouldReRegister: statusCode == 401 || statusCode == 403
+                    shouldFallback: decision.ShouldFallback,
+                    shouldReRegister: decision.ShouldReRegister
                 );
             }
 
@@ -117,10 +118,11 @@ internal sealed class GhostBattleApiClient
             if (!response.IsSuccessStatusCode)
             {
                 var statusCode = (int)response.StatusCode;
+                var decision = V3HttpFailureClassifier.Classify(statusCode);
                 return GhostBattleReplayDownloadLinkResult.Failure(
                     V3ErrorFormatter.FormatHttpFailure(statusCode, responseBody),
-                    shouldFallback: statusCode >= 500 || statusCode == 429,
-                    shouldReRegister: statusCode == 401 || statusCode == 403
+                    shouldFallback: decision.ShouldFallback,
+                    shouldReRegister: decision.ShouldReRegister
                 );
             }
 

@@ -45,8 +45,7 @@ public class Plugin : BaseUnityPlugin
 
             var configFile = CreatePluginConfigFile();
 
-            CombatReplayRuntime? combatReplayRuntime = null;
-            _composition = new BppComposition(Logger, configFile, () => combatReplayRuntime);
+            _composition = new BppComposition(Logger, configFile);
 
             var services = _composition.Services;
             BppLog.Install(services.Logger);
@@ -57,8 +56,9 @@ public class Plugin : BaseUnityPlugin
             ApplyHarmonyPatches();
 
             BppLog.Info("Plugin", "Adding CombatReplayRuntime");
-            combatReplayRuntime = gameObject.AddComponent<CombatReplayRuntime>();
+            var combatReplayRuntime = gameObject.AddComponent<CombatReplayRuntime>();
             combatReplayRuntime.Initialize(services, _composition.RunLifecycle);
+            _composition.AttachCombatReplayRuntime(combatReplayRuntime);
 
             _composition.Start();
 

@@ -40,20 +40,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     public static bool IsVisible { get; private set; }
 
-    private HistoryRunRecord? SelectedRun =>
-        _runs.Count == 0 ? null : _runs[Mathf.Clamp(_selectedRunIndex, 0, _runs.Count - 1)];
+    private HistoryRunRecord? SelectedRun => _state.GetSelectedRun();
 
-    private HistoryBattleRecord? SelectedBattle =>
-        _battles.Count == 0
-            ? null
-            : _battles[Mathf.Clamp(_selectedBattleIndex, 0, _battles.Count - 1)];
+    private HistoryBattleRecord? SelectedBattle => _state.GetSelectedBattle();
 
     private HistoryBattleRecord? SelectedGhostBattle =>
-        FilteredGhostBattles.Count == 0
-            ? null
-            : FilteredGhostBattles[
-                Mathf.Clamp(_selectedGhostBattleIndex, 0, FilteredGhostBattles.Count - 1)
-            ];
+        _state.GetSelectedGhostBattle(FilteredGhostBattles);
 
     private HistoryBattleRecord? ActiveSelectedBattle =>
         _sectionMode == HistorySectionMode.Ghost ? SelectedGhostBattle : SelectedBattle;

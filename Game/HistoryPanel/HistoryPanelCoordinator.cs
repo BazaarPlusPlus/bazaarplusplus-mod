@@ -441,7 +441,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         var token = GetCurrentSessionToken();
         var sessionVersion = _panelSessionVersion;
-        HistoryPanelGhostSyncAttemptResult syncResult;
+        HistoryPanelAttemptResult syncResult;
         try
         {
             syncResult = await _dataService.SyncGhostBattlesAsync(token);
@@ -506,7 +506,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         var token = GetCurrentSessionToken();
         var sessionVersion = _panelSessionVersion;
-        HistoryPanelFinalBuildRefreshAttemptResult refreshResult;
+        HistoryPanelAttemptResult refreshResult;
         try
         {
             refreshResult = await _dataService.RefreshFinalBuildsAsync(token);

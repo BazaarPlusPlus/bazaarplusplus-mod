@@ -315,7 +315,13 @@ internal sealed class PreviewItemCardSurface : IPreviewCardSurface
                 );
             method?.Invoke(cardVfxController, args);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "PreviewItemCardSurface",
+                $"Failed to invoke item VFX method '{methodName}': {ex.Message}"
+            );
+        }
     }
 
     private bool EnsureApi(AssetLoader loader)

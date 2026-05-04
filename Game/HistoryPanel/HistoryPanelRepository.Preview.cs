@@ -6,6 +6,7 @@ using System.Reflection;
 using BazaarGameShared.Domain.Cards.Socket;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect.AuraActions;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.PreviewSurface;
@@ -326,7 +327,13 @@ internal sealed partial class HistoryPanelRepository
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "HistoryPanel",
+                $"Failed to resolve socket-effect attribute type for {snapshot.TemplateId}: {ex.Message}"
+            );
+        }
 
         lock (SocketEffectTemplateLock)
             SocketEffectAttributeTypeCache[cacheKey] = resolvedType;
@@ -364,7 +371,10 @@ internal sealed partial class HistoryPanelRepository
                 return _staticGameData;
         }
 
-        var staticData = Data.GetStatic().GetAwaiter().GetResult();
+        var staticData = BppStaticDataAccess.TryGet();
+        if (staticData == null)
+            return null;
+
         lock (SocketEffectTemplateLock)
         {
             _staticGameData ??= staticData;

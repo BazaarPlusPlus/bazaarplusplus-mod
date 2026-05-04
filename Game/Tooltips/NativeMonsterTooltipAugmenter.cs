@@ -4,6 +4,7 @@ using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards.Encounter.Combat;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
+using BazaarPlusPlus.Core.Runtime;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
@@ -78,7 +79,7 @@ internal static class NativeMonsterTooltipAugmenter
             return false;
         }
 
-        var staticData = (object?)Data.GetStatic().GetAwaiter().GetResult();
+        var staticData = BppStaticDataAccess.TryGet();
         if (staticData == null)
         {
             reason = "static_data_unavailable";
