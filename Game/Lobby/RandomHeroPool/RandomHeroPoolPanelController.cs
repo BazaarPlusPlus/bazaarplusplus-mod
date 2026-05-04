@@ -1,9 +1,7 @@
 #nullable enable
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using BazaarPlusPlus.Game.Lobby;
 using HarmonyLib;
 using TheBazaar;
@@ -61,7 +59,6 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
     private bool _warnedMissingHeroUnlockStateField;
     private bool _warnedMissingRandomHeroToggleField;
     private bool _subscribedToEvents;
-    private Coroutine? _pendingRosterRefreshCoroutine;
 
     internal static void Attach(HeroSelectButtonsView view)
     {
@@ -85,20 +82,6 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         controller.UpdatePanelVisibility();
     }
 
-    internal static void ScheduleRosterRefresh(
-        HeroSelectButtonsView view,
-        Task refreshTask,
-        bool forceRebuild
-    )
-    {
-        if (view == null || refreshTask == null)
-            return;
-
-        var controller = GetOrCreateController(view);
-        controller.TryAttach(view);
-        controller.ScheduleRosterRefresh(refreshTask, forceRebuild);
-    }
-
     internal static void NotifyVisibilityChanged(HeroSelectButtonsView view)
     {
         if (view == null)
@@ -109,7 +92,6 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
 
     private void OnDestroy()
     {
-        CancelPendingRosterRefresh();
         UnsubscribeFromEvents();
         UnbindToggle();
     }
@@ -383,33 +365,6 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         {
             return false;
         }
-    }
-
-    private void ScheduleRosterRefresh(Task refreshTask, bool forceRebuild)
-    {
-        CancelPendingRosterRefresh();
-        _pendingRosterRefreshCoroutine = StartCoroutine(
-            WaitForRosterRefresh(refreshTask, forceRebuild)
-        );
-    }
-
-    private void CancelPendingRosterRefresh()
-    {
-        if (_pendingRosterRefreshCoroutine == null)
-            return;
-
-        StopCoroutine(_pendingRosterRefreshCoroutine);
-        _pendingRosterRefreshCoroutine = null;
-    }
-
-    private IEnumerator WaitForRosterRefresh(Task refreshTask, bool forceRebuild)
-    {
-        while (!refreshTask.IsCompleted)
-            yield return null;
-
-        _pendingRosterRefreshCoroutine = null;
-        if (_view != null)
-            NotifyRosterChanged(_view, forceRebuild);
     }
 
     private void SyncPanelPlacement()
