@@ -16,7 +16,7 @@
 3. combat replay 持久化完成后把关联 battle 的 `replay_dirty` 标记为 dirty。
 4. `RunUploadController` 在启动延迟后，或 run 退出 / replay 落盘完成后，扫描待上传 completed runs。
 5. `RunBundleUploadStore` 组装 run projection、battle projections 和 replay artifact。
-6. `RunBundleUploadService` 直接 `POST /run-bundles`，不附加 Authorization 头。
+6. `RunBundleUploadService` 编排上传流程，调用 `RunBundleClient` 执行 `POST /run-bundles`，不附加 Authorization 头。
 7. 服务端把 `battle_projections` 中最后一条 battle 的 `battle_id` 作为 final marker；该 battle 被投影时写入 `is_bundle_final_battle`，供 ghost battle UI 判断对手是否在这一战后出局。
 8. 上传成功后清除 run 和关联 replay 的 dirty 标记。
 

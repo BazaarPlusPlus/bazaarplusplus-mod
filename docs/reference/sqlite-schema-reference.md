@@ -49,6 +49,8 @@ erDiagram
     runs ||--o{ run_screenshots : "run_id logical"
     sync_cursors {
         string scope PK
+        string cursor_value
+        string updated_at_utc
     }
 ```
 

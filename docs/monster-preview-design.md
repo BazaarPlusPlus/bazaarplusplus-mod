@@ -2,9 +2,7 @@
 
 ## Scope
 
-本文只描述当前 shipped 的怪物预览实现。
-
-2026-04 的清理中，旧的 Bazaar++ 自绘 monster showcase 路径已经删除。当前运行时保留的是：
+本文只描述当前 shipped 的怪物预览实现。旧的 Bazaar++ 自绘 monster showcase 路径已被移除，当前运行时保留的是：
 
 - 原生怪物 tooltip / monster board 的局部增强
 - 基于原生 `MonsterBoardTooltip` 的 Bazaar++ item-board overlay

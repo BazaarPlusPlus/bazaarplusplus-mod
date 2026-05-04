@@ -1,11 +1,8 @@
 # Preview Surface Implementation Summary
 
-Date: 2026-04-08
-Commit: `57a4412`
-
-This is a retained implementation note. The historical execution spec and plan
-were removed during docs cleanup because they described transient migration
-steps rather than the current codebase.
+This is a retained implementation note describing how the preview surface area
+is currently structured. It records the shape of the architecture rather than
+the migration steps that produced it.
 
 ## Scope
 
@@ -70,15 +67,9 @@ The final implementation serializes all surface work inside `PreviewBoardRenderT
 
 This preserves cancel-and-replace semantics without allowing late `Clear()` calls from cancelled work to wipe newer content.
 
-### 5. Runtime consumers rewired to the new boundary
+### 5. Runtime consumers
 
-At the time of this refactor, both the monster showcase flow and `HistoryPanel` consumed the shared render-target boundary.
-
-Today, the monster self-render showcase path has been removed, while `HistoryPanelPreviewRenderer` still uses `PreviewBoardSurface` plus `PreviewBoardRenderTarget`. The shared host/cancellation model remains the active architecture for `HistoryPanel`.
-
-### 6. Later cleanup
-
-The old monster-specific showcase runtime, controller, projector, and request/session glue were deleted in a later cleanup once the runtime had fully converged on native monster preview plus shared `PreviewSurface` consumers.
+`HistoryPanelPreviewRenderer` consumes `PreviewBoardSurface` through `PreviewBoardRenderTarget`. The monster self-render showcase path was removed; the only remaining consumer of the shared render target is `HistoryPanel`. Native monster preview is used everywhere else.
 
 ## Verification
 

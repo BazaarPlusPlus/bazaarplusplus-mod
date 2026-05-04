@@ -4,7 +4,7 @@
 
 BazaarPlusPlus is a BepInEx mod for *The Bazaar*. It adds combat UI enhancements, monster and tooltip previews, run logging, an in-game history panel, local combat replay playback, end-of-run automatic screenshots, and background upload features.
 
-This repository only keeps documentation that still matches the current implementation. If any document conflicts with the code, treat `Plugin.cs`, `Core/`, `Game/`, `Patches/`, and `Data/` as the source of truth.
+This repository only keeps documentation that still matches the current implementation. If any document conflicts with the code, treat `Plugin.cs`, `Core/`, `Game/`, and `Patches/` as the source of truth.
 
 ## Feature Overview
 
@@ -12,7 +12,7 @@ This repository only keeps documentation that still matches the current implemen
 - Monster preview: the default flow uses the game's native monster preview; Bazaar++ adds targeted tooltip augmentation and reuses `MonsterBoardTooltip` for custom board displays.
 - Enchant / upgrade preview: appends enchant text to the native tooltip flow and enters the native upgrade preview path while the upgrade modifier key is held.
 - Run Logging and HistoryPanel: active runs are written to SQLite; the in-game panel can browse runs, PvP battles, ghost battles, and saved board snapshots.
-- Combat replay: saves local PvP replay payloads; `HistoryPanel` and the debug panel can replay saved battles when the required conditions are met.
+- Combat replay: saves local PvP replay payloads; `HistoryPanel` can replay saved battles when the required conditions are met.
 - End-of-run automatic screenshots: saves the primary final-run screenshot and SQLite metadata before `Continue`.
 - Background upload: run and replay upload, performed only while the client is outside a live run.
 - Anonymous Mode: replaces the local player name with `Anonymous`.
@@ -50,7 +50,8 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 ## Repository Layout
 
 - `Plugin.cs`: BepInEx runtime entry point.
-- `Core/`, `Game/`, `Patches/`, `Data/`: main feature implementation.
+- `Core/`, `Game/`, `Patches/`: main feature implementation.
+- `Data/`: embedded resources (e.g. build recommendation JSON).
 - `tests/`: feature-focused test projects.
 - `run.sh`: local build, test, format, and decompile entry point.
 - `ModCFServerV3/`: cloud sync backend.
