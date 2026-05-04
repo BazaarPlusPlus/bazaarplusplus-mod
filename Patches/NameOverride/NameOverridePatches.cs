@@ -71,7 +71,7 @@ public static class PlayerProfileGetDisplayUsernamePatch
         if (!NameOverrideHelper.TryGetDisplayNameOverride(__result, out var replacementName))
             return;
 
-        __result = replacementName;
+        __result = replacementName!;
         BppLog.Debug(
             "NameOverride",
             $"GetDisplayUsername replaced display username with {replacementName}"
@@ -106,7 +106,7 @@ public static class UpdatePlayerPatch
         if (!NameOverrideHelper.TryGetReplacementName(userName, out var replacementName))
             return true;
 
-        userName = replacementName;
+        userName = replacementName!;
         nameId = 0;
         BppLog.Debug("NameOverride", $"UpdatePlayer replaced username with {replacementName}");
         return true;
@@ -122,7 +122,7 @@ public static class SetHeroNamePatch
         if (!NameOverrideHelper.TryGetReplacementName(newName, out var replacementName))
             return true;
 
-        newName = replacementName;
+        newName = replacementName!;
         usernameId = 0;
         BppLog.Debug("NameOverride", $"SetHeroName replaced username with {replacementName}");
         return true;

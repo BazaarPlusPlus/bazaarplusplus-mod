@@ -65,9 +65,11 @@ internal sealed partial class CombatReplayRuntime
                 cardSkinIds = Array.Empty<string>(),
             };
 
+#pragma warning disable CS0618
         var skinData =
             await collectionManager.GetEquippedHeroSkin(hero.Value, loadout)
             ?? await collectionManager.GetEquippedHeroSkin(hero.Value);
+#pragma warning restore CS0618
         if (skinData == null)
         {
             BppLog.Warn(
