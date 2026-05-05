@@ -2,10 +2,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
-using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.Online;
-using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
@@ -15,46 +14,40 @@ internal sealed class GhostBattleSyncService : IDisposable
 
     private readonly HistoryPanelRepository _repository;
     private readonly ModOnlineClient _onlineClient;
-    private readonly AuthStore _authStore;
 
     public GhostBattleSyncService(
         HistoryPanelRepository repository,
-        ModOnlineClient onlineClient,
-        AuthStore authStore
+        ModOnlineClient onlineClient
     )
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _onlineClient = onlineClient ?? throw new ArgumentNullException(nameof(onlineClient));
-        _authStore = authStore ?? throw new ArgumentNullException(nameof(authStore));
     }
 
     public async Task<GhostBattleSyncResult> SyncRecentBattlesAsync(
         CancellationToken cancellationToken
     )
     {
-        var bearer = _onlineClient.Bearer;
-        if (!bearer.IsAvailable || string.IsNullOrWhiteSpace(bearer.PlayerAccountId))
-            return GhostBattleSyncResult.Failure("not_logged_in");
+        var playerAccountId = ResolvePlayerAccountId();
+        if (string.IsNullOrWhiteSpace(playerAccountId))
+            return GhostBattleSyncResult.Failure("player_account_id_unavailable");
 
         var apiClient = new GhostBattleApiClient(_onlineClient.HttpClient, _onlineClient.Routes);
         var syncStartedAtUtc = DateTimeOffset.UtcNow;
         var queryResult = await apiClient.QueryAgainstMeAsync(
-            bearer.PlayerAccountId!,
-            bearer.Token!,
+            playerAccountId!,
             MaxSyncBattleLimit,
             cancellationToken
         );
         if (!queryResult.Succeeded)
         {
-            if (queryResult.ShouldReRegister)
-                _onlineClient.HandleUnauthorized(_authStore);
             return GhostBattleSyncResult.Failure(queryResult.Error ?? "ghost_sync_failed");
         }
 
-        _repository.UpsertGhostBattles(bearer.PlayerAccountId!, queryResult.Battles);
+        _repository.UpsertGhostBattles(playerAccountId!, queryResult.Battles);
         _repository.MarkOldUndownloadedGhostBattlesDeleted(syncStartedAtUtc);
         if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit))
-            _repository.SaveGhostSyncCheckpointUtc(bearer.PlayerAccountId!, syncStartedAtUtc);
+            _repository.SaveGhostSyncCheckpointUtc(playerAccountId!, syncStartedAtUtc);
         return GhostBattleSyncResult.Success(queryResult.Battles.Count);
     }
 
@@ -69,20 +62,13 @@ internal sealed class GhostBattleSyncService : IDisposable
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
             return GhostBattleReplayDownloadResult.Failure("replay_directory_required");
 
-        var bearer = _onlineClient.Bearer;
-        if (!bearer.IsAvailable || string.IsNullOrWhiteSpace(bearer.PlayerAccountId))
-            return GhostBattleReplayDownloadResult.Failure("not_logged_in");
-
         var apiClient = new GhostBattleApiClient(_onlineClient.HttpClient, _onlineClient.Routes);
         var linkResult = await apiClient.RequestReplayDownloadLinkAsync(
             battleId,
-            bearer.Token!,
             cancellationToken
         );
         if (!linkResult.Succeeded)
         {
-            if (linkResult.ShouldReRegister)
-                _onlineClient.HandleUnauthorized(_authStore);
             return GhostBattleReplayDownloadResult.Failure(
                 linkResult.Error ?? "ghost_replay_link_failed"
             );
@@ -91,7 +77,6 @@ internal sealed class GhostBattleSyncService : IDisposable
         var payloadResult = await apiClient.DownloadReplayPayloadAsync(
             battleId,
             linkResult.DownloadUrl!,
-            bearer.Token!,
             cancellationToken
         );
         if (!payloadResult.Succeeded || payloadResult.Payload?.ReplayPayload == null)
@@ -120,6 +105,18 @@ internal sealed class GhostBattleSyncService : IDisposable
     }
 
     public void Dispose() { }
+
+    private static string? ResolvePlayerAccountId()
+    {
+        try
+        {
+            return BppClientCacheBridge.TryGetProfileAccountId()?.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     private static bool ShouldAdvanceCheckpoint(int importedCount, int limit)
     {
