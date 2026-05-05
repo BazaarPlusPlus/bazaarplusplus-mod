@@ -327,6 +327,11 @@ internal sealed partial class HistoryPanelUiToolkitView
         refs.OpponentName.style.display = string.IsNullOrWhiteSpace(refs.OpponentName.text)
             ? DisplayStyle.None
             : DisplayStyle.Flex;
+
+        var isEliminated = HistoryPanelFormatter.IsGhostOpponentEliminated(battle);
+        refs.EliminatedChip.text = HistoryPanelText.GhostOpponentEliminatedShort();
+        refs.EliminatedChip.style.display = isEliminated ? DisplayStyle.Flex : DisplayStyle.None;
+
         ApplyBattleRowState(refs, _battleList?.selectedIndex == index, battle);
     }
 
@@ -360,25 +365,32 @@ internal sealed partial class HistoryPanelUiToolkitView
     {
         var isWin = HistoryPanelFormatter.IsBattleWin(battle);
         var isLoss = HistoryPanelFormatter.IsBattleLoss(battle);
+        var isEliminated = HistoryPanelFormatter.IsGhostOpponentEliminated(battle);
 
         refs.Root.style.backgroundColor = selected
-            ? isWin
-                ? new Color(0.13f, 0.23f, 0.22f, 0.99f)
-                : isLoss
-                    ? new Color(0.24f, 0.18f, 0.16f, 0.99f)
-                    : new Color(0.18f, 0.24f, 0.31f, 0.99f)
-            : isWin
-                ? new Color(0.10f, 0.15f, 0.16f, 0.98f)
-                : isLoss
-                    ? new Color(0.15f, 0.13f, 0.15f, 0.98f)
-                    : new Color(0.13f, 0.15f, 0.18f, 0.98f);
+            ? isEliminated
+                ? new Color(0.22f, 0.18f, 0.10f, 0.99f)
+                : isWin
+                    ? new Color(0.13f, 0.23f, 0.22f, 0.99f)
+                    : isLoss
+                        ? new Color(0.24f, 0.18f, 0.16f, 0.99f)
+                        : new Color(0.18f, 0.24f, 0.31f, 0.99f)
+            : isEliminated
+                ? new Color(0.18f, 0.14f, 0.08f, 0.98f)
+                : isWin
+                    ? new Color(0.10f, 0.15f, 0.16f, 0.98f)
+                    : isLoss
+                        ? new Color(0.15f, 0.13f, 0.15f, 0.98f)
+                        : new Color(0.13f, 0.15f, 0.18f, 0.98f);
 
         refs.Accent.style.backgroundColor =
-            isWin ? new Color(0.23f, 0.54f, 0.47f, 0.95f)
+            isEliminated ? new Color(0.94f, 0.70f, 0.28f, 0.95f)
+            : isWin ? new Color(0.23f, 0.54f, 0.47f, 0.95f)
             : isLoss ? new Color(0.63f, 0.36f, 0.24f, 0.95f)
             : new Color(0.34f, 0.47f, 0.64f, 0.95f);
         var borderColor =
-            isWin ? new Color(0.22f, 0.44f, 0.40f, 0.42f)
+            isEliminated ? new Color(0.62f, 0.46f, 0.18f, 0.50f)
+            : isWin ? new Color(0.22f, 0.44f, 0.40f, 0.42f)
             : isLoss ? new Color(0.44f, 0.27f, 0.20f, 0.42f)
             : new Color(0.24f, 0.31f, 0.41f, 0.42f);
         refs.Root.style.borderLeftColor = borderColor;
@@ -386,7 +398,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         refs.Root.style.borderTopColor = borderColor;
         refs.Root.style.borderBottomColor = borderColor;
         refs.DayBubble.style.backgroundColor =
-            isWin ? new Color(0.13f, 0.28f, 0.23f, 0.98f)
+            isEliminated ? new Color(0.24f, 0.18f, 0.08f, 0.98f)
+            : isWin ? new Color(0.13f, 0.28f, 0.23f, 0.98f)
             : isLoss ? new Color(0.33f, 0.20f, 0.15f, 0.98f)
             : new Color(0.18f, 0.23f, 0.31f, 0.98f);
         refs.DayBubble.style.borderLeftColor = borderColor;
