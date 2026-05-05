@@ -1,23 +1,11 @@
-import { allowUnauthenticatedReplayLinks } from "../../config/v3";
 import type { Env } from "../../env";
 import { json } from "../../http/json";
-import { requireBearerAuth } from "./requireBearerAuth";
 
 export async function handleCreateReplayLink(
   request: Request,
   env: Env,
   battleId: string,
 ): Promise<Response> {
-  let requesterPlayerAccountId: string | null = null;
-  if (!allowUnauthenticatedReplayLinks(env)) {
-    const auth = await requireBearerAuth(request, env);
-    if (auth instanceof Response) {
-      return auth;
-    }
-
-    requesterPlayerAccountId = auth.playerAccountId;
-  }
-
   const battleRow = await env.DB.prepare(
     `
       SELECT
@@ -37,14 +25,8 @@ export async function handleCreateReplayLink(
   if (!battleRow) {
     return json({ error: "battle_not_found" }, { status: 404 });
   }
-  if (
-    requesterPlayerAccountId != null &&
-    battleRow.opponent_account_id !== requesterPlayerAccountId
-  ) {
-    return json({ error: "replay_forbidden" }, { status: 403 });
-  }
 
-  const tokenOwnerPlayerAccountId = requesterPlayerAccountId ?? battleRow.opponent_account_id;
+  const tokenOwnerPlayerAccountId = battleRow.opponent_account_id;
   if (!tokenOwnerPlayerAccountId) {
     return json({ error: "replay_forbidden" }, { status: 403 });
   }

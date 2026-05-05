@@ -1,7 +1,5 @@
-import { allowUnauthenticatedReplayDownloads } from "../../config/v3";
 import type { Env } from "../../env";
 import { json } from "../../http/json";
-import { requireBearerAuth } from "./requireBearerAuth";
 
 type ReplayTokenRow = {
   token: string;
@@ -12,29 +10,14 @@ type ReplayTokenRow = {
   revoked_at_utc: string | null;
 };
 
-type BattleRow = {
-  bundle_id: string;
-};
-
-type RunBundleRow = {
-  object_key: string;
-};
+type BattleRow = { bundle_id: string };
+type RunBundleRow = { object_key: string };
 
 export async function handleDownloadReplay(
   request: Request,
   env: Env,
   token: string,
 ): Promise<Response> {
-  let requesterPlayerAccountId: string | null = null;
-  if (!allowUnauthenticatedReplayDownloads(env)) {
-    const auth = await requireBearerAuth(request, env);
-    if (auth instanceof Response) {
-      return auth;
-    }
-
-    requesterPlayerAccountId = auth.playerAccountId;
-  }
-
   const replayToken = await env.DB.prepare(
     `
       SELECT
@@ -56,20 +39,9 @@ export async function handleDownloadReplay(
   if (Date.parse(replayToken.expires_at_utc) < Date.now()) {
     return json({ error: "replay_token_expired" }, { status: 410 });
   }
-  if (
-    requesterPlayerAccountId != null &&
-    replayToken.requested_by_player_account_id !== requesterPlayerAccountId
-  ) {
-    return json({ error: "replay_token_forbidden" }, { status: 403 });
-  }
 
   const battle = await env.DB.prepare(
-    `
-      SELECT
-        bundle_id
-      FROM battles
-      WHERE battle_id = ?
-    `,
+    `SELECT bundle_id FROM battles WHERE battle_id = ?`,
   )
     .bind(replayToken.battle_id)
     .first<BattleRow>();
@@ -78,12 +50,7 @@ export async function handleDownloadReplay(
   }
 
   const runBundle = await env.DB.prepare(
-    `
-      SELECT
-        object_key
-      FROM run_bundles
-      WHERE bundle_id = ?
-    `,
+    `SELECT object_key FROM run_bundles WHERE bundle_id = ?`,
   )
     .bind(battle.bundle_id)
     .first<RunBundleRow>();
@@ -98,11 +65,7 @@ export async function handleDownloadReplay(
 
   if (replayToken.used_at_utc == null) {
     await env.DB.prepare(
-      `
-        UPDATE replay_tokens
-        SET used_at_utc = ?
-        WHERE token = ?
-      `,
+      `UPDATE replay_tokens SET used_at_utc = ? WHERE token = ?`,
     )
       .bind(new Date().toISOString(), replayToken.token)
       .run();
