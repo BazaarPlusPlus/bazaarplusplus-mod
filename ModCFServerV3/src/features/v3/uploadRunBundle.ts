@@ -56,7 +56,6 @@ type RunBundleRequest = {
 };
 
 const AnonymousPlayerAccountId = "anonymous-player";
-const LegacyInstallationId = "legacy";
 const MaxDistinctOpponentAccountIds = 20;
 
 const ObjectKeySegmentPattern = /^[A-Za-z0-9._-]{1,128}$/;
@@ -133,7 +132,7 @@ async function loadKnownOpponentAccountIds(
   const result = await env.DB.prepare(
     `
       SELECT player_account_id
-      FROM users
+      FROM seen_player_accounts
       WHERE player_account_id IN (${placeholders})
     `,
   )
@@ -232,18 +231,11 @@ async function insertRunBundleProjection(args: {
   createdAtUtc: string;
 }): Promise<void> {
   // bundle_id is deterministically the run_id: one run -> one run_bundles row.
-  // INSERT OR REPLACE absorbs three cases with zero reads:
-  //   - fresh run        -> plain INSERT
-  //   - progress update  -> PK conflict on bundle_id, replace in place
-  //   - transition row   -> UNIQUE(installation_id, run_id, payload_hash) conflict
-  //                         with a pre-existing uuid-style bundle; old row is dropped
-  //                         and the run_id-keyed row wins. Retention cleans up the
-  //                         orphan R2 object. Safe to simplify after transition.
+  // INSERT OR REPLACE keeps idempotent retries cheap on PK conflict.
   await args.env.DB.prepare(
     `
       INSERT OR REPLACE INTO run_bundles (
         bundle_id,
-        installation_id,
         player_account_id,
         run_id,
         payload_hash,
@@ -253,12 +245,11 @@ async function insertRunBundleProjection(args: {
         size_bytes,
         submitted_at_utc,
         created_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
   )
     .bind(
       args.bundleId,
-      LegacyInstallationId,
       args.persistedPlayerAccountId,
       args.runId,
       args.payloadHash,
@@ -286,7 +277,6 @@ async function upsertRunProjection(args: {
     `
       INSERT INTO runs (
         run_id,
-        installation_id,
         player_account_id,
         bundle_id,
         status,
@@ -304,9 +294,8 @@ async function upsertRunProjection(args: {
         final_player_rating,
         final_player_position,
         updated_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(run_id) DO UPDATE SET
-        installation_id = excluded.installation_id,
         player_account_id = excluded.player_account_id,
         bundle_id = excluded.bundle_id,
         status = excluded.status,
@@ -328,7 +317,6 @@ async function upsertRunProjection(args: {
   )
     .bind(
       args.runId,
-      LegacyInstallationId,
       args.persistedPlayerAccountId,
       args.bundleId,
       args.runStatus,
@@ -368,7 +356,6 @@ async function upsertBattleProjections(args: {
           INSERT INTO battles (
             battle_id,
             run_id,
-            installation_id,
             player_account_id,
             bundle_id,
             recorded_at_utc,
@@ -389,10 +376,9 @@ async function upsertBattleProjections(args: {
             replay_available,
             is_bundle_final_battle,
             updated_at_utc
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(battle_id) DO UPDATE SET
             run_id = excluded.run_id,
-            installation_id = excluded.installation_id,
             player_account_id = excluded.player_account_id,
             bundle_id = excluded.bundle_id,
             recorded_at_utc = excluded.recorded_at_utc,
@@ -417,7 +403,6 @@ async function upsertBattleProjections(args: {
       ).bind(
         optionalTrimmedString(battle.battle_id),
         args.runId,
-        LegacyInstallationId,
         args.persistedPlayerAccountId,
         args.bundleId,
         optionalTrimmedString(battle.recorded_at_utc),
@@ -444,6 +429,33 @@ async function upsertBattleProjections(args: {
   if (battleStatements.length > 0) {
     await args.env.DB.batch(battleStatements);
   }
+}
+
+async function rememberUploader(
+  env: Env,
+  uploaderPlayerAccountId: string,
+  nowUtc: string,
+): Promise<void> {
+  if (
+    !uploaderPlayerAccountId ||
+    uploaderPlayerAccountId === AnonymousPlayerAccountId
+  ) {
+    return;
+  }
+
+  await env.DB.prepare(
+    `
+      INSERT INTO seen_player_accounts (
+        player_account_id,
+        first_seen_at_utc,
+        last_seen_at_utc
+      ) VALUES (?, ?, ?)
+      ON CONFLICT(player_account_id) DO UPDATE SET
+        last_seen_at_utc = excluded.last_seen_at_utc
+    `,
+  )
+    .bind(uploaderPlayerAccountId, nowUtc, nowUtc)
+    .run();
 }
 
 export async function handleUploadRunBundle(
@@ -554,6 +566,8 @@ export async function handleUploadRunBundle(
     finalBattleId: battleValidation.finalBattleId,
     createdAtUtc,
   });
+
+  await rememberUploader(env, persistedPlayerAccountId, createdAtUtc);
 
   return json({ status: "accepted", bundle_id: bundleId, object_key: objectKey });
 }
