@@ -32,7 +32,6 @@ public class Plugin : BaseUnityPlugin
     private readonly Harmony _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
     private BppComposition? _composition;
     private ModOnlineClient? _onlineClient;
-    private AuthStore? _authStore;
     private PlayerObservationStore? _playerObservationStore;
     private bool _patchesApplied;
 
@@ -119,7 +118,8 @@ public class Plugin : BaseUnityPlugin
             return;
         }
 
-        _authStore = new AuthStore(identityDirectoryPath);
+        DeleteLegacyAuthFile(identityDirectoryPath);
+
         _playerObservationStore = new PlayerObservationStore(identityDirectoryPath);
 
         var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
@@ -135,6 +135,23 @@ public class Plugin : BaseUnityPlugin
         };
         _onlineClient = new ModOnlineClient(httpClient, routes);
         BppLog.Info("Plugin", "Identity JSON store and online client ready.");
+    }
+
+    private static void DeleteLegacyAuthFile(string identityDirectoryPath)
+    {
+        var legacyAuthPath = Path.Combine(identityDirectoryPath, "auth.v1.json");
+        if (!File.Exists(legacyAuthPath))
+            return;
+
+        try
+        {
+            File.Delete(legacyAuthPath);
+            BppLog.Info("Plugin", "Removed legacy auth.v1.json from identity directory.");
+        }
+        catch (Exception ex)
+        {
+            BppLog.Info("Plugin", $"Could not delete legacy auth.v1.json: {ex.Message}");
+        }
     }
 
     private void ApplyHarmonyPatches()
@@ -180,16 +197,16 @@ public class Plugin : BaseUnityPlugin
     private void AddConfiguredPlayerObservationController()
     {
         var controller = gameObject.AddComponent<PlayerObservationController>();
-        if (_playerObservationStore == null || _authStore == null || _onlineClient == null)
+        if (_playerObservationStore == null)
         {
             BppLog.Warn(
                 "Plugin",
-                "Skipping PlayerObservationController configuration; identity services unavailable."
+                "Skipping PlayerObservationController configuration; observation store unavailable."
             );
             return;
         }
 
-        controller.Configure(_playerObservationStore, _authStore, _onlineClient);
+        controller.Configure(_playerObservationStore);
     }
 
     private void AddConfiguredHistoryPanel(
@@ -207,17 +224,17 @@ public class Plugin : BaseUnityPlugin
             () => combatReplayRuntime
         );
 
-        if (_onlineClient == null || _authStore == null)
+        if (_onlineClient == null)
         {
             BppLog.Warn(
                 "Plugin",
-                "Skipping HistoryPanel online wiring; identity services unavailable."
+                "Skipping HistoryPanel online wiring; online client unavailable."
             );
             return;
         }
 
         historyPanel.Configure(
-            HistoryPanelFactory.Create(historyPanelRuntime, _onlineClient, _authStore)
+            HistoryPanelFactory.Create(historyPanelRuntime, _onlineClient)
         );
     }
 
@@ -243,7 +260,6 @@ public class Plugin : BaseUnityPlugin
     {
         _onlineClient?.Dispose();
         _onlineClient = null;
-        _authStore = null;
         _playerObservationStore = null;
     }
 
