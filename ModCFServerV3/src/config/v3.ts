@@ -25,13 +25,3 @@ export function getGhostQueryLookbackDays(env: Env): number {
 export function getRunBundleRetentionDays(env: Env): number {
   return requireNonNegativeInteger(env, "RUN_BUNDLE_RETENTION_DAYS");
 }
-
-export function allowUnauthenticatedReplayDownloads(env: Env): boolean {
-  const raw = env.ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS?.trim().toLowerCase();
-  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
-}
-
-export function allowUnauthenticatedReplayLinks(env: Env): boolean {
-  const raw = env.ALLOW_UNAUTHENTICATED_REPLAY_LINKS?.trim().toLowerCase();
-  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
-}

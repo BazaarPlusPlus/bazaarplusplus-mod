@@ -21,8 +21,6 @@ export default defineConfig({
         bindings: {
           TEST_MIGRATIONS: await readD1Migrations(migrationsPath),
           REPLAY_DOWNLOAD_SECRET: "test-replay-download-secret",
-          ALLOW_UNAUTHENTICATED_REPLAY_LINKS: "false",
-          ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS: "false",
           GHOST_QUERY_LOOKBACK_DAYS: "3",
           RUN_BUNDLE_RETENTION_DAYS: "5",
         },

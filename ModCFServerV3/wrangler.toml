@@ -6,10 +6,6 @@ workers_dev = false
 [vars]
 GHOST_QUERY_LOOKBACK_DAYS = "5"
 RUN_BUNDLE_RETENTION_DAYS = "5"
-# Early rollout default: keep replay-link minting and replay downloads aligned.
-# When tightening auth later, switch both flags to "false" together.
-ALLOW_UNAUTHENTICATED_REPLAY_LINKS = "true"
-ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS = "true"
 
 [observability]
 enabled = true

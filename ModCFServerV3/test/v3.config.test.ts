@@ -10,8 +10,6 @@ function buildConfigEnv(overrides: Partial<Env> = {}): Env {
     REPLAY_DOWNLOAD_SECRET: "test-replay-download-secret",
     GHOST_QUERY_LOOKBACK_DAYS: "3",
     RUN_BUNDLE_RETENTION_DAYS: "5",
-    ALLOW_UNAUTHENTICATED_REPLAY_LINKS: "false",
-    ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS: "false",
     ...overrides,
   };
 }
