@@ -43,7 +43,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## 数据与网络行为
 
-- run logging、战斗回放和终局截图会在本地保存 SQLite 数据、replay payload 与截图文件；线上身份令牌使用 `BazaarPlusPlus/Identity/` 下的 JSON 文件。
+- run logging、战斗回放和终局截图会在本地保存 SQLite 数据、replay payload 与截图文件；玩家观察数据写到 `BazaarPlusPlus/Identity/observation.v1.json`，云同步本身不携带任何鉴权凭证。
 - 后台上传会在非 live run 状态下执行上传扫描。
 - `ModCFServerV3/` 目录包含当前上传、ghost battles、replay 下载相关的 Cloudflare Worker 后端实现。
 

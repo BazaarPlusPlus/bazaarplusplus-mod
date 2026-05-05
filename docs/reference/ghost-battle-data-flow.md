@@ -40,7 +40,7 @@ The server inserts rows into the `battles` table with no perspective rewriting:
 ```
 INSERT INTO battles (
   ...
-  player_account_id,             -- uploader (auth context)
+  player_account_id,             -- uploader (from request body)
   player_account_id_in_payload,  -- uploader (from recorded payload)
   player_name, player_hero, player_rank, player_rating, player_level,
   opponent_account_id,           -- whoever the uploader fought
@@ -65,7 +65,7 @@ File: [`ModCFServerV3/src/features/v3/queryGhostBattles.ts`](../../ModCFServerV3
 in the `opponent` slot of somebody else's upload**:
 
 ```sql
-WHERE b.opponent_account_id = ?   -- bound to auth.playerAccountId (= me)
+WHERE b.opponent_account_id = ?   -- bound to ?player_account_id query param (= me)
   AND b.recorded_at_utc >= ?       -- lookback window
 ORDER BY b.recorded_at_utc DESC, b.battle_id DESC
 LIMIT ?

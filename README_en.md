@@ -43,7 +43,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## Data And Network Behavior
 
-- Run logging, combat replay, and end-of-run screenshots store local SQLite data, replay payloads, and screenshot files; online identity tokens use JSON files under `BazaarPlusPlus/Identity/`.
+- Run logging, combat replay, and end-of-run screenshots store local SQLite data, replay payloads, and screenshot files; player observation data is written to `BazaarPlusPlus/Identity/observation.v1.json`. Cloud sync itself carries no authentication credentials.
 - Background upload only scans for uploads while the client is outside a live run.
 - The `ModCFServerV3/` directory contains the current Cloudflare Worker backend used for uploads, ghost battles, and replay download links.
 

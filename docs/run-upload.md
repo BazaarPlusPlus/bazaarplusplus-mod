@@ -37,7 +37,7 @@
 ## Notes
 
 - 身份目录是 `<GameRoot>/BazaarPlusPlus/Identity/`。
-- 当前身份文件是 `auth.v1.json` 和 `observation.v1.json`；旧 `identity.db`、`identity.db-wal`、`identity.db-shm` 会被当前 JSON store 清理。
+- 当前只写 `observation.v1.json`；旧 `auth.v1.json` 与 `identity.db`、`identity.db-wal`、`identity.db-shm` 会在 mod 启动时被一次性清理。
 - ghost 查询与 replay-link 现在是：
   - `GET /ghost-battles`
   - `POST /ghost-battles/:battleId/replay-link`
