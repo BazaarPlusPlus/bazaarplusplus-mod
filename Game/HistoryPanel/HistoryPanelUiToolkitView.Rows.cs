@@ -240,6 +240,26 @@ internal sealed partial class HistoryPanelUiToolkitView
         );
         opponentSummaryChip.style.marginRight = 0f;
         opponentSummaryChip.style.marginLeft = 8f;
+
+        var eliminatedChip = CreateInlinePill(opponentRow, 0f);
+        eliminatedChip.style.marginLeft = 10f;
+        eliminatedChip.style.marginRight = 0f;
+        eliminatedChip.style.paddingLeft = 10f;
+        eliminatedChip.style.paddingRight = 10f;
+        eliminatedChip.style.fontSize = 11;
+        eliminatedChip.style.color = new Color(0.99f, 0.90f, 0.68f, 1f);
+        eliminatedChip.style.backgroundColor = new Color(0.32f, 0.24f, 0.10f, 0.96f);
+        eliminatedChip.style.borderTopWidth = 1f;
+        eliminatedChip.style.borderRightWidth = 1f;
+        eliminatedChip.style.borderBottomWidth = 1f;
+        eliminatedChip.style.borderLeftWidth = 1f;
+        var eliminatedBorder = new Color(0.94f, 0.70f, 0.28f, 0.55f);
+        eliminatedChip.style.borderTopColor = eliminatedBorder;
+        eliminatedChip.style.borderRightColor = eliminatedBorder;
+        eliminatedChip.style.borderBottomColor = eliminatedBorder;
+        eliminatedChip.style.borderLeftColor = eliminatedBorder;
+        eliminatedChip.style.display = DisplayStyle.None;
+
         var opponentName = CreateInlineText(opponentRow, 12, new Color(0.76f, 0.80f, 0.87f, 0.92f));
         opponentName.style.marginLeft = 10f;
         opponentName.style.flexGrow = 1f;
@@ -254,6 +274,7 @@ internal sealed partial class HistoryPanelUiToolkitView
             playerSummaryChip,
             opponentHeroPill,
             opponentSummaryChip,
+            eliminatedChip,
             opponentName
         );
         row.userData = refs;
@@ -487,6 +508,7 @@ internal sealed partial class HistoryPanelUiToolkitView
             Label playerSummaryChip,
             Label opponentHeroPill,
             Label opponentSummaryChip,
+            Label eliminatedChip,
             Label opponentName
         )
         {
@@ -498,6 +520,7 @@ internal sealed partial class HistoryPanelUiToolkitView
             PlayerSummaryChip = playerSummaryChip;
             OpponentHeroPill = opponentHeroPill;
             OpponentSummaryChip = opponentSummaryChip;
+            EliminatedChip = eliminatedChip;
             OpponentName = opponentName;
             Index = -1;
         }
@@ -517,6 +540,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         public Label OpponentHeroPill { get; }
 
         public Label OpponentSummaryChip { get; }
+
+        public Label EliminatedChip { get; }
 
         public Label OpponentName { get; }
 
