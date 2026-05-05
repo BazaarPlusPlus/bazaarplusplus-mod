@@ -5,7 +5,7 @@ import worker from "../src/index";
 import { sha256Base64, toBase64UrlSegment } from "./helpers/crypto";
 import {
   countRows,
-  insertV3User,
+  insertSeenPlayerAccount,
   resetTestState,
   selectFirst,
 } from "./helpers/seed";
@@ -31,12 +31,10 @@ async function listObjectKeys(): Promise<string[]> {
 }
 
 async function registerPlayer(playerAccountId: string): Promise<void> {
-  await insertV3User(env.DB, {
+  await insertSeenPlayerAccount(env.DB, {
     playerAccountId,
-    playerUsername: `${playerAccountId}-username`,
-    passwordHash: "hash",
-    createdAtUtc: "2026-04-10T00:00:00.000Z",
-    updatedAtUtc: "2026-04-10T00:00:00.000Z",
+    firstSeenAtUtc: "2026-04-10T00:00:00.000Z",
+    lastSeenAtUtc: "2026-04-10T00:00:00.000Z",
   });
 }
 
@@ -124,22 +122,11 @@ test("run bundle upload stores one artifact object and projection rows", async (
   expect(await countRows(env.DB, "battles")).toBe(2);
 
   const bundle = await selectFirst<{
-    installation_id: string;
     object_key: string;
   }>(
     env.DB,
-    "SELECT installation_id, object_key FROM run_bundles WHERE run_id = ?",
+    "SELECT object_key FROM run_bundles WHERE run_id = ?",
     "run-001",
-  );
-  const run = await selectFirst<{ installation_id: string }>(
-    env.DB,
-    "SELECT installation_id FROM runs WHERE run_id = ?",
-    "run-001",
-  );
-  const battle = await selectFirst<{ installation_id: string }>(
-    env.DB,
-    "SELECT installation_id FROM battles WHERE battle_id = ?",
-    "battle-001",
   );
   const battleFlags = await env.DB.prepare(
     `
@@ -149,9 +136,6 @@ test("run bundle upload stores one artifact object and projection rows", async (
       ORDER BY battle_id ASC
     `,
   ).all<{ battle_id: string; is_bundle_final_battle: number }>();
-  expect(bundle?.installation_id).toBe("legacy");
-  expect(run?.installation_id).toBe("legacy");
-  expect(battle?.installation_id).toBe("legacy");
   expect(battleFlags.results).toEqual([
     { battle_id: "battle-001", is_bundle_final_battle: 0 },
     { battle_id: "battle-002", is_bundle_final_battle: 1 },
@@ -159,6 +143,22 @@ test("run bundle upload stores one artifact object and projection rows", async (
   expect(bundle?.object_key).toBe(
     `run-bundles/player-account-001/run-001/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );
+
+  const seen = await selectFirst<{
+    player_account_id: string;
+    first_seen_at_utc: string;
+    last_seen_at_utc: string;
+  }>(
+    env.DB,
+    `
+      SELECT player_account_id, first_seen_at_utc, last_seen_at_utc
+      FROM seen_player_accounts
+      WHERE player_account_id = ?
+    `,
+    "player-account-001",
+  );
+  expect(seen?.player_account_id).toBe("player-account-001");
+  expect(seen?.first_seen_at_utc).toBe(seen?.last_seen_at_utc);
 });
 
 test("run bundle upload accepts requests without Authorization header", async () => {
@@ -262,29 +262,22 @@ test("run bundle upload accepts requests without player account id", async () =>
   expect(response.status).toBe(200);
   const bundle = await selectFirst<{
     player_account_id: string;
-    installation_id: string;
     object_key: string;
   }>(
     env.DB,
     `
-      SELECT player_account_id, installation_id, object_key
+      SELECT player_account_id, object_key
       FROM run_bundles
       WHERE run_id = ?
     `,
     "run-no-player-account",
   );
-  const run = await selectFirst<{ installation_id: string }>(
-    env.DB,
-    "SELECT installation_id FROM runs WHERE run_id = ?",
-    "run-no-player-account",
-  );
   expect(bundle?.player_account_id).toBe("anonymous-player");
-  expect(bundle?.installation_id).toBe("legacy");
-  expect(run?.installation_id).toBe("legacy");
   expect(await countRows(env.DB, "battles")).toBe(0);
   expect(bundle?.object_key).toBe(
     `run-bundles/anonymous-player/run-no-player-account/${toBase64UrlSegment(payloadHash)}.mpack.gz`,
   );
+  expect(await countRows(env.DB, "seen_player_accounts")).toBe(0);
 });
 
 test("run bundle upload rejects mismatched battle run ids", async () => {
@@ -498,22 +491,17 @@ test("run bundle upload accepts duplicate payload retries idempotently", async (
   expect(await countRows(env.DB, "runs")).toBe(1);
   expect(await countRows(env.DB, "battles")).toBe(1);
 
-  const bundle = await selectFirst<{ installation_id: string }>(
-    env.DB,
-    "SELECT installation_id FROM run_bundles WHERE bundle_id = ?",
-    firstJson.bundle_id,
-  );
-  const run = await selectFirst<{ installation_id: string }>(
-    env.DB,
-    "SELECT installation_id FROM runs WHERE run_id = ?",
-    "run-dup",
-  );
-  const battle = await selectFirst<{ installation_id: string }>(
-    env.DB,
-    "SELECT installation_id FROM battles WHERE battle_id = ?",
-    "battle-dup",
-  );
-  expect(bundle?.installation_id).toBe("legacy");
-  expect(run?.installation_id).toBe("legacy");
-  expect(battle?.installation_id).toBe("legacy");
+  const seenRows = await env.DB.prepare(
+    `SELECT player_account_id, first_seen_at_utc, last_seen_at_utc FROM seen_player_accounts`,
+  ).all<{
+    player_account_id: string;
+    first_seen_at_utc: string;
+    last_seen_at_utc: string;
+  }>();
+  expect(seenRows.results.length).toBe(1);
+  expect(seenRows.results[0]!.player_account_id).toBe("player-account-001");
+  expect(
+    Date.parse(seenRows.results[0]!.last_seen_at_utc) >=
+      Date.parse(seenRows.results[0]!.first_seen_at_utc),
+  ).toBe(true);
 });
