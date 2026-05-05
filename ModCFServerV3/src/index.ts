@@ -1,9 +1,6 @@
 import type { Env } from "./env";
-import { handleActivate } from "./features/v3/activate";
 import { handleCreateReplayLink } from "./features/v3/createReplayLink";
 import { handleDownloadReplay } from "./features/v3/downloadReplay";
-import { handleLogin } from "./features/v3/login";
-import { handleLogout } from "./features/v3/logout";
 import { handleQueryGhostBattles } from "./features/v3/queryGhostBattles";
 import { handleUploadRunBundle } from "./features/v3/uploadRunBundle";
 import { preflight, withCors } from "./http/cors";
@@ -16,36 +13,9 @@ type StaticRoute = {
 };
 
 const StaticRoutes: StaticRoute[] = [
-  {
-    method: "GET",
-    path: "/health",
-    handle: () => json({ ok: true }),
-  },
-  {
-    method: "POST",
-    path: "/activate",
-    handle: handleActivate,
-  },
-  {
-    method: "POST",
-    path: "/login",
-    handle: handleLogin,
-  },
-  {
-    method: "POST",
-    path: "/logout",
-    handle: handleLogout,
-  },
-  {
-    method: "POST",
-    path: "/run-bundles",
-    handle: handleUploadRunBundle,
-  },
-  {
-    method: "GET",
-    path: "/ghost-battles",
-    handle: handleQueryGhostBattles,
-  },
+  { method: "GET", path: "/health", handle: () => json({ ok: true }) },
+  { method: "POST", path: "/run-bundles", handle: handleUploadRunBundle },
+  { method: "GET", path: "/ghost-battles", handle: handleQueryGhostBattles },
 ];
 
 function findStaticRoute(method: string, path: string): StaticRoute | undefined {
