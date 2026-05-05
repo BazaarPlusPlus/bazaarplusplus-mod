@@ -20,12 +20,7 @@ internal static class IdentityJsonFileStore
             Formatting = Formatting.None,
         };
 
-    internal static string AuthFileName => "auth.v1.json";
-
     internal static string ObservationFileName => "observation.v1.json";
-
-    internal static string AuthPath(string identityDirectoryPath) =>
-        Path.Combine(identityDirectoryPath, AuthFileName);
 
     internal static string ObservationPath(string identityDirectoryPath) =>
         Path.Combine(identityDirectoryPath, ObservationFileName);
@@ -78,7 +73,7 @@ internal static class IdentityJsonFileStore
         }
         catch
         {
-            // Legacy cleanup must not break the current JSON auth path.
+            // Legacy cleanup must not break the current JSON observation path.
         }
     }
 
