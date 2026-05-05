@@ -3,11 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
-using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.MonsterPreview;
-using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -15,18 +12,14 @@ internal sealed class HistoryPanelDataService
 {
     private readonly HistoryPanelRepository? _repository;
     private readonly GhostBattleSyncService? _ghostSyncService;
-    private readonly Func<string?> _currentPlayerAccountIdAccessor;
 
     public HistoryPanelDataService(
         HistoryPanelRepository? repository,
-        GhostBattleSyncService? ghostSyncService = null,
-        Func<string?>? currentPlayerAccountIdAccessor = null
+        GhostBattleSyncService? ghostSyncService = null
     )
     {
         _repository = repository;
         _ghostSyncService = ghostSyncService;
-        _currentPlayerAccountIdAccessor =
-            currentPlayerAccountIdAccessor ?? PlayerAccountIdResolver.ResolveCurrent;
     }
 
     public bool IsAvailable => _repository != null;
@@ -140,14 +133,7 @@ internal sealed class HistoryPanelDataService
 
         try
         {
-            var localPlayerAccountId = _currentPlayerAccountIdAccessor();
-            if (string.IsNullOrWhiteSpace(localPlayerAccountId))
-            {
-                statusMessage = HistoryPanelText.CurrentPlayerAccountUnavailable();
-                return false;
-            }
-
-            battles = _repository.ListRecentGhostBattles(localPlayerAccountId, limit);
+            battles = _repository.ListRecentGhostBattles(limit);
             statusMessage = HistoryPanelText.LoadedGhostBattles(battles.Count);
             return true;
         }

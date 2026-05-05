@@ -153,11 +153,15 @@ try
     )!;
     var markGhostReplayDownloaded = repositoryType.GetMethod(
         "MarkGhostReplayDownloaded",
-        [typeof(string), typeof(string)]
+        [typeof(string)]
     )!;
     var listRecentGhostBattles = repositoryType.GetMethod(
         "ListRecentGhostBattles",
-        [typeof(string), typeof(int)]
+        [typeof(int)]
+    )!;
+    var markOldUndownloadedGhostBattlesDeleted = repositoryType.GetMethod(
+        "MarkOldUndownloadedGhostBattlesDeleted",
+        [typeof(DateTimeOffset)]
     )!;
     var getGhostSyncCheckpoint = repositoryType.GetMethod(
         "TryGetGhostSyncCheckpointUtc",
@@ -193,7 +197,7 @@ try
             CreateGhostImports(ghostImportType, "ghost-1", nowUtc.AddHours(-2).ToString("o")),
         ]
     );
-    markGhostReplayDownloaded.Invoke(repository, ["player-account-a", "ghost-1"]);
+    markGhostReplayDownloaded.Invoke(repository, ["ghost-1"]);
 
     replaceGhostBattles.Invoke(
         repository,
@@ -210,8 +214,7 @@ try
     );
 
     var ghostRecords = (
-        (System.Collections.IEnumerable)
-            listRecentGhostBattles.Invoke(repository, ["player-account-a", 10])!
+        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!
     )
         .Cast<object>()
         .ToList();
@@ -242,8 +245,7 @@ try
         ]
     );
     ghostRecords = (
-        (System.Collections.IEnumerable)
-            listRecentGhostBattles.Invoke(repository, ["player-account-a", 10])!
+        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!
     )
         .Cast<object>()
         .ToList();
@@ -268,20 +270,23 @@ try
             CreateGhostImports(ghostImportType, "ghost-3", nowUtc.AddMinutes(-15).ToString("o")),
         ]
     );
-    var playerBGhostRecords = (
-        (System.Collections.IEnumerable)
-            listRecentGhostBattles.Invoke(repository, ["player-account-b", 10])!
+    var crossAccountGhostRecords = (
+        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!
     )
         .Cast<object>()
         .ToList();
     Assert(
-        playerBGhostRecords.Count == 1
-            && (string)
-                playerBGhostRecords[0]
-                    .GetType()
-                    .GetProperty("BattleId")!
-                    .GetValue(playerBGhostRecords[0])! == "ghost-3",
-        "Ghost battle rows should be isolated per local player account."
+        crossAccountGhostRecords.Count == 3
+            && crossAccountGhostRecords.Any(record =>
+                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
+            )
+            && crossAccountGhostRecords.Any(record =>
+                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-2"
+            )
+            && crossAccountGhostRecords.Any(record =>
+                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-3"
+            ),
+        "Ghost battle rows should be visible across local player account scopes."
     );
 
     replaceGhostBattles.Invoke(
@@ -297,13 +302,10 @@ try
             ),
         ]
     );
-    markGhostReplayDownloaded.Invoke(repository, ["player-account-a", "ghost-stale-downloaded"]);
-    repositoryType
-        .GetMethod("MarkOldUndownloadedGhostBattlesDeleted")!
-        .Invoke(repository, ["player-account-a", nowUtc]);
+    markGhostReplayDownloaded.Invoke(repository, ["ghost-stale-downloaded"]);
+    markOldUndownloadedGhostBattlesDeleted.Invoke(repository, [nowUtc]);
     ghostRecords = (
-        (System.Collections.IEnumerable)
-            listRecentGhostBattles.Invoke(repository, ["player-account-a", 20])!
+        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [20])!
     )
         .Cast<object>()
         .ToList();

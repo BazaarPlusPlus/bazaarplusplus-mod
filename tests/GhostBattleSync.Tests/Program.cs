@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleSyncService");
 var apiClientType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleApiClient");
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
+var dataServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelDataService");
 var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleRecord");
 var formatterType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelFormatter");
 var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
@@ -503,7 +504,7 @@ try
             repositoryType,
             repository,
             "ListRecentGhostBattles",
-            ["local-account-001", 20]
+            [20]
         );
     var projectedBattles = ghostBattles.Cast<object>().ToList();
     var projectedBattle =
@@ -560,6 +561,66 @@ try
     Assert(
         Equals(resolvedOutcome, lostOutcome),
         "Ghost battle filtering should use the projected local-player outcome."
+    );
+
+    var serviceScopedImportRecords = Array.CreateInstance(importRecordType, 1);
+    var serviceScopedImportRecord =
+        tryParseBattle!.Invoke(
+            null,
+            [
+                JObject.Parse(
+                    $$"""
+                    {
+                      "battle_id": "ghost-battle-bearer-scope",
+                      "recorded_at_utc": "{{DateTimeOffset.UtcNow.AddMinutes(-3).ToString("o")}}",
+                      "day": 11,
+                      "player_name": "RemoteBearerScope",
+                      "player_account_id": "remote-account-bearer-scope",
+                      "player_hero": "Mak",
+                      "opponent_name": "LocalBearerScope",
+                      "opponent_account_id": "bearer-account-001",
+                      "opponent_hero": "Pygmalien",
+                      "combat_kind": "PVPCombat",
+                      "result": "Lost",
+                      "winner_combatant_id": "Opponent",
+                      "loser_combatant_id": "Player",
+                      "replay": {
+                        "available": true
+                      }
+                    }
+                    """
+                ),
+            ]
+        ) ?? throw new InvalidOperationException("TryParseBattle should return bearer-scoped data.");
+    serviceScopedImportRecords.SetValue(serviceScopedImportRecord, 0);
+    InvokeVoid(
+        repositoryType,
+        repository,
+        "UpsertGhostBattles",
+        ["bearer-account-001", serviceScopedImportRecords]
+    );
+
+    var dataService =
+        Activator.CreateInstance(
+            dataServiceType,
+            repository,
+            null
+        ) ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
+    var loadGhostArgs = new object?[] { 100, null, null, null };
+    var loadGhostSucceeded = (bool)
+        dataServiceType.GetMethod("TryLoadGhostBattles")!.Invoke(dataService, loadGhostArgs)!;
+    var loadedServiceScopedBattles = ((IEnumerable)loadGhostArgs[1]!).Cast<object>().ToList();
+    Assert(loadGhostSucceeded, "Ghost battle load should not require a current account.");
+    Assert(
+        loadedServiceScopedBattles.Any(battle =>
+            (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
+            == "ghost-battle-bearer-scope"
+        )
+            && loadedServiceScopedBattles.Any(battle =>
+                (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
+                == "ghost-battle-001"
+            ),
+        "Ghost battle loads should include locally cached rows from every account scope."
     );
 }
 finally

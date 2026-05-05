@@ -257,15 +257,12 @@ internal sealed partial class HistoryPanelRepository
         return records;
     }
 
-    public IReadOnlyList<HistoryBattleRecord> ListRecentGhostBattles(
-        string localPlayerAccountId,
-        int limit
-    )
+    public IReadOnlyList<HistoryBattleRecord> ListRecentGhostBattles(int limit)
     {
-        if (!DatabaseExists || string.IsNullOrWhiteSpace(localPlayerAccountId))
+        if (!DatabaseExists)
             return Array.Empty<HistoryBattleRecord>();
 
-        MarkOldUndownloadedGhostBattlesDeleted(localPlayerAccountId, DateTimeOffset.UtcNow);
+        MarkOldUndownloadedGhostBattlesDeleted(DateTimeOffset.UtcNow);
 
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
@@ -299,12 +296,10 @@ internal sealed partial class HistoryPanelRepository
                 replay_downloaded
             FROM {RunLogSqliteSchema.BattlesTableName}
             WHERE source = 'GHOST'
-              AND local_player_account_id = $localPlayerAccountId
               AND deleted_at_utc IS NULL
             ORDER BY recorded_at_utc DESC, battle_id DESC
             LIMIT $limit;
             """;
-        command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
         command.Parameters.AddWithValue("$limit", limit);
 
         using var reader = command.ExecuteReader();
@@ -565,14 +560,8 @@ internal sealed partial class HistoryPanelRepository
         transaction.Commit();
     }
 
-    public void MarkOldUndownloadedGhostBattlesDeleted(
-        string localPlayerAccountId,
-        DateTimeOffset nowUtc
-    )
+    public void MarkOldUndownloadedGhostBattlesDeleted(DateTimeOffset nowUtc)
     {
-        if (string.IsNullOrWhiteSpace(localPlayerAccountId))
-            return;
-
         using var connection = OpenConnection(ensureSchema: true);
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
@@ -580,12 +569,10 @@ internal sealed partial class HistoryPanelRepository
             UPDATE {RunLogSqliteSchema.BattlesTableName}
             SET deleted_at_utc = COALESCE(deleted_at_utc, $deletedAtUtc)
             WHERE source = 'GHOST'
-              AND local_player_account_id = $localPlayerAccountId
               AND replay_downloaded = 0
               AND deleted_at_utc IS NULL
               AND recorded_at_utc < $staleCutoffUtc;
             """;
-        command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
         command.Parameters.AddWithValue("$deletedAtUtc", nowUtc.ToString("o"));
         command.Parameters.AddWithValue(
             "$staleCutoffUtc",
@@ -643,9 +630,9 @@ internal sealed partial class HistoryPanelRepository
         command.ExecuteNonQuery();
     }
 
-    public void MarkGhostReplayDownloaded(string localPlayerAccountId, string battleId)
+    public void MarkGhostReplayDownloaded(string battleId)
     {
-        if (string.IsNullOrWhiteSpace(localPlayerAccountId) || string.IsNullOrWhiteSpace(battleId))
+        if (string.IsNullOrWhiteSpace(battleId))
             return;
 
         using var connection = OpenConnection(ensureSchema: true);
@@ -655,10 +642,8 @@ internal sealed partial class HistoryPanelRepository
             UPDATE {RunLogSqliteSchema.BattlesTableName}
             SET replay_downloaded = 1
             WHERE source = 'GHOST'
-              AND local_player_account_id = $localPlayerAccountId
               AND battle_id = $battleId;
             """;
-        command.Parameters.AddWithValue("$localPlayerAccountId", localPlayerAccountId);
         command.Parameters.AddWithValue("$battleId", battleId);
         command.ExecuteNonQuery();
     }
