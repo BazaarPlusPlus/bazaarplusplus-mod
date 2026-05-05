@@ -697,7 +697,7 @@ Assert(
     var replayLinkTask = (Task)(
         requestReplayDownloadLinkAsync!.Invoke(
             replayLinkClient,
-            ["battle-public", "bearer-token-xyz", CancellationToken.None]
+            ["battle-public", CancellationToken.None]
         ) ?? throw new InvalidOperationException("Replay-link request should return a task.")
     );
     await replayLinkTask;
@@ -707,47 +707,16 @@ Assert(
     var replayLinkResultType = replayLinkResult.GetType();
     Assert(
         (bool)(replayLinkResultType.GetProperty("Succeeded")?.GetValue(replayLinkResult) ?? false),
-        "GhostBattleApiClient replay-link request should succeed on 200 with a bearer token."
+        "GhostBattleApiClient replay-link request should succeed on 200."
     );
     Assert(replayLinkRequest != null, "Replay-link request should reach the HTTP transport.");
     Assert(
         !replayLinkRequest!.Headers.Contains("X-BPP-Installation-Id"),
-        "Bearer-based replay-link requests should not send installation headers."
+        "Replay-link requests should not send installation headers."
     );
     Assert(
-        replayLinkRequest.Headers.Authorization != null
-            && replayLinkRequest.Headers.Authorization.Scheme == "Bearer"
-            && replayLinkRequest.Headers.Authorization.Parameter == "bearer-token-xyz",
-        "Replay-link requests should send the bearer token via the Authorization header."
-    );
-
-    HttpRequestMessage? emptyTokenRequest = null;
-    var emptyTokenHandler = new RecordingHttpMessageHandler(request =>
-    {
-        emptyTokenRequest = request;
-        return new HttpResponseMessage(HttpStatusCode.Unauthorized)
-        {
-            Content = new StringContent("{\"error\":\"unauthorized\"}"),
-        };
-    });
-    using var emptyTokenHttpClient = new HttpClient(emptyTokenHandler);
-    var emptyTokenClient =
-        Activator.CreateInstance(apiClientType, emptyTokenHttpClient, routes)
-        ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
-    var emptyTokenTask = (Task)(
-        requestReplayDownloadLinkAsync!.Invoke(
-            emptyTokenClient,
-            ["battle-public", string.Empty, CancellationToken.None]
-        ) ?? throw new InvalidOperationException("Replay-link request should return a task.")
-    );
-    await emptyTokenTask;
-    Assert(
-        emptyTokenRequest != null,
-        "Replay-link request with empty bearer should still reach the transport."
-    );
-    Assert(
-        emptyTokenRequest!.Headers.Authorization == null,
-        "Replay-link requests should omit the Authorization header when no bearer token is supplied."
+        replayLinkRequest.Headers.Authorization == null,
+        "Replay-link requests should not send an Authorization header after auth removal."
     );
 
     HttpRequestMessage? replayPayloadRequest = null;
@@ -777,7 +746,6 @@ Assert(
             [
                 "battle-001",
                 "https://mod-api-v3.bazaarplusplus.com/replays/token-public",
-                "bearer-token-xyz",
                 CancellationToken.None,
             ]
         ) ?? throw new InvalidOperationException("Replay-payload request should return a task.")
@@ -791,18 +759,16 @@ Assert(
         (bool)(
             replayPayloadResultType.GetProperty("Succeeded")?.GetValue(replayPayloadResult) ?? false
         ),
-        "GhostBattleApiClient replay-payload request should succeed on 200 with a bearer token."
+        "GhostBattleApiClient replay-payload request should succeed on 200."
     );
     Assert(replayPayloadRequest != null, "Replay-payload request should reach the HTTP transport.");
     Assert(
         !replayPayloadRequest!.Headers.Contains("X-BPP-Installation-Id"),
-        "Bearer-based replay-payload requests should not send installation headers."
+        "Replay-payload requests should not send installation headers."
     );
     Assert(
-        replayPayloadRequest.Headers.Authorization != null
-            && replayPayloadRequest.Headers.Authorization.Scheme == "Bearer"
-            && replayPayloadRequest.Headers.Authorization.Parameter == "bearer-token-xyz",
-        "Replay-payload requests should send the bearer token via the Authorization header."
+        replayPayloadRequest.Headers.Authorization == null,
+        "Replay-payload requests should not send an Authorization header after auth removal."
     );
 }
 
