@@ -11,9 +11,6 @@ internal sealed class RunBundleUploadRequestV3
     [JsonProperty("schema_version")]
     public int SchemaVersion { get; set; }
 
-    [JsonProperty("installation_id")]
-    public string InstallationId { get; set; } = string.Empty;
-
     [JsonProperty("player_account_id")]
     public string PlayerAccountId { get; set; } = string.Empty;
 
