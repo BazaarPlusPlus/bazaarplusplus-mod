@@ -189,6 +189,13 @@ internal static class HistoryPanelText
         "打完這場戰鬥後，對手直接出局。"
     );
 
+    private static readonly LocalizedTextSet GhostOpponentEliminatedShortText = new(
+        "Knocked Out",
+        "对手出局",
+        "對手出局",
+        "對手出局"
+    );
+
     internal static string Title() => Resolve(TitleText);
 
     internal static string Subtitle() => Resolve(SubtitleText);
@@ -269,6 +276,9 @@ internal static class HistoryPanelText
 
     internal static string GhostOpponentEliminatedNotice() =>
         Resolve(GhostOpponentEliminatedNoticeText);
+
+    internal static string GhostOpponentEliminatedShort() =>
+        Resolve(GhostOpponentEliminatedShortText);
 
     internal static string CountGhost(int count) => FormatCount(count, GhostTab());
 
