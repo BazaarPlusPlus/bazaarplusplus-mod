@@ -1,28 +1,7 @@
 type SqlValue = string | number | null;
 
-export type InsertTokenArgs = {
-  token: string;
-  playerAccountId: string;
-  issuedAtUtc: string;
-  revokedAtUtc?: string | null;
-  lastUsedAtUtc?: string | null;
-};
-
-export type InsertV3UserArgs = {
-  playerAccountId: string;
-  playerUsername: string;
-  passwordHash: string;
-  streamPlatform?: string | null;
-  streamChannelId?: string | null;
-  streamUrl?: string | null;
-  createdAtUtc: string;
-  updatedAtUtc: string;
-  lastLoginAtUtc?: string | null;
-};
-
 export type InsertV3RunBundleArgs = {
   bundleId: string;
-  installationId: string;
   playerAccountId: string;
   runId: string;
   payloadHash: string;
@@ -37,7 +16,6 @@ export type InsertV3RunBundleArgs = {
 export type InsertV3BattleArgs = {
   battleId: string;
   runId: string;
-  installationId: string;
   playerAccountId: string;
   bundleId: string;
   recordedAtUtc: string;
@@ -70,70 +48,18 @@ export type InsertReplayTokenArgs = {
   revokedAtUtc?: string | null;
 };
 
+export type InsertSeenPlayerAccountArgs = {
+  playerAccountId: string;
+  firstSeenAtUtc: string;
+  lastSeenAtUtc: string;
+};
+
 function statement<T extends SqlValue[]>(
   db: D1Database,
   sql: string,
   values: T,
 ): D1PreparedStatement {
   return db.prepare(sql).bind(...values);
-}
-
-export async function insertToken(
-  db: D1Database,
-  args: InsertTokenArgs,
-): Promise<void> {
-  await statement(
-    db,
-    `
-      INSERT INTO tokens (
-        token,
-        player_account_id,
-        issued_at_utc,
-        revoked_at_utc,
-        last_used_at_utc
-      ) VALUES (?, ?, ?, ?, ?)
-    `,
-    [
-      args.token,
-      args.playerAccountId,
-      args.issuedAtUtc,
-      args.revokedAtUtc ?? null,
-      args.lastUsedAtUtc ?? null,
-    ],
-  ).run();
-}
-
-export async function insertV3User(
-  db: D1Database,
-  args: InsertV3UserArgs,
-): Promise<void> {
-  await statement(
-    db,
-    `
-      INSERT INTO users (
-        player_account_id,
-        player_username,
-        password_hash,
-        stream_platform,
-        stream_channel_id,
-        stream_url,
-        created_at_utc,
-        updated_at_utc,
-        last_login_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    [
-      args.playerAccountId,
-      args.playerUsername,
-      args.passwordHash,
-      args.streamPlatform ?? null,
-      args.streamChannelId ?? null,
-      args.streamUrl ?? null,
-      args.createdAtUtc,
-      args.updatedAtUtc,
-      args.lastLoginAtUtc ?? null,
-    ],
-  ).run();
 }
 
 export async function insertRunBundle(
@@ -145,7 +71,6 @@ export async function insertRunBundle(
     `
       INSERT INTO run_bundles (
         bundle_id,
-        installation_id,
         player_account_id,
         run_id,
         payload_hash,
@@ -155,11 +80,10 @@ export async function insertRunBundle(
         size_bytes,
         submitted_at_utc,
         created_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       args.bundleId,
-      args.installationId,
       args.playerAccountId,
       args.runId,
       args.payloadHash,
@@ -183,7 +107,6 @@ export async function insertV3Battle(
       INSERT INTO battles (
         battle_id,
         run_id,
-        installation_id,
         player_account_id,
         bundle_id,
         recorded_at_utc,
@@ -204,12 +127,11 @@ export async function insertV3Battle(
         replay_available,
         is_bundle_final_battle,
         updated_at_utc
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       args.battleId,
       args.runId,
-      args.installationId,
       args.playerAccountId,
       args.bundleId,
       args.recordedAtUtc,
@@ -263,6 +185,23 @@ export async function insertReplayToken(
   ).run();
 }
 
+export async function insertSeenPlayerAccount(
+  db: D1Database,
+  args: InsertSeenPlayerAccountArgs,
+): Promise<void> {
+  await statement(
+    db,
+    `
+      INSERT INTO seen_player_accounts (
+        player_account_id,
+        first_seen_at_utc,
+        last_seen_at_utc
+      ) VALUES (?, ?, ?)
+    `,
+    [args.playerAccountId, args.firstSeenAtUtc, args.lastSeenAtUtc],
+  ).run();
+}
+
 export async function countRows(
   db: D1Database,
   tableName: string,
@@ -299,12 +238,9 @@ export async function resetTestState(env: Cloudflare.Env): Promise<void> {
     env.DB.prepare("DELETE FROM battles"),
     env.DB.prepare("DELETE FROM runs"),
     env.DB.prepare("DELETE FROM run_bundles"),
-    env.DB.prepare("DELETE FROM tokens"),
-    env.DB.prepare("DELETE FROM users"),
+    env.DB.prepare("DELETE FROM seen_player_accounts"),
   ]);
   await deleteAllR2(env.RUN_BUNDLE_BUCKET);
-  env.ALLOW_UNAUTHENTICATED_REPLAY_LINKS = "false";
-  env.ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS = "false";
   env.GHOST_QUERY_LOOKBACK_DAYS = "3";
   env.RUN_BUNDLE_RETENTION_DAYS = "5";
 }
