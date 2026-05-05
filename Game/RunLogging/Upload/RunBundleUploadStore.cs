@@ -161,7 +161,6 @@ internal sealed class RunBundleUploadStore
 
     public RunBundleUploadSnapshot? TryBuildRunBundleSnapshot(
         string runId,
-        string installationId,
         string playerAccountId
     )
     {
@@ -225,7 +224,6 @@ internal sealed class RunBundleUploadStore
             Payload = new RunBundleUploadRequestV3
             {
                 SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
-                InstallationId = installationId,
                 PlayerAccountId = playerAccountId,
                 SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
                 ArtifactCodec = V3RunBundleArtifactCodec.ContentType,

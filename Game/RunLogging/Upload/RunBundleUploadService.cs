@@ -38,7 +38,6 @@ internal sealed class RunBundleUploadService : IDisposable
         }
 
         var playerAccountId = ResolvePlayerAccountId() ?? AnonymousPlayerAccountId;
-        var installationId = string.Empty;
 
         var uploadedCount = 0;
         var client = new RunBundleClient(_httpClient, _routes);
@@ -48,11 +47,7 @@ internal sealed class RunBundleUploadService : IDisposable
             var attemptedAtUtc = DateTimeOffset.UtcNow;
             try
             {
-                var snapshot = _store.TryBuildRunBundleSnapshot(
-                    runId,
-                    installationId,
-                    playerAccountId
-                );
+                var snapshot = _store.TryBuildRunBundleSnapshot(runId, playerAccountId);
                 if (snapshot == null)
                 {
                     _store.MarkRunUploadFailed(runId, attemptedAtUtc, "run_bundle_not_ready");
