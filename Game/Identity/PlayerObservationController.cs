@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Online;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.Identity;
@@ -11,26 +10,18 @@ internal sealed class PlayerObservationController : MonoBehaviour
     private const float PollIntervalSeconds = 5f;
 
     private PlayerObservationStore? _store;
-    private AuthStore? _authStore;
-    private ModOnlineClient? _onlineClient;
     private float _nextPollAt;
     private string? _lastPlayerAccountId;
     private string? _lastPlayerUsername;
 
-    internal void Configure(
-        PlayerObservationStore store,
-        AuthStore authStore,
-        ModOnlineClient onlineClient
-    )
+    internal void Configure(PlayerObservationStore store)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _authStore = authStore ?? throw new ArgumentNullException(nameof(authStore));
-        _onlineClient = onlineClient ?? throw new ArgumentNullException(nameof(onlineClient));
     }
 
     private void Update()
     {
-        if (_store == null || _authStore == null || _onlineClient == null)
+        if (_store == null)
             return;
         if (Time.unscaledTime < _nextPollAt)
             return;
@@ -66,8 +57,6 @@ internal sealed class PlayerObservationController : MonoBehaviour
                     $"Wrote player observation for account {playerAccountId} to observation.v1.json."
                 );
             }
-
-            _onlineClient.LoadBearerFrom(_authStore, playerAccountId);
 
             _lastPlayerAccountId = playerAccountId;
             _lastPlayerUsername = playerUsername;
