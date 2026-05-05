@@ -233,42 +233,30 @@ The server treats the last `battle_projection` in an accepted bundle as the bund
 
 Current effective tables after all migrations:
 
-- `users`
-- `tokens`
+- `seen_player_accounts`
 - `run_bundles`
 - `runs`
 - `battles`
 - `replay_tokens`
 
-The original `installations`, `installation_sessions`, and `installation_observations` tables are dropped by `0002_auth_simplification.sql`. Some projection tables still retain an `installation_id` column for transition compatibility; current upload code writes the legacy value `legacy`.
+Historical note: the original `installations` family of tables was dropped by `0002_auth_simplification.sql`; the auth-era `users` and `tokens` tables were dropped by `0009_drop_auth_tables.sql`; the `installation_id` column on `run_bundles` / `runs` / `battles` was dropped by `0010_drop_installation_id.sql`. `seen_player_accounts` was added by `0011_create_seen_player_accounts.sql` to take over the auth-era `users` role as the ghost-battles opponent allow-list, with a one-time backfill from existing `run_bundles` uploaders.
 
-### `users`
+### `seen_player_accounts`
 
-Player account table.
-
-Columns:
-
-- `player_account_id TEXT PRIMARY KEY`
-- `player_username TEXT NOT NULL UNIQUE`
-- `password_hash TEXT NOT NULL`
-- optional stream fields: `stream_platform`, `stream_channel_id`, `stream_url`
-- timestamps: `created_at_utc`, `updated_at_utc`, `last_login_at_utc`
-
-### `tokens`
-
-Bearer token table added by `0002_auth_simplification.sql`.
+Lightweight registry of player accounts that have submitted at least one run bundle. Replaces the auth-era `users` table for the ghost-battle opponent filter.
 
 ```sql
-CREATE TABLE tokens (
-  token              TEXT    PRIMARY KEY,
-  player_account_id  TEXT    NOT NULL REFERENCES users(player_account_id),
-  issued_at_utc      TEXT    NOT NULL,
-  revoked_at_utc     TEXT    NULL,
-  last_used_at_utc   TEXT    NULL
+CREATE TABLE seen_player_accounts (
+  player_account_id TEXT PRIMARY KEY,
+  first_seen_at_utc TEXT NOT NULL,
+  last_seen_at_utc  TEXT NOT NULL
 );
-
-CREATE INDEX tokens_by_user ON tokens(player_account_id, revoked_at_utc);
 ```
+
+Upsert behavior:
+
+- `/run-bundles` writes / updates the uploader's row on every successful upload (`anonymous-player` is skipped).
+- The upload handler queries this table to decide whether to project a battle row for an opponent (`loadKnownOpponentAccountIds`).
 
 ### `run_bundles`
 
@@ -277,7 +265,6 @@ Metadata for uploaded artifact blobs.
 Key columns:
 
 - `bundle_id TEXT PRIMARY KEY`
-- `installation_id TEXT NOT NULL`
 - `player_account_id TEXT NOT NULL`
 - `run_id TEXT NOT NULL`
 - `payload_hash TEXT NOT NULL`
@@ -291,7 +278,6 @@ Key columns:
 Current upload behavior:
 
 - `bundle_id` is deterministically the `run_id`
-- `installation_id` is written as `legacy`
 - object key shape is `run-bundles/<player>/<run>/<hash>.mpack.gz`
 
 ### `runs` Server Projection
@@ -301,7 +287,6 @@ Queryable summary for uploaded runs.
 Key columns:
 
 - `run_id TEXT PRIMARY KEY`
-- `installation_id TEXT NOT NULL`
 - `player_account_id TEXT NOT NULL`
 - `bundle_id TEXT NOT NULL`
 - `status TEXT NOT NULL`
@@ -317,7 +302,6 @@ Key columns:
 
 - `battle_id TEXT PRIMARY KEY`
 - `run_id TEXT NOT NULL`
-- `installation_id TEXT NOT NULL`
 - `player_account_id TEXT NOT NULL`
 - `bundle_id TEXT NOT NULL`
 - `recorded_at_utc TEXT NOT NULL`
@@ -348,9 +332,6 @@ Columns:
 ### Server Indexes
 
 ```sql
-CREATE INDEX tokens_by_user
-  ON tokens(player_account_id, revoked_at_utc);
-
 CREATE INDEX IF NOT EXISTS idx_battles_opponent_recorded_covering
   ON battles(
     opponent_account_id,
@@ -391,6 +372,6 @@ CREATE INDEX IF NOT EXISTS idx_runs_updated_at
 - Local SQLite is the client-side capture and projection cache.
 - Local replay payload files are the heavy binary source for replay.
 - V3 upload packages local run and battle state into one artifact plus lightweight SQL projections.
-- Server SQL is for lookup and authorization. The uploaded artifact body lives in R2.
-- Current auth is bearer-token based through `tokens`, not installation-signature based.
+- Server SQL is for lookup. The uploaded artifact body lives in R2.
+- The server is fully unauthenticated; identity comes from `player_account_id` in `/run-bundles` bodies and `/ghost-battles` query strings, with `seen_player_accounts` acting as the opponent allow-list for ghost battle projection.
 - `is_bundle_final_battle` is a server-computed projection flag carried through ghost sync so `HistoryPanel` can explain final-battle elimination outcomes without reading sibling battles or R2 artifacts.

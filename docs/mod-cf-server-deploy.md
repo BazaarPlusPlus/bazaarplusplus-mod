@@ -8,14 +8,11 @@
 - D1 migrations dir: `ModCFServerV3/migrations`
 - Runtime entry: `ModCFServerV3/src/index.ts`
 
-当前 Worker 路由包括：
+当前 Worker 路由包括（全部不鉴权）：
 
 - `GET /health`
-- `POST /activate`
-- `POST /login`
-- `POST /logout`
 - `POST /run-bundles`
-- `GET /ghost-battles`
+- `GET /ghost-battles?player_account_id=…`
 - `POST /ghost-battles/:battleId/replay-link`
 - `GET /replays/:token`
 
@@ -71,11 +68,8 @@ curl https://mod-api-v3.bazaarplusplus.com/health
 
 建议 smoke test 至少覆盖：
 
-- `POST /activate`
-- `POST /login`
-- `POST /logout`
 - `POST /run-bundles`
-- `GET /ghost-battles`
+- `GET /ghost-battles?player_account_id=…`
 - `POST /ghost-battles/:battleId/replay-link`
 - `GET /replays/:token`
 
@@ -84,5 +78,4 @@ curl https://mod-api-v3.bazaarplusplus.com/health
 - D1 schema 由 Wrangler migration 管理，见 `ModCFServerV3/migrations/`。
 - replay 对象与 token 行为由 `createReplayLink` / `downloadReplay` 路由负责。
 - 当前 V3 预期资源名为 `bazaarplusplus-mod-api-v3`、`mod-api-v3.bazaarplusplus.com`、`bazaarplusplus-mod-api-v3-db`、`bazaarplusplus-run-bundles-v3`。
-- `ALLOW_UNAUTHENTICATED_REPLAY_LINKS` 和 `ALLOW_UNAUTHENTICATED_REPLAY_DOWNLOADS` 是早期 rollout 兼容开关；收紧鉴权时应成对调整。
 - 如果生产环境已存在实际资源名，以 `ModCFServerV3/wrangler.toml` 为准。

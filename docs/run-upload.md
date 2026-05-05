@@ -6,8 +6,8 @@
 
 - 本地 SQLite 仍然是 run / battle 的 source of truth。
 - 仅在玩家不处于 live run 时执行。
-- 上传协议是未认证的 V3 `run-bundle` 上传；服务端只把已注册玩家或上传者本人作为可投影 opponent，不使用 installation 签名。
-- 读类端点使用 installer 写入 `auth.v1.json` 的 bearer token。
+- 上传协议是未认证的 V3 `run-bundle` 上传；服务端只把已在 `seen_player_accounts` 注册过的玩家或上传者本人作为可投影 opponent。
+- 服务端所有读类端点也已不鉴权——`/ghost-battles` 用 `?player_account_id=` query 参数携带身份，replay link / download 仅靠短 TTL token。
 
 ## Client Flow
 
@@ -16,13 +16,12 @@
 3. combat replay 持久化完成后把关联 battle 的 `replay_dirty` 标记为 dirty。
 4. `RunUploadController` 在启动延迟后，或 run 退出 / replay 落盘完成后，扫描待上传 completed runs。
 5. `RunBundleUploadStore` 组装 run projection、battle projections 和 replay artifact。
-6. `RunBundleUploadService` 编排上传流程，调用 `RunBundleClient` 执行 `POST /run-bundles`，不附加 Authorization 头。
+6. `RunBundleUploadService` 编排上传流程，调用 `RunBundleClient` 执行 `POST /run-bundles`，不附加任何鉴权头。
 7. 服务端把 `battle_projections` 中最后一条 battle 的 `battle_id` 作为 final marker；该 battle 被投影时写入 `is_bundle_final_battle`，供 ghost battle UI 判断对手是否在这一战后出局。
 8. 上传成功后清除 run 和关联 replay 的 dirty 标记。
 
 ## 当前实现文件
 
-- `Game/Identity/AuthStore.cs`
 - `Game/Identity/PlayerObservationStore.cs`
 - `Game/Identity/IdentityJsonFileStore.cs`
 - `Game/Online/V3Routes.cs`

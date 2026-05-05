@@ -70,7 +70,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - `RunUploadController` 仅在非 live run 时扫描待上传 completed runs
 - `RunBundleUploadStore` 组装 run projection、battle projections 和 gzip MessagePack artifact
 - `RunBundleUploadService` 上传到 `POST /run-bundles`
-- HistoryPanel 的 ghost sync 使用 bearer token 查询 `GET /ghost-battles`，按需申请 `POST /ghost-battles/:battleId/replay-link`
+- HistoryPanel 的 ghost sync 用 `?player_account_id=` 调用 `GET /ghost-battles`（不鉴权），按需申请 `POST /ghost-battles/:battleId/replay-link`
 
 详见 `docs/run-upload.md`。
 
@@ -102,10 +102,10 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 面向 **ModCFServerV3**（`ModCFServerV3/`，Cloudflare Workers + D1 + R2）：
 
-- **共享身份目录**：`<GameRoot>/BazaarPlusPlus/Identity/`，当前使用 `auth.v1.json` 和 `observation.v1.json`；旧 `identity.db` 会被清理
-- **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`（未认证；服务端只把已注册玩家或上传者本人作为可投影 opponent）
-- **Player Observation**：mod 把观察到的 `player_account_id` 写入 `observation.v1.json`，供 installer 参考
-- **Ghost 战斗**：`GET /ghost-battles` 查询 against-me 列表（需要 `Authorization: Bearer <token>`）；按需签发 `POST /ghost-battles/:battleId/replay-link`
+- **共享身份目录**：`<GameRoot>/BazaarPlusPlus/Identity/`，当前只写 `observation.v1.json`；旧 `auth.v1.json` 与 `identity.db*` 在 mod 启动时会被一次性清理
+- **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`（不鉴权；服务端只把 `seen_player_accounts` 注册过的玩家或上传者本人作为可投影 opponent）
+- **Player Observation**：mod 把观察到的 `player_account_id` 写入 `observation.v1.json`
+- **Ghost 战斗**：`GET /ghost-battles?player_account_id=…` 查询 against-me 列表（不鉴权）；按需签发 `POST /ghost-battles/:battleId/replay-link`
 - **Bundle-final 标记**：服务端把上传 bundle 中最后一场 battle 在被投影时标记为 `is_bundle_final_battle`；HistoryPanel 在 ghost 视角下用它提示“这场后对手出局”
 
 模组侧仅在**非 live run** 时执行上传扫描；`RunUploadController` 统一调度 run-bundle 上传。信任模型与安全限制见 `docs/run-upload.md`。
