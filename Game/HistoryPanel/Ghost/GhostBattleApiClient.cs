@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,7 +27,6 @@ internal sealed class GhostBattleApiClient
 
     public async Task<GhostBattleApiResult> QueryAgainstMeAsync(
         string playerAccountId,
-        string bearerToken,
         int limit,
         CancellationToken cancellationToken
     )
@@ -39,8 +37,7 @@ internal sealed class GhostBattleApiClient
             {
                 return GhostBattleApiResult.Failure(
                     "player_account_id_required",
-                    shouldFallback: false,
-                    shouldReRegister: false
+                    shouldFallback: false
                 );
             }
 
@@ -49,7 +46,7 @@ internal sealed class GhostBattleApiClient
                 Query =
                     $"player_account_id={Uri.EscapeDataString(playerAccountId.Trim())}&limit={Math.Clamp(limit, 1, 200)}",
             }.Uri.ToString();
-            using var request = CreateBearerRequest(HttpMethod.Get, endpoint, bearerToken);
+            using var request = CreateRequest(HttpMethod.Get, endpoint);
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -62,8 +59,7 @@ internal sealed class GhostBattleApiClient
                 var decision = V3HttpFailureClassifier.Classify(statusCode);
                 return GhostBattleApiResult.Failure(
                     V3ErrorFormatter.FormatHttpFailure(statusCode, responseBody),
-                    shouldFallback: decision.ShouldFallback,
-                    shouldReRegister: decision.ShouldReRegister
+                    shouldFallback: decision.ShouldFallback
                 );
             }
 
@@ -93,22 +89,20 @@ internal sealed class GhostBattleApiClient
         {
             return GhostBattleApiResult.Failure(
                 V3ErrorFormatter.Truncate(ex.Message),
-                shouldFallback: true,
-                shouldReRegister: false
+                shouldFallback: true
             );
         }
     }
 
     public async Task<GhostBattleReplayDownloadLinkResult> RequestReplayDownloadLinkAsync(
         string battleId,
-        string bearerToken,
         CancellationToken cancellationToken
     )
     {
         try
         {
             var endpoint = _routes.CreateReplayLink(battleId);
-            using var request = CreateBearerRequest(HttpMethod.Post, endpoint, bearerToken);
+            using var request = CreateRequest(HttpMethod.Post, endpoint);
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -121,8 +115,7 @@ internal sealed class GhostBattleApiClient
                 var decision = V3HttpFailureClassifier.Classify(statusCode);
                 return GhostBattleReplayDownloadLinkResult.Failure(
                     V3ErrorFormatter.FormatHttpFailure(statusCode, responseBody),
-                    shouldFallback: decision.ShouldFallback,
-                    shouldReRegister: decision.ShouldReRegister
+                    shouldFallback: decision.ShouldFallback
                 );
             }
 
@@ -132,8 +125,7 @@ internal sealed class GhostBattleApiClient
             {
                 return GhostBattleReplayDownloadLinkResult.Failure(
                     "download_url_missing",
-                    shouldFallback: false,
-                    shouldReRegister: false
+                    shouldFallback: false
                 );
             }
 
@@ -147,8 +139,7 @@ internal sealed class GhostBattleApiClient
         {
             return GhostBattleReplayDownloadLinkResult.Failure(
                 V3ErrorFormatter.Truncate(ex.Message),
-                shouldFallback: true,
-                shouldReRegister: false
+                shouldFallback: true
             );
         }
     }
@@ -156,13 +147,12 @@ internal sealed class GhostBattleApiClient
     public async Task<GhostBattleReplayPayloadResult> DownloadReplayPayloadAsync(
         string battleId,
         string downloadUrl,
-        string bearerToken,
         CancellationToken cancellationToken
     )
     {
         try
         {
-            using var request = CreateBearerRequest(HttpMethod.Get, downloadUrl, bearerToken);
+            using var request = CreateRequest(HttpMethod.Get, downloadUrl);
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -198,18 +188,9 @@ internal sealed class GhostBattleApiClient
         }
     }
 
-    private static HttpRequestMessage CreateBearerRequest(
-        HttpMethod method,
-        string endpoint,
-        string bearerToken
-    )
+    private static HttpRequestMessage CreateRequest(HttpMethod method, string endpoint)
     {
-        var request = new HttpRequestMessage(method, endpoint);
-        if (!string.IsNullOrWhiteSpace(bearerToken))
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
-        }
-        return request;
+        return new HttpRequestMessage(method, endpoint);
     }
 
     private static bool IsValidGhostBattlePayload(GhostBattlePayload? payload)
@@ -407,15 +388,13 @@ internal readonly struct GhostBattleApiResult
         bool succeeded,
         IReadOnlyList<GhostBattleImportRecord>? battles,
         string? error,
-        bool shouldFallback,
-        bool shouldReRegister
+        bool shouldFallback
     )
     {
         Succeeded = succeeded;
         Battles = battles ?? Array.Empty<GhostBattleImportRecord>();
         Error = error;
         ShouldFallback = shouldFallback;
-        ShouldReRegister = shouldReRegister;
     }
 
     public bool Succeeded { get; }
@@ -426,16 +405,13 @@ internal readonly struct GhostBattleApiResult
 
     public bool ShouldFallback { get; }
 
-    public bool ShouldReRegister { get; }
-
     public static GhostBattleApiResult Success(IReadOnlyList<GhostBattleImportRecord> battles) =>
-        new(true, battles, null, false, false);
+        new(true, battles, null, false);
 
     public static GhostBattleApiResult Failure(
         string error,
-        bool shouldFallback,
-        bool shouldReRegister
-    ) => new(false, null, error, shouldFallback, shouldReRegister);
+        bool shouldFallback
+    ) => new(false, null, error, shouldFallback);
 }
 
 internal readonly struct GhostBattleReplayDownloadLinkResult
@@ -444,15 +420,13 @@ internal readonly struct GhostBattleReplayDownloadLinkResult
         bool succeeded,
         string? downloadUrl,
         string? error,
-        bool shouldFallback,
-        bool shouldReRegister
+        bool shouldFallback
     )
     {
         Succeeded = succeeded;
         DownloadUrl = downloadUrl;
         Error = error;
         ShouldFallback = shouldFallback;
-        ShouldReRegister = shouldReRegister;
     }
 
     public bool Succeeded { get; }
@@ -463,16 +437,13 @@ internal readonly struct GhostBattleReplayDownloadLinkResult
 
     public bool ShouldFallback { get; }
 
-    public bool ShouldReRegister { get; }
-
     public static GhostBattleReplayDownloadLinkResult Success(string downloadUrl) =>
-        new(true, downloadUrl, null, false, false);
+        new(true, downloadUrl, null, false);
 
     public static GhostBattleReplayDownloadLinkResult Failure(
         string error,
-        bool shouldFallback,
-        bool shouldReRegister
-    ) => new(false, null, error, shouldFallback, shouldReRegister);
+        bool shouldFallback
+    ) => new(false, null, error, shouldFallback);
 }
 
 internal readonly struct GhostBattleReplayPayloadResult
