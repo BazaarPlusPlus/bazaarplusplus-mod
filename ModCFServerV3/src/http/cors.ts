@@ -1,8 +1,6 @@
 const ALLOWED_METHODS = "GET, POST, OPTIONS";
 const ALLOWED_HEADERS = [
-  "authorization",
   "content-type",
-  "x-bpp-installation-id",
   "x-bpp-timestamp",
   "x-bpp-content-sha256",
   "x-bpp-signature",
