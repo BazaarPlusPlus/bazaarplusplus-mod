@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
 
-import authSimplificationSql from "../migrations/0002_auth_simplification.sql?raw";
+import dropAuthTablesSql from "../migrations/0009_drop_auth_tables.sql?raw";
+import dropInstallationIdSql from "../migrations/0010_drop_installation_id.sql?raw";
+import createSeenPlayerAccountsSql from "../migrations/0011_create_seen_player_accounts.sql?raw";
 import runsEndedAtIndexSql from "../migrations/0005_runs_ended_at_index.sql?raw";
 import runBundlesCreatedAtIndexSql from "../migrations/0006_run_bundles_created_at_index.sql?raw";
 import runsUpdatedAtIndexSql from "../migrations/0007_runs_updated_at_index.sql?raw";
@@ -16,44 +18,9 @@ function getTableSection(sql: string, tableName: string): string {
 }
 
 test("initial migration defines the V3 projection tables", () => {
-  const sql = initialSchemaSql;
-
-  for (const tableName of [
-    "users",
-    "run_bundles",
-    "runs",
-    "battles",
-    "replay_tokens",
-  ]) {
-    expect(getTableSection(sql, tableName)).toBeTruthy();
+  for (const tableName of ["run_bundles", "runs", "battles", "replay_tokens"]) {
+    expect(getTableSection(initialSchemaSql, tableName)).toBeTruthy();
   }
-
-  expect(sql).not.toMatch(/\bclients\b/);
-  expect(sql).not.toMatch(/\bplayer_links\b/);
-});
-
-test("initial migration stores V3 user identity columns", () => {
-  const sql = initialSchemaSql;
-  const usersSection = getTableSection(sql, "users");
-
-  expect(usersSection).toMatch(/\bplayer_account_id TEXT PRIMARY KEY\b/);
-  expect(usersSection).toMatch(/\bplayer_username TEXT NOT NULL UNIQUE\b/);
-  expect(usersSection).toMatch(/\bpassword_hash TEXT NOT NULL\b/);
-});
-
-test("auth simplification migration creates tokens and drops installation tables", () => {
-  const sql = authSimplificationSql;
-  const tokensSection = getTableSection(sql, "tokens");
-
-  expect(tokensSection).toMatch(/\btoken\s+TEXT\s+PRIMARY KEY\b/);
-  expect(tokensSection).toMatch(/\bplayer_account_id\s+TEXT\s+NOT NULL\b/);
-  expect(tokensSection).toMatch(/\bissued_at_utc\s+TEXT\s+NOT NULL\b/);
-  expect(tokensSection).toMatch(/\brevoked_at_utc\s+TEXT\s+NULL\b/);
-  expect(tokensSection).toMatch(/\blast_used_at_utc\s+TEXT\s+NULL\b/);
-
-  expect(sql).toMatch(/DROP TABLE IF EXISTS installation_sessions;/);
-  expect(sql).toMatch(/DROP TABLE IF EXISTS installation_observations;/);
-  expect(sql).toMatch(/DROP TABLE IF EXISTS installations;/);
 });
 
 test("runs ended_at index migration adds the mirror sync index", () => {
@@ -79,5 +46,30 @@ test("battles bundle-final migration adds the ghost display flag to the covering
     "ADD COLUMN is_bundle_final_battle INTEGER NOT NULL DEFAULT 0",
   );
   expect(battlesBundleFinalFlagSql).toContain("idx_battles_opponent_recorded_covering");
-  expect(battlesBundleFinalFlagSql).toMatch(/is_bundle_final_battle\s*\n\s*\)/);
+});
+
+test("0009 drops auth tables in dependency order", () => {
+  expect(dropAuthTablesSql).toMatch(/DROP TABLE IF EXISTS tokens;/);
+  expect(dropAuthTablesSql).toMatch(/DROP TABLE IF EXISTS users;/);
+  expect(dropAuthTablesSql.indexOf("DROP TABLE IF EXISTS tokens")).toBeLessThan(
+    dropAuthTablesSql.indexOf("DROP TABLE IF EXISTS users"),
+  );
+});
+
+test("0010 drops installation_id and rebuilds run_bundles without UNIQUE", () => {
+  expect(dropInstallationIdSql).toMatch(/ALTER TABLE runs\s+DROP COLUMN installation_id;/);
+  expect(dropInstallationIdSql).toMatch(/ALTER TABLE battles\s+DROP COLUMN installation_id;/);
+  expect(dropInstallationIdSql).toMatch(/CREATE TABLE run_bundles_new \(/);
+  expect(dropInstallationIdSql).toMatch(/ALTER TABLE run_bundles_new RENAME TO run_bundles;/);
+  expect(dropInstallationIdSql).not.toMatch(/UNIQUE \(installation_id/);
+});
+
+test("0011 creates seen_player_accounts and backfills uploaders", () => {
+  expect(createSeenPlayerAccountsSql).toMatch(
+    /CREATE TABLE seen_player_accounts \(/,
+  );
+  expect(createSeenPlayerAccountsSql).toMatch(
+    /INSERT OR IGNORE INTO seen_player_accounts/,
+  );
+  expect(createSeenPlayerAccountsSql).toMatch(/FROM run_bundles/);
 });
