@@ -265,8 +265,9 @@ The mod release is independent — old mod builds still in the wild will simply 
 
 Before merging the implementation PR:
 
-- [ ] `npm test` (or `pnpm test` / `bun test` per repo convention) green inside `ModCFServerV3/`.
-- [ ] `dotnet build` of `BazaarPlusPlus.sln` green (or `BuildAll` per `.rules` if build logic changed).
-- [ ] No remaining references to `users` / `tokens` / `installation_id` / `Authorization: Bearer` / `AuthStore` / `BearerState` in tracked files (`Grep` sweep).
-- [ ] `wrangler d1 migrations list` shows 0009 / 0010 / 0011 in order.
-- [ ] Manual smoke against staging worker: ghost-battles round-trip with a freshly uploaded run bundle.
+- [x] `npm test` green inside `ModCFServerV3/` — 43/43 passing across 7 test files.
+- [x] `dotnet build BazaarPlusPlus.csproj` green — 0 errors, 0 warnings.
+- [x] No remaining references to `users` / `tokens` / `installation_id` / `Authorization: Bearer` / `AuthStore` / `BearerState` in tracked files. Surviving hits are confined to migration files (the SQL that drops them), `test/schema.test.ts` deletion-canaries, `test/index.test.ts` deletion-canaries, and the spec/plan docs.
+- [x] All 35 tasks committed in order from the implementation plan.
+- [ ] `wrangler d1 migrations list` shows 0009 / 0010 / 0011 in order — pending deploy window.
+- [ ] Manual smoke against staging worker: ghost-battles round-trip with a freshly uploaded run bundle — pending deploy window.
