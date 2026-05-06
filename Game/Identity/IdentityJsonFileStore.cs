@@ -52,31 +52,6 @@ internal static class IdentityJsonFileStore
         WriteStringAtomically(filePath, json);
     }
 
-    internal static void DeleteIfExists(string filePath)
-    {
-        if (File.Exists(filePath))
-            File.Delete(filePath);
-    }
-
-    internal static void DeleteLegacyDatabaseFiles(string identityDirectoryPath)
-    {
-        TryDelete(Path.Combine(identityDirectoryPath, "identity.db"));
-        TryDelete(Path.Combine(identityDirectoryPath, "identity.db-wal"));
-        TryDelete(Path.Combine(identityDirectoryPath, "identity.db-shm"));
-    }
-
-    private static void TryDelete(string filePath)
-    {
-        try
-        {
-            DeleteIfExists(filePath);
-        }
-        catch
-        {
-            // Legacy cleanup must not break the current JSON observation path.
-        }
-    }
-
     private static void WriteStringAtomically(string filePath, string contents)
     {
         var directoryPath =

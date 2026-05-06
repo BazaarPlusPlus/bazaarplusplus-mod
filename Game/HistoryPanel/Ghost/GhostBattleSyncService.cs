@@ -8,7 +8,7 @@ using BazaarPlusPlus.Game.Online;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
-internal sealed class GhostBattleSyncService : IDisposable
+internal sealed class GhostBattleSyncService
 {
     private const int MaxSyncBattleLimit = 200;
 
@@ -103,8 +103,6 @@ internal sealed class GhostBattleSyncService : IDisposable
         _repository.MarkGhostReplayDownloaded(battleId);
         return GhostBattleReplayDownloadResult.Success();
     }
-
-    public void Dispose() { }
 
     private static string? ResolvePlayerAccountId()
     {

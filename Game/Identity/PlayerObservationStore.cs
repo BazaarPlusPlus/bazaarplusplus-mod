@@ -52,7 +52,6 @@ public sealed class PlayerObservationStore
                 ObservedAtUtc = record.ObservedAtUtc,
             }
         );
-        IdentityJsonFileStore.DeleteLegacyDatabaseFiles(_identityDirectoryPath);
     }
 
     private sealed class PlayerObservationFile

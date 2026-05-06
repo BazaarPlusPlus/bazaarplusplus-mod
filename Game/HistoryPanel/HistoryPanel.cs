@@ -175,7 +175,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         _coordinator?.Dispose();
         DisposePreviewRenderer();
-        _dependencies?.GhostSyncService?.Dispose();
         _dependencies = null;
         DisposeUi();
     }

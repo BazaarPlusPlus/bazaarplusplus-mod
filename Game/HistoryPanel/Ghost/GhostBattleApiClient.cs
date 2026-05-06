@@ -35,10 +35,7 @@ internal sealed class GhostBattleApiClient
         {
             if (string.IsNullOrWhiteSpace(playerAccountId))
             {
-                return GhostBattleApiResult.Failure(
-                    "player_account_id_required",
-                    shouldFallback: false
-                );
+                return GhostBattleApiResult.Failure("player_account_id_required");
             }
 
             var endpoint = new UriBuilder(_routes.QueryGhostBattles)
@@ -56,10 +53,8 @@ internal sealed class GhostBattleApiClient
             if (!response.IsSuccessStatusCode)
             {
                 var statusCode = (int)response.StatusCode;
-                var decision = V3HttpFailureClassifier.Classify(statusCode);
                 return GhostBattleApiResult.Failure(
-                    V3ErrorFormatter.FormatHttpFailure(statusCode, responseBody),
-                    shouldFallback: decision.ShouldFallback
+                    V3ErrorFormatter.FormatHttpFailure(statusCode, responseBody)
                 );
             }
 
@@ -87,10 +82,7 @@ internal sealed class GhostBattleApiClient
         }
         catch (Exception ex)
         {
-            return GhostBattleApiResult.Failure(
-                V3ErrorFormatter.Truncate(ex.Message),
-                shouldFallback: true
-            );
+            return GhostBattleApiResult.Failure(V3ErrorFormatter.Truncate(ex.Message));
         }
     }
 
@@ -112,10 +104,8 @@ internal sealed class GhostBattleApiClient
             if (!response.IsSuccessStatusCode)
             {
                 var statusCode = (int)response.StatusCode;
-                var decision = V3HttpFailureClassifier.Classify(statusCode);
                 return GhostBattleReplayDownloadLinkResult.Failure(
-                    V3ErrorFormatter.FormatHttpFailure(statusCode, responseBody),
-                    shouldFallback: decision.ShouldFallback
+                    V3ErrorFormatter.FormatHttpFailure(statusCode, responseBody)
                 );
             }
 
@@ -123,10 +113,7 @@ internal sealed class GhostBattleApiClient
             var downloadUrl = payload["download_url"]?.Value<string>()?.Trim();
             if (string.IsNullOrWhiteSpace(downloadUrl))
             {
-                return GhostBattleReplayDownloadLinkResult.Failure(
-                    "download_url_missing",
-                    shouldFallback: false
-                );
+                return GhostBattleReplayDownloadLinkResult.Failure("download_url_missing");
             }
 
             return GhostBattleReplayDownloadLinkResult.Success(downloadUrl);
@@ -138,8 +125,7 @@ internal sealed class GhostBattleApiClient
         catch (Exception ex)
         {
             return GhostBattleReplayDownloadLinkResult.Failure(
-                V3ErrorFormatter.Truncate(ex.Message),
-                shouldFallback: true
+                V3ErrorFormatter.Truncate(ex.Message)
             );
         }
     }
@@ -387,14 +373,12 @@ internal readonly struct GhostBattleApiResult
     private GhostBattleApiResult(
         bool succeeded,
         IReadOnlyList<GhostBattleImportRecord>? battles,
-        string? error,
-        bool shouldFallback
+        string? error
     )
     {
         Succeeded = succeeded;
         Battles = battles ?? Array.Empty<GhostBattleImportRecord>();
         Error = error;
-        ShouldFallback = shouldFallback;
     }
 
     public bool Succeeded { get; }
@@ -403,15 +387,10 @@ internal readonly struct GhostBattleApiResult
 
     public string? Error { get; }
 
-    public bool ShouldFallback { get; }
-
     public static GhostBattleApiResult Success(IReadOnlyList<GhostBattleImportRecord> battles) =>
-        new(true, battles, null, false);
+        new(true, battles, null);
 
-    public static GhostBattleApiResult Failure(
-        string error,
-        bool shouldFallback
-    ) => new(false, null, error, shouldFallback);
+    public static GhostBattleApiResult Failure(string error) => new(false, null, error);
 }
 
 internal readonly struct GhostBattleReplayDownloadLinkResult
@@ -419,14 +398,12 @@ internal readonly struct GhostBattleReplayDownloadLinkResult
     private GhostBattleReplayDownloadLinkResult(
         bool succeeded,
         string? downloadUrl,
-        string? error,
-        bool shouldFallback
+        string? error
     )
     {
         Succeeded = succeeded;
         DownloadUrl = downloadUrl;
         Error = error;
-        ShouldFallback = shouldFallback;
     }
 
     public bool Succeeded { get; }
@@ -435,15 +412,11 @@ internal readonly struct GhostBattleReplayDownloadLinkResult
 
     public string? Error { get; }
 
-    public bool ShouldFallback { get; }
-
     public static GhostBattleReplayDownloadLinkResult Success(string downloadUrl) =>
-        new(true, downloadUrl, null, false);
+        new(true, downloadUrl, null);
 
-    public static GhostBattleReplayDownloadLinkResult Failure(
-        string error,
-        bool shouldFallback
-    ) => new(false, null, error, shouldFallback);
+    public static GhostBattleReplayDownloadLinkResult Failure(string error) =>
+        new(false, null, error);
 }
 
 internal readonly struct GhostBattleReplayPayloadResult

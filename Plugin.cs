@@ -118,8 +118,6 @@ public class Plugin : BaseUnityPlugin
             return;
         }
 
-        DeleteLegacyAuthFile(identityDirectoryPath);
-
         _playerObservationStore = new PlayerObservationStore(identityDirectoryPath);
 
         var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
@@ -135,23 +133,6 @@ public class Plugin : BaseUnityPlugin
         };
         _onlineClient = new ModOnlineClient(httpClient, routes);
         BppLog.Info("Plugin", "Identity JSON store and online client ready.");
-    }
-
-    private static void DeleteLegacyAuthFile(string identityDirectoryPath)
-    {
-        var legacyAuthPath = Path.Combine(identityDirectoryPath, "auth.v1.json");
-        if (!File.Exists(legacyAuthPath))
-            return;
-
-        try
-        {
-            File.Delete(legacyAuthPath);
-            BppLog.Info("Plugin", "Removed legacy auth.v1.json from identity directory.");
-        }
-        catch (Exception ex)
-        {
-            BppLog.Info("Plugin", $"Could not delete legacy auth.v1.json: {ex.Message}");
-        }
     }
 
     private void ApplyHarmonyPatches()
