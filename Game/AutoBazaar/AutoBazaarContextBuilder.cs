@@ -110,12 +110,26 @@ internal static class AutoBazaarContextBuilder
         List<AutoBazaarCardSnapshot> selectionOptions = BuildSelectionOptions(
             runState, playerGold, selectionIsFree, run, canHandleOp(StateOps.SelectItem));
 
+        // Target-selection mode (upgrade/enchant): when AppState._iteractionFilter
+        // is non-empty, the game restricts SelectItem to owned cards whose
+        // templateId is in the filter. Offer-based clicks silently no-op.
+        var interactionFilterList = AutoBazaarInteractionFilterProbe.ReadCurrentFilter();
+        ISet<string>? interactionFilter = interactionFilterList.Count > 0
+            ? new HashSet<string>(interactionFilterList)
+            : null;
+
         // Available actions
         var actions = BuildActions(
             stateName, isInRun, canHandleOp,
             canReroll, canStartOrContinueRun,
             runState, selectionOptions, boardItems, chestItems, playerSkills, canMove, canSell,
             run);
+
+        if (interactionFilter is not null)
+        {
+            actions = ReplaceSelectItemWithTargetSelection(actions, interactionFilter,
+                boardItems, chestItems, playerSkills);
+        }
 
         return new AutoBazaarContext
         {
@@ -137,6 +151,7 @@ internal static class AutoBazaarContextBuilder
             RerollsRemaining = rerollsRemaining,
             CurrentEncounterId = currentEncounterId,
             ActionCooldownRemainingSeconds = actionCooldownRemainingSeconds,
+            InteractableTemplateIds = interactionFilter is not null ? interactionFilterList : null,
             BoardItems = boardItems,
             ChestItems = chestItems,
             PlayerSkills = playerSkills,
@@ -686,6 +701,62 @@ internal static class AutoBazaarContextBuilder
         Group = AutoBazaarActionGroup.Wait,
         DisplayKey = "Wait",
     };
+
+    /// <summary>Target-selection mode: drop offer-based SelectItem options (game
+    /// rejects them via CanInteractWithCard) and append SelectItem actions for
+    /// each owned card whose templateId is in the filter, so an external client
+    /// can pick one of the player's cards as the upgrade target.</summary>
+    private static IReadOnlyList<AutoBazaarDecisionOption> ReplaceSelectItemWithTargetSelection(
+        IReadOnlyList<AutoBazaarDecisionOption> actions,
+        ISet<string> filter,
+        IReadOnlyList<AutoBazaarCardSnapshot> boardItems,
+        IReadOnlyList<AutoBazaarCardSnapshot> chestItems,
+        IReadOnlyList<AutoBazaarCardSnapshot> playerSkills)
+    {
+        var kept = new List<AutoBazaarDecisionOption>(actions.Count);
+        foreach (var a in actions)
+        {
+            if (a.ActionKind != AutoBazaarActionKind.SelectItem) kept.Add(a);
+        }
+
+        var owned = new List<AutoBazaarTargetSelectionActions.OwnedCardRef>();
+        AddOwnedRefs(owned, boardItems, AutoBazaarTargetSection.Hand);
+        AddOwnedRefs(owned, chestItems, AutoBazaarTargetSection.Stash);
+        AddOwnedRefs(owned, playerSkills, AutoBazaarTargetSection.Skill);
+
+        var targetOpts = AutoBazaarTargetSelectionActions.Emit(filter, owned);
+        kept.AddRange(targetOpts);
+        return kept;
+    }
+
+    private static void AddOwnedRefs(
+        List<AutoBazaarTargetSelectionActions.OwnedCardRef> sink,
+        IReadOnlyList<AutoBazaarCardSnapshot> cards,
+        AutoBazaarTargetSection section)
+    {
+        foreach (var c in cards)
+        {
+            if (string.IsNullOrEmpty(c.TemplateId)) continue;
+            int size = ParseCardSize(c.Size);
+            sink.Add(new AutoBazaarTargetSelectionActions.OwnedCardRef(
+                InstanceId: c.InstanceId,
+                TemplateId: c.TemplateId!,
+                Section: section,
+                LeftSocketId: c.SocketId ?? "",
+                Size: size));
+        }
+    }
+
+    private static int ParseCardSize(string? size)
+    {
+        return size switch
+        {
+            "Small" => 1,
+            "Medium" => 2,
+            "Large" => 3,
+            _ => 1,
+        };
+    }
 
     private static AutoBazaarContext MakeDegenerate(bool isEnabled, double cooldown) => new()
     {
