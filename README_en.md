@@ -16,6 +16,7 @@ This repository only keeps documentation that still matches the current implemen
 - End-of-run automatic screenshots: saves the primary final-run screenshot and SQLite metadata before `Continue`.
 - Background upload: run and replay upload, performed only while the client is outside a live run.
 - Anonymous Mode: replaces the local player name with `Anonymous`.
+- **AutoBazaar HTTP endpoint** — local loopback HTTP server (default port 47900) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. See [docs/reference/auto-bazaar-http-api-v1.md](docs/reference/auto-bazaar-http-api-v1.md).
 
 ## Installation And Configuration
 

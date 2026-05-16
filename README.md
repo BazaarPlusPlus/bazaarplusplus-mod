@@ -16,6 +16,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 - 终局自动截图：终局 `Continue` 前保存主截图和 SQLite 元数据。
 - 后台上传：run / replay 后台上传，仅在未处于 live run 时执行。
 - Anonymous Mode：将本地玩家名替换为 `Anonymous`。
+- **AutoBazaar HTTP 接口** — 本地回环 HTTP 服务（默认端口 47900），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。详见 [docs/reference/auto-bazaar-http-api-v1.md](docs/reference/auto-bazaar-http-api-v1.md)。
 
 ## 安装与配置
 

@@ -13,6 +13,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 大厅与展示类小功能：随机英雄池面板、主菜单版本号、Legendary 段位展示文案、中文术语切换
 - **Anonymous Mode**：可选将显示名改为 `Anonymous`
 - 终局自动截图：终局 `Continue` 前自动保存主截图和元数据
+- **AutoBazaar HTTP 接口**：本地回环 HTTP 服务（默认端口 47900），对外暴露决策上下文（`GET /v1/context`）并接受外部动作（`POST /v1/actions`）；纯传输与校验层，Mod 本身不做策略决策。详见 [auto-bazaar-http-api-v1.md](reference/auto-bazaar-http-api-v1.md)。
 
 ## 运行时骨架
 
@@ -139,3 +140,5 @@ HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings
 - 上传与风险说明：`docs/run-upload.md`
 - 战斗状态条 / 怪物预览 / 终局截图 / CF 部署：`docs/combat-status-bar.md`、`docs/monster-preview-design.md`、`docs/reference/end-of-run-screenshot-flow.md`、`docs/mod-cf-server-deploy.md`
 - 热键、设置表面、SQLite schema、tooltip 实现细节：`docs/reference/`
+- AutoBazaar HTTP API 规范：`docs/reference/auto-bazaar-http-api-v1.md`
+- AutoBazaar 决策表面字段推导：`docs/reference/auto-bazaar-decision-surface.md`
