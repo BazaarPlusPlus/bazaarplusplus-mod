@@ -1,4 +1,5 @@
 #nullable enable
+using System.IO;
 using UnityEngine;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Core.Runtime;
@@ -12,6 +13,7 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
     private readonly AutoBazaarContextSnapshotPublisher _snapshots = new();
     private float _lastActionTime = float.NegativeInfinity;
     private const float ActionMinDelaySeconds = 1.0f;
+    private AutoBazaarDecisionLog? _decisionLog;
 
     internal AutoBazaarContextSnapshot? CurrentSnapshot => _snapshots.Current;
 
@@ -37,6 +39,7 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
         {
             BppLog.Info("AutoBazaar", $"First snapshot published. state={ctx.StateName}");
         }
+        AutoBazaarUiPlumbing.Tick();
         // Phase 3+ drains the action queue here.
     }
 
@@ -46,6 +49,19 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
         var remaining = ActionMinDelaySeconds - elapsed;
         return remaining > 0 ? remaining : 0;
     }
+
+    private AutoBazaarDecisionLog GetOrCreateDecisionLog()
+    {
+        if (_decisionLog is null)
+        {
+            var root = GetLogRoot();
+            _decisionLog = new AutoBazaarDecisionLog(root);
+        }
+        return _decisionLog;
+    }
+
+    private static string GetLogRoot()
+        => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "BazaarPlusPlus", "AutoBazaar"));
 
     private void OnDestroy()
     {
