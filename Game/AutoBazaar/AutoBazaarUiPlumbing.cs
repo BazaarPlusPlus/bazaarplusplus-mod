@@ -71,7 +71,6 @@ internal static class AutoBazaarUiPlumbing
     }
 
     private static MethodInfo? _exitRecapReplayStateMethod;
-    private static UnityEngine.Object? _boardManagerInstance;
 
     private static void TryExitRecapReplayState()
     {
