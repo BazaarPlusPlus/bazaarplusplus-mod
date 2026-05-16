@@ -60,5 +60,9 @@
       Include="..\..\Game\AutoBazaar\AutoBazaarHttpServer.cs"
       Link="AutoBazaarHttpServer.cs"
     />
+    <Compile
+      Include="..\..\Game\AutoBazaar\AutoBazaarTargetSelectionActions.cs"
+      Link="AutoBazaarTargetSelectionActions.cs"
+    />
   </ItemGroup>
 </Project>
