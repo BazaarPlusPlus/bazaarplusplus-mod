@@ -57,17 +57,23 @@ internal static class AutoBazaarContextBuilder
         // Determine state name
         var stateName = ResolveStateName(appState, runState);
 
-        // If game isn't ready, return a mostly-default context
+        // If game isn't ready (no active AppState), the only meaningful action the
+        // mod can offer is StartOrContinueRun — but only when actually at hero-select.
         if (appState == null || stateName == AutoBazaarRunStateName.Unknown)
         {
+            bool canStartEarly = AutoBazaarSceneProbe.IsAtHeroSelectAndReadyForNewRun();
+            var lobbyActions = canStartEarly
+                ? new[] { WaitOption(), StartOrContinueRunOption() }
+                : new[] { WaitOption() };
             return new AutoBazaarContext
             {
                 SchemaVersion = "1.0.0",
                 ServerTimeUtc = UtcNow(),
                 IsEnabled = isEnabled,
                 StateName = AutoBazaarRunStateName.Unknown,
+                CanStartOrContinueRun = canStartEarly,
                 ActionCooldownRemainingSeconds = actionCooldownRemainingSeconds,
-                AvailableActions = new[] { WaitOption() },
+                AvailableActions = lobbyActions,
             };
         }
 
@@ -701,6 +707,13 @@ internal static class AutoBazaarContextBuilder
         ActionKind = AutoBazaarActionKind.Wait,
         Group = AutoBazaarActionGroup.Wait,
         DisplayKey = "Wait",
+    };
+
+    private static AutoBazaarDecisionOption StartOrContinueRunOption() => new()
+    {
+        ActionKind = AutoBazaarActionKind.StartOrContinueRun,
+        Group = AutoBazaarActionGroup.Flow,
+        DisplayKey = "StartOrContinueRun",
     };
 
     /// <summary>Target-selection mode: drop offer-based SelectItem options (game

@@ -21,18 +21,25 @@ internal static class AutoBazaarSceneProbe
     private static PropertyInfo? _profileValueProp;
     private static bool _reflectionAttempted;
 
+    private static (bool sceneOk, bool appStateNull, bool profileLoaded)? _lastDiagnosis;
+
     public static bool IsAtHeroSelectAndReadyForNewRun()
     {
         try
         {
             var sceneName = SceneManager.GetActiveScene().name;
-            if (!string.Equals(sceneName, HeroSelectSceneName, StringComparison.Ordinal)) return false;
+            var sceneOk = string.Equals(sceneName, HeroSelectSceneName, StringComparison.Ordinal);
+            var appStateNull = AppState.CurrentState == null;
+            var profileLoaded = TryReadProfileLoaded();
 
-            if (AppState.CurrentState != null) return false;
+            var snapshot = (sceneOk, appStateNull, profileLoaded);
+            if (_lastDiagnosis != snapshot)
+            {
+                _lastDiagnosis = snapshot;
+                BppLog.Info("AutoBazaar", $"SceneProbe: scene='{sceneName}' (ok={sceneOk}) appStateNull={appStateNull} profileLoaded={profileLoaded}");
+            }
 
-            if (!TryReadProfileLoaded()) return false;
-
-            return true;
+            return sceneOk && appStateNull && profileLoaded;
         }
         catch (Exception ex)
         {
