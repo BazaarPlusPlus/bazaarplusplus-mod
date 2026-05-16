@@ -271,8 +271,8 @@ internal static class AutoBazaarContextBuilder
         var stashContainer = (run?.Player?.Stash as CardContainer)?.Container;
 
         // Compute occupied sockets for placement hints
-        var occupiedHand = GetOccupiedSockets(handContainer);
-        var occupiedStash = GetOccupiedSockets(stashContainer);
+        var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
+        var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
 
         int handCapacity = SocketedContainer.SocketCount;
         int stashCapacity = SocketedContainer.SocketCount;
@@ -464,8 +464,8 @@ internal static class AutoBazaarContextBuilder
             var stashContainer = (run.Player.Stash as CardContainer)?.Container;
             int cap = SocketedContainer.SocketCount;
 
-            var occupiedHand = GetOccupiedSockets(handContainer);
-            var occupiedStash = GetOccupiedSockets(stashContainer);
+            var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
+            var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
 
             EmitMoveActions(actions, boardItems, handContainer, stashContainer,
                 occupiedHand, occupiedStash, cap, isOwnHand: true);
@@ -485,8 +485,8 @@ internal static class AutoBazaarContextBuilder
                 var handContainer = (run?.Player?.Hand as CardContainer)?.Container;
                 var stashContainer = (run?.Player?.Stash as CardContainer)?.Container;
                 int cap = SocketedContainer.SocketCount;
-                var occupiedHand = GetOccupiedSockets(handContainer);
-                var occupiedStash = GetOccupiedSockets(stashContainer);
+                var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
+                var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
 
                 foreach (var placement in AutoBazaarMoveTargetPlanner.Enumerate(size, cap, occupiedHand))
                 {
@@ -635,14 +635,14 @@ internal static class AutoBazaarContextBuilder
         }
     }
 
-    private static HashSet<int> GetOccupiedSockets(SocketedContainer? container)
+    private static HashSet<int> GetOccupiedAndLockedSockets(SocketedContainer? container)
     {
         var result = new HashSet<int>();
         if (container == null) return result;
 
         for (int i = 0; i < container.Sockets.Length; i++)
         {
-            if (container.Sockets[i] != null)
+            if (container.Sockets[i] != null || container.IsSocketLocked(i))
                 result.Add(i);
         }
 
@@ -666,7 +666,7 @@ internal static class AutoBazaarContextBuilder
             "Small" => 1,
             "Medium" => 2,
             "Large" => 3,
-            _ => 1,
+            _ => 0,
         };
     }
 

@@ -78,6 +78,28 @@ public class AutoBazaarMoveTargetPlannerTests
     }
 
     [Fact]
+    public void SizeZero_ReturnsEmpty()
+    {
+        var result = AutoBazaarMoveTargetPlanner.Enumerate(
+            itemSize: 0,
+            capacity: 10,
+            occupiedSockets: new HashSet<int>());
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Size2_CapacityZero_ReturnsEmpty()
+    {
+        var result = AutoBazaarMoveTargetPlanner.Enumerate(
+            itemSize: 2,
+            capacity: 0,
+            occupiedSockets: new HashSet<int>());
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public void SizeGreaterThanCapacity_ReturnsEmpty()
     {
         var result = AutoBazaarMoveTargetPlanner.Enumerate(
