@@ -18,7 +18,7 @@ Companion to `auto-bazaar-http-api-v1.md`. Documents how `AutoBazaarContextBuild
 | `IsEnabled` | `services.Config.AutoBazaarEnabled?.Value == true` |
 | `IsInRun` | `Data.Run != null && AppState.CurrentState is RunAppState` |
 | `HasActiveRun` | `Data.HasActiveRun` (computed property on `Data`) |
-| `CanStartOrContinueRun` | Hardcoded `false` in v1 — scene-detection deferred |
+| `CanStartOrContinueRun` | `AutoBazaarSceneProbe.IsAtHeroSelectAndReadyForNewRun()` — true iff `SceneManager.GetActiveScene().name == "HeroSelectScene"` AND `AppState.CurrentState == null` AND `ClientCache.Profile.Value != null` |
 | `IsClientBusy` | Hardcoded `false` in v1 — `HttpGameClient` busy-tracking deferred |
 | `RunId` | `Data.Run?.GameModeId.ToString("D")`, or `null` if Guid is default |
 | `StateName` | See "State Mapping" section below |
@@ -30,6 +30,7 @@ Companion to `auto-bazaar-http-api-v1.md`. Documents how `AutoBazaarContextBuild
 | `RerollsRemaining` | `(int)(Data.CurrentState?.RerollsRemaining ?? 0u)` |
 | `CurrentEncounterId` | `Data.CurrentState?.CurrentEncounterId` (already `string?`) |
 | `ActionCooldownRemainingSeconds` | Passed in by `AutoBazaarRuntime`, computed from `_lastActionTime` |
+| `InteractableTemplateIds` | `AutoBazaarInteractionFilterProbe.ReadCurrentFilter()` — reflection on `AppState._iteractionFilter`. Null/omitted when the list is empty or reflection fails. |
 
 ## State Mapping
 
@@ -76,6 +77,8 @@ Each action's inclusion criterion in terms of game-state paths:
 | `MoveItem` (per placement) | Legal placements computed by `AutoBazaarMoveTargetPlanner.Enumerate(itemSize, capacity=10, occupiedAndLockedSockets, excludeStart, excludeCount)`. A socket counts as unusable if `SocketedContainer.IsSocketLocked` returns true for it, or if it is occupied. One entry per legal `(card, targetSection, targetSocket)` triplet. |
 | `SelectItem` (per card) | `AppState.CanHandleOperation(SelectItem) && card.CanSelect != false` — one entry per offered item in `SelectionOptions` |
 | `SelectSkill` (per skill) | `AppState.CanHandleOperation(SelectSkill)` — one entry per offered skill in `SelectionOptions` |
+
+**Target-selection mode override**: when `InteractableTemplateIds` is non-empty (i.e. `AppState._iteractionFilter` is populated by an upgrade/enchant encounter), offer-based `SelectItem` entries are suppressed and the builder appends one `SelectItem` `AutoBazaarDecisionOption` per owned card (across `BoardItems` / `ChestItems` / `PlayerSkills`) whose templateId is in the filter, using the card's current `Section` + `LeftSocketId` + `Size` to fill `targetSection` and `targetSockets`. See `AutoBazaarTargetSelectionActions.Emit`.
 
 ## Error Handling
 

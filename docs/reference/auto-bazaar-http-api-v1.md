@@ -72,7 +72,7 @@ Top-level scalar fields:
 | `isEnabled` | bool | Whether AutoBazaar is active |
 | `isInRun` | bool | Whether the game is inside an active run |
 | `hasActiveRun` | bool | Whether a run exists (may be ended) |
-| `canStartOrContinueRun` | bool | Whether `StartOrContinueRun` is a legal action now |
+| `canStartOrContinueRun` | bool | True when the game is on the hero-select scene with the player profile loaded and no active `AppState`. Covers both fresh-run and resume-run cases — the server distinguishes via the player profile. |
 | `isClientBusy` | bool | Whether the game client is busy (e.g. waiting for server) |
 | `runId` | string\|null | Run identifier from the game; null when no run is active |
 | `stateName` | string | Current run state; see enum reference |
@@ -84,6 +84,7 @@ Top-level scalar fields:
 | `rerollsRemaining` | int | Rerolls available in this state |
 | `currentEncounterId` | string\|null | Template ID of the active encounter card, if any |
 | `actionCooldownRemainingSeconds` | float64 | Seconds until the cooldown gate clears; 0 when no gate is active |
+| `interactableTemplateIds` | string[] \| omitted | When present and non-empty, the game is in target-selection mode (upgrade/enchant). Clients pick from `availableActions` `SelectItem` options targeting owned cards whose templateId is in this set. See "Target-selection mode" section. |
 
 Card list fields (each element is an `AutoBazaarCardSnapshot`):
 
@@ -216,7 +217,7 @@ Rules are applied in order. The first failure terminates validation and the erro
 | ActionKind | Group | Required params | Appears when | Dispatches |
 |---|---|---|---|---|
 | `Wait` | `Wait` | — | always | (no-op) |
-| `StartOrContinueRun` | `Flow` | `hero?`, `playMode?` | hero-select scene (v1: detection not implemented) | `GameInstance.Instance.StartNewRun()` |
+| `StartOrContinueRun` | `Flow` | `hero?`, `playMode?` | hero-select scene with profile loaded and no active `AppState` | `GameInstance.Instance.StartNewRun()` |
 | `AbandonRun` | `Flow` | — | in-run, not in combat / replay / end-run | `Cmd.GetInstance().SendAbandonRun()` |
 | `SelectItem` | `Offer` | `cardInstanceId`, `targetSection`, `targetSockets` | item offered, `SelectItem` allowed | `Cmd.GetInstance().SelectItem(card, sockets, section)` |
 | `SelectSkill` | `Offer` | `cardInstanceId` | skill offered, `SelectSkill` allowed | `Cmd.GetInstance().SendSelectSkill(instanceId)` |
@@ -262,6 +263,20 @@ The mod auto-handles two zero-decision UI gates so external tools do not need to
 - **Known overlay dismissal** — no overlays are dismissed automatically in v1. PvP first-victory tutorial dialog detection was not reliably implemented in the decompiled types.
 
 **End-run screens do not auto-advance.** External tools must POST `AdvanceEndRun` to leave the end-of-run screen. This allows tools to read the final state before proceeding.
+
+---
+
+## 8.5. Target-selection mode
+
+Certain encounters (upgrade, enchant, etc.) show a UI dialog asking the player to click one of their own cards. Internally the game populates an interaction filter (a set of templateIds) and only accepts clicks on owned cards whose templateId is in that set; other clicks silently no-op.
+
+While the filter is non-empty:
+
+- `context.interactableTemplateIds` is the filter contents.
+- `availableActions` does **not** include offer-based `SelectItem` options (the game would reject them).
+- For each of the player's owned cards (in `boardItems` / `chestItems` / `playerSkills`) whose `templateId` is in the filter, `availableActions` contains a `SelectItem` entry whose `cardInstanceId` is that owned card. `targetSection` and `targetSockets` reflect the card's current placement so the dispatcher's `BuyItemCommand` walks the `CanFuse()` path and the server applies the upgrade.
+
+Client recipe: when `interactableTemplateIds` is present, pick the first `SelectItem` entry from `availableActions` and POST it verbatim. If no `SelectItem` entries exist despite a non-empty filter, none of your owned cards match — bail with `ExitState` (where allowed) or `AbandonRun`.
 
 ---
 
