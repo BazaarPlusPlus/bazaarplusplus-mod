@@ -9,6 +9,11 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
 {
     private IBppServices? _services;
     private float _lastTickTime;
+    private readonly AutoBazaarContextSnapshotPublisher _snapshots = new();
+    private float _lastActionTime = float.NegativeInfinity;
+    private const float ActionMinDelaySeconds = 1.0f;
+
+    internal AutoBazaarContextSnapshot? CurrentSnapshot => _snapshots.Current;
 
     public void Initialize(IBppServices services)
     {
@@ -25,7 +30,21 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
         if (Time.unscaledTime - _lastTickTime < interval) return;
         _lastTickTime = Time.unscaledTime;
 
-        // Phase 2+ fills this in.
+        var cooldownLeft = ComputeCooldownLeft();
+        var ctx = AutoBazaarContextBuilder.Build(_services, cooldownLeft);
+        var snap = _snapshots.Publish(ctx);
+        if (snap.TickId == 1)
+        {
+            BppLog.Info("AutoBazaar", $"First snapshot published. state={ctx.StateName}");
+        }
+        // Phase 3+ drains the action queue here.
+    }
+
+    private double ComputeCooldownLeft()
+    {
+        var elapsed = Time.unscaledTime - _lastActionTime;
+        var remaining = ActionMinDelaySeconds - elapsed;
+        return remaining > 0 ? remaining : 0;
     }
 
     private void OnDestroy()
