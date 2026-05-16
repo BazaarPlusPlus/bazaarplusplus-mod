@@ -17,8 +17,6 @@ internal static class AutoBazaarUiPlumbing
     // Reflection cache — filled on first successful lookup to avoid per-tick cost
     // -------------------------------------------------------------------------
 
-    // AppState._cachedGameSim (protected static NetMessageGameSim)
-    private static FieldInfo? _cachedGameSimField;
     // ReplayState._exitRequested (private bool)
     private static FieldInfo? _exitRequestedField;
 
@@ -50,32 +48,61 @@ internal static class AutoBazaarUiPlumbing
             if (replay.IsReplaying) return;
 
             // Guard 2: Exit() must not have already been called.
-            // ReplayState.Exit() sets the private _exitRequested flag and is
-            // idempotent, but we check it via reflection so we do not call Exit()
-            // on every tick after the first call (which would be a no-op but noisy).
+            // ReplayState.Exit() is idempotent via the private _exitRequested flag;
+            // we check it via reflection so subsequent ticks don't redundantly
+            // invoke Exit() (no-op but adds log noise).
             if (ExitAlreadyRequested(replay)) return;
 
-            // Guard 3: the sequence's DespawnMessage (the "cached game sim") must
-            // be available. ReplayState.Exit() reads _sequence.DespawnMessage
-            // internally; if _sequence is null (e.g. state entered but
-            // OnCombatSequenceCreated hasn't fired) Exit() would NRE. We rely on
-            // Exit()'s own guard (_exitRequested) for true idempotency, but this
-            // check avoids a noisy stack trace on an edge case.
+            // Advance out of the replay state. ReplayState.Exit() sets
+            // AppState._cachedGameSim and calls AppState._gameSimHandler.Handle(),
+            // which triggers the run-state machine to transition.
             //
-            // _cachedGameSim on AppState is protected static. We reflect on it as
-            // a proxy: if it is already non-null, another code path already called
-            // Exit() (or GoToNextState on a CombatState), so skip.
-            if (CachedGameSimNonNull()) return;
-
-            // All guards passed — advance out of the replay state.
-            // ReplayState.Exit() is public. It sets AppState._cachedGameSim and
-            // calls AppState._gameSimHandler.Handle(), which triggers the run-state
-            // machine to transition to the next state (Choice / LevelUp / etc.).
+            // The BoardManager.OnBoardRecapReplayButtonsContinueClicked path also
+            // calls ExitRecapReplayState() when the underlying RunState is LevelUp;
+            // calling that first via reflection avoids a recap-overlay leak on
+            // LevelUp transitions. If reflection misses it, Exit() alone still works.
+            TryExitRecapReplayState();
             replay.Exit();
         }
         catch (Exception ex)
         {
             BppLog.Error("AutoBazaar", "TryAdvanceReplay failed", ex);
+        }
+    }
+
+    private static MethodInfo? _exitRecapReplayStateMethod;
+    private static UnityEngine.Object? _boardManagerInstance;
+
+    private static void TryExitRecapReplayState()
+    {
+        try
+        {
+            // Only meaningful when the underlying RunState is LevelUp — mirrors
+            // BoardManager.OnBoardRecapReplayButtonsContinueClicked's own guard.
+            var runState = Data.CurrentState;
+            if (runState is null) return;
+            // ERunState.LevelUp is value 4 across builds we've seen; compare by name
+            // to avoid taking a hard dependency on the enum's integer layout.
+            if (runState.StateName.ToString() != "LevelUp") return;
+
+            var boardManagerType = HarmonyLib.AccessTools.TypeByName("TheBazaar.BoardManager");
+            if (boardManagerType is null) return;
+
+            _exitRecapReplayStateMethod ??= boardManagerType.GetMethod(
+                "ExitRecapReplayState",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            if (_exitRecapReplayStateMethod is null) return;
+
+            // Singleton<BoardManager>.Instance — get the singleton via FindObjectOfType
+            // as a fallback that doesn't depend on the generic Singleton helper.
+            var instance = UnityEngine.Object.FindObjectOfType(boardManagerType) as UnityEngine.Object;
+            if (instance is null) return;
+
+            _exitRecapReplayStateMethod.Invoke(instance, null);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("AutoBazaar", "TryExitRecapReplayState failed (non-fatal)", ex);
         }
     }
 
@@ -137,20 +164,4 @@ internal static class AutoBazaarUiPlumbing
         }
     }
 
-    private static bool CachedGameSimNonNull()
-    {
-        try
-        {
-            _cachedGameSimField ??= typeof(AppState).GetField(
-                "_cachedGameSim",
-                BindingFlags.Static | BindingFlags.NonPublic);
-
-            if (_cachedGameSimField is null) return false;
-            return _cachedGameSimField.GetValue(null) is not null;
-        }
-        catch
-        {
-            return false;
-        }
-    }
 }
