@@ -135,14 +135,28 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
 
         var result = AutoBazaarActionDispatcher.Execute(action, snap);
 
-        if (result.Executed && action.ActionKind != AutoBazaarActionKind.Wait)
+        if (result.Executed)
         {
-            _lastActionTime = Time.unscaledTime;
+            if (action.ActionKind != AutoBazaarActionKind.Wait)
+            {
+                _lastActionTime = Time.unscaledTime;
+            }
+            var okBody = BuildOkBody(decisionId, snap, action, executed: true);
+            pending.SetResponse(new AutoBazaarServerResponse(200, okBody));
+            LogDecision(decisionId, snap, action, executed: true, error: null);
+            return;
         }
 
-        var okBody = BuildOkBody(decisionId, snap, action, result.Executed);
-        pending.SetResponse(new AutoBazaarServerResponse(result.Executed ? 200 : 500, okBody));
-        LogDecision(decisionId, snap, action, result.Executed, result.Executed ? null : result.Error);
+        var dispatchErrBody = BuildDispatchErrorBody(result.Error);
+        pending.SetResponse(new AutoBazaarServerResponse(500, dispatchErrBody));
+        LogDecision(decisionId, snap, action, executed: false, error: result.Error);
+    }
+
+    private string BuildDispatchErrorBody(string? details)
+    {
+        var envelope = new Dictionary<string, object?> { ["error"] = "internal" };
+        if (details is not null) envelope["details"] = details;
+        return JsonConvert.SerializeObject(envelope, _responseJson);
     }
 
     private string BuildOkBody(string decisionId, AutoBazaarContextSnapshot snap, AutoBazaarAction action, bool executed)
