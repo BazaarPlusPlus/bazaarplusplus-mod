@@ -563,11 +563,18 @@ internal static class AutoBazaarContextBuilder
             }
         }
 
-        // 10. CommitToPedestal — per owned item card
+        // 10. CommitToPedestal — per owned item card that the active pedestal template
+        // marks as a valid upgrade target. PedestalState.CanBeUpgraded(card) runs the
+        // template's SelectionCriteria predicate; we only surface cards it accepts so
+        // the external client never POSTs CommitToPedestal on an ineligible card
+        // (DoDrop short-circuits on the same predicate, so emitting ineligibles would
+        // produce silent server-side rejections).
         if (stateName == AutoBazaarRunStateName.Pedestal && canHandleOp(StateOps.CommitToPedestal))
         {
+            var pedestalState = AppState.CurrentState as PedestalState;
             foreach (var card in boardItems)
             {
+                if (!IsPedestalEligible(pedestalState, card.InstanceId)) continue;
                 actions.Add(new AutoBazaarDecisionOption
                 {
                     ActionKind = AutoBazaarActionKind.CommitToPedestal,
@@ -579,6 +586,7 @@ internal static class AutoBazaarContextBuilder
             }
             foreach (var card in chestItems)
             {
+                if (!IsPedestalEligible(pedestalState, card.InstanceId)) continue;
                 actions.Add(new AutoBazaarDecisionOption
                 {
                     ActionKind = AutoBazaarActionKind.CommitToPedestal,
@@ -807,6 +815,25 @@ internal static class AutoBazaarContextBuilder
             "Large" => 3,
             _ => 1,
         };
+    }
+
+    /// <summary>Resolves the live <c>Card</c> object from a snapshot instanceId and
+    /// asks the active <see cref="PedestalState"/> whether it's a legal upgrade target.
+    /// Returns false on any failure so the action list stays conservative.</summary>
+    private static bool IsPedestalEligible(PedestalState? pedestalState, string? instanceId)
+    {
+        if (pedestalState is null || string.IsNullOrEmpty(instanceId)) return false;
+        try
+        {
+            if (!Data.Entities.TryGetValue(new InstanceId(instanceId!), out var entity)) return false;
+            if (entity is not Card card) return false;
+            return pedestalState.CanBeUpgraded(card);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("AutoBazaar", $"IsPedestalEligible threw for {instanceId}", ex);
+            return false;
+        }
     }
 
     private static AutoBazaarContext MakeDegenerate(bool isEnabled, double cooldown) => new()
