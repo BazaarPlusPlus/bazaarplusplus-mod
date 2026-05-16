@@ -22,4 +22,12 @@ internal interface IBppConfig
     ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; }
 
     ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig { get; }
+
+    ConfigEntry<bool>? AutoBazaarEnabled { get; }
+
+    ConfigEntry<float>? AutoBazaarDecisionIntervalSeconds { get; }
+
+    ConfigEntry<int>? AutoBazaarHttpListenerPort { get; }
+
+    ConfigEntry<float>? AutoBazaarHttpEndpointTimeoutSeconds { get; }
 }

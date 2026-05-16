@@ -27,6 +27,14 @@ internal sealed class BppConfig : IBppConfig
         private set;
     }
 
+    public ConfigEntry<bool>? AutoBazaarEnabled { get; private set; }
+
+    public ConfigEntry<float>? AutoBazaarDecisionIntervalSeconds { get; private set; }
+
+    public ConfigEntry<int>? AutoBazaarHttpListenerPort { get; private set; }
+
+    public ConfigEntry<float>? AutoBazaarHttpEndpointTimeoutSeconds { get; private set; }
+
     public void Initialize(ConfigFile config)
     {
         ItemBoardAnchoredPositionConfig = config.Bind(
@@ -83,5 +91,26 @@ internal sealed class BppConfig : IBppConfig
             LegendaryPositionDisplayMode.Default,
             "How BazaarPlusPlus should rewrite native Legendary leaderboard position labels. Default keeps the original value, Blank clears it, Fixed999999 forces 999999, and PositionWithRating shows '#position | rating'."
         );
+        // AutoBazaar
+        AutoBazaarEnabled = config.Bind(
+            "AutoBazaar",
+            "Enabled",
+            true,
+            "Master switch for the AutoBazaar HTTP endpoint. When true, a loopback HTTP server starts on the configured port. There is no in-game UI for this toggle; edit the cfg file to disable.");
+        AutoBazaarDecisionIntervalSeconds = config.Bind(
+            "AutoBazaar",
+            "DecisionIntervalSeconds",
+            1.5f,
+            "Mod tick cadence for snapshot publication, in seconds. Clamped to [0.5, 10] at runtime.");
+        AutoBazaarHttpListenerPort = config.Bind(
+            "AutoBazaar",
+            "HttpListenerPort",
+            47900,
+            "Loopback port for the AutoBazaar HTTP listener. Changing this restarts the listener.");
+        AutoBazaarHttpEndpointTimeoutSeconds = config.Bind(
+            "AutoBazaar",
+            "HttpEndpointTimeoutSeconds",
+            3.0f,
+            "Maximum time (seconds) the server will block on a POST /v1/actions before returning 503.");
     }
 }
