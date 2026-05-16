@@ -5,6 +5,7 @@ using System.IO;
 using System.Net.Http;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.AutoBazaar;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
@@ -172,6 +173,10 @@ public class Plugin : BaseUnityPlugin
         screenshot.Initialize(services);
 
         AddConfiguredTooltipModifierRefreshController(services.Config);
+
+        var autoBazaar = gameObject.AddComponent<AutoBazaarRuntime>();
+        autoBazaar.Initialize(services);
+
         BppLog.Info("Plugin", "Runtime components attached");
     }
 
@@ -255,6 +260,7 @@ public class Plugin : BaseUnityPlugin
 
     private void DetachRuntimeComponents()
     {
+        DestroyComponentIfPresent<AutoBazaarRuntime>();
         DestroyComponentIfPresent<TooltipModifierRefreshController>();
         DestroyComponentIfPresent<EndOfRunScreenshotController>();
         DestroyComponentIfPresent<MonsterPreviewItemBoardRuntime>();
