@@ -77,8 +77,7 @@ internal static class AutoBazaarActionDispatcher
                     return new(false, "unsupported target section");
                 }
                 var sockets = ParseSockets(action.TargetSockets);
-                Cmd.GetInstance().SelectItem(card, sockets, section);
-                return new(true, null);
+                return InvokeCmd("SelectItem", card, sockets, section);
             }
 
             case AutoBazaarActionKind.SelectSkill:
@@ -108,13 +107,11 @@ internal static class AutoBazaarActionDispatcher
                     return new(false, "unsupported target section");
                 }
                 var sockets = ParseSockets(action.TargetSockets);
-                Cmd.GetInstance().SendMoveItem(card, sockets, section);
-                return new(true, null);
+                return InvokeCmd("SendMoveItem", card, sockets, section);
             }
 
             case AutoBazaarActionKind.SellItem:
-                Cmd.GetInstance().SendSellCard(new InstanceId(action.CardInstanceId ?? ""));
-                return new(true, null);
+                return InvokeCmd("SendSellCard", new InstanceId(action.CardInstanceId ?? ""));
 
             case AutoBazaarActionKind.Reroll:
                 Cmd.GetInstance().SendReRollSelection();
@@ -201,5 +198,37 @@ internal static class AutoBazaarActionDispatcher
             if (Enum.TryParse<EContainerSocketId>(s, ignoreCase: true, out var v)) list.Add(v);
         }
         return list;
+    }
+
+    private static AutoBazaarDispatchResult InvokeCmd(string methodName, params object[] args)
+    {
+        var cmd = Cmd.GetInstance();
+        if (cmd is null) return new(false, "Cmd.GetInstance() returned null");
+        var methods = typeof(Cmd).GetMethods(BindingFlags.Instance | BindingFlags.Public);
+        foreach (var m in methods)
+        {
+            if (m.Name != methodName) continue;
+            var ps = m.GetParameters();
+            if (ps.Length < args.Length) continue;
+            var match = true;
+            for (var i = 0; i < args.Length; i++)
+            {
+                if (args[i] is not null && !ps[i].ParameterType.IsAssignableFrom(args[i].GetType()))
+                {
+                    match = false;
+                    break;
+                }
+            }
+            if (!match) continue;
+            var fullArgs = new object?[ps.Length];
+            for (var i = 0; i < args.Length; i++) fullArgs[i] = args[i];
+            for (var i = args.Length; i < ps.Length; i++)
+            {
+                fullArgs[i] = ps[i].HasDefaultValue ? ps[i].DefaultValue : null;
+            }
+            m.Invoke(cmd, fullArgs);
+            return new(true, null);
+        }
+        return new(false, $"Cmd.{methodName} not found with compatible signature");
     }
 }
