@@ -15,7 +15,8 @@ internal readonly record struct AutoBazaarDispatchResult(bool Executed, string? 
 
 internal static class AutoBazaarActionDispatcher
 {
-    /// <summary>Main thread only. Routes the action to the appropriate game API.</summary>
+    /// <summary>Main thread only. Routes the action through AppState.CurrentState.*Command()
+    /// so the game's UI animation + state-validation chain runs the same way a real click does.</summary>
     public static AutoBazaarDispatchResult Execute(AutoBazaarAction action, AutoBazaarContextSnapshot snapshot)
     {
         try
@@ -59,67 +60,53 @@ internal static class AutoBazaarActionDispatcher
             }
 
             case AutoBazaarActionKind.AbandonRun:
-                Cmd.GetInstance().SendAbandonRun();
-                return new(true, null);
+                return InvokeAppStateCommand("AbandonRunCommand");
 
             case AutoBazaarActionKind.SelectItem:
             {
-                var card = ResolveItemCard(action.CardInstanceId);
+                var card = ResolveCard<ItemCard>(action.CardInstanceId);
                 if (card is null) return new(false, "item not found in Data.Entities");
-                EInventorySection section;
-                try
-                {
-                    section = (EInventorySection)Enum.Parse(typeof(EInventorySection),
-                        (action.TargetSection ?? AutoBazaarTargetSection.Hand).ToString());
-                }
-                catch
-                {
+                if (!TryParseSection(action.TargetSection, out var section))
                     return new(false, "unsupported target section");
-                }
                 var sockets = ParseSockets(action.TargetSockets);
-                return InvokeCmd("SelectItem", card, sockets, section);
+                return InvokeAppStateCommand("BuyItemCommand", card, sockets, section);
             }
 
             case AutoBazaarActionKind.SelectSkill:
-                Cmd.GetInstance().SendSelectSkill(new InstanceId(action.CardInstanceId ?? ""));
-                return new(true, null);
+            {
+                var skill = ResolveCard<SkillCard>(action.CardInstanceId);
+                if (skill is null) return new(false, "skill not found in Data.Entities");
+                return InvokeAppStateCommand("SelectSkillCommand", skill);
+            }
 
             case AutoBazaarActionKind.SelectEncounter:
-                Cmd.GetInstance().SelectEncounter(new InstanceId(action.CardInstanceId ?? ""));
-                return new(true, null);
+                return InvokeAppStateCommand("SelectEncounterCommand", new InstanceId(action.CardInstanceId ?? ""));
 
             case AutoBazaarActionKind.CommitToPedestal:
-                Cmd.GetInstance().SendCommitToPedestal(new InstanceId(action.CardInstanceId ?? ""));
-                return new(true, null);
+                return InvokeAppStateCommand("CommitToPedestalCommand", new InstanceId(action.CardInstanceId ?? ""));
 
             case AutoBazaarActionKind.MoveItem:
             {
-                var card = ResolveItemCard(action.CardInstanceId);
+                var card = ResolveCard<ItemCard>(action.CardInstanceId);
                 if (card is null) return new(false, "item not found in Data.Entities");
-                EInventorySection section;
-                try
-                {
-                    section = (EInventorySection)Enum.Parse(typeof(EInventorySection),
-                        (action.TargetSection ?? AutoBazaarTargetSection.Hand).ToString());
-                }
-                catch
-                {
+                if (!TryParseSection(action.TargetSection, out var section))
                     return new(false, "unsupported target section");
-                }
                 var sockets = ParseSockets(action.TargetSockets);
-                return InvokeCmd("SendMoveItem", card, sockets, section);
+                return InvokeAppStateCommand("MoveCardCommand", card, sockets, section);
             }
 
             case AutoBazaarActionKind.SellItem:
-                return InvokeCmd("SendSellCard", new InstanceId(action.CardInstanceId ?? ""));
+            {
+                var card = ResolveCard<ItemCard>(action.CardInstanceId);
+                if (card is null) return new(false, "item not found in Data.Entities");
+                return InvokeAppStateCommand("SellCardCommand", card);
+            }
 
             case AutoBazaarActionKind.Reroll:
-                Cmd.GetInstance().SendReRollSelection();
-                return new(true, null);
+                return InvokeAppStateCommand("RerollCommand");
 
             case AutoBazaarActionKind.ExitState:
-                Cmd.GetInstance().SendExitCurrentState();
-                return new(true, null);
+                return InvokeAppStateCommand("ExitStateCommand");
 
             case AutoBazaarActionKind.AdvanceEndRun:
             {
@@ -181,12 +168,27 @@ internal static class AutoBazaarActionDispatcher
         return null;
     }
 
-    private static ItemCard? ResolveItemCard(string? instanceIdValue)
+    private static T? ResolveCard<T>(string? instanceIdValue) where T : class
     {
         if (string.IsNullOrEmpty(instanceIdValue)) return null;
         var id = new InstanceId(instanceIdValue);
         if (!Data.Entities.TryGetValue(id, out var entity)) return null;
-        return entity as ItemCard;
+        return entity as T;
+    }
+
+    private static bool TryParseSection(AutoBazaarTargetSection? src, out EInventorySection section)
+    {
+        try
+        {
+            section = (EInventorySection)Enum.Parse(typeof(EInventorySection),
+                (src ?? AutoBazaarTargetSection.Hand).ToString());
+            return true;
+        }
+        catch
+        {
+            section = default;
+            return false;
+        }
     }
 
     private static List<EContainerSocketId> ParseSockets(IReadOnlyList<string>? raw)
@@ -200,11 +202,17 @@ internal static class AutoBazaarActionDispatcher
         return list;
     }
 
-    private static AutoBazaarDispatchResult InvokeCmd(string methodName, params object[] args)
+    /// <summary>
+    /// Invokes <c>AppState.CurrentState.{methodName}</c> via reflection. Picks the first overload
+    /// whose first N parameter types are compatible with the supplied arguments; trailing parameters
+    /// with default values are filled with their defaults. Routing through AppState's command
+    /// methods (rather than Cmd directly) plays the game's UI animation + state-machine chain.
+    /// </summary>
+    private static AutoBazaarDispatchResult InvokeAppStateCommand(string methodName, params object[] args)
     {
-        var cmd = Cmd.GetInstance();
-        if (cmd is null) return new(false, "Cmd.GetInstance() returned null");
-        var methods = typeof(Cmd).GetMethods(BindingFlags.Instance | BindingFlags.Public);
+        var appState = AppState.CurrentState;
+        if (appState is null) return new(false, "AppState.CurrentState is null");
+        var methods = appState.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public);
         foreach (var m in methods)
         {
             if (m.Name != methodName) continue;
@@ -226,9 +234,9 @@ internal static class AutoBazaarActionDispatcher
             {
                 fullArgs[i] = ps[i].HasDefaultValue ? ps[i].DefaultValue : null;
             }
-            m.Invoke(cmd, fullArgs);
+            m.Invoke(appState, fullArgs);
             return new(true, null);
         }
-        return new(false, $"Cmd.{methodName} not found with compatible signature");
+        return new(false, $"AppState.{methodName} not found with compatible signature");
     }
 }
