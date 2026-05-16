@@ -135,7 +135,7 @@ internal static class AutoBazaarContextBuilder
         if (interactionFilter is not null)
         {
             actions = ReplaceSelectItemWithTargetSelection(actions, interactionFilter,
-                boardItems, chestItems, playerSkills);
+                boardItems, chestItems, playerSkills, selectionOptions);
         }
 
         return new AutoBazaarContext
@@ -716,31 +716,68 @@ internal static class AutoBazaarContextBuilder
         DisplayKey = "StartOrContinueRun",
     };
 
-    /// <summary>Target-selection mode: drop offer-based SelectItem options (game
-    /// rejects them via CanInteractWithCard) and append SelectItem actions for
-    /// each owned card whose templateId is in the filter, so an external client
-    /// can pick one of the player's cards as the upgrade target.</summary>
+    /// <summary>Target-selection mode (filter non-empty): keep only the SelectItem
+    /// options whose underlying templateId is in the filter — these are the only
+    /// clicks the game accepts (other clicks fail CanInteractWithCard silently).
+    /// Add owned-card SelectItem options for any owned card whose templateId is in
+    /// the filter (covers BuySpecificCardCondition's _canInteractWithOwnedCards=true
+    /// variant). Card-bearing actions for other ActionKinds pass through unchanged.</summary>
     private static IReadOnlyList<AutoBazaarDecisionOption> ReplaceSelectItemWithTargetSelection(
         IReadOnlyList<AutoBazaarDecisionOption> actions,
         ISet<string> filter,
         IReadOnlyList<AutoBazaarCardSnapshot> boardItems,
         IReadOnlyList<AutoBazaarCardSnapshot> chestItems,
-        IReadOnlyList<AutoBazaarCardSnapshot> playerSkills)
+        IReadOnlyList<AutoBazaarCardSnapshot> playerSkills,
+        IReadOnlyList<AutoBazaarCardSnapshot> selectionOptionsCards)
     {
+        // Build cardInstanceId → templateId lookup across every snapshot (offers + owned).
+        var templateByInstance = new Dictionary<string, string>();
+        AddTemplates(templateByInstance, boardItems);
+        AddTemplates(templateByInstance, chestItems);
+        AddTemplates(templateByInstance, playerSkills);
+        AddTemplates(templateByInstance, selectionOptionsCards);
+
         var kept = new List<AutoBazaarDecisionOption>(actions.Count);
+        var keptInstanceIds = new HashSet<string>();
         foreach (var a in actions)
         {
-            if (a.ActionKind != AutoBazaarActionKind.SelectItem) kept.Add(a);
+            if (a.ActionKind != AutoBazaarActionKind.SelectItem)
+            {
+                kept.Add(a);
+                continue;
+            }
+            if (a.CardInstanceId is null) continue;
+            if (!templateByInstance.TryGetValue(a.CardInstanceId, out var tid)) continue;
+            if (!filter.Contains(tid)) continue;
+            kept.Add(a);
+            keptInstanceIds.Add(a.CardInstanceId);
         }
 
+        // Owned-card variant for when filter explicitly enumerates owned templates.
         var owned = new List<AutoBazaarTargetSelectionActions.OwnedCardRef>();
         AddOwnedRefs(owned, boardItems, AutoBazaarTargetSection.Hand);
         AddOwnedRefs(owned, chestItems, AutoBazaarTargetSection.Stash);
         AddOwnedRefs(owned, playerSkills, AutoBazaarTargetSection.Skill);
 
         var targetOpts = AutoBazaarTargetSelectionActions.Emit(filter, owned);
-        kept.AddRange(targetOpts);
+        foreach (var opt in targetOpts)
+        {
+            if (opt.CardInstanceId is null) continue;
+            if (!keptInstanceIds.Add(opt.CardInstanceId)) continue;
+            kept.Add(opt);
+        }
         return kept;
+    }
+
+    private static void AddTemplates(
+        Dictionary<string, string> sink,
+        IReadOnlyList<AutoBazaarCardSnapshot> cards)
+    {
+        foreach (var c in cards)
+        {
+            if (string.IsNullOrEmpty(c.InstanceId) || string.IsNullOrEmpty(c.TemplateId)) continue;
+            sink[c.InstanceId] = c.TemplateId!;
+        }
     }
 
     private static void AddOwnedRefs(
