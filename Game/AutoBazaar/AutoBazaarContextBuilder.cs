@@ -76,8 +76,9 @@ internal static class AutoBazaarContextBuilder
 
         bool isInRun = run != null && appState is RunAppState;
         bool hasActiveRun = Data.HasActiveRun;
-        // CanStartOrContinueRun: safely false in v1 — we cannot reliably detect hero-select
-        bool canStartOrContinueRun = false;
+        // CanStartOrContinueRun: true on the hero-select scene with profile loaded
+        // and no active AppState — see AutoBazaarSceneProbe for the conservative check.
+        bool canStartOrContinueRun = AutoBazaarSceneProbe.IsAtHeroSelectAndReadyForNewRun();
 
         string? runId = null;
         if (run != null && run.GameModeId != default(Guid))
