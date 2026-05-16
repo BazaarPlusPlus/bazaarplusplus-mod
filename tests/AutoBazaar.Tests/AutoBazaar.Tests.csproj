@@ -52,5 +52,9 @@
       Include="..\..\Game\AutoBazaar\AutoBazaarDecisionLog.cs"
       Link="AutoBazaarDecisionLog.cs"
     />
+    <Compile
+      Include="..\..\Game\AutoBazaar\AutoBazaarActionQueue.cs"
+      Link="AutoBazaarActionQueue.cs"
+    />
   </ItemGroup>
 </Project>
