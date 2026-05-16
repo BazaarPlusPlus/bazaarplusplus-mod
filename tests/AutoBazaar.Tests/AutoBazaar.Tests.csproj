@@ -32,5 +32,9 @@
       Include="..\..\Game\AutoBazaar\IsExternalInitPolyfill.cs"
       Link="IsExternalInitPolyfill.cs"
     />
+    <Compile
+      Include="..\..\Game\AutoBazaar\AutoBazaarContextSnapshot.cs"
+      Link="AutoBazaarContextSnapshot.cs"
+    />
   </ItemGroup>
 </Project>
