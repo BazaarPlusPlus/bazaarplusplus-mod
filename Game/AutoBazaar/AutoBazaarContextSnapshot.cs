@@ -65,6 +65,7 @@ internal sealed class AutoBazaarContextSnapshotPublisher
             RerollsRemaining = src.RerollsRemaining,
             CurrentEncounterId = src.CurrentEncounterId,
             ActionCooldownRemainingSeconds = src.ActionCooldownRemainingSeconds,
+            InteractableTemplateIds = src.InteractableTemplateIds,
             BoardItems = src.BoardItems,
             ChestItems = src.ChestItems,
             PlayerSkills = src.PlayerSkills,
@@ -91,6 +92,7 @@ internal sealed class AutoBazaarContextSnapshotPublisher
             && a.RerollsRemaining == b.RerollsRemaining
             && a.CurrentEncounterId == b.CurrentEncounterId
             && a.ActionCooldownRemainingSeconds == b.ActionCooldownRemainingSeconds
+            && SocketsEqual(a.InteractableTemplateIds, b.InteractableTemplateIds)
             && CardsEqual(a.BoardItems, b.BoardItems)
             && CardsEqual(a.ChestItems, b.ChestItems)
             && CardsEqual(a.PlayerSkills, b.PlayerSkills)

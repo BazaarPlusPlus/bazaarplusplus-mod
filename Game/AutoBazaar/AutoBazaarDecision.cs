@@ -139,6 +139,9 @@ internal sealed class AutoBazaarContext
     public string? CurrentEncounterId { get; init; }
     public double ActionCooldownRemainingSeconds { get; init; }
 
+    /// <summary>Template IDs the game currently restricts player clicks to (target-selection mode: upgrade, enchant). Null/empty means no filter is active. When non-empty, only owned cards whose templateId is in this set accept a SelectItem POST; offer-based SelectItem actions are suppressed from <see cref="AvailableActions"/>.</summary>
+    public IReadOnlyList<string>? InteractableTemplateIds { get; init; }
+
     public IReadOnlyList<AutoBazaarCardSnapshot> BoardItems { get; init; } = System.Array.Empty<AutoBazaarCardSnapshot>();
     public IReadOnlyList<AutoBazaarCardSnapshot> ChestItems { get; init; } = System.Array.Empty<AutoBazaarCardSnapshot>();
     public IReadOnlyList<AutoBazaarCardSnapshot> PlayerSkills { get; init; } = System.Array.Empty<AutoBazaarCardSnapshot>();
