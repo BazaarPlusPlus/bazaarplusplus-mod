@@ -94,6 +94,8 @@ internal sealed class AutoBazaarCardSnapshot
     public bool? CanSelect { get; init; }
     public bool? IsFree { get; init; }
     public AutoBazaarTargetSection? TargetSection { get; init; }
+
+    /// <summary>Comma-joined informational hint (e.g. "Socket_2,Socket_3") for human/UI display. Not the authoritative dispatch input — clients must POST <see cref="AutoBazaarAction.TargetSockets"/> sourced from <see cref="AutoBazaarDecisionOption.TargetSockets"/>.</summary>
     public string? TargetSockets { get; init; }
     public string? UnavailableReason { get; init; }
 
@@ -108,6 +110,8 @@ internal sealed class AutoBazaarDecisionOption
     public string DisplayKey { get; init; } = "";
     public string? CardInstanceId { get; init; }
     public AutoBazaarTargetSection? TargetSection { get; init; }
+
+    /// <summary>Structured socket list the validator and dispatcher use to match a POST body. Order-sensitive. Clients pick a triplet `(CardInstanceId, TargetSection, TargetSockets)` from this list verbatim.</summary>
     public IReadOnlyList<string>? TargetSockets { get; init; }
     public AutoBazaarCardSnapshot? Card { get; init; }
 }
