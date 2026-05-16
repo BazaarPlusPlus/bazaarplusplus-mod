@@ -64,4 +64,87 @@ internal static class AutoBazaarTargetSelectionActions
         if (!socketId.StartsWith(prefix, System.StringComparison.Ordinal)) return false;
         return int.TryParse(socketId.Substring(prefix.Length), out index);
     }
+
+    /// <summary>Target-selection mode (filter non-empty): preserve only the
+    /// <c>SelectItem</c> options whose underlying templateId is in the filter (these
+    /// are the only clicks the game accepts), then append owned-card SelectItem
+    /// options for any owned card whose templateId is in the filter — covers the
+    /// BuySpecificCardCondition._canInteractWithOwnedCards=true variant. Existing
+    /// non-SelectItem options pass through untouched.</summary>
+    public static IReadOnlyList<AutoBazaarDecisionOption> ApplyTargetSelectionFilter(
+        IReadOnlyList<AutoBazaarDecisionOption> actions,
+        ISet<string> filter,
+        IReadOnlyList<AutoBazaarCardSnapshot> boardItems,
+        IReadOnlyList<AutoBazaarCardSnapshot> chestItems,
+        IReadOnlyList<AutoBazaarCardSnapshot> playerSkills,
+        IReadOnlyList<AutoBazaarCardSnapshot> selectionOptionsCards)
+    {
+        var templateByInstance = new Dictionary<string, string>();
+        AddTemplates(templateByInstance, boardItems);
+        AddTemplates(templateByInstance, chestItems);
+        AddTemplates(templateByInstance, playerSkills);
+        AddTemplates(templateByInstance, selectionOptionsCards);
+
+        var kept = new List<AutoBazaarDecisionOption>(actions.Count);
+        var keptInstanceIds = new HashSet<string>();
+        foreach (var a in actions)
+        {
+            if (a.ActionKind != AutoBazaarActionKind.SelectItem)
+            {
+                kept.Add(a);
+                continue;
+            }
+            if (a.CardInstanceId is null) continue;
+            if (!templateByInstance.TryGetValue(a.CardInstanceId, out var tid)) continue;
+            if (!filter.Contains(tid)) continue;
+            kept.Add(a);
+            keptInstanceIds.Add(a.CardInstanceId);
+        }
+
+        var owned = new List<OwnedCardRef>();
+        AddOwnedRefs(owned, boardItems, AutoBazaarTargetSection.Hand);
+        AddOwnedRefs(owned, chestItems, AutoBazaarTargetSection.Stash);
+        AddOwnedRefs(owned, playerSkills, AutoBazaarTargetSection.Skill);
+
+        var targetOpts = Emit(filter, owned);
+        foreach (var opt in targetOpts)
+        {
+            if (opt.CardInstanceId is null) continue;
+            if (!keptInstanceIds.Add(opt.CardInstanceId)) continue;
+            kept.Add(opt);
+        }
+        return kept;
+    }
+
+    private static void AddTemplates(
+        Dictionary<string, string> sink,
+        IReadOnlyList<AutoBazaarCardSnapshot> cards)
+    {
+        foreach (var c in cards)
+        {
+            if (string.IsNullOrEmpty(c.InstanceId) || string.IsNullOrEmpty(c.TemplateId)) continue;
+            if (!sink.ContainsKey(c.InstanceId)) sink[c.InstanceId] = c.TemplateId!;
+        }
+    }
+
+    private static void AddOwnedRefs(
+        List<OwnedCardRef> sink,
+        IReadOnlyList<AutoBazaarCardSnapshot> cards,
+        AutoBazaarTargetSection section)
+    {
+        foreach (var c in cards)
+        {
+            if (string.IsNullOrEmpty(c.TemplateId)) continue;
+            int size = ParseCardSize(c.Size);
+            sink.Add(new OwnedCardRef(
+                InstanceId: c.InstanceId,
+                TemplateId: c.TemplateId!,
+                Section: section,
+                LeftSocketId: c.SocketId ?? "",
+                Size: size));
+        }
+    }
+
+    private static int ParseCardSize(string? size)
+        => size switch { "Small" => 1, "Medium" => 2, "Large" => 3, _ => 1 };
 }

@@ -134,7 +134,8 @@ internal static class AutoBazaarContextBuilder
 
         if (interactionFilter is not null)
         {
-            actions = ReplaceSelectItemWithTargetSelection(actions, interactionFilter,
+            actions = AutoBazaarTargetSelectionActions.ApplyTargetSelectionFilter(
+                actions, interactionFilter,
                 boardItems, chestItems, playerSkills, selectionOptions);
         }
 
@@ -564,17 +565,22 @@ internal static class AutoBazaarContextBuilder
         }
 
         // 10. CommitToPedestal — per owned item card that the active pedestal template
-        // marks as a valid upgrade target. PedestalState.CanBeUpgraded(card) runs the
-        // template's SelectionCriteria predicate; we only surface cards it accepts so
-        // the external client never POSTs CommitToPedestal on an ineligible card
-        // (DoDrop short-circuits on the same predicate, so emitting ineligibles would
-        // produce silent server-side rejections).
+        // marks as a valid upgrade target. The eligibility set is computed once per
+        // tick via the probe (which reflects on PedestalState._validCards), so a
+        // pedestal with N owned items costs O(N) per snapshot instead of the O(N²)
+        // we'd pay calling CanBeUpgraded(card) per card. Cards mid-transition (when
+        // AppState.CurrentState is briefly not yet a PedestalState even though
+        // stateName resolves to Pedestal) yield an empty eligibility set and no
+        // CommitToPedestal options — picker should ExitState in that window.
         if (stateName == AutoBazaarRunStateName.Pedestal && canHandleOp(StateOps.CommitToPedestal))
         {
             var pedestalState = AppState.CurrentState as PedestalState;
+            var eligibleIds = pedestalState is null
+                ? new HashSet<string>()
+                : AutoBazaarPedestalEligibilityProbe.ReadEligibleInstanceIds(pedestalState);
             foreach (var card in boardItems)
             {
-                if (!IsPedestalEligible(pedestalState, card.InstanceId)) continue;
+                if (!eligibleIds.Contains(card.InstanceId)) continue;
                 actions.Add(new AutoBazaarDecisionOption
                 {
                     ActionKind = AutoBazaarActionKind.CommitToPedestal,
@@ -586,7 +592,7 @@ internal static class AutoBazaarContextBuilder
             }
             foreach (var card in chestItems)
             {
-                if (!IsPedestalEligible(pedestalState, card.InstanceId)) continue;
+                if (!eligibleIds.Contains(card.InstanceId)) continue;
                 actions.Add(new AutoBazaarDecisionOption
                 {
                     ActionKind = AutoBazaarActionKind.CommitToPedestal,
@@ -724,117 +730,6 @@ internal static class AutoBazaarContextBuilder
         DisplayKey = "StartOrContinueRun",
     };
 
-    /// <summary>Target-selection mode (filter non-empty): keep only the SelectItem
-    /// options whose underlying templateId is in the filter — these are the only
-    /// clicks the game accepts (other clicks fail CanInteractWithCard silently).
-    /// Add owned-card SelectItem options for any owned card whose templateId is in
-    /// the filter (covers BuySpecificCardCondition's _canInteractWithOwnedCards=true
-    /// variant). Card-bearing actions for other ActionKinds pass through unchanged.</summary>
-    private static IReadOnlyList<AutoBazaarDecisionOption> ReplaceSelectItemWithTargetSelection(
-        IReadOnlyList<AutoBazaarDecisionOption> actions,
-        ISet<string> filter,
-        IReadOnlyList<AutoBazaarCardSnapshot> boardItems,
-        IReadOnlyList<AutoBazaarCardSnapshot> chestItems,
-        IReadOnlyList<AutoBazaarCardSnapshot> playerSkills,
-        IReadOnlyList<AutoBazaarCardSnapshot> selectionOptionsCards)
-    {
-        // Build cardInstanceId → templateId lookup across every snapshot (offers + owned).
-        var templateByInstance = new Dictionary<string, string>();
-        AddTemplates(templateByInstance, boardItems);
-        AddTemplates(templateByInstance, chestItems);
-        AddTemplates(templateByInstance, playerSkills);
-        AddTemplates(templateByInstance, selectionOptionsCards);
-
-        var kept = new List<AutoBazaarDecisionOption>(actions.Count);
-        var keptInstanceIds = new HashSet<string>();
-        foreach (var a in actions)
-        {
-            if (a.ActionKind != AutoBazaarActionKind.SelectItem)
-            {
-                kept.Add(a);
-                continue;
-            }
-            if (a.CardInstanceId is null) continue;
-            if (!templateByInstance.TryGetValue(a.CardInstanceId, out var tid)) continue;
-            if (!filter.Contains(tid)) continue;
-            kept.Add(a);
-            keptInstanceIds.Add(a.CardInstanceId);
-        }
-
-        // Owned-card variant for when filter explicitly enumerates owned templates.
-        var owned = new List<AutoBazaarTargetSelectionActions.OwnedCardRef>();
-        AddOwnedRefs(owned, boardItems, AutoBazaarTargetSection.Hand);
-        AddOwnedRefs(owned, chestItems, AutoBazaarTargetSection.Stash);
-        AddOwnedRefs(owned, playerSkills, AutoBazaarTargetSection.Skill);
-
-        var targetOpts = AutoBazaarTargetSelectionActions.Emit(filter, owned);
-        foreach (var opt in targetOpts)
-        {
-            if (opt.CardInstanceId is null) continue;
-            if (!keptInstanceIds.Add(opt.CardInstanceId)) continue;
-            kept.Add(opt);
-        }
-        return kept;
-    }
-
-    private static void AddTemplates(
-        Dictionary<string, string> sink,
-        IReadOnlyList<AutoBazaarCardSnapshot> cards)
-    {
-        foreach (var c in cards)
-        {
-            if (string.IsNullOrEmpty(c.InstanceId) || string.IsNullOrEmpty(c.TemplateId)) continue;
-            sink[c.InstanceId] = c.TemplateId!;
-        }
-    }
-
-    private static void AddOwnedRefs(
-        List<AutoBazaarTargetSelectionActions.OwnedCardRef> sink,
-        IReadOnlyList<AutoBazaarCardSnapshot> cards,
-        AutoBazaarTargetSection section)
-    {
-        foreach (var c in cards)
-        {
-            if (string.IsNullOrEmpty(c.TemplateId)) continue;
-            int size = ParseCardSize(c.Size);
-            sink.Add(new AutoBazaarTargetSelectionActions.OwnedCardRef(
-                InstanceId: c.InstanceId,
-                TemplateId: c.TemplateId!,
-                Section: section,
-                LeftSocketId: c.SocketId ?? "",
-                Size: size));
-        }
-    }
-
-    private static int ParseCardSize(string? size)
-    {
-        return size switch
-        {
-            "Small" => 1,
-            "Medium" => 2,
-            "Large" => 3,
-            _ => 1,
-        };
-    }
-
-    /// <summary>Resolves the live <c>Card</c> object from a snapshot instanceId and
-    /// asks the active <see cref="PedestalState"/> whether it's a legal upgrade target.
-    /// Returns false on any failure so the action list stays conservative.</summary>
-    private static bool IsPedestalEligible(PedestalState? pedestalState, string? instanceId)
-    {
-        if (pedestalState is null || string.IsNullOrEmpty(instanceId)) return false;
-        try
-        {
-            if (!Data.Entities.TryGetValue(new InstanceId(instanceId!), out var entity)) return false;
-            if (entity is not Card card) return false;
-            return pedestalState.CanBeUpgraded(card);
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("AutoBazaar", $"IsPedestalEligible threw for {instanceId}", ex);
-            return false;
-        }
-    }
 
     private static AutoBazaarContext MakeDegenerate(bool isEnabled, double cooldown) => new()
     {
