@@ -3,6 +3,11 @@ using System.Collections.Generic;
 
 namespace BazaarPlusPlus.Game.AutoBazaar;
 
+internal static class AutoBazaarSchema
+{
+    public const string Version = "1.1.0";
+}
+
 internal enum AutoBazaarActionKind
 {
     Wait,
@@ -78,13 +83,21 @@ internal sealed class AutoBazaarCardSnapshot
 {
     public string InstanceId { get; init; } = "";
     public AutoBazaarCardKind Kind { get; init; }
+    public string? Type { get; init; }
     public string? TemplateId { get; init; }
     public string? DisplayName { get; init; }
     public string? Tier { get; init; }
     public string? Size { get; init; }
+    public string? Enchantment { get; init; }
     public string? SocketId { get; init; }
     public AutoBazaarCardLocation Location { get; init; }
     public int Order { get; init; }
+    public IReadOnlyList<string> Tags { get; init; } = System.Array.Empty<string>();
+    public IReadOnlyList<string> HiddenTags { get; init; } = System.Array.Empty<string>();
+    public IReadOnlyDictionary<string, int> Attributes { get; init; } =
+        new Dictionary<string, int>();
+    public IReadOnlyList<AutoBazaarCardAbilitySnapshot> ActiveAbilities { get; init; } =
+        System.Array.Empty<AutoBazaarCardAbilitySnapshot>();
 
     // Selection-only fields
     public int? BuyPrice { get; init; }
@@ -103,6 +116,18 @@ internal sealed class AutoBazaarCardSnapshot
     public bool? CanSell { get; init; }
 }
 
+internal sealed class AutoBazaarCardAbilitySnapshot
+{
+    public string Id { get; init; } = "";
+    public string? InternalName { get; init; }
+    public string? InternalDescription { get; init; }
+    public string? Trigger { get; init; }
+    public string? Action { get; init; }
+    public string? ActiveIn { get; init; }
+    public string? WorksIn { get; init; }
+    public string? Priority { get; init; }
+}
+
 internal sealed class AutoBazaarDecisionOption
 {
     public AutoBazaarActionKind ActionKind { get; init; }
@@ -118,7 +143,7 @@ internal sealed class AutoBazaarDecisionOption
 
 internal sealed class AutoBazaarContext
 {
-    public string SchemaVersion { get; init; } = "1.0.0";
+    public string SchemaVersion { get; init; } = AutoBazaarSchema.Version;
     public ulong TickId { get; init; }
     public string ServerTimeUtc { get; init; } = "";
 
@@ -130,16 +155,27 @@ internal sealed class AutoBazaarContext
 
     public string? RunId { get; init; }
     public AutoBazaarRunStateName StateName { get; init; }
+    public string? PlayerHero { get; init; }
+    public int? Day { get; init; }
+    public int? Hour { get; init; }
+    public int? Wins { get; init; }
+    public int? Losses { get; init; }
     public int PlayerGold { get; init; }
+    public int? PlayerIncome { get; init; }
+    public int? PlayerHealth { get; init; }
+    public int? PlayerMaxHealth { get; init; }
+    public int? PlayerPrestige { get; init; }
+    public int? PlayerLevel { get; init; }
     public bool SelectionIsFree { get; init; }
     public bool CanExit { get; init; }
     public bool CanReroll { get; init; }
     public int RerollCost { get; init; }
     public int RerollsRemaining { get; init; }
     public string? CurrentEncounterId { get; init; }
+    public string? CurrentEncounterType { get; init; }
     public double ActionCooldownRemainingSeconds { get; init; }
 
-    /// <summary>Template IDs the game currently restricts player clicks to (target-selection mode: upgrade, enchant). Null/empty means no filter is active. When non-empty, only owned cards whose templateId is in this set accept a SelectItem POST; offer-based SelectItem actions are suppressed from <see cref="AvailableActions"/>.</summary>
+    /// <summary>Template IDs the game currently restricts player clicks to (target-selection mode: upgrade, enchant). Null/empty means no filter is active. When non-empty, only owned board/chest item cards whose templateId is in this set accept a SelectItem POST; offer-based SelectItem actions are suppressed from <see cref="AvailableActions"/>.</summary>
     public IReadOnlyList<string>? InteractableTemplateIds { get; init; }
 
     public IReadOnlyList<AutoBazaarCardSnapshot> BoardItems { get; init; } = System.Array.Empty<AutoBazaarCardSnapshot>();

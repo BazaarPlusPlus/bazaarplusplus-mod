@@ -25,7 +25,9 @@ public class AutoBazaarActionValidatorTests
         AutoBazaarTargetSection? section = null,
         IReadOnlyList<string>? sockets = null,
         bool? canSelect = null,
-        bool? canSell = null)
+        bool? canSell = null,
+        bool? canAfford = null,
+        bool? canFit = null)
         => new()
         {
             ActionKind = kind,
@@ -37,6 +39,8 @@ public class AutoBazaarActionValidatorTests
                 InstanceId = cardId,
                 CanSelect = canSelect,
                 CanSell = canSell,
+                CanAfford = canAfford,
+                CanFit = canFit,
             },
         };
 
@@ -261,6 +265,30 @@ public class AutoBazaarActionValidatorTests
         Assert.Equal(AutoBazaarValidationCode.StaleOrUnavailable, result.Code);
         Assert.Equal(409, result.HttpStatus);
         Assert.Equal("option marked CanSelect=false", result.Details);
+    }
+
+    [Fact]
+    public void Rule5_SelectItem_CanAffordFalse_RejectsStaleOrUnavailable()
+    {
+        var opt = CardOption(AutoBazaarActionKind.SelectItem, "c1", canAfford: false);
+        var snap = MakeSnap(1, opt);
+        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.SelectItem, CardInstanceId = "c1" };
+        var result = AutoBazaarActionValidator.Validate(snap, action, 0);
+        Assert.Equal(AutoBazaarValidationCode.StaleOrUnavailable, result.Code);
+        Assert.Equal(409, result.HttpStatus);
+        Assert.Equal("option not affordable", result.Details);
+    }
+
+    [Fact]
+    public void Rule5_SelectItem_CanFitFalse_RejectsStaleOrUnavailable()
+    {
+        var opt = CardOption(AutoBazaarActionKind.SelectItem, "c1", canFit: false);
+        var snap = MakeSnap(1, opt);
+        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.SelectItem, CardInstanceId = "c1" };
+        var result = AutoBazaarActionValidator.Validate(snap, action, 0);
+        Assert.Equal(AutoBazaarValidationCode.StaleOrUnavailable, result.Code);
+        Assert.Equal(409, result.HttpStatus);
+        Assert.Equal("option does not fit", result.Details);
     }
 
     // ── Rule 6: CanSell == true ───────────────────────────────────────────────

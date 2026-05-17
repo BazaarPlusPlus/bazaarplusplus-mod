@@ -67,7 +67,7 @@ internal static class AutoBazaarContextBuilder
                 : new[] { WaitOption() };
             return new AutoBazaarContext
             {
-                SchemaVersion = "1.0.0",
+                SchemaVersion = AutoBazaarSchema.Version,
                 ServerTimeUtc = UtcNow(),
                 IsEnabled = isEnabled,
                 StateName = AutoBazaarRunStateName.Unknown,
@@ -92,6 +92,11 @@ internal static class AutoBazaarContextBuilder
 
         // Player gold via attribute system
         int playerGold = run?.Player?.GetAttributeValue(EPlayerAttributeType.Gold) ?? 0;
+        int? playerIncome = run?.Player?.GetAttributeValue(EPlayerAttributeType.Income);
+        int? playerHealth = run?.Player?.GetAttributeValue(EPlayerAttributeType.Health);
+        int? playerMaxHealth = run?.Player?.GetAttributeValue(EPlayerAttributeType.HealthMax);
+        int? playerPrestige = run?.Player?.GetAttributeValue(EPlayerAttributeType.Prestige);
+        int? playerLevel = run?.Player?.GetAttributeValue(EPlayerAttributeType.Level);
 
         bool selectionIsFree = runState?.SelectionContextRules?.SelectionIsFree ?? false;
         bool canExit = runState?.SelectionContextRules?.CanExit ?? false;
@@ -102,6 +107,7 @@ internal static class AutoBazaarContextBuilder
         bool canReroll = canHandleOp(StateOps.Reroll) && rerollsRemaining > 0 && playerGold >= rerollCost;
 
         string? currentEncounterId = runState?.CurrentEncounterId;
+        string? currentEncounterType = ResolveCurrentEncounterType(currentEncounterId);
 
         // --- Card inventories ---
         bool canSell = canHandleOp(StateOps.SellItem);
@@ -111,7 +117,7 @@ internal static class AutoBazaarContextBuilder
         var chestItems = BuildBoardCards(run, playerGold, canSell, AutoBazaarCardLocation.Chest);
         var playerSkills = BuildSkillCards(run, canSell);
 
-        var sellableItems = BuildSellableItems(boardItems, chestItems, playerSkills, canSell);
+        var sellableItems = BuildSellableItems(boardItems, chestItems, canSell);
 
         // Selection set
         List<AutoBazaarCardSnapshot> selectionOptions = BuildSelectionOptions(
@@ -141,7 +147,7 @@ internal static class AutoBazaarContextBuilder
 
         return new AutoBazaarContext
         {
-            SchemaVersion = "1.0.0",
+            SchemaVersion = AutoBazaarSchema.Version,
             TickId = 0,
             ServerTimeUtc = UtcNow(),
             IsEnabled = isEnabled,
@@ -151,13 +157,24 @@ internal static class AutoBazaarContextBuilder
             IsClientBusy = false, // TODO v2: track HttpGameClient busy state
             RunId = runId,
             StateName = stateName,
+            PlayerHero = run?.Player?.Hero.ToString(),
+            Day = run == null ? null : unchecked((int)run.Day),
+            Hour = run == null ? null : unchecked((int)run.Hour),
+            Wins = run == null ? null : unchecked((int)run.Victories),
+            Losses = run == null ? null : unchecked((int)run.Losses),
             PlayerGold = playerGold,
+            PlayerIncome = playerIncome,
+            PlayerHealth = playerHealth,
+            PlayerMaxHealth = playerMaxHealth,
+            PlayerPrestige = playerPrestige,
+            PlayerLevel = playerLevel,
             SelectionIsFree = selectionIsFree,
             CanExit = canExit,
             CanReroll = canReroll,
             RerollCost = rerollCost,
             RerollsRemaining = rerollsRemaining,
             CurrentEncounterId = currentEncounterId,
+            CurrentEncounterType = currentEncounterType,
             ActionCooldownRemainingSeconds = actionCooldownRemainingSeconds,
             InteractableTemplateIds = interactionFilter is not null ? interactionFilterList : null,
             BoardItems = boardItems,
@@ -225,13 +242,19 @@ internal static class AutoBazaarContextBuilder
             {
                 InstanceId = card.InstanceId.Value ?? "",
                 Kind = AutoBazaarCardKind.Item,
+                Type = card.Type.ToString(),
                 TemplateId = card.TemplateId.ToString("D"),
                 DisplayName = card.Name,
                 Tier = card.Tier.ToString(),
                 Size = card.Size.ToString(),
+                Enchantment = card.Enchantment?.ToString(),
                 SocketId = socketId.ToString(),
                 Location = location,
                 Order = order++,
+                Tags = BuildStringList(card.Tags),
+                HiddenTags = BuildStringList(card.HiddenTags),
+                Attributes = BuildAttributes(card),
+                ActiveAbilities = BuildActiveAbilities(card),
                 SellPrice = sellPrice,
                 CanSell = canSell && !card.HiddenTags.Contains(EHiddenTag.Unsellable),
             });
@@ -254,6 +277,7 @@ internal static class AutoBazaarContextBuilder
             {
                 InstanceId = skill.InstanceId.Value ?? "",
                 Kind = AutoBazaarCardKind.Skill,
+                Type = skill.Type.ToString(),
                 TemplateId = skill.TemplateId.ToString("D"),
                 DisplayName = skill.Name,
                 Tier = skill.Tier.ToString(),
@@ -261,6 +285,10 @@ internal static class AutoBazaarContextBuilder
                 SocketId = null,
                 Location = AutoBazaarCardLocation.Skill,
                 Order = order++,
+                Tags = BuildStringList(skill.Tags),
+                HiddenTags = BuildStringList(skill.HiddenTags),
+                Attributes = BuildAttributes(skill),
+                ActiveAbilities = BuildActiveAbilities(skill),
                 SellPrice = sellPrice,
                 CanSell = canSell && !skill.HiddenTags.Contains(EHiddenTag.Unsellable),
             });
@@ -272,7 +300,6 @@ internal static class AutoBazaarContextBuilder
     private static IReadOnlyList<AutoBazaarCardSnapshot> BuildSellableItems(
         IReadOnlyList<AutoBazaarCardSnapshot> boardItems,
         IReadOnlyList<AutoBazaarCardSnapshot> chestItems,
-        IReadOnlyList<AutoBazaarCardSnapshot> playerSkills,
         bool canSell)
     {
         if (!canSell) return Array.Empty<AutoBazaarCardSnapshot>();
@@ -280,7 +307,6 @@ internal static class AutoBazaarContextBuilder
         var result = new List<AutoBazaarCardSnapshot>();
         foreach (var c in boardItems) if (c.CanSell == true) result.Add(c);
         foreach (var c in chestItems) if (c.CanSell == true) result.Add(c);
-        foreach (var c in playerSkills) if (c.CanSell == true) result.Add(c);
         return result;
     }
 
@@ -352,22 +378,35 @@ internal static class AutoBazaarContextBuilder
                 canFit = true; // encounters don't need a placement
             }
 
+            var canSelect = kind switch
+            {
+                AutoBazaarCardKind.Item => canSelectItem && canAfford && canFit,
+                AutoBazaarCardKind.Skill => canAfford && canFit,
+                _ => true,
+            };
+
             result.Add(new AutoBazaarCardSnapshot
             {
                 InstanceId = card.InstanceId.Value ?? "",
                 Kind = kind,
+                Type = card.Type.ToString(),
                 TemplateId = card.TemplateId.ToString("D"),
                 DisplayName = card.Name,
                 Tier = card.Tier.ToString(),
                 Size = card.Size.ToString(),
+                Enchantment = (card as ItemCard)?.Enchantment?.ToString(),
                 SocketId = null,
                 Location = AutoBazaarCardLocation.Selection,
                 Order = order++,
+                Tags = BuildStringList(card.Tags),
+                HiddenTags = BuildStringList(card.HiddenTags),
+                Attributes = BuildAttributes(card),
+                ActiveAbilities = BuildActiveAbilities(card),
                 BuyPrice = buyPrice,
                 SellPrice = sellPrice,
                 CanAfford = canAfford,
                 CanFit = canFit,
-                CanSelect = true,
+                CanSelect = canSelect,
                 IsFree = selectionIsFree,
                 TargetSection = targetSection,
                 TargetSockets = targetSockets,
@@ -466,7 +505,7 @@ internal static class AutoBazaarContextBuilder
         // 7. SellItem — per-card
         if (canSell && canHandleOp(StateOps.SellItem))
         {
-            foreach (var card in SellableSnapshotsFrom(boardItems, chestItems, playerSkills))
+            foreach (var card in SellableSnapshotsFrom(boardItems, chestItems))
             {
                 if (card.CanSell != true) continue;
                 actions.Add(new AutoBazaarDecisionOption
@@ -687,12 +726,10 @@ internal static class AutoBazaarContextBuilder
 
     private static IEnumerable<AutoBazaarCardSnapshot> SellableSnapshotsFrom(
         IReadOnlyList<AutoBazaarCardSnapshot> board,
-        IReadOnlyList<AutoBazaarCardSnapshot> chest,
-        IReadOnlyList<AutoBazaarCardSnapshot> skills)
+        IReadOnlyList<AutoBazaarCardSnapshot> chest)
     {
         foreach (var c in board) yield return c;
         foreach (var c in chest) yield return c;
-        foreach (var c in skills) yield return c;
     }
 
     private static int ParseSize(string? size)
@@ -716,6 +753,76 @@ internal static class AutoBazaarContextBuilder
         return -1;
     }
 
+    private static string? ResolveCurrentEncounterType(string? currentEncounterId)
+    {
+        if (string.IsNullOrWhiteSpace(currentEncounterId)) return null;
+        if (!Guid.TryParse(currentEncounterId, out var templateId)) return null;
+
+        foreach (var entity in Data.Entities.Values)
+        {
+            if (entity is not Card card) continue;
+            if (card.TemplateId != templateId) continue;
+            return card.Template?.GetType().Name ?? card.Type.ToString();
+        }
+        return null;
+    }
+
+    private static IReadOnlyDictionary<string, int> BuildAttributes(Card card)
+    {
+        var result = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        if (card.Attributes == null) return result;
+        foreach (var kv in card.Attributes)
+        {
+            result[kv.Key.ToString()] = kv.Value;
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<string> BuildStringList<T>(IEnumerable<T>? source)
+    {
+        if (source is null) return Array.Empty<string>();
+        var result = new List<string>();
+        foreach (var value in source)
+        {
+            if (value is null) continue;
+            result.Add(value.ToString() ?? "");
+        }
+        result.Sort(StringComparer.Ordinal);
+        return result;
+    }
+
+    private static IReadOnlyList<AutoBazaarCardAbilitySnapshot> BuildActiveAbilities(Card card)
+    {
+        try
+        {
+            var result = new List<AutoBazaarCardAbilitySnapshot>();
+            foreach (var ability in card.GetActiveAbilities())
+            {
+                if (ability is null) continue;
+                result.Add(new AutoBazaarCardAbilitySnapshot
+                {
+                    Id = ability.Id,
+                    InternalName = EmptyAsNull(ability.InternalName),
+                    InternalDescription = EmptyAsNull(ability.InternalDescription),
+                    Trigger = ability.Trigger?.GetType().Name,
+                    Action = ability.Action?.GetType().Name,
+                    ActiveIn = ability.ActiveIn.ToString(),
+                    WorksIn = ability.WorksIn.ToString(),
+                    Priority = ability.Priority.ToString(),
+                });
+            }
+            result.Sort((x, y) => string.CompareOrdinal(x.Id, y.Id));
+            return result;
+        }
+        catch
+        {
+            return Array.Empty<AutoBazaarCardAbilitySnapshot>();
+        }
+    }
+
+    private static string? EmptyAsNull(string? value)
+        => string.IsNullOrEmpty(value) ? null : value;
+
     private static AutoBazaarDecisionOption WaitOption() => new()
     {
         ActionKind = AutoBazaarActionKind.Wait,
@@ -733,7 +840,7 @@ internal static class AutoBazaarContextBuilder
 
     private static AutoBazaarContext MakeDegenerate(bool isEnabled, double cooldown) => new()
     {
-        SchemaVersion = "1.0.0",
+        SchemaVersion = AutoBazaarSchema.Version,
         ServerTimeUtc = UtcNow(),
         IsEnabled = isEnabled,
         StateName = AutoBazaarRunStateName.Unknown,

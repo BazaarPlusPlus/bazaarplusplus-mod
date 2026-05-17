@@ -57,13 +57,24 @@ internal sealed class AutoBazaarContextSnapshotPublisher
             IsClientBusy = src.IsClientBusy,
             RunId = src.RunId,
             StateName = src.StateName,
+            PlayerHero = src.PlayerHero,
+            Day = src.Day,
+            Hour = src.Hour,
+            Wins = src.Wins,
+            Losses = src.Losses,
             PlayerGold = src.PlayerGold,
+            PlayerIncome = src.PlayerIncome,
+            PlayerHealth = src.PlayerHealth,
+            PlayerMaxHealth = src.PlayerMaxHealth,
+            PlayerPrestige = src.PlayerPrestige,
+            PlayerLevel = src.PlayerLevel,
             SelectionIsFree = src.SelectionIsFree,
             CanExit = src.CanExit,
             CanReroll = src.CanReroll,
             RerollCost = src.RerollCost,
             RerollsRemaining = src.RerollsRemaining,
             CurrentEncounterId = src.CurrentEncounterId,
+            CurrentEncounterType = src.CurrentEncounterType,
             ActionCooldownRemainingSeconds = src.ActionCooldownRemainingSeconds,
             InteractableTemplateIds = src.InteractableTemplateIds,
             BoardItems = src.BoardItems,
@@ -84,13 +95,24 @@ internal sealed class AutoBazaarContextSnapshotPublisher
             && a.IsClientBusy == b.IsClientBusy
             && a.RunId == b.RunId
             && a.StateName == b.StateName
+            && a.PlayerHero == b.PlayerHero
+            && a.Day == b.Day
+            && a.Hour == b.Hour
+            && a.Wins == b.Wins
+            && a.Losses == b.Losses
             && a.PlayerGold == b.PlayerGold
+            && a.PlayerIncome == b.PlayerIncome
+            && a.PlayerHealth == b.PlayerHealth
+            && a.PlayerMaxHealth == b.PlayerMaxHealth
+            && a.PlayerPrestige == b.PlayerPrestige
+            && a.PlayerLevel == b.PlayerLevel
             && a.SelectionIsFree == b.SelectionIsFree
             && a.CanExit == b.CanExit
             && a.CanReroll == b.CanReroll
             && a.RerollCost == b.RerollCost
             && a.RerollsRemaining == b.RerollsRemaining
             && a.CurrentEncounterId == b.CurrentEncounterId
+            && a.CurrentEncounterType == b.CurrentEncounterType
             && a.ActionCooldownRemainingSeconds == b.ActionCooldownRemainingSeconds
             && SocketsEqual(a.InteractableTemplateIds, b.InteractableTemplateIds)
             && CardsEqual(a.BoardItems, b.BoardItems)
@@ -112,13 +134,19 @@ internal sealed class AutoBazaarContextSnapshotPublisher
     {
         return a.InstanceId == b.InstanceId
             && a.Kind == b.Kind
+            && a.Type == b.Type
             && a.TemplateId == b.TemplateId
             && a.DisplayName == b.DisplayName
             && a.Tier == b.Tier
             && a.Size == b.Size
+            && a.Enchantment == b.Enchantment
             && a.SocketId == b.SocketId
             && a.Location == b.Location
             && a.Order == b.Order
+            && SocketsEqual(a.Tags, b.Tags)
+            && SocketsEqual(a.HiddenTags, b.HiddenTags)
+            && AttributesEqual(a.Attributes, b.Attributes)
+            && AbilitiesEqual(a.ActiveAbilities, b.ActiveAbilities)
             && a.BuyPrice == b.BuyPrice
             && a.SellPrice == b.SellPrice
             && a.CanAfford == b.CanAfford
@@ -156,6 +184,41 @@ internal sealed class AutoBazaarContextSnapshotPublisher
         if (a is null || b is null) return false;
         if (a.Count != b.Count) return false;
         for (var i = 0; i < a.Count; i++) if (a[i] != b[i]) return false;
+        return true;
+    }
+
+    private static bool AttributesEqual(
+        IReadOnlyDictionary<string, int> a,
+        IReadOnlyDictionary<string, int> b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a.Count != b.Count) return false;
+        foreach (var kv in a)
+        {
+            if (!b.TryGetValue(kv.Key, out var value) || value != kv.Value) return false;
+        }
+        return true;
+    }
+
+    private static bool AbilitiesEqual(
+        IReadOnlyList<AutoBazaarCardAbilitySnapshot> a,
+        IReadOnlyList<AutoBazaarCardAbilitySnapshot> b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a.Count != b.Count) return false;
+        for (var i = 0; i < a.Count; i++)
+        {
+            var x = a[i];
+            var y = b[i];
+            if (x.Id != y.Id) return false;
+            if (x.InternalName != y.InternalName) return false;
+            if (x.InternalDescription != y.InternalDescription) return false;
+            if (x.Trigger != y.Trigger) return false;
+            if (x.Action != y.Action) return false;
+            if (x.ActiveIn != y.ActiveIn) return false;
+            if (x.WorksIn != y.WorksIn) return false;
+            if (x.Priority != y.Priority) return false;
+        }
         return true;
     }
 }

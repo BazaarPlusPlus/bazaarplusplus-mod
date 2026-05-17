@@ -44,6 +44,47 @@ public class AutoBazaarContextSnapshotTests
     }
 
     [Fact]
+    public void Publish_DifferentRunProgressFields_BumpsTickId()
+    {
+        var pub = new AutoBazaarContextSnapshotPublisher();
+        var s1 = pub.Publish(new AutoBazaarContext
+        {
+            IsEnabled = true,
+            StateName = AutoBazaarRunStateName.Choice,
+            PlayerHero = "Vanessa",
+            Day = 1,
+            Hour = 2,
+            Wins = 0,
+            Losses = 0,
+            PlayerHealth = 100,
+            PlayerMaxHealth = 100,
+            PlayerPrestige = 20,
+            PlayerLevel = 1,
+            PlayerIncome = 1,
+            CurrentEncounterType = "TCardEncounterEvent",
+        });
+        var s2 = pub.Publish(new AutoBazaarContext
+        {
+            IsEnabled = true,
+            StateName = AutoBazaarRunStateName.Choice,
+            PlayerHero = "Vanessa",
+            Day = 1,
+            Hour = 3,
+            Wins = 0,
+            Losses = 0,
+            PlayerHealth = 100,
+            PlayerMaxHealth = 100,
+            PlayerPrestige = 20,
+            PlayerLevel = 1,
+            PlayerIncome = 1,
+            CurrentEncounterType = "TCardEncounterEvent",
+        });
+
+        Assert.Equal(1UL, s1.TickId);
+        Assert.Equal(2UL, s2.TickId);
+    }
+
+    [Fact]
     public void Publish_DifferentStateName_BumpsTickId()
     {
         var pub = new AutoBazaarContextSnapshotPublisher();
@@ -82,6 +123,67 @@ public class AutoBazaarContextSnapshotTests
         };
         var s1 = pub.Publish(withOne);
         var s2 = pub.Publish(withTwo);
+        Assert.NotEqual(s1.TickId, s2.TickId);
+    }
+
+    [Fact]
+    public void Publish_CardMetadataDiffers_BumpsTickId()
+    {
+        var pub = new AutoBazaarContextSnapshotPublisher();
+        var basic = new AutoBazaarContext
+        {
+            IsEnabled = true,
+            BoardItems = new[]
+            {
+                new AutoBazaarCardSnapshot
+                {
+                    InstanceId = "i1",
+                    Kind = AutoBazaarCardKind.Item,
+                    Type = "Item",
+                    Tags = new[] { "Weapon" },
+                    HiddenTags = new[] { "Damage" },
+                    Attributes = new Dictionary<string, int> { ["DamageAmount"] = 10 },
+                    ActiveAbilities = new[]
+                    {
+                        new AutoBazaarCardAbilitySnapshot
+                        {
+                            Id = "a1",
+                            Action = "TActionDamage",
+                            Trigger = "TTriggerOnCardFired",
+                        },
+                    },
+                },
+            },
+        };
+        var changed = new AutoBazaarContext
+        {
+            IsEnabled = true,
+            BoardItems = new[]
+            {
+                new AutoBazaarCardSnapshot
+                {
+                    InstanceId = "i1",
+                    Kind = AutoBazaarCardKind.Item,
+                    Type = "Item",
+                    Tags = new[] { "Weapon" },
+                    HiddenTags = new[] { "Damage" },
+                    Attributes = new Dictionary<string, int> { ["DamageAmount"] = 12 },
+                    ActiveAbilities = new[]
+                    {
+                        new AutoBazaarCardAbilitySnapshot
+                        {
+                            Id = "a1",
+                            Action = "TActionDamage",
+                            Trigger = "TTriggerOnCardFired",
+                        },
+                    },
+                },
+            },
+        };
+
+        var s1 = pub.Publish(basic);
+        var s2 = pub.Publish(changed);
+
         Assert.NotEqual(s1.TickId, s2.TickId);
     }
 

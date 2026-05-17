@@ -231,7 +231,7 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         var payload = new
         {
             baseUrl = $"http://127.0.0.1:{Port}",
-            schemaVersion = "1.0.0",
+            schemaVersion = AutoBazaarSchema.Version,
             pid = System.Diagnostics.Process.GetCurrentProcess().Id,
         };
         var json = JsonConvert.SerializeObject(payload, _json);

@@ -49,6 +49,10 @@
       Link="AutoBazaarActionValidator.cs"
     />
     <Compile
+      Include="..\..\Game\AutoBazaar\AutoBazaarResponseJson.cs"
+      Link="AutoBazaarResponseJson.cs"
+    />
+    <Compile
       Include="..\..\Game\AutoBazaar\AutoBazaarDecisionLog.cs"
       Link="AutoBazaarDecisionLog.cs"
     />

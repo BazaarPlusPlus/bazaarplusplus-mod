@@ -122,6 +122,21 @@ internal static class AutoBazaarActionValidator
                     "option marked CanSelect=false");
         }
 
+        if (matchedOption is not null
+            && kind is AutoBazaarActionKind.SelectItem or AutoBazaarActionKind.SelectSkill)
+        {
+            if (matchedOption.Card?.CanAfford == false)
+                return Fail(AutoBazaarValidationCode.StaleOrUnavailable, 409,
+                    "option not affordable");
+        }
+
+        if (matchedOption is not null && kind == AutoBazaarActionKind.SelectItem)
+        {
+            if (matchedOption.Card?.CanFit == false)
+                return Fail(AutoBazaarValidationCode.StaleOrUnavailable, 409,
+                    "option does not fit");
+        }
+
         // ── Rule 6: CanSell == true ────────────────────────────────────────────
         if (kind == AutoBazaarActionKind.SellItem && matchedOption is not null)
         {

@@ -30,10 +30,14 @@ internal static class AutoBazaarTargetSelectionActions
             if (string.IsNullOrEmpty(c.TemplateId)) continue;
             if (!filter.Contains(c.TemplateId)) continue;
             if (!seen.Add(c.InstanceId)) continue;
+            if (c.Section is not AutoBazaarTargetSection.Hand
+                && c.Section is not AutoBazaarTargetSection.Stash)
+            {
+                continue;
+            }
 
             IReadOnlyList<string>? sockets = null;
-            if ((c.Section is AutoBazaarTargetSection.Hand || c.Section is AutoBazaarTargetSection.Stash)
-                && !string.IsNullOrEmpty(c.LeftSocketId)
+            if (!string.IsNullOrEmpty(c.LeftSocketId)
                 && c.Size > 0
                 && TryParseSocketIndex(c.LeftSocketId, out var start))
             {
@@ -104,7 +108,6 @@ internal static class AutoBazaarTargetSelectionActions
         var owned = new List<OwnedCardRef>();
         AddOwnedRefs(owned, boardItems, AutoBazaarTargetSection.Hand);
         AddOwnedRefs(owned, chestItems, AutoBazaarTargetSection.Stash);
-        AddOwnedRefs(owned, playerSkills, AutoBazaarTargetSection.Skill);
 
         var targetOpts = Emit(filter, owned);
         foreach (var opt in targetOpts)

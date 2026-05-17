@@ -23,7 +23,7 @@ On startup the mod writes a discovery file:
 The file is deleted on shutdown. Its contents:
 
 ```json
-{"baseUrl":"http://127.0.0.1:47900","schemaVersion":"1.0.0","pid":12345}
+{"baseUrl":"http://127.0.0.1:47900","schemaVersion":"1.1.0","pid":12345}
 ```
 
 All POST requests are subject to a 64 KB body cap. Requests whose declared `Content-Length` header exceeds 65536 bytes are rejected immediately with `413` before the body is read. Requests without a declared length are read up to 65537 bytes and rejected if that limit is reached.
@@ -66,7 +66,7 @@ Top-level scalar fields:
 
 | Field | Type | Description |
 |---|---|---|
-| `schemaVersion` | string | Semver string, e.g. `"1.0.0"` |
+| `schemaVersion` | string | Semver string, e.g. `"1.1.0"` |
 | `tickId` | uint64 | Monotonically increasing counter; resets to 1 when the listener restarts |
 | `serverTimeUtc` | string | ISO-8601 UTC timestamp of snapshot build; excluded from ETag fingerprint |
 | `isEnabled` | bool | Whether AutoBazaar is active |
@@ -76,15 +76,26 @@ Top-level scalar fields:
 | `isClientBusy` | bool | Whether the game client is busy (e.g. waiting for server) |
 | `runId` | string\|null | Run identifier from the game; null when no run is active |
 | `stateName` | string | Current run state; see enum reference |
+| `playerHero` | string\|null | Current player hero |
+| `day` | int\|null | Current run day |
+| `hour` | int\|null | Current run hour |
+| `wins` | int\|null | Current run win count |
+| `losses` | int\|null | Current run loss count |
 | `playerGold` | int | Current gold amount |
+| `playerIncome` | int\|null | Current income |
+| `playerHealth` | int\|null | Current health |
+| `playerMaxHealth` | int\|null | Current max health |
+| `playerPrestige` | int\|null | Current prestige |
+| `playerLevel` | int\|null | Current level |
 | `selectionIsFree` | bool | Whether the current selection costs no gold |
 | `canExit` | bool | Whether `ExitState` is legal |
 | `canReroll` | bool | Whether `Reroll` is legal |
 | `rerollCost` | int | Gold cost for next reroll |
 | `rerollsRemaining` | int | Rerolls available in this state |
 | `currentEncounterId` | string\|null | Template ID of the active encounter card, if any |
+| `currentEncounterType` | string\|null | Runtime template type for the active encounter when it can be resolved from live entities |
 | `actionCooldownRemainingSeconds` | float64 | Seconds until the cooldown gate clears; 0 when no gate is active |
-| `interactableTemplateIds` | string[] \| omitted | When present and non-empty, the game is in target-selection mode (upgrade/enchant). Clients pick from `availableActions` `SelectItem` options targeting owned cards whose templateId is in this set. See "Target-selection mode" section. |
+| `interactableTemplateIds` | string[] \| omitted | When present and non-empty, the game is in target-selection mode (upgrade/enchant). Clients pick from `availableActions` `SelectItem` options targeting owned board/chest item cards whose templateId is in this set. See "Target-selection mode" section. |
 
 Card list fields (each element is an `AutoBazaarCardSnapshot`):
 
@@ -104,13 +115,19 @@ Card list fields (each element is an `AutoBazaarCardSnapshot`):
 |---|---|---|---|
 | `instanceId` | string | all | Unique card instance identifier |
 | `kind` | string | all | `Item`, `Skill`, `Encounter`, `Unknown` |
+| `type` | string\|null | all | Raw game `ECardType` name |
 | `templateId` | string\|null | all | Card template identifier |
 | `displayName` | string\|null | all | Human-readable card name |
 | `tier` | string\|null | all | Card tier |
 | `size` | string\|null | all | Card size |
+| `enchantment` | string\|null | item | Item enchantment name, when present |
 | `socketId` | string\|null | all | Socket the card occupies, if any |
 | `location` | string | all | `Selection`, `Board`, `Chest`, `Skill`, `Unknown` |
 | `order` | int | all | Display order |
+| `tags` | string[] | all | Sorted card tag names |
+| `hiddenTags` | string[] | all | Sorted hidden tag names |
+| `attributes` | object | all | Card attributes as `{ attributeName: integerValue }`, sorted by attribute name at build time |
+| `activeAbilities` | object[] | all | Active ability summaries. Each object may include `id`, `internalName`, `internalDescription`, `trigger`, `action`, `activeIn`, `worksIn`, and `priority`. |
 | `buyPrice` | int\|null | selection | Gold cost to purchase |
 | `sellPrice` | int\|null | selection | Gold received on sale |
 | `canAfford` | bool\|null | selection | Whether the player can afford this card |
@@ -159,7 +176,7 @@ Card-bearing kinds are: `SelectItem`, `SelectSkill`, `SelectEncounter`, `CommitT
 
 ```jsonc
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "decisionId": "01HXYZ...",
   "executed": true,
   "tickId": 12346,
@@ -193,7 +210,7 @@ Future error codes are possible. Clients must tolerate unknown codes: log the re
 
 ## 5. Validation rules
 
-Rules are applied in order. The first failure terminates validation and the error is returned. Rules 1–6 and 8 run before dispatch; rule 7 (`forTickId`) runs between rule 6 and rule 8.
+Rules are applied in order. The first failure terminates validation and the error is returned. Rules 1–6, including 5a/5b, and rule 8 run before dispatch; rule 7 (`forTickId`) runs between rule 6 and rule 8.
 
 | # | Name | Trigger | Failure: status / code / extra |
 |---|---|---|---|
@@ -202,6 +219,8 @@ Rules are applied in order. The first failure terminates validation and the erro
 | 3 | Card-bearing exact match | For card-bearing kinds: no `availableActions` entry matches `(cardInstanceId, targetSection, targetSockets)` exactly | 409 `stale-or-unavailable` + `currentTickId` |
 | 4 | Hero / PlayMode valid | `hero` supplied but not a known hero name; or `playMode` supplied but not a known play mode (applies to `StartOrContinueRun` only) | 400 `invalid` |
 | 5 | CanSelect not false | Matched option's card has `canSelect == false` (applies to `SelectItem`, `SelectSkill`, `SelectEncounter`, `CommitToPedestal`) | 409 `stale-or-unavailable` |
+| 5a | CanAfford not false | Matched option's card has `canAfford == false` (applies to `SelectItem`, `SelectSkill`) | 409 `stale-or-unavailable` |
+| 5b | CanFit not false | Matched option's card has `canFit == false` (applies to `SelectItem`) | 409 `stale-or-unavailable` |
 | 6 | CanSell true | Matched option's card does not have `canSell == true` (applies to `SellItem`) | 409 `stale-or-unavailable` |
 | 7 | forTickId match | `forTickId` supplied but does not equal current snapshot `tickId` | 409 `stale-or-unavailable` + `currentTickId` |
 | 8 | Cooldown gate | `cooldownRemainingSeconds > 0` for any non-`Wait` action | 429 `cooldown` + `retryAfterSeconds` |
@@ -268,15 +287,15 @@ The mod auto-handles two zero-decision UI gates so external tools do not need to
 
 ## 8.5. Target-selection mode
 
-Certain encounters (upgrade, enchant, etc.) show a UI dialog asking the player to click one of their own cards. Internally the game populates an interaction filter (a set of templateIds) and only accepts clicks on owned cards whose templateId is in that set; other clicks silently no-op.
+Certain encounters (upgrade, enchant, etc.) show a UI dialog asking the player to click one of their own cards. Internally the game populates an interaction filter (a set of templateIds) and accepts clicks on matching owned item cards; other clicks silently no-op.
 
 While the filter is non-empty:
 
 - `context.interactableTemplateIds` is the filter contents.
 - `availableActions` does **not** include offer-based `SelectItem` options (the game would reject them).
-- For each of the player's owned cards (in `boardItems` / `chestItems` / `playerSkills`) whose `templateId` is in the filter, `availableActions` contains a `SelectItem` entry whose `cardInstanceId` is that owned card. `targetSection` and `targetSockets` reflect the card's current placement so the dispatcher's `BuyItemCommand` walks the `CanFuse()` path and the server applies the upgrade.
+- For each of the player's owned item cards (in `boardItems` / `chestItems`) whose `templateId` is in the filter, `availableActions` contains a `SelectItem` entry whose `cardInstanceId` is that owned item. `targetSection` and `targetSockets` reflect the card's current placement so the dispatcher's `BuyItemCommand` walks the `CanFuse()` path and the server applies the upgrade.
 
-Client recipe: when `interactableTemplateIds` is present, pick the first `SelectItem` entry from `availableActions` and POST it verbatim. If no `SelectItem` entries exist despite a non-empty filter, none of your owned cards match — bail with `ExitState` (where allowed) or `AbandonRun`.
+Client recipe: when `interactableTemplateIds` is present, pick the first `SelectItem` entry from `availableActions` and POST it verbatim. If no `SelectItem` entries exist despite a non-empty filter, none of your owned item cards match — bail with `ExitState` (where allowed) or `AbandonRun`.
 
 ---
 
@@ -333,7 +352,7 @@ Toggling `Enabled` back to `true` restarts the listener. `tickId` restarts from 
 
 ## 11. Cooldown gate
 
-After every non-`Wait` action that the mod dispatched (`executed: true`), a 1.0 second minimum-delay gate is set. Subsequent non-`Wait` POST requests within that window are rejected with `429 cooldown` and `retryAfterSeconds` in the error extra payload.
+After every non-`Wait` action that the mod dispatched (`executed: true`), a 1.0 second minimum-delay gate is set. Subsequent non-`Wait` POST requests within that window are rejected with `429 cooldown` and `retryAfterSeconds` inside the `extra` object.
 
 `Wait` neither consumes the gate nor resets it. The cooldown gate is independent of `DecisionIntervalSeconds`, which controls the snapshot tick cadence.
 

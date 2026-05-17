@@ -163,7 +163,7 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
     {
         var payload = new
         {
-            schemaVersion = "1.0.0",
+            schemaVersion = AutoBazaarSchema.Version,
             decisionId,
             executed,
             tickId = snap.TickId,
@@ -174,24 +174,7 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
 
     private string BuildErrorBody(AutoBazaarValidationResult validation)
     {
-        var code = validation.Code switch
-        {
-            AutoBazaarValidationCode.Invalid => "invalid",
-            AutoBazaarValidationCode.StaleOrUnavailable => "stale-or-unavailable",
-            AutoBazaarValidationCode.Cooldown => "cooldown",
-            AutoBazaarValidationCode.Unavailable => "unavailable",
-            _ => "internal",
-        };
-        var envelope = new Dictionary<string, object?>
-        {
-            ["error"] = code,
-        };
-        if (validation.Details is not null) envelope["details"] = validation.Details;
-        if (validation.Extra is not null)
-        {
-            foreach (var kv in validation.Extra) envelope[kv.Key] = kv.Value;
-        }
-        return JsonConvert.SerializeObject(envelope, _responseJson);
+        return AutoBazaarResponseJson.BuildValidationErrorBody(validation);
     }
 
     private void LogDecision(string decisionId, AutoBazaarContextSnapshot snap, AutoBazaarAction action, bool executed, string? error)

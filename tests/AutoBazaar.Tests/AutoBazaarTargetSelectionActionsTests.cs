@@ -70,14 +70,12 @@ public class AutoBazaarTargetSelectionActionsTests
     }
 
     [Fact]
-    public void Emit_SkillCard_NoSocketsField()
+    public void Emit_SkillCard_DoesNotEmitSelectItem()
     {
         var emit = AutoBazaarTargetSelectionActions.Emit(
             new HashSet<string> { "ts1" },
             new[] { Card("skl_a", "ts1", AutoBazaarTargetSection.Skill, "", 1) });
-        Assert.Single(emit);
-        Assert.Equal(AutoBazaarTargetSection.Skill, emit[0].TargetSection);
-        Assert.True(emit[0].TargetSockets is null || emit[0].TargetSockets!.Count == 0);
+        Assert.Empty(emit);
     }
 
     [Fact]
@@ -201,6 +199,26 @@ public class AutoBazaarTargetSelectionActionsTests
         Assert.Single(selects);
         Assert.Equal("itm_owned", selects[0].CardInstanceId);
         Assert.Equal(AutoBazaarTargetSection.Hand, selects[0].TargetSection);
+    }
+
+    [Fact]
+    public void Apply_DoesNotEmitOwnedSkillAsSelectItem()
+    {
+        var actions = new[] { WaitOpt };
+        var skill = new[]
+        {
+            Snap("skl_owned", "tpl_SKILL", size: "Small",
+                location: AutoBazaarCardLocation.Skill),
+        };
+        var result = AutoBazaarTargetSelectionActions.ApplyTargetSelectionFilter(
+            actions,
+            new HashSet<string> { "tpl_SKILL" },
+            boardItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
+            chestItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
+            playerSkills: skill,
+            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>());
+
+        Assert.DoesNotContain(result, a => a.ActionKind == AutoBazaarActionKind.SelectItem);
     }
 
     [Fact]
