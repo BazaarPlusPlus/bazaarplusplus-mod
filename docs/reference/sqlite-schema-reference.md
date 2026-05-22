@@ -15,6 +15,7 @@ Source of truth:
 - `Game/RunLogging/Persistence/SqliteRunLogStore.cs`
 - `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
 - `Game/Screenshots/Persistence/RunScreenshotSqliteStore.cs`
+- `Game/CombatReplay/Video/CombatReplayVideoMetadataStore.cs`
 - `Game/HistoryPanel/HistoryPanelRepository.cs`
 - `Game/RunLogging/Upload/RunBundleUploadStore.cs`
 - `ModCFServerV3/migrations/`
@@ -23,10 +24,10 @@ Source of truth:
 ## Local Client SQLite
 
 - Database file: `<GameRoot>/BazaarPlusPlus/bazaarplusplus.db`
-- Local schema version: `11`
+- Local schema version: `12`
 - Row schema version: `11`
 - Upload payload schema version: `1`
-- Runtime pragmas include `foreign_keys = ON`, `user_version = 11`, `busy_timeout = 2000`, and WAL mode.
+- Runtime pragmas include `foreign_keys = ON`, `user_version = 12`, `busy_timeout = 2000`, and WAL mode.
 
 Current tables:
 
@@ -35,6 +36,7 @@ Current tables:
 - `battles`
 - `battle_snapshots`
 - `run_screenshots`
+- `combat_replay_videos`
 - `sync_cursors`
 - `run_sync_state`
 
@@ -158,6 +160,36 @@ Columns:
 - `player_position INTEGER NULL`
 - `victories_at_capture INTEGER NULL`
 
+### `combat_replay_videos`
+
+Stores metadata for MP4 video recordings of saved combat replay playback. The MP4 files themselves live under `<GameRoot>/BazaarPlusPlus/CombatReplayVideos/<yyyy-MM-dd>/`; this table indexes them. Only present when the optional video recording feature has been enabled at least once (`CombatReplayVideo / Enabled = true`).
+
+Columns:
+
+- `video_id TEXT PRIMARY KEY`
+- `battle_id TEXT NOT NULL` — implicit reference to `battles.battle_id` (no FK to keep ghost replays insertable when the battle row hasn't been persisted)
+- `source TEXT NOT NULL` — `LocalSaved` or `ImportedGhost`
+- `video_relative_path TEXT NOT NULL` — relative to `<GameRoot>/BazaarPlusPlus/CombatReplayVideos/`
+- `width INTEGER NOT NULL`
+- `height INTEGER NOT NULL`
+- `fps INTEGER NOT NULL`
+- `codec TEXT NOT NULL` — currently always `libx264`
+- `crf INTEGER NULL`
+- `preset TEXT NULL`
+- `started_at_utc TEXT NOT NULL`
+- `ended_at_utc TEXT NULL`
+- `duration_ms INTEGER NULL`
+- `captured_frames INTEGER NOT NULL DEFAULT 0`
+- `dropped_frames INTEGER NOT NULL DEFAULT 0`
+- `file_size_bytes INTEGER NULL`
+- `status TEXT NOT NULL` — `RECORDING`, `COMPLETED`, or `FAILED`
+- `error TEXT NULL`
+
+Write paths:
+
+- `CombatReplayVideoMetadataStore.SaveStart` — inserts a `RECORDING` row when playback begins.
+- `CombatReplayVideoMetadataStore.SaveFinish` — updates the row to `COMPLETED` or `FAILED` when playback ends.
+
 ### `sync_cursors`
 
 Generic key-value cursor table. Current use is ghost sync checkpoints.
@@ -216,6 +248,9 @@ CREATE INDEX IF NOT EXISTS idx_run_screenshots_run_id_captured_at_utc
 CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
     ON run_screenshots(run_id)
     WHERE is_primary = 1 AND run_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_combat_replay_videos_battle
+    ON combat_replay_videos(battle_id, started_at_utc DESC);
 ```
 
 ## V3 Upload Payload Model

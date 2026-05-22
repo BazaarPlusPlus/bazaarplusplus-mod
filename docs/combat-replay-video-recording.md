@@ -4,7 +4,7 @@
 
 为 saved combat replay 的回放过程提供视频录制能力。当玩家在 HistoryPanel 触发本地战斗回放或 ghost battle 回放时，将 Unity Game View 录制为 MP4 文件，落到 `<GameRoot>/BazaarPlusPlus/CombatReplayVideos/` 下，供玩家离线复盘、社区分享和剪辑使用。
 
-本文档描述目标、关键设计决策、实施阶段和验证逻辑。代码尚未落地，目录结构和事件类等以本文档为准。
+本文档描述目标、关键设计决策、实施阶段和验证逻辑。Phase 1–3 已实现（默认关闭，需要 FFmpeg 在 `BazaarPlusPlus/tools/ffmpeg/` 或 PATH 上）；HistoryPanel 录制状态/Open Folder 行动项与 installer 侧 FFmpeg 部署仍未落地。代码入口见 [Game/CombatReplay/Video/](../Game/CombatReplay/Video/)。
 
 ## 背景
 
