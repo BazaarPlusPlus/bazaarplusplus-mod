@@ -108,7 +108,7 @@ internal static class AutoBazaarContextBuilder
         bool canReroll = canHandleOp(StateOps.Reroll) && rerollsRemaining > 0 && playerGold >= rerollCost;
 
         string? currentEncounterId = runState?.CurrentEncounterId;
-        string? currentEncounterType = ResolveCurrentEncounterType(currentEncounterId);
+        string? currentEncounterType = EncounterTypeResolver.Resolve(currentEncounterId);
 
         // --- Card inventories ---
         bool canSell = canHandleOp(StateOps.SellItem);
@@ -754,21 +754,7 @@ internal static class AutoBazaarContextBuilder
         return -1;
     }
 
-    private static string? ResolveCurrentEncounterType(string? currentEncounterId)
-    {
-        if (string.IsNullOrWhiteSpace(currentEncounterId)) return null;
-        if (!Guid.TryParse(currentEncounterId, out var templateId)) return null;
-
-        foreach (var entity in Data.Entities.Values)
-        {
-            if (entity is not Card card) continue;
-            if (card.TemplateId != templateId) continue;
-            return card.Template?.GetType().Name ?? card.Type.ToString();
-        }
-        return null;
-    }
-
-    private static IReadOnlyDictionary<string, int> BuildAttributes(Card card)
+private static IReadOnlyDictionary<string, int> BuildAttributes(Card card)
     {
         var result = new SortedDictionary<string, int>(StringComparer.Ordinal);
         if (card.Attributes == null) return result;
