@@ -147,7 +147,7 @@ internal sealed partial class CombatReplayRuntime
         if (player == null)
             return;
 
-        EnsureReplayHealthAttributes(player, controller.combatantId);
+        EnsureReplayPlayerAttributes(player, controller.combatantId);
 
         if (InitializedReplayBoardUiControllers.Add(controller.GetInstanceID()))
             InvokeBoardUiMethod(controller, "Init", player);
@@ -168,7 +168,7 @@ internal sealed partial class CombatReplayRuntime
         if (playerController != null)
         {
             if (Data.Run?.Player != null)
-                EnsureReplayHealthAttributes(Data.Run.Player, ECombatantId.Player);
+                EnsureReplayPlayerAttributes(Data.Run.Player, ECombatantId.Player);
 
             InvokeBoardUiMethod(playerController, "SetBattlePlayer", Data.Run?.Player);
             InitializeBoardUiHealthBar(playerController, Data.Run?.Player);
@@ -181,8 +181,25 @@ internal sealed partial class CombatReplayRuntime
         Data.PlayerHealthBar?.ShowEmptyPlayerHealthBar();
     }
 
-    private static void EnsureReplayHealthAttributes(object player, ECombatantId combatantId)
+    private static void EnsureReplaySequencePlayerAttributes(CombatSequenceMessages sequence)
     {
+        EnsureReplayPlayerAttributes(sequence.SpawnMessage?.Data?.Player, ECombatantId.Player);
+        EnsureReplayPlayerAttributes(sequence.SpawnMessage?.Data?.Opponent, ECombatantId.Opponent);
+        EnsureReplayPlayerAttributes(sequence.DespawnMessage?.Data?.Player, ECombatantId.Player);
+        EnsureReplayPlayerAttributes(sequence.DespawnMessage?.Data?.Opponent, ECombatantId.Opponent);
+    }
+
+    private static void EnsureReplayRunPlayerAttributes()
+    {
+        EnsureReplayPlayerAttributes(Data.Run?.Player, ECombatantId.Player);
+        EnsureReplayPlayerAttributes(Data.Run?.Opponent, ECombatantId.Opponent);
+    }
+
+    private static void EnsureReplayPlayerAttributes(object? player, ECombatantId combatantId)
+    {
+        if (player == null)
+            return;
+
         try
         {
             var attributesProperty = player
@@ -197,25 +214,58 @@ internal sealed partial class CombatReplayRuntime
             )
                 return;
 
-            if (attributes.Contains(EPlayerAttributeType.HealthMax))
-                return;
-
-            if (!attributes.Contains(EPlayerAttributeType.Health))
-                return;
-
-            var healthValue = Convert.ToInt32(attributes[EPlayerAttributeType.Health]);
-            if (healthValue <= 0)
-                return;
-
-            attributes[EPlayerAttributeType.HealthMax] = healthValue;
+            EnsureReplayPlayerAttributeDefaults(attributes);
+            EnsureReplayHealthMax(attributes);
         }
         catch (Exception ex)
         {
             BppLog.Warn(
                 "CombatReplayRuntime",
-                $"Failed to backfill replay HealthMax for {combatantId}: {ex.Message}"
+                $"Failed to backfill replay player attributes for {combatantId}: {ex.Message}"
             );
         }
+    }
+
+    private static void EnsureReplayHealthMax(System.Collections.IDictionary attributes)
+    {
+        if (
+            attributes.Contains(EPlayerAttributeType.HealthMax)
+            && Convert.ToInt32(attributes[EPlayerAttributeType.HealthMax]) > 0
+        )
+            return;
+
+        if (!attributes.Contains(EPlayerAttributeType.Health))
+            return;
+
+        var healthValue = Convert.ToInt32(attributes[EPlayerAttributeType.Health]);
+        if (healthValue <= 0)
+            return;
+
+        attributes[EPlayerAttributeType.HealthMax] = healthValue;
+    }
+
+    private static void EnsureReplayPlayerAttributeDefaults(
+        System.Collections.IDictionary attributes
+    )
+    {
+        foreach (EPlayerAttributeType attributeType in Enum.GetValues(typeof(EPlayerAttributeType)))
+        {
+            EnsureReplayPlayerAttribute(
+                attributes,
+                attributeType,
+                attributeType == EPlayerAttributeType.Level ? 1 : 0
+            );
+        }
+    }
+
+    private static void EnsureReplayPlayerAttribute(
+        System.Collections.IDictionary attributes,
+        EPlayerAttributeType attributeType,
+        int defaultValue
+    )
+    {
+        if (!attributes.Contains(attributeType))
+            attributes[attributeType] = defaultValue;
     }
 
     private static void RecalculateHealthBarDividers(BoardUIController controller, object? player)

@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Reflection;
+using BazaarPlusPlus.Game.CombatReplay;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.AutoBazaar;
@@ -41,6 +42,7 @@ internal static class AutoBazaarUiPlumbing
         {
             var state = AppState.CurrentState;
             if (state is not ReplayState replay) return;
+            if (CombatReplayRuntime.Instance?.IsReplayStartInProgress == true) return;
 
             // Guard 1: replay animation must have finished.
             // IsReplaying is a public property; it is true while the combat sim

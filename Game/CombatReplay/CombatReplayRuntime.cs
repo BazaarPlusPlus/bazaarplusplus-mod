@@ -70,6 +70,8 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
 
     public bool IsSavedReplayPlaybackActive => _savedReplayPlaybackActive;
 
+    public bool IsReplayStartInProgress => _isReplayStartInProgress;
+
     public bool HasPendingPersistence => _persistenceQueue?.HasPendingPersistence == true;
 
     private void Awake()
@@ -414,6 +416,43 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
                 "CombatReplayRuntime",
                 $"Failed to return to main menu after replay: {ex}"
             );
+        }
+    }
+
+    internal static bool TryExitBootstrappedSavedReplayToMenu()
+    {
+        var instance = Instance;
+        if (
+            instance == null
+            || !instance._savedReplayPlaybackActive
+            || !instance._bootstrappedReplayActive
+        )
+        {
+            return false;
+        }
+
+        instance.ExitBootstrappedSavedReplayToMenu();
+        return true;
+    }
+
+    private void ExitBootstrappedSavedReplayToMenu()
+    {
+        _returnToMenuAfterReplay = false;
+        _bootstrappedReplayActive = false;
+        _savedReplayPlaybackActive = false;
+        _isReplayStartInProgress = false;
+        RestoreReplaySelectedHeroOverride();
+        CleanupReplayOpponentPortrait();
+        InitializedReplayBoardUiControllers.Clear();
+
+        try
+        {
+            BppLog.Info("CombatReplayRuntime", "Returning to main menu after saved replay exit.");
+            Services.Get<RunManager>()?.ReturnToMainMenu();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("CombatReplayRuntime", $"Failed to exit saved replay: {ex}");
         }
     }
 

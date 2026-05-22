@@ -9,6 +9,7 @@ using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
+using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Core.Runtime;
@@ -111,18 +112,22 @@ internal sealed partial class CombatReplayRuntime
         string battleId
     )
     {
+        EnsureReplaySequencePlayerAttributes(sequence);
         bootstrapContext.SetLastCombatSequence(sequence);
         await bootstrapContext.HandleSpawnMessageAsync(sequence.SpawnMessage);
+        EnsureReplayRunPlayerAttributes();
         RehydrateSavedReplayPlayerCards(manifest, sequence.SpawnMessage);
         RehydrateSavedReplayOpponentCards(manifest, sequence.SpawnMessage);
         RehydrateSavedReplayPlayerSkills(manifest, sequence.SpawnMessage);
         RehydrateSavedReplayOpponentSkills(manifest, sequence.SpawnMessage);
+        SanitizeSavedReplaySpawnEvents(sequence);
         await RebuildSavedReplaySkillPresentationAsync();
         bootstrapContext.TriggerCombatSequenceCreated();
         await Task.Delay(50);
         await AppState.TryPushState<ReplayState>();
         if (AppState.CurrentState is not ReplayState replayState)
             throw new InvalidOperationException("ReplayState did not become active.");
+        Singleton<BoardManager>.Instance.ShowReplayAndRecapButtons(show: false, deactivate: true);
         HideEncounterPickerOverlays();
         EnsureOpponentPortraitVisible();
         await PrepareReplayHealthBarsAsync();
@@ -139,6 +144,31 @@ internal sealed partial class CombatReplayRuntime
         Singleton<BoardManager>.Instance.ShowReplayAndRecapButtons(show: false, deactivate: true);
 
         BppLog.Info("CombatReplayRuntime", $"Saved replay injection completed for {battleId}.");
+    }
+
+    private static void SanitizeSavedReplaySpawnEvents(CombatSequenceMessages sequence)
+    {
+        var events = sequence.SpawnMessage?.Data?.Events;
+        if (events == null || events.Count == 0)
+            return;
+
+        var removedCount = events.RemoveAll(ShouldRemoveSavedReplaySpawnEvent);
+        if (removedCount > 0)
+        {
+            BppLog.Info(
+                "CombatReplayRuntime",
+                $"Removed {removedCount} non-combat opponent spawn events from saved replay bootstrap."
+            );
+        }
+    }
+
+    private static bool ShouldRemoveSavedReplaySpawnEvent(IGameSimEvent gameSimEvent)
+    {
+        return gameSimEvent is GameSimEventCardSpawned
+        {
+            CombatantId: ECombatantId.Opponent,
+            Section: not EInventorySection.Hand,
+        };
     }
 
     private static void RehydrateSavedReplayPlayerCards(

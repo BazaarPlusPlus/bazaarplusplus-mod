@@ -908,15 +908,27 @@ internal sealed partial class CombatReplayRuntime
 
     private static void EnsureReplayAudioUnpaused()
     {
-        var gameServiceManager = Singleton<GameServiceManager>.Instance;
-        if (gameServiceManager == null || !gameServiceManager.GamePaused)
-            return;
+        try
+        {
+            var gameServiceManager = Singleton<GameServiceManager>.Instance;
+            if (gameServiceManager?.GamePaused == true)
+            {
+                BppLog.Info(
+                    "CombatReplayRuntime",
+                    "Saved replay playback found gameplay paused; unpausing before combat simulation."
+                );
+                gameServiceManager.PauseOrUnpauseGame(toPauseOrUnpause: false);
+            }
 
-        BppLog.Info(
-            "CombatReplayRuntime",
-            "Saved replay playback found gameplay paused; unpausing audio buses before combat simulation."
-        );
-        gameServiceManager.PauseOrUnpauseGame(toPauseOrUnpause: false);
+            Services.Get<SoundManager>()?.PauseBusses(isPausing: false);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Saved replay audio unpause failed: {ex.Message}"
+            );
+        }
     }
 
     private sealed class ReplayAudioWarmupStats
