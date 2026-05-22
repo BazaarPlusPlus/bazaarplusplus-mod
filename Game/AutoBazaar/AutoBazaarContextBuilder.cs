@@ -617,7 +617,7 @@ internal static class AutoBazaarContextBuilder
             var pedestalState = AppState.CurrentState as PedestalState;
             var eligibleIds = pedestalState is null
                 ? new HashSet<string>()
-                : AutoBazaarPedestalEligibilityProbe.ReadEligibleInstanceIds(pedestalState);
+                : PedestalEligibilityProbe.ReadEligibleInstanceIds(pedestalState);
             foreach (var card in boardItems)
             {
                 if (!eligibleIds.Contains(card.InstanceId)) continue;

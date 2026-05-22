@@ -7,7 +7,7 @@ using BazaarGameClient.Domain.Models.Cards;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.Game.Encounter;
 
 /// <summary>Reads the active <c>PedestalState</c>'s eligible-card set once per tick.
 /// Calls <c>PedestalState.ValidateCards()</c> via reflection (it's private but
@@ -16,7 +16,7 @@ namespace BazaarPlusPlus.Game.AutoBazaar;
 /// returns the InstanceIds. Replaces N invocations of the public
 /// <c>CanBeUpgraded(Card)</c> — each of which would re-run ValidateCards internally
 /// for an O(N²) cost per tick.</summary>
-internal static class AutoBazaarPedestalEligibilityProbe
+internal static class PedestalEligibilityProbe
 {
     private static MethodInfo? _validateCardsMethod;
     private static FieldInfo? _validCardsField;
@@ -36,8 +36,8 @@ internal static class AutoBazaarPedestalEligibilityProbe
                 _reflectionAttempted = true;
                 _validateCardsMethod = AccessTools.Method(typeof(PedestalState), "ValidateCards");
                 _validCardsField = AccessTools.Field(typeof(PedestalState), "_validCards");
-                if (_validateCardsMethod is null) BppLog.Info("AutoBazaar", "PedestalState.ValidateCards not found via reflection");
-                if (_validCardsField is null) BppLog.Info("AutoBazaar", "PedestalState._validCards not found via reflection");
+                if (_validateCardsMethod is null) BppLog.Info("Encounter", "PedestalState.ValidateCards not found via reflection");
+                if (_validCardsField is null) BppLog.Info("Encounter", "PedestalState._validCards not found via reflection");
             }
             if (_validateCardsMethod is null || _validCardsField is null) return EmptySet;
 
@@ -58,7 +58,7 @@ internal static class AutoBazaarPedestalEligibilityProbe
         }
         catch (Exception ex)
         {
-            BppLog.Info("AutoBazaar", $"PedestalEligibilityProbe transient failure: {ex.GetType().Name}: {ex.Message}");
+            BppLog.Info("Encounter", $"PedestalEligibilityProbe transient failure: {ex.GetType().Name}: {ex.Message}");
             return EmptySet;
         }
     }
