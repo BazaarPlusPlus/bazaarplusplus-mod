@@ -4,13 +4,13 @@ using System.Reflection;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.Game.Encounter;
 
 /// <summary>Reads <c>AppState._iteractionFilter</c> via reflection. When the
 /// filter is non-empty, the game is in a target-selection state (upgrade,
 /// enchant, etc.) and only owned cards whose templateId is in the filter are
 /// accepted by <c>BuyItemCommand</c>; other clicks silently no-op.</summary>
-internal static class AutoBazaarInteractionFilterProbe
+internal static class InteractionFilterProbe
 {
     private static FieldInfo? _filterField;
     private static bool _resolveAttempted;
@@ -30,7 +30,7 @@ internal static class AutoBazaarInteractionFilterProbe
                 _filterField = AccessTools.Field(typeof(AppState), "_iteractionFilter");
                 if (_filterField is null)
                 {
-                    BppLog.Info("AutoBazaar", "AppState._iteractionFilter field not found via reflection");
+                    BppLog.Info("Encounter", "AppState._iteractionFilter field not found via reflection");
                 }
             }
             if (_filterField is null) return EmptyArray;
@@ -42,7 +42,7 @@ internal static class AutoBazaarInteractionFilterProbe
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", "ReadCurrentFilter reflection failed", ex);
+            BppLog.Error("Encounter", "ReadCurrentFilter reflection failed", ex);
             return EmptyArray;
         }
     }

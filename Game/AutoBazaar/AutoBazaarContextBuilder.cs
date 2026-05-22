@@ -10,6 +10,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.Encounter;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.AutoBazaar;
@@ -126,7 +127,7 @@ internal static class AutoBazaarContextBuilder
         // Target-selection mode (upgrade/enchant): when AppState._iteractionFilter
         // is non-empty, the game restricts SelectItem to owned cards whose
         // templateId is in the filter. Offer-based clicks silently no-op.
-        var interactionFilterList = AutoBazaarInteractionFilterProbe.ReadCurrentFilter();
+        var interactionFilterList = InteractionFilterProbe.ReadCurrentFilter();
         ISet<string>? interactionFilter = interactionFilterList.Count > 0
             ? new HashSet<string>(interactionFilterList)
             : null;
