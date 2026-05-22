@@ -10,7 +10,6 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Encounter;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.AutoBazaar;
@@ -107,8 +106,10 @@ internal static class AutoBazaarContextBuilder
 
         bool canReroll = canHandleOp(StateOps.Reroll) && rerollsRemaining > 0 && playerGold >= rerollCost;
 
-        string? currentEncounterId = runState?.CurrentEncounterId;
-        string? currentEncounterType = EncounterTypeResolver.Resolve(currentEncounterId);
+        var encounter = services.EncounterState.GetCurrent();
+
+        string? currentEncounterId = encounter.CurrentEncounterId;
+        string? currentEncounterType = encounter.CurrentEncounterType;
 
         // --- Card inventories ---
         bool canSell = canHandleOp(StateOps.SellItem);
@@ -127,7 +128,7 @@ internal static class AutoBazaarContextBuilder
         // Target-selection mode (upgrade/enchant): when AppState._iteractionFilter
         // is non-empty, the game restricts SelectItem to owned cards whose
         // templateId is in the filter. Offer-based clicks silently no-op.
-        var interactionFilterList = InteractionFilterProbe.ReadCurrentFilter();
+        var interactionFilterList = encounter.InteractionFilterTemplateIds;
         ISet<string>? interactionFilter = interactionFilterList.Count > 0
             ? new HashSet<string>(interactionFilterList)
             : null;
@@ -137,7 +138,7 @@ internal static class AutoBazaarContextBuilder
             stateName, isInRun, canHandleOp,
             canReroll, canStartOrContinueRun,
             runState, selectionOptions, boardItems, chestItems, playerSkills, canMove, canSell,
-            run);
+            run, encounter.PedestalEligibleInstanceIds);
 
         if (interactionFilter is not null)
         {
@@ -434,7 +435,8 @@ internal static class AutoBazaarContextBuilder
         IReadOnlyList<AutoBazaarCardSnapshot> playerSkills,
         bool canMove,
         bool canSell,
-        Run? run)
+        Run? run,
+        HashSet<string> pedestalEligibleIds)
     {
         var actions = new List<AutoBazaarDecisionOption>();
 
@@ -614,10 +616,7 @@ internal static class AutoBazaarContextBuilder
         // CommitToPedestal options — picker should ExitState in that window.
         if (stateName == AutoBazaarRunStateName.Pedestal && canHandleOp(StateOps.CommitToPedestal))
         {
-            var pedestalState = AppState.CurrentState as PedestalState;
-            var eligibleIds = pedestalState is null
-                ? new HashSet<string>()
-                : PedestalEligibilityProbe.ReadEligibleInstanceIds(pedestalState);
+            var eligibleIds = pedestalEligibleIds;
             foreach (var card in boardItems)
             {
                 if (!eligibleIds.Contains(card.InstanceId)) continue;

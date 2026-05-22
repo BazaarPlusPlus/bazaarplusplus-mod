@@ -8,6 +8,7 @@ using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.Encounter;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -22,6 +23,7 @@ internal sealed class BppComposition : IDisposable
     private readonly BppPathService _paths = new();
     private readonly RunContextStore _runContext = new();
     private readonly GameStateProbe _gameStateProbe = new();
+    private readonly EncounterStateProbe _encounterStateProbe = new();
     private readonly BppRuntimeServices _services;
     private readonly BppFeatureRegistry _featureRegistry = new();
     private readonly RunLifecycleModule _runLifecycle;
@@ -48,6 +50,7 @@ internal sealed class BppComposition : IDisposable
             _paths,
             _runContext,
             _gameStateProbe,
+            _encounterStateProbe,
             logger
         );
 
