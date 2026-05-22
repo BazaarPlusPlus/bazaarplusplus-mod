@@ -109,7 +109,8 @@ internal sealed partial class CombatReplayRuntime
         ReplayBootstrapContext bootstrapContext,
         PvpBattleManifest manifest,
         CombatSequenceMessages sequence,
-        string battleId
+        string battleId,
+        Action? onBeforeReplayPlayback = null
     )
     {
         EnsureReplaySequencePlayerAttributes(sequence);
@@ -139,6 +140,7 @@ internal sealed partial class CombatReplayRuntime
         HideEncounterPickerOverlays();
         EnsureOpponentPortraitVisible();
         RefillReplayOpponentHealthBar();
+        onBeforeReplayPlayback?.Invoke();
         replayState.Replay();
         EnsureOpponentPortraitVisible();
         Singleton<BoardManager>.Instance.ShowReplayAndRecapButtons(show: false, deactivate: true);

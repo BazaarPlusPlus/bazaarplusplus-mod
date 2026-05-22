@@ -6,7 +6,7 @@ var schemaType = RequireType(
 );
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 11,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 12,
     "Local database schema version mismatch."
 );
 Assert(
@@ -42,7 +42,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 11;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 12;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(

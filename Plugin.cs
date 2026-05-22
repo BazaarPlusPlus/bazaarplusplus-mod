@@ -7,6 +7,7 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.AutoBazaar;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Identity;
@@ -177,6 +178,9 @@ public class Plugin : BaseUnityPlugin
         var autoBazaar = gameObject.AddComponent<AutoBazaarRuntime>();
         autoBazaar.Initialize(services);
 
+        var combatReplayVideoRecorder = gameObject.AddComponent<CombatReplayVideoRecorder>();
+        combatReplayVideoRecorder.Initialize(services);
+
         BppLog.Info("Plugin", "Runtime components attached");
     }
 
@@ -260,6 +264,7 @@ public class Plugin : BaseUnityPlugin
 
     private void DetachRuntimeComponents()
     {
+        DestroyComponentIfPresent<CombatReplayVideoRecorder>();
         DestroyComponentIfPresent<AutoBazaarRuntime>();
         DestroyComponentIfPresent<TooltipModifierRefreshController>();
         DestroyComponentIfPresent<EndOfRunScreenshotController>();

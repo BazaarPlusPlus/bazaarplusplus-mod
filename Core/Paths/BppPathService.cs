@@ -12,6 +12,10 @@ internal sealed class BppPathService : IPathService
 
     public string? IdentityDirectoryPath { get; private set; }
 
+    public string? CombatReplayVideoDirectoryPath { get; private set; }
+
+    public string? ToolsDirectoryPath { get; private set; }
+
     public void Initialize()
     {
         RunLogDatabasePath = System.IO.Path.Combine(
@@ -33,6 +37,16 @@ internal sealed class BppPathService : IPathService
             BepInEx.Paths.GameRootPath,
             "BazaarPlusPlus",
             "Identity"
+        );
+        CombatReplayVideoDirectoryPath = System.IO.Path.Combine(
+            BepInEx.Paths.GameRootPath,
+            "BazaarPlusPlus",
+            "CombatReplayVideos"
+        );
+        ToolsDirectoryPath = System.IO.Path.Combine(
+            BepInEx.Paths.GameRootPath,
+            "BazaarPlusPlus",
+            "tools"
         );
     }
 }

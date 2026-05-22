@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int LocalDatabaseSchemaVersion => 11;
+    public static int LocalDatabaseSchemaVersion => 12;
 
     public static int RowSchemaVersion => 11;
 
@@ -26,6 +26,8 @@ public static class RunLogSqliteSchema
     public static string BattleSnapshotsTableName => "battle_snapshots";
 
     public static string RunScreenshotsTableName => "run_screenshots";
+
+    public static string CombatReplayVideosTableName => "combat_replay_videos";
 
     public static string SyncCursorsTableName => "sync_cursors";
 
@@ -157,6 +159,27 @@ public static class RunLogSqliteSchema
                 victories_at_capture INTEGER NULL
             );
 
+            CREATE TABLE IF NOT EXISTS {CombatReplayVideosTableName} (
+                video_id TEXT PRIMARY KEY,
+                battle_id TEXT NOT NULL,
+                source TEXT NOT NULL,
+                video_relative_path TEXT NOT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                fps INTEGER NOT NULL,
+                codec TEXT NOT NULL,
+                crf INTEGER NULL,
+                preset TEXT NULL,
+                started_at_utc TEXT NOT NULL,
+                ended_at_utc TEXT NULL,
+                duration_ms INTEGER NULL,
+                captured_frames INTEGER NOT NULL DEFAULT 0,
+                dropped_frames INTEGER NOT NULL DEFAULT 0,
+                file_size_bytes INTEGER NULL,
+                status TEXT NOT NULL,
+                error TEXT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS {SyncCursorsTableName} (
                 scope TEXT PRIMARY KEY,
                 cursor_value TEXT NOT NULL,
@@ -205,6 +228,9 @@ public static class RunLogSqliteSchema
             CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
                 ON {RunScreenshotsTableName}(run_id)
                 WHERE is_primary = 1 AND run_id IS NOT NULL;
+
+            CREATE INDEX IF NOT EXISTS idx_{CombatReplayVideosTableName}_battle
+                ON {CombatReplayVideosTableName}(battle_id, started_at_utc DESC);
             """;
 
     public static void EnsureInitialized(SqliteConnection connection)

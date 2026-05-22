@@ -60,6 +60,10 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
     private EncounterController? _replayTemporaryOpponentPortrait;
     private EHero? _replayOriginalSelectedHero;
     private bool _replaySelectedHeroOverridden;
+    private string? _activeReplayBattleId;
+    private PvpBattleManifest? _activeReplayManifest;
+    private CombatReplayPlaybackSource _activeReplaySource;
+    private bool _replayPlaybackStartingPublished;
 
     public static CombatReplayRuntime? Instance { get; private set; }
 
@@ -312,7 +316,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
         var sequence = controller.LoadReplay(payload);
         InitializedReplayBoardUiControllers.Clear();
         _savedReplayPlaybackActive = true;
-        _ = StartReplayAsync(manifest, sequence, battleId);
+        _ = StartReplayAsync(manifest, sequence, battleId, CombatReplayPlaybackSource.LocalSaved);
         return true;
     }
 
@@ -336,18 +340,28 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
         var sequence = loader.Load(payload);
         InitializedReplayBoardUiControllers.Clear();
         _savedReplayPlaybackActive = true;
-        _ = StartReplayAsync(manifest, sequence, manifest.BattleId);
+        _ = StartReplayAsync(
+            manifest,
+            sequence,
+            manifest.BattleId,
+            CombatReplayPlaybackSource.ImportedGhost
+        );
         return true;
     }
 
     private async Task StartReplayAsync(
         PvpBattleManifest manifest,
         CombatSequenceMessages sequence,
-        string battleId
+        string battleId,
+        CombatReplayPlaybackSource source
     )
     {
         var attemptedBootstrapFromLobby = false;
         _isReplayStartInProgress = true;
+        _activeReplayBattleId = battleId;
+        _activeReplayManifest = manifest;
+        _activeReplaySource = source;
+        _replayPlaybackStartingPublished = false;
         try
         {
             _returnToMenuAfterReplay = false;
@@ -362,7 +376,13 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
             var bootstrapContext = ResolveReplayDependencies();
             EnsureReplayOpponentIdentity(manifest, sequence.SpawnMessage);
             await EnsureReplayTemporaryOpponentPortraitAsync(manifest);
-            await TryInjectSavedReplayAsync(bootstrapContext, manifest, sequence, battleId);
+            await TryInjectSavedReplayAsync(
+                bootstrapContext,
+                manifest,
+                sequence,
+                battleId,
+                PublishReplayPlaybackStarting
+            );
             _bootstrappedReplayActive = bootstrappedFromLobby;
             BppLog.Info("CombatReplayRuntime", $"Started replay for saved combat {battleId}");
         }
@@ -374,12 +394,83 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
             CleanupReplayOpponentPortrait();
             RestoreReplaySelectedHeroOverride();
             BppLog.Error("CombatReplayRuntime", $"Failed to start replay {battleId}: {ex}");
+            if (_replayPlaybackStartingPublished)
+            {
+                PublishReplayPlaybackEnded("start-failed", failed: true);
+            }
             if (attemptedBootstrapFromLobby)
                 await RollbackReplayBootstrapAsync();
         }
         finally
         {
             _isReplayStartInProgress = false;
+        }
+    }
+
+    private void PublishReplayPlaybackStarting()
+    {
+        if (_replayPlaybackStartingPublished)
+            return;
+
+        var services = _services;
+        var battleId = _activeReplayBattleId;
+        if (services == null || string.IsNullOrEmpty(battleId))
+            return;
+
+        try
+        {
+            services.EventBus.Publish(
+                new CombatReplayPlaybackStarting
+                {
+                    BattleId = battleId,
+                    Manifest = _activeReplayManifest,
+                    Source = _activeReplaySource,
+                }
+            );
+            _replayPlaybackStartingPublished = true;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error(
+                "CombatReplayRuntime",
+                "Failed to publish CombatReplayPlaybackStarting event.",
+                ex
+            );
+        }
+    }
+
+    private void PublishReplayPlaybackEnded(string reason, bool failed)
+    {
+        if (!_replayPlaybackStartingPublished)
+            return;
+
+        var services = _services;
+        var battleId = _activeReplayBattleId ?? string.Empty;
+        _replayPlaybackStartingPublished = false;
+        _activeReplayBattleId = null;
+        _activeReplayManifest = null;
+
+        if (services == null)
+            return;
+
+        try
+        {
+            services.EventBus.Publish(
+                new CombatReplayPlaybackEnded
+                {
+                    BattleId = battleId,
+                    Reason = reason,
+                    Failed = failed,
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error(
+                "CombatReplayRuntime",
+                "Failed to publish CombatReplayPlaybackEnded event.",
+                ex
+            );
         }
     }
 
@@ -393,6 +484,7 @@ internal sealed partial class CombatReplayRuntime : MonoBehaviour
 
         RestoreReplaySelectedHeroOverride();
         _savedReplayPlaybackActive = false;
+        PublishReplayPlaybackEnded("state-exit", failed: false);
         CleanupReplayOpponentPortrait();
         InitializedReplayBoardUiControllers.Clear();
 

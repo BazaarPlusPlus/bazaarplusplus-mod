@@ -30,4 +30,22 @@ internal interface IBppConfig
     ConfigEntry<int>? AutoBazaarHttpListenerPort { get; }
 
     ConfigEntry<float>? AutoBazaarHttpEndpointTimeoutSeconds { get; }
+
+    ConfigEntry<bool>? CombatReplayVideoEnabled { get; }
+
+    ConfigEntry<int>? CombatReplayVideoFps { get; }
+
+    ConfigEntry<int>? CombatReplayVideoWidth { get; }
+
+    ConfigEntry<int>? CombatReplayVideoHeight { get; }
+
+    ConfigEntry<int>? CombatReplayVideoCrf { get; }
+
+    ConfigEntry<string>? CombatReplayVideoPreset { get; }
+
+    ConfigEntry<bool>? CombatReplayVideoForceSpeed1x { get; }
+
+    ConfigEntry<bool>? CombatReplayVideoSuppressBppOverlays { get; }
+
+    ConfigEntry<int>? CombatReplayVideoMaxQueuedFrames { get; }
 }
