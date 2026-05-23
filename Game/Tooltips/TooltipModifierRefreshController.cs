@@ -2,7 +2,7 @@
 using System;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Core.Config;
-using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Core.GameState;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
@@ -12,26 +12,21 @@ namespace BazaarPlusPlus.Game.Tooltips;
 
 internal sealed class TooltipModifierRefreshController : MonoBehaviour
 {
-    private enum TooltipModifierMode
-    {
-        Normal,
-        Enchant,
-        Upgrade,
-    }
-
-    private TooltipModifierMode _lastMode;
+    private TooltipPreviewMode _lastMode;
     private IBppConfig? _config;
+    private IEncounterStateProbe? _encounterState;
 
-    internal void Initialize(IBppConfig config)
+    internal void Initialize(IBppConfig config, IEncounterStateProbe encounterState)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _encounterState = encounterState ?? throw new ArgumentNullException(nameof(encounterState));
     }
 
     private void Update()
     {
         try
         {
-            var mode = GetCurrentMode();
+            var mode = TooltipPreviewModePolicy.Resolve(_config, _encounterState);
             if (mode == _lastMode)
                 return;
 
@@ -42,18 +37,6 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         {
             BppLog.Error("TooltipPreview", "Tooltip modifier update failed", ex);
         }
-    }
-
-    private TooltipModifierMode GetCurrentMode()
-    {
-        if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
-            return TooltipModifierMode.Upgrade;
-
-        var alwaysShowEnchant = _config?.EnchantPreviewAlwaysShowConfig?.Value ?? true;
-        if (alwaysShowEnchant || BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview))
-            return TooltipModifierMode.Enchant;
-
-        return TooltipModifierMode.Normal;
     }
 
     private static void TryRefreshCurrentItemTooltip()

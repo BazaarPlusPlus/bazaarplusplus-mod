@@ -7,6 +7,7 @@ using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.Screenshots.Upload;
+using BazaarPlusPlus.Game.UpgradePreview;
 using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
@@ -60,7 +61,20 @@ internal static class BppSettingsDockCatalog
         new(
             "EnchantPreview",
             EnchantPreviewSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(ReadEnchantPreviewEnabled, WriteEnchantPreviewEnabled)
+            languageCode =>
+                ResolvePreviewVisibilityModeStatus(ReadEnchantPreviewMode(), languageCode),
+            IsEnchantPreviewOverrideActive,
+            CycleEnchantPreviewMode,
+            collapseAfterActivate: false
+        ),
+        new(
+            "UpgradePreview",
+            UpgradePreviewSettingsMenuLabel.Resolve,
+            languageCode =>
+                ResolvePreviewVisibilityModeStatus(ReadUpgradePreviewMode(), languageCode),
+            IsUpgradePreviewOverrideActive,
+            CycleUpgradePreviewMode,
+            collapseAfterActivate: false
         ),
         new(
             "CombatStatusBar",
@@ -116,16 +130,72 @@ internal static class BppSettingsDockCatalog
             config.Value = enabled;
     }
 
-    private static bool ReadEnchantPreviewEnabled()
+    private static PreviewVisibilityMode ReadEnchantPreviewMode()
     {
-        return Config.EnchantPreviewAlwaysShowConfig?.Value ?? false;
+        return Config.EnchantPreviewModeConfig?.Value ?? PreviewVisibilityMode.AutoOnPedestalChoice;
     }
 
-    private static void WriteEnchantPreviewEnabled(bool enabled)
+    private static void CycleEnchantPreviewMode()
     {
-        var config = Config.EnchantPreviewAlwaysShowConfig;
+        var config = Config.EnchantPreviewModeConfig;
         if (config != null)
-            config.Value = enabled;
+            config.Value = NextPreviewVisibilityMode(config.Value);
+    }
+
+    private static bool IsEnchantPreviewOverrideActive()
+    {
+        return ReadEnchantPreviewMode() != PreviewVisibilityMode.Off;
+    }
+
+    private static PreviewVisibilityMode ReadUpgradePreviewMode()
+    {
+        return Config.UpgradePreviewModeConfig?.Value ?? PreviewVisibilityMode.AutoOnPedestalChoice;
+    }
+
+    private static void CycleUpgradePreviewMode()
+    {
+        var config = Config.UpgradePreviewModeConfig;
+        if (config != null)
+            config.Value = NextPreviewVisibilityMode(config.Value);
+    }
+
+    private static bool IsUpgradePreviewOverrideActive()
+    {
+        return ReadUpgradePreviewMode() != PreviewVisibilityMode.Off;
+    }
+
+    private static PreviewVisibilityMode NextPreviewVisibilityMode(PreviewVisibilityMode mode) =>
+        mode switch
+        {
+            PreviewVisibilityMode.Off => PreviewVisibilityMode.AutoOnPedestalChoice,
+            PreviewVisibilityMode.AutoOnPedestalChoice => PreviewVisibilityMode.Always,
+            PreviewVisibilityMode.Always => PreviewVisibilityMode.Off,
+            _ => PreviewVisibilityMode.AutoOnPedestalChoice,
+        };
+
+    private static string ResolvePreviewVisibilityModeStatus(
+        PreviewVisibilityMode mode,
+        string languageCode
+    )
+    {
+        if (LanguageCodeMatcher.IsChinese(languageCode))
+        {
+            return mode switch
+            {
+                PreviewVisibilityMode.Off => "关闭",
+                PreviewVisibilityMode.AutoOnPedestalChoice => "智能",
+                PreviewVisibilityMode.Always => "总是",
+                _ => "智能",
+            };
+        }
+
+        return mode switch
+        {
+            PreviewVisibilityMode.Off => "OFF",
+            PreviewVisibilityMode.AutoOnPedestalChoice => "AUTO",
+            PreviewVisibilityMode.Always => "ON",
+            _ => "AUTO",
+        };
     }
 
     private static string ResolveChineseLocaleModeLabel(string languageCode)

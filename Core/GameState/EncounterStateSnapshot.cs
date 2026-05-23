@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using BazaarPlusPlus.Game.Encounter;
 
 namespace BazaarPlusPlus.Core.GameState;
 
@@ -19,11 +20,17 @@ internal readonly struct EncounterStateSnapshot
     /// netstandard2.1 does not expose the latter; callers treat it as read-only.</summary>
     public HashSet<string> PedestalEligibleInstanceIds { get; init; }
 
+    /// <summary>The kind of pedestal currently offered on the choice screen,
+    /// or <see cref="ChoiceScreenPedestalKind.None"/> when the player is not
+    /// in ChoiceState or the offered SelectionSet contains no relevant pedestal.</summary>
+    public ChoiceScreenPedestalKind ChoiceScreenPedestalKind { get; init; }
+
     public static EncounterStateSnapshot Empty { get; } = new()
     {
         CurrentEncounterId = null,
         CurrentEncounterType = null,
         InteractionFilterTemplateIds = Array.Empty<string>(),
         PedestalEligibleInstanceIds = new HashSet<string>(),
+        ChoiceScreenPedestalKind = ChoiceScreenPedestalKind.None,
     };
 }

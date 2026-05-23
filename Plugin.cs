@@ -3,7 +3,6 @@
 using System;
 using System.IO;
 using System.Net.Http;
-using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
@@ -177,7 +176,7 @@ public class Plugin : BaseUnityPlugin
             gameObject.AddComponent<BazaarDbScreenshotUploadController>();
         bazaarDbScreenshotUpload.Initialize(services);
 
-        AddConfiguredTooltipModifierRefreshController(services.Config);
+        AddConfiguredTooltipModifierRefreshController(services);
 
         var combatReplayVideoRecorder = gameObject.AddComponent<CombatReplayVideoRecorder>();
         combatReplayVideoRecorder.Initialize(services);
@@ -231,12 +230,12 @@ public class Plugin : BaseUnityPlugin
         );
     }
 
-    private void AddConfiguredTooltipModifierRefreshController(IBppConfig config)
+    private void AddConfiguredTooltipModifierRefreshController(IBppServices services)
     {
         BppLog.Info("Plugin", "Adding TooltipModifierRefreshController");
         var tooltipModifierRefreshController =
             gameObject.AddComponent<TooltipModifierRefreshController>();
-        tooltipModifierRefreshController.Initialize(config);
+        tooltipModifierRefreshController.Initialize(services.Config, services.EncounterState);
         BppLog.Info("Plugin", "TooltipModifierRefreshController initialized");
     }
 

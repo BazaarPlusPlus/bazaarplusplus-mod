@@ -3,8 +3,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
-using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.Tooltips;
+using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
@@ -24,6 +24,13 @@ internal static class UpgradePreviewTooltipPatch
         TryScheduleUpgradeTooltip(__instance);
     }
 
+    private static bool IsUpgradePreviewActive()
+    {
+        var services = BppPatchHost.Services;
+        return TooltipPreviewModePolicy.Resolve(services.Config, services.EncounterState)
+            == TooltipPreviewMode.Upgrade;
+    }
+
     internal static bool TryScheduleUpgradeTooltip(
         CardController controller,
         CardTooltipData? tooltipData = null
@@ -32,7 +39,7 @@ internal static class UpgradePreviewTooltipPatch
         if (controller == null)
             return false;
 
-        if (!BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
+        if (!IsUpgradePreviewActive())
             return false;
 
         var card = controller.CardData;
@@ -72,7 +79,7 @@ internal static class UpgradePreviewTooltipPatch
                 if (
                     controller == null
                     || controller.CardData != card
-                    || !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview)
+                    || !IsUpgradePreviewActive()
                 )
                 {
                     yield break;
@@ -115,11 +122,7 @@ internal static class UpgradePreviewTooltipPatch
         var refreshedTooltipData = CardTooltipDataFactory.Create(card, tooltipData);
         tooltipParent.HideCardTooltipController();
 
-        if (
-            controller == null
-            || controller.CardData != card
-            || !BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview)
-        )
+        if (controller == null || controller.CardData != card || !IsUpgradePreviewActive())
         {
             return;
         }

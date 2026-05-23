@@ -9,7 +9,9 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
 
-    public ConfigEntry<bool>? EnchantPreviewAlwaysShowConfig { get; private set; }
+    public ConfigEntry<PreviewVisibilityMode>? EnchantPreviewModeConfig { get; private set; }
+
+    public ConfigEntry<PreviewVisibilityMode>? UpgradePreviewModeConfig { get; private set; }
 
     public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
 
@@ -69,12 +71,19 @@ internal sealed class BppConfig : IBppConfig
             false,
             "Whether to set the in-game display name to Anonymous"
         );
-        EnchantPreviewAlwaysShowConfig = config.Bind(
+        EnchantPreviewModeConfig = config.Bind(
             "EnchantPreview",
-            "AlwaysShow",
-            true,
-            "Whether to always show enchant preview text in item tooltips. If disabled, hold Ctrl to show it."
+            "Mode",
+            PreviewVisibilityMode.AutoOnPedestalChoice,
+            "When to show enchant preview text in item tooltips. Off = hold Ctrl only. AutoOnPedestalChoice = auto-show while an enchant pedestal is offered on the choice screen, hold Ctrl otherwise. Always = append to every eligible tooltip."
         );
+        UpgradePreviewModeConfig = config.Bind(
+            "UpgradePreview",
+            "Mode",
+            PreviewVisibilityMode.AutoOnPedestalChoice,
+            "When to show the upgrade preview tooltip variant. Off = hold Shift only. AutoOnPedestalChoice = auto-show while an upgrade pedestal is offered on the choice screen, hold Shift otherwise. Always = always show the upgraded variant for eligible items."
+        );
+        MigrateLegacyEnchantPreviewAlwaysShow(config);
         EnableCombatStatusBarConfig = config.Bind(
             "CombatStatusBar",
             "Enabled",
@@ -193,6 +202,32 @@ internal sealed class BppConfig : IBppConfig
             "UploadScreenshots",
             false,
             "When enabled, end-of-run screenshots and their summary (hero, days, MMR, rank, position, etc.) are uploaded to our server and forwarded to BazaarDB. Includes screenshots from past runs. You can turn this off at any time; we will stop uploading and never delete what was already sent."
+        );
+    }
+
+    private void MigrateLegacyEnchantPreviewAlwaysShow(ConfigFile config)
+    {
+        if (EnchantPreviewModeConfig == null)
+            return;
+
+        var legacyKey = new ConfigDefinition("EnchantPreview", "AlwaysShow");
+        if (!config.OrphanedEntries.TryGetValue(legacyKey, out var legacyValue))
+            return;
+
+        var migratedTo = EnchantPreviewModeConfig.Value;
+        if (bool.TryParse(legacyValue, out var legacyAlwaysShow))
+        {
+            migratedTo = legacyAlwaysShow
+                ? PreviewVisibilityMode.Always
+                : PreviewVisibilityMode.AutoOnPedestalChoice;
+            EnchantPreviewModeConfig.Value = migratedTo;
+        }
+
+        config.OrphanedEntries.Remove(legacyKey);
+        config.Save();
+        global::BazaarPlusPlus.BppLog.Info(
+            "Config",
+            $"Migrated legacy [EnchantPreview] AlwaysShow={legacyValue} to Mode={migratedTo}."
         );
     }
 }

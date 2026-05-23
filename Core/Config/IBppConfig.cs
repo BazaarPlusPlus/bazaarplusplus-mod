@@ -9,7 +9,9 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? EnableNameOverrideConfig { get; }
 
-    ConfigEntry<bool>? EnchantPreviewAlwaysShowConfig { get; }
+    ConfigEntry<PreviewVisibilityMode>? EnchantPreviewModeConfig { get; }
+
+    ConfigEntry<PreviewVisibilityMode>? UpgradePreviewModeConfig { get; }
 
     ConfigEntry<bool>? EnableCombatStatusBarConfig { get; }
 

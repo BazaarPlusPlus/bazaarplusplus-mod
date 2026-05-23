@@ -264,10 +264,10 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "始终显示附魔预览")]
-    [InlineData("zh-CN", "始终显示附魔预览")]
-    [InlineData("en", "Always Show Enchant Preview")]
-    [InlineData("", "Always Show Enchant Preview")]
+    [InlineData("zh-Hans", "附魔预览")]
+    [InlineData("zh-CN", "附魔预览")]
+    [InlineData("en", "Enchant Preview")]
+    [InlineData("", "Enchant Preview")]
     public void EnchantPreviewSettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
         string languageCode,
         string expected
