@@ -164,3 +164,87 @@ test("ingest requires player_account_id", async () => {
   const response = await worker.fetch(buildIngestRequest(payload), env as never);
   expect(response.status).toBe(400);
 });
+
+function buildManifestRequest(date: string, authorization?: string): Request {
+  const headers = new Headers();
+  if (authorization != null) {
+    headers.set("Authorization", authorization);
+  }
+  return new Request(`https://example.com/bazaardb/manifest?date=${date}`, {
+    method: "GET",
+    headers,
+  });
+}
+
+async function ingestOne(
+  screenshotId: string,
+  capturedAtUtc: string,
+): Promise<void> {
+  const payload = {
+    schema_version: 1,
+    submitted_at_utc: "2026-05-24T12:34:56.789Z",
+    player_account_id: "acct-9",
+    screenshot_id: screenshotId,
+    captured_at_utc: capturedAtUtc,
+    image_format: "png",
+    image_bytes_base64: PNG_BASE64,
+  };
+  const response = await worker.fetch(buildIngestRequest(payload), env as never);
+  expect(response.status).toBe(200);
+}
+
+test("manifest returns 401 with no token", async () => {
+  const response = await worker.fetch(
+    buildManifestRequest("2026-05-23"),
+    env as never,
+  );
+  expect(response.status).toBe(401);
+});
+
+test("manifest returns 401 with wrong token", async () => {
+  const response = await worker.fetch(
+    buildManifestRequest("2026-05-23", "Bearer wrong"),
+    env as never,
+  );
+  expect(response.status).toBe(401);
+});
+
+test("manifest returns 400 for invalid date", async () => {
+  const response = await worker.fetch(
+    buildManifestRequest("not-a-date", "Bearer test-pull-token"),
+    env as never,
+  );
+  expect(response.status).toBe(400);
+});
+
+test("manifest returns 200 with empty items when no screenshots for the date", async () => {
+  const response = await worker.fetch(
+    buildManifestRequest("2026-05-23", "Bearer test-pull-token"),
+    env as never,
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { items: unknown[]; date: string };
+  expect(body.date).toBe("2026-05-23");
+  expect(body.items).toEqual([]);
+});
+
+test("manifest returns ascending-by-uploaded items for the requested date", async () => {
+  await ingestOne("snap-day-a-1", "2026-05-23T01:00:00Z");
+  await ingestOne("snap-day-a-2", "2026-05-23T02:00:00Z");
+  await ingestOne("snap-day-b-1", "2026-05-24T01:00:00Z");
+
+  const response = await worker.fetch(
+    buildManifestRequest("2026-05-23", "Bearer test-pull-token"),
+    env as never,
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as {
+    items: { screenshot_id: string; image_url: string }[];
+  };
+  expect(body.items.length).toBe(2);
+  expect(body.items.map((i) => i.screenshot_id)).toEqual([
+    "snap-day-a-1",
+    "snap-day-a-2",
+  ]);
+  expect(body.items[0]?.image_url).toMatch(/\/bazaardb\/image\/snap-day-a-1$/);
+});
