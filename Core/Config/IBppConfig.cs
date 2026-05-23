@@ -48,4 +48,6 @@ internal interface IBppConfig
     ConfigEntry<bool>? CombatReplayVideoSuppressBppOverlays { get; }
 
     ConfigEntry<int>? CombatReplayVideoMaxQueuedFrames { get; }
+
+    ConfigEntry<bool>? BazaarDbUploadEnabled { get; }
 }

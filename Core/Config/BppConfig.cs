@@ -53,6 +53,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<int>? CombatReplayVideoMaxQueuedFrames { get; private set; }
 
+    public ConfigEntry<bool>? BazaarDbUploadEnabled { get; private set; }
+
     public void Initialize(ConfigFile config)
     {
         ItemBoardAnchoredPositionConfig = config.Bind(
@@ -184,6 +186,13 @@ internal sealed class BppConfig : IBppConfig
             "MaxQueuedFrames",
             90,
             "Maximum frames buffered between GPU readback and the FFmpeg encoder. Frames above this are dropped to protect memory. Default 90 ≈ 3 seconds at 30fps."
+        );
+        // BazaarDB
+        BazaarDbUploadEnabled = config.Bind(
+            "BazaarDB",
+            "UploadScreenshots",
+            false,
+            "When enabled, end-of-run screenshots and their summary (hero, days, MMR, rank, position, etc.) are uploaded to our server and forwarded to BazaarDB. Includes screenshots from past runs. You can turn this off at any time; we will stop uploading and never delete what was already sent."
         );
     }
 }
