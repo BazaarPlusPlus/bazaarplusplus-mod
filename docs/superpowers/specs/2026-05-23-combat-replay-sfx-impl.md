@@ -1,6 +1,6 @@
 # CombatReplay 战斗 SFX 失声：补充诊断与分层修复
 
-**Status:** Implementation
+**Status:** Implemented (commit `1ce7c38`，等待 saved replay 实跑验证 §5)
 **Date:** 2026-05-23
 **Owner:** BazaarPlusPlus mod / CombatReplay
 **Supersedes:** —
@@ -22,7 +22,7 @@
 
 ## 1. 为什么需要再写一份
 
-[2026-05-22 分析文档](2026-05-22-combat-replay-sfx-silent-analysis.md) §4.5 给出的根因假设——“`CombatBus` 等 FMOD bus 卡在 `paused=true`，因为 `SoundEventListener` 重订阅有时序竞争”——方向是对的。但目前的 [CombatReplayRuntime.Warmup.cs:909](../../../Game/CombatReplay/CombatReplayRuntime.Warmup.cs#L909) `EnsureReplayAudioUnpaused` 已经实现了那份文档 §5 Method A 的关键一步：
+[2026-05-22 分析文档](2026-05-22-combat-replay-sfx-silent-analysis.md) §4.5 给出的根因假设——“`CombatBus` 等 FMOD bus 卡在 `paused=true`，因为 `SoundEventListener` 重订阅有时序竞争”——方向是对的。但**改造前的** `EnsureReplayAudioUnpaused` 已经实现了那份文档 §5 Method A 的关键一步：
 
 ```csharp
 Services.Get<SoundManager>()?.PauseBusses(isPausing: false);
@@ -30,7 +30,7 @@ Services.Get<SoundManager>()?.PauseBusses(isPausing: false);
 
 直接调到 `SoundManager.PauseBusses(false)`。**这就是文档推荐的“绕过订阅链直接 setPaused(false)”修复，但用户报告 SFX 仍然失声。**
 
-也就是说：原假设至少不够完整。还有别的“静音器”没有被列举/验证。继续按假设去“再多写一层修复”就是在重复 [WarmReplayAudioBanksAsync](../../../Game/CombatReplay/CombatReplayRuntime.Warmup.cs#L490) 走过的弯路：方向感觉对、改完仍然没声音、反复 churn。
+也就是说：原假设至少不够完整。还有别的“静音器”没有被列举/验证。继续按假设去“再多写一层修复”就是在重复 [WarmReplayAudioBanksAsync](../../../Game/CombatReplay/CombatReplayRuntime.Warmup.cs#L492) 走过的弯路：方向感觉对、改完仍然没声音、反复 churn。
 
 这份补充文档要做两件事：
 
@@ -182,3 +182,17 @@ PauseSnapshot 是个 FMOD mixer snapshot——一旦 `start()` 之后，它会�
 ## 6. 后续可能的清理
 
 如果验证后日志显示某些 layer 进入时已经是“无事可做”状态（例如 bus 永远不 paused、`sfxEventInstances` 永远只剩 user UI snapshot 一类应保留项），那么对应 layer 在下一轮 PR 里可以删掉，回归到“仅保留真正有效的一层”。**不要在这次 PR 里提前删——证据没采全之前就预判会再次踩坑。**
+
+---
+
+## 7. 实施结果
+
+commit `1ce7c38` 已落地，文件清单：
+
+- 修改：[Game/CombatReplay/CombatReplayRuntime.Warmup.cs](../../../Game/CombatReplay/CombatReplayRuntime.Warmup.cs) — 加 `LogReplayAudioState` (L970)、`EnsureReplayAudioReadyForPlayback` (L923)、`StopAllTrackedSfxEventInstances` (L1179)、`ReassertSfxVolumeFromPreferences` (L1239)
+- 修改：[Game/CombatReplay/CombatReplayRuntime.Bootstrap.cs:139](../../../Game/CombatReplay/CombatReplayRuntime.Bootstrap.cs#L139) — 调用点更名
+- 新增：[Patches/Combat/ReplayStateAudioDiagnosticPatch.cs](../../../Patches/Combat/ReplayStateAudioDiagnosticPatch.cs) — Harmony prefix on `ReplayState.Replay`
+- 修改：[BazaarPlusPlus.csproj](../../../BazaarPlusPlus.csproj) — `FMODUnity` 加进 `<Reference>`
+- 修改：[run.sh](../../../run.sh) — `FMODUnity` 加进 `decompile_all`
+
+下一步是按 §5 跑 saved replay + live PvP→Replay，拉日志对比，决定哪些 layer 在本环境下实际生效、哪些可以在后续 PR 里精简。

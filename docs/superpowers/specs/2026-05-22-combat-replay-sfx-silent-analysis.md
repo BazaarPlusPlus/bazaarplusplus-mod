@@ -1,6 +1,6 @@
 # CombatReplay 战斗 SFX 失声分析与验证方案
 
-**Status:** Draft for plan authoring
+**Status:** Superseded by [2026-05-23-combat-replay-sfx-impl.md](2026-05-23-combat-replay-sfx-impl.md)（commit `1ce7c38`）—— Method A 已落地但单层不足以恢复 SFX，分层方案在新文档中。
 **Date:** 2026-05-22
 **Owner:** BazaarPlusPlus mod / CombatReplay
 **Related code:**
