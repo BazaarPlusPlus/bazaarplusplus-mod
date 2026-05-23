@@ -6,6 +6,7 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.Screenshots.Upload;
 using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
@@ -67,6 +68,15 @@ internal static class BppSettingsDockCatalog
             new CombatStatusBarSettingsMenuBridge(
                 CombatStatusBarFeature.GetEnabledSettingValue,
                 CombatStatusBarFeature.SetEnabledSettingValue
+            )
+        ),
+        new(
+            "BazaarDbUpload",
+            BazaarDbScreenshotUploadSettingsMenuLabel.Resolve,
+            new SettingsMenuToggleBridge(
+                ReadBazaarDbUploadEnabled,
+                WriteBazaarDbUploadEnabled,
+                BazaarDbScreenshotUploadController.OnEnabledChanged
             )
         ),
         new(
@@ -196,5 +206,17 @@ internal static class BppSettingsDockCatalog
             LegendaryPositionDisplayMode.PositionWithRating => "P|R",
             _ => "DEF",
         };
+    }
+
+    private static bool ReadBazaarDbUploadEnabled()
+    {
+        return Config.BazaarDbUploadEnabled?.Value ?? false;
+    }
+
+    private static void WriteBazaarDbUploadEnabled(bool enabled)
+    {
+        var config = Config.BazaarDbUploadEnabled;
+        if (config != null)
+            config.Value = enabled;
     }
 }

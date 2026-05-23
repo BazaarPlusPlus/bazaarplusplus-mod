@@ -35,6 +35,8 @@ public static class RunLogSqliteSchema
 
     public static string BazaarDbScreenshotUploadsTableName => "bazaardb_screenshot_uploads";
 
+    public static string CaptureSourceEndOfRunAuto => "end_of_run_auto";
+
     public static string RunCheckpointsTableName => RunsTableName;
 
     public static string RunStatusTableName => RunsTableName;

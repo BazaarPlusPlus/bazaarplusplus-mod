@@ -72,6 +72,6 @@ internal sealed class RunScreenshotSqliteStore : SqlitePersistenceStoreBase
 
     private static string GetStorageValue()
     {
-        return "end_of_run_auto";
+        return RunLogSqliteSchema.CaptureSourceEndOfRunAuto;
     }
 }

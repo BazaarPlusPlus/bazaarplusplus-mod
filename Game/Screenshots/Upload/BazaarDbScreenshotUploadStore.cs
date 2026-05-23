@@ -35,13 +35,17 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
                 (screenshot_id, status, attempts, last_attempted_at_utc, last_error, uploaded_at_utc)
             SELECT s.screenshot_id, 'pending', 0, NULL, NULL, NULL
             FROM {RunLogSqliteSchema.RunScreenshotsTableName} AS s
-            WHERE s.capture_source = 'end_of_run_auto'
+            WHERE s.capture_source = $captureSource
               AND NOT EXISTS (
                   SELECT 1
                   FROM {RunLogSqliteSchema.BazaarDbScreenshotUploadsTableName} AS u
                   WHERE u.screenshot_id = s.screenshot_id
               );
             """;
+        command.Parameters.AddWithValue(
+            "$captureSource",
+            RunLogSqliteSchema.CaptureSourceEndOfRunAuto
+        );
         command.ExecuteNonQuery();
     }
 
