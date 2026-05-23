@@ -248,3 +248,46 @@ test("manifest returns ascending-by-uploaded items for the requested date", asyn
   ]);
   expect(body.items[0]?.image_url).toMatch(/\/bazaardb\/image\/snap-day-a-1$/);
 });
+
+function buildImageRequest(id: string, authorization?: string): Request {
+  const headers = new Headers();
+  if (authorization != null) {
+    headers.set("Authorization", authorization);
+  }
+  return new Request(`https://example.com/bazaardb/image/${id}`, {
+    method: "GET",
+    headers,
+  });
+}
+
+test("image proxy returns 401 without token", async () => {
+  const response = await worker.fetch(
+    buildImageRequest("snap-1"),
+    env as never,
+  );
+  expect(response.status).toBe(401);
+});
+
+test("image proxy returns 404 for unknown screenshot", async () => {
+  const response = await worker.fetch(
+    buildImageRequest("does-not-exist", "Bearer test-pull-token"),
+    env as never,
+  );
+  expect(response.status).toBe(404);
+});
+
+test("image proxy streams the PNG bytes", async () => {
+  await ingestOne("snap-image-stream", "2026-05-23T01:00:00Z");
+
+  const response = await worker.fetch(
+    buildImageRequest("snap-image-stream", "Bearer test-pull-token"),
+    env as never,
+  );
+  expect(response.status).toBe(200);
+  expect(response.headers.get("content-type")).toBe("image/png");
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  expect(bytes.length).toBe(PNG_BYTES.length);
+  expect(bytes.slice(0, 8)).toEqual(
+    new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  );
+});
