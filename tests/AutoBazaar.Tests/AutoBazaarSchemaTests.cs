@@ -8,6 +8,6 @@ public class AutoBazaarSchemaTests
     {
         var context = new AutoBazaarContext();
 
-        Assert.Equal("1.1.0", context.SchemaVersion);
+        Assert.Equal("1.2.0", context.SchemaVersion);
     }
 }

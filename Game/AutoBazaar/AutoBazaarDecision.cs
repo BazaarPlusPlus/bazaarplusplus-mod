@@ -5,7 +5,7 @@ namespace BazaarPlusPlus.Game.AutoBazaar;
 
 internal static class AutoBazaarSchema
 {
-    public const string Version = "1.1.0";
+    public const string Version = "1.2.0";
 }
 
 internal enum AutoBazaarActionKind
@@ -21,7 +21,6 @@ internal enum AutoBazaarActionKind
     SellItem,
     Reroll,
     ExitState,
-    AdvanceEndRun,
 }
 
 internal enum AutoBazaarActionGroup
@@ -35,7 +34,6 @@ internal enum AutoBazaarActionGroup
     Sell,
     Reroll,
     Exit,
-    UiFlow,
 }
 
 internal enum AutoBazaarRunStateName

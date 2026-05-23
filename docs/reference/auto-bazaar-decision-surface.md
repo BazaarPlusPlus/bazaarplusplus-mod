@@ -12,7 +12,7 @@ Companion to `auto-bazaar-http-api-v1.md`. Documents how `AutoBazaarContextBuild
 
 | Context field | Derivation |
 |---|---|
-| `SchemaVersion` | Const `"1.1.0"` |
+| `SchemaVersion` | Const `"1.2.0"` |
 | `TickId` | Assigned by `AutoBazaarContextSnapshotPublisher` (incremented on each publish) |
 | `ServerTimeUtc` | `DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)` (ISO-8601) |
 | `IsEnabled` | `services.Config.AutoBazaarEnabled?.Value == true` |
@@ -85,7 +85,6 @@ Each action's inclusion criterion in terms of game-state paths:
 | `Wait` | Always included |
 | `Reroll` | `AppState.CanHandleOperation(Reroll) && RerollsRemaining > 0 && PlayerGold >= RerollCost` |
 | `ExitState` | `AppState.CanHandleOperation(ExitState) && SelectionContextRules.CanExit != false` |
-| `AdvanceEndRun` | `StateName` is `EndRunVictory` or `EndRunDefeat` |
 | `SellItem` (per card) | `AppState.CanHandleOperation(SellItem)` — one entry per sellable card |
 | `MoveItem` (per placement) | Legal placements computed by `AutoBazaarMoveTargetPlanner.Enumerate(itemSize, capacity=10, occupiedAndLockedSockets, excludeStart, excludeCount)`. A socket counts as unusable if `SocketedContainer.IsSocketLocked` returns true for it, or if it is occupied. One entry per legal `(card, targetSection, targetSocket)` triplet. |
 | `SelectItem` (per card) | `AppState.CanHandleOperation(SelectItem) && card.CanSelect != false && card.CanAfford != false && card.CanFit != false` — one entry per offered item in `SelectionOptions` |

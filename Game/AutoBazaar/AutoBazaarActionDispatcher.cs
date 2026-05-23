@@ -7,7 +7,6 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using HarmonyLib;
 using TheBazaar;
-using TheBazaar.UI.EndOfRun;
 
 namespace BazaarPlusPlus.Game.AutoBazaar;
 
@@ -107,18 +106,6 @@ internal static class AutoBazaarActionDispatcher
 
             case AutoBazaarActionKind.ExitState:
                 return InvokeAppStateCommand("ExitStateCommand");
-
-            case AutoBazaarActionKind.AdvanceEndRun:
-            {
-                var controller = UnityEngine.Object.FindObjectOfType<EndOfRunScreenController>();
-                if (controller is null) return new(false, "EndOfRunScreenController not in scene");
-                var method = typeof(EndOfRunScreenController).GetMethod(
-                    "OnContinueClick",
-                    BindingFlags.Instance | BindingFlags.NonPublic);
-                if (method is null) return new(false, "OnContinueClick not found via reflection");
-                method.Invoke(controller, null);
-                return new(true, null);
-            }
 
             default:
                 return new(false, $"unhandled ActionKind: {action.ActionKind}");

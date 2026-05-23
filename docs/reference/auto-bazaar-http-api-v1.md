@@ -23,7 +23,7 @@ On startup the mod writes a discovery file:
 The file is deleted on shutdown. Its contents:
 
 ```json
-{"baseUrl":"http://127.0.0.1:47900","schemaVersion":"1.1.0","pid":12345}
+{"baseUrl":"http://127.0.0.1:47900","schemaVersion":"1.2.0","pid":12345}
 ```
 
 All POST requests are subject to a 64 KB body cap. Requests whose declared `Content-Length` header exceeds 65536 bytes are rejected immediately with `413` before the body is read. Requests without a declared length are read up to 65537 bytes and rejected if that limit is reached.
@@ -32,7 +32,7 @@ All POST requests are subject to a 64 KB body cap. Requests whose declared `Cont
 
 ## 3. Versioning
 
-The major API version is encoded in the URL path (`/v1`). A bump to `/v2` signals breaking changes. The body field `schemaVersion` follows semver; minor bumps (e.g. `1.1.0`) introduce additive changes only: new fields, new enum values, or new `actionKind` values.
+The major API version is encoded in the URL path (`/v1`). A bump to `/v2` signals breaking changes to the request/response envelope. The body field `schemaVersion` follows semver; minor bumps (e.g. `1.2.0`) signal contract changes — added fields, added or removed enum values, or added or removed `actionKind` values — that clients SHOULD inspect when targeting a specific minor version.
 
 **Client guarantees (required):**
 
@@ -66,7 +66,7 @@ Top-level scalar fields:
 
 | Field | Type | Description |
 |---|---|---|
-| `schemaVersion` | string | Semver string, e.g. `"1.1.0"` |
+| `schemaVersion` | string | Semver string, e.g. `"1.2.0"` |
 | `tickId` | uint64 | Monotonically increasing counter; resets to 1 when the listener restarts |
 | `serverTimeUtc` | string | ISO-8601 UTC timestamp of snapshot build; excluded from ETag fingerprint |
 | `isEnabled` | bool | Whether AutoBazaar is active |
@@ -176,7 +176,7 @@ Card-bearing kinds are: `SelectItem`, `SelectSkill`, `SelectEncounter`, `CommitT
 
 ```jsonc
 {
-  "schemaVersion": "1.1.0",
+  "schemaVersion": "1.2.0",
   "decisionId": "01HXYZ...",
   "executed": true,
   "tickId": 12346,
@@ -246,14 +246,13 @@ Rules are applied in order. The first failure terminates validation and the erro
 | `SellItem` | `Sell` | `cardInstanceId` | sellable item, `SellItem` allowed | `Cmd.GetInstance().SendSellCard(instanceId)` |
 | `Reroll` | `Reroll` | — | `rerollsRemaining > 0` and `playerGold >= rerollCost` and `Reroll` allowed | `Cmd.GetInstance().SendReRollSelection()` |
 | `ExitState` | `Exit` | — | `canExit == true` and `ExitState` allowed | `Cmd.GetInstance().SendExitCurrentState()` |
-| `AdvanceEndRun` | `UiFlow` | — | `stateName` is `EndRunVictory` or `EndRunDefeat` | reflection: `EndOfRunScreenController` continue handler |
 
 ---
 
 ## 7. Enum reference
 
 **`actionKind` values:**
-`Wait`, `StartOrContinueRun`, `AbandonRun`, `SelectItem`, `SelectSkill`, `SelectEncounter`, `CommitToPedestal`, `MoveItem`, `SellItem`, `Reroll`, `ExitState`, `AdvanceEndRun`
+`Wait`, `StartOrContinueRun`, `AbandonRun`, `SelectItem`, `SelectSkill`, `SelectEncounter`, `CommitToPedestal`, `MoveItem`, `SellItem`, `Reroll`, `ExitState`
 
 **`EHero` values:**
 `Common`, `Pygmalien`, `Vanessa`, `Stelle`, `Jules`, `Dooley`, `Mak`, `Karnok`
@@ -281,7 +280,7 @@ The mod auto-handles two zero-decision UI gates so external tools do not need to
 - **Replay auto-advance** — when the game enters `ReplayState` and playback completes, the mod advances to the next state automatically.
 - **Known overlay dismissal** — no overlays are dismissed automatically in v1. PvP first-victory tutorial dialog detection was not reliably implemented in the decompiled types.
 
-**End-run screens do not auto-advance.** External tools must POST `AdvanceEndRun` to leave the end-of-run screen. This allows tools to read the final state before proceeding.
+**End-run screens are not driven by AutoBazaar.** When `stateName` is `EndRunVictory` or `EndRunDefeat`, `availableActions` contains only `Wait` — the player (or whatever drives the game UI directly) advances past the end-of-run screen, after which the next `StartOrContinueRun` becomes available at hero-select.
 
 ---
 

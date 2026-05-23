@@ -494,18 +494,7 @@ internal static class AutoBazaarContextBuilder
             });
         }
 
-        // 6. AdvanceEndRun
-        if (stateName is AutoBazaarRunStateName.EndRunVictory or AutoBazaarRunStateName.EndRunDefeat)
-        {
-            actions.Add(new AutoBazaarDecisionOption
-            {
-                ActionKind = AutoBazaarActionKind.AdvanceEndRun,
-                Group = AutoBazaarActionGroup.UiFlow,
-                DisplayKey = "AdvanceEndRun",
-            });
-        }
-
-        // 7. SellItem — per-card
+        // 6. SellItem — per-card
         if (canSell && canHandleOp(StateOps.SellItem))
         {
             foreach (var card in SellableSnapshotsFrom(boardItems, chestItems))
@@ -522,7 +511,7 @@ internal static class AutoBazaarContextBuilder
             }
         }
 
-        // 8. MoveItem — per-card per-placement (board + chest)
+        // 7. MoveItem — per-card per-placement (board + chest)
         if (canMove && canHandleOp(StateOps.MoveItem) && run?.Player != null)
         {
             var handContainer = (run.Player.Hand as CardContainer)?.Container;
@@ -538,7 +527,7 @@ internal static class AutoBazaarContextBuilder
                 occupiedHand, occupiedStash, cap, isOwnHand: false);
         }
 
-        // 9. SelectItem / SelectSkill / SelectEncounter — per offer
+        // 8. SelectItem / SelectSkill / SelectEncounter — per offer
         foreach (var offer in selectionOptions)
         {
             if (offer.CanSelect == false) continue;
@@ -606,7 +595,7 @@ internal static class AutoBazaarContextBuilder
             }
         }
 
-        // 10. CommitToPedestal — per owned item card that the active pedestal template
+        // 9. CommitToPedestal — per owned item card that the active pedestal template
         // marks as a valid upgrade target. The eligibility set is computed once per
         // tick via the probe (which reflects on PedestalState._validCards), so a
         // pedestal with N owned items costs O(N) per snapshot instead of the O(N²)
