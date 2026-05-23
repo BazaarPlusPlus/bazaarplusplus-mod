@@ -10,6 +10,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **Run logging**：活跃对局写入本地 SQLite，供 HistoryPanel 和上传队列使用
 - **PVP 战斗回放**：本地录制 replay payload，并在 HistoryPanel / ghost replay 路径下条件回放
 - **云同步**：在**非 live run** 时后台上传 V3 `run-bundle`，并从 **ModCFServerV3** 同步 ghost battles / replay 下载链接
+- **BazaarDB 截图上传**（默认关闭）：开启后将历史与新增的终局截图与摘要 JSON 推到 ModCFServerV3，BazaarDB 再从服务端拉取
 - 大厅与展示类小功能：随机英雄池面板、主菜单版本号、Legendary 段位展示文案、中文术语切换
 - **Anonymous Mode**：可选将显示名改为 `Anonymous`
 - 终局自动截图：终局 `Continue` 前自动保存主截图和元数据
@@ -24,7 +25,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `Core/` | 配置、事件总线、路径、run context、运行时服务接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
-`Plugin.AttachRuntimeComponents()` 当前挂载 `RunLoggingController`、`RunUploadController`、`PlayerObservationController`、`HistoryPanel`、`CombatStatusBar`、怪物预览相关 runtime、`EndOfRunScreenshotController` 和 `TooltipModifierRefreshController`。
+`Plugin.AttachRuntimeComponents()` 当前挂载 `RunLoggingController`、`RunUploadController`、`PlayerObservationController`、`HistoryPanel`、`CombatStatusBar`、怪物预览相关 runtime、`EndOfRunScreenshotController`、`BazaarDbScreenshotUploadController` 和 `TooltipModifierRefreshController`。
 
 ## 游戏内功能模块
 
@@ -92,6 +93,15 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 详见 `docs/reference/end-of-run-screenshot-flow.md`。
 
+### BazaarDB 截图上传
+
+- `BazaarDB / UploadScreenshots` 默认关闭；开启后 `BazaarDbScreenshotUploadController` 在非 live run 时按 180s 间隔扫描待上传截图
+- Sidecar 表 `bazaardb_screenshot_uploads` 用 `INSERT OR IGNORE` 回填 `run_screenshots` 中所有 `capture_source = 'end_of_run_auto'` 的行——开关从关切到开就能把历史截图一并补传
+- 数据流：模组 `POST /bazaardb-screenshots`（无鉴权）→ Worker 写 R2 + D1 → BazaarDB 用 Bearer token 调 `GET /bazaardb/manifest` 与 `GET /bazaardb/image/{id}` 拉取
+- 4xx（除 408 / 429）落 `permanent_failure`，不再重试；5xx / 网络错误保留 `pending` 自动重试；翻开开关 / run 退出时立刻触发一次
+
+详见 `docs/bazaardb-screenshot-upload.md`。
+
 ### 大厅、设置与本地化
 
 - **随机英雄池 / 皮肤池**：英雄选择界面附加面板逻辑
@@ -109,6 +119,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **Player Observation**：mod 把观察到的 `player_account_id` 写入 `observation.v1.json`
 - **Ghost 战斗**：`GET /ghost-battles?player_account_id=…` 查询 against-me 列表（不鉴权）；按需签发 `POST /ghost-battles/:battleId/replay-link`
 - **Bundle-final 标记**：服务端把上传 bundle 中最后一场 battle 在被投影时标记为 `is_bundle_final_battle`；HistoryPanel 在 ghost 视角下用它提示“这场后对手出局”
+- **BazaarDB 截图上传**：`POST /bazaardb-screenshots`（不鉴权）写 R2 + D1，BazaarDB 用 `BAZAARDB_PULL_TOKEN` 拉 `GET /bazaardb/manifest` / `GET /bazaardb/image/{id}`
 
 模组侧仅在**非 live run** 时执行上传扫描；`RunUploadController` 统一调度 run-bundle 上传。信任模型与安全限制见 `docs/run-upload.md`。
 
@@ -129,6 +140,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `CombatReplayVideo / Enabled` | 可选战斗回放视频录制总开关（默认 false） |
 | `CombatReplayVideo / Fps`, `Width`, `Height`, `Crf`, `Preset` | 视频编码参数；`Width=0` / `Height=0` 表示跟随 `Screen` |
 | `CombatReplayVideo / ForceSpeed1x`, `SuppressBppOverlays`, `MaxQueuedFrames` | 录制期间锁定 1x 速度、隐藏 BPP overlay、抓帧队列上限 |
+| `BazaarDB / UploadScreenshots` | 是否将终局截图上传到 ModCFServerV3 供 BazaarDB 拉取，默认 `false` |
 
 HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings`）。
 
@@ -141,7 +153,8 @@ HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings
 
 - 仓库总览：`README.md`
 - Run / History / SQLite：`docs/run-logging.md`
-- 上传与风险说明：`docs/run-upload.md`
+- Run bundle 上传与信任模型：`docs/run-upload.md`
+- BazaarDB 截图上传链路：`docs/bazaardb-screenshot-upload.md`
 - 战斗状态条 / 怪物预览 / 终局截图 / CF 部署：`docs/combat-status-bar.md`、`docs/monster-preview-design.md`、`docs/reference/end-of-run-screenshot-flow.md`、`docs/mod-cf-server-deploy.md`
 - 热键、设置表面、SQLite schema、tooltip 实现细节：`docs/reference/`
 - AutoBazaar HTTP API 规范：`docs/reference/auto-bazaar-http-api-v1.md`

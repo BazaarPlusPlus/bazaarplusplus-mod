@@ -15,6 +15,7 @@ This repository only keeps documentation that still matches the current implemen
 - Combat replay: saves local PvP replay payloads; `HistoryPanel` can replay saved battles when the required conditions are met.
 - End-of-run automatic screenshots: saves the primary final-run screenshot and SQLite metadata before `Continue`.
 - Background upload: run and replay upload, performed only while the client is outside a live run.
+- BazaarDB screenshot upload: optional toggle that pushes end-of-run screenshots plus a summary JSON to ModCFServerV3 for BazaarDB to pull on a daily cadence (off by default).
 - Anonymous Mode: replaces the local player name with `Anonymous`.
 - **AutoBazaar HTTP endpoint** — local loopback HTTP server (default port 47900) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. See [docs/reference/auto-bazaar-http-api-v1.md](docs/reference/auto-bazaar-http-api-v1.md).
 
@@ -61,7 +62,8 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 - `docs/mod-features-overview.md`: overview of the currently implemented feature set.
 - `docs/run-logging.md`: run logging, history panel, and ghost battles.
-- `docs/run-upload.md`: upload behavior, trust model, and constraints.
+- `docs/run-upload.md`: run-bundle upload behavior, trust model, and constraints.
+- `docs/bazaardb-screenshot-upload.md`: BazaarDB screenshot upload toggle, sidecar table, and server contract.
 - `docs/reference/end-of-run-screenshot-flow.md`: final-run screenshot trigger, storage, and reader contract.
 - `docs/reference/`: hotkeys, settings surfaces, SQLite schema, tooltip internals, and related reference material.
 

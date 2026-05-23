@@ -15,6 +15,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 - 战斗回放：本地保存 PVP replay payload；`HistoryPanel` 在条件满足时可回放已保存战斗。
 - 终局自动截图：终局 `Continue` 前保存主截图和 SQLite 元数据。
 - 后台上传：run / replay 后台上传，仅在未处于 live run 时执行。
+- BazaarDB 截图上传：可选开关，启用后把终局截图与摘要 JSON 推到 ModCFServerV3，BazaarDB 再按天拉取（默认关闭）。
 - Anonymous Mode：将本地玩家名替换为 `Anonymous`。
 - **AutoBazaar HTTP 接口** — 本地回环 HTTP 服务（默认端口 47900），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。详见 [docs/reference/auto-bazaar-http-api-v1.md](docs/reference/auto-bazaar-http-api-v1.md)。
 
@@ -61,7 +62,8 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 - `docs/mod-features-overview.md`：当前功能总览。
 - `docs/run-logging.md`：run logging、history panel、ghost battles。
-- `docs/run-upload.md`：上传行为、信任模型和边界。
+- `docs/run-upload.md`：run bundle 上传行为、信任模型和边界。
+- `docs/bazaardb-screenshot-upload.md`：BazaarDB 截图上传开关、sidecar 表与服务端契约。
 - `docs/reference/end-of-run-screenshot-flow.md`：终局截图触发、存储和读取契约。
 - `docs/reference/`：热键、设置表面、SQLite schema、tooltip 实现等参考文档。
 

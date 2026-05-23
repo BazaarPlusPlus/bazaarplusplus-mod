@@ -8,13 +8,21 @@
 - D1 migrations dir: `ModCFServerV3/migrations`
 - Runtime entry: `ModCFServerV3/src/index.ts`
 
-当前 Worker 路由包括（全部不鉴权）：
+当前 Worker 路由：
+
+不鉴权（运行依赖自定义域）：
 
 - `GET /health`
 - `POST /run-bundles`
 - `GET /ghost-battles?player_account_id=…`
 - `POST /ghost-battles/:battleId/replay-link`
 - `GET /replays/:token`
+- `POST /bazaardb-screenshots`（模组上传 BazaarDB 终局截图）
+
+`Authorization: Bearer <BAZAARDB_PULL_TOKEN>`：
+
+- `GET /bazaardb/manifest?date=YYYY-MM-DD`（BazaarDB 拉取当日截图列表）
+- `GET /bazaardb/image/{screenshot_id}`（BazaarDB 拉取单张截图，Worker 代理 R2）
 
 ## First Deploy
 
@@ -44,9 +52,16 @@ npx wrangler d1 migrations apply bazaarplusplus-mod-api-v3-db
 
 ```powershell
 npx wrangler r2 bucket create bazaarplusplus-run-bundles-v3
+npx wrangler r2 bucket create bazaarplusplus-bazaardb-assets
 ```
 
-4. 部署 Worker：
+4. 设置 BazaarDB 拉取 token（不入仓，与 BazaarDB 团队约定后通过 secret put 注入）：
+
+```powershell
+npx wrangler secret put BAZAARDB_PULL_TOKEN
+```
+
+5. 部署 Worker：
 
 ```powershell
 npm run deploy
@@ -72,10 +87,14 @@ curl https://mod-api-v3.bazaarplusplus.com/health
 - `GET /ghost-battles?player_account_id=…`
 - `POST /ghost-battles/:battleId/replay-link`
 - `GET /replays/:token`
+- `POST /bazaardb-screenshots`
+- `GET /bazaardb/manifest?date=YYYY-MM-DD`（带正确的 `Authorization: Bearer` 头预期 200，错误 token 预期 401）
+- `GET /bazaardb/image/{screenshot_id}`（同样需要 Bearer header）
 
 ## Notes
 
 - D1 schema 由 Wrangler migration 管理，见 `ModCFServerV3/migrations/`。
 - replay 对象与 token 行为由 `createReplayLink` / `downloadReplay` 路由负责。
-- 当前 V3 预期资源名为 `bazaarplusplus-mod-api-v3`、`mod-api-v3.bazaarplusplus.com`、`bazaarplusplus-mod-api-v3-db`、`bazaarplusplus-run-bundles-v3`。
+- 当前 V3 预期资源名为 `bazaarplusplus-mod-api-v3`、`mod-api-v3.bazaarplusplus.com`、`bazaarplusplus-mod-api-v3-db`、`bazaarplusplus-run-bundles-v3`、`bazaarplusplus-bazaardb-assets`。
 - 如果生产环境已存在实际资源名，以 `ModCFServerV3/wrangler.toml` 为准。
+- `BAZAARDB_PULL_TOKEN` 只通过 `wrangler secret put` 设置，不写进 `wrangler.toml`；轮换时再次 `secret put` 即可（无需改 URL 契约）。
