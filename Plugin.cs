@@ -17,6 +17,7 @@ using BazaarPlusPlus.Game.Online;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots;
+using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Patches;
@@ -172,6 +173,10 @@ public class Plugin : BaseUnityPlugin
         var screenshot = gameObject.AddComponent<EndOfRunScreenshotController>();
         screenshot.Initialize(services);
 
+        var bazaarDbScreenshotUpload =
+            gameObject.AddComponent<BazaarDbScreenshotUploadController>();
+        bazaarDbScreenshotUpload.Initialize(services);
+
         AddConfiguredTooltipModifierRefreshController(services.Config);
 
         var combatReplayVideoRecorder = gameObject.AddComponent<CombatReplayVideoRecorder>();
@@ -267,6 +272,7 @@ public class Plugin : BaseUnityPlugin
         DestroyComponentIfPresent<CombatReplayVideoRecorder>();
         DestroyComponentIfPresent<TooltipModifierRefreshController>();
         DestroyComponentIfPresent<EndOfRunScreenshotController>();
+        DestroyComponentIfPresent<BazaarDbScreenshotUploadController>();
         DestroyComponentIfPresent<MonsterPreviewItemBoardRuntime>();
         DestroyComponentIfPresent<CardSetPreviewRuntime>();
         DestroyComponentIfPresent<MonsterPreviewWarmupController>();
