@@ -10,6 +10,8 @@ internal sealed class V3Routes
         ApiBaseUri = apiBaseUri;
         UploadRunBundle = BuildAbsolute("/run-bundles");
         QueryGhostBattles = BuildAbsolute("/ghost-battles");
+        UploadBazaarDbScreenshot = BuildAbsolute("/bazaardb-screenshots");
+        BazaarDbManifestBase = BuildAbsolute("/bazaardb/manifest");
     }
 
     public Uri ApiBaseUri { get; }
@@ -17,6 +19,10 @@ internal sealed class V3Routes
     public string UploadRunBundle { get; }
 
     public string QueryGhostBattles { get; }
+
+    public string UploadBazaarDbScreenshot { get; }
+
+    public string BazaarDbManifestBase { get; }
 
     public string CreateReplayLink(string battleId)
     {
