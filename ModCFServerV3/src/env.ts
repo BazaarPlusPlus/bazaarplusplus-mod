@@ -1,7 +1,9 @@
 export interface Env {
   DB: D1Database;
   RUN_BUNDLE_BUCKET: R2Bucket;
+  BAZAARDB_BUCKET: R2Bucket;
   REPLAY_DOWNLOAD_SECRET: string;
+  BAZAARDB_PULL_TOKEN: string;
   GHOST_QUERY_LOOKBACK_DAYS: string;
   RUN_BUNDLE_RETENTION_DAYS: string;
 }

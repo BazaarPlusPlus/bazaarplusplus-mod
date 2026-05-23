@@ -21,6 +21,7 @@ export default defineConfig({
         bindings: {
           TEST_MIGRATIONS: await readD1Migrations(migrationsPath),
           REPLAY_DOWNLOAD_SECRET: "test-replay-download-secret",
+          BAZAARDB_PULL_TOKEN: "test-pull-token",
           GHOST_QUERY_LOOKBACK_DAYS: "3",
           RUN_BUNDLE_RETENTION_DAYS: "5",
         },

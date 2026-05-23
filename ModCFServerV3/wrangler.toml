@@ -28,3 +28,7 @@ migrations_dir = "migrations"
 [[r2_buckets]]
 binding = "RUN_BUNDLE_BUCKET"
 bucket_name = "bazaarplusplus-run-bundles-v3"
+
+[[r2_buckets]]
+binding = "BAZAARDB_BUCKET"
+bucket_name = "bazaarplusplus-bazaardb-assets"
