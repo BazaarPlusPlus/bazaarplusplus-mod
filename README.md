@@ -10,7 +10,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 
 - 战斗状态条：在底部 HUD 显示逻辑战斗时间、已处理帧数、暂停状态以及离散速度档（0.50x / 0.67x / 1.00x）。
 - 怪物预览：默认走游戏原生怪物预览；Bazaar++ 在 tooltip 路径上做局部增强，并复用原生 `MonsterBoardTooltip` 展示自定义 board 内容。
-- 附魔 / 升级预览：在原生 tooltip 路径上追加附魔文本，或在按住升级预览热键时进入原生 upgrade preview。
+- 附魔 / 升级预览：每种预览各有一个可视性模式（Off / AutoOnPedestalChoice / Always，默认 Auto），在选择屏遇到对应种类的 pedestal 时自动显示对应预览；按住 Ctrl / Shift 仍可手动覆盖。
 - Run Logging 与 HistoryPanel：活跃 run 写入 SQLite；游戏内可浏览 runs、PVP battles、ghost battles，并预览保存的战斗快照。
 - 战斗回放：本地保存 PVP replay payload；`HistoryPanel` 在条件满足时可回放已保存战斗。
 - 终局自动截图：终局 `Continue` 前保存主截图和 SQLite 元数据。

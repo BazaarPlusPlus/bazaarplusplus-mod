@@ -6,8 +6,8 @@
 | --- | --- | --- | --- |
 | `F8` | Toggle `HistoryPanel` | Lobby / non-combat UI | No |
 | `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No |
-| `Ctrl` | Show enchant preview when always-show is disabled | Tooltip hover | Yes |
-| `Shift` | Show upgrade preview | Tooltip hover | Yes |
+| `Ctrl` | Force enchant preview (overrides EnchantPreview Mode) | Tooltip hover | Yes |
+| `Shift` | Force upgrade preview (overrides UpgradePreview Mode) | Tooltip hover | Yes |
 
 ## Rebindable Bazaar++ Actions
 

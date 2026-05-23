@@ -48,9 +48,11 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 ### 附魔预览与升级预览（Tooltips）
 
-- **附魔**：在物品 tooltip 上追加附魔说明；可配置「始终显示」或按住 **EnchantPreview** 热键时显示（默认 Ctrl）
-- **升级预览**：按住 **UpgradePreview** 热键（默认 Shift）进入原生 upgrade preview 路径
-- `TooltipModifierRefreshController` 在配置或 modifier 状态变化时刷新当前 tooltip
+- **可视性模式**：附魔与升级各有独立的 3 态配置（`Off` / `AutoOnPedestalChoice` / `Always`），默认 `AutoOnPedestalChoice`
+- **自动触发**：在 `ChoiceState` 选择屏遇到对应种类 pedestal 时，hover 物品自动展示匹配的预览；非 pedestal 选项或非 ChoiceState 不会自动触发
+- **手动覆盖**：按住 `HoldEnchantPreview`（默认 Ctrl）/ `HoldUpgradePreview`（默认 Shift）总是显示对应预览，等级最高，覆盖所有模式
+- **共享决策**：`TooltipModifierRefreshController`、`ItemEnchantPreviewPatch`、`UpgradePreviewTooltipPatch` 共同调用 `Game/Tooltips/TooltipPreviewModePolicy.Resolve`，保证三处行为一致；模式由 `Game/Encounter/ChoiceScreenPedestalResolver` 从 `RunState.SelectionSet` 推导
+- **迁移**：首次启动会把旧的 `[EnchantPreview] AlwaysShow = true/false` 自动迁移到 `[EnchantPreview] Mode = Always / AutoOnPedestalChoice`，并从配置文件移除旧键
 
 ### Streamer / Anonymous 名称（Name Override）
 
@@ -108,7 +110,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **主菜单版本号**：在游戏版本字符串旁展示模组版本
 - **Legendary 位置展示**：可按配置保留原值、隐藏、固定 `999999` 或显示 `#position | rating`
 - **中文术语模式**：可在 Mainland / Taiwan / HongKong 术语间切换
-- **Bazaar++ 设置坞**：注入 Game History、Anonymous、Legendary Position、Enchant Preview、Combat Status Bar、Chinese Locale 等入口
+- **Bazaar++ 设置坞**：注入 Game History、Anonymous、Legendary Position、Enchant Preview、Upgrade Preview、Combat Status Bar、Chinese Locale 等入口
 
 ## 云同步与 ModCFServerV3
 
@@ -131,7 +133,8 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | --- | --- |
 | `ItemBoard / AnchoredPosition` | item-board overlay 位置覆盖 |
 | `StreamerMode / EnableNameOverride` | Anonymous 显示名 |
-| `EnchantPreview / AlwaysShow` | 附魔 tooltip 是否始终显示 |
+| `EnchantPreview / Mode` | 附魔预览可视性模式：`Off` / `AutoOnPedestalChoice` / `Always`（默认 Auto） |
+| `UpgradePreview / Mode` | 升级预览可视性模式：同上（默认 Auto） |
 | `CombatStatusBar / Enabled` | 战斗状态条开关 |
 | `CombatStatusBar / SpeedMultiplier` | 默认战斗速度档位 |
 | `Hotkeys / EnchantPreview`, `Hotkeys / UpgradePreview` | 附魔/升级预览按键路径 |
