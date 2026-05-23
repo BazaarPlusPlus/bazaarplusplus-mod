@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
 public static class RunLogSqliteSchema
 {
-    public static int LocalDatabaseSchemaVersion => 12;
+    public static int LocalDatabaseSchemaVersion => 13;
 
     public static int RowSchemaVersion => 11;
 
@@ -32,6 +32,8 @@ public static class RunLogSqliteSchema
     public static string SyncCursorsTableName => "sync_cursors";
 
     public static string RunSyncStateTableName => "run_sync_state";
+
+    public static string BazaarDbScreenshotUploadsTableName => "bazaardb_screenshot_uploads";
 
     public static string RunCheckpointsTableName => RunsTableName;
 
@@ -198,6 +200,16 @@ public static class RunLogSqliteSchema
                 FOREIGN KEY (run_id) REFERENCES {RunsTableName}(run_id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS {BazaarDbScreenshotUploadsTableName} (
+                screenshot_id          TEXT PRIMARY KEY,
+                status                 TEXT NOT NULL,
+                attempts               INTEGER NOT NULL DEFAULT 0,
+                last_attempted_at_utc  TEXT NULL,
+                last_error             TEXT NULL,
+                uploaded_at_utc        TEXT NULL,
+                FOREIGN KEY (screenshot_id) REFERENCES {RunScreenshotsTableName}(screenshot_id) ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS idx_{RunEventsTableName}_ts_utc
                 ON {RunEventsTableName}(ts_utc);
 
@@ -231,6 +243,9 @@ public static class RunLogSqliteSchema
 
             CREATE INDEX IF NOT EXISTS idx_{CombatReplayVideosTableName}_battle
                 ON {CombatReplayVideosTableName}(battle_id, started_at_utc DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_{BazaarDbScreenshotUploadsTableName}_status
+                ON {BazaarDbScreenshotUploadsTableName}(status);
             """;
 
     public static void EnsureInitialized(SqliteConnection connection)
