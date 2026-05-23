@@ -45,7 +45,7 @@ function parseCapturedDateUtc(value: string): string | null {
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
-  if (parsed.getTime() > Date.now() + 60_000) {
+  if (parsed.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
     return null;
   }
   const yyyy = parsed.getUTCFullYear().toString().padStart(4, "0");

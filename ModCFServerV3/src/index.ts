@@ -1,7 +1,10 @@
 import type { Env } from "./env";
 import { handleCreateReplayLink } from "./features/v3/createReplayLink";
 import { handleDownloadReplay } from "./features/v3/downloadReplay";
+import { handleGetBazaarDbImage } from "./features/v3/getBazaarDbImage";
+import { handleGetBazaarDbManifest } from "./features/v3/getBazaarDbManifest";
 import { handleQueryGhostBattles } from "./features/v3/queryGhostBattles";
+import { handleUploadBazaarDbScreenshot } from "./features/v3/uploadBazaarDbScreenshot";
 import { handleUploadRunBundle } from "./features/v3/uploadRunBundle";
 import { preflight, withCors } from "./http/cors";
 import { json } from "./http/json";
@@ -16,6 +19,8 @@ const StaticRoutes: StaticRoute[] = [
   { method: "GET", path: "/health", handle: () => json({ ok: true }) },
   { method: "POST", path: "/run-bundles", handle: handleUploadRunBundle },
   { method: "GET", path: "/ghost-battles", handle: handleQueryGhostBattles },
+  { method: "POST", path: "/bazaardb-screenshots", handle: handleUploadBazaarDbScreenshot },
+  { method: "GET", path: "/bazaardb/manifest", handle: handleGetBazaarDbManifest },
 ];
 
 function findStaticRoute(method: string, path: string): StaticRoute | undefined {
@@ -55,6 +60,18 @@ export default {
             request,
             _env,
             decodeURIComponent(replayDownloadMatch[1] ?? ""),
+          ),
+        );
+      }
+
+      const bazaarDbImageMatch = url.pathname.match(/^\/bazaardb\/image\/([^/]+)$/);
+      if (request.method === "GET" && bazaarDbImageMatch) {
+        return withCors(
+          request,
+          await handleGetBazaarDbImage(
+            request,
+            _env,
+            decodeURIComponent(bazaarDbImageMatch[1] ?? ""),
           ),
         );
       }

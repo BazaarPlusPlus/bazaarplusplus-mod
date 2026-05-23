@@ -239,8 +239,10 @@ export async function resetTestState(env: Cloudflare.Env): Promise<void> {
     env.DB.prepare("DELETE FROM runs"),
     env.DB.prepare("DELETE FROM run_bundles"),
     env.DB.prepare("DELETE FROM seen_player_accounts"),
+    env.DB.prepare("DELETE FROM bazaardb_screenshots"),
   ]);
   await deleteAllR2(env.RUN_BUNDLE_BUCKET);
+  await deleteAllR2(env.BAZAARDB_BUCKET);
   env.GHOST_QUERY_LOOKBACK_DAYS = "3";
   env.RUN_BUNDLE_RETENTION_DAYS = "5";
 }
