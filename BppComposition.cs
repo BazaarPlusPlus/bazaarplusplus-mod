@@ -65,7 +65,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_combatReplayModule);
         _featureRegistry.Register(_combatStatusBarModule);
 
-        _mountables.Register(new AutoBazaarMount());
+        // _mountables.Register(new AutoBazaarMount());
     }
 
     public void AttachCombatReplayRuntime(CombatReplayRuntime runtime) =>
