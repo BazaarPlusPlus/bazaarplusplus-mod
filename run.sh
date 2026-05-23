@@ -97,7 +97,7 @@ decompile() {
 }
 
 decompile_all() {
-    for dll in Assembly-CSharp BazaarGameClient BazaarGameShared BazaarBattleService TheBazaarRuntime; do
+    for dll in Assembly-CSharp BazaarGameClient BazaarGameShared BazaarBattleService TheBazaarRuntime FMODUnity; do
         decompile _ "$dll"
     done
 }

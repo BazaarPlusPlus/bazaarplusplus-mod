@@ -135,6 +135,9 @@
     <Reference Include="MessagePack">
       <HintPath>$(ManagedPath)\MessagePack.dll</HintPath>
     </Reference>
+    <Reference Include="FMODUnity">
+      <HintPath>$(ManagedPath)\FMODUnity.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <!-- Publicize all game assemblies -->

@@ -136,7 +136,7 @@ internal sealed partial class CombatReplayRuntime
         await WaitForReplayPresentationReadyAsync();
         await WarmReplayPresentationAssetsAsync(manifest, sequence);
         await WarmReplayAudioBanksAsync();
-        EnsureReplayAudioUnpaused();
+        EnsureReplayAudioReadyForPlayback();
         HideEncounterPickerOverlays();
         EnsureOpponentPortraitVisible();
         RefillReplayOpponentHealthBar();

@@ -15,6 +15,8 @@ using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Game.PvpBattles;
+using FMOD.Studio;
+using FMODUnity;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
@@ -906,27 +908,377 @@ internal sealed partial class CombatReplayRuntime
             stats.SoundtrackBanksLoaded++;
     }
 
-    private static void EnsureReplayAudioUnpaused()
+    private static readonly string[] ReplayDiagnosticBusPathFields =
+    {
+        "MasterBusPath",
+        "BoardDiegeticBusPath",
+        "BoardPresentationBusPath",
+        "CombatBusPath",
+        "MonsterNonVerbalBusPath",
+        "VOBusPath",
+        "EnvironmentSpecificBusPath",
+        "EnvironmentFocusBusPath",
+    };
+
+    internal static void EnsureReplayAudioReadyForPlayback()
     {
         try
         {
+            LogReplayAudioState("pre-fix");
+
             var gameServiceManager = Singleton<GameServiceManager>.Instance;
             if (gameServiceManager?.GamePaused == true)
             {
                 BppLog.Info(
                     "CombatReplayRuntime",
-                    "Saved replay playback found gameplay paused; unpausing before combat simulation."
+                    "Replay audio readiness layer-1: GamePaused=true, calling PauseOrUnpauseGame(false)."
                 );
                 gameServiceManager.PauseOrUnpauseGame(toPauseOrUnpause: false);
             }
 
-            Services.Get<SoundManager>()?.PauseBusses(isPausing: false);
+            var soundManager = Services.Get<SoundManager>();
+            if (soundManager == null)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    "Replay audio readiness aborted: SoundManager unavailable."
+                );
+                return;
+            }
+
+            BppLog.Info(
+                "CombatReplayRuntime",
+                "Replay audio readiness layer-2: SoundManager.PauseBusses(false)."
+            );
+            soundManager.PauseBusses(isPausing: false);
+
+            StopAllTrackedSfxEventInstances(soundManager);
+
+            ReassertSfxVolumeFromPreferences();
+
+            LogReplayAudioState("post-fix");
         }
         catch (Exception ex)
         {
             BppLog.Warn(
                 "CombatReplayRuntime",
-                $"Saved replay audio unpause failed: {ex.Message}"
+                $"Replay audio readiness step failed: {ex.Message}"
+            );
+        }
+    }
+
+    internal static void LogReplayAudioState(string label)
+    {
+        try
+        {
+            var soundManager = Services.Get<SoundManager>();
+            if (soundManager == null)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    $"[ReplayAudioDiag/{label}] SoundManager unavailable."
+                );
+                return;
+            }
+
+            var soundManagerType = typeof(SoundManager);
+            foreach (var fieldName in ReplayDiagnosticBusPathFields)
+            {
+                LogBusState(label, soundManager, soundManagerType, fieldName);
+            }
+
+            try
+            {
+                var settingsField = soundManagerType.GetField(
+                    "SoundSettings",
+                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public
+                );
+                if (settingsField?.GetValue(null) is SoundSettings soundSettings)
+                {
+                    LogVcaState(label, "SfxVCA", soundSettings.SfxVCA);
+                    LogVcaState(label, "MusicVCA", soundSettings.MusicVCA);
+                    LogVcaState(label, "VoVCA", soundSettings.VoVCA);
+                }
+                else
+                {
+                    BppLog.Info(
+                        "CombatReplayRuntime",
+                        $"[ReplayAudioDiag/{label}] SoundSettings static field is null."
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    $"[ReplayAudioDiag/{label}] VCA read failed: {ex.Message}"
+                );
+            }
+
+            try
+            {
+                var dict = GetSfxEventInstancesDict(soundManager);
+                if (dict != null)
+                {
+                    var keys = string.Join(",", dict.Keys);
+                    BppLog.Info(
+                        "CombatReplayRuntime",
+                        $"[ReplayAudioDiag/{label}] tracked-sfx count={dict.Count} keys=[{keys}]"
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    $"[ReplayAudioDiag/{label}] tracked-sfx read failed: {ex.Message}"
+                );
+            }
+
+            try
+            {
+                var pauseSnapshotField = soundManagerType.GetField(
+                    "PauseSnapshot",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
+                );
+                if (pauseSnapshotField?.GetValue(soundManager) is EventReference pauseSnapshot)
+                {
+                    BppLog.Info(
+                        "CombatReplayRuntime",
+                        $"[ReplayAudioDiag/{label}] PauseSnapshot.Guid={pauseSnapshot.Guid} isNull={pauseSnapshot.IsNull}"
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    $"[ReplayAudioDiag/{label}] PauseSnapshot read failed: {ex.Message}"
+                );
+            }
+
+            try
+            {
+                var gsm = Singleton<GameServiceManager>.Instance;
+                BppLog.Info(
+                    "CombatReplayRuntime",
+                    $"[ReplayAudioDiag/{label}] GamePaused={gsm?.GamePaused} StateName={Data.CurrentState?.StateName}"
+                );
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    $"[ReplayAudioDiag/{label}] GamePaused read failed: {ex.Message}"
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"[ReplayAudioDiag/{label}] diagnostics failed: {ex.Message}"
+            );
+        }
+    }
+
+    private static void LogBusState(
+        string label,
+        SoundManager soundManager,
+        Type soundManagerType,
+        string fieldName
+    )
+    {
+        try
+        {
+            var field = soundManagerType.GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
+            );
+            var path = field?.GetValue(soundManager) as string;
+            if (string.IsNullOrEmpty(path))
+            {
+                BppLog.Info(
+                    "CombatReplayRuntime",
+                    $"[ReplayAudioDiag/{label}] bus.{fieldName}=<no-path>"
+                );
+                return;
+            }
+
+            var bus = RuntimeManager.GetBus(path);
+            if (!bus.isValid())
+            {
+                BppLog.Info(
+                    "CombatReplayRuntime",
+                    $"[ReplayAudioDiag/{label}] bus.{fieldName} path={path} invalid"
+                );
+                return;
+            }
+
+            bus.getPaused(out var paused);
+            bus.getVolume(out var vol, out var finalVol);
+            BppLog.Info(
+                "CombatReplayRuntime",
+                $"[ReplayAudioDiag/{label}] bus.{fieldName} path={path} paused={paused} vol={vol:F3} final={finalVol:F3}"
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"[ReplayAudioDiag/{label}] bus.{fieldName} read failed: {ex.Message}"
+            );
+        }
+    }
+
+    private static void LogVcaState(string label, string vcaName, VCA vca)
+    {
+        try
+        {
+            if (!vca.isValid())
+            {
+                BppLog.Info(
+                    "CombatReplayRuntime",
+                    $"[ReplayAudioDiag/{label}] vca.{vcaName} invalid"
+                );
+                return;
+            }
+
+            vca.getVolume(out var vol, out var finalVol);
+            BppLog.Info(
+                "CombatReplayRuntime",
+                $"[ReplayAudioDiag/{label}] vca.{vcaName} vol={vol:F3} final={finalVol:F3}"
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"[ReplayAudioDiag/{label}] vca.{vcaName} read failed: {ex.Message}"
+            );
+        }
+    }
+
+    private static Dictionary<string, EventInstance>? GetSfxEventInstancesDict(
+        SoundManager soundManager
+    )
+    {
+        var sfxPlayer = soundManager.SFXPlayer;
+        if (sfxPlayer == null)
+            return null;
+
+        var dictField = sfxPlayer
+            .GetType()
+            .GetField(
+                "sfxEventInstances",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
+            );
+        return dictField?.GetValue(sfxPlayer) as Dictionary<string, EventInstance>;
+    }
+
+    private static void StopAllTrackedSfxEventInstances(SoundManager soundManager)
+    {
+        try
+        {
+            var dict = GetSfxEventInstancesDict(soundManager);
+            if (dict == null)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    "Replay audio readiness layer-3: sfxEventInstances dictionary not accessible; skipping."
+                );
+                return;
+            }
+
+            if (dict.Count == 0)
+            {
+                BppLog.Info(
+                    "CombatReplayRuntime",
+                    "Replay audio readiness layer-3: no tracked SFX EventInstances to stop."
+                );
+                return;
+            }
+
+            var keys = dict.Keys.ToList();
+            BppLog.Info(
+                "CombatReplayRuntime",
+                $"Replay audio readiness layer-3: stopping {keys.Count} tracked SFX EventInstance(s): [{string.Join(",", keys)}]"
+            );
+
+            foreach (var key in keys)
+            {
+                try
+                {
+                    var instance = dict[key];
+                    if (instance.isValid())
+                    {
+                        instance.stop(FMOD.Studio.STOP_MODE.IMMEDIATE);
+                        instance.release();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    BppLog.Warn(
+                        "CombatReplayRuntime",
+                        $"Replay audio readiness layer-3: stop/release for key={key} failed: {ex.Message}"
+                    );
+                }
+            }
+
+            dict.Clear();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Replay audio readiness layer-3 failed: {ex.Message}"
+            );
+        }
+    }
+
+    private static void ReassertSfxVolumeFromPreferences()
+    {
+        try
+        {
+            var prefs = PlayerPreferences.Data;
+            if (prefs == null)
+            {
+                BppLog.Info(
+                    "CombatReplayRuntime",
+                    "Replay audio readiness layer-4: PlayerPreferences.Data is null; skipping."
+                );
+                return;
+            }
+
+            var setVolume = typeof(SoundManager).GetMethod(
+                "SetVolume",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public
+            );
+            var volumeTypeEnum = typeof(SoundManager).GetNestedType(
+                "VolumeType",
+                BindingFlags.NonPublic | BindingFlags.Public
+            );
+            if (setVolume == null || volumeTypeEnum == null)
+            {
+                BppLog.Warn(
+                    "CombatReplayRuntime",
+                    "Replay audio readiness layer-4: SoundManager.SetVolume/VolumeType not found; skipping."
+                );
+                return;
+            }
+
+            var sfxValue = Enum.Parse(volumeTypeEnum, "SFX");
+            setVolume.Invoke(null, new[] { sfxValue, (object)prefs.VolumeSfx });
+            BppLog.Info(
+                "CombatReplayRuntime",
+                $"Replay audio readiness layer-4: re-asserted SFX volume to {prefs.VolumeSfx:F3} from PlayerPreferences."
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayRuntime",
+                $"Replay audio readiness layer-4 failed: {ex.Message}"
             );
         }
     }
