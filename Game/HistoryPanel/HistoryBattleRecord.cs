@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.PvpBattles;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -26,8 +27,8 @@ internal sealed class HistoryBattleRecord
         string? result,
         string? winnerCombatantId,
         string? loserCombatantId,
-        string snapshotSummary,
-        HistoryBattlePreviewData previewData,
+        HistoryBattleSnapshotCounts snapshotCounts,
+        PvpBattleSnapshots? snapshots,
         bool isBundleFinalBattle,
         HistoryBattleSource source,
         bool replayAvailable,
@@ -54,8 +55,8 @@ internal sealed class HistoryBattleRecord
         Result = result;
         WinnerCombatantId = winnerCombatantId;
         LoserCombatantId = loserCombatantId;
-        SnapshotSummary = snapshotSummary;
-        PreviewData = previewData;
+        SnapshotCounts = snapshotCounts;
+        Snapshots = snapshots;
         IsBundleFinalBattle = isBundleFinalBattle;
         Source = source;
         ReplayAvailable = replayAvailable;
@@ -102,9 +103,19 @@ internal sealed class HistoryBattleRecord
 
     public string? LoserCombatantId { get; }
 
-    public string SnapshotSummary { get; }
+    public HistoryBattleSnapshotCounts SnapshotCounts { get; }
 
-    public HistoryBattlePreviewData PreviewData { get; }
+    public int PlayerHandItemCount => SnapshotCounts.PlayerHandItemCount;
+
+    public int PlayerSkillCount => SnapshotCounts.PlayerSkillCount;
+
+    public int OpponentHandItemCount => SnapshotCounts.OpponentHandItemCount;
+
+    public int OpponentSkillCount => SnapshotCounts.OpponentSkillCount;
+
+    // The raw card-set captures used to project a card preview; null for ghost-list rows where
+    // snapshots live in a separate payload file the repository does not read.
+    public PvpBattleSnapshots? Snapshots { get; }
 
     public bool IsBundleFinalBattle { get; }
 

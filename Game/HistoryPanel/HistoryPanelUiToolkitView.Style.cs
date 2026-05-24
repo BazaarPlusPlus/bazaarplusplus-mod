@@ -207,15 +207,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         return row;
     }
 
-    private static Label CreateRowTitle(VisualElement row)
-    {
-        var label = CreateLabel(14, FontStyle.Bold, Color.white);
-        label.style.whiteSpace = WhiteSpace.NoWrap;
-        label.style.flexGrow = 1f;
-        row.Add(label);
-        return label;
-    }
-
     private static Label CreateRowCornerLabel(VisualElement row, int fontSize)
     {
         var label = CreateLabel(fontSize, FontStyle.Normal, new Color(0.72f, 0.78f, 0.85f, 0.92f));
@@ -230,41 +221,6 @@ internal sealed partial class HistoryPanelUiToolkitView
     {
         var label = CreateLabel(fontSize, FontStyle.Normal, color);
         label.style.whiteSpace = WhiteSpace.NoWrap;
-        row.Add(label);
-        return label;
-    }
-
-    private static Label CreateRowPill(VisualElement row)
-    {
-        var pill = CreateLabel(10, FontStyle.Bold, Color.white);
-        pill.style.minWidth = 58f;
-        pill.style.height = 20f;
-        pill.style.paddingLeft = 8f;
-        pill.style.paddingRight = 8f;
-        pill.style.marginLeft = 8f;
-        pill.style.unityTextAlign = TextAnchor.MiddleCenter;
-        pill.style.borderTopLeftRadius = 10f;
-        pill.style.borderTopRightRadius = 10f;
-        pill.style.borderBottomLeftRadius = 10f;
-        pill.style.borderBottomRightRadius = 10f;
-        row.Add(pill);
-        return pill;
-    }
-
-    private static Label CreateRowMeta(VisualElement row)
-    {
-        var label = CreateLabel(12, FontStyle.Normal, new Color(0.82f, 0.86f, 0.92f, 0.96f));
-        label.style.whiteSpace = WhiteSpace.NoWrap;
-        label.style.marginTop = 4f;
-        row.Add(label);
-        return label;
-    }
-
-    private static Label CreateRowDetail(VisualElement row)
-    {
-        var label = CreateLabel(11, FontStyle.Normal, new Color(0.70f, 0.75f, 0.83f, 0.90f));
-        label.style.whiteSpace = WhiteSpace.NoWrap;
-        label.style.marginTop = 4f;
         row.Add(label);
         return label;
     }
@@ -300,16 +256,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         chip.style.borderBottomRightRadius = 7f;
         row.Add(chip);
         return chip;
-    }
-
-    private static VisualElement CreateRunBadgeRow(VisualElement parent)
-    {
-        var row = new VisualElement();
-        row.style.flexDirection = FlexDirection.Row;
-        row.style.alignItems = Align.Center;
-        row.style.marginTop = 6f;
-        parent.Add(row);
-        return row;
     }
 
     private static Label CreateInlinePill(VisualElement row, float minWidth)
@@ -565,13 +511,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         StyleButton(button, new Color(0.40f, 0.24f, 0.20f, 0.98f), new Color(1f, 0.93f, 0.90f, 1f));
     }
 
-    private static string ShortenBattleId(string battleId)
-    {
-        return string.IsNullOrWhiteSpace(battleId) ? "-"
-            : battleId.Length <= 12 ? battleId
-            : battleId[..12];
-    }
-
     private readonly struct HeroBadgeStyle
     {
         public HeroBadgeStyle(string shortCode, Color background, Color text)
@@ -586,40 +525,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         public Color Background { get; }
 
         public Color Text { get; }
-    }
-
-    private static Color GetRunAchievementBackground(string achievement)
-    {
-        return achievement switch
-        {
-            "PERFECT" => new Color(0.36f, 0.28f, 0.10f, 0.98f),
-            "GOLD" => new Color(0.41f, 0.31f, 0.12f, 0.98f),
-            "SILVER" => new Color(0.36f, 0.38f, 0.44f, 0.98f),
-            "BRONZE" => new Color(0.38f, 0.25f, 0.18f, 0.98f),
-            _ => new Color(0.24f, 0.18f, 0.18f, 0.98f),
-        };
-    }
-
-    private static Color GetRunAchievementText(string achievement)
-    {
-        return achievement switch
-        {
-            "PERFECT" => new Color(1f, 0.94f, 0.71f, 1f),
-            "GOLD" => new Color(0.99f, 0.90f, 0.66f, 1f),
-            "SILVER" => new Color(0.94f, 0.97f, 1f, 1f),
-            "BRONZE" => new Color(0.98f, 0.88f, 0.80f, 1f),
-            _ => new Color(0.96f, 0.84f, 0.84f, 1f),
-        };
-    }
-
-    private static string? FormatRank(string? rawRank)
-    {
-        if (string.IsNullOrWhiteSpace(rawRank))
-            return null;
-
-        var trimmed = rawRank.Trim();
-        var firstSpace = trimmed.IndexOf(' ');
-        return firstSpace > 0 ? trimmed[..firstSpace] : trimmed;
     }
 
     private static (Color Background, Color Text) GetRankBadgePalette(string rank)

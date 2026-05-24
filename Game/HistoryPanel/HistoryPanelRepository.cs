@@ -102,44 +102,7 @@ internal sealed partial class HistoryPanelRepository
         using var reader = command.ExecuteReader();
         var records = new List<HistoryRunRecord>();
         while (reader.Read())
-        {
-            var startedAt = DateTimeOffset.Parse(
-                reader.GetString(reader.GetOrdinal("started_at_utc"))
-            );
-            var endedAt = GetNullableDateTimeOffset(reader, "ended_at_utc");
-            var victories = GetNullableInt32(reader, "victories");
-            var losses = GetNullableInt32(reader, "losses");
-            var finalDay = GetNullableInt32(reader, "final_day") ?? GetNullableInt32(reader, "day");
-            var finalHour =
-                GetNullableInt32(reader, "final_hour") ?? GetNullableInt32(reader, "hour");
-            var lastSeen =
-                endedAt ?? GetNullableDateTimeOffset(reader, "last_seen_at_utc") ?? startedAt;
-            var rawStatus = reader.GetString(reader.GetOrdinal("run_status"));
-
-            records.Add(
-                new HistoryRunRecord(
-                    reader.GetString(reader.GetOrdinal("run_id")),
-                    reader.GetString(reader.GetOrdinal("hero")),
-                    reader.GetString(reader.GetOrdinal("game_mode")),
-                    startedAt,
-                    endedAt,
-                    lastSeen,
-                    finalDay,
-                    finalHour,
-                    GetNullableInt32(reader, "final_max_health"),
-                    GetNullableInt32(reader, "final_prestige"),
-                    GetNullableInt32(reader, "final_level"),
-                    GetNullableInt32(reader, "final_income"),
-                    GetNullableInt32(reader, "final_gold"),
-                    GetNullableString(reader, "player_rank"),
-                    GetNullableInt32(reader, "player_rating"),
-                    victories,
-                    losses,
-                    rawStatus,
-                    reader.GetInt32(reader.GetOrdinal("battle_count"))
-                )
-            );
-        }
+            records.Add(HistoryPanelRowMapper.ReadRun(reader));
 
         return records;
     }
@@ -191,7 +154,7 @@ internal sealed partial class HistoryPanelRepository
         var records = new List<HistoryBattleRecord>();
         while (reader.Read())
         {
-            var battleId = SafeGetNullableString(reader, "battle_id") ?? "unknown";
+            var battleId = HistoryPanelRowMapper.SafeGetNullableString(reader, "battle_id") ?? "unknown";
             try
             {
                 var playerHand = DeserializeCapture(
@@ -208,40 +171,16 @@ internal sealed partial class HistoryPanelRepository
                 );
 
                 records.Add(
-                    new HistoryBattleRecord(
+                    HistoryPanelRowMapper.ReadLocalBattle(
+                        reader,
                         battleId,
-                        reader.GetString(reader.GetOrdinal("run_id")),
-                        DateTimeOffset.Parse(
-                            reader.GetString(reader.GetOrdinal("recorded_at_utc"))
-                        ),
-                        GetNullableInt32(reader, "day"),
-                        GetNullableInt32(reader, "hour"),
-                        GetNullableString(reader, "encounter_id"),
-                        GetNullableString(reader, "player_hero"),
-                        GetNullableString(reader, "player_rank"),
-                        GetNullableInt32(reader, "player_rating"),
-                        GetNullableInt32(reader, "player_level"),
-                        GetNullableString(reader, "opponent_name"),
-                        GetNullableString(reader, "opponent_hero"),
-                        GetNullableString(reader, "opponent_rank"),
-                        GetNullableInt32(reader, "opponent_rating"),
-                        GetNullableInt32(reader, "opponent_level"),
-                        GetNullableString(reader, "opponent_account_id"),
-                        GetNullableString(reader, "combat_kind"),
-                        GetNullableString(reader, "result"),
-                        GetNullableString(reader, "winner_combatant_id"),
-                        GetNullableString(reader, "loser_combatant_id"),
-                        BuildSnapshotSummary(
-                            playerHand,
-                            playerSkills,
-                            opponentHand,
-                            opponentSkills
-                        ),
-                        BuildPreviewData(playerHand, playerSkills, opponentHand, opponentSkills),
-                        isBundleFinalBattle: false,
-                        source: HistoryBattleSource.Local,
-                        replayAvailable: true,
-                        replayDownloaded: true
+                        new PvpBattleSnapshots
+                        {
+                            PlayerHand = playerHand,
+                            PlayerSkills = playerSkills,
+                            OpponentHand = opponentHand,
+                            OpponentSkills = opponentSkills,
+                        }
                     )
                 );
             }
@@ -305,35 +244,7 @@ internal sealed partial class HistoryPanelRepository
         using var reader = command.ExecuteReader();
         var records = new List<HistoryBattleRecord>();
         while (reader.Read())
-        {
-            var battleId = SafeGetNullableString(reader, "battle_id") ?? "unknown";
-            records.Add(
-                GhostBattleLocalProjector.CreateHistoryBattleRecord(
-                    battleId,
-                    DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
-                    GetNullableInt32(reader, "day"),
-                    GetNullableInt32(reader, "hour"),
-                    GetNullableString(reader, "encounter_id"),
-                    GetNullableString(reader, "player_name"),
-                    GetNullableString(reader, "player_account_id"),
-                    GetNullableString(reader, "player_hero"),
-                    GetNullableString(reader, "player_rank"),
-                    GetNullableInt32(reader, "player_rating"),
-                    GetNullableInt32(reader, "player_level"),
-                    GetNullableString(reader, "opponent_hero"),
-                    GetNullableString(reader, "opponent_rank"),
-                    GetNullableInt32(reader, "opponent_rating"),
-                    GetNullableInt32(reader, "opponent_level"),
-                    GetNullableString(reader, "combat_kind"),
-                    GetNullableString(reader, "result"),
-                    GetNullableString(reader, "winner_combatant_id"),
-                    GetNullableString(reader, "loser_combatant_id"),
-                    isBundleFinalBattle: GetNullableInt32(reader, "is_bundle_final_battle") == 1,
-                    replayAvailable: GetNullableInt32(reader, "replay_available") == 1,
-                    replayDownloaded: GetNullableInt32(reader, "replay_downloaded") == 1
-                )
-            );
-        }
+            records.Add(HistoryPanelRowMapper.ReadGhostBattle(reader));
 
         return records;
     }
@@ -716,60 +627,6 @@ internal sealed partial class HistoryPanelRepository
         return $"{RecentGhostSyncScopePrefix}::{localPlayerAccountId.Trim()}";
     }
 
-    private static PvpBattleManifest ReadManifest(SqliteDataReader reader, string? runIdColumnName)
-    {
-        return new PvpBattleManifest
-        {
-            BattleId = reader.GetString(reader.GetOrdinal("battle_id")),
-            RunId = string.IsNullOrWhiteSpace(runIdColumnName)
-                ? null
-                : GetNullableString(reader, runIdColumnName),
-            RecordedAtUtc = DateTimeOffset.Parse(
-                reader.GetString(reader.GetOrdinal("recorded_at_utc"))
-            ),
-            Day = GetNullableInt32(reader, "day"),
-            Hour = GetNullableInt32(reader, "hour"),
-            EncounterId = GetNullableString(reader, "encounter_id"),
-            CombatKind = reader.GetString(reader.GetOrdinal("combat_kind")),
-            Participants = new PvpBattleParticipants
-            {
-                PlayerName = GetNullableString(reader, "player_name"),
-                PlayerAccountId = GetNullableString(reader, "player_account_id"),
-                PlayerHero = GetNullableString(reader, "player_hero"),
-                PlayerRank = GetNullableString(reader, "player_rank"),
-                PlayerRating = GetNullableInt32(reader, "player_rating"),
-                PlayerLevel = GetNullableInt32(reader, "player_level"),
-                OpponentName = GetNullableString(reader, "opponent_name"),
-                OpponentHero = GetNullableString(reader, "opponent_hero"),
-                OpponentRank = GetNullableString(reader, "opponent_rank"),
-                OpponentRating = GetNullableInt32(reader, "opponent_rating"),
-                OpponentLevel = GetNullableInt32(reader, "opponent_level"),
-                OpponentAccountId = GetNullableString(reader, "opponent_account_id"),
-            },
-            Outcome = new PvpBattleOutcome
-            {
-                Result = GetNullableString(reader, "result"),
-                WinnerCombatantId = GetNullableString(reader, "winner_combatant_id"),
-                LoserCombatantId = GetNullableString(reader, "loser_combatant_id"),
-            },
-            Snapshots = new PvpBattleSnapshots
-            {
-                PlayerHand = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("player_hand_json"))
-                ),
-                PlayerSkills = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("player_skills_json"))
-                ),
-                OpponentHand = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("opponent_hand_json"))
-                ),
-                OpponentSkills = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("opponent_skills_json"))
-                ),
-            },
-        };
-    }
-
     private static void EnsureColumnExists(
         SqliteConnection connection,
         string tableName,
@@ -809,38 +666,5 @@ internal sealed partial class HistoryPanelRepository
         alter.CommandTimeout = 2;
         alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
         alter.ExecuteNonQuery();
-    }
-
-    private static string? GetNullableString(SqliteDataReader reader, string columnName)
-    {
-        var ordinal = reader.GetOrdinal(columnName);
-        return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
-    }
-
-    private static string? SafeGetNullableString(SqliteDataReader reader, string columnName)
-    {
-        try
-        {
-            return GetNullableString(reader, columnName);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static int? GetNullableInt32(SqliteDataReader reader, string columnName)
-    {
-        var ordinal = reader.GetOrdinal(columnName);
-        return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
-    }
-
-    private static DateTimeOffset? GetNullableDateTimeOffset(
-        SqliteDataReader reader,
-        string columnName
-    )
-    {
-        var ordinal = reader.GetOrdinal(columnName);
-        return reader.IsDBNull(ordinal) ? null : DateTimeOffset.Parse(reader.GetString(ordinal));
     }
 }

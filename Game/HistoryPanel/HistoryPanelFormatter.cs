@@ -146,6 +146,19 @@ internal static class HistoryPanelFormatter
         return value.ToLocalTime().ToString("MM-dd HH:mm");
     }
 
+    public static string FormatSnapshotSummary(HistoryBattleSnapshotCounts counts)
+    {
+        if (!counts.HasAnyRecordedCard)
+            return string.Empty;
+
+        return HistoryPanelText.SnapshotSummary(
+            counts.PlayerHandItemCount,
+            counts.PlayerSkillCount,
+            counts.OpponentHandItemCount,
+            counts.OpponentSkillCount
+        );
+    }
+
     public static string? NormalizeRank(string? rawRank)
     {
         if (string.IsNullOrWhiteSpace(rawRank))
