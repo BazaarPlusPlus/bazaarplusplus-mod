@@ -76,12 +76,42 @@ internal static class HistoryBattlePreviewProjection
         PvpBattleCardSetCapture? opponentSkills
     )
     {
+        // Counts match what Build() would render so row-chip totals stay aligned with the
+        // preview board: drop snapshots with empty/unparseable TemplateId, type mismatch
+        // (e.g. SocketEffect appearing in an item capture), or missing static template.
+        var staticData = TryGetStaticGameData();
         return new HistoryBattleSnapshotCounts(
-            playerHand?.Items?.Count ?? 0,
-            playerSkills?.Items?.Count ?? 0,
-            opponentHand?.Items?.Count ?? 0,
-            opponentSkills?.Items?.Count ?? 0
+            CountRenderable(playerHand?.Items, isSkill: false, staticData),
+            CountRenderable(playerSkills?.Items, isSkill: true, staticData),
+            CountRenderable(opponentHand?.Items, isSkill: false, staticData),
+            CountRenderable(opponentSkills?.Items, isSkill: true, staticData)
         );
+    }
+
+    private static int CountRenderable(
+        IList<CombatReplayCardSnapshot>? snapshots,
+        bool isSkill,
+        object? staticData
+    )
+    {
+        if (snapshots == null)
+            return 0;
+
+        var count = 0;
+        for (var i = 0; i < snapshots.Count; i++)
+        {
+            var snapshot = snapshots[i];
+            if (snapshot == null || string.IsNullOrWhiteSpace(snapshot.TemplateId))
+                continue;
+            if (isSkill ? snapshot.Type != ECardType.Skill : snapshot.Type != ECardType.Item)
+                continue;
+            if (!Guid.TryParse(snapshot.TemplateId, out var templateId))
+                continue;
+            if (!HasStaticCardTemplate(staticData, templateId))
+                continue;
+            count++;
+        }
+        return count;
     }
 
     private static PreviewBoardModel BuildBoard(
