@@ -1,35 +1,8 @@
 import type { Env } from "../../env";
-import { json } from "../../http/json";
+import { requireBearer } from "../../http/auth";
+import { json, jsonError } from "../../http/json";
 
 const DatePattern = /^\d{4}-\d{2}-\d{2}$/;
-
-function constantTimeEquals(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  let result = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    result |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return result === 0;
-}
-
-function authorizeBearer(request: Request, env: Env): boolean {
-  const header = request.headers.get("Authorization");
-  if (header == null) {
-    return false;
-  }
-  const prefix = "Bearer ";
-  if (!header.startsWith(prefix)) {
-    return false;
-  }
-  const presented = header.slice(prefix.length).trim();
-  const expected = (env.BAZAARDB_PULL_TOKEN ?? "").trim();
-  if (expected.length === 0) {
-    return false;
-  }
-  return constantTimeEquals(presented, expected);
-}
 
 function validateDate(date: string | null): string | null {
   if (date == null || !DatePattern.test(date)) {
@@ -72,16 +45,21 @@ export async function handleGetBazaarDbManifest(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  if (!authorizeBearer(request, env)) {
-    return new Response(null, { status: 401 });
+  const unauthorized = requireBearer(request, env, "BAZAARDB_PULL_TOKEN");
+  if (unauthorized != null) {
+    return unauthorized;
   }
 
   const url = new URL(request.url);
   const validatedDate = validateDate(url.searchParams.get("date"));
   if (validatedDate == null) {
-    return json({ error: "invalid_date" }, { status: 400 });
+    return jsonError("invalid_date");
   }
 
+  // Scan shape: covered by idx_bazaardb_screenshots_date (captured_date_utc,
+  // uploaded_at_utc) — index seek + range, ORDER BY satisfied by the index.
+  // No LIMIT: per-day cardinality is bounded by daily upload volume. If a
+  // single day grows past a few thousand rows, add pagination here.
   const result = await env.DB.prepare(
     `
       SELECT screenshot_id, player_account_id, run_id, hero_name, final_days,

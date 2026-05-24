@@ -7,7 +7,7 @@ import { handleQueryGhostBattles } from "./features/v3/queryGhostBattles";
 import { handleUploadBazaarDbScreenshot } from "./features/v3/uploadBazaarDbScreenshot";
 import { handleUploadRunBundle } from "./features/v3/uploadRunBundle";
 import { preflight, withCors } from "./http/cors";
-import { json } from "./http/json";
+import { json, jsonError } from "./http/json";
 
 type StaticRoute = {
   method: string;
@@ -76,7 +76,7 @@ export default {
         );
       }
 
-      return withCors(request, json({ error: "not_found" }, { status: 404 }));
+      return withCors(request, jsonError("not_found", 404));
     } catch (error) {
       if (error instanceof Response) {
         return withCors(request, error);
