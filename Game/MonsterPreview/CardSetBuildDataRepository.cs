@@ -29,10 +29,10 @@ internal sealed class CardSetBuildDataRepository
         "十勝陣容"
     );
     private static readonly TimeSpan FinalBuildsCacheDuration = TimeSpan.FromHours(20);
-    private static readonly HttpClient FinalBuildsHttpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(10),
-    };
+    private static readonly HttpClient FinalBuildsHttpClient = BppHttpClientFactory.Create(
+        userAgentSuffix: "BuildDataRepository",
+        timeout: TimeSpan.FromSeconds(10)
+    );
     private static readonly object SyncRoot = new();
     private static FinalBuildRoot? _finalRoot;
     private static bool _attemptedLoad;

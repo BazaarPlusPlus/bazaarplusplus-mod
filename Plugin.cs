@@ -2,7 +2,6 @@
 #nullable enable
 using System;
 using System.IO;
-using System.Net.Http;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
@@ -128,10 +127,10 @@ public class Plugin : BaseUnityPlugin
             return;
         }
 
-        var httpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(Math.Max(10, V3UploadDefaults.RequestTimeoutSeconds)),
-        };
+        var httpClient = BppHttpClientFactory.Create(
+            userAgentSuffix: "OnlineClient",
+            timeout: TimeSpan.FromSeconds(Math.Max(10, V3UploadDefaults.RequestTimeoutSeconds))
+        );
         _onlineClient = new ModOnlineClient(httpClient, routes);
         BppLog.Info("Plugin", "Identity JSON store and online client ready.");
     }

@@ -20,7 +20,10 @@ internal sealed class RunBundleUploadService : IDisposable
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
-        _httpClient = new HttpClient { Timeout = timeout };
+        _httpClient = BppHttpClientFactory.Create(
+            userAgentSuffix: "RunBundleUpload",
+            timeout: timeout
+        );
     }
 
     public async Task<RunBundleUploadCycleResult> UploadPendingRunBundlesAsync(
