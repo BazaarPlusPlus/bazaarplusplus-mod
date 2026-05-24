@@ -274,6 +274,8 @@ Response shape:
 }
 ```
 
+BazaarDB must send the same `Authorization: Bearer <BAZAARDB_PULL_TOKEN>` header on `image_url` GETs as on the manifest GET — the image proxy (Section 7.4) authenticates against the same secret.
+
 Pagination (contract only — implementation deferred): `?cursor=<uploaded_at_utc>&limit=N` returns items strictly after `cursor` sorted ascending; response includes `next_cursor` when truncated.
 
 ### 7.4 Image proxy — `GET /bazaardb/image/{screenshot_id}`

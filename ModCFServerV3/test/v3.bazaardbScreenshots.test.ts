@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { env } from "cloudflare:test";
 
 import worker from "../src/index";
@@ -105,6 +105,34 @@ test("ingest accepts idempotent re-POST of the same screenshot id", async () => 
   expect((await listScreenshotKeys()).length).toBe(1);
 });
 
+test("ingest deletes R2 object when D1 upsert fails", async () => {
+  const payload = {
+    schema_version: 1,
+    submitted_at_utc: "2026-05-24T12:34:56.789Z",
+    player_account_id: "acct-9",
+    screenshot_id: "snap-d1-fail",
+    captured_at_utc: "2026-05-23T20:30:05Z",
+    image_format: "png",
+    image_bytes_base64: PNG_BASE64,
+  };
+
+  const prepareSpy = vi
+    .spyOn(env.DB, "prepare")
+    .mockImplementationOnce(() => {
+      throw new Error("simulated d1 outage");
+    });
+
+  try {
+    const response = await worker.fetch(buildIngestRequest(payload), env as never);
+    expect(response.status).toBe(500);
+
+    expect(await listScreenshotKeys()).toEqual([]);
+    expect(await countRows(env.DB, "bazaardb_screenshots")).toBe(0);
+  } finally {
+    prepareSpy.mockRestore();
+  }
+});
+
 test("ingest rejects unsupported schema_version with 400", async () => {
   const payload = {
     schema_version: 99,
@@ -133,6 +161,28 @@ test("ingest rejects when image bytes are not a PNG", async () => {
 
   const response = await worker.fetch(buildIngestRequest(payload), env as never);
   expect(response.status).toBe(400);
+});
+
+test("ingest rejects oversized images with 400 image_too_large", async () => {
+  const oversized = Buffer.concat([
+    Buffer.from(PNG_BYTES),
+    Buffer.alloc(3 * 1024 * 1024),
+  ]).toString("base64");
+  const payload = {
+    schema_version: 1,
+    submitted_at_utc: "2026-05-24T12:34:56.789Z",
+    player_account_id: "acct-9",
+    screenshot_id: "snap-too-large",
+    captured_at_utc: "2026-05-23T20:30:05Z",
+    image_format: "png",
+    image_bytes_base64: oversized,
+  };
+
+  const response = await worker.fetch(buildIngestRequest(payload), env as never);
+  expect(response.status).toBe(400);
+  const body = (await response.json()) as { status: string; reason: string };
+  expect(body.status).toBe("rejected");
+  expect(body.reason).toBe("image_too_large");
 });
 
 test("ingest rejects future captured_at_utc with 400", async () => {

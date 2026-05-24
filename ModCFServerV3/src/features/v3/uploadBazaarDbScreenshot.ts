@@ -108,6 +108,10 @@ export async function handleUploadBazaarDbScreenshot(
     return rejected("invalid_image_bytes_base64");
   }
 
+  if (imageBytes.length > 2 * 1024 * 1024) {
+    return rejected("image_too_large");
+  }
+
   if (imageBytes.length === 0 || !hasPngMagic(imageBytes)) {
     return rejected("image_bytes_not_png");
   }
@@ -163,6 +167,15 @@ export async function handleUploadBazaarDbScreenshot(
       screenshot_id: screenshotId,
       error: String(error),
     });
+    try {
+      await env.BAZAARDB_BUCKET.delete(r2Key);
+    } catch (cleanupError) {
+      logWarn("upload_bazaardb_screenshot.r2_cleanup_failed", {
+        screenshot_id: screenshotId,
+        r2_key: r2Key,
+        error: String(cleanupError),
+      });
+    }
     return json(
       { status: "error", reason: "db_upsert_failed" },
       { status: 500 },
