@@ -25,27 +25,49 @@ using UnityEngine.AddressableAssets;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
-internal sealed partial class CombatReplayRuntime
+// Process-wide caches: addressables/audio banks live for the lifetime of the running game, so the
+// reservation set follows that lifetime, not any one CombatReplayRuntime instance.
+internal static class WarmupCoordinator
 {
-    private static readonly ECardSize[] ReplayWarmupCardSizes =
+    private const int ReplayWarmupConcurrency = 4;
+
+    private static readonly object CacheLock = new();
+    private static readonly HashSet<string> PreloadedCardKeys = new(StringComparer.Ordinal);
+    private static readonly HashSet<string> PreloadedOverrideKeys = new(StringComparer.Ordinal);
+    private static readonly HashSet<string> PrewarmedVfxKeys = new(StringComparer.Ordinal);
+    private static bool SharedAssetsPreloaded;
+
+    private static readonly ECardSize[] WarmupCardSizes =
     {
         ECardSize.Small,
         ECardSize.Medium,
         ECardSize.Large,
     };
 
-    private static async Task WarmReplayPresentationAssetsAsync(
+    private static readonly string[] DiagnosticBusPathFields =
+    {
+        "MasterBusPath",
+        "BoardDiegeticBusPath",
+        "BoardPresentationBusPath",
+        "CombatBusPath",
+        "MonsterNonVerbalBusPath",
+        "VOBusPath",
+        "EnvironmentSpecificBusPath",
+        "EnvironmentFocusBusPath",
+    };
+
+    public static async Task WarmPresentationAssetsAsync(
         PvpBattleManifest manifest,
         CombatSequenceMessages sequence
     )
     {
         var stopwatch = Stopwatch.StartNew();
         var stats = new ReplayWarmupStats();
-        await WarmReplayAssetLoaderAsync(manifest, sequence, stats);
-        await WarmReplayCombatVfxAsync(sequence, stats);
+        await WarmAssetLoaderAsync(manifest, sequence, stats);
+        await WarmCombatVfxAsync(sequence, stats);
         stopwatch.Stop();
         BppLog.Info(
-            "CombatReplayRuntime",
+            "WarmupCoordinator",
             $"Saved replay warmup finished in {stopwatch.ElapsedMilliseconds}ms "
                 + $"sharedAssets(preloaded={stats.SharedAssetsPreloaded}, skipped={stats.SharedAssetsSkipped}) "
                 + $"cards(preloaded={stats.CardsPreloaded}, skipped={stats.CardsSkipped}, failed={stats.CardsFailed}) "
@@ -54,7 +76,239 @@ internal sealed partial class CombatReplayRuntime
         );
     }
 
-    private static async Task WarmReplayAssetLoaderAsync(
+    public static async Task WarmAudioBanksAsync()
+    {
+        try
+        {
+            var soundManager = Services.Get<SoundManager>();
+            if (soundManager == null)
+            {
+                BppLog.Warn(
+                    "WarmupCoordinator",
+                    "Saved replay audio warmup skipped because SoundManager is unavailable."
+                );
+                return;
+            }
+
+            var stats = new ReplayAudioWarmupStats();
+            var collectionManager = Services.Get<CollectionManager>();
+            if (collectionManager == null)
+            {
+                BppLog.Warn(
+                    "WarmupCoordinator",
+                    "Saved replay audio warmup cannot resolve equipped board audio because CollectionManager is unavailable."
+                );
+            }
+
+            var boardAssets = UnityEngine
+                .Object.FindObjectsOfType<HeroBoardController>(true)
+                .Where(controller =>
+                    controller != null && controller.gameObject.scene.rootCount > 0
+                )
+                .Select(controller => controller.AssociatedDataSO)
+                .Where(asset => asset != null)
+                .Distinct()
+                .ToList();
+
+            var playerBoard = await TryGetPlayerBoardAsync(collectionManager);
+            AddBoardAsset(boardAssets, playerBoard);
+
+            var opponentBoard = await TryGetOpponentBoardAsync(collectionManager);
+            AddBoardAsset(boardAssets, opponentBoard);
+
+            if (boardAssets.Count == 0)
+            {
+                BppLog.Warn(
+                    "WarmupCoordinator",
+                    "Saved replay audio warmup found no player or opponent board assets."
+                );
+            }
+
+            foreach (var boardAsset in boardAssets)
+            {
+                await WarmBoardAudioAsync(soundManager, boardAsset!, stats);
+            }
+
+            await WarmSoundtracksAsync(soundManager, collectionManager, boardAssets, stats);
+
+            BppLog.Info(
+                "WarmupCoordinator",
+                "Saved replay audio warmup finished: "
+                    + $"boardBanks(loaded={stats.BoardBanksLoaded}, alreadyLoaded={stats.BoardBanksAlreadyLoaded}, failed={stats.BoardBanksFailed}, skipped={stats.BoardBanksSkipped}) "
+                    + $"soundtrackBanks(loaded={stats.SoundtrackBanksLoaded}, alreadyLoaded={stats.SoundtrackBanksAlreadyLoaded}, failed={stats.SoundtrackBanksFailed}, skipped={stats.SoundtrackBanksSkipped})"
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "WarmupCoordinator",
+                $"Saved replay audio warmup failed: {ex.Message}"
+            );
+        }
+    }
+
+    public static void EnsureAudioReadyForPlayback()
+    {
+        try
+        {
+            LogAudioState("pre-fix");
+
+            var gameServiceManager = Singleton<GameServiceManager>.Instance;
+            if (gameServiceManager?.GamePaused == true)
+            {
+                BppLog.Info(
+                    "WarmupCoordinator",
+                    "Replay audio readiness layer-1: GamePaused=true, calling PauseOrUnpauseGame(false)."
+                );
+                gameServiceManager.PauseOrUnpauseGame(toPauseOrUnpause: false);
+            }
+
+            var soundManager = Services.Get<SoundManager>();
+            if (soundManager == null)
+            {
+                BppLog.Warn(
+                    "WarmupCoordinator",
+                    "Replay audio readiness aborted: SoundManager unavailable."
+                );
+                return;
+            }
+
+            BppLog.Info(
+                "WarmupCoordinator",
+                "Replay audio readiness layer-2: SoundManager.PauseBusses(false)."
+            );
+            soundManager.PauseBusses(isPausing: false);
+
+            StopAllTrackedSfxEventInstances(soundManager);
+            ReassertSfxVolumeFromPreferences();
+
+            LogAudioState("post-fix");
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "WarmupCoordinator",
+                $"Replay audio readiness step failed: {ex.Message}"
+            );
+        }
+    }
+
+    public static void LogAudioState(string label)
+    {
+        try
+        {
+            var soundManager = Services.Get<SoundManager>();
+            if (soundManager == null)
+            {
+                BppLog.Warn(
+                    "WarmupCoordinator",
+                    $"[ReplayAudioDiag/{label}] SoundManager unavailable."
+                );
+                return;
+            }
+
+            var soundManagerType = typeof(SoundManager);
+            foreach (var fieldName in DiagnosticBusPathFields)
+            {
+                LogBusState(label, soundManager, soundManagerType, fieldName);
+            }
+
+            try
+            {
+                var settingsField = soundManagerType.GetField(
+                    "SoundSettings",
+                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public
+                );
+                if (settingsField?.GetValue(null) is SoundSettings soundSettings)
+                {
+                    LogVcaState(label, "SfxVCA", soundSettings.SfxVCA);
+                    LogVcaState(label, "MusicVCA", soundSettings.MusicVCA);
+                    LogVcaState(label, "VoVCA", soundSettings.VoVCA);
+                }
+                else
+                {
+                    BppLog.Info(
+                        "WarmupCoordinator",
+                        $"[ReplayAudioDiag/{label}] SoundSettings static field is null."
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "WarmupCoordinator",
+                    $"[ReplayAudioDiag/{label}] VCA read failed: {ex.Message}"
+                );
+            }
+
+            try
+            {
+                var dict = GetSfxEventInstancesDict(soundManager);
+                if (dict != null)
+                {
+                    var keys = string.Join(",", dict.Keys);
+                    BppLog.Info(
+                        "WarmupCoordinator",
+                        $"[ReplayAudioDiag/{label}] tracked-sfx count={dict.Count} keys=[{keys}]"
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "WarmupCoordinator",
+                    $"[ReplayAudioDiag/{label}] tracked-sfx read failed: {ex.Message}"
+                );
+            }
+
+            try
+            {
+                var pauseSnapshotField = soundManagerType.GetField(
+                    "PauseSnapshot",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
+                );
+                if (pauseSnapshotField?.GetValue(soundManager) is EventReference pauseSnapshot)
+                {
+                    BppLog.Info(
+                        "WarmupCoordinator",
+                        $"[ReplayAudioDiag/{label}] PauseSnapshot.Guid={pauseSnapshot.Guid} isNull={pauseSnapshot.IsNull}"
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "WarmupCoordinator",
+                    $"[ReplayAudioDiag/{label}] PauseSnapshot read failed: {ex.Message}"
+                );
+            }
+
+            try
+            {
+                var gsm = Singleton<GameServiceManager>.Instance;
+                BppLog.Info(
+                    "WarmupCoordinator",
+                    $"[ReplayAudioDiag/{label}] GamePaused={gsm?.GamePaused} StateName={Data.CurrentState?.StateName}"
+                );
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "WarmupCoordinator",
+                    $"[ReplayAudioDiag/{label}] GamePaused read failed: {ex.Message}"
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "WarmupCoordinator",
+                $"[ReplayAudioDiag/{label}] diagnostics failed: {ex.Message}"
+            );
+        }
+    }
+
+    private static async Task WarmAssetLoaderAsync(
         PvpBattleManifest manifest,
         CombatSequenceMessages sequence,
         ReplayWarmupStats stats
@@ -64,13 +318,13 @@ internal sealed partial class CombatReplayRuntime
         if (assetLoader == null)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 "Saved replay visual warmup skipped because AssetLoader is unavailable."
             );
             return;
         }
 
-        if (TryReserveReplaySharedAssetsPreload())
+        if (TryReserveSharedAssetsPreload())
         {
             try
             {
@@ -79,9 +333,9 @@ internal sealed partial class CombatReplayRuntime
             }
             catch (Exception ex)
             {
-                ReleaseReplaySharedAssetsPreload();
+                ReleaseSharedAssetsPreload();
                 BppLog.Warn(
-                    "CombatReplayRuntime",
+                    "WarmupCoordinator",
                     $"Saved replay asset preload failed: {ex.Message}"
                 );
             }
@@ -95,7 +349,7 @@ internal sealed partial class CombatReplayRuntime
             StringComparer.Ordinal
         );
 
-        foreach (var snapshot in EnumerateReplayItemSnapshots(manifest))
+        foreach (var snapshot in EnumerateItemSnapshots(manifest))
         {
             if (!Guid.TryParse(snapshot.TemplateId, out var templateId))
                 continue;
@@ -106,7 +360,7 @@ internal sealed partial class CombatReplayRuntime
 
         var cardSemaphore = new SemaphoreSlim(ReplayWarmupConcurrency);
         var cardWarmupTasks = preloadRequests.Select(request =>
-            WarmReplayCardAsync(assetLoader, request.Key, request.Value, cardSemaphore, stats)
+            WarmCardAsync(assetLoader, request.Key, request.Value, cardSemaphore, stats)
         );
         await Task.WhenAll(cardWarmupTasks);
 
@@ -115,12 +369,12 @@ internal sealed partial class CombatReplayRuntime
             .CombatMessage.Data.VfxKeys.Where(key => !string.IsNullOrWhiteSpace(key))
             .Distinct(StringComparer.Ordinal)
             .Select(overrideKey =>
-                WarmReplayOverrideAssetAsync(assetLoader, overrideKey, overrideSemaphore, stats)
+                WarmOverrideAssetAsync(assetLoader, overrideKey, overrideSemaphore, stats)
             );
         await Task.WhenAll(overrideWarmupTasks);
     }
 
-    private static async Task WarmReplayCardAsync(
+    private static async Task WarmCardAsync(
         AssetLoader assetLoader,
         string cacheKey,
         (Guid TemplateId, ECardSize Size) request,
@@ -128,7 +382,7 @@ internal sealed partial class CombatReplayRuntime
         ReplayWarmupStats stats
     )
     {
-        if (!TryReserveReplayCacheKey(ReplayPreloadedCardKeys, cacheKey))
+        if (!TryReserveCacheKey(PreloadedCardKeys, cacheKey))
         {
             stats.CardsSkipped++;
             return;
@@ -142,10 +396,10 @@ internal sealed partial class CombatReplayRuntime
         }
         catch (Exception ex)
         {
-            ReleaseReplayCacheKey(ReplayPreloadedCardKeys, cacheKey);
+            ReleaseCacheKey(PreloadedCardKeys, cacheKey);
             stats.CardsFailed++;
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay card preload failed for template={request.TemplateId} size={request.Size}: {ex.Message}"
             );
         }
@@ -155,14 +409,14 @@ internal sealed partial class CombatReplayRuntime
         }
     }
 
-    private static async Task WarmReplayOverrideAssetAsync(
+    private static async Task WarmOverrideAssetAsync(
         AssetLoader assetLoader,
         string overrideKey,
         SemaphoreSlim semaphore,
         ReplayWarmupStats stats
     )
     {
-        if (!TryReserveReplayCacheKey(ReplayPreloadedOverrideKeys, overrideKey))
+        if (!TryReserveCacheKey(PreloadedOverrideKeys, overrideKey))
         {
             stats.OverrideAssetsSkipped++;
             return;
@@ -176,10 +430,10 @@ internal sealed partial class CombatReplayRuntime
         }
         catch (Exception ex)
         {
-            ReleaseReplayCacheKey(ReplayPreloadedOverrideKeys, overrideKey);
+            ReleaseCacheKey(PreloadedOverrideKeys, overrideKey);
             stats.OverrideAssetsFailed++;
             BppLog.Debug(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay override VFX preload skipped for '{overrideKey}': {ex.Message}"
             );
         }
@@ -189,7 +443,7 @@ internal sealed partial class CombatReplayRuntime
         }
     }
 
-    private static IEnumerable<CombatReplayCardSnapshot> EnumerateReplayItemSnapshots(
+    private static IEnumerable<CombatReplayCardSnapshot> EnumerateItemSnapshots(
         PvpBattleManifest manifest
     )
     {
@@ -208,7 +462,7 @@ internal sealed partial class CombatReplayRuntime
         }
     }
 
-    private static async Task WarmReplayCombatVfxAsync(
+    private static async Task WarmCombatVfxAsync(
         CombatSequenceMessages sequence,
         ReplayWarmupStats stats
     )
@@ -218,7 +472,7 @@ internal sealed partial class CombatReplayRuntime
         if (assetLoader == null || vfxManager == null)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 "Saved replay combat VFX warmup skipped because replay asset services are unavailable."
             );
             return;
@@ -239,7 +493,7 @@ internal sealed partial class CombatReplayRuntime
         foreach (var action in actionTypes)
         {
             vfxTasks.Add(
-                WarmReplayActionVfxAsync(assetLoader, vfxManager, action, vfxSemaphore, stats)
+                WarmActionVfxAsync(assetLoader, vfxManager, action, vfxSemaphore, stats)
             );
         }
 
@@ -250,7 +504,7 @@ internal sealed partial class CombatReplayRuntime
         )
         {
             vfxTasks.Add(
-                WarmReplayOverrideVfxAsync(
+                WarmOverrideVfxAsync(
                     assetLoader,
                     vfxManager,
                     actionTypes,
@@ -263,7 +517,7 @@ internal sealed partial class CombatReplayRuntime
         await Task.WhenAll(vfxTasks);
     }
 
-    private static async Task WarmReplayActionVfxAsync(
+    private static async Task WarmActionVfxAsync(
         AssetLoader assetLoader,
         VFXManager vfxManager,
         ActionType action,
@@ -271,10 +525,10 @@ internal sealed partial class CombatReplayRuntime
         ReplayWarmupStats stats
     )
     {
-        var vfxConfig = GetReplayVfxConfig(vfxManager);
+        var vfxConfig = GetVfxConfig(vfxManager);
         if (vfxConfig == null)
         {
-            await WarmReplayVfxReferenceAsync(
+            await WarmVfxReferenceAsync(
                 assetLoader,
                 vfxManager.GetVFX(action),
                 semaphore,
@@ -285,9 +539,9 @@ internal sealed partial class CombatReplayRuntime
 
         if (TryIsActionAttributeMapped(vfxConfig, action))
         {
-            foreach (var size in ReplayWarmupCardSizes)
+            foreach (var size in WarmupCardSizes)
             {
-                await WarmReplayVfxReferenceAsync(
+                await WarmVfxReferenceAsync(
                     assetLoader,
                     TryGetMappedActionVfx(vfxConfig, size, action),
                     semaphore,
@@ -296,10 +550,10 @@ internal sealed partial class CombatReplayRuntime
             }
         }
 
-        await WarmReplayVfxReferenceAsync(assetLoader, vfxManager.GetVFX(action), semaphore, stats);
+        await WarmVfxReferenceAsync(assetLoader, vfxManager.GetVFX(action), semaphore, stats);
     }
 
-    private static async Task WarmReplayOverrideVfxAsync(
+    private static async Task WarmOverrideVfxAsync(
         AssetLoader assetLoader,
         VFXManager vfxManager,
         IReadOnlyCollection<ActionType> actionTypes,
@@ -308,15 +562,15 @@ internal sealed partial class CombatReplayRuntime
         ReplayWarmupStats stats
     )
     {
-        var vfxConfig = GetReplayVfxConfig(vfxManager);
+        var vfxConfig = GetVfxConfig(vfxManager);
         if (vfxConfig == null)
             return;
 
         foreach (var action in actionTypes)
         {
-            foreach (var size in ReplayWarmupCardSizes)
+            foreach (var size in WarmupCardSizes)
             {
-                await WarmReplayVfxReferenceAsync(
+                await WarmVfxReferenceAsync(
                     assetLoader,
                     await TryGetOverrideActionVfxAsync(vfxConfig, action, size, overrideKey),
                     semaphore,
@@ -326,7 +580,7 @@ internal sealed partial class CombatReplayRuntime
         }
     }
 
-    private static object? GetReplayVfxConfig(VFXManager vfxManager)
+    private static object? GetVfxConfig(VFXManager vfxManager)
     {
         return vfxManager
             .GetType()
@@ -398,7 +652,7 @@ internal sealed partial class CombatReplayRuntime
                 ?.GetValue(task) as AssetReference;
     }
 
-    private static async Task WarmReplayVfxReferenceAsync(
+    private static async Task WarmVfxReferenceAsync(
         AssetLoader assetLoader,
         AssetReference? assetReference,
         SemaphoreSlim semaphore,
@@ -411,7 +665,7 @@ internal sealed partial class CombatReplayRuntime
         var key = !string.IsNullOrWhiteSpace(assetReference.AssetGUID)
             ? assetReference.AssetGUID
             : assetReference.ToString();
-        if (!TryReserveReplayCacheKey(ReplayPrewarmedVfxKeys, key))
+        if (!TryReserveCacheKey(PrewarmedVfxKeys, key))
         {
             stats.VfxSkipped++;
             return;
@@ -425,10 +679,10 @@ internal sealed partial class CombatReplayRuntime
         }
         catch (Exception ex)
         {
-            ReleaseReplayCacheKey(ReplayPrewarmedVfxKeys, key);
+            ReleaseCacheKey(PrewarmedVfxKeys, key);
             stats.VfxFailed++;
             BppLog.Debug(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay VFX warmup skipped for '{key}': {ex.Message}"
             );
         }
@@ -438,126 +692,43 @@ internal sealed partial class CombatReplayRuntime
         }
     }
 
-    private static bool TryReserveReplaySharedAssetsPreload()
+    private static bool TryReserveSharedAssetsPreload()
     {
-        lock (ReplayWarmupCacheLock)
+        lock (CacheLock)
         {
-            if (ReplaySharedAssetsPreloaded)
+            if (SharedAssetsPreloaded)
                 return false;
 
-            ReplaySharedAssetsPreloaded = true;
+            SharedAssetsPreloaded = true;
             return true;
         }
     }
 
-    private static void ReleaseReplaySharedAssetsPreload()
+    private static void ReleaseSharedAssetsPreload()
     {
-        lock (ReplayWarmupCacheLock)
+        lock (CacheLock)
         {
-            ReplaySharedAssetsPreloaded = false;
+            SharedAssetsPreloaded = false;
         }
     }
 
-    private static bool TryReserveReplayCacheKey(HashSet<string> cache, string key)
+    private static bool TryReserveCacheKey(HashSet<string> cache, string key)
     {
-        lock (ReplayWarmupCacheLock)
+        lock (CacheLock)
         {
             return cache.Add(key);
         }
     }
 
-    private static void ReleaseReplayCacheKey(HashSet<string> cache, string key)
+    private static void ReleaseCacheKey(HashSet<string> cache, string key)
     {
-        lock (ReplayWarmupCacheLock)
+        lock (CacheLock)
         {
             cache.Remove(key);
         }
     }
 
-    private sealed class ReplayWarmupStats
-    {
-        public int SharedAssetsPreloaded;
-        public int SharedAssetsSkipped;
-        public int CardsPreloaded;
-        public int CardsSkipped;
-        public int CardsFailed;
-        public int OverrideAssetsPreloaded;
-        public int OverrideAssetsSkipped;
-        public int OverrideAssetsFailed;
-        public int VfxPrewarmed;
-        public int VfxSkipped;
-        public int VfxFailed;
-    }
-
-    private static async Task WarmReplayAudioBanksAsync()
-    {
-        try
-        {
-            var soundManager = Services.Get<SoundManager>();
-            if (soundManager == null)
-            {
-                BppLog.Warn(
-                    "CombatReplayRuntime",
-                    "Saved replay audio warmup skipped because SoundManager is unavailable."
-                );
-                return;
-            }
-
-            var stats = new ReplayAudioWarmupStats();
-            var collectionManager = Services.Get<CollectionManager>();
-            if (collectionManager == null)
-            {
-                BppLog.Warn(
-                    "CombatReplayRuntime",
-                    "Saved replay audio warmup cannot resolve equipped board audio because CollectionManager is unavailable."
-                );
-            }
-
-            var boardAssets = UnityEngine
-                .Object.FindObjectsOfType<HeroBoardController>(true)
-                .Where(controller =>
-                    controller != null && controller.gameObject.scene.rootCount > 0
-                )
-                .Select(controller => controller.AssociatedDataSO)
-                .Where(asset => asset != null)
-                .Distinct()
-                .ToList();
-
-            var playerBoard = await TryGetReplayPlayerBoardAsync(collectionManager);
-            AddReplayBoardAsset(boardAssets, playerBoard);
-
-            var opponentBoard = await TryGetReplayOpponentBoardAsync(collectionManager);
-            AddReplayBoardAsset(boardAssets, opponentBoard);
-
-            if (boardAssets.Count == 0)
-            {
-                BppLog.Warn(
-                    "CombatReplayRuntime",
-                    "Saved replay audio warmup found no player or opponent board assets."
-                );
-            }
-
-            foreach (var boardAsset in boardAssets)
-            {
-                await WarmReplayBoardAudioAsync(soundManager, boardAsset!, stats);
-            }
-
-            await WarmReplaySoundtracksAsync(soundManager, collectionManager, boardAssets, stats);
-
-            BppLog.Info(
-                "CombatReplayRuntime",
-                "Saved replay audio warmup finished: "
-                    + $"boardBanks(loaded={stats.BoardBanksLoaded}, alreadyLoaded={stats.BoardBanksAlreadyLoaded}, failed={stats.BoardBanksFailed}, skipped={stats.BoardBanksSkipped}) "
-                    + $"soundtrackBanks(loaded={stats.SoundtrackBanksLoaded}, alreadyLoaded={stats.SoundtrackBanksAlreadyLoaded}, failed={stats.SoundtrackBanksFailed}, skipped={stats.SoundtrackBanksSkipped})"
-            );
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn("CombatReplayRuntime", $"Saved replay audio warmup failed: {ex.Message}");
-        }
-    }
-
-    private static async Task<BoardAssetDataSO?> TryGetReplayPlayerBoardAsync(
+    private static async Task<BoardAssetDataSO?> TryGetPlayerBoardAsync(
         CollectionManager? collectionManager
     )
     {
@@ -571,14 +742,14 @@ internal sealed partial class CombatReplayRuntime
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay audio warmup could not resolve player board audio: {ex.Message}"
             );
             return null;
         }
     }
 
-    private static async Task<BoardAssetDataSO?> TryGetReplayOpponentBoardAsync(
+    private static async Task<BoardAssetDataSO?> TryGetOpponentBoardAsync(
         CollectionManager? collectionManager
     )
     {
@@ -595,14 +766,14 @@ internal sealed partial class CombatReplayRuntime
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay audio warmup could not resolve opponent board audio: {ex.Message}"
             );
             return null;
         }
     }
 
-    private static void AddReplayBoardAsset(
+    private static void AddBoardAsset(
         ICollection<BoardAssetDataSO> boardAssets,
         BoardAssetDataSO? boardAsset
     )
@@ -616,7 +787,7 @@ internal sealed partial class CombatReplayRuntime
         boardAssets.Add(boardAsset);
     }
 
-    private static async Task WarmReplayBoardAudioAsync(
+    private static async Task WarmBoardAudioAsync(
         SoundManager soundManager,
         BoardAssetDataSO boardAsset,
         ReplayAudioWarmupStats stats
@@ -625,7 +796,7 @@ internal sealed partial class CombatReplayRuntime
         if (string.IsNullOrWhiteSpace(boardAsset.boardBank))
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Board '{boardAsset.name}' has no boardBank; replay SFX may be incomplete."
             );
             stats.BoardBanksSkipped++;
@@ -635,7 +806,7 @@ internal sealed partial class CombatReplayRuntime
         if (string.IsNullOrWhiteSpace(boardAsset.boardAssetBank))
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Board '{boardAsset.name}' has no boardAssetBank; replay SFX may be incomplete."
             );
             stats.BoardBanksSkipped++;
@@ -645,7 +816,7 @@ internal sealed partial class CombatReplayRuntime
         var wasMetadataLoaded = soundManager.IsBankLoaded(boardAsset.boardBank, isMetadata: false);
         var wasAssetLoaded = soundManager.IsBankLoaded(boardAsset.boardAssetBank, isMetadata: false);
         BppLog.Info(
-            "CombatReplayRuntime",
+            "WarmupCoordinator",
             $"Warm replay audio bank: board='{boardAsset.name}', metadata='{boardAsset.boardBank}', asset='{boardAsset.boardAssetBank}'"
         );
         var loaded = await soundManager.LoadBankAsync(
@@ -665,7 +836,7 @@ internal sealed partial class CombatReplayRuntime
             stats.BoardBanksLoaded++;
     }
 
-    private static async Task WarmReplaySoundtracksAsync(
+    private static async Task WarmSoundtracksAsync(
         SoundManager soundManager,
         CollectionManager? collectionManager,
         IReadOnlyCollection<BoardAssetDataSO> boardAssets,
@@ -674,9 +845,9 @@ internal sealed partial class CombatReplayRuntime
     {
         var warmedAny = false;
         var warmedSoundtracks = new HashSet<string>(StringComparer.Ordinal);
-        warmedAny |= await WarmReplaySoundtrackAsync(
+        warmedAny |= await WarmSoundtrackAsync(
             soundManager,
-            await TryGetReplaySoundtrackAsync(collectionManager),
+            await TryGetSoundtrackAsync(collectionManager),
             stats,
             warmedSoundtracks,
             setPlayingSoundtrack: true
@@ -684,7 +855,7 @@ internal sealed partial class CombatReplayRuntime
 
         foreach (var boardAsset in boardAssets)
         {
-            warmedAny |= await WarmReplaySoundtrackAsync(
+            warmedAny |= await WarmSoundtrackAsync(
                 soundManager,
                 boardAsset.soundtrack,
                 stats,
@@ -697,13 +868,13 @@ internal sealed partial class CombatReplayRuntime
         {
             stats.SoundtrackBanksSkipped++;
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 "Saved replay audio warmup could not resolve any soundtrack; replay combat music fallback may be incomplete."
             );
         }
     }
 
-    private static async Task<bool> WarmReplaySoundtrackAsync(
+    private static async Task<bool> WarmSoundtrackAsync(
         SoundManager soundManager,
         SoundtrackSO? soundtrack,
         ReplayAudioWarmupStats stats,
@@ -720,7 +891,7 @@ internal sealed partial class CombatReplayRuntime
         if (!string.IsNullOrWhiteSpace(key) && warmedSoundtracks.Contains(key))
             return true;
 
-        var loadedSoundtrack = await TryLoadReplaySoundtrackAssetAsync(soundtrack);
+        var loadedSoundtrack = await TryLoadSoundtrackAssetAsync(soundtrack);
         if (loadedSoundtrack == null)
         {
             stats.SoundtrackBanksFailed++;
@@ -734,7 +905,7 @@ internal sealed partial class CombatReplayRuntime
         {
             stats.SoundtrackBanksSkipped++;
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay soundtrack '{loadedSoundtrack.name}' has no music tracks to warm."
             );
             return false;
@@ -745,7 +916,7 @@ internal sealed partial class CombatReplayRuntime
 
         for (uint trackIndex = 0; trackIndex < loadedSoundtrack.MusicTracks.Length; trackIndex++)
         {
-            await WarmReplaySoundtrackTrackAsync(
+            await WarmSoundtrackTrackAsync(
                 soundManager,
                 loadedSoundtrack,
                 trackIndex,
@@ -756,7 +927,7 @@ internal sealed partial class CombatReplayRuntime
         return true;
     }
 
-    private static async Task<SoundtrackSO?> TryGetReplaySoundtrackAsync(
+    private static async Task<SoundtrackSO?> TryGetSoundtrackAsync(
         CollectionManager? collectionManager
     )
     {
@@ -771,14 +942,14 @@ internal sealed partial class CombatReplayRuntime
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay audio warmup could not resolve equipped soundtrack: {ex.Message}"
             );
             return null;
         }
     }
 
-    private static async Task<SoundtrackSO?> TryLoadReplaySoundtrackAssetAsync(
+    private static async Task<SoundtrackSO?> TryLoadSoundtrackAssetAsync(
         SoundtrackSO soundtrack
     )
     {
@@ -796,7 +967,7 @@ internal sealed partial class CombatReplayRuntime
                 return handle.Result;
 
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay soundtrack load failed for path '{soundtrack.SoundtrackPath}'."
             );
             return soundtrack;
@@ -804,14 +975,14 @@ internal sealed partial class CombatReplayRuntime
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay soundtrack load failed for path '{soundtrack.SoundtrackPath}': {ex.Message}"
             );
             return soundtrack;
         }
     }
 
-    private static bool TryGetReplaySoundtrackTrackBanks(
+    private static bool TryGetSoundtrackTrackBanks(
         SoundtrackSO soundtrack,
         uint trackIndex,
         out string? metadataBank,
@@ -858,14 +1029,14 @@ internal sealed partial class CombatReplayRuntime
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay soundtrack '{soundtrack.name}' track {trackIndex} bank metadata lookup failed: {ex.Message}"
             );
             return false;
         }
     }
 
-    private static async Task WarmReplaySoundtrackTrackAsync(
+    private static async Task WarmSoundtrackTrackAsync(
         SoundManager soundManager,
         SoundtrackSO soundtrack,
         uint trackIndex,
@@ -873,7 +1044,7 @@ internal sealed partial class CombatReplayRuntime
     )
     {
         if (
-            !TryGetReplaySoundtrackTrackBanks(
+            !TryGetSoundtrackTrackBanks(
                 soundtrack,
                 trackIndex,
                 out var metadataBank,
@@ -883,7 +1054,7 @@ internal sealed partial class CombatReplayRuntime
         {
             stats.SoundtrackBanksSkipped++;
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Saved replay soundtrack '{soundtrack.name}' track {trackIndex} has incomplete bank metadata."
             );
             return;
@@ -908,180 +1079,6 @@ internal sealed partial class CombatReplayRuntime
             stats.SoundtrackBanksLoaded++;
     }
 
-    private static readonly string[] ReplayDiagnosticBusPathFields =
-    {
-        "MasterBusPath",
-        "BoardDiegeticBusPath",
-        "BoardPresentationBusPath",
-        "CombatBusPath",
-        "MonsterNonVerbalBusPath",
-        "VOBusPath",
-        "EnvironmentSpecificBusPath",
-        "EnvironmentFocusBusPath",
-    };
-
-    internal static void EnsureReplayAudioReadyForPlayback()
-    {
-        try
-        {
-            LogReplayAudioState("pre-fix");
-
-            var gameServiceManager = Singleton<GameServiceManager>.Instance;
-            if (gameServiceManager?.GamePaused == true)
-            {
-                BppLog.Info(
-                    "CombatReplayRuntime",
-                    "Replay audio readiness layer-1: GamePaused=true, calling PauseOrUnpauseGame(false)."
-                );
-                gameServiceManager.PauseOrUnpauseGame(toPauseOrUnpause: false);
-            }
-
-            var soundManager = Services.Get<SoundManager>();
-            if (soundManager == null)
-            {
-                BppLog.Warn(
-                    "CombatReplayRuntime",
-                    "Replay audio readiness aborted: SoundManager unavailable."
-                );
-                return;
-            }
-
-            BppLog.Info(
-                "CombatReplayRuntime",
-                "Replay audio readiness layer-2: SoundManager.PauseBusses(false)."
-            );
-            soundManager.PauseBusses(isPausing: false);
-
-            StopAllTrackedSfxEventInstances(soundManager);
-
-            ReassertSfxVolumeFromPreferences();
-
-            LogReplayAudioState("post-fix");
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "CombatReplayRuntime",
-                $"Replay audio readiness step failed: {ex.Message}"
-            );
-        }
-    }
-
-    internal static void LogReplayAudioState(string label)
-    {
-        try
-        {
-            var soundManager = Services.Get<SoundManager>();
-            if (soundManager == null)
-            {
-                BppLog.Warn(
-                    "CombatReplayRuntime",
-                    $"[ReplayAudioDiag/{label}] SoundManager unavailable."
-                );
-                return;
-            }
-
-            var soundManagerType = typeof(SoundManager);
-            foreach (var fieldName in ReplayDiagnosticBusPathFields)
-            {
-                LogBusState(label, soundManager, soundManagerType, fieldName);
-            }
-
-            try
-            {
-                var settingsField = soundManagerType.GetField(
-                    "SoundSettings",
-                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public
-                );
-                if (settingsField?.GetValue(null) is SoundSettings soundSettings)
-                {
-                    LogVcaState(label, "SfxVCA", soundSettings.SfxVCA);
-                    LogVcaState(label, "MusicVCA", soundSettings.MusicVCA);
-                    LogVcaState(label, "VoVCA", soundSettings.VoVCA);
-                }
-                else
-                {
-                    BppLog.Info(
-                        "CombatReplayRuntime",
-                        $"[ReplayAudioDiag/{label}] SoundSettings static field is null."
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "CombatReplayRuntime",
-                    $"[ReplayAudioDiag/{label}] VCA read failed: {ex.Message}"
-                );
-            }
-
-            try
-            {
-                var dict = GetSfxEventInstancesDict(soundManager);
-                if (dict != null)
-                {
-                    var keys = string.Join(",", dict.Keys);
-                    BppLog.Info(
-                        "CombatReplayRuntime",
-                        $"[ReplayAudioDiag/{label}] tracked-sfx count={dict.Count} keys=[{keys}]"
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "CombatReplayRuntime",
-                    $"[ReplayAudioDiag/{label}] tracked-sfx read failed: {ex.Message}"
-                );
-            }
-
-            try
-            {
-                var pauseSnapshotField = soundManagerType.GetField(
-                    "PauseSnapshot",
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
-                );
-                if (pauseSnapshotField?.GetValue(soundManager) is EventReference pauseSnapshot)
-                {
-                    BppLog.Info(
-                        "CombatReplayRuntime",
-                        $"[ReplayAudioDiag/{label}] PauseSnapshot.Guid={pauseSnapshot.Guid} isNull={pauseSnapshot.IsNull}"
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "CombatReplayRuntime",
-                    $"[ReplayAudioDiag/{label}] PauseSnapshot read failed: {ex.Message}"
-                );
-            }
-
-            try
-            {
-                var gsm = Singleton<GameServiceManager>.Instance;
-                BppLog.Info(
-                    "CombatReplayRuntime",
-                    $"[ReplayAudioDiag/{label}] GamePaused={gsm?.GamePaused} StateName={Data.CurrentState?.StateName}"
-                );
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "CombatReplayRuntime",
-                    $"[ReplayAudioDiag/{label}] GamePaused read failed: {ex.Message}"
-                );
-            }
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "CombatReplayRuntime",
-                $"[ReplayAudioDiag/{label}] diagnostics failed: {ex.Message}"
-            );
-        }
-    }
-
     private static void LogBusState(
         string label,
         SoundManager soundManager,
@@ -1099,7 +1096,7 @@ internal sealed partial class CombatReplayRuntime
             if (string.IsNullOrEmpty(path))
             {
                 BppLog.Info(
-                    "CombatReplayRuntime",
+                    "WarmupCoordinator",
                     $"[ReplayAudioDiag/{label}] bus.{fieldName}=<no-path>"
                 );
                 return;
@@ -1109,7 +1106,7 @@ internal sealed partial class CombatReplayRuntime
             if (!bus.isValid())
             {
                 BppLog.Info(
-                    "CombatReplayRuntime",
+                    "WarmupCoordinator",
                     $"[ReplayAudioDiag/{label}] bus.{fieldName} path={path} invalid"
                 );
                 return;
@@ -1118,14 +1115,14 @@ internal sealed partial class CombatReplayRuntime
             bus.getPaused(out var paused);
             bus.getVolume(out var vol, out var finalVol);
             BppLog.Info(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"[ReplayAudioDiag/{label}] bus.{fieldName} path={path} paused={paused} vol={vol:F3} final={finalVol:F3}"
             );
         }
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"[ReplayAudioDiag/{label}] bus.{fieldName} read failed: {ex.Message}"
             );
         }
@@ -1138,7 +1135,7 @@ internal sealed partial class CombatReplayRuntime
             if (!vca.isValid())
             {
                 BppLog.Info(
-                    "CombatReplayRuntime",
+                    "WarmupCoordinator",
                     $"[ReplayAudioDiag/{label}] vca.{vcaName} invalid"
                 );
                 return;
@@ -1146,14 +1143,14 @@ internal sealed partial class CombatReplayRuntime
 
             vca.getVolume(out var vol, out var finalVol);
             BppLog.Info(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"[ReplayAudioDiag/{label}] vca.{vcaName} vol={vol:F3} final={finalVol:F3}"
             );
         }
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"[ReplayAudioDiag/{label}] vca.{vcaName} read failed: {ex.Message}"
             );
         }
@@ -1184,7 +1181,7 @@ internal sealed partial class CombatReplayRuntime
             if (dict == null)
             {
                 BppLog.Warn(
-                    "CombatReplayRuntime",
+                    "WarmupCoordinator",
                     "Replay audio readiness layer-3: sfxEventInstances dictionary not accessible; skipping."
                 );
                 return;
@@ -1193,7 +1190,7 @@ internal sealed partial class CombatReplayRuntime
             if (dict.Count == 0)
             {
                 BppLog.Info(
-                    "CombatReplayRuntime",
+                    "WarmupCoordinator",
                     "Replay audio readiness layer-3: no tracked SFX EventInstances to stop."
                 );
                 return;
@@ -1201,7 +1198,7 @@ internal sealed partial class CombatReplayRuntime
 
             var keys = dict.Keys.ToList();
             BppLog.Info(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Replay audio readiness layer-3: stopping {keys.Count} tracked SFX EventInstance(s): [{string.Join(",", keys)}]"
             );
 
@@ -1219,7 +1216,7 @@ internal sealed partial class CombatReplayRuntime
                 catch (Exception ex)
                 {
                     BppLog.Warn(
-                        "CombatReplayRuntime",
+                        "WarmupCoordinator",
                         $"Replay audio readiness layer-3: stop/release for key={key} failed: {ex.Message}"
                     );
                 }
@@ -1230,7 +1227,7 @@ internal sealed partial class CombatReplayRuntime
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Replay audio readiness layer-3 failed: {ex.Message}"
             );
         }
@@ -1244,7 +1241,7 @@ internal sealed partial class CombatReplayRuntime
             if (prefs == null)
             {
                 BppLog.Info(
-                    "CombatReplayRuntime",
+                    "WarmupCoordinator",
                     "Replay audio readiness layer-4: PlayerPreferences.Data is null; skipping."
                 );
                 return;
@@ -1261,7 +1258,7 @@ internal sealed partial class CombatReplayRuntime
             if (setVolume == null || volumeTypeEnum == null)
             {
                 BppLog.Warn(
-                    "CombatReplayRuntime",
+                    "WarmupCoordinator",
                     "Replay audio readiness layer-4: SoundManager.SetVolume/VolumeType not found; skipping."
                 );
                 return;
@@ -1270,17 +1267,32 @@ internal sealed partial class CombatReplayRuntime
             var sfxValue = Enum.Parse(volumeTypeEnum, "SFX");
             setVolume.Invoke(null, new[] { sfxValue, (object)prefs.VolumeSfx });
             BppLog.Info(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Replay audio readiness layer-4: re-asserted SFX volume to {prefs.VolumeSfx:F3} from PlayerPreferences."
             );
         }
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "WarmupCoordinator",
                 $"Replay audio readiness layer-4 failed: {ex.Message}"
             );
         }
+    }
+
+    private sealed class ReplayWarmupStats
+    {
+        public int SharedAssetsPreloaded;
+        public int SharedAssetsSkipped;
+        public int CardsPreloaded;
+        public int CardsSkipped;
+        public int CardsFailed;
+        public int OverrideAssetsPreloaded;
+        public int OverrideAssetsSkipped;
+        public int OverrideAssetsFailed;
+        public int VfxPrewarmed;
+        public int VfxSkipped;
+        public int VfxFailed;
     }
 
     private sealed class ReplayAudioWarmupStats

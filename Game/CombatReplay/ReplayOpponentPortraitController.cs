@@ -3,7 +3,6 @@ using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarGameShared.TempoNet.Enums;
@@ -16,14 +15,25 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
-internal sealed partial class CombatReplayRuntime
+internal sealed class ReplayOpponentPortraitController
 {
-    private async Task EnsureReplayTemporaryOpponentPortraitAsync(PvpBattleManifest manifest)
+    private readonly Action<UnityEngine.Object> _destroyHandle;
+    private EncounterController? _portrait;
+    private EHero? _originalSelectedHero;
+    private bool _selectedHeroOverridden;
+
+    public ReplayOpponentPortraitController(Action<UnityEngine.Object> destroyHandle)
     {
-        if (_replayTemporaryOpponentPortrait != null)
+        _destroyHandle = destroyHandle ?? throw new ArgumentNullException(nameof(destroyHandle));
+    }
+
+    public async Task EnsureTemporaryOpponentPortraitAsync(PvpBattleManifest manifest)
+    {
+        if (_portrait != null)
         {
-            _replayTemporaryOpponentPortrait.gameObject.SetActive(true);
-            _replayTemporaryOpponentPortrait.ShowCard(show: true);
+            _portrait.gameObject.SetActive(true);
+            _portrait.ShowCard(show: true);
+            ReplayHealthBarRebuilder.ActiveOpponentPortrait = _portrait;
             return;
         }
 
@@ -31,7 +41,7 @@ internal sealed partial class CombatReplayRuntime
         if (boardManager == null)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "ReplayOpponentPortrait",
                 $"Replay temp portrait: board manager unavailable for battle={manifest.BattleId}"
             );
             return;
@@ -43,7 +53,7 @@ internal sealed partial class CombatReplayRuntime
             if (!TryParseHeroName(manifest.Participants.OpponentHero, out var parsedHero))
             {
                 BppLog.Warn(
-                    "CombatReplayRuntime",
+                    "ReplayOpponentPortrait",
                     $"Replay temp portrait: opponent hero unavailable for battle={manifest.BattleId}"
                 );
                 return;
@@ -73,22 +83,22 @@ internal sealed partial class CombatReplayRuntime
         if (skinData == null)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "ReplayOpponentPortrait",
                 $"Replay temp portrait: skin load returned null for hero={hero.Value} battle={manifest.BattleId}"
             );
             return;
         }
 
         var anchor = boardManager.GetAnchor(AnchorSide.Opponent, AnchorType.Portrait);
-        var portraitController = await LoadReplayHeroPortraitAsync(
+        var portraitController = await LoadHeroPortraitAsync(
             skinData,
-            ResolveReplayPortraitTier(manifest),
+            ResolvePortraitTier(manifest),
             anchor
         );
         if (portraitController == null)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "ReplayOpponentPortrait",
                 $"Replay temp portrait: portrait load failed for hero={hero.Value} battle={manifest.BattleId}"
             );
             return;
@@ -100,26 +110,28 @@ internal sealed partial class CombatReplayRuntime
         portraitController.gameObject.name = "ReplayOpponentPortrait";
         portraitController.gameObject.SetActive(true);
         portraitController.ShowCard(show: true);
-        _replayTemporaryOpponentPortrait = portraitController;
+        _portrait = portraitController;
+        ReplayHealthBarRebuilder.ActiveOpponentPortrait = _portrait;
     }
 
-    private void CleanupReplayOpponentPortrait()
+    public void Cleanup()
     {
-        if (_replayTemporaryOpponentPortrait != null)
+        if (_portrait != null)
         {
             try
             {
-                Destroy(_replayTemporaryOpponentPortrait.gameObject);
+                _destroyHandle(_portrait.gameObject);
             }
             catch (Exception ex)
             {
                 BppLog.Warn(
-                    "CombatReplayRuntime",
+                    "ReplayOpponentPortrait",
                     $"Replay temp portrait cleanup failed: {ex.Message}"
                 );
             }
 
-            _replayTemporaryOpponentPortrait = null;
+            _portrait = null;
+            ReplayHealthBarRebuilder.ActiveOpponentPortrait = null;
         }
 
         if (Data.CurrentEncounterController != null)
@@ -129,45 +141,7 @@ internal sealed partial class CombatReplayRuntime
         }
     }
 
-    private static async Task<EncounterController?> LoadReplayHeroPortraitAsync(
-        SkinAssetDataSO skinData,
-        ETier tier,
-        Transform parent
-    )
-    {
-        var boardBuilderType = typeof(BoardBuilder);
-        var loadMethod = boardBuilderType.GetMethod(
-            "LoadHeroPortraitAsync",
-            BindingFlags.Static | BindingFlags.NonPublic
-        );
-        if (loadMethod == null)
-            throw new MissingMethodException(boardBuilderType.FullName, "LoadHeroPortraitAsync");
-
-        var taskObject = loadMethod.Invoke(null, new object?[] { skinData, tier, parent, false });
-        if (taskObject is Task<EncounterController> typedTask)
-            return await typedTask;
-
-        if (taskObject is not Task task)
-            return taskObject as EncounterController;
-
-        await task;
-        return task.GetType()
-                .GetProperty("Result", BindingFlags.Instance | BindingFlags.Public)
-                ?.GetValue(task) as EncounterController;
-    }
-
-    private static ETier ResolveReplayPortraitTier(PvpBattleManifest manifest)
-    {
-        if (
-            !string.IsNullOrWhiteSpace(manifest?.Participants?.OpponentRank)
-            && Enum.TryParse(manifest.Participants.OpponentRank.Trim(), true, out ETier tier)
-        )
-            return tier;
-
-        return ETier.Bronze;
-    }
-
-    private void ApplyReplaySelectedHeroOverride(PvpBattleManifest manifest)
+    public void ApplySelectedHeroOverride(PvpBattleManifest manifest)
     {
         if (manifest?.Participants == null)
             return;
@@ -175,46 +149,29 @@ internal sealed partial class CombatReplayRuntime
         if (!TryParseHeroName(manifest.Participants.PlayerHero, out var replayHero))
             return;
 
-        _replayOriginalSelectedHero = Data.SelectedHero;
-        if (_replayOriginalSelectedHero.Value == replayHero)
+        _originalSelectedHero = Data.SelectedHero;
+        if (_originalSelectedHero.Value == replayHero)
         {
-            _replaySelectedHeroOverridden = false;
-            _replayOriginalSelectedHero = null;
+            _selectedHeroOverridden = false;
+            _originalSelectedHero = null;
             return;
         }
 
-        SetReplaySelectedHero(replayHero);
-        _replaySelectedHeroOverridden = true;
+        SetSelectedHero(replayHero);
+        _selectedHeroOverridden = true;
     }
 
-    private void RestoreReplaySelectedHeroOverride()
+    public void RestoreSelectedHeroOverride()
     {
-        if (!_replaySelectedHeroOverridden || !_replayOriginalSelectedHero.HasValue)
+        if (!_selectedHeroOverridden || !_originalSelectedHero.HasValue)
             return;
 
-        SetReplaySelectedHero(_replayOriginalSelectedHero.Value);
-        _replaySelectedHeroOverridden = false;
-        _replayOriginalSelectedHero = null;
+        SetSelectedHero(_originalSelectedHero.Value);
+        _selectedHeroOverridden = false;
+        _originalSelectedHero = null;
     }
 
-    private static void SetReplaySelectedHero(EHero hero)
-    {
-        var clientCacheType = typeof(Data).Assembly.GetType("TheBazaar.ClientCache", false);
-        var runConfigField = clientCacheType?.GetField(
-            "RunConfig",
-            BindingFlags.Static | BindingFlags.Public
-        );
-        var runConfig = runConfigField?.GetValue(null);
-        var setSelectedHeroMethod = runConfig
-            ?.GetType()
-            .GetMethod("SetSelectedHero", BindingFlags.Instance | BindingFlags.Public);
-        if (setSelectedHeroMethod == null)
-            throw new MissingMethodException("TheBazaar.RunConfigurationCache", "SetSelectedHero");
-
-        setSelectedHeroMethod.Invoke(runConfig, new object[] { hero });
-    }
-
-    private static void EnsureReplayOpponentIdentity(
+    public static void EnsureOpponentIdentity(
         PvpBattleManifest manifest,
         NetMessageGameSim spawnMessage
     )
@@ -228,7 +185,7 @@ internal sealed partial class CombatReplayRuntime
         if (!TryParseHeroName(manifest.Participants.OpponentHero, out var opponentHero))
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "ReplayOpponentPortrait",
                 $"Replay opponent hero was unavailable for battle {manifest.BattleId}."
             );
             return;
@@ -255,6 +212,61 @@ internal sealed partial class CombatReplayRuntime
             opponentLoadout,
             null
         );
+    }
+
+    private static async Task<EncounterController?> LoadHeroPortraitAsync(
+        SkinAssetDataSO skinData,
+        ETier tier,
+        Transform parent
+    )
+    {
+        var boardBuilderType = typeof(BoardBuilder);
+        var loadMethod = boardBuilderType.GetMethod(
+            "LoadHeroPortraitAsync",
+            BindingFlags.Static | BindingFlags.NonPublic
+        );
+        if (loadMethod == null)
+            throw new MissingMethodException(boardBuilderType.FullName, "LoadHeroPortraitAsync");
+
+        var taskObject = loadMethod.Invoke(null, new object?[] { skinData, tier, parent, false });
+        if (taskObject is Task<EncounterController> typedTask)
+            return await typedTask;
+
+        if (taskObject is not Task task)
+            return taskObject as EncounterController;
+
+        await task;
+        return task.GetType()
+                .GetProperty("Result", BindingFlags.Instance | BindingFlags.Public)
+                ?.GetValue(task) as EncounterController;
+    }
+
+    private static ETier ResolvePortraitTier(PvpBattleManifest manifest)
+    {
+        if (
+            !string.IsNullOrWhiteSpace(manifest?.Participants?.OpponentRank)
+            && Enum.TryParse(manifest.Participants.OpponentRank.Trim(), true, out ETier tier)
+        )
+            return tier;
+
+        return ETier.Bronze;
+    }
+
+    private static void SetSelectedHero(EHero hero)
+    {
+        var clientCacheType = typeof(Data).Assembly.GetType("TheBazaar.ClientCache", false);
+        var runConfigField = clientCacheType?.GetField(
+            "RunConfig",
+            BindingFlags.Static | BindingFlags.Public
+        );
+        var runConfig = runConfigField?.GetValue(null);
+        var setSelectedHeroMethod = runConfig
+            ?.GetType()
+            .GetMethod("SetSelectedHero", BindingFlags.Instance | BindingFlags.Public);
+        if (setSelectedHeroMethod == null)
+            throw new MissingMethodException("TheBazaar.RunConfigurationCache", "SetSelectedHero");
+
+        setSelectedHeroMethod.Invoke(runConfig, new object[] { hero });
     }
 
     private static bool TryParseHeroName(string? heroName, out EHero hero)

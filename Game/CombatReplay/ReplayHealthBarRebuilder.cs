@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Infra.Messages.GameSimEvents;
+using BazaarGameShared.TempoNet.Models;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
@@ -14,8 +16,14 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
-internal sealed partial class CombatReplayRuntime
+// "Initialized" board UI controllers are tracked across replay sessions to avoid double-binding the
+// game's BoardUIController.Init, which throws on repeat. Owner clears this when sessions start/end.
+internal static class ReplayHealthBarRebuilder
 {
+    public static readonly HashSet<int> InitializedBoardUiControllers = new();
+
+    public static EncounterController? ActiveOpponentPortrait { get; set; }
+
     public static void HideEncounterPickerOverlays()
     {
         HideObjectsOfType<EncounterPickerMapController>();
@@ -39,7 +47,7 @@ internal sealed partial class CombatReplayRuntime
 
     public static void EnsureOpponentPortraitVisible()
     {
-        var replayPortrait = Instance?._replayTemporaryOpponentPortrait;
+        var replayPortrait = ActiveOpponentPortrait;
         if (replayPortrait != null)
         {
             if (Data.CurrentEncounterController != null)
@@ -58,28 +66,42 @@ internal sealed partial class CombatReplayRuntime
         encounterController.ShowCard(show: true);
     }
 
-    public static async Task PrepareReplayHealthBarsAsync()
+    public static async Task PrepareHealthBarsAsync()
     {
-        var bindings = await RefreshReplayHealthBarBindingsAsync();
-        ShowReplayPlayerHealthBar(bindings.PlayerController);
+        var bindings = await RefreshHealthBarBindingsAsync();
+        ShowPlayerHealthBar(bindings.PlayerController);
         Data.PlayerExperienceBar?.ToggleExperienceBarAndText(isVisible: false);
         Events.TryShowEmptyOpponentHealthBar.Trigger();
     }
 
-    public static void RefillReplayOpponentHealthBar()
+    public static void RefillOpponentHealthBar()
     {
         Events.TryRefillOpponentHealthBar.Trigger();
     }
 
-    private static async Task<ReplayBoardUiBindings> RefreshReplayHealthBarBindingsAsync()
+    public static void EnsureSequencePlayerAttributes(CombatSequenceMessages sequence)
     {
-        var bindings = ResolveReplayBoardUiControllers();
+        EnsurePlayerAttributes(sequence.SpawnMessage?.Data?.Player, ECombatantId.Player);
+        EnsurePlayerAttributes(sequence.SpawnMessage?.Data?.Opponent, ECombatantId.Opponent);
+        EnsurePlayerAttributes(sequence.DespawnMessage?.Data?.Player, ECombatantId.Player);
+        EnsurePlayerAttributes(sequence.DespawnMessage?.Data?.Opponent, ECombatantId.Opponent);
+    }
+
+    public static void EnsureRunPlayerAttributes()
+    {
+        EnsurePlayerAttributes(Data.Run?.Player, ECombatantId.Player);
+        EnsurePlayerAttributes(Data.Run?.Opponent, ECombatantId.Opponent);
+    }
+
+    private static async Task<ReplayBoardUiBindings> RefreshHealthBarBindingsAsync()
+    {
+        var bindings = ResolveBoardUiControllers();
 
         if (bindings.PlayerController != null)
-            BindReplayBoardUiController(bindings.PlayerController, registerPlayerHealthBar: true);
+            BindBoardUiController(bindings.PlayerController, registerPlayerHealthBar: true);
 
         if (bindings.OpponentController != null)
-            BindReplayBoardUiController(
+            BindBoardUiController(
                 bindings.OpponentController,
                 registerPlayerHealthBar: false
             );
@@ -95,16 +117,16 @@ internal sealed partial class CombatReplayRuntime
             .Where(controller => controller != null && controller.gameObject.scene.rootCount > 0);
     }
 
-    private static ReplayBoardUiBindings ResolveReplayBoardUiControllers()
+    private static ReplayBoardUiBindings ResolveBoardUiControllers()
     {
         var controllers = GetSceneBoardUiControllers().ToList();
         return new ReplayBoardUiBindings(
-            SelectReplayBoardUiController(controllers, ECombatantId.Player, AnchorSide.Player),
-            SelectReplayBoardUiController(controllers, ECombatantId.Opponent, AnchorSide.Opponent)
+            SelectBoardUiController(controllers, ECombatantId.Player, AnchorSide.Player),
+            SelectBoardUiController(controllers, ECombatantId.Opponent, AnchorSide.Opponent)
         );
     }
 
-    private static BoardUIController? SelectReplayBoardUiController(
+    private static BoardUIController? SelectBoardUiController(
         IEnumerable<BoardUIController> controllers,
         ECombatantId combatantId,
         AnchorSide anchorSide
@@ -137,7 +159,7 @@ internal sealed partial class CombatReplayRuntime
         return Vector3.SqrMagnitude(controller.transform.position - anchor.position);
     }
 
-    private static void BindReplayBoardUiController(
+    private static void BindBoardUiController(
         BoardUIController controller,
         bool registerPlayerHealthBar
     )
@@ -147,9 +169,9 @@ internal sealed partial class CombatReplayRuntime
         if (player == null)
             return;
 
-        EnsureReplayPlayerAttributes(player, controller.combatantId);
+        EnsurePlayerAttributes(player, controller.combatantId);
 
-        if (InitializedReplayBoardUiControllers.Add(controller.GetInstanceID()))
+        if (InitializedBoardUiControllers.Add(controller.GetInstanceID()))
             InvokeBoardUiMethod(controller, "Init", player);
 
         if (controller.combatantId == ECombatantId.Player)
@@ -163,12 +185,12 @@ internal sealed partial class CombatReplayRuntime
             Data.RegisterPlayerHealthBar(controller);
     }
 
-    private static void ShowReplayPlayerHealthBar(BoardUIController? playerController)
+    private static void ShowPlayerHealthBar(BoardUIController? playerController)
     {
         if (playerController != null)
         {
             if (Data.Run?.Player != null)
-                EnsureReplayPlayerAttributes(Data.Run.Player, ECombatantId.Player);
+                EnsurePlayerAttributes(Data.Run.Player, ECombatantId.Player);
 
             InvokeBoardUiMethod(playerController, "SetBattlePlayer", Data.Run?.Player);
             InitializeBoardUiHealthBar(playerController, Data.Run?.Player);
@@ -181,21 +203,7 @@ internal sealed partial class CombatReplayRuntime
         Data.PlayerHealthBar?.ShowEmptyPlayerHealthBar();
     }
 
-    private static void EnsureReplaySequencePlayerAttributes(CombatSequenceMessages sequence)
-    {
-        EnsureReplayPlayerAttributes(sequence.SpawnMessage?.Data?.Player, ECombatantId.Player);
-        EnsureReplayPlayerAttributes(sequence.SpawnMessage?.Data?.Opponent, ECombatantId.Opponent);
-        EnsureReplayPlayerAttributes(sequence.DespawnMessage?.Data?.Player, ECombatantId.Player);
-        EnsureReplayPlayerAttributes(sequence.DespawnMessage?.Data?.Opponent, ECombatantId.Opponent);
-    }
-
-    private static void EnsureReplayRunPlayerAttributes()
-    {
-        EnsureReplayPlayerAttributes(Data.Run?.Player, ECombatantId.Player);
-        EnsureReplayPlayerAttributes(Data.Run?.Opponent, ECombatantId.Opponent);
-    }
-
-    private static void EnsureReplayPlayerAttributes(object? player, ECombatantId combatantId)
+    private static void EnsurePlayerAttributes(object? player, ECombatantId combatantId)
     {
         if (player == null)
             return;
@@ -214,19 +222,19 @@ internal sealed partial class CombatReplayRuntime
             )
                 return;
 
-            EnsureReplayPlayerAttributeDefaults(attributes);
-            EnsureReplayHealthMax(attributes);
+            EnsurePlayerAttributeDefaults(attributes);
+            EnsureHealthMax(attributes);
         }
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "ReplayHealthBarRebuilder",
                 $"Failed to backfill replay player attributes for {combatantId}: {ex.Message}"
             );
         }
     }
 
-    private static void EnsureReplayHealthMax(System.Collections.IDictionary attributes)
+    private static void EnsureHealthMax(System.Collections.IDictionary attributes)
     {
         if (
             attributes.Contains(EPlayerAttributeType.HealthMax)
@@ -244,13 +252,13 @@ internal sealed partial class CombatReplayRuntime
         attributes[EPlayerAttributeType.HealthMax] = healthValue;
     }
 
-    private static void EnsureReplayPlayerAttributeDefaults(
+    private static void EnsurePlayerAttributeDefaults(
         System.Collections.IDictionary attributes
     )
     {
         foreach (EPlayerAttributeType attributeType in Enum.GetValues(typeof(EPlayerAttributeType)))
         {
-            EnsureReplayPlayerAttribute(
+            EnsurePlayerAttribute(
                 attributes,
                 attributeType,
                 attributeType == EPlayerAttributeType.Level ? 1 : 0
@@ -258,7 +266,7 @@ internal sealed partial class CombatReplayRuntime
         }
     }
 
-    private static void EnsureReplayPlayerAttribute(
+    private static void EnsurePlayerAttribute(
         System.Collections.IDictionary attributes,
         EPlayerAttributeType attributeType,
         int defaultValue
@@ -306,7 +314,7 @@ internal sealed partial class CombatReplayRuntime
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "ReplayHealthBarRebuilder",
                 $"Failed to unregister PlayerPortraitPlaced handler: {ex.Message}"
             );
         }
@@ -338,7 +346,7 @@ internal sealed partial class CombatReplayRuntime
         catch (TargetInvocationException ex)
         {
             BppLog.Warn(
-                "CombatReplayRuntime",
+                "ReplayHealthBarRebuilder",
                 $"Skipping health bar init for {controller.combatantId}: {ex.InnerException?.Message ?? ex.Message}"
             );
         }
@@ -490,4 +498,30 @@ internal sealed partial class CombatReplayRuntime
 
         targetMethod.Invoke(controller, [argument]);
     }
+
+    private static void HideObjectsOfType<T>()
+        where T : Component
+    {
+        foreach (var component in Resources.FindObjectsOfTypeAll<T>())
+        {
+            if (component?.gameObject != null)
+                component.gameObject.SetActive(false);
+        }
+    }
+}
+
+internal sealed class ReplayBoardUiBindings
+{
+    public ReplayBoardUiBindings(
+        BoardUIController? playerController,
+        BoardUIController? opponentController
+    )
+    {
+        PlayerController = playerController;
+        OpponentController = opponentController;
+    }
+
+    public BoardUIController? PlayerController { get; }
+
+    public BoardUIController? OpponentController { get; }
 }
