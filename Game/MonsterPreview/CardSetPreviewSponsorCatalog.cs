@@ -38,7 +38,10 @@ internal static class CardSetPreviewSponsorCatalog
         "supporter-list-cache.json"
     );
     private static readonly object SyncRoot = new();
-    private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private static readonly HttpClient HttpClient = BppHttpClientFactory.Create(
+        userAgentSuffix: "SponsorCatalog",
+        timeout: TimeSpan.FromSeconds(10)
+    );
     private static readonly IReadOnlyList<SupporterEntry> FallbackEntries = new[]
     {
         new SupporterEntry { Name = "Bronze Sponsor A", Tier = 2 },

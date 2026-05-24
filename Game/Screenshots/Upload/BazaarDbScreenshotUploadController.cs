@@ -63,12 +63,12 @@ internal sealed class BazaarDbScreenshotUploadController : MonoBehaviour
                 return;
 
             var store = new BazaarDbScreenshotUploadStore(databasePath, screenshotsDirectoryPath);
-            _httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(
+            _httpClient = BppHttpClientFactory.Create(
+                userAgentSuffix: "BazaarDbScreenshotUpload",
+                timeout: TimeSpan.FromSeconds(
                     Math.Max(10, V3UploadDefaults.RequestTimeoutSeconds)
-                ),
-            };
+                )
+            );
             _uploadService = new BazaarDbScreenshotUploadService(
                 store,
                 routes,
