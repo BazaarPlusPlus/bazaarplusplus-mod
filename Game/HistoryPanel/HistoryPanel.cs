@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.Input;
 using TheBazaar;
 using UnityEngine;
@@ -30,6 +29,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private HistoryPanelCoordinator? _coordinator;
     private HistoryPanelDataService _dataService = null!;
     private HistoryPanelReplayService _replayService = null!;
+    private HistoryPanelPreviewSource? _previewSource;
     private HistoryPanelPreviewRenderer? _previewRenderer;
     private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
@@ -52,15 +52,13 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private IReadOnlyList<HistoryBattleRecord> FilteredGhostBattles => GetFilteredGhostBattles();
 
-    private System.Collections.Generic.List<HistoryRunRecord> _runs => _state.Runs;
+    private List<HistoryRunRecord> _runs => _state.Runs;
 
-    private System.Collections.Generic.List<HistoryBattleRecord> _battles => _state.Battles;
+    private List<HistoryBattleRecord> _battles => _state.Battles;
 
-    private System.Collections.Generic.List<HistoryBattleRecord> _ghostBattles =>
-        _state.GhostBattles;
+    private List<HistoryBattleRecord> _ghostBattles => _state.GhostBattles;
 
-    private System.Collections.Generic.List<HistoryBattleRecord> _filteredGhostBattles =>
-        _state.FilteredGhostBattles;
+    private List<HistoryBattleRecord> _filteredGhostBattles => _state.FilteredGhostBattles;
 
     private int _selectedRunIndex
     {
@@ -96,18 +94,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         }
     }
 
-    private string? _deleteRunConfirmationRunId
-    {
-        get => _state.DeleteRunConfirmationRunId;
-        set => _state.DeleteRunConfirmationRunId = value;
-    }
-
-    private float _deleteRunConfirmationUntil
-    {
-        get => _state.DeleteRunConfirmationUntil;
-        set => _state.DeleteRunConfirmationUntil = value;
-    }
-
     private PreviewSelectionMode _previewSelectionMode
     {
         get => _state.PreviewSelectionMode;
@@ -120,22 +106,10 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         set => _state.SectionMode = value;
     }
 
-    private bool _ghostSyncInProgress
-    {
-        get => _state.GhostSyncInProgress;
-        set => _state.GhostSyncInProgress = value;
-    }
-
     private bool _replayActionInProgress
     {
         get => _state.ReplayActionInProgress;
         set => _state.ReplayActionInProgress = value;
-    }
-
-    private bool _filteredGhostBattlesDirty
-    {
-        get => _state.FilteredGhostBattlesDirty;
-        set => _state.FilteredGhostBattlesDirty = value;
     }
 
     private void Awake()
@@ -150,6 +124,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _runtime = dependencies.Runtime;
         _dataService = dependencies.DataService;
         _replayService = dependencies.ReplayService;
+        _previewSource = new HistoryPanelPreviewSource(_runtime);
         _coordinator = new HistoryPanelCoordinator(
             _state,
             dependencies,
@@ -319,10 +294,16 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         }
 
         EnsurePreviewRenderer();
-        if (_previewRenderer == null)
+        if (_previewRenderer == null || _previewSource == null)
             return;
 
-        var previewRequest = BuildPreviewRequest();
+        var previewRequest = _previewSource.Build(
+            _previewSelectionMode,
+            _sectionMode,
+            ActiveSelectedBattle,
+            SelectedRun,
+            _battles
+        );
         _previewCoroutine = StartCoroutine(
             _previewRenderer.RenderPreview(
                 previewRequest.RenderId,
@@ -515,86 +496,5 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         SetPreviewDebugText(summary, true);
         _previewDebugOverlayUntil = Time.unscaledTime + 6f;
-    }
-
-    private PreviewRequest BuildPreviewRequest()
-    {
-        if (_previewSelectionMode == PreviewSelectionMode.Battle && ActiveSelectedBattle != null)
-        {
-            var previewData =
-                _sectionMode == HistorySectionMode.Ghost
-                    ? ResolveGhostPreviewData(ActiveSelectedBattle)
-                    : ActiveSelectedBattle.PreviewData.OpponentHandOnly();
-            return new PreviewRequest($"battle:{ActiveSelectedBattle.BattleId}", previewData);
-        }
-
-        var runPreviewBattle = GetRunPreviewBattle();
-        if (runPreviewBattle != null)
-        {
-            return new PreviewRequest(
-                $"run:{SelectedRun?.RunId}:{runPreviewBattle.BattleId}",
-                runPreviewBattle.PreviewData.PlayerHandOnly()
-            );
-        }
-
-        return new PreviewRequest(null, null);
-    }
-
-    private HistoryBattlePreviewData ResolveGhostPreviewData(HistoryBattleRecord battle)
-    {
-        if (battle.Source != HistoryBattleSource.Ghost)
-            return battle.PreviewData;
-
-        if (battle.PreviewData.HasRenderableCards)
-            return battle.PreviewData.PlayerHandOnly();
-
-        var replayDirectoryPath = _runtime?.CombatReplayDirectoryPath;
-        if (string.IsNullOrWhiteSpace(replayDirectoryPath))
-            return battle.PreviewData.PlayerHandOnly();
-
-        var ghostPayloadStore = new GhostBattlePayloadStore(
-            BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
-        );
-        var ghostPayload = ghostPayloadStore.Load(battle.BattleId);
-        var snapshots = ghostPayload?.BattleManifest?.Snapshots;
-        if (snapshots == null)
-            return battle.PreviewData.PlayerHandOnly();
-
-        // Ghost replay payload snapshots stay in the uploader's original perspective.
-        // For the local "against me" view, our board is stored on the opponent side.
-        return HistoryPanelRepository.BuildPreviewData(snapshots).OpponentHandOnly();
-    }
-
-    private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)
-    {
-        var parentDirectory = System.IO.Path.GetDirectoryName(replayDirectoryPath);
-        return string.IsNullOrWhiteSpace(parentDirectory)
-            ? System.IO.Path.Combine(replayDirectoryPath, "GhostBattlePayloads")
-            : System.IO.Path.Combine(parentDirectory, "GhostBattlePayloads");
-    }
-
-    private HistoryBattleRecord? GetRunPreviewBattle()
-    {
-        if (_battles.Count == 0)
-            return null;
-
-        return _battles
-            .OrderByDescending(battle => battle.Day ?? int.MinValue)
-            .ThenByDescending(battle => battle.Hour ?? int.MinValue)
-            .ThenByDescending(battle => battle.RecordedAtUtc)
-            .FirstOrDefault();
-    }
-
-    private readonly struct PreviewRequest
-    {
-        public PreviewRequest(string? renderId, HistoryBattlePreviewData? previewData)
-        {
-            RenderId = renderId;
-            PreviewData = previewData;
-        }
-
-        public string? RenderId { get; }
-
-        public HistoryBattlePreviewData? PreviewData { get; }
     }
 }

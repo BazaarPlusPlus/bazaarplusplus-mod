@@ -11,14 +11,11 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.PreviewSurface;
 using BazaarPlusPlus.Game.PvpBattles;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Serialization;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
-internal sealed partial class HistoryPanelRepository
+internal static class HistoryBattlePreviewProjection
 {
     private static readonly object SocketEffectTemplateLock = new();
     private static readonly Dictionary<
@@ -27,38 +24,7 @@ internal sealed partial class HistoryPanelRepository
     > SocketEffectAttributeTypeCache = new();
     private static object? _staticGameData;
 
-    private static readonly JsonSerializerSettings SerializerSettings = new()
-    {
-        ContractResolver = new DefaultContractResolver
-        {
-            NamingStrategy = new SnakeCaseNamingStrategy(),
-        },
-        Converters = new List<JsonConverter> { new StringEnumConverter() },
-        NullValueHandling = NullValueHandling.Ignore,
-        Formatting = Formatting.None,
-        DateFormatString = "yyyy-MM-dd'T'HH:mm:ss.fffK",
-    };
-
-    internal static string BuildSnapshotSummary(
-        PvpBattleCardSetCapture playerHand,
-        PvpBattleCardSetCapture playerSkills,
-        PvpBattleCardSetCapture opponentHand,
-        PvpBattleCardSetCapture opponentSkills
-    )
-    {
-        var playerItems = CountSnapshotItems(playerHand);
-        var playerSkillCount = CountSnapshotItems(playerSkills);
-        var opponentItems = CountSnapshotItems(opponentHand);
-        var opponentSkillCount = CountSnapshotItems(opponentSkills);
-        return HistoryPanelText.SnapshotSummary(
-            playerItems,
-            playerSkillCount,
-            opponentItems,
-            opponentSkillCount
-        );
-    }
-
-    internal static HistoryBattlePreviewData BuildEmptyPreviewData()
+    public static HistoryBattlePreviewData BuildEmpty()
     {
         return new HistoryBattlePreviewData(
             new PreviewBoardModel
@@ -78,24 +44,12 @@ internal sealed partial class HistoryPanelRepository
         );
     }
 
-    internal static HistoryBattlePreviewData BuildPreviewData(
-        PvpBattleCardSetCapture playerHand,
-        PvpBattleCardSetCapture playerSkills,
-        PvpBattleCardSetCapture opponentHand,
-        PvpBattleCardSetCapture opponentSkills
-    )
-    {
-        var playerBoard = BuildPreviewBoard(playerHand, playerSkills);
-        var opponentBoard = BuildPreviewBoard(opponentHand, opponentSkills);
-        return new HistoryBattlePreviewData(playerBoard, opponentBoard);
-    }
-
-    internal static HistoryBattlePreviewData BuildPreviewData(PvpBattleSnapshots snapshots)
+    public static HistoryBattlePreviewData Build(PvpBattleSnapshots? snapshots)
     {
         if (snapshots == null)
-            return BuildEmptyPreviewData();
+            return BuildEmpty();
 
-        return BuildPreviewData(
+        return Build(
             snapshots.PlayerHand,
             snapshots.PlayerSkills,
             snapshots.OpponentHand,
@@ -103,7 +57,34 @@ internal sealed partial class HistoryPanelRepository
         );
     }
 
-    private static PreviewBoardModel BuildPreviewBoard(
+    public static HistoryBattlePreviewData Build(
+        PvpBattleCardSetCapture playerHand,
+        PvpBattleCardSetCapture playerSkills,
+        PvpBattleCardSetCapture opponentHand,
+        PvpBattleCardSetCapture opponentSkills
+    )
+    {
+        var playerBoard = BuildBoard(playerHand, playerSkills);
+        var opponentBoard = BuildBoard(opponentHand, opponentSkills);
+        return new HistoryBattlePreviewData(playerBoard, opponentBoard);
+    }
+
+    public static HistoryBattleSnapshotCounts CountSnapshots(
+        PvpBattleCardSetCapture? playerHand,
+        PvpBattleCardSetCapture? playerSkills,
+        PvpBattleCardSetCapture? opponentHand,
+        PvpBattleCardSetCapture? opponentSkills
+    )
+    {
+        return new HistoryBattleSnapshotCounts(
+            playerHand?.Items?.Count ?? 0,
+            playerSkills?.Items?.Count ?? 0,
+            opponentHand?.Items?.Count ?? 0,
+            opponentSkills?.Items?.Count ?? 0
+        );
+    }
+
+    private static PreviewBoardModel BuildBoard(
         PvpBattleCardSetCapture itemCapture,
         PvpBattleCardSetCapture skillCapture
     )
@@ -355,7 +336,7 @@ internal sealed partial class HistoryPanelRepository
         catch (Exception ex)
         {
             BppLog.Error(
-                "HistoryPanelRepository",
+                "HistoryBattlePreviewProjection",
                 "Failed to load static game data for battle preview filtering",
                 ex
             );
@@ -399,12 +380,6 @@ internal sealed partial class HistoryPanelRepository
         return method?.Invoke(staticData, new object[] { templateId });
     }
 
-    private static PvpBattleCardSetCapture DeserializeCapture(string json)
-    {
-        return JsonConvert.DeserializeObject<PvpBattleCardSetCapture>(json, SerializerSettings)
-            ?? new PvpBattleCardSetCapture();
-    }
-
     private static int ParseTier(string? value)
     {
         return
@@ -423,10 +398,5 @@ internal sealed partial class HistoryPanelRepository
             ECardSize.Large => 3,
             _ => 1,
         };
-    }
-
-    private static int CountSnapshotItems(PvpBattleCardSetCapture? capture)
-    {
-        return capture?.Items?.Count ?? 0;
     }
 }

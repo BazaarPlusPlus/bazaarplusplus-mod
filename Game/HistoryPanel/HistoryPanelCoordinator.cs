@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -16,8 +15,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     private readonly Action _requestUiRefresh;
     private readonly Action _requestPreviewRefresh;
     private readonly Action<bool> _requestVisibilityChange;
-    private CancellationTokenSource? _panelSessionCts;
-    private int _panelSessionVersion;
+    private readonly HistoryPanelSessionScope _session = new();
 
     public HistoryPanelCoordinator(
         HistoryPanelState state,
@@ -44,12 +42,12 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     public void Dispose()
     {
-        EndPanelSession();
+        _session.Dispose();
     }
 
     public void OnPanelShown()
     {
-        BeginPanelSession();
+        _session.Begin();
         _state.IsVisible = true;
         RefreshSectionOnEntry();
     }
@@ -61,7 +59,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.ReplayActionInProgress = false;
         _state.FinalBuildRefreshInProgress = false;
         ClearDeleteRunConfirmation();
-        EndPanelSession();
+        _session.End();
     }
 
     public void Tick(float now)
@@ -314,16 +312,15 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         );
         _requestUiRefresh();
 
-        var token = GetCurrentSessionToken();
-        var sessionVersion = _panelSessionVersion;
+        var sessionVersion = _session.Version;
         HistoryPanelReplayAttemptResult replayResult;
         try
         {
-            replayResult = await _replayService.ReplayBattleAsync(battle, token);
+            replayResult = await _replayService.ReplayBattleAsync(battle, _session.Token);
         }
         catch (OperationCanceledException)
         {
-            if (!IsSessionCurrent(sessionVersion))
+            if (!_session.IsCurrent(sessionVersion))
                 return;
 
             _state.ReplayActionInProgress = false;
@@ -333,7 +330,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         }
         catch (Exception ex)
         {
-            if (!IsSessionCurrent(sessionVersion))
+            if (!_session.IsCurrent(sessionVersion))
                 return;
 
             _state.ReplayActionInProgress = false;
@@ -343,7 +340,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
-        if (!IsSessionCurrent(sessionVersion))
+        if (!_session.IsCurrent(sessionVersion))
             return;
 
         _state.ReplayActionInProgress = false;
@@ -439,16 +436,15 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         SetStatusMessage(HistoryPanelText.SyncingGhostBattles());
         _requestUiRefresh();
 
-        var token = GetCurrentSessionToken();
-        var sessionVersion = _panelSessionVersion;
+        var sessionVersion = _session.Version;
         HistoryPanelAttemptResult syncResult;
         try
         {
-            syncResult = await _dataService.SyncGhostBattlesAsync(token);
+            syncResult = await _dataService.SyncGhostBattlesAsync(_session.Token);
         }
         catch (OperationCanceledException)
         {
-            if (!IsSessionCurrent(sessionVersion))
+            if (!_session.IsCurrent(sessionVersion))
                 return;
 
             _state.GhostSyncInProgress = false;
@@ -458,7 +454,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         }
         catch (Exception ex)
         {
-            if (!IsSessionCurrent(sessionVersion))
+            if (!_session.IsCurrent(sessionVersion))
                 return;
 
             _state.GhostSyncInProgress = false;
@@ -468,7 +464,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
-        if (!IsSessionCurrent(sessionVersion))
+        if (!_session.IsCurrent(sessionVersion))
             return;
 
         _state.GhostSyncInProgress = false;
@@ -504,16 +500,15 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         SetStatusMessage(HistoryPanelText.RefreshingFinalBuilds());
         _requestUiRefresh();
 
-        var token = GetCurrentSessionToken();
-        var sessionVersion = _panelSessionVersion;
+        var sessionVersion = _session.Version;
         HistoryPanelAttemptResult refreshResult;
         try
         {
-            refreshResult = await _dataService.RefreshFinalBuildsAsync(token);
+            refreshResult = await _dataService.RefreshFinalBuildsAsync(_session.Token);
         }
         catch (OperationCanceledException)
         {
-            if (!IsSessionCurrent(sessionVersion))
+            if (!_session.IsCurrent(sessionVersion))
                 return;
 
             _state.FinalBuildRefreshInProgress = false;
@@ -523,7 +518,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         }
         catch (Exception ex)
         {
-            if (!IsSessionCurrent(sessionVersion))
+            if (!_session.IsCurrent(sessionVersion))
                 return;
 
             _state.FinalBuildRefreshInProgress = false;
@@ -533,7 +528,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
-        if (!IsSessionCurrent(sessionVersion))
+        if (!_session.IsCurrent(sessionVersion))
             return;
 
         _state.FinalBuildRefreshInProgress = false;
@@ -551,7 +546,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.FilteredGhostBattles.Clear();
         foreach (var battle in _state.GhostBattles)
         {
-            if (MatchesGhostFilter(battle))
+            if (HistoryPanelGhostBattleFilter.Matches(_state.GhostBattleFilter, battle))
                 _state.FilteredGhostBattles.Add(battle);
         }
 
@@ -621,39 +616,17 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.FilteredGhostBattlesDirty = true;
     }
 
-    private bool MatchesGhostFilter(HistoryBattleRecord battle)
-    {
-        var outcome = ResolveGhostBattleOutcome(battle);
-        return _state.GhostBattleFilter switch
-        {
-            GhostBattleFilter.IWon => outcome == GhostBattleOutcome.Won,
-            GhostBattleFilter.ILost => outcome == GhostBattleOutcome.Lost,
-            _ => true,
-        };
-    }
-
+    // Kept as a thin alias on the coordinator so external test reflection that targets
+    // HistoryPanelCoordinator+GhostBattleOutcome / ResolveGhostBattleOutcome continues to compile.
+    // The actual matching logic lives in HistoryPanelGhostBattleFilter.
     private static GhostBattleOutcome ResolveGhostBattleOutcome(HistoryBattleRecord battle)
     {
-        if (string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase))
-            return GhostBattleOutcome.Won;
-
-        if (string.Equals(battle.WinnerCombatantId, "Opponent", StringComparison.OrdinalIgnoreCase))
-            return GhostBattleOutcome.Lost;
-
-        var result = battle.Result?.Trim();
-        if (
-            string.Equals(result, "Win", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(result, "Won", StringComparison.OrdinalIgnoreCase)
-        )
-            return GhostBattleOutcome.Won;
-
-        if (
-            string.Equals(result, "Loss", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(result, "Lost", StringComparison.OrdinalIgnoreCase)
-        )
-            return GhostBattleOutcome.Lost;
-
-        return GhostBattleOutcome.Unknown;
+        return HistoryPanelGhostBattleFilter.ResolveOutcomeForCompatibility(battle) switch
+        {
+            HistoryPanelGhostBattleOutcome.Won => GhostBattleOutcome.Won,
+            HistoryPanelGhostBattleOutcome.Lost => GhostBattleOutcome.Lost,
+            _ => GhostBattleOutcome.Unknown,
+        };
     }
 
     private enum GhostBattleOutcome
@@ -661,41 +634,5 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         Unknown,
         Won,
         Lost,
-    }
-
-    private void BeginPanelSession()
-    {
-        EndPanelSession();
-        _panelSessionVersion++;
-        _panelSessionCts = new CancellationTokenSource();
-    }
-
-    private void EndPanelSession()
-    {
-        _panelSessionVersion++;
-        if (_panelSessionCts == null)
-            return;
-
-        try
-        {
-            _panelSessionCts.Cancel();
-        }
-        catch
-        {
-            // Cancellation is best-effort during teardown.
-        }
-
-        _panelSessionCts.Dispose();
-        _panelSessionCts = null;
-    }
-
-    private CancellationToken GetCurrentSessionToken()
-    {
-        return _panelSessionCts?.Token ?? CancellationToken.None;
-    }
-
-    private bool IsSessionCurrent(int version)
-    {
-        return version == _panelSessionVersion;
     }
 }

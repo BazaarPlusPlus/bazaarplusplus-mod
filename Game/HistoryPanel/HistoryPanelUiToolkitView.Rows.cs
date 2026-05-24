@@ -307,8 +307,8 @@ internal sealed partial class HistoryPanelUiToolkitView
             refs.PlayerSummaryChip,
             HistoryPanelText.PlayerSideShort(),
             HistoryPanelText.BoardSummary(
-                battle.PreviewData.PlayerBoard.ItemCards.Count,
-                battle.PreviewData.PlayerBoard.SkillCards.Count
+                battle.PlayerHandItemCount,
+                battle.PlayerSkillCount
             ),
             new Color(0.44f, 0.76f, 1f, 1f)
         );
@@ -318,8 +318,8 @@ internal sealed partial class HistoryPanelUiToolkitView
             refs.OpponentSummaryChip,
             HistoryPanelText.OpponentSideShort(),
             HistoryPanelText.BoardSummary(
-                battle.PreviewData.OpponentBoard.ItemCards.Count,
-                battle.PreviewData.OpponentBoard.SkillCards.Count
+                battle.OpponentHandItemCount,
+                battle.OpponentSkillCount
             ),
             new Color(0.96f, 0.77f, 0.39f, 1f)
         );
@@ -406,41 +406,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         refs.DayBubble.style.borderRightColor = borderColor;
         refs.DayBubble.style.borderTopColor = borderColor;
         refs.DayBubble.style.borderBottomColor = borderColor;
-    }
-
-    private sealed class RowRefs
-    {
-        public RowRefs(
-            VisualElement root,
-            VisualElement accent,
-            Label title,
-            Label pill,
-            Label meta,
-            Label detail
-        )
-        {
-            Root = root;
-            Accent = accent;
-            Title = title;
-            Pill = pill;
-            Meta = meta;
-            Detail = detail;
-            Index = -1;
-        }
-
-        public VisualElement Root { get; }
-
-        public VisualElement Accent { get; }
-
-        public Label Title { get; }
-
-        public Label Pill { get; }
-
-        public Label Meta { get; }
-
-        public Label Detail { get; }
-
-        public int Index { get; set; }
     }
 
     private sealed class RunRowRefs
