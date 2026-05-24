@@ -1,6 +1,6 @@
 import type { Env } from "../../env";
 import { getGhostQueryLookbackDays } from "../../config/v3";
-import { json } from "../../http/json";
+import { json, jsonError } from "../../http/json";
 import { parseClampedInteger, trimString } from "../../http/request";
 
 type GhostBattleRow = {
@@ -31,13 +31,17 @@ export async function handleQueryGhostBattles(
   const url = new URL(request.url);
   const playerAccountId = trimString(url.searchParams.get("player_account_id"));
   if (!playerAccountId) {
-    return json({ error: "invalid_request" }, { status: 400 });
+    return jsonError("invalid_request");
   }
 
   const lookbackDays = getGhostQueryLookbackDays(env);
   const limit = parseClampedInteger(url.searchParams.get("limit"), 200, 1, 200);
   const fromUtc = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
 
+  // Scan shape: opponent_account_id has a covering index
+  // (idx_battles_opponent_recorded_covering from migration 0008). Query is
+  // index-seek + bounded-range scan on recorded_at_utc per opponent, capped at
+  // LIMIT 200 — O(lookback-window-rows-for-one-opponent) read, not full scan.
   const result = await env.DB.prepare(
     `
       SELECT
