@@ -32,14 +32,6 @@ public sealed class ModApiRoutes
         return BuildAbsolute($"/ghost-battles/{Uri.EscapeDataString(battleId.Trim())}/replay-link");
     }
 
-    public string DownloadReplay(string token)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-            throw new ArgumentException("Replay token is required.", nameof(token));
-
-        return BuildAbsolute($"/replays/{Uri.EscapeDataString(token.Trim())}");
-    }
-
     public static ModApiRoutes? TryCreate(string? apiBaseUrl)
     {
         if (
