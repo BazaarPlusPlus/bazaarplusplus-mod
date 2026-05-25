@@ -99,6 +99,7 @@
 
   <ItemGroup>
     <ProjectReference Include="BazaarPlusPlus.ModApi.csproj" />
+    <ProjectReference Include="BazaarPlusPlus.Storage.csproj" />
   </ItemGroup>
 
   <!-- Game assembly references -->
