@@ -4,28 +4,29 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.ModApi.Models;
 using Newtonsoft.Json;
 
-namespace BazaarPlusPlus.Game.Online;
+namespace BazaarPlusPlus.ModApi.Clients;
 
-internal sealed class RunBundleClient
+public sealed class RunBundleClient
 {
     private readonly HttpClient _httpClient;
-    private readonly V3Routes _routes;
+    private readonly ModApiRoutes _routes;
 
-    public RunBundleClient(HttpClient httpClient, V3Routes routes)
+    public RunBundleClient(HttpClient httpClient, ModApiRoutes routes)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
     }
 
     public async Task<RunBundleUploadResult> UploadRunBundleAsync(
-        Models.RunBundleUploadRequestV3 payload,
+        RunBundleUploadRequest payload,
         CancellationToken cancellationToken
     )
     {
         var bodyBytes = Encoding.UTF8.GetBytes(
-            JsonConvert.SerializeObject(payload, V3Serialization.SerializerSettings)
+            JsonConvert.SerializeObject(payload, ModApiSerialization.SerializerSettings)
         );
         using var request = new HttpRequestMessage(HttpMethod.Post, _routes.UploadRunBundle)
         {
@@ -39,12 +40,12 @@ internal sealed class RunBundleClient
 
         var responseBody = await response.Content.ReadAsStringAsync();
         return RunBundleUploadResult.Failure(
-            V3ErrorFormatter.FormatHttpFailure((int)response.StatusCode, responseBody)
+            ModApiErrorFormatter.FormatHttpFailure((int)response.StatusCode, responseBody)
         );
     }
 }
 
-internal readonly struct RunBundleUploadResult
+public readonly struct RunBundleUploadResult
 {
     private RunBundleUploadResult(bool succeeded, string? error)
     {

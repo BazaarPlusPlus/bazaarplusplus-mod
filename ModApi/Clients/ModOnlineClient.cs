@@ -2,14 +2,14 @@
 using System;
 using System.Net.Http;
 
-namespace BazaarPlusPlus.Game.Online;
+namespace BazaarPlusPlus.ModApi.Clients;
 
-internal sealed class ModOnlineClient : IDisposable
+public sealed class ModOnlineClient : IDisposable
 {
     private readonly HttpClient _httpClient;
-    private readonly V3Routes _routes;
+    private readonly ModApiRoutes _routes;
 
-    public ModOnlineClient(HttpClient httpClient, V3Routes routes)
+    public ModOnlineClient(HttpClient httpClient, ModApiRoutes routes)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
@@ -17,7 +17,7 @@ internal sealed class ModOnlineClient : IDisposable
 
     public HttpClient HttpClient => _httpClient;
 
-    public V3Routes Routes => _routes;
+    public ModApiRoutes Routes => _routes;
 
     public void Dispose()
     {

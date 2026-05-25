@@ -2,13 +2,13 @@
 using System;
 using System.IO;
 using System.IO.Compression;
-using BazaarPlusPlus.Game.Online.Models;
+using BazaarPlusPlus.ModApi.Models;
 using MessagePack;
 using MessagePack.Resolvers;
 
-namespace BazaarPlusPlus.Game.Online;
+namespace BazaarPlusPlus.ModApi;
 
-internal static class V3RunBundleArtifactCodec
+public static class RunBundleArtifactCodec
 {
     public const string ContentType = "application/x-bpp-runbundle+msgpack+gzip";
 
@@ -17,12 +17,12 @@ internal static class V3RunBundleArtifactCodec
             ContractlessStandardResolverAllowPrivate.Instance
         );
 
-    public static byte[] Serialize(RunArtifactV3 artifact)
+    public static byte[] Serialize(RunArtifact artifact)
     {
         if (artifact == null)
             throw new ArgumentNullException(nameof(artifact));
 
-        var messagePackBytes = MessagePackSerializer.Serialize(artifact, Options);
+        var messagePackBytes = MessagePackSerializer.Serialize<RunArtifact>(artifact, Options);
         using var output = new MemoryStream();
         using (var gzip = new GZipStream(output, CompressionLevel.Optimal, leaveOpen: true))
         {
@@ -32,7 +32,7 @@ internal static class V3RunBundleArtifactCodec
         return output.ToArray();
     }
 
-    public static RunArtifactV3? Deserialize(byte[] artifactBytes)
+    public static RunArtifact? Deserialize(byte[] artifactBytes)
     {
         if (artifactBytes == null || artifactBytes.Length == 0)
             return null;
@@ -46,7 +46,7 @@ internal static class V3RunBundleArtifactCodec
             using var gzip = new GZipStream(input, CompressionMode.Decompress);
             using var decompressed = new MemoryStream();
             gzip.CopyTo(decompressed);
-            return MessagePackSerializer.Deserialize<RunArtifactV3>(
+            return MessagePackSerializer.Deserialize<RunArtifact>(
                 decompressed.ToArray(),
                 Options
             );

@@ -1,11 +1,11 @@
 #nullable enable
 using System;
 
-namespace BazaarPlusPlus.Game.Online;
+namespace BazaarPlusPlus.ModApi;
 
-internal sealed class V3Routes
+public sealed class ModApiRoutes
 {
-    private V3Routes(Uri apiBaseUri)
+    private ModApiRoutes(Uri apiBaseUri)
     {
         ApiBaseUri = apiBaseUri;
         UploadRunBundle = BuildAbsolute("/run-bundles");
@@ -40,7 +40,7 @@ internal sealed class V3Routes
         return BuildAbsolute($"/replays/{Uri.EscapeDataString(token.Trim())}");
     }
 
-    public static V3Routes? TryCreate(string? apiBaseUrl)
+    public static ModApiRoutes? TryCreate(string? apiBaseUrl)
     {
         if (
             string.IsNullOrWhiteSpace(apiBaseUrl)
@@ -51,7 +51,7 @@ internal sealed class V3Routes
             return null;
         }
 
-        return new V3Routes(
+        return new ModApiRoutes(
             new UriBuilder(apiBaseUri) { Path = string.Empty, Query = string.Empty }.Uri
         );
     }

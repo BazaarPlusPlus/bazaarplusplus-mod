@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Online.Models;
+using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
@@ -128,7 +128,7 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
         return new BazaarDbScreenshotUploadSnapshot
         {
             ScreenshotId = screenshotId,
-            Payload = new BazaarDbScreenshotUploadRequestV3
+            Payload = new BazaarDbScreenshotUploadRequest
             {
                 SchemaVersion = UploadPayloadSchemaVersion,
                 SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),

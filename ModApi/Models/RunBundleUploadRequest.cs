@@ -1,12 +1,11 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.CombatReplay;
 using Newtonsoft.Json;
 
-namespace BazaarPlusPlus.Game.Online.Models;
+namespace BazaarPlusPlus.ModApi.Models;
 
-internal sealed class RunBundleUploadRequestV3
+public sealed class RunBundleUploadRequest
 {
     [JsonProperty("schema_version")]
     public int SchemaVersion { get; set; }
@@ -34,13 +33,13 @@ internal sealed class RunBundleUploadRequestV3
     }
 
     [JsonProperty("run_projection")]
-    public RunProjectionV3 RunProjection { get; set; } = new();
+    public RunProjection RunProjection { get; set; } = new();
 
     [JsonProperty("battle_projections")]
-    public List<BattleProjectionV3> BattleProjections { get; set; } = new();
+    public List<BattleProjection> BattleProjections { get; set; } = new();
 }
 
-internal sealed class RunProjectionV3
+public sealed class RunProjection
 {
     [JsonProperty("run_id")]
     public string RunId { get; set; } = string.Empty;
@@ -88,10 +87,10 @@ internal sealed class RunProjectionV3
     public int? FinalPlayerPosition { get; set; }
 
     [JsonProperty("battles")]
-    public List<BattleProjectionV3> Battles { get; set; } = new();
+    public List<BattleProjection> Battles { get; set; } = new();
 }
 
-internal sealed class BattleProjectionV3
+public sealed class BattleProjection
 {
     [JsonProperty("battle_id")]
     public string BattleId { get; set; } = string.Empty;
@@ -148,34 +147,34 @@ internal sealed class BattleProjectionV3
     public bool ReplayAvailable { get; set; }
 }
 
-public sealed class RunArtifactV3
+public sealed class RunArtifact
 {
     [JsonProperty("run_id")]
     public string RunId { get; set; } = string.Empty;
 
     [JsonProperty("battles")]
-    public List<RunArtifactBattleV3> Battles { get; set; } = new();
+    public List<RunArtifactBattle> Battles { get; set; } = new();
 }
 
-public sealed class RunArtifactBattleV3
+public sealed class RunArtifactBattle
 {
     [JsonProperty("battle_id")]
     public string BattleId { get; set; } = string.Empty;
 
     [JsonProperty("manifest")]
-    public BattleManifestArtifactV3 Manifest { get; set; } = new();
+    public BattleManifestArtifact Manifest { get; set; } = new();
 
     [JsonProperty("participants")]
-    public BattleParticipantsArtifactV3 Participants { get; set; } = new();
+    public BattleParticipantsArtifact Participants { get; set; } = new();
 
     [JsonProperty("snapshots")]
-    public BattleSnapshotsArtifactV3 Snapshots { get; set; } = new();
+    public BattleSnapshotsArtifact Snapshots { get; set; } = new();
 
     [JsonProperty("replay_payload")]
-    public ReplayPayloadArtifactV3 ReplayPayload { get; set; } = new();
+    public ReplayPayloadArtifact ReplayPayload { get; set; } = new();
 }
 
-public sealed class BattleManifestArtifactV3
+public sealed class BattleManifestArtifact
 {
     [JsonProperty("battle_id")]
     public string? BattleId { get; set; }
@@ -205,7 +204,7 @@ public sealed class BattleManifestArtifactV3
     public string? LoserCombatantId { get; set; }
 }
 
-public sealed class BattleParticipantsArtifactV3
+public sealed class BattleParticipantsArtifact
 {
     [JsonProperty("player_name")]
     public string? PlayerName { get; set; }
@@ -244,13 +243,13 @@ public sealed class BattleParticipantsArtifactV3
     public int? OpponentLevel { get; set; }
 }
 
-public sealed class BattleSnapshotsArtifactV3
+public sealed class BattleSnapshotsArtifact
 {
     [JsonProperty("card_sets")]
-    public List<CardSetCaptureArtifactV3> CardSets { get; set; } = new();
+    public List<CardSetCaptureArtifact> CardSets { get; set; } = new();
 }
 
-public sealed class CardSetCaptureArtifactV3
+public sealed class CardSetCaptureArtifact
 {
     [JsonProperty("label")]
     public string Label { get; set; } = string.Empty;
@@ -262,10 +261,51 @@ public sealed class CardSetCaptureArtifactV3
     public string? Source { get; set; }
 
     [JsonProperty("items")]
-    public List<CombatReplayCardSnapshot> Items { get; set; } = new();
+    public List<CardSetItemArtifact> Items { get; set; } = new();
 }
 
-public sealed class ReplayPayloadArtifactV3
+/// <summary>
+/// Wire-format representation of a card snapshot. Uses primitive/string types so this
+/// model can live in ModApi without game-assembly references. The main assembly maps
+/// these to CombatReplayCardSnapshot after deserialization.
+/// </summary>
+public sealed class CardSetItemArtifact
+{
+    [JsonProperty("instance_id")]
+    public string InstanceId { get; set; } = string.Empty;
+
+    [JsonProperty("template_id")]
+    public string TemplateId { get; set; } = string.Empty;
+
+    [JsonProperty("type")]
+    public int Type { get; set; }
+
+    [JsonProperty("size")]
+    public int Size { get; set; }
+
+    [JsonProperty("section")]
+    public int? Section { get; set; }
+
+    [JsonProperty("socket")]
+    public int? Socket { get; set; }
+
+    [JsonProperty("name")]
+    public string? Name { get; set; }
+
+    [JsonProperty("tier")]
+    public string? Tier { get; set; }
+
+    [JsonProperty("enchant")]
+    public string? Enchant { get; set; }
+
+    [JsonProperty("tags")]
+    public List<string> Tags { get; set; } = new();
+
+    [JsonProperty("attributes")]
+    public Dictionary<string, int> Attributes { get; set; } = new();
+}
+
+public sealed class ReplayPayloadArtifact
 {
     [JsonProperty("battle_id")]
     public string BattleId { get; set; } = string.Empty;

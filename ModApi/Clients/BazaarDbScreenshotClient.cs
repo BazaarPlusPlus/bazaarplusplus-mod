@@ -5,24 +5,24 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.Online.Models;
+using BazaarPlusPlus.ModApi.Models;
 using Newtonsoft.Json;
 
-namespace BazaarPlusPlus.Game.Online;
+namespace BazaarPlusPlus.ModApi.Clients;
 
-internal sealed class BazaarDbScreenshotClient
+public sealed class BazaarDbScreenshotClient
 {
     private readonly HttpClient _httpClient;
-    private readonly V3Routes _routes;
+    private readonly ModApiRoutes _routes;
 
-    public BazaarDbScreenshotClient(HttpClient httpClient, V3Routes routes)
+    public BazaarDbScreenshotClient(HttpClient httpClient, ModApiRoutes routes)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
     }
 
     public async Task<BazaarDbScreenshotUploadResult> UploadScreenshotAsync(
-        BazaarDbScreenshotUploadRequestV3 payload,
+        BazaarDbScreenshotUploadRequest payload,
         CancellationToken cancellationToken
     )
     {
@@ -30,7 +30,7 @@ internal sealed class BazaarDbScreenshotClient
             throw new ArgumentNullException(nameof(payload));
 
         var bodyBytes = Encoding.UTF8.GetBytes(
-            JsonConvert.SerializeObject(payload, V3Serialization.SerializerSettings)
+            JsonConvert.SerializeObject(payload, ModApiSerialization.SerializerSettings)
         );
         using var request = new HttpRequestMessage(HttpMethod.Post, _routes.UploadBazaarDbScreenshot)
         {
@@ -43,7 +43,7 @@ internal sealed class BazaarDbScreenshotClient
             return BazaarDbScreenshotUploadResult.Success();
 
         var responseBody = await response.Content.ReadAsStringAsync();
-        var formattedError = V3ErrorFormatter.FormatHttpFailure(
+        var formattedError = ModApiErrorFormatter.FormatHttpFailure(
             (int)response.StatusCode,
             responseBody
         );
@@ -60,7 +60,7 @@ internal sealed class BazaarDbScreenshotClient
     }
 }
 
-internal readonly struct BazaarDbScreenshotUploadResult
+public readonly struct BazaarDbScreenshotUploadResult
 {
     private BazaarDbScreenshotUploadResult(bool succeeded, bool permanent, string? error)
     {

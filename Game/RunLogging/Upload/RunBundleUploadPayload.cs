@@ -1,12 +1,12 @@
 #nullable enable
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.Online.Models;
+using BazaarPlusPlus.ModApi.Models;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal sealed class RunBundleUploadSnapshot
 {
-    public RunBundleUploadRequestV3 Payload { get; set; } = new();
+    public RunBundleUploadRequest Payload { get; set; } = new();
 
     public string RunId { get; set; } = string.Empty;
 

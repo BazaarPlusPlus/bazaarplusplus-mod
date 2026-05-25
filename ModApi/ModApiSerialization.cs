@@ -2,9 +2,9 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
-namespace BazaarPlusPlus.Game.Online;
+namespace BazaarPlusPlus.ModApi;
 
-internal static class V3Serialization
+public static class ModApiSerialization
 {
     public static JsonSerializerSettings SerializerSettings { get; } =
         new()

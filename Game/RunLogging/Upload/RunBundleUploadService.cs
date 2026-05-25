@@ -4,7 +4,8 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Online;
+using BazaarPlusPlus.ModApi;
+using BazaarPlusPlus.ModApi.Clients;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
@@ -13,10 +14,10 @@ internal sealed class RunBundleUploadService : IDisposable
     private const string AnonymousPlayerAccountId = "anonymous-player";
 
     private readonly RunBundleUploadStore _store;
-    private readonly V3Routes _routes;
+    private readonly ModApiRoutes _routes;
     private readonly HttpClient _httpClient;
 
-    public RunBundleUploadService(RunBundleUploadStore store, V3Routes routes, TimeSpan timeout)
+    public RunBundleUploadService(RunBundleUploadStore store, ModApiRoutes routes, TimeSpan timeout)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));

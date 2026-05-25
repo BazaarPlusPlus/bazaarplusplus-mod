@@ -4,7 +4,8 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Online;
+using BazaarPlusPlus.ModApi;
+using BazaarPlusPlus.ModApi.Clients;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
@@ -14,13 +15,13 @@ internal sealed class BazaarDbScreenshotUploadService
     private const string AnonymousPlayerAccountId = "anonymous-player";
 
     private readonly BazaarDbScreenshotUploadStore _store;
-    private readonly V3Routes _routes;
+    private readonly ModApiRoutes _routes;
     private readonly HttpClient _httpClient;
     private readonly Func<string?> _playerAccountIdResolver;
 
     public BazaarDbScreenshotUploadService(
         BazaarDbScreenshotUploadStore store,
-        V3Routes routes,
+        ModApiRoutes routes,
         HttpClient httpClient,
         Func<string?> playerAccountIdResolver
     )

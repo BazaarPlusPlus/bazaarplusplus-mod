@@ -1,8 +1,8 @@
 #nullable enable
 
-namespace BazaarPlusPlus.Game.Online;
+namespace BazaarPlusPlus.ModApi;
 
-internal static class V3UploadDefaults
+public static class ModApiUploadDefaults
 {
     public const string ApiBaseUrl = "https://mod-api-v3.bazaarplusplus.com";
     public const int StartupDelaySeconds = 20;

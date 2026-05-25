@@ -2,9 +2,9 @@
 using System;
 using Newtonsoft.Json.Linq;
 
-namespace BazaarPlusPlus.Game.Online;
+namespace BazaarPlusPlus.ModApi;
 
-internal static class V3ErrorFormatter
+public static class ModApiErrorFormatter
 {
     public static string Truncate(string value)
     {

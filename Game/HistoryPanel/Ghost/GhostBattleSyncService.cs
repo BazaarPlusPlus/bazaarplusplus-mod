@@ -1,10 +1,16 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
-using BazaarPlusPlus.Game.Online;
+using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.ModApi;
+using BazaarPlusPlus.ModApi.Clients;
+using BazaarPlusPlus.ModApi.Models;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
@@ -32,7 +38,7 @@ internal sealed class GhostBattleSyncService
         if (string.IsNullOrWhiteSpace(playerAccountId))
             return GhostBattleSyncResult.Failure("player_account_id_unavailable");
 
-        var apiClient = new GhostBattleApiClient(_onlineClient.HttpClient, _onlineClient.Routes);
+        var apiClient = new GhostBattleClient(_onlineClient.HttpClient, _onlineClient.Routes);
         var syncStartedAtUtc = DateTimeOffset.UtcNow;
         var queryResult = await apiClient.QueryAgainstMeAsync(
             playerAccountId!,
@@ -62,7 +68,7 @@ internal sealed class GhostBattleSyncService
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
             return GhostBattleReplayDownloadResult.Failure("replay_directory_required");
 
-        var apiClient = new GhostBattleApiClient(_onlineClient.HttpClient, _onlineClient.Routes);
+        var apiClient = new GhostBattleClient(_onlineClient.HttpClient, _onlineClient.Routes);
         var linkResult = await apiClient.RequestReplayDownloadLinkAsync(
             battleId,
             cancellationToken
@@ -74,20 +80,26 @@ internal sealed class GhostBattleSyncService
             );
         }
 
-        var payloadResult = await apiClient.DownloadReplayPayloadAsync(
-            battleId,
+        var bytesResult = await apiClient.DownloadReplayBytesAsync(
             linkResult.DownloadUrl!,
             cancellationToken
         );
-        if (!payloadResult.Succeeded || payloadResult.Payload?.ReplayPayload == null)
+        if (!bytesResult.Succeeded || bytesResult.Bytes == null)
         {
             return GhostBattleReplayDownloadResult.Failure(
-                payloadResult.Error ?? "ghost_replay_payload_failed"
+                bytesResult.Error ?? "ghost_replay_payload_failed"
             );
         }
+
+        var payload = TryExtractPayloadFromArtifact(battleId, bytesResult.Bytes);
+        if (!IsValidGhostBattlePayload(payload))
+        {
+            return GhostBattleReplayDownloadResult.Failure("replay_payload_missing");
+        }
+
         if (
             !string.Equals(
-                payloadResult.Payload.ReplayPayload.BattleId,
+                payload!.ReplayPayload!.BattleId,
                 battleId,
                 StringComparison.Ordinal
             )
@@ -99,7 +111,7 @@ internal sealed class GhostBattleSyncService
         var payloadStore = new GhostBattlePayloadStore(
             BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
         );
-        payloadStore.Save(payloadResult.Payload);
+        payloadStore.Save(payload);
         _repository.MarkGhostReplayDownloaded(battleId);
         return GhostBattleReplayDownloadResult.Success();
     }
@@ -127,6 +139,173 @@ internal sealed class GhostBattleSyncService
         return string.IsNullOrWhiteSpace(parentDirectory)
             ? System.IO.Path.Combine(replayDirectoryPath, "GhostBattlePayloads")
             : System.IO.Path.Combine(parentDirectory, "GhostBattlePayloads");
+    }
+
+    private static bool IsValidGhostBattlePayload(GhostBattlePayload? payload)
+    {
+        return payload?.ReplayPayload != null
+            && payload.BattleManifest != null
+            && !string.IsNullOrWhiteSpace(payload.ReplayPayload.BattleId);
+    }
+
+    private static GhostBattlePayload? TryExtractPayloadFromArtifact(
+        string battleId,
+        byte[] responseBytes
+    )
+    {
+        if (
+            string.IsNullOrWhiteSpace(battleId)
+            || responseBytes == null
+            || responseBytes.Length == 0
+        )
+            return null;
+
+        try
+        {
+            var artifact = RunBundleArtifactCodec.Deserialize(responseBytes);
+            if (artifact == null)
+                return null;
+
+            var battle = artifact?.Battles?.FirstOrDefault(candidate =>
+                string.Equals(candidate.BattleId, battleId, StringComparison.Ordinal)
+            );
+            if (battle == null)
+                return null;
+
+            if (battle.ReplayPayload == null)
+                return null;
+
+            var replayPayload = new PvpReplayPayload
+            {
+                BattleId = battle.ReplayPayload.BattleId,
+                Version = battle.ReplayPayload.Version,
+                SpawnMessageBytes = battle.ReplayPayload.SpawnMessageBytes?.ToArray() ?? [],
+                CombatMessageBytes = battle.ReplayPayload.CombatMessageBytes?.ToArray() ?? [],
+                DespawnMessageBytes = battle.ReplayPayload.DespawnMessageBytes?.ToArray() ?? [],
+            };
+            if (
+                string.IsNullOrWhiteSpace(replayPayload.BattleId)
+                || replayPayload.SpawnMessageBytes.Length == 0
+                || replayPayload.CombatMessageBytes.Length == 0
+                || replayPayload.DespawnMessageBytes.Length == 0
+            )
+                return null;
+
+            var battleManifest = BuildBattleManifest(artifact, battleId, battle);
+            if (battleManifest == null)
+                return null;
+
+            return new GhostBattlePayload
+            {
+                BattleId = battleId,
+                BattleManifest = battleManifest,
+                ReplayPayload = replayPayload,
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static PvpBattleManifest? BuildBattleManifest(
+        RunArtifact? artifact,
+        string battleId,
+        RunArtifactBattle battle
+    )
+    {
+        if (battle.Manifest == null || battle.Participants == null || battle.Snapshots == null)
+            return null;
+
+        return new PvpBattleManifest
+        {
+            BattleId = battleId,
+            RunId = artifact?.RunId,
+            RecordedAtUtc = DateTimeOffset.Parse(battle.Manifest.RecordedAtUtc),
+            CombatKind = battle.Manifest.CombatKind,
+            Day = battle.Manifest.Day,
+            Hour = battle.Manifest.Hour,
+            EncounterId = battle.Manifest.EncounterId,
+            Participants = new PvpBattleParticipants
+            {
+                PlayerName = battle.Participants.PlayerName,
+                PlayerAccountId = battle.Participants.PlayerAccountId,
+                PlayerHero = battle.Participants.PlayerHero,
+                PlayerRank = battle.Participants.PlayerRank,
+                PlayerRating = battle.Participants.PlayerRating,
+                PlayerLevel = battle.Participants.PlayerLevel,
+                OpponentName = battle.Participants.OpponentName,
+                OpponentAccountId = battle.Participants.OpponentAccountId,
+                OpponentHero = battle.Participants.OpponentHero,
+                OpponentRank = battle.Participants.OpponentRank,
+                OpponentRating = battle.Participants.OpponentRating,
+                OpponentLevel = battle.Participants.OpponentLevel,
+            },
+            Outcome = new PvpBattleOutcome
+            {
+                Result = battle.Manifest.Result,
+                WinnerCombatantId = battle.Manifest.WinnerCombatantId,
+                LoserCombatantId = battle.Manifest.LoserCombatantId,
+            },
+            Snapshots = new PvpBattleSnapshots
+            {
+                PlayerHand = BuildCapture(battle.Snapshots, "player_hand"),
+                PlayerSkills = BuildCapture(battle.Snapshots, "player_skills"),
+                OpponentHand = BuildCapture(battle.Snapshots, "opponent_hand"),
+                OpponentSkills = BuildCapture(battle.Snapshots, "opponent_skills"),
+            },
+        };
+    }
+
+    private static PvpBattleCardSetCapture BuildCapture(
+        BattleSnapshotsArtifact snapshots,
+        string label
+    )
+    {
+        var capture = snapshots.CardSets?.FirstOrDefault(cardSet =>
+            string.Equals(cardSet.Label, label, StringComparison.Ordinal)
+        );
+
+        return new PvpBattleCardSetCapture
+        {
+            Status = ParseEnum(capture?.Status, PvpBattleCaptureStatus.Missing),
+            Source = ParseEnum(capture?.Source, PvpBattleCaptureSource.Unknown),
+            Items =
+                capture?.Items?.Select(MapToCardSnapshot).ToList()
+                ?? new List<CombatReplayCardSnapshot>(),
+        };
+    }
+
+    private static CombatReplayCardSnapshot MapToCardSnapshot(CardSetItemArtifact item)
+    {
+        return new CombatReplayCardSnapshot
+        {
+            InstanceId = item.InstanceId,
+            TemplateId = item.TemplateId,
+            Type = (BazaarGameShared.Domain.Core.Types.ECardType)item.Type,
+            Size = (BazaarGameShared.Domain.Core.Types.ECardSize)item.Size,
+            Section = item.Section.HasValue
+                ? (BazaarGameShared.Domain.Core.Types.EInventorySection?)item.Section.Value
+                : null,
+            Socket = item.Socket.HasValue
+                ? (BazaarGameShared.Domain.Core.Types.EContainerSocketId?)item.Socket.Value
+                : null,
+            Name = item.Name,
+            Tier = item.Tier,
+            Enchant = item.Enchant,
+            Tags = new List<string>(item.Tags ?? new List<string>()),
+            Attributes = new Dictionary<string, int>(item.Attributes ?? new Dictionary<string, int>()),
+        };
+    }
+
+    private static TEnum ParseEnum<TEnum>(string? value, TEnum fallback)
+        where TEnum : struct
+    {
+        return
+            !string.IsNullOrWhiteSpace(value)
+            && Enum.TryParse<TEnum>(value.Trim(), true, out var parsed)
+            ? parsed
+            : fallback;
     }
 }
 

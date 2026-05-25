@@ -11,7 +11,8 @@ using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.MonsterPreview;
-using BazaarPlusPlus.Game.Online;
+using BazaarPlusPlus.ModApi;
+using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots;
@@ -120,16 +121,16 @@ public class Plugin : BaseUnityPlugin
 
         _playerObservationStore = new PlayerObservationStore(identityDirectoryPath);
 
-        var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
+        var routes = ModApiRoutes.TryCreate(ModApiUploadDefaults.ApiBaseUrl);
         if (routes == null)
         {
-            BppLog.Warn("Plugin", "V3 API base URL invalid; online services will be inactive.");
+            BppLog.Warn("Plugin", "ModApi base URL invalid; online services will be inactive.");
             return;
         }
 
         var httpClient = BppHttpClientFactory.Create(
             userAgentSuffix: "OnlineClient",
-            timeout: TimeSpan.FromSeconds(Math.Max(10, V3UploadDefaults.RequestTimeoutSeconds))
+            timeout: TimeSpan.FromSeconds(Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds))
         );
         _onlineClient = new ModOnlineClient(httpClient, routes);
         BppLog.Info("Plugin", "Identity JSON store and online client ready.");

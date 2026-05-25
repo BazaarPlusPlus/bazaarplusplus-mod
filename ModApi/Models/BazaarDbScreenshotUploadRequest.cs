@@ -2,9 +2,9 @@
 using System;
 using Newtonsoft.Json;
 
-namespace BazaarPlusPlus.Game.Online.Models;
+namespace BazaarPlusPlus.ModApi.Models;
 
-internal sealed class BazaarDbScreenshotUploadRequestV3
+public sealed class BazaarDbScreenshotUploadRequest
 {
     [JsonProperty("schema_version")]
     public int SchemaVersion { get; set; }

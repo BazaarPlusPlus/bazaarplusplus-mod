@@ -1,9 +1,9 @@
 #nullable enable
 using System;
 
-namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
+namespace BazaarPlusPlus.ModApi.Models;
 
-internal sealed class GhostBattleImportRecord
+public sealed class GhostBattleImportRecord
 {
     public string BattleId { get; set; } = string.Empty;
 
