@@ -12,7 +12,6 @@ namespace BazaarPlusPlus.Game.Screenshots.Upload;
 internal sealed class BazaarDbScreenshotUploadService
 {
     private const int BatchSize = 3;
-    private const string AnonymousPlayerAccountId = "anonymous-player";
 
     private readonly BazaarDbScreenshotUploadStore _store;
     private readonly ModApiRoutes _routes;
@@ -47,10 +46,14 @@ internal sealed class BazaarDbScreenshotUploadService
             return;
         }
 
-        var playerAccountId =
-            (_playerAccountIdResolver()?.Trim() is { Length: > 0 } resolved)
-                ? resolved
-                : AnonymousPlayerAccountId;
+        if (_playerAccountIdResolver()?.Trim() is not { Length: > 0 } playerAccountId)
+        {
+            BppLog.Info(
+                "BazaarDbScreenshotUploadService",
+                $"Skipping {pending.Count} pending screenshot(s): player account id not yet available."
+            );
+            return;
+        }
 
         var client = new BazaarDbScreenshotClient(_httpClient, _routes);
         foreach (var screenshotId in pending)
