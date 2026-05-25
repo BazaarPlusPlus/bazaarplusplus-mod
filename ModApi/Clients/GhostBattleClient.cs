@@ -204,8 +204,8 @@ public sealed class GhostBattleClient
             Result = battle["result"]?.Value<string>()?.Trim(),
             WinnerCombatantId = battle["winner_combatant_id"]?.Value<string>()?.Trim(),
             LoserCombatantId = battle["loser_combatant_id"]?.Value<string>()?.Trim(),
-            IsBundleFinalBattle = battle["is_bundle_final_battle"]?.Value<bool>() == true,
-            ReplayAvailable = battle["replay"]?["available"]?.Value<bool>() == true,
+            IsBundleFinalBattle = battle["is_final_battle"]?.Value<bool>() == true,
+            ReplayAvailable = true,
             ReplayDownloaded = false,
             LastSyncedAtUtc = DateTimeOffset.UtcNow,
         };
