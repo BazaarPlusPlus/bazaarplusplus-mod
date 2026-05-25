@@ -1,8 +1,9 @@
 #nullable enable
+using BazaarPlusPlus.Storage.Paths;
 
 namespace BazaarPlusPlus.Core.Paths;
 
-internal sealed class BppPathService : IPathService
+internal sealed class BepInExPathProvider : IPathProvider
 {
     public string? RunLogDatabasePath { get; private set; }
 
@@ -21,7 +22,7 @@ internal sealed class BppPathService : IPathService
         RunLogDatabasePath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
             "BazaarPlusPlus",
-            BppPathConstants.RunLogDatabaseFileName
+            PathConstants.RunLogDatabaseFileName
         );
         CombatReplayDirectoryPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,

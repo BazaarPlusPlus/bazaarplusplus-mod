@@ -4,6 +4,7 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.Paths;
+using BazaarPlusPlus.Storage.Paths;
 using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.AutoBazaar;
@@ -21,7 +22,7 @@ internal sealed class BppComposition : IDisposable
 {
     private readonly InMemoryBppEventBus _eventBus = new();
     private readonly BppConfig _config = new();
-    private readonly BppPathService _paths = new();
+    private readonly BepInExPathProvider _paths = new();
     private readonly RunContextStore _runContext = new();
     private readonly GameStateProbe _gameStateProbe = new();
     private readonly EncounterStateProbe _encounterStateProbe = new();

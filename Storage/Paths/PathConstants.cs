@@ -1,7 +1,7 @@
 #nullable enable
-namespace BazaarPlusPlus.Core.Paths;
+namespace BazaarPlusPlus.Storage.Paths;
 
-internal static class BppPathConstants
+public static class PathConstants
 {
     public const string RunLogDatabaseFileName = "bazaarplusplus.db";
 }

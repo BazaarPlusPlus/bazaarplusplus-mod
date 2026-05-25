@@ -3,7 +3,7 @@ using System;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
-using BazaarPlusPlus.Core.Paths;
+using BazaarPlusPlus.Storage.Paths;
 using BazaarPlusPlus.Core.RunContext;
 using BepInEx.Logging;
 
@@ -14,7 +14,7 @@ internal sealed class BppRuntimeServices : IBppServices
     public BppRuntimeServices(
         IBppEventBus eventBus,
         IBppConfig config,
-        IPathService paths,
+        IPathProvider paths,
         IRunContext runContext,
         IGameStateProbe gameStateProbe,
         IEncounterStateProbe encounterState,
@@ -32,7 +32,7 @@ internal sealed class BppRuntimeServices : IBppServices
 
     public IBppEventBus EventBus { get; }
     public IBppConfig Config { get; }
-    public IPathService Paths { get; }
+    public IPathProvider Paths { get; }
     public IRunContext RunContext { get; }
     public IGameStateProbe GameStateProbe { get; }
     public IEncounterStateProbe EncounterState { get; }

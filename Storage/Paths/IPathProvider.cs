@@ -1,7 +1,7 @@
 #nullable enable
-namespace BazaarPlusPlus.Core.Paths;
+namespace BazaarPlusPlus.Storage.Paths;
 
-internal interface IPathService
+public interface IPathProvider
 {
     string? RunLogDatabasePath { get; }
 
