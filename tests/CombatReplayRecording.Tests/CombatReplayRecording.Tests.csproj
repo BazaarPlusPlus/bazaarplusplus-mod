@@ -12,5 +12,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../BazaarPlusPlus.csproj" />
+    <PackageReference Include="MessagePack" Version="3.1.4" />
   </ItemGroup>
 </Project>

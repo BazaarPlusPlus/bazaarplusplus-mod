@@ -1,8 +1,8 @@
 #nullable enable
 using Microsoft.Data.Sqlite;
 
-var schemaType = RequireType(
-    "BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite.RunLogSqliteSchema"
+var schemaType = RequireStorageType(
+    "BazaarPlusPlus.Storage.RunLog.RunLogSchema"
 );
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var ctor = repositoryType.GetConstructor([typeof(string)]);
@@ -155,8 +155,8 @@ try
         "ListBattleIdsByRun should return all linked battles ordered from newest to oldest."
     );
 
-    var ghostImportType = RequireType(
-        "BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleImportRecord"
+    var ghostImportType = RequireModApiType(
+        "BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord"
     );
     var replaceGhostBattles = repositoryType.GetMethod(
         "ReplaceGhostBattles",
@@ -381,6 +381,20 @@ Console.WriteLine("HistoryPanelRepository checks passed.");
 static Type RequireType(string fullName)
 {
     var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus");
+    return assembly.GetType(fullName, throwOnError: false)
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static Type RequireStorageType(string fullName)
+{
+    var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus.Storage");
+    return assembly.GetType(fullName, throwOnError: false)
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static Type RequireModApiType(string fullName)
+{
+    var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus.ModApi");
     return assembly.GetType(fullName, throwOnError: false)
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }

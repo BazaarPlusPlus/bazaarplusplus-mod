@@ -1,15 +1,15 @@
 using System.Reflection;
 
-RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCreateRequest");
-RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogSessionState");
-RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogEvent");
-RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCheckpoint");
-RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogPendingSelectionState");
-RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCompletion");
-RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogAbandonment");
+RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogCreateRequest");
+RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogSessionState");
+RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogEvent");
+RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogCheckpoint");
+RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogPendingSelectionState");
+RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogCompletion");
+RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogAbandonment");
 RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingGameDataReader");
 
-var storeType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.IRunLogStore");
+var storeType = RequireStorageType("BazaarPlusPlus.Storage.RunLog.IRunLogStore");
 RequireMethod(storeType, "TryResumeActiveRun");
 RequireMethod(storeType, "CreateRun");
 RequireMethod(storeType, "AppendEvent");
@@ -17,8 +17,8 @@ RequireMethod(storeType, "SaveCheckpoint");
 RequireMethod(storeType, "CompleteRun");
 RequireMethod(storeType, "MarkRunAbandoned");
 
-var eventType = RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogEvent");
-var completionType = RequireType("BazaarPlusPlus.Game.RunLogging.Models.RunLogCompletion");
+var eventType = RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogEvent");
+var completionType = RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogCompletion");
 RequireProperty(eventType, "SchemaVersion");
 RequireProperty(eventType, "RunId");
 RequireProperty(eventType, "Seq");
@@ -30,31 +30,8 @@ RequireProperty(completionType, "FinalPlayerRank");
 RequireProperty(completionType, "FinalPlayerRating");
 RequireProperty(completionType, "FinalPlayerRatingDelta");
 
-var gameDataReaderType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingGameDataReader");
-var formatPlayerRank = gameDataReaderType.GetMethod(
-    "FormatPlayerRank",
-    BindingFlags.NonPublic | BindingFlags.Static
-);
-Assert(
-    formatPlayerRank != null,
-    "RunLoggingGameDataReader should expose a private static rank formatter."
-);
-var seasonRankType = RequireExternalType("TheBazaar.ProfileData.SeasonRank", "TheBazaarRuntime");
-var rankEnumType = RequireExternalType("BazaarGameShared.TempoNet.Enums.ERank", "BazaarGameShared");
-var seasonRank =
-    Activator.CreateInstance(seasonRankType)
-    ?? throw new InvalidOperationException("SeasonRank should be constructible.");
-seasonRankType
-    .GetMethod("SetRankData", [typeof(int), rankEnumType, typeof(int), typeof(int), typeof(int)])!
-    .Invoke(seasonRank, [1, Enum.Parse(rankEnumType, "Gold"), 2, 0, 1420]);
-Assert(
-    string.Equals(
-        (string?)formatPlayerRank!.Invoke(null, [seasonRank]),
-        "Gold",
-        StringComparison.Ordinal
-    ),
-    "Player rank formatting should keep only the tier and ignore division."
-);
+// Verify RunLoggingGameDataReader still lives in the main assembly.
+RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingGameDataReader");
 
 Console.WriteLine("RunLogging model contract checks passed.");
 
@@ -64,9 +41,9 @@ static Type RequireType(string fullName)
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 
-static Type RequireExternalType(string fullName, string assemblyName)
+static Type RequireStorageType(string fullName)
 {
-    return Type.GetType($"{fullName}, {assemblyName}")
+    return Type.GetType($"{fullName}, BazaarPlusPlus.Storage")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 

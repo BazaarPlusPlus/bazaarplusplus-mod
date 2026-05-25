@@ -40,12 +40,12 @@ clear_macos_sqlite_quarantine() {
 }
 
 build() {
-    dotnet build -verbosity detailed
+    dotnet build BazaarPlusPlus.csproj -verbosity detailed
 }
 
 build_all() {
     clear_macos_sqlite_quarantine
-    dotnet build -t:BuildAll -verbosity detailed
+    dotnet build BazaarPlusPlus.csproj -t:BuildAll -verbosity detailed
     clear_macos_sqlite_quarantine
 }
 
