@@ -2,7 +2,7 @@
 using System.Reflection;
 
 var schemaType = RequireType(
-    "BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite.RunLogSqliteSchema"
+    "BazaarPlusPlus.Storage.RunLog.RunLogSchema"
 );
 
 Assert(
@@ -147,7 +147,8 @@ Console.WriteLine("RunLogging SQLite schema checks passed.");
 
 static Type RequireType(string fullName)
 {
-    return Type.GetType($"{fullName}, BazaarPlusPlus")
+    return Type.GetType($"{fullName}, BazaarPlusPlus.Storage")
+        ?? Type.GetType($"{fullName}, BazaarPlusPlus")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 

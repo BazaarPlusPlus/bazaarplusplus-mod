@@ -1,15 +1,16 @@
 #nullable enable
 using System;
 using System.IO;
+using BazaarPlusPlus.Storage.RunLog;
 using Microsoft.Data.Sqlite;
 
-namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+namespace BazaarPlusPlus.Storage.Sqlite;
 
-public abstract class SqlitePersistenceStoreBase
+public abstract class SqliteStoreBase
 {
     private readonly string _databasePath;
 
-    protected SqlitePersistenceStoreBase(string databasePath)
+    protected SqliteStoreBase(string databasePath)
     {
         if (string.IsNullOrWhiteSpace(databasePath))
             throw new ArgumentException("Database path is required.", nameof(databasePath));
@@ -22,7 +23,7 @@ public abstract class SqlitePersistenceStoreBase
 
         using var connection = OpenConnection();
         EnableWriteAheadLogging(connection);
-        RunLogSqliteSchema.EnsureInitialized(connection);
+        RunLogSchema.EnsureInitialized(connection);
     }
 
     protected SqliteConnection OpenConnection()

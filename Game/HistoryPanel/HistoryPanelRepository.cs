@@ -4,7 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Game.PvpBattles;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -57,11 +58,11 @@ internal sealed partial class HistoryPanelRepository
                 r.losses,
                 r.ended_at_utc,
                 COUNT(s.battle_id) AS battle_count
-            FROM {RunLogSqliteSchema.RunsTableName} AS r
-            LEFT JOIN {RunLogSqliteSchema.BattlesTableName} AS pb
+            FROM {RunLogSchema.RunsTableName} AS r
+            LEFT JOIN {RunLogSchema.BattlesTableName} AS pb
                 ON pb.run_id = r.run_id
                AND pb.source = 'LOCAL'
-            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
                 ON s.battle_id = pb.battle_id
                AND s.player_hand_json IS NOT NULL
                AND s.player_skills_json IS NOT NULL
@@ -141,8 +142,8 @@ internal sealed partial class HistoryPanelRepository
                 s.player_skills_json,
                 s.opponent_hand_json,
                 s.opponent_skills_json
-            FROM {RunLogSqliteSchema.BattlesTableName} AS b
-            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+            FROM {RunLogSchema.BattlesTableName} AS b
+            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
                 ON s.battle_id = b.battle_id
             WHERE b.run_id = $runId
               AND b.source = 'LOCAL'
@@ -233,7 +234,7 @@ internal sealed partial class HistoryPanelRepository
                 is_bundle_final_battle,
                 replay_available,
                 replay_downloaded
-            FROM {RunLogSqliteSchema.BattlesTableName}
+            FROM {RunLogSchema.BattlesTableName}
             WHERE source = 'GHOST'
               AND deleted_at_utc IS NULL
             ORDER BY recorded_at_utc DESC, battle_id DESC
@@ -277,7 +278,7 @@ internal sealed partial class HistoryPanelRepository
             insertCommand.Transaction = transaction;
             insertCommand.CommandTimeout = 2;
             insertCommand.CommandText = $"""
-                INSERT INTO {RunLogSqliteSchema.BattlesTableName} (
+                INSERT INTO {RunLogSchema.BattlesTableName} (
                     battle_id,
                     source,
                     run_id,
@@ -363,13 +364,13 @@ internal sealed partial class HistoryPanelRepository
                     is_bundle_final_battle = excluded.is_bundle_final_battle,
                     replay_available = excluded.replay_available,
                     replay_downloaded = MAX(
-                        {RunLogSqliteSchema.GhostBattlesTableName}.replay_downloaded,
+                        {RunLogSchema.GhostBattlesTableName}.replay_downloaded,
                         excluded.replay_downloaded
                     ),
                     last_synced_at_utc = excluded.last_synced_at_utc,
                     deleted_at_utc = CASE
                         WHEN excluded.recorded_at_utc >= $staleCutoffUtc THEN NULL
-                        ELSE {RunLogSqliteSchema.BattlesTableName}.deleted_at_utc
+                        ELSE {RunLogSchema.BattlesTableName}.deleted_at_utc
                     END;
                 """;
             insertCommand.Parameters.AddWithValue("$battleId", battle.BattleId);
@@ -477,7 +478,7 @@ internal sealed partial class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            UPDATE {RunLogSchema.BattlesTableName}
             SET deleted_at_utc = COALESCE(deleted_at_utc, $deletedAtUtc)
             WHERE source = 'GHOST'
               AND replay_downloaded = 0
@@ -502,7 +503,7 @@ internal sealed partial class HistoryPanelRepository
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT cursor_value
-            FROM {RunLogSqliteSchema.SyncCursorsTableName}
+            FROM {RunLogSchema.SyncCursorsTableName}
             WHERE scope = $scope
             LIMIT 1;
             """;
@@ -523,7 +524,7 @@ internal sealed partial class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.SyncCursorsTableName} (
+            INSERT INTO {RunLogSchema.SyncCursorsTableName} (
                 scope,
                 cursor_value,
                 updated_at_utc
@@ -550,7 +551,7 @@ internal sealed partial class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            UPDATE {RunLogSchema.BattlesTableName}
             SET replay_downloaded = 1
             WHERE source = 'GHOST'
               AND battle_id = $battleId;
@@ -569,7 +570,7 @@ internal sealed partial class HistoryPanelRepository
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT battle_id
-            FROM {RunLogSqliteSchema.BattlesTableName}
+            FROM {RunLogSchema.BattlesTableName}
             WHERE run_id = $runId
               AND source = 'LOCAL'
             ORDER BY recorded_at_utc DESC, battle_id DESC;
@@ -596,7 +597,7 @@ internal sealed partial class HistoryPanelRepository
         using var deleteRun = connection.CreateCommand();
         deleteRun.CommandTimeout = 2;
         deleteRun.CommandText =
-            $"DELETE FROM {RunLogSqliteSchema.RunsTableName} WHERE run_id = $runId;";
+            $"DELETE FROM {RunLogSchema.RunsTableName} WHERE run_id = $runId;";
         deleteRun.Parameters.AddWithValue("$runId", runId);
         deleteRun.ExecuteNonQuery();
     }
@@ -611,10 +612,10 @@ internal sealed partial class HistoryPanelRepository
         pragma.ExecuteNonQuery();
         if (ensureSchema)
         {
-            RunLogSqliteSchema.EnsureInitialized(connection);
+            RunLogSchema.EnsureInitialized(connection);
             EnsureColumnExists(
                 connection,
-                RunLogSqliteSchema.BattlesTableName,
+                RunLogSchema.BattlesTableName,
                 "is_bundle_final_battle",
                 "INTEGER NOT NULL DEFAULT 0"
             );

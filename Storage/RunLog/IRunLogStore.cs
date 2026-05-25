@@ -1,7 +1,5 @@
 #nullable enable
-using BazaarPlusPlus.Game.RunLogging.Models;
-
-namespace BazaarPlusPlus.Game.RunLogging.Persistence;
+namespace BazaarPlusPlus.Storage.RunLog;
 
 public interface IRunLogStore
 {

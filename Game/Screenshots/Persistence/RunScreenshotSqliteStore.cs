@@ -1,10 +1,11 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Sqlite;
 
 namespace BazaarPlusPlus.Game.Screenshots.Persistence;
 
-internal sealed class RunScreenshotSqliteStore : SqlitePersistenceStoreBase
+internal sealed class RunScreenshotSqliteStore : SqliteStoreBase
 {
     public RunScreenshotSqliteStore(string databasePath)
         : base(databasePath) { }
@@ -21,7 +22,7 @@ internal sealed class RunScreenshotSqliteStore : SqlitePersistenceStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.RunScreenshotsTableName} (
+            INSERT INTO {RunLogSchema.RunScreenshotsTableName} (
                 screenshot_id,
                 run_id,
                 hero_name,
@@ -72,6 +73,6 @@ internal sealed class RunScreenshotSqliteStore : SqlitePersistenceStoreBase
 
     private static string GetStorageValue()
     {
-        return RunLogSqliteSchema.CaptureSourceEndOfRunAuto;
+        return RunLogSchema.CaptureSourceEndOfRunAuto;
     }
 }

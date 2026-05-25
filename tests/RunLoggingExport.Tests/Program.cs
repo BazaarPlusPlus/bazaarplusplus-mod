@@ -1,8 +1,8 @@
 #nullable enable
 using System.Diagnostics;
 using System.Text.Json;
-using BazaarPlusPlus.Game.RunLogging.Models;
-using BazaarPlusPlus.Game.RunLogging.Persistence;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.RunLog;
 using Microsoft.Data.Sqlite;
 
 var tempRoot = Path.Combine(

@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace BazaarPlusPlus.Game.RunLogging.Models;
+namespace BazaarPlusPlus.Storage.RunLog;
 
 public sealed class RunLogPendingSelectionState
 {

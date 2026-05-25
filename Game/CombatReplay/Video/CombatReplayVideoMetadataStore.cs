@@ -1,10 +1,11 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Sqlite;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
-internal sealed class CombatReplayVideoMetadataStore : SqlitePersistenceStoreBase
+internal sealed class CombatReplayVideoMetadataStore : SqliteStoreBase
 {
     public CombatReplayVideoMetadataStore(string databasePath)
         : base(databasePath) { }
@@ -17,7 +18,7 @@ internal sealed class CombatReplayVideoMetadataStore : SqlitePersistenceStoreBas
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.CombatReplayVideosTableName} (
+            INSERT INTO {RunLogSchema.CombatReplayVideosTableName} (
                 video_id,
                 battle_id,
                 source,
@@ -71,7 +72,7 @@ internal sealed class CombatReplayVideoMetadataStore : SqlitePersistenceStoreBas
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.CombatReplayVideosTableName}
+            UPDATE {RunLogSchema.CombatReplayVideosTableName}
             SET
                 video_relative_path = $videoRelativePath,
                 ended_at_utc = $endedAtUtc,

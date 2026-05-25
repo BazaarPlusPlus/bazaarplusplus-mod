@@ -8,7 +8,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarPlusPlus.Core.RunContext;
-using BazaarPlusPlus.Game.RunLogging.Models;
+using BazaarPlusPlus.Storage.RunLog;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.RunLogging;
@@ -38,7 +38,7 @@ internal static class RunLoggingGameDataReader
 
         request = new RunLogCreateRequest
         {
-            SchemaVersion = Persistence.Sqlite.RunLogSqliteSchema.RowSchemaVersion,
+            SchemaVersion = RunLogSchema.RowSchemaVersion,
             RunId = serverRunId,
             StartedAtUtc = DateTimeOffset.UtcNow,
             Hero = Data.Run.Player.Hero.ToString(),
@@ -94,7 +94,7 @@ internal static class RunLoggingGameDataReader
         TryGetPlayerRankSnapshot(out var finalPlayerRank, out var finalPlayerRating);
         return new RunLogCompletion
         {
-            SchemaVersion = Persistence.Sqlite.RunLogSqliteSchema.RowSchemaVersion,
+            SchemaVersion = RunLogSchema.RowSchemaVersion,
             Status = status,
             EndedAtUtc = DateTimeOffset.UtcNow,
             FinalDay = Data.Run == null ? null : (int?)Data.Run.Day,
@@ -116,7 +116,7 @@ internal static class RunLoggingGameDataReader
     {
         return new RunLogAbandonment
         {
-            SchemaVersion = Persistence.Sqlite.RunLogSqliteSchema.RowSchemaVersion,
+            SchemaVersion = RunLogSchema.RowSchemaVersion,
             Status = "abandoned",
             EndedAtUtc = DateTimeOffset.UtcNow,
             FinalDay = Data.Run == null ? null : (int?)Data.Run.Day,

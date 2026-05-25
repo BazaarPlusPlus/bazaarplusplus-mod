@@ -2,8 +2,8 @@
 using System.Reflection;
 using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Game.RunLogging;
-using BazaarPlusPlus.Game.RunLogging.Models;
-using BazaarPlusPlus.Game.RunLogging.Persistence;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.RunLog;
 
 var assembly = Assembly.Load("BazaarPlusPlus");
 var eventBusType = RequireType("BazaarPlusPlus.Core.Events.InMemoryBppEventBus");

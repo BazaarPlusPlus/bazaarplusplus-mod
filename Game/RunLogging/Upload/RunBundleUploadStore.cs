@@ -5,7 +5,8 @@ using System.Linq;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Sqlite;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Models;
 using Microsoft.Data.Sqlite;
@@ -38,8 +39,8 @@ internal sealed class RunBundleUploadStore
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT s.run_id
-            FROM {RunLogSqliteSchema.RunSyncStateTableName} AS s
-            INNER JOIN {RunLogSqliteSchema.RunsTableName} AS r
+            FROM {RunLogSchema.RunSyncStateTableName} AS s
+            INNER JOIN {RunLogSchema.RunsTableName} AS r
                 ON r.run_id = s.run_id
             WHERE s.dirty = 1
               AND r.completed = 1
@@ -64,8 +65,8 @@ internal sealed class RunBundleUploadStore
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT 1
-            FROM {RunLogSqliteSchema.RunSyncStateTableName} AS s
-            INNER JOIN {RunLogSqliteSchema.RunsTableName} AS r
+            FROM {RunLogSchema.RunSyncStateTableName} AS s
+            INNER JOIN {RunLogSchema.RunsTableName} AS r
                 ON r.run_id = s.run_id
             WHERE s.dirty = 1
               AND r.completed = 1
@@ -81,7 +82,7 @@ internal sealed class RunBundleUploadStore
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.RunSyncStateTableName}
+            UPDATE {RunLogSchema.RunSyncStateTableName}
             SET last_attempt_at_utc = $attemptedAtUtc,
                 retry_count = retry_count + 1,
                 last_error = $error
@@ -109,7 +110,7 @@ internal sealed class RunBundleUploadStore
             command.Transaction = transaction;
             command.CommandTimeout = 2;
             command.CommandText = $"""
-                UPDATE {RunLogSqliteSchema.RunSyncStateTableName}
+                UPDATE {RunLogSchema.RunSyncStateTableName}
                 SET dirty = 0,
                     uploaded_seq = $uploadedSeq,
                     uploaded_status = $uploadedStatus,
@@ -144,7 +145,7 @@ internal sealed class RunBundleUploadStore
 
             command.Parameters.AddWithValue("$uploadedAtUtc", uploadedAtUtc.ToString("o"));
             command.CommandText = $"""
-                UPDATE {RunLogSqliteSchema.BattlesTableName}
+                UPDATE {RunLogSchema.BattlesTableName}
                 SET replay_dirty = 0,
                     replay_last_attempt_at_utc = $uploadedAtUtc,
                     replay_last_uploaded_at_utc = $uploadedAtUtc,
@@ -182,7 +183,7 @@ internal sealed class RunBundleUploadStore
                 final_player_rank,
                 final_player_rating,
                 last_seq
-            FROM {RunLogSqliteSchema.RunsTableName}
+            FROM {RunLogSchema.RunsTableName}
             WHERE run_id = $runId
             LIMIT 1;
             """;
@@ -223,7 +224,7 @@ internal sealed class RunBundleUploadStore
             BattleIds = battleIds,
             Payload = new RunBundleUploadRequest
             {
-                SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
+                SchemaVersion = RunLogSchema.UploadPayloadSchemaVersion,
                 PlayerAccountId = playerAccountId,
                 SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
                 ArtifactCodec = RunBundleArtifactCodec.ContentType,
@@ -369,7 +370,7 @@ internal sealed class RunBundleUploadStore
     private void EnsureSchema()
     {
         using var connection = OpenConnection();
-        RunLogSqliteSchema.EnsureInitialized(connection);
+        RunLogSchema.EnsureInitialized(connection);
     }
 
     private SqliteConnection OpenConnection()

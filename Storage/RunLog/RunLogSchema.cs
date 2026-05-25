@@ -3,9 +3,9 @@ using System;
 using BazaarPlusPlus.Storage.Paths;
 using Microsoft.Data.Sqlite;
 
-namespace BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+namespace BazaarPlusPlus.Storage.RunLog;
 
-public static class RunLogSqliteSchema
+public static class RunLogSchema
 {
     public static int LocalDatabaseSchemaVersion => 13;
 

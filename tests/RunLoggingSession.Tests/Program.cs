@@ -1,8 +1,8 @@
 #nullable enable
 using System.Reflection;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.RunLogging.Models;
-using BazaarPlusPlus.Game.RunLogging.Persistence;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.RunLog;
 
 var managerType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogSessionManager");
 var ctor = managerType.GetConstructor([typeof(IRunLogStore), typeof(Func<DateTimeOffset>)]);

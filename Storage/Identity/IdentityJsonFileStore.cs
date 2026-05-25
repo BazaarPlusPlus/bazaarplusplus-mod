@@ -5,9 +5,9 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
-namespace BazaarPlusPlus.Game.Identity;
+namespace BazaarPlusPlus.Storage.Identity;
 
-internal static class IdentityJsonFileStore
+public static class IdentityJsonFileStore
 {
     private static readonly JsonSerializerSettings SerializerSettings =
         new()
@@ -20,12 +20,12 @@ internal static class IdentityJsonFileStore
             Formatting = Formatting.None,
         };
 
-    internal static string ObservationFileName => "observation.v1.json";
+    public static string ObservationFileName => "observation.v1.json";
 
-    internal static string ObservationPath(string identityDirectoryPath) =>
+    public static string ObservationPath(string identityDirectoryPath) =>
         Path.Combine(identityDirectoryPath, ObservationFileName);
 
-    internal static bool TryRead<T>(string filePath, out T? payload)
+    public static bool TryRead<T>(string filePath, out T? payload)
         where T : class
     {
         payload = null;
@@ -45,7 +45,7 @@ internal static class IdentityJsonFileStore
         }
     }
 
-    internal static void Write<T>(string filePath, T payload)
+    public static void Write<T>(string filePath, T payload)
         where T : class
     {
         var json = JsonConvert.SerializeObject(payload, SerializerSettings);

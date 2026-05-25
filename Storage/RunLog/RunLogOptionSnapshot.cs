@@ -1,7 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.RunLogging.Models;
+namespace BazaarPlusPlus.Storage.RunLog;
 
 public sealed class RunLogOptionSnapshot
 {

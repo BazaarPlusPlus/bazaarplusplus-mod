@@ -1,11 +1,12 @@
 #nullable enable
 using System.Reflection;
-using BazaarPlusPlus.Game.RunLogging.Models;
+using BazaarPlusPlus.Storage.Paths;
+using BazaarPlusPlus.Storage.RunLog;
 using Microsoft.Data.Sqlite;
 
-var storeType = RequireType("BazaarPlusPlus.Game.RunLogging.Persistence.SqliteRunLogStore");
-var ctor = storeType.GetConstructor([typeof(string)]);
-Assert(ctor != null, "SqliteRunLogStore should expose a constructor taking the database path.");
+var storeType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogStore");
+var ctor = storeType.GetConstructor([typeof(IPathProvider)]);
+Assert(ctor != null, "RunLogStore should expose a constructor taking IPathProvider.");
 
 var tempRoot = Path.Combine(
     Path.GetTempPath(),
@@ -20,7 +21,8 @@ try
     var startedAt = new DateTimeOffset(2026, 3, 15, 12, 15, 30, TimeSpan.Zero);
     const string runId = "run_20260315t121530z_vanessa_ranked_002a_deadbeef";
 
-    var firstStore = ctor!.Invoke([dbPath]);
+    var paths = new TempPathProvider(dbPath);
+    var firstStore = ctor!.Invoke([paths]);
     Invoke<RunLogSessionState>(
         storeType,
         firstStore,
@@ -78,7 +80,7 @@ try
         ]
     );
 
-    var resumedStore = ctor.Invoke([dbPath]);
+    var resumedStore = ctor.Invoke([paths]);
     var resumed = Invoke<RunLogSessionState?>(storeType, resumedStore, "TryResumeActiveRun", []);
 
     Assert(resumed != null, "TryResumeActiveRun should restore an unfinished run.");
@@ -138,7 +140,8 @@ Console.WriteLine("RunLogging SQLite recovery checks passed.");
 
 static Type RequireType(string fullName)
 {
-    return Type.GetType($"{fullName}, BazaarPlusPlus")
+    return Type.GetType($"{fullName}, BazaarPlusPlus.Storage")
+        ?? Type.GetType($"{fullName}, BazaarPlusPlus")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 
@@ -175,4 +178,16 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+sealed class TempPathProvider : IPathProvider
+{
+    private readonly string _dbPath;
+    public TempPathProvider(string dbPath) => _dbPath = dbPath;
+    public string? RunLogDatabasePath => _dbPath;
+    public string? CombatReplayDirectoryPath => null;
+    public string? ScreenshotsDirectoryPath => null;
+    public string? IdentityDirectoryPath => null;
+    public string? CombatReplayVideoDirectoryPath => null;
+    public string? ToolsDirectoryPath => null;
 }

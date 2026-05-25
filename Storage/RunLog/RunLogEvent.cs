@@ -1,13 +1,12 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
-namespace BazaarPlusPlus.Game.RunLogging.Models;
+namespace BazaarPlusPlus.Storage.RunLog;
 
 public sealed class RunLogEvent
 {
-    public int SchemaVersion { get; set; } = RunLogSqliteSchema.RowSchemaVersion;
+    public int SchemaVersion { get; set; } = RunLogSchema.RowSchemaVersion;
 
     public string RunId { get; set; } = string.Empty;
 

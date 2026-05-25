@@ -1,14 +1,14 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Game.RunLogging.Models;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using BazaarPlusPlus.Storage.Paths;
+using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
-namespace BazaarPlusPlus.Game.RunLogging.Persistence;
+namespace BazaarPlusPlus.Storage.RunLog;
 
-public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
+public sealed class RunLogStore : SqliteStoreBase, IRunLogStore
 {
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
@@ -21,8 +21,11 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
         DateFormatString = "yyyy-MM-dd'T'HH:mm:ss.fffK",
     };
 
-    public SqliteRunLogStore(string databasePath)
-        : base(databasePath) { }
+    public RunLogStore(IPathProvider paths)
+        : base(
+            paths.RunLogDatabasePath
+                ?? throw new InvalidOperationException("RunLogDatabasePath is not set")
+        ) { }
 
     public RunLogSessionState? TryResumeActiveRun()
     {
@@ -44,7 +47,7 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
 
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.RunsTableName} (
+            INSERT INTO {RunLogSchema.RunsTableName} (
                 run_id,
                 started_at_utc,
                 last_seen_at_utc,
@@ -76,11 +79,11 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
             ON CONFLICT(run_id) DO UPDATE SET
                 hero = excluded.hero,
                 game_mode = excluded.game_mode,
-                seed = COALESCE(excluded.seed, {RunLogSqliteSchema.RunsTableName}.seed),
-                player_rank = COALESCE(excluded.player_rank, {RunLogSqliteSchema.RunsTableName}.player_rank),
-                player_rating = COALESCE(excluded.player_rating, {RunLogSqliteSchema.RunsTableName}.player_rating),
-                day = COALESCE({RunLogSqliteSchema.RunsTableName}.day, excluded.day),
-                hour = COALESCE({RunLogSqliteSchema.RunsTableName}.hour, excluded.hour),
+                seed = COALESCE(excluded.seed, {RunLogSchema.RunsTableName}.seed),
+                player_rank = COALESCE(excluded.player_rank, {RunLogSchema.RunsTableName}.player_rank),
+                player_rating = COALESCE(excluded.player_rating, {RunLogSchema.RunsTableName}.player_rating),
+                day = COALESCE({RunLogSchema.RunsTableName}.day, excluded.day),
+                hour = COALESCE({RunLogSchema.RunsTableName}.hour, excluded.hour),
                 status = excluded.status,
                 completed = 0;
             """;
@@ -115,7 +118,7 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
 
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.RunEventsTableName} (
+            INSERT INTO {RunLogSchema.RunEventsTableName} (
                 run_id,
                 seq,
                 ts_utc,
@@ -138,7 +141,7 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
 
         using var updateRun = CreateCommand(connection, transaction);
         updateRun.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.RunsTableName}
+            UPDATE {RunLogSchema.RunsTableName}
             SET last_seq = MAX(last_seq, $seq),
                 last_seen_at_utc = MAX(last_seen_at_utc, $tsUtc),
                 day = COALESCE($day, day),
@@ -160,7 +163,7 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.RunsTableName}
+            UPDATE {RunLogSchema.RunsTableName}
             SET last_seq = $lastSeq,
                 last_seen_at_utc = $lastSeenAtUtc,
                 day = $day,
@@ -259,7 +262,7 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
 
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.RunsTableName}
+            UPDATE {RunLogSchema.RunsTableName}
             SET status = $status,
                 completed = 1,
                 ended_at_utc = $endedAtUtc,
@@ -314,7 +317,7 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
             SELECT player_rating
-            FROM {RunLogSqliteSchema.RunsTableName}
+            FROM {RunLogSchema.RunsTableName}
             WHERE run_id = $runId;
             """;
         command.Parameters.AddWithValue("$runId", runId);
@@ -335,7 +338,7 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
             SELECT completed
-            FROM {RunLogSqliteSchema.RunsTableName}
+            FROM {RunLogSchema.RunsTableName}
             WHERE run_id = $runId
             LIMIT 1;
             """;
@@ -355,14 +358,14 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
             runId == null
                 ? $"""
                     SELECT *
-                    FROM {RunLogSqliteSchema.RunsTableName}
+                    FROM {RunLogSchema.RunsTableName}
                     WHERE completed = 0
                     ORDER BY last_seen_at_utc DESC
                     LIMIT 1;
                     """
                 : $"""
                     SELECT *
-                    FROM {RunLogSqliteSchema.RunsTableName}
+                    FROM {RunLogSchema.RunsTableName}
                     WHERE completed = 0
                       AND run_id = $runId
                     LIMIT 1;
@@ -392,7 +395,7 @@ public sealed class SqliteRunLogStore : SqlitePersistenceStoreBase, IRunLogStore
         return new RunLogSessionState
         {
             RunId = reader.GetString(reader.GetOrdinal("run_id")),
-            SchemaVersion = RunLogSqliteSchema.CurrentSchemaVersion,
+            SchemaVersion = RunLogSchema.CurrentSchemaVersion,
             StartedAtUtc = startedAtUtc,
             LastSeenAtUtc = lastSeenAtUtc,
             LastSeq = GetNullableInt64(reader, "last_seq") ?? 0,

@@ -1,20 +1,17 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
 
-namespace BazaarPlusPlus.Game.RunLogging.Models;
+namespace BazaarPlusPlus.Storage.RunLog;
 
-public sealed class RunLogSessionState
+public sealed class RunLogCheckpoint
 {
+    public int SchemaVersion { get; set; } = RunLogSchema.RowSchemaVersion;
+
     public string RunId { get; set; } = string.Empty;
 
-    public int SchemaVersion { get; set; } = RunLogSqliteSchema.RowSchemaVersion;
-
-    public DateTimeOffset StartedAtUtc { get; set; }
+    public long LastSeq { get; set; }
 
     public DateTimeOffset LastSeenAtUtc { get; set; }
-
-    public long LastSeq { get; set; }
 
     public int? Day { get; set; }
 

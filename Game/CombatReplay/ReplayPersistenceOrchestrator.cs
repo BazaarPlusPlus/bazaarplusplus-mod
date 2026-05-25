@@ -3,9 +3,9 @@ using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.CombatReplay.Upload;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
+using BazaarPlusPlus.Storage.Upload;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
@@ -33,10 +33,7 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
 
         _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
-        _syncStateStore = new BattleReplaySyncStateStore(
-            runLogDatabasePath,
-            combatReplayDirectoryPath
-        );
+        _syncStateStore = new BattleReplaySyncStateStore(services.Paths);
         _persistenceQueue = new CombatReplayPersistenceQueue(
             _payloadStore.Save,
             _battleCatalog.Save,
