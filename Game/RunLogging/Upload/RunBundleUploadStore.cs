@@ -273,7 +273,6 @@ internal sealed class RunBundleUploadStore
             OpponentRating = manifest.Participants.OpponentRating,
             OpponentLevel = manifest.Participants.OpponentLevel,
             Result = manifest.Outcome.Result,
-            ReplayAvailable = true,
         };
     }
 

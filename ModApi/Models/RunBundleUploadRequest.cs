@@ -143,8 +143,6 @@ public sealed class BattleProjection
     [JsonProperty("result")]
     public string? Result { get; set; }
 
-    [JsonProperty("replay_available")]
-    public bool ReplayAvailable { get; set; }
 }
 
 public sealed class RunArtifact
