@@ -11,8 +11,6 @@ namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal sealed class RunBundleUploadService : IDisposable
 {
-    private const string AnonymousPlayerAccountId = "anonymous-player";
-
     private readonly RunBundleUploadStore _store;
     private readonly ModApiRoutes _routes;
     private readonly HttpClient _httpClient;
@@ -41,7 +39,15 @@ internal sealed class RunBundleUploadService : IDisposable
             return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
         }
 
-        var playerAccountId = ResolvePlayerAccountId() ?? AnonymousPlayerAccountId;
+        var playerAccountId = ResolvePlayerAccountId();
+        if (string.IsNullOrWhiteSpace(playerAccountId))
+        {
+            BppLog.Info(
+                "RunBundleUploadService",
+                $"Skipping {pendingRunIds.Count} pending run bundle(s): player account id not yet available."
+            );
+            return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
+        }
 
         var uploadedCount = 0;
         var client = new RunBundleClient(_httpClient, _routes);
