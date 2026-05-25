@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Give each csproj in the repo root its own intermediate/output dirs so that
+    they do not clobber each other's project.assets.json and NuGet lock files.
+    Must be set here (before Microsoft.Common.props is imported) to take effect.
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.ModApi'">
+    <BaseIntermediateOutputPath>obj\ModApi\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\ModApi\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

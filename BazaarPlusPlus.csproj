@@ -32,6 +32,12 @@
     <Compile Remove="decompiled/**" />
     <EmbeddedResource Remove="decompiled/**" />
     <None Remove="decompiled/**" />
+    <Compile Remove="ModApi/**" />
+    <EmbeddedResource Remove="ModApi/**" />
+    <None Remove="ModApi/**" />
+    <Compile Remove="Storage/**" />
+    <EmbeddedResource Remove="Storage/**" />
+    <None Remove="Storage/**" />
   </ItemGroup>
   <!-- Project paths -->
   <PropertyGroup>
@@ -89,6 +95,10 @@
     />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="BazaarPlusPlus.ModApi.csproj" />
   </ItemGroup>
 
   <!-- Game assembly references -->
@@ -161,6 +171,8 @@
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.provider.e_sqlite3.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\e_sqlite3.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\libe_sqlite3.dylib" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.ModApi.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.Storage.dll" />
     </ItemGroup>
     <ItemGroup>
       <PluginManagedRuntimeFiles Include="$(TargetDir)Microsoft.Data.Sqlite.dll" />
@@ -169,6 +181,8 @@
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.provider.e_sqlite3.dll" />
       <MacSqliteNativeFile Include="$(FixedMacSqliteNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.ModApi.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.Storage.dll" Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')" />
     </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
     <Copy
@@ -223,6 +237,8 @@
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.provider.e_sqlite3.dll" />
       <MacSqliteNativeFile Include="$(FixedMacSqliteNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.ModApi.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.Storage.dll" Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')" />
     </ItemGroup>
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
