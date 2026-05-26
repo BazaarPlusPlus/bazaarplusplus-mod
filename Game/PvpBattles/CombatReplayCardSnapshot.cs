@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.CombatReplay;
+namespace BazaarPlusPlus.Game.PvpBattles;
 
+/// <summary>PvpBattle capture data shape. Historical name retains the "CombatReplay"
+/// prefix; see follow-up task #29 if a rename to PvpBattle* is wanted.</summary>
 public sealed class CombatReplayCardSnapshot
 {
     public string InstanceId { get; set; } = string.Empty;

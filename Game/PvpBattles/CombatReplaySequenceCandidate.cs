@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using BazaarGameShared.Infra.Messages;
 
-namespace BazaarPlusPlus.Game.CombatReplay;
+namespace BazaarPlusPlus.Game.PvpBattles;
 
+/// <summary>PvpBattle in-flight capture state assembled across spawn → combat → despawn
+/// game-sim events. Historical name retains the "CombatReplay" prefix; see follow-up
+/// task #29 if a rename to PvpBattle* is wanted.</summary>
 internal sealed class CombatReplaySequenceCandidate
 {
     public string? BattleId { get; set; }

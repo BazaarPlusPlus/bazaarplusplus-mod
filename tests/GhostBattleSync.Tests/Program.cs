@@ -47,7 +47,7 @@ var cardSetCaptureArtifactType = RequireModApiType(
 var cardSetItemArtifactType = RequireModApiType(
     "BazaarPlusPlus.ModApi.Models.CardSetItemArtifact"
 );
-var cardSnapshotType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayCardSnapshot");
+var cardSnapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.CombatReplayCardSnapshot");
 
 var shouldAdvanceCheckpoint = syncServiceType.GetMethod(
     "ShouldAdvanceCheckpoint",

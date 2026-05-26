@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.ModApi;
