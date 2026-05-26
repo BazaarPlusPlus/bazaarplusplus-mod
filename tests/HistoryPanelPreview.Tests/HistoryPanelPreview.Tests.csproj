@@ -9,16 +9,12 @@
 
   <ItemGroup>
     <Compile
-      Include="../../Game/MonsterPreview/CardSetBuildRecommendationMode.cs"
-      Link="CardSetBuildRecommendationMode.cs"
+      Include="../../Game/HistoryPanel/HistoryPanelPreviewSignatureGate.cs"
+      Link="HistoryPanelPreviewSignatureGate.cs"
     />
     <Compile
-      Include="../../Game/MonsterPreview/CardSetBuildRecommendationModeFlow.cs"
-      Link="CardSetBuildRecommendationModeFlow.cs"
-    />
-    <Compile
-      Include="../../Game/MonsterPreview/CardSetPreviewHotkeys.cs"
-      Link="CardSetPreviewHotkeys.cs"
+      Include="../../Game/HistoryPanel/HistoryPanelPreviewGenerationGuard.cs"
+      Link="HistoryPanelPreviewGenerationGuard.cs"
     />
     <Compile Include="Program.cs" />
   </ItemGroup>

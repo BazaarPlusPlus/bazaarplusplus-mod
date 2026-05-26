@@ -20,7 +20,7 @@ internal sealed class HistoryPanelPreviewSource
         _runtime = runtime;
     }
 
-    public PreviewRequest Build(
+    public HistoryBattlePreviewData Build(
         PreviewSelectionMode previewSelectionMode,
         HistorySectionMode sectionMode,
         HistoryBattleRecord? activeSelectedBattle,
@@ -30,35 +30,37 @@ internal sealed class HistoryPanelPreviewSource
     {
         if (previewSelectionMode == PreviewSelectionMode.Battle && activeSelectedBattle != null)
         {
-            var previewData =
-                sectionMode == HistorySectionMode.Ghost
-                    ? ResolveGhostPreviewData(activeSelectedBattle)
-                    : HistoryBattlePreviewProjection.Build(activeSelectedBattle.Snapshots).OpponentHandOnly();
-            return new PreviewRequest($"battle:{activeSelectedBattle.BattleId}", previewData);
+            var signature = $"battle:{activeSelectedBattle.BattleId}";
+            return sectionMode == HistorySectionMode.Ghost
+                ? ResolveGhostPreviewData(activeSelectedBattle, signature)
+                : HistoryBattlePreviewProjection.BuildOpponent(activeSelectedBattle.Snapshots, signature);
         }
 
         var runPreviewBattle = PickRunPreviewBattle(runBattles);
         if (runPreviewBattle != null)
         {
-            return new PreviewRequest(
-                $"run:{selectedRun?.RunId}:{runPreviewBattle.BattleId}",
-                HistoryBattlePreviewProjection.Build(runPreviewBattle.Snapshots).PlayerHandOnly()
+            return HistoryBattlePreviewProjection.BuildPlayer(
+                runPreviewBattle.Snapshots,
+                $"run:{selectedRun?.RunId}:{runPreviewBattle.BattleId}"
             );
         }
 
-        return new PreviewRequest(null, null);
+        return HistoryBattlePreviewData.Empty;
     }
 
     // Ghost replay payload snapshots stay in the uploader's original perspective.
     // For the local "against me" view, our board is stored on the opponent side.
-    private HistoryBattlePreviewData ResolveGhostPreviewData(HistoryBattleRecord battle)
+    private HistoryBattlePreviewData ResolveGhostPreviewData(
+        HistoryBattleRecord battle,
+        string signature
+    )
     {
         if (battle.Source != HistoryBattleSource.Ghost)
-            return HistoryBattlePreviewProjection.Build(battle.Snapshots);
+            return HistoryBattlePreviewProjection.BuildOpponent(battle.Snapshots, signature);
 
         var replayDirectoryPath = _runtime.CombatReplayDirectoryPath;
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
-            return HistoryBattlePreviewProjection.BuildEmpty();
+            return HistoryBattlePreviewProjection.BuildEmpty(signature);
 
         var ghostPayloadStore = new GhostBattlePayloadStore(
             BuildGhostPayloadDirectoryPath(replayDirectoryPath)
@@ -66,9 +68,9 @@ internal sealed class HistoryPanelPreviewSource
         var ghostPayload = ghostPayloadStore.Load(battle.BattleId);
         var snapshots = ghostPayload?.BattleManifest?.Snapshots;
         if (snapshots == null)
-            return HistoryBattlePreviewProjection.BuildEmpty();
+            return HistoryBattlePreviewProjection.BuildEmpty(signature);
 
-        return HistoryBattlePreviewProjection.Build(snapshots).OpponentHandOnly();
+        return HistoryBattlePreviewProjection.BuildOpponent(snapshots, signature);
     }
 
     private static HistoryBattleRecord? PickRunPreviewBattle(
@@ -91,18 +93,5 @@ internal sealed class HistoryPanelPreviewSource
         return string.IsNullOrWhiteSpace(parentDirectory)
             ? Path.Combine(replayDirectoryPath, GhostPayloadDirectoryName)
             : Path.Combine(parentDirectory, GhostPayloadDirectoryName);
-    }
-
-    public readonly struct PreviewRequest
-    {
-        public PreviewRequest(string? renderId, HistoryBattlePreviewData? previewData)
-        {
-            RenderId = renderId;
-            PreviewData = previewData;
-        }
-
-        public string? RenderId { get; }
-
-        public HistoryBattlePreviewData? PreviewData { get; }
     }
 }

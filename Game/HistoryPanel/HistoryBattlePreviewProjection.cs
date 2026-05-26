@@ -3,11 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Socket;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect.AuraActions;
-using BazaarPlusPlus.Game.MonsterPreview;
-using BazaarPlusPlus.Game.PreviewSurface;
+using BazaarPlusPlus.Game.ItemBoard;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
@@ -24,49 +24,34 @@ internal static class HistoryBattlePreviewProjection
     > SocketEffectAttributeTypeCache = new();
     private static object? _staticGameData;
 
-    public static HistoryBattlePreviewData BuildEmpty()
+    public static HistoryBattlePreviewData BuildEmpty(string signature = "")
     {
-        return new HistoryBattlePreviewData(
-            new PreviewBoardModel
-            {
-                ItemCards = new List<PreviewCardSpec>(),
-                SkillCards = new List<PreviewCardSpec>(),
-                Metadata = new Dictionary<string, string>(),
-                Signature = string.Empty,
-            },
-            new PreviewBoardModel
-            {
-                ItemCards = new List<PreviewCardSpec>(),
-                SkillCards = new List<PreviewCardSpec>(),
-                Metadata = new Dictionary<string, string>(),
-                Signature = string.Empty,
-            }
-        );
+        return new HistoryBattlePreviewData(Array.Empty<ItemBoardItemSpec>(), signature);
     }
 
-    public static HistoryBattlePreviewData Build(PvpBattleSnapshots? snapshots)
+    public static HistoryBattlePreviewData BuildPlayer(
+        PvpBattleSnapshots? snapshots,
+        string signature
+    )
     {
-        if (snapshots == null)
-            return BuildEmpty();
+        return Build(snapshots?.PlayerHand, signature);
+    }
 
-        return Build(
-            snapshots.PlayerHand,
-            snapshots.PlayerSkills,
-            snapshots.OpponentHand,
-            snapshots.OpponentSkills
-        );
+    public static HistoryBattlePreviewData BuildOpponent(
+        PvpBattleSnapshots? snapshots,
+        string signature
+    )
+    {
+        return Build(snapshots?.OpponentHand, signature);
     }
 
     public static HistoryBattlePreviewData Build(
-        PvpBattleCardSetCapture playerHand,
-        PvpBattleCardSetCapture playerSkills,
-        PvpBattleCardSetCapture opponentHand,
-        PvpBattleCardSetCapture opponentSkills
+        PvpBattleCardSetCapture? itemCapture,
+        string signature
     )
     {
-        var playerBoard = BuildBoard(playerHand, playerSkills);
-        var opponentBoard = BuildBoard(opponentHand, opponentSkills);
-        return new HistoryBattlePreviewData(playerBoard, opponentBoard);
+        var items = BuildItemSpecs(itemCapture?.Items);
+        return new HistoryBattlePreviewData(items, signature);
     }
 
     public static HistoryBattleSnapshotCounts CountSnapshots(
@@ -114,42 +99,19 @@ internal static class HistoryBattlePreviewProjection
         return count;
     }
 
-    private static PreviewBoardModel BuildBoard(
-        PvpBattleCardSetCapture itemCapture,
-        PvpBattleCardSetCapture skillCapture
+    private static List<ItemBoardItemSpec> BuildItemSpecs(
+        IList<PvpBattleCardSnapshot>? itemSnapshots
     )
     {
-        var itemSnapshots = itemCapture?.Items;
-        var socketEffectsBySocket = BuildSocketEffectMap(itemSnapshots);
-        var staticData = TryGetStaticGameData();
-        var model = new PreviewBoardModel
-        {
-            ItemCards = PreviewCardSpecFilter.Filter(
-                BuildPreviewCardSpecs(itemSnapshots, isSkill: false, socketEffectsBySocket),
-                templateId => HasStaticCardTemplate(staticData, templateId)
-            ),
-            SkillCards = PreviewCardSpecFilter.Filter(
-                BuildPreviewCardSpecs(skillCapture?.Items, isSkill: true, null),
-                templateId => HasStaticCardTemplate(staticData, templateId)
-            ),
-            Metadata = new Dictionary<string, string>(),
-        };
-        model.Signature = PreviewBoardSignature.Build(model);
-        return model;
-    }
-
-    private static List<PreviewCardSpec> BuildPreviewCardSpecs(
-        IEnumerable<PvpBattleCardSnapshot>? snapshots,
-        bool isSkill,
-        IReadOnlyDictionary<EContainerSocketId, HashSet<ECardAttributeType>>? socketEffectsBySocket
-    )
-    {
-        var specs = new List<PreviewCardSpec>();
-        if (snapshots == null)
+        var specs = new List<ItemBoardItemSpec>();
+        if (itemSnapshots == null || itemSnapshots.Count == 0)
             return specs;
 
+        var socketEffectsBySocket = BuildSocketEffectMap(itemSnapshots);
+        var staticData = TryGetStaticGameData();
+
         foreach (
-            var snapshot in snapshots
+            var snapshot in itemSnapshots
                 .Select((snapshot, index) => new { snapshot, index })
                 .OrderBy(entry => entry.snapshot?.Socket.HasValue == true ? 0 : 1)
                 .ThenBy(entry =>
@@ -163,62 +125,54 @@ internal static class HistoryBattlePreviewProjection
         {
             if (snapshot == null || string.IsNullOrWhiteSpace(snapshot.TemplateId))
                 continue;
+            if (snapshot.Type != ECardType.Item)
+                continue;
+            if (!Guid.TryParse(snapshot.TemplateId, out var templateId))
+                continue;
+            if (!HasStaticCardTemplate(staticData, templateId))
+                continue;
 
-            var spec = BuildPreviewCardSpec(snapshot, isSkill, socketEffectsBySocket);
-            if (spec != null)
-                specs.Add(spec);
+            var attributes = BuildAttributeDictionary(snapshot);
+            ApplySocketEffectAttributes(snapshot, attributes, socketEffectsBySocket);
+
+            specs.Add(
+                new ItemBoardItemSpec
+                {
+                    TemplateId = templateId,
+                    Tier = ParseTier(snapshot.Tier),
+                    EnchantmentType = ParseEnchantmentType(snapshot.Enchant),
+                    SocketId = snapshot.Socket,
+                    Attributes = attributes,
+                }
+            );
         }
 
         return specs;
     }
 
-    private static PreviewCardSpec? BuildPreviewCardSpec(
-        PvpBattleCardSnapshot snapshot,
-        bool isSkill,
-        IReadOnlyDictionary<EContainerSocketId, HashSet<ECardAttributeType>>? socketEffectsBySocket
+    private static Dictionary<ECardAttributeType, int> BuildAttributeDictionary(
+        PvpBattleCardSnapshot snapshot
     )
     {
-        if (snapshot == null || string.IsNullOrWhiteSpace(snapshot.TemplateId))
-            return null;
+        var attributes = new Dictionary<ECardAttributeType, int>();
+        if (snapshot.Attributes == null)
+            return attributes;
 
-        if (isSkill)
+        foreach (var pair in snapshot.Attributes)
         {
-            if (snapshot.Type != ECardType.Skill)
-                return null;
-        }
-        else if (snapshot.Type != ECardType.Item)
-            return null;
-
-        var attributes = new Dictionary<int, int>();
-        if (snapshot.Attributes != null)
-        {
-            foreach (var pair in snapshot.Attributes)
-            {
-                if (
-                    Enum.TryParse<ECardAttributeType>(
-                        pair.Key,
-                        ignoreCase: false,
-                        out var attributeType
-                    )
+            if (
+                Enum.TryParse<ECardAttributeType>(
+                    pair.Key,
+                    ignoreCase: false,
+                    out var attributeType
                 )
-                {
-                    attributes[(int)attributeType] = pair.Value;
-                }
+            )
+            {
+                attributes[attributeType] = pair.Value;
             }
         }
 
-        if (!isSkill)
-            ApplySocketEffectAttributes(snapshot, attributes, socketEffectsBySocket);
-
-        return new PreviewCardSpec
-        {
-            TemplateId = snapshot.TemplateId,
-            SourceName = snapshot.Name ?? string.Empty,
-            Tier = ParseTier(snapshot.Tier),
-            Size = isSkill ? 1 : ParseSize(snapshot.Size),
-            Enchant = string.IsNullOrWhiteSpace(snapshot.Enchant) ? "None" : snapshot.Enchant!,
-            Attributes = attributes,
-        };
+        return attributes;
     }
 
     private static IReadOnlyDictionary<
@@ -258,7 +212,7 @@ internal static class HistoryBattlePreviewProjection
 
     private static void ApplySocketEffectAttributes(
         PvpBattleCardSnapshot snapshot,
-        IDictionary<int, int> attributes,
+        IDictionary<ECardAttributeType, int> attributes,
         IReadOnlyDictionary<EContainerSocketId, HashSet<ECardAttributeType>>? socketEffectsBySocket
     )
     {
@@ -266,6 +220,7 @@ internal static class HistoryBattlePreviewProjection
             snapshot == null
             || attributes == null
             || socketEffectsBySocket == null
+            || socketEffectsBySocket.Count == 0
             || !snapshot.Socket.HasValue
         )
             return;
@@ -277,9 +232,8 @@ internal static class HistoryBattlePreviewProjection
 
             foreach (var effectType in effectTypes)
             {
-                var key = (int)effectType;
-                if (!attributes.TryGetValue(key, out var currentValue) || currentValue <= 0)
-                    attributes[key] = 1;
+                if (!attributes.TryGetValue(effectType, out var currentValue) || currentValue <= 0)
+                    attributes[effectType] = 1;
             }
         }
     }
@@ -289,7 +243,13 @@ internal static class HistoryBattlePreviewProjection
         ECardSize size
     )
     {
-        var span = ParseSize(size);
+        var span = size switch
+        {
+            ECardSize.Small => 1,
+            ECardSize.Medium => 2,
+            ECardSize.Large => 3,
+            _ => 1,
+        };
         var start = Math.Max(0, (int)startSocket);
         var end = Math.Min(9, start + Math.Max(1, span) - 1);
         for (var value = start; value <= end; value++)
@@ -306,7 +266,7 @@ internal static class HistoryBattlePreviewProjection
         if (!Guid.TryParse(snapshot.TemplateId, out var templateId))
             return null;
 
-        var tier = ParseTier(snapshot.Tier);
+        var tier = (int)ParseTier(snapshot.Tier);
         var cacheKey = (templateId, tier);
         lock (SocketEffectTemplateLock)
         {
@@ -410,23 +370,25 @@ internal static class HistoryBattlePreviewProjection
         return method?.Invoke(staticData, new object[] { templateId });
     }
 
-    private static int ParseTier(string? value)
+    private static ETier ParseTier(string? value)
     {
         return
             !string.IsNullOrWhiteSpace(value)
             && Enum.TryParse<ETier>(value, ignoreCase: false, out var tier)
-            ? (int)tier
-            : 0;
+            ? tier
+            : ETier.Bronze;
     }
 
-    private static int ParseSize(ECardSize size)
+    private static EEnchantmentType? ParseEnchantmentType(string? value)
     {
-        return size switch
-        {
-            ECardSize.Small => 1,
-            ECardSize.Medium => 2,
-            ECardSize.Large => 3,
-            _ => 1,
-        };
+        if (
+            string.IsNullOrWhiteSpace(value)
+            || string.Equals(value, "None", StringComparison.OrdinalIgnoreCase)
+        )
+            return null;
+
+        return Enum.TryParse<EEnchantmentType>(value, ignoreCase: false, out var enchant)
+            ? enchant
+            : null;
     }
 }

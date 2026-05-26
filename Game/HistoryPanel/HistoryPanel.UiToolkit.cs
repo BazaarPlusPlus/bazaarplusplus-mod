@@ -11,18 +11,31 @@ internal sealed partial class HistoryPanel
 
     private void EnsureUi()
     {
-        _uiView ??= new HistoryPanelUiToolkitView(
-            transform,
-            () => SetHistoryVisible(false),
-            TryReplaySelectedBattle,
-            TryDeleteSelectedRun,
-            TryRefreshFinalBuilds,
-            SelectRun,
-            SelectBattle,
-            SetSectionMode,
-            SetGhostBattleFilter
-        );
+        if (_uiView == null)
+        {
+            _uiView = new HistoryPanelUiToolkitView(
+                transform,
+                () => SetHistoryVisible(false),
+                TryReplaySelectedBattle,
+                TryDeleteSelectedRun,
+                TryRefreshFinalBuilds,
+                SelectRun,
+                SelectBattle,
+                SetSectionMode,
+                SetGhostBattleFilter
+            );
+            _uiView.PreviewContainerSizeChanged += OnPreviewContainerSizeChanged;
+        }
         _uiView.EnsureCreated();
+    }
+
+    private void OnPreviewContainerSizeChanged(int width, int height)
+    {
+        if (_previewRenderer == null)
+            return;
+
+        if (_previewRenderer.SetTextureSize(width, height) && IsVisible)
+            RefreshSelectedBattlePreview();
     }
 
     private void DisposeUi()
@@ -41,23 +54,17 @@ internal sealed partial class HistoryPanel
         _uiView?.Refresh(BuildUiModel());
     }
 
-    private void UpdatePreviewUiTick(bool previewDebugVisible)
+    private void UpdatePreviewUiTick()
     {
         if (_uiView == null)
             return;
 
         _uiView.SetPreviewTexture(_previewRenderer?.CurrentTexture);
-        _uiView.SetPreviewDebugVisible(previewDebugVisible);
     }
 
     private void SetPreviewStatus(string? message, bool visible)
     {
         _uiView?.SetPreviewStatus(message, visible);
-    }
-
-    private void SetPreviewDebugText(string? message, bool visible)
-    {
-        _uiView?.SetPreviewDebug(message, visible);
     }
 
     private HistoryPanelUiToolkitModel BuildUiModel()

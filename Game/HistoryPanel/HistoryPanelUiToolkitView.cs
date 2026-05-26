@@ -52,6 +52,9 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Button? _deleteButton;
     private Button? _replayButton;
     private bool _suppressSelectionCallbacks;
+    private Vector2 _lastPreviewContainerSize;
+
+    public event Action<int, int>? PreviewContainerSizeChanged;
 
     public HistoryPanelUiToolkitView(
         Transform parent,
@@ -105,6 +108,23 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _root.pickingMode = PickingMode.Position;
 
         BuildTree(_root);
+
+        _previewContainer?.RegisterCallback<GeometryChangedEvent>(OnPreviewContainerGeometryChanged);
+    }
+
+    private void OnPreviewContainerGeometryChanged(GeometryChangedEvent evt)
+    {
+        var size = evt.newRect.size;
+        var width = Mathf.Max(1, Mathf.RoundToInt(size.x));
+        var height = Mathf.Max(1, Mathf.RoundToInt(size.y));
+        if (width <= 0 || height <= 0)
+            return;
+        if (Mathf.Approximately(_lastPreviewContainerSize.x, size.x)
+            && Mathf.Approximately(_lastPreviewContainerSize.y, size.y))
+            return;
+
+        _lastPreviewContainerSize = size;
+        PreviewContainerSizeChanged?.Invoke(width, height);
     }
 
     public void SetVisible(bool visible)

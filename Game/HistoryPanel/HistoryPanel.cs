@@ -34,7 +34,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private HistoryPanelPreviewRenderer? _previewRenderer;
     private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
-    private float _previewDebugOverlayUntil;
     private string _lastSceneToken = string.Empty;
     private bool _initialized;
     private bool _uiFontPrewarmedForScene;
@@ -181,11 +180,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (!IsVisible)
             return;
 
-        _previewRenderer?.RenderLiveFrame();
-        UpdatePreviewUiTick(Time.unscaledTime < _previewDebugOverlayUntil);
-
-        if (TryHandlePreviewDebugHotkeys(keyboard))
-            return;
+        UpdatePreviewUiTick();
 
         if (keyboard.escapeKey.wasPressedThisFrame)
             SetHistoryVisible(false);
@@ -276,7 +271,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private void RefreshLocalizationInternal()
     {
         RefreshUi();
-        UpdatePreviewUiTick(Time.unscaledTime < _previewDebugOverlayUntil);
+        UpdatePreviewUiTick();
     }
 
     private bool CanOpenHistoryReview()
@@ -298,7 +293,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (_previewRenderer == null || _previewSource == null)
             return;
 
-        var previewRequest = _previewSource.Build(
+        var previewData = _previewSource.Build(
             _previewSelectionMode,
             _sectionMode,
             ActiveSelectedBattle,
@@ -307,10 +302,9 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         );
         _previewCoroutine = StartCoroutine(
             _previewRenderer.RenderPreview(
-                previewRequest.RenderId,
-                previewRequest.PreviewData,
+                previewData,
                 SetPreviewStatus,
-                () => UpdatePreviewUiTick(Time.unscaledTime < _previewDebugOverlayUntil)
+                UpdatePreviewUiTick
             )
         );
     }
@@ -434,68 +428,4 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         return $"{prefix}{eventSystem.GetType().Name}(name='{eventSystem.name}',activeSelf={eventSystem.gameObject.activeSelf},activeInHierarchy={eventSystem.gameObject.activeInHierarchy},enabled={eventSystem.enabled},isCurrent={ReferenceEquals(EventSystem.current, eventSystem)},scene='{eventSystem.gameObject.scene.name}',modules=[{string.Join(", ", modules)}])";
     }
 
-    private bool TryHandlePreviewDebugHotkeys(Keyboard keyboard)
-    {
-        if (_previewRenderer == null)
-            return false;
-
-        var ctrlPressed = keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
-        if (!ctrlPressed)
-            return false;
-
-        var positionStep =
-            keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed ? 1f : 0.25f;
-        var fovStep = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed ? 5f : 1f;
-        var scaleStep =
-            keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed ? 0.1f : 0.025f;
-        var altPressed = keyboard.leftAltKey.isPressed || keyboard.rightAltKey.isPressed;
-
-        var handled = false;
-        if (keyboard.leftArrowKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeBoardHorizontalOffset(-positionStep);
-        else if (keyboard.rightArrowKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeBoardHorizontalOffset(positionStep);
-        else if (keyboard.upArrowKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeCameraDepth(-positionStep);
-        else if (keyboard.downArrowKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeCameraDepth(positionStep);
-        else if (keyboard.pageUpKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeCameraVerticalCenter(positionStep);
-        else if (keyboard.pageDownKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeCameraVerticalCenter(-positionStep);
-        else if (keyboard.homeKey.wasPressedThisFrame || keyboard.qKey.wasPressedThisFrame)
-            handled = altPressed
-                ? _previewRenderer.NudgeCardHeightScale(scaleStep)
-                : _previewRenderer.NudgeCardWidthScale(scaleStep);
-        else if (keyboard.endKey.wasPressedThisFrame || keyboard.eKey.wasPressedThisFrame)
-            handled = altPressed
-                ? _previewRenderer.NudgeCardHeightScale(-scaleStep)
-                : _previewRenderer.NudgeCardWidthScale(-scaleStep);
-        else if (keyboard.leftBracketKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeCardSpacingX(-scaleStep);
-        else if (keyboard.rightBracketKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeCardSpacingX(scaleStep);
-        else if (keyboard.equalsKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeFieldOfView(fovStep);
-        else if (keyboard.minusKey.wasPressedThisFrame)
-            handled = _previewRenderer.NudgeFieldOfView(-fovStep);
-        else if (keyboard.backspaceKey.wasPressedThisFrame)
-            handled = _previewRenderer.ResetDebugTuning();
-
-        if (!handled)
-            return false;
-
-        _statusMessage =
-            $"{HistoryPanelText.PreviewTuneStatus(_previewRenderer.GetDebugSummary())} | {HistoryPanelText.PreviewTuneHelp()}";
-        ShowPreviewDebugOverlay(_previewRenderer.GetDebugSummary());
-        RefreshUi();
-        RefreshSelectedBattlePreview();
-        return true;
-    }
-
-    private void ShowPreviewDebugOverlay(string summary)
-    {
-        SetPreviewDebugText(summary, true);
-        _previewDebugOverlayUntil = Time.unscaledTime + 6f;
-    }
 }
