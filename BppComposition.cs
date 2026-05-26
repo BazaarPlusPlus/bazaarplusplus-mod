@@ -85,6 +85,7 @@ internal sealed class BppComposition : IDisposable
 
         _mountables.Register(new CardSetPreviewMount());
         _mountables.Register(new CombatStatusBarMount());
+        _mountables.Register(new MonsterPreviewItemBoardMount());
         _mountables.Register(new MonsterPreviewWarmupMount());
         _mountables.Register(new RunLoggingMount());
         _mountables.Register(new RunUploadMount());

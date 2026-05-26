@@ -8,7 +8,6 @@ using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
-using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
@@ -143,9 +142,6 @@ public class Plugin : BaseUnityPlugin
 
         AddConfiguredHistoryPanel(services, combatReplayRuntime);
 
-        var itemBoardRuntime = gameObject.AddComponent<MonsterPreviewItemBoardRuntime>();
-        itemBoardRuntime.Initialize(services);
-
         var screenshot = gameObject.AddComponent<EndOfRunScreenshotController>();
         screenshot.Initialize(services);
 
@@ -233,7 +229,6 @@ public class Plugin : BaseUnityPlugin
         DestroyComponentIfPresent<TooltipModifierRefreshController>();
         DestroyComponentIfPresent<EndOfRunScreenshotController>();
         DestroyComponentIfPresent<BazaarDbScreenshotUploadController>();
-        DestroyComponentIfPresent<MonsterPreviewItemBoardRuntime>();
         DestroyComponentIfPresent<HistoryPanel>();
         DestroyComponentIfPresent<CombatReplayRuntime>();
     }
