@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
-using BazaarPlusPlus.Game.Screenshots.Upload;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
 
@@ -23,15 +22,6 @@ internal static class BppSettingsDockCatalog
             collapseAfterActivate: true
         ),
         new(
-            "BazaarDbUpload",
-            BazaarDbScreenshotUploadSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                ReadBazaarDbUploadEnabled,
-                WriteBazaarDbUploadEnabled,
-                BazaarDbScreenshotUploadController.OnEnabledChanged
-            )
-        ),
-        new(
             "ChineseLocaleMode",
             ResolveChineseLocaleModeLabel,
             _ => BppChineseLocalization.ResolveModeStatus(ReadChineseLocaleMode()),
@@ -49,7 +39,7 @@ internal static class BppSettingsDockCatalog
     // Final expected indices 0..7:
     //   GameHistory, NameOverride, LegendaryPositionDisplay, EnchantPreview,
     //   UpgradePreview, CombatStatusBar, BazaarDbUpload, ChineseLocaleMode.
-    private static readonly int[] _hardcodedOrders = [0, 6, 7];
+    private static readonly int[] _hardcodedOrders = [0, 7];
 
     public static void Install(IBppConfig config, SettingsDockEntryRegistry registry)
     {
@@ -152,15 +142,4 @@ internal static class BppSettingsDockCatalog
         return ReadChineseLocaleMode() != BppChineseLocaleMode.Mainland;
     }
 
-    private static bool ReadBazaarDbUploadEnabled()
-    {
-        return Config.BazaarDbUploadEnabled?.Value ?? false;
-    }
-
-    private static void WriteBazaarDbUploadEnabled(bool enabled)
-    {
-        var config = Config.BazaarDbUploadEnabled;
-        if (config != null)
-            config.Value = enabled;
-    }
 }

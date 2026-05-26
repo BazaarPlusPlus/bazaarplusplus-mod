@@ -12,6 +12,7 @@ using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLifecycle;
+using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.UpgradePreview;
 using BazaarPlusPlus.GameInterop;
@@ -72,6 +73,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_combatReplayModule);
         _featureRegistry.Register(_combatStatusBarModule);
 
+        _settingsDockRegistry.Register(new BazaarDbScreenshotUploadSettingsDockEntry());
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
         _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());
         _settingsDockRegistry.Register(new LegendaryPositionSettingsDockEntry());
