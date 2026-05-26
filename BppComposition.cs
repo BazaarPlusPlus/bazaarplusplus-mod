@@ -15,6 +15,7 @@ using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Upload;
+using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.UpgradePreview;
@@ -85,6 +86,7 @@ internal sealed class BppComposition : IDisposable
 
         _mountables.Register(new CardSetPreviewMount());
         _mountables.Register(new CombatStatusBarMount());
+        _mountables.Register(new EndOfRunScreenshotMount());
         _mountables.Register(new MonsterPreviewItemBoardMount());
         _mountables.Register(new MonsterPreviewWarmupMount());
         _mountables.Register(new RunLoggingMount());
