@@ -125,7 +125,7 @@ public static class ItemEnchantPreviewRenderer
             if (
                 component is ITooltipToken token
                 && token.ReferencedAttribute.HasValue
-                && token.ReferencedAttribute.Value.RequiresConversionToSecondsForTooltips()
+                && token.ReferencedAttribute.Value.RequiresConversionToSeconds()
             )
             {
                 var seconds = TooltipExtensions.MillisecondsToSeconds(
