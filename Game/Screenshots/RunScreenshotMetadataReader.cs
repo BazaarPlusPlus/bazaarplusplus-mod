@@ -1,6 +1,6 @@
 #nullable enable
-using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.RunLogging;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Storage.RunScreenshot;
 using TheBazaar;
 

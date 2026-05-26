@@ -3,6 +3,7 @@ using System;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Storage.Paths;
 using BazaarPlusPlus.Core.RunContext;
 using BepInEx.Logging;

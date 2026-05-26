@@ -13,7 +13,7 @@ var combatReplayPersistenceDrainedType = RequireType(
     "BazaarPlusPlus.Core.Events.CombatReplayPersistenceDrained"
 );
 var runInitializedObservedType = RequireType("BazaarPlusPlus.Core.Events.RunInitializedObserved");
-var runContextStoreType = RequireType("BazaarPlusPlus.Core.RunContext.RunContextStore");
+var runContextStoreType = RequireType("BazaarPlusPlus.GameInterop.RunContextStore");
 var captureServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCaptureService");
 var runLifecycleChangedType = RequireType("BazaarPlusPlus.Core.Events.RunLifecycleChanged");
 var runExitKindType = RequireType("BazaarPlusPlus.Core.RunContext.RunExitKind");

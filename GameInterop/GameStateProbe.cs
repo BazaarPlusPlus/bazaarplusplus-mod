@@ -1,6 +1,7 @@
+using BazaarPlusPlus.Core.GameState;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Core.GameState;
+namespace BazaarPlusPlus.GameInterop;
 
 internal sealed class GameStateProbe : IGameStateProbe
 {

@@ -8,6 +8,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarPlusPlus.Core.RunContext;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Storage.RunLog;
 using TheBazaar;
 
@@ -55,7 +56,7 @@ internal static class RunLoggingGameDataReader
     {
         try
         {
-            return BazaarPlusPlus.Core.Runtime.BppClientCacheBridge.TryGetPlayerRankSnapshot(
+            return BazaarPlusPlus.GameInterop.BppClientCacheBridge.TryGetPlayerRankSnapshot(
                 out rank,
                 out rating,
                 out _

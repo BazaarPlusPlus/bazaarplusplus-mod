@@ -1,7 +1,8 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Core.RunContext;
 
-namespace BazaarPlusPlus.Core.RunContext;
+namespace BazaarPlusPlus.GameInterop;
 
 internal sealed class RunContextStore : IRunContext
 {

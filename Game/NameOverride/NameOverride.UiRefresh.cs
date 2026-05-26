@@ -1,4 +1,4 @@
-using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop;
 using TheBazaar;
 using UnityEngine;
 

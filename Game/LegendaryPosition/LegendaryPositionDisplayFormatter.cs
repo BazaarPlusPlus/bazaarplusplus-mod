@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Core.Config;
-using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop;
 
 namespace BazaarPlusPlus.Game.LegendaryPosition;
 

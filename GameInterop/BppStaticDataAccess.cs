@@ -1,7 +1,7 @@
 #nullable enable
 using TheBazaar;
 
-namespace BazaarPlusPlus.Core.Runtime;
+namespace BazaarPlusPlus.GameInterop;
 
 /// <summary>
 /// <c>Data.GetStatic()</c> returns <c>Task.FromResult(manager)</c>, so reading the

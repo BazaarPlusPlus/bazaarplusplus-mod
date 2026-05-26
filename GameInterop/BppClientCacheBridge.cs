@@ -6,7 +6,7 @@ using BazaarGameShared.TempoNet.Models;
 using BazaarGameShared.TempoNet.Responses;
 using HarmonyLib;
 
-namespace BazaarPlusPlus.Core.Runtime;
+namespace BazaarPlusPlus.GameInterop;
 
 internal static class BppClientCacheBridge
 {
