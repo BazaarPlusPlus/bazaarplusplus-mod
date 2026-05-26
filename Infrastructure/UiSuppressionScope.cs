@@ -2,19 +2,19 @@
 using System;
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.Screenshots;
+namespace BazaarPlusPlus.Infrastructure;
 
-internal sealed class ScreenshotUiSuppressionScope : IDisposable
+internal sealed class UiSuppressionScope : IDisposable
 {
     private readonly List<IDisposable> _leases;
     private bool _disposed;
 
-    private ScreenshotUiSuppressionScope(List<IDisposable> leases)
+    private UiSuppressionScope(List<IDisposable> leases)
     {
         _leases = leases;
     }
 
-    internal static ScreenshotUiSuppressionScope Begin(
+    internal static UiSuppressionScope Begin(
         params Func<IDisposable?>[] suppressionActions
     )
     {
@@ -33,7 +33,7 @@ internal sealed class ScreenshotUiSuppressionScope : IDisposable
                     leases.Add(lease);
             }
 
-            return new ScreenshotUiSuppressionScope(leases);
+            return new UiSuppressionScope(leases);
         }
         catch
         {

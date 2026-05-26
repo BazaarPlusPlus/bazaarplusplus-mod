@@ -1,10 +1,9 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.Settings;
@@ -245,8 +244,4 @@ internal sealed partial class BppSettingsDockController
         return "BazaarPlusPlus";
     }
 
-    private static bool IsCtrlHeld()
-    {
-        return KeyBindings.Modifiers.IsCtrlPressed(Keyboard.current);
-    }
 }

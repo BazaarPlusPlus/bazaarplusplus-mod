@@ -2,9 +2,10 @@
 using System;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Settings;
 
 [HarmonyPatch(typeof(OptionsDialogController), "OnLanguageOptionChanged")]
 internal static class OptionsDialogLanguageRefreshPatch

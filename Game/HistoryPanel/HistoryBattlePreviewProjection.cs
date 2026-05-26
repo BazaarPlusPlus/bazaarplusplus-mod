@@ -6,11 +6,11 @@ using System.Reflection;
 using BazaarGameShared.Domain.Cards.Socket;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect.AuraActions;
-using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.PreviewSurface;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -89,7 +89,7 @@ internal static class HistoryBattlePreviewProjection
     }
 
     private static int CountRenderable(
-        IList<CombatReplayCardSnapshot>? snapshots,
+        IList<PvpBattleCardSnapshot>? snapshots,
         bool isSkill,
         object? staticData
     )
@@ -139,7 +139,7 @@ internal static class HistoryBattlePreviewProjection
     }
 
     private static List<PreviewCardSpec> BuildPreviewCardSpecs(
-        IEnumerable<CombatReplayCardSnapshot>? snapshots,
+        IEnumerable<PvpBattleCardSnapshot>? snapshots,
         bool isSkill,
         IReadOnlyDictionary<EContainerSocketId, HashSet<ECardAttributeType>>? socketEffectsBySocket
     )
@@ -173,7 +173,7 @@ internal static class HistoryBattlePreviewProjection
     }
 
     private static PreviewCardSpec? BuildPreviewCardSpec(
-        CombatReplayCardSnapshot snapshot,
+        PvpBattleCardSnapshot snapshot,
         bool isSkill,
         IReadOnlyDictionary<EContainerSocketId, HashSet<ECardAttributeType>>? socketEffectsBySocket
     )
@@ -224,7 +224,7 @@ internal static class HistoryBattlePreviewProjection
     private static IReadOnlyDictionary<
         EContainerSocketId,
         HashSet<ECardAttributeType>
-    > BuildSocketEffectMap(IEnumerable<CombatReplayCardSnapshot>? snapshots)
+    > BuildSocketEffectMap(IEnumerable<PvpBattleCardSnapshot>? snapshots)
     {
         var result = new Dictionary<EContainerSocketId, HashSet<ECardAttributeType>>();
         if (snapshots == null)
@@ -257,7 +257,7 @@ internal static class HistoryBattlePreviewProjection
     }
 
     private static void ApplySocketEffectAttributes(
-        CombatReplayCardSnapshot snapshot,
+        PvpBattleCardSnapshot snapshot,
         IDictionary<int, int> attributes,
         IReadOnlyDictionary<EContainerSocketId, HashSet<ECardAttributeType>>? socketEffectsBySocket
     )
@@ -297,7 +297,7 @@ internal static class HistoryBattlePreviewProjection
     }
 
     private static ECardAttributeType? ResolveSocketEffectAttributeType(
-        CombatReplayCardSnapshot snapshot
+        PvpBattleCardSnapshot snapshot
     )
     {
         if (snapshot == null || string.IsNullOrWhiteSpace(snapshot.TemplateId))

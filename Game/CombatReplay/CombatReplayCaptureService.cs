@@ -29,7 +29,7 @@ internal sealed class CombatReplayCaptureService
     private readonly PvpBattleSnapshotCollector _collector;
     private readonly PvpBattleManifestFactory _manifestFactory;
     private readonly PvpReplayPayloadFactory _payloadFactory;
-    private CombatReplaySequenceCandidate _candidate = new CombatReplaySequenceCandidate();
+    private PvpBattleSequenceCandidate _candidate = new PvpBattleSequenceCandidate();
 
     public CombatReplayCaptureService()
         : this(null) { }
@@ -114,7 +114,7 @@ internal sealed class CombatReplayCaptureService
     }
 
     private PvpBattleCaptureArtifact CreateArtifact(
-        CombatReplaySequenceCandidate candidate,
+        PvpBattleSequenceCandidate candidate,
         PvpBattleSequenceWindow sequenceWindow
     )
     {
@@ -138,7 +138,7 @@ internal sealed class CombatReplayCaptureService
         return new PvpBattleCaptureArtifact { Manifest = manifest, Payload = payload };
     }
 
-    private CombatReplaySequenceCandidate CreateOpeningCandidate(
+    private PvpBattleSequenceCandidate CreateOpeningCandidate(
         NetMessageGameSim message,
         string? runId
     )
@@ -148,7 +148,7 @@ internal sealed class CombatReplayCaptureService
         return candidate;
     }
 
-    private void CaptureLiveSnapshots(CombatReplaySequenceCandidate candidate)
+    private void CaptureLiveSnapshots(PvpBattleSequenceCandidate candidate)
     {
         _collector.CaptureLiveSnapshots(candidate);
     }

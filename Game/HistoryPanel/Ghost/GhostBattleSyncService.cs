@@ -5,9 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Models;
@@ -272,13 +271,13 @@ internal sealed class GhostBattleSyncService
             Source = ParseEnum(capture?.Source, PvpBattleCaptureSource.Unknown),
             Items =
                 capture?.Items?.Select(MapToCardSnapshot).ToList()
-                ?? new List<CombatReplayCardSnapshot>(),
+                ?? new List<PvpBattleCardSnapshot>(),
         };
     }
 
-    private static CombatReplayCardSnapshot MapToCardSnapshot(CardSetItemArtifact item)
+    private static PvpBattleCardSnapshot MapToCardSnapshot(CardSetItemArtifact item)
     {
-        return new CombatReplayCardSnapshot
+        return new PvpBattleCardSnapshot
         {
             InstanceId = item.InstanceId,
             TemplateId = item.TemplateId,

@@ -92,10 +92,9 @@ var summaryRevealStateType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.EndOfRunSummaryRevealState",
     throwOnError: true
 )!;
-var captureSourceType = assembly.GetType(
-    "BazaarPlusPlus.Game.Screenshots.RunScreenshotCaptureSource",
-    throwOnError: true
-)!;
+var captureSourceType = Assembly
+    .Load("BazaarPlusPlus.Storage")
+    .GetType("BazaarPlusPlus.Storage.RunScreenshot.RunScreenshotCaptureSource", throwOnError: true)!;
 Assert(
     Enum.GetNames(captureSourceType) is ["EndOfRunAuto"],
     "Screenshot capture sources should only expose EndOfRunAuto."

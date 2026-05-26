@@ -4,7 +4,7 @@ using BazaarPlusPlus.Game.Screenshots;
 using HarmonyLib;
 using TheBazaar.UI.EndOfRun;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.EndOfRun;
 
 [HarmonyPatch(typeof(EndOfRunScreenController), "OnContinueClick")]
 internal static class EndOfRunScreenshotPatch

@@ -1,9 +1,9 @@
 #nullable enable
 using System;
 
-namespace BazaarPlusPlus.Game.Screenshots;
+namespace BazaarPlusPlus.Storage.RunScreenshot;
 
-internal sealed class RunScreenshotRecord
+public sealed class RunScreenshotRecord
 {
     public string ScreenshotId { get; set; } = string.Empty;
 

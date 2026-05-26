@@ -2,7 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.Infrastructure;
 using Newtonsoft.Json;
 using UnityEngine;
 

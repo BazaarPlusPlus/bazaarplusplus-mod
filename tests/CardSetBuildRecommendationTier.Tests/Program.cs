@@ -58,8 +58,8 @@ static void TestDefaultFinalBuildCachePathUsesGameRootDirectory()
     var cachePath = (string)buildPathMethod!.Invoke(null, [gameRootPath])!;
 
     Assert(
-        cachePath == Path.Combine(gameRootPath, "BazaarPlusPlus", "final_builds_for_mod.json"),
-        "Final build cache should live under GameRoot/BazaarPlusPlus/final_builds_for_mod.json."
+        cachePath == Path.Combine(gameRootPath, "BazaarPlusPlusV4", "final_builds_for_mod.json"),
+        "Final build cache should live under GameRoot/BazaarPlusPlusV4/final_builds_for_mod.json."
     );
 }
 

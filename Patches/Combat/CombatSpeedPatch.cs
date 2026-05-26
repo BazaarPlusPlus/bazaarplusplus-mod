@@ -3,7 +3,7 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Combat;
 
 [HarmonyPatch(typeof(CombatSimHandler), "SetSpeed")]
 internal static class CombatSpeedPatch

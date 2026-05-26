@@ -2,6 +2,7 @@
 using System;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 

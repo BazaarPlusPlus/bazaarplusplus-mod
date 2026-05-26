@@ -5,7 +5,7 @@ using HarmonyLib;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Tooltips;
 
 [HarmonyPatch(typeof(CardTooltipTypeHandler), nameof(CardTooltipTypeHandler.HandleTooltip))]
 internal static class NativeMonsterBoardOnlyHandleTooltipPatch

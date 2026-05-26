@@ -10,6 +10,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.AutoBazaar;

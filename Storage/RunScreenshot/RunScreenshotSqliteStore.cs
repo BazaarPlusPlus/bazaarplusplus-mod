@@ -3,9 +3,9 @@ using System;
 using BazaarPlusPlus.Storage.RunLog;
 using BazaarPlusPlus.Storage.Sqlite;
 
-namespace BazaarPlusPlus.Game.Screenshots.Persistence;
+namespace BazaarPlusPlus.Storage.RunScreenshot;
 
-internal sealed class RunScreenshotSqliteStore : SqliteStoreBase
+public sealed class RunScreenshotSqliteStore : SqliteStoreBase
 {
     public RunScreenshotSqliteStore(string databasePath)
         : base(databasePath) { }

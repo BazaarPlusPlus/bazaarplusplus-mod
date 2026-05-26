@@ -5,6 +5,8 @@ using System.Reflection;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 

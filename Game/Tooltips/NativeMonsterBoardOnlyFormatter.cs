@@ -1,6 +1,7 @@
 #nullable enable
 using System.Reflection;
 using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;

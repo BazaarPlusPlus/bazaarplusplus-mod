@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 

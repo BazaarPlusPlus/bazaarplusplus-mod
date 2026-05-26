@@ -1,16 +1,16 @@
-using BazaarPlusPlus.Game.Screenshots;
+using BazaarPlusPlus.Infrastructure;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests;
 
-public sealed class ScreenshotUiSuppressionScopeTests
+public sealed class UiSuppressionScopeTests
 {
     [Fact]
     public void Begin_AppliesSuppressionsInOrder_AndRestoresInReverseOrder()
     {
         var events = new List<string>();
 
-        using var scope = ScreenshotUiSuppressionScope.Begin(
+        using var scope = UiSuppressionScope.Begin(
             () => CreateLease("dock", events),
             () => CreateLease("combat", events)
         );
@@ -28,7 +28,7 @@ public sealed class ScreenshotUiSuppressionScopeTests
         var events = new List<string>();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ScreenshotUiSuppressionScope.Begin(
+            UiSuppressionScope.Begin(
                 () => CreateLease("dock", events),
                 () => throw new InvalidOperationException("boom")
             )

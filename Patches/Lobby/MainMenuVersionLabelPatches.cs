@@ -2,12 +2,13 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.Lobby;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 using TMPro;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Lobby;
 
 [HarmonyPatch(typeof(VersionShow), "BuildVersionLabel")]
 internal static class MainMenuVersionLabelBuildPatch

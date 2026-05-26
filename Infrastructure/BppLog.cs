@@ -2,10 +2,9 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Infrastructure;
 using BepInEx.Logging;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Infrastructure;
 
 internal static class BppLog
 {

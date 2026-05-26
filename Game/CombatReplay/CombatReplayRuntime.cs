@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.RunLifecycle;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;

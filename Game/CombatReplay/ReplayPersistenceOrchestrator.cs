@@ -5,6 +5,7 @@ using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Storage.Upload;
 
 namespace BazaarPlusPlus.Game.CombatReplay;

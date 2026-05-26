@@ -4,8 +4,8 @@ using System.Reflection;
 var assembly = Assembly.Load("BazaarPlusPlus");
 var runLifecycleType = RequireType("BazaarPlusPlus.Game.RunLifecycle.RunLifecycleModule");
 var eventBusType = RequireType("BazaarPlusPlus.Core.Events.InMemoryBppEventBus");
-var gameStateProbeType = RequireType("BazaarPlusPlus.Core.GameState.GameStateProbe");
-var runContextType = RequireType("BazaarPlusPlus.Core.RunContext.RunContextStore");
+var gameStateProbeType = RequireType("BazaarPlusPlus.GameInterop.GameStateProbe");
+var runContextType = RequireType("BazaarPlusPlus.GameInterop.RunContextStore");
 
 var eventBus =
     Activator.CreateInstance(eventBusType)

@@ -5,6 +5,7 @@ using System.Linq;
 using BazaarGameShared;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Lobby;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.AppFramework;

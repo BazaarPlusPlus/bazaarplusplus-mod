@@ -3,7 +3,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Combat;
 
 [HarmonyPatch(typeof(ReplayState), nameof(ReplayState.Exit))]
 internal static class CombatReplayStateExitPatch

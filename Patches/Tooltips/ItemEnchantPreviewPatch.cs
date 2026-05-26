@@ -2,13 +2,14 @@
 using System.Text;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.Tooltips;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Tooltips;
 
 // Item enchant preview: append BazaarPlusPlus-generated text into passive tooltip block
 [HarmonyPatch(typeof(CardTooltipData), nameof(CardTooltipData.GetPassiveTooltipBlock))]

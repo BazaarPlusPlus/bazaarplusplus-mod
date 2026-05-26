@@ -2,8 +2,9 @@
 using System;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Events;
-using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.Events;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 

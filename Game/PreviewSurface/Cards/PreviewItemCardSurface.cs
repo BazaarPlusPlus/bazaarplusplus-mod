@@ -7,6 +7,7 @@ using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;
@@ -35,7 +36,7 @@ internal sealed class PreviewItemCardSurface : IPreviewCardSurface
 
             if (_staticData == null)
             {
-                _staticData = await Data.GetStatic();
+                _staticData = Data.GetStatic();
                 BppLog.Debug(
                     "PreviewItemCardSurface",
                     $"Static data loaded={(_staticData != null)}"

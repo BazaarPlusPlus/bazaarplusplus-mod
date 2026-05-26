@@ -2,10 +2,11 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using UnityEngine.UI;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Settings;
 
 [HarmonyPatch(typeof(SettingDialogsView), "Awake")]
 internal static class BppSettingsDockAwakePatch

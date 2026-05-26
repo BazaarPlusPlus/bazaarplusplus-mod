@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Reflection;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 

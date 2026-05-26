@@ -1,7 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Runs;
 using BazaarGameShared.Infra.Messages;
-using BazaarPlusPlus.Game.CombatReplay;
 
 namespace BazaarPlusPlus.Game.PvpBattles;
 
@@ -19,13 +18,13 @@ internal sealed class PvpBattleSequenceMatcher
         return state == ERunState.Combat || state == ERunState.PVPCombat;
     }
 
-    public CombatReplaySequenceCandidate ResetCandidate()
+    public PvpBattleSequenceCandidate ResetCandidate()
     {
-        return new CombatReplaySequenceCandidate();
+        return new PvpBattleSequenceCandidate();
     }
 
     public PvpBattleSequenceWindow CreateCompletedWindow(
-        CombatReplaySequenceCandidate candidate,
+        PvpBattleSequenceCandidate candidate,
         NetMessageGameSim despawnMessage,
         string? runId
     )

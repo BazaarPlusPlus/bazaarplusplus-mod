@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Infrastructure;
 
 internal static class BppPluginVersion
 {

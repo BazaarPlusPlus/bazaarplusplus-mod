@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using BazaarGameShared.Infra.Messages;
 
-namespace BazaarPlusPlus.Game.CombatReplay;
+namespace BazaarPlusPlus.Game.PvpBattles;
 
-internal sealed class CombatReplaySequenceCandidate
+/// <summary>PvpBattle in-flight capture state assembled across spawn → combat → despawn
+/// game-sim events.</summary>
+internal sealed class PvpBattleSequenceCandidate
 {
     public string? BattleId { get; set; }
 
@@ -34,21 +36,21 @@ internal sealed class CombatReplaySequenceCandidate
 
     public bool PlayerHandCardsCapturedLive { get; set; }
 
-    public List<CombatReplayCardSnapshot> PlayerHandCards { get; set; } = new();
+    public List<PvpBattleCardSnapshot> PlayerHandCards { get; set; } = new();
 
     public bool PlayerSkillsCapturedFromOpening { get; set; }
 
     public bool PlayerSkillsCapturedLive { get; set; }
 
-    public List<CombatReplayCardSnapshot> PlayerSkills { get; set; } = new();
+    public List<PvpBattleCardSnapshot> PlayerSkills { get; set; } = new();
 
     public bool OpponentHandCardsCapturedFromOpening { get; set; }
 
-    public List<CombatReplayCardSnapshot> OpponentHandCards { get; set; } = new();
+    public List<PvpBattleCardSnapshot> OpponentHandCards { get; set; } = new();
 
     public bool OpponentSkillsCapturedFromOpening { get; set; }
 
-    public List<CombatReplayCardSnapshot> OpponentSkills { get; set; } = new();
+    public List<PvpBattleCardSnapshot> OpponentSkills { get; set; } = new();
 
     public NetMessageGameSim? SpawnMessage { get; set; }
 

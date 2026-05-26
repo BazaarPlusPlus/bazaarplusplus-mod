@@ -1,13 +1,12 @@
 #nullable enable
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.CombatReplay;
 
 namespace BazaarPlusPlus.Game.PvpBattles;
 
 public sealed class PvpBattleCardSetCapture
 {
-    public IList<CombatReplayCardSnapshot> Items { get; set; } =
-        new List<CombatReplayCardSnapshot>();
+    public IList<PvpBattleCardSnapshot> Items { get; set; } =
+        new List<PvpBattleCardSnapshot>();
 
     public PvpBattleCaptureStatus Status { get; set; }
 

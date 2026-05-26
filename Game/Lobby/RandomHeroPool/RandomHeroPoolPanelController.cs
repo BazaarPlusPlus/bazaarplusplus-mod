@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.Lobby;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI;

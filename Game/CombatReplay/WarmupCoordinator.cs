@@ -15,6 +15,7 @@ using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Infrastructure;
 using FMOD.Studio;
 using FMODUnity;
 using TheBazaar;
@@ -443,7 +444,7 @@ internal static class WarmupCoordinator
         }
     }
 
-    private static IEnumerable<CombatReplayCardSnapshot> EnumerateItemSnapshots(
+    private static IEnumerable<PvpBattleCardSnapshot> EnumerateItemSnapshots(
         PvpBattleManifest manifest
     )
     {

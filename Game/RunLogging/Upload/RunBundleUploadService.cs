@@ -3,9 +3,11 @@ using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
+using BazaarPlusPlus.ModApi.Http;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
@@ -20,6 +22,7 @@ internal sealed class RunBundleUploadService : IDisposable
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
         _httpClient = BppHttpClientFactory.Create(
+            productVersion: BppPluginVersion.Current,
             userAgentSuffix: "RunBundleUpload",
             timeout: timeout
         );

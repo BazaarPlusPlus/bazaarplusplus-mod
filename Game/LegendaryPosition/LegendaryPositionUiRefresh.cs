@@ -1,6 +1,6 @@
 #nullable enable
 using BazaarGameShared.TempoNet.Enums;
-using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;

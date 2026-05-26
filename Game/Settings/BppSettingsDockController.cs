@@ -1,8 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.Input;
-using BazaarPlusPlus.Game.Screenshots;
+using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -68,7 +67,7 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
         for (var index = 0; index < controllers.Length; index++)
             suppressionActions[index] = controllers[index].BeginInstanceScreenshotSuppression;
 
-        return ScreenshotUiSuppressionScope.Begin(suppressionActions);
+        return UiSuppressionScope.Begin(suppressionActions);
     }
 
     internal static void RefreshAll()
@@ -358,9 +357,6 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
 
     private void ActivateDefinition(BppSettingsDockDefinition definition)
     {
-        if (definition.RequiresCtrlToActivate && !IsCtrlHeld())
-            return;
-
         definition.Activate();
         if (definition.CollapseAfterActivate)
             SetExpanded(false);

@@ -5,11 +5,12 @@ using System.Collections.Generic;
 using System.Linq;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Lobby.RandomHeroPool;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.UI;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Lobby;
 
 [HarmonyPatch(typeof(HeroSelectButtonsView), "Awake")]
 internal static class RandomHeroPoolAwakePatch

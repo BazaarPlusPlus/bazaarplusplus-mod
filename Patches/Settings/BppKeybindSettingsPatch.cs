@@ -4,11 +4,12 @@ using System;
 using System.Collections;
 using System.Linq;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.UI;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Settings;
 
 [HarmonyPatch(typeof(OptionsDialogController), "Awake")]
 internal static class BppKeybindSettingsAwakePatch

@@ -3,15 +3,15 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Storage.RunLog;
 
-namespace BazaarPlusPlus.Game.RunLogging.Persistence;
+namespace BazaarPlusPlus.Storage.RunLog.Replication;
 
-internal sealed class QueuedRunLogStore : IRunLogStore, IDisposable
+public sealed class QueuedRunLogStore : IRunLogStore, IDisposable
 {
     private static readonly TimeSpan DefaultShutdownDrainTimeout = TimeSpan.FromMilliseconds(2500);
 
     private readonly IRunLogStore _innerStore;
+    private readonly IRunLogStoreLogger? _logger;
     private readonly TimeSpan _shutdownDrainTimeout;
     private readonly object _lifecycleGate = new();
     private readonly ConcurrentQueue<QueuedWrite> _pending = new();
@@ -21,12 +21,17 @@ internal sealed class QueuedRunLogStore : IRunLogStore, IDisposable
     private int _stopAcceptingNewWork;
     private int _disposeStarted;
 
-    public QueuedRunLogStore(IRunLogStore innerStore)
-        : this(innerStore, DefaultShutdownDrainTimeout) { }
+    public QueuedRunLogStore(IRunLogStore innerStore, IRunLogStoreLogger? logger = null)
+        : this(innerStore, DefaultShutdownDrainTimeout, logger) { }
 
-    internal QueuedRunLogStore(IRunLogStore innerStore, TimeSpan shutdownDrainTimeout)
+    internal QueuedRunLogStore(
+        IRunLogStore innerStore,
+        TimeSpan shutdownDrainTimeout,
+        IRunLogStoreLogger? logger = null
+    )
     {
         _innerStore = innerStore ?? throw new ArgumentNullException(nameof(innerStore));
+        _logger = logger;
         _shutdownDrainTimeout =
             shutdownDrainTimeout <= TimeSpan.Zero
                 ? DefaultShutdownDrainTimeout
@@ -83,7 +88,7 @@ internal sealed class QueuedRunLogStore : IRunLogStore, IDisposable
 
         if (!_worker.Wait(_shutdownDrainTimeout))
         {
-            BppLog.Warn(
+            _logger?.Warn(
                 "QueuedRunLogStore",
                 "Timed out while draining queued run logging writes during shutdown."
             );
@@ -137,7 +142,7 @@ internal sealed class QueuedRunLogStore : IRunLogStore, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    BppLog.Error("QueuedRunLogStore", $"Failed to {write.Description}.", ex);
+                    _logger?.Error("QueuedRunLogStore", $"Failed to {write.Description}.", ex);
                 }
             }
 

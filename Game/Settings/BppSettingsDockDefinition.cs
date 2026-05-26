@@ -16,8 +16,7 @@ internal sealed class BppSettingsDockDefinition
             _ => bridge.GetInitialValue() ? "ON" : "OFF",
             bridge.GetInitialValue,
             () => bridge.ApplyValue(!bridge.GetInitialValue()),
-            collapseAfterActivate: false,
-            requiresCtrlToActivate: false
+            collapseAfterActivate: false
         ) { }
 
     internal BppSettingsDockDefinition(
@@ -26,8 +25,7 @@ internal sealed class BppSettingsDockDefinition
         Func<string, string> resolveStatus,
         Func<bool> isActive,
         Action activate,
-        bool collapseAfterActivate,
-        bool requiresCtrlToActivate = false
+        bool collapseAfterActivate
     )
     {
         Key = !string.IsNullOrWhiteSpace(key)
@@ -38,7 +36,6 @@ internal sealed class BppSettingsDockDefinition
         IsActive = isActive ?? throw new ArgumentNullException(nameof(isActive));
         Activate = activate ?? throw new ArgumentNullException(nameof(activate));
         CollapseAfterActivate = collapseAfterActivate;
-        RequiresCtrlToActivate = requiresCtrlToActivate;
     }
 
     internal string Key { get; }
@@ -52,6 +49,4 @@ internal sealed class BppSettingsDockDefinition
     internal Action Activate { get; }
 
     internal bool CollapseAfterActivate { get; }
-
-    internal bool RequiresCtrlToActivate { get; }
 }

@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.CombatReplay;
+namespace BazaarPlusPlus.Game.PvpBattles;
 
-public sealed class CombatReplayCardSnapshot
+public sealed class PvpBattleCardSnapshot
 {
     public string InstanceId { get; set; } = string.Empty;
 
@@ -28,9 +28,9 @@ public sealed class CombatReplayCardSnapshot
 
     public IDictionary<string, int> Attributes { get; set; } = new Dictionary<string, int>();
 
-    public CombatReplayCardSnapshot Clone()
+    public PvpBattleCardSnapshot Clone()
     {
-        return new CombatReplayCardSnapshot
+        return new PvpBattleCardSnapshot
         {
             InstanceId = InstanceId,
             TemplateId = TemplateId,

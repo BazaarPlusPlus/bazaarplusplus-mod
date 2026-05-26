@@ -7,16 +7,16 @@ using BazaarGameShared;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
-using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.RunLogging;
+using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.PvpBattles;
 
 internal sealed class PvpBattleSnapshotCollector
 {
-    public CombatReplaySequenceCandidate CreateOpeningCandidate(
+    public PvpBattleSequenceCandidate CreateOpeningCandidate(
         NetMessageGameSim message,
         string? runId
     )
@@ -32,7 +32,7 @@ internal sealed class PvpBattleSnapshotCollector
             opponentLevel,
             opponentAccountId
         ) = CaptureOpponentIdentityAtOpening(message);
-        var candidate = new CombatReplaySequenceCandidate
+        var candidate = new PvpBattleSequenceCandidate
         {
             RunId = runId,
             PlayerHero = playerHero,
@@ -59,7 +59,7 @@ internal sealed class PvpBattleSnapshotCollector
         return candidate;
     }
 
-    public void CaptureLiveSnapshots(CombatReplaySequenceCandidate candidate)
+    public void CaptureLiveSnapshots(PvpBattleSequenceCandidate candidate)
     {
         if (
             ShouldRefreshPlayerCapture(
@@ -85,7 +85,7 @@ internal sealed class PvpBattleSnapshotCollector
         }
     }
 
-    public PvpBattleParticipants BuildParticipants(CombatReplaySequenceCandidate candidate)
+    public PvpBattleParticipants BuildParticipants(PvpBattleSequenceCandidate candidate)
     {
         return new PvpBattleParticipants
         {
@@ -114,7 +114,7 @@ internal sealed class PvpBattleSnapshotCollector
         };
     }
 
-    public PvpBattleSnapshots BuildSnapshots(CombatReplaySequenceCandidate candidate)
+    public PvpBattleSnapshots BuildSnapshots(PvpBattleSequenceCandidate candidate)
     {
         return new PvpBattleSnapshots
         {
@@ -150,7 +150,7 @@ internal sealed class PvpBattleSnapshotCollector
     }
 
     private static PvpBattleCardSetCapture CreateCardSetCapture(
-        IReadOnlyList<CombatReplayCardSnapshot> items,
+        IReadOnlyList<PvpBattleCardSnapshot> items,
         bool capturedFromOpening,
         bool capturedLive,
         PvpBattleCaptureSource openingSource,
@@ -195,7 +195,7 @@ internal sealed class PvpBattleSnapshotCollector
     private static bool ShouldRefreshPlayerCapture(
         bool capturedFromOpening,
         bool capturedLive,
-        IReadOnlyCollection<CombatReplayCardSnapshot> snapshots
+        IReadOnlyCollection<PvpBattleCardSnapshot> snapshots
     )
     {
         if (capturedLive)
@@ -206,7 +206,7 @@ internal sealed class PvpBattleSnapshotCollector
 
     private static (
         bool Captured,
-        List<CombatReplayCardSnapshot> Snapshots
+        List<PvpBattleCardSnapshot> Snapshots
     ) CapturePlayerHandCards()
     {
         try
@@ -219,11 +219,11 @@ internal sealed class PvpBattleSnapshotCollector
                 "CombatReplayCaptureService",
                 $"Unable to snapshot player hand cards for combat replay capture: {ex.Message}"
             );
-            return (false, new List<CombatReplayCardSnapshot>());
+            return (false, new List<PvpBattleCardSnapshot>());
         }
     }
 
-    private static (bool Captured, List<CombatReplayCardSnapshot> Snapshots) CapturePlayerSkills()
+    private static (bool Captured, List<PvpBattleCardSnapshot> Snapshots) CapturePlayerSkills()
     {
         try
         {
@@ -235,19 +235,19 @@ internal sealed class PvpBattleSnapshotCollector
                 "CombatReplayCaptureService",
                 $"Unable to snapshot player skills for combat replay capture: {ex.Message}"
             );
-            return (false, new List<CombatReplayCardSnapshot>());
+            return (false, new List<PvpBattleCardSnapshot>());
         }
     }
 
-    private static List<CombatReplayCardSnapshot> CapturePlayerSkillsUnsafe()
+    private static List<PvpBattleCardSnapshot> CapturePlayerSkillsUnsafe()
     {
         return Data.Run?.Player?.Skills?.Where(skill => skill != null)
                 .Select(CreateSkillSnapshot)
                 .ToList()
-            ?? new List<CombatReplayCardSnapshot>();
+            ?? new List<PvpBattleCardSnapshot>();
     }
 
-    private static List<CombatReplayCardSnapshot> CaptureCards(
+    private static List<PvpBattleCardSnapshot> CaptureCards(
         ECombatantId combatantId,
         EInventorySection section
     )
@@ -258,9 +258,9 @@ internal sealed class PvpBattleSnapshotCollector
             .ToList();
     }
 
-    private static CombatReplayCardSnapshot CreateSnapshot(Card card)
+    private static PvpBattleCardSnapshot CreateSnapshot(Card card)
     {
-        return new CombatReplayCardSnapshot
+        return new PvpBattleCardSnapshot
         {
             InstanceId = card.InstanceId.ToString(),
             TemplateId = card.TemplateId.ToString(),
@@ -278,7 +278,7 @@ internal sealed class PvpBattleSnapshotCollector
         };
     }
 
-    private static CombatReplayCardSnapshot CreateSkillSnapshot(SkillCard skill)
+    private static PvpBattleCardSnapshot CreateSkillSnapshot(SkillCard skill)
     {
         var snapshot = CreateSnapshot(skill);
         snapshot.Name = skill.Template?.Localization?.Title?.Text ?? skill.Template?.InternalName;
@@ -287,7 +287,7 @@ internal sealed class PvpBattleSnapshotCollector
 
     private static (
         bool Captured,
-        List<CombatReplayCardSnapshot> Snapshots
+        List<PvpBattleCardSnapshot> Snapshots
     ) CaptureOpeningHandCards(NetMessageGameSim message, ECombatantId combatantId)
     {
         try
@@ -306,7 +306,7 @@ internal sealed class PvpBattleSnapshotCollector
                         entry
                     )
                 )
-                .OfType<CombatReplayCardSnapshot>()
+                .OfType<PvpBattleCardSnapshot>()
                 .ToList();
 
             return (true, snapshots);
@@ -317,13 +317,13 @@ internal sealed class PvpBattleSnapshotCollector
                 "CombatReplayCaptureService",
                 $"Unable to capture opening {combatantId} hand cards from GameSim: {ex.Message}"
             );
-            return (false, new List<CombatReplayCardSnapshot>());
+            return (false, new List<PvpBattleCardSnapshot>());
         }
     }
 
     private static (
         bool Captured,
-        List<CombatReplayCardSnapshot> Snapshots
+        List<PvpBattleCardSnapshot> Snapshots
     ) CaptureCurrentHandCardsAtOpening(ECombatantId combatantId)
     {
         try
@@ -336,20 +336,20 @@ internal sealed class PvpBattleSnapshotCollector
                 "CombatReplayCaptureService",
                 $"Unable to capture opening {combatantId} hand cards from current Data: {ex.Message}"
             );
-            return (false, new List<CombatReplayCardSnapshot>());
+            return (false, new List<PvpBattleCardSnapshot>());
         }
     }
 
     private static (
         bool Captured,
-        List<CombatReplayCardSnapshot> Snapshots
+        List<PvpBattleCardSnapshot> Snapshots
     ) CaptureCurrentSkillsAtOpening(ECombatantId combatantId)
     {
         try
         {
             return combatantId == ECombatantId.Player
                 ? (true, CapturePlayerSkillsUnsafe())
-                : (false, new List<CombatReplayCardSnapshot>());
+                : (false, new List<PvpBattleCardSnapshot>());
         }
         catch (Exception ex)
         {
@@ -357,13 +357,13 @@ internal sealed class PvpBattleSnapshotCollector
                 "CombatReplayCaptureService",
                 $"Unable to capture opening {combatantId} skills from current Data: {ex.Message}"
             );
-            return (false, new List<CombatReplayCardSnapshot>());
+            return (false, new List<PvpBattleCardSnapshot>());
         }
     }
 
     private static (
         bool Captured,
-        List<CombatReplayCardSnapshot> Snapshots
+        List<PvpBattleCardSnapshot> Snapshots
     ) CaptureOpponentSkillsFromOpening(NetMessageGameSim message)
     {
         try
@@ -376,7 +376,7 @@ internal sealed class PvpBattleSnapshotCollector
                 .Where(evt => evt.Owner == ECombatantId.Opponent)
                 .ToList();
             if (skillEvents.Count == 0)
-                return (true, new List<CombatReplayCardSnapshot>());
+                return (true, new List<PvpBattleCardSnapshot>());
 
             var snapshots = skillEvents
                 .Select(evt =>
@@ -391,7 +391,7 @@ internal sealed class PvpBattleSnapshotCollector
                         fallbackType: ECardType.Skill
                     );
                 })
-                .OfType<CombatReplayCardSnapshot>()
+                .OfType<PvpBattleCardSnapshot>()
                 .ToList();
             return (true, snapshots);
         }
@@ -401,11 +401,11 @@ internal sealed class PvpBattleSnapshotCollector
                 "CombatReplayCaptureService",
                 $"Unable to capture opening opponent skills from GameSim: {ex.Message}"
             );
-            return (false, new List<CombatReplayCardSnapshot>());
+            return (false, new List<PvpBattleCardSnapshot>());
         }
     }
 
-    private static CombatReplayCardSnapshot? CreateOpeningSnapshot(
+    private static PvpBattleCardSnapshot? CreateOpeningSnapshot(
         string instanceId,
         SimUpdateCard? cardUpdate,
         GameSimEventCardSpawned? spawnedCard,
@@ -421,7 +421,7 @@ internal sealed class PvpBattleSnapshotCollector
             )
             ?? new Dictionary<string, int>();
 
-        return new CombatReplayCardSnapshot
+        return new PvpBattleCardSnapshot
         {
             InstanceId = instanceId,
             TemplateId =

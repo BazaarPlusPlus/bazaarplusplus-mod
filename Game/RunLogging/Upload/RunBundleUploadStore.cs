@@ -5,10 +5,10 @@ using System.Linq;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
-using BazaarPlusPlus.Storage.RunLog;
-using BazaarPlusPlus.Storage.Sqlite;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Models;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
@@ -348,7 +348,7 @@ internal sealed class RunBundleUploadStore
         };
     }
 
-    private static CardSetItemArtifact MapCardSnapshot(CombatReplayCardSnapshot snapshot)
+    private static CardSetItemArtifact MapCardSnapshot(PvpBattleCardSnapshot snapshot)
     {
         return new CardSetItemArtifact
         {

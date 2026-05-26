@@ -7,6 +7,7 @@ using Newtonsoft.Json.Serialization;
 using UnityEngine;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.AutoBazaar;
 

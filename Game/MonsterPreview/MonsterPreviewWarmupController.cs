@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using UnityEngine;
 
@@ -26,16 +27,16 @@ internal sealed class MonsterPreviewWarmupController : MonoBehaviour
         );
     }
 
-    private static async Task<bool> WarmStaticDataAsync()
+    private static Task<bool> WarmStaticDataAsync()
     {
         try
         {
-            return await Data.GetStatic() != null;
+            return Task.FromResult(Data.GetStatic() != null);
         }
         catch (Exception ex)
         {
             BppLog.Error("MonsterPreviewWarmupController", "Static data warmup failed", ex);
-            return false;
+            return Task.FromResult(false);
         }
     }
 }

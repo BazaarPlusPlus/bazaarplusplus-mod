@@ -1,7 +1,7 @@
 #nullable enable
 using BazaarGameShared.Infra.Messages;
 
-namespace BazaarPlusPlus.Core.Events;
+namespace BazaarPlusPlus.GameInterop.Events;
 
 internal sealed class NetMessageObserved
 {

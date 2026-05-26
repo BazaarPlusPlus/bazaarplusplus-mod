@@ -6,7 +6,7 @@ using BazaarPlusPlus.Game.Tooltips;
 using HarmonyLib;
 using TheBazaar.Tooltips;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Tooltips;
 
 [HarmonyPatch(typeof(CardController), "ShowTooltips")]
 internal static class NativeMonsterPreviewShowTooltipsPatch

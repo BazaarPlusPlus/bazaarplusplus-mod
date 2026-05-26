@@ -5,10 +5,11 @@ using BazaarGameShared;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Game.Lobby.RandomHeroSkinPool;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Lobby;
 
 [HarmonyPatch(typeof(CosmeticsListManager), "RefreshView")]
 internal static class RandomHeroSkinPoolRefreshViewPatch

@@ -2,12 +2,13 @@
 #nullable enable
 using System;
 using System.Reflection;
-using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.NameOverride;
 
 internal static class NameOverrideHelper
 {

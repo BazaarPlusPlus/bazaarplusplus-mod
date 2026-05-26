@@ -1,11 +1,11 @@
 #pragma warning disable CS0436
 using BazaarGameShared.Infra.Messages;
-using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.GameInterop.Events;
 using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Combat;
 
 [HarmonyPatch(typeof(NetMessageProcessor), "ReceiveOrQueue")]
 internal static class CombatReplayCapturePatch
