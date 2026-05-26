@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
-using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.UpgradePreview;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
@@ -24,18 +23,6 @@ internal static class BppSettingsDockCatalog
             IsHistoryPanelActionable,
             HistoryPanelFeature.OpenFromDockEntry,
             collapseAfterActivate: true
-        ),
-        new(
-            "LegendaryPositionDisplay",
-            LegendaryPositionSettingsMenuLabel.Resolve,
-            languageCode =>
-                ResolveLegendaryPositionDisplayStatus(
-                    ReadLegendaryPositionDisplayMode(),
-                    languageCode
-                ),
-            IsLegendaryPositionDisplayOverrideActive,
-            CycleLegendaryPositionDisplayMode,
-            collapseAfterActivate: false
         ),
         new(
             "EnchantPreview",
@@ -82,7 +69,7 @@ internal static class BppSettingsDockCatalog
     // Final expected indices 0..7:
     //   GameHistory, NameOverride, LegendaryPositionDisplay, EnchantPreview,
     //   UpgradePreview, CombatStatusBar, BazaarDbUpload, ChineseLocaleMode.
-    private static readonly int[] _hardcodedOrders = [0, 2, 3, 4, 6, 7];
+    private static readonly int[] _hardcodedOrders = [0, 3, 4, 6, 7];
 
     public static void Install(IBppConfig config, SettingsDockEntryRegistry registry)
     {
@@ -217,62 +204,6 @@ internal static class BppSettingsDockCatalog
     private static bool IsChineseLocaleOverrideActive()
     {
         return ReadChineseLocaleMode() != BppChineseLocaleMode.Mainland;
-    }
-
-    private static LegendaryPositionDisplayMode ReadLegendaryPositionDisplayMode()
-    {
-        return Config.LegendaryPositionDisplayModeConfig?.Value
-            ?? LegendaryPositionDisplayMode.Default;
-    }
-
-    private static void CycleLegendaryPositionDisplayMode()
-    {
-        var config = Config.LegendaryPositionDisplayModeConfig;
-        if (config == null)
-            return;
-
-        config.Value = config.Value switch
-        {
-            LegendaryPositionDisplayMode.Default => LegendaryPositionDisplayMode.Blank,
-            LegendaryPositionDisplayMode.Blank => LegendaryPositionDisplayMode.Fixed999999,
-            LegendaryPositionDisplayMode.Fixed999999 =>
-                LegendaryPositionDisplayMode.PositionWithRating,
-            _ => LegendaryPositionDisplayMode.Default,
-        };
-
-        LegendaryPositionUiRefresh.TryRefreshVisibleDisplays();
-    }
-
-    private static bool IsLegendaryPositionDisplayOverrideActive()
-    {
-        return ReadLegendaryPositionDisplayMode() != LegendaryPositionDisplayMode.Default;
-    }
-
-    private static string ResolveLegendaryPositionDisplayStatus(
-        LegendaryPositionDisplayMode mode,
-        string languageCode
-    )
-    {
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-        {
-            return mode switch
-            {
-                LegendaryPositionDisplayMode.Default => "默认",
-                LegendaryPositionDisplayMode.Blank => "无人知晓",
-                LegendaryPositionDisplayMode.Fixed999999 => "战力爆表",
-                LegendaryPositionDisplayMode.PositionWithRating => "双显模式",
-                _ => "默认",
-            };
-        }
-
-        return mode switch
-        {
-            LegendaryPositionDisplayMode.Default => "DEF",
-            LegendaryPositionDisplayMode.Blank => "BLANK",
-            LegendaryPositionDisplayMode.Fixed999999 => "999999",
-            LegendaryPositionDisplayMode.PositionWithRating => "P|R",
-            _ => "DEF",
-        };
     }
 
     private static bool ReadBazaarDbUploadEnabled()
