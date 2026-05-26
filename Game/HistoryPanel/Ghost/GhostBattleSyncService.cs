@@ -271,13 +271,13 @@ internal sealed class GhostBattleSyncService
             Source = ParseEnum(capture?.Source, PvpBattleCaptureSource.Unknown),
             Items =
                 capture?.Items?.Select(MapToCardSnapshot).ToList()
-                ?? new List<CombatReplayCardSnapshot>(),
+                ?? new List<PvpBattleCardSnapshot>(),
         };
     }
 
-    private static CombatReplayCardSnapshot MapToCardSnapshot(CardSetItemArtifact item)
+    private static PvpBattleCardSnapshot MapToCardSnapshot(CardSetItemArtifact item)
     {
-        return new CombatReplayCardSnapshot
+        return new PvpBattleCardSnapshot
         {
             InstanceId = item.InstanceId,
             TemplateId = item.TemplateId,

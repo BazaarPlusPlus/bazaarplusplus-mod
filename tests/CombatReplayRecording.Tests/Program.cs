@@ -13,7 +13,7 @@ var controllerType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayC
 var artifactType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureArtifact");
 var manifestType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifest");
 var payloadType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpReplayPayload");
-var candidateType = RequireType("BazaarPlusPlus.Game.PvpBattles.CombatReplaySequenceCandidate");
+var candidateType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleSequenceCandidate");
 var cardSetCaptureType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSetCapture");
 var captureStatusType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureStatus");
 var captureSourceType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureSource");
@@ -758,7 +758,7 @@ try
     var participantCandidate = Activator.CreateInstance(candidateType);
     Assert(
         participantCandidate != null,
-        "CombatReplaySequenceCandidate should be constructible for participant tests."
+        "PvpBattleSequenceCandidate should be constructible for participant tests."
     );
     SetProperty(candidateType, participantCandidate!, "PlayerRank", "Legendary 5");
     SetProperty(candidateType, participantCandidate!, "PlayerRating", 502);
@@ -1048,7 +1048,7 @@ static object? GetFieldValue(Type type, object instance, string name)
 
 static object CreateSnapshotList(string instanceId, string templateId)
 {
-    var snapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.CombatReplayCardSnapshot");
+    var snapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSnapshot");
     var listType = typeof(List<>).MakeGenericType(snapshotType);
     var list =
         Activator.CreateInstance(listType)
@@ -1085,7 +1085,7 @@ static object CreateSnapshotList(string instanceId, string templateId)
 
 static object CreateEmptySnapshotList()
 {
-    var snapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.CombatReplayCardSnapshot");
+    var snapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSnapshot");
     var listType = typeof(List<>).MakeGenericType(snapshotType);
     return Activator.CreateInstance(listType)
         ?? throw new InvalidOperationException("Empty snapshot list should be constructible.");

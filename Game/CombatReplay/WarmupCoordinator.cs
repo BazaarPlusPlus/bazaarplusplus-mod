@@ -444,7 +444,7 @@ internal static class WarmupCoordinator
         }
     }
 
-    private static IEnumerable<CombatReplayCardSnapshot> EnumerateItemSnapshots(
+    private static IEnumerable<PvpBattleCardSnapshot> EnumerateItemSnapshots(
         PvpBattleManifest manifest
     )
     {

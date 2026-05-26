@@ -292,7 +292,7 @@ internal static class ReplayBootstrapCoordinator
     }
 
     private static void RehydrateCards(
-        IEnumerable<CombatReplayCardSnapshot> snapshots,
+        IEnumerable<PvpBattleCardSnapshot> snapshots,
         NetMessageGameSim spawnMessage,
         IPlayer? owner
     )
@@ -319,7 +319,7 @@ internal static class ReplayBootstrapCoordinator
     }
 
     private static List<SkillCard> RehydrateSkillCards(
-        IEnumerable<CombatReplayCardSnapshot> snapshots,
+        IEnumerable<PvpBattleCardSnapshot> snapshots,
         NetMessageGameSim spawnMessage,
         IPlayer? owner
     )
@@ -351,7 +351,7 @@ internal static class ReplayBootstrapCoordinator
         return skills;
     }
 
-    private static void ApplySnapshotFallback(Card card, CombatReplayCardSnapshot snapshot)
+    private static void ApplySnapshotFallback(Card card, PvpBattleCardSnapshot snapshot)
     {
         if (snapshot.Attributes != null && snapshot.Attributes.Count > 0)
         {

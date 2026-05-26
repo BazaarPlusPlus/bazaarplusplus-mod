@@ -265,7 +265,7 @@ public sealed class CardSetCaptureArtifact
 /// <summary>
 /// Wire-format representation of a card snapshot. Uses primitive/string types so this
 /// model can live in ModApi without game-assembly references. The main assembly maps
-/// these to CombatReplayCardSnapshot after deserialization.
+/// these to PvpBattleCardSnapshot after deserialization.
 /// </summary>
 public sealed class CardSetItemArtifact
 {

@@ -348,7 +348,7 @@ internal sealed class RunBundleUploadStore
         };
     }
 
-    private static CardSetItemArtifact MapCardSnapshot(CombatReplayCardSnapshot snapshot)
+    private static CardSetItemArtifact MapCardSnapshot(PvpBattleCardSnapshot snapshot)
     {
         return new CardSetItemArtifact
         {
