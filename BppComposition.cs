@@ -12,6 +12,7 @@ using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLifecycle;
+using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.UpgradePreview;
@@ -79,6 +80,8 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new LegendaryPositionSettingsDockEntry());
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
         _settingsDockRegistry.Register(new UpgradePreviewSettingsDockEntry());
+
+        _mountables.Register(new RunLoggingMount());
 
         // _mountables.Register(new AutoBazaarMount());
     }

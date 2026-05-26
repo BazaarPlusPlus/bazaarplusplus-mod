@@ -143,9 +143,6 @@ public class Plugin : BaseUnityPlugin
     {
         BppLog.Info("Plugin", "Attaching runtime components");
 
-        var runLogging = gameObject.AddComponent<RunLoggingController>();
-        runLogging.Initialize(services);
-
         var runUpload = gameObject.AddComponent<RunUploadController>();
         runUpload.Initialize(services);
 
@@ -253,7 +250,6 @@ public class Plugin : BaseUnityPlugin
         DestroyComponentIfPresent<CombatStatusBar>();
         DestroyComponentIfPresent<HistoryPanel>();
         DestroyComponentIfPresent<RunUploadController>();
-        DestroyComponentIfPresent<RunLoggingController>();
         DestroyComponentIfPresent<CombatReplayRuntime>();
     }
 
