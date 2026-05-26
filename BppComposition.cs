@@ -8,6 +8,7 @@ using BazaarPlusPlus.Game.AutoBazaar;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.Encounter;
+using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLifecycle;
@@ -71,6 +72,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_combatStatusBarModule);
 
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
+        _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());
         _settingsDockRegistry.Register(new LegendaryPositionSettingsDockEntry());
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
 

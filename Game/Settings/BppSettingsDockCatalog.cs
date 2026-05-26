@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
-using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.UpgradePreview;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
@@ -23,15 +22,6 @@ internal static class BppSettingsDockCatalog
             IsHistoryPanelActionable,
             HistoryPanelFeature.OpenFromDockEntry,
             collapseAfterActivate: true
-        ),
-        new(
-            "EnchantPreview",
-            EnchantPreviewSettingsMenuLabel.Resolve,
-            languageCode =>
-                ResolvePreviewVisibilityModeStatus(ReadEnchantPreviewMode(), languageCode),
-            IsEnchantPreviewOverrideActive,
-            CycleEnchantPreviewMode,
-            collapseAfterActivate: false
         ),
         new(
             "UpgradePreview",
@@ -69,7 +59,7 @@ internal static class BppSettingsDockCatalog
     // Final expected indices 0..7:
     //   GameHistory, NameOverride, LegendaryPositionDisplay, EnchantPreview,
     //   UpgradePreview, CombatStatusBar, BazaarDbUpload, ChineseLocaleMode.
-    private static readonly int[] _hardcodedOrders = [0, 3, 4, 6, 7];
+    private static readonly int[] _hardcodedOrders = [0, 4, 6, 7];
 
     public static void Install(IBppConfig config, SettingsDockEntryRegistry registry)
     {
@@ -114,23 +104,6 @@ internal static class BppSettingsDockCatalog
         return !TheBazaar.Data.IsInCombat;
     }
 
-    private static PreviewVisibilityMode ReadEnchantPreviewMode()
-    {
-        return Config.EnchantPreviewModeConfig?.Value ?? PreviewVisibilityMode.AutoOnPedestalChoice;
-    }
-
-    private static void CycleEnchantPreviewMode()
-    {
-        var config = Config.EnchantPreviewModeConfig;
-        if (config != null)
-            config.Value = NextPreviewVisibilityMode(config.Value);
-    }
-
-    private static bool IsEnchantPreviewOverrideActive()
-    {
-        return ReadEnchantPreviewMode() != PreviewVisibilityMode.Off;
-    }
-
     private static PreviewVisibilityMode ReadUpgradePreviewMode()
     {
         return Config.UpgradePreviewModeConfig?.Value ?? PreviewVisibilityMode.AutoOnPedestalChoice;
@@ -148,7 +121,7 @@ internal static class BppSettingsDockCatalog
         return ReadUpgradePreviewMode() != PreviewVisibilityMode.Off;
     }
 
-    private static PreviewVisibilityMode NextPreviewVisibilityMode(PreviewVisibilityMode mode) =>
+    internal static PreviewVisibilityMode NextPreviewVisibilityMode(PreviewVisibilityMode mode) =>
         mode switch
         {
             PreviewVisibilityMode.Off => PreviewVisibilityMode.AutoOnPedestalChoice,
@@ -157,7 +130,7 @@ internal static class BppSettingsDockCatalog
             _ => PreviewVisibilityMode.AutoOnPedestalChoice,
         };
 
-    private static string ResolvePreviewVisibilityModeStatus(
+    internal static string ResolvePreviewVisibilityModeStatus(
         PreviewVisibilityMode mode,
         string languageCode
     )
