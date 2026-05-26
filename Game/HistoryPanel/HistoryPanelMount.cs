@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Infrastructure;
@@ -12,6 +13,7 @@ internal sealed class HistoryPanelMount : IBppMountable
 {
     private readonly Func<CombatReplayRuntime?> _combatReplayRuntime;
     private readonly Func<ModOnlineClient?> _onlineClient;
+    private IDisposable? _localeChangedSubscription;
 
     public HistoryPanelMount(
         Func<CombatReplayRuntime?> combatReplayRuntime,
@@ -50,10 +52,17 @@ internal sealed class HistoryPanelMount : IBppMountable
         }
 
         panel.Configure(HistoryPanelFactory.Create(runtime, onlineClient));
+
+        _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(
+            _ => HistoryPanel.RefreshLocalization()
+        );
     }
 
     public void Unmount(GameObject host)
     {
+        _localeChangedSubscription?.Dispose();
+        _localeChangedSubscription = null;
+
         var panel = host.GetComponent<HistoryPanel>();
         if (panel != null)
             UnityEngine.Object.DestroyImmediate(panel);
