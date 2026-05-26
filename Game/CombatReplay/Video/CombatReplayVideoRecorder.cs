@@ -4,7 +4,6 @@ using System.Collections;
 using System.IO;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
@@ -447,7 +446,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     {
         try
         {
-            return ScreenshotUiSuppressionScope.Begin(
+            return UiSuppressionScope.Begin(
                 BppSettingsDockController.BeginScreenshotSuppression,
                 CombatStatusBarFeature.BeginScreenshotSuppression
             );

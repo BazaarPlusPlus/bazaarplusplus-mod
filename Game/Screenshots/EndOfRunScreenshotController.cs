@@ -330,7 +330,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private static IDisposable? BeginUiSuppression()
     {
-        return ScreenshotUiSuppressionScope.Begin(
+        return UiSuppressionScope.Begin(
             BppSettingsDockController.BeginScreenshotSuppression,
             CombatStatusBarFeature.BeginScreenshotSuppression
         );
