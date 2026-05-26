@@ -49,6 +49,8 @@ public class Plugin : BaseUnityPlugin
             ApplyHarmonyPatches();
 
             BppLog.Info("Plugin", "Adding CombatReplayRuntime");
+            // CombatReplayRuntime is constructed before composition.Start() because RunLifecycle
+            // and several features take a reference through CombatReplayModule. Not a mountable.
             var combatReplayRuntime = gameObject.AddComponent<CombatReplayRuntime>();
             combatReplayRuntime.Initialize(services, _composition.RunLifecycle);
             _composition.AttachCombatReplayRuntime(combatReplayRuntime);
@@ -57,7 +59,11 @@ public class Plugin : BaseUnityPlugin
 
             BuildOnlineServices();
             _composition.AttachOnlineClient(_onlineClient);
-            AttachRuntimeComponents(services, combatReplayRuntime);
+
+            BppLog.Info("Plugin", "Attaching runtime components");
+            _composition.Mountables.MountAll(gameObject, services);
+            BppLog.Info("Plugin", "Runtime components attached");
+
             BppLog.Info("Plugin", "Plugin initialization completed");
         }
         catch (Exception ex)
@@ -72,7 +78,8 @@ public class Plugin : BaseUnityPlugin
     {
         try
         {
-            DetachRuntimeComponents();
+            _composition?.Mountables.UnmountAll(gameObject);
+            DestroyComponentIfPresent<CombatReplayRuntime>();
             _composition?.Dispose();
             _composition = null;
             DisposeOnlineServices();
@@ -130,21 +137,10 @@ public class Plugin : BaseUnityPlugin
         BppLog.Info("Plugin", "Harmony patches applied");
     }
 
-    private void AttachRuntimeComponents(
-        IBppServices services,
-        CombatReplayRuntime combatReplayRuntime
-    )
-    {
-        BppLog.Info("Plugin", "Attaching runtime components");
-
-        _composition?.Mountables.MountAll(gameObject, services);
-
-        BppLog.Info("Plugin", "Runtime components attached");
-    }
-
     private void CleanupFailedInitialization()
     {
-        DetachRuntimeComponents();
+        _composition?.Mountables.UnmountAll(gameObject);
+        DestroyComponentIfPresent<CombatReplayRuntime>();
         _composition?.Dispose();
         _composition = null;
         DisposeOnlineServices();
@@ -164,13 +160,6 @@ public class Plugin : BaseUnityPlugin
 
         _harmony.UnpatchSelf();
         _patchesApplied = false;
-    }
-
-    private void DetachRuntimeComponents()
-    {
-        _composition?.Mountables.UnmountAll(gameObject);
-
-        DestroyComponentIfPresent<CombatReplayRuntime>();
     }
 
     private void DestroyComponentIfPresent<T>()
