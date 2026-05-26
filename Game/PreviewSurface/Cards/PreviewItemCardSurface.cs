@@ -36,7 +36,7 @@ internal sealed class PreviewItemCardSurface : IPreviewCardSurface
 
             if (_staticData == null)
             {
-                _staticData = await Data.GetStatic();
+                _staticData = Data.GetStatic();
                 BppLog.Debug(
                     "PreviewItemCardSurface",
                     $"Static data loaded={(_staticData != null)}"

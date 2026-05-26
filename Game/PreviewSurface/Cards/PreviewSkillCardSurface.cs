@@ -29,7 +29,7 @@ internal sealed class PreviewSkillCardSurface : IPreviewCardSurface
                 return null;
 
             if (_staticData == null)
-                _staticData = await Data.GetStatic();
+                _staticData = Data.GetStatic();
 
             if (_staticData == null)
                 return null;
