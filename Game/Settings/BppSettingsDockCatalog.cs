@@ -2,13 +2,11 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
-using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.UpgradePreview;
-using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 using HistoryPanelLabel = BazaarPlusPlus.Game.HistoryPanel.HistoryPanelSettingsMenuLabel;
 
@@ -18,16 +16,7 @@ internal static class BppSettingsDockCatalog
 {
     private static IBppConfig? _config;
 
-    public static void Install(IBppConfig config) =>
-        _config = config ?? throw new ArgumentNullException(nameof(config));
-
-    private static IBppConfig Config =>
-        _config
-        ?? throw new InvalidOperationException(
-            "BppSettingsDockCatalog.Install must be called at startup."
-        );
-
-    internal static IReadOnlyList<BppSettingsDockDefinition> Definitions { get; } =
+    private static readonly List<BppSettingsDockDefinition> _definitions =
     [
         new(
             "GameHistory",
@@ -77,14 +66,6 @@ internal static class BppSettingsDockCatalog
             collapseAfterActivate: false
         ),
         new(
-            "CombatStatusBar",
-            CombatStatusBarSettingsMenuLabel.Resolve,
-            new CombatStatusBarSettingsMenuBridge(
-                CombatStatusBarFeature.GetEnabledSettingValue,
-                CombatStatusBarFeature.SetEnabledSettingValue
-            )
-        ),
-        new(
             "BazaarDbUpload",
             BazaarDbScreenshotUploadSettingsMenuLabel.Resolve,
             new SettingsMenuToggleBridge(
@@ -102,6 +83,24 @@ internal static class BppSettingsDockCatalog
             collapseAfterActivate: false
         ),
     ];
+
+    public static void Install(IBppConfig config, SettingsDockEntryRegistry registry)
+    {
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        if (registry == null)
+            throw new ArgumentNullException(nameof(registry));
+
+        foreach (var definition in registry.MaterializeAll(config))
+            _definitions.Add(definition);
+    }
+
+    private static IBppConfig Config =>
+        _config
+        ?? throw new InvalidOperationException(
+            "BppSettingsDockCatalog.Install must be called at startup."
+        );
+
+    internal static IReadOnlyList<BppSettingsDockDefinition> Definitions => _definitions;
 
     private static bool ReadNameOverrideEnabled()
     {

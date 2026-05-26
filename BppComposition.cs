@@ -9,6 +9,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.Encounter;
 using BazaarPlusPlus.Game.RunLifecycle;
+using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
@@ -28,6 +29,7 @@ internal sealed class BppComposition : IDisposable
     private readonly BppRuntimeServices _services;
     private readonly BppFeatureRegistry _featureRegistry = new();
     private readonly BppMountableRegistry _mountables = new();
+    private readonly SettingsDockEntryRegistry _settingsDockRegistry = new();
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
@@ -35,6 +37,7 @@ internal sealed class BppComposition : IDisposable
     public IBppServices Services => _services;
     public RunLifecycleModule RunLifecycle => _runLifecycle;
     public BppMountableRegistry Mountables => _mountables;
+    public SettingsDockEntryRegistry SettingsDockRegistry => _settingsDockRegistry;
 
     public BppComposition(ManualLogSource logger, ConfigFile configFile)
     {
@@ -64,6 +67,8 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
         _featureRegistry.Register(_combatStatusBarModule);
+
+        _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
 
         // _mountables.Register(new AutoBazaarMount());
     }

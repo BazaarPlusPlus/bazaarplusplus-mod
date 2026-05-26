@@ -51,7 +51,7 @@ public class Plugin : BaseUnityPlugin
             BppLog.Install(services.Logger);
             BppPatchHost.Install(services);
 
-            InstallStaticUtilities(services);
+            InstallStaticUtilities(services, _composition.SettingsDockRegistry);
 
             ApplyHarmonyPatches();
 
@@ -98,11 +98,14 @@ public class Plugin : BaseUnityPlugin
         return configFile;
     }
 
-    private static void InstallStaticUtilities(IBppServices services)
+    private static void InstallStaticUtilities(
+        IBppServices services,
+        SettingsDockEntryRegistry settingsDockRegistry
+    )
     {
         LegendaryPositionDisplayFormatter.Install(services.Config);
         BppChineseLocalization.Install(services.Config);
-        BppSettingsDockCatalog.Install(services.Config);
+        BppSettingsDockCatalog.Install(services.Config, settingsDockRegistry);
         BppHotkeyService.Install(services.Config);
         RunLoggingGameDataReader.Install(services.RunContext);
     }
