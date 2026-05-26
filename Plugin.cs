@@ -13,7 +13,6 @@ using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Http;
 using BazaarPlusPlus.Game.RunLogging;
-using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Patches;
@@ -141,10 +140,6 @@ public class Plugin : BaseUnityPlugin
 
         AddConfiguredHistoryPanel(services, combatReplayRuntime);
 
-        var bazaarDbScreenshotUpload =
-            gameObject.AddComponent<BazaarDbScreenshotUploadController>();
-        bazaarDbScreenshotUpload.Initialize(services);
-
         AddConfiguredTooltipModifierRefreshController(services);
 
         var combatReplayVideoRecorder = gameObject.AddComponent<CombatReplayVideoRecorder>();
@@ -223,7 +218,6 @@ public class Plugin : BaseUnityPlugin
 
         DestroyComponentIfPresent<CombatReplayVideoRecorder>();
         DestroyComponentIfPresent<TooltipModifierRefreshController>();
-        DestroyComponentIfPresent<BazaarDbScreenshotUploadController>();
         DestroyComponentIfPresent<HistoryPanel>();
         DestroyComponentIfPresent<CombatReplayRuntime>();
     }
