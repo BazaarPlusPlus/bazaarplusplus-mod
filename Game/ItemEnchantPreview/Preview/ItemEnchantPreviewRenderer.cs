@@ -68,12 +68,11 @@ public static class ItemEnchantPreviewRenderer
             try
             {
                 var builder = TooltipBuilder.Create(
-                    new TooltipContext
-                    {
-                        Instance = previewCard,
-                        Template = previewCard.Template!,
-                        ValueContext = new ValueContext(Data.Run, previewCard),
-                    },
+                    new TooltipContext(
+                        previewCard,
+                        previewCard.Template!,
+                        new ValueContext(Data.Run, previewCard)
+                    ),
                     localized
                 );
 
@@ -89,12 +88,11 @@ public static class ItemEnchantPreviewRenderer
     private static string RenderWithCardTooltipData(ItemCard previewCard, string localized)
     {
         var builder = TooltipBuilder.Create(
-            new TooltipContext
-            {
-                Instance = previewCard,
-                Template = previewCard.Template!,
-                ValueContext = new ValueContext(Data.Run, previewCard),
-            },
+            new TooltipContext(
+                previewCard,
+                previewCard.Template!,
+                new ValueContext(Data.Run, previewCard)
+            ),
             localized
         );
 
