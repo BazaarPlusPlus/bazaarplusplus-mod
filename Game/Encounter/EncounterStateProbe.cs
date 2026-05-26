@@ -62,7 +62,7 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
             return ChoiceScreenPedestalKind.None;
         }
 
-        var manager = Data.GetStatic();
+        var manager = Data.GetStatic().GetAwaiter().GetResult();
         var kind = ChoiceScreenPedestalResolver.Resolve(selectionSet, manager.GetCardById);
 
         _cachedSelectionSet = selectionSet;
