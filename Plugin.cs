@@ -15,7 +15,6 @@ using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Http;
 using BazaarPlusPlus.Game.RunLogging;
-using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
@@ -143,9 +142,6 @@ public class Plugin : BaseUnityPlugin
     {
         BppLog.Info("Plugin", "Attaching runtime components");
 
-        var runUpload = gameObject.AddComponent<RunUploadController>();
-        runUpload.Initialize(services);
-
         AddConfiguredHistoryPanel(services, combatReplayRuntime);
 
         var statusBar = gameObject.AddComponent<CombatStatusBar>();
@@ -249,7 +245,6 @@ public class Plugin : BaseUnityPlugin
         DestroyComponentIfPresent<MonsterPreviewWarmupController>();
         DestroyComponentIfPresent<CombatStatusBar>();
         DestroyComponentIfPresent<HistoryPanel>();
-        DestroyComponentIfPresent<RunUploadController>();
         DestroyComponentIfPresent<CombatReplayRuntime>();
     }
 
