@@ -13,7 +13,6 @@ using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Http;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Settings;
-using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Patches;
 using BepInEx;
 using BepInEx.Configuration;
@@ -138,20 +137,9 @@ public class Plugin : BaseUnityPlugin
     {
         BppLog.Info("Plugin", "Attaching runtime components");
 
-        AddConfiguredTooltipModifierRefreshController(services);
-
         _composition?.Mountables.MountAll(gameObject, services);
 
         BppLog.Info("Plugin", "Runtime components attached");
-    }
-
-    private void AddConfiguredTooltipModifierRefreshController(IBppServices services)
-    {
-        BppLog.Info("Plugin", "Adding TooltipModifierRefreshController");
-        var tooltipModifierRefreshController =
-            gameObject.AddComponent<TooltipModifierRefreshController>();
-        tooltipModifierRefreshController.Initialize(services.Config, services.EncounterState);
-        BppLog.Info("Plugin", "TooltipModifierRefreshController initialized");
     }
 
     private void CleanupFailedInitialization()
@@ -182,7 +170,6 @@ public class Plugin : BaseUnityPlugin
     {
         _composition?.Mountables.UnmountAll(gameObject);
 
-        DestroyComponentIfPresent<TooltipModifierRefreshController>();
         DestroyComponentIfPresent<CombatReplayRuntime>();
     }
 

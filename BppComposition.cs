@@ -20,6 +20,7 @@ using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Game.UpgradePreview;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.ModApi.Clients;
@@ -102,6 +103,7 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(new MonsterPreviewWarmupMount());
         _mountables.Register(new RunLoggingMount());
         _mountables.Register(new RunUploadMount());
+        _mountables.Register(new TooltipModifierRefreshMount());
 
         // _mountables.Register(new AutoBazaarMount());
     }
