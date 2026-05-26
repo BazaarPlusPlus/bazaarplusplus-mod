@@ -9,7 +9,7 @@ using Xunit;
 using BazaarPlusPlus.Game.AutoBazaar;
 
 // Minimal shim so AutoBazaarHttpServer.cs compiles in the test project without BepInEx.
-namespace BazaarPlusPlus
+namespace BazaarPlusPlus.Infrastructure
 {
     internal static class BppLog
     {
