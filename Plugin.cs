@@ -5,7 +5,6 @@ using System.IO;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
-using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
@@ -144,9 +143,6 @@ public class Plugin : BaseUnityPlugin
 
         AddConfiguredHistoryPanel(services, combatReplayRuntime);
 
-        var statusBar = gameObject.AddComponent<CombatStatusBar>();
-        statusBar.Initialize(services);
-
         gameObject.AddComponent<MonsterPreviewWarmupController>();
         gameObject.AddComponent<CardSetPreviewRuntime>();
 
@@ -243,7 +239,6 @@ public class Plugin : BaseUnityPlugin
         DestroyComponentIfPresent<MonsterPreviewItemBoardRuntime>();
         DestroyComponentIfPresent<CardSetPreviewRuntime>();
         DestroyComponentIfPresent<MonsterPreviewWarmupController>();
-        DestroyComponentIfPresent<CombatStatusBar>();
         DestroyComponentIfPresent<HistoryPanel>();
         DestroyComponentIfPresent<CombatReplayRuntime>();
     }

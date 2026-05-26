@@ -82,6 +82,7 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
         _settingsDockRegistry.Register(new UpgradePreviewSettingsDockEntry());
 
+        _mountables.Register(new CombatStatusBarMount());
         _mountables.Register(new RunLoggingMount());
         _mountables.Register(new RunUploadMount());
 
