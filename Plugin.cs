@@ -7,7 +7,6 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
-using BazaarPlusPlus.Game.Identity;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.MonsterPreview;
@@ -33,7 +32,6 @@ public class Plugin : BaseUnityPlugin
     private readonly Harmony _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
     private BppComposition? _composition;
     private ModOnlineClient? _onlineClient;
-    private PlayerObservationStore? _playerObservationStore;
     private bool _patchesApplied;
 
     protected virtual void Awake()
@@ -62,7 +60,7 @@ public class Plugin : BaseUnityPlugin
 
             _composition.Start();
 
-            BuildIdentityAndOnlineServices(services);
+            BuildOnlineServices();
             AttachRuntimeComponents(services, combatReplayRuntime);
             BppLog.Info("Plugin", "Plugin initialization completed");
         }
@@ -81,7 +79,7 @@ public class Plugin : BaseUnityPlugin
             DetachRuntimeComponents();
             _composition?.Dispose();
             _composition = null;
-            DisposeIdentityAndOnlineServices();
+            DisposeOnlineServices();
             UnpatchHarmony();
         }
         finally
@@ -107,20 +105,8 @@ public class Plugin : BaseUnityPlugin
         RunLoggingGameDataReader.Install(services.RunContext);
     }
 
-    private void BuildIdentityAndOnlineServices(IBppServices services)
+    private void BuildOnlineServices()
     {
-        var identityDirectoryPath = services.Paths.IdentityDirectoryPath;
-        if (string.IsNullOrWhiteSpace(identityDirectoryPath))
-        {
-            BppLog.Warn(
-                "Plugin",
-                "Identity directory path unavailable; online services will be inactive."
-            );
-            return;
-        }
-
-        _playerObservationStore = new PlayerObservationStore(identityDirectoryPath);
-
         var routes = ModApiRoutes.TryCreate(ModApiUploadDefaults.ApiBaseUrl);
         if (routes == null)
         {
@@ -133,7 +119,7 @@ public class Plugin : BaseUnityPlugin
             timeout: TimeSpan.FromSeconds(Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds))
         );
         _onlineClient = new ModOnlineClient(httpClient, routes);
-        BppLog.Info("Plugin", "Identity JSON store and online client ready.");
+        BppLog.Info("Plugin", "Online client ready.");
     }
 
     private void ApplyHarmonyPatches()
@@ -157,7 +143,6 @@ public class Plugin : BaseUnityPlugin
         var runUpload = gameObject.AddComponent<RunUploadController>();
         runUpload.Initialize(services);
 
-        AddConfiguredPlayerObservationController();
         AddConfiguredHistoryPanel(services, combatReplayRuntime);
 
         var statusBar = gameObject.AddComponent<CombatStatusBar>();
@@ -184,21 +169,6 @@ public class Plugin : BaseUnityPlugin
         _composition?.Mountables.MountAll(gameObject, services);
 
         BppLog.Info("Plugin", "Runtime components attached");
-    }
-
-    private void AddConfiguredPlayerObservationController()
-    {
-        var controller = gameObject.AddComponent<PlayerObservationController>();
-        if (_playerObservationStore == null)
-        {
-            BppLog.Warn(
-                "Plugin",
-                "Skipping PlayerObservationController configuration; observation store unavailable."
-            );
-            return;
-        }
-
-        controller.Configure(_playerObservationStore);
     }
 
     private void AddConfiguredHistoryPanel(
@@ -244,15 +214,14 @@ public class Plugin : BaseUnityPlugin
         DetachRuntimeComponents();
         _composition?.Dispose();
         _composition = null;
-        DisposeIdentityAndOnlineServices();
+        DisposeOnlineServices();
         UnpatchHarmony();
     }
 
-    private void DisposeIdentityAndOnlineServices()
+    private void DisposeOnlineServices()
     {
         _onlineClient?.Dispose();
         _onlineClient = null;
-        _playerObservationStore = null;
     }
 
     private void UnpatchHarmony()
@@ -277,7 +246,6 @@ public class Plugin : BaseUnityPlugin
         DestroyComponentIfPresent<MonsterPreviewWarmupController>();
         DestroyComponentIfPresent<CombatStatusBar>();
         DestroyComponentIfPresent<HistoryPanel>();
-        DestroyComponentIfPresent<PlayerObservationController>();
         DestroyComponentIfPresent<RunUploadController>();
         DestroyComponentIfPresent<RunLoggingController>();
         DestroyComponentIfPresent<CombatReplayRuntime>();

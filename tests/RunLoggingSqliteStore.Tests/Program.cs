@@ -431,7 +431,6 @@ sealed class TempPathProvider : IPathProvider
     public string? RunLogDatabasePath => _dbPath;
     public string? CombatReplayDirectoryPath => null;
     public string? ScreenshotsDirectoryPath => null;
-    public string? IdentityDirectoryPath => null;
     public string? CombatReplayVideoDirectoryPath => null;
     public string? ToolsDirectoryPath => null;
 }

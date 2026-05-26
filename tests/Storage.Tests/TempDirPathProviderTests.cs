@@ -21,7 +21,6 @@ internal static class TempDirPathProviderTests
             Assert(paths.RunLogDatabasePath == dbPath, "RunLogDatabasePath should match.");
             Assert(paths.CombatReplayDirectoryPath == null, "CombatReplayDirectoryPath should be null.");
             Assert(paths.ScreenshotsDirectoryPath == null, "ScreenshotsDirectoryPath should be null.");
-            Assert(paths.IdentityDirectoryPath == null, "IdentityDirectoryPath should be null.");
             Assert(paths.CombatReplayVideoDirectoryPath == null, "CombatReplayVideoDirectoryPath should be null.");
             Assert(paths.ToolsDirectoryPath == null, "ToolsDirectoryPath should be null.");
 
@@ -114,7 +113,6 @@ sealed class TempDirPathProvider : IPathProvider
     public string? RunLogDatabasePath => _dbPath;
     public string? CombatReplayDirectoryPath => null;
     public string? ScreenshotsDirectoryPath => null;
-    public string? IdentityDirectoryPath => null;
     public string? CombatReplayVideoDirectoryPath => null;
     public string? ToolsDirectoryPath => null;
 }

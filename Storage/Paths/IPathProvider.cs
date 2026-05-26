@@ -9,8 +9,6 @@ public interface IPathProvider
 
     string? ScreenshotsDirectoryPath { get; }
 
-    string? IdentityDirectoryPath { get; }
-
     string? CombatReplayVideoDirectoryPath { get; }
 
     string? ToolsDirectoryPath { get; }

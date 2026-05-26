@@ -11,8 +11,6 @@ internal sealed class BepInExPathProvider : IPathProvider
 
     public string? ScreenshotsDirectoryPath { get; private set; }
 
-    public string? IdentityDirectoryPath { get; private set; }
-
     public string? CombatReplayVideoDirectoryPath { get; private set; }
 
     public string? ToolsDirectoryPath { get; private set; }
@@ -33,11 +31,6 @@ internal sealed class BepInExPathProvider : IPathProvider
             BepInEx.Paths.GameRootPath,
             "BazaarPlusPlusV4",
             "Screenshots"
-        );
-        IdentityDirectoryPath = System.IO.Path.Combine(
-            BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlusV4",
-            "Identity"
         );
         CombatReplayVideoDirectoryPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
