@@ -20,12 +20,13 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 | 层次 | 作用 |
 | --- | --- |
-| `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、身份/网络服务和 `MonoBehaviour` 控制器 |
-| `BppComposition.cs` | 创建 `IBppServices`，注册 `RunLifecycleModule`、`CombatReplayModule`、`CombatStatusBarModule` |
-| `Core/` | 配置、事件总线、路径、run context、运行时服务接口 |
+| `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好其余 11 个 feature |
+| `BppComposition.cs` | 创建 `IBppServices`，注册 `RunLifecycleModule`、`CombatReplayModule`、`CombatStatusBarModule`，并把所有 `IBppMountable`（feature runtime）和 `ISettingsDockEntry`（设置坞入口）汇总到两个 registry |
+| `Core/` | 纯抽象：配置、事件总线、路径、run context、运行时服务接口 |
+| `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`BppStaticDataAccess`，以及带 game type 的事件 + `IRunContext` 接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
-`Plugin.AttachRuntimeComponents()` 当前挂载 `RunLoggingController`、`RunUploadController`、`PlayerObservationController`、`HistoryPanel`、`CombatStatusBar`、怪物预览相关 runtime、`EndOfRunScreenshotController`、`BazaarDbScreenshotUploadController` 和 `TooltipModifierRefreshController`。
+挂载的 11 个 `IBppMountable`：`RunLoggingMount`、`RunUploadMount`、`CombatStatusBarMount`、`MonsterPreviewWarmupMount`、`CardSetPreviewMount`、`MonsterPreviewItemBoardMount`、`EndOfRunScreenshotMount`、`BazaarDbScreenshotUploadMount`、`CombatReplayVideoRecorderMount`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`TooltipModifierRefreshMount`。新增 feature 只需在 `BppComposition` 加一行 `_mountables.Register(...)`。
 
 ## 游戏内功能模块
 
