@@ -3,9 +3,9 @@ using System;
 using System.Threading;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
-using BazaarPlusPlus.Game.Upload;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;

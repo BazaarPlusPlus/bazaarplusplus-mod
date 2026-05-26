@@ -3,7 +3,7 @@ using Xunit;
 
 namespace BazaarPlusPlus.Tests;
 
-public sealed class ScreenshotUiSuppressionScopeTests
+public sealed class UiSuppressionScopeTests
 {
     [Fact]
     public void Begin_AppliesSuppressionsInOrder_AndRestoresInReverseOrder()
