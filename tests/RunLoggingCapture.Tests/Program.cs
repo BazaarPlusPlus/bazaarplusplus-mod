@@ -1,7 +1,7 @@
 #nullable enable
 using System.Reflection;
 using BazaarPlusPlus.Game.RunLogging;
-using BazaarPlusPlus.Game.RunLogging.Models;
+using BazaarPlusPlus.Storage.RunLog;
 
 var captureServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCaptureService");
 var pvpBattleInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogPvpBattleInput");

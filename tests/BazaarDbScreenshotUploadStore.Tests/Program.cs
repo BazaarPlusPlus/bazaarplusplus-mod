@@ -3,7 +3,7 @@ using System.Reflection;
 using Microsoft.Data.Sqlite;
 
 var schemaType = RequireType(
-    "BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite.RunLogSqliteSchema"
+    "BazaarPlusPlus.Storage.RunLog.RunLogSchema"
 );
 var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbScreenshotUploadStore");
 
@@ -25,8 +25,8 @@ Directory.CreateDirectory(screenshotsDir);
 
 try
 {
-    // Bootstrap the schema by touching the existing RunScreenshotSqliteStore (it inherits SqlitePersistenceStoreBase
-    // which runs RunLogSqliteSchema.EnsureInitialized in the ctor).
+    // Bootstrap the schema by touching the existing RunScreenshotSqliteStore (it inherits SqliteStoreBase
+    // which runs RunLogSchema.EnsureInitialized in the ctor).
     var screenshotStoreType = RequireType(
         "BazaarPlusPlus.Game.Screenshots.Persistence.RunScreenshotSqliteStore"
     );
@@ -242,7 +242,8 @@ static long GetInt64(SqliteConnection connection, string sql, string id)
 
 static Type RequireType(string fullName)
 {
-    return Type.GetType($"{fullName}, BazaarPlusPlus")
+    return Type.GetType($"{fullName}, BazaarPlusPlus.Storage")
+        ?? Type.GetType($"{fullName}, BazaarPlusPlus")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 

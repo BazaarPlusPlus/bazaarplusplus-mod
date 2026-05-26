@@ -3,11 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.CombatReplay;
-using BazaarPlusPlus.Game.Online;
-using BazaarPlusPlus.Game.Online.Models;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Sqlite;
+using BazaarPlusPlus.ModApi;
+using BazaarPlusPlus.ModApi.Models;
 using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
@@ -38,8 +39,8 @@ internal sealed class RunBundleUploadStore
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT s.run_id
-            FROM {RunLogSqliteSchema.RunSyncStateTableName} AS s
-            INNER JOIN {RunLogSqliteSchema.RunsTableName} AS r
+            FROM {RunLogSchema.RunSyncStateTableName} AS s
+            INNER JOIN {RunLogSchema.RunsTableName} AS r
                 ON r.run_id = s.run_id
             WHERE s.dirty = 1
               AND r.completed = 1
@@ -64,8 +65,8 @@ internal sealed class RunBundleUploadStore
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT 1
-            FROM {RunLogSqliteSchema.RunSyncStateTableName} AS s
-            INNER JOIN {RunLogSqliteSchema.RunsTableName} AS r
+            FROM {RunLogSchema.RunSyncStateTableName} AS s
+            INNER JOIN {RunLogSchema.RunsTableName} AS r
                 ON r.run_id = s.run_id
             WHERE s.dirty = 1
               AND r.completed = 1
@@ -81,7 +82,7 @@ internal sealed class RunBundleUploadStore
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.RunSyncStateTableName}
+            UPDATE {RunLogSchema.RunSyncStateTableName}
             SET last_attempt_at_utc = $attemptedAtUtc,
                 retry_count = retry_count + 1,
                 last_error = $error
@@ -109,7 +110,7 @@ internal sealed class RunBundleUploadStore
             command.Transaction = transaction;
             command.CommandTimeout = 2;
             command.CommandText = $"""
-                UPDATE {RunLogSqliteSchema.RunSyncStateTableName}
+                UPDATE {RunLogSchema.RunSyncStateTableName}
                 SET dirty = 0,
                     uploaded_seq = $uploadedSeq,
                     uploaded_status = $uploadedStatus,
@@ -144,7 +145,7 @@ internal sealed class RunBundleUploadStore
 
             command.Parameters.AddWithValue("$uploadedAtUtc", uploadedAtUtc.ToString("o"));
             command.CommandText = $"""
-                UPDATE {RunLogSqliteSchema.BattlesTableName}
+                UPDATE {RunLogSchema.BattlesTableName}
                 SET replay_dirty = 0,
                     replay_last_attempt_at_utc = $uploadedAtUtc,
                     replay_last_uploaded_at_utc = $uploadedAtUtc,
@@ -182,7 +183,7 @@ internal sealed class RunBundleUploadStore
                 final_player_rank,
                 final_player_rating,
                 last_seq
-            FROM {RunLogSqliteSchema.RunsTableName}
+            FROM {RunLogSchema.RunsTableName}
             WHERE run_id = $runId
             LIMIT 1;
             """;
@@ -194,8 +195,8 @@ internal sealed class RunBundleUploadStore
         var lastSeq = GetNullableInt64(reader, "last_seq") ?? 0L;
         var uploadedStatus = GetNullableString(reader, "status");
         var battleManifests = _battleCatalog.ListByRunId(runId);
-        var battleProjections = new List<BattleProjectionV3>();
-        var artifactBattles = new List<RunArtifactBattleV3>();
+        var battleProjections = new List<BattleProjection>();
+        var artifactBattles = new List<RunArtifactBattle>();
         var battleIds = new List<string>();
 
         foreach (var manifest in battleManifests)
@@ -212,8 +213,8 @@ internal sealed class RunBundleUploadStore
             artifactBattles.Add(BuildArtifactBattle(manifest, payload));
         }
 
-        var artifact = new RunArtifactV3 { RunId = runId, Battles = artifactBattles };
-        var artifactBytes = V3RunBundleArtifactCodec.Serialize(artifact);
+        var artifact = new RunArtifact { RunId = runId, Battles = artifactBattles };
+        var artifactBytes = RunBundleArtifactCodec.Serialize(artifact);
 
         return new RunBundleUploadSnapshot
         {
@@ -221,14 +222,14 @@ internal sealed class RunBundleUploadStore
             LastSeq = lastSeq,
             UploadedStatus = uploadedStatus,
             BattleIds = battleIds,
-            Payload = new RunBundleUploadRequestV3
+            Payload = new RunBundleUploadRequest
             {
-                SchemaVersion = RunLogSqliteSchema.UploadPayloadSchemaVersion,
+                SchemaVersion = RunLogSchema.UploadPayloadSchemaVersion,
                 PlayerAccountId = playerAccountId,
                 SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
-                ArtifactCodec = V3RunBundleArtifactCodec.ContentType,
+                ArtifactCodec = RunBundleArtifactCodec.ContentType,
                 ArtifactBytes = artifactBytes.ToArray(),
-                RunProjection = new RunProjectionV3
+                RunProjection = new RunProjection
                 {
                     RunId = runId,
                     Status = uploadedStatus ?? string.Empty,
@@ -251,9 +252,9 @@ internal sealed class RunBundleUploadStore
         };
     }
 
-    private static BattleProjectionV3 BuildBattleProjection(PvpBattleManifest manifest)
+    private static BattleProjection BuildBattleProjection(PvpBattleManifest manifest)
     {
-        return new BattleProjectionV3
+        return new BattleProjection
         {
             BattleId = manifest.BattleId,
             RunId = manifest.RunId,
@@ -272,19 +273,18 @@ internal sealed class RunBundleUploadStore
             OpponentRating = manifest.Participants.OpponentRating,
             OpponentLevel = manifest.Participants.OpponentLevel,
             Result = manifest.Outcome.Result,
-            ReplayAvailable = true,
         };
     }
 
-    private static RunArtifactBattleV3 BuildArtifactBattle(
+    private static RunArtifactBattle BuildArtifactBattle(
         PvpBattleManifest manifest,
         PvpReplayPayload payload
     )
     {
-        return new RunArtifactBattleV3
+        return new RunArtifactBattle
         {
             BattleId = manifest.BattleId,
-            Manifest = new BattleManifestArtifactV3
+            Manifest = new BattleManifestArtifact
             {
                 BattleId = manifest.BattleId,
                 RecordedAtUtc = manifest.RecordedAtUtc.ToString("o"),
@@ -296,7 +296,7 @@ internal sealed class RunBundleUploadStore
                 WinnerCombatantId = manifest.Outcome.WinnerCombatantId,
                 LoserCombatantId = manifest.Outcome.LoserCombatantId,
             },
-            Participants = new BattleParticipantsArtifactV3
+            Participants = new BattleParticipantsArtifact
             {
                 PlayerName = manifest.Participants.PlayerName,
                 PlayerAccountId = manifest.Participants.PlayerAccountId,
@@ -311,9 +311,9 @@ internal sealed class RunBundleUploadStore
                 OpponentRating = manifest.Participants.OpponentRating,
                 OpponentLevel = manifest.Participants.OpponentLevel,
             },
-            Snapshots = new BattleSnapshotsArtifactV3
+            Snapshots = new BattleSnapshotsArtifact
             {
-                CardSets = new List<CardSetCaptureArtifactV3>
+                CardSets = new List<CardSetCaptureArtifact>
                 {
                     CreateCardSet("player_hand", manifest.Snapshots.PlayerHand),
                     CreateCardSet("player_skills", manifest.Snapshots.PlayerSkills),
@@ -321,7 +321,7 @@ internal sealed class RunBundleUploadStore
                     CreateCardSet("opponent_skills", manifest.Snapshots.OpponentSkills),
                 },
             },
-            ReplayPayload = new ReplayPayloadArtifactV3
+            ReplayPayload = new ReplayPayloadArtifact
             {
                 BattleId = payload.BattleId,
                 Version = payload.Version,
@@ -332,26 +332,44 @@ internal sealed class RunBundleUploadStore
         };
     }
 
-    private static CardSetCaptureArtifactV3 CreateCardSet(
+    private static CardSetCaptureArtifact CreateCardSet(
         string label,
         PvpBattleCardSetCapture capture
     )
     {
-        return new CardSetCaptureArtifactV3
+        return new CardSetCaptureArtifact
         {
             Label = label,
             Status = capture.Status.ToString(),
             Source = capture.Source.ToString(),
             Items =
-                capture.Items?.ToList()
-                ?? new List<BazaarPlusPlus.Game.CombatReplay.CombatReplayCardSnapshot>(),
+                capture.Items?.Select(MapCardSnapshot).ToList()
+                ?? new List<CardSetItemArtifact>(),
+        };
+    }
+
+    private static CardSetItemArtifact MapCardSnapshot(CombatReplayCardSnapshot snapshot)
+    {
+        return new CardSetItemArtifact
+        {
+            InstanceId = snapshot.InstanceId,
+            TemplateId = snapshot.TemplateId,
+            Type = (int)snapshot.Type,
+            Size = (int)snapshot.Size,
+            Section = snapshot.Section.HasValue ? (int?)snapshot.Section.Value : null,
+            Socket = snapshot.Socket.HasValue ? (int?)snapshot.Socket.Value : null,
+            Name = snapshot.Name,
+            Tier = snapshot.Tier,
+            Enchant = snapshot.Enchant,
+            Tags = new List<string>(snapshot.Tags ?? new List<string>()),
+            Attributes = new Dictionary<string, int>(snapshot.Attributes ?? new Dictionary<string, int>()),
         };
     }
 
     private void EnsureSchema()
     {
         using var connection = OpenConnection();
-        RunLogSqliteSchema.EnsureInitialized(connection);
+        RunLogSchema.EnsureInitialized(connection);
     }
 
     private SqliteConnection OpenConnection()

@@ -3,6 +3,7 @@ import { sha256Base64 } from "../../crypto/hash";
 import type { Env } from "../../env";
 import { json, readJson } from "../../http/json";
 import { optionalFiniteNumber, optionalTrimmedString } from "../../http/request";
+import { hasPngMagic, objectKeySegment } from "../../http/validation";
 import { logInfo, logWarn } from "../../observability";
 
 type BazaarDbScreenshotRequest = {
@@ -24,21 +25,7 @@ type BazaarDbScreenshotRequest = {
 };
 
 const SupportedSchemaVersion = 1;
-const PngMagic = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
-const ScreenshotIdPattern = /^[A-Za-z0-9._-]{1,128}$/;
-
-function hasPngMagic(bytes: Uint8Array): boolean {
-  if (bytes.length < PngMagic.length) {
-    return false;
-  }
-  for (let index = 0; index < PngMagic.length; index += 1) {
-    if (bytes[index] !== PngMagic[index]) {
-      return false;
-    }
-  }
-  return true;
-}
+const MaxImageBytes = 2 * 1024 * 1024;
 
 function parseCapturedDateUtc(value: string): string | null {
   const parsed = new Date(value);
@@ -54,8 +41,19 @@ function parseCapturedDateUtc(value: string): string | null {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Wire-compatible rejection shape: `{status:"rejected", reason:"..."}`.
+// Distinct from the canonical `{error:"..."}` shape on purpose: the mod-side
+// ingest contract (see uploadBazaarDbScreenshot.ts in the mod) reads `reason`.
 function rejected(reason: string): Response {
   return json({ status: "rejected", reason }, { status: 400 });
+}
+
+function tryDecodeBase64(value: string): Uint8Array | null {
+  try {
+    return base64ToBytes(value);
+  } catch {
+    return null;
+  }
 }
 
 export async function handleUploadBazaarDbScreenshot(
@@ -88,7 +86,7 @@ export async function handleUploadBazaarDbScreenshot(
     return rejected("missing_required_field");
   }
 
-  if (!ScreenshotIdPattern.test(screenshotId)) {
+  if (objectKeySegment(screenshotId) == null) {
     return rejected("invalid_screenshot_id");
   }
 
@@ -101,14 +99,12 @@ export async function handleUploadBazaarDbScreenshot(
     return rejected("invalid_captured_at_utc");
   }
 
-  let imageBytes: Uint8Array;
-  try {
-    imageBytes = base64ToBytes(imageBytesBase64);
-  } catch {
+  const imageBytes = tryDecodeBase64(imageBytesBase64);
+  if (imageBytes == null) {
     return rejected("invalid_image_bytes_base64");
   }
 
-  if (imageBytes.length > 2 * 1024 * 1024) {
+  if (imageBytes.length > MaxImageBytes) {
     return rejected("image_too_large");
   }
 

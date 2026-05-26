@@ -8,7 +8,7 @@ var serviceType = RequireType(
     "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbScreenshotUploadService"
 );
 var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbScreenshotUploadStore");
-var routesType = RequireType("BazaarPlusPlus.Game.Online.V3Routes");
+var routesType = RequireModApiType("BazaarPlusPlus.ModApi.ModApiRoutes");
 
 var ctor = serviceType.GetConstructor(
     BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic,
@@ -231,6 +231,12 @@ static long GetUploadAttempts(string dbPath, string id)
 static Type RequireType(string fullName)
 {
     return Type.GetType($"{fullName}, BazaarPlusPlus")
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static Type RequireModApiType(string fullName)
+{
+    return Type.GetType($"{fullName}, BazaarPlusPlus.ModApi")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 

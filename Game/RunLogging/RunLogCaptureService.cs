@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.RunLogging.Models;
+using BazaarPlusPlus.Storage.RunLog;
 
 namespace BazaarPlusPlus.Game.RunLogging;
 

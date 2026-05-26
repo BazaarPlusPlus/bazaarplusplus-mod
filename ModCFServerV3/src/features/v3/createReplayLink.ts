@@ -1,5 +1,5 @@
 import type { Env } from "../../env";
-import { json } from "../../http/json";
+import { json, jsonError } from "../../http/json";
 
 export async function handleCreateReplayLink(
   request: Request,
@@ -23,12 +23,12 @@ export async function handleCreateReplayLink(
       opponent_account_id: string | null;
     }>();
   if (!battleRow) {
-    return json({ error: "battle_not_found" }, { status: 404 });
+    return jsonError("battle_not_found", 404);
   }
 
   const tokenOwnerPlayerAccountId = battleRow.opponent_account_id;
   if (!tokenOwnerPlayerAccountId) {
-    return json({ error: "replay_forbidden" }, { status: 403 });
+    return jsonError("replay_forbidden", 403);
   }
 
   const createdAtUtc = new Date().toISOString();

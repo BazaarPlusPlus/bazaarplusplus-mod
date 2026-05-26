@@ -23,8 +23,8 @@ Assert(
 
 Assert(
     TooltipPreviewTargetSelection.ResolveCurrentPrimaryItemTooltipData(itemTooltipData, null)
-        == null,
-    "Missing current card should be rejected."
+        == itemTooltipData,
+    "Missing current card should fall through to the active tooltip (modifier-driven refresh case)."
 );
 
 var otherItemCard = new ItemCard

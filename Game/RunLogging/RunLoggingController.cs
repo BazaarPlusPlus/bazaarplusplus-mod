@@ -3,9 +3,10 @@ using System;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
-using BazaarPlusPlus.Game.RunLogging.Models;
 using BazaarPlusPlus.Game.RunLogging.Persistence;
 using BazaarPlusPlus.Game.RunLogging.Upload;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Upload;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.RunLogging;
@@ -37,12 +38,12 @@ internal sealed class RunLoggingController : MonoBehaviour
     private void InitializeCore()
     {
         var services = _services!;
-        var runLogDatabasePath =
+        var sqliteStore = new RunLogStore(services.Paths);
+        var uploadStore = new RunSyncStateStore(services.Paths);
+        var battleCatalog = new PvpBattleCatalog(
             services.Paths.RunLogDatabasePath
-            ?? throw new InvalidOperationException("Run log database path is not initialized.");
-        var sqliteStore = new SqliteRunLogStore(runLogDatabasePath);
-        var uploadStore = new RunSyncStateSqliteStore(runLogDatabasePath);
-        var battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
+                ?? throw new InvalidOperationException("Run log database path is not initialized.")
+        );
         _store = new QueuedRunLogStore(new ReplicatedRunLogStore(sqliteStore, uploadStore));
         _sessionManager = new RunLogSessionManager(_store);
         _sessionManager.RestoreActiveSession();

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Storage.Identity;
 
 namespace BazaarPlusPlus.Game.Identity;
 

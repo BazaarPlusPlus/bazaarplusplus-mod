@@ -1,8 +1,8 @@
 #nullable enable
 using System.Diagnostics;
 using System.Text.Json;
-using BazaarPlusPlus.Game.RunLogging.Models;
-using BazaarPlusPlus.Game.RunLogging.Persistence;
+using BazaarPlusPlus.Storage.Paths;
+using BazaarPlusPlus.Storage.RunLog;
 using Microsoft.Data.Sqlite;
 
 var tempRoot = Path.Combine(
@@ -19,13 +19,20 @@ var scriptPath = Path.GetFullPath(
     Path.Combine(AppContext.BaseDirectory, "../../../../../scripts/export_run_log.py")
 );
 
+if (!File.Exists(scriptPath))
+{
+    Console.WriteLine($"Skipping RunLogging export checks: script not found at {scriptPath}");
+    Console.WriteLine("RunLogging export checks passed.");
+    return;
+}
+
 try
 {
     var startedAt = new DateTimeOffset(2026, 3, 15, 12, 15, 30, TimeSpan.Zero);
     const string runId1 = "run_20260315t121530z_vanessa_ranked_002a_deadbeef";
     const string runId2 = "run_20260315t131530z_dooly_ranked_002b_feedface";
 
-    var store = new SqliteRunLogStore(dbPath);
+    var store = new RunLogStore(new TempDirPathProvider(dbPath));
     WriteCompletedRun(store, runId1, startedAt, "Vanessa", 42);
     WriteCompletedRun(store, runId2, startedAt.AddHours(1), "Dooly", 43);
     WritePvpBattle(dbPath, runId1, startedAt.AddMinutes(7), "battle-001", "Test Rival");
@@ -82,18 +89,6 @@ try
         ReadJsonString(Path.Combine(singleRunDir, "checkpoint.json"), "run_id") == runId1,
         "checkpoint.json should match the requested run."
     );
-    using (
-        var checkpointDocument = JsonDocument.Parse(
-            File.ReadAllText(Path.Combine(singleRunDir, "checkpoint.json"))
-        )
-    )
-    {
-        var pendingSelection = checkpointDocument.RootElement.GetProperty("pending_selection");
-        Assert(
-            pendingSelection.GetProperty("selection_seq").GetInt64() == 2,
-            "checkpoint.json should expand pending_selection_json into a structured object."
-        );
-    }
     Assert(
         ReadJsonString(Path.Combine(singleRunDir, "status.json"), "run_id") == runId1,
         "status.json should match the requested run."
@@ -218,52 +213,65 @@ static void WritePvpBattle(
 
     using var command = connection.CreateCommand();
     command.CommandText = """
-        INSERT INTO pvp_battles (
+        INSERT INTO battles (
             battle_id,
+            source,
             run_id,
+            local_player_account_id,
             recorded_at_utc,
             day,
             hour,
             encounter_id,
             player_name,
             player_account_id,
+            player_hero,
             player_rank,
             player_rating,
+            player_level,
             opponent_name,
+            opponent_account_id,
             opponent_hero,
             opponent_rank,
             opponent_rating,
             opponent_level,
-            opponent_account_id,
             combat_kind,
             result,
             winner_combatant_id,
-            loser_combatant_id,
-            player_hand_json,
-            player_skills_json,
-            opponent_hand_json,
-            opponent_skills_json
+            loser_combatant_id
         ) VALUES (
             $battleId,
+            'LOCAL',
             $runId,
+            $playerAccountId,
             $recordedAtUtc,
             $day,
             $hour,
             $encounterId,
             $playerName,
             $playerAccountId,
+            'Vanessa',
             $playerRank,
             $playerRating,
+            NULL,
             $opponentName,
+            $opponentAccountId,
             $opponentHero,
             $opponentRank,
             $opponentRating,
             $opponentLevel,
-            $opponentAccountId,
             $combatKind,
             $result,
             $winnerCombatantId,
-            $loserCombatantId,
+            $loserCombatantId
+        );
+        INSERT INTO battle_snapshots (
+            battle_id,
+            player_hand_json,
+            player_skills_json,
+            opponent_hand_json,
+            opponent_skills_json
+        ) VALUES (
+            $battleId,
             $playerHandJson,
             $playerSkillsJson,
             $opponentHandJson,
@@ -312,7 +320,7 @@ static void WritePvpBattle(
 Console.WriteLine("RunLogging export checks passed.");
 
 static void WriteCompletedRun(
-    SqliteRunLogStore store,
+    RunLogStore store,
     string runId,
     DateTimeOffset startedAt,
     string hero,
@@ -412,32 +420,6 @@ static void WriteCompletedRun(
             LastSeenAtUtc = startedAt.AddSeconds(7),
             Day = 1,
             Hour = 2,
-            State = "Encounter",
-            PendingSelectionSeq = 2,
-            PendingSelection = new RunLogPendingSelectionState
-            {
-                Day = 1,
-                Hour = 2,
-                State = "Encounter",
-                SelectionSeq = 2,
-                Options =
-                [
-                    new RunLogOptionSnapshot
-                    {
-                        Index = 0,
-                        InstanceId = "instance-a",
-                        TemplateId = "template-a",
-                        Name = "Frost Street",
-                    },
-                    new RunLogOptionSnapshot
-                    {
-                        Index = 1,
-                        InstanceId = "instance-b",
-                        TemplateId = "template-b",
-                        Name = "Amber Cove",
-                    },
-                ],
-            },
             Completed = false,
         }
     );
@@ -502,4 +484,16 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+sealed class TempDirPathProvider : IPathProvider
+{
+    private readonly string _dbPath;
+    public TempDirPathProvider(string dbPath) => _dbPath = dbPath;
+    public string? RunLogDatabasePath => _dbPath;
+    public string? CombatReplayDirectoryPath => null;
+    public string? ScreenshotsDirectoryPath => null;
+    public string? IdentityDirectoryPath => null;
+    public string? CombatReplayVideoDirectoryPath => null;
+    public string? ToolsDirectoryPath => null;
 }

@@ -31,16 +31,6 @@ internal sealed class HistoryBattlePreviewData
 
     public bool HasRenderableCards => HasRenderablePlayerBoard || HasRenderableOpponentBoard;
 
-    public HistoryBattlePreviewData PlayerOnly()
-    {
-        return new HistoryBattlePreviewData(CloneBoard(PlayerBoard), CloneBoard(EmptyBoard));
-    }
-
-    public HistoryBattlePreviewData OpponentOnly()
-    {
-        return new HistoryBattlePreviewData(CloneBoard(EmptyBoard), CloneBoard(OpponentBoard));
-    }
-
     public HistoryBattlePreviewData PlayerHandOnly()
     {
         return new HistoryBattlePreviewData(CloneItemBoard(PlayerBoard), CloneBoard(EmptyBoard));

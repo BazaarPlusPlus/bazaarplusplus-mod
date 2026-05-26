@@ -1,5 +1,5 @@
 import type { Env } from "../../env";
-import { json } from "../../http/json";
+import { jsonError } from "../../http/json";
 
 type ReplayTokenRow = {
   token: string;
@@ -34,10 +34,10 @@ export async function handleDownloadReplay(
     .bind(token)
     .first<ReplayTokenRow>();
   if (!replayToken || replayToken.revoked_at_utc != null) {
-    return json({ error: "replay_token_not_found" }, { status: 404 });
+    return jsonError("replay_token_not_found", 404);
   }
   if (Date.parse(replayToken.expires_at_utc) < Date.now()) {
-    return json({ error: "replay_token_expired" }, { status: 410 });
+    return jsonError("replay_token_expired", 410);
   }
 
   const battle = await env.DB.prepare(
@@ -46,7 +46,7 @@ export async function handleDownloadReplay(
     .bind(replayToken.battle_id)
     .first<BattleRow>();
   if (!battle) {
-    return json({ error: "battle_not_found" }, { status: 404 });
+    return jsonError("battle_not_found", 404);
   }
 
   const runBundle = await env.DB.prepare(
@@ -55,12 +55,12 @@ export async function handleDownloadReplay(
     .bind(battle.bundle_id)
     .first<RunBundleRow>();
   if (!runBundle?.object_key) {
-    return json({ error: "artifact_expired" }, { status: 410 });
+    return jsonError("artifact_expired", 410);
   }
 
   const object = await env.RUN_BUNDLE_BUCKET.get(runBundle.object_key);
   if (!object) {
-    return json({ error: "artifact_expired" }, { status: 410 });
+    return jsonError("artifact_expired", 410);
   }
 
   if (replayToken.used_at_utc == null) {

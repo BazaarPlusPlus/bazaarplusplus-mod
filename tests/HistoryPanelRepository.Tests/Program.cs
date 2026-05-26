@@ -1,8 +1,8 @@
 #nullable enable
 using Microsoft.Data.Sqlite;
 
-var schemaType = RequireType(
-    "BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite.RunLogSqliteSchema"
+var schemaType = RequireStorageType(
+    "BazaarPlusPlus.Storage.RunLog.RunLogSchema"
 );
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var ctor = repositoryType.GetConstructor([typeof(string)]);
@@ -114,8 +114,17 @@ try
     var playerRating = (int?)(
         recordList[0].GetType().GetProperty("PlayerRating")!.GetValue(recordList[0])
     );
-    var snapshotSummary = (string)(
-        recordList[0].GetType().GetProperty("SnapshotSummary")!.GetValue(recordList[0])!
+    var playerHandItemCount = (int)(
+        recordList[0].GetType().GetProperty("PlayerHandItemCount")!.GetValue(recordList[0])!
+    );
+    var playerSkillCount = (int)(
+        recordList[0].GetType().GetProperty("PlayerSkillCount")!.GetValue(recordList[0])!
+    );
+    var opponentHandItemCount = (int)(
+        recordList[0].GetType().GetProperty("OpponentHandItemCount")!.GetValue(recordList[0])!
+    );
+    var opponentSkillCount = (int)(
+        recordList[0].GetType().GetProperty("OpponentSkillCount")!.GetValue(recordList[0])!
     );
 
     Assert(
@@ -127,9 +136,11 @@ try
         "ListBattlesByRun should surface the persisted player rank and rating snapshot."
     );
     Assert(
-        snapshotSummary.Contains("YOU 0 items", StringComparison.Ordinal)
-            && snapshotSummary.Contains("OPP 0 items", StringComparison.Ordinal),
-        "ListBattlesByRun should still build the snapshot summary from parsed capture payloads."
+        playerHandItemCount == 0
+            && playerSkillCount == 0
+            && opponentHandItemCount == 0
+            && opponentSkillCount == 0,
+        "ListBattlesByRun should derive snapshot card counts from the parsed capture payloads."
     );
 
     var battleIds = (
@@ -144,8 +155,8 @@ try
         "ListBattleIdsByRun should return all linked battles ordered from newest to oldest."
     );
 
-    var ghostImportType = RequireType(
-        "BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleImportRecord"
+    var ghostImportType = RequireModApiType(
+        "BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord"
     );
     var replaceGhostBattles = repositoryType.GetMethod(
         "ReplaceGhostBattles",
@@ -230,11 +241,8 @@ try
         "ReplaceGhostBattles should preserve replay_downloaded for ghost battles already fetched locally."
     );
     Assert(
-        string.IsNullOrEmpty(
-            (string?)
-                downloadedGhost.GetType().GetProperty("SnapshotSummary")!.GetValue(downloadedGhost)
-        ),
-        "Ghost battle list rows should not depend on remote snapshot payloads for their summary."
+        downloadedGhost.GetType().GetProperty("Snapshots")!.GetValue(downloadedGhost) is null,
+        "Ghost battle list rows should not depend on remote snapshot payloads for their counts."
     );
 
     replaceGhostBattles.Invoke(
@@ -373,6 +381,20 @@ Console.WriteLine("HistoryPanelRepository checks passed.");
 static Type RequireType(string fullName)
 {
     var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus");
+    return assembly.GetType(fullName, throwOnError: false)
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static Type RequireStorageType(string fullName)
+{
+    var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus.Storage");
+    return assembly.GetType(fullName, throwOnError: false)
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static Type RequireModApiType(string fullName)
+{
+    var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus.ModApi");
     return assembly.GetType(fullName, throwOnError: false)
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }

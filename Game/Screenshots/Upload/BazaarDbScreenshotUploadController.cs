@@ -4,7 +4,7 @@ using System.Net.Http;
 using System.Threading;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Online;
+using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.Game.Upload;
 using UnityEngine;
 
@@ -58,17 +58,17 @@ internal sealed class BazaarDbScreenshotUploadController : MonoBehaviour
                 return;
             }
 
-            var routes = V3Routes.TryCreate(V3UploadDefaults.ApiBaseUrl);
+            var routes = ModApiRoutes.TryCreate(ModApiUploadDefaults.ApiBaseUrl);
             if (routes == null)
                 return;
 
             var store = new BazaarDbScreenshotUploadStore(databasePath, screenshotsDirectoryPath);
-            _httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(
-                    Math.Max(10, V3UploadDefaults.RequestTimeoutSeconds)
-                ),
-            };
+            _httpClient = BppHttpClientFactory.Create(
+                userAgentSuffix: "BazaarDbScreenshotUpload",
+                timeout: TimeSpan.FromSeconds(
+                    Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds)
+                )
+            );
             _uploadService = new BazaarDbScreenshotUploadService(
                 store,
                 routes,
@@ -77,8 +77,8 @@ internal sealed class BazaarDbScreenshotUploadController : MonoBehaviour
             );
             _shutdown = new CancellationTokenSource();
 
-            var startupDelaySeconds = Math.Max(5, V3UploadDefaults.StartupDelaySeconds);
-            var retryIntervalSeconds = Math.Max(1, V3UploadDefaults.IntervalSeconds);
+            var startupDelaySeconds = Math.Max(5, ModApiUploadDefaults.StartupDelaySeconds);
+            var retryIntervalSeconds = Math.Max(1, ModApiUploadDefaults.IntervalSeconds);
             _startupGate = new StartupUploadAttemptGate(
                 Time.unscaledTime + startupDelaySeconds,
                 retryIntervalSeconds

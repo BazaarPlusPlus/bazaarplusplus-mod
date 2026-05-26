@@ -1,7 +1,8 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -9,7 +10,7 @@ using Newtonsoft.Json.Serialization;
 
 namespace BazaarPlusPlus.Game.PvpBattles.Persistence;
 
-internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
+internal sealed class PvpBattleSqliteStore : SqliteStoreBase
 {
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
@@ -40,7 +41,7 @@ internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
         var persistedRunId = ResolvePersistedRunId(connection, transaction, manifest.RunId);
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.BattlesTableName} (
+            INSERT INTO {RunLogSchema.BattlesTableName} (
                 battle_id,
                 source,
                 run_id,
@@ -178,7 +179,7 @@ internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
 
         using var snapshotCommand = CreateCommand(connection, transaction);
         snapshotCommand.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.BattleSnapshotsTableName} (
+            INSERT INTO {RunLogSchema.BattleSnapshotsTableName} (
                 battle_id,
                 player_hand_json,
                 player_skills_json,
@@ -230,7 +231,7 @@ internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
         using var command = CreateCommand(connection, transaction);
         command.CommandText = $"""
             SELECT 1
-            FROM {RunLogSqliteSchema.RunsTableName}
+            FROM {RunLogSchema.RunsTableName}
             WHERE run_id = $runId
             LIMIT 1;
             """;
@@ -270,8 +271,8 @@ internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
                 s.player_skills_json,
                 s.opponent_hand_json,
                 s.opponent_skills_json
-            FROM {RunLogSqliteSchema.BattlesTableName} AS b
-            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+            FROM {RunLogSchema.BattlesTableName} AS b
+            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
                 ON s.battle_id = b.battle_id
             WHERE b.battle_id = $battleId
               AND b.source = 'LOCAL'
@@ -293,7 +294,7 @@ internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText =
-            $"DELETE FROM {RunLogSqliteSchema.BattlesTableName} WHERE battle_id = $battleId;";
+            $"DELETE FROM {RunLogSchema.BattlesTableName} WHERE battle_id = $battleId;";
         command.Parameters.AddWithValue("$battleId", battleId);
         command.ExecuteNonQuery();
     }
@@ -306,14 +307,14 @@ internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            UPDATE {RunLogSchema.BattlesTableName}
             SET run_id = $runId
             WHERE battle_id = $battleId
               AND source = 'LOCAL'
               AND (run_id IS NULL OR run_id = $runId)
               AND EXISTS (
                   SELECT 1
-                  FROM {RunLogSqliteSchema.RunsTableName}
+                  FROM {RunLogSchema.RunsTableName}
                   WHERE run_id = $runId
                   LIMIT 1
               );
@@ -329,7 +330,7 @@ internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
         using var command = CreateCommand(connection);
         command.CommandText = $"""
             SELECT battle_id
-            FROM {RunLogSqliteSchema.BattlesTableName}
+            FROM {RunLogSchema.BattlesTableName}
             WHERE source = 'LOCAL'
             ORDER BY recorded_at_utc DESC, battle_id DESC;
             """;
@@ -373,8 +374,8 @@ internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
                 s.player_skills_json,
                 s.opponent_hand_json,
                 s.opponent_skills_json
-            FROM {RunLogSqliteSchema.BattlesTableName} AS b
-            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+            FROM {RunLogSchema.BattlesTableName} AS b
+            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
                 ON s.battle_id = b.battle_id
             WHERE b.source = 'LOCAL'
             ORDER BY b.recorded_at_utc DESC, b.battle_id DESC
@@ -427,8 +428,8 @@ internal sealed class PvpBattleSqliteStore : SqlitePersistenceStoreBase
                 s.player_skills_json,
                 s.opponent_hand_json,
                 s.opponent_skills_json
-            FROM {RunLogSqliteSchema.BattlesTableName} AS b
-            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+            FROM {RunLogSchema.BattlesTableName} AS b
+            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
                 ON s.battle_id = b.battle_id
             WHERE b.source = 'LOCAL'
               AND b.run_id = $runId

@@ -2,9 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using BazaarPlusPlus.Game.HistoryPanel.Ghost;
+using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Game.PvpBattles;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -57,11 +58,11 @@ internal sealed partial class HistoryPanelRepository
                 r.losses,
                 r.ended_at_utc,
                 COUNT(s.battle_id) AS battle_count
-            FROM {RunLogSqliteSchema.RunsTableName} AS r
-            LEFT JOIN {RunLogSqliteSchema.BattlesTableName} AS pb
+            FROM {RunLogSchema.RunsTableName} AS r
+            LEFT JOIN {RunLogSchema.BattlesTableName} AS pb
                 ON pb.run_id = r.run_id
                AND pb.source = 'LOCAL'
-            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
                 ON s.battle_id = pb.battle_id
                AND s.player_hand_json IS NOT NULL
                AND s.player_skills_json IS NOT NULL
@@ -102,44 +103,7 @@ internal sealed partial class HistoryPanelRepository
         using var reader = command.ExecuteReader();
         var records = new List<HistoryRunRecord>();
         while (reader.Read())
-        {
-            var startedAt = DateTimeOffset.Parse(
-                reader.GetString(reader.GetOrdinal("started_at_utc"))
-            );
-            var endedAt = GetNullableDateTimeOffset(reader, "ended_at_utc");
-            var victories = GetNullableInt32(reader, "victories");
-            var losses = GetNullableInt32(reader, "losses");
-            var finalDay = GetNullableInt32(reader, "final_day") ?? GetNullableInt32(reader, "day");
-            var finalHour =
-                GetNullableInt32(reader, "final_hour") ?? GetNullableInt32(reader, "hour");
-            var lastSeen =
-                endedAt ?? GetNullableDateTimeOffset(reader, "last_seen_at_utc") ?? startedAt;
-            var rawStatus = reader.GetString(reader.GetOrdinal("run_status"));
-
-            records.Add(
-                new HistoryRunRecord(
-                    reader.GetString(reader.GetOrdinal("run_id")),
-                    reader.GetString(reader.GetOrdinal("hero")),
-                    reader.GetString(reader.GetOrdinal("game_mode")),
-                    startedAt,
-                    endedAt,
-                    lastSeen,
-                    finalDay,
-                    finalHour,
-                    GetNullableInt32(reader, "final_max_health"),
-                    GetNullableInt32(reader, "final_prestige"),
-                    GetNullableInt32(reader, "final_level"),
-                    GetNullableInt32(reader, "final_income"),
-                    GetNullableInt32(reader, "final_gold"),
-                    GetNullableString(reader, "player_rank"),
-                    GetNullableInt32(reader, "player_rating"),
-                    victories,
-                    losses,
-                    rawStatus,
-                    reader.GetInt32(reader.GetOrdinal("battle_count"))
-                )
-            );
-        }
+            records.Add(HistoryPanelRowMapper.ReadRun(reader));
 
         return records;
     }
@@ -178,8 +142,8 @@ internal sealed partial class HistoryPanelRepository
                 s.player_skills_json,
                 s.opponent_hand_json,
                 s.opponent_skills_json
-            FROM {RunLogSqliteSchema.BattlesTableName} AS b
-            LEFT JOIN {RunLogSqliteSchema.BattleSnapshotsTableName} AS s
+            FROM {RunLogSchema.BattlesTableName} AS b
+            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
                 ON s.battle_id = b.battle_id
             WHERE b.run_id = $runId
               AND b.source = 'LOCAL'
@@ -191,7 +155,7 @@ internal sealed partial class HistoryPanelRepository
         var records = new List<HistoryBattleRecord>();
         while (reader.Read())
         {
-            var battleId = SafeGetNullableString(reader, "battle_id") ?? "unknown";
+            var battleId = HistoryPanelRowMapper.SafeGetNullableString(reader, "battle_id") ?? "unknown";
             try
             {
                 var playerHand = DeserializeCapture(
@@ -208,40 +172,16 @@ internal sealed partial class HistoryPanelRepository
                 );
 
                 records.Add(
-                    new HistoryBattleRecord(
+                    HistoryPanelRowMapper.ReadLocalBattle(
+                        reader,
                         battleId,
-                        reader.GetString(reader.GetOrdinal("run_id")),
-                        DateTimeOffset.Parse(
-                            reader.GetString(reader.GetOrdinal("recorded_at_utc"))
-                        ),
-                        GetNullableInt32(reader, "day"),
-                        GetNullableInt32(reader, "hour"),
-                        GetNullableString(reader, "encounter_id"),
-                        GetNullableString(reader, "player_hero"),
-                        GetNullableString(reader, "player_rank"),
-                        GetNullableInt32(reader, "player_rating"),
-                        GetNullableInt32(reader, "player_level"),
-                        GetNullableString(reader, "opponent_name"),
-                        GetNullableString(reader, "opponent_hero"),
-                        GetNullableString(reader, "opponent_rank"),
-                        GetNullableInt32(reader, "opponent_rating"),
-                        GetNullableInt32(reader, "opponent_level"),
-                        GetNullableString(reader, "opponent_account_id"),
-                        GetNullableString(reader, "combat_kind"),
-                        GetNullableString(reader, "result"),
-                        GetNullableString(reader, "winner_combatant_id"),
-                        GetNullableString(reader, "loser_combatant_id"),
-                        BuildSnapshotSummary(
-                            playerHand,
-                            playerSkills,
-                            opponentHand,
-                            opponentSkills
-                        ),
-                        BuildPreviewData(playerHand, playerSkills, opponentHand, opponentSkills),
-                        isBundleFinalBattle: false,
-                        source: HistoryBattleSource.Local,
-                        replayAvailable: true,
-                        replayDownloaded: true
+                        new PvpBattleSnapshots
+                        {
+                            PlayerHand = playerHand,
+                            PlayerSkills = playerSkills,
+                            OpponentHand = opponentHand,
+                            OpponentSkills = opponentSkills,
+                        }
                     )
                 );
             }
@@ -294,7 +234,7 @@ internal sealed partial class HistoryPanelRepository
                 is_bundle_final_battle,
                 replay_available,
                 replay_downloaded
-            FROM {RunLogSqliteSchema.BattlesTableName}
+            FROM {RunLogSchema.BattlesTableName}
             WHERE source = 'GHOST'
               AND deleted_at_utc IS NULL
             ORDER BY recorded_at_utc DESC, battle_id DESC
@@ -305,35 +245,7 @@ internal sealed partial class HistoryPanelRepository
         using var reader = command.ExecuteReader();
         var records = new List<HistoryBattleRecord>();
         while (reader.Read())
-        {
-            var battleId = SafeGetNullableString(reader, "battle_id") ?? "unknown";
-            records.Add(
-                GhostBattleLocalProjector.CreateHistoryBattleRecord(
-                    battleId,
-                    DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("recorded_at_utc"))),
-                    GetNullableInt32(reader, "day"),
-                    GetNullableInt32(reader, "hour"),
-                    GetNullableString(reader, "encounter_id"),
-                    GetNullableString(reader, "player_name"),
-                    GetNullableString(reader, "player_account_id"),
-                    GetNullableString(reader, "player_hero"),
-                    GetNullableString(reader, "player_rank"),
-                    GetNullableInt32(reader, "player_rating"),
-                    GetNullableInt32(reader, "player_level"),
-                    GetNullableString(reader, "opponent_hero"),
-                    GetNullableString(reader, "opponent_rank"),
-                    GetNullableInt32(reader, "opponent_rating"),
-                    GetNullableInt32(reader, "opponent_level"),
-                    GetNullableString(reader, "combat_kind"),
-                    GetNullableString(reader, "result"),
-                    GetNullableString(reader, "winner_combatant_id"),
-                    GetNullableString(reader, "loser_combatant_id"),
-                    isBundleFinalBattle: GetNullableInt32(reader, "is_bundle_final_battle") == 1,
-                    replayAvailable: GetNullableInt32(reader, "replay_available") == 1,
-                    replayDownloaded: GetNullableInt32(reader, "replay_downloaded") == 1
-                )
-            );
-        }
+            records.Add(HistoryPanelRowMapper.ReadGhostBattle(reader));
 
         return records;
     }
@@ -366,7 +278,7 @@ internal sealed partial class HistoryPanelRepository
             insertCommand.Transaction = transaction;
             insertCommand.CommandTimeout = 2;
             insertCommand.CommandText = $"""
-                INSERT INTO {RunLogSqliteSchema.BattlesTableName} (
+                INSERT INTO {RunLogSchema.BattlesTableName} (
                     battle_id,
                     source,
                     run_id,
@@ -452,13 +364,13 @@ internal sealed partial class HistoryPanelRepository
                     is_bundle_final_battle = excluded.is_bundle_final_battle,
                     replay_available = excluded.replay_available,
                     replay_downloaded = MAX(
-                        {RunLogSqliteSchema.GhostBattlesTableName}.replay_downloaded,
+                        {RunLogSchema.GhostBattlesTableName}.replay_downloaded,
                         excluded.replay_downloaded
                     ),
                     last_synced_at_utc = excluded.last_synced_at_utc,
                     deleted_at_utc = CASE
                         WHEN excluded.recorded_at_utc >= $staleCutoffUtc THEN NULL
-                        ELSE {RunLogSqliteSchema.BattlesTableName}.deleted_at_utc
+                        ELSE {RunLogSchema.BattlesTableName}.deleted_at_utc
                     END;
                 """;
             insertCommand.Parameters.AddWithValue("$battleId", battle.BattleId);
@@ -566,7 +478,7 @@ internal sealed partial class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            UPDATE {RunLogSchema.BattlesTableName}
             SET deleted_at_utc = COALESCE(deleted_at_utc, $deletedAtUtc)
             WHERE source = 'GHOST'
               AND replay_downloaded = 0
@@ -591,7 +503,7 @@ internal sealed partial class HistoryPanelRepository
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT cursor_value
-            FROM {RunLogSqliteSchema.SyncCursorsTableName}
+            FROM {RunLogSchema.SyncCursorsTableName}
             WHERE scope = $scope
             LIMIT 1;
             """;
@@ -612,7 +524,7 @@ internal sealed partial class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            INSERT INTO {RunLogSqliteSchema.SyncCursorsTableName} (
+            INSERT INTO {RunLogSchema.SyncCursorsTableName} (
                 scope,
                 cursor_value,
                 updated_at_utc
@@ -639,7 +551,7 @@ internal sealed partial class HistoryPanelRepository
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.BattlesTableName}
+            UPDATE {RunLogSchema.BattlesTableName}
             SET replay_downloaded = 1
             WHERE source = 'GHOST'
               AND battle_id = $battleId;
@@ -658,7 +570,7 @@ internal sealed partial class HistoryPanelRepository
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT battle_id
-            FROM {RunLogSqliteSchema.BattlesTableName}
+            FROM {RunLogSchema.BattlesTableName}
             WHERE run_id = $runId
               AND source = 'LOCAL'
             ORDER BY recorded_at_utc DESC, battle_id DESC;
@@ -685,7 +597,7 @@ internal sealed partial class HistoryPanelRepository
         using var deleteRun = connection.CreateCommand();
         deleteRun.CommandTimeout = 2;
         deleteRun.CommandText =
-            $"DELETE FROM {RunLogSqliteSchema.RunsTableName} WHERE run_id = $runId;";
+            $"DELETE FROM {RunLogSchema.RunsTableName} WHERE run_id = $runId;";
         deleteRun.Parameters.AddWithValue("$runId", runId);
         deleteRun.ExecuteNonQuery();
     }
@@ -700,10 +612,10 @@ internal sealed partial class HistoryPanelRepository
         pragma.ExecuteNonQuery();
         if (ensureSchema)
         {
-            RunLogSqliteSchema.EnsureInitialized(connection);
+            RunLogSchema.EnsureInitialized(connection);
             EnsureColumnExists(
                 connection,
-                RunLogSqliteSchema.BattlesTableName,
+                RunLogSchema.BattlesTableName,
                 "is_bundle_final_battle",
                 "INTEGER NOT NULL DEFAULT 0"
             );
@@ -714,60 +626,6 @@ internal sealed partial class HistoryPanelRepository
     private static string BuildGhostSyncScope(string localPlayerAccountId)
     {
         return $"{RecentGhostSyncScopePrefix}::{localPlayerAccountId.Trim()}";
-    }
-
-    private static PvpBattleManifest ReadManifest(SqliteDataReader reader, string? runIdColumnName)
-    {
-        return new PvpBattleManifest
-        {
-            BattleId = reader.GetString(reader.GetOrdinal("battle_id")),
-            RunId = string.IsNullOrWhiteSpace(runIdColumnName)
-                ? null
-                : GetNullableString(reader, runIdColumnName),
-            RecordedAtUtc = DateTimeOffset.Parse(
-                reader.GetString(reader.GetOrdinal("recorded_at_utc"))
-            ),
-            Day = GetNullableInt32(reader, "day"),
-            Hour = GetNullableInt32(reader, "hour"),
-            EncounterId = GetNullableString(reader, "encounter_id"),
-            CombatKind = reader.GetString(reader.GetOrdinal("combat_kind")),
-            Participants = new PvpBattleParticipants
-            {
-                PlayerName = GetNullableString(reader, "player_name"),
-                PlayerAccountId = GetNullableString(reader, "player_account_id"),
-                PlayerHero = GetNullableString(reader, "player_hero"),
-                PlayerRank = GetNullableString(reader, "player_rank"),
-                PlayerRating = GetNullableInt32(reader, "player_rating"),
-                PlayerLevel = GetNullableInt32(reader, "player_level"),
-                OpponentName = GetNullableString(reader, "opponent_name"),
-                OpponentHero = GetNullableString(reader, "opponent_hero"),
-                OpponentRank = GetNullableString(reader, "opponent_rank"),
-                OpponentRating = GetNullableInt32(reader, "opponent_rating"),
-                OpponentLevel = GetNullableInt32(reader, "opponent_level"),
-                OpponentAccountId = GetNullableString(reader, "opponent_account_id"),
-            },
-            Outcome = new PvpBattleOutcome
-            {
-                Result = GetNullableString(reader, "result"),
-                WinnerCombatantId = GetNullableString(reader, "winner_combatant_id"),
-                LoserCombatantId = GetNullableString(reader, "loser_combatant_id"),
-            },
-            Snapshots = new PvpBattleSnapshots
-            {
-                PlayerHand = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("player_hand_json"))
-                ),
-                PlayerSkills = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("player_skills_json"))
-                ),
-                OpponentHand = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("opponent_hand_json"))
-                ),
-                OpponentSkills = DeserializeCapture(
-                    reader.GetString(reader.GetOrdinal("opponent_skills_json"))
-                ),
-            },
-        };
     }
 
     private static void EnsureColumnExists(
@@ -809,38 +667,5 @@ internal sealed partial class HistoryPanelRepository
         alter.CommandTimeout = 2;
         alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
         alter.ExecuteNonQuery();
-    }
-
-    private static string? GetNullableString(SqliteDataReader reader, string columnName)
-    {
-        var ordinal = reader.GetOrdinal(columnName);
-        return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
-    }
-
-    private static string? SafeGetNullableString(SqliteDataReader reader, string columnName)
-    {
-        try
-        {
-            return GetNullableString(reader, columnName);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static int? GetNullableInt32(SqliteDataReader reader, string columnName)
-    {
-        var ordinal = reader.GetOrdinal(columnName);
-        return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
-    }
-
-    private static DateTimeOffset? GetNullableDateTimeOffset(
-        SqliteDataReader reader,
-        string columnName
-    )
-    {
-        var ordinal = reader.GetOrdinal(columnName);
-        return reader.IsDBNull(ordinal) ? null : DateTimeOffset.Parse(reader.GetString(ordinal));
     }
 }

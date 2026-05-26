@@ -6,7 +6,7 @@ using System.Reflection;
 using Newtonsoft.Json.Linq;
 
 var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleSyncService");
-var apiClientType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleApiClient");
+var apiClientType = RequireModApiType("BazaarPlusPlus.ModApi.Clients.GhostBattleClient");
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var dataServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelDataService");
 var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleRecord");
@@ -19,30 +19,33 @@ var coordinatorDependenciesType = RequireType(
 var coordinatorOutcomeType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator+GhostBattleOutcome"
 );
-var importRecordType = RequireType(
-    "BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleImportRecord"
+var importRecordType = RequireModApiType(
+    "BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord"
 );
-var routesType = RequireType("BazaarPlusPlus.Game.Online.V3Routes");
-var artifactCodecType = RequireType("BazaarPlusPlus.Game.Online.V3RunBundleArtifactCodec");
+var routesType = RequireModApiType("BazaarPlusPlus.ModApi.ModApiRoutes");
+var artifactCodecType = RequireModApiType("BazaarPlusPlus.ModApi.RunBundleArtifactCodec");
 var ghostPayloadStoreType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattlePayloadStore"
 );
-var runArtifactType = RequireType("BazaarPlusPlus.Game.Online.Models.RunArtifactV3");
-var runArtifactBattleType = RequireType("BazaarPlusPlus.Game.Online.Models.RunArtifactBattleV3");
-var battleManifestArtifactType = RequireType(
-    "BazaarPlusPlus.Game.Online.Models.BattleManifestArtifactV3"
+var runArtifactType = RequireModApiType("BazaarPlusPlus.ModApi.Models.RunArtifact");
+var runArtifactBattleType = RequireModApiType("BazaarPlusPlus.ModApi.Models.RunArtifactBattle");
+var battleManifestArtifactType = RequireModApiType(
+    "BazaarPlusPlus.ModApi.Models.BattleManifestArtifact"
 );
-var battleParticipantsArtifactType = RequireType(
-    "BazaarPlusPlus.Game.Online.Models.BattleParticipantsArtifactV3"
+var battleParticipantsArtifactType = RequireModApiType(
+    "BazaarPlusPlus.ModApi.Models.BattleParticipantsArtifact"
 );
-var battleSnapshotsArtifactType = RequireType(
-    "BazaarPlusPlus.Game.Online.Models.BattleSnapshotsArtifactV3"
+var battleSnapshotsArtifactType = RequireModApiType(
+    "BazaarPlusPlus.ModApi.Models.BattleSnapshotsArtifact"
 );
-var replayPayloadArtifactType = RequireType(
-    "BazaarPlusPlus.Game.Online.Models.ReplayPayloadArtifactV3"
+var replayPayloadArtifactType = RequireModApiType(
+    "BazaarPlusPlus.ModApi.Models.ReplayPayloadArtifact"
 );
-var cardSetCaptureArtifactType = RequireType(
-    "BazaarPlusPlus.Game.Online.Models.CardSetCaptureArtifactV3"
+var cardSetCaptureArtifactType = RequireModApiType(
+    "BazaarPlusPlus.ModApi.Models.CardSetCaptureArtifact"
+);
+var cardSetItemArtifactType = RequireModApiType(
+    "BazaarPlusPlus.ModApi.Models.CardSetItemArtifact"
 );
 var cardSnapshotType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayCardSnapshot");
 
@@ -50,7 +53,7 @@ var shouldAdvanceCheckpoint = syncServiceType.GetMethod(
     "ShouldAdvanceCheckpoint",
     BindingFlags.NonPublic | BindingFlags.Static
 );
-var tryExtractPayloadFromArtifact = apiClientType.GetMethod(
+var tryExtractPayloadFromArtifact = syncServiceType.GetMethod(
     "TryExtractPayloadFromArtifact",
     BindingFlags.NonPublic | BindingFlags.Static
 );
@@ -76,10 +79,10 @@ Assert(
 );
 Assert(
     tryExtractPayloadFromArtifact != null,
-    "GhostBattleApiClient should expose artifact extraction logic for replay downloads."
+    "GhostBattleSyncService should expose artifact extraction logic for replay downloads."
 );
-Assert(serializeArtifact != null, "V3RunBundleArtifactCodec should expose a serialize helper.");
-Assert(tryParseBattle != null, "GhostBattleApiClient should expose battle parsing logic.");
+Assert(serializeArtifact != null, "RunBundleArtifactCodec should expose a serialize helper.");
+Assert(tryParseBattle != null, "GhostBattleClient should expose battle parsing logic.");
 Assert(
     resolveGhostBattleOutcome != null,
     "HistoryPanelCoordinator should expose ghost-outcome resolution logic."
@@ -204,21 +207,21 @@ var cardSetCapture =
 cardSetCaptureArtifactType.GetProperty("Label")!.SetValue(cardSetCapture, "player_hand");
 cardSetCaptureArtifactType.GetProperty("Status")!.SetValue(cardSetCapture, "Captured");
 cardSetCaptureArtifactType.GetProperty("Source")!.SetValue(cardSetCapture, "LiveRetry");
-var cardSnapshot =
-    Activator.CreateInstance(cardSnapshotType)
-    ?? throw new InvalidOperationException("CombatReplayCardSnapshot should be constructible.");
-cardSnapshotType.GetProperty("InstanceId")!.SetValue(cardSnapshot, "card-instance-001");
-cardSnapshotType.GetProperty("TemplateId")!.SetValue(cardSnapshot, "card-template-001");
-cardSnapshotType.GetProperty("Name")!.SetValue(cardSnapshot, "Test Card");
-var cardSnapshotListType = typeof(List<>).MakeGenericType(cardSnapshotType);
-var cardSnapshotList = (IList)(
-    Activator.CreateInstance(cardSnapshotListType)
+var cardItemArtifact =
+    Activator.CreateInstance(cardSetItemArtifactType)
+    ?? throw new InvalidOperationException("CardSetItemArtifact should be constructible.");
+cardSetItemArtifactType.GetProperty("InstanceId")!.SetValue(cardItemArtifact, "card-instance-001");
+cardSetItemArtifactType.GetProperty("TemplateId")!.SetValue(cardItemArtifact, "card-template-001");
+cardSetItemArtifactType.GetProperty("Name")!.SetValue(cardItemArtifact, "Test Card");
+var cardItemArtifactListType = typeof(List<>).MakeGenericType(cardSetItemArtifactType);
+var cardItemArtifactList = (IList)(
+    Activator.CreateInstance(cardItemArtifactListType)
     ?? throw new InvalidOperationException(
-        "Combat replay card snapshot list should be constructible."
+        "CardSetItemArtifact list should be constructible."
     )
 );
-cardSnapshotList.Add(cardSnapshot);
-cardSetCaptureArtifactType.GetProperty("Items")!.SetValue(cardSetCapture, cardSnapshotList);
+cardItemArtifactList.Add(cardItemArtifact);
+cardSetCaptureArtifactType.GetProperty("Items")!.SetValue(cardSetCapture, cardItemArtifactList);
 cardSetList.Add(cardSetCapture);
 battleSnapshotsArtifactType.GetProperty("CardSets")!.SetValue(snapshotsArtifact, cardSetList);
 runArtifactBattleType.GetProperty("Snapshots")!.SetValue(battleArtifact, snapshotsArtifact);
@@ -407,10 +410,7 @@ var rawBattlePayload = JObject.Parse(
       "result": "Won",
       "winner_combatant_id": "Player",
       "loser_combatant_id": "Opponent",
-      "is_bundle_final_battle": true,
-      "replay": {
-        "available": true
-      }
+      "is_final_battle": true
     }
     """
 );
@@ -466,10 +466,7 @@ var localWinBattlePayload = JObject.Parse(
       "result": "Lost",
       "winner_combatant_id": "Opponent",
       "loser_combatant_id": "Player",
-      "is_bundle_final_battle": true,
-      "replay": {
-        "available": true
-      }
+      "is_final_battle": true
     }
     """
 );
@@ -583,10 +580,7 @@ try
                       "combat_kind": "PVPCombat",
                       "result": "Lost",
                       "winner_combatant_id": "Opponent",
-                      "loser_combatant_id": "Player",
-                      "replay": {
-                        "available": true
-                      }
+                      "loser_combatant_id": "Player"
                     }
                     """
                 ),
@@ -649,10 +643,10 @@ finally
 }
 
 var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
-Assert(tryCreateRoutes != null, "V3Routes should expose a static TryCreate factory.");
+Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
 var routes =
-    tryCreateRoutes!.Invoke(null, ["https://mod-api-v3.bazaarplusplus.com"])
-    ?? throw new InvalidOperationException("Failed to create V3Routes.");
+    tryCreateRoutes!.Invoke(null, ["https://mod-api-v4.bazaarplusplus.com"])
+    ?? throw new InvalidOperationException("Failed to create ModApiRoutes.");
 var queryGhostBattles = (string)(
     routesType.GetProperty("QueryGhostBattles")!.GetValue(routes)
     ?? throw new InvalidOperationException("QueryGhostBattles should be populated.")
@@ -662,12 +656,12 @@ var replayLink = (string)(
     ?? throw new InvalidOperationException("CreateReplayLink should return a route.")
 );
 Assert(
-    queryGhostBattles == "https://mod-api-v3.bazaarplusplus.com/ghost-battles",
-    "V3Routes should publish the /ghost-battles query route."
+    queryGhostBattles == "https://mod-api-v4.bazaarplusplus.com/ghost-battles",
+    "ModApiRoutes should publish the /ghost-battles query route."
 );
 Assert(
-    replayLink == "https://mod-api-v3.bazaarplusplus.com/ghost-battles/battle-001/replay-link",
-    "V3Routes should publish replay links under /ghost-battles/{battle_id}/replay-link."
+    replayLink == "https://mod-api-v4.bazaarplusplus.com/ghost-battles/battle-001/replay-link",
+    "ModApiRoutes should publish replay links under /ghost-battles/{battle_id}/replay-link."
 );
 
 {
@@ -678,21 +672,21 @@ Assert(
         return new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(
-                """{"download_url":"https://mod-api-v3.bazaarplusplus.com/replays/token-public"}"""
+                """{"download_url":"https://r2-presigned.example.com/replays/token-public"}"""
             ),
         };
     });
     using var replayLinkHttpClient = new HttpClient(replayLinkHandler);
     var replayLinkClient =
         Activator.CreateInstance(apiClientType, replayLinkHttpClient, routes)
-        ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
+        ?? throw new InvalidOperationException("GhostBattleClient should be constructible.");
     var requestReplayDownloadLinkAsync = apiClientType.GetMethod(
         "RequestReplayDownloadLinkAsync",
         BindingFlags.Public | BindingFlags.Instance
     );
     Assert(
         requestReplayDownloadLinkAsync != null,
-        "GhostBattleApiClient should expose replay-link downloads."
+        "GhostBattleClient should expose replay-link downloads."
     );
     var replayLinkTask = (Task)(
         requestReplayDownloadLinkAsync!.Invoke(
@@ -707,7 +701,7 @@ Assert(
     var replayLinkResultType = replayLinkResult.GetType();
     Assert(
         (bool)(replayLinkResultType.GetProperty("Succeeded")?.GetValue(replayLinkResult) ?? false),
-        "GhostBattleApiClient replay-link request should succeed on 200."
+        "GhostBattleClient replay-link request should succeed on 200."
     );
     Assert(replayLinkRequest != null, "Replay-link request should reach the HTTP transport.");
     Assert(
@@ -731,44 +725,43 @@ Assert(
     using var replayPayloadHttpClient = new HttpClient(replayPayloadHandler);
     var replayPayloadClient =
         Activator.CreateInstance(apiClientType, replayPayloadHttpClient, routes)
-        ?? throw new InvalidOperationException("GhostBattleApiClient should be constructible.");
-    var downloadReplayPayloadAsync = apiClientType.GetMethod(
-        "DownloadReplayPayloadAsync",
+        ?? throw new InvalidOperationException("GhostBattleClient should be constructible.");
+    var downloadReplayBytesAsync = apiClientType.GetMethod(
+        "DownloadReplayBytesAsync",
         BindingFlags.Public | BindingFlags.Instance
     );
     Assert(
-        downloadReplayPayloadAsync != null,
-        "GhostBattleApiClient should expose replay-payload downloads."
+        downloadReplayBytesAsync != null,
+        "GhostBattleClient should expose replay-bytes downloads."
     );
     var replayPayloadTask = (Task)(
-        downloadReplayPayloadAsync!.Invoke(
+        downloadReplayBytesAsync!.Invoke(
             replayPayloadClient,
             [
-                "battle-001",
-                "https://mod-api-v3.bazaarplusplus.com/replays/token-public",
+                "https://r2-presigned.example.com/replays/token-public",
                 CancellationToken.None,
             ]
-        ) ?? throw new InvalidOperationException("Replay-payload request should return a task.")
+        ) ?? throw new InvalidOperationException("Replay-bytes request should return a task.")
     );
     await replayPayloadTask;
     var replayPayloadResult =
         replayPayloadTask.GetType().GetProperty("Result")?.GetValue(replayPayloadTask)
-        ?? throw new InvalidOperationException("Replay-payload request should produce a result.");
+        ?? throw new InvalidOperationException("Replay-bytes request should produce a result.");
     var replayPayloadResultType = replayPayloadResult.GetType();
     Assert(
         (bool)(
             replayPayloadResultType.GetProperty("Succeeded")?.GetValue(replayPayloadResult) ?? false
         ),
-        "GhostBattleApiClient replay-payload request should succeed on 200."
+        "GhostBattleClient replay-bytes request should succeed on 200."
     );
-    Assert(replayPayloadRequest != null, "Replay-payload request should reach the HTTP transport.");
+    Assert(replayPayloadRequest != null, "Replay-bytes request should reach the HTTP transport.");
     Assert(
         !replayPayloadRequest!.Headers.Contains("X-BPP-Installation-Id"),
-        "Replay-payload requests should not send installation headers."
+        "Replay-bytes requests should not send installation headers."
     );
     Assert(
         replayPayloadRequest.Headers.Authorization == null,
-        "Replay-payload requests should not send an Authorization header after auth removal."
+        "Replay-bytes requests should not send an Authorization header after auth removal."
     );
 }
 
@@ -777,6 +770,12 @@ Console.WriteLine("Ghost battle sync checks passed.");
 static Type RequireType(string fullName)
 {
     return Type.GetType($"{fullName}, BazaarPlusPlus")
+        ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static Type RequireModApiType(string fullName)
+{
+    return Type.GetType($"{fullName}, BazaarPlusPlus.ModApi")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 

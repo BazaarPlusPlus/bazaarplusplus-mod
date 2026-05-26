@@ -1,16 +1,16 @@
 #nullable enable
 using System;
-using BazaarPlusPlus.Game.RunLogging.Models;
-using BazaarPlusPlus.Game.RunLogging.Upload;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Upload;
 
 namespace BazaarPlusPlus.Game.RunLogging.Persistence;
 
 internal sealed class ReplicatedRunLogStore : IRunLogStore
 {
     private readonly IRunLogStore _innerStore;
-    private readonly RunSyncStateSqliteStore _syncStateStore;
+    private readonly RunSyncStateStore _syncStateStore;
 
-    public ReplicatedRunLogStore(IRunLogStore innerStore, RunSyncStateSqliteStore syncStateStore)
+    public ReplicatedRunLogStore(IRunLogStore innerStore, RunSyncStateStore syncStateStore)
     {
         _innerStore = innerStore ?? throw new ArgumentNullException(nameof(innerStore));
         _syncStateStore = syncStateStore ?? throw new ArgumentNullException(nameof(syncStateStore));

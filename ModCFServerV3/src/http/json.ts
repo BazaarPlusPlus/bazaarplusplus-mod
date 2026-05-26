@@ -8,6 +8,18 @@ export function json(data: unknown, init?: ResponseInit): Response {
   });
 }
 
+/**
+ * Canonical error response: `{"error":"<code>"}` with the given status.
+ * Use this instead of `json({ error: "..." }, { status })` so the wire shape
+ * stays consistent across handlers.
+ *
+ * Note: uploadBazaarDbScreenshot intentionally returns `{status:"rejected",reason}`
+ * — that shape is fixed by the mod-side ingest contract, not a drift.
+ */
+export function jsonError(errorCode: string, status = 400): Response {
+  return json({ error: errorCode }, { status });
+}
+
 export async function readJson(request: Request): Promise<unknown> {
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {

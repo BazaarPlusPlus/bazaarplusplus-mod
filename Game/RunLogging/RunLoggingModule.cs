@@ -3,7 +3,7 @@ using System;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Game.PvpBattles;
-using BazaarPlusPlus.Game.RunLogging.Models;
+using BazaarPlusPlus.Storage.RunLog;
 
 namespace BazaarPlusPlus.Game.RunLogging;
 

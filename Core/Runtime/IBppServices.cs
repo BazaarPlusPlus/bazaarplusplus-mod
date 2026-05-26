@@ -2,7 +2,7 @@
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
-using BazaarPlusPlus.Core.Paths;
+using BazaarPlusPlus.Storage.Paths;
 using BazaarPlusPlus.Core.RunContext;
 using BepInEx.Logging;
 
@@ -12,7 +12,7 @@ internal interface IBppServices
 {
     IBppEventBus EventBus { get; }
     IBppConfig Config { get; }
-    IPathService Paths { get; }
+    IPathProvider Paths { get; }
     IRunContext RunContext { get; }
     IGameStateProbe GameStateProbe { get; }
     IEncounterStateProbe EncounterState { get; }

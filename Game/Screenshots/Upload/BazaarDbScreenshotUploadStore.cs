@@ -3,13 +3,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.Online.Models;
-using BazaarPlusPlus.Game.RunLogging.Persistence.Sqlite;
+using BazaarPlusPlus.ModApi.Models;
+using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
-internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
+internal sealed class BazaarDbScreenshotUploadStore : SqliteStoreBase
 {
     private const int UploadPayloadSchemaVersion = 1;
 
@@ -31,20 +32,20 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            INSERT OR IGNORE INTO {RunLogSqliteSchema.BazaarDbScreenshotUploadsTableName}
+            INSERT OR IGNORE INTO {RunLogSchema.BazaarDbScreenshotUploadsTableName}
                 (screenshot_id, status, attempts, last_attempted_at_utc, last_error, uploaded_at_utc)
             SELECT s.screenshot_id, 'pending', 0, NULL, NULL, NULL
-            FROM {RunLogSqliteSchema.RunScreenshotsTableName} AS s
+            FROM {RunLogSchema.RunScreenshotsTableName} AS s
             WHERE s.capture_source = $captureSource
               AND NOT EXISTS (
                   SELECT 1
-                  FROM {RunLogSqliteSchema.BazaarDbScreenshotUploadsTableName} AS u
+                  FROM {RunLogSchema.BazaarDbScreenshotUploadsTableName} AS u
                   WHERE u.screenshot_id = s.screenshot_id
               );
             """;
         command.Parameters.AddWithValue(
             "$captureSource",
-            RunLogSqliteSchema.CaptureSourceEndOfRunAuto
+            RunLogSchema.CaptureSourceEndOfRunAuto
         );
         command.ExecuteNonQuery();
     }
@@ -58,8 +59,8 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
         using var command = CreateCommand(connection);
         command.CommandText = $"""
             SELECT u.screenshot_id
-            FROM {RunLogSqliteSchema.BazaarDbScreenshotUploadsTableName} AS u
-            INNER JOIN {RunLogSqliteSchema.RunScreenshotsTableName} AS s
+            FROM {RunLogSchema.BazaarDbScreenshotUploadsTableName} AS u
+            INNER JOIN {RunLogSchema.RunScreenshotsTableName} AS s
                 ON s.screenshot_id = u.screenshot_id
             WHERE u.status = 'pending'
             ORDER BY s.captured_at_utc ASC
@@ -79,7 +80,7 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            SELECT 1 FROM {RunLogSqliteSchema.BazaarDbScreenshotUploadsTableName}
+            SELECT 1 FROM {RunLogSchema.BazaarDbScreenshotUploadsTableName}
             WHERE status = 'pending'
             LIMIT 1;
             """;
@@ -105,7 +106,7 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
                 player_rating,
                 player_position,
                 victories_at_capture
-            FROM {RunLogSqliteSchema.RunScreenshotsTableName}
+            FROM {RunLogSchema.RunScreenshotsTableName}
             WHERE screenshot_id = $id
             LIMIT 1;
             """;
@@ -128,7 +129,7 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
         return new BazaarDbScreenshotUploadSnapshot
         {
             ScreenshotId = screenshotId,
-            Payload = new BazaarDbScreenshotUploadRequestV3
+            Payload = new BazaarDbScreenshotUploadRequest
             {
                 SchemaVersion = UploadPayloadSchemaVersion,
                 SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
@@ -154,7 +155,7 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.BazaarDbScreenshotUploadsTableName}
+            UPDATE {RunLogSchema.BazaarDbScreenshotUploadsTableName}
             SET status = 'uploaded',
                 uploaded_at_utc = $uploadedAtUtc,
                 last_attempted_at_utc = $uploadedAtUtc,
@@ -171,7 +172,7 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.BazaarDbScreenshotUploadsTableName}
+            UPDATE {RunLogSchema.BazaarDbScreenshotUploadsTableName}
             SET attempts = attempts + 1,
                 last_attempted_at_utc = $attemptedAtUtc,
                 last_error = $error
@@ -188,7 +189,7 @@ internal sealed class BazaarDbScreenshotUploadStore : SqlitePersistenceStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            UPDATE {RunLogSqliteSchema.BazaarDbScreenshotUploadsTableName}
+            UPDATE {RunLogSchema.BazaarDbScreenshotUploadsTableName}
             SET status = 'permanent_failure',
                 attempts = attempts + 1,
                 last_attempted_at_utc = $attemptedAtUtc,
