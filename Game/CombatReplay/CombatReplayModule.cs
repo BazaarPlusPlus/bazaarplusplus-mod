@@ -12,6 +12,8 @@ internal sealed class CombatReplayModule : IBppFeature
     private CombatReplayRuntime? _runtime;
     private IDisposable? _messageSubscription;
 
+    public CombatReplayRuntime? Runtime => _runtime;
+
     public CombatReplayModule(IBppEventBus eventBus)
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));

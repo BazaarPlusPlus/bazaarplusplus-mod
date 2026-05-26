@@ -57,6 +57,7 @@ public class Plugin : BaseUnityPlugin
             _composition.Start();
 
             BuildOnlineServices();
+            _composition.AttachOnlineClient(_onlineClient);
             AttachRuntimeComponents(services, combatReplayRuntime);
             BppLog.Info("Plugin", "Plugin initialization completed");
         }
@@ -137,42 +138,11 @@ public class Plugin : BaseUnityPlugin
     {
         BppLog.Info("Plugin", "Attaching runtime components");
 
-        AddConfiguredHistoryPanel(services, combatReplayRuntime);
-
         AddConfiguredTooltipModifierRefreshController(services);
 
         _composition?.Mountables.MountAll(gameObject, services);
 
         BppLog.Info("Plugin", "Runtime components attached");
-    }
-
-    private void AddConfiguredHistoryPanel(
-        IBppServices services,
-        CombatReplayRuntime combatReplayRuntime
-    )
-    {
-        BppLog.Info("Plugin", "Adding HistoryPanel");
-        var historyPanel = gameObject.AddComponent<HistoryPanel>();
-
-        var historyPanelRuntime = new HistoryPanelRuntime(
-            services.RunContext,
-            services.Paths.RunLogDatabasePath,
-            services.Paths.CombatReplayDirectoryPath,
-            () => combatReplayRuntime
-        );
-
-        if (_onlineClient == null)
-        {
-            BppLog.Warn(
-                "Plugin",
-                "Skipping HistoryPanel online wiring; online client unavailable."
-            );
-            return;
-        }
-
-        historyPanel.Configure(
-            HistoryPanelFactory.Create(historyPanelRuntime, _onlineClient)
-        );
     }
 
     private void AddConfiguredTooltipModifierRefreshController(IBppServices services)
@@ -213,7 +183,6 @@ public class Plugin : BaseUnityPlugin
         _composition?.Mountables.UnmountAll(gameObject);
 
         DestroyComponentIfPresent<TooltipModifierRefreshController>();
-        DestroyComponentIfPresent<HistoryPanel>();
         DestroyComponentIfPresent<CombatReplayRuntime>();
     }
 

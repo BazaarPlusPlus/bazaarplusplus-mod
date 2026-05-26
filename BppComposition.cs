@@ -9,6 +9,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.Encounter;
+using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.MonsterPreview;
@@ -21,6 +22,7 @@ using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.UpgradePreview;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -43,11 +45,13 @@ internal sealed class BppComposition : IDisposable
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
+    private ModOnlineClient? _onlineClientRef;
 
     public IBppServices Services => _services;
     public RunLifecycleModule RunLifecycle => _runLifecycle;
     public BppMountableRegistry Mountables => _mountables;
     public SettingsDockEntryRegistry SettingsDockRegistry => _settingsDockRegistry;
+    public ModOnlineClient? OnlineClient => _onlineClientRef;
 
     public BppComposition(ManualLogSource logger, ConfigFile configFile)
     {
@@ -90,6 +94,10 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(new CombatReplayVideoRecorderMount());
         _mountables.Register(new CombatStatusBarMount());
         _mountables.Register(new EndOfRunScreenshotMount());
+        _mountables.Register(new HistoryPanelMount(
+            combatReplayRuntime: () => _combatReplayModule.Runtime,
+            onlineClient: () => _onlineClientRef
+        ));
         _mountables.Register(new MonsterPreviewItemBoardMount());
         _mountables.Register(new MonsterPreviewWarmupMount());
         _mountables.Register(new RunLoggingMount());
@@ -100,6 +108,8 @@ internal sealed class BppComposition : IDisposable
 
     public void AttachCombatReplayRuntime(CombatReplayRuntime runtime) =>
         _combatReplayModule.AttachRuntime(runtime);
+
+    public void AttachOnlineClient(ModOnlineClient? client) => _onlineClientRef = client;
 
     public void Start() => _featureRegistry.Start();
 
