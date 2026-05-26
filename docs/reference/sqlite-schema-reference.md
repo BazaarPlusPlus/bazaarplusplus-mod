@@ -1,29 +1,29 @@
-# SQLite And V3 Data Schema Reference
+# SQLite Schema Reference
 
 ## Scope
 
-This document describes the current storage model used by BazaarPlusPlus after the V3 run-bundle flow and JSON identity cleanup.
+This document describes the storage model used by BazaarPlusPlus after the V4 run-bundle flow.
 
 It covers:
 
 1. Local client SQLite in `bazaarplusplus.db`
-2. V3 server-side D1 projection tables in `ModCFServerV3`
+2. V4 server-side D1 projection tables (in the separate `bazaarplusplus-server` repo)
 
 Source of truth:
 
-- `Game/RunLogging/Persistence/Sqlite/RunLogSqliteSchema.cs`
-- `Game/RunLogging/Persistence/SqliteRunLogStore.cs`
+- `Storage/RunLog/RunLogSchema.cs`
+- `Storage/RunLog/RunLogStore.cs`
 - `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
 - `Game/Screenshots/Persistence/RunScreenshotSqliteStore.cs`
 - `Game/CombatReplay/Video/CombatReplayVideoMetadataStore.cs`
 - `Game/HistoryPanel/HistoryPanelRepository.cs`
 - `Game/RunLogging/Upload/RunBundleUploadStore.cs`
-- `ModCFServerV3/migrations/`
-- `ModCFServerV3/src/features/v3/uploadRunBundle.ts`
+- `bazaarplusplus-server/migrations/0001_v4_initial.sql`
+- `bazaarplusplus-server/src/features/runBundles/upload.ts`
 
 ## Local Client SQLite
 
-- Database file: `<GameRoot>/BazaarPlusPlus/bazaarplusplus.db`
+- Database file: `<GameRoot>/BazaarPlusPlusV4/bazaarplusplus.db`
 - Local schema version: `12`
 - Row schema version: `11`
 - Upload payload schema version: `1`
@@ -90,7 +90,7 @@ Columns:
 - `payload_json TEXT NOT NULL`
 - primary key: `(run_id, seq)`
 
-The V3 upload path does not upload `run_events` directly. Upload projection comes from `runs`, `battles`, `battle_snapshots`, and replay payload files.
+The upload path does not upload `run_events` directly. Upload projection comes from `runs`, `battles`, `battle_snapshots`, and replay payload files.
 
 ### `battles`
 
@@ -253,160 +253,40 @@ CREATE INDEX IF NOT EXISTS idx_combat_replay_videos_battle
     ON combat_replay_videos(battle_id, started_at_utc DESC);
 ```
 
-## V3 Upload Payload Model
+## V4 Upload Payload Model
 
-The V3 upload request has three layers:
+The upload request has three layers:
 
 - `artifact_bytes`: gzip-compressed MessagePack blob, content type `application/x-bpp-runbundle+msgpack+gzip`
 - `run_projection`: queryable run summary
-- `battle_projections`: queryable battle metadata
+- `battle_projections[]`: queryable battle metadata
 
-`artifact_bytes` stores the raw replay payloads and card-set snapshots inside R2. SQL stores only metadata and query projections.
-The server treats the last `battle_projection` in an accepted bundle as the bundle-final battle and writes `is_bundle_final_battle = 1` if that battle is projected into SQL.
+`artifact_bytes` stores the raw replay payloads and card-set snapshots inside R2. D1 stores only metadata and query projections. The server treats `is_final_battle = true` in any incoming battle projection as sticky — once set it stays set, so out-of-order retransmits of mid-run battles can never flip a final battle back to non-final.
 
-## V3 Server D1 Schema
+## V4 Server D1 Schema
 
-Current effective tables after all migrations:
+The V4 server schema lives in a separate repo (`bazaarplusplus-server`) and is the single source of truth — do **not** duplicate the column lists here, they drift. Effective tables:
 
-- `seen_player_accounts`
-- `run_bundles`
-- `runs`
-- `battles`
-- `replay_tokens`
+- `runs` — collapsed `run_bundles + runs` (V3 had two; V4 has one)
+- `battles` — projection for `GET /ghost-battles`
+- `seen_player_accounts` — ghost-battle opponent allow-list (V4 dropped `last_seen_at_utc`)
+- `bazaardb_screenshots` — BazaarDB screenshot manifest
 
-Historical note: the original `installations` family of tables was dropped by `0002_auth_simplification.sql`; the auth-era `users` and `tokens` tables were dropped by `0009_drop_auth_tables.sql`; the `installation_id` column on `run_bundles` / `runs` / `battles` was dropped by `0010_drop_installation_id.sql`. `seen_player_accounts` was added by `0011_create_seen_player_accounts.sql` to take over the auth-era `users` role as the ghost-battles opponent allow-list, with a one-time backfill from existing `run_bundles` uploaders.
+V4 explicitly removed (vs V3): `run_bundles` table, `replay_tokens` table, all `installation_id` columns, `battles.player_account_id_in_payload`, `battles.replay_available`, `seen_player_accounts.last_seen_at_utc`. Battle bundle-final flag is named `is_final_battle` (V3 had the redundant `is_bundle_final_` prefix).
 
-### `seen_player_accounts`
+Authoritative references:
 
-Lightweight registry of player accounts that have submitted at least one run bundle. Replaces the auth-era `users` table for the ghost-battle opponent filter.
-
-```sql
-CREATE TABLE seen_player_accounts (
-  player_account_id TEXT PRIMARY KEY,
-  first_seen_at_utc TEXT NOT NULL,
-  last_seen_at_utc  TEXT NOT NULL
-);
-```
-
-Upsert behavior:
-
-- `/run-bundles` writes / updates the uploader's row on every successful upload (`anonymous-player` is skipped).
-- The upload handler queries this table to decide whether to project a battle row for an opponent (`loadKnownOpponentAccountIds`).
-
-### `run_bundles`
-
-Metadata for uploaded artifact blobs.
-
-Key columns:
-
-- `bundle_id TEXT PRIMARY KEY`
-- `player_account_id TEXT NOT NULL`
-- `run_id TEXT NOT NULL`
-- `payload_hash TEXT NOT NULL`
-- `schema_version INTEGER NOT NULL`
-- `object_key TEXT NOT NULL`
-- `codec TEXT NOT NULL`
-- `size_bytes INTEGER NOT NULL`
-- `submitted_at_utc TEXT NOT NULL`
-- `created_at_utc TEXT NOT NULL`
-
-Current upload behavior:
-
-- `bundle_id` is deterministically the `run_id`
-- object key shape is `run-bundles/<player>/<run>/<hash>.mpack.gz`
-
-### `runs` Server Projection
-
-Queryable summary for uploaded runs.
-
-Key columns:
-
-- `run_id TEXT PRIMARY KEY`
-- `player_account_id TEXT NOT NULL`
-- `bundle_id TEXT NOT NULL`
-- `status TEXT NOT NULL`
-- hero/rating fields: `hero_id`, `hero_name`, `player_rank`, `player_rating`, `player_position`
-- timing/final fields: `started_at_utc`, `ended_at_utc`, `final_day`, `final_wins`, `final_losses`, `final_player_rank`, `final_player_rating`, `final_player_position`
-- `updated_at_utc TEXT NOT NULL`
-
-### `battles` Server Projection
-
-Queryable battle projection used by `GET /ghost-battles`.
-
-Key columns:
-
-- `battle_id TEXT PRIMARY KEY`
-- `run_id TEXT NOT NULL`
-- `player_account_id TEXT NOT NULL`
-- `bundle_id TEXT NOT NULL`
-- `recorded_at_utc TEXT NOT NULL`
-- `day INTEGER NULL`
-- uploader side: `player_name`, `player_account_id_in_payload`, `player_hero`, `player_rank`, `player_rating`, `player_level`
-- opponent side: `opponent_name`, `opponent_account_id`, `opponent_hero`, `opponent_rank`, `opponent_rating`, `opponent_level`
-- `result TEXT NULL`
-- `is_bundle_final_battle INTEGER NOT NULL DEFAULT 0`
-- `replay_available INTEGER NOT NULL`
-- `updated_at_utc TEXT NOT NULL`
-
-`player_account_id` is row ownership, while `player_account_id_in_payload` is the account id carried inside the uploaded battle projection.
-
-### `replay_tokens`
-
-Short-lived replay download links.
-
-Columns:
-
-- `token TEXT PRIMARY KEY`
-- `battle_id TEXT NOT NULL`
-- `requested_by_player_account_id TEXT NOT NULL`
-- `expires_at_utc TEXT NOT NULL`
-- `created_at_utc TEXT NOT NULL`
-- `used_at_utc TEXT NULL`
-- `revoked_at_utc TEXT NULL`
-
-### Server Indexes
-
-```sql
-CREATE INDEX IF NOT EXISTS idx_battles_opponent_recorded_covering
-  ON battles(
-    opponent_account_id,
-    recorded_at_utc DESC,
-    battle_id DESC,
-    day,
-    player_name,
-    player_account_id_in_payload,
-    player_hero,
-    player_rank,
-    player_rating,
-    player_level,
-    opponent_name,
-    opponent_hero,
-    opponent_rank,
-    opponent_rating,
-    opponent_level,
-    result,
-    replay_available,
-    is_bundle_final_battle
-  );
-
-CREATE INDEX IF NOT EXISTS idx_run_bundles_submitted_at
-  ON run_bundles (submitted_at_utc, bundle_id);
-
-CREATE INDEX IF NOT EXISTS idx_runs_ended_at
-  ON runs (ended_at_utc, run_id);
-
-CREATE INDEX IF NOT EXISTS idx_run_bundles_created_at
-  ON run_bundles (created_at_utc, bundle_id);
-
-CREATE INDEX IF NOT EXISTS idx_runs_updated_at
-  ON runs (updated_at_utc, run_id);
-```
+- DDL: [`bazaarplusplus-server/migrations/0001_v4_initial.sql`](../../../bazaarplusplus-server/migrations/0001_v4_initial.sql)
+- Wire contract: [`bazaarplusplus-server/docs/api-reference.md`](../../../bazaarplusplus-server/docs/api-reference.md)
+- Upload write path: [`bazaarplusplus-server/src/features/runBundles/upload.ts`](../../../bazaarplusplus-server/src/features/runBundles/upload.ts)
+- Ghost query: [`bazaarplusplus-server/src/features/ghostBattles/query.ts`](../../../bazaarplusplus-server/src/features/ghostBattles/query.ts)
 
 ## Practical Summary
 
 - Local SQLite is the client-side capture and projection cache.
 - Local replay payload files are the heavy binary source for replay.
-- V3 upload packages local run and battle state into one artifact plus lightweight SQL projections.
-- Server SQL is for lookup. The uploaded artifact body lives in R2.
-- The server is fully unauthenticated; identity comes from `player_account_id` in `/run-bundles` bodies and `/ghost-battles` query strings, with `seen_player_accounts` acting as the opponent allow-list for ghost battle projection.
-- `is_bundle_final_battle` is a server-computed projection flag carried through ghost sync so `HistoryPanel` can explain final-battle elimination outcomes without reading sibling battles or R2 artifacts.
+- Run-bundle upload packages local run + battle state into one MessagePack artifact (to R2) plus lightweight SQL projections written via `db.batch()` (`runs` upsert + per-battle ON CONFLICT INSERT + `seen_player_accounts` INSERT OR IGNORE, in that order).
+- Server SQL is for lookup; the uploaded artifact body lives in R2 and is served via short-lived presigned URLs from `POST /ghost-battles/:battle_id/replay-link`.
+- The server is fully unauthenticated for mod-side endpoints; identity comes from `player_account_id` in `POST /run-bundles` bodies and `GET /ghost-battles` query strings, with `seen_player_accounts` acting as the opponent allow-list for ghost battle projection (plus a literal `opponent_account_id = uploader` OR branch for self-battles, since D1 doesn't guarantee intra-batch read-after-write visibility against `seen_player_accounts`).
+- `is_final_battle` is a server-side sticky flag carried through ghost sync so `HistoryPanel` can explain final-battle elimination outcomes without reading sibling battles or R2 artifacts.
+- BazaarDB manifest endpoint (`GET /bazaardb/manifest`) is the only mod-API endpoint that requires a Bearer token (`BAZAARDB_PULL_TOKEN`), since manifest rows carry identifying metadata. Image bytes themselves come from a public R2 custom domain (`bazaardb-assets-v4.bazaarplusplus.com`), keyed by a high-entropy `screenshot_id` GUID so URLs aren't enumerable in practice.

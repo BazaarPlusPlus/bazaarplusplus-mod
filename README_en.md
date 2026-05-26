@@ -15,7 +15,7 @@ This repository only keeps documentation that still matches the current implemen
 - Combat replay: saves local PvP replay payloads; `HistoryPanel` can replay saved battles when the required conditions are met.
 - End-of-run automatic screenshots: saves the primary final-run screenshot and SQLite metadata before `Continue`.
 - Background upload: run and replay upload, performed only while the client is outside a live run.
-- BazaarDB screenshot upload: optional toggle that pushes end-of-run screenshots plus a summary JSON to ModCFServerV3 for BazaarDB to pull on a daily cadence (off by default).
+- BazaarDB screenshot upload: optional toggle that pushes end-of-run screenshots plus a summary JSON to the V4 mod backend (`bazaarplusplus-server` repo, deployed at `mod-api-v4.bazaarplusplus.com`) for BazaarDB to pull on a daily cadence (off by default).
 - Anonymous Mode: replaces the local player name with `Anonymous`.
 - **AutoBazaar HTTP endpoint** — local loopback HTTP server (default port 47900) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. See [docs/reference/auto-bazaar-http-api-v1.md](docs/reference/auto-bazaar-http-api-v1.md).
 
@@ -45,18 +45,18 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## Data And Network Behavior
 
-- Run logging, combat replay, and end-of-run screenshots store local SQLite data, replay payloads, and screenshot files; player observation data is written to `BazaarPlusPlus/Identity/observation.v1.json`. Cloud sync itself carries no authentication credentials.
+- Run logging, combat replay, and end-of-run screenshots store local SQLite data, replay payloads, and screenshot files; player observation data is written to `BazaarPlusPlusV4/Identity/observation.v1.json`. Cloud sync itself carries no authentication credentials.
 - Background upload only scans for uploads while the client is outside a live run.
-- The `ModCFServerV3/` directory contains the current Cloudflare Worker backend used for uploads, ghost battles, and replay download links.
+- The cloud backend (uploads, ghost battles, replay links, BazaarDB screenshot manifest) now lives in a separate repository `bazaarplusplus-server`, deployed at `mod-api-v4.bazaarplusplus.com`. The mod-side HTTP client lives in `BazaarPlusPlus.ModApi.csproj`.
 
 ## Repository Layout
 
 - `Plugin.cs`: BepInEx runtime entry point.
 - `Core/`, `Game/`, `Patches/`: main feature implementation.
 - `Data/`: embedded resources (e.g. build recommendation JSON).
+- `ModApi/`, `Storage/`: the HTTP-client and local-persistence csprojs (zero game/Unity/BepInEx dependencies), wired into the mod via `BppComposition.cs`.
 - `tests/`: feature-focused test projects.
 - `run.sh`: local build, test, format, and decompile entry point.
-- `ModCFServerV3/`: cloud sync backend.
 
 ## Documentation Entry Points
 

@@ -2,7 +2,7 @@
 
 ## Scope
 
-终局自动截图（end-of-run screenshot）由模组直接上传到 ModCFServerV3，BazaarDB 再从服务端按天拉取——模组与 BazaarDB 之间不再有直接连接。
+终局自动截图（end-of-run screenshot）由模组直接上传到 `bazaarplusplus-server`（V4 mod backend，部署 `mod-api-v4.bazaarplusplus.com`），BazaarDB 再从服务端按天拉取——模组与 BazaarDB 之间不再有直接连接。
 
 - 默认关闭，由用户在 Bazaar++ 设置坞中开启 `Upload screenshots to BazaarDB` 才会启动后台上传任务。
 - 截图 PNG 字节（由 `ScreenshotService.WriteCurrentFrameToFile` 用 Unity `EncodeToPNG` 生成）以 base64 直接放在 JSON 请求体里，复用现有 V3 JSON 上传管线，不引入 multipart。
@@ -15,7 +15,7 @@
 2. `BazaarDbScreenshotUploadController` 每个 tick（20s 启动延迟 + 180s 间隔，复用 `StartupUploadAttemptRunner`）触发一次上传循环。开关关闭时在 tick 顶部短路，零数据库读、零网络。
 3. 每次循环先调 `BazaarDbScreenshotUploadStore.EnsureBackfilled`，用 `INSERT OR IGNORE … WHERE NOT EXISTS …` 把缺失的 sidecar 行补齐。
 4. 取最多 3 条 `status = 'pending'` 的截图，按 `captured_at_utc ASC` 排序。
-5. 对每条截图：读盘 PNG → 装载玩家身份（`BppClientCacheBridge.TryGetProfileAccountId`，缺省 `"anonymous-player"`）→ 构造 `BazaarDbScreenshotUploadRequestV3` → 调 `BazaarDbScreenshotClient.UploadScreenshotAsync` → 按结果落库。
+5. 对每条截图：读盘 PNG → 装载玩家身份（`BppClientCacheBridge.TryGetProfileAccountId`；V4 后若取不到 id 则**整轮短路跳过**,不再发 `"anonymous-player"` sentinel）→ 构造 `BazaarDbScreenshotUploadRequest` → 调 `BazaarDbScreenshotClient.UploadScreenshotAsync` → 按结果落库。
 6. 结果分类：
    - `Success` → `MarkUploaded(uploaded_at_utc)`，sidecar status `uploaded`。
    - 4xx 除 408 / 429 → `MarkPermanentFailure(error)`，sidecar status `permanent_failure`，不再重试。
@@ -26,17 +26,16 @@
 
 ## Server Flow
 
-ModCFServerV3 暴露三个端点：
+V4 `bazaarplusplus-server` 暴露两个端点（V3 时代的 `/bazaardb/image/{id}` Worker 代理已废除,改为公开桶直供）：
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | POST | `/bazaardb-screenshots` | open (无鉴权) | 模组上传 |
-| GET | `/bazaardb/manifest?date=YYYY-MM-DD` | `Authorization: Bearer <BAZAARDB_PULL_TOKEN>` | BazaarDB 拉取当日截图列表 |
-| GET | `/bazaardb/image/{screenshot_id}` | 同上 | BazaarDB 拉取单张截图（Worker 代理 R2 流） |
+| GET | `/bazaardb/manifest?date=YYYY-MM-DD&cursor=&limit=` | `Authorization: Bearer <BAZAARDB_PULL_TOKEN>` | BazaarDB 游标分页拉当日截图列表，行内带公开 `image_url` |
 
-Ingest 写顺序：先 R2 `BAZAARDB_BUCKET.put(bazaardb/screenshots/{YYYY-MM-DD}/{screenshot_id}.png)`，再 D1 `bazaardb_screenshots` 单行 `INSERT … ON CONFLICT(screenshot_id) DO UPDATE SET …`。R2 成功而 D1 失败时 R2 对象成孤儿——下次同 `screenshot_id` 重传会覆盖同一确定性 key，不会累积重复。
+Ingest 写顺序：先 R2 `BAZAARDB_BUCKET.put(bazaardb/{YYYY-MM-DD}/{screenshot_id}.png)`（V4 key 去掉了 V3 的 `screenshots/` 前缀段），再 D1 `bazaardb_screenshots` 单行 `INSERT … ON CONFLICT(screenshot_id) DO UPDATE SET …`。R2 成功而 D1 失败时 best-effort `R2.delete` 清孤儿后返回 500；下次同 `screenshot_id` 重传会覆盖同一确定性 key，不会累积重复。
 
-Manifest 查询走 `idx_bazaardb_screenshots_date(captured_date_utc, uploaded_at_utc)` 范围扫描——不会退化成全表扫描。Manifest 响应里的每一项都带 `image_url`，BazaarDB 拉取这些 URL 时**必须**带同样的 Bearer header（图片代理端点也是鉴权的）。
+Manifest 查询走 `idx_bazaardb_screenshots_cursor(captured_date_utc, uploaded_at_utc, screenshot_id)` 复合游标分页（row-value comparison `(uploaded_at_utc, screenshot_id) > (?, ?)`,因为 `screenshot_id` 是高熵 GUID 非单调,不能单独作游标）。Manifest 响应每行带 `image_url = https://bazaardb-assets-v4.bazaarplusplus.com/{r2_key}`,BazaarDB 拿到 URL 直接走公开桶下载,**不再经过 Worker proxy**。Manifest 端点的 bearer 鉴权仍保留(行里包含 `player_account_id`/name/rank/rating 等可识别信息,不能公开 enumerable)。
 
 ## Sidecar Schema
 
@@ -85,7 +84,7 @@ CREATE INDEX idx_bazaardb_screenshots_date
   ON bazaardb_screenshots(captured_date_utc, uploaded_at_utc);
 ```
 
-Migration: `ModCFServerV3/migrations/0012_create_bazaardb_screenshots.sql`。
+Migration: V4 已经把所有 schema 合进 `bazaarplusplus-server/migrations/0001_v4_initial.sql`(`bazaardb_screenshots` 表 + `idx_bazaardb_screenshots_cursor` 索引)。
 
 ## 当前实现文件
 
@@ -98,17 +97,16 @@ Migration: `ModCFServerV3/migrations/0012_create_bazaardb_screenshots.sql`。
 - `Game/Screenshots/Upload/BazaarDbScreenshotUploadStore.cs`
 - `Game/Screenshots/Upload/BazaarDbScreenshotUploadSnapshot.cs`
 - `Game/Screenshots/Upload/BazaarDbScreenshotUploadSettingsMenuLabel.cs`
-- `Game/Online/BazaarDbScreenshotClient.cs`
-- `Game/Online/Models/BazaarDbScreenshotUploadRequestV3.cs`
-- `Game/Online/V3Routes.cs` (`UploadBazaarDbScreenshot`, `BazaarDbManifestBase` 属性)
+- `ModApi/Clients/BazaarDbScreenshotClient.cs`
+- `ModApi/Models/BazaarDbScreenshotUploadRequest.cs`
+- `ModApi/ModApiRoutes.cs` (`UploadBazaarDbScreenshot`, `BazaarDbManifestBase` 属性)
 
-服务端：
+服务端(独立仓库 `bazaarplusplus-server`)：
 
-- `ModCFServerV3/src/features/v3/uploadBazaarDbScreenshot.ts`
-- `ModCFServerV3/src/features/v3/getBazaarDbManifest.ts`
-- `ModCFServerV3/src/features/v3/getBazaarDbImage.ts`
-- `ModCFServerV3/migrations/0012_create_bazaardb_screenshots.sql`
-- `ModCFServerV3/wrangler.toml` (`BAZAARDB_BUCKET` R2 绑定)
+- `src/features/bazaardb/upload.ts`
+- `src/features/bazaardb/manifest.ts`
+- `migrations/0001_v4_initial.sql`(`bazaardb_screenshots` 表)
+- `wrangler.toml`(`BAZAARDB_BUCKET` R2 绑定 + 公开桶 custom domain `bazaardb-assets-v4.bazaarplusplus.com`)
 
 ## 配置
 
@@ -123,7 +121,7 @@ Migration: `ModCFServerV3/migrations/0012_create_bazaardb_screenshots.sql`。
 ## Notes
 
 - 当前图片格式固定 PNG。Unity `EncodeToPNG` 生成约 1–3 MB 一张（1080p）。
-- 服务端 ingest 端点未鉴权，依赖于自定义域 `mod-api-v3.bazaarplusplus.com` 的访问边界；模组没有上传 token。
+- 服务端 ingest 端点未鉴权，依赖于自定义域 `mod-api-v4.bazaarplusplus.com` 的访问边界；模组没有上传 token。
 - 服务端 ingest 校验：`schema_version === 1` / 必需字段非空 / `screenshot_id` 匹配 `/^[A-Za-z0-9._-]{1,128}$/` / `image_format === "png"` / `captured_at_utc` 可解析且不超过当前 UTC 时间 24 小时（为了容忍客户端时钟漂移）/ PNG magic bytes 校验 / 解码后字节数 ≤ 2 MiB（防止 unauthenticated ingest 被滥用）。超过 2 MiB 直接 400 `image_too_large`，不写 R2，不写 D1。
 - 若 R2 写入成功但 D1 upsert 失败：服务端在 catch 分支尽力 `BAZAARDB_BUCKET.delete(r2_key)`（best-effort，记 `r2_cleanup_failed` warning）后返回 500；模组下次 tick 会重试。
 - BazaarDB 端 cron 时间表与他们自己的拉取语义不在本仓库的范围内；只要保证 `BAZAARDB_PULL_TOKEN` 一致即可对接。

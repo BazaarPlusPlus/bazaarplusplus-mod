@@ -33,33 +33,35 @@ session, so physics/board sides are encoded relative to the uploader as
 
 ## 2. Upload (Uploader → Server)
 
-File: [`ModCFServerV3/src/features/v3/uploadRunBundle.ts`](../../ModCFServerV3/src/features/v3/uploadRunBundle.ts)
+File: [`bazaarplusplus-server/src/features/runBundles/upload.ts`](../../../bazaarplusplus-server/src/features/runBundles/upload.ts)
 
 The server inserts rows into the `battles` table with no perspective rewriting:
 
 ```
 INSERT INTO battles (
   ...
-  player_account_id,             -- uploader (from request body)
-  player_account_id_in_payload,  -- uploader (from recorded payload)
+  player_account_id,             -- uploader (from request body, NOT NULL in V4)
   player_name, player_hero, player_rank, player_rating, player_level,
   opponent_account_id,           -- whoever the uploader fought
   opponent_name, opponent_hero, opponent_rank, opponent_rating, opponent_level,
   result,                        -- from uploader's POV ("Win" = uploader won)
-  is_bundle_final_battle,         -- last battle in this uploaded bundle, if projected
-  replay_available,
+  is_final_battle,               -- sticky boolean: once 1, MAX() keeps it 1
   ...
 )
 ```
 
+V4 dropped the V3 `player_account_id_in_payload` reconciliation column (server now just trusts the uploader id from the envelope) and dropped `replay_available` (it was always written as `true` in V3 — a true dead field).
+
 **Invariant after this step**: every row on the server holds the uploader's
 view. `player_*` is the uploader, `opponent_*` is whoever they fought.
-`is_bundle_final_battle` is a bundle-level fact computed from upload order, not
-a player-perspective field.
+`is_final_battle` is a sticky fact set by the uploader (V3 had the redundant
+`is_bundle_final_` prefix); the upsert uses `MAX(battles.is_final_battle,
+excluded.is_final_battle)` so out-of-order retransmits cannot flip a final
+battle back to non-final.
 
 ## 3. Ghost Query (Server → Local Player's Client)
 
-File: [`ModCFServerV3/src/features/v3/queryGhostBattles.ts`](../../ModCFServerV3/src/features/v3/queryGhostBattles.ts)
+File: [`bazaarplusplus-server/src/features/ghostBattles/query.ts`](../../../bazaarplusplus-server/src/features/ghostBattles/query.ts)
 
 `GET /ghost-battles` returns rows where the **local player appears
 in the `opponent` slot of somebody else's upload**:
@@ -79,12 +81,14 @@ The response is **raw uploader-perspective data** — no flip yet:
 - `player_*` = uploader (some other player who fought my ghost)
 - `opponent_*` = me
 - `result = "Win"` means the uploader won (i.e., *I lost* my mirror match)
-- `is_bundle_final_battle` marks whether this was the uploader's final battle in
-  that run bundle and also passed the server projection gate.
+- `is_final_battle` (V4 wire key; V3 used `is_bundle_final_battle`) marks
+  whether this was the uploader's final battle in that run bundle and also
+  passed the server projection gate. The mod's local C# field name remains
+  `IsBundleFinalBattle` — only the wire key changed.
 
 ## 4. Import (Client Parses Response)
 
-File: [`Game/HistoryPanel/Ghost/GhostBattleApiClient.cs`](../../Game/HistoryPanel/Ghost/GhostBattleApiClient.cs)
+File: [`ModApi/Clients/GhostBattleClient.cs`](../../ModApi/Clients/GhostBattleClient.cs)
 (`TryParseBattle`)
 
 Fields are deserialized into `GhostBattleImportRecord` **1:1** — the client
@@ -97,7 +101,10 @@ version adds them.
 - `OpponentName / OpponentAccountId / OpponentHero / ...` = me
 - `Result` = uploader-perspective win/loss string
 - `WinnerCombatantId` ∈ { `Player`, `Opponent` } — `Player` means uploader won.
-- `IsBundleFinalBattle` = raw server boolean.
+- `IsBundleFinalBattle` = parsed from V4 wire key `is_final_battle`.
+- `ReplayAvailable` = constant `true` (V4 server no longer ships a per-row
+  flag; the V4 invariant is "battle row exists ⇒ R2 artifact exists", since
+  R2.put precedes the D1 batch and orphan cleanup runs on D1 failure).
 
 ## 5. Local Persistence
 
@@ -109,7 +116,7 @@ Ghost rows are written to the local SQLite `battles` table with
 `opponent_*` columns continue to carry uploader-perspective values — storage
 matches what the server returned.
 
-`is_bundle_final_battle` is also stored unchanged.
+The local SQLite still uses the column name `is_bundle_final_battle` (mod-side schema, decoupled from the V4 wire rename).
 
 This is a deliberate choice: the repository stores facts, and perspective
 translation happens at read time.
@@ -132,7 +139,7 @@ Files:
 | `Result` | `ProjectResultToLocal(result)` — `Win`↔`Lost`, `Won`↔`Lost` | My outcome |
 | `WinnerCombatantId` | `ProjectCombatantIdToLocal(...)` — `Player`↔`Opponent` | Who won from my POV |
 | `LoserCombatantId` | `ProjectCombatantIdToLocal(...)` | Who lost from my POV |
-| `IsBundleFinalBattle` | `is_bundle_final_battle` | Whether this was the uploader's final bundle battle and passed the projection gate |
+| `IsBundleFinalBattle` | `is_bundle_final_battle` (local SQLite column; mod schema independent of the V4 wire rename) | Whether this was the uploader's final bundle battle and passed the projection gate |
 | `Source` | — | `HistoryBattleSource.Ghost` |
 | `ReplayAvailable / ReplayDownloaded` | `replay_available / replay_downloaded` | Whether replay payload can/has been fetched |
 
