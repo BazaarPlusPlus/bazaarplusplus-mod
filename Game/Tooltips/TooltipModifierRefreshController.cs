@@ -3,6 +3,7 @@ using System;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.GameState;
+using BazaarPlusPlus.Patches.Tooltips;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;

@@ -4,7 +4,7 @@ using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.Tooltips;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Showcase;
 
 /// <summary>
 /// When ShowTooltips runs on a showcase card, set a bypass flag so the

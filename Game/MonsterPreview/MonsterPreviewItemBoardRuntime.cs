@@ -5,6 +5,7 @@ using BazaarGameShared.Domain.Players;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.ItemBoard;
 using BazaarPlusPlus.Game.Tooltips;
+using BazaarPlusPlus.Patches.Tooltips;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;

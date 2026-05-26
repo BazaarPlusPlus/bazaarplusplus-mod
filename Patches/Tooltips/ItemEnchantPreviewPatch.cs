@@ -8,7 +8,7 @@ using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Tooltips;
 
 // Item enchant preview: append BazaarPlusPlus-generated text into passive tooltip block
 [HarmonyPatch(typeof(CardTooltipData), nameof(CardTooltipData.GetPassiveTooltipBlock))]

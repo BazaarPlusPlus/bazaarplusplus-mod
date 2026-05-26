@@ -8,7 +8,7 @@ using TheBazaar.UI;
 using TMPro;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Settings;
 
 [HarmonyPatch(typeof(OptionsDialogController), "Awake")]
 internal static class NativeKeybindLabelAwakePatch

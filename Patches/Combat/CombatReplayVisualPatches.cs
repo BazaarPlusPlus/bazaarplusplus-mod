@@ -6,7 +6,7 @@ using HarmonyLib;
 using TheBazaar.UI.EncounterPicker;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Combat;
 
 [HarmonyPatch(typeof(EncounterPickerMapController), nameof(EncounterPickerMapController.Show))]
 internal static class CombatReplayEncounterPickerMapShowPatch

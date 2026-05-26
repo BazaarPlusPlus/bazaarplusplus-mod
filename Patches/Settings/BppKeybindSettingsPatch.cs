@@ -8,7 +8,7 @@ using HarmonyLib;
 using TheBazaar.UI;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Settings;
 
 [HarmonyPatch(typeof(OptionsDialogController), "Awake")]
 internal static class BppKeybindSettingsAwakePatch

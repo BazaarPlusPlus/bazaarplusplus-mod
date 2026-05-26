@@ -3,7 +3,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using HarmonyLib;
 using TheBazaar.Game.CardFrames;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Combat;
 
 [HarmonyPatch(typeof(PriceTagContainer), "PlayPriceChangeVFX")]
 internal static class CombatReplayPriceTagVfxPatch

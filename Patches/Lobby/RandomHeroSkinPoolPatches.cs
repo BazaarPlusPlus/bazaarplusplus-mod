@@ -8,7 +8,7 @@ using BazaarPlusPlus.Game.Lobby.RandomHeroSkinPool;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Lobby;
 
 [HarmonyPatch(typeof(CosmeticsListManager), "RefreshView")]
 internal static class RandomHeroSkinPoolRefreshViewPatch

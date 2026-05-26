@@ -9,7 +9,7 @@ using HarmonyLib;
 using TheBazaar.UI;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Lobby;
 
 [HarmonyPatch(typeof(HeroSelectButtonsView), "Awake")]
 internal static class RandomHeroPoolAwakePatch

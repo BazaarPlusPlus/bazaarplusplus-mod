@@ -7,7 +7,7 @@ using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.NameOverride;
 
 internal static class NameOverrideHelper
 {

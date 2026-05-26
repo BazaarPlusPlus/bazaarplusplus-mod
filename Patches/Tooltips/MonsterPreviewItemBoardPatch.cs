@@ -5,7 +5,7 @@ using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.Tooltips;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Tooltips;
 
 [HarmonyPatch(typeof(CardController), "ShowTooltips")]
 internal static class MonsterPreviewItemBoardShowTooltipsPatch

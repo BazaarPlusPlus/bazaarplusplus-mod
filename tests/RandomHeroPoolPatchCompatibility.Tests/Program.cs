@@ -18,7 +18,7 @@ var pluginPath = Path.Combine(AppContext.BaseDirectory, "BazaarPlusPlus.dll");
 Assert(File.Exists(pluginPath), $"Expected plugin assembly at {pluginPath}.");
 
 var assembly = Assembly.LoadFrom(pluginPath);
-var patchType = assembly.GetType("BazaarPlusPlus.RandomHeroPoolRefreshButtonsPatch", throwOnError: true)!;
+var patchType = assembly.GetType("BazaarPlusPlus.Patches.Lobby.RandomHeroPoolRefreshButtonsPatch", throwOnError: true)!;
 var postfix = patchType.GetMethod("Postfix", BindingFlags.NonPublic | BindingFlags.Static);
 Assert(postfix != null, "Random hero pool RefreshButtons postfix was not found.");
 

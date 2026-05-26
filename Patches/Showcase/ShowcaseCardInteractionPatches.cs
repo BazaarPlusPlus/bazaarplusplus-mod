@@ -2,7 +2,7 @@
 using HarmonyLib;
 using UnityEngine.EventSystems;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Showcase;
 
 [HarmonyPatch(typeof(CardController), "ProceedClick")]
 internal static class ShowcaseCardClickPatch

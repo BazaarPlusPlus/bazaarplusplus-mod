@@ -4,7 +4,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Combat;
 
 [HarmonyPatch(typeof(StartRunAppState), nameof(StartRunAppState.FinalizeRunInitialization))]
 internal static class CombatReplayFinalizeRunInitializationPatch

@@ -4,7 +4,7 @@ using BazaarPlusPlus.Game.MonsterPreview;
 using HarmonyLib;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Showcase;
 
 [HarmonyPatch(typeof(CardController), "IsPointerOverThis")]
 internal static class PreviewBoardSurfaceBlocksUnderlyingCardsPatch

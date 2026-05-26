@@ -5,7 +5,7 @@ using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Combat;
 
 [HarmonyPatch(typeof(NetMessageProcessor), "ReceiveOrQueue")]
 internal static class CombatReplayCapturePatch

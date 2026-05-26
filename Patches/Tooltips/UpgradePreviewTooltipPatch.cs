@@ -10,7 +10,7 @@ using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Tooltips;
 
 [HarmonyPatch(typeof(CardController), "ShowTooltips")]
 internal static class UpgradePreviewTooltipPatch

@@ -7,7 +7,7 @@ using TheBazaar;
 using TMPro;
 using UnityEngine;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Lobby;
 
 [HarmonyPatch(typeof(VersionShow), "BuildVersionLabel")]
 internal static class MainMenuVersionLabelBuildPatch

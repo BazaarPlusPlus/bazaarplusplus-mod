@@ -6,7 +6,7 @@ using TheBazaar;
 using TheBazaar.UI.Tooltips;
 using UnityEngine.EventSystems;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.Patches.Tooltips;
 
 [HarmonyPatch(typeof(CardController), nameof(CardController.OnPointerClick))]
 internal static class CardSetPreviewClickPatch
