@@ -143,7 +143,6 @@ public class Plugin : BaseUnityPlugin
 
         AddConfiguredHistoryPanel(services, combatReplayRuntime);
 
-        gameObject.AddComponent<MonsterPreviewWarmupController>();
         gameObject.AddComponent<CardSetPreviewRuntime>();
 
         var itemBoardRuntime = gameObject.AddComponent<MonsterPreviewItemBoardRuntime>();
@@ -238,7 +237,6 @@ public class Plugin : BaseUnityPlugin
         DestroyComponentIfPresent<BazaarDbScreenshotUploadController>();
         DestroyComponentIfPresent<MonsterPreviewItemBoardRuntime>();
         DestroyComponentIfPresent<CardSetPreviewRuntime>();
-        DestroyComponentIfPresent<MonsterPreviewWarmupController>();
         DestroyComponentIfPresent<HistoryPanel>();
         DestroyComponentIfPresent<CombatReplayRuntime>();
     }

@@ -10,6 +10,7 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.Encounter;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
+using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
@@ -83,6 +84,7 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new UpgradePreviewSettingsDockEntry());
 
         _mountables.Register(new CombatStatusBarMount());
+        _mountables.Register(new MonsterPreviewWarmupMount());
         _mountables.Register(new RunLoggingMount());
         _mountables.Register(new RunUploadMount());
 
