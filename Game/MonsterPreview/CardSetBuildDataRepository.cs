@@ -339,7 +339,7 @@ internal sealed class CardSetBuildDataRepository
 
     private static string BuildDefaultFinalBuildsCacheFilePath(string gameRootPath)
     {
-        return Path.Combine(gameRootPath, "BazaarPlusPlus", FinalBuildsCacheFileName);
+        return Path.Combine(gameRootPath, "BazaarPlusPlusV4", FinalBuildsCacheFileName);
     }
 
     private static string DownloadFinalBuildJson(string url)

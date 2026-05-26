@@ -21,32 +21,32 @@ internal sealed class BepInExPathProvider : IPathProvider
     {
         RunLogDatabasePath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
+            "BazaarPlusPlusV4",
             PathConstants.RunLogDatabaseFileName
         );
         CombatReplayDirectoryPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
+            "BazaarPlusPlusV4",
             "CombatReplays"
         );
         ScreenshotsDirectoryPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
+            "BazaarPlusPlusV4",
             "Screenshots"
         );
         IdentityDirectoryPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
+            "BazaarPlusPlusV4",
             "Identity"
         );
         CombatReplayVideoDirectoryPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
+            "BazaarPlusPlusV4",
             "CombatReplayVideos"
         );
         ToolsDirectoryPath = System.IO.Path.Combine(
             BepInEx.Paths.GameRootPath,
-            "BazaarPlusPlus",
+            "BazaarPlusPlusV4",
             "tools"
         );
     }
