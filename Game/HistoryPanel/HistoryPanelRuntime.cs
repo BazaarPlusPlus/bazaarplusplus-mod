@@ -1,15 +1,16 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.GameInterop;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class HistoryPanelRuntime : IHistoryPanelRuntime
 {
-    private readonly Core.RunContext.IRunContext _runContext;
+    private readonly IRunContext _runContext;
 
     public HistoryPanelRuntime(
-        Core.RunContext.IRunContext runContext,
+        IRunContext runContext,
         string? runLogDatabasePath,
         string? combatReplayDirectoryPath,
         Func<CombatReplayRuntime?> combatReplayRuntimeAccessor

@@ -4,6 +4,7 @@ using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 

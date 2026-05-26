@@ -2,6 +2,7 @@
 using System.Threading;
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.GameInterop.Events;
 using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;
