@@ -28,7 +28,7 @@ try
     // Bootstrap the schema by touching the existing RunScreenshotSqliteStore (it inherits SqliteStoreBase
     // which runs RunLogSchema.EnsureInitialized in the ctor).
     var screenshotStoreType = RequireType(
-        "BazaarPlusPlus.Game.Screenshots.Persistence.RunScreenshotSqliteStore"
+        "BazaarPlusPlus.Storage.RunScreenshot.RunScreenshotSqliteStore"
     );
     Activator.CreateInstance(screenshotStoreType, dbPath);
 

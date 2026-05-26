@@ -2,9 +2,9 @@
 using System.Reflection;
 using Microsoft.Data.Sqlite;
 
-var recordType = RequireType("BazaarPlusPlus.Game.Screenshots.RunScreenshotRecord");
-var sourceType = RequireType("BazaarPlusPlus.Game.Screenshots.RunScreenshotCaptureSource");
-var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Persistence.RunScreenshotSqliteStore");
+var recordType = RequireType("BazaarPlusPlus.Storage.RunScreenshot.RunScreenshotRecord");
+var sourceType = RequireType("BazaarPlusPlus.Storage.RunScreenshot.RunScreenshotCaptureSource");
+var storeType = RequireType("BazaarPlusPlus.Storage.RunScreenshot.RunScreenshotSqliteStore");
 
 var ctor = storeType.GetConstructor([typeof(string)]);
 Assert(
@@ -240,7 +240,8 @@ static void ExpectSqliteConstraint(Action action, string message)
 
 static Type RequireType(string fullName)
 {
-    return Type.GetType($"{fullName}, BazaarPlusPlus")
+    return Type.GetType($"{fullName}, BazaarPlusPlus.Storage")
+        ?? Type.GetType($"{fullName}, BazaarPlusPlus")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 

@@ -34,7 +34,7 @@ Directory.CreateDirectory(screenshotsDir);
 try
 {
     var screenshotStoreType = RequireType(
-        "BazaarPlusPlus.Game.Screenshots.Persistence.RunScreenshotSqliteStore"
+        "BazaarPlusPlus.Storage.RunScreenshot.RunScreenshotSqliteStore"
     );
     Activator.CreateInstance(screenshotStoreType, dbPath);
     SeedRunScreenshotWithFile(dbPath, screenshotsDir, "shot-1", "2026-04-08_20-30-25-000_final_run-r1.png");
@@ -230,7 +230,8 @@ static long GetUploadAttempts(string dbPath, string id)
 
 static Type RequireType(string fullName)
 {
-    return Type.GetType($"{fullName}, BazaarPlusPlus")
+    return Type.GetType($"{fullName}, BazaarPlusPlus.Storage")
+        ?? Type.GetType($"{fullName}, BazaarPlusPlus")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 
