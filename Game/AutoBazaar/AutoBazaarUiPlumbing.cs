@@ -2,6 +2,7 @@
 using System;
 using System.Reflection;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.AutoBazaar;

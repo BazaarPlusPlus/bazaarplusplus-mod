@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 

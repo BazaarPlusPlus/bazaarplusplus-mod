@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Http;
 using Newtonsoft.Json;
 using TheBazaar;

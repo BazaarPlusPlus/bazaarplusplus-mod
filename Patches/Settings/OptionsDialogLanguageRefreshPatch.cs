@@ -2,6 +2,7 @@
 using System;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 
 namespace BazaarPlusPlus.Patches.Settings;

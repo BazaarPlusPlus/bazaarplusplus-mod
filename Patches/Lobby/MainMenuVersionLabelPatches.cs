@@ -2,6 +2,7 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.Lobby;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 using TMPro;

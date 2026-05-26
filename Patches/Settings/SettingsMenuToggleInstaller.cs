@@ -3,6 +3,7 @@
 using System;
 using System.Linq;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TMPro;
 using UnityEngine;

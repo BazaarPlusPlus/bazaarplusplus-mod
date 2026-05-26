@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Storage.RunLog;

@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Core.Events;
 
@@ -60,7 +61,7 @@ internal sealed class InMemoryBppEventBus : IBppEventBus
                     method.DeclaringType?.FullName != null
                         ? $"{method.DeclaringType.FullName}.{method.Name}"
                         : method.Name;
-                global::BazaarPlusPlus.BppLog.Error(
+                global::BazaarPlusPlus.Infrastructure.BppLog.Error(
                     "EventBus",
                     $"Handler failed for event {typeof(TEvent).FullName}: {handlerName}",
                     ex

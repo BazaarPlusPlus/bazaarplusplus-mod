@@ -11,6 +11,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.Game.PreviewSurface;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;

@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;

@@ -1,5 +1,6 @@
 #nullable enable
 using System.Reflection;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.Screenshots;
 

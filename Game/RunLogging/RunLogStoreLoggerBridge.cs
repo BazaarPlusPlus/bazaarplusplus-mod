@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Storage.RunLog;
 
 namespace BazaarPlusPlus.Game.RunLogging;

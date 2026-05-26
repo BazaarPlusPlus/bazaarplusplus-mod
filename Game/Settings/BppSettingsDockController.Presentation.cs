@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;

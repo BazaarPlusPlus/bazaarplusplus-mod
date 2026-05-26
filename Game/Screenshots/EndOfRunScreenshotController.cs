@@ -4,6 +4,7 @@ using System.Collections;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Storage.RunScreenshot;
 using HarmonyLib;
 using TheBazaar;

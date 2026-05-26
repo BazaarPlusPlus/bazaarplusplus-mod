@@ -1,5 +1,6 @@
 #pragma warning disable CS0436
 using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.Tooltips;

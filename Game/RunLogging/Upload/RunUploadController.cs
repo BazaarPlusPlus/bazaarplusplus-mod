@@ -3,6 +3,7 @@ using System;
 using System.Threading;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.Game.Upload;
 using UnityEngine;

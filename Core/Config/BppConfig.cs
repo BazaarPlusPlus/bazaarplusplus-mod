@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarPlusPlus.Infrastructure;
 using BepInEx.Configuration;
 
 namespace BazaarPlusPlus.Core.Config;
@@ -225,7 +226,7 @@ internal sealed class BppConfig : IBppConfig
 
         config.OrphanedEntries.Remove(legacyKey);
         config.Save();
-        global::BazaarPlusPlus.BppLog.Info(
+        global::BazaarPlusPlus.Infrastructure.BppLog.Info(
             "Config",
             $"Migrated legacy [EnchantPreview] AlwaysShow={legacyValue} to Mode={migratedTo}."
         );

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarGameShared.TempoNet.Models;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;

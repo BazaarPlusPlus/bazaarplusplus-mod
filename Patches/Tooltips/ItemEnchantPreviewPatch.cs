@@ -2,6 +2,7 @@
 using System.Text;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.Tooltips;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;

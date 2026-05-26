@@ -10,6 +10,7 @@ using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.RunLogging;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.PvpBattles;

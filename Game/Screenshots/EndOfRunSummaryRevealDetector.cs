@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Reflection;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.Screenshots;
 

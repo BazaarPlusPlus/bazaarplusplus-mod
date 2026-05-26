@@ -230,7 +230,7 @@ internal sealed class PreviewBoardRenderTarget : IBoardRenderTarget, IDisposable
 
     private static void TryLog(string methodName, string message)
     {
-        var bppLogType = Type.GetType("BazaarPlusPlus.BppLog, BazaarPlusPlus");
+        var bppLogType = Type.GetType("BazaarPlusPlus.Infrastructure.BppLog, BazaarPlusPlus");
         var method = bppLogType?.GetMethod(
             methodName,
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static
@@ -240,7 +240,7 @@ internal sealed class PreviewBoardRenderTarget : IBoardRenderTarget, IDisposable
 
     private static void TryLogException(string message, Exception ex)
     {
-        var bppLogType = Type.GetType("BazaarPlusPlus.BppLog, BazaarPlusPlus");
+        var bppLogType = Type.GetType("BazaarPlusPlus.Infrastructure.BppLog, BazaarPlusPlus");
         var method = bppLogType?.GetMethod(
             "Error",
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
