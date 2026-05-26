@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
-using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.UpgradePreview;
 using HistoryPanelFeature = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
@@ -25,15 +24,6 @@ internal static class BppSettingsDockCatalog
             IsHistoryPanelActionable,
             HistoryPanelFeature.OpenFromDockEntry,
             collapseAfterActivate: true
-        ),
-        new(
-            "NameOverride",
-            NameOverrideSettingsMenuLabel.Resolve,
-            new NameOverrideSettingsMenuBridge(
-                ReadNameOverrideEnabled,
-                WriteNameOverrideEnabled,
-                NameOverrideUiRefresh.TryRefreshVisibleHeroBanners
-            )
         ),
         new(
             "LegendaryPositionDisplay",
@@ -92,7 +82,7 @@ internal static class BppSettingsDockCatalog
     // Final expected indices 0..7:
     //   GameHistory, NameOverride, LegendaryPositionDisplay, EnchantPreview,
     //   UpgradePreview, CombatStatusBar, BazaarDbUpload, ChineseLocaleMode.
-    private static readonly int[] _hardcodedOrders = [0, 1, 2, 3, 4, 6, 7];
+    private static readonly int[] _hardcodedOrders = [0, 2, 3, 4, 6, 7];
 
     public static void Install(IBppConfig config, SettingsDockEntryRegistry registry)
     {
@@ -122,11 +112,6 @@ internal static class BppSettingsDockCatalog
 
     internal static IReadOnlyList<BppSettingsDockDefinition> Definitions => _definitions;
 
-    private static bool ReadNameOverrideEnabled()
-    {
-        return Config.EnableNameOverrideConfig?.Value ?? false;
-    }
-
     private static string ResolveHistoryPanelStatus(string languageCode)
     {
         if (TheBazaar.Data.IsInCombat)
@@ -140,13 +125,6 @@ internal static class BppSettingsDockCatalog
     private static bool IsHistoryPanelActionable()
     {
         return !TheBazaar.Data.IsInCombat;
-    }
-
-    private static void WriteNameOverrideEnabled(bool enabled)
-    {
-        var config = Config.EnableNameOverrideConfig;
-        if (config != null)
-            config.Value = enabled;
     }
 
     private static PreviewVisibilityMode ReadEnchantPreviewMode()

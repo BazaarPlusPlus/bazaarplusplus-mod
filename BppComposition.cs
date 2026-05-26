@@ -8,6 +8,7 @@ using BazaarPlusPlus.Game.AutoBazaar;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.Encounter;
+using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.GameInterop;
@@ -69,6 +70,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_combatStatusBarModule);
 
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
+        _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
 
         // _mountables.Register(new AutoBazaarMount());
     }
