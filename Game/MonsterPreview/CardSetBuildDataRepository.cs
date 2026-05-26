@@ -10,6 +10,7 @@ using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.ItemBoard;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.ModApi.Http;
 using Newtonsoft.Json;
 using TheBazaar;
 using UnityEngine;
@@ -30,6 +31,7 @@ internal sealed class CardSetBuildDataRepository
     );
     private static readonly TimeSpan FinalBuildsCacheDuration = TimeSpan.FromHours(20);
     private static readonly HttpClient FinalBuildsHttpClient = BppHttpClientFactory.Create(
+        productVersion: BppPluginVersion.Current,
         userAgentSuffix: "BuildDataRepository",
         timeout: TimeSpan.FromSeconds(10)
     );

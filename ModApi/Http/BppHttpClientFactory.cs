@@ -3,25 +3,33 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 
-namespace BazaarPlusPlus;
+namespace BazaarPlusPlus.ModApi.Http;
 
-internal static class BppHttpClientFactory
+public static class BppHttpClientFactory
 {
     private const string ProductName = "BazaarPlusPlus";
 
-    public static HttpClient Create(string? userAgentSuffix = null, TimeSpan? timeout = null)
+    public static HttpClient Create(
+        string productVersion,
+        string? userAgentSuffix = null,
+        TimeSpan? timeout = null
+    )
     {
         var client = new HttpClient();
         if (timeout.HasValue)
             client.Timeout = timeout.Value;
 
-        ApplyUserAgent(client, userAgentSuffix);
+        ApplyUserAgent(client, productVersion, userAgentSuffix);
         return client;
     }
 
-    private static void ApplyUserAgent(HttpClient client, string? userAgentSuffix)
+    private static void ApplyUserAgent(
+        HttpClient client,
+        string productVersion,
+        string? userAgentSuffix
+    )
     {
-        var version = SanitizeUserAgentToken(BppPluginVersion.Current) ?? "0.0.0";
+        var version = SanitizeUserAgentToken(productVersion) ?? "0.0.0";
         client.DefaultRequestHeaders.UserAgent.Add(
             new ProductInfoHeaderValue(ProductName, version)
         );

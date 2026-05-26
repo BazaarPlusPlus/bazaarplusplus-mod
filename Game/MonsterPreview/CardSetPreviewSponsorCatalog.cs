@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.ModApi.Http;
 using Newtonsoft.Json;
 using TheBazaar;
 using UnityEngine;
@@ -39,6 +40,7 @@ internal static class CardSetPreviewSponsorCatalog
     );
     private static readonly object SyncRoot = new();
     private static readonly HttpClient HttpClient = BppHttpClientFactory.Create(
+        productVersion: BppPluginVersion.Current,
         userAgentSuffix: "SponsorCatalog",
         timeout: TimeSpan.FromSeconds(10)
     );

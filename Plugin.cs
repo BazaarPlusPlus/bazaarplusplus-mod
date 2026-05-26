@@ -12,6 +12,7 @@ using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.MonsterPreview;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
+using BazaarPlusPlus.ModApi.Http;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots;
@@ -115,6 +116,7 @@ public class Plugin : BaseUnityPlugin
         }
 
         var httpClient = BppHttpClientFactory.Create(
+            productVersion: BppPluginVersion.Current,
             userAgentSuffix: "OnlineClient",
             timeout: TimeSpan.FromSeconds(Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds))
         );

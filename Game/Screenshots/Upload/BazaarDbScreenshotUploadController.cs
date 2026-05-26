@@ -4,8 +4,9 @@ using System.Net.Http;
 using System.Threading;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.Game.Upload;
+using BazaarPlusPlus.ModApi;
+using BazaarPlusPlus.ModApi.Http;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
@@ -64,6 +65,7 @@ internal sealed class BazaarDbScreenshotUploadController : MonoBehaviour
 
             var store = new BazaarDbScreenshotUploadStore(databasePath, screenshotsDirectoryPath);
             _httpClient = BppHttpClientFactory.Create(
+                productVersion: BppPluginVersion.Current,
                 userAgentSuffix: "BazaarDbScreenshotUpload",
                 timeout: TimeSpan.FromSeconds(
                     Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds)
