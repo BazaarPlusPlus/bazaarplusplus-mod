@@ -6,6 +6,7 @@ using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.AutoBazaar;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.Encounter;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
@@ -86,6 +87,7 @@ internal sealed class BppComposition : IDisposable
 
         _mountables.Register(new BazaarDbScreenshotUploadMount());
         _mountables.Register(new CardSetPreviewMount());
+        _mountables.Register(new CombatReplayVideoRecorderMount());
         _mountables.Register(new CombatStatusBarMount());
         _mountables.Register(new EndOfRunScreenshotMount());
         _mountables.Register(new MonsterPreviewItemBoardMount());

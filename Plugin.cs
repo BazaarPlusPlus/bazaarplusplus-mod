@@ -4,7 +4,6 @@ using System;
 using System.IO;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
-using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
@@ -142,9 +141,6 @@ public class Plugin : BaseUnityPlugin
 
         AddConfiguredTooltipModifierRefreshController(services);
 
-        var combatReplayVideoRecorder = gameObject.AddComponent<CombatReplayVideoRecorder>();
-        combatReplayVideoRecorder.Initialize(services);
-
         _composition?.Mountables.MountAll(gameObject, services);
 
         BppLog.Info("Plugin", "Runtime components attached");
@@ -216,7 +212,6 @@ public class Plugin : BaseUnityPlugin
     {
         _composition?.Mountables.UnmountAll(gameObject);
 
-        DestroyComponentIfPresent<CombatReplayVideoRecorder>();
         DestroyComponentIfPresent<TooltipModifierRefreshController>();
         DestroyComponentIfPresent<HistoryPanel>();
         DestroyComponentIfPresent<CombatReplayRuntime>();
