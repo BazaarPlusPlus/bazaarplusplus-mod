@@ -84,14 +84,34 @@ internal static class BppSettingsDockCatalog
         ),
     ];
 
+    // Order slots reserved for the migrated registry entries. The hardcoded list
+    // below uses the complement of this set (0, 1, 2, 3, 4, 6, 7) so registered
+    // entries can slot back into their legacy index. As more features migrate to
+    // the registry in Task 3.3, the hardcoded list shrinks and the Orders below
+    // collapse to the still-hardcoded entries only.
+    // Final expected indices 0..7:
+    //   GameHistory, NameOverride, LegendaryPositionDisplay, EnchantPreview,
+    //   UpgradePreview, CombatStatusBar, BazaarDbUpload, ChineseLocaleMode.
+    private static readonly int[] _hardcodedOrders = [0, 1, 2, 3, 4, 6, 7];
+
     public static void Install(IBppConfig config, SettingsDockEntryRegistry registry)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         if (registry == null)
             throw new ArgumentNullException(nameof(registry));
 
-        foreach (var definition in registry.MaterializeAll(config))
-            _definitions.Add(definition);
+        var merged = new List<(int Order, BppSettingsDockDefinition Def)>(
+            _definitions.Count + 8
+        );
+        for (var i = 0; i < _definitions.Count; i++)
+            merged.Add((_hardcodedOrders[i], _definitions[i]));
+        foreach (var pair in registry.MaterializeWithOrder(config))
+            merged.Add(pair);
+        merged.Sort((a, b) => a.Order.CompareTo(b.Order));
+
+        _definitions.Clear();
+        foreach (var pair in merged)
+            _definitions.Add(pair.Def);
     }
 
     private static IBppConfig Config =>

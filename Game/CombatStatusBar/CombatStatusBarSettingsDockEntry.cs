@@ -7,6 +7,8 @@ namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal sealed class CombatStatusBarSettingsDockEntry : ISettingsDockEntry
 {
+    public int Order => 5;
+
     public BppSettingsDockDefinition Build(IBppConfig config) =>
         new(
             "CombatStatusBar",

@@ -9,6 +9,7 @@ public class SettingsDockRegistryTests
     private sealed class FakeEntry : ISettingsDockEntry
     {
         public string Key { get; }
+        public int Order { get; init; }
         public int BuildCount { get; private set; }
 
         public FakeEntry(string key)
@@ -54,5 +55,22 @@ public class SettingsDockRegistryTests
     {
         var registry = new SettingsDockEntryRegistry();
         Assert.Throws<ArgumentNullException>(() => registry.Register(null!));
+    }
+
+    [Fact]
+    public void MaterializeWithOrder_returns_entries_paired_with_their_Order()
+    {
+        var registry = new SettingsDockEntryRegistry();
+        registry.Register(new FakeEntry("A") { Order = 5 });
+        registry.Register(new FakeEntry("B") { Order = 1 });
+
+        var pairs = registry.MaterializeWithOrder(config: null!);
+
+        Assert.Equal(2, pairs.Count);
+        // Materialization preserves registration order; sorting is the caller's job.
+        Assert.Equal(5, pairs[0].Order);
+        Assert.Equal("A", pairs[0].Definition.Key);
+        Assert.Equal(1, pairs[1].Order);
+        Assert.Equal("B", pairs[1].Definition.Key);
     }
 }
