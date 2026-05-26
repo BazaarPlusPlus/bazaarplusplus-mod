@@ -51,8 +51,10 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## 仓库结构
 
-- `Plugin.cs`：BepInEx 运行时入口。
-- `Core/`、`Game/`、`Patches/`：主要功能实现。
+- `Plugin.cs`：BepInEx 运行时入口（精简，feature wiring 走 `BppComposition` 的 `IBppMountable`/`ISettingsDockEntry` 注册表）。
+- `Core/`：纯抽象（配置、事件总线、路径、运行时服务接口，零 game DLL 引用）。
+- `GameInterop/`：游戏 DLL 耦合层（`BppClientCacheBridge`、`BppStaticDataAccess`、`GameStateProbe`、`RunContextStore`、`IRunContext` 接口、带 game type 的事件 `CombatSimObserved`/`NetMessageObserved`）。
+- `Game/`、`Patches/`：主要功能实现 + Harmony 补丁。
 - `Data/`：内嵌资源（如 build 推荐 JSON）。
 - `ModApi/`、`Storage/`：分别是 HTTP 客户端 csproj 与本地持久化 csproj（零 game/Unity/BepInEx 依赖），由 `BppComposition.cs` 装配进 mod。
 - `tests/`：按特性拆分的测试项目。
