@@ -2,9 +2,9 @@
 
 ## Scope
 
-为 saved combat replay 的回放过程提供视频录制能力。当玩家在 HistoryPanel 触发本地战斗回放或 ghost battle 回放时，将 Unity Game View 录制为 MP4 文件，落到 `<GameRoot>/BazaarPlusPlus/CombatReplayVideos/` 下，供玩家离线复盘、社区分享和剪辑使用。
+为 saved combat replay 的回放过程提供视频录制能力。当玩家在 HistoryPanel 触发本地战斗回放或 ghost battle 回放时，将 Unity Game View 录制为 MP4 文件，落到 `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/` 下，供玩家离线复盘、社区分享和剪辑使用。
 
-本文档描述目标、关键设计决策、实施阶段和验证逻辑。Phase 1–3 已实现（默认关闭，需要 FFmpeg 在 `BazaarPlusPlus/tools/ffmpeg/` 或 PATH 上）；HistoryPanel 录制状态/Open Folder 行动项与 installer 侧 FFmpeg 部署仍未落地。代码入口见 [Game/CombatReplay/Video/](../Game/CombatReplay/Video/)。
+本文档描述目标、关键设计决策、实施阶段和验证逻辑。Phase 1–3 已实现（默认关闭，需要 FFmpeg 在 `BazaarPlusPlusV4/tools/ffmpeg/` 或 PATH 上）；HistoryPanel 录制状态/Open Folder 行动项与 installer 侧 FFmpeg 部署仍未落地。代码入口见 [Game/CombatReplay/Video/](../Game/CombatReplay/Video/)。
 
 ## 背景
 
@@ -16,7 +16,7 @@ BPP mod 已有完整的 PVP combat replay 保存和回放系统。
 
 - [Patches/CombatReplayCapturePatch.cs](../Patches/CombatReplayCapturePatch.cs) patch 了 `NetMessageProcessor.ReceiveOrQueue`,监听 `NetMessageGameSim` / `NetMessageCombatSim`,发布 `NetMessageObserved`
 - [Game/CombatReplay/CombatReplayCaptureService.cs](../Game/CombatReplay/CombatReplayCaptureService.cs) 识别 PVPCombat 的三段消息窗口(opening GameSim → CombatSim → closing GameSim),组装 manifest + snapshots + payload
-- Payload 存到 `<GameRoot>/BazaarPlusPlus/CombatReplays/<battle_id>.payload.mpack.gz`,由 [Game/CombatReplay/CombatReplayPayloadStore.cs](../Game/CombatReplay/CombatReplayPayloadStore.cs) 管理
+- Payload 存到 `<GameRoot>/BazaarPlusPlusV4/CombatReplays/<battle_id>.payload.mpack.gz`,由 [Game/CombatReplay/CombatReplayPayloadStore.cs](../Game/CombatReplay/CombatReplayPayloadStore.cs) 管理
 - Metadata 存到 SQLite 的 `battles` + `battle_snapshots` 表
 
 **回放链路**：
@@ -44,7 +44,7 @@ BPP mod 已有完整的 PVP combat replay 保存和回放系统。
 ### 功能目标
 
 - saved replay 播放期间自动录制 Unity Game View 为 MP4
-- 输出路径：`<GameRoot>/BazaarPlusPlus/CombatReplayVideos/<yyyy-MM-dd>/<battle_id>.<yyyyMMdd-HHmmss>.mp4`
+- 输出路径：`<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<yyyy-MM-dd>/<battle_id>.<yyyyMMdd-HHmmss>.mp4`
 - 默认关闭(`CombatReplayVideoEnabled = false`)
 - FFmpeg 未检测到时静默禁用,不报错不弹窗,BPP log 一行 Info 提示放置位置
 - Local battle replay 与 ghost battle replay 一视同仁
@@ -65,7 +65,7 @@ BPP mod 已有完整的 PVP combat replay 保存和回放系统。
 | 项目 | 职责 |
 |---|---|
 | `bazaarplusplus-mod` | runtime 只做**检测 + 抓帧 + 调用 ffmpeg**。绝不下载,绝不写 `tools/ffmpeg/`。 |
-| `bazaarplusplus-installer` | install/repair flow 可选步骤：下载平台对应 FFmpeg minimal build → 校验 SHA256 → 写到 `<GameRoot>/BazaarPlusPlus/tools/ffmpeg/` → 验证 `ffmpeg -version`。Binary 托管在 R2 上(LGPL minimal + OpenH264,避开 GPL 传染)。 |
+| `bazaarplusplus-installer` | install/repair flow 可选步骤：下载平台对应 FFmpeg minimal build → 校验 SHA256 → 写到 `<GameRoot>/BazaarPlusPlusV4/tools/ffmpeg/` → 验证 `ffmpeg -version`。Binary 托管在 R2 上(LGPL minimal + OpenH264,避开 GPL 传染)。 |
 
 ### 明确不做
 
@@ -123,7 +123,7 @@ internal sealed class CombatReplayPlaybackEnded
 两级 fallback,**只检测,不下载**：
 
 ```text
-1. <GameRoot>/BazaarPlusPlus/tools/ffmpeg/ffmpeg(.exe)   ← installer 部署
+1. <GameRoot>/BazaarPlusPlusV4/tools/ffmpeg/ffmpeg(.exe)   ← installer 部署
 2. 系统 PATH 里的 ffmpeg                                  ← 用户手动装
 都未命中 → 功能静默禁用,Info log 一行
 ```
@@ -136,7 +136,7 @@ internal sealed class CombatReplayPlaybackEnded
 
 ### 数据落地
 
-- 文件：`<GameRoot>/BazaarPlusPlus/CombatReplayVideos/<yyyy-MM-dd>/<battle_id>.<yyyyMMdd-HHmmss>.mp4`(同 battle 多次录制由 timestamp 区分)
+- 文件：`<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<yyyy-MM-dd>/<battle_id>.<yyyyMMdd-HHmmss>.mp4`(同 battle 多次录制由 timestamp 区分)
 - Metadata：新增 SQLite 表 `combat_replay_videos`,schema version 从 11 升级到 12,不污染现有 `battles` 表
 
 ```sql
@@ -298,7 +298,7 @@ CombatReplayVideoMaxQueuedFrames      // 默认 90  (= 3s @ 30fps)
 
 1. 按 `.rules` 要求做最小相关构建(`dotnet build BazaarPlusPlus.csproj -c Debug`);只有 packaging 改动才跑 `BuildAll`
 2. 关闭 `CombatReplayVideoEnabled` 后整个 mod 行为与改动前完全一致
-3. 故意删 `<GameRoot>/BazaarPlusPlus/tools/` 整个目录,启动游戏 → 不崩、不报错、其他功能正常
+3. 故意删 `<GameRoot>/BazaarPlusPlusV4/tools/` 整个目录,启动游戏 → 不崩、不报错、其他功能正常
 
 ## 风险与回滚
 

@@ -34,7 +34,7 @@
 
 截图文件保存到：
 
-- `<GameRoot>/BazaarPlusPlus/Screenshots`
+- `<GameRoot>/BazaarPlusPlusV4/Screenshots`
 
 路径按日期分层：
 
@@ -117,5 +117,5 @@
 
 图片绝对路径应通过以下方式拼接：
 
-- `BazaarPlusPlus/Screenshots`
+- `BazaarPlusPlusV4/Screenshots`
 - 加上 `image_relative_path`

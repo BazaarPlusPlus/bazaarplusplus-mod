@@ -162,14 +162,14 @@ Columns:
 
 ### `combat_replay_videos`
 
-Stores metadata for MP4 video recordings of saved combat replay playback. The MP4 files themselves live under `<GameRoot>/BazaarPlusPlus/CombatReplayVideos/<yyyy-MM-dd>/`; this table indexes them. Only present when the optional video recording feature has been enabled at least once (`CombatReplayVideo / Enabled = true`).
+Stores metadata for MP4 video recordings of saved combat replay playback. The MP4 files themselves live under `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<yyyy-MM-dd>/`; this table indexes them. Only present when the optional video recording feature has been enabled at least once (`CombatReplayVideo / Enabled = true`).
 
 Columns:
 
 - `video_id TEXT PRIMARY KEY`
 - `battle_id TEXT NOT NULL` — implicit reference to `battles.battle_id` (no FK to keep ghost replays insertable when the battle row hasn't been persisted)
 - `source TEXT NOT NULL` — `LocalSaved` or `ImportedGhost`
-- `video_relative_path TEXT NOT NULL` — relative to `<GameRoot>/BazaarPlusPlus/CombatReplayVideos/`
+- `video_relative_path TEXT NOT NULL` — relative to `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/`
 - `width INTEGER NOT NULL`
 - `height INTEGER NOT NULL`
 - `fps INTEGER NOT NULL`

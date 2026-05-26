@@ -10,7 +10,7 @@
 
 ## Storage
 
-- payload 文件目录：`<GameRoot>/BazaarPlusPlus/CombatReplays`
+- payload 文件目录：`<GameRoot>/BazaarPlusPlusV4/CombatReplays`
 - payload 文件格式：`<battle_id>.payload.mpack.gz`
 - battle metadata：SQLite `battles` / `battle_snapshots`
 

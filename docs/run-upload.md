@@ -36,12 +36,11 @@
 
 ## Notes
 
-- 身份目录是 `<GameRoot>/BazaarPlusPlus/Identity/`。
+- 身份目录是 `<GameRoot>/BazaarPlusPlusV4/Identity/`。
 - 当前只写 `observation.v1.json`；旧 `auth.v1.json` 与 `identity.db`、`identity.db-wal`、`identity.db-shm` 会在 mod 启动时被一次性清理。
-- ghost 查询与 replay-link 现在是：
+- ghost 查询与 replay-link 现在是(V4 wire,服务端在独立仓库 `bazaarplusplus-server`,部署 `mod-api-v4.bazaarplusplus.com`)：
   - `GET /ghost-battles`
-  - `POST /ghost-battles/:battleId/replay-link`
-  - `GET /replays/:token`
-- `POST /run-bundles` 会同时携带 projection 和 artifact；服务端不要求完整解包 artifact 后再接受投影。
-- bundle-final 标记由服务端根据 `battle_projections` 顺序计算，客户端不需要在 payload 里额外传字段；如果最后一场 battle 未通过服务端投影 gate，则不会产生可查询的 final marker row。
+  - `POST /ghost-battles/:battleId/replay-link` —— 返回 5 分钟有效的 R2 预签 URL；V3 的 `GET /replays/:token` Worker 路由已废除
+- `POST /run-bundles` 会同时携带 projection 和 artifact；服务端不要求完整解包 artifact 后再接受投影。`player_account_id` 必填(V4 删除了 V3 的 `"anonymous-player"` sentinel,mod 在没拿到本机 account id 时跳过上传)。
+- `is_final_battle`(V3 wire 叫 `is_bundle_final_battle`)由 mod 客户端在上传 payload 里直接传;服务端以 sticky `MAX()` 语义 upsert,一旦 1 永远 1。
 - battle gate 仍然允许“artifact 已收但 battle 不可查询”的设计，这是当前接受的产品取舍，不是实现遗漏。

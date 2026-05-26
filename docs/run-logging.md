@@ -36,7 +36,7 @@
 - `battle_snapshots`：battle 对应的 board snapshot
 - `sync_cursors`：ghost sync checkpoint
 - `run_sync_state`：后台 run-bundle 上传状态
-- replay payload 文件：`<GameRoot>/BazaarPlusPlus/CombatReplays`
+- replay payload 文件：`<GameRoot>/BazaarPlusPlusV4/CombatReplays`
 
 ## HistoryPanel
 
