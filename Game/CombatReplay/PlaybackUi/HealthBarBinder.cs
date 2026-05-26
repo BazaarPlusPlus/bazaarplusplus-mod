@@ -1,12 +1,11 @@
 #nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarGameShared.Infra.Messages.GameSimEvents;
-using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.AppFramework;
@@ -15,17 +14,11 @@ using TheBazaar.UI.Components;
 using TheBazaar.UI.EncounterPicker;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.CombatReplay;
+namespace BazaarPlusPlus.Game.CombatReplay.PlaybackUi;
 
-// "Initialized" board UI controllers are tracked across replay sessions to avoid double-binding the
-// game's BoardUIController.Init, which throws on repeat. Owner clears this when sessions start/end.
-internal static class ReplayHealthBarRebuilder
+internal static class HealthBarBinder
 {
-    public static readonly HashSet<int> InitializedBoardUiControllers = new();
-
-    public static EncounterController? ActiveOpponentPortrait { get; set; }
-
-    public static void HideEncounterPickerOverlays()
+    internal static void HideEncounterPickerOverlays()
     {
         HideObjectsOfType<EncounterPickerMapController>();
         HideObjectsOfType<InjectedEncounterPickerMapController>();
@@ -46,9 +39,9 @@ internal static class ReplayHealthBarRebuilder
         }
     }
 
-    public static void EnsureOpponentPortraitVisible()
+    internal static void EnsureOpponentPortraitVisible()
     {
-        var replayPortrait = ActiveOpponentPortrait;
+        var replayPortrait = PlaybackUiState.ActiveOpponentPortrait;
         if (replayPortrait != null)
         {
             if (Data.CurrentEncounterController != null)
@@ -67,7 +60,7 @@ internal static class ReplayHealthBarRebuilder
         encounterController.ShowCard(show: true);
     }
 
-    public static async Task PrepareHealthBarsAsync()
+    internal static async Task PrepareHealthBarsAsync()
     {
         var bindings = await RefreshHealthBarBindingsAsync();
         ShowPlayerHealthBar(bindings.PlayerController);
@@ -75,23 +68,9 @@ internal static class ReplayHealthBarRebuilder
         Events.TryShowEmptyOpponentHealthBar.Trigger();
     }
 
-    public static void RefillOpponentHealthBar()
+    internal static void RefillOpponentHealthBar()
     {
         Events.TryRefillOpponentHealthBar.Trigger();
-    }
-
-    public static void EnsureSequencePlayerAttributes(CombatSequenceMessages sequence)
-    {
-        EnsurePlayerAttributes(sequence.SpawnMessage?.Data?.Player, ECombatantId.Player);
-        EnsurePlayerAttributes(sequence.SpawnMessage?.Data?.Opponent, ECombatantId.Opponent);
-        EnsurePlayerAttributes(sequence.DespawnMessage?.Data?.Player, ECombatantId.Player);
-        EnsurePlayerAttributes(sequence.DespawnMessage?.Data?.Opponent, ECombatantId.Opponent);
-    }
-
-    public static void EnsureRunPlayerAttributes()
-    {
-        EnsurePlayerAttributes(Data.Run?.Player, ECombatantId.Player);
-        EnsurePlayerAttributes(Data.Run?.Opponent, ECombatantId.Opponent);
     }
 
     private static async Task<ReplayBoardUiBindings> RefreshHealthBarBindingsAsync()
@@ -170,17 +149,17 @@ internal static class ReplayHealthBarRebuilder
         if (player == null)
             return;
 
-        EnsurePlayerAttributes(player, controller.combatantId);
+        PlayerAttributeRepairer.EnsurePlayerAttributes(player, controller.combatantId);
 
-        if (InitializedBoardUiControllers.Add(controller.GetInstanceID()))
+        if (PlaybackUiState.InitializedBoardUiControllers.Add(controller.GetInstanceID()))
             InvokeBoardUiMethod(controller, "Init", player);
 
         if (controller.combatantId == ECombatantId.Player)
-            UnregisterPlayerPortraitPlacedHandler(controller);
+            PlayerAttributeRepairer.UnregisterPlayerPortraitPlacedHandler(controller);
 
         InvokeBoardUiMethod(controller, "SetBattlePlayer", player);
         ApplyBoardUiDividerConfig(controller);
-        InitializeBoardUiHealthBar(controller, player);
+        PlayerAttributeRepairer.InitializeBoardUiHealthBar(controller, player);
 
         if (registerPlayerHealthBar && controller.combatantId == ECombatantId.Player)
             Data.RegisterPlayerHealthBar(controller);
@@ -191,166 +170,17 @@ internal static class ReplayHealthBarRebuilder
         if (playerController != null)
         {
             if (Data.Run?.Player != null)
-                EnsurePlayerAttributes(Data.Run.Player, ECombatantId.Player);
+                PlayerAttributeRepairer.EnsurePlayerAttributes(Data.Run.Player, ECombatantId.Player);
 
             InvokeBoardUiMethod(playerController, "SetBattlePlayer", Data.Run?.Player);
-            InitializeBoardUiHealthBar(playerController, Data.Run?.Player);
+            PlayerAttributeRepairer.InitializeBoardUiHealthBar(playerController, Data.Run?.Player);
             playerController.ShowEmptyPlayerHealthBar();
             RevealBoardUiHealthBar(playerController, showStatusNumbers: true);
-            RecalculateHealthBarDividers(playerController, Data.Run?.Player);
+            PlayerAttributeRepairer.RecalculateHealthBarDividers(playerController, Data.Run?.Player);
             return;
         }
 
         Data.PlayerHealthBar?.ShowEmptyPlayerHealthBar();
-    }
-
-    private static void EnsurePlayerAttributes(object? player, ECombatantId combatantId)
-    {
-        if (player == null)
-            return;
-
-        try
-        {
-            var attributesProperty = player
-                .GetType()
-                .GetProperty(
-                    "Attributes",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                );
-            if (
-                attributesProperty?.GetValue(player)
-                is not System.Collections.IDictionary attributes
-            )
-                return;
-
-            EnsurePlayerAttributeDefaults(attributes);
-            EnsureHealthMax(attributes);
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "ReplayHealthBarRebuilder",
-                $"Failed to backfill replay player attributes for {combatantId}: {ex.Message}"
-            );
-        }
-    }
-
-    private static void EnsureHealthMax(System.Collections.IDictionary attributes)
-    {
-        if (
-            attributes.Contains(EPlayerAttributeType.HealthMax)
-            && Convert.ToInt32(attributes[EPlayerAttributeType.HealthMax]) > 0
-        )
-            return;
-
-        if (!attributes.Contains(EPlayerAttributeType.Health))
-            return;
-
-        var healthValue = Convert.ToInt32(attributes[EPlayerAttributeType.Health]);
-        if (healthValue <= 0)
-            return;
-
-        attributes[EPlayerAttributeType.HealthMax] = healthValue;
-    }
-
-    private static void EnsurePlayerAttributeDefaults(
-        System.Collections.IDictionary attributes
-    )
-    {
-        foreach (EPlayerAttributeType attributeType in Enum.GetValues(typeof(EPlayerAttributeType)))
-        {
-            EnsurePlayerAttribute(
-                attributes,
-                attributeType,
-                attributeType == EPlayerAttributeType.Level ? 1 : 0
-            );
-        }
-    }
-
-    private static void EnsurePlayerAttribute(
-        System.Collections.IDictionary attributes,
-        EPlayerAttributeType attributeType,
-        int defaultValue
-    )
-    {
-        if (!attributes.Contains(attributeType))
-            attributes[attributeType] = defaultValue;
-    }
-
-    private static void RecalculateHealthBarDividers(BoardUIController controller, object? player)
-    {
-        if (player == null)
-            return;
-
-        var healthBar = GetBoardUiHealthBar(controller);
-        if (healthBar == null)
-            return;
-
-        ApplyHealthBarMaxValue(healthBar, player);
-    }
-
-    private static void UnregisterPlayerPortraitPlacedHandler(BoardUIController controller)
-    {
-        try
-        {
-            var handlerMethod = controller
-                .GetType()
-                .GetMethod(
-                    "HandleOnPlayerPortraitPlaced",
-                    BindingFlags.Instance | BindingFlags.NonPublic
-                );
-            if (handlerMethod == null)
-                return;
-
-            var handler = Delegate.CreateDelegate(typeof(Action), controller, handlerMethod);
-            var eventField = typeof(BoardManager).GetField(
-                "_playerPortraitPlaced",
-                BindingFlags.Static | BindingFlags.NonPublic
-            );
-            if (eventField?.GetValue(null) is Action currentDelegate)
-            {
-                eventField.SetValue(null, (Action)Delegate.Remove(currentDelegate, handler));
-            }
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "ReplayHealthBarRebuilder",
-                $"Failed to unregister PlayerPortraitPlaced handler: {ex.Message}"
-            );
-        }
-    }
-
-    private static void InitializeBoardUiHealthBar(BoardUIController controller, object? player)
-    {
-        if (player == null)
-            return;
-
-        var healthBar = GetBoardUiHealthBar(controller);
-        if (healthBar == null)
-            return;
-
-        var initMethod = healthBar
-            .GetType()
-            .GetMethod(
-                "Init",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        if (initMethod == null)
-            return;
-
-        try
-        {
-            initMethod.Invoke(healthBar, [player]);
-            ApplyHealthBarMaxValue(healthBar, player);
-        }
-        catch (TargetInvocationException ex)
-        {
-            BppLog.Warn(
-                "ReplayHealthBarRebuilder",
-                $"Skipping health bar init for {controller.combatantId}: {ex.InnerException?.Message ?? ex.Message}"
-            );
-        }
     }
 
     private static void ApplyBoardUiDividerConfig(BoardUIController controller)
@@ -373,48 +203,6 @@ internal static class ReplayHealthBarRebuilder
         InvokeOptionalMethod(healthBar, "SetDividerConfig", dividerConfig);
     }
 
-    private static void ApplyHealthBarMaxValue(object healthBar, object player)
-    {
-        var healthMax = TryGetPlayerAttribute(player, EPlayerAttributeType.HealthMax);
-        if (!healthMax.HasValue)
-            return;
-
-        var updateMaxHealth = healthBar
-            .GetType()
-            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .FirstOrDefault(method =>
-            {
-                if (!string.Equals(method.Name, "UpdateMaxHealth", StringComparison.Ordinal))
-                    return false;
-
-                var parameters = method.GetParameters();
-                return parameters.Length == 3
-                    && parameters[0].ParameterType == typeof(uint)
-                    && parameters[1].ParameterType == typeof(uint)
-                    && parameters[2].ParameterType == typeof(bool);
-            });
-        if (updateMaxHealth == null)
-            return;
-
-        updateMaxHealth.Invoke(healthBar, [healthMax.Value, healthMax.Value, false]);
-    }
-
-    private static uint? TryGetPlayerAttribute(object player, EPlayerAttributeType attributeType)
-    {
-        var attributesProperty = player
-            .GetType()
-            .GetProperty(
-                "Attributes",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        if (attributesProperty?.GetValue(player) is not System.Collections.IDictionary attributes)
-            return null;
-        if (!attributes.Contains(attributeType))
-            return null;
-
-        return Convert.ToUInt32(attributes[attributeType]);
-    }
-
     private static void RevealBoardUiHealthBar(BoardUIController controller, bool showStatusNumbers)
     {
         var healthBar = GetBoardUiHealthBar(controller);
@@ -426,7 +214,7 @@ internal static class ReplayHealthBarRebuilder
         InvokeOptionalMethod(healthBar, "RefillHealthBar", 1f);
     }
 
-    private static object? GetBoardUiHealthBar(BoardUIController controller)
+    internal static object? GetBoardUiHealthBar(BoardUIController controller)
     {
         return controller
             .GetType()

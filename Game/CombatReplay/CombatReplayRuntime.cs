@@ -3,6 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.CombatReplay.Bootstrap;
+using BazaarPlusPlus.Game.CombatReplay.PlaybackUi;
+using BazaarPlusPlus.Game.CombatReplay.Warmup;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Infrastructure;
@@ -21,7 +24,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private CombatReplayController? _controller;
     private ReplayPersistenceOrchestrator? _persistence;
     private ReplayPlaybackPublisher? _playbackPublisher;
-    private ReplayOpponentPortraitController? _portraitController;
+    private OpponentPortraitController? _portraitController;
 
     private bool _returnToMenuAfterReplay;
     private bool _bootstrappedReplayActive;
@@ -53,7 +56,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
         _persistence = new ReplayPersistenceOrchestrator(_services);
         _playbackPublisher = new ReplayPlaybackPublisher(_services);
-        _portraitController = new ReplayOpponentPortraitController(Destroy);
+        _portraitController = new OpponentPortraitController(Destroy);
         _captureService = new CombatReplayCaptureService();
         _loader = new CombatReplayLoader();
         _controller = new CombatReplayController(
@@ -194,7 +197,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
 
         var sequence = controller.LoadReplay(payload);
-        ReplayHealthBarRebuilder.InitializedBoardUiControllers.Clear();
+        PlaybackUiState.InitializedBoardUiControllers.Clear();
         _savedReplayPlaybackActive = true;
         _ = StartReplayAsync(manifest, sequence, battleId, CombatReplayPlaybackSource.LocalSaved);
         return true;
@@ -218,7 +221,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
 
         var sequence = loader.Load(payload);
-        ReplayHealthBarRebuilder.InitializedBoardUiControllers.Clear();
+        PlaybackUiState.InitializedBoardUiControllers.Clear();
         _savedReplayPlaybackActive = true;
         _ = StartReplayAsync(
             manifest,
@@ -247,13 +250,13 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _portraitController.ApplySelectedHeroOverride(manifest);
             Data.ResetRunData();
             _runLifecycle!.RefreshRunStateFromCurrentState();
-            attemptedBootstrapFromLobby = !ReplayBootstrapCoordinator.IsBootstrapReady();
-            var bootstrappedFromLobby = await ReplayBootstrapCoordinator.EnsureBootstrapReadyAsync();
+            attemptedBootstrapFromLobby = !ReplayBootstrap.IsBootstrapReady();
+            var bootstrappedFromLobby = await ReplayBootstrap.EnsureBootstrapReadyAsync();
             _returnToMenuAfterReplay = bootstrappedFromLobby;
-            var bootstrapContext = ReplayBootstrapCoordinator.ResolveDependencies();
-            ReplayOpponentPortraitController.EnsureOpponentIdentity(manifest, sequence.SpawnMessage);
+            var bootstrapContext = ReplayBootstrap.ResolveDependencies();
+            OpponentPortraitController.EnsureOpponentIdentity(manifest, sequence.SpawnMessage);
             await _portraitController.EnsureTemporaryOpponentPortraitAsync(manifest);
-            await ReplayBootstrapCoordinator.InjectSavedReplayAsync(
+            await ReplayBootstrap.InjectSavedReplayAsync(
                 bootstrapContext,
                 manifest,
                 sequence,
@@ -276,7 +279,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 _playbackPublisher.PublishEnded("start-failed", failed: true);
             }
             if (attemptedBootstrapFromLobby)
-                await ReplayBootstrapCoordinator.RollbackBootstrapAsync();
+                await ReplayBootstrap.RollbackBootstrapAsync();
         }
         finally
         {
@@ -296,7 +299,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _savedReplayPlaybackActive = false;
         _playbackPublisher?.PublishEnded("state-exit", failed: false);
         _portraitController?.Cleanup();
-        ReplayHealthBarRebuilder.InitializedBoardUiControllers.Clear();
+        PlaybackUiState.InitializedBoardUiControllers.Clear();
 
         if (!_returnToMenuAfterReplay || !_bootstrappedReplayActive)
             return;
@@ -345,7 +348,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _isReplayStartInProgress = false;
         _portraitController?.RestoreSelectedHeroOverride();
         _portraitController?.Cleanup();
-        ReplayHealthBarRebuilder.InitializedBoardUiControllers.Clear();
+        PlaybackUiState.InitializedBoardUiControllers.Clear();
 
         try
         {
@@ -360,9 +363,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     // Patches/Combat/CombatReplayVisualPatches.cs calls this static facade — keep the surface.
     public static void HideEncounterPickerOverlays() =>
-        ReplayHealthBarRebuilder.HideEncounterPickerOverlays();
+        HealthBarBinder.HideEncounterPickerOverlays();
 
     // Patches/Combat/ReplayStateAudioDiagnosticPatch.cs calls this static facade — keep the surface.
     public static void LogReplayAudioState(string label) =>
-        WarmupCoordinator.LogAudioState(label);
+        AudioBankWarmer.LogAudioState(label);
 }

@@ -14,16 +14,16 @@ using TheBazaar.AppFramework;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.CombatReplay;
+namespace BazaarPlusPlus.Game.CombatReplay.PlaybackUi;
 
-internal sealed class ReplayOpponentPortraitController
+internal sealed class OpponentPortraitController
 {
     private readonly Action<UnityEngine.Object> _destroyHandle;
     private EncounterController? _portrait;
     private EHero? _originalSelectedHero;
     private bool _selectedHeroOverridden;
 
-    public ReplayOpponentPortraitController(Action<UnityEngine.Object> destroyHandle)
+    public OpponentPortraitController(Action<UnityEngine.Object> destroyHandle)
     {
         _destroyHandle = destroyHandle ?? throw new ArgumentNullException(nameof(destroyHandle));
     }
@@ -34,7 +34,7 @@ internal sealed class ReplayOpponentPortraitController
         {
             _portrait.gameObject.SetActive(true);
             _portrait.ShowCard(show: true);
-            ReplayHealthBarRebuilder.ActiveOpponentPortrait = _portrait;
+            PlaybackUiState.ActiveOpponentPortrait = _portrait;
             return;
         }
 
@@ -112,7 +112,7 @@ internal sealed class ReplayOpponentPortraitController
         portraitController.gameObject.SetActive(true);
         portraitController.ShowCard(show: true);
         _portrait = portraitController;
-        ReplayHealthBarRebuilder.ActiveOpponentPortrait = _portrait;
+        PlaybackUiState.ActiveOpponentPortrait = _portrait;
     }
 
     public void Cleanup()
@@ -132,7 +132,7 @@ internal sealed class ReplayOpponentPortraitController
             }
 
             _portrait = null;
-            ReplayHealthBarRebuilder.ActiveOpponentPortrait = null;
+            PlaybackUiState.ActiveOpponentPortrait = null;
         }
 
         if (Data.CurrentEncounterController != null)
