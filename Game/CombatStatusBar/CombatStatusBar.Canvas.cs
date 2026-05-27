@@ -2,7 +2,6 @@
 
 using UnityEngine;
 using UnityEngine.UI;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
@@ -15,6 +14,7 @@ internal sealed partial class CombatStatusBar
     private const int CanvasSortingOrder = 10;
 
     private static Sprite? _roundedSprite;
+    private static Font? _uiFont;
 
     private GameObject? _canvasObject;
     private Canvas? _canvas;
@@ -631,7 +631,7 @@ internal sealed partial class CombatStatusBar
 
     private static Font GetUiFont()
     {
-        return BppUiFont.Default;
+        return _uiFont ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
     }
 
     private static Sprite GetRoundedSprite()
