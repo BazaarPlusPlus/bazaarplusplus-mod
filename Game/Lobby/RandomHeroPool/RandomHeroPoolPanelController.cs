@@ -335,6 +335,7 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
             -LobbyPanelLayout.PanelTopPadding - LobbyPanelLayout.HeaderHeight - 8f
         );
         _emptyLabel.text = "No heroes";
+        LobbyPanelLayout.ApplyTextStyle(_emptyLabel, _emptyLabel.text);
         _emptyLabel.gameObject.SetActive(false);
 
         _panelRoot = panelRect;
@@ -564,6 +565,7 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
         label.text = GetHeroBadgeStyle(heroAvailability.HeroId).ShortCode;
+        LobbyPanelLayout.ApplyTextStyle(label, label.text);
 
         _heroEntryViews[heroAvailability.HeroId] = new HeroPoolEntryView(
             heroAvailability.HeroId,
@@ -604,6 +606,7 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
                 _unlockedHeroIds.Length == 0
                     ? "POOL 0/0"
                     : $"POOL {selectedCount}/{_unlockedHeroIds.Length}";
+            LobbyPanelLayout.ApplyTextStyle(_headerLabel, _headerLabel.text);
         }
     }
 

@@ -34,7 +34,7 @@ the bar for "fixed."
 
 3. **Preview 区域比例锁定**：[HistoryPanelPreviewRenderer.cs:21-22](../Game/HistoryPanel/HistoryPanelPreviewRenderer.cs#L21-L22) 的 `TextureWidth = 2688`、`TextureHeight = 640` 写死了 4.2:1 的渲染宽高比；UI 容器若按屏幕缩放，会和这个比例错位。
 
-4. **行内组件像素硬编码**：例如 [Style.cs:74](../Game/HistoryPanel/HistoryPanelUiToolkitView.Style.cs#L74) 的 chip `minWidth = 86f`、[Style.cs:97-106](../Game/HistoryPanel/HistoryPanelUiToolkitView.Style.cs#L97-L106) 的 button 固定宽高，超宽屏拉伸后容易在文字与按钮之间留下不自然的空白或挤压。
+4. **行内组件像素硬编码**：已通过 UI token 基础设施降级；chip / pill / button / bubble 的固定尺寸现在走 `Infrastructure/UiTokens/Sizes.cs`。剩余宽屏风险集中在 1/2/3 项。
 
 ### 验收标准（修复时必须满足）
 

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Infrastructure.Fonts;
 using TheBazaar;
 using TMPro;
 using UnityEngine;
@@ -39,6 +40,7 @@ internal sealed class CardSetPreviewModeIndicator : IDisposable
             return;
 
         _label.text = text;
+        ApplyTextStyle(_label, text);
         _rootRect.gameObject.SetActive(true);
         _rootRect.SetAsLastSibling();
     }
@@ -80,8 +82,8 @@ internal sealed class CardSetPreviewModeIndicator : IDisposable
         _rootRect.anchorMin = new Vector2(0.5f, 1f);
         _rootRect.anchorMax = new Vector2(0.5f, 1f);
         _rootRect.pivot = new Vector2(0.5f, 1f);
-        _rootRect.anchoredPosition = new Vector2(0f, -120f);
-        _rootRect.sizeDelta = new Vector2(360f, 42f);
+        _rootRect.anchoredPosition = new Vector2(0f, -112f);
+        _rootRect.sizeDelta = new Vector2(640f, 56f);
         _rootRect.localScale = Vector3.one;
 
         _background = rootObject.GetComponent<Image>();
@@ -102,16 +104,16 @@ internal sealed class CardSetPreviewModeIndicator : IDisposable
         textRect.SetParent(_rootRect, false);
         textRect.anchorMin = Vector2.zero;
         textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = new Vector2(12f, 6f);
-        textRect.offsetMax = new Vector2(-12f, -6f);
+        textRect.offsetMin = new Vector2(16f, 8f);
+        textRect.offsetMax = new Vector2(-16f, -8f);
 
         _label = textObject.GetComponent<TextMeshProUGUI>();
         ApplyTextStyle(_label);
         _label.alignment = TextAlignmentOptions.Center;
-        _label.fontSize = 18f;
+        _label.fontSize = 16f;
         _label.enableAutoSizing = true;
         _label.fontSizeMin = 12f;
-        _label.fontSizeMax = 18f;
+        _label.fontSizeMax = 16f;
         _label.color = new Color(0.98f, 0.93f, 0.84f, 1f);
         _label.textWrappingMode = TextWrappingModes.NoWrap;
         _label.overflowMode = TextOverflowModes.Ellipsis;
@@ -120,13 +122,14 @@ internal sealed class CardSetPreviewModeIndicator : IDisposable
         rootObject.SetActive(false);
     }
 
-    private static void ApplyTextStyle(TextMeshProUGUI text)
+    private static void ApplyTextStyle(TextMeshProUGUI text, string? sampleText = null)
     {
         ResolveTextStyle();
         text.font = _resolvedFont ?? TMP_Settings.defaultFontAsset;
         if (_resolvedMaterial != null)
             text.fontSharedMaterial = _resolvedMaterial;
 
+        BppTmpFont.TryApply(text, sampleText ?? text.text);
         text.richText = false;
     }
 

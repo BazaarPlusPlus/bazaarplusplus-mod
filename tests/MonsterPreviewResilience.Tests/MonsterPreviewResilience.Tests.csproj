@@ -20,6 +20,15 @@
       Include="../../Game/MonsterPreview/CardSetPreviewHotkeys.cs"
       Link="CardSetPreviewHotkeys.cs"
     />
+    <Compile
+      Include="../../Game/MonsterPreview/CardSetPreviewModeStatusText.cs"
+      Link="CardSetPreviewModeStatusText.cs"
+    />
+    <Compile
+      Include="../../Game/MonsterPreview/CardSetPreviewSponsorTextFormatter.cs"
+      Link="CardSetPreviewSponsorTextFormatter.cs"
+    />
+    <Compile Include="../../Game/Settings/LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>
 </Project>

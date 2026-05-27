@@ -367,7 +367,11 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
     private void RefreshView()
     {
         if (_headerLabel != null)
-            _headerLabel.text = ResolveHeader(PlayerPreferences.Data.LanguageCode);
+        {
+            var headerText = ResolveHeader(PlayerPreferences.Data.LanguageCode);
+            _headerLabel.text = headerText;
+            ApplyTextStyle(_headerLabel, headerText);
+        }
 
         foreach (var row in _rows)
             ApplyRowState(row);
@@ -380,6 +384,8 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
         var enabled = row.Definition.IsActive();
         row.Label.text = row.Definition.ResolveLabel(PlayerPreferences.Data.LanguageCode);
         row.Status.text = row.Definition.ResolveStatus(PlayerPreferences.Data.LanguageCode);
+        ApplyTextStyle(row.Label, row.Label.text);
+        ApplyTextStyle(row.Status, row.Status.text);
         row.Background.color = enabled
             ? new Color(0.23f, 0.35f, 0.22f, 0.94f)
             : new Color(0.19f, 0.19f, 0.22f, 0.92f);

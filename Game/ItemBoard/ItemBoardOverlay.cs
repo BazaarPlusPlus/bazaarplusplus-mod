@@ -9,6 +9,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Fonts;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
@@ -583,7 +584,7 @@ internal sealed class ItemBoardOverlay : IDisposable
         if (!hasSponsorText)
             return;
 
-        ApplySponsorTextStyle(_sponsorText);
+        ApplySponsorTextStyle(_sponsorText, sponsorText);
         ApplySponsorTextColor(
             sponsorText ?? string.Empty,
             sponsorName,
@@ -606,16 +607,17 @@ internal sealed class ItemBoardOverlay : IDisposable
         _sponsorPanelRect.localScale = Vector3.one * (clamped * _sponsorPanelDebugScale);
     }
 
-    private void ApplySponsorTextStyle(TextMeshProUGUI text)
+    private void ApplySponsorTextStyle(TextMeshProUGUI text, string? sampleText = null)
     {
         if (text == null)
             return;
 
-        ResolveSponsorTextStyle(text.text);
+        ResolveSponsorTextStyle(sampleText ?? text.text);
         text.font = _resolvedSponsorFont ?? TMP_Settings.defaultFontAsset;
         if (_resolvedSponsorFontMaterial != null)
             text.fontSharedMaterial = _resolvedSponsorFontMaterial;
 
+        BppTmpFont.TryApply(text, sampleText ?? text.text);
         text.richText = false;
     }
 

@@ -323,6 +323,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private void EnsurePreviewRenderer()
     {
         _previewRenderer ??= new HistoryPanelPreviewRenderer();
+        if (_hasPreviewContainerBounds)
+            _previewRenderer.SetPreviewBounds(_previewContainerBounds);
     }
 
     private void DisposePreviewRenderer()

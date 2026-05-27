@@ -16,6 +16,10 @@
       Include="../../Game/HistoryPanel/HistoryPanelPreviewGenerationGuard.cs"
       Link="HistoryPanelPreviewGenerationGuard.cs"
     />
+    <Compile
+      Include="../../Game/HistoryPanel/HistoryPanelPreviewTextureGeometry.cs"
+      Link="HistoryPanelPreviewTextureGeometry.cs"
+    />
     <Compile Include="Program.cs" />
   </ItemGroup>
 </Project>

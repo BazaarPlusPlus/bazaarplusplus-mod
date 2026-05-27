@@ -8,6 +8,8 @@ TestSignatureGate_CompletedSuccessfully_Caches();
 TestGenerationGuard_FreshSnapshotIsCurrent();
 TestGenerationGuard_BumpInvalidatesPriorSnapshot();
 TestGenerationGuard_ParallelBumpsAreSerialised();
+TestPreviewTextureGeometry_DoesNotShrinkBelowNativeBoardSize();
+TestPreviewOverlayPlacement_FitsNativeBoardInsideContainer();
 
 Console.WriteLine("HistoryPanelPreview checks passed.");
 
@@ -87,6 +89,26 @@ static void TestGenerationGuard_ParallelBumpsAreSerialised()
     var third = guard.Bump();
     Assert(first != second && second != third && first != third, "Sequential Bumps must produce distinct snapshots.");
     Assert(guard.IsCurrent(third), "Latest snapshot must be the current generation.");
+}
+
+static void TestPreviewTextureGeometry_DoesNotShrinkBelowNativeBoardSize()
+{
+    var size = HistoryPanelPreviewTextureGeometry.ResolveTextureSize(720, 284);
+
+    Assert(
+        size.Width == 2400 && size.Height == 600,
+        "Small UI preview containers must not shrink the native-card render board; otherwise CardPreviewBase prefabs overlap or crop."
+    );
+}
+
+static void TestPreviewOverlayPlacement_FitsNativeBoardInsideContainer()
+{
+    var placement = HistoryPanelPreviewTextureGeometry.ResolveBoardPlacement(720, 284);
+
+    Assert(placement.Width == 720, "Overlay board width should fill the preview container.");
+    Assert(placement.Height == 180, "Overlay board height should preserve the native board aspect ratio.");
+    Assert(placement.OffsetX == 0, "Overlay board should be horizontally centered.");
+    Assert(placement.OffsetY == 52, "Overlay board should be vertically centered.");
 }
 
 static void Assert(bool condition, string message)

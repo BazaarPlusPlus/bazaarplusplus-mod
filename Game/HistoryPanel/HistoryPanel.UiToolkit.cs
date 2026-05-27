@@ -8,6 +8,8 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed partial class HistoryPanel
 {
     private HistoryPanelUiToolkitView? _uiView;
+    private Rect _previewContainerBounds;
+    private bool _hasPreviewContainerBounds;
 
     private void EnsureUi()
     {
@@ -24,17 +26,20 @@ internal sealed partial class HistoryPanel
                 SetSectionMode,
                 SetGhostBattleFilter
             );
-            _uiView.PreviewContainerSizeChanged += OnPreviewContainerSizeChanged;
+            _uiView.PreviewContainerBoundsChanged += OnPreviewContainerBoundsChanged;
         }
         _uiView.EnsureCreated();
     }
 
-    private void OnPreviewContainerSizeChanged(int width, int height)
+    private void OnPreviewContainerBoundsChanged(Rect bounds)
     {
+        _previewContainerBounds = bounds;
+        _hasPreviewContainerBounds = true;
+
         if (_previewRenderer == null)
             return;
 
-        if (_previewRenderer.SetTextureSize(width, height) && IsVisible)
+        if (_previewRenderer.SetPreviewBounds(bounds) && IsVisible)
             RefreshSelectedBattlePreview();
     }
 

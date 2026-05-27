@@ -2,18 +2,19 @@
 
 using UnityEngine;
 using UnityEngine.UI;
+using BazaarPlusPlus.Infrastructure.Fonts;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal sealed partial class CombatStatusBar
 {
-    private const float BarHeight = 60f;
+    private const float BarHeight = Sizes.CombatStatusBarHeight;
     private const float BarBottomMargin = 0f;
-    private const float SegmentSpacing = 4f;
+    private const float SegmentSpacing = UiSpacing.Xs;
     private const int CanvasSortingOrder = 10;
 
     private static Sprite? _roundedSprite;
-    private static Font? _uiFont;
 
     private GameObject? _canvasObject;
     private Canvas? _canvas;
@@ -92,8 +93,8 @@ internal sealed partial class CombatStatusBar
         _barRoot.anchoredPosition = new Vector2(0f, BarBottomMargin);
         _barRoot.sizeDelta = new Vector2(462f, BarHeight);
 
-        _barBackground = AddImage(_barRoot.gameObject, new Color(0.06f, 0.07f, 0.09f, 0.90f));
-        _barGlow = AddChildImage("BarGlow", _barRoot, new Color(0.28f, 0.22f, 0.12f, 0.10f));
+        _barBackground = AddImage(_barRoot.gameObject, Colors.CombatBarBackground);
+        _barGlow = AddChildImage("BarGlow", _barRoot, Colors.CombatBarGlow);
         _barGlow.rectTransform.offsetMin = new Vector2(3f, 3f);
         _barGlow.rectTransform.offsetMax = new Vector2(-3f, -3f);
 
@@ -630,8 +631,7 @@ internal sealed partial class CombatStatusBar
 
     private static Font GetUiFont()
     {
-        _uiFont ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        return _uiFont;
+        return BppUiFont.Default;
     }
 
     private static Sprite GetRoundedSprite()

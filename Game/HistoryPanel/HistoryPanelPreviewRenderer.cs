@@ -11,6 +11,7 @@ using BazaarPlusPlus.Game.ItemBoard;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
+using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -18,48 +19,52 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed class HistoryPanelPreviewRenderer
 {
     private const int DefaultPreviewLayer = 30;
-    private const int DefaultTextureWidth = 2400;
-    private const int DefaultTextureHeight = 600;
-    private const float CanvasPlaneDistance = 100f;
+    private const int OverlaySortingOrder = 27;
+    private const float PreviewHorizontalInset = 4f;
+    private const float PreviewVerticalInset = 10f;
 
     private readonly int _layer;
     private GameObject? _root;
     private Canvas? _canvas;
-    private Camera? _camera;
-    private RenderTexture? _texture;
+    private RectTransform? _rootRect;
+    private RectTransform? _clipRect;
+    private RectTransform? _boardRect;
     private RectTransform[]? _sockets;
     private HistoryPanelPreviewCardPool? _pool;
     private readonly List<Component> _active = new();
     private readonly List<Task> _activeSetUpTasks = new();
     private readonly HistoryPanelPreviewGenerationGuard _generation = new();
     private string? _renderedSignature;
-    private int _textureWidth = DefaultTextureWidth;
-    private int _textureHeight = DefaultTextureHeight;
+    private Rect _previewBounds;
+    private bool _hasPreviewBounds;
 
     public HistoryPanelPreviewRenderer(int layer = DefaultPreviewLayer)
     {
         _layer = layer;
     }
 
-    public Texture? CurrentTexture => _texture;
+    public Texture? CurrentTexture => null;
 
     public void CancelPending()
     {
         _generation.Bump();
     }
 
-    public bool SetTextureSize(int width, int height)
+    public bool SetPreviewBounds(Rect bounds)
     {
-        var clampedWidth = Mathf.Clamp(width, 256, 4096);
-        var clampedHeight = Mathf.Clamp(height, 128, 2048);
-        if (clampedWidth == _textureWidth && clampedHeight == _textureHeight)
-            return false;
+        var normalized = NormalizePreviewBounds(bounds);
+        var sizeChanged =
+            !_hasPreviewBounds
+            || !Mathf.Approximately(_previewBounds.width, normalized.width)
+            || !Mathf.Approximately(_previewBounds.height, normalized.height);
 
-        _textureWidth = clampedWidth;
-        _textureHeight = clampedHeight;
-        RebuildRenderTexture();
-        _renderedSignature = null;
-        return true;
+        _previewBounds = normalized;
+        _hasPreviewBounds = true;
+        ApplyPreviewBounds();
+
+        if (sizeChanged)
+            _renderedSignature = null;
+        return sizeChanged;
     }
 
     public IEnumerator RenderPreview(
@@ -96,6 +101,7 @@ internal sealed class HistoryPanelPreviewRenderer
         setStatus(HistoryPanelText.LoadingPreview(), true);
 
         _root!.SetActive(true);
+        ApplyPreviewBounds();
         ReturnActiveCardsToPool();
         _activeSetUpTasks.Clear();
 
@@ -108,21 +114,15 @@ internal sealed class HistoryPanelPreviewRenderer
         if (!_generation.IsCurrent(snapshot))
             yield break;
 
-        // Settle layout for one frame so Resize/anchored positions are committed before render.
-        yield return new WaitForEndOfFrame();
+        ShowAllActiveCards();
+        Canvas.ForceUpdateCanvases();
+
+        // Settle layout for one frame so Resize/Show activation is committed before render.
+        yield return null;
         if (!_generation.IsCurrent(snapshot))
             yield break;
 
-        ShowAllActiveCards();
-
-        if (_camera != null && _texture != null)
-        {
-            if (!_texture.IsCreated())
-                _texture.Create();
-            if (_camera.targetTexture != _texture)
-                _camera.targetTexture = _texture;
-            _camera.Render();
-        }
+        Canvas.ForceUpdateCanvases();
 
         // Cache the signature only when all SetUp tasks succeeded; faulted frames stay
         // un-cached so the next selection retries instead of locking in a half-rendered RT.
@@ -152,24 +152,14 @@ internal sealed class HistoryPanelPreviewRenderer
         _pool = null;
         _sockets = null;
 
-        if (_texture != null)
-        {
-            _texture.Release();
-            Object.Destroy(_texture);
-            _texture = null;
-        }
-
-        if (_camera != null)
-        {
-            Object.Destroy(_camera.gameObject);
-            _camera = null;
-        }
-
         if (_root != null)
         {
             Object.Destroy(_root);
             _root = null;
             _canvas = null;
+            _rootRect = null;
+            _clipRect = null;
+            _boardRect = null;
         }
     }
 
@@ -178,8 +168,19 @@ internal sealed class HistoryPanelPreviewRenderer
         if (HistoryPanelCardPreviewReflection.SetUpMethod == null)
             return false;
 
-        if (_root != null && _canvas != null && _camera != null && _sockets != null && _pool != null)
+        if (
+            _root != null
+            && _canvas != null
+            && _rootRect != null
+            && _clipRect != null
+            && _boardRect != null
+            && _sockets != null
+            && _pool != null
+        )
+        {
+            ApplyPreviewBounds();
             return _pool.TryEnsurePrefabRefs();
+        }
 
         DisposeRuntimeObjects();
 
@@ -190,84 +191,101 @@ internal sealed class HistoryPanelPreviewRenderer
             return false;
         }
 
-        _root = new GameObject("HistoryPanelPreviewRoot");
-        _root.layer = _layer;
-        _root.SetActive(false);
-        var rootTransform = _root.transform;
-
-        var cameraObject = new GameObject("HistoryPanelPreviewCamera");
-        cameraObject.layer = _layer;
-        cameraObject.transform.SetParent(rootTransform, worldPositionStays: false);
-        _camera = cameraObject.AddComponent<Camera>();
-        _camera.enabled = false;
-        _camera.clearFlags = CameraClearFlags.SolidColor;
-        _camera.backgroundColor = new Color(0f, 0f, 0f, 0f);
-        _camera.cullingMask = 1 << _layer;
-        _camera.orthographic = true;
-        _camera.nearClipPlane = 0.1f;
-        _camera.farClipPlane = 200f;
-        _camera.allowMSAA = true;
-        _camera.allowHDR = false;
-        _camera.transform.localPosition = Vector3.zero;
-        _camera.transform.localRotation = Quaternion.identity;
-
-        var canvasObject = new GameObject(
-            "HistoryPanelPreviewCanvas",
+        _root = new GameObject(
+            "HistoryPanelPreviewOverlayRoot",
             typeof(RectTransform),
             typeof(Canvas)
         );
-        canvasObject.layer = _layer;
-        canvasObject.transform.SetParent(rootTransform, worldPositionStays: false);
-        _canvas = canvasObject.GetComponent<Canvas>();
-        _canvas.renderMode = RenderMode.ScreenSpaceCamera;
-        _canvas.worldCamera = _camera;
-        _canvas.planeDistance = CanvasPlaneDistance;
-        _canvas.sortingLayerID = 0;
-        _canvas.sortingOrder = 0;
+        _root.layer = _layer;
+        _root.SetActive(false);
 
-        var canvasRect = canvasObject.GetComponent<RectTransform>();
-        _sockets = HistoryPanelPreviewLayout.BuildSockets(canvasRect, _layer);
+        _canvas = _root.GetComponent<Canvas>();
+        _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        _canvas.overrideSorting = true;
+        _canvas.sortingOrder = OverlaySortingOrder;
+        _canvas.pixelPerfect = false;
 
-        RebuildRenderTexture();
+        _rootRect = _root.GetComponent<RectTransform>();
+
+        var clipObject = new GameObject(
+            "HistoryPanelPreviewClip",
+            typeof(RectTransform),
+            typeof(RectMask2D)
+        );
+        clipObject.layer = _layer;
+        clipObject.transform.SetParent(_root.transform, worldPositionStays: false);
+        _clipRect = clipObject.GetComponent<RectTransform>();
+
+        var boardObject = new GameObject("HistoryPanelPreviewBoard", typeof(RectTransform));
+        boardObject.layer = _layer;
+        boardObject.transform.SetParent(_clipRect, worldPositionStays: false);
+        _boardRect = boardObject.GetComponent<RectTransform>();
+        _sockets = HistoryPanelPreviewLayout.BuildSockets(_boardRect, _layer);
+
+        ApplyPreviewBounds();
         return true;
     }
 
-    private void RebuildRenderTexture()
+    private static Rect NormalizePreviewBounds(Rect bounds)
     {
-        if (_texture != null)
-        {
-            _texture.Release();
-            Object.Destroy(_texture);
-            _texture = null;
-        }
-
-        _texture = new RenderTexture(_textureWidth, _textureHeight, 24, RenderTextureFormat.ARGB32)
-        {
-            antiAliasing = 2,
-            useMipMap = false,
-            autoGenerateMips = false,
-            name = "HistoryPanelPreviewRT",
-        };
-        _texture.Create();
-
-        if (_camera != null)
-        {
-            _camera.targetTexture = _texture;
-            // ortho size = half-height in world units = (texture-pixels / 2) / referencePixelsPerUnit.
-            // Canvas defaults referencePixelsPerUnit = 100, so 1 world unit = 100 pixels at planeDistance.
-            _camera.orthographicSize = _textureHeight * 0.5f / 100f;
-            _camera.aspect = (float)_textureWidth / Mathf.Max(1, _textureHeight);
-        }
+        return new Rect(
+            Mathf.Round(bounds.x),
+            Mathf.Round(bounds.y),
+            Mathf.Max(1f, Mathf.Round(bounds.width)),
+            Mathf.Max(1f, Mathf.Round(bounds.height))
+        );
     }
 
-    private void SpawnCards(IReadOnlyList<ItemBoardItemSpec> items)
+    private void ApplyPreviewBounds()
+    {
+        if (_rootRect == null || _clipRect == null || _boardRect == null)
+            return;
+
+        _rootRect.anchorMin = Vector2.zero;
+        _rootRect.anchorMax = Vector2.zero;
+        _rootRect.pivot = Vector2.zero;
+        _rootRect.anchoredPosition = Vector2.zero;
+        _rootRect.sizeDelta = new Vector2(Mathf.Max(1, Screen.width), Mathf.Max(1, Screen.height));
+        _rootRect.localScale = Vector3.one;
+
+        if (!_hasPreviewBounds)
+            return;
+
+        var x = _previewBounds.x + PreviewHorizontalInset;
+        var y = _previewBounds.y + PreviewVerticalInset;
+        var width = Mathf.Max(1f, _previewBounds.width - PreviewHorizontalInset * 2f);
+        var height = Mathf.Max(1f, _previewBounds.height - PreviewVerticalInset * 2f);
+
+        _clipRect.anchorMin = Vector2.zero;
+        _clipRect.anchorMax = Vector2.zero;
+        _clipRect.pivot = Vector2.zero;
+        _clipRect.anchoredPosition = new Vector2(x, y);
+        _clipRect.sizeDelta = new Vector2(width, height);
+        _clipRect.localScale = Vector3.one;
+
+        var placement = HistoryPanelPreviewTextureGeometry.ResolveBoardPlacement(
+            Mathf.RoundToInt(width),
+            Mathf.RoundToInt(height)
+        );
+        _boardRect.anchorMin = Vector2.zero;
+        _boardRect.anchorMax = Vector2.zero;
+        _boardRect.pivot = Vector2.zero;
+        _boardRect.anchoredPosition = new Vector2(placement.OffsetX, placement.OffsetY);
+        _boardRect.sizeDelta = new Vector2(
+            HistoryPanelPreviewTextureGeometry.NativeBoardWidth,
+            HistoryPanelPreviewTextureGeometry.NativeBoardHeight
+        );
+        _boardRect.localScale = Vector3.one * placement.Scale;
+    }
+
+    private int SpawnCards(IReadOnlyList<ItemBoardItemSpec> items)
     {
         if (_pool == null || _sockets == null)
-            return;
+            return 0;
 
         var staticData = BppStaticDataAccess.TryGet();
         if (staticData == null)
-            return;
+            return 0;
 
         var i = 0;
         foreach (var spec in items)
@@ -293,6 +311,8 @@ internal sealed class HistoryPanelPreviewRenderer
             _active.Add(card);
             i++;
         }
+
+        return i;
     }
 
     private RectTransform? ResolveSocket(EContainerSocketId? requested, int fallbackIndex, ECardSize size)
@@ -427,24 +447,14 @@ internal sealed class HistoryPanelPreviewRenderer
         _pool = null;
         _sockets = null;
 
-        if (_texture != null)
-        {
-            _texture.Release();
-            Object.Destroy(_texture);
-            _texture = null;
-        }
-
-        if (_camera != null)
-        {
-            Object.Destroy(_camera.gameObject);
-            _camera = null;
-        }
-
         if (_root != null)
         {
             Object.Destroy(_root);
             _root = null;
             _canvas = null;
+            _rootRect = null;
+            _clipRect = null;
+            _boardRect = null;
         }
     }
 }

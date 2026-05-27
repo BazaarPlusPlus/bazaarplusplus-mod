@@ -3,6 +3,8 @@ using BazaarPlusPlus.Game.MonsterPreview;
 TestRecommendationModesExposeOnlyCurrentAndTenWin();
 TestRecommendationModeFlow();
 TestCardSetPreviewHotkeys();
+TestCardSetPreviewSponsorText();
+TestCardSetPreviewModeStatusText();
 
 Console.WriteLine("MonsterPreviewResilience checks passed.");
 
@@ -73,6 +75,43 @@ static void TestCardSetPreviewHotkeys()
             nextCandidatePressed: true
         ) == 0,
         "Pressing W and S together should not browse candidates."
+    );
+}
+
+static void TestCardSetPreviewSponsorText()
+{
+    Assert(
+        CardSetPreviewSponsorTextFormatter.FormatSupportedBy("Alice", "en")
+            == "Supported by Alice",
+        "English sponsor text should preserve the existing Supported by wording."
+    );
+    Assert(
+        CardSetPreviewSponsorTextFormatter.FormatSupportedBy("Alice", "zh-CN")
+            == "由 Alice 支持",
+        "Chinese sponsor text should preserve the existing localized wording."
+    );
+    Assert(
+        CardSetPreviewSponsorTextFormatter.FormatSupportedBy(" Alice ", "zh-Hant")
+            == "由 Alice 支持",
+        "Sponsor text should trim names before formatting."
+    );
+    Assert(
+        CardSetPreviewSponsorTextFormatter.FormatSupportedBy(" ", "zh-CN") == string.Empty,
+        "Blank sponsor names should not produce a visible sponsor label."
+    );
+}
+
+static void TestCardSetPreviewModeStatusText()
+{
+    Assert(
+        CardSetPreviewModeStatusText.Build("当前卡组", "zh-CN")
+            == "卡组选择模式：点击物品加入/移除，CapsLock 退出 | 当前卡组",
+        "Chinese mode status should explain the active stage and how to exit."
+    );
+    Assert(
+        CardSetPreviewModeStatusText.Build("Selected Set", "en")
+            == "Card Set Selection: click items to add/remove, CapsLock to exit | Selected Set",
+        "English mode status should explain the active stage and how to exit."
     );
 }
 

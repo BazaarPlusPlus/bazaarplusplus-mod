@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarPlusPlus.Infrastructure.Fonts;
 using TMPro;
 using UnityEngine;
 
@@ -36,7 +37,16 @@ internal static class LobbyPanelLayout
         text.color = color;
         text.raycastTarget = false;
         text.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+        BppTmpFont.TryApply(text, text.text);
         return text;
+    }
+
+    public static void ApplyTextStyle(TextMeshProUGUI? text, string? sampleText)
+    {
+        if (text == null)
+            return;
+
+        BppTmpFont.TryApply(text, sampleText ?? text.text);
     }
 
     public static float CalculatePanelHeight(

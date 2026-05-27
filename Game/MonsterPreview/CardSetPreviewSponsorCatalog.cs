@@ -18,18 +18,6 @@ internal static class CardSetPreviewSponsorCatalog
 {
     private const string SupporterListUrl =
         "https://bpp-static.bazaarplusplus.com/supporter-list.json";
-    private static readonly LocalizedTextSet SupportedByPrefix = new(
-        "Supported by",
-        "由",
-        "由",
-        "由"
-    );
-    private static readonly LocalizedTextSet SupportedBySuffix = new(
-        string.Empty,
-        "支持",
-        "支持",
-        "支持"
-    );
     private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(1);
     private static readonly string CacheDirectoryPath = Path.Combine(
         Path.GetTempPath(),
@@ -86,14 +74,16 @@ internal static class CardSetPreviewSponsorCatalog
         if (selectedEntry == null)
             return new CardSetPreviewSponsorSelection();
 
+        var sponsorName = selectedEntry.Name.Trim();
         var languageCode = PlayerPreferences.Data?.LanguageCode ?? string.Empty;
-        var text = LanguageCodeMatcher.IsChinese(languageCode)
-            ? $"{SupportedByPrefix.Resolve(languageCode)} {selectedEntry.Name} {SupportedBySuffix.Resolve(languageCode)}"
-            : $"{SupportedByPrefix.Resolve(languageCode)} {selectedEntry.Name}";
+        var text = CardSetPreviewSponsorTextFormatter.FormatSupportedBy(
+            sponsorName,
+            languageCode
+        );
         return new CardSetPreviewSponsorSelection
         {
             Text = text,
-            Name = selectedEntry.Name,
+            Name = sponsorName,
             Tier = selectedEntry.Tier,
         };
     }

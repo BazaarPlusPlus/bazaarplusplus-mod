@@ -49,12 +49,6 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         "無匹配 / 無候選",
         "無匹配 / 無候選"
     );
-    private static readonly LocalizedTextSet ModeEnabledLabel = new(
-        "Selection Mode Active",
-        "已进入选择模式",
-        "已進入選擇模式",
-        "已進入選擇模式"
-    );
     private static readonly LocalizedTextSet DataFromLabel = new(
         "Data from",
         "数据来自",
@@ -393,7 +387,12 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             return;
         }
 
-        _modeIndicator.Show($"{ResolveModeEnabledLabel()} | {GetDisplayModeLabel(_displayMode)}");
+        _modeIndicator.Show(
+            CardSetPreviewModeStatusText.Build(
+                GetDisplayModeLabel(_displayMode),
+                PlayerPreferences.Data?.LanguageCode ?? string.Empty
+            )
+        );
     }
 
     private static int WrapIndex(int index, int count)
@@ -430,11 +429,6 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         return NoCandidateWarningLabel.Resolve(
             PlayerPreferences.Data?.LanguageCode ?? string.Empty
         );
-    }
-
-    private static string ResolveModeEnabledLabel()
-    {
-        return ModeEnabledLabel.Resolve(PlayerPreferences.Data?.LanguageCode ?? string.Empty);
     }
 
     private static string ResolveDataFromLabel()

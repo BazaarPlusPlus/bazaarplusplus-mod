@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -10,16 +11,13 @@ internal sealed partial class HistoryPanelUiToolkitView
     private VisualElement MakeRunRow()
     {
         var row = CreateRowShell();
-        row.style.marginTop = 4f;
-        row.style.marginBottom = 4f;
-        row.style.borderLeftWidth = 1f;
-        row.style.borderRightWidth = 1f;
-        row.style.borderTopWidth = 1f;
-        row.style.borderBottomWidth = 1f;
+        row.style.marginTop = UiSpacing.Xs;
+        row.style.marginBottom = UiSpacing.Xs;
+        UiStyle.BorderWidth(row.style, Borders.Thin);
         var accent = CreateAccentBar();
         row.Add(accent);
         var outcomeHost = new VisualElement();
-        outcomeHost.style.width = 62f;
+        outcomeHost.style.width = Sizes.RowSideHostWidth;
         outcomeHost.style.flexShrink = 0f;
         outcomeHost.style.alignItems = Align.Center;
         outcomeHost.style.justifyContent = Justify.Center;
@@ -27,32 +25,32 @@ internal sealed partial class HistoryPanelUiToolkitView
         var outcomeBubble = CreateDayBubble(outcomeHost);
         var content = CreateRowContent();
         content.style.justifyContent = Justify.Center;
-        content.style.paddingLeft = 4f;
+        content.style.paddingLeft = UiSpacing.Xs;
         row.Add(content);
 
         var topRow = CreateRowTopRow();
         content.Add(topRow);
-        var heroPill = CreateInlinePill(topRow, 64f);
-        SetFixedPillWidth(heroPill, 60f);
-        var rankPill = CreateInlinePill(topRow, 84f);
-        SetFixedPillWidth(rankPill, 84f);
-        var progressPill = CreateInlinePill(topRow, 72f);
-        SetFixedPillWidth(progressPill, 50f);
-        var statusPill = CreateInlinePill(topRow, 84f);
-        SetFixedPillWidth(statusPill, 60f);
+        var heroPill = CreateInlinePill(topRow, Sizes.InlinePillMinWidth);
+        SetFixedPillWidth(heroPill, Sizes.RunHeroPillWidth);
+        var rankPill = CreateInlinePill(topRow, Sizes.RunRankPillWidth);
+        SetFixedPillWidth(rankPill, Sizes.RunRankPillWidth);
+        var progressPill = CreateInlinePill(topRow, Sizes.RunProgressPillMinWidth);
+        SetFixedPillWidth(progressPill, Sizes.RunProgressPillWidth);
+        var statusPill = CreateInlinePill(topRow, Sizes.RunStatusPillMinWidth);
+        SetFixedPillWidth(statusPill, Sizes.RunStatusPillWidth);
         topRow.Add(CreateSpacer());
-        var timeLabel = CreateRowCornerLabel(topRow, 11);
+        var timeLabel = CreateRowCornerLabel(topRow, Sizes.FontCorner);
 
-        var statRow = CreateInfoChipRow(content, 6f, 6f);
-        var healthChip = CreateInfoChip(statRow, HistoryPanelText.StatHealthShort(), 54f);
+        var statRow = CreateInfoChipRow(content, UiSpacing.Sm, UiSpacing.Sm);
+        var healthChip = CreateInfoChip(statRow, HistoryPanelText.StatHealthShort(), Sizes.InfoChipMinWidth);
         SetEqualChipWidth(healthChip);
-        var prestigeChip = CreateInfoChip(statRow, HistoryPanelText.StatPrestigeShort(), 54f);
+        var prestigeChip = CreateInfoChip(statRow, HistoryPanelText.StatPrestigeShort(), Sizes.InfoChipMinWidth);
         SetEqualChipWidth(prestigeChip);
-        var levelChip = CreateInfoChip(statRow, HistoryPanelText.StatLevelShort(), 54f);
+        var levelChip = CreateInfoChip(statRow, HistoryPanelText.StatLevelShort(), Sizes.InfoChipMinWidth);
         SetEqualChipWidth(levelChip);
-        var incomeChip = CreateInfoChip(statRow, HistoryPanelText.StatIncomeShort(), 54f);
+        var incomeChip = CreateInfoChip(statRow, HistoryPanelText.StatIncomeShort(), Sizes.InfoChipMinWidth);
         SetEqualChipWidth(incomeChip);
-        var goldChip = CreateInfoChip(statRow, HistoryPanelText.StatGoldShort(), 54f);
+        var goldChip = CreateInfoChip(statRow, HistoryPanelText.StatGoldShort(), Sizes.InfoChipMinWidth);
         SetEqualChipWidth(goldChip, isLast: true);
         var refs = new RunRowRefs(
             row,
@@ -107,8 +105,8 @@ internal sealed partial class HistoryPanelUiToolkitView
                 ConfigurePill(
                     refs.RankPill,
                     HistoryPanelText.RankLabel(rank, run.PlayerRating),
-                    ColorFromRgb(241, 54, 41),
-                    Color.white,
+                    Colors.RankLegendaryBackground,
+                    Colors.White,
                     true
                 );
             }
@@ -128,8 +126,8 @@ internal sealed partial class HistoryPanelUiToolkitView
                 ConfigurePill(
                     refs.RankPill,
                     HistoryPanelText.Unranked(),
-                    new Color(0.22f, 0.24f, 0.29f, 0.98f),
-                    new Color(0.90f, 0.94f, 1f, 1f),
+                    Colors.HistoryUnrankedBackground,
+                    Colors.HistoryUnrankedText,
                     true
                 );
             }
@@ -139,8 +137,8 @@ internal sealed partial class HistoryPanelUiToolkitView
             ConfigurePill(
                 refs.RankPill,
                 HistoryPanelText.Unranked(),
-                new Color(0.22f, 0.24f, 0.29f, 0.98f),
-                new Color(0.90f, 0.94f, 1f, 1f),
+                Colors.HistoryUnrankedBackground,
+                Colors.HistoryUnrankedText,
                 true
             );
         }
@@ -158,39 +156,39 @@ internal sealed partial class HistoryPanelUiToolkitView
         ConfigurePill(
             refs.ProgressPill,
             $"{(run.Victories ?? 0)}/{(run.FinalDay?.ToString() ?? "?")}",
-            new Color(0.20f, 0.24f, 0.31f, 0.98f),
-            new Color(0.89f, 0.94f, 1f, 1f),
+            Colors.HistoryProgressBackground,
+            Colors.HistoryProgressText,
             true
         );
         ConfigureInfoChip(
             refs.HealthChip,
             HistoryPanelText.StatHealthShort(),
             run.MaxHealth?.ToString() ?? "--",
-            new Color(0.63f, 0.98f, 0.35f, 1f)
+            Colors.HistoryHealthAccent
         );
         ConfigureInfoChip(
             refs.PrestigeChip,
             HistoryPanelText.StatPrestigeShort(),
             run.Prestige?.ToString() ?? "--",
-            new Color(1f, 0.65f, 0.13f, 1f)
+            Colors.HistoryPrestigeAccent
         );
         ConfigureInfoChip(
             refs.LevelChip,
             HistoryPanelText.StatLevelShort(),
             run.Level?.ToString() ?? "--",
-            new Color(0.36f, 0.79f, 1f, 1f)
+            Colors.HistoryLevelAccent
         );
         ConfigureInfoChip(
             refs.IncomeChip,
             HistoryPanelText.StatIncomeShort(),
             run.Income?.ToString() ?? "--",
-            new Color(1f, 0.86f, 0.10f, 1f)
+            Colors.HistoryGoldAccent
         );
         ConfigureInfoChip(
             refs.GoldChip,
             HistoryPanelText.StatGoldShort(),
             run.Gold?.ToString() ?? "--",
-            new Color(1f, 0.86f, 0.10f, 1f)
+            Colors.HistoryGoldAccent
         );
         ApplyRunRowState(refs, _runsList?.selectedIndex == index);
     }
@@ -198,70 +196,66 @@ internal sealed partial class HistoryPanelUiToolkitView
     private VisualElement MakeBattleRow()
     {
         var row = CreateRowShell();
-        row.style.marginTop = 4f;
-        row.style.marginBottom = 4f;
-        row.style.borderLeftWidth = 1f;
-        row.style.borderRightWidth = 1f;
-        row.style.borderTopWidth = 1f;
-        row.style.borderBottomWidth = 1f;
+        row.style.marginTop = UiSpacing.Xs;
+        row.style.marginBottom = UiSpacing.Xs;
+        UiStyle.BorderWidth(row.style, Borders.Thin);
         var accent = CreateAccentBar();
         row.Add(accent);
         var dayHost = new VisualElement();
-        dayHost.style.width = 62f;
+        dayHost.style.width = Sizes.RowSideHostWidth;
         dayHost.style.flexShrink = 0f;
         dayHost.style.alignItems = Align.Center;
         dayHost.style.justifyContent = Justify.Center;
         row.Add(dayHost);
         var dayBubble = CreateBattleDayBubble(dayHost);
         var content = CreateRowContent();
-        content.style.paddingLeft = 4f;
-        content.style.paddingTop = 8f;
-        content.style.paddingBottom = 8f;
+        content.style.paddingLeft = UiSpacing.Xs;
+        content.style.paddingTop = UiSpacing.Md;
+        content.style.paddingBottom = UiSpacing.Md;
         content.style.justifyContent = Justify.Center;
         row.Add(content);
 
-        var playerRow = CreateInfoChipRow(content, 6f, 0f);
-        var opponentRankPill = CreateInlinePill(playerRow, 68f);
-        SetFixedPillWidth(opponentRankPill, 80f);
-        var playerSummaryChip = CreateInfoChip(playerRow, HistoryPanelText.PlayerSideShort(), 100f);
-        playerSummaryChip.style.marginRight = 0f;
-        playerSummaryChip.style.marginLeft = 8f;
+        var playerRow = CreateInfoChipRow(content, UiSpacing.Sm, UiSpacing.None);
+        var opponentRankPill = CreateInlinePill(playerRow, Sizes.BattleRankPillMinWidth);
+        SetFixedPillWidth(opponentRankPill, Sizes.BattleRankPillWidth);
+        var playerSummaryChip = CreateInfoChip(
+            playerRow,
+            HistoryPanelText.PlayerSideShort(),
+            Sizes.InfoChipSummaryMinWidth
+        );
+        playerSummaryChip.style.marginRight = UiSpacing.None;
+        playerSummaryChip.style.marginLeft = UiSpacing.Md;
         var playerSpacer = CreateSpacer();
         playerRow.Add(playerSpacer);
-        var timeLabel = CreateRowCornerLabel(playerRow, 11);
+        var timeLabel = CreateRowCornerLabel(playerRow, Sizes.FontCorner);
 
-        var opponentRow = CreateInfoChipRow(content, 6f, 6f);
-        var opponentHeroPill = CreateInlinePill(opponentRow, 64f);
-        SetFixedPillWidth(opponentHeroPill, 80f);
+        var opponentRow = CreateInfoChipRow(content, UiSpacing.Sm, UiSpacing.Sm);
+        var opponentHeroPill = CreateInlinePill(opponentRow, Sizes.InlinePillMinWidth);
+        SetFixedPillWidth(opponentHeroPill, Sizes.BattleRankPillWidth);
         var opponentSummaryChip = CreateInfoChip(
             opponentRow,
             HistoryPanelText.OpponentSideShort(),
-            100f
+            Sizes.InfoChipSummaryMinWidth
         );
-        opponentSummaryChip.style.marginRight = 0f;
-        opponentSummaryChip.style.marginLeft = 8f;
+        opponentSummaryChip.style.marginRight = UiSpacing.None;
+        opponentSummaryChip.style.marginLeft = UiSpacing.Md;
 
-        var eliminatedChip = CreateInlinePill(opponentRow, 0f);
-        eliminatedChip.style.marginLeft = 10f;
-        eliminatedChip.style.marginRight = 0f;
-        eliminatedChip.style.paddingLeft = 10f;
-        eliminatedChip.style.paddingRight = 10f;
-        eliminatedChip.style.fontSize = 11;
-        eliminatedChip.style.color = new Color(0.99f, 0.90f, 0.68f, 1f);
-        eliminatedChip.style.backgroundColor = new Color(0.32f, 0.24f, 0.10f, 0.96f);
-        eliminatedChip.style.borderTopWidth = 1f;
-        eliminatedChip.style.borderRightWidth = 1f;
-        eliminatedChip.style.borderBottomWidth = 1f;
-        eliminatedChip.style.borderLeftWidth = 1f;
-        var eliminatedBorder = new Color(0.94f, 0.70f, 0.28f, 0.55f);
-        eliminatedChip.style.borderTopColor = eliminatedBorder;
-        eliminatedChip.style.borderRightColor = eliminatedBorder;
-        eliminatedChip.style.borderBottomColor = eliminatedBorder;
-        eliminatedChip.style.borderLeftColor = eliminatedBorder;
+        var eliminatedChip = CreateInlinePill(opponentRow, UiSpacing.None);
+        eliminatedChip.style.marginLeft = UiSpacing.Lg;
+        eliminatedChip.style.marginRight = UiSpacing.None;
+        UiStyle.HorizontalPadding(eliminatedChip.style, UiSpacing.Lg);
+        eliminatedChip.style.fontSize = Sizes.FontCorner;
+        eliminatedChip.style.color = Colors.HistoryEliminatedText;
+        eliminatedChip.style.backgroundColor = Colors.HistoryEliminatedBackground;
+        UiStyle.Border(eliminatedChip.style, Borders.Thin, Colors.HistoryEliminatedBorder);
         eliminatedChip.style.display = DisplayStyle.None;
 
-        var opponentName = CreateInlineText(opponentRow, 12, new Color(0.76f, 0.80f, 0.87f, 0.92f));
-        opponentName.style.marginLeft = 10f;
+        var opponentName = CreateInlineText(
+            opponentRow,
+            Sizes.FontSmall,
+            Colors.HistoryOpponentNameText
+        );
+        opponentName.style.marginLeft = UiSpacing.Lg;
         opponentName.style.flexGrow = 1f;
         opponentName.style.unityTextAlign = TextAnchor.MiddleRight;
 
@@ -310,7 +304,7 @@ internal sealed partial class HistoryPanelUiToolkitView
                 battle.PlayerHandItemCount,
                 battle.PlayerSkillCount
             ),
-            new Color(0.44f, 0.76f, 1f, 1f)
+            Colors.HistoryPlayerAccent
         );
 
         BindHeroPill(refs.OpponentHeroPill, battle.OpponentHero);
@@ -321,7 +315,7 @@ internal sealed partial class HistoryPanelUiToolkitView
                 battle.OpponentHandItemCount,
                 battle.OpponentSkillCount
             ),
-            new Color(0.96f, 0.77f, 0.39f, 1f)
+            Colors.HistoryOpponentAccent
         );
         refs.OpponentName.text = battle.OpponentName ?? string.Empty;
         refs.OpponentName.style.display = string.IsNullOrWhiteSpace(refs.OpponentName.text)
@@ -335,78 +329,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         ApplyBattleRowState(refs, _battleList?.selectedIndex == index, battle);
     }
 
-    private static void ApplyRunRowState(RunRowRefs refs, bool selected)
-    {
-        refs.Root.style.backgroundColor = selected
-            ? new Color(0.17f, 0.24f, 0.32f, 0.99f)
-            : new Color(0.11f, 0.14f, 0.18f, 0.98f);
-        refs.Accent.style.backgroundColor = selected
-            ? new Color(0.46f, 0.70f, 0.92f, 0.94f)
-            : new Color(0.24f, 0.31f, 0.39f, 0.96f);
-        var borderColor = selected
-            ? new Color(0.37f, 0.57f, 0.79f, 0.56f)
-            : new Color(0.28f, 0.35f, 0.45f, 0.40f);
-        refs.Root.style.borderLeftColor = borderColor;
-        refs.Root.style.borderRightColor = borderColor;
-        refs.Root.style.borderTopColor = borderColor;
-        refs.Root.style.borderBottomColor = borderColor;
-        refs.OutcomeBubble.style.borderLeftColor = borderColor;
-        refs.OutcomeBubble.style.borderRightColor = borderColor;
-        refs.OutcomeBubble.style.borderTopColor = borderColor;
-        refs.OutcomeBubble.style.borderBottomColor = borderColor;
-        refs.OutcomeBubble.style.opacity = selected ? 1f : 0.96f;
-    }
-
-    private static void ApplyBattleRowState(
-        BattleRowRefs refs,
-        bool selected,
-        HistoryBattleRecord battle
-    )
-    {
-        var isWin = HistoryPanelFormatter.IsBattleWin(battle);
-        var isLoss = HistoryPanelFormatter.IsBattleLoss(battle);
-        var isEliminated = HistoryPanelFormatter.IsGhostOpponentEliminated(battle);
-
-        refs.Root.style.backgroundColor = selected
-            ? isEliminated
-                ? new Color(0.22f, 0.18f, 0.10f, 0.99f)
-                : isWin
-                    ? new Color(0.13f, 0.23f, 0.22f, 0.99f)
-                    : isLoss
-                        ? new Color(0.24f, 0.18f, 0.16f, 0.99f)
-                        : new Color(0.18f, 0.24f, 0.31f, 0.99f)
-            : isEliminated
-                ? new Color(0.18f, 0.14f, 0.08f, 0.98f)
-                : isWin
-                    ? new Color(0.10f, 0.15f, 0.16f, 0.98f)
-                    : isLoss
-                        ? new Color(0.15f, 0.13f, 0.15f, 0.98f)
-                        : new Color(0.13f, 0.15f, 0.18f, 0.98f);
-
-        refs.Accent.style.backgroundColor =
-            isEliminated ? new Color(0.94f, 0.70f, 0.28f, 0.95f)
-            : isWin ? new Color(0.23f, 0.54f, 0.47f, 0.95f)
-            : isLoss ? new Color(0.63f, 0.36f, 0.24f, 0.95f)
-            : new Color(0.34f, 0.47f, 0.64f, 0.95f);
-        var borderColor =
-            isEliminated ? new Color(0.62f, 0.46f, 0.18f, 0.50f)
-            : isWin ? new Color(0.22f, 0.44f, 0.40f, 0.42f)
-            : isLoss ? new Color(0.44f, 0.27f, 0.20f, 0.42f)
-            : new Color(0.24f, 0.31f, 0.41f, 0.42f);
-        refs.Root.style.borderLeftColor = borderColor;
-        refs.Root.style.borderRightColor = borderColor;
-        refs.Root.style.borderTopColor = borderColor;
-        refs.Root.style.borderBottomColor = borderColor;
-        refs.DayBubble.style.backgroundColor =
-            isEliminated ? new Color(0.24f, 0.18f, 0.08f, 0.98f)
-            : isWin ? new Color(0.13f, 0.28f, 0.23f, 0.98f)
-            : isLoss ? new Color(0.33f, 0.20f, 0.15f, 0.98f)
-            : new Color(0.18f, 0.23f, 0.31f, 0.98f);
-        refs.DayBubble.style.borderLeftColor = borderColor;
-        refs.DayBubble.style.borderRightColor = borderColor;
-        refs.DayBubble.style.borderTopColor = borderColor;
-        refs.DayBubble.style.borderBottomColor = borderColor;
-    }
 
     private sealed class RunRowRefs
     {

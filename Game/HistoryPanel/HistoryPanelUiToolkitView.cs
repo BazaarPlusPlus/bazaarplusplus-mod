@@ -1,5 +1,7 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Infrastructure.Fonts;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -7,8 +9,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 {
-    private static Font? _uiFont;
-
     private readonly Transform _parent;
     private readonly Action _close;
     private readonly Action _replay;
@@ -52,9 +52,9 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Button? _deleteButton;
     private Button? _replayButton;
     private bool _suppressSelectionCallbacks;
-    private Vector2 _lastPreviewContainerSize;
+    private Rect _lastPreviewContainerBounds;
 
-    public event Action<int, int>? PreviewContainerSizeChanged;
+    public event Action<Rect>? PreviewContainerBoundsChanged;
 
     public HistoryPanelUiToolkitView(
         Transform parent,
@@ -104,6 +104,9 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _root.style.top = 0f;
         _root.style.bottom = 0f;
         _root.style.display = DisplayStyle.None;
+        var fontAtlasSample = HistoryPanelText.FontAtlasSample();
+        BppUiFont.RequestCharactersInTexture(fontAtlasSample, Sizes.FontButton, FontStyle.Normal);
+        BppUiFont.RequestCharactersInTexture(fontAtlasSample, Sizes.FontButton, FontStyle.Bold);
         _root.style.unityFont = GetUiFont();
         _root.pickingMode = PickingMode.Position;
 
@@ -114,17 +117,28 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 
     private void OnPreviewContainerGeometryChanged(GeometryChangedEvent evt)
     {
-        var size = evt.newRect.size;
-        var width = Mathf.Max(1, Mathf.RoundToInt(size.x));
-        var height = Mathf.Max(1, Mathf.RoundToInt(size.y));
-        if (width <= 0 || height <= 0)
+        var worldBound = _previewContainer?.worldBound ?? evt.newRect;
+        var bounds = new Rect(
+            Mathf.Round(worldBound.x),
+            Mathf.Round(Screen.height - worldBound.yMax),
+            Mathf.Max(1f, Mathf.Round(worldBound.width)),
+            Mathf.Max(1f, Mathf.Round(worldBound.height))
+        );
+        if (bounds.width <= 0f || bounds.height <= 0f)
             return;
-        if (Mathf.Approximately(_lastPreviewContainerSize.x, size.x)
-            && Mathf.Approximately(_lastPreviewContainerSize.y, size.y))
+        if (RectApproximately(_lastPreviewContainerBounds, bounds))
             return;
 
-        _lastPreviewContainerSize = size;
-        PreviewContainerSizeChanged?.Invoke(width, height);
+        _lastPreviewContainerBounds = bounds;
+        PreviewContainerBoundsChanged?.Invoke(bounds);
+    }
+
+    private static bool RectApproximately(Rect left, Rect right)
+    {
+        return Mathf.Approximately(left.x, right.x)
+            && Mathf.Approximately(left.y, right.y)
+            && Mathf.Approximately(left.width, right.width)
+            && Mathf.Approximately(left.height, right.height);
     }
 
     public void SetVisible(bool visible)
@@ -150,7 +164,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _runsSection!.style.display =
             model.SectionMode == HistorySectionMode.Ghost ? DisplayStyle.None : DisplayStyle.Flex;
         _battlesSection!.style.marginLeft =
-            model.SectionMode == HistorySectionMode.Ghost ? 0f : 18f;
+            model.SectionMode == HistorySectionMode.Ghost ? UiSpacing.None : UiSpacing.ColumnGap;
         _battlesTitle!.style.display =
             model.SectionMode == HistorySectionMode.Ghost ? DisplayStyle.None : DisplayStyle.Flex;
         _runsBattleSubtitle!.text = model.RunsBattleSubtitle;
@@ -214,6 +228,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
             return;
 
         _previewImage.image = texture;
+        _previewImage.style.display = texture == null ? DisplayStyle.None : DisplayStyle.Flex;
         _previewImage.MarkDirtyRepaint();
     }
 

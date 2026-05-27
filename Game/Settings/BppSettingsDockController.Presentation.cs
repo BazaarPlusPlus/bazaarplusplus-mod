@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Fonts;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -221,7 +222,7 @@ internal sealed partial class BppSettingsDockController
         return string.Join("/", segments);
     }
 
-    private void ApplyTextStyle(TextMeshProUGUI text)
+    private void ApplyTextStyle(TextMeshProUGUI text, string? sampleText = null)
     {
         _uiFont ??= TMP_Settings.defaultFontAsset;
         if (_uiFont != null)
@@ -230,6 +231,7 @@ internal sealed partial class BppSettingsDockController
         if (_uiFontMaterial != null)
             text.fontSharedMaterial = _uiFontMaterial;
 
+        BppTmpFont.TryApply(text, sampleText ?? text.text);
         text.richText = false;
     }
 

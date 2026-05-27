@@ -202,6 +202,8 @@ internal sealed class HistoryPanelPreviewCardPool
         if (card == null)
             return null;
 
+        card.transform.localScale = Vector3.one;
+        card.transform.localRotation = Quaternion.identity;
         card.gameObject.SetActive(true);
         ApplyLayerRecursive(card.gameObject, _layer);
 

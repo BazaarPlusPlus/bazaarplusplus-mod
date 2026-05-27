@@ -315,6 +315,7 @@ internal sealed class RandomHeroSkinPoolPanelController : MonoBehaviour
             -LobbyPanelLayout.PanelTopPadding - LobbyPanelLayout.HeaderHeight - 8f
         );
         _emptyLabel.text = "No skins";
+        LobbyPanelLayout.ApplyTextStyle(_emptyLabel, _emptyLabel.text);
         _emptyLabel.gameObject.SetActive(false);
 
         _panelRoot = panelRect;
@@ -507,6 +508,7 @@ internal sealed class RandomHeroSkinPoolPanelController : MonoBehaviour
         labelRect.offsetMin = new Vector2(6f, 4f);
         labelRect.offsetMax = new Vector2(-6f, -4f);
         label.text = BuildEntryLabel(saleItem);
+        LobbyPanelLayout.ApplyTextStyle(label, label.text);
 
         _entryViews[saleItem.CollectionItemID] = new SkinPoolEntryView(
             saleItem,
@@ -557,6 +559,7 @@ internal sealed class RandomHeroSkinPoolPanelController : MonoBehaviour
                 _availableSkins.Length == 0
                     ? "RANDOM POOL 0/0"
                     : $"RANDOM POOL {selectedCount}/{_availableSkins.Length}";
+            LobbyPanelLayout.ApplyTextStyle(_headerLabel, _headerLabel.text);
         }
     }
 
