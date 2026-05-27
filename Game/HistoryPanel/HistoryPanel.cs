@@ -343,31 +343,53 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     }
 
     // Translates a screen-space UI Toolkit container Rect into the three BattleBoardPreview
-    // knobs: position (bottom-left, inset for visual padding), clip size (rect inside that
-    // padding), and an auto-fit card scale that matches the legacy behaviour of fitting the
-    // 2400x600 native board into the available area. Returns true if the card scale changed
-    // so the caller knows to re-render.
+    // knobs: position (bottom-left of the overlay clip), clip size, and an auto-fit card
+    // scale that matches the legacy behaviour of fitting the 2400x600 native board into the
+    // available area. Returns true if the card scale changed so the caller knows to re-render.
+    //
+    // X/Y/W/H/ScaleMul come from PreviewTunerDebug fields so a live IMGUI window (F9) can
+    // drive them. X/Y are pixel offsets from the container's bottom-left corner; W/H are
+    // pixel deltas applied to the container's width and height. Both are expressed in
+    // 1920×1080 reference-resolution pixels and multiplied by PanelScale at runtime so the
+    // baked values stay visually consistent across screen resolutions. PanelScale matches
+    // the UI Toolkit panel's actual scale (PanelScaleMode.ScaleWithScreenSize with
+    // referenceResolution=1920×1080 and default screenMatchMode = width-matched → match=0),
+    // so it's just Screen.width / 1920. The board inside the clip is always centered, so
+    // moving the clip moves the cards, and resizing the clip also shifts the cards' visual
+    // center. Bake the tuned values straight into the field defaults in
+    // HistoryPanel.PreviewTunerDebug.cs (they'll keep being multiplied by PanelScale here)
+    // and delete the tuner file.
     private bool ApplyPreviewContainerBounds(Rect bounds)
     {
         if (_battleBoardPreview == null)
             return false;
 
-        const float horizontalInset = 4f;
-        const float verticalInset = 10f;
-
-        var position = new Vector2(bounds.x + horizontalInset, bounds.y + verticalInset);
-        var clipSize = new Vector2(
-            Mathf.Max(1f, bounds.width - horizontalInset * 2f),
-            Mathf.Max(1f, bounds.height - verticalInset * 2f)
+        var panelScale = ComputePreviewPanelScale();
+        var position = new Vector2(
+            bounds.x + _debugX * panelScale,
+            bounds.y + _debugY * panelScale
         );
-        var cardScale = Mathf.Min(
+        var clipSize = new Vector2(
+            Mathf.Max(1f, bounds.width + _debugWidthDelta * panelScale),
+            Mathf.Max(1f, bounds.height + _debugHeightDelta * panelScale)
+        );
+        var autoFitScale = Mathf.Min(
             clipSize.x / HistoryPanelPreviewTextureGeometry.NativeBoardWidth,
             clipSize.y / HistoryPanelPreviewTextureGeometry.NativeBoardHeight
         );
+        var cardScale = autoFitScale * _debugCardScaleMul;
 
         _battleBoardPreview.SetPosition(position);
         _battleBoardPreview.SetClipSize(clipSize);
         return _battleBoardPreview.SetCardScale(cardScale);
+    }
+
+    // Scale factor that maps 1920×1080 reference-resolution pixels (the space the tuner
+    // sliders work in) to actual screen pixels. Matches the UI Toolkit PanelSettings'
+    // ScaleWithScreenSize + width-matched semantics — see HistoryPanelUiToolkitView.cs.
+    private static float ComputePreviewPanelScale()
+    {
+        return Mathf.Max(0.01f, Screen.width / 1920f);
     }
 
     private void DisposePreviewRenderer()

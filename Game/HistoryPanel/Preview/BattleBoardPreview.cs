@@ -38,6 +38,7 @@ internal sealed class BattleBoardPreview
     private Canvas? _canvas;
     private RectTransform? _rootRect;
     private RectTransform? _clipRect;
+    private UnityEngine.UI.RectMask2D? _clipMask;
     private RectTransform? _boardRect;
     private RectTransform[]? _sockets;
     private HistoryPanelPreviewCardPool? _pool;
@@ -111,6 +112,15 @@ internal sealed class BattleBoardPreview
         ApplyTransform();
         _renderedSignature = null;
         return true;
+    }
+
+    // Toggles the RectMask2D on the clip object. When disabled, board content (cards) that
+    // extends past _clipSize renders into the rest of the Canvas overlay instead of being
+    // masked away. Used by the temporary preview tuner to reveal content otherwise clipped.
+    public void SetClipMaskEnabled(bool enabled)
+    {
+        if (_clipMask != null)
+            _clipMask.enabled = enabled;
     }
 
     public IEnumerator Render(
@@ -209,6 +219,7 @@ internal sealed class BattleBoardPreview
             _canvas = null;
             _rootRect = null;
             _clipRect = null;
+            _clipMask = null;
             _boardRect = null;
         }
     }
@@ -261,6 +272,7 @@ internal sealed class BattleBoardPreview
         clipObject.layer = _layer;
         clipObject.transform.SetParent(_root.transform, worldPositionStays: false);
         _clipRect = clipObject.GetComponent<RectTransform>();
+        _clipMask = clipObject.GetComponent<UnityEngine.UI.RectMask2D>();
 
         var boardObject = new GameObject("BattleBoardPreviewBoard", typeof(RectTransform));
         boardObject.layer = _layer;
@@ -491,6 +503,7 @@ internal sealed class BattleBoardPreview
             _canvas = null;
             _rootRect = null;
             _clipRect = null;
+            _clipMask = null;
             _boardRect = null;
         }
     }
