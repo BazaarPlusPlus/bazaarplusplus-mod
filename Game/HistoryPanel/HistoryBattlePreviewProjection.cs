@@ -7,7 +7,6 @@ using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Socket;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect.AuraActions;
-using BazaarPlusPlus.Game.ItemBoard;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
@@ -26,7 +25,7 @@ internal static class HistoryBattlePreviewProjection
 
     public static HistoryBattlePreviewData BuildEmpty(string signature = "")
     {
-        return new HistoryBattlePreviewData(Array.Empty<ItemBoardItemSpec>(), signature);
+        return new HistoryBattlePreviewData(Array.Empty<HistoryItemSpec>(), signature);
     }
 
     public static HistoryBattlePreviewData BuildPlayer(
@@ -99,11 +98,11 @@ internal static class HistoryBattlePreviewProjection
         return count;
     }
 
-    private static List<ItemBoardItemSpec> BuildItemSpecs(
+    private static List<HistoryItemSpec> BuildItemSpecs(
         IList<PvpBattleCardSnapshot>? itemSnapshots
     )
     {
-        var specs = new List<ItemBoardItemSpec>();
+        var specs = new List<HistoryItemSpec>();
         if (itemSnapshots == null || itemSnapshots.Count == 0)
             return specs;
 
@@ -136,7 +135,7 @@ internal static class HistoryBattlePreviewProjection
             ApplySocketEffectAttributes(snapshot, attributes, socketEffectsBySocket);
 
             specs.Add(
-                new ItemBoardItemSpec
+                new HistoryItemSpec
                 {
                     TemplateId = templateId,
                     Tier = ParseTier(snapshot.Tier),

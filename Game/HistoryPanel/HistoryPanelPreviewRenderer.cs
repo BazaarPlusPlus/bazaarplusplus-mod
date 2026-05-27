@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.ItemBoard;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
@@ -278,7 +277,7 @@ internal sealed class HistoryPanelPreviewRenderer
         _boardRect.localScale = Vector3.one * placement.Scale;
     }
 
-    private int SpawnCards(IReadOnlyList<ItemBoardItemSpec> items)
+    private int SpawnCards(IReadOnlyList<HistoryItemSpec> items)
     {
         if (_pool == null || _sockets == null)
             return 0;
@@ -352,7 +351,7 @@ internal sealed class HistoryPanelPreviewRenderer
         };
     }
 
-    private static TCardInstanceItem BuildSyntheticInstance(ItemBoardItemSpec spec, int index)
+    private static TCardInstanceItem BuildSyntheticInstance(HistoryItemSpec spec, int index)
     {
         return new TCardInstanceItem
         {
