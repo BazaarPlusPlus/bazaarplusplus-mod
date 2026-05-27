@@ -101,8 +101,6 @@ internal sealed class BppComposition : IDisposable
             combatReplayRuntime: () => _combatReplayModule.Runtime,
             onlineClient: () => _onlineClientRef
         ));
-        _mountables.Register(new MonsterPreviewItemBoardMount());
-        _mountables.Register(new MonsterPreviewWarmupMount());
         _mountables.Register(new RunLoggingMount());
         _mountables.Register(new RunUploadMount());
         _mountables.Register(new TooltipModifierRefreshMount());

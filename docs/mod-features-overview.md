@@ -26,7 +26,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`BppStaticDataAccess`，以及带 game type 的事件 + `IRunContext` 接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
-挂载的 11 个 `IBppMountable`：`RunLoggingMount`、`RunUploadMount`、`CombatStatusBarMount`、`MonsterPreviewWarmupMount`、`CardSetPreviewMount`、`MonsterPreviewItemBoardMount`、`EndOfRunScreenshotMount`、`BazaarDbScreenshotUploadMount`、`CombatReplayVideoRecorderMount`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`TooltipModifierRefreshMount`。新增 feature 只需在 `BppComposition` 加一行 `_mountables.Register(...)`。
+挂载的 9 个 `IBppMountable`：`RunLoggingMount`、`RunUploadMount`、`CombatStatusBarMount`、`CardSetPreviewMount`、`EndOfRunScreenshotMount`、`BazaarDbScreenshotUploadMount`、`CombatReplayVideoRecorderMount`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`TooltipModifierRefreshMount`。新增 feature 只需在 `BppComposition` 加一行 `_mountables.Register(...)`。
 
 ## 游戏内功能模块
 
@@ -42,7 +42,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 - 默认走游戏原生怪物预览
 - Bazaar++ 在原生 tooltip 路径上做局部增强：按需补 monster 上下文、附魔/升级预览注入、showcase tooltip 锁绕过
-- `MonsterPreviewItemBoardRuntime` / `CardSetPreviewRuntime` 会复用原生 `MonsterBoardTooltip` 展示 Bazaar++ 组织的 board 内容
+- `CardSetPreviewRuntime` 会复用原生 `MonsterBoardTooltip` 展示 Bazaar++ 组织的 board 内容
 - HistoryPanel 预览使用共享 `Game/PreviewSurface` 渲染栈
 
 详见 `docs/monster-preview-design.md`。
