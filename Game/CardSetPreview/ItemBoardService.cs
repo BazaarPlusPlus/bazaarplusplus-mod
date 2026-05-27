@@ -3,7 +3,7 @@ using System;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.ItemBoard;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
 internal sealed class ItemBoardService : IDisposable
 {

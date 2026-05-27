@@ -44,7 +44,7 @@ JSON；过期或未知的 template id 会在进入 preview surface 前被过滤�
 
 - `Plugin.cs`
 - `Game/CardSetPreview/CardSetPreviewRuntime.cs`
-- `Game/ItemBoard/ItemBoardOverlay.cs`
+- `Game/CardSetPreview/ItemBoardOverlay.cs`
 - `Game/HistoryPanel/HistoryPanelPreviewRenderer.cs`
 - `Game/HistoryPanel/HistoryPanelRepository.Preview.cs`
 - `Game/PreviewSurface/Board/PreviewBoardSurface.cs`

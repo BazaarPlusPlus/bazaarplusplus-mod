@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.ItemBoard;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
 internal sealed class ItemBoardItemSpec
 {

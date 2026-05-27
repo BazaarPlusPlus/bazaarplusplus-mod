@@ -132,7 +132,6 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 | Section / Key | 含义 |
 | --- | --- |
-| `ItemBoard / AnchoredPosition` | item-board overlay 位置覆盖 |
 | `StreamerMode / EnableNameOverride` | Anonymous 显示名 |
 | `EnchantPreview / Mode` | 附魔预览可视性模式：`Off` / `AutoOnPedestalChoice` / `Always`（默认 Auto） |
 | `UpgradePreview / Mode` | 升级预览可视性模式：同上（默认 Auto） |

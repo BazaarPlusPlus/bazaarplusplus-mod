@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.ItemBoard;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
 internal sealed class ItemBoardTemplateSetRequest
 {

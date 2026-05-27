@@ -5,7 +5,6 @@ using System.Linq;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.ItemBoard;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;

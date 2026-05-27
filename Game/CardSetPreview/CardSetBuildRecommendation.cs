@@ -1,6 +1,5 @@
 #nullable enable
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.ItemBoard;
 
 namespace BazaarPlusPlus.Game.CardSetPreview;
 

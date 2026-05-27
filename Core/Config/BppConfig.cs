@@ -6,8 +6,6 @@ namespace BazaarPlusPlus.Core.Config;
 
 internal sealed class BppConfig : IBppConfig
 {
-    public ConfigEntry<string>? ItemBoardAnchoredPositionConfig { get; private set; }
-
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
 
     public ConfigEntry<PreviewVisibilityMode>? EnchantPreviewModeConfig { get; private set; }
@@ -60,12 +58,6 @@ internal sealed class BppConfig : IBppConfig
 
     public void Initialize(ConfigFile config)
     {
-        ItemBoardAnchoredPositionConfig = config.Bind(
-            "ItemBoard",
-            "AnchoredPosition",
-            "auto",
-            "Anchored position override for the standalone item board overlay. Use 'auto' to follow the source tooltip, or 'x,y' such as '320,-40'."
-        );
         EnableNameOverrideConfig = config.Bind(
             "StreamerMode",
             "EnableNameOverride",

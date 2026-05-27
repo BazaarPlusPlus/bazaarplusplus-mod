@@ -18,8 +18,11 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace BazaarPlusPlus.Game.ItemBoard;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
+// Clones the native MonsterBoardTooltip via reflection and drives it items-only
+// (skill + health hidden) so CardSetPreview reuses the game's item rendering
+// pipeline verbatim instead of reimplementing it.
 internal sealed class ItemBoardOverlay : IDisposable
 {
     private sealed class OverlayRuntimeBehaviour : MonoBehaviour { }

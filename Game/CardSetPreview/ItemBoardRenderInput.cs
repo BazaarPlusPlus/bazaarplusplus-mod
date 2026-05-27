@@ -3,7 +3,7 @@ using BazaarGameShared.Domain.Players;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.ItemBoard;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
 internal sealed class ItemBoardRenderInput
 {
