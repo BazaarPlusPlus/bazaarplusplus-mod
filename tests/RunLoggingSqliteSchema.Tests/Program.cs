@@ -1,9 +1,7 @@
 #nullable enable
 using System.Reflection;
 
-var schemaType = RequireType(
-    "BazaarPlusPlus.Storage.RunLog.RunLogSchema"
-);
+var schemaType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
 
 Assert(
     GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 13,

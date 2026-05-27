@@ -37,7 +37,10 @@ internal static class AutoBazaarSceneProbe
             if (_lastDiagnosis != snapshot)
             {
                 _lastDiagnosis = snapshot;
-                BppLog.Info("AutoBazaar", $"SceneProbe: scene='{sceneName}' (ok={sceneOk}) appStateNull={appStateNull} profileLoaded={profileLoaded}");
+                BppLog.Info(
+                    "AutoBazaar",
+                    $"SceneProbe: scene='{sceneName}' (ok={sceneOk}) appStateNull={appStateNull} profileLoaded={profileLoaded}"
+                );
             }
 
             return sceneOk && appStateNull && profileLoaded;
@@ -60,16 +63,20 @@ internal static class AutoBazaarSceneProbe
                 BppLog.Info("AutoBazaar", "TheBazaar.ClientCache not found via reflection");
                 return false;
             }
-            _clientCacheProfileField = clientCacheType.GetField("Profile",
-                BindingFlags.Static | BindingFlags.Public);
+            _clientCacheProfileField = clientCacheType.GetField(
+                "Profile",
+                BindingFlags.Static | BindingFlags.Public
+            );
             if (_clientCacheProfileField is not null)
             {
                 _profileValueProp = _clientCacheProfileField.FieldType.GetProperty("Value");
             }
         }
-        if (_clientCacheProfileField is null || _profileValueProp is null) return false;
+        if (_clientCacheProfileField is null || _profileValueProp is null)
+            return false;
         var profileCache = _clientCacheProfileField.GetValue(null);
-        if (profileCache is null) return false;
+        if (profileCache is null)
+            return false;
         var profile = _profileValueProp.GetValue(profileCache);
         return profile is not null;
     }

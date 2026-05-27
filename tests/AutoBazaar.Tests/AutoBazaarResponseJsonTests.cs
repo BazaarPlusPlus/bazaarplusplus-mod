@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using Xunit;
 using BazaarPlusPlus.Game.AutoBazaar;
+using Xunit;
 
 public class AutoBazaarResponseJsonTests
 {
@@ -11,7 +11,8 @@ public class AutoBazaarResponseJsonTests
             AutoBazaarValidationCode.Cooldown,
             429,
             "action min-delay not yet elapsed",
-            new Dictionary<string, object?> { ["retryAfterSeconds"] = 0.75 });
+            new Dictionary<string, object?> { ["retryAfterSeconds"] = 0.75 }
+        );
 
         var json = AutoBazaarResponseJson.BuildValidationErrorBody(validation);
 
@@ -27,7 +28,8 @@ public class AutoBazaarResponseJsonTests
             AutoBazaarValidationCode.Invalid,
             400,
             "unknown actionKind",
-            null);
+            null
+        );
 
         var json = AutoBazaarResponseJson.BuildValidationErrorBody(validation);
 

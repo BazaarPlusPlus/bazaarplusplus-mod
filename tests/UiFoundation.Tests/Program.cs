@@ -1,4 +1,5 @@
 using BazaarPlusPlus.Infrastructure.Fonts;
+
 TestEmbeddedFontExtractionWritesResourceBytes();
 TestEmbeddedFontExtractionFailsForMissingResource();
 TestTmpFontPolicyDetectsCjkText();
@@ -18,7 +19,10 @@ static void TestEmbeddedFontExtractionWritesResourceBytes()
         );
 
         Assert(path == Path.Combine(cacheRoot, "sample-font.txt"), "Unexpected extracted path.");
-        Assert(File.ReadAllText(path) == "font-bytes-for-test\n", "Extracted file content must match the embedded resource.");
+        Assert(
+            File.ReadAllText(path) == "font-bytes-for-test\n",
+            "Extracted file content must match the embedded resource."
+        );
     }
     finally
     {
@@ -43,7 +47,10 @@ static void TestEmbeddedFontExtractionFailsForMissingResource()
         catch (FileNotFoundException ex)
         {
             Assert(
-                ex.Message.Contains("UiFoundation.Tests.Resources.missing-font.txt", StringComparison.Ordinal),
+                ex.Message.Contains(
+                    "UiFoundation.Tests.Resources.missing-font.txt",
+                    StringComparison.Ordinal
+                ),
                 "Missing-resource error should include the manifest resource name."
             );
             return;

@@ -10,8 +10,10 @@ public sealed class LogRepeatSuppressorTests
     private const int Warning = 1;
     private const int Error = 2;
 
-    private static (LogRepeatSuppressor Suppressor, List<(int Level, string Message)> Output)
-        CreateSuppressor(int maxPatternLength = 3)
+    private static (
+        LogRepeatSuppressor Suppressor,
+        List<(int Level, string Message)> Output
+    ) CreateSuppressor(int maxPatternLength = 3)
     {
         var output = new List<(int, string)>();
         var suppressor = new LogRepeatSuppressor(
@@ -31,10 +33,7 @@ public sealed class LogRepeatSuppressorTests
         sut.Write(Info, "b");
         sut.Write(Info, "c");
 
-        Assert.Equal(
-            new[] { (Info, "a"), (Info, "b"), (Info, "c") },
-            output
-        );
+        Assert.Equal(new[] { (Info, "a"), (Info, "b"), (Info, "c") }, output);
     }
 
     [Fact]

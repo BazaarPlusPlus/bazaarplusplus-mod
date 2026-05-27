@@ -37,7 +37,12 @@ try
         "BazaarPlusPlus.Storage.RunScreenshot.RunScreenshotSqliteStore"
     );
     Activator.CreateInstance(screenshotStoreType, dbPath);
-    SeedRunScreenshotWithFile(dbPath, screenshotsDir, "shot-1", "2026-04-08_20-30-25-000_final_run-r1.png");
+    SeedRunScreenshotWithFile(
+        dbPath,
+        screenshotsDir,
+        "shot-1",
+        "2026-04-08_20-30-25-000_final_run-r1.png"
+    );
 
     var storeCtor = storeType.GetConstructor([typeof(string), typeof(string)])!;
     var store = storeCtor.Invoke([dbPath, screenshotsDir]);
@@ -73,15 +78,20 @@ try
     }
 
     // Test 2: transient HTTP 503 keeps row pending and increments attempts
-    SeedRunScreenshotWithFile(dbPath, screenshotsDir, "shot-2", "2026-04-08_20-31-25-000_final_run-r1.png");
+    SeedRunScreenshotWithFile(
+        dbPath,
+        screenshotsDir,
+        "shot-2",
+        "2026-04-08_20-31-25-000_final_run-r1.png"
+    );
     ensureBackfilled.Invoke(store, []);
     {
-        var handler = new RecordingHandler(req =>
-            new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
-            {
-                Content = new StringContent("boom"),
-            }
-        );
+        var handler = new RecordingHandler(req => new HttpResponseMessage(
+            HttpStatusCode.ServiceUnavailable
+        )
+        {
+            Content = new StringContent("boom"),
+        });
         var client = new HttpClient(handler);
         var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => "acct-9")]);
         var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;
@@ -101,12 +111,10 @@ try
 
     // Test 3: permanent HTTP 400 flips to permanent_failure
     {
-        var handler = new RecordingHandler(req =>
-            new HttpResponseMessage(HttpStatusCode.BadRequest)
-            {
-                Content = new StringContent("{\"reason\":\"schema_mismatch\"}"),
-            }
-        );
+        var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("{\"reason\":\"schema_mismatch\"}"),
+        });
         var client = new HttpClient(handler);
         var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => "acct-9")]);
         var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;
@@ -124,12 +132,10 @@ try
     SeedRunScreenshotMissingFile(dbPath, "shot-3");
     ensureBackfilled.Invoke(store, []);
     {
-        var handler = new RecordingHandler(req =>
-            new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent("{\"status\":\"ok\"}"),
-            }
-        );
+        var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"status\":\"ok\"}"),
+        });
         var client = new HttpClient(handler);
         var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => "acct-9")]);
         var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;

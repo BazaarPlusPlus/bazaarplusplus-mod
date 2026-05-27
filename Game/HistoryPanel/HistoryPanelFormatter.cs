@@ -1,7 +1,7 @@
 #nullable enable
 using System;
-using UnityEngine;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using UnityEngine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -100,7 +100,11 @@ internal static class HistoryPanelFormatter
     private static bool IsBattleWinFromLocalPerspective(HistoryBattleRecord battle)
     {
         return IsBattleWin(battle)
-            || string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(
+                battle.WinnerCombatantId,
+                "Player",
+                StringComparison.OrdinalIgnoreCase
+            );
     }
 
     public static string? FormatOpponentHero(string? rawHero)

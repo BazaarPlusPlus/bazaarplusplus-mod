@@ -5,6 +5,7 @@ using System.IO;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.HistoryPanel;
+using BazaarPlusPlus.Game.HistoryPanel.Preview;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.RunLogging;
@@ -18,7 +19,6 @@ using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
-using BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 namespace BazaarPlusPlus;
 

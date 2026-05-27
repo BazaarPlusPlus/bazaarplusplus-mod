@@ -25,12 +25,13 @@ internal readonly struct EncounterStateSnapshot
     /// in ChoiceState or the offered SelectionSet contains no relevant pedestal.</summary>
     public ChoiceScreenPedestalKind ChoiceScreenPedestalKind { get; init; }
 
-    public static EncounterStateSnapshot Empty { get; } = new()
-    {
-        CurrentEncounterId = null,
-        CurrentEncounterType = null,
-        InteractionFilterTemplateIds = Array.Empty<string>(),
-        PedestalEligibleInstanceIds = new HashSet<string>(),
-        ChoiceScreenPedestalKind = ChoiceScreenPedestalKind.None,
-    };
+    public static EncounterStateSnapshot Empty { get; } =
+        new()
+        {
+            CurrentEncounterId = null,
+            CurrentEncounterType = null,
+            InteractionFilterTemplateIds = Array.Empty<string>(),
+            PedestalEligibleInstanceIds = new HashSet<string>(),
+            ChoiceScreenPedestalKind = ChoiceScreenPedestalKind.None,
+        };
 }

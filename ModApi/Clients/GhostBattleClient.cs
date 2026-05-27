@@ -157,9 +157,7 @@ public sealed class GhostBattleClient
         }
         catch (Exception ex)
         {
-            return GhostBattleReplayBytesResult.Failure(
-                ModApiErrorFormatter.Truncate(ex.Message)
-            );
+            return GhostBattleReplayBytesResult.Failure(ModApiErrorFormatter.Truncate(ex.Message));
         }
     }
 
@@ -239,11 +237,7 @@ public readonly struct GhostBattleQueryResult
 
 public readonly struct GhostBattleReplayLinkResult
 {
-    private GhostBattleReplayLinkResult(
-        bool succeeded,
-        string? downloadUrl,
-        string? error
-    )
+    private GhostBattleReplayLinkResult(bool succeeded, string? downloadUrl, string? error)
     {
         Succeeded = succeeded;
         DownloadUrl = downloadUrl;
@@ -259,17 +253,12 @@ public readonly struct GhostBattleReplayLinkResult
     public static GhostBattleReplayLinkResult Success(string downloadUrl) =>
         new(true, downloadUrl, null);
 
-    public static GhostBattleReplayLinkResult Failure(string error) =>
-        new(false, null, error);
+    public static GhostBattleReplayLinkResult Failure(string error) => new(false, null, error);
 }
 
 public readonly struct GhostBattleReplayBytesResult
 {
-    private GhostBattleReplayBytesResult(
-        bool succeeded,
-        byte[]? bytes,
-        string? error
-    )
+    private GhostBattleReplayBytesResult(bool succeeded, byte[]? bytes, string? error)
     {
         Succeeded = succeeded;
         Bytes = bytes;
@@ -282,8 +271,7 @@ public readonly struct GhostBattleReplayBytesResult
 
     public string? Error { get; }
 
-    public static GhostBattleReplayBytesResult Success(byte[] bytes) =>
-        new(true, bytes, null);
+    public static GhostBattleReplayBytesResult Success(byte[] bytes) => new(true, bytes, null);
 
     public static GhostBattleReplayBytesResult Failure(string error) => new(false, null, error);
 }

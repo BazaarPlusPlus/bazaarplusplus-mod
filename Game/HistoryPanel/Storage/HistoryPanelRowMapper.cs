@@ -1,8 +1,8 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.PvpBattles;
 using Microsoft.Data.Sqlite;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
 
@@ -12,13 +12,10 @@ internal static class HistoryPanelRowMapper
 {
     public static HistoryRunRecord ReadRun(SqliteDataReader reader)
     {
-        var startedAt = DateTimeOffset.Parse(
-            reader.GetString(reader.GetOrdinal("started_at_utc"))
-        );
+        var startedAt = DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("started_at_utc")));
         var endedAt = GetNullableDateTimeOffset(reader, "ended_at_utc");
         var finalDay = GetNullableInt32(reader, "final_day") ?? GetNullableInt32(reader, "day");
-        var finalHour =
-            GetNullableInt32(reader, "final_hour") ?? GetNullableInt32(reader, "hour");
+        var finalHour = GetNullableInt32(reader, "final_hour") ?? GetNullableInt32(reader, "hour");
         var lastSeen =
             endedAt ?? GetNullableDateTimeOffset(reader, "last_seen_at_utc") ?? startedAt;
         var rawStatus = reader.GetString(reader.GetOrdinal("run_status"));

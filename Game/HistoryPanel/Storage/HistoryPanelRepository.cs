@@ -2,13 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Storage.RunLog;
 using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
 
@@ -157,7 +157,8 @@ internal sealed partial class HistoryPanelRepository
         var records = new List<HistoryBattleRecord>();
         while (reader.Read())
         {
-            var battleId = HistoryPanelRowMapper.SafeGetNullableString(reader, "battle_id") ?? "unknown";
+            var battleId =
+                HistoryPanelRowMapper.SafeGetNullableString(reader, "battle_id") ?? "unknown";
             try
             {
                 var playerHand = DeserializeCapture(
@@ -598,8 +599,7 @@ internal sealed partial class HistoryPanelRepository
         using var connection = OpenConnection();
         using var deleteRun = connection.CreateCommand();
         deleteRun.CommandTimeout = 2;
-        deleteRun.CommandText =
-            $"DELETE FROM {RunLogSchema.RunsTableName} WHERE run_id = $runId;";
+        deleteRun.CommandText = $"DELETE FROM {RunLogSchema.RunsTableName} WHERE run_id = $runId;";
         deleteRun.Parameters.AddWithValue("$runId", runId);
         deleteRun.ExecuteNonQuery();
     }

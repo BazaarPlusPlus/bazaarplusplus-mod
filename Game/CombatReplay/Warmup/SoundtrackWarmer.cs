@@ -79,7 +79,10 @@ internal static class SoundtrackWarmer
         }
 
         var wasMetadataLoaded = soundManager.IsBankLoaded(boardAsset.boardBank, isMetadata: false);
-        var wasAssetLoaded = soundManager.IsBankLoaded(boardAsset.boardAssetBank, isMetadata: false);
+        var wasAssetLoaded = soundManager.IsBankLoaded(
+            boardAsset.boardAssetBank,
+            isMetadata: false
+        );
         BppLog.Info(
             "SoundtrackWarmer",
             $"Warm replay audio bank: board='{boardAsset.name}', metadata='{boardAsset.boardBank}', asset='{boardAsset.boardAssetBank}'"
@@ -202,12 +205,7 @@ internal static class SoundtrackWarmer
 
         for (uint trackIndex = 0; trackIndex < loadedSoundtrack.MusicTracks.Length; trackIndex++)
         {
-            await WarmSoundtrackTrackAsync(
-                soundManager,
-                loadedSoundtrack,
-                trackIndex,
-                stats
-            );
+            await WarmSoundtrackTrackAsync(soundManager, loadedSoundtrack, trackIndex, stats);
         }
 
         return true;
@@ -235,9 +233,7 @@ internal static class SoundtrackWarmer
         }
     }
 
-    private static async Task<SoundtrackSO?> TryLoadSoundtrackAssetAsync(
-        SoundtrackSO soundtrack
-    )
+    private static async Task<SoundtrackSO?> TryLoadSoundtrackAssetAsync(SoundtrackSO soundtrack)
     {
         if (string.IsNullOrWhiteSpace(soundtrack.SoundtrackPath))
             return soundtrack;
@@ -290,9 +286,11 @@ internal static class SoundtrackWarmer
             );
             if (trackBankNameMethod != null)
             {
-                metadataBank = trackBankNameMethod.Invoke(soundtrack, new object[] { trackIndex, false })
+                metadataBank =
+                    trackBankNameMethod.Invoke(soundtrack, new object[] { trackIndex, false })
                     as string;
-                assetBank = trackBankNameMethod.Invoke(soundtrack, new object[] { trackIndex, true })
+                assetBank =
+                    trackBankNameMethod.Invoke(soundtrack, new object[] { trackIndex, true })
                     as string;
                 return !string.IsNullOrWhiteSpace(metadataBank)
                     && !string.IsNullOrWhiteSpace(assetBank);
@@ -308,9 +306,11 @@ internal static class SoundtrackWarmer
             if (trackBankNameMethod == null)
                 return false;
 
-            metadataBank = trackBankNameMethod.Invoke(soundtrack, new object[] { trackIndex }) as string;
+            metadataBank =
+                trackBankNameMethod.Invoke(soundtrack, new object[] { trackIndex }) as string;
             assetBank = string.IsNullOrWhiteSpace(metadataBank) ? null : metadataBank + ".assets";
-            return !string.IsNullOrWhiteSpace(metadataBank) && !string.IsNullOrWhiteSpace(assetBank);
+            return !string.IsNullOrWhiteSpace(metadataBank)
+                && !string.IsNullOrWhiteSpace(assetBank);
         }
         catch (Exception ex)
         {

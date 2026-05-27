@@ -108,9 +108,7 @@ internal sealed partial class CombatStatusBar
 
     internal static string GetDisplayedFrameText()
     {
-        return IsCombatPlaybackActive
-            ? GetCurrentCombatFrameIndex().ToString()
-            : "Standby";
+        return IsCombatPlaybackActive ? GetCurrentCombatFrameIndex().ToString() : "Standby";
     }
 
     internal static float AdvanceVisualBlend(float current, bool active, float deltaTime)

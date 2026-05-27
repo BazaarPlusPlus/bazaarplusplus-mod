@@ -31,7 +31,9 @@ internal sealed class AutoBazaarDecisionLog
         Converters = { new StringEnumConverter() },
     };
 
-    private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(
+        encoderShouldEmitUTF8Identifier: false
+    );
 
     private readonly string _rootDir;
 

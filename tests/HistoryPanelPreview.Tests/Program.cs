@@ -87,7 +87,10 @@ static void TestGenerationGuard_ParallelBumpsAreSerialised()
     var first = guard.Bump();
     var second = guard.Bump();
     var third = guard.Bump();
-    Assert(first != second && second != third && first != third, "Sequential Bumps must produce distinct snapshots.");
+    Assert(
+        first != second && second != third && first != third,
+        "Sequential Bumps must produce distinct snapshots."
+    );
     Assert(guard.IsCurrent(third), "Latest snapshot must be the current generation.");
 }
 
@@ -106,7 +109,10 @@ static void TestPreviewOverlayPlacement_FitsNativeBoardInsideContainer()
     var placement = HistoryPanelPreviewTextureGeometry.ResolveBoardPlacement(720, 284);
 
     Assert(placement.Width == 720, "Overlay board width should fill the preview container.");
-    Assert(placement.Height == 180, "Overlay board height should preserve the native board aspect ratio.");
+    Assert(
+        placement.Height == 180,
+        "Overlay board height should preserve the native board aspect ratio."
+    );
     Assert(placement.OffsetX == 0, "Overlay board should be horizontally centered.");
     Assert(placement.OffsetY == 52, "Overlay board should be vertically centered.");
 }

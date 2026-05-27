@@ -20,7 +20,8 @@ internal sealed class AutoBazaarMount : IBppMountable
 
     public void Unmount(GameObject host)
     {
-        if (_runtime != null) UnityEngine.Object.DestroyImmediate(_runtime);
+        if (_runtime != null)
+            UnityEngine.Object.DestroyImmediate(_runtime);
         _runtime = null;
     }
 }

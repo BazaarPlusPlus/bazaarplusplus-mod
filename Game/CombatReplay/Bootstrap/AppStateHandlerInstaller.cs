@@ -15,17 +15,19 @@ namespace BazaarPlusPlus.Game.CombatReplay.Bootstrap;
 
 internal static class AppStateHandlerInstaller
 {
-    internal static void EnsureAppStateHandlersInitialized(
-        NetMessageProcessor? processor = null
-    )
+    internal static void EnsureAppStateHandlersInitialized(NetMessageProcessor? processor = null)
     {
         if (ReplayBootstrap.TryGetAppStateField<GameSimHandler>("_gameSimHandler") != null)
             return;
 
         processor ??= ReplayBootstrap.TryGetAppStateField<NetMessageProcessor>("_messageProcessor");
-        processor ??= SocketBehaviorBridge.GetProcessor(SocketBehaviorBridge.TryGetSocketBehavior());
+        processor ??= SocketBehaviorBridge.GetProcessor(
+            SocketBehaviorBridge.TryGetSocketBehavior()
+        );
 
-        var sharedVariables = ReplayBootstrap.TryGetAppStateField<SharedVariablesSO>("_sharedVariablesSo");
+        var sharedVariables = ReplayBootstrap.TryGetAppStateField<SharedVariablesSO>(
+            "_sharedVariablesSo"
+        );
         if (sharedVariables == null)
         {
             foreach (var candidate in Resources.FindObjectsOfTypeAll<SharedVariablesSO>())

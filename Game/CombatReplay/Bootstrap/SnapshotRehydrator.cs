@@ -90,11 +90,7 @@ internal static class SnapshotRehydrator
             return;
         }
 
-        var skills = RehydrateSkillCards(
-            capture.Items,
-            spawnMessage,
-            Data.Run?.Opponent
-        );
+        var skills = RehydrateSkillCards(capture.Items, spawnMessage, Data.Run?.Opponent);
         ReplaceSkillCollection(Data.Run?.Opponent, skills);
     }
 
@@ -116,11 +112,12 @@ internal static class SnapshotRehydrator
 
     private static bool ShouldRemoveSpawnEvent(IGameSimEvent gameSimEvent)
     {
-        return gameSimEvent is GameSimEventCardSpawned
-        {
-            CombatantId: ECombatantId.Opponent,
-            Section: not EInventorySection.Hand,
-        };
+        return gameSimEvent
+            is GameSimEventCardSpawned
+            {
+                CombatantId: ECombatantId.Opponent,
+                Section: not EInventorySection.Hand,
+            };
     }
 
     private static void RehydrateCards(

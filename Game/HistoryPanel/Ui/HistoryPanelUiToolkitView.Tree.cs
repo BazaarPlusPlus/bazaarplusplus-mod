@@ -1,8 +1,8 @@
 #nullable enable
+using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
-using BazaarPlusPlus.Infrastructure.UiTokens;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ui;
 

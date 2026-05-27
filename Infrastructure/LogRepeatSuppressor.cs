@@ -74,8 +74,8 @@ internal sealed class LogRepeatSuppressor
         public int Level { get; }
         public string Message { get; }
 
-        public bool Matches(int level, string message)
-            => Level == level && string.Equals(Message, message, StringComparison.Ordinal);
+        public bool Matches(int level, string message) =>
+            Level == level && string.Equals(Message, message, StringComparison.Ordinal);
     }
 
     private bool TryConsumeActiveSequence(int level, string message, ref bool flushedActiveSequence)

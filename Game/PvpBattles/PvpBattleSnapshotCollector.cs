@@ -204,10 +204,7 @@ internal sealed class PvpBattleSnapshotCollector
         return !capturedFromOpening || snapshots.Count == 0;
     }
 
-    private static (
-        bool Captured,
-        List<PvpBattleCardSnapshot> Snapshots
-    ) CapturePlayerHandCards()
+    private static (bool Captured, List<PvpBattleCardSnapshot> Snapshots) CapturePlayerHandCards()
     {
         try
         {
@@ -285,10 +282,10 @@ internal sealed class PvpBattleSnapshotCollector
         return snapshot;
     }
 
-    private static (
-        bool Captured,
-        List<PvpBattleCardSnapshot> Snapshots
-    ) CaptureOpeningHandCards(NetMessageGameSim message, ECombatantId combatantId)
+    private static (bool Captured, List<PvpBattleCardSnapshot> Snapshots) CaptureOpeningHandCards(
+        NetMessageGameSim message,
+        ECombatantId combatantId
+    )
     {
         try
         {

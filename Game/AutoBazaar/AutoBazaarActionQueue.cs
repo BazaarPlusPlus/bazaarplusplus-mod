@@ -10,6 +10,7 @@ internal sealed class AutoBazaarServerResponse
 {
     public int HttpStatus { get; }
     public string JsonBody { get; }
+
     public AutoBazaarServerResponse(int status, string body)
     {
         HttpStatus = status;
@@ -19,7 +20,9 @@ internal sealed class AutoBazaarServerResponse
 
 internal sealed class PendingAction
 {
-    private readonly TaskCompletionSource<AutoBazaarServerResponse> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<AutoBazaarServerResponse> _tcs = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
     private int _completed;
     private volatile bool _discardedByTimer;
     private Timer? _timer;
@@ -42,8 +45,13 @@ internal sealed class PendingAction
 
     public void SetResponse(AutoBazaarServerResponse response)
     {
-        if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0) return;
-        try { _timer?.Dispose(); } catch { }
+        if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
+            return;
+        try
+        {
+            _timer?.Dispose();
+        }
+        catch { }
         _timer = null;
         _tcs.TrySetResult(response);
     }
@@ -60,7 +68,9 @@ internal sealed class AutoBazaarActionQueue : IDisposable
     public Task<AutoBazaarServerResponse> EnqueueAndAwaitAsync(AutoBazaarAction action)
     {
         if (Volatile.Read(ref _disposed) != 0)
-            return Task.FromResult(new AutoBazaarServerResponse(503, "{\"error\":\"unavailable\"}"));
+            return Task.FromResult(
+                new AutoBazaarServerResponse(503, "{\"error\":\"unavailable\"}")
+            );
         var p = new PendingAction(action, _timeoutMs);
         _queue.Enqueue(p);
         return p.ResponseTask;
@@ -70,7 +80,8 @@ internal sealed class AutoBazaarActionQueue : IDisposable
     {
         while (_queue.TryDequeue(out var p))
         {
-            if (p.IsDiscarded) continue;
+            if (p.IsDiscarded)
+                continue;
             return p;
         }
         return null;
@@ -78,7 +89,8 @@ internal sealed class AutoBazaarActionQueue : IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
         while (_queue.TryDequeue(out var p))
         {
             p.SetResponse(new AutoBazaarServerResponse(503, "{\"error\":\"unavailable\"}"));

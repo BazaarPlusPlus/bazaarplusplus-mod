@@ -1,5 +1,4 @@
 #nullable enable
-using BazaarPlusPlus.Infrastructure;
 using BepInEx.Configuration;
 
 namespace BazaarPlusPlus.Core.Config;
@@ -118,22 +117,26 @@ internal sealed class BppConfig : IBppConfig
             "AutoBazaar",
             "Enabled",
             true,
-            "Master switch for the AutoBazaar HTTP endpoint. When true, a loopback HTTP server starts on the configured port. There is no in-game UI for this toggle; edit the cfg file to disable.");
+            "Master switch for the AutoBazaar HTTP endpoint. When true, a loopback HTTP server starts on the configured port. There is no in-game UI for this toggle; edit the cfg file to disable."
+        );
         AutoBazaarDecisionIntervalSeconds = config.Bind(
             "AutoBazaar",
             "DecisionIntervalSeconds",
             1.5f,
-            "Mod tick cadence for snapshot publication, in seconds. Clamped to [0.5, 10] at runtime.");
+            "Mod tick cadence for snapshot publication, in seconds. Clamped to [0.5, 10] at runtime."
+        );
         AutoBazaarHttpListenerPort = config.Bind(
             "AutoBazaar",
             "HttpListenerPort",
             47900,
-            "Loopback port for the AutoBazaar HTTP listener. Changing this restarts the listener.");
+            "Loopback port for the AutoBazaar HTTP listener. Changing this restarts the listener."
+        );
         AutoBazaarHttpEndpointTimeoutSeconds = config.Bind(
             "AutoBazaar",
             "HttpEndpointTimeoutSeconds",
             3.0f,
-            "Maximum time (seconds) the server will block on a POST /v1/actions before returning 503.");
+            "Maximum time (seconds) the server will block on a POST /v1/actions before returning 503."
+        );
         // CombatReplayVideo
         CombatReplayVideoEnabled = config.Bind(
             "CombatReplayVideo",

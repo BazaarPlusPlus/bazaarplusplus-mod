@@ -157,7 +157,8 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                 var success = encoder.WaitForCompletion(TimeSpan.FromSeconds(20));
                 if (!success)
                 {
-                    _failureReason ??= encoder.FailureReason ?? "FFmpeg failed to finalize within timeout.";
+                    _failureReason ??=
+                        encoder.FailureReason ?? "FFmpeg failed to finalize within timeout.";
                 }
             }
             catch (Exception ex)
@@ -222,7 +223,11 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         catch (Exception ex)
         {
             _failureReason ??= $"ScreenCapture failed: {ex.GetType().Name} {ex.Message}";
-            BppLog.Error("CombatReplayVideo", "ScreenCapture.CaptureScreenshotIntoRenderTexture failed.", ex);
+            BppLog.Error(
+                "CombatReplayVideo",
+                "ScreenCapture.CaptureScreenshotIntoRenderTexture failed.",
+                ex
+            );
             return false;
         }
     }
@@ -347,9 +352,11 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         var status =
             _failureReason != null
                 ? ReplayVideoCaptureStatus.Failed
-                : (_capturedFrames > 0
-                    ? ReplayVideoCaptureStatus.Completed
-                    : ReplayVideoCaptureStatus.Failed);
+                : (
+                    _capturedFrames > 0
+                        ? ReplayVideoCaptureStatus.Completed
+                        : ReplayVideoCaptureStatus.Failed
+                );
         var error = _failureReason;
         if (status == ReplayVideoCaptureStatus.Failed && error == null && _capturedFrames == 0)
             error = $"No frames captured before {endReason}.";

@@ -98,9 +98,7 @@ internal static class HistoryBattlePreviewProjection
         return count;
     }
 
-    private static List<HistoryItemSpec> BuildItemSpecs(
-        IList<PvpBattleCardSnapshot>? itemSnapshots
-    )
+    private static List<HistoryItemSpec> BuildItemSpecs(IList<PvpBattleCardSnapshot>? itemSnapshots)
     {
         var specs = new List<HistoryItemSpec>();
         if (itemSnapshots == null || itemSnapshots.Count == 0)

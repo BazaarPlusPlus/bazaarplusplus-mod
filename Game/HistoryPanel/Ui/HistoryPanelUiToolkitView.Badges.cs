@@ -1,7 +1,7 @@
 #nullable enable
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ui;
 
@@ -39,7 +39,10 @@ internal sealed partial class HistoryPanelUiToolkitView
     {
         return tier switch
         {
-            RunOutcomeTier.Diamond => (Colors.OutcomeDiamondBackground, Colors.OutcomeDiamondBorder),
+            RunOutcomeTier.Diamond => (
+                Colors.OutcomeDiamondBackground,
+                Colors.OutcomeDiamondBorder
+            ),
             RunOutcomeTier.Gold => (Colors.OutcomeGoldBackground, Colors.OutcomeGoldBorder),
             RunOutcomeTier.Silver => (Colors.OutcomeSilverBackground, Colors.OutcomeSilverBorder),
             RunOutcomeTier.Bronze => (Colors.OutcomeBronzeBackground, Colors.OutcomeBronzeBorder),

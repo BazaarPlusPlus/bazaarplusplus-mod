@@ -97,10 +97,12 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(new CombatReplayVideoRecorderMount());
         _mountables.Register(new CombatStatusBarMount());
         _mountables.Register(new EndOfRunScreenshotMount());
-        _mountables.Register(new HistoryPanelMount(
-            combatReplayRuntime: () => _combatReplayModule.Runtime,
-            onlineClient: () => _onlineClientRef
-        ));
+        _mountables.Register(
+            new HistoryPanelMount(
+                combatReplayRuntime: () => _combatReplayModule.Runtime,
+                onlineClient: () => _onlineClientRef
+            )
+        );
         _mountables.Register(new RunLoggingMount());
         _mountables.Register(new RunUploadMount());
         _mountables.Register(new TooltipModifierRefreshMount());

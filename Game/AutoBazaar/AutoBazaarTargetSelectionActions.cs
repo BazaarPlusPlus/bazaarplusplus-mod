@@ -13,49 +13,62 @@ internal static class AutoBazaarTargetSelectionActions
         string TemplateId,
         AutoBazaarTargetSection Section,
         string LeftSocketId,
-        int Size);
+        int Size
+    );
 
     /// <summary>Emit one SelectItem AutoBazaarDecisionOption per owned card whose
     /// TemplateId is in <paramref name="filter"/>. When <paramref name="filter"/>
     /// is empty, returns empty. Skill-section cards get no TargetSockets list.</summary>
     public static IReadOnlyList<AutoBazaarDecisionOption> Emit(
         ISet<string> filter,
-        IEnumerable<OwnedCardRef> ownedCards)
+        IEnumerable<OwnedCardRef> ownedCards
+    )
     {
-        if (filter.Count == 0) return System.Array.Empty<AutoBazaarDecisionOption>();
+        if (filter.Count == 0)
+            return System.Array.Empty<AutoBazaarDecisionOption>();
         var result = new List<AutoBazaarDecisionOption>();
         var seen = new HashSet<string>();
         foreach (var c in ownedCards)
         {
-            if (string.IsNullOrEmpty(c.TemplateId)) continue;
-            if (!filter.Contains(c.TemplateId)) continue;
-            if (!seen.Add(c.InstanceId)) continue;
-            if (c.Section is not AutoBazaarTargetSection.Hand
-                && c.Section is not AutoBazaarTargetSection.Stash)
+            if (string.IsNullOrEmpty(c.TemplateId))
+                continue;
+            if (!filter.Contains(c.TemplateId))
+                continue;
+            if (!seen.Add(c.InstanceId))
+                continue;
+            if (
+                c.Section is not AutoBazaarTargetSection.Hand
+                && c.Section is not AutoBazaarTargetSection.Stash
+            )
             {
                 continue;
             }
 
             IReadOnlyList<string>? sockets = null;
-            if (!string.IsNullOrEmpty(c.LeftSocketId)
+            if (
+                !string.IsNullOrEmpty(c.LeftSocketId)
                 && c.Size > 0
-                && TryParseSocketIndex(c.LeftSocketId, out var start))
+                && TryParseSocketIndex(c.LeftSocketId, out var start)
+            )
             {
                 var list = new string[c.Size];
-                for (var i = 0; i < c.Size; i++) list[i] = "Socket_" + (start + i);
+                for (var i = 0; i < c.Size; i++)
+                    list[i] = "Socket_" + (start + i);
                 sockets = list;
             }
 
             var socketSeg = sockets is null ? "" : ":" + string.Join(",", sockets);
-            result.Add(new AutoBazaarDecisionOption
-            {
-                ActionKind = AutoBazaarActionKind.SelectItem,
-                Group = AutoBazaarActionGroup.Offer,
-                DisplayKey = "SelectItem:" + c.InstanceId + ":" + c.Section + socketSeg,
-                CardInstanceId = c.InstanceId,
-                TargetSection = c.Section,
-                TargetSockets = sockets,
-            });
+            result.Add(
+                new AutoBazaarDecisionOption
+                {
+                    ActionKind = AutoBazaarActionKind.SelectItem,
+                    Group = AutoBazaarActionGroup.Offer,
+                    DisplayKey = "SelectItem:" + c.InstanceId + ":" + c.Section + socketSeg,
+                    CardInstanceId = c.InstanceId,
+                    TargetSection = c.Section,
+                    TargetSockets = sockets,
+                }
+            );
         }
         return result;
     }
@@ -63,9 +76,11 @@ internal static class AutoBazaarTargetSelectionActions
     private static bool TryParseSocketIndex(string socketId, out int index)
     {
         index = 0;
-        if (string.IsNullOrEmpty(socketId)) return false;
+        if (string.IsNullOrEmpty(socketId))
+            return false;
         const string prefix = "Socket_";
-        if (!socketId.StartsWith(prefix, System.StringComparison.Ordinal)) return false;
+        if (!socketId.StartsWith(prefix, System.StringComparison.Ordinal))
+            return false;
         return int.TryParse(socketId.Substring(prefix.Length), out index);
     }
 
@@ -81,7 +96,8 @@ internal static class AutoBazaarTargetSelectionActions
         IReadOnlyList<AutoBazaarCardSnapshot> boardItems,
         IReadOnlyList<AutoBazaarCardSnapshot> chestItems,
         IReadOnlyList<AutoBazaarCardSnapshot> playerSkills,
-        IReadOnlyList<AutoBazaarCardSnapshot> selectionOptionsCards)
+        IReadOnlyList<AutoBazaarCardSnapshot> selectionOptionsCards
+    )
     {
         var templateByInstance = new Dictionary<string, string>();
         AddTemplates(templateByInstance, boardItems);
@@ -98,9 +114,12 @@ internal static class AutoBazaarTargetSelectionActions
                 kept.Add(a);
                 continue;
             }
-            if (a.CardInstanceId is null) continue;
-            if (!templateByInstance.TryGetValue(a.CardInstanceId, out var tid)) continue;
-            if (!filter.Contains(tid)) continue;
+            if (a.CardInstanceId is null)
+                continue;
+            if (!templateByInstance.TryGetValue(a.CardInstanceId, out var tid))
+                continue;
+            if (!filter.Contains(tid))
+                continue;
             kept.Add(a);
             keptInstanceIds.Add(a.CardInstanceId);
         }
@@ -112,8 +131,10 @@ internal static class AutoBazaarTargetSelectionActions
         var targetOpts = Emit(filter, owned);
         foreach (var opt in targetOpts)
         {
-            if (opt.CardInstanceId is null) continue;
-            if (!keptInstanceIds.Add(opt.CardInstanceId)) continue;
+            if (opt.CardInstanceId is null)
+                continue;
+            if (!keptInstanceIds.Add(opt.CardInstanceId))
+                continue;
             kept.Add(opt);
         }
         return kept;
@@ -121,33 +142,47 @@ internal static class AutoBazaarTargetSelectionActions
 
     private static void AddTemplates(
         Dictionary<string, string> sink,
-        IReadOnlyList<AutoBazaarCardSnapshot> cards)
+        IReadOnlyList<AutoBazaarCardSnapshot> cards
+    )
     {
         foreach (var c in cards)
         {
-            if (string.IsNullOrEmpty(c.InstanceId) || string.IsNullOrEmpty(c.TemplateId)) continue;
-            if (!sink.ContainsKey(c.InstanceId)) sink[c.InstanceId] = c.TemplateId!;
+            if (string.IsNullOrEmpty(c.InstanceId) || string.IsNullOrEmpty(c.TemplateId))
+                continue;
+            if (!sink.ContainsKey(c.InstanceId))
+                sink[c.InstanceId] = c.TemplateId!;
         }
     }
 
     private static void AddOwnedRefs(
         List<OwnedCardRef> sink,
         IReadOnlyList<AutoBazaarCardSnapshot> cards,
-        AutoBazaarTargetSection section)
+        AutoBazaarTargetSection section
+    )
     {
         foreach (var c in cards)
         {
-            if (string.IsNullOrEmpty(c.TemplateId)) continue;
+            if (string.IsNullOrEmpty(c.TemplateId))
+                continue;
             int size = ParseCardSize(c.Size);
-            sink.Add(new OwnedCardRef(
-                InstanceId: c.InstanceId,
-                TemplateId: c.TemplateId!,
-                Section: section,
-                LeftSocketId: c.SocketId ?? "",
-                Size: size));
+            sink.Add(
+                new OwnedCardRef(
+                    InstanceId: c.InstanceId,
+                    TemplateId: c.TemplateId!,
+                    Section: section,
+                    LeftSocketId: c.SocketId ?? "",
+                    Size: size
+                )
+            );
         }
     }
 
-    private static int ParseCardSize(string? size)
-        => size switch { "Small" => 1, "Medium" => 2, "Large" => 3, _ => 1 };
+    private static int ParseCardSize(string? size) =>
+        size switch
+        {
+            "Small" => 1,
+            "Medium" => 2,
+            "Large" => 3,
+            _ => 1,
+        };
 }

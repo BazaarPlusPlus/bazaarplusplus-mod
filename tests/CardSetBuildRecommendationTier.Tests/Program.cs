@@ -142,8 +142,14 @@ static void TestExpiredFinalBuildCacheUsesStaleCacheAndQueuesRemoteRefresh()
         var sources = LoadFinalBuildSources(repositoryType, "StaleHero");
 
         Assert(!downloaded, "Expired final build cache should not block on a remote download.");
-        Assert(queuedRefreshCount == 1, "Expired final build cache should queue a background refresh.");
-        Assert(queuedRefresh != null, "Queued background refresh should be executable by the scheduler.");
+        Assert(
+            queuedRefreshCount == 1,
+            "Expired final build cache should queue a background refresh."
+        );
+        Assert(
+            queuedRefresh != null,
+            "Queued background refresh should be executable by the scheduler."
+        );
         Assert(sources.Count == 1, "Stale cached final builds should remain loadable.");
         Assert(
             sources[0] == "stale-cache",
@@ -322,8 +328,8 @@ static List<string> LoadFinalBuildSources(Type repositoryType, string hero)
         bucket.GetType().GetProperty("Builds")!.GetValue(bucket)!;
     return builds
         .Cast<object>()
-        .Select(
-            build => (string?)build.GetType().GetProperty("Source")!.GetValue(build) ?? string.Empty
+        .Select(build =>
+            (string?)build.GetType().GetProperty("Source")!.GetValue(build) ?? string.Empty
         )
         .ToList();
 }
@@ -366,8 +372,7 @@ static string CreateFinalBuildPayload(string hero, Guid selectedCardId, string s
 
 static void InvokeStatic(Type type, string methodName, params object[] parameters)
 {
-    var method = type
-        .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+    var method = type.GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
         .FirstOrDefault(method =>
             method.Name == methodName && method.GetParameters().Length == parameters.Length
         );
@@ -389,9 +394,7 @@ static void TryDelete(string path)
         if (File.Exists(path))
             File.Delete(path);
     }
-    catch
-    {
-    }
+    catch { }
 }
 
 static void Assert(bool condition, string message)

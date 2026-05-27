@@ -56,7 +56,9 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         _startingSubscription = services.EventBus.Subscribe<CombatReplayPlaybackStarting>(
             OnPlaybackStarting
         );
-        _endedSubscription = services.EventBus.Subscribe<CombatReplayPlaybackEnded>(OnPlaybackEnded);
+        _endedSubscription = services.EventBus.Subscribe<CombatReplayPlaybackEnded>(
+            OnPlaybackEnded
+        );
     }
 
     private void OnDisable()
@@ -317,7 +319,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             )
             {
                 var trimmed = fileFull.Substring(rootFull.Length);
-                return trimmed.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                return trimmed.TrimStart(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar
+                );
             }
         }
         catch

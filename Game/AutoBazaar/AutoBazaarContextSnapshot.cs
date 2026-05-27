@@ -13,7 +13,10 @@ internal sealed class AutoBazaarContextSnapshot
     public AutoBazaarContextSnapshot(AutoBazaarContext context)
     {
         Context = context;
-        ETag = "\"" + context.TickId.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\"";
+        ETag =
+            "\""
+            + context.TickId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + "\"";
     }
 }
 
@@ -44,8 +47,8 @@ internal sealed class AutoBazaarContextSnapshotPublisher
         Volatile.Write(ref _current, null);
     }
 
-    private static AutoBazaarContext CloneWithTickId(AutoBazaarContext src, ulong tickId)
-        => new()
+    private static AutoBazaarContext CloneWithTickId(AutoBazaarContext src, ulong tickId) =>
+        new()
         {
             SchemaVersion = src.SchemaVersion,
             TickId = tickId,
@@ -123,10 +126,16 @@ internal sealed class AutoBazaarContextSnapshotPublisher
             && OptionsEqual(a.AvailableActions, b.AvailableActions);
     }
 
-    private static bool CardsEqual(IReadOnlyList<AutoBazaarCardSnapshot> a, IReadOnlyList<AutoBazaarCardSnapshot> b)
+    private static bool CardsEqual(
+        IReadOnlyList<AutoBazaarCardSnapshot> a,
+        IReadOnlyList<AutoBazaarCardSnapshot> b
+    )
     {
-        if (a.Count != b.Count) return false;
-        for (var i = 0; i < a.Count; i++) if (!CardEqual(a[i], b[i])) return false;
+        if (a.Count != b.Count)
+            return false;
+        for (var i = 0; i < a.Count; i++)
+            if (!CardEqual(a[i], b[i]))
+                return false;
         return true;
     }
 
@@ -159,65 +168,97 @@ internal sealed class AutoBazaarContextSnapshotPublisher
             && a.CanSell == b.CanSell;
     }
 
-    private static bool OptionsEqual(IReadOnlyList<AutoBazaarDecisionOption> a, IReadOnlyList<AutoBazaarDecisionOption> b)
+    private static bool OptionsEqual(
+        IReadOnlyList<AutoBazaarDecisionOption> a,
+        IReadOnlyList<AutoBazaarDecisionOption> b
+    )
     {
-        if (a.Count != b.Count) return false;
+        if (a.Count != b.Count)
+            return false;
         for (var i = 0; i < a.Count; i++)
         {
             var x = a[i];
             var y = b[i];
-            if (x.ActionKind != y.ActionKind) return false;
-            if (x.Group != y.Group) return false;
-            if (x.DisplayKey != y.DisplayKey) return false;
-            if (x.CardInstanceId != y.CardInstanceId) return false;
-            if (x.TargetSection != y.TargetSection) return false;
-            if (!SocketsEqual(x.TargetSockets, y.TargetSockets)) return false;
-            if (x.Card is null != y.Card is null) return false;
-            if (x.Card is not null && y.Card is not null && !CardEqual(x.Card, y.Card)) return false;
+            if (x.ActionKind != y.ActionKind)
+                return false;
+            if (x.Group != y.Group)
+                return false;
+            if (x.DisplayKey != y.DisplayKey)
+                return false;
+            if (x.CardInstanceId != y.CardInstanceId)
+                return false;
+            if (x.TargetSection != y.TargetSection)
+                return false;
+            if (!SocketsEqual(x.TargetSockets, y.TargetSockets))
+                return false;
+            if (x.Card is null != y.Card is null)
+                return false;
+            if (x.Card is not null && y.Card is not null && !CardEqual(x.Card, y.Card))
+                return false;
         }
         return true;
     }
 
     private static bool SocketsEqual(IReadOnlyList<string>? a, IReadOnlyList<string>? b)
     {
-        if (ReferenceEquals(a, b)) return true;
-        if (a is null || b is null) return false;
-        if (a.Count != b.Count) return false;
-        for (var i = 0; i < a.Count; i++) if (a[i] != b[i]) return false;
+        if (ReferenceEquals(a, b))
+            return true;
+        if (a is null || b is null)
+            return false;
+        if (a.Count != b.Count)
+            return false;
+        for (var i = 0; i < a.Count; i++)
+            if (a[i] != b[i])
+                return false;
         return true;
     }
 
     private static bool AttributesEqual(
         IReadOnlyDictionary<string, int> a,
-        IReadOnlyDictionary<string, int> b)
+        IReadOnlyDictionary<string, int> b
+    )
     {
-        if (ReferenceEquals(a, b)) return true;
-        if (a.Count != b.Count) return false;
+        if (ReferenceEquals(a, b))
+            return true;
+        if (a.Count != b.Count)
+            return false;
         foreach (var kv in a)
         {
-            if (!b.TryGetValue(kv.Key, out var value) || value != kv.Value) return false;
+            if (!b.TryGetValue(kv.Key, out var value) || value != kv.Value)
+                return false;
         }
         return true;
     }
 
     private static bool AbilitiesEqual(
         IReadOnlyList<AutoBazaarCardAbilitySnapshot> a,
-        IReadOnlyList<AutoBazaarCardAbilitySnapshot> b)
+        IReadOnlyList<AutoBazaarCardAbilitySnapshot> b
+    )
     {
-        if (ReferenceEquals(a, b)) return true;
-        if (a.Count != b.Count) return false;
+        if (ReferenceEquals(a, b))
+            return true;
+        if (a.Count != b.Count)
+            return false;
         for (var i = 0; i < a.Count; i++)
         {
             var x = a[i];
             var y = b[i];
-            if (x.Id != y.Id) return false;
-            if (x.InternalName != y.InternalName) return false;
-            if (x.InternalDescription != y.InternalDescription) return false;
-            if (x.Trigger != y.Trigger) return false;
-            if (x.Action != y.Action) return false;
-            if (x.ActiveIn != y.ActiveIn) return false;
-            if (x.WorksIn != y.WorksIn) return false;
-            if (x.Priority != y.Priority) return false;
+            if (x.Id != y.Id)
+                return false;
+            if (x.InternalName != y.InternalName)
+                return false;
+            if (x.InternalDescription != y.InternalDescription)
+                return false;
+            if (x.Trigger != y.Trigger)
+                return false;
+            if (x.Action != y.Action)
+                return false;
+            if (x.ActiveIn != y.ActiveIn)
+                return false;
+            if (x.WorksIn != y.WorksIn)
+                return false;
+            if (x.Priority != y.Priority)
+                return false;
         }
         return true;
     }

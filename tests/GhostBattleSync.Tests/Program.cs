@@ -19,9 +19,7 @@ var coordinatorDependenciesType = RequireType(
 var coordinatorOutcomeType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator+GhostBattleOutcome"
 );
-var importRecordType = RequireModApiType(
-    "BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord"
-);
+var importRecordType = RequireModApiType("BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord");
 var routesType = RequireModApiType("BazaarPlusPlus.ModApi.ModApiRoutes");
 var artifactCodecType = RequireModApiType("BazaarPlusPlus.ModApi.RunBundleArtifactCodec");
 var ghostPayloadStoreType = RequireType(
@@ -44,9 +42,7 @@ var replayPayloadArtifactType = RequireModApiType(
 var cardSetCaptureArtifactType = RequireModApiType(
     "BazaarPlusPlus.ModApi.Models.CardSetCaptureArtifact"
 );
-var cardSetItemArtifactType = RequireModApiType(
-    "BazaarPlusPlus.ModApi.Models.CardSetItemArtifact"
-);
+var cardSetItemArtifactType = RequireModApiType("BazaarPlusPlus.ModApi.Models.CardSetItemArtifact");
 var cardSnapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSnapshot");
 
 var shouldAdvanceCheckpoint = syncServiceType.GetMethod(
@@ -111,7 +107,8 @@ Assert(
             (Action)(() => { }),
             (Action)(() => { }),
             (Action<bool>)(_ => { })
-        ) ?? throw new InvalidOperationException("HistoryPanelCoordinator should be constructible.");
+        )
+        ?? throw new InvalidOperationException("HistoryPanelCoordinator should be constructible.");
 
     InvokeVoid(coordinatorType, coordinator, "OnPanelHidden", []);
 
@@ -216,9 +213,7 @@ cardSetItemArtifactType.GetProperty("Name")!.SetValue(cardItemArtifact, "Test Ca
 var cardItemArtifactListType = typeof(List<>).MakeGenericType(cardSetItemArtifactType);
 var cardItemArtifactList = (IList)(
     Activator.CreateInstance(cardItemArtifactListType)
-    ?? throw new InvalidOperationException(
-        "CardSetItemArtifact list should be constructible."
-    )
+    ?? throw new InvalidOperationException("CardSetItemArtifact list should be constructible.")
 );
 cardItemArtifactList.Add(cardItemArtifact);
 cardSetCaptureArtifactType.GetProperty("Items")!.SetValue(cardSetCapture, cardItemArtifactList);
@@ -497,25 +492,18 @@ try
     );
 
     var ghostBattles = (System.Collections.IEnumerable)
-        Invoke<object>(
-            repositoryType,
-            repository,
-            "ListRecentGhostBattles",
-            [20]
-        );
+        Invoke<object>(repositoryType, repository, "ListRecentGhostBattles", [20]);
     var projectedBattles = ghostBattles.Cast<object>().ToList();
     var projectedBattle =
         projectedBattles.SingleOrDefault(battle =>
             (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
             == "ghost-battle-001"
-        )
-        ?? throw new InvalidOperationException("Expected the projected remote-win ghost battle.");
+        ) ?? throw new InvalidOperationException("Expected the projected remote-win ghost battle.");
     var projectedLocalWinBattle =
         projectedBattles.SingleOrDefault(battle =>
             (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
             == "ghost-battle-local-win"
-        )
-        ?? throw new InvalidOperationException("Expected the projected local-win ghost battle.");
+        ) ?? throw new InvalidOperationException("Expected the projected local-win ghost battle.");
 
     Assert(
         (string?)battleRecordType.GetProperty("OpponentName")?.GetValue(projectedBattle)
@@ -536,7 +524,9 @@ try
         "Ghost repository reads should project the result into local-player perspective."
     );
     Assert(
-        (bool)(battleRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(projectedBattle) ?? false),
+        (bool)(
+            battleRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(projectedBattle) ?? false
+        ),
         "Ghost repository reads should preserve the bundle-final battle marker."
     );
     Assert(
@@ -544,8 +534,7 @@ try
         "A bundle-final ghost battle should not show elimination text when the local player lost."
     );
     Assert(
-        (string?)battleRecordType.GetProperty("Result")?.GetValue(projectedLocalWinBattle)
-            == "Won",
+        (string?)battleRecordType.GetProperty("Result")?.GetValue(projectedLocalWinBattle) == "Won",
         "Ghost repository reads should project a remote loss into a local-player win."
     );
     Assert(
@@ -585,7 +574,8 @@ try
                     """
                 ),
             ]
-        ) ?? throw new InvalidOperationException("TryParseBattle should return bearer-scoped data.");
+        )
+        ?? throw new InvalidOperationException("TryParseBattle should return bearer-scoped data.");
     serviceScopedImportRecords.SetValue(serviceScopedImportRecord, 0);
     InvokeVoid(
         repositoryType,
@@ -595,11 +585,8 @@ try
     );
 
     var dataService =
-        Activator.CreateInstance(
-            dataServiceType,
-            repository,
-            null
-        ) ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
+        Activator.CreateInstance(dataServiceType, repository, null)
+        ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
     var loadGhostArgs = new object?[] { 100, null, null, null };
     var loadGhostSucceeded = (bool)
         dataServiceType.GetMethod("TryLoadGhostBattles")!.Invoke(dataService, loadGhostArgs)!;
@@ -737,10 +724,7 @@ Assert(
     var replayPayloadTask = (Task)(
         downloadReplayBytesAsync!.Invoke(
             replayPayloadClient,
-            [
-                "https://r2-presigned.example.com/replays/token-public",
-                CancellationToken.None,
-            ]
+            ["https://r2-presigned.example.com/replays/token-public", CancellationToken.None]
         ) ?? throw new InvalidOperationException("Replay-bytes request should return a task.")
     );
     await replayPayloadTask;

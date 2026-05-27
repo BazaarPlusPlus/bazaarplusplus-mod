@@ -1,9 +1,9 @@
 #nullable enable
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ui;
+using UnityEngine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -91,8 +91,7 @@ internal sealed partial class HistoryPanel
                 : HistoryPanelFormatter.FormatSnapshotSummary(ActiveSelectedBattle.SnapshotCounts);
         var battleSummary =
             ActiveSelectedBattle == null ? HistoryPanelText.SelectBattleForFooter()
-            : string.IsNullOrWhiteSpace(snapshotSummary)
-                ? selectedBattleTimestampText
+            : string.IsNullOrWhiteSpace(snapshotSummary) ? selectedBattleTimestampText
             : $"{selectedBattleTimestampText} | {snapshotSummary}";
         var footerSecondaryText = string.IsNullOrWhiteSpace(_statusMessage)
             ? battleSummary

@@ -2,12 +2,13 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Xunit;
 using BazaarPlusPlus.Game.AutoBazaar;
+using Xunit;
 
 public class AutoBazaarActionQueueTests
 {
-    private static AutoBazaarAction WaitAction() => new() { ActionKind = AutoBazaarActionKind.Wait };
+    private static AutoBazaarAction WaitAction() =>
+        new() { ActionKind = AutoBazaarActionKind.Wait };
 
     [Fact]
     public async Task EnqueueDequeueSetResult_CompletesAwait_WithCorrectResponse()
@@ -44,7 +45,7 @@ public class AutoBazaarActionQueueTests
         var task = q.EnqueueAndAwaitAsync(WaitAction());
         var pending = q.TryDequeue()!;
         pending.SetResponse(new AutoBazaarServerResponse(200, "{\"first\":true}"));
-        pending.SetResponse(new AutoBazaarServerResponse(500, "{\"second\":true}"));  // should be ignored
+        pending.SetResponse(new AutoBazaarServerResponse(500, "{\"second\":true}")); // should be ignored
         var res = await task;
         Assert.Equal(200, res.HttpStatus);
     }
@@ -85,7 +86,10 @@ public class AutoBazaarActionQueueTests
         var sw = Stopwatch.StartNew();
         var task = q.EnqueueAndAwaitAsync(WaitAction());
         sw.Stop();
-        Assert.True(sw.ElapsedMilliseconds < 50, $"Enqueue took {sw.ElapsedMilliseconds}ms — should be near-instant");
+        Assert.True(
+            sw.ElapsedMilliseconds < 50,
+            $"Enqueue took {sw.ElapsedMilliseconds}ms — should be near-instant"
+        );
         q.TryDequeue()!.SetResponse(new AutoBazaarServerResponse(200, "{}"));
         await task;
     }

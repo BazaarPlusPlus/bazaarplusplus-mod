@@ -12,11 +12,13 @@ internal sealed class BppMountableRegistry
 
     public void MountAll(GameObject host, IBppServices services)
     {
-        foreach (var m in _mountables) m.Mount(host, services);
+        foreach (var m in _mountables)
+            m.Mount(host, services);
     }
 
     public void UnmountAll(GameObject host)
     {
-        for (var i = _mountables.Count - 1; i >= 0; i--) _mountables[i].Unmount(host);
+        for (var i = _mountables.Count - 1; i >= 0; i--)
+            _mountables[i].Unmount(host);
     }
 }

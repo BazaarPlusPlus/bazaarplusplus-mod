@@ -24,10 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarDecision.cs"
-      Link="AutoBazaarDecision.cs"
-    />
+    <Compile Include="..\..\Game\AutoBazaar\AutoBazaarDecision.cs" Link="AutoBazaarDecision.cs" />
     <Compile
       Include="..\..\Game\AutoBazaar\IsExternalInitPolyfill.cs"
       Link="IsExternalInitPolyfill.cs"
@@ -40,10 +37,7 @@
       Include="..\..\Game\AutoBazaar\AutoBazaarMoveTargetPlanner.cs"
       Link="AutoBazaarMoveTargetPlanner.cs"
     />
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarUlid.cs"
-      Link="AutoBazaarUlid.cs"
-    />
+    <Compile Include="..\..\Game\AutoBazaar\AutoBazaarUlid.cs" Link="AutoBazaarUlid.cs" />
     <Compile
       Include="..\..\Game\AutoBazaar\AutoBazaarActionValidator.cs"
       Link="AutoBazaarActionValidator.cs"

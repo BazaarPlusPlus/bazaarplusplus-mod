@@ -5,8 +5,8 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
-using Xunit;
 using BazaarPlusPlus.Game.AutoBazaar;
+using Xunit;
 
 // Minimal shim so AutoBazaarHttpServer.cs compiles in the test project without BepInEx.
 namespace BazaarPlusPlus.Infrastructure
@@ -14,6 +14,7 @@ namespace BazaarPlusPlus.Infrastructure
     internal static class BppLog
     {
         internal static void Error(string component, string message) { }
+
         internal static void Error(string component, string message, Exception ex) { }
     }
 }
@@ -32,6 +33,7 @@ public class AutoBazaarHttpServerTests
         public string EndpointJsonPath { get; }
         private AutoBazaarContextSnapshot? _snapshot;
         public AutoBazaarContextSnapshot? CurrentSnapshot => _snapshot;
+
         public void SetSnapshot(AutoBazaarContextSnapshot? s) => _snapshot = s;
 
         public ServerFixture(int timeoutMs = 5000)
@@ -40,16 +42,29 @@ public class AutoBazaarHttpServerTests
             Queue = new AutoBazaarActionQueue(timeoutMs);
             EndpointJsonPath = System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(),
-                $"endpoint-{Guid.NewGuid():N}.json");
+                $"endpoint-{Guid.NewGuid():N}.json"
+            );
             Server = new AutoBazaarHttpServer(Port, EndpointJsonPath, () => CurrentSnapshot, Queue);
             Server.Start();
         }
 
         public void Dispose()
         {
-            try { Server.Dispose(); } catch { }
-            try { Queue.Dispose(); } catch { }
-            try { System.IO.File.Delete(EndpointJsonPath); } catch { }
+            try
+            {
+                Server.Dispose();
+            }
+            catch { }
+            try
+            {
+                Queue.Dispose();
+            }
+            catch { }
+            try
+            {
+                System.IO.File.Delete(EndpointJsonPath);
+            }
+            catch { }
         }
 
         private static int PickFreePort()
@@ -68,22 +83,23 @@ public class AutoBazaarHttpServerTests
     // Helper: build a minimal valid context with a Wait action available
     // ---------------------------------------------------------------------------
 
-    private static AutoBazaarContext WaitContext(ulong tickId = 1) => new()
-    {
-        TickId = tickId,
-        IsEnabled = true,
-        StateName = AutoBazaarRunStateName.Choice,
-        PlayerGold = 10,
-        AvailableActions = new[]
+    private static AutoBazaarContext WaitContext(ulong tickId = 1) =>
+        new()
         {
-            new AutoBazaarDecisionOption
+            TickId = tickId,
+            IsEnabled = true,
+            StateName = AutoBazaarRunStateName.Choice,
+            PlayerGold = 10,
+            AvailableActions = new[]
             {
-                ActionKind = AutoBazaarActionKind.Wait,
-                Group = AutoBazaarActionGroup.Wait,
-                DisplayKey = "Wait",
+                new AutoBazaarDecisionOption
+                {
+                    ActionKind = AutoBazaarActionKind.Wait,
+                    Group = AutoBazaarActionGroup.Wait,
+                    DisplayKey = "Wait",
+                },
             },
-        },
-    };
+        };
 
     // ---------------------------------------------------------------------------
     // Case 1: GET 503 when snapshot is null
@@ -174,7 +190,9 @@ public class AutoBazaarHttpServerTests
                 var pending = f.Queue.TryDequeue();
                 if (pending is not null)
                 {
-                    pending.SetResponse(new AutoBazaarServerResponse(200, "{\"ok\":true,\"decisionId\":\"01\"}"));
+                    pending.SetResponse(
+                        new AutoBazaarServerResponse(200, "{\"ok\":true,\"decisionId\":\"01\"}")
+                    );
                     return;
                 }
                 await Task.Delay(10);
@@ -184,7 +202,8 @@ public class AutoBazaarHttpServerTests
         using var http = Http();
         var res = await http.PostAsync(
             $"http://127.0.0.1:{f.Port}/v1/actions",
-            new StringContent("{\"actionKind\":\"Wait\"}", Encoding.UTF8, "application/json"));
+            new StringContent("{\"actionKind\":\"Wait\"}", Encoding.UTF8, "application/json")
+        );
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         var body = await res.Content.ReadAsStringAsync();
         Assert.Contains("\"ok\":true", body);
@@ -204,7 +223,8 @@ public class AutoBazaarHttpServerTests
         using var http = Http();
         var res = await http.PostAsync(
             $"http://127.0.0.1:{f.Port}/v1/actions",
-            new StringContent("not-json", Encoding.UTF8, "application/json"));
+            new StringContent("not-json", Encoding.UTF8, "application/json")
+        );
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
         var body = await res.Content.ReadAsStringAsync();
         Assert.Contains("\"error\"", body);
@@ -247,7 +267,8 @@ public class AutoBazaarHttpServerTests
         using var http = Http();
         var res = await http.PostAsync(
             $"http://127.0.0.1:{f.Port}/v1/actions",
-            new StringContent("{\"actionKind\":\"Wait\"}", Encoding.UTF8, "application/json"));
+            new StringContent("{\"actionKind\":\"Wait\"}", Encoding.UTF8, "application/json")
+        );
         Assert.Equal(HttpStatusCode.ServiceUnavailable, res.StatusCode);
     }
 
@@ -263,7 +284,8 @@ public class AutoBazaarHttpServerTests
         using var http = Http();
         var res = await http.PostAsync(
             $"http://127.0.0.1:{f.Port}/v1/missing",
-            new StringContent("{}", Encoding.UTF8, "application/json"));
+            new StringContent("{}", Encoding.UTF8, "application/json")
+        );
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
         var body = await res.Content.ReadAsStringAsync();
         Assert.Contains("\"error\"", body);
@@ -281,9 +303,15 @@ public class AutoBazaarHttpServerTests
         using (var f = new ServerFixture())
         {
             path = f.EndpointJsonPath;
-            Assert.True(System.IO.File.Exists(path), "endpoint.json should exist while server is running");
+            Assert.True(
+                System.IO.File.Exists(path),
+                "endpoint.json should exist while server is running"
+            );
         }
         // After Dispose, the server's Stop() removes the file
-        Assert.False(System.IO.File.Exists(path), "endpoint.json should be deleted after server stops");
+        Assert.False(
+            System.IO.File.Exists(path),
+            "endpoint.json should be deleted after server stops"
+        );
     }
 }

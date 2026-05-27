@@ -82,7 +82,12 @@ internal static class AudioBankWarmer
                 await SoundtrackWarmer.WarmBoardAudioAsync(soundManager, boardAsset!, stats);
             }
 
-            await SoundtrackWarmer.WarmSoundtracksAsync(soundManager, collectionManager, boardAssets, stats);
+            await SoundtrackWarmer.WarmSoundtracksAsync(
+                soundManager,
+                collectionManager,
+                boardAssets,
+                stats
+            );
 
             BppLog.Info(
                 "AudioBankWarmer",
@@ -93,10 +98,7 @@ internal static class AudioBankWarmer
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "AudioBankWarmer",
-                $"Saved replay audio warmup failed: {ex.Message}"
-            );
+            BppLog.Warn("AudioBankWarmer", $"Saved replay audio warmup failed: {ex.Message}");
         }
     }
 
@@ -139,10 +141,7 @@ internal static class AudioBankWarmer
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "AudioBankWarmer",
-                $"Replay audio readiness step failed: {ex.Message}"
-            );
+            BppLog.Warn("AudioBankWarmer", $"Replay audio readiness step failed: {ex.Message}");
         }
     }
 
@@ -316,10 +315,7 @@ internal static class AudioBankWarmer
         {
             if (!vca.isValid())
             {
-                BppLog.Info(
-                    "AudioBankWarmer",
-                    $"[ReplayAudioDiag/{label}] vca.{vcaName} invalid"
-                );
+                BppLog.Info("AudioBankWarmer", $"[ReplayAudioDiag/{label}] vca.{vcaName} invalid");
                 return;
             }
 
@@ -408,10 +404,7 @@ internal static class AudioBankWarmer
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "AudioBankWarmer",
-                $"Replay audio readiness layer-3 failed: {ex.Message}"
-            );
+            BppLog.Warn("AudioBankWarmer", $"Replay audio readiness layer-3 failed: {ex.Message}");
         }
     }
 
@@ -455,10 +448,7 @@ internal static class AudioBankWarmer
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "AudioBankWarmer",
-                $"Replay audio readiness layer-4 failed: {ex.Message}"
-            );
+            BppLog.Warn("AudioBankWarmer", $"Replay audio readiness layer-4 failed: {ex.Message}");
         }
     }
 }

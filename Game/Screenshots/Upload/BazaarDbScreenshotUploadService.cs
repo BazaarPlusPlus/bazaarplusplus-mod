@@ -30,7 +30,8 @@ internal sealed class BazaarDbScreenshotUploadService
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _playerAccountIdResolver =
-            playerAccountIdResolver ?? throw new ArgumentNullException(nameof(playerAccountIdResolver));
+            playerAccountIdResolver
+            ?? throw new ArgumentNullException(nameof(playerAccountIdResolver));
     }
 
     public async Task UploadPendingAsync(CancellationToken cancellationToken)
@@ -74,7 +75,10 @@ internal sealed class BazaarDbScreenshotUploadService
                     continue;
                 }
 
-                var result = await client.UploadScreenshotAsync(snapshot.Payload, cancellationToken);
+                var result = await client.UploadScreenshotAsync(
+                    snapshot.Payload,
+                    cancellationToken
+                );
                 if (result.Succeeded)
                 {
                     _store.MarkUploaded(screenshotId, DateTime.UtcNow);

@@ -20,8 +20,12 @@ internal static class BppTmpFontPolicy
 
     private static bool IsCjk(char character)
     {
-        return character is >= '\u3400' and <= '\u4DBF'
-            or >= '\u4E00' and <= '\u9FFF'
-            or >= '\uF900' and <= '\uFAFF';
+        return character
+            is >= '\u3400'
+                and <= '\u4DBF'
+                or >= '\u4E00'
+                and <= '\u9FFF'
+                or >= '\uF900'
+                and <= '\uFAFF';
     }
 }

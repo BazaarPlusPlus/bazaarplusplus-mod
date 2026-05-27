@@ -42,7 +42,8 @@ internal static class AutoBazaarUlid
     {
         for (var i = r.Length - 1; i >= 0; i--)
         {
-            if (++r[i] != 0) return;
+            if (++r[i] != 0)
+                return;
         }
         // 80-bit overflow within one ms is astronomically unlikely; reseed defensively.
         using var rng = RandomNumberGenerator.Create();
@@ -61,11 +62,27 @@ internal static class AutoBazaarUlid
     private static void EncodeRandomness(ReadOnlySpan<byte> rand, Span<char> dst)
     {
         // 80 bits → 16 chars (5 bits each). Treat the 10 bytes as an 80-bit big-endian integer.
-        ulong hi = ((ulong)rand[0] << 32) | ((ulong)rand[1] << 24) | ((ulong)rand[2] << 16)
-                 | ((ulong)rand[3] << 8) | rand[4];
-        ulong lo = ((ulong)rand[5] << 32) | ((ulong)rand[6] << 24) | ((ulong)rand[7] << 16)
-                 | ((ulong)rand[8] << 8) | rand[9];
-        for (var i = 7; i >= 0; i--) { dst[i] = Alphabet[(int)(hi & 0x1F)]; hi >>= 5; }
-        for (var i = 15; i >= 8; i--) { dst[i] = Alphabet[(int)(lo & 0x1F)]; lo >>= 5; }
+        ulong hi =
+            ((ulong)rand[0] << 32)
+            | ((ulong)rand[1] << 24)
+            | ((ulong)rand[2] << 16)
+            | ((ulong)rand[3] << 8)
+            | rand[4];
+        ulong lo =
+            ((ulong)rand[5] << 32)
+            | ((ulong)rand[6] << 24)
+            | ((ulong)rand[7] << 16)
+            | ((ulong)rand[8] << 8)
+            | rand[9];
+        for (var i = 7; i >= 0; i--)
+        {
+            dst[i] = Alphabet[(int)(hi & 0x1F)];
+            hi >>= 5;
+        }
+        for (var i = 15; i >= 8; i--)
+        {
+            dst[i] = Alphabet[(int)(lo & 0x1F)];
+            lo >>= 5;
+        }
     }
 }

@@ -31,14 +31,21 @@ internal static class InteractionFilterProbe
                 _filterField = AccessTools.Field(typeof(AppState), "_iteractionFilter");
                 if (_filterField is null)
                 {
-                    BppLog.Info("Encounter", "AppState._iteractionFilter field not found via reflection");
+                    BppLog.Info(
+                        "Encounter",
+                        "AppState._iteractionFilter field not found via reflection"
+                    );
                 }
             }
-            if (_filterField is null) return EmptyArray;
-            if (_filterField.GetValue(null) is not System.Collections.IList list) return EmptyArray;
-            if (list.Count == 0) return EmptyArray;
+            if (_filterField is null)
+                return EmptyArray;
+            if (_filterField.GetValue(null) is not System.Collections.IList list)
+                return EmptyArray;
+            if (list.Count == 0)
+                return EmptyArray;
             var copy = new string[list.Count];
-            for (var i = 0; i < list.Count; i++) copy[i] = list[i]?.ToString() ?? "";
+            for (var i = 0; i < list.Count; i++)
+                copy[i] = list[i]?.ToString() ?? "";
             return copy;
         }
         catch (Exception ex)

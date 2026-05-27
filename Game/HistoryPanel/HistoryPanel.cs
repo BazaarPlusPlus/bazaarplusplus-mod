@@ -2,6 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.HistoryPanel.Preview;
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
@@ -10,9 +13,6 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using Coroutine = UnityEngine.Coroutine;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
-using BazaarPlusPlus.Game.HistoryPanel.Storage;
-using BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -301,11 +301,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             _battles
         );
         _previewCoroutine = StartCoroutine(
-            _battleBoardPreview.Render(
-                previewData.Items,
-                previewData.Signature,
-                OnPreviewPhase
-            )
+            _battleBoardPreview.Render(previewData.Items, previewData.Signature, OnPreviewPhase)
         );
     }
 
@@ -476,5 +472,4 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         return $"{prefix}{eventSystem.GetType().Name}(name='{eventSystem.name}',activeSelf={eventSystem.gameObject.activeSelf},activeInHierarchy={eventSystem.gameObject.activeInHierarchy},enabled={eventSystem.enabled},isCurrent={ReferenceEquals(EventSystem.current, eventSystem)},scene='{eventSystem.gameObject.scene.name}',modules=[{string.Join(", ", modules)}])";
     }
-
 }

@@ -25,11 +25,9 @@ internal static class AutoBazaarResponseJson
             AutoBazaarValidationCode.Unavailable => "unavailable",
             _ => "internal",
         };
-        var envelope = new Dictionary<string, object?>
-        {
-            ["error"] = code,
-        };
-        if (validation.Details is not null) envelope["details"] = validation.Details;
+        var envelope = new Dictionary<string, object?> { ["error"] = code };
+        if (validation.Details is not null)
+            envelope["details"] = validation.Details;
         if (validation.Extra is not null && validation.Extra.Count > 0)
         {
             envelope["extra"] = validation.Extra;

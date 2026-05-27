@@ -1,11 +1,11 @@
 using System.Collections.Generic;
-using Xunit;
 using BazaarPlusPlus.Game.AutoBazaar;
+using Xunit;
 
 public class AutoBazaarContextSnapshotTests
 {
-    private static AutoBazaarContext MakeChoice(int gold = 10, string serverTime = "t1")
-        => new()
+    private static AutoBazaarContext MakeChoice(int gold = 10, string serverTime = "t1") =>
+        new()
         {
             ServerTimeUtc = serverTime,
             StateName = AutoBazaarRunStateName.Choice,
@@ -27,7 +27,7 @@ public class AutoBazaarContextSnapshotTests
     {
         var pub = new AutoBazaarContextSnapshotPublisher();
         var s1 = pub.Publish(MakeChoice(serverTime: "t1"));
-        var s2 = pub.Publish(MakeChoice(serverTime: "t2"));  // only ServerTimeUtc differs
+        var s2 = pub.Publish(MakeChoice(serverTime: "t2")); // only ServerTimeUtc differs
         Assert.Equal(s1.TickId, s2.TickId);
         Assert.Same(s1, s2);
     }
@@ -47,38 +47,42 @@ public class AutoBazaarContextSnapshotTests
     public void Publish_DifferentRunProgressFields_BumpsTickId()
     {
         var pub = new AutoBazaarContextSnapshotPublisher();
-        var s1 = pub.Publish(new AutoBazaarContext
-        {
-            IsEnabled = true,
-            StateName = AutoBazaarRunStateName.Choice,
-            PlayerHero = "Vanessa",
-            Day = 1,
-            Hour = 2,
-            Wins = 0,
-            Losses = 0,
-            PlayerHealth = 100,
-            PlayerMaxHealth = 100,
-            PlayerPrestige = 20,
-            PlayerLevel = 1,
-            PlayerIncome = 1,
-            CurrentEncounterType = "TCardEncounterEvent",
-        });
-        var s2 = pub.Publish(new AutoBazaarContext
-        {
-            IsEnabled = true,
-            StateName = AutoBazaarRunStateName.Choice,
-            PlayerHero = "Vanessa",
-            Day = 1,
-            Hour = 3,
-            Wins = 0,
-            Losses = 0,
-            PlayerHealth = 100,
-            PlayerMaxHealth = 100,
-            PlayerPrestige = 20,
-            PlayerLevel = 1,
-            PlayerIncome = 1,
-            CurrentEncounterType = "TCardEncounterEvent",
-        });
+        var s1 = pub.Publish(
+            new AutoBazaarContext
+            {
+                IsEnabled = true,
+                StateName = AutoBazaarRunStateName.Choice,
+                PlayerHero = "Vanessa",
+                Day = 1,
+                Hour = 2,
+                Wins = 0,
+                Losses = 0,
+                PlayerHealth = 100,
+                PlayerMaxHealth = 100,
+                PlayerPrestige = 20,
+                PlayerLevel = 1,
+                PlayerIncome = 1,
+                CurrentEncounterType = "TCardEncounterEvent",
+            }
+        );
+        var s2 = pub.Publish(
+            new AutoBazaarContext
+            {
+                IsEnabled = true,
+                StateName = AutoBazaarRunStateName.Choice,
+                PlayerHero = "Vanessa",
+                Day = 1,
+                Hour = 3,
+                Wins = 0,
+                Losses = 0,
+                PlayerHealth = 100,
+                PlayerMaxHealth = 100,
+                PlayerPrestige = 20,
+                PlayerLevel = 1,
+                PlayerIncome = 1,
+                CurrentEncounterType = "TCardEncounterEvent",
+            }
+        );
 
         Assert.Equal(1UL, s1.TickId);
         Assert.Equal(2UL, s2.TickId);
@@ -90,12 +94,22 @@ public class AutoBazaarContextSnapshotTests
         var pub = new AutoBazaarContextSnapshotPublisher();
         var s1 = pub.Publish(MakeChoice());
         // choice2 has same content as s1 — no bump expected
-        var choice2 = new AutoBazaarContext { StateName = AutoBazaarRunStateName.Choice, IsEnabled = true, PlayerGold = 10 };
+        var choice2 = new AutoBazaarContext
+        {
+            StateName = AutoBazaarRunStateName.Choice,
+            IsEnabled = true,
+            PlayerGold = 10,
+        };
         var s2 = pub.Publish(choice2);
         Assert.Equal(1UL, s2.TickId);
         Assert.Same(s1, s2);
         // combat state differs — must bump
-        var combat = new AutoBazaarContext { StateName = AutoBazaarRunStateName.Combat, IsEnabled = true, PlayerGold = 10 };
+        var combat = new AutoBazaarContext
+        {
+            StateName = AutoBazaarRunStateName.Combat,
+            IsEnabled = true,
+            PlayerGold = 10,
+        };
         var s3 = pub.Publish(combat);
         Assert.Equal(2UL, s3.TickId);
         Assert.NotSame(s1, s3);
@@ -109,7 +123,10 @@ public class AutoBazaarContextSnapshotTests
         {
             IsEnabled = true,
             StateName = AutoBazaarRunStateName.Choice,
-            BoardItems = new[] { new AutoBazaarCardSnapshot { InstanceId = "i1", Kind = AutoBazaarCardKind.Item } },
+            BoardItems = new[]
+            {
+                new AutoBazaarCardSnapshot { InstanceId = "i1", Kind = AutoBazaarCardKind.Item },
+            },
         };
         var withTwo = new AutoBazaarContext
         {
@@ -191,14 +208,38 @@ public class AutoBazaarContextSnapshotTests
     public void Publish_AvailableActionsSocketsDiffer_BumpsTickId()
     {
         var pub = new AutoBazaarContextSnapshotPublisher();
-        var a = new AutoBazaarContext { IsEnabled = true, AvailableActions = new[] {
-            new AutoBazaarDecisionOption { ActionKind = AutoBazaarActionKind.MoveItem, Group = AutoBazaarActionGroup.Move,
-                DisplayKey = "MoveItem:i1", CardInstanceId = "i1", TargetSection = AutoBazaarTargetSection.Hand,
-                TargetSockets = new[] { "Socket_0", "Socket_1" } } } };
-        var b = new AutoBazaarContext { IsEnabled = true, AvailableActions = new[] {
-            new AutoBazaarDecisionOption { ActionKind = AutoBazaarActionKind.MoveItem, Group = AutoBazaarActionGroup.Move,
-                DisplayKey = "MoveItem:i1", CardInstanceId = "i1", TargetSection = AutoBazaarTargetSection.Hand,
-                TargetSockets = new[] { "Socket_0", "Socket_2" } } } };  // sockets differ
+        var a = new AutoBazaarContext
+        {
+            IsEnabled = true,
+            AvailableActions = new[]
+            {
+                new AutoBazaarDecisionOption
+                {
+                    ActionKind = AutoBazaarActionKind.MoveItem,
+                    Group = AutoBazaarActionGroup.Move,
+                    DisplayKey = "MoveItem:i1",
+                    CardInstanceId = "i1",
+                    TargetSection = AutoBazaarTargetSection.Hand,
+                    TargetSockets = new[] { "Socket_0", "Socket_1" },
+                },
+            },
+        };
+        var b = new AutoBazaarContext
+        {
+            IsEnabled = true,
+            AvailableActions = new[]
+            {
+                new AutoBazaarDecisionOption
+                {
+                    ActionKind = AutoBazaarActionKind.MoveItem,
+                    Group = AutoBazaarActionGroup.Move,
+                    DisplayKey = "MoveItem:i1",
+                    CardInstanceId = "i1",
+                    TargetSection = AutoBazaarTargetSection.Hand,
+                    TargetSockets = new[] { "Socket_0", "Socket_2" },
+                },
+            },
+        }; // sockets differ
         var s1 = pub.Publish(a);
         var s2 = pub.Publish(b);
         Assert.NotEqual(s1.TickId, s2.TickId);

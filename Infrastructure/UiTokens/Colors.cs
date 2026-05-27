@@ -133,16 +133,16 @@ internal static class Colors
     public static Color CombatBarBackground => Rgba(0.06f, 0.07f, 0.09f, 0.90f);
     public static Color CombatBarGlow => Rgba(0.28f, 0.22f, 0.12f, 0.10f);
 
-    public static Color ButtonBorderFor(Color background)
-        => Rgba(
+    public static Color ButtonBorderFor(Color background) =>
+        Rgba(
             Mathf.Clamp01(background.r + 0.08f),
             Mathf.Clamp01(background.g + 0.08f),
             Mathf.Clamp01(background.b + 0.08f),
             0.58f
         );
 
-    public static Color InfoChipBackground(Color accent)
-        => Rgba(
+    public static Color InfoChipBackground(Color accent) =>
+        Rgba(
             Mathf.Lerp(0.14f, accent.r, 0.10f),
             Mathf.Lerp(0.16f, accent.g, 0.10f),
             Mathf.Lerp(0.20f, accent.b, 0.10f),
@@ -151,11 +151,11 @@ internal static class Colors
 
     public static Color InfoChipBorder(Color accent) => Rgba(accent.r, accent.g, accent.b, 0.95f);
 
-    public static Color WithAlpha(Color color, float alpha)
-        => Rgba(color.r, color.g, color.b, alpha);
+    public static Color WithAlpha(Color color, float alpha) =>
+        Rgba(color.r, color.g, color.b, alpha);
 
-    public static Color FromRgb(int r, int g, int b, float alpha = 0.98f)
-        => Rgba(r / 255f, g / 255f, b / 255f, alpha);
+    public static Color FromRgb(int r, int g, int b, float alpha = 0.98f) =>
+        Rgba(r / 255f, g / 255f, b / 255f, alpha);
 
     private static Color Rgba(float r, float g, float b, float a) => new(r, g, b, a);
 }

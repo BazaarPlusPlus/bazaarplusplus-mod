@@ -1,10 +1,10 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ui;
 
@@ -113,7 +113,9 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 
         BuildTree(_root);
 
-        _previewContainer?.RegisterCallback<GeometryChangedEvent>(OnPreviewContainerGeometryChanged);
+        _previewContainer?.RegisterCallback<GeometryChangedEvent>(
+            OnPreviewContainerGeometryChanged
+        );
     }
 
     private void OnPreviewContainerGeometryChanged(GeometryChangedEvent evt)
@@ -173,10 +175,11 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _footerPrimary!.text = model.FooterPrimaryText;
         _footerSecondary!.text = model.FooterSecondaryText;
         _ghostOpponentEliminatedNotice!.text = model.GhostOpponentEliminatedNoticeText;
-        _ghostOpponentEliminatedNotice.style.display =
-            string.IsNullOrWhiteSpace(model.GhostOpponentEliminatedNoticeText)
-                ? DisplayStyle.None
-                : DisplayStyle.Flex;
+        _ghostOpponentEliminatedNotice.style.display = string.IsNullOrWhiteSpace(
+            model.GhostOpponentEliminatedNoticeText
+        )
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
 
         RefreshTabButton(_runsTabButton!, model.SectionMode == HistorySectionMode.Runs);
         RefreshTabButton(_ghostTabButton!, model.SectionMode == HistorySectionMode.Ghost);

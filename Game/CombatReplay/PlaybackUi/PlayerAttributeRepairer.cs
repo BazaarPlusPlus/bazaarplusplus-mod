@@ -1,8 +1,8 @@
 #nullable enable
 
 using System;
-using System.Reflection;
 using System.Linq;
+using System.Reflection;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarGameShared.TempoNet.Models;
@@ -153,9 +153,7 @@ internal static class PlayerAttributeRepairer
         attributes[EPlayerAttributeType.HealthMax] = healthValue;
     }
 
-    private static void EnsurePlayerAttributeDefaults(
-        System.Collections.IDictionary attributes
-    )
+    private static void EnsurePlayerAttributeDefaults(System.Collections.IDictionary attributes)
     {
         foreach (EPlayerAttributeType attributeType in Enum.GetValues(typeof(EPlayerAttributeType)))
         {

@@ -160,10 +160,7 @@ internal sealed class RunBundleUploadStore
         transaction.Commit();
     }
 
-    public RunBundleUploadSnapshot? TryBuildRunBundleSnapshot(
-        string runId,
-        string playerAccountId
-    )
+    public RunBundleUploadSnapshot? TryBuildRunBundleSnapshot(string runId, string playerAccountId)
     {
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
@@ -343,8 +340,7 @@ internal sealed class RunBundleUploadStore
             Status = capture.Status.ToString(),
             Source = capture.Source.ToString(),
             Items =
-                capture.Items?.Select(MapCardSnapshot).ToList()
-                ?? new List<CardSetItemArtifact>(),
+                capture.Items?.Select(MapCardSnapshot).ToList() ?? new List<CardSetItemArtifact>(),
         };
     }
 
@@ -362,7 +358,9 @@ internal sealed class RunBundleUploadStore
             Tier = snapshot.Tier,
             Enchant = snapshot.Enchant,
             Tags = new List<string>(snapshot.Tags ?? new List<string>()),
-            Attributes = new Dictionary<string, int>(snapshot.Attributes ?? new Dictionary<string, int>()),
+            Attributes = new Dictionary<string, int>(
+                snapshot.Attributes ?? new Dictionary<string, int>()
+            ),
         };
     }
 

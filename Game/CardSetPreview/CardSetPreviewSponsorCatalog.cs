@@ -76,10 +76,7 @@ internal static class CardSetPreviewSponsorCatalog
 
         var sponsorName = selectedEntry.Name.Trim();
         var languageCode = PlayerPreferences.Data?.LanguageCode ?? string.Empty;
-        var text = CardSetPreviewSponsorTextFormatter.FormatSupportedBy(
-            sponsorName,
-            languageCode
-        );
+        var text = CardSetPreviewSponsorTextFormatter.FormatSupportedBy(sponsorName, languageCode);
         return new CardSetPreviewSponsorSelection
         {
             Text = text,

@@ -47,9 +47,7 @@ internal static class CombatVfxWarmer
 
         foreach (var action in actionTypes)
         {
-            vfxTasks.Add(
-                WarmActionVfxAsync(assetLoader, vfxManager, action, vfxSemaphore, stats)
-            );
+            vfxTasks.Add(WarmActionVfxAsync(assetLoader, vfxManager, action, vfxSemaphore, stats));
         }
 
         foreach (
@@ -83,12 +81,7 @@ internal static class CombatVfxWarmer
         var vfxConfig = GetVfxConfig(vfxManager);
         if (vfxConfig == null)
         {
-            await WarmVfxReferenceAsync(
-                assetLoader,
-                vfxManager.GetVFX(action),
-                semaphore,
-                stats
-            );
+            await WarmVfxReferenceAsync(assetLoader, vfxManager.GetVFX(action), semaphore, stats);
             return;
         }
 

@@ -6,14 +6,19 @@ internal static class RoutesTests
 {
     public static void Run()
     {
-        var routes = ModApiRoutes.TryCreate("https://mod-api-v4.bazaarplusplus.com")
+        var routes =
+            ModApiRoutes.TryCreate("https://mod-api-v4.bazaarplusplus.com")
             ?? throw new InvalidOperationException("TryCreate returned null for valid URL");
 
         if (routes.UploadRunBundle != "https://mod-api-v4.bazaarplusplus.com/run-bundles")
-            throw new InvalidOperationException($"Unexpected UploadRunBundle: {routes.UploadRunBundle}");
+            throw new InvalidOperationException(
+                $"Unexpected UploadRunBundle: {routes.UploadRunBundle}"
+            );
 
         if (routes.QueryGhostBattles != "https://mod-api-v4.bazaarplusplus.com/ghost-battles")
-            throw new InvalidOperationException($"Unexpected QueryGhostBattles: {routes.QueryGhostBattles}");
+            throw new InvalidOperationException(
+                $"Unexpected QueryGhostBattles: {routes.QueryGhostBattles}"
+            );
 
         if (!routes.CreateReplayLink("b-1").EndsWith("/ghost-battles/b-1/replay-link"))
             throw new InvalidOperationException("Unexpected CreateReplayLink shape");

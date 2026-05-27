@@ -1,14 +1,18 @@
 #nullable enable
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ui;
 
 internal sealed partial class HistoryPanelUiToolkitView
 {
-    private static VisualElement CreateInfoChipRow(VisualElement parent, float spacing, float marginTop)
+    private static VisualElement CreateInfoChipRow(
+        VisualElement parent,
+        float spacing,
+        float marginTop
+    )
     {
         var row = new VisualElement();
         row.style.flexDirection = FlexDirection.Row;
@@ -46,7 +50,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         return pill;
     }
 
-    private static void SetFixedPillWidth(Label pill, float width) => UiStyle.FixedWidth(pill.style, width);
+    private static void SetFixedPillWidth(Label pill, float width) =>
+        UiStyle.FixedWidth(pill.style, width);
 
     private static void SetEqualChipWidth(Label chip, bool isLast = false)
     {

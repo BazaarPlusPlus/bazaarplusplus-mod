@@ -49,7 +49,10 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         if (fps <= 0)
             throw new ArgumentException("FPS must be positive.", nameof(fps));
         if (maxQueuedFrames <= 0)
-            throw new ArgumentException("Max queued frames must be positive.", nameof(maxQueuedFrames));
+            throw new ArgumentException(
+                "Max queued frames must be positive.",
+                nameof(maxQueuedFrames)
+            );
 
         _executable = executable;
         _outputFilePath = outputFilePath;
@@ -101,9 +104,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
 
         _process = new Process { StartInfo = startInfo };
         if (!_process.Start())
-            throw new InvalidOperationException(
-                $"Failed to start FFmpeg process '{_executable}'."
-            );
+            throw new InvalidOperationException($"Failed to start FFmpeg process '{_executable}'.");
 
         _running = true;
 
@@ -191,7 +192,8 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
             if (process.ExitCode != 0)
             {
                 _writerFailed = true;
-                _failureReason ??= $"ffmpeg exit code {process.ExitCode}. stderr tail: {StderrTail}";
+                _failureReason ??=
+                    $"ffmpeg exit code {process.ExitCode}. stderr tail: {StderrTail}";
                 BppLog.Warn(
                     "CombatReplayVideo",
                     $"FFmpeg exited with non-zero code {process.ExitCode}. stderr tail: {StderrTail}"

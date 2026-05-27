@@ -101,9 +101,10 @@ internal static class ShopForecastLogPatch
         if (f == null)
             return $" spawner='{template.Name}'(no-filters)";
 
-        var tierFilter = (f.ItemTierFilters?.Count ?? 0) > 0
-            ? "[" + string.Join(",", f.ItemTierFilters) + "]"
-            : "any";
+        var tierFilter =
+            (f.ItemTierFilters?.Count ?? 0) > 0
+                ? "[" + string.Join(",", f.ItemTierFilters) + "]"
+                : "any";
         var idCount = f.CardIdFilters?.Count ?? 0;
         var repeats = f.Rerolls?.RerollRepeats ?? false;
 
@@ -112,9 +113,10 @@ internal static class ShopForecastLogPatch
             + $"tier={tierFilter},ids={idCount},repeats={repeats})";
 
         var battlePlayer = dealer.GetBazaarBattlePlayer();
-        var player = battlePlayer != null
-            ? $" player=({battlePlayer.Hero},day={battlePlayer.Day},hour={battlePlayer.Hour})"
-            : " player=null";
+        var player =
+            battlePlayer != null
+                ? $" player=({battlePlayer.Hero},day={battlePlayer.Day},hour={battlePlayer.Hour})"
+                : " player=null";
 
         var excl = dealer.GameStateMetadata?.DealtCardForReRollExclusion?.Count ?? -1;
 

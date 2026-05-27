@@ -35,24 +35,18 @@ static void TestRecommendationModeFlow()
 static void TestCardSetPreviewHotkeys()
 {
     Assert(
-        CardSetPreviewHotkeys.ResolveDisplayMode(
-            currentSetPressed: true,
-            finalBuildPressed: false
-        ) == CardSetBuildRecommendationMode.SelectedSet,
+        CardSetPreviewHotkeys.ResolveDisplayMode(currentSetPressed: true, finalBuildPressed: false)
+            == CardSetBuildRecommendationMode.SelectedSet,
         "A should switch to the current card set."
     );
     Assert(
-        CardSetPreviewHotkeys.ResolveDisplayMode(
-            currentSetPressed: false,
-            finalBuildPressed: true
-        ) == CardSetBuildRecommendationMode.FinalBuild,
+        CardSetPreviewHotkeys.ResolveDisplayMode(currentSetPressed: false, finalBuildPressed: true)
+            == CardSetBuildRecommendationMode.FinalBuild,
         "D should switch to the ten-win build."
     );
     Assert(
-        CardSetPreviewHotkeys.ResolveDisplayMode(
-            currentSetPressed: true,
-            finalBuildPressed: true
-        ) == null,
+        CardSetPreviewHotkeys.ResolveDisplayMode(currentSetPressed: true, finalBuildPressed: true)
+            == null,
         "Pressing A and D together should not switch display modes."
     );
     Assert(
@@ -81,13 +75,11 @@ static void TestCardSetPreviewHotkeys()
 static void TestCardSetPreviewSponsorText()
 {
     Assert(
-        CardSetPreviewSponsorTextFormatter.FormatSupportedBy("Alice", "en")
-            == "Supported by Alice",
+        CardSetPreviewSponsorTextFormatter.FormatSupportedBy("Alice", "en") == "Supported by Alice",
         "English sponsor text should preserve the existing Supported by wording."
     );
     Assert(
-        CardSetPreviewSponsorTextFormatter.FormatSupportedBy("Alice", "zh-CN")
-            == "由 Alice 支持",
+        CardSetPreviewSponsorTextFormatter.FormatSupportedBy("Alice", "zh-CN") == "由 Alice 支持",
         "Chinese sponsor text should preserve the existing localized wording."
     );
     Assert(

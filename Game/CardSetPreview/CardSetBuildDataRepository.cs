@@ -41,7 +41,8 @@ internal sealed class CardSetBuildDataRepository
     private static string? _finalBuildsCacheFilePath;
     private static Func<DateTime> _utcNow = () => DateTime.UtcNow;
     private static Func<string, string> _downloadFinalBuildJson = DownloadFinalBuildJson;
-    private static Action<Action> _queueBackgroundFinalBuildRefresh = QueueBackgroundFinalBuildRefresh;
+    private static Action<Action> _queueBackgroundFinalBuildRefresh =
+        QueueBackgroundFinalBuildRefresh;
     private static bool _backgroundFinalBuildRefreshInProgress;
 
     public bool TryFindFinalRecommendation(
@@ -133,7 +134,9 @@ internal sealed class CardSetBuildDataRepository
 
         try
         {
-            _queueBackgroundFinalBuildRefresh(() => RefreshFinalBuildsFromRemoteInBackground(reason));
+            _queueBackgroundFinalBuildRefresh(() =>
+                RefreshFinalBuildsFromRemoteInBackground(reason)
+            );
             BppLog.Info(
                 "CardSetBuildDataRepository",
                 $"Queued background final builds refresh reason={reason}."

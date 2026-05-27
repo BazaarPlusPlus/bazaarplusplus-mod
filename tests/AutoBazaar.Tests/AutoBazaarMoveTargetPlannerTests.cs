@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using Xunit;
 using BazaarPlusPlus.Game.AutoBazaar;
+using Xunit;
 
 public class AutoBazaarMoveTargetPlannerTests
 {
@@ -10,7 +10,8 @@ public class AutoBazaarMoveTargetPlannerTests
         var result = AutoBazaarMoveTargetPlanner.Enumerate(
             itemSize: 1,
             capacity: 10,
-            occupiedSockets: new HashSet<int>());
+            occupiedSockets: new HashSet<int>()
+        );
 
         Assert.Equal(10, result.Count);
         for (int i = 0; i < 10; i++)
@@ -26,7 +27,8 @@ public class AutoBazaarMoveTargetPlannerTests
         var result = AutoBazaarMoveTargetPlanner.Enumerate(
             itemSize: 2,
             capacity: 10,
-            occupiedSockets: new HashSet<int>());
+            occupiedSockets: new HashSet<int>()
+        );
 
         Assert.Equal(9, result.Count);
         // First placement: Socket_0, Socket_1
@@ -49,7 +51,8 @@ public class AutoBazaarMoveTargetPlannerTests
         var result = AutoBazaarMoveTargetPlanner.Enumerate(
             itemSize: 3,
             capacity: 10,
-            occupiedSockets: new HashSet<int> { 3, 4 });
+            occupiedSockets: new HashSet<int> { 3, 4 }
+        );
 
         Assert.Equal(4, result.Count);
         Assert.Equal(new[] { "Socket_0", "Socket_1", "Socket_2" }, result[0]);
@@ -69,7 +72,8 @@ public class AutoBazaarMoveTargetPlannerTests
             capacity: 10,
             occupiedSockets: new HashSet<int> { 2, 3, 4 },
             excludeStartIndexInclusive: 2,
-            excludeCountInclusive: 3);
+            excludeCountInclusive: 3
+        );
 
         // All 8 valid starts (capacity - itemSize + 1 = 8)
         Assert.Equal(8, result.Count);
@@ -83,7 +87,8 @@ public class AutoBazaarMoveTargetPlannerTests
         var result = AutoBazaarMoveTargetPlanner.Enumerate(
             itemSize: 0,
             capacity: 10,
-            occupiedSockets: new HashSet<int>());
+            occupiedSockets: new HashSet<int>()
+        );
 
         Assert.Empty(result);
     }
@@ -94,7 +99,8 @@ public class AutoBazaarMoveTargetPlannerTests
         var result = AutoBazaarMoveTargetPlanner.Enumerate(
             itemSize: 2,
             capacity: 0,
-            occupiedSockets: new HashSet<int>());
+            occupiedSockets: new HashSet<int>()
+        );
 
         Assert.Empty(result);
     }
@@ -105,7 +111,8 @@ public class AutoBazaarMoveTargetPlannerTests
         var result = AutoBazaarMoveTargetPlanner.Enumerate(
             itemSize: 11,
             capacity: 10,
-            occupiedSockets: new HashSet<int>());
+            occupiedSockets: new HashSet<int>()
+        );
 
         Assert.Empty(result);
     }
@@ -116,7 +123,8 @@ public class AutoBazaarMoveTargetPlannerTests
         var result = AutoBazaarMoveTargetPlanner.Enumerate(
             itemSize: 10,
             capacity: 10,
-            occupiedSockets: new HashSet<int>());
+            occupiedSockets: new HashSet<int>()
+        );
 
         Assert.Single(result);
         Assert.Equal(10, result[0].Count);

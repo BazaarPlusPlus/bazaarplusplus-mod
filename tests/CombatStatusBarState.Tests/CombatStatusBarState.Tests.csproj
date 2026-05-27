@@ -24,10 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile
-      Include="..\..\Infrastructure\UiSuppressionScope.cs"
-      Link="UiSuppressionScope.cs"
-    />
+    <Compile Include="..\..\Infrastructure\UiSuppressionScope.cs" Link="UiSuppressionScope.cs" />
     <Compile Include="..\..\Game\Settings\LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
     <Compile Include="..\..\Game\Settings\LocalizedTextSet.cs" Link="LocalizedTextSet.cs" />
     <Compile

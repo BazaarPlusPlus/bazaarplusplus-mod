@@ -189,7 +189,10 @@
       <MacSqliteNativeFile Include="$(FixedMacSqliteNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.ModApi.dll" />
-      <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.Storage.dll" Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')" />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)BazaarPlusPlus.Storage.dll"
+        Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')"
+      />
     </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
     <Copy
@@ -245,7 +248,10 @@
       <MacSqliteNativeFile Include="$(FixedMacSqliteNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.ModApi.dll" />
-      <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.Storage.dll" Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')" />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)BazaarPlusPlus.Storage.dll"
+        Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')"
+      />
     </ItemGroup>
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"

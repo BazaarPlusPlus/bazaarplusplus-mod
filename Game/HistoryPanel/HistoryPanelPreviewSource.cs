@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -34,7 +34,10 @@ internal sealed class HistoryPanelPreviewSource
             var signature = $"battle:{activeSelectedBattle.BattleId}";
             return sectionMode == HistorySectionMode.Ghost
                 ? ResolveGhostPreviewData(activeSelectedBattle, signature)
-                : HistoryBattlePreviewProjection.BuildOpponent(activeSelectedBattle.Snapshots, signature);
+                : HistoryBattlePreviewProjection.BuildOpponent(
+                    activeSelectedBattle.Snapshots,
+                    signature
+                );
         }
 
         var runPreviewBattle = PickRunPreviewBattle(runBattles);

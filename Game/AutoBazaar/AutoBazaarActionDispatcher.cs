@@ -18,7 +18,10 @@ internal static class AutoBazaarActionDispatcher
 {
     /// <summary>Main thread only. Routes the action through AppState.CurrentState.*Command()
     /// so the game's UI animation + state-validation chain runs the same way a real click does.</summary>
-    public static AutoBazaarDispatchResult Execute(AutoBazaarAction action, AutoBazaarContextSnapshot snapshot)
+    public static AutoBazaarDispatchResult Execute(
+        AutoBazaarAction action,
+        AutoBazaarContextSnapshot snapshot
+    )
     {
         try
         {
@@ -31,7 +34,10 @@ internal static class AutoBazaarActionDispatcher
         }
     }
 
-    private static AutoBazaarDispatchResult Dispatch(AutoBazaarAction action, AutoBazaarContextSnapshot snapshot)
+    private static AutoBazaarDispatchResult Dispatch(
+        AutoBazaarAction action,
+        AutoBazaarContextSnapshot snapshot
+    )
     {
         switch (action.ActionKind)
         {
@@ -45,14 +51,16 @@ internal static class AutoBazaarActionDispatcher
                     if (!Enum.TryParse<EHero>(heroStr, ignoreCase: true, out var hero))
                         return new(false, "unknown hero");
                     var setHeroErr = SetRunConfigSelectedHero(hero);
-                    if (setHeroErr is not null) return new(false, setHeroErr);
+                    if (setHeroErr is not null)
+                        return new(false, setHeroErr);
                 }
                 if (action.PlayMode is { } modeStr)
                 {
                     if (!Enum.TryParse<EPlayMode>(modeStr, ignoreCase: true, out var mode))
                         return new(false, "unknown playMode");
                     var setModeErr = SetRunConfigSelectedPlaymode(mode);
-                    if (setModeErr is not null) return new(false, setModeErr);
+                    if (setModeErr is not null)
+                        return new(false, setModeErr);
                 }
                 if (GameInstance.Instance is null)
                     return new(false, "GameInstance.Instance is null");
@@ -66,7 +74,8 @@ internal static class AutoBazaarActionDispatcher
             case AutoBazaarActionKind.SelectItem:
             {
                 var card = ResolveCard<ItemCard>(action.CardInstanceId);
-                if (card is null) return new(false, "item not found in Data.Entities");
+                if (card is null)
+                    return new(false, "item not found in Data.Entities");
                 if (!TryParseSection(action.TargetSection, out var section))
                     return new(false, "unsupported target section");
                 var sockets = ParseSockets(action.TargetSockets);
@@ -76,20 +85,28 @@ internal static class AutoBazaarActionDispatcher
             case AutoBazaarActionKind.SelectSkill:
             {
                 var skill = ResolveCard<SkillCard>(action.CardInstanceId);
-                if (skill is null) return new(false, "skill not found in Data.Entities");
+                if (skill is null)
+                    return new(false, "skill not found in Data.Entities");
                 return InvokeAppStateCommand("SelectSkillCommand", skill);
             }
 
             case AutoBazaarActionKind.SelectEncounter:
-                return InvokeAppStateCommand("SelectEncounterCommand", new InstanceId(action.CardInstanceId ?? ""));
+                return InvokeAppStateCommand(
+                    "SelectEncounterCommand",
+                    new InstanceId(action.CardInstanceId ?? "")
+                );
 
             case AutoBazaarActionKind.CommitToPedestal:
-                return InvokeAppStateCommand("CommitToPedestalCommand", new InstanceId(action.CardInstanceId ?? ""));
+                return InvokeAppStateCommand(
+                    "CommitToPedestalCommand",
+                    new InstanceId(action.CardInstanceId ?? "")
+                );
 
             case AutoBazaarActionKind.MoveItem:
             {
                 var card = ResolveCard<ItemCard>(action.CardInstanceId);
-                if (card is null) return new(false, "item not found in Data.Entities");
+                if (card is null)
+                    return new(false, "item not found in Data.Entities");
                 if (!TryParseSection(action.TargetSection, out var section))
                     return new(false, "unsupported target section");
                 var sockets = ParseSockets(action.TargetSockets);
@@ -99,7 +116,8 @@ internal static class AutoBazaarActionDispatcher
             case AutoBazaarActionKind.SellItem:
             {
                 var card = ResolveCard<ItemCard>(action.CardInstanceId);
-                if (card is null) return new(false, "item not found in Data.Entities");
+                if (card is null)
+                    return new(false, "item not found in Data.Entities");
                 return InvokeAppStateCommand("SellCardCommand", card);
             }
 
@@ -122,16 +140,20 @@ internal static class AutoBazaarActionDispatcher
     private static string? SetRunConfigSelectedHero(EHero hero)
     {
         var clientCacheType = AccessTools.TypeByName("TheBazaar.ClientCache");
-        if (clientCacheType is null) return "ClientCache type not found";
+        if (clientCacheType is null)
+            return "ClientCache type not found";
         var runConfigField = clientCacheType.GetField(
             "RunConfig",
-            BindingFlags.Static | BindingFlags.Public);
+            BindingFlags.Static | BindingFlags.Public
+        );
         var runConfig = runConfigField?.GetValue(null);
-        if (runConfig is null) return "ClientCache.RunConfig not found";
-        var method = runConfig.GetType().GetMethod(
-            "SetSelectedHero",
-            BindingFlags.Instance | BindingFlags.Public);
-        if (method is null) return "RunConfigurationCache.SetSelectedHero not found";
+        if (runConfig is null)
+            return "ClientCache.RunConfig not found";
+        var method = runConfig
+            .GetType()
+            .GetMethod("SetSelectedHero", BindingFlags.Instance | BindingFlags.Public);
+        if (method is null)
+            return "RunConfigurationCache.SetSelectedHero not found";
         method.Invoke(runConfig, new object[] { hero });
         return null;
     }
@@ -143,25 +165,32 @@ internal static class AutoBazaarActionDispatcher
     private static string? SetRunConfigSelectedPlaymode(EPlayMode mode)
     {
         var clientCacheType = AccessTools.TypeByName("TheBazaar.ClientCache");
-        if (clientCacheType is null) return "ClientCache type not found";
+        if (clientCacheType is null)
+            return "ClientCache type not found";
         var runConfigField = clientCacheType.GetField(
             "RunConfig",
-            BindingFlags.Static | BindingFlags.Public);
+            BindingFlags.Static | BindingFlags.Public
+        );
         var runConfig = runConfigField?.GetValue(null);
-        if (runConfig is null) return "ClientCache.RunConfig not found";
-        var method = runConfig.GetType().GetMethod(
-            "SetSelectedPlaymode",
-            BindingFlags.Instance | BindingFlags.Public);
-        if (method is null) return "RunConfigurationCache.SetSelectedPlaymode not found";
+        if (runConfig is null)
+            return "ClientCache.RunConfig not found";
+        var method = runConfig
+            .GetType()
+            .GetMethod("SetSelectedPlaymode", BindingFlags.Instance | BindingFlags.Public);
+        if (method is null)
+            return "RunConfigurationCache.SetSelectedPlaymode not found";
         method.Invoke(runConfig, new object[] { mode });
         return null;
     }
 
-    private static T? ResolveCard<T>(string? instanceIdValue) where T : class
+    private static T? ResolveCard<T>(string? instanceIdValue)
+        where T : class
     {
-        if (string.IsNullOrEmpty(instanceIdValue)) return null;
+        if (string.IsNullOrEmpty(instanceIdValue))
+            return null;
         var id = new InstanceId(instanceIdValue);
-        if (!Data.Entities.TryGetValue(id, out var entity)) return null;
+        if (!Data.Entities.TryGetValue(id, out var entity))
+            return null;
         return entity as T;
     }
 
@@ -169,8 +198,11 @@ internal static class AutoBazaarActionDispatcher
     {
         try
         {
-            section = (EInventorySection)Enum.Parse(typeof(EInventorySection),
-                (src ?? AutoBazaarTargetSection.Hand).ToString());
+            section = (EInventorySection)
+                Enum.Parse(
+                    typeof(EInventorySection),
+                    (src ?? AutoBazaarTargetSection.Hand).ToString()
+                );
             return true;
         }
         catch
@@ -183,10 +215,12 @@ internal static class AutoBazaarActionDispatcher
     private static List<EContainerSocketId> ParseSockets(IReadOnlyList<string>? raw)
     {
         var list = new List<EContainerSocketId>();
-        if (raw is null) return list;
+        if (raw is null)
+            return list;
         foreach (var s in raw)
         {
-            if (Enum.TryParse<EContainerSocketId>(s, ignoreCase: true, out var v)) list.Add(v);
+            if (Enum.TryParse<EContainerSocketId>(s, ignoreCase: true, out var v))
+                list.Add(v);
         }
         return list;
     }
@@ -197,16 +231,22 @@ internal static class AutoBazaarActionDispatcher
     /// with default values are filled with their defaults. Routing through AppState's command
     /// methods (rather than Cmd directly) plays the game's UI animation + state-machine chain.
     /// </summary>
-    private static AutoBazaarDispatchResult InvokeAppStateCommand(string methodName, params object[] args)
+    private static AutoBazaarDispatchResult InvokeAppStateCommand(
+        string methodName,
+        params object[] args
+    )
     {
         var appState = AppState.CurrentState;
-        if (appState is null) return new(false, "AppState.CurrentState is null");
+        if (appState is null)
+            return new(false, "AppState.CurrentState is null");
         var methods = appState.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public);
         foreach (var m in methods)
         {
-            if (m.Name != methodName) continue;
+            if (m.Name != methodName)
+                continue;
             var ps = m.GetParameters();
-            if (ps.Length < args.Length) continue;
+            if (ps.Length < args.Length)
+                continue;
             var match = true;
             for (var i = 0; i < args.Length; i++)
             {
@@ -216,9 +256,11 @@ internal static class AutoBazaarActionDispatcher
                     break;
                 }
             }
-            if (!match) continue;
+            if (!match)
+                continue;
             var fullArgs = new object?[ps.Length];
-            for (var i = 0; i < args.Length; i++) fullArgs[i] = args[i];
+            for (var i = 0; i < args.Length; i++)
+                fullArgs[i] = args[i];
             for (var i = args.Length; i < ps.Length; i++)
             {
                 fullArgs[i] = ps[i].HasDefaultValue ? ps[i].DefaultValue : null;

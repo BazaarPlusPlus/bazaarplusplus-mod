@@ -142,7 +142,6 @@ public sealed class BattleProjection
 
     [JsonProperty("result")]
     public string? Result { get; set; }
-
 }
 
 public sealed class RunArtifact

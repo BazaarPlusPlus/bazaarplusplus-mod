@@ -69,10 +69,7 @@ AssertEqual(
 
 AssertEqual(
     ChoiceScreenPedestalKind.Upgrade,
-    ChoiceScreenPedestalResolver.Resolve(
-        new[] { "not-a-guid", upgradeGuid.ToString() },
-        Lookup
-    ),
+    ChoiceScreenPedestalResolver.Resolve(new[] { "not-a-guid", upgradeGuid.ToString() }, Lookup),
     "Non-Guid entries should be skipped without affecting later matches."
 );
 
@@ -114,7 +111,5 @@ Console.WriteLine("ChoiceScreenPedestalResolver checks passed.");
 static void AssertEqual<T>(T expected, T actual, string message)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual))
-        throw new InvalidOperationException(
-            $"{message} Expected: {expected}, Actual: {actual}"
-        );
+        throw new InvalidOperationException($"{message} Expected: {expected}, Actual: {actual}");
 }

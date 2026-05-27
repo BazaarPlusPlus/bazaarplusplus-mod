@@ -1,8 +1,8 @@
 #nullable enable
 
+using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UI;
-using BazaarPlusPlus.Infrastructure.UiTokens;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 

@@ -1,10 +1,10 @@
 #nullable enable
 using System.Collections.Generic;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.PvpBattles;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
 

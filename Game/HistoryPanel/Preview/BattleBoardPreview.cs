@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using Object = UnityEngine.Object;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
 
@@ -69,8 +69,10 @@ internal sealed class BattleBoardPreview
     public void SetPosition(Vector2 position)
     {
         var rounded = new Vector2(Mathf.Round(position.x), Mathf.Round(position.y));
-        if (Mathf.Approximately(_position.x, rounded.x)
-            && Mathf.Approximately(_position.y, rounded.y))
+        if (
+            Mathf.Approximately(_position.x, rounded.x)
+            && Mathf.Approximately(_position.y, rounded.y)
+        )
             return;
 
         _position = rounded;
@@ -84,8 +86,10 @@ internal sealed class BattleBoardPreview
             Mathf.Max(1f, Mathf.Round(size.x)),
             Mathf.Max(1f, Mathf.Round(size.y))
         );
-        if (Mathf.Approximately(_clipSize.x, rounded.x)
-            && Mathf.Approximately(_clipSize.y, rounded.y))
+        if (
+            Mathf.Approximately(_clipSize.x, rounded.x)
+            && Mathf.Approximately(_clipSize.y, rounded.y)
+        )
             return;
 
         _clipSize = rounded;
@@ -133,9 +137,11 @@ internal sealed class BattleBoardPreview
             yield break;
         }
 
-        if (!string.IsNullOrEmpty(_renderedSignature)
+        if (
+            !string.IsNullOrEmpty(_renderedSignature)
             && !string.IsNullOrEmpty(signature)
-            && string.Equals(_renderedSignature, signature, StringComparison.Ordinal))
+            && string.Equals(_renderedSignature, signature, StringComparison.Ordinal)
+        )
         {
             onPhase?.Invoke(BattleBoardRenderPhase.Done);
             onComplete?.Invoke();
@@ -235,11 +241,7 @@ internal sealed class BattleBoardPreview
             return false;
         }
 
-        _root = new GameObject(
-            "BattleBoardPreviewRoot",
-            typeof(RectTransform),
-            typeof(Canvas)
-        );
+        _root = new GameObject("BattleBoardPreviewRoot", typeof(RectTransform), typeof(Canvas));
         _root.layer = _layer;
         _root.SetActive(false);
 
@@ -320,7 +322,10 @@ internal sealed class BattleBoardPreview
             if (spec == null || spec.TemplateId == Guid.Empty)
                 continue;
 
-            var template = HistoryPanelPreviewTemplateLookup.GetCardTemplate(staticData, spec.TemplateId);
+            var template = HistoryPanelPreviewTemplateLookup.GetCardTemplate(
+                staticData,
+                spec.TemplateId
+            );
             if (template == null)
                 continue;
 
@@ -342,7 +347,11 @@ internal sealed class BattleBoardPreview
         return i;
     }
 
-    private RectTransform? ResolveSocket(EContainerSocketId? requested, int fallbackIndex, ECardSize size)
+    private RectTransform? ResolveSocket(
+        EContainerSocketId? requested,
+        int fallbackIndex,
+        ECardSize size
+    )
     {
         if (_sockets == null || _sockets.Length == 0)
             return null;
@@ -389,9 +398,10 @@ internal sealed class BattleBoardPreview
             Tier = spec.Tier,
             SocketId = spec.SocketId ?? (EContainerSocketId)Mathf.Clamp(index, 0, 9),
             EnchantmentType = spec.EnchantmentType,
-            Attributes = spec.Attributes != null
-                ? new Dictionary<ECardAttributeType, int>(spec.Attributes)
-                : new Dictionary<ECardAttributeType, int>(),
+            Attributes =
+                spec.Attributes != null
+                    ? new Dictionary<ECardAttributeType, int>(spec.Attributes)
+                    : new Dictionary<ECardAttributeType, int>(),
         };
     }
 

@@ -1,20 +1,24 @@
 using System.Collections.Generic;
-using Xunit;
 using BazaarPlusPlus.Game.AutoBazaar;
+using Xunit;
 
 public class AutoBazaarTargetSelectionActionsTests
 {
     private static AutoBazaarTargetSelectionActions.OwnedCardRef Card(
-        string id, string templateId, AutoBazaarTargetSection section,
-        string leftSocket, int size)
-        => new(id, templateId, section, leftSocket, size);
+        string id,
+        string templateId,
+        AutoBazaarTargetSection section,
+        string leftSocket,
+        int size
+    ) => new(id, templateId, section, leftSocket, size);
 
     [Fact]
     public void Emit_EmptyFilter_ReturnsEmpty()
     {
         var emit = AutoBazaarTargetSelectionActions.Emit(
             new HashSet<string>(),
-            new[] { Card("itm_a", "t1", AutoBazaarTargetSection.Hand, "Socket_2", 1) });
+            new[] { Card("itm_a", "t1", AutoBazaarTargetSection.Hand, "Socket_2", 1) }
+        );
         Assert.Empty(emit);
     }
 
@@ -27,7 +31,8 @@ public class AutoBazaarTargetSelectionActionsTests
             {
                 Card("itm_a", "t1", AutoBazaarTargetSection.Hand, "Socket_2", 1),
                 Card("itm_b", "t2", AutoBazaarTargetSection.Hand, "Socket_3", 1),
-            });
+            }
+        );
         Assert.Single(emit);
         var o = emit[0];
         Assert.Equal(AutoBazaarActionKind.SelectItem, o.ActionKind);
@@ -50,10 +55,12 @@ public class AutoBazaarTargetSelectionActionsTests
                 Card("itm_a", "t1", AutoBazaarTargetSection.Hand, "Socket_2", 1),
                 Card("itm_b", "t2", AutoBazaarTargetSection.Stash, "Socket_5", 1),
                 Card("itm_c", "t3", AutoBazaarTargetSection.Hand, "Socket_7", 1),
-            });
+            }
+        );
         Assert.Equal(2, emit.Count);
         var ids = new HashSet<string>();
-        foreach (var o in emit) ids.Add(o.CardInstanceId!);
+        foreach (var o in emit)
+            ids.Add(o.CardInstanceId!);
         Assert.Contains("itm_a", ids);
         Assert.Contains("itm_b", ids);
         Assert.DoesNotContain("itm_c", ids);
@@ -64,7 +71,8 @@ public class AutoBazaarTargetSelectionActionsTests
     {
         var emit = AutoBazaarTargetSelectionActions.Emit(
             new HashSet<string> { "t1" },
-            new[] { Card("itm_a", "t1", AutoBazaarTargetSection.Hand, "Socket_3", 3) });
+            new[] { Card("itm_a", "t1", AutoBazaarTargetSection.Hand, "Socket_3", 3) }
+        );
         Assert.Single(emit);
         Assert.Equal(new[] { "Socket_3", "Socket_4", "Socket_5" }, emit[0].TargetSockets);
     }
@@ -74,7 +82,8 @@ public class AutoBazaarTargetSelectionActionsTests
     {
         var emit = AutoBazaarTargetSelectionActions.Emit(
             new HashSet<string> { "ts1" },
-            new[] { Card("skl_a", "ts1", AutoBazaarTargetSection.Skill, "", 1) });
+            new[] { Card("skl_a", "ts1", AutoBazaarTargetSection.Skill, "", 1) }
+        );
         Assert.Empty(emit);
     }
 
@@ -87,7 +96,8 @@ public class AutoBazaarTargetSelectionActionsTests
             {
                 Card("itm_a", "t1", AutoBazaarTargetSection.Hand, "Socket_2", 1),
                 Card("itm_a", "t1", AutoBazaarTargetSection.Hand, "Socket_2", 1),
-            });
+            }
+        );
         Assert.Single(emit);
     }
 
@@ -95,10 +105,14 @@ public class AutoBazaarTargetSelectionActionsTests
     // ApplyTargetSelectionFilter
     // -------------------------------------------------------------------------
 
-    private static AutoBazaarCardSnapshot Snap(string instanceId, string templateId,
-        string size = "Small", string? socketId = null,
-        AutoBazaarCardLocation location = AutoBazaarCardLocation.Selection)
-        => new()
+    private static AutoBazaarCardSnapshot Snap(
+        string instanceId,
+        string templateId,
+        string size = "Small",
+        string? socketId = null,
+        AutoBazaarCardLocation location = AutoBazaarCardLocation.Selection
+    ) =>
+        new()
         {
             InstanceId = instanceId,
             TemplateId = templateId,
@@ -107,9 +121,12 @@ public class AutoBazaarTargetSelectionActionsTests
             Location = location,
         };
 
-    private static AutoBazaarDecisionOption SelectItemOption(string instanceId,
-        AutoBazaarTargetSection section, params string[] sockets)
-        => new()
+    private static AutoBazaarDecisionOption SelectItemOption(
+        string instanceId,
+        AutoBazaarTargetSection section,
+        params string[] sockets
+    ) =>
+        new()
         {
             ActionKind = AutoBazaarActionKind.SelectItem,
             Group = AutoBazaarActionGroup.Offer,
@@ -142,7 +159,8 @@ public class AutoBazaarTargetSelectionActionsTests
             boardItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             chestItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             playerSkills: System.Array.Empty<AutoBazaarCardSnapshot>(),
-            selectionOptionsCards: new[] { Snap("itm_offer", "tpl_X", size: "Medium") });
+            selectionOptionsCards: new[] { Snap("itm_offer", "tpl_X", size: "Medium") }
+        );
 
         Assert.Contains(result, a => a.ActionKind == AutoBazaarActionKind.Wait);
         var selects = new List<AutoBazaarDecisionOption>(result);
@@ -166,11 +184,8 @@ public class AutoBazaarTargetSelectionActionsTests
             boardItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             chestItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             playerSkills: System.Array.Empty<AutoBazaarCardSnapshot>(),
-            selectionOptionsCards: new[]
-            {
-                Snap("itm_a", "tpl_KEEP"),
-                Snap("itm_b", "tpl_OTHER"),
-            });
+            selectionOptionsCards: new[] { Snap("itm_a", "tpl_KEEP"), Snap("itm_b", "tpl_OTHER") }
+        );
 
         var selects = result.Where(a => a.ActionKind == AutoBazaarActionKind.SelectItem).ToList();
         Assert.Single(selects);
@@ -184,8 +199,13 @@ public class AutoBazaarTargetSelectionActionsTests
         var actions = new[] { WaitOpt };
         var owned = new[]
         {
-            Snap("itm_owned", "tpl_OWNED", size: "Small", socketId: "Socket_3",
-                location: AutoBazaarCardLocation.Board),
+            Snap(
+                "itm_owned",
+                "tpl_OWNED",
+                size: "Small",
+                socketId: "Socket_3",
+                location: AutoBazaarCardLocation.Board
+            ),
         };
         var result = AutoBazaarTargetSelectionActions.ApplyTargetSelectionFilter(
             actions,
@@ -193,7 +213,8 @@ public class AutoBazaarTargetSelectionActionsTests
             boardItems: owned,
             chestItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             playerSkills: System.Array.Empty<AutoBazaarCardSnapshot>(),
-            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>());
+            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>()
+        );
 
         var selects = result.Where(a => a.ActionKind == AutoBazaarActionKind.SelectItem).ToList();
         Assert.Single(selects);
@@ -207,8 +228,7 @@ public class AutoBazaarTargetSelectionActionsTests
         var actions = new[] { WaitOpt };
         var skill = new[]
         {
-            Snap("skl_owned", "tpl_SKILL", size: "Small",
-                location: AutoBazaarCardLocation.Skill),
+            Snap("skl_owned", "tpl_SKILL", size: "Small", location: AutoBazaarCardLocation.Skill),
         };
         var result = AutoBazaarTargetSelectionActions.ApplyTargetSelectionFilter(
             actions,
@@ -216,7 +236,8 @@ public class AutoBazaarTargetSelectionActionsTests
             boardItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             chestItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             playerSkills: skill,
-            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>());
+            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>()
+        );
 
         Assert.DoesNotContain(result, a => a.ActionKind == AutoBazaarActionKind.SelectItem);
     }
@@ -243,7 +264,8 @@ public class AutoBazaarTargetSelectionActionsTests
             boardItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             chestItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             playerSkills: System.Array.Empty<AutoBazaarCardSnapshot>(),
-            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>());
+            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>()
+        );
 
         Assert.Contains(result, a => a.ActionKind == AutoBazaarActionKind.Wait);
         Assert.Contains(result, a => a.ActionKind == AutoBazaarActionKind.Reroll);
@@ -267,7 +289,8 @@ public class AutoBazaarTargetSelectionActionsTests
             boardItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             chestItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             playerSkills: System.Array.Empty<AutoBazaarCardSnapshot>(),
-            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>());
+            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>()
+        );
 
         Assert.DoesNotContain(result, a => a.ActionKind == AutoBazaarActionKind.SelectItem);
     }
@@ -279,8 +302,13 @@ public class AutoBazaarTargetSelectionActionsTests
         // contained a SelectItem for that same owned instanceId (defensive only —
         // builder doesn't currently produce owned SelectItem in availableActions),
         // we should not emit a duplicate.
-        var owned = Snap("itm_o", "tpl_X", size: "Small", socketId: "Socket_3",
-            location: AutoBazaarCardLocation.Board);
+        var owned = Snap(
+            "itm_o",
+            "tpl_X",
+            size: "Small",
+            socketId: "Socket_3",
+            location: AutoBazaarCardLocation.Board
+        );
         var alreadyKept = SelectItemOption("itm_o", AutoBazaarTargetSection.Hand, "Socket_3");
         var actions = new[] { WaitOpt, alreadyKept };
         var result = AutoBazaarTargetSelectionActions.ApplyTargetSelectionFilter(
@@ -289,9 +317,10 @@ public class AutoBazaarTargetSelectionActionsTests
             boardItems: new[] { owned },
             chestItems: System.Array.Empty<AutoBazaarCardSnapshot>(),
             playerSkills: System.Array.Empty<AutoBazaarCardSnapshot>(),
-            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>());
+            selectionOptionsCards: System.Array.Empty<AutoBazaarCardSnapshot>()
+        );
 
         var selects = result.Where(a => a.ActionKind == AutoBazaarActionKind.SelectItem).ToList();
-        Assert.Single(selects);  // only the kept one; owned-emit skipped via dedup
+        Assert.Single(selects); // only the kept one; owned-emit skipped via dedup
     }
 }

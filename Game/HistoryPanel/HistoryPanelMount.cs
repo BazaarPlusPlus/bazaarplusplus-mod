@@ -53,8 +53,8 @@ internal sealed class HistoryPanelMount : IBppMountable
 
         panel.Configure(HistoryPanelFactory.Create(runtime, onlineClient));
 
-        _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(
-            _ => HistoryPanel.RefreshLocalization()
+        _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(_ =>
+            HistoryPanel.RefreshLocalization()
         );
     }
 

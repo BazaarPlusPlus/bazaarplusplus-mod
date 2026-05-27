@@ -38,7 +38,8 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         int port,
         string endpointJsonPath,
         Func<AutoBazaarContextSnapshot?> snapshotGetter,
-        AutoBazaarActionQueue queue)
+        AutoBazaarActionQueue queue
+    )
     {
         Port = port;
         _endpointJsonPath = endpointJsonPath;
@@ -48,7 +49,8 @@ internal sealed class AutoBazaarHttpServer : IDisposable
 
     public void Start()
     {
-        if (Interlocked.Exchange(ref _started, 1) == 1) return;
+        if (Interlocked.Exchange(ref _started, 1) == 1)
+            return;
 
         _listener = new HttpListener();
         _listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
@@ -58,21 +60,47 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         var token = _cts.Token;
         _ = Task.Run(() => AcceptLoop(token));
 
-        try { WriteEndpointJson(); }
-        catch (Exception ex) { BppLog.Error("AutoBazaar", "endpoint.json write failed", ex); }
+        try
+        {
+            WriteEndpointJson();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("AutoBazaar", "endpoint.json write failed", ex);
+        }
 
         IsRunning = true;
     }
 
     public void Stop()
     {
-        if (Interlocked.Exchange(ref _started, 0) == 0) return;
+        if (Interlocked.Exchange(ref _started, 0) == 0)
+            return;
         IsRunning = false;
-        try { _cts?.Cancel(); } catch { }
-        try { _listener?.Stop(); } catch { }
-        try { _listener?.Close(); } catch { }
+        try
+        {
+            _cts?.Cancel();
+        }
+        catch { }
+        try
+        {
+            _listener?.Stop();
+        }
+        catch { }
+        try
+        {
+            _listener?.Close();
+        }
+        catch { }
         _listener = null;
-        try { DeleteEndpointJson(); } catch (Exception ex) { BppLog.Error("AutoBazaar", "endpoint.json delete failed", ex); }
+        try
+        {
+            DeleteEndpointJson();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("AutoBazaar", "endpoint.json delete failed", ex);
+        }
     }
 
     public void Dispose() => Stop();
@@ -80,12 +108,19 @@ internal sealed class AutoBazaarHttpServer : IDisposable
     private async Task AcceptLoop(CancellationToken token)
     {
         var listener = _listener;
-        if (listener is null) return;
+        if (listener is null)
+            return;
         while (!token.IsCancellationRequested)
         {
             HttpListenerContext ctx;
-            try { ctx = await listener.GetContextAsync().ConfigureAwait(false); }
-            catch { return; }
+            try
+            {
+                ctx = await listener.GetContextAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                return;
+            }
             _ = HandleContextAsync(ctx);
         }
     }
@@ -96,11 +131,17 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         {
             var path = ctx.Request.Url?.AbsolutePath ?? "";
             var method = ctx.Request.HttpMethod;
-            if (string.Equals(path, "/v1/context", StringComparison.OrdinalIgnoreCase) && method == "GET")
+            if (
+                string.Equals(path, "/v1/context", StringComparison.OrdinalIgnoreCase)
+                && method == "GET"
+            )
             {
                 await HandleGetContext(ctx).ConfigureAwait(false);
             }
-            else if (string.Equals(path, "/v1/actions", StringComparison.OrdinalIgnoreCase) && method == "POST")
+            else if (
+                string.Equals(path, "/v1/actions", StringComparison.OrdinalIgnoreCase)
+                && method == "POST"
+            )
             {
                 await HandlePostActions(ctx).ConfigureAwait(false);
             }
@@ -111,12 +152,24 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", $"HTTP handler threw on {ctx.Request.Url?.AbsolutePath}", ex);
-            try { WriteErrorEnvelope(ctx, 500, "internal", ex.GetType().Name); } catch { }
+            BppLog.Error(
+                "AutoBazaar",
+                $"HTTP handler threw on {ctx.Request.Url?.AbsolutePath}",
+                ex
+            );
+            try
+            {
+                WriteErrorEnvelope(ctx, 500, "internal", ex.GetType().Name);
+            }
+            catch { }
         }
         finally
         {
-            try { ctx.Response.Close(); } catch { }
+            try
+            {
+                ctx.Response.Close();
+            }
+            catch { }
         }
     }
 
@@ -164,8 +217,11 @@ internal sealed class AutoBazaarHttpServer : IDisposable
             var total = 0;
             while (true)
             {
-                var read = await ctx.Request.InputStream.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false);
-                if (read <= 0) break;
+                var read = await ctx
+                    .Request.InputStream.ReadAsync(buf, 0, buf.Length)
+                    .ConfigureAwait(false);
+                if (read <= 0)
+                    break;
                 total += read;
                 if (total > MaxBodyBytes)
                 {
@@ -209,12 +265,18 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
     }
 
-    private void WriteErrorEnvelope(HttpListenerContext ctx, int status, string code, string? details)
+    private void WriteErrorEnvelope(
+        HttpListenerContext ctx,
+        int status,
+        string code,
+        string? details
+    )
     {
         ctx.Response.StatusCode = status;
         ctx.Response.ContentType = "application/json; charset=utf-8";
         var envelope = new Dictionary<string, object?> { ["error"] = code };
-        if (details is not null) envelope["details"] = details;
+        if (details is not null)
+            envelope["details"] = details;
         var json = JsonConvert.SerializeObject(envelope, _json);
         var bytes = Encoding.UTF8.GetBytes(json);
         try
@@ -228,7 +290,8 @@ internal sealed class AutoBazaarHttpServer : IDisposable
     private void WriteEndpointJson()
     {
         var dir = Path.GetDirectoryName(_endpointJsonPath);
-        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
         var payload = new
         {
             baseUrl = $"http://127.0.0.1:{Port}",
@@ -238,12 +301,22 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         var json = JsonConvert.SerializeObject(payload, _json);
         var tmp = _endpointJsonPath + ".tmp";
         File.WriteAllText(tmp, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        try { File.Delete(_endpointJsonPath); } catch { }
+        try
+        {
+            File.Delete(_endpointJsonPath);
+        }
+        catch { }
         File.Move(tmp, _endpointJsonPath);
     }
 
     private void DeleteEndpointJson()
     {
-        try { File.Delete(_endpointJsonPath); } catch (IOException) { /* ok */ }
+        try
+        {
+            File.Delete(_endpointJsonPath);
+        }
+        catch (IOException)
+        { /* ok */
+        }
     }
 }

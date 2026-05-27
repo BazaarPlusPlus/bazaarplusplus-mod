@@ -1,9 +1,9 @@
 #nullable enable
 using System.Collections.Generic;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ui;
 
@@ -43,15 +43,35 @@ internal sealed partial class HistoryPanelUiToolkitView
         var timeLabel = CreateRowCornerLabel(topRow, Sizes.FontCorner);
 
         var statRow = CreateInfoChipRow(content, UiSpacing.Sm, UiSpacing.Sm);
-        var healthChip = CreateInfoChip(statRow, HistoryPanelText.StatHealthShort(), Sizes.InfoChipMinWidth);
+        var healthChip = CreateInfoChip(
+            statRow,
+            HistoryPanelText.StatHealthShort(),
+            Sizes.InfoChipMinWidth
+        );
         SetEqualChipWidth(healthChip);
-        var prestigeChip = CreateInfoChip(statRow, HistoryPanelText.StatPrestigeShort(), Sizes.InfoChipMinWidth);
+        var prestigeChip = CreateInfoChip(
+            statRow,
+            HistoryPanelText.StatPrestigeShort(),
+            Sizes.InfoChipMinWidth
+        );
         SetEqualChipWidth(prestigeChip);
-        var levelChip = CreateInfoChip(statRow, HistoryPanelText.StatLevelShort(), Sizes.InfoChipMinWidth);
+        var levelChip = CreateInfoChip(
+            statRow,
+            HistoryPanelText.StatLevelShort(),
+            Sizes.InfoChipMinWidth
+        );
         SetEqualChipWidth(levelChip);
-        var incomeChip = CreateInfoChip(statRow, HistoryPanelText.StatIncomeShort(), Sizes.InfoChipMinWidth);
+        var incomeChip = CreateInfoChip(
+            statRow,
+            HistoryPanelText.StatIncomeShort(),
+            Sizes.InfoChipMinWidth
+        );
         SetEqualChipWidth(incomeChip);
-        var goldChip = CreateInfoChip(statRow, HistoryPanelText.StatGoldShort(), Sizes.InfoChipMinWidth);
+        var goldChip = CreateInfoChip(
+            statRow,
+            HistoryPanelText.StatGoldShort(),
+            Sizes.InfoChipMinWidth
+        );
         SetEqualChipWidth(goldChip, isLast: true);
         var refs = new RunRowRefs(
             row,
@@ -99,7 +119,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         refs.Time.text = string.Join(" · ", timing);
 
         var rank = HistoryPanelFormatter.NormalizeRank(run.PlayerRank);
-        if (string.Equals(run.GameMode?.Trim(), "Ranked", System.StringComparison.OrdinalIgnoreCase))
+        if (
+            string.Equals(run.GameMode?.Trim(), "Ranked", System.StringComparison.OrdinalIgnoreCase)
+        )
         {
             if (string.Equals(rank, "Legendary", System.StringComparison.OrdinalIgnoreCase))
             {
@@ -301,10 +323,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         ConfigureInfoChip(
             refs.PlayerSummaryChip,
             HistoryPanelText.PlayerSideShort(),
-            HistoryPanelText.BoardSummary(
-                battle.PlayerHandItemCount,
-                battle.PlayerSkillCount
-            ),
+            HistoryPanelText.BoardSummary(battle.PlayerHandItemCount, battle.PlayerSkillCount),
             Colors.HistoryPlayerAccent
         );
 
@@ -312,10 +331,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         ConfigureInfoChip(
             refs.OpponentSummaryChip,
             HistoryPanelText.OpponentSideShort(),
-            HistoryPanelText.BoardSummary(
-                battle.OpponentHandItemCount,
-                battle.OpponentSkillCount
-            ),
+            HistoryPanelText.BoardSummary(battle.OpponentHandItemCount, battle.OpponentSkillCount),
             Colors.HistoryOpponentAccent
         );
         refs.OpponentName.text = battle.OpponentName ?? string.Empty;
@@ -329,7 +345,6 @@ internal sealed partial class HistoryPanelUiToolkitView
 
         ApplyBattleRowState(refs, _battleList?.selectedIndex == index, battle);
     }
-
 
     private sealed class RunRowRefs
     {

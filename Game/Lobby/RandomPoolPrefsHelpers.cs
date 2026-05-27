@@ -45,9 +45,7 @@ internal static class RandomPoolPrefsHelpers
     }
 
     public static string[] NormalizeIds(IEnumerable<string> ids) =>
-        ids.Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        ids.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToArray();
 
     public static string ResolveAccountScopeForPrefs(string logScope)
     {

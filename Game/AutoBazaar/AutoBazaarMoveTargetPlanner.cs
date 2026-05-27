@@ -26,7 +26,8 @@ internal static class AutoBazaarMoveTargetPlanner
         int capacity,
         ISet<int> occupiedSockets,
         int excludeStartIndexInclusive = -1,
-        int excludeCountInclusive = 0)
+        int excludeCountInclusive = 0
+    )
     {
         var results = new List<IReadOnlyList<string>>();
 
@@ -40,7 +41,8 @@ internal static class AutoBazaarMoveTargetPlanner
             {
                 int idx = start + offset;
                 // Treat excluded range as vacant
-                bool isExcluded = excludeStartIndexInclusive >= 0
+                bool isExcluded =
+                    excludeStartIndexInclusive >= 0
                     && idx >= excludeStartIndexInclusive
                     && idx < excludeStartIndexInclusive + excludeCountInclusive;
 

@@ -32,7 +32,10 @@ public sealed class BazaarDbScreenshotClient
         var bodyBytes = Encoding.UTF8.GetBytes(
             JsonConvert.SerializeObject(payload, ModApiSerialization.SerializerSettings)
         );
-        using var request = new HttpRequestMessage(HttpMethod.Post, _routes.UploadBazaarDbScreenshot)
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            _routes.UploadBazaarDbScreenshot
+        )
         {
             Content = new ByteArrayContent(bodyBytes),
         };

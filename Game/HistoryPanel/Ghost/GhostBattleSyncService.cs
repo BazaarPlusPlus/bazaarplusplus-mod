@@ -5,12 +5,12 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Models;
-using BazaarPlusPlus.Game.HistoryPanel.Storage;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
@@ -21,10 +21,7 @@ internal sealed class GhostBattleSyncService
     private readonly HistoryPanelRepository _repository;
     private readonly ModOnlineClient _onlineClient;
 
-    public GhostBattleSyncService(
-        HistoryPanelRepository repository,
-        ModOnlineClient onlineClient
-    )
+    public GhostBattleSyncService(HistoryPanelRepository repository, ModOnlineClient onlineClient)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _onlineClient = onlineClient ?? throw new ArgumentNullException(nameof(onlineClient));
@@ -97,13 +94,7 @@ internal sealed class GhostBattleSyncService
             return GhostBattleReplayDownloadResult.Failure("replay_payload_missing");
         }
 
-        if (
-            !string.Equals(
-                payload!.ReplayPayload!.BattleId,
-                battleId,
-                StringComparison.Ordinal
-            )
-        )
+        if (!string.Equals(payload!.ReplayPayload!.BattleId, battleId, StringComparison.Ordinal))
         {
             return GhostBattleReplayDownloadResult.Failure("ghost_replay_battle_id_mismatch");
         }
@@ -294,7 +285,9 @@ internal sealed class GhostBattleSyncService
             Tier = item.Tier,
             Enchant = item.Enchant,
             Tags = new List<string>(item.Tags ?? new List<string>()),
-            Attributes = new Dictionary<string, int>(item.Attributes ?? new Dictionary<string, int>()),
+            Attributes = new Dictionary<string, int>(
+                item.Attributes ?? new Dictionary<string, int>()
+            ),
         };
     }
 

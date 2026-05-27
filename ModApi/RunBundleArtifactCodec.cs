@@ -46,10 +46,7 @@ public static class RunBundleArtifactCodec
             using var gzip = new GZipStream(input, CompressionMode.Decompress);
             using var decompressed = new MemoryStream();
             gzip.CopyTo(decompressed);
-            return MessagePackSerializer.Deserialize<RunArtifact>(
-                decompressed.ToArray(),
-                Options
-            );
+            return MessagePackSerializer.Deserialize<RunArtifact>(decompressed.ToArray(), Options);
         }
         catch
         {

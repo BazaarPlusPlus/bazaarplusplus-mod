@@ -1,5 +1,5 @@
-using Xunit;
 using BazaarPlusPlus.Game.AutoBazaar;
+using Xunit;
 
 public class AutoBazaarSchemaTests
 {

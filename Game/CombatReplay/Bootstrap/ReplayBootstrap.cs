@@ -42,7 +42,10 @@ internal static class ReplayBootstrap
         );
         await BootstrapManagerInitializer.BootstrapManagersAsync();
         AppStateHandlerInstaller.EnsureAppStateHandlersInitialized();
-        await BootstrapManagerInitializer.WaitUntilAsync(IsBootstrapReady, timeout: TimeSpan.FromSeconds(20));
+        await BootstrapManagerInitializer.WaitUntilAsync(
+            IsBootstrapReady,
+            timeout: TimeSpan.FromSeconds(20)
+        );
 
         await SceneLoader.SetActiveScene(SceneID.GameScene);
         SceneLoader.LoadingComplete();
@@ -160,7 +163,9 @@ internal static class ReplayBootstrap
     {
         var field = typeof(AppState).GetField(
             fieldName,
-            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic
+            System.Reflection.BindingFlags.Static
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic
         );
         return field?.GetValue(null) as T;
     }

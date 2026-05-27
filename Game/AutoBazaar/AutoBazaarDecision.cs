@@ -176,12 +176,18 @@ internal sealed class AutoBazaarContext
     /// <summary>Template IDs the game currently restricts player clicks to (target-selection mode: upgrade, enchant). Null/empty means no filter is active. When non-empty, only owned board/chest item cards whose templateId is in this set accept a SelectItem POST; offer-based SelectItem actions are suppressed from <see cref="AvailableActions"/>.</summary>
     public IReadOnlyList<string>? InteractableTemplateIds { get; init; }
 
-    public IReadOnlyList<AutoBazaarCardSnapshot> BoardItems { get; init; } = System.Array.Empty<AutoBazaarCardSnapshot>();
-    public IReadOnlyList<AutoBazaarCardSnapshot> ChestItems { get; init; } = System.Array.Empty<AutoBazaarCardSnapshot>();
-    public IReadOnlyList<AutoBazaarCardSnapshot> PlayerSkills { get; init; } = System.Array.Empty<AutoBazaarCardSnapshot>();
-    public IReadOnlyList<AutoBazaarCardSnapshot> SellableItems { get; init; } = System.Array.Empty<AutoBazaarCardSnapshot>();
-    public IReadOnlyList<AutoBazaarCardSnapshot> SelectionOptions { get; init; } = System.Array.Empty<AutoBazaarCardSnapshot>();
-    public IReadOnlyList<AutoBazaarDecisionOption> AvailableActions { get; init; } = System.Array.Empty<AutoBazaarDecisionOption>();
+    public IReadOnlyList<AutoBazaarCardSnapshot> BoardItems { get; init; } =
+        System.Array.Empty<AutoBazaarCardSnapshot>();
+    public IReadOnlyList<AutoBazaarCardSnapshot> ChestItems { get; init; } =
+        System.Array.Empty<AutoBazaarCardSnapshot>();
+    public IReadOnlyList<AutoBazaarCardSnapshot> PlayerSkills { get; init; } =
+        System.Array.Empty<AutoBazaarCardSnapshot>();
+    public IReadOnlyList<AutoBazaarCardSnapshot> SellableItems { get; init; } =
+        System.Array.Empty<AutoBazaarCardSnapshot>();
+    public IReadOnlyList<AutoBazaarCardSnapshot> SelectionOptions { get; init; } =
+        System.Array.Empty<AutoBazaarCardSnapshot>();
+    public IReadOnlyList<AutoBazaarDecisionOption> AvailableActions { get; init; } =
+        System.Array.Empty<AutoBazaarDecisionOption>();
 }
 
 internal sealed class AutoBazaarAction

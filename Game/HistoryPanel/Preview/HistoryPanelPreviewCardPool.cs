@@ -53,30 +53,39 @@ internal sealed class HistoryPanelPreviewCardPool
         MonsterBoardTooltipTypeName
     );
 
-    private static readonly FieldInfo? SmallItemReferenceField = MonsterBoardTooltipType != null
-        ? AccessTools.Field(MonsterBoardTooltipType, "_smallItemReference")
-        : null;
+    private static readonly FieldInfo? SmallItemReferenceField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_smallItemReference")
+            : null;
 
-    private static readonly FieldInfo? MediumItemReferenceField = MonsterBoardTooltipType != null
-        ? AccessTools.Field(MonsterBoardTooltipType, "_mediumItemReference")
-        : null;
+    private static readonly FieldInfo? MediumItemReferenceField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_mediumItemReference")
+            : null;
 
-    private static readonly FieldInfo? LargeItemReferenceField = MonsterBoardTooltipType != null
-        ? AccessTools.Field(MonsterBoardTooltipType, "_largeItemReference")
-        : null;
+    private static readonly FieldInfo? LargeItemReferenceField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_largeItemReference")
+            : null;
 
-    private static readonly FieldInfo? SocketsField = MonsterBoardTooltipType != null
-        ? AccessTools.Field(MonsterBoardTooltipType, "_sockets")
-        : null;
+    private static readonly FieldInfo? SocketsField =
+        MonsterBoardTooltipType != null
+            ? AccessTools.Field(MonsterBoardTooltipType, "_sockets")
+            : null;
 
-    private static readonly MethodInfo? ResizeMethod = HistoryPanelCardPreviewReflection.ResizeMethod;
-    private static readonly PropertyInfo? SizeProperty = HistoryPanelCardPreviewReflection.SizeProperty;
+    private static readonly MethodInfo? ResizeMethod =
+        HistoryPanelCardPreviewReflection.ResizeMethod;
+    private static readonly PropertyInfo? SizeProperty =
+        HistoryPanelCardPreviewReflection.SizeProperty;
 
     private readonly int _layer;
     private readonly int _maxPoolSizePerSize;
     private readonly Dictionary<ECardSize, Queue<Component>> _pool = new();
 
-    public HistoryPanelPreviewCardPool(int layer, int maxPoolSizePerSize = DefaultMaxPoolSizePerSize)
+    public HistoryPanelPreviewCardPool(
+        int layer,
+        int maxPoolSizePerSize = DefaultMaxPoolSizePerSize
+    )
     {
         _layer = layer;
         _maxPoolSizePerSize = Math.Max(1, maxPoolSizePerSize);
@@ -105,11 +114,13 @@ internal sealed class HistoryPanelPreviewCardPool
                 return true;
         }
 
-        if (MonsterBoardTooltipType == null
+        if (
+            MonsterBoardTooltipType == null
             || SmallItemReferenceField == null
             || MediumItemReferenceField == null
             || LargeItemReferenceField == null
-            || SocketsField == null)
+            || SocketsField == null
+        )
         {
             BppLog.Warn(
                 "HistoryPanelPreviewCardPool",
@@ -134,7 +145,13 @@ internal sealed class HistoryPanelPreviewCardPool
             var large = LargeItemReferenceField.GetValue(tooltip) as Component;
             var sockets = SocketsField.GetValue(tooltip) as RectTransform[];
 
-            if (small == null || medium == null || large == null || sockets == null || sockets.Length == 0)
+            if (
+                small == null
+                || medium == null
+                || large == null
+                || sockets == null
+                || sockets.Length == 0
+            )
                 continue;
 
             var templates = CaptureSocketTemplates(sockets);
@@ -213,7 +230,10 @@ internal sealed class HistoryPanelPreviewCardPool
         }
         catch (Exception ex)
         {
-            BppLog.Warn("HistoryPanelPreviewCardPool", $"CardPreviewBase.Resize threw: {ex.Message}");
+            BppLog.Warn(
+                "HistoryPanelPreviewCardPool",
+                $"CardPreviewBase.Resize threw: {ex.Message}"
+            );
         }
 
         return card;
@@ -300,7 +320,9 @@ internal sealed class HistoryPanelPreviewCardPool
         return ECardSize.Small;
     }
 
-    private static HistoryPanelPreviewSocketTemplate[] CaptureSocketTemplates(RectTransform[] sockets)
+    private static HistoryPanelPreviewSocketTemplate[] CaptureSocketTemplates(
+        RectTransform[] sockets
+    )
     {
         var templates = new HistoryPanelPreviewSocketTemplate[sockets.Length];
         for (var i = 0; i < sockets.Length; i++)
@@ -338,19 +360,15 @@ internal static class HistoryPanelCardPreviewReflection
         CardPreviewBaseTypeName
     );
 
-    public static readonly MethodInfo? SetUpMethod = CardPreviewBaseType != null
-        ? AccessTools.Method(CardPreviewBaseType, "SetUp")
-        : null;
+    public static readonly MethodInfo? SetUpMethod =
+        CardPreviewBaseType != null ? AccessTools.Method(CardPreviewBaseType, "SetUp") : null;
 
-    public static readonly MethodInfo? ShowMethod = CardPreviewBaseType != null
-        ? AccessTools.Method(CardPreviewBaseType, "Show")
-        : null;
+    public static readonly MethodInfo? ShowMethod =
+        CardPreviewBaseType != null ? AccessTools.Method(CardPreviewBaseType, "Show") : null;
 
-    public static readonly MethodInfo? ResizeMethod = CardPreviewBaseType != null
-        ? AccessTools.Method(CardPreviewBaseType, "Resize")
-        : null;
+    public static readonly MethodInfo? ResizeMethod =
+        CardPreviewBaseType != null ? AccessTools.Method(CardPreviewBaseType, "Resize") : null;
 
-    public static readonly PropertyInfo? SizeProperty = CardPreviewBaseType != null
-        ? AccessTools.Property(CardPreviewBaseType, "Size")
-        : null;
+    public static readonly PropertyInfo? SizeProperty =
+        CardPreviewBaseType != null ? AccessTools.Property(CardPreviewBaseType, "Size") : null;
 }

@@ -245,5 +245,4 @@ internal sealed partial class BppSettingsDockController
     {
         return "BazaarPlusPlus";
     }
-
 }

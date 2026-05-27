@@ -21,11 +21,11 @@ internal static class BppLog
         _logger = logger;
     }
 
-    public static string Format(string component, string message)
-        => $"{Prefix}[{component}] {message}";
+    public static string Format(string component, string message) =>
+        $"{Prefix}[{component}] {message}";
 
-    public static string FormatError(string component, string message, Exception ex)
-        => $"{Format(component, message)}{Environment.NewLine}{ex}";
+    public static string FormatError(string component, string message, Exception ex) =>
+        $"{Format(component, message)}{Environment.NewLine}{ex}";
 
     public static void Debug(string component, string message)
     {
@@ -33,17 +33,17 @@ internal static class BppLog
             Emit(LogLevel.Debug, Format(component, message));
     }
 
-    public static void Info(string component, string message)
-        => Emit(LogLevel.Info, Format(component, message));
+    public static void Info(string component, string message) =>
+        Emit(LogLevel.Info, Format(component, message));
 
-    public static void Warn(string component, string message)
-        => Emit(LogLevel.Warning, Format(component, message));
+    public static void Warn(string component, string message) =>
+        Emit(LogLevel.Warning, Format(component, message));
 
-    public static void Error(string component, string message)
-        => Emit(LogLevel.Error, Format(component, message));
+    public static void Error(string component, string message) =>
+        Emit(LogLevel.Error, Format(component, message));
 
-    public static void Error(string component, string message, Exception ex)
-        => Emit(LogLevel.Error, FormatError(component, message, ex));
+    public static void Error(string component, string message, Exception ex) =>
+        Emit(LogLevel.Error, FormatError(component, message, ex));
 
     public static void Flush()
     {

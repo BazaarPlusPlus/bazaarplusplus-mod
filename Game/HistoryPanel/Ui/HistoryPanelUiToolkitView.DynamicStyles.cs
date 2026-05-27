@@ -1,9 +1,9 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ui;
 
@@ -44,16 +44,14 @@ internal sealed partial class HistoryPanelUiToolkitView
         var status = HistoryPanelFormatter.FormatRunStatus(rawStatus);
         var isCompleted = string.Equals(rawStatus, "completed", StringComparison.OrdinalIgnoreCase);
         var isAbandoned = string.Equals(rawStatus, "abandoned", StringComparison.OrdinalIgnoreCase);
-        var background = isCompleted
-            ? Colors.StatusCompletedBackground
-            : isAbandoned
-                ? Colors.StatusAbandonedBackground
-                : Colors.StatusDefaultBackground;
-        var text = isCompleted
-            ? Colors.StatusCompletedText
-            : isAbandoned
-                ? Colors.StatusAbandonedText
-                : Colors.StatusDefaultText;
+        var background =
+            isCompleted ? Colors.StatusCompletedBackground
+            : isAbandoned ? Colors.StatusAbandonedBackground
+            : Colors.StatusDefaultBackground;
+        var text =
+            isCompleted ? Colors.StatusCompletedText
+            : isAbandoned ? Colors.StatusAbandonedText
+            : Colors.StatusDefaultText;
         ConfigurePill(pill, status, background, text, true);
     }
 
@@ -173,7 +171,12 @@ internal sealed partial class HistoryPanelUiToolkitView
         var isWin = HistoryPanelFormatter.IsBattleWin(battle);
         var isLoss = HistoryPanelFormatter.IsBattleLoss(battle);
         var isEliminated = HistoryPanelFormatter.IsGhostOpponentEliminated(battle);
-        refs.Root.style.backgroundColor = GetBattleRowBackground(selected, isEliminated, isWin, isLoss);
+        refs.Root.style.backgroundColor = GetBattleRowBackground(
+            selected,
+            isEliminated,
+            isWin,
+            isLoss
+        );
         refs.Accent.style.backgroundColor = GetBattleAccent(isEliminated, isWin, isLoss);
         var borderColor = GetBattleBorder(isEliminated, isWin, isLoss);
         UiStyle.BorderColor(refs.Root.style, borderColor);

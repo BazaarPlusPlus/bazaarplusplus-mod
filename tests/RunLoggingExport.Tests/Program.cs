@@ -489,7 +489,9 @@ static void Assert(bool condition, string message)
 sealed class TempDirPathProvider : IPathProvider
 {
     private readonly string _dbPath;
+
     public TempDirPathProvider(string dbPath) => _dbPath = dbPath;
+
     public string? RunLogDatabasePath => _dbPath;
     public string? CombatReplayDirectoryPath => null;
     public string? ScreenshotsDirectoryPath => null;

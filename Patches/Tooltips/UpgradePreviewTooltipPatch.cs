@@ -76,11 +76,7 @@ internal static class UpgradePreviewTooltipPatch
             const int maxFramesToWait = 10;
             for (var i = 0; i < maxFramesToWait; i++)
             {
-                if (
-                    controller == null
-                    || controller.CardData != card
-                    || !IsUpgradePreviewActive()
-                )
+                if (controller == null || controller.CardData != card || !IsUpgradePreviewActive())
                 {
                     yield break;
                 }

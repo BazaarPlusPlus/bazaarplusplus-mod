@@ -42,19 +42,23 @@ internal static class AutoBazaarUiPlumbing
         try
         {
             var state = AppState.CurrentState;
-            if (state is not ReplayState replay) return;
-            if (CombatReplayRuntime.Instance?.IsReplayStartInProgress == true) return;
+            if (state is not ReplayState replay)
+                return;
+            if (CombatReplayRuntime.Instance?.IsReplayStartInProgress == true)
+                return;
 
             // Guard 1: replay animation must have finished.
             // IsReplaying is a public property; it is true while the combat sim
             // animation is playing and flips to false when Replay() completes.
-            if (replay.IsReplaying) return;
+            if (replay.IsReplaying)
+                return;
 
             // Guard 2: Exit() must not have already been called.
             // ReplayState.Exit() is idempotent via the private _exitRequested flag;
             // we check it via reflection so subsequent ticks don't redundantly
             // invoke Exit() (no-op but adds log noise).
-            if (ExitAlreadyRequested(replay)) return;
+            if (ExitAlreadyRequested(replay))
+                return;
 
             // Advance out of the replay state. ReplayState.Exit() sets
             // AppState._cachedGameSim and calls AppState._gameSimHandler.Handle(),
@@ -82,23 +86,30 @@ internal static class AutoBazaarUiPlumbing
             // Only meaningful when the underlying RunState is LevelUp — mirrors
             // BoardManager.OnBoardRecapReplayButtonsContinueClicked's own guard.
             var runState = Data.CurrentState;
-            if (runState is null) return;
+            if (runState is null)
+                return;
             // ERunState.LevelUp is value 4 across builds we've seen; compare by name
             // to avoid taking a hard dependency on the enum's integer layout.
-            if (runState.StateName.ToString() != "LevelUp") return;
+            if (runState.StateName.ToString() != "LevelUp")
+                return;
 
             var boardManagerType = HarmonyLib.AccessTools.TypeByName("TheBazaar.BoardManager");
-            if (boardManagerType is null) return;
+            if (boardManagerType is null)
+                return;
 
             _exitRecapReplayStateMethod ??= boardManagerType.GetMethod(
                 "ExitRecapReplayState",
-                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            if (_exitRecapReplayStateMethod is null) return;
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
+            );
+            if (_exitRecapReplayStateMethod is null)
+                return;
 
             // Singleton<BoardManager>.Instance — get the singleton via FindObjectOfType
             // as a fallback that doesn't depend on the generic Singleton helper.
-            var instance = UnityEngine.Object.FindObjectOfType(boardManagerType) as UnityEngine.Object;
-            if (instance is null) return;
+            var instance =
+                UnityEngine.Object.FindObjectOfType(boardManagerType) as UnityEngine.Object;
+            if (instance is null)
+                return;
 
             _exitRecapReplayStateMethod.Invoke(instance, null);
         }
@@ -155,9 +166,11 @@ internal static class AutoBazaarUiPlumbing
         {
             _exitRequestedField ??= typeof(ReplayState).GetField(
                 "_exitRequested",
-                BindingFlags.Instance | BindingFlags.NonPublic);
+                BindingFlags.Instance | BindingFlags.NonPublic
+            );
 
-            if (_exitRequestedField is null) return false; // can't tell — be safe and proceed
+            if (_exitRequestedField is null)
+                return false; // can't tell — be safe and proceed
             return _exitRequestedField.GetValue(replay) is true;
         }
         catch
@@ -165,5 +178,4 @@ internal static class AutoBazaarUiPlumbing
             return false; // reflection failed — let Exit() guard itself
         }
     }
-
 }

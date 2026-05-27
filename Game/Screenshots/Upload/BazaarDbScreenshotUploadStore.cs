@@ -43,10 +43,7 @@ internal sealed class BazaarDbScreenshotUploadStore : SqliteStoreBase
                   WHERE u.screenshot_id = s.screenshot_id
               );
             """;
-        command.Parameters.AddWithValue(
-            "$captureSource",
-            RunLogSchema.CaptureSourceEndOfRunAuto
-        );
+        command.Parameters.AddWithValue("$captureSource", RunLogSchema.CaptureSourceEndOfRunAuto);
         command.ExecuteNonQuery();
     }
 

@@ -81,10 +81,7 @@ internal static class HealthBarBinder
             BindBoardUiController(bindings.PlayerController, registerPlayerHealthBar: true);
 
         if (bindings.OpponentController != null)
-            BindBoardUiController(
-                bindings.OpponentController,
-                registerPlayerHealthBar: false
-            );
+            BindBoardUiController(bindings.OpponentController, registerPlayerHealthBar: false);
 
         await Task.Delay(150);
         return bindings;
@@ -170,13 +167,19 @@ internal static class HealthBarBinder
         if (playerController != null)
         {
             if (Data.Run?.Player != null)
-                PlayerAttributeRepairer.EnsurePlayerAttributes(Data.Run.Player, ECombatantId.Player);
+                PlayerAttributeRepairer.EnsurePlayerAttributes(
+                    Data.Run.Player,
+                    ECombatantId.Player
+                );
 
             InvokeBoardUiMethod(playerController, "SetBattlePlayer", Data.Run?.Player);
             PlayerAttributeRepairer.InitializeBoardUiHealthBar(playerController, Data.Run?.Player);
             playerController.ShowEmptyPlayerHealthBar();
             RevealBoardUiHealthBar(playerController, showStatusNumbers: true);
-            PlayerAttributeRepairer.RecalculateHealthBarDividers(playerController, Data.Run?.Player);
+            PlayerAttributeRepairer.RecalculateHealthBarDividers(
+                playerController,
+                Data.Run?.Player
+            );
             return;
         }
 

@@ -2,8 +2,8 @@
 using System;
 using System.IO;
 using System.Reflection;
-using BepInEx;
 using BazaarPlusPlus.Infrastructure;
+using BepInEx;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Infrastructure.Fonts;
@@ -12,7 +12,8 @@ internal static class BppUiFont
 {
     private const string Component = "UiFont";
     private const string FontFileName = "SourceHanSansCN-Regular.otf";
-    private const string ResourceName = "BazaarPlusPlus.Resources.Fonts.SourceHanSansCN-Regular.otf";
+    private const string ResourceName =
+        "BazaarPlusPlus.Resources.Fonts.SourceHanSansCN-Regular.otf";
 
     private static Font? _default;
 

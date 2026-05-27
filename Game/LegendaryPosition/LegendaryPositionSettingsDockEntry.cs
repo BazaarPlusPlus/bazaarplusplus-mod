@@ -19,8 +19,7 @@ internal sealed class LegendaryPositionSettingsDockEntry : ISettingsDockEntry
         );
 
     private static LegendaryPositionDisplayMode ReadMode(IBppConfig config) =>
-        config.LegendaryPositionDisplayModeConfig?.Value
-        ?? LegendaryPositionDisplayMode.Default;
+        config.LegendaryPositionDisplayModeConfig?.Value ?? LegendaryPositionDisplayMode.Default;
 
     private static bool IsOverrideActive(IBppConfig config) =>
         ReadMode(config) != LegendaryPositionDisplayMode.Default;

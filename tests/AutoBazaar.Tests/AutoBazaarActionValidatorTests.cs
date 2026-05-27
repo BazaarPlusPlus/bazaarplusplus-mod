@@ -1,7 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
-using Xunit;
 using BazaarPlusPlus.Game.AutoBazaar;
+using Xunit;
 
 public class AutoBazaarActionValidatorTests
 {
@@ -9,13 +9,10 @@ public class AutoBazaarActionValidatorTests
 
     private static AutoBazaarContextSnapshot MakeSnap(
         ulong tickId = 1,
-        params AutoBazaarDecisionOption[] available)
+        params AutoBazaarDecisionOption[] available
+    )
     {
-        var ctx = new AutoBazaarContext
-        {
-            TickId = tickId,
-            AvailableActions = available,
-        };
+        var ctx = new AutoBazaarContext { TickId = tickId, AvailableActions = available };
         return new AutoBazaarContextSnapshot(ctx);
     }
 
@@ -27,8 +24,9 @@ public class AutoBazaarActionValidatorTests
         bool? canSelect = null,
         bool? canSell = null,
         bool? canAfford = null,
-        bool? canFit = null)
-        => new()
+        bool? canFit = null
+    ) =>
+        new()
         {
             ActionKind = kind,
             CardInstanceId = cardId,
@@ -44,8 +42,8 @@ public class AutoBazaarActionValidatorTests
             },
         };
 
-    private static AutoBazaarDecisionOption SimpleOption(AutoBazaarActionKind kind)
-        => new() { ActionKind = kind };
+    private static AutoBazaarDecisionOption SimpleOption(AutoBazaarActionKind kind) =>
+        new() { ActionKind = kind };
 
     // ── Rule 1: known actionKind ──────────────────────────────────────────────
 
@@ -108,8 +106,12 @@ public class AutoBazaarActionValidatorTests
     [Fact]
     public void Rule3_CardBearing_ExactMatch_Passes()
     {
-        var opt = CardOption(AutoBazaarActionKind.SelectItem, "c1", AutoBazaarTargetSection.Hand,
-            new[] { "Socket_0" });
+        var opt = CardOption(
+            AutoBazaarActionKind.SelectItem,
+            "c1",
+            AutoBazaarTargetSection.Hand,
+            new[] { "Socket_0" }
+        );
         var snap = MakeSnap(1, opt);
         var action = new AutoBazaarAction
         {
@@ -143,15 +145,19 @@ public class AutoBazaarActionValidatorTests
     [Fact]
     public void Rule3_CardBearing_SocketOrderDiffers_RejectsStaleOrUnavailable()
     {
-        var opt = CardOption(AutoBazaarActionKind.MoveItem, "c1", AutoBazaarTargetSection.Hand,
-            new[] { "Socket_0", "Socket_1" });
+        var opt = CardOption(
+            AutoBazaarActionKind.MoveItem,
+            "c1",
+            AutoBazaarTargetSection.Hand,
+            new[] { "Socket_0", "Socket_1" }
+        );
         var snap = MakeSnap(2, opt);
         var action = new AutoBazaarAction
         {
             ActionKind = AutoBazaarActionKind.MoveItem,
             CardInstanceId = "c1",
             TargetSection = AutoBazaarTargetSection.Hand,
-            TargetSockets = new[] { "Socket_1", "Socket_0" },   // reversed
+            TargetSockets = new[] { "Socket_1", "Socket_0" }, // reversed
         };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.StaleOrUnavailable, result.Code);
@@ -250,7 +256,11 @@ public class AutoBazaarActionValidatorTests
     {
         var opt = CardOption(AutoBazaarActionKind.SelectItem, "c1", canSelect: null);
         var snap = MakeSnap(1, opt);
-        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.SelectItem, CardInstanceId = "c1" };
+        var action = new AutoBazaarAction
+        {
+            ActionKind = AutoBazaarActionKind.SelectItem,
+            CardInstanceId = "c1",
+        };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.Ok, result.Code);
     }
@@ -260,7 +270,11 @@ public class AutoBazaarActionValidatorTests
     {
         var opt = CardOption(AutoBazaarActionKind.SelectItem, "c1", canSelect: false);
         var snap = MakeSnap(1, opt);
-        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.SelectItem, CardInstanceId = "c1" };
+        var action = new AutoBazaarAction
+        {
+            ActionKind = AutoBazaarActionKind.SelectItem,
+            CardInstanceId = "c1",
+        };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.StaleOrUnavailable, result.Code);
         Assert.Equal(409, result.HttpStatus);
@@ -272,7 +286,11 @@ public class AutoBazaarActionValidatorTests
     {
         var opt = CardOption(AutoBazaarActionKind.SelectItem, "c1", canAfford: false);
         var snap = MakeSnap(1, opt);
-        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.SelectItem, CardInstanceId = "c1" };
+        var action = new AutoBazaarAction
+        {
+            ActionKind = AutoBazaarActionKind.SelectItem,
+            CardInstanceId = "c1",
+        };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.StaleOrUnavailable, result.Code);
         Assert.Equal(409, result.HttpStatus);
@@ -284,7 +302,11 @@ public class AutoBazaarActionValidatorTests
     {
         var opt = CardOption(AutoBazaarActionKind.SelectItem, "c1", canFit: false);
         var snap = MakeSnap(1, opt);
-        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.SelectItem, CardInstanceId = "c1" };
+        var action = new AutoBazaarAction
+        {
+            ActionKind = AutoBazaarActionKind.SelectItem,
+            CardInstanceId = "c1",
+        };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.StaleOrUnavailable, result.Code);
         Assert.Equal(409, result.HttpStatus);
@@ -298,7 +320,11 @@ public class AutoBazaarActionValidatorTests
     {
         var opt = CardOption(AutoBazaarActionKind.SellItem, "c1", canSell: true);
         var snap = MakeSnap(1, opt);
-        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.SellItem, CardInstanceId = "c1" };
+        var action = new AutoBazaarAction
+        {
+            ActionKind = AutoBazaarActionKind.SellItem,
+            CardInstanceId = "c1",
+        };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.Ok, result.Code);
     }
@@ -308,7 +334,11 @@ public class AutoBazaarActionValidatorTests
     {
         var opt = CardOption(AutoBazaarActionKind.SellItem, "c1", canSell: null);
         var snap = MakeSnap(1, opt);
-        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.SellItem, CardInstanceId = "c1" };
+        var action = new AutoBazaarAction
+        {
+            ActionKind = AutoBazaarActionKind.SellItem,
+            CardInstanceId = "c1",
+        };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.StaleOrUnavailable, result.Code);
         Assert.Equal(409, result.HttpStatus);
@@ -321,7 +351,11 @@ public class AutoBazaarActionValidatorTests
     public void Rule7_ForTickId_Matches_Passes()
     {
         var snap = MakeSnap(7, SimpleOption(AutoBazaarActionKind.Reroll));
-        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.Reroll, ForTickId = 7UL };
+        var action = new AutoBazaarAction
+        {
+            ActionKind = AutoBazaarActionKind.Reroll,
+            ForTickId = 7UL,
+        };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.Ok, result.Code);
     }
@@ -330,7 +364,11 @@ public class AutoBazaarActionValidatorTests
     public void Rule7_ForTickId_Mismatch_RejectsStaleOrUnavailable()
     {
         var snap = MakeSnap(9, SimpleOption(AutoBazaarActionKind.Reroll));
-        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.Reroll, ForTickId = 5UL };
+        var action = new AutoBazaarAction
+        {
+            ActionKind = AutoBazaarActionKind.Reroll,
+            ForTickId = 5UL,
+        };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.StaleOrUnavailable, result.Code);
         Assert.Equal(409, result.HttpStatus);
@@ -343,7 +381,11 @@ public class AutoBazaarActionValidatorTests
     public void Rule7_ForTickId_Null_Passes()
     {
         var snap = MakeSnap(9, SimpleOption(AutoBazaarActionKind.Reroll));
-        var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.Reroll, ForTickId = null };
+        var action = new AutoBazaarAction
+        {
+            ActionKind = AutoBazaarActionKind.Reroll,
+            ForTickId = null,
+        };
         var result = AutoBazaarActionValidator.Validate(snap, action, 0);
         Assert.Equal(AutoBazaarValidationCode.Ok, result.Code);
     }
@@ -364,7 +406,11 @@ public class AutoBazaarActionValidatorTests
     {
         var snap = MakeSnap(1, SimpleOption(AutoBazaarActionKind.Reroll));
         var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.Reroll };
-        var result = AutoBazaarActionValidator.Validate(snap, action, cooldownRemainingSeconds: 1.5);
+        var result = AutoBazaarActionValidator.Validate(
+            snap,
+            action,
+            cooldownRemainingSeconds: 1.5
+        );
         Assert.Equal(AutoBazaarValidationCode.Cooldown, result.Code);
         Assert.Equal(429, result.HttpStatus);
         Assert.Equal("action min-delay not yet elapsed", result.Details);
@@ -377,7 +423,11 @@ public class AutoBazaarActionValidatorTests
     {
         var snap = MakeSnap(1);
         var action = new AutoBazaarAction { ActionKind = AutoBazaarActionKind.Wait };
-        var result = AutoBazaarActionValidator.Validate(snap, action, cooldownRemainingSeconds: 99.9);
+        var result = AutoBazaarActionValidator.Validate(
+            snap,
+            action,
+            cooldownRemainingSeconds: 99.9
+        );
         Assert.Equal(AutoBazaarValidationCode.Ok, result.Code);
     }
 

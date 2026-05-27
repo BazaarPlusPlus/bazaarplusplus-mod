@@ -3,9 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.CardSetPreview;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
 
@@ -151,9 +151,7 @@ internal sealed class HistoryPanelDataService
     )
     {
         if (_ghostSyncService == null)
-            return HistoryPanelAttemptResult.Failure(
-                HistoryPanelText.GhostSyncUnavailable()
-            );
+            return HistoryPanelAttemptResult.Failure(HistoryPanelText.GhostSyncUnavailable());
 
         try
         {
@@ -201,9 +199,7 @@ internal sealed class HistoryPanelDataService
                     )
                 );
 
-            return HistoryPanelAttemptResult.Success(
-                HistoryPanelText.FinalBuildRefreshSucceeded()
-            );
+            return HistoryPanelAttemptResult.Success(HistoryPanelText.FinalBuildRefreshSucceeded());
         }
         catch (OperationCanceledException)
         {
@@ -221,11 +217,7 @@ internal sealed class HistoryPanelDataService
 
 internal readonly struct HistoryPanelAttemptResult
 {
-    private HistoryPanelAttemptResult(
-        bool succeeded,
-        string statusMessage,
-        Exception? error
-    )
+    private HistoryPanelAttemptResult(bool succeeded, string statusMessage, Exception? error)
     {
         Succeeded = succeeded;
         StatusMessage = statusMessage;
@@ -246,4 +238,3 @@ internal readonly struct HistoryPanelAttemptResult
         Exception? error = null
     ) => new(false, statusMessage, error);
 }
-

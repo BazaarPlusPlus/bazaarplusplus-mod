@@ -39,7 +39,10 @@
     <None Include="$(ManagedPath)/UnityEngine.CoreModule.dll" Link="UnityEngine.CoreModule.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(ManagedPath)/UnityEngine.UIElementsModule.dll" Link="UnityEngine.UIElementsModule.dll">
+    <None
+      Include="$(ManagedPath)/UnityEngine.UIElementsModule.dll"
+      Link="UnityEngine.UIElementsModule.dll"
+    >
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

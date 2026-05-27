@@ -1,9 +1,7 @@
 #nullable enable
 using Microsoft.Data.Sqlite;
 
-var schemaType = RequireStorageType(
-    "BazaarPlusPlus.Storage.RunLog.RunLogSchema"
-);
+var schemaType = RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
 var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
 var ctor = repositoryType.GetConstructor([typeof(string)]);
 Assert(
@@ -155,9 +153,7 @@ try
         "ListBattleIdsByRun should return all linked battles ordered from newest to oldest."
     );
 
-    var ghostImportType = RequireModApiType(
-        "BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord"
-    );
+    var ghostImportType = RequireModApiType("BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord");
     var replaceGhostBattles = repositoryType.GetMethod(
         "ReplaceGhostBattles",
         [typeof(string), typeof(IReadOnlyList<>).MakeGenericType(ghostImportType)]
@@ -166,10 +162,7 @@ try
         "MarkGhostReplayDownloaded",
         [typeof(string)]
     )!;
-    var listRecentGhostBattles = repositoryType.GetMethod(
-        "ListRecentGhostBattles",
-        [typeof(int)]
-    )!;
+    var listRecentGhostBattles = repositoryType.GetMethod("ListRecentGhostBattles", [typeof(int)])!;
     var markOldUndownloadedGhostBattlesDeleted = repositoryType.GetMethod(
         "MarkOldUndownloadedGhostBattlesDeleted",
         [typeof(DateTimeOffset)]

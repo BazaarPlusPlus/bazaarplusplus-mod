@@ -37,10 +37,16 @@ internal static class PedestalEligibilityProbe
                 _reflectionAttempted = true;
                 _validateCardsMethod = AccessTools.Method(typeof(PedestalState), "ValidateCards");
                 _validCardsField = AccessTools.Field(typeof(PedestalState), "_validCards");
-                if (_validateCardsMethod is null) BppLog.Info("Encounter", "PedestalState.ValidateCards not found via reflection");
-                if (_validCardsField is null) BppLog.Info("Encounter", "PedestalState._validCards not found via reflection");
+                if (_validateCardsMethod is null)
+                    BppLog.Info(
+                        "Encounter",
+                        "PedestalState.ValidateCards not found via reflection"
+                    );
+                if (_validCardsField is null)
+                    BppLog.Info("Encounter", "PedestalState._validCards not found via reflection");
             }
-            if (_validateCardsMethod is null || _validCardsField is null) return EmptySet;
+            if (_validateCardsMethod is null || _validCardsField is null)
+                return EmptySet;
 
             _validateCardsMethod.Invoke(pedestalState, null);
             if (_validCardsField.GetValue(pedestalState) is not IList list || list.Count == 0)
@@ -52,14 +58,18 @@ internal static class PedestalEligibilityProbe
                 if (entry is Card card)
                 {
                     var iid = card.InstanceId.Value;
-                    if (!string.IsNullOrEmpty(iid)) ids.Add(iid);
+                    if (!string.IsNullOrEmpty(iid))
+                        ids.Add(iid);
                 }
             }
             return ids;
         }
         catch (Exception ex)
         {
-            BppLog.Info("Encounter", $"PedestalEligibilityProbe transient failure: {ex.GetType().Name}: {ex.Message}");
+            BppLog.Info(
+                "Encounter",
+                $"PedestalEligibilityProbe transient failure: {ex.GetType().Name}: {ex.Message}"
+            );
             return EmptySet;
         }
     }

@@ -17,7 +17,13 @@ internal readonly struct HistoryPanelPreviewTextureSize
 
 internal readonly struct HistoryPanelPreviewBoardPlacement
 {
-    public HistoryPanelPreviewBoardPlacement(int width, int height, int offsetX, int offsetY, float scale)
+    public HistoryPanelPreviewBoardPlacement(
+        int width,
+        int height,
+        int offsetX,
+        int offsetY,
+        float scale
+    )
     {
         Width = width;
         Height = height;
@@ -60,8 +66,16 @@ internal static class HistoryPanelPreviewTextureGeometry
         );
 
         return new HistoryPanelPreviewTextureSize(
-            Clamp((int)System.Math.Round(NativeBoardWidth * scale), MinTextureWidth, MaxTextureWidth),
-            Clamp((int)System.Math.Round(NativeBoardHeight * scale), MinTextureHeight, MaxTextureHeight)
+            Clamp(
+                (int)System.Math.Round(NativeBoardWidth * scale),
+                MinTextureWidth,
+                MaxTextureWidth
+            ),
+            Clamp(
+                (int)System.Math.Round(NativeBoardHeight * scale),
+                MinTextureHeight,
+                MaxTextureHeight
+            )
         );
     }
 
@@ -76,11 +90,7 @@ internal static class HistoryPanelPreviewTextureGeometry
         if (scale <= 0)
             scale = 1.0;
 
-        var boardWidth = Clamp(
-            (int)System.Math.Round(NativeBoardWidth * scale),
-            1,
-            clampedWidth
-        );
+        var boardWidth = Clamp((int)System.Math.Round(NativeBoardWidth * scale), 1, clampedWidth);
         var boardHeight = Clamp(
             (int)System.Math.Round(NativeBoardHeight * scale),
             1,

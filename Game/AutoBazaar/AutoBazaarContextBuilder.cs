@@ -25,7 +25,10 @@ internal static class AutoBazaarContextBuilder
     /// Build a context from live game state. Never throws — exceptions produce a
     /// degenerate context with <c>StateName=Unknown</c> and <c>AvailableActions=[Wait]</c>.
     /// </summary>
-    public static AutoBazaarContext Build(IBppServices services, double actionCooldownRemainingSeconds)
+    public static AutoBazaarContext Build(
+        IBppServices services,
+        double actionCooldownRemainingSeconds
+    )
     {
         bool isEnabled = services.Config.AutoBazaarEnabled?.Value == true;
 
@@ -49,7 +52,11 @@ internal static class AutoBazaarContextBuilder
     // Core builder
     // -------------------------------------------------------------------------
 
-    private static AutoBazaarContext BuildCore(IBppServices services, bool isEnabled, double actionCooldownRemainingSeconds)
+    private static AutoBazaarContext BuildCore(
+        IBppServices services,
+        bool isEnabled,
+        double actionCooldownRemainingSeconds
+    )
     {
         var appState = AppState.CurrentState;
         var runState = Data.CurrentState;
@@ -105,7 +112,8 @@ internal static class AutoBazaarContextBuilder
         int rerollCost = (int)(runState?.RerollCost ?? 0u);
         int rerollsRemaining = (int)(runState?.RerollsRemaining ?? 0u);
 
-        bool canReroll = canHandleOp(StateOps.Reroll) && rerollsRemaining > 0 && playerGold >= rerollCost;
+        bool canReroll =
+            canHandleOp(StateOps.Reroll) && rerollsRemaining > 0 && playerGold >= rerollCost;
 
         var encounter = services.EncounterState.GetCurrent();
 
@@ -124,28 +132,48 @@ internal static class AutoBazaarContextBuilder
 
         // Selection set
         List<AutoBazaarCardSnapshot> selectionOptions = BuildSelectionOptions(
-            runState, playerGold, selectionIsFree, run, canHandleOp(StateOps.SelectItem));
+            runState,
+            playerGold,
+            selectionIsFree,
+            run,
+            canHandleOp(StateOps.SelectItem)
+        );
 
         // Target-selection mode (upgrade/enchant): when AppState._iteractionFilter
         // is non-empty, the game restricts SelectItem to owned cards whose
         // templateId is in the filter. Offer-based clicks silently no-op.
         var interactionFilterList = encounter.InteractionFilterTemplateIds;
-        ISet<string>? interactionFilter = interactionFilterList.Count > 0
-            ? new HashSet<string>(interactionFilterList)
-            : null;
+        ISet<string>? interactionFilter =
+            interactionFilterList.Count > 0 ? new HashSet<string>(interactionFilterList) : null;
 
         // Available actions
         var actions = BuildActions(
-            stateName, isInRun, canHandleOp,
-            canReroll, canStartOrContinueRun,
-            runState, selectionOptions, boardItems, chestItems, playerSkills, canMove, canSell,
-            run, encounter.PedestalEligibleInstanceIds);
+            stateName,
+            isInRun,
+            canHandleOp,
+            canReroll,
+            canStartOrContinueRun,
+            runState,
+            selectionOptions,
+            boardItems,
+            chestItems,
+            playerSkills,
+            canMove,
+            canSell,
+            run,
+            encounter.PedestalEligibleInstanceIds
+        );
 
         if (interactionFilter is not null)
         {
             actions = AutoBazaarTargetSelectionActions.ApplyTargetSelectionFilter(
-                actions, interactionFilter,
-                boardItems, chestItems, playerSkills, selectionOptions);
+                actions,
+                interactionFilter,
+                boardItems,
+                chestItems,
+                playerSkills,
+                selectionOptions
+            );
         }
 
         return new AutoBazaarContext
@@ -195,20 +223,23 @@ internal static class AutoBazaarContextBuilder
 
     private static AutoBazaarRunStateName ResolveStateName(AppState? appState, RunState? runState)
     {
-        if (appState is StartRunAppState) return AutoBazaarRunStateName.StartRun;
-        if (appState is ReplayState) return AutoBazaarRunStateName.Replay;
+        if (appState is StartRunAppState)
+            return AutoBazaarRunStateName.StartRun;
+        if (appState is ReplayState)
+            return AutoBazaarRunStateName.Replay;
 
-        if (runState == null) return AutoBazaarRunStateName.Unknown;
+        if (runState == null)
+            return AutoBazaarRunStateName.Unknown;
 
         return runState.StateName switch
         {
-            ERunState.Choice       => AutoBazaarRunStateName.Choice,
-            ERunState.Encounter    => AutoBazaarRunStateName.Encounter,
-            ERunState.Combat       => AutoBazaarRunStateName.Combat,
-            ERunState.LevelUp      => AutoBazaarRunStateName.LevelUp,
-            ERunState.Loot         => AutoBazaarRunStateName.Loot,
-            ERunState.Pedestal     => AutoBazaarRunStateName.Pedestal,
-            ERunState.PVPCombat    => AutoBazaarRunStateName.PvpCombat,
+            ERunState.Choice => AutoBazaarRunStateName.Choice,
+            ERunState.Encounter => AutoBazaarRunStateName.Encounter,
+            ERunState.Combat => AutoBazaarRunStateName.Combat,
+            ERunState.LevelUp => AutoBazaarRunStateName.LevelUp,
+            ERunState.Loot => AutoBazaarRunStateName.Loot,
+            ERunState.Pedestal => AutoBazaarRunStateName.Pedestal,
+            ERunState.PVPCombat => AutoBazaarRunStateName.PvpCombat,
             ERunState.EndRunVictory => AutoBazaarRunStateName.EndRunVictory,
             ERunState.EndRunDefeat => AutoBazaarRunStateName.EndRunDefeat,
             _ => AutoBazaarRunStateName.Unknown,
@@ -220,47 +251,56 @@ internal static class AutoBazaarContextBuilder
     // -------------------------------------------------------------------------
 
     private static IReadOnlyList<AutoBazaarCardSnapshot> BuildBoardCards(
-        Run? run, int playerGold, bool canSell, AutoBazaarCardLocation location)
+        Run? run,
+        int playerGold,
+        bool canSell,
+        AutoBazaarCardLocation location
+    )
     {
-        if (run?.Player == null) return Array.Empty<AutoBazaarCardSnapshot>();
+        if (run?.Player == null)
+            return Array.Empty<AutoBazaarCardSnapshot>();
 
-        var inventory = location == AutoBazaarCardLocation.Board
-            ? run.Player.Hand
-            : run.Player.Stash;
+        var inventory =
+            location == AutoBazaarCardLocation.Board ? run.Player.Hand : run.Player.Stash;
 
-        if (inventory == null) return Array.Empty<AutoBazaarCardSnapshot>();
+        if (inventory == null)
+            return Array.Empty<AutoBazaarCardSnapshot>();
 
         var result = new List<AutoBazaarCardSnapshot>();
         int order = 0;
 
         var container = (inventory as CardContainer)?.Container;
-        if (container == null) return Array.Empty<AutoBazaarCardSnapshot>();
+        if (container == null)
+            return Array.Empty<AutoBazaarCardSnapshot>();
 
         foreach (var (socketable, socketId) in container.GetCardsAndSockets())
         {
-            if (socketable is not ItemCard card) continue;
+            if (socketable is not ItemCard card)
+                continue;
 
             int? sellPrice = card.GetAttributeValue(ECardAttributeType.SellPrice);
-            result.Add(new AutoBazaarCardSnapshot
-            {
-                InstanceId = card.InstanceId.Value ?? "",
-                Kind = AutoBazaarCardKind.Item,
-                Type = card.Type.ToString(),
-                TemplateId = card.TemplateId.ToString("D"),
-                DisplayName = card.Name,
-                Tier = card.Tier.ToString(),
-                Size = card.Size.ToString(),
-                Enchantment = card.Enchantment?.ToString(),
-                SocketId = socketId.ToString(),
-                Location = location,
-                Order = order++,
-                Tags = BuildStringList(card.Tags),
-                HiddenTags = BuildStringList(card.HiddenTags),
-                Attributes = BuildAttributes(card),
-                ActiveAbilities = BuildActiveAbilities(card),
-                SellPrice = sellPrice,
-                CanSell = canSell && !card.HiddenTags.Contains(EHiddenTag.Unsellable),
-            });
+            result.Add(
+                new AutoBazaarCardSnapshot
+                {
+                    InstanceId = card.InstanceId.Value ?? "",
+                    Kind = AutoBazaarCardKind.Item,
+                    Type = card.Type.ToString(),
+                    TemplateId = card.TemplateId.ToString("D"),
+                    DisplayName = card.Name,
+                    Tier = card.Tier.ToString(),
+                    Size = card.Size.ToString(),
+                    Enchantment = card.Enchantment?.ToString(),
+                    SocketId = socketId.ToString(),
+                    Location = location,
+                    Order = order++,
+                    Tags = BuildStringList(card.Tags),
+                    HiddenTags = BuildStringList(card.HiddenTags),
+                    Attributes = BuildAttributes(card),
+                    ActiveAbilities = BuildActiveAbilities(card),
+                    SellPrice = sellPrice,
+                    CanSell = canSell && !card.HiddenTags.Contains(EHiddenTag.Unsellable),
+                }
+            );
         }
 
         return result;
@@ -268,7 +308,8 @@ internal static class AutoBazaarContextBuilder
 
     private static IReadOnlyList<AutoBazaarCardSnapshot> BuildSkillCards(Run? run, bool canSell)
     {
-        if (run?.Player?.Skills == null) return Array.Empty<AutoBazaarCardSnapshot>();
+        if (run?.Player?.Skills == null)
+            return Array.Empty<AutoBazaarCardSnapshot>();
 
         var result = new List<AutoBazaarCardSnapshot>();
         int order = 0;
@@ -276,25 +317,27 @@ internal static class AutoBazaarContextBuilder
         foreach (var skill in run.Player.Skills)
         {
             int? sellPrice = skill.GetAttributeValue(ECardAttributeType.SellPrice);
-            result.Add(new AutoBazaarCardSnapshot
-            {
-                InstanceId = skill.InstanceId.Value ?? "",
-                Kind = AutoBazaarCardKind.Skill,
-                Type = skill.Type.ToString(),
-                TemplateId = skill.TemplateId.ToString("D"),
-                DisplayName = skill.Name,
-                Tier = skill.Tier.ToString(),
-                Size = skill.Size.ToString(),
-                SocketId = null,
-                Location = AutoBazaarCardLocation.Skill,
-                Order = order++,
-                Tags = BuildStringList(skill.Tags),
-                HiddenTags = BuildStringList(skill.HiddenTags),
-                Attributes = BuildAttributes(skill),
-                ActiveAbilities = BuildActiveAbilities(skill),
-                SellPrice = sellPrice,
-                CanSell = canSell && !skill.HiddenTags.Contains(EHiddenTag.Unsellable),
-            });
+            result.Add(
+                new AutoBazaarCardSnapshot
+                {
+                    InstanceId = skill.InstanceId.Value ?? "",
+                    Kind = AutoBazaarCardKind.Skill,
+                    Type = skill.Type.ToString(),
+                    TemplateId = skill.TemplateId.ToString("D"),
+                    DisplayName = skill.Name,
+                    Tier = skill.Tier.ToString(),
+                    Size = skill.Size.ToString(),
+                    SocketId = null,
+                    Location = AutoBazaarCardLocation.Skill,
+                    Order = order++,
+                    Tags = BuildStringList(skill.Tags),
+                    HiddenTags = BuildStringList(skill.HiddenTags),
+                    Attributes = BuildAttributes(skill),
+                    ActiveAbilities = BuildActiveAbilities(skill),
+                    SellPrice = sellPrice,
+                    CanSell = canSell && !skill.HiddenTags.Contains(EHiddenTag.Unsellable),
+                }
+            );
         }
 
         return result;
@@ -303,21 +346,33 @@ internal static class AutoBazaarContextBuilder
     private static IReadOnlyList<AutoBazaarCardSnapshot> BuildSellableItems(
         IReadOnlyList<AutoBazaarCardSnapshot> boardItems,
         IReadOnlyList<AutoBazaarCardSnapshot> chestItems,
-        bool canSell)
+        bool canSell
+    )
     {
-        if (!canSell) return Array.Empty<AutoBazaarCardSnapshot>();
+        if (!canSell)
+            return Array.Empty<AutoBazaarCardSnapshot>();
 
         var result = new List<AutoBazaarCardSnapshot>();
-        foreach (var c in boardItems) if (c.CanSell == true) result.Add(c);
-        foreach (var c in chestItems) if (c.CanSell == true) result.Add(c);
+        foreach (var c in boardItems)
+            if (c.CanSell == true)
+                result.Add(c);
+        foreach (var c in chestItems)
+            if (c.CanSell == true)
+                result.Add(c);
         return result;
     }
 
     private static List<AutoBazaarCardSnapshot> BuildSelectionOptions(
-        RunState? runState, int playerGold, bool selectionIsFree, Run? run, bool canSelectItem)
+        RunState? runState,
+        int playerGold,
+        bool selectionIsFree,
+        Run? run,
+        bool canSelectItem
+    )
     {
         var result = new List<AutoBazaarCardSnapshot>();
-        if (runState?.SelectionSet == null) return result;
+        if (runState?.SelectionSet == null)
+            return result;
 
         var handContainer = (run?.Player?.Hand as CardContainer)?.Container;
         var stashContainer = (run?.Player?.Stash as CardContainer)?.Container;
@@ -333,7 +388,8 @@ internal static class AutoBazaarContextBuilder
         foreach (var entry in runState.SelectionSet)
         {
             var instanceId = InstanceId.TryParse(entry);
-            if (!Data.Entities.TryGetValue(instanceId, out var card)) continue;
+            if (!Data.Entities.TryGetValue(instanceId, out var card))
+                continue;
 
             AutoBazaarCardKind kind;
             if (card is ItemCard)
@@ -355,8 +411,16 @@ internal static class AutoBazaarContextBuilder
             if (kind == AutoBazaarCardKind.Item)
             {
                 int size = (int)card.Size;
-                var handPlacements = AutoBazaarMoveTargetPlanner.Enumerate(size, handCapacity, occupiedHand);
-                var stashPlacements = AutoBazaarMoveTargetPlanner.Enumerate(size, stashCapacity, occupiedStash);
+                var handPlacements = AutoBazaarMoveTargetPlanner.Enumerate(
+                    size,
+                    handCapacity,
+                    occupiedHand
+                );
+                var stashPlacements = AutoBazaarMoveTargetPlanner.Enumerate(
+                    size,
+                    stashCapacity,
+                    occupiedStash
+                );
 
                 if (handPlacements.Count > 0)
                 {
@@ -388,32 +452,34 @@ internal static class AutoBazaarContextBuilder
                 _ => true,
             };
 
-            result.Add(new AutoBazaarCardSnapshot
-            {
-                InstanceId = card.InstanceId.Value ?? "",
-                Kind = kind,
-                Type = card.Type.ToString(),
-                TemplateId = card.TemplateId.ToString("D"),
-                DisplayName = card.Name,
-                Tier = card.Tier.ToString(),
-                Size = card.Size.ToString(),
-                Enchantment = (card as ItemCard)?.Enchantment?.ToString(),
-                SocketId = null,
-                Location = AutoBazaarCardLocation.Selection,
-                Order = order++,
-                Tags = BuildStringList(card.Tags),
-                HiddenTags = BuildStringList(card.HiddenTags),
-                Attributes = BuildAttributes(card),
-                ActiveAbilities = BuildActiveAbilities(card),
-                BuyPrice = buyPrice,
-                SellPrice = sellPrice,
-                CanAfford = canAfford,
-                CanFit = canFit,
-                CanSelect = canSelect,
-                IsFree = selectionIsFree,
-                TargetSection = targetSection,
-                TargetSockets = targetSockets,
-            });
+            result.Add(
+                new AutoBazaarCardSnapshot
+                {
+                    InstanceId = card.InstanceId.Value ?? "",
+                    Kind = kind,
+                    Type = card.Type.ToString(),
+                    TemplateId = card.TemplateId.ToString("D"),
+                    DisplayName = card.Name,
+                    Tier = card.Tier.ToString(),
+                    Size = card.Size.ToString(),
+                    Enchantment = (card as ItemCard)?.Enchantment?.ToString(),
+                    SocketId = null,
+                    Location = AutoBazaarCardLocation.Selection,
+                    Order = order++,
+                    Tags = BuildStringList(card.Tags),
+                    HiddenTags = BuildStringList(card.HiddenTags),
+                    Attributes = BuildAttributes(card),
+                    ActiveAbilities = BuildActiveAbilities(card),
+                    BuyPrice = buyPrice,
+                    SellPrice = sellPrice,
+                    CanAfford = canAfford,
+                    CanFit = canFit,
+                    CanSelect = canSelect,
+                    IsFree = selectionIsFree,
+                    TargetSection = targetSection,
+                    TargetSockets = targetSockets,
+                }
+            );
         }
 
         return result;
@@ -437,7 +503,8 @@ internal static class AutoBazaarContextBuilder
         bool canMove,
         bool canSell,
         Run? run,
-        HashSet<string> pedestalEligibleIds)
+        HashSet<string> pedestalEligibleIds
+    )
     {
         var actions = new List<AutoBazaarDecisionOption>();
 
@@ -447,52 +514,61 @@ internal static class AutoBazaarContextBuilder
         // 2. StartOrContinueRun
         if (canStartOrContinueRun)
         {
-            actions.Add(new AutoBazaarDecisionOption
-            {
-                ActionKind = AutoBazaarActionKind.StartOrContinueRun,
-                Group = AutoBazaarActionGroup.Flow,
-                DisplayKey = "StartOrContinueRun",
-            });
+            actions.Add(
+                new AutoBazaarDecisionOption
+                {
+                    ActionKind = AutoBazaarActionKind.StartOrContinueRun,
+                    Group = AutoBazaarActionGroup.Flow,
+                    DisplayKey = "StartOrContinueRun",
+                }
+            );
         }
 
         // 3. AbandonRun
         static bool isEndOrReplay(AutoBazaarRunStateName s) =>
-            s is AutoBazaarRunStateName.Combat
-            or AutoBazaarRunStateName.PvpCombat
-            or AutoBazaarRunStateName.Replay
-            or AutoBazaarRunStateName.EndRunVictory
-            or AutoBazaarRunStateName.EndRunDefeat;
+            s
+                is AutoBazaarRunStateName.Combat
+                    or AutoBazaarRunStateName.PvpCombat
+                    or AutoBazaarRunStateName.Replay
+                    or AutoBazaarRunStateName.EndRunVictory
+                    or AutoBazaarRunStateName.EndRunDefeat;
 
         if (isInRun && !isEndOrReplay(stateName) && canHandleOp(StateOps.AbandonRun))
         {
-            actions.Add(new AutoBazaarDecisionOption
-            {
-                ActionKind = AutoBazaarActionKind.AbandonRun,
-                Group = AutoBazaarActionGroup.Flow,
-                DisplayKey = "AbandonRun",
-            });
+            actions.Add(
+                new AutoBazaarDecisionOption
+                {
+                    ActionKind = AutoBazaarActionKind.AbandonRun,
+                    Group = AutoBazaarActionGroup.Flow,
+                    DisplayKey = "AbandonRun",
+                }
+            );
         }
 
         // 4. Reroll
         if (canReroll)
         {
-            actions.Add(new AutoBazaarDecisionOption
-            {
-                ActionKind = AutoBazaarActionKind.Reroll,
-                Group = AutoBazaarActionGroup.Reroll,
-                DisplayKey = "Reroll",
-            });
+            actions.Add(
+                new AutoBazaarDecisionOption
+                {
+                    ActionKind = AutoBazaarActionKind.Reroll,
+                    Group = AutoBazaarActionGroup.Reroll,
+                    DisplayKey = "Reroll",
+                }
+            );
         }
 
         // 5. ExitState
         if (canHandleOp(StateOps.ExitState) && runState?.SelectionContextRules?.CanExit != false)
         {
-            actions.Add(new AutoBazaarDecisionOption
-            {
-                ActionKind = AutoBazaarActionKind.ExitState,
-                Group = AutoBazaarActionGroup.Exit,
-                DisplayKey = "ExitState",
-            });
+            actions.Add(
+                new AutoBazaarDecisionOption
+                {
+                    ActionKind = AutoBazaarActionKind.ExitState,
+                    Group = AutoBazaarActionGroup.Exit,
+                    DisplayKey = "ExitState",
+                }
+            );
         }
 
         // 6. SellItem — per-card
@@ -500,15 +576,18 @@ internal static class AutoBazaarContextBuilder
         {
             foreach (var card in SellableSnapshotsFrom(boardItems, chestItems))
             {
-                if (card.CanSell != true) continue;
-                actions.Add(new AutoBazaarDecisionOption
-                {
-                    ActionKind = AutoBazaarActionKind.SellItem,
-                    Group = AutoBazaarActionGroup.Sell,
-                    DisplayKey = $"SellItem:{card.InstanceId}",
-                    CardInstanceId = card.InstanceId,
-                    Card = card,
-                });
+                if (card.CanSell != true)
+                    continue;
+                actions.Add(
+                    new AutoBazaarDecisionOption
+                    {
+                        ActionKind = AutoBazaarActionKind.SellItem,
+                        Group = AutoBazaarActionGroup.Sell,
+                        DisplayKey = $"SellItem:{card.InstanceId}",
+                        CardInstanceId = card.InstanceId,
+                        Card = card,
+                    }
+                );
             }
         }
 
@@ -522,16 +601,33 @@ internal static class AutoBazaarContextBuilder
             var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
             var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
 
-            EmitMoveActions(actions, boardItems, handContainer, stashContainer,
-                occupiedHand, occupiedStash, cap, isOwnHand: true);
-            EmitMoveActions(actions, chestItems, handContainer, stashContainer,
-                occupiedHand, occupiedStash, cap, isOwnHand: false);
+            EmitMoveActions(
+                actions,
+                boardItems,
+                handContainer,
+                stashContainer,
+                occupiedHand,
+                occupiedStash,
+                cap,
+                isOwnHand: true
+            );
+            EmitMoveActions(
+                actions,
+                chestItems,
+                handContainer,
+                stashContainer,
+                occupiedHand,
+                occupiedStash,
+                cap,
+                isOwnHand: false
+            );
         }
 
         // 8. SelectItem / SelectSkill / SelectEncounter — per offer
         foreach (var offer in selectionOptions)
         {
-            if (offer.CanSelect == false) continue;
+            if (offer.CanSelect == false)
+                continue;
 
             if (offer.Kind == AutoBazaarCardKind.Item && canHandleOp(StateOps.SelectItem))
             {
@@ -543,56 +639,73 @@ internal static class AutoBazaarContextBuilder
                 var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
                 var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
 
-                foreach (var placement in AutoBazaarMoveTargetPlanner.Enumerate(size, cap, occupiedHand))
+                foreach (
+                    var placement in AutoBazaarMoveTargetPlanner.Enumerate(size, cap, occupiedHand)
+                )
                 {
                     var sockets = new List<string>(placement);
-                    actions.Add(new AutoBazaarDecisionOption
-                    {
-                        ActionKind = AutoBazaarActionKind.SelectItem,
-                        Group = AutoBazaarActionGroup.Offer,
-                        DisplayKey = $"SelectItem:{offer.InstanceId}:Hand:{string.Join(",", sockets)}",
-                        CardInstanceId = offer.InstanceId,
-                        TargetSection = AutoBazaarTargetSection.Hand,
-                        TargetSockets = sockets,
-                        Card = offer,
-                    });
+                    actions.Add(
+                        new AutoBazaarDecisionOption
+                        {
+                            ActionKind = AutoBazaarActionKind.SelectItem,
+                            Group = AutoBazaarActionGroup.Offer,
+                            DisplayKey =
+                                $"SelectItem:{offer.InstanceId}:Hand:{string.Join(",", sockets)}",
+                            CardInstanceId = offer.InstanceId,
+                            TargetSection = AutoBazaarTargetSection.Hand,
+                            TargetSockets = sockets,
+                            Card = offer,
+                        }
+                    );
                 }
-                foreach (var placement in AutoBazaarMoveTargetPlanner.Enumerate(size, cap, occupiedStash))
+                foreach (
+                    var placement in AutoBazaarMoveTargetPlanner.Enumerate(size, cap, occupiedStash)
+                )
                 {
                     var sockets = new List<string>(placement);
-                    actions.Add(new AutoBazaarDecisionOption
-                    {
-                        ActionKind = AutoBazaarActionKind.SelectItem,
-                        Group = AutoBazaarActionGroup.Offer,
-                        DisplayKey = $"SelectItem:{offer.InstanceId}:Stash:{string.Join(",", sockets)}",
-                        CardInstanceId = offer.InstanceId,
-                        TargetSection = AutoBazaarTargetSection.Stash,
-                        TargetSockets = sockets,
-                        Card = offer,
-                    });
+                    actions.Add(
+                        new AutoBazaarDecisionOption
+                        {
+                            ActionKind = AutoBazaarActionKind.SelectItem,
+                            Group = AutoBazaarActionGroup.Offer,
+                            DisplayKey =
+                                $"SelectItem:{offer.InstanceId}:Stash:{string.Join(",", sockets)}",
+                            CardInstanceId = offer.InstanceId,
+                            TargetSection = AutoBazaarTargetSection.Stash,
+                            TargetSockets = sockets,
+                            Card = offer,
+                        }
+                    );
                 }
             }
             else if (offer.Kind == AutoBazaarCardKind.Skill && canHandleOp(StateOps.SelectSkill))
             {
-                actions.Add(new AutoBazaarDecisionOption
-                {
-                    ActionKind = AutoBazaarActionKind.SelectSkill,
-                    Group = AutoBazaarActionGroup.Offer,
-                    DisplayKey = $"SelectSkill:{offer.InstanceId}",
-                    CardInstanceId = offer.InstanceId,
-                    Card = offer,
-                });
+                actions.Add(
+                    new AutoBazaarDecisionOption
+                    {
+                        ActionKind = AutoBazaarActionKind.SelectSkill,
+                        Group = AutoBazaarActionGroup.Offer,
+                        DisplayKey = $"SelectSkill:{offer.InstanceId}",
+                        CardInstanceId = offer.InstanceId,
+                        Card = offer,
+                    }
+                );
             }
-            else if (offer.Kind == AutoBazaarCardKind.Encounter && canHandleOp(StateOps.SelectEncounter))
+            else if (
+                offer.Kind == AutoBazaarCardKind.Encounter
+                && canHandleOp(StateOps.SelectEncounter)
+            )
             {
-                actions.Add(new AutoBazaarDecisionOption
-                {
-                    ActionKind = AutoBazaarActionKind.SelectEncounter,
-                    Group = AutoBazaarActionGroup.Offer,
-                    DisplayKey = $"SelectEncounter:{offer.InstanceId}",
-                    CardInstanceId = offer.InstanceId,
-                    Card = offer,
-                });
+                actions.Add(
+                    new AutoBazaarDecisionOption
+                    {
+                        ActionKind = AutoBazaarActionKind.SelectEncounter,
+                        Group = AutoBazaarActionGroup.Offer,
+                        DisplayKey = $"SelectEncounter:{offer.InstanceId}",
+                        CardInstanceId = offer.InstanceId,
+                        Card = offer,
+                    }
+                );
             }
         }
 
@@ -609,27 +722,33 @@ internal static class AutoBazaarContextBuilder
             var eligibleIds = pedestalEligibleIds;
             foreach (var card in boardItems)
             {
-                if (!eligibleIds.Contains(card.InstanceId)) continue;
-                actions.Add(new AutoBazaarDecisionOption
-                {
-                    ActionKind = AutoBazaarActionKind.CommitToPedestal,
-                    Group = AutoBazaarActionGroup.Pedestal,
-                    DisplayKey = $"CommitToPedestal:{card.InstanceId}",
-                    CardInstanceId = card.InstanceId,
-                    Card = card,
-                });
+                if (!eligibleIds.Contains(card.InstanceId))
+                    continue;
+                actions.Add(
+                    new AutoBazaarDecisionOption
+                    {
+                        ActionKind = AutoBazaarActionKind.CommitToPedestal,
+                        Group = AutoBazaarActionGroup.Pedestal,
+                        DisplayKey = $"CommitToPedestal:{card.InstanceId}",
+                        CardInstanceId = card.InstanceId,
+                        Card = card,
+                    }
+                );
             }
             foreach (var card in chestItems)
             {
-                if (!eligibleIds.Contains(card.InstanceId)) continue;
-                actions.Add(new AutoBazaarDecisionOption
-                {
-                    ActionKind = AutoBazaarActionKind.CommitToPedestal,
-                    Group = AutoBazaarActionGroup.Pedestal,
-                    DisplayKey = $"CommitToPedestal:{card.InstanceId}",
-                    CardInstanceId = card.InstanceId,
-                    Card = card,
-                });
+                if (!eligibleIds.Contains(card.InstanceId))
+                    continue;
+                actions.Add(
+                    new AutoBazaarDecisionOption
+                    {
+                        ActionKind = AutoBazaarActionKind.CommitToPedestal,
+                        Group = AutoBazaarActionGroup.Pedestal,
+                        DisplayKey = $"CommitToPedestal:{card.InstanceId}",
+                        CardInstanceId = card.InstanceId,
+                        Card = card,
+                    }
+                );
             }
         }
 
@@ -648,7 +767,8 @@ internal static class AutoBazaarContextBuilder
         ISet<int> occupiedHand,
         ISet<int> occupiedStash,
         int cap,
-        bool isOwnHand)
+        bool isOwnHand
+    )
     {
         foreach (var card in cards)
         {
@@ -657,45 +777,56 @@ internal static class AutoBazaarContextBuilder
             // Hand placements
             var ownLeftSocket = isOwnHand ? ParseSocketIndex(card.SocketId) : -1;
             var handPlacements = AutoBazaarMoveTargetPlanner.Enumerate(
-                size, cap, occupiedHand,
+                size,
+                cap,
+                occupiedHand,
                 excludeStartIndexInclusive: isOwnHand ? ownLeftSocket : -1,
-                excludeCountInclusive: isOwnHand ? size : 0);
+                excludeCountInclusive: isOwnHand ? size : 0
+            );
 
             foreach (var placement in handPlacements)
             {
                 var sockets = new List<string>(placement);
-                actions.Add(new AutoBazaarDecisionOption
-                {
-                    ActionKind = AutoBazaarActionKind.MoveItem,
-                    Group = AutoBazaarActionGroup.Move,
-                    DisplayKey = $"MoveItem:{card.InstanceId}:Hand:{string.Join(",", sockets)}",
-                    CardInstanceId = card.InstanceId,
-                    TargetSection = AutoBazaarTargetSection.Hand,
-                    TargetSockets = sockets,
-                    Card = card,
-                });
+                actions.Add(
+                    new AutoBazaarDecisionOption
+                    {
+                        ActionKind = AutoBazaarActionKind.MoveItem,
+                        Group = AutoBazaarActionGroup.Move,
+                        DisplayKey = $"MoveItem:{card.InstanceId}:Hand:{string.Join(",", sockets)}",
+                        CardInstanceId = card.InstanceId,
+                        TargetSection = AutoBazaarTargetSection.Hand,
+                        TargetSockets = sockets,
+                        Card = card,
+                    }
+                );
             }
 
             // Stash placements
             var ownStashLeftSocket = !isOwnHand ? ParseSocketIndex(card.SocketId) : -1;
             var stashPlacements = AutoBazaarMoveTargetPlanner.Enumerate(
-                size, cap, occupiedStash,
+                size,
+                cap,
+                occupiedStash,
                 excludeStartIndexInclusive: !isOwnHand ? ownStashLeftSocket : -1,
-                excludeCountInclusive: !isOwnHand ? size : 0);
+                excludeCountInclusive: !isOwnHand ? size : 0
+            );
 
             foreach (var placement in stashPlacements)
             {
                 var sockets = new List<string>(placement);
-                actions.Add(new AutoBazaarDecisionOption
-                {
-                    ActionKind = AutoBazaarActionKind.MoveItem,
-                    Group = AutoBazaarActionGroup.Move,
-                    DisplayKey = $"MoveItem:{card.InstanceId}:Stash:{string.Join(",", sockets)}",
-                    CardInstanceId = card.InstanceId,
-                    TargetSection = AutoBazaarTargetSection.Stash,
-                    TargetSockets = sockets,
-                    Card = card,
-                });
+                actions.Add(
+                    new AutoBazaarDecisionOption
+                    {
+                        ActionKind = AutoBazaarActionKind.MoveItem,
+                        Group = AutoBazaarActionGroup.Move,
+                        DisplayKey =
+                            $"MoveItem:{card.InstanceId}:Stash:{string.Join(",", sockets)}",
+                        CardInstanceId = card.InstanceId,
+                        TargetSection = AutoBazaarTargetSection.Stash,
+                        TargetSockets = sockets,
+                        Card = card,
+                    }
+                );
             }
         }
     }
@@ -703,7 +834,8 @@ internal static class AutoBazaarContextBuilder
     private static HashSet<int> GetOccupiedAndLockedSockets(SocketedContainer? container)
     {
         var result = new HashSet<int>();
-        if (container == null) return result;
+        if (container == null)
+            return result;
 
         for (int i = 0; i < container.Sockets.Length; i++)
         {
@@ -716,10 +848,13 @@ internal static class AutoBazaarContextBuilder
 
     private static IEnumerable<AutoBazaarCardSnapshot> SellableSnapshotsFrom(
         IReadOnlyList<AutoBazaarCardSnapshot> board,
-        IReadOnlyList<AutoBazaarCardSnapshot> chest)
+        IReadOnlyList<AutoBazaarCardSnapshot> chest
+    )
     {
-        foreach (var c in board) yield return c;
-        foreach (var c in chest) yield return c;
+        foreach (var c in board)
+            yield return c;
+        foreach (var c in chest)
+            yield return c;
     }
 
     private static int ParseSize(string? size)
@@ -736,17 +871,21 @@ internal static class AutoBazaarContextBuilder
     private static int ParseSocketIndex(string? socketId)
     {
         // e.g. "Socket_3" → 3
-        if (socketId == null) return -1;
+        if (socketId == null)
+            return -1;
         var idx = socketId.LastIndexOf('_');
-        if (idx < 0 || idx + 1 >= socketId.Length) return -1;
-        if (int.TryParse(socketId.AsSpan(idx + 1), out var n)) return n;
+        if (idx < 0 || idx + 1 >= socketId.Length)
+            return -1;
+        if (int.TryParse(socketId.AsSpan(idx + 1), out var n))
+            return n;
         return -1;
     }
 
-private static IReadOnlyDictionary<string, int> BuildAttributes(Card card)
+    private static IReadOnlyDictionary<string, int> BuildAttributes(Card card)
     {
         var result = new SortedDictionary<string, int>(StringComparer.Ordinal);
-        if (card.Attributes == null) return result;
+        if (card.Attributes == null)
+            return result;
         foreach (var kv in card.Attributes)
         {
             result[kv.Key.ToString()] = kv.Value;
@@ -756,11 +895,13 @@ private static IReadOnlyDictionary<string, int> BuildAttributes(Card card)
 
     private static IReadOnlyList<string> BuildStringList<T>(IEnumerable<T>? source)
     {
-        if (source is null) return Array.Empty<string>();
+        if (source is null)
+            return Array.Empty<string>();
         var result = new List<string>();
         foreach (var value in source)
         {
-            if (value is null) continue;
+            if (value is null)
+                continue;
             result.Add(value.ToString() ?? "");
         }
         result.Sort(StringComparer.Ordinal);
@@ -774,18 +915,21 @@ private static IReadOnlyDictionary<string, int> BuildAttributes(Card card)
             var result = new List<AutoBazaarCardAbilitySnapshot>();
             foreach (var ability in card.GetActiveAbilities())
             {
-                if (ability is null) continue;
-                result.Add(new AutoBazaarCardAbilitySnapshot
-                {
-                    Id = ability.Id,
-                    InternalName = EmptyAsNull(ability.InternalName),
-                    InternalDescription = EmptyAsNull(ability.InternalDescription),
-                    Trigger = ability.Trigger?.GetType().Name,
-                    Action = ability.Action?.GetType().Name,
-                    ActiveIn = ability.ActiveIn.ToString(),
-                    WorksIn = ability.WorksIn.ToString(),
-                    Priority = ability.Priority.ToString(),
-                });
+                if (ability is null)
+                    continue;
+                result.Add(
+                    new AutoBazaarCardAbilitySnapshot
+                    {
+                        Id = ability.Id,
+                        InternalName = EmptyAsNull(ability.InternalName),
+                        InternalDescription = EmptyAsNull(ability.InternalDescription),
+                        Trigger = ability.Trigger?.GetType().Name,
+                        Action = ability.Action?.GetType().Name,
+                        ActiveIn = ability.ActiveIn.ToString(),
+                        WorksIn = ability.WorksIn.ToString(),
+                        Priority = ability.Priority.ToString(),
+                    }
+                );
             }
             result.Sort((x, y) => string.CompareOrdinal(x.Id, y.Id));
             return result;
@@ -796,33 +940,34 @@ private static IReadOnlyDictionary<string, int> BuildAttributes(Card card)
         }
     }
 
-    private static string? EmptyAsNull(string? value)
-        => string.IsNullOrEmpty(value) ? null : value;
+    private static string? EmptyAsNull(string? value) => string.IsNullOrEmpty(value) ? null : value;
 
-    private static AutoBazaarDecisionOption WaitOption() => new()
-    {
-        ActionKind = AutoBazaarActionKind.Wait,
-        Group = AutoBazaarActionGroup.Wait,
-        DisplayKey = "Wait",
-    };
+    private static AutoBazaarDecisionOption WaitOption() =>
+        new()
+        {
+            ActionKind = AutoBazaarActionKind.Wait,
+            Group = AutoBazaarActionGroup.Wait,
+            DisplayKey = "Wait",
+        };
 
-    private static AutoBazaarDecisionOption StartOrContinueRunOption() => new()
-    {
-        ActionKind = AutoBazaarActionKind.StartOrContinueRun,
-        Group = AutoBazaarActionGroup.Flow,
-        DisplayKey = "StartOrContinueRun",
-    };
+    private static AutoBazaarDecisionOption StartOrContinueRunOption() =>
+        new()
+        {
+            ActionKind = AutoBazaarActionKind.StartOrContinueRun,
+            Group = AutoBazaarActionGroup.Flow,
+            DisplayKey = "StartOrContinueRun",
+        };
 
-
-    private static AutoBazaarContext MakeDegenerate(bool isEnabled, double cooldown) => new()
-    {
-        SchemaVersion = AutoBazaarSchema.Version,
-        ServerTimeUtc = UtcNow(),
-        IsEnabled = isEnabled,
-        StateName = AutoBazaarRunStateName.Unknown,
-        ActionCooldownRemainingSeconds = cooldown,
-        AvailableActions = new[] { WaitOption() },
-    };
+    private static AutoBazaarContext MakeDegenerate(bool isEnabled, double cooldown) =>
+        new()
+        {
+            SchemaVersion = AutoBazaarSchema.Version,
+            ServerTimeUtc = UtcNow(),
+            IsEnabled = isEnabled,
+            StateName = AutoBazaarRunStateName.Unknown,
+            ActionCooldownRemainingSeconds = cooldown,
+            AvailableActions = new[] { WaitOption() },
+        };
 
     private static string UtcNow() =>
         DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture);

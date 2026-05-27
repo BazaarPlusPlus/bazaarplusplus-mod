@@ -2,9 +2,7 @@
 using System.Reflection;
 using Microsoft.Data.Sqlite;
 
-var schemaType = RequireType(
-    "BazaarPlusPlus.Storage.RunLog.RunLogSchema"
-);
+var schemaType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
 var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbScreenshotUploadStore");
 
 var ctor = storeType.GetConstructor([typeof(string), typeof(string)]);
@@ -46,7 +44,10 @@ try
         "EnsureBackfilled",
         BindingFlags.Public | BindingFlags.Instance
     );
-    Assert(ensureBackfilled != null, "BazaarDbScreenshotUploadStore should expose EnsureBackfilled.");
+    Assert(
+        ensureBackfilled != null,
+        "BazaarDbScreenshotUploadStore should expose EnsureBackfilled."
+    );
     ensureBackfilled!.Invoke(store, []);
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -81,7 +82,10 @@ try
         "GetPendingScreenshotIds",
         BindingFlags.Public | BindingFlags.Instance
     );
-    Assert(getPending != null, "BazaarDbScreenshotUploadStore should expose GetPendingScreenshotIds.");
+    Assert(
+        getPending != null,
+        "BazaarDbScreenshotUploadStore should expose GetPendingScreenshotIds."
+    );
     var pending = (System.Collections.Generic.IReadOnlyList<string>)
         getPending!.Invoke(store, [10])!;
     Assert(pending.Count == 2, "GetPendingScreenshotIds should return both backfilled rows.");

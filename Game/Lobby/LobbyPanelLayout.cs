@@ -23,11 +23,7 @@ internal static class LobbyPanelLayout
         bool wrap = false
     )
     {
-        var textObject = new GameObject(
-            objectName,
-            typeof(RectTransform),
-            typeof(TextMeshProUGUI)
-        );
+        var textObject = new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
         var textRect = textObject.GetComponent<RectTransform>();
         textRect.SetParent(parent, worldPositionStays: false);
 

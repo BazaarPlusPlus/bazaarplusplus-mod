@@ -2,12 +2,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
-using UnityEngine;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Infrastructure;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using UnityEngine;
 
 namespace BazaarPlusPlus.Game.AutoBazaar;
 
@@ -42,13 +42,20 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
 
     private void Update()
     {
-        if (_services is null) return;
+        if (_services is null)
+            return;
 
         ReconcileListener();
-        if (_http is null || _queue is null) return;
+        if (_http is null || _queue is null)
+            return;
 
-        var interval = Mathf.Clamp(_services.Config.AutoBazaarDecisionIntervalSeconds?.Value ?? 1.5f, 0.5f, 10f);
-        if (Time.unscaledTime - _lastTickTime < interval) return;
+        var interval = Mathf.Clamp(
+            _services.Config.AutoBazaarDecisionIntervalSeconds?.Value ?? 1.5f,
+            0.5f,
+            10f
+        );
+        if (Time.unscaledTime - _lastTickTime < interval)
+            return;
         _lastTickTime = Time.unscaledTime;
 
         var cooldownLeft = ComputeCooldownLeft();
@@ -61,51 +68,81 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
         AutoBazaarUiPlumbing.Tick();
 
         var pending = _queue.TryDequeue();
-        if (pending is null) return;
+        if (pending is null)
+            return;
 
         ProcessPending(pending, snap);
     }
 
     private void ReconcileListener()
     {
-        if (_services is null) return;
-        if (Time.unscaledTime - _lastListenerReconcileTime < ListenerReconcileDebounceSeconds) return;
+        if (_services is null)
+            return;
+        if (Time.unscaledTime - _lastListenerReconcileTime < ListenerReconcileDebounceSeconds)
+            return;
         _lastListenerReconcileTime = Time.unscaledTime;
 
         var enabled = _services.Config.AutoBazaarEnabled?.Value == true;
         var desiredPort = _services.Config.AutoBazaarHttpListenerPort?.Value ?? 47900;
-        var desiredTimeoutMs = (int)((_services.Config.AutoBazaarHttpEndpointTimeoutSeconds?.Value ?? 3f) * 1000);
+        var desiredTimeoutMs = (int)(
+            (_services.Config.AutoBazaarHttpEndpointTimeoutSeconds?.Value ?? 3f) * 1000
+        );
 
         if (!enabled)
         {
             if (_http is not null)
             {
                 BppLog.Info("AutoBazaar", "Stopping listener (Enabled=false)");
-                try { _http.Stop(); } catch { }
-                try { _queue?.Dispose(); } catch { }
-                _http = null; _queue = null; _currentPort = -1;
-                _snapshots.Reset();  // tickId restarts on next enable
+                try
+                {
+                    _http.Stop();
+                }
+                catch { }
+                try
+                {
+                    _queue?.Dispose();
+                }
+                catch { }
+                _http = null;
+                _queue = null;
+                _currentPort = -1;
+                _snapshots.Reset(); // tickId restarts on next enable
             }
             return;
         }
 
         // enabled — make sure we're listening on the right port
-        if (_http is not null && desiredPort == _currentPort) return;  // already correct
+        if (_http is not null && desiredPort == _currentPort)
+            return; // already correct
 
         // Need to (re)start
         if (_http is not null)
         {
             BppLog.Info("AutoBazaar", $"Restarting listener (port {_currentPort} → {desiredPort})");
-            try { _http.Stop(); } catch { }
-            try { _queue?.Dispose(); } catch { }
-            _http = null; _queue = null;
+            try
+            {
+                _http.Stop();
+            }
+            catch { }
+            try
+            {
+                _queue?.Dispose();
+            }
+            catch { }
+            _http = null;
+            _queue = null;
         }
 
         try
         {
             _queue = new AutoBazaarActionQueue(desiredTimeoutMs);
             var endpointPath = System.IO.Path.Combine(GetLogRoot(), "endpoint.json");
-            _http = new AutoBazaarHttpServer(desiredPort, endpointPath, () => _snapshots.Current, _queue);
+            _http = new AutoBazaarHttpServer(
+                desiredPort,
+                endpointPath,
+                () => _snapshots.Current,
+                _queue
+            );
             _http.Start();
             _currentPort = desiredPort;
             BppLog.Info("AutoBazaar", $"Listener started on http://127.0.0.1:{desiredPort}");
@@ -113,9 +150,19 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
         catch (Exception ex)
         {
             BppLog.Error("AutoBazaar", $"Listener failed on port {desiredPort}", ex);
-            try { _http?.Stop(); } catch { }
-            try { _queue?.Dispose(); } catch { }
-            _http = null; _queue = null; _currentPort = -1;
+            try
+            {
+                _http?.Stop();
+            }
+            catch { }
+            try
+            {
+                _queue?.Dispose();
+            }
+            catch { }
+            _http = null;
+            _queue = null;
+            _currentPort = -1;
         }
     }
 
@@ -130,7 +177,13 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
         {
             var errBody = BuildErrorBody(validation);
             pending.SetResponse(new AutoBazaarServerResponse(validation.HttpStatus, errBody));
-            LogDecision(decisionId, snap, action, executed: false, error: validation.Code.ToString());
+            LogDecision(
+                decisionId,
+                snap,
+                action,
+                executed: false,
+                error: validation.Code.ToString()
+            );
             return;
         }
 
@@ -156,11 +209,17 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
     private string BuildDispatchErrorBody(string? details)
     {
         var envelope = new Dictionary<string, object?> { ["error"] = "internal" };
-        if (details is not null) envelope["details"] = details;
+        if (details is not null)
+            envelope["details"] = details;
         return JsonConvert.SerializeObject(envelope, _responseJson);
     }
 
-    private string BuildOkBody(string decisionId, AutoBazaarContextSnapshot snap, AutoBazaarAction action, bool executed)
+    private string BuildOkBody(
+        string decisionId,
+        AutoBazaarContextSnapshot snap,
+        AutoBazaarAction action,
+        bool executed
+    )
     {
         var payload = new
         {
@@ -178,22 +237,30 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
         return AutoBazaarResponseJson.BuildValidationErrorBody(validation);
     }
 
-    private void LogDecision(string decisionId, AutoBazaarContextSnapshot snap, AutoBazaarAction action, bool executed, string? error)
+    private void LogDecision(
+        string decisionId,
+        AutoBazaarContextSnapshot snap,
+        AutoBazaarAction action,
+        bool executed,
+        string? error
+    )
     {
         try
         {
             var log = GetOrCreateDecisionLog();
-            log.Append(new AutoBazaarDecisionLogEntry
-            {
-                TickId = snap.TickId,
-                DecisionId = decisionId,
-                RunId = snap.Context.RunId,
-                State = snap.Context.StateName.ToString(),
-                Action = action,
-                Executed = executed,
-                Error = error,
-                Reason = action.Reason,
-            });
+            log.Append(
+                new AutoBazaarDecisionLogEntry
+                {
+                    TickId = snap.TickId,
+                    DecisionId = decisionId,
+                    RunId = snap.Context.RunId,
+                    State = snap.Context.StateName.ToString(),
+                    Action = action,
+                    Executed = executed,
+                    Error = error,
+                    Reason = action.Reason,
+                }
+            );
         }
         catch (Exception ex)
         {
@@ -218,13 +285,22 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
         return _decisionLog;
     }
 
-    private static string GetLogRoot()
-        => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "BazaarPlusPlus", "AutoBazaar"));
+    private static string GetLogRoot() =>
+        Path.GetFullPath(Path.Combine(Application.dataPath, "..", "BazaarPlusPlus", "AutoBazaar"));
 
     private void OnDestroy()
     {
-        try { _http?.Stop(); } catch { }
-        try { _queue?.Dispose(); } catch { }
-        _http = null; _queue = null;
+        try
+        {
+            _http?.Stop();
+        }
+        catch { }
+        try
+        {
+            _queue?.Dispose();
+        }
+        catch { }
+        _http = null;
+        _queue = null;
     }
 }
