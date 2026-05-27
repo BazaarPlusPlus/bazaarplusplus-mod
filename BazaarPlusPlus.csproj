@@ -40,6 +40,10 @@
     <Compile Remove="Storage/**" />
     <EmbeddedResource Remove="Storage/**" />
     <None Remove="Storage/**" />
+    <Compile Remove="**/bin/**;**/obj/**" />
+    <EmbeddedResource Remove="**/bin/**;**/obj/**" />
+    <None Remove="**/bin/**;**/obj/**" />
+    <Content Remove="**/bin/**;**/obj/**" />
   </ItemGroup>
   <!-- Project paths -->
   <PropertyGroup>
