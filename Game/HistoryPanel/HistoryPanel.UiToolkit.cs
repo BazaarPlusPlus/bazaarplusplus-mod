@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.HistoryPanel.Ui;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -36,10 +38,10 @@ internal sealed partial class HistoryPanel
         _previewContainerBounds = bounds;
         _hasPreviewContainerBounds = true;
 
-        if (_previewRenderer == null)
+        if (_battleBoardPreview == null)
             return;
 
-        if (_previewRenderer.SetPreviewBounds(bounds) && IsVisible)
+        if (ApplyPreviewContainerBounds(bounds) && IsVisible)
             RefreshSelectedBattlePreview();
     }
 
@@ -57,14 +59,6 @@ internal sealed partial class HistoryPanel
     private void RefreshUi()
     {
         _uiView?.Refresh(BuildUiModel());
-    }
-
-    private void UpdatePreviewUiTick()
-    {
-        if (_uiView == null)
-            return;
-
-        _uiView.SetPreviewTexture(_previewRenderer?.CurrentTexture);
     }
 
     private void SetPreviewStatus(string? message, bool visible)

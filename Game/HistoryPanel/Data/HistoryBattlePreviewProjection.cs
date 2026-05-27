@@ -12,7 +12,7 @@ using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Data;
 
 internal static class HistoryBattlePreviewProjection
 {

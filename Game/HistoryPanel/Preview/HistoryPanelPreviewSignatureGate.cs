@@ -1,7 +1,7 @@
 #nullable enable
 using System.Threading.Tasks;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 // Decides whether the renderer should cache `previewData.Signature` after awaiting all
 // per-card SetUp tasks. Any failed or cancelled task means the frame is incomplete: we

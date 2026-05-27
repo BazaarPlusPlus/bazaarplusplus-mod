@@ -8,8 +8,9 @@ using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Storage.RunLog;
 using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
 
 internal sealed partial class HistoryPanelRepository
 {

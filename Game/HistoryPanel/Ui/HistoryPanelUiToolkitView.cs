@@ -4,8 +4,9 @@ using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Ui;
 
 internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 {

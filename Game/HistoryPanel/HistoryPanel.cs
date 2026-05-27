@@ -10,6 +10,9 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using Coroutine = UnityEngine.Coroutine;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
+using BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -31,7 +34,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private HistoryPanelDataService _dataService = null!;
     private HistoryPanelReplayService _replayService = null!;
     private HistoryPanelPreviewSource? _previewSource;
-    private HistoryPanelPreviewRenderer? _previewRenderer;
+    private BattleBoardPreview? _battleBoardPreview;
     private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
     private string _lastSceneToken = string.Empty;
@@ -139,7 +142,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         IsVisible = false;
         _coordinator?.OnPanelHidden();
         StopPreviewRender();
-        _previewRenderer?.Hide();
+        _battleBoardPreview?.Hide();
         SetUiVisible(false);
     }
 
@@ -158,7 +161,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         DetectSceneChange();
 
-        if (IsVisible && Data.IsInCombat)
+        if (IsVisible && TheBazaar.Data.IsInCombat)
         {
             SetHistoryVisible(false);
             return;
@@ -179,8 +182,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         if (!IsVisible)
             return;
-
-        UpdatePreviewUiTick();
 
         if (keyboard.escapeKey.wasPressedThisFrame)
             SetHistoryVisible(false);
@@ -271,12 +272,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private void RefreshLocalizationInternal()
     {
         RefreshUi();
-        UpdatePreviewUiTick();
     }
 
     private bool CanOpenHistoryReview()
     {
-        return HistoryPanelAccessPolicy.CanOpen(Data.IsInCombat);
+        return HistoryPanelAccessPolicy.CanOpen(TheBazaar.Data.IsInCombat);
     }
 
     private void RefreshSelectedBattlePreview()
@@ -285,12 +285,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         if (!IsVisible)
         {
-            _previewRenderer?.Hide();
+            _battleBoardPreview?.Hide();
             return;
         }
 
         EnsurePreviewRenderer();
-        if (_previewRenderer == null || _previewSource == null)
+        if (_battleBoardPreview == null || _previewSource == null)
             return;
 
         var previewData = _previewSource.Build(
@@ -301,17 +301,36 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             _battles
         );
         _previewCoroutine = StartCoroutine(
-            _previewRenderer.RenderPreview(
-                previewData,
-                SetPreviewStatus,
-                UpdatePreviewUiTick
+            _battleBoardPreview.Render(
+                previewData.Items,
+                previewData.Signature,
+                OnPreviewPhase
             )
         );
     }
 
+    private void OnPreviewPhase(BattleBoardRenderPhase phase)
+    {
+        switch (phase)
+        {
+            case BattleBoardRenderPhase.Empty:
+                SetPreviewStatus(HistoryPanelText.NoLocallyRenderableCards(), true);
+                break;
+            case BattleBoardRenderPhase.InitFailed:
+                SetPreviewStatus(HistoryPanelText.PreviewRendererInitFailed(), true);
+                break;
+            case BattleBoardRenderPhase.Loading:
+                SetPreviewStatus(HistoryPanelText.LoadingPreview(), true);
+                break;
+            case BattleBoardRenderPhase.Done:
+                SetPreviewStatus(null, false);
+                break;
+        }
+    }
+
     private void StopPreviewRender()
     {
-        _previewRenderer?.CancelPending();
+        _battleBoardPreview?.CancelPending();
 
         if (_previewCoroutine == null)
             return;
@@ -322,16 +341,44 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void EnsurePreviewRenderer()
     {
-        _previewRenderer ??= new HistoryPanelPreviewRenderer();
+        _battleBoardPreview ??= new BattleBoardPreview();
         if (_hasPreviewContainerBounds)
-            _previewRenderer.SetPreviewBounds(_previewContainerBounds);
+            ApplyPreviewContainerBounds(_previewContainerBounds);
+    }
+
+    // Translates a screen-space UI Toolkit container Rect into the three BattleBoardPreview
+    // knobs: position (bottom-left, inset for visual padding), clip size (rect inside that
+    // padding), and an auto-fit card scale that matches the legacy behaviour of fitting the
+    // 2400x600 native board into the available area. Returns true if the card scale changed
+    // so the caller knows to re-render.
+    private bool ApplyPreviewContainerBounds(Rect bounds)
+    {
+        if (_battleBoardPreview == null)
+            return false;
+
+        const float horizontalInset = 4f;
+        const float verticalInset = 10f;
+
+        var position = new Vector2(bounds.x + horizontalInset, bounds.y + verticalInset);
+        var clipSize = new Vector2(
+            Mathf.Max(1f, bounds.width - horizontalInset * 2f),
+            Mathf.Max(1f, bounds.height - verticalInset * 2f)
+        );
+        var cardScale = Mathf.Min(
+            clipSize.x / HistoryPanelPreviewTextureGeometry.NativeBoardWidth,
+            clipSize.y / HistoryPanelPreviewTextureGeometry.NativeBoardHeight
+        );
+
+        _battleBoardPreview.SetPosition(position);
+        _battleBoardPreview.SetClipSize(clipSize);
+        return _battleBoardPreview.SetCardScale(cardScale);
     }
 
     private void DisposePreviewRenderer()
     {
         StopPreviewRender();
-        _previewRenderer?.Dispose();
-        _previewRenderer = null;
+        _battleBoardPreview?.Dispose();
+        _battleBoardPreview = null;
     }
 
     private void EnsureInitialized(string source)
@@ -355,7 +402,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _uiFontPrewarmedForScene = false;
         PrewarmUiFontState("scene-change");
         LogEventSystemDiagnostics(SceneManager.GetActiveScene());
-        if (IsVisible && Data.IsInCombat)
+        if (IsVisible && TheBazaar.Data.IsInCombat)
             SetHistoryVisible(false);
 
         DisposePreviewRenderer();

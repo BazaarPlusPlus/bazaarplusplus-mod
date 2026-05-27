@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 

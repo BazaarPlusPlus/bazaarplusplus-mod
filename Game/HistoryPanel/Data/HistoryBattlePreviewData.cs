@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Data;
 
 internal sealed class HistoryBattlePreviewData
 {

@@ -9,15 +9,15 @@
 
   <ItemGroup>
     <Compile
-      Include="../../Game/HistoryPanel/HistoryPanelPreviewSignatureGate.cs"
+      Include="../../Game/HistoryPanel/Preview/HistoryPanelPreviewSignatureGate.cs"
       Link="HistoryPanelPreviewSignatureGate.cs"
     />
     <Compile
-      Include="../../Game/HistoryPanel/HistoryPanelPreviewGenerationGuard.cs"
+      Include="../../Game/HistoryPanel/Preview/HistoryPanelPreviewGenerationGuard.cs"
       Link="HistoryPanelPreviewGenerationGuard.cs"
     />
     <Compile
-      Include="../../Game/HistoryPanel/HistoryPanelPreviewTextureGeometry.cs"
+      Include="../../Game/HistoryPanel/Preview/HistoryPanelPreviewTextureGeometry.cs"
       Link="HistoryPanelPreviewTextureGeometry.cs"
     />
     <Compile Include="Program.cs" />

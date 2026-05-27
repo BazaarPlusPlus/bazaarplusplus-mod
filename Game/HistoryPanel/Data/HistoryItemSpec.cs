@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Data;
 
 internal sealed class HistoryItemSpec
 {

@@ -1,8 +1,9 @@
 #nullable enable
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Ui;
 
 internal sealed partial class HistoryPanelUiToolkitView
 {

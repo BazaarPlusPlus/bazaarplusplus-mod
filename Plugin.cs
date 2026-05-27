@@ -18,6 +18,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
+using BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 namespace BazaarPlusPlus;
 

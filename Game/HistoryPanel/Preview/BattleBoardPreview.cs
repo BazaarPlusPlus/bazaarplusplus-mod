@@ -10,17 +10,28 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
-using UnityEngine.UI;
 using Object = UnityEngine.Object;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
 
-internal sealed class HistoryPanelPreviewRenderer
+internal enum BattleBoardRenderPhase
 {
-    private const int DefaultPreviewLayer = 30;
+    Empty,
+    InitFailed,
+    Loading,
+    Done,
+}
+
+// Self-contained 10-socket card board preview. Owns its overlay Canvas, clip, socket
+// RectTransforms, card pool, and reflection-driven SetUp/Show/Resize lifecycle. The caller
+// supplies cards (HistoryItemSpec list) and configures three independent transform knobs:
+// SetPosition / SetClipSize / SetCardScale. Status reporting is via BattleBoardRenderPhase
+// so callers map to their own UI strings.
+internal sealed class BattleBoardPreview
+{
+    private const int DefaultLayer = 30;
     private const int OverlaySortingOrder = 27;
-    private const float PreviewHorizontalInset = 4f;
-    private const float PreviewVerticalInset = 10f;
 
     private readonly int _layer;
     private GameObject? _root;
@@ -34,77 +45,111 @@ internal sealed class HistoryPanelPreviewRenderer
     private readonly List<Task> _activeSetUpTasks = new();
     private readonly HistoryPanelPreviewGenerationGuard _generation = new();
     private string? _renderedSignature;
-    private Rect _previewBounds;
-    private bool _hasPreviewBounds;
 
-    public HistoryPanelPreviewRenderer(int layer = DefaultPreviewLayer)
+    // Default geometry: clip area exactly matches the native board at 1.0× card scale,
+    // anchored at the screen's bottom-left. Callers override via SetPosition / SetClipSize.
+    private Vector2 _position = Vector2.zero;
+    private Vector2 _clipSize = new(
+        HistoryPanelPreviewTextureGeometry.NativeBoardWidth,
+        HistoryPanelPreviewTextureGeometry.NativeBoardHeight
+    );
+    private float _cardScale = 1f;
+
+    public BattleBoardPreview(int layer = DefaultLayer)
     {
         _layer = layer;
     }
-
-    public Texture? CurrentTexture => null;
 
     public void CancelPending()
     {
         _generation.Bump();
     }
 
-    public bool SetPreviewBounds(Rect bounds)
+    // Screen-space pixel coordinates of the clip rect's bottom-left corner.
+    public void SetPosition(Vector2 position)
     {
-        var normalized = NormalizePreviewBounds(bounds);
-        var sizeChanged =
-            !_hasPreviewBounds
-            || !Mathf.Approximately(_previewBounds.width, normalized.width)
-            || !Mathf.Approximately(_previewBounds.height, normalized.height);
+        var rounded = new Vector2(Mathf.Round(position.x), Mathf.Round(position.y));
+        if (Mathf.Approximately(_position.x, rounded.x)
+            && Mathf.Approximately(_position.y, rounded.y))
+            return;
 
-        _previewBounds = normalized;
-        _hasPreviewBounds = true;
-        ApplyPreviewBounds();
-
-        if (sizeChanged)
-            _renderedSignature = null;
-        return sizeChanged;
+        _position = rounded;
+        ApplyTransform();
     }
 
-    public IEnumerator RenderPreview(
-        HistoryBattlePreviewData? previewData,
-        Action<string?, bool> setStatus,
-        Action? onRendered = null
+    // Size of the clip rect in pixels. Cards rendered outside this rect are masked.
+    public void SetClipSize(Vector2 size)
+    {
+        var rounded = new Vector2(
+            Mathf.Max(1f, Mathf.Round(size.x)),
+            Mathf.Max(1f, Mathf.Round(size.y))
+        );
+        if (Mathf.Approximately(_clipSize.x, rounded.x)
+            && Mathf.Approximately(_clipSize.y, rounded.y))
+            return;
+
+        _clipSize = rounded;
+        ApplyTransform();
+    }
+
+    // Multiplier on top of native card size (the prefab's intrinsic sizeDelta from
+    // MonsterBoardTooltip sockets). 1.0 = native; values < 1 shrink; > 1 enlarge and may
+    // overflow the clip rect. Returns true if the value actually changed; in that case the
+    // render cache is invalidated, and the caller should re-issue Render() if it wants the
+    // cards re-taken from the pool with a fresh CardPreviewBase.Resize.
+    public bool SetCardScale(float scale)
+    {
+        var clamped = Mathf.Max(0.05f, scale);
+        if (Mathf.Approximately(_cardScale, clamped))
+            return false;
+
+        _cardScale = clamped;
+        ApplyTransform();
+        _renderedSignature = null;
+        return true;
+    }
+
+    public IEnumerator Render(
+        IReadOnlyList<HistoryItemSpec>? cards,
+        string? signature = null,
+        Action<BattleBoardRenderPhase>? onPhase = null,
+        Action? onComplete = null
     )
     {
         var snapshot = _generation.Bump();
 
-        if (previewData == null || !previewData.HasRenderableCards)
+        if (cards == null || cards.Count == 0)
         {
-            setStatus(HistoryPanelText.NoLocallyRenderableCards(), true);
+            onPhase?.Invoke(BattleBoardRenderPhase.Empty);
             Hide();
-            onRendered?.Invoke();
+            onComplete?.Invoke();
             yield break;
         }
 
         if (!EnsureInitialized())
         {
-            setStatus(HistoryPanelText.PreviewRendererInitFailed(), true);
-            onRendered?.Invoke();
+            onPhase?.Invoke(BattleBoardRenderPhase.InitFailed);
+            onComplete?.Invoke();
             yield break;
         }
 
         if (!string.IsNullOrEmpty(_renderedSignature)
-            && string.Equals(_renderedSignature, previewData.Signature, StringComparison.Ordinal))
+            && !string.IsNullOrEmpty(signature)
+            && string.Equals(_renderedSignature, signature, StringComparison.Ordinal))
         {
-            setStatus(null, false);
-            onRendered?.Invoke();
+            onPhase?.Invoke(BattleBoardRenderPhase.Done);
+            onComplete?.Invoke();
             yield break;
         }
 
-        setStatus(HistoryPanelText.LoadingPreview(), true);
+        onPhase?.Invoke(BattleBoardRenderPhase.Loading);
 
         _root!.SetActive(true);
-        ApplyPreviewBounds();
+        ApplyTransform();
         ReturnActiveCardsToPool();
         _activeSetUpTasks.Clear();
 
-        SpawnCards(previewData.Items);
+        SpawnCards(cards);
 
         var aggregate = Task.WhenAll(_activeSetUpTasks);
         while (!aggregate.IsCompleted && _generation.IsCurrent(snapshot))
@@ -126,10 +171,10 @@ internal sealed class HistoryPanelPreviewRenderer
         // Cache the signature only when all SetUp tasks succeeded; faulted frames stay
         // un-cached so the next selection retries instead of locking in a half-rendered RT.
         if (HistoryPanelPreviewSignatureGate.ShouldCache(aggregate))
-            _renderedSignature = previewData.Signature;
+            _renderedSignature = signature;
 
-        setStatus(null, false);
-        onRendered?.Invoke();
+        onPhase?.Invoke(BattleBoardRenderPhase.Done);
+        onComplete?.Invoke();
     }
 
     public void Hide()
@@ -177,7 +222,7 @@ internal sealed class HistoryPanelPreviewRenderer
             && _pool != null
         )
         {
-            ApplyPreviewBounds();
+            ApplyTransform();
             return _pool.TryEnsurePrefabRefs();
         }
 
@@ -191,7 +236,7 @@ internal sealed class HistoryPanelPreviewRenderer
         }
 
         _root = new GameObject(
-            "HistoryPanelPreviewOverlayRoot",
+            "BattleBoardPreviewRoot",
             typeof(RectTransform),
             typeof(Canvas)
         );
@@ -207,35 +252,25 @@ internal sealed class HistoryPanelPreviewRenderer
         _rootRect = _root.GetComponent<RectTransform>();
 
         var clipObject = new GameObject(
-            "HistoryPanelPreviewClip",
+            "BattleBoardPreviewClip",
             typeof(RectTransform),
-            typeof(RectMask2D)
+            typeof(UnityEngine.UI.RectMask2D)
         );
         clipObject.layer = _layer;
         clipObject.transform.SetParent(_root.transform, worldPositionStays: false);
         _clipRect = clipObject.GetComponent<RectTransform>();
 
-        var boardObject = new GameObject("HistoryPanelPreviewBoard", typeof(RectTransform));
+        var boardObject = new GameObject("BattleBoardPreviewBoard", typeof(RectTransform));
         boardObject.layer = _layer;
         boardObject.transform.SetParent(_clipRect, worldPositionStays: false);
         _boardRect = boardObject.GetComponent<RectTransform>();
         _sockets = HistoryPanelPreviewLayout.BuildSockets(_boardRect, _layer);
 
-        ApplyPreviewBounds();
+        ApplyTransform();
         return true;
     }
 
-    private static Rect NormalizePreviewBounds(Rect bounds)
-    {
-        return new Rect(
-            Mathf.Round(bounds.x),
-            Mathf.Round(bounds.y),
-            Mathf.Max(1f, Mathf.Round(bounds.width)),
-            Mathf.Max(1f, Mathf.Round(bounds.height))
-        );
-    }
-
-    private void ApplyPreviewBounds()
+    private void ApplyTransform()
     {
         if (_rootRect == null || _clipRect == null || _boardRect == null)
             return;
@@ -247,34 +282,27 @@ internal sealed class HistoryPanelPreviewRenderer
         _rootRect.sizeDelta = new Vector2(Mathf.Max(1, Screen.width), Mathf.Max(1, Screen.height));
         _rootRect.localScale = Vector3.one;
 
-        if (!_hasPreviewBounds)
-            return;
-
-        var x = _previewBounds.x + PreviewHorizontalInset;
-        var y = _previewBounds.y + PreviewVerticalInset;
-        var width = Mathf.Max(1f, _previewBounds.width - PreviewHorizontalInset * 2f);
-        var height = Mathf.Max(1f, _previewBounds.height - PreviewVerticalInset * 2f);
-
+        // Clip rect: anchored at bottom-left of overlay canvas, pivot bottom-left, exact
+        // pixel size from _clipSize. Anything outside is masked by RectMask2D.
         _clipRect.anchorMin = Vector2.zero;
         _clipRect.anchorMax = Vector2.zero;
         _clipRect.pivot = Vector2.zero;
-        _clipRect.anchoredPosition = new Vector2(x, y);
-        _clipRect.sizeDelta = new Vector2(width, height);
+        _clipRect.anchoredPosition = _position;
+        _clipRect.sizeDelta = _clipSize;
         _clipRect.localScale = Vector3.one;
 
-        var placement = HistoryPanelPreviewTextureGeometry.ResolveBoardPlacement(
-            Mathf.RoundToInt(width),
-            Mathf.RoundToInt(height)
-        );
-        _boardRect.anchorMin = Vector2.zero;
-        _boardRect.anchorMax = Vector2.zero;
-        _boardRect.pivot = Vector2.zero;
-        _boardRect.anchoredPosition = new Vector2(placement.OffsetX, placement.OffsetY);
+        // Board: anchored to clip-rect center with center pivot, so the native 2400x600
+        // board stays visually centred regardless of clip size. Scale is the card-scale
+        // multiplier; values > 1 will bleed past the clip and get masked.
+        _boardRect.anchorMin = new Vector2(0.5f, 0.5f);
+        _boardRect.anchorMax = new Vector2(0.5f, 0.5f);
+        _boardRect.pivot = new Vector2(0.5f, 0.5f);
+        _boardRect.anchoredPosition = Vector2.zero;
         _boardRect.sizeDelta = new Vector2(
             HistoryPanelPreviewTextureGeometry.NativeBoardWidth,
             HistoryPanelPreviewTextureGeometry.NativeBoardHeight
         );
-        _boardRect.localScale = Vector3.one * placement.Scale;
+        _boardRect.localScale = Vector3.one * _cardScale;
     }
 
     private int SpawnCards(IReadOnlyList<HistoryItemSpec> items)
@@ -357,7 +385,7 @@ internal sealed class HistoryPanelPreviewRenderer
         {
             TemplateId = spec.TemplateId,
             TemplateVersion = string.Empty,
-            InstanceId = $"bpp-historypanel-{index}",
+            InstanceId = $"bpp-battleboard-{index}",
             Tier = spec.Tier,
             SocketId = spec.SocketId ?? (EContainerSocketId)Mathf.Clamp(index, 0, 9),
             EnchantmentType = spec.EnchantmentType,
@@ -386,7 +414,7 @@ internal sealed class HistoryPanelPreviewRenderer
         catch (TargetInvocationException ex)
         {
             BppLog.Warn(
-                "HistoryPanelPreviewRenderer",
+                "BattleBoardPreview",
                 $"CardPreviewBase.SetUp threw for template={template?.Id}: {ex.InnerException?.Message ?? ex.Message}"
             );
             throw;
@@ -394,7 +422,7 @@ internal sealed class HistoryPanelPreviewRenderer
         catch (Exception ex)
         {
             BppLog.Warn(
-                "HistoryPanelPreviewRenderer",
+                "BattleBoardPreview",
                 $"CardPreviewBase.SetUp invocation failed for template={template?.Id}: {ex.Message}"
             );
             throw;
@@ -418,7 +446,7 @@ internal sealed class HistoryPanelPreviewRenderer
             }
             catch (Exception ex)
             {
-                BppLog.Warn("HistoryPanelPreviewRenderer", $"CardPreviewBase.Show threw: {ex.Message}");
+                BppLog.Warn("BattleBoardPreview", $"CardPreviewBase.Show threw: {ex.Message}");
             }
         }
     }

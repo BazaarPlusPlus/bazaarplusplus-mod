@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using UnityEngine;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 

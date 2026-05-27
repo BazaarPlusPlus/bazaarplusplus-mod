@@ -2,8 +2,9 @@
 using System;
 using BazaarPlusPlus.Game.PvpBattles;
 using Microsoft.Data.Sqlite;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
 
 // Pure SQLite reader → typed record translation. No SQL, no UI, no formatting; just
 // column reads and the projection rules tied to the schema (e.g. final_* fallback to day/hour).

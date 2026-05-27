@@ -1,7 +1,7 @@
 #nullable enable
 using BepInEx.Configuration;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 internal static class HistoryPanelPreviewSettings
 {

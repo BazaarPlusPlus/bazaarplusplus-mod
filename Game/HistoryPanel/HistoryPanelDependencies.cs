@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 

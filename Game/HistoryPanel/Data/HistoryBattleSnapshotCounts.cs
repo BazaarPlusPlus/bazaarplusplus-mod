@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Data;
 
 internal readonly struct HistoryBattleSnapshotCounts
 {

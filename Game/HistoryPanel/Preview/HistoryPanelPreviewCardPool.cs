@@ -8,7 +8,7 @@ using HarmonyLib;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 internal readonly struct HistoryPanelPreviewSocketTemplate
 {

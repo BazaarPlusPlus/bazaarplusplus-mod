@@ -5,8 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.CardSetPreview;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
 
 internal sealed class HistoryPanelDataService
 {

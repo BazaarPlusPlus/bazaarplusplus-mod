@@ -1,4 +1,4 @@
-using BazaarPlusPlus.Game.HistoryPanel;
+using BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 TestSignatureGate_NullAggregate_DoesNotCache();
 TestSignatureGate_IncompleteAggregate_DoesNotCache();

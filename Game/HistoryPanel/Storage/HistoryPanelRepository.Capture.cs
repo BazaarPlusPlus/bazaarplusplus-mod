@@ -4,8 +4,9 @@ using BazaarPlusPlus.Game.PvpBattles;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
 
 internal sealed partial class HistoryPanelRepository
 {

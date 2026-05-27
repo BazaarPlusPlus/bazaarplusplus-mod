@@ -2,7 +2,7 @@
 using System;
 using BazaarPlusPlus.Game.PvpBattles;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Data;
 
 internal sealed class HistoryBattleRecord
 {

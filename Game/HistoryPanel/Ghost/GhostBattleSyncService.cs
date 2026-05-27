@@ -10,6 +10,7 @@ using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Models;
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
 

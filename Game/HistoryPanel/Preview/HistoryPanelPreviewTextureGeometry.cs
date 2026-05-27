@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 internal readonly struct HistoryPanelPreviewTextureSize
 {

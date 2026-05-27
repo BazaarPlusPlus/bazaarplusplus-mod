@@ -1,7 +1,7 @@
 #nullable enable
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.HistoryPanel;
+namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
 
 // Builds 10 socket RectTransforms under a host Canvas. Sockets use anchored positions in
 // normalised canvas space so the layout reflows when the canvas (and RT) resizes — no

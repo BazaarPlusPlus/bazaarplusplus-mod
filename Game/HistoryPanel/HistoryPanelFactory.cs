@@ -2,6 +2,7 @@
 using System;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.ModApi.Clients;
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
