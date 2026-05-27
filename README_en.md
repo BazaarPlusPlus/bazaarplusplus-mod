@@ -9,7 +9,7 @@ This repository only keeps documentation that still matches the current implemen
 ## Feature Overview
 
 - Combat status bar: shows logical combat time, processed frames, pause state, and discrete speed multipliers in a bottom HUD.
-- Monster preview: the default flow uses the game's native monster preview; Bazaar++ adds targeted tooltip augmentation and reuses `MonsterBoardTooltip` for custom board displays.
+- Monster preview: fully delegates to the game's native monster preview without modification; the CardSet preview reuses `MonsterBoardTooltip` as a host to display custom board content.
 - Enchant / upgrade preview: each preview has its own visibility mode (Off / AutoOnPedestalChoice / Always, default Auto) that auto-shows the matching preview while a pedestal of that kind is offered on the choice screen; Ctrl / Shift still work as manual overrides.
 - Run Logging and HistoryPanel: active runs are written to SQLite; the in-game panel can browse runs, PvP battles, ghost battles, and saved board snapshots.
 - Combat replay: saves local PvP replay payloads; `HistoryPanel` can replay saved battles when the required conditions are met.

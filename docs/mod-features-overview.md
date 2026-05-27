@@ -6,7 +6,7 @@
 
 BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提供：
 
-- 战斗与 UI 增强：状态条、怪物 tooltip 增强、附魔/升级 tooltip、展示柜 item-board overlay
+- 战斗与 UI 增强：状态条、附魔/升级 tooltip、CardSet preview overlay、Showcase tooltip 锁绕过
 - **Run logging**：活跃对局写入本地 SQLite，供 HistoryPanel 和上传队列使用
 - **PVP 战斗回放**：本地录制 replay payload，并在 HistoryPanel / ghost replay 路径下条件回放
 - **云同步**：在**非 live run** 时后台上传 run-bundle，并从 **`bazaarplusplus-server`**（部署在 `mod-api-v4.bazaarplusplus.com`）同步 ghost battles / replay 下载链接
@@ -40,10 +40,10 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 ### 怪物预览（Monster Preview）
 
-- 默认走游戏原生怪物预览
-- Bazaar++ 在原生 tooltip 路径上做局部增强：按需补 monster 上下文、附魔/升级预览注入、showcase tooltip 锁绕过
-- `CardSetPreviewRuntime` 会复用原生 `MonsterBoardTooltip` 展示 Bazaar++ 组织的 board 内容
+- 完全走游戏原生怪物预览，Bazaar++ 不再 patch 或 augment 原生 tooltip
+- `CardSetPreviewRuntime` 会复用原生 `MonsterBoardTooltip` 作为宿主展示 Bazaar++ 组织的 CardSet board 内容
 - HistoryPanel 预览使用共享 `Game/PreviewSurface` 渲染栈
+- 附魔/升级预览注入、Showcase tooltip 锁绕过由独立的 patch 提供（见后续小节 / `Patches/Tooltips/`、`Patches/Showcase/`），不属于 monster preview 路径
 
 详见 `docs/monster-preview-design.md`。
 
