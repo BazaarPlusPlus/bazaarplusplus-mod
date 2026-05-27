@@ -2,9 +2,8 @@
 
 ## Scope
 
-本文只描述当前 shipped 的怪物预览实现。旧的 Bazaar++ 自绘 monster showcase 路径以及锁定野怪后弹出的 Bazaar++ item-board overlay 均已被移除，当前运行时保留的是：
+本文只描述当前 shipped 的怪物预览实现。旧的 Bazaar++ 自绘 monster showcase 路径、锁定野怪后弹出的 Bazaar++ item-board overlay、对原生 monster tooltip 的 augment 注入全部已被移除，当前运行时保留的是：
 
-- 原生怪物 tooltip / monster board 的局部增强
 - `CardSetPreviewRuntime` 复用原生 `MonsterBoardTooltip` 作为宿主渲染 CardSet preview overlay
 - `HistoryPanel` 使用的共享 `PreviewSurface`
 
@@ -16,18 +15,7 @@
 
 ## 当前主路径
 
-默认的野怪预览展示走游戏原生 monster preview。
-
-Bazaar++ 只在原生路径前后做局部注入：
-
-```text
-CardController.ShowTooltips() / GetTooltipData()
-  -> NativeMonsterPreviewTooltipPatch
-  -> NativeMonsterTooltipAugmenter
-  -> 原生 CardTooltip / MonsterBoardTooltip
-```
-
-这里的 augment 是兜底式补充：仅当 `CardTooltipData` 尚未带 monster 上下文时才会补，不会覆盖已有原生数据。
+默认的野怪预览展示完全走游戏原生 monster preview，Bazaar++ 不做任何介入。历史上曾通过 `NativeMonsterPreviewTooltipPatch` + `NativeMonsterTooltipAugmenter` 在 `CardController.ShowTooltips()` / `GetTooltipData()` 前后注入 monster 上下文，这部分代码已被删除。
 
 ## 相关旁路
 
@@ -55,9 +43,7 @@ JSON；过期或未知的 template id 会在进入 preview surface 前被过滤�
 ## 关键文件
 
 - `Plugin.cs`
-- `Game/MonsterPreview/CardSetPreviewRuntime.cs`
-- `Patches/Tooltips/NativeMonsterPreviewTooltipPatch.cs`
-- `Game/Tooltips/NativeMonsterTooltipAugmenter.cs`
+- `Game/CardSetPreview/CardSetPreviewRuntime.cs`
 - `Game/ItemBoard/ItemBoardOverlay.cs`
 - `Game/HistoryPanel/HistoryPanelPreviewRenderer.cs`
 - `Game/HistoryPanel/HistoryPanelRepository.Preview.cs`
@@ -65,5 +51,5 @@ JSON；过期或未知的 template id 会在进入 preview surface 前被过滤�
 
 ## Debug
 
-- 怪物 tooltip / item-board 问题优先看 `NativeMonsterPreviewTooltipPatch`、`CardSetPreviewRuntime`、`ItemBoardOverlay` 的日志。
+- Bazaar++ 不再 patch 原生 monster tooltip 流程；CardSet preview / item-board 相关问题看 `CardSetPreviewRuntime`、`ItemBoardOverlay` 的日志。
 - `HistoryPanel` 预览问题看 `HistoryPanelPreviewRenderer` 与 `PreviewBoardRenderTarget`。

@@ -12,7 +12,7 @@ using Newtonsoft.Json;
 using TheBazaar;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.MonsterPreview;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
 internal static class CardSetPreviewSponsorCatalog
 {

@@ -2,7 +2,7 @@
 using BazaarPlusPlus.Core.Runtime;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.MonsterPreview;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
 internal sealed class CardSetPreviewMount : IBppMountable
 {

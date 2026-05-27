@@ -1,4 +1,4 @@
-using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.CardSetPreview;
 
 TestRecommendationModesExposeOnlyCurrentAndTenWin();
 TestRecommendationModeFlow();

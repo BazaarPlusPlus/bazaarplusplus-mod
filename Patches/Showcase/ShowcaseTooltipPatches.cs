@@ -1,5 +1,5 @@
 #pragma warning disable CS0436
-using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.CardSetPreview;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;

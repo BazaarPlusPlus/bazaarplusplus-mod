@@ -13,7 +13,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
-namespace BazaarPlusPlus.Game.MonsterPreview;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
 internal sealed class CardSetPreviewRuntime : MonoBehaviour
 {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.ItemBoard;
 
-namespace BazaarPlusPlus.Game.MonsterPreview;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
 internal sealed class CardSetBuildRecommendation
 {

@@ -9,23 +9,23 @@
 
   <ItemGroup>
     <Compile
-      Include="../../Game/MonsterPreview/CardSetBuildRecommendationMode.cs"
+      Include="../../Game/CardSetPreview/CardSetBuildRecommendationMode.cs"
       Link="CardSetBuildRecommendationMode.cs"
     />
     <Compile
-      Include="../../Game/MonsterPreview/CardSetBuildRecommendationModeFlow.cs"
+      Include="../../Game/CardSetPreview/CardSetBuildRecommendationModeFlow.cs"
       Link="CardSetBuildRecommendationModeFlow.cs"
     />
     <Compile
-      Include="../../Game/MonsterPreview/CardSetPreviewHotkeys.cs"
+      Include="../../Game/CardSetPreview/CardSetPreviewHotkeys.cs"
       Link="CardSetPreviewHotkeys.cs"
     />
     <Compile
-      Include="../../Game/MonsterPreview/CardSetPreviewModeStatusText.cs"
+      Include="../../Game/CardSetPreview/CardSetPreviewModeStatusText.cs"
       Link="CardSetPreviewModeStatusText.cs"
     />
     <Compile
-      Include="../../Game/MonsterPreview/CardSetPreviewSponsorTextFormatter.cs"
+      Include="../../Game/CardSetPreview/CardSetPreviewSponsorTextFormatter.cs"
       Link="CardSetPreviewSponsorTextFormatter.cs"
     />
     <Compile Include="../../Game/Settings/LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />

@@ -53,12 +53,7 @@ internal static class CardTooltipDataFactory
         return Create(card, source, MonsterField.GetValue(source) as TMonster);
     }
 
-    internal static TMonster? GetMonster(CardTooltipData tooltipData)
-    {
-        return tooltipData != null ? MonsterField.GetValue(tooltipData) as TMonster : null;
-    }
-
-    internal static CardTooltipData Create(Card card, CardTooltipData source, TMonster? monster)
+    private static CardTooltipData Create(Card card, CardTooltipData source, TMonster? monster)
     {
         if (card == null)
             throw new ArgumentNullException(nameof(card));

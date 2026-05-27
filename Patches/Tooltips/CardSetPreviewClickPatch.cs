@@ -1,6 +1,6 @@
 #pragma warning disable CS0436
 #nullable enable
-using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.CardSetPreview;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.Tooltips;

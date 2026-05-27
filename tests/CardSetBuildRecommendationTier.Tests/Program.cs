@@ -26,7 +26,7 @@ static void TestRecommendationTierMapping()
 {
     var assembly = typeof(BazaarPlusPlus.RunInfo).Assembly;
     var repositoryType = assembly.GetType(
-        "BazaarPlusPlus.Game.MonsterPreview.CardSetBuildDataRepository"
+        "BazaarPlusPlus.Game.CardSetPreview.CardSetBuildDataRepository"
     )!;
     var playerCardEntryType = repositoryType.GetNestedType(
         "PlayerCardEntry",
@@ -255,7 +255,7 @@ static void AssertMappedTier(
 static Type GetRepositoryType()
 {
     var assembly = typeof(BazaarPlusPlus.RunInfo).Assembly;
-    return assembly.GetType("BazaarPlusPlus.Game.MonsterPreview.CardSetBuildDataRepository")!;
+    return assembly.GetType("BazaarPlusPlus.Game.CardSetPreview.CardSetBuildDataRepository")!;
 }
 
 static void ConfigureFinalBuildRemoteForTests(

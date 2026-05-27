@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace BazaarPlusPlus.Game.MonsterPreview;
+namespace BazaarPlusPlus.Game.CardSetPreview;
 
 internal static class CardSetBuildRecommendationModeFlow
 {

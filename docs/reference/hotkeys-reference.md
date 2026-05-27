@@ -47,7 +47,7 @@
 
 - `Game/Input/KeyBindings.cs`
 - `Game/Input/BppHotkeyService.cs`
-- `Game/MonsterPreview/CardSetPreviewRuntime.cs`
+- `Game/CardSetPreview/CardSetPreviewRuntime.cs`
 - `Game/HistoryPanel/HistoryPanel.cs`
 - `Patches/Settings/BppKeybindSettingsPatch.cs`
 - `Patches/Tooltips/ItemEnchantPreviewPatch.cs`

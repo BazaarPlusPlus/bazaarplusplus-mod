@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
-using BazaarPlusPlus.Game.MonsterPreview;
+using BazaarPlusPlus.Game.CardSetPreview;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
