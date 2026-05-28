@@ -13,7 +13,7 @@ namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
 internal static class HistoryPanelPreviewLayout
 {
     public const int SocketCount = 10;
-    private const float HorizontalPaddingFraction = 0.05f;
+    private const float HorizontalPaddingFraction = 0f; // sockets span the full board: 1 slot = 1/SocketCount, no compression
     private const float FallbackSocketWidthPixels = 240f;
     private const float FallbackSocketHeightPixels = 320f;
 

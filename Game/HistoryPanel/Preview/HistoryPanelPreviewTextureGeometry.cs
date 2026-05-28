@@ -45,7 +45,10 @@ internal readonly struct HistoryPanelPreviewBoardPlacement
 
 internal static class HistoryPanelPreviewTextureGeometry
 {
-    public const int NativeBoardWidth = 2400;
+    // 10 slots × 260px = the card root width incl. its frame + corner stat-gems (measured in-game),
+    // so adjacent cards tile without their frames overlapping. (Drives the overlay board layout;
+    // the RT path is dormant.)
+    public const int NativeBoardWidth = 2600;
     public const int NativeBoardHeight = 600;
 
     private const int MinTextureWidth = NativeBoardWidth;

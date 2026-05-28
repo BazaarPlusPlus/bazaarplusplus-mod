@@ -121,11 +121,17 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private void OnPreviewContainerGeometryChanged(GeometryChangedEvent evt)
     {
         var worldBound = _previewContainer?.worldBound ?? evt.newRect;
+        // worldBound is in UI Toolkit panel POINTS (the ~1920-wide reference space), not physical
+        // pixels. The overlay Canvas works in physical pixels, so scale points -> pixels via
+        // scaledPixelsPerPoint (1 at 1080p, 2 at 4K, …) and flip Y against the scaled top edge.
+        // Without this the rect is correct only at 1080p (points == pixels); at 4K it lands
+        // half-size in the upper-left.
+        var ppp = _previewContainer?.scaledPixelsPerPoint ?? 1f;
         var bounds = new Rect(
-            Mathf.Round(worldBound.x),
-            Mathf.Round(Screen.height - worldBound.yMax),
-            Mathf.Max(1f, Mathf.Round(worldBound.width)),
-            Mathf.Max(1f, Mathf.Round(worldBound.height))
+            Mathf.Round(worldBound.x * ppp),
+            Mathf.Round(Screen.height - worldBound.yMax * ppp),
+            Mathf.Max(1f, Mathf.Round(worldBound.width * ppp)),
+            Mathf.Max(1f, Mathf.Round(worldBound.height * ppp))
         );
         if (bounds.width <= 0f || bounds.height <= 0f)
             return;
