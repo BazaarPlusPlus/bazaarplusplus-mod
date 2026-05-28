@@ -23,23 +23,25 @@ internal enum BattleBoardRenderPhase
     Done,
 }
 
-// Self-contained 10-socket card board preview. Owns its overlay Canvas, clip, socket
-// RectTransforms, card pool, and reflection-driven SetUp/Show/Resize lifecycle. The caller
-// supplies cards (HistoryItemSpec list) and configures three independent transform knobs:
-// SetPosition / SetClipSize / SetCardScale. Status reporting is via BattleBoardRenderPhase
-// so callers map to their own UI strings.
+// Offscreen Camera + fixed-aspect RenderTexture board preview. Spawns CardPreviewBase clones
+// (reflected off MonsterBoardTooltip) into 10 sockets under a ScreenSpaceCamera canvas; a
+// dedicated orthographic Camera renders them continuously into a fixed 2400x600 RenderTexture.
+// The caller shows OutputTexture in a UI Toolkit Image (ScaleToFit), so UI Toolkit owns all
+// container scaling / letterboxing / resolution adaptation. The camera clears transparent so
+// letterbox margins show the container background.
 internal sealed class BattleBoardPreview
 {
     private const int DefaultLayer = 30;
-    private const int OverlaySortingOrder = 27;
+    private const int TextureWidth = HistoryPanelPreviewTextureGeometry.NativeBoardWidth; // 2400
+    private const int TextureHeight = HistoryPanelPreviewTextureGeometry.NativeBoardHeight; // 600
+    private const float CanvasPlaneDistance = 100f;
+    private const float CanvasReferencePixelsPerUnit = 100f;
 
     private readonly int _layer;
     private GameObject? _root;
     private Canvas? _canvas;
-    private RectTransform? _rootRect;
-    private RectTransform? _clipRect;
-    private UnityEngine.UI.RectMask2D? _clipMask;
-    private RectTransform? _boardRect;
+    private Camera? _camera;
+    private RenderTexture? _texture;
     private RectTransform[]? _sockets;
     private HistoryPanelPreviewCardPool? _pool;
     private readonly List<Component> _active = new();
@@ -47,80 +49,18 @@ internal sealed class BattleBoardPreview
     private readonly HistoryPanelPreviewGenerationGuard _generation = new();
     private string? _renderedSignature;
 
-    // Default geometry: clip area exactly matches the native board at 1.0× card scale,
-    // anchored at the screen's bottom-left. Callers override via SetPosition / SetClipSize.
-    private Vector2 _position = Vector2.zero;
-    private Vector2 _clipSize = new(
-        HistoryPanelPreviewTextureGeometry.NativeBoardWidth,
-        HistoryPanelPreviewTextureGeometry.NativeBoardHeight
-    );
-    private float _cardScale = 1f;
-
     public BattleBoardPreview(int layer = DefaultLayer)
     {
         _layer = layer;
     }
 
+    // The live RenderTexture the caller displays in a UI Toolkit Image. Null until the first
+    // successful EnsureInitialized inside Render.
+    public Texture? OutputTexture => _texture;
+
     public void CancelPending()
     {
         _generation.Bump();
-    }
-
-    // Screen-space pixel coordinates of the clip rect's bottom-left corner.
-    public void SetPosition(Vector2 position)
-    {
-        var rounded = new Vector2(Mathf.Round(position.x), Mathf.Round(position.y));
-        if (
-            Mathf.Approximately(_position.x, rounded.x)
-            && Mathf.Approximately(_position.y, rounded.y)
-        )
-            return;
-
-        _position = rounded;
-        ApplyTransform();
-    }
-
-    // Size of the clip rect in pixels. Cards rendered outside this rect are masked.
-    public void SetClipSize(Vector2 size)
-    {
-        var rounded = new Vector2(
-            Mathf.Max(1f, Mathf.Round(size.x)),
-            Mathf.Max(1f, Mathf.Round(size.y))
-        );
-        if (
-            Mathf.Approximately(_clipSize.x, rounded.x)
-            && Mathf.Approximately(_clipSize.y, rounded.y)
-        )
-            return;
-
-        _clipSize = rounded;
-        ApplyTransform();
-    }
-
-    // Multiplier on top of native card size (the prefab's intrinsic sizeDelta from
-    // MonsterBoardTooltip sockets). 1.0 = native; values < 1 shrink; > 1 enlarge and may
-    // overflow the clip rect. Returns true if the value actually changed; in that case the
-    // render cache is invalidated, and the caller should re-issue Render() if it wants the
-    // cards re-taken from the pool with a fresh CardPreviewBase.Resize.
-    public bool SetCardScale(float scale)
-    {
-        var clamped = Mathf.Max(0.05f, scale);
-        if (Mathf.Approximately(_cardScale, clamped))
-            return false;
-
-        _cardScale = clamped;
-        ApplyTransform();
-        _renderedSignature = null;
-        return true;
-    }
-
-    // Toggles the RectMask2D on the clip object. When disabled, board content (cards) that
-    // extends past _clipSize renders into the rest of the Canvas overlay instead of being
-    // masked away. Used by the temporary preview tuner to reveal content otherwise clipped.
-    public void SetClipMaskEnabled(bool enabled)
-    {
-        if (_clipMask != null)
-            _clipMask.enabled = enabled;
     }
 
     public IEnumerator Render(
@@ -161,7 +101,6 @@ internal sealed class BattleBoardPreview
         onPhase?.Invoke(BattleBoardRenderPhase.Loading);
 
         _root!.SetActive(true);
-        ApplyTransform();
         ReturnActiveCardsToPool();
         _activeSetUpTasks.Clear();
 
@@ -177,7 +116,8 @@ internal sealed class BattleBoardPreview
         ShowAllActiveCards();
         Canvas.ForceUpdateCanvases();
 
-        // Settle layout for one frame so Resize/Show activation is committed before render.
+        // Settle layout for one frame so Resize/Show activation is committed before the live
+        // camera samples the canvas.
         yield return null;
         if (!_generation.IsCurrent(snapshot))
             yield break;
@@ -185,7 +125,7 @@ internal sealed class BattleBoardPreview
         Canvas.ForceUpdateCanvases();
 
         // Cache the signature only when all SetUp tasks succeeded; faulted frames stay
-        // un-cached so the next selection retries instead of locking in a half-rendered RT.
+        // un-cached so the next selection retries instead of locking in a half-rendered board.
         if (HistoryPanelPreviewSignatureGate.ShouldCache(aggregate))
             _renderedSignature = signature;
 
@@ -205,23 +145,7 @@ internal sealed class BattleBoardPreview
     {
         CancelPending();
         _renderedSignature = null;
-        _active.Clear();
-        _activeSetUpTasks.Clear();
-
-        _pool?.DestroyAll();
-        _pool = null;
-        _sockets = null;
-
-        if (_root != null)
-        {
-            Object.Destroy(_root);
-            _root = null;
-            _canvas = null;
-            _rootRect = null;
-            _clipRect = null;
-            _clipMask = null;
-            _boardRect = null;
-        }
+        DisposeRuntimeObjects();
     }
 
     private bool EnsureInitialized()
@@ -232,16 +156,12 @@ internal sealed class BattleBoardPreview
         if (
             _root != null
             && _canvas != null
-            && _rootRect != null
-            && _clipRect != null
-            && _boardRect != null
+            && _camera != null
+            && _texture != null
             && _sockets != null
             && _pool != null
         )
-        {
-            ApplyTransform();
             return _pool.TryEnsurePrefabRefs();
-        }
 
         DisposeRuntimeObjects();
 
@@ -252,71 +172,73 @@ internal sealed class BattleBoardPreview
             return false;
         }
 
-        _root = new GameObject("BattleBoardPreviewRoot", typeof(RectTransform), typeof(Canvas));
+        _root = new GameObject("HistoryPanelPreviewRoot");
         _root.layer = _layer;
         _root.SetActive(false);
+        var rootTransform = _root.transform;
 
-        _canvas = _root.GetComponent<Canvas>();
-        _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        _canvas.overrideSorting = true;
-        _canvas.sortingOrder = OverlaySortingOrder;
-        _canvas.pixelPerfect = false;
+        var cameraObject = new GameObject("HistoryPanelPreviewCamera");
+        cameraObject.layer = _layer;
+        cameraObject.transform.SetParent(rootTransform, worldPositionStays: false);
+        _camera = cameraObject.AddComponent<Camera>();
+        _camera.enabled = true; // live: renders every frame while the root is active
+        _camera.clearFlags = CameraClearFlags.SolidColor;
+        _camera.backgroundColor = new Color(0f, 0f, 0f, 0f); // transparent letterbox
+        _camera.cullingMask = 1 << _layer;
+        _camera.orthographic = true;
+        _camera.nearClipPlane = 0.1f;
+        _camera.farClipPlane = 200f;
+        _camera.allowMSAA = true;
+        _camera.allowHDR = false;
+        _camera.transform.localPosition = Vector3.zero;
+        _camera.transform.localRotation = Quaternion.identity;
 
-        _rootRect = _root.GetComponent<RectTransform>();
-
-        var clipObject = new GameObject(
-            "BattleBoardPreviewClip",
+        var canvasObject = new GameObject(
+            "HistoryPanelPreviewCanvas",
             typeof(RectTransform),
-            typeof(UnityEngine.UI.RectMask2D)
+            typeof(Canvas)
         );
-        clipObject.layer = _layer;
-        clipObject.transform.SetParent(_root.transform, worldPositionStays: false);
-        _clipRect = clipObject.GetComponent<RectTransform>();
-        _clipMask = clipObject.GetComponent<UnityEngine.UI.RectMask2D>();
+        canvasObject.layer = _layer;
+        canvasObject.transform.SetParent(rootTransform, worldPositionStays: false);
+        _canvas = canvasObject.GetComponent<Canvas>();
+        _canvas.renderMode = RenderMode.ScreenSpaceCamera;
+        _canvas.worldCamera = _camera;
+        _canvas.planeDistance = CanvasPlaneDistance;
+        _canvas.sortingLayerID = 0;
+        _canvas.sortingOrder = 0;
 
-        var boardObject = new GameObject("BattleBoardPreviewBoard", typeof(RectTransform));
-        boardObject.layer = _layer;
-        boardObject.transform.SetParent(_clipRect, worldPositionStays: false);
-        _boardRect = boardObject.GetComponent<RectTransform>();
-        _sockets = HistoryPanelPreviewLayout.BuildSockets(_boardRect, _layer);
+        var canvasRect = canvasObject.GetComponent<RectTransform>();
+        _sockets = HistoryPanelPreviewLayout.BuildSockets(canvasRect, _layer);
 
-        ApplyTransform();
+        CreateRenderTexture();
         return true;
     }
 
-    private void ApplyTransform()
+    private void CreateRenderTexture()
     {
-        if (_rootRect == null || _clipRect == null || _boardRect == null)
-            return;
+        if (_texture != null)
+        {
+            _texture.Release();
+            Object.Destroy(_texture);
+            _texture = null;
+        }
 
-        _rootRect.anchorMin = Vector2.zero;
-        _rootRect.anchorMax = Vector2.zero;
-        _rootRect.pivot = Vector2.zero;
-        _rootRect.anchoredPosition = Vector2.zero;
-        _rootRect.sizeDelta = new Vector2(Mathf.Max(1, Screen.width), Mathf.Max(1, Screen.height));
-        _rootRect.localScale = Vector3.one;
+        _texture = new RenderTexture(TextureWidth, TextureHeight, 24, RenderTextureFormat.ARGB32)
+        {
+            antiAliasing = 2,
+            useMipMap = false,
+            autoGenerateMips = false,
+            name = "HistoryPanelPreviewRT",
+        };
+        _texture.Create();
 
-        // Clip rect: anchored at bottom-left of overlay canvas, pivot bottom-left, exact
-        // pixel size from _clipSize. Anything outside is masked by RectMask2D.
-        _clipRect.anchorMin = Vector2.zero;
-        _clipRect.anchorMax = Vector2.zero;
-        _clipRect.pivot = Vector2.zero;
-        _clipRect.anchoredPosition = _position;
-        _clipRect.sizeDelta = _clipSize;
-        _clipRect.localScale = Vector3.one;
-
-        // Board: anchored to clip-rect center with center pivot, so the native 2400x600
-        // board stays visually centred regardless of clip size. Scale is the card-scale
-        // multiplier; values > 1 will bleed past the clip and get masked.
-        _boardRect.anchorMin = new Vector2(0.5f, 0.5f);
-        _boardRect.anchorMax = new Vector2(0.5f, 0.5f);
-        _boardRect.pivot = new Vector2(0.5f, 0.5f);
-        _boardRect.anchoredPosition = Vector2.zero;
-        _boardRect.sizeDelta = new Vector2(
-            HistoryPanelPreviewTextureGeometry.NativeBoardWidth,
-            HistoryPanelPreviewTextureGeometry.NativeBoardHeight
-        );
-        _boardRect.localScale = Vector3.one * _cardScale;
+        if (_camera != null)
+        {
+            _camera.targetTexture = _texture;
+            // ortho size = half-height in world units = (texture-pixels / 2) / referencePixelsPerUnit.
+            _camera.orthographicSize = TextureHeight * 0.5f / CanvasReferencePixelsPerUnit;
+            _camera.aspect = (float)TextureWidth / Mathf.Max(1, TextureHeight);
+        }
     }
 
     private int SpawnCards(IReadOnlyList<HistoryItemSpec> items)
@@ -496,15 +418,19 @@ internal sealed class BattleBoardPreview
         _pool = null;
         _sockets = null;
 
+        if (_texture != null)
+        {
+            _texture.Release();
+            Object.Destroy(_texture);
+            _texture = null;
+        }
+
         if (_root != null)
         {
             Object.Destroy(_root);
             _root = null;
             _canvas = null;
-            _rootRect = null;
-            _clipRect = null;
-            _clipMask = null;
-            _boardRect = null;
+            _camera = null;
         }
     }
 }

@@ -10,8 +10,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed partial class HistoryPanel
 {
     private HistoryPanelUiToolkitView? _uiView;
-    private Rect _previewContainerBounds;
-    private bool _hasPreviewContainerBounds;
 
     private void EnsureUi()
     {
@@ -35,14 +33,9 @@ internal sealed partial class HistoryPanel
 
     private void OnPreviewContainerBoundsChanged(Rect bounds)
     {
-        _previewContainerBounds = bounds;
-        _hasPreviewContainerBounds = true;
-
-        if (_battleBoardPreview == null)
-            return;
-
-        if (ApplyPreviewContainerBounds(bounds) && IsVisible)
-            RefreshSelectedBattlePreview();
+        // Fixed-aspect RenderTexture: UI Toolkit's Image (ScaleToFit) handles container
+        // resizing, so the preview no longer needs the container's screen rect. Kept as a
+        // no-op subscriber so the view's GeometryChangedEvent wiring stays intact.
     }
 
     private void DisposeUi()
@@ -64,6 +57,11 @@ internal sealed partial class HistoryPanel
     private void SetPreviewStatus(string? message, bool visible)
     {
         _uiView?.SetPreviewStatus(message, visible);
+    }
+
+    private void SetPreviewTexture(UnityEngine.Texture? texture)
+    {
+        _uiView?.SetPreviewTexture(texture);
     }
 
     private HistoryPanelUiToolkitModel BuildUiModel()
