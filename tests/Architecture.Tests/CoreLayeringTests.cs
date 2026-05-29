@@ -1,0 +1,81 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.CompilerServices;
+using Xunit;
+
+namespace Architecture.Tests;
+
+// Ratchet guard for the intended layering: types under Core/ are the pure abstraction floor and
+// must not depend on the Game features, the GameInterop bridge, or the game DLLs. Because every
+// layer compiles into one assembly, the C# compiler does not enforce this; this test does.
+//
+// A small allowlist records the deliberate, known exceptions. When a Core -> GameInterop leak is
+// fixed, remove its entry; when a new dependency appears, this fails until it is justified (added
+// here) or removed. Game.* and game-DLL (BazaarGameShared) references are never allowed.
+public class CoreLayeringTests
+{
+    private static readonly HashSet<string> AllowedGameInteropFiles = new(StringComparer.Ordinal)
+    {
+        // The service aggregate re-exports GameInterop.IRunContext to features. Splitting Core into
+        // its own assembly (or moving IRunContext's abstraction down) would let us drop these.
+        "Core/Runtime/IBppServices.cs",
+        "Core/Runtime/BppRuntimeServices.cs",
+    };
+
+    [Fact]
+    public void Core_does_not_depend_on_Game_GameInterop_or_game_assemblies()
+    {
+        var repoRoot = RepoRoot();
+        var coreDir = Path.Combine(repoRoot, "Core");
+        Assert.True(Directory.Exists(coreDir), $"Could not locate Core directory at '{coreDir}'.");
+
+        var violations = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(coreDir, "*.cs", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+            foreach (var rawLine in File.ReadLines(file))
+            {
+                var line = rawLine.Trim();
+                if (!line.StartsWith("using ", StringComparison.Ordinal))
+                    continue;
+
+                // The game DLL and sibling Game features are never permitted in Core.
+                if (
+                    line.StartsWith("using BazaarGameShared", StringComparison.Ordinal)
+                    || line.StartsWith("using BazaarPlusPlus.Game.", StringComparison.Ordinal)
+                )
+                {
+                    violations.Add($"{relative}: {line}");
+                    continue;
+                }
+
+                // GameInterop is permitted only for the explicitly allowlisted files.
+                if (
+                    line.StartsWith("using BazaarPlusPlus.GameInterop", StringComparison.Ordinal)
+                    && !AllowedGameInteropFiles.Contains(relative)
+                )
+                {
+                    violations.Add($"{relative}: {line}");
+                }
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Core must stay free of Game/GameInterop/game-DLL dependencies. Either remove the "
+                + "import or, for a deliberate GameInterop dependency, add the file to "
+                + "AllowedGameInteropFiles with justification. Offending imports:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
+    // The compile-time path of this source file anchors the repo root without loading any
+    // game-coupled assembly at runtime: <repo>/tests/Architecture.Tests/CoreLayeringTests.cs.
+    private static string RepoRoot([CallerFilePath] string thisFile = "")
+    {
+        var testDir = Path.GetDirectoryName(thisFile)!;
+        return Path.GetFullPath(Path.Combine(testDir, "..", ".."));
+    }
+}
