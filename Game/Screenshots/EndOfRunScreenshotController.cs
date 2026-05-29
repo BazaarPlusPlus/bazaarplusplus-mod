@@ -34,6 +34,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private string? _bufferedHeroName;
     private bool? _lastLoggedBlockerActive;
     private string? _lastLoggedBlockerStateSummary;
+    private EndOfRunScreenController? _cachedEndOfRunScreenController;
     private int _trackedEndOfRunControllerId;
     private float _endOfRunEnteredAtSeconds = -1f;
     private IBppServices? _services;
@@ -353,11 +354,26 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         DisposeCaptureSuppressionScope();
         _gate.CancelCaptureAttempt();
         _mouseBlocker.Destroy();
+        _cachedEndOfRunScreenController = null;
         _trackedEndOfRunControllerId = 0;
         _endOfRunEnteredAtSeconds = -1f;
     }
 
-    private static EndOfRunScreenController? FindActiveEndOfRunScreenController()
+    private EndOfRunScreenController? FindActiveEndOfRunScreenController()
+    {
+        // Reuse the cached controller while it is still alive and active, avoiding the
+        // per-frame FindObjectsOfType scan/allocation once the end-of-run screen resolves.
+        // Unity's overloaded equality treats destroyed objects as null, so this also
+        // re-scans automatically after the controller is torn down.
+        var cached = _cachedEndOfRunScreenController;
+        if (cached != null && cached.gameObject.activeInHierarchy)
+            return cached;
+
+        _cachedEndOfRunScreenController = ScanForActiveEndOfRunScreenController();
+        return _cachedEndOfRunScreenController;
+    }
+
+    private static EndOfRunScreenController? ScanForActiveEndOfRunScreenController()
     {
         var controllers = UnityEngine.Object.FindObjectsOfType<EndOfRunScreenController>(
             includeInactive: true

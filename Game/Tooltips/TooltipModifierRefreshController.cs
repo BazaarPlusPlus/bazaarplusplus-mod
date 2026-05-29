@@ -3,6 +3,7 @@ using System;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.GameState;
+using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Patches.Tooltips;
 using TheBazaar;
@@ -17,6 +18,8 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
     private TooltipPreviewMode _lastMode;
     private IBppConfig? _config;
     private IEncounterStateProbe? _encounterState;
+    private bool _hasResolvedInputs;
+    private ResolveInputs _lastInputs;
 
     internal void Initialize(IBppConfig config, IEncounterStateProbe encounterState)
     {
@@ -28,6 +31,16 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
     {
         try
         {
+            // TooltipPreviewModePolicy.Resolve is a pure function of these inputs, so the
+            // resolved mode cannot change unless one of them changes. Skip re-resolving
+            // (and the downstream refresh check) on frames where the inputs are identical.
+            var inputs = ReadResolveInputs();
+            if (_hasResolvedInputs && inputs.Equals(_lastInputs))
+                return;
+
+            _hasResolvedInputs = true;
+            _lastInputs = inputs;
+
             var mode = TooltipPreviewModePolicy.Resolve(_config, _encounterState);
             if (mode == _lastMode)
                 return;
@@ -40,6 +53,25 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             BppLog.Error("TooltipPreview", "Tooltip modifier update failed", ex);
         }
     }
+
+    private ResolveInputs ReadResolveInputs()
+    {
+        return new ResolveInputs(
+            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview),
+            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview),
+            _config?.UpgradePreviewModeConfig?.Value,
+            _config?.EnchantPreviewModeConfig?.Value,
+            _encounterState?.GetCurrent().ChoiceScreenPedestalKind ?? ChoiceScreenPedestalKind.None
+        );
+    }
+
+    private readonly record struct ResolveInputs(
+        bool HoldUpgrade,
+        bool HoldEnchant,
+        PreviewVisibilityMode? UpgradeMode,
+        PreviewVisibilityMode? EnchantMode,
+        ChoiceScreenPedestalKind PedestalKind
+    );
 
     private static void TryRefreshCurrentItemTooltip()
     {

@@ -1,5 +1,6 @@
 #nullable enable
 
+using System;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,6 +13,33 @@ internal sealed partial class CombatStatusBar
     private const float BarBottomMargin = 0f;
     private const float SegmentSpacing = UiSpacing.Xs;
     private const int CanvasSortingOrder = 10;
+
+    private static readonly Color BarColorIdle = new(0.06f, 0.07f, 0.09f, 0.90f);
+    private static readonly Color BarColorActive = new(0.16f, 0.12f, 0.08f, 0.96f);
+    private static readonly Color GlowColorIdle = new(0.20f, 0.24f, 0.28f, 0.08f);
+    private static readonly Color GlowColorActive = new(0.44f, 0.30f, 0.14f, 0.20f);
+    private static readonly Color SegmentColorIdle = new(0.11f, 0.13f, 0.16f, 0.90f);
+    private static readonly Color SegmentColorActive = new(0.23f, 0.18f, 0.11f, 0.92f);
+    private static readonly Color LabelColorIdle = new(0.62f, 0.67f, 0.74f, 0.88f);
+    private static readonly Color LabelColorActive = new(0.90f, 0.84f, 0.62f, 0.96f);
+    private static readonly Color ValueColorIdle = new(0.84f, 0.87f, 0.93f, 0.96f);
+    private static readonly Color ValueColorActive = new(1f, 0.96f, 0.90f, 1f);
+    private static readonly Color DividerColorIdle = new(0.42f, 0.46f, 0.53f, 0.22f);
+    private static readonly Color DividerColorActive = new(0.84f, 0.74f, 0.44f, 0.42f);
+    private static readonly Color SpeedButtonColorIdle = new(0.26f, 0.30f, 0.36f, 0.92f);
+    private static readonly Color SpeedButtonColorActive = new(0.48f, 0.33f, 0.13f, 0.95f);
+    private static readonly Color SpeedButtonPressedColorIdle = new(0.35f, 0.39f, 0.46f, 1f);
+    private static readonly Color SpeedButtonPressedColorActive = new(0.66f, 0.47f, 0.16f, 1f);
+    private static readonly Color SpeedButtonDisabledColor = new(0.22f, 0.24f, 0.28f, 0.45f);
+    private static readonly Color PausedBaseColorIdle = new(0.28f, 0.33f, 0.40f, 0.95f);
+    private static readonly Color PausedBaseColorActive = new(0.54f, 0.40f, 0.16f, 0.96f);
+    private static readonly Color UnpausedBaseColorIdle = new(0.24f, 0.27f, 0.33f, 0.90f);
+    private static readonly Color UnpausedBaseColorActive = new(0.41f, 0.31f, 0.13f, 0.93f);
+    private static readonly Color PausedPressedColorIdle = new(0.36f, 0.42f, 0.50f, 1f);
+    private static readonly Color PausedPressedColorActive = new(0.68f, 0.50f, 0.18f, 1f);
+    private static readonly Color UnpausedPressedColorIdle = new(0.32f, 0.36f, 0.43f, 1f);
+    private static readonly Color UnpausedPressedColorActive = new(0.56f, 0.41f, 0.15f, 1f);
+    private static readonly Color PauseDisabledColor = new(0.22f, 0.24f, 0.28f, 0.45f);
 
     private static Sprite? _roundedSprite;
     private static Font? _uiFont;
@@ -49,6 +77,11 @@ internal sealed partial class CombatStatusBar
     private Image? _timeDivider;
     private Image? _frameDivider;
     private Image? _speedDivider;
+
+    private string? _renderedTimeLabel;
+    private string? _renderedTimeText;
+    private string? _renderedFrameText;
+    private string? _renderedPauseButtonText;
 
     private void EnsureUi()
     {
@@ -188,6 +221,10 @@ internal sealed partial class CombatStatusBar
         _timeDivider = null;
         _frameDivider = null;
         _speedDivider = null;
+        _renderedTimeLabel = null;
+        _renderedTimeText = null;
+        _renderedFrameText = null;
+        _renderedPauseButtonText = null;
     }
 
     private void SetUiVisible(bool visible)
@@ -206,36 +243,12 @@ internal sealed partial class CombatStatusBar
         if (!shouldDraw)
             return;
 
-        var barColor = Color.Lerp(
-            new Color(0.06f, 0.07f, 0.09f, 0.90f),
-            new Color(0.16f, 0.12f, 0.08f, 0.96f),
-            _visualBlend
-        );
-        var glowColor = Color.Lerp(
-            new Color(0.20f, 0.24f, 0.28f, 0.08f),
-            new Color(0.44f, 0.30f, 0.14f, 0.20f),
-            _visualBlend
-        );
-        var segmentColor = Color.Lerp(
-            new Color(0.11f, 0.13f, 0.16f, 0.90f),
-            new Color(0.23f, 0.18f, 0.11f, 0.92f),
-            _visualBlend
-        );
-        var labelColor = Color.Lerp(
-            new Color(0.62f, 0.67f, 0.74f, 0.88f),
-            new Color(0.90f, 0.84f, 0.62f, 0.96f),
-            _visualBlend
-        );
-        var valueColor = Color.Lerp(
-            new Color(0.84f, 0.87f, 0.93f, 0.96f),
-            new Color(1f, 0.96f, 0.90f, 1f),
-            _visualBlend
-        );
-        var dividerColor = Color.Lerp(
-            new Color(0.42f, 0.46f, 0.53f, 0.22f),
-            new Color(0.84f, 0.74f, 0.44f, 0.42f),
-            _visualBlend
-        );
+        var barColor = Color.Lerp(BarColorIdle, BarColorActive, _visualBlend);
+        var glowColor = Color.Lerp(GlowColorIdle, GlowColorActive, _visualBlend);
+        var segmentColor = Color.Lerp(SegmentColorIdle, SegmentColorActive, _visualBlend);
+        var labelColor = Color.Lerp(LabelColorIdle, LabelColorActive, _visualBlend);
+        var valueColor = Color.Lerp(ValueColorIdle, ValueColorActive, _visualBlend);
+        var dividerColor = Color.Lerp(DividerColorIdle, DividerColorActive, _visualBlend);
 
         SetImageColor(_barBackground, barColor);
         SetImageColor(_barGlow, glowColor);
@@ -254,23 +267,44 @@ internal sealed partial class CombatStatusBar
         SetTextColor(_timeValue, valueColor);
         SetTextColor(_frameValue, valueColor);
 
-        SetLabel(_timeLabel, GetDisplayedTimeLabel());
-        if (_timeValue != null)
-            _timeValue.text = GetDisplayedTimeText();
-        if (_frameValue != null)
-            _frameValue.text = GetDisplayedFrameText();
+        var timeLabel = GetDisplayedTimeLabel();
+        if (!string.Equals(_renderedTimeLabel, timeLabel, StringComparison.Ordinal))
+        {
+            _renderedTimeLabel = timeLabel;
+            SetLabel(_timeLabel, timeLabel);
+        }
+
+        var timeText = GetDisplayedTimeText();
+        if (
+            _timeValue != null
+            && !string.Equals(_renderedTimeText, timeText, StringComparison.Ordinal)
+        )
+        {
+            _renderedTimeText = timeText;
+            _timeValue.text = timeText;
+        }
+
+        var frameText = GetDisplayedFrameText();
+        if (
+            _frameValue != null
+            && !string.Equals(_renderedFrameText, frameText, StringComparison.Ordinal)
+        )
+        {
+            _renderedFrameText = frameText;
+            _frameValue.text = frameText;
+        }
 
         var speedButtonColor = Color.Lerp(
-            new Color(0.26f, 0.30f, 0.36f, 0.92f),
-            new Color(0.48f, 0.33f, 0.13f, 0.95f),
+            SpeedButtonColorIdle,
+            SpeedButtonColorActive,
             _visualBlend
         );
         var speedButtonPressedColor = Color.Lerp(
-            new Color(0.35f, 0.39f, 0.46f, 1f),
-            new Color(0.66f, 0.47f, 0.16f, 1f),
+            SpeedButtonPressedColorIdle,
+            SpeedButtonPressedColorActive,
             _visualBlend
         );
-        var speedButtonDisabledColor = new Color(0.22f, 0.24f, 0.28f, 0.45f);
+        var speedButtonDisabledColor = SpeedButtonDisabledColor;
         ApplyButtonColors(
             _decrementButton,
             _decrementButtonBackground,
@@ -295,28 +329,12 @@ internal sealed partial class CombatStatusBar
 
         var pauseInteractable = CanToggleCombatPause();
         var pauseBaseColor = IsCombatPaused
-            ? Color.Lerp(
-                new Color(0.28f, 0.33f, 0.40f, 0.95f),
-                new Color(0.54f, 0.40f, 0.16f, 0.96f),
-                _visualBlend
-            )
-            : Color.Lerp(
-                new Color(0.24f, 0.27f, 0.33f, 0.90f),
-                new Color(0.41f, 0.31f, 0.13f, 0.93f),
-                _visualBlend
-            );
+            ? Color.Lerp(PausedBaseColorIdle, PausedBaseColorActive, _visualBlend)
+            : Color.Lerp(UnpausedBaseColorIdle, UnpausedBaseColorActive, _visualBlend);
         var pausePressedColor = IsCombatPaused
-            ? Color.Lerp(
-                new Color(0.36f, 0.42f, 0.50f, 1f),
-                new Color(0.68f, 0.50f, 0.18f, 1f),
-                _visualBlend
-            )
-            : Color.Lerp(
-                new Color(0.32f, 0.36f, 0.43f, 1f),
-                new Color(0.56f, 0.41f, 0.15f, 1f),
-                _visualBlend
-            );
-        var pauseDisabledColor = new Color(0.22f, 0.24f, 0.28f, 0.45f);
+            ? Color.Lerp(PausedPressedColorIdle, PausedPressedColorActive, _visualBlend)
+            : Color.Lerp(UnpausedPressedColorIdle, UnpausedPressedColorActive, _visualBlend);
+        var pauseDisabledColor = PauseDisabledColor;
         ApplyButtonColors(
             _pauseButton,
             _pauseButtonBackground,
@@ -327,8 +345,15 @@ internal sealed partial class CombatStatusBar
             pauseDisabledColor,
             valueColor
         );
-        if (_pauseButtonText != null)
-            _pauseButtonText.text = IsCombatPaused ? ">" : "||";
+        var pauseButtonText = IsCombatPaused ? ">" : "||";
+        if (
+            _pauseButtonText != null
+            && !string.Equals(_renderedPauseButtonText, pauseButtonText, StringComparison.Ordinal)
+        )
+        {
+            _renderedPauseButtonText = pauseButtonText;
+            _pauseButtonText.text = pauseButtonText;
+        }
     }
 
     private void CreateSpeedContent(RectTransform parent)

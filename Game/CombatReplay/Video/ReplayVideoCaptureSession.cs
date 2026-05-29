@@ -16,6 +16,13 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     private readonly double _frameInterval;
     private readonly Dictionary<int, byte[]?> _orderingBuffer = new();
     private readonly object _disposeLock = new();
+
+    // Reused across every captured frame for the in-place vertical flip so we
+    // do not allocate a fresh per-row scratch buffer on each readback. Only
+    // touched from the AsyncGPUReadback completion callback, which Unity invokes
+    // on the main thread (the same thread that drives capture/finalize), so no
+    // synchronization is required.
+    private byte[]? _flipRowBuffer;
     private RenderTexture? _captureRenderTexture;
     private FfmpegRawVideoEncoder? _encoder;
     private double _nextCaptureTime;
@@ -254,9 +261,12 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         try
         {
             var data = request.GetData<byte>();
+            // The encoder's writer thread writes exactly frame.Length bytes to
+            // ffmpeg stdin, so the buffer handed off here must be sized exactly
+            // to the frame; a pooled (oversized) array would corrupt the stream.
             var buffer = new byte[data.Length];
             data.CopyTo(buffer);
-            ReplayVideoFrameTransforms.FlipVerticalRgba32(buffer, _request.Width, _request.Height);
+            FlipVerticalRgba32(buffer, _request.Width, _request.Height);
             _orderingBuffer[sequenceNumber] = buffer;
         }
         catch (Exception ex)
@@ -311,6 +321,40 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                     _droppedFrames++;
             }
             _orderingBuffer.Clear();
+        }
+    }
+
+    // In-place vertical flip identical to ReplayVideoFrameTransforms.FlipVerticalRgba32,
+    // but reusing the per-session _flipRowBuffer field instead of allocating a fresh
+    // row-sized scratch buffer on every frame. Invoked only from OnReadbackComplete on
+    // the Unity main thread, so the shared field needs no synchronization.
+    private void FlipVerticalRgba32(byte[] buffer, int width, int height)
+    {
+        if (buffer == null)
+            throw new ArgumentNullException(nameof(buffer));
+        if (width <= 0 || height <= 0)
+            return;
+
+        var stride = width * 4;
+        var expectedLength = stride * height;
+        if (buffer.Length < expectedLength)
+            return;
+
+        var rowBuffer = _flipRowBuffer;
+        if (rowBuffer == null || rowBuffer.Length < stride)
+        {
+            rowBuffer = new byte[stride];
+            _flipRowBuffer = rowBuffer;
+        }
+
+        for (var row = 0; row < height / 2; row++)
+        {
+            var topOffset = row * stride;
+            var bottomOffset = (height - 1 - row) * stride;
+
+            Buffer.BlockCopy(buffer, topOffset, rowBuffer, 0, stride);
+            Buffer.BlockCopy(buffer, bottomOffset, buffer, topOffset, stride);
+            Buffer.BlockCopy(rowBuffer, 0, buffer, bottomOffset, stride);
         }
     }
 
