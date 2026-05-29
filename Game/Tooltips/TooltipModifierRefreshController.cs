@@ -5,7 +5,6 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Patches.Tooltips;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
@@ -46,7 +45,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
                 return;
 
             _lastMode = mode;
-            TryRefreshCurrentItemTooltip();
+            TryRefreshCurrentItemTooltip(_config, _encounterState);
         }
         catch (Exception ex)
         {
@@ -73,7 +72,10 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         ChoiceScreenPedestalKind PedestalKind
     );
 
-    private static void TryRefreshCurrentItemTooltip()
+    private static void TryRefreshCurrentItemTooltip(
+        IBppConfig? config,
+        IEncounterStateProbe? encounterState
+    )
     {
         var tooltipParent = Data.TooltipParentComponent;
         if (tooltipParent == null)
@@ -93,8 +95,10 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             target.Controller.TooltipOffset,
             refreshedTooltipData
         );
-        UpgradePreviewTooltipPatch.TryScheduleUpgradeTooltip(
+        UpgradeTooltipScheduler.TryScheduleUpgradeTooltip(
             target.Controller,
+            config,
+            encounterState,
             refreshedTooltipData
         );
     }
