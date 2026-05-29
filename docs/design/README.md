@@ -11,7 +11,12 @@ Dated, point-in-time design documents (`YYYY-MM-DD-<slug>.md`). A spec captures 
   - `SUPERSEDED by <doc>` — replaced by a later spec or decision.
 - When a spec records a decision that outlives it (an abstraction choice, a rejected approach, a tradeoff), promote that decision to a [docs/adr/](../adr/) entry **before** archiving — ADRs are the canonical "why", specs are the historical "how we planned it".
 
-There are currently no active proposals; everything is under `archive/`.
+## Active proposals
+
+Work designed but not yet (fully) landed; lives at this top level until implemented, then moves to `archive/` with a status banner.
+
+- [`2026-05-30-ffmpeg-relocation-to-mod-design.md`](2026-05-30-ffmpeg-relocation-to-mod-design.md) — FFmpeg 改为随 mod 分发的兄弟二进制（mod 侧定位逻辑已落地；installer 侧删除与文档同步待办）。
+- [`2026-05-30-combat-replay-record-button-design.md`](2026-05-30-combat-replay-record-button-design.md) — Combat Replay 视频录制从全局开关自动录每场改为 HistoryPanel 按钮单次触发。
 
 ## Archived specs
 
