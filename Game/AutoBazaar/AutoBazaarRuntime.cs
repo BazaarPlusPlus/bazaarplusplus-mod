@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using BazaarPlusPlus;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Infrastructure;
 using Newtonsoft.Json;

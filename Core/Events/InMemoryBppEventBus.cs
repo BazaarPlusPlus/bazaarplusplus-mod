@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Core.Events;
 

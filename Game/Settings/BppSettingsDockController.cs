@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.Settings;

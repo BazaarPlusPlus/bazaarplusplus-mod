@@ -1,4 +1,8 @@
 <Project>
+  <PropertyGroup>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
   <!--
     Give each csproj in the repo root its own intermediate/output dirs so that
     they do not clobber each other's project.assets.json and NuGet lock files.

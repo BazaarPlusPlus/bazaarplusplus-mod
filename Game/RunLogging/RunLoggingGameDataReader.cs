@@ -1,9 +1,6 @@
 #pragma warning disable CS0436
 #nullable enable
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;

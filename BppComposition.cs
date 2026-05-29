@@ -4,7 +4,6 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.AutoBazaar;
 using BazaarPlusPlus.Game.CardSetPreview;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;

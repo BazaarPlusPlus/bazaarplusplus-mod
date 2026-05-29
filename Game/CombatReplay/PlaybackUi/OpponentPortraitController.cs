@@ -4,7 +4,6 @@ using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
-using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Game.PvpBattles;

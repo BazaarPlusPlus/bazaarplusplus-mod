@@ -4,7 +4,6 @@ using System;
 using System.Linq;
 using System.Reflection;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;

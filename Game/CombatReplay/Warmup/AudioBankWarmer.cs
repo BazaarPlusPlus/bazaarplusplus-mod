@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Assets.Scripts.Audio;
-using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Infrastructure;
 using FMOD.Studio;
 using FMODUnity;
