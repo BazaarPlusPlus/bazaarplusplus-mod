@@ -92,20 +92,30 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
         _settingsDockRegistry.Register(new UpgradePreviewSettingsDockEntry());
 
-        _mountables.Register(new BazaarDbScreenshotUploadMount());
-        _mountables.Register(new CardSetPreviewMount());
-        _mountables.Register(new CombatReplayVideoRecorderMount());
-        _mountables.Register(new CombatStatusBarMount());
-        _mountables.Register(new EndOfRunScreenshotMount());
+        _mountables.Register(
+            new ComponentMount<BazaarDbScreenshotUploadController>((c, s) => c.Initialize(s))
+        );
+        _mountables.Register(new ComponentMount<CardSetPreviewRuntime>());
+        _mountables.Register(
+            new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
+        );
+        _mountables.Register(new ComponentMount<CombatStatusBar>((c, s) => c.Initialize(s)));
+        _mountables.Register(
+            new ComponentMount<EndOfRunScreenshotController>((c, s) => c.Initialize(s))
+        );
         _mountables.Register(
             new HistoryPanelMount(
                 combatReplayRuntime: () => _combatReplayModule.Runtime,
                 onlineClient: () => _onlineClientRef
             )
         );
-        _mountables.Register(new RunLoggingMount());
-        _mountables.Register(new RunUploadMount());
-        _mountables.Register(new TooltipModifierRefreshMount());
+        _mountables.Register(new ComponentMount<RunLoggingController>((c, s) => c.Initialize(s)));
+        _mountables.Register(new ComponentMount<RunUploadController>((c, s) => c.Initialize(s)));
+        _mountables.Register(
+            new ComponentMount<TooltipModifierRefreshController>(
+                (c, s) => c.Initialize(s.Config, s.EncounterState)
+            )
+        );
 
         // _mountables.Register(new AutoBazaarMount());
     }
