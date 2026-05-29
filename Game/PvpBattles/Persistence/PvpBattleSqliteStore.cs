@@ -24,6 +24,41 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
         DateFormatString = "yyyy-MM-dd'T'HH:mm:ss.fffK",
     };
 
+    // Shared column list + battle/snapshot join used by every manifest read. Callers append only
+    // their WHERE/ORDER/LIMIT clauses. Column order is fixed because ReadManifest depends on it.
+    private static readonly string SelectBattleManifestSql = $"""
+        SELECT
+            b.battle_id,
+            b.run_id,
+            b.recorded_at_utc,
+            b.day,
+            b.hour,
+            b.encounter_id,
+            b.player_name,
+            b.player_account_id,
+            b.player_hero,
+            b.player_rank,
+            b.player_rating,
+            b.player_level,
+            b.opponent_name,
+            b.opponent_hero,
+            b.opponent_rank,
+            b.opponent_rating,
+            b.opponent_level,
+            b.opponent_account_id,
+            b.combat_kind,
+            b.result,
+            b.winner_combatant_id,
+            b.loser_combatant_id,
+            s.player_hand_json,
+            s.player_skills_json,
+            s.opponent_hand_json,
+            s.opponent_skills_json
+        FROM {RunLogSchema.BattlesTableName} AS b
+        LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
+            ON s.battle_id = b.battle_id
+        """;
+
     public PvpBattleSqliteStore(string databasePath)
         : base(databasePath) { }
 
@@ -243,41 +278,9 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
     {
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
-        command.CommandText = $"""
-            SELECT
-                b.battle_id,
-                b.run_id,
-                b.recorded_at_utc,
-                b.day,
-                b.hour,
-                b.encounter_id,
-                b.player_name,
-                b.player_account_id,
-                b.player_hero,
-                b.player_rank,
-                b.player_rating,
-                b.player_level,
-                b.opponent_name,
-                b.opponent_hero,
-                b.opponent_rank,
-                b.opponent_rating,
-                b.opponent_level,
-                b.opponent_account_id,
-                b.combat_kind,
-                b.result,
-                b.winner_combatant_id,
-                b.loser_combatant_id,
-                s.player_hand_json,
-                s.player_skills_json,
-                s.opponent_hand_json,
-                s.opponent_skills_json
-            FROM {RunLogSchema.BattlesTableName} AS b
-            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
-                ON s.battle_id = b.battle_id
-            WHERE b.battle_id = $battleId
-              AND b.source = 'LOCAL'
-            LIMIT 1;
-            """;
+        command.CommandText =
+            SelectBattleManifestSql
+            + "\nWHERE b.battle_id = $battleId\n  AND b.source = 'LOCAL'\nLIMIT 1;";
         command.Parameters.AddWithValue("$battleId", battleId);
         using var reader = command.ExecuteReader();
         if (!reader.Read())
@@ -346,41 +349,9 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
     {
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
-        command.CommandText = $"""
-            SELECT
-                b.battle_id,
-                b.run_id,
-                b.recorded_at_utc,
-                b.day,
-                b.hour,
-                b.encounter_id,
-                b.player_name,
-                b.player_account_id,
-                b.player_hero,
-                b.player_rank,
-                b.player_rating,
-                b.player_level,
-                b.opponent_name,
-                b.opponent_hero,
-                b.opponent_rank,
-                b.opponent_rating,
-                b.opponent_level,
-                b.opponent_account_id,
-                b.combat_kind,
-                b.result,
-                b.winner_combatant_id,
-                b.loser_combatant_id,
-                s.player_hand_json,
-                s.player_skills_json,
-                s.opponent_hand_json,
-                s.opponent_skills_json
-            FROM {RunLogSchema.BattlesTableName} AS b
-            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
-                ON s.battle_id = b.battle_id
-            WHERE b.source = 'LOCAL'
-            ORDER BY b.recorded_at_utc DESC, b.battle_id DESC
-            LIMIT $limit;
-            """;
+        command.CommandText =
+            SelectBattleManifestSql
+            + "\nWHERE b.source = 'LOCAL'\nORDER BY b.recorded_at_utc DESC, b.battle_id DESC\nLIMIT $limit;";
         command.Parameters.AddWithValue("$limit", limit);
 
         using var reader = command.ExecuteReader();
@@ -400,41 +371,9 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
 
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
-        command.CommandText = $"""
-            SELECT
-                b.battle_id,
-                b.run_id,
-                b.recorded_at_utc,
-                b.day,
-                b.hour,
-                b.encounter_id,
-                b.player_name,
-                b.player_account_id,
-                b.player_hero,
-                b.player_rank,
-                b.player_rating,
-                b.player_level,
-                b.opponent_name,
-                b.opponent_hero,
-                b.opponent_rank,
-                b.opponent_rating,
-                b.opponent_level,
-                b.opponent_account_id,
-                b.combat_kind,
-                b.result,
-                b.winner_combatant_id,
-                b.loser_combatant_id,
-                s.player_hand_json,
-                s.player_skills_json,
-                s.opponent_hand_json,
-                s.opponent_skills_json
-            FROM {RunLogSchema.BattlesTableName} AS b
-            LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
-                ON s.battle_id = b.battle_id
-            WHERE b.source = 'LOCAL'
-              AND b.run_id = $runId
-            ORDER BY b.recorded_at_utc ASC, b.battle_id ASC;
-            """;
+        command.CommandText =
+            SelectBattleManifestSql
+            + "\nWHERE b.source = 'LOCAL'\n  AND b.run_id = $runId\nORDER BY b.recorded_at_utc ASC, b.battle_id ASC;";
         command.Parameters.AddWithValue("$runId", runId);
 
         using var reader = command.ExecuteReader();

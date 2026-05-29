@@ -9,34 +9,28 @@ using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Storage.RunLog;
 using BazaarPlusPlus.Storage.Sqlite;
-using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
-internal sealed class RunBundleUploadStore
+internal sealed class RunBundleUploadStore : SqliteStoreBase
 {
-    private readonly string _databasePath;
     private readonly CombatReplayPayloadStore _payloadStore;
     private readonly PvpBattleCatalog _battleCatalog;
 
     public RunBundleUploadStore(string databasePath, string replayRootPath)
+        : base(databasePath)
     {
-        if (string.IsNullOrWhiteSpace(databasePath))
-            throw new ArgumentException("Database path is required.", nameof(databasePath));
         if (string.IsNullOrWhiteSpace(replayRootPath))
             throw new ArgumentException("Replay root path is required.", nameof(replayRootPath));
 
-        _databasePath = databasePath;
         _payloadStore = new CombatReplayPayloadStore(replayRootPath);
         _battleCatalog = new PvpBattleCatalog(databasePath);
-        EnsureSchema();
     }
 
     public IReadOnlyList<string> GetPendingCompletedRunIds(int limit)
     {
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
+        using var command = CreateCommand(connection);
         command.CommandText = $"""
             SELECT s.run_id
             FROM {RunLogSchema.RunSyncStateTableName} AS s
@@ -61,8 +55,7 @@ internal sealed class RunBundleUploadStore
     public bool HasMorePendingCompletedRuns()
     {
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
+        using var command = CreateCommand(connection);
         command.CommandText = $"""
             SELECT 1
             FROM {RunLogSchema.RunSyncStateTableName} AS s
@@ -79,8 +72,7 @@ internal sealed class RunBundleUploadStore
     public void MarkRunUploadFailed(string runId, DateTimeOffset attemptedAtUtc, string error)
     {
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
+        using var command = CreateCommand(connection);
         command.CommandText = $"""
             UPDATE {RunLogSchema.RunSyncStateTableName}
             SET last_attempt_at_utc = $attemptedAtUtc,
@@ -105,10 +97,8 @@ internal sealed class RunBundleUploadStore
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
 
-        using (var command = connection.CreateCommand())
+        using (var command = CreateCommand(connection, transaction))
         {
-            command.Transaction = transaction;
-            command.CommandTimeout = 2;
             command.CommandText = $"""
                 UPDATE {RunLogSchema.RunSyncStateTableName}
                 SET dirty = 0,
@@ -132,9 +122,7 @@ internal sealed class RunBundleUploadStore
 
         if (battleIds.Count > 0)
         {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandTimeout = 2;
+            using var command = CreateCommand(connection, transaction);
             var placeholders = new List<string>();
             for (var index = 0; index < battleIds.Count; index++)
             {
@@ -163,8 +151,7 @@ internal sealed class RunBundleUploadStore
     public RunBundleUploadSnapshot? TryBuildRunBundleSnapshot(string runId, string playerAccountId)
     {
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
+        using var command = CreateCommand(connection);
         command.CommandText = $"""
             SELECT
                 run_id,
@@ -362,51 +349,5 @@ internal sealed class RunBundleUploadStore
                 snapshot.Attributes ?? new Dictionary<string, int>()
             ),
         };
-    }
-
-    private void EnsureSchema()
-    {
-        using var connection = OpenConnection();
-        RunLogSchema.EnsureInitialized(connection);
-    }
-
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection($"Data Source={_databasePath}");
-        try
-        {
-            connection.Open();
-            using var command = connection.CreateCommand();
-            command.CommandTimeout = 2;
-            command.CommandText = """
-                PRAGMA foreign_keys = ON;
-                PRAGMA busy_timeout = 2000;
-                """;
-            command.ExecuteNonQuery();
-            return connection;
-        }
-        catch
-        {
-            connection.Dispose();
-            throw;
-        }
-    }
-
-    private static string? GetNullableString(SqliteDataReader reader, string column)
-    {
-        var ordinal = reader.GetOrdinal(column);
-        return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
-    }
-
-    private static int? GetNullableInt32(SqliteDataReader reader, string column)
-    {
-        var ordinal = reader.GetOrdinal(column);
-        return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
-    }
-
-    private static long? GetNullableInt64(SqliteDataReader reader, string column)
-    {
-        var ordinal = reader.GetOrdinal(column);
-        return reader.IsDBNull(ordinal) ? null : reader.GetInt64(ordinal);
     }
 }
