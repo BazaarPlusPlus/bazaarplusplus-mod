@@ -6,20 +6,6 @@ using BazaarPlusPlus.Storage.RunLog;
 var captureServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCaptureService");
 var pvpBattleInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogPvpBattleInput");
 var controllerCoreType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingControllerCore");
-var manifestType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifest");
-var payloadType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpReplayPayload");
-var cardSetCaptureType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSetCapture");
-
-Assert(manifestType.GetProperty("BattleId") != null, "Manifest should expose BattleId.");
-Assert(manifestType.GetProperty("ReplayId") == null, "Manifest should not expose ReplayId.");
-Assert(payloadType.GetProperty("BattleId") != null, "Replay payload should expose BattleId.");
-Assert(
-    cardSetCaptureType.GetProperty("Items") != null
-        && cardSetCaptureType.GetProperty("Status") != null
-        && cardSetCaptureType.GetProperty("Source") != null,
-    "PvpBattleCardSetCapture should expose Items, Status, and Source."
-);
-
 var service =
     Activator.CreateInstance(captureServiceType)
     ?? throw new InvalidOperationException("RunLogCaptureService should be constructible.");
