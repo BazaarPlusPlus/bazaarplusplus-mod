@@ -14,19 +14,19 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 大厅与展示类小功能：随机英雄池面板、主菜单版本号、Legendary 段位展示文案、中文术语切换
 - **Anonymous Mode**：可选将显示名改为 `Anonymous`
 - 终局自动截图：终局 `Continue` 前自动保存主截图和元数据
-- **AutoBazaar HTTP 接口**：本地回环 HTTP 服务（默认端口 47900），对外暴露决策上下文（`GET /v1/context`）并接受外部动作（`POST /v1/actions`）；纯传输与校验层，Mod 本身不做策略决策。详见 [auto-bazaar-http-api-v1.md](reference/auto-bazaar-http-api-v1.md)。
+- **AutoBazaar HTTP 接口**（**当前 parked**）：本地回环 HTTP 服务（默认端口 47900），对外暴露决策上下文（`GET /v1/context`）并接受外部动作（`POST /v1/actions`）；纯传输与校验层，Mod 本身不做策略决策。**注意：该 mount 在 `BppComposition.cs:120` 被注释掉，HTTP 服务当前不启动；wire 契约与源码保留，取消注释即重新启用。** 详见 [auto-bazaar-http-api-v1.md](reference/auto-bazaar-http-api-v1.md)。
 
 ## 运行时骨架
 
 | 层次 | 作用 |
 | --- | --- |
-| `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好其余 11 个 feature |
+| `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好 9 个 `IBppMountable`（第 10 个 `AutoBazaarMount` 在 `BppComposition.cs:120` 注释掉，parked） |
 | `BppComposition.cs` | 创建 `IBppServices`，注册 `RunLifecycleModule`、`CombatReplayModule`、`CombatStatusBarModule`，并把所有 `IBppMountable`（feature runtime）和 `ISettingsDockEntry`（设置坞入口）汇总到两个 registry |
 | `Core/` | 纯抽象：配置、事件总线、路径、run context、运行时服务接口 |
 | `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`BppStaticDataAccess`，以及带 game type 的事件 + `IRunContext` 接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
-挂载的 9 个 `IBppMountable`：`RunLoggingMount`、`RunUploadMount`、`CombatStatusBarMount`、`CardSetPreviewMount`、`EndOfRunScreenshotMount`、`BazaarDbScreenshotUploadMount`、`CombatReplayVideoRecorderMount`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`TooltipModifierRefreshMount`。新增 feature 只需在 `BppComposition` 加一行 `_mountables.Register(...)`。
+挂载的 9 个 `IBppMountable`（实际注册见 `BppComposition.cs:95-118`；多数是泛型 `ComponentMount<T>`，仅 `HistoryPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<CardSetPreviewRuntime>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbScreenshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`ComponentMount<TooltipModifierRefreshController>`。第 10 个 `AutoBazaarMount` 在 `BppComposition.cs:120` 被注释（parked）。新增 feature 只需在 `BppComposition` 加一行 `_mountables.Register(...)`。
 
 ## 游戏内功能模块
 

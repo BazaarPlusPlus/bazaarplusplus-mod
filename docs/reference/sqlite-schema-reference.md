@@ -14,9 +14,10 @@ Source of truth:
 - `Storage/RunLog/RunLogSchema.cs`
 - `Storage/RunLog/RunLogStore.cs`
 - `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
-- `Game/Screenshots/Persistence/RunScreenshotSqliteStore.cs`
+- `Storage/RunScreenshot/RunScreenshotSqliteStore.cs`
 - `Game/CombatReplay/Video/CombatReplayVideoMetadataStore.cs`
-- `Game/HistoryPanel/HistoryPanelRepository.cs`
+- `Game/Screenshots/Upload/BazaarDbScreenshotUploadStore.cs`
+- `Game/HistoryPanel/Storage/HistoryPanelRepository.cs`
 - `Game/RunLogging/Upload/RunBundleUploadStore.cs`
 - `bazaarplusplus-server/migrations/0001_v4_initial.sql`
 - `bazaarplusplus-server/src/features/runBundles/upload.ts`
@@ -24,10 +25,12 @@ Source of truth:
 ## Local Client SQLite
 
 - Database file: `<GameRoot>/BazaarPlusPlusV4/bazaarplusplus.db`
-- Local schema version: `12`
+- Local schema version: `13` (`RunLogSchema.LocalDatabaseSchemaVersion`)
 - Row schema version: `11`
 - Upload payload schema version: `1`
-- Runtime pragmas include `foreign_keys = ON`, `user_version = 12`, `busy_timeout = 2000`, and WAL mode.
+- Runtime pragmas include `foreign_keys = ON`, `user_version = 13`, `busy_timeout = 2000`, and WAL mode.
+
+> Version history: `v11→v12` added the `combat_replay_videos` table; `v13` added the `bazaardb_screenshot_uploads` sidecar. The bootstrap is a single `CREATE TABLE IF NOT EXISTS` pass (`RunLogSchema.BootstrapSql`), so a fresh database is created directly at the current version rather than migrated step by step.
 
 Current tables:
 
@@ -39,6 +42,7 @@ Current tables:
 - `combat_replay_videos`
 - `sync_cursors`
 - `run_sync_state`
+- `bazaardb_screenshot_uploads`
 
 Older logical names like `run_checkpoints`, `run_status`, `pvp_battles`, `ghost_battles`, and `replay_sync_state` now map onto the tables above. They are not separate tables.
 
@@ -103,7 +107,7 @@ Columns:
 - player side: `player_name`, `player_account_id`, `player_hero`, `player_rank`, `player_rating`, `player_level`
 - opponent side: `opponent_name`, `opponent_account_id`, `opponent_hero`, `opponent_rank`, `opponent_rating`, `opponent_level`
 - outcome: `result`, `winner_combatant_id`, `loser_combatant_id`
-- bundle marker: `is_bundle_final_battle`
+- bundle marker: `is_bundle_final_battle` — this is the **local column** name. It projects to the **server wire / D1** field `is_final_battle` (the V4 rename dropped the redundant `is_bundle_` prefix; see [V4 Server D1 Schema](#v4-server-d1-schema)). Both names are correct at their respective layers — this is not a drift to "fix".
 - replay state: `replay_available`, `replay_downloaded`, `has_local_payload`, `replay_dirty`, `replay_last_attempt_at_utc`, `replay_last_uploaded_at_utc`, `replay_retry_count`, `replay_last_error`
 - sync/lifecycle: `last_synced_at_utc`, `deleted_at_utc`
 
@@ -215,6 +219,21 @@ Columns:
 - `retry_count INTEGER NOT NULL DEFAULT 0`
 - `last_error TEXT NULL`
 
+### `bazaardb_screenshot_uploads`
+
+Sidecar upload-queue table for the optional BazaarDB screenshot upload feature (`BazaarDB / UploadScreenshots`). One row per `run_screenshots` row that has been (or is being) pushed to `bazaarplusplus-server`. Only present once the feature has been enabled at least once; rows are backfilled for every existing `capture_source = 'end_of_run_auto'` screenshot via `INSERT OR IGNORE`, so flipping the switch on uploads historical screenshots too.
+
+Columns:
+
+- `screenshot_id TEXT PRIMARY KEY` — references `run_screenshots.screenshot_id` (`ON DELETE CASCADE`)
+- `status TEXT NOT NULL` — `pending`, `uploaded`, or `permanent_failure`
+- `attempts INTEGER NOT NULL DEFAULT 0`
+- `last_attempted_at_utc TEXT NULL`
+- `last_error TEXT NULL`
+- `uploaded_at_utc TEXT NULL`
+
+Write path: `Game/Screenshots/Upload/BazaarDbScreenshotUploadStore.cs` (`MarkUploaded` → `uploaded`; 4xx except 408/429 → `permanent_failure`; 5xx / network errors stay `pending` for retry).
+
 ### Local Indexes
 
 ```sql
@@ -251,6 +270,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
 
 CREATE INDEX IF NOT EXISTS idx_combat_replay_videos_battle
     ON combat_replay_videos(battle_id, started_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_bazaardb_screenshot_uploads_status
+    ON bazaardb_screenshot_uploads(status);
 ```
 
 ## V4 Upload Payload Model

@@ -1,8 +1,10 @@
 # AutoBazaar Decision Surface — Internal Reference
 
+> **Status: parked.** The AutoBazaar mount is commented out at `BppComposition.cs:120`; the HTTP surface this doc derives is not currently served. Preserved for re-enable. The wire contract itself is owned by [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md); this doc owns the builder-side derivation.
+
 ## Scope
 
-Companion to `auto-bazaar-http-api-v1.md`. Documents how `AutoBazaarContextBuilder` populates each `AutoBazaarContext` field from live game state. Intended for contributors modifying `AutoBazaarContextBuilder.cs`.
+Companion to [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md). Documents how `AutoBazaarContextBuilder` populates each `AutoBazaarContext` field from live game state. Intended for contributors modifying `AutoBazaarContextBuilder.cs`.
 
 ## Source of Truth
 
