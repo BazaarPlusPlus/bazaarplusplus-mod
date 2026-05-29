@@ -66,7 +66,7 @@ saved replay 播放期间把 Unity Game View 抓帧编码为 MP4，落到 `<Game
 
 ### 当前状态
 
-Phase 1–3 已落地：录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / speed 恢复 / overlay 抑制）、SQLite `combat_replay_videos` 元数据。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项、installer 侧 FFmpeg 自动部署、音频（原 Phase 4）。视频录制的完整设计演进与 SFX 修复历史归档在 [docs/design/archive/](../design/archive/)（`2026-05-23-combat-replay-sfx-impl.md`、`2026-05-24-arm-combat-replay-recording-design.md` 等）。
+Phase 1–3 已落地：录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / speed 恢复 / overlay 抑制）、SQLite `combat_replay_videos` 元数据。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项、installer 侧 FFmpeg 自动部署、音频（原 Phase 4）。SFX 修复历史归档在 [docs/design/archive/2026-05-23-combat-replay-sfx-impl.md](../design/archive/2026-05-23-combat-replay-sfx-impl.md)。
 
 ## 关键文件
 

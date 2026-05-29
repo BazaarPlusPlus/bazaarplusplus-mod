@@ -91,7 +91,7 @@ HistoryPanel 整个 UI Toolkit 层都是这个调调。
 
 ### 为什么是现在
 
-- **HistoryPanel native rendering migration 刚落地**（[../specs/2026-05-27-history-panel-native-rendering-migration.md](2026-05-27-history-panel-native-rendering-migration.md)），
+- **HistoryPanel native rendering migration 刚落地**（spec 已清理，决策见 [ADR-0003](../../adr/0003-history-panel-preview-overlay.md)），
   之前的卡牌渲染分歧解决了，下一层视觉债务自然轮到字体与样式
 - **宽屏问题 [history-panel-known-issues.md #1](../../features/history-panel.md) 的第 4 项**
   （行内组件像素硬编码，[Style.cs:74](../../../Game/HistoryPanel/HistoryPanelUiToolkitView.Style.cs#L74)）

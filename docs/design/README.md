@@ -15,23 +15,12 @@ There are currently no active proposals; everything is under `archive/`.
 
 ## Archived specs
 
-**Implemented (historical)** — shipped; see the linked living doc / ADR:
+All remaining archived specs are `IMPLEMENTED (historical)` — shipped; the living truth is the linked ADR / feature doc / code:
 
 - `2026-05-22-autobazaar-mountable-and-encounter-decoupling-design.md` → [ADR-0002](../adr/0002-mountable-feature-registry.md)
 - `2026-05-23-combat-replay-sfx-impl.md` → [combat-replay.md](../features/combat-replay.md)
-- `2026-05-24-bazaardb-upload-in-mod-design.md` → [screenshots.md](../features/screenshots.md)
 - `2026-05-24-pedestal-aware-preview-display-design.md` → [ADR-0004](../adr/0004-preview-visibility-three-state-mode.md), [tooltip-preview.md](../features/tooltip-preview.md)
 - `2026-05-27-mod-ui-typography-token-foundation.md` → `Infrastructure/Fonts/`, `Infrastructure/UiTokens/`
 - `2026-05-29-historypanel-fullscreen-responsive-design.md` → [history-panel.md](../features/history-panel.md)
 
-**Superseded** — kept as a reasoning trail:
-
-- `2026-05-22-combat-replay-sfx-silent-analysis.md` → superseded by the `2026-05-23` SFX impl
-- `2026-05-27-history-panel-native-rendering-migration.md` → RT approach reverted, see [ADR-0003](../adr/0003-history-panel-preview-overlay.md)
-
-**Aspirational** — never implemented; kept for design reasoning:
-
-- `2026-05-17-autobazaar-agent-design.md` (decision agent now in the `bazaarplusplus-agent` repo)
-- `2026-05-17-bypass-http-rate-limit-design.md`
-- `2026-05-24-arm-combat-replay-recording-design.md` (contradicts the shipped auto-record behaviour)
-- `2026-05-24-combat-replay-skill-showcase-design.md`
+> Earlier aspirational / superseded specs (AutoBazaar agent, HTTP rate-limit bypass, arm-then-record, skill showcase, V3 BazaarDB upload, SFX silent-analysis, the offscreen-RT migration) were pruned once their decisions landed in ADRs or they were confirmed never-built; recover them from git history if needed.

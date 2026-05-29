@@ -64,16 +64,6 @@ Rules emerge from validated patterns, not one-off observations. The workflow is:
 2. Team validates the pattern in code review
 3. A dedicated commit adds the rule with context on why it exists
 
-## Agent skills
+## Domain docs
 
-### Issue tracker
-
-Issues and PRDs live in this repo's GitHub Issues (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default five-role vocabulary (`needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`). See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context (`CONTEXT.md` + `docs/adr/` at the repo root). See `docs/agents/domain.md`.
+Single-context: project vocabulary lives in `CONTEXT.md`, design decisions in `docs/adr/`. The full documentation map is `docs/README.md`.

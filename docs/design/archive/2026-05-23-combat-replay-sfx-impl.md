@@ -6,7 +6,7 @@
 **Date:** 2026-05-23
 **Owner:** BazaarPlusPlus mod / CombatReplay
 **Supersedes:** —
-**Builds on:** [2026-05-22-combat-replay-sfx-silent-analysis.md](2026-05-22-combat-replay-sfx-silent-analysis.md)
+**Builds on:** 2026-05-22 combat-replay SFX silent-playback analysis（已随归档清理，可从 git 历史恢复）
 **Related code:**
 - [Game/CombatReplay/CombatReplayRuntime.Bootstrap.cs](../../../Game/CombatReplay/CombatReplayRuntime.Bootstrap.cs)
 - [Game/CombatReplay/CombatReplayRuntime.Warmup.cs](../../../Game/CombatReplay/CombatReplayRuntime.Warmup.cs)
@@ -24,7 +24,7 @@
 
 ## 1. 为什么需要再写一份
 
-[2026-05-22 分析文档](2026-05-22-combat-replay-sfx-silent-analysis.md) §4.5 给出的根因假设——“`CombatBus` 等 FMOD bus 卡在 `paused=true`，因为 `SoundEventListener` 重订阅有时序竞争”——方向是对的。但**改造前的** `EnsureReplayAudioUnpaused` 已经实现了那份文档 §5 Method A 的关键一步：
+2026-05-22 的 SFX 静默分析（已清理）§4.5 给出的根因假设——“`CombatBus` 等 FMOD bus 卡在 `paused=true`，因为 `SoundEventListener` 重订阅有时序竞争”——方向是对的。但**改造前的** `EnsureReplayAudioUnpaused` 已经实现了那份文档 §5 Method A 的关键一步：
 
 ```csharp
 Services.Get<SoundManager>()?.PauseBusses(isPausing: false);

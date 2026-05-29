@@ -40,10 +40,6 @@
 
 - [design/README.md](design/README.md) — spec 生命周期约定 + 按状态索引的 [design/archive/](design/archive/)（已实现 / 已废弃 / 未实现的 dated 设计 spec，每篇带状态横幅）。
 
-## Agent 流程（`agents/`）
-
-- [agents/domain.md](agents/domain.md)、[agents/issue-tracker.md](agents/issue-tracker.md)、[agents/triage-labels.md](agents/triage-labels.md) — 工程 skill 如何消费本仓库的领域文档、issue 追踪与 triage 标签约定。
-
 ## 游戏逆向工程（`reverse-engineering/`）
 
 - [reverse-engineering/README.md](reverse-engineering/README.md) — 事实型 RE 参考（网络面、DTO、session 协议、反编译记录；2026-05-21 快照口径）；[reverse-engineering/proposals/](reverse-engineering/proposals/) 下是**尚未实现**的离线模式设计提案。
