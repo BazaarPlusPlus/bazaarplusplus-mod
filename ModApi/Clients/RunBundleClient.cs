@@ -1,11 +1,10 @@
 #nullable enable
 using System;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.ModApi.Http;
 using BazaarPlusPlus.ModApi.Models;
-using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.ModApi.Clients;
 
@@ -25,22 +24,17 @@ public sealed class RunBundleClient
         CancellationToken cancellationToken
     )
     {
-        var bodyBytes = Encoding.UTF8.GetBytes(
-            JsonConvert.SerializeObject(payload, ModApiSerialization.SerializerSettings)
+        var result = await ModApiJsonPost.PostJsonAsync(
+            _httpClient,
+            _routes.UploadRunBundle,
+            payload,
+            cancellationToken
         );
-        using var request = new HttpRequestMessage(HttpMethod.Post, _routes.UploadRunBundle)
-        {
-            Content = new ByteArrayContent(bodyBytes),
-        };
-        request.Content.Headers.ContentType = new("application/json");
-
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        if (response.IsSuccessStatusCode)
+        if (result.IsSuccess)
             return RunBundleUploadResult.Success();
 
-        var responseBody = await response.Content.ReadAsStringAsync();
         return RunBundleUploadResult.Failure(
-            ModApiErrorFormatter.FormatHttpFailure((int)response.StatusCode, responseBody)
+            ModApiErrorFormatter.FormatHttpFailure(result.StatusCode, result.FailureBody!)
         );
     }
 }

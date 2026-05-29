@@ -1,12 +1,10 @@
 #nullable enable
 using System;
-using System.Net;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.ModApi.Http;
 using BazaarPlusPlus.ModApi.Models;
-using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.ModApi.Clients;
 
@@ -29,37 +27,28 @@ public sealed class BazaarDbScreenshotClient
         if (payload == null)
             throw new ArgumentNullException(nameof(payload));
 
-        var bodyBytes = Encoding.UTF8.GetBytes(
-            JsonConvert.SerializeObject(payload, ModApiSerialization.SerializerSettings)
+        var result = await ModApiJsonPost.PostJsonAsync(
+            _httpClient,
+            _routes.UploadBazaarDbScreenshot,
+            payload,
+            cancellationToken
         );
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            _routes.UploadBazaarDbScreenshot
-        )
-        {
-            Content = new ByteArrayContent(bodyBytes),
-        };
-        request.Content.Headers.ContentType = new("application/json");
-
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        if (response.IsSuccessStatusCode)
+        if (result.IsSuccess)
             return BazaarDbScreenshotUploadResult.Success();
 
-        var responseBody = await response.Content.ReadAsStringAsync();
         var formattedError = ModApiErrorFormatter.FormatHttpFailure(
-            (int)response.StatusCode,
-            responseBody
+            result.StatusCode,
+            result.FailureBody!
         );
-        return IsPermanentClientError(response.StatusCode)
+        return IsPermanentClientError(result.StatusCode)
             ? BazaarDbScreenshotUploadResult.PermanentFailure(formattedError)
             : BazaarDbScreenshotUploadResult.TransientFailure(formattedError);
     }
 
-    private static bool IsPermanentClientError(HttpStatusCode statusCode)
+    private static bool IsPermanentClientError(int statusCode)
     {
-        var code = (int)statusCode;
         // 4xx except 408 (Request Timeout) and 429 (Too Many Requests) — design §10.1 maps both to transient.
-        return code >= 400 && code < 500 && code != 408 && code != 429;
+        return statusCode >= 400 && statusCode < 500 && statusCode != 408 && statusCode != 429;
     }
 }
 
