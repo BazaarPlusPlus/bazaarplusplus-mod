@@ -28,9 +28,7 @@ internal sealed class RunBundleUploadService : IDisposable
         );
     }
 
-    public async Task<RunBundleUploadCycleResult> UploadPendingRunBundlesAsync(
-        CancellationToken cancellationToken
-    )
+    public async Task UploadPendingRunBundlesAsync(CancellationToken cancellationToken)
     {
         var pendingRunIds = _store.GetPendingCompletedRunIds(3);
         if (pendingRunIds.Count == 0)
@@ -39,7 +37,7 @@ internal sealed class RunBundleUploadService : IDisposable
                 "RunBundleUploadService",
                 "No completed runs are waiting for bundle upload."
             );
-            return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
+            return;
         }
 
         var playerAccountId = ResolvePlayerAccountId();
@@ -49,10 +47,9 @@ internal sealed class RunBundleUploadService : IDisposable
                 "RunBundleUploadService",
                 $"Skipping {pendingRunIds.Count} pending run bundle(s): player account id not yet available."
             );
-            return new RunBundleUploadCycleResult(uploadedCount: 0, hasMorePending: false);
+            return;
         }
 
-        var uploadedCount = 0;
         var client = new RunBundleClient(_httpClient, _routes);
         foreach (var runId in pendingRunIds)
         {
@@ -85,7 +82,6 @@ internal sealed class RunBundleUploadService : IDisposable
                     snapshot.BattleIds,
                     DateTimeOffset.UtcNow
                 );
-                uploadedCount++;
             }
             catch (OperationCanceledException)
             {
@@ -96,8 +92,6 @@ internal sealed class RunBundleUploadService : IDisposable
                 _store.MarkRunUploadFailed(runId, attemptedAtUtc, ex.Message);
             }
         }
-
-        return new RunBundleUploadCycleResult(uploadedCount, _store.HasMorePendingCompletedRuns());
     }
 
     public void Dispose()

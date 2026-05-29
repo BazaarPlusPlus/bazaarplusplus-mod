@@ -24,7 +24,7 @@ static void RegisterAssemblyResolution()
 
 static void TestRecommendationTierMapping()
 {
-    var assembly = typeof(BazaarPlusPlus.RunInfo).Assembly;
+    var assembly = Assembly.Load("BazaarPlusPlus");
     var repositoryType = assembly.GetType(
         "BazaarPlusPlus.Game.CardSetPreview.CardSetBuildDataRepository"
     )!;
@@ -260,7 +260,7 @@ static void AssertMappedTier(
 
 static Type GetRepositoryType()
 {
-    var assembly = typeof(BazaarPlusPlus.RunInfo).Assembly;
+    var assembly = Assembly.Load("BazaarPlusPlus");
     return assembly.GetType("BazaarPlusPlus.Game.CardSetPreview.CardSetBuildDataRepository")!;
 }
 

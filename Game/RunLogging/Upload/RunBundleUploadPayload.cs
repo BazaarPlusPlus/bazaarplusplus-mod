@@ -16,16 +16,3 @@ internal sealed class RunBundleUploadSnapshot
 
     public IReadOnlyList<string> BattleIds { get; set; } = new List<string>();
 }
-
-internal readonly struct RunBundleUploadCycleResult
-{
-    public RunBundleUploadCycleResult(int uploadedCount, bool hasMorePending)
-    {
-        UploadedCount = uploadedCount;
-        HasMorePending = hasMorePending;
-    }
-
-    public int UploadedCount { get; }
-
-    public bool HasMorePending { get; }
-}
