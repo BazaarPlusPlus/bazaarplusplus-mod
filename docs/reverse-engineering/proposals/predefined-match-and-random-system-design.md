@@ -1,5 +1,7 @@
 # 预定义对局、对战系统和随机系统方案
 
+> **状态：未实现的设计提案（aspirational）。** 与 [offline-local-run-design.md](offline-local-run-design.md) 是同一套离线模式提案的两半，建议一起读。代码中无对应实现（fixtures / 确定性 RNG / 本地对战引擎均未落地）。
+
 ## 设计目标
 
 用户体验目标：

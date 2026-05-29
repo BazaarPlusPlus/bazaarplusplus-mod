@@ -1,5 +1,7 @@
 # 本地运行与离线化方案
 
+> **状态：未实现的设计提案（aspirational）。** 与 [predefined-match-and-random-system-design.md](predefined-match-and-random-system-design.md) 是同一套离线模式提案的两半，建议一起读。代码中无对应实现——`LocalRunEngine` / `LocalGameSessionServer` / `FixtureManifest` 等类型仅存在于本文档。
+
 ## 目标
 
 把游戏流程改成可以本地运行、不依赖互联网，同时尽量复用现有客户端 UI、状态机和消息处理链路。目标不是克隆官方后端的账号/支付/排行榜，而是让玩家能稳定开始 run、操作选择、进入战斗、结束 run，并支持预定义对局和确定性随机。

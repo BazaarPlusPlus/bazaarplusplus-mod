@@ -38,7 +38,7 @@ CardSetPreviewRuntime
 overlay 完全解耦——旧的共享 `Game/PreviewSurface` 渲染栈已删除。它自建一个 `ScreenSpaceOverlay`
 Canvas，渲染游戏原生 `CardPreviewBase` prefab（反射自 `MonsterBoardTooltip`），并读 UI Toolkit
 预览容器的 `worldBound` 同步位置（见 `BattleBoardPreview.cs`）。曾短暂改用离屏 Camera→RenderTexture，
-因 URP 下无法渲染 uGUI 已回退到 overlay；详见 `docs/history-panel-known-issues.md` §2。
+因 URP 下无法渲染 uGUI 已回退到 overlay；详见 [history-panel.md](history-panel.md) §预览渲染 与 [ADR-0003](../adr/0003-history-panel-preview-overlay.md)。
 
 History preview 过滤 card template 时使用游戏静态数据
 `Data.GetStatic().GetCardById(Guid)`。Bazaar++ 不再定位、解析、缓存或预热本地卡牌模板

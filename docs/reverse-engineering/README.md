@@ -2,6 +2,8 @@
 
 本文档集基于当前仓库的反编译源码、已安装游戏目录和 mod 源码做静态分析。过程只读取源码/资源和新增文档，没有编译代码。
 
+> **快照口径：截至 2026-05-21 的反编译构建静态分析。** 字节大小、行数、路由表等会随游戏更新漂移；依赖具体数值前请对照 `decompiled/` 复核。下方 `network-interface-inventory.md` / `data-structure-catalog.md` / `session-command-protocol.md` / `decompile-and-data-notes.md` 是事实型 RE 参考；`proposals/` 下两篇是**尚未实现**的离线模式设计提案。
+
 ## 文档目录
 
 - [network-interface-inventory.md](network-interface-inventory.md)  
@@ -10,9 +12,9 @@
   所有主要接口 DTO、MessagePack DTO、mod DTO、AutoBazaar DTO 和本地 fixture DTO 建议。
 - [session-command-protocol.md](session-command-protocol.md)  
   `/sessions`、`/commands`、`DELETE /sessions` 的 MessagePack 协议、命令/消息 DTO、客户端状态流和失败恢复逻辑。
-- [offline-local-run-design.md](offline-local-run-design.md)  
+- [offline-local-run-design.md](proposals/offline-local-run-design.md)  
   将游戏改成本地运行、不依赖网络的完整方案，包括最小实现、推荐架构、替换点、接口实现方式和风险边界。
-- [predefined-match-and-random-system-design.md](predefined-match-and-random-system-design.md)  
+- [predefined-match-and-random-system-design.md](proposals/predefined-match-and-random-system-design.md)  
   预定义对局、共享种子、可复现随机系统、对战系统和回放/校验方案。
 - [decompile-and-data-notes.md](decompile-and-data-notes.md)  
   安装目录、`Magic` 搜索、可反编译程序集、`GameData.db.zip`、Addressables 资源和数据包结构记录。

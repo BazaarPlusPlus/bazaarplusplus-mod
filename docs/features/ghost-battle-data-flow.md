@@ -108,7 +108,7 @@ version adds them.
 
 ## 5. Local Persistence
 
-File: [`Game/HistoryPanel/HistoryPanelRepository.cs`](../../Game/HistoryPanel/HistoryPanelRepository.cs)
+File: [`Game/HistoryPanel/Storage/HistoryPanelRepository.cs`](../../Game/HistoryPanel/Storage/HistoryPanelRepository.cs)
 (`UpsertGhostBattles`, `ReplaceGhostBattles`)
 
 Ghost rows are written to the local SQLite `battles` table with
@@ -124,7 +124,7 @@ translation happens at read time.
 ## 6. Read + Projection (Storage → UI Model)
 
 Files:
-- [`Game/HistoryPanel/HistoryPanelRepository.cs`](../../Game/HistoryPanel/HistoryPanelRepository.cs)
+- [`Game/HistoryPanel/Storage/HistoryPanelRepository.cs`](../../Game/HistoryPanel/Storage/HistoryPanelRepository.cs)
   (`ListRecentGhostBattles`)
 - [`Game/HistoryPanel/Ghost/GhostBattleLocalProjector.cs`](../../Game/HistoryPanel/Ghost/GhostBattleLocalProjector.cs)
 
@@ -150,7 +150,7 @@ downstream rendering and filtering code does not special-case ghost rows.
 
 ## 7. Rendering (UI Model → Screen)
 
-File: [`Game/HistoryPanel/HistoryPanelUiToolkitView.cs`](../../Game/HistoryPanel/HistoryPanelUiToolkitView.cs)
+File: [`Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs`](../../Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs)
 
 The history panel binds the projected record directly:
 
@@ -169,7 +169,7 @@ Files:
 - [`Game/HistoryPanel/HistoryPanelReplayService.cs`](../../Game/HistoryPanel/HistoryPanelReplayService.cs)
   (`ReplayGhostBattleAsync`)
 - [`Game/HistoryPanel/Ghost/GhostBattlePayloadStore.cs`](../../Game/HistoryPanel/Ghost/GhostBattlePayloadStore.cs)
-- [`Game/HistoryPanel/Ghost/GhostBattleApiClient.cs`](../../Game/HistoryPanel/Ghost/GhostBattleApiClient.cs)
+- [`Game/HistoryPanel/Ghost/GhostBattleSyncService.cs`](../../Game/HistoryPanel/Ghost/GhostBattleSyncService.cs)
   (`DownloadReplayPayloadAsync` / `BuildBattleManifest`)
 
 When the user presses Replay:
