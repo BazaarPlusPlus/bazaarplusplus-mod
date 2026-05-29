@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Encounter.Pedestal;
 using BazaarGameShared.Domain.Cards.Encounter.Pedestal.Behaviors;
+using BazaarPlusPlus.Core.GameState;
 
 namespace BazaarPlusPlus.Game.Encounter;
 

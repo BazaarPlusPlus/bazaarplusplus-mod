@@ -3,6 +3,7 @@ using BazaarGameShared.Domain.Cards.Encounter.Combat;
 using BazaarGameShared.Domain.Cards.Encounter.Pedestal;
 using BazaarGameShared.Domain.Cards.Encounter.Pedestal.Behaviors;
 using BazaarPlusPlus.Game.Encounter;
+using BazaarPlusPlus.Core.GameState;
 
 var upgradeGuid = Guid.NewGuid();
 var enchantGuid = Guid.NewGuid();

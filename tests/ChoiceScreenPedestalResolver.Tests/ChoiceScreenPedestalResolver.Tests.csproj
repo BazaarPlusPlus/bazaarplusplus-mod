@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <Compile
-      Include="..\..\Game\Encounter\ChoiceScreenPedestalKind.cs"
+      Include="..\..\Core\GameState\ChoiceScreenPedestalKind.cs"
       Link="ChoiceScreenPedestalKind.cs"
     />
     <Compile

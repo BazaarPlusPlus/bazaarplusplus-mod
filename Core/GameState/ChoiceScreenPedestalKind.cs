@@ -1,4 +1,4 @@
-namespace BazaarPlusPlus.Game.Encounter;
+namespace BazaarPlusPlus.Core.GameState;
 
 internal enum ChoiceScreenPedestalKind
 {
