@@ -2,11 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Socket;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect.AuraActions;
+using BazaarPlusPlus.Game.HistoryPanel.Preview;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
@@ -352,19 +352,9 @@ internal static class HistoryBattlePreviewProjection
 
     private static object? GetTemplate(object? staticData, Guid templateId)
     {
-        if (staticData == null)
-            return null;
-
-        var method = staticData
-            .GetType()
-            .GetMethod(
-                "GetCardById",
-                BindingFlags.Public | BindingFlags.Instance,
-                null,
-                new[] { typeof(Guid) },
-                null
-            );
-        return method?.Invoke(staticData, new object[] { templateId });
+        // Delegate to the cached GetCardById(Guid) reflection lookup shared with the preview
+        // renderer so the MethodInfo is resolved once per static-data type rather than per call.
+        return HistoryPanelPreviewTemplateLookup.GetCardTemplate(staticData, templateId);
     }
 
     private static ETier ParseTier(string? value)

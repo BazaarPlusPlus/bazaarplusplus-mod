@@ -8,7 +8,19 @@ namespace BazaarPlusPlus.Game.HistoryPanel.Ghost;
 internal sealed class GhostBattlePayloadStore
 {
     private const string FileSuffix = ".ghost.mpack.gz";
+    private const string DirectoryName = "GhostBattlePayloads";
     private readonly string _rootPath;
+
+    // Resolves the ghost-payload directory as a sibling of the combat replay directory, falling
+    // back to a child directory when the replay path has no parent. Single source of truth for
+    // every call site that needs to construct a GhostBattlePayloadStore from the replay root.
+    public static string ResolveDirectory(string replayDirectoryPath)
+    {
+        var parentDirectory = Path.GetDirectoryName(replayDirectoryPath);
+        return string.IsNullOrWhiteSpace(parentDirectory)
+            ? Path.Combine(replayDirectoryPath, DirectoryName)
+            : Path.Combine(parentDirectory, DirectoryName);
+    }
 
     public GhostBattlePayloadStore(string rootPath)
     {

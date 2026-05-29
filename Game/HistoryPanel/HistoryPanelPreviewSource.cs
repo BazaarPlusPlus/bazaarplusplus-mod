@@ -1,6 +1,5 @@
 #nullable enable
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
@@ -12,8 +11,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 // plus an optional disk lookup for ghost payloads that the repository does not load eagerly.
 internal sealed class HistoryPanelPreviewSource
 {
-    private const string GhostPayloadDirectoryName = "GhostBattlePayloads";
-
     private readonly IHistoryPanelRuntime _runtime;
 
     public HistoryPanelPreviewSource(IHistoryPanelRuntime runtime)
@@ -67,7 +64,7 @@ internal sealed class HistoryPanelPreviewSource
             return HistoryBattlePreviewProjection.BuildEmpty(signature);
 
         var ghostPayloadStore = new GhostBattlePayloadStore(
-            BuildGhostPayloadDirectoryPath(replayDirectoryPath)
+            GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
         );
         var ghostPayload = ghostPayloadStore.Load(battle.BattleId);
         var snapshots = ghostPayload?.BattleManifest?.Snapshots;
@@ -89,13 +86,5 @@ internal sealed class HistoryPanelPreviewSource
             .ThenByDescending(battle => battle.Hour ?? int.MinValue)
             .ThenByDescending(battle => battle.RecordedAtUtc)
             .FirstOrDefault();
-    }
-
-    private static string BuildGhostPayloadDirectoryPath(string replayDirectoryPath)
-    {
-        var parentDirectory = Path.GetDirectoryName(replayDirectoryPath);
-        return string.IsNullOrWhiteSpace(parentDirectory)
-            ? Path.Combine(replayDirectoryPath, GhostPayloadDirectoryName)
-            : Path.Combine(parentDirectory, GhostPayloadDirectoryName);
     }
 }

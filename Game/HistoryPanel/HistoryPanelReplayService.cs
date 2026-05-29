@@ -143,7 +143,7 @@ internal sealed class HistoryPanelReplayService
         }
 
         var ghostPayloadStore = new GhostBattlePayloadStore(
-            BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
+            GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
         );
         var ghostPayload = ghostPayloadStore.Load(battle.BattleId);
         var manifest = ghostPayload?.BattleManifest;
@@ -186,7 +186,7 @@ internal sealed class HistoryPanelReplayService
 
         var payloadStore = new CombatReplayPayloadStore(replayDirectoryPath);
         var ghostPayloadStore = new GhostBattlePayloadStore(
-            BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
+            GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
         );
         foreach (var battleId in battleIds)
         {
@@ -203,14 +203,6 @@ internal sealed class HistoryPanelReplayService
                 );
             }
         }
-    }
-
-    private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)
-    {
-        var parentDirectory = System.IO.Path.GetDirectoryName(replayDirectoryPath);
-        return string.IsNullOrWhiteSpace(parentDirectory)
-            ? System.IO.Path.Combine(replayDirectoryPath, "GhostBattlePayloads")
-            : System.IO.Path.Combine(parentDirectory, "GhostBattlePayloads");
     }
 }
 

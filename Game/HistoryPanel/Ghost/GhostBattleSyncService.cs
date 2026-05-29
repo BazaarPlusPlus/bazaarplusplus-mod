@@ -100,7 +100,7 @@ internal sealed class GhostBattleSyncService
         }
 
         var payloadStore = new GhostBattlePayloadStore(
-            BuildGhostBattlePayloadDirectoryPath(replayDirectoryPath)
+            GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
         );
         payloadStore.Save(payload);
         _repository.MarkGhostReplayDownloaded(battleId);
@@ -122,14 +122,6 @@ internal sealed class GhostBattleSyncService
     private static bool ShouldAdvanceCheckpoint(int importedCount, int limit)
     {
         return importedCount < limit;
-    }
-
-    private static string BuildGhostBattlePayloadDirectoryPath(string replayDirectoryPath)
-    {
-        var parentDirectory = System.IO.Path.GetDirectoryName(replayDirectoryPath);
-        return string.IsNullOrWhiteSpace(parentDirectory)
-            ? System.IO.Path.Combine(replayDirectoryPath, "GhostBattlePayloads")
-            : System.IO.Path.Combine(parentDirectory, "GhostBattlePayloads");
     }
 
     private static bool IsValidGhostBattlePayload(GhostBattlePayload? payload)
