@@ -31,7 +31,7 @@ internal static class TempDirPathProviderTests
                 paths.CombatReplayVideoDirectoryPath == null,
                 "CombatReplayVideoDirectoryPath should be null."
             );
-            Assert(paths.ToolsDirectoryPath == null, "ToolsDirectoryPath should be null.");
+            Assert(paths.PluginsDirectoryPath == null, "PluginsDirectoryPath should be null.");
 
             // RunLogStore is constructable from IPathProvider alone.
             var store = new RunLogStore(paths);
@@ -148,5 +148,5 @@ sealed class TempDirPathProvider : IPathProvider
     public string? CombatReplayDirectoryPath => null;
     public string? ScreenshotsDirectoryPath => null;
     public string? CombatReplayVideoDirectoryPath => null;
-    public string? ToolsDirectoryPath => null;
+    public string? PluginsDirectoryPath => null;
 }

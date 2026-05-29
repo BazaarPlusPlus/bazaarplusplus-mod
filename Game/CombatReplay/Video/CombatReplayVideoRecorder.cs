@@ -107,8 +107,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             return;
         }
 
-        var toolsDirectoryPath = services.Paths.ToolsDirectoryPath;
-        var ffmpegExecutable = FfmpegLocator.Resolve(toolsDirectoryPath);
+        var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
+        var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
         if (string.IsNullOrEmpty(ffmpegExecutable))
             return;
 

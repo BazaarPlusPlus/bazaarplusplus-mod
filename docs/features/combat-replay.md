@@ -46,10 +46,10 @@ PVP combat 的本地录制与回放，外加可选的 MP4 视频录制。录制 
 saved replay 播放期间把 Unity Game View 抓帧编码为 MP4，落到 `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<yyyy-MM-dd>/<battle_id>.<yyyyMMdd-HHmmss>.mp4`，供离线复盘 / 社区分享。Local 与 ghost replay 一视同仁。
 
 - **默认关闭**，由 `CombatReplayVideo / Enabled` 控制；关闭时录制器不订阅、零开销。
-- **FFmpeg 两级检测，只检测不下载**：`<GameRoot>/BazaarPlusPlusV4/tools/ffmpeg/ffmpeg(.exe)` → 系统 `PATH`。检测方式是起 `ffmpeg -version`（2s 超时，`ExitCode==0`），结果缓存到 session；都未命中则功能静默禁用并打一行 Info log，不影响 replay 本身。
+- **FFmpeg 两级检测，只检测不下载（随 mod 分发）**：`<GameRoot>/BepInEx/plugins/ffmpeg(.exe)`（与 mod 同目录的 bundled 二进制）→ 系统 `PATH`。FFmpeg 随 mod 一起分发，无需单独下载或安装。检测方式是起 `ffmpeg -version`（2s 超时，`ExitCode==0`），结果缓存到 session；都未命中则功能静默禁用并打一行 Info log，不影响 replay 本身。
 - **抓帧 / 编码**：`ScreenCapture.CaptureScreenshotIntoRenderTexture` + `AsyncGPUReadback`（main thread 只 enqueue 到 bounded queue）→ FFmpeg subprocess（rawvideo stdin → libx264 / openh264 → MP4）。`SystemInfo.supportsAsyncGPUReadback` 为 false 时禁用。
 - **元数据**：SQLite `combat_replay_videos`（列定义见 schema 参考）。
-- **职责切分**：mod runtime 只做检测 + 抓帧 + 调 ffmpeg，绝不下载、绝不写 `tools/ffmpeg/`；可选的 FFmpeg 部署由 `bazaarplusplus-installer` 负责（minimal LGPL build + OpenH264，避开 GPL 传染），保证 mod release artifact 不变大、无许可证分发风险。
+- **二进制分发**：FFmpeg 现在作为逐平台的兄弟二进制随 mod payload 一起分发（与 SQLite native lib 同构），落在 `BepInEx/plugins/` 下、运行时由 mod 相对自身定位；本项目是公开 GPL 源码项目，接受 GPL，无许可证顾虑。
 
 ### Config（`CombatReplayVideo` 段，权威见 `Core/Config/BppConfig.cs`）
 
@@ -66,7 +66,7 @@ saved replay 播放期间把 Unity Game View 抓帧编码为 MP4，落到 `<Game
 
 ### 当前状态
 
-Phase 1–3 已落地：录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / speed 恢复 / overlay 抑制）、SQLite `combat_replay_videos` 元数据。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项、installer 侧 FFmpeg 自动部署、音频（原 Phase 4）。SFX 修复历史归档在 [docs/design/archive/2026-05-23-combat-replay-sfx-impl.md](../design/archive/2026-05-23-combat-replay-sfx-impl.md)。
+Phase 1–3 已落地：录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / speed 恢复 / overlay 抑制）、SQLite `combat_replay_videos` 元数据。FFmpeg 已随 mod 分发（见上文"二进制分发"），无需 installer 单独部署。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项、音频（原 Phase 4）。SFX 修复历史归档在 [docs/design/archive/2026-05-23-combat-replay-sfx-impl.md](../design/archive/2026-05-23-combat-replay-sfx-impl.md)。
 
 ## 关键文件
 

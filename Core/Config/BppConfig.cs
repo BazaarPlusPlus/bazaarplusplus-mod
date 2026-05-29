@@ -142,7 +142,7 @@ internal sealed class BppConfig : IBppConfig
             "CombatReplayVideo",
             "Enabled",
             false,
-            "Master switch for recording saved combat replays as MP4 videos. Requires FFmpeg in <GameRoot>/BazaarPlusPlusV4/tools/ffmpeg/ or on PATH. Silently disabled if FFmpeg is missing."
+            "Master switch for recording saved combat replays as MP4 videos. FFmpeg now ships with the mod (in BepInEx/plugins) and falls back to PATH. Silently disabled if FFmpeg is missing."
         );
         CombatReplayVideoFps = config.Bind(
             "CombatReplayVideo",

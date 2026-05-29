@@ -53,6 +53,14 @@
     <MacSqliteRuntimeRid>osx-x64</MacSqliteRuntimeRid>
     <FixedMacSqliteNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/libe_sqlite3.dylib</FixedMacSqliteNativeFile>
     <FixedWindowsSqliteNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/e_sqlite3.dll</FixedWindowsSqliteNativeFile>
+    <!-- FFmpeg binary source (repackaged zips: a single ffmpeg(.exe) at the zip root) -->
+    <WindowsFfmpegZip>$(BPPInstallerSourcePath)/FfmpegSource/windows/ffmpeg.zip</WindowsFfmpegZip>
+    <MacFfmpegZip>$(BPPInstallerSourcePath)/FfmpegSource/macos/ffmpeg.zip</MacFfmpegZip>
+    <WindowsFfmpegLicense>$(BPPInstallerSourcePath)/FfmpegSource/windows/LICENSE.txt</WindowsFfmpegLicense>
+    <MacFfmpegLicense>$(BPPInstallerSourcePath)/FfmpegSource/macos/LICENSE.txt</MacFfmpegLicense>
+    <!-- Host platform's FFmpeg zip, used by the Debug copy-to-game step -->
+    <HostFfmpegZip Condition="$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))">$(WindowsFfmpegZip)</HostFfmpegZip>
+    <HostFfmpegZip Condition="'$(HostFfmpegZip)' == ''">$(MacFfmpegZip)</HostFfmpegZip>
   </PropertyGroup>
   <!-- Candidate install paths for common Steam locations -->
   <PropertyGroup>
@@ -217,6 +225,13 @@
       SkipUnchangedFiles="true"
       Condition="'@(WindowsSqliteNativeFile)' != ''"
     />
+    <!-- Unzip the host platform's bundled FFmpeg next to the mod for local recording tests -->
+    <Unzip
+      SourceFiles="$(HostFfmpegZip)"
+      DestinationFolder="$(GamePath)\BepInEx\plugins"
+      OverwriteReadOnlyFiles="true"
+      Condition="Exists('$(HostFfmpegZip)')"
+    />
     <WriteLinesToFile
       File="$(GamePath)\BepInEx\plugins\$(TargetName).version"
       Lines="$(Version).t$([System.DateTime]::Now.ToString('yyyyMMdd.HHmmss')).dev"
@@ -280,6 +295,29 @@
       DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
       SkipUnchangedFiles="true"
       Condition="'@(PluginManagedRuntimeFiles)' != ''"
+    />
+    <!-- Unzip the per-platform bundled FFmpeg into each payload tree's plugins dir -->
+    <Unzip
+      SourceFiles="$(MacFfmpegZip)"
+      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins"
+      OverwriteReadOnlyFiles="true"
+      Condition="Exists('$(MacFfmpegZip)')"
+    />
+    <Unzip
+      SourceFiles="$(WindowsFfmpegZip)"
+      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
+      OverwriteReadOnlyFiles="true"
+      Condition="Exists('$(WindowsFfmpegZip)')"
+    />
+    <Copy
+      SourceFiles="$(MacFfmpegLicense)"
+      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/ffmpeg-LICENSE.txt"
+      Condition="Exists('$(MacFfmpegLicense)')"
+    />
+    <Copy
+      SourceFiles="$(WindowsFfmpegLicense)"
+      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/ffmpeg-LICENSE.txt"
+      Condition="Exists('$(WindowsFfmpegLicense)')"
     />
     <ZipDirectory
       SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos"

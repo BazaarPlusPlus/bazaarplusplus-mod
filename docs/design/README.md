@@ -15,7 +15,7 @@ Dated, point-in-time design documents (`YYYY-MM-DD-<slug>.md`). A spec captures 
 
 Work designed but not yet (fully) landed; lives at this top level until implemented, then moves to `archive/` with a status banner.
 
-- [`2026-05-30-ffmpeg-relocation-to-mod-design.md`](2026-05-30-ffmpeg-relocation-to-mod-design.md) — FFmpeg 改为随 mod 分发的兄弟二进制（mod 侧定位逻辑已落地；installer 侧删除与文档同步待办）。
+- [`2026-05-30-ffmpeg-relocation-to-mod-design.md`](2026-05-30-ffmpeg-relocation-to-mod-design.md) — FFmpeg 改为随 mod 分发的兄弟二进制（已实现并验证，待提交；合并后移入 `archive/` 并加 `Status:` banner）。
 - [`2026-05-30-combat-replay-record-button-design.md`](2026-05-30-combat-replay-record-button-design.md) — Combat Replay 视频录制从全局开关自动录每场改为 HistoryPanel 按钮单次触发。
 
 ## Archived specs
