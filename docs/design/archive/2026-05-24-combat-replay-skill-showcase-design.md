@@ -10,7 +10,7 @@
 
 ### 1.1 Combat Replay videos today
 
-The mod can record saved combat replays as MP4 files. See [docs/combat-replay-video-recording.md](../../combat-replay-video-recording.md). Pipeline:
+The mod can record saved combat replays as MP4 files. See [docs/combat-replay-video-recording.md](../../features/combat-replay.md). Pipeline:
 
 - [CombatReplayVideoRecorder](../../../Game/CombatReplay/Video/CombatReplayVideoRecorder.cs) subscribes to `CombatReplayPlaybackStarting` / `Ended`.
 - [ReplayVideoCaptureSession](../../../Game/CombatReplay/Video/ReplayVideoCaptureSession.cs) drives frame capture via `AsyncGPUReadback`.
@@ -325,7 +325,7 @@ Result pill (`outcome`) is not a standalone card in v1 — it surfaces only on t
 
 The renderer reads `video_width`, `video_height`, `video_fps` from the sidecar and renders intro/outro at exactly those values. Concat with the raw MP4 then uses stream copy.
 
-If the recorded MP4's actual encoding parameters drifted from the sidecar's recorded values (e.g., the recorder downscaled mid-session for some reason — currently it cannot, but defensive), the Installer falls back to `ffmpeg concat filter` with re-encode using libx264 CRF 23 preset veryfast (matching the recorder's defaults from [combat-replay-video-recording.md](../../combat-replay-video-recording.md) §3.6).
+If the recorded MP4's actual encoding parameters drifted from the sidecar's recorded values (e.g., the recorder downscaled mid-session for some reason — currently it cannot, but defensive), the Installer falls back to `ffmpeg concat filter` with re-encode using libx264 CRF 23 preset veryfast (matching the recorder's defaults from [combat-replay-video-recording.md](../../features/combat-replay.md) §3.6).
 
 ## 8. File structure summary
 

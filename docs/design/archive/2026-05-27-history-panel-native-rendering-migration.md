@@ -208,7 +208,7 @@ Dispose() => Destroy 所有 card + RT + Camera + root;  // 仅 scene change / pa
 | **S5** | 重写 `HistoryPanelPreviewRenderer`, Task-await 主流程 |
 | **S6** | 新测试替代 `tests/PreviewSurfaceHost.Tests/`: <br>- generation 取消 <br>- signature 不缓存失败帧 <br>- 池上限淘汰 <br>- prefab-refs-unavailable 路径 |
 | **S7** | 删 `PreviewSurface/` + `MonsterPreview/Architecture/*` + `PreviewBoardSurfaceMarker.cs` + `Patches/Showcase/PreviewBoardSurfacePatches.cs` + `tests/PreviewSurfaceHost.Tests/` + csproj 引用清理 |
-| **S8** | 顺手解掉 [history-panel-known-issues.md](../../history-panel-known-issues.md) 的宽屏问题: RT 跟 UI Toolkit `GeometryChangedEvent` 重建, socket 布局 anchor 跟随容器缩放 |
+| **S8** | 顺手解掉 [history-panel-known-issues.md](../../features/history-panel.md) 的宽屏问题: RT 跟 UI Toolkit `GeometryChangedEvent` 重建, socket 布局 anchor 跟随容器缩放 |
 
 ## 删除清单
 

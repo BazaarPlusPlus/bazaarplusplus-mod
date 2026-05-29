@@ -93,7 +93,7 @@ HistoryPanel 整个 UI Toolkit 层都是这个调调。
 
 - **HistoryPanel native rendering migration 刚落地**（[../specs/2026-05-27-history-panel-native-rendering-migration.md](2026-05-27-history-panel-native-rendering-migration.md)），
   之前的卡牌渲染分歧解决了，下一层视觉债务自然轮到字体与样式
-- **宽屏问题 [history-panel-known-issues.md #1](../../history-panel-known-issues.md) 的第 4 项**
+- **宽屏问题 [history-panel-known-issues.md #1](../../features/history-panel.md) 的第 4 项**
   （行内组件像素硬编码，[Style.cs:74](../../../Game/HistoryPanel/HistoryPanelUiToolkitView.Style.cs#L74)）
   本质上是 token 表覆盖范围 —— 不在 token 化基础上谈宽屏适配，宽屏 spec 会被迫先做一次 token 抽离
 - **CJK 豆腐是当前生产 bug**，不是预防性修复
@@ -160,7 +160,7 @@ HistoryPanel 整个 UI Toolkit 层都是这个调调。
    `Sizes.ButtonStandardHeight`, `Sizes.DayBubbleSize` 等
 2. HistoryPanel 全部 chip / pill / button / bubble 的 `minWidth` / `maxWidth` /
    `width` / `height` 由 token 解析
-3. [history-panel-known-issues.md](../../history-panel-known-issues.md)
+3. [history-panel-known-issues.md](../../features/history-panel.md)
    §1 的第 4 项（"行内组件像素硬编码"）可以在本工作落地后从 known-issues
    降级或勾除（**注意**：known-issues #1 的 1/2/3 项 —— 根容器写死像素、
    `screenMatchMode` 未设置、preview RT 比例 —— 不在本 spec 解决，是宽屏
@@ -363,7 +363,7 @@ HistoryPanel `Bold` 用得不多（标题 + chip 数字 + 部分按钮文字）�
 ## 后续 spec 列表（不在本 doc 范围）
 
 - 字体 + Token 的 implementation spec（基于本 doc 的 Goal + open questions）
-- 宽屏 / 超宽屏适配 spec（[history-panel-known-issues.md](../../history-panel-known-issues.md)
+- 宽屏 / 超宽屏适配 spec（[history-panel-known-issues.md](../../features/history-panel.md)
   §1 的 1/2/3 项 + preview RT 比例自适应）
 - 英雄 badge 改用游戏立绘 sprite（前一份 native rendering migration spec
   列出的 future work）

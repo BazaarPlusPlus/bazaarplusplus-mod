@@ -10,7 +10,7 @@
 
 ### 1.1 Today: auto-record everything
 
-When `CombatReplayVideo.Enabled = true`, [CombatReplayVideoRecorder](../../../Game/CombatReplay/Video/CombatReplayVideoRecorder.cs) subscribes to `CombatReplayPlaybackStarting` and **starts recording every replay the player opens, with no further opt-in**. See [docs/combat-replay-video-recording.md](../../combat-replay-video-recording.md) for the full pipeline.
+When `CombatReplayVideo.Enabled = true`, [CombatReplayVideoRecorder](../../../Game/CombatReplay/Video/CombatReplayVideoRecorder.cs) subscribes to `CombatReplayPlaybackStarting` and **starts recording every replay the player opens, with no further opt-in**. See [docs/combat-replay-video-recording.md](../../features/combat-replay.md) for the full pipeline.
 
 ### 1.2 The problem
 
