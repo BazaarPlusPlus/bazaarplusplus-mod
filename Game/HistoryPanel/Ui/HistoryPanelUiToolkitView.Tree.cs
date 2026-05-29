@@ -10,28 +10,18 @@ internal sealed partial class HistoryPanelUiToolkitView
 {
     private void BuildTree(VisualElement root)
     {
-        var overlay = new VisualElement();
-        overlay.style.position = Position.Absolute;
-        overlay.style.left = 0f;
-        overlay.style.right = 0f;
-        overlay.style.top = 0f;
-        overlay.style.bottom = 0f;
-        overlay.style.backgroundColor = Colors.HistoryOverlay;
-        overlay.style.justifyContent = Justify.Center;
-        overlay.style.alignItems = Align.Center;
-        root.Add(overlay);
-
+        // Edge-to-edge full-screen panel: fills the root (which is absolute inset:0) via
+        // flex-grow (height) + the default align-items:stretch (width). No dimming overlay and
+        // square corners since the opaque panel is the only layer covering the game behind it.
         var panel = new VisualElement();
-        panel.style.width = Sizes.HistoryPanelWidth;
-        panel.style.height = Sizes.HistoryPanelHeight;
+        panel.style.flexGrow = 1f;
         panel.style.backgroundColor = Colors.HistoryPanelBackground;
-        UiStyle.Radius(panel.style, Radii.Panel);
         panel.style.paddingLeft = UiSpacing.PanelPadding;
         panel.style.paddingRight = UiSpacing.PanelPadding;
         panel.style.paddingTop = UiSpacing.PanelPadding;
         panel.style.paddingBottom = UiSpacing.Xxl;
         panel.style.flexDirection = FlexDirection.Column;
-        overlay.Add(panel);
+        root.Add(panel);
 
         BuildHeader(panel);
         BuildContent(panel);
@@ -110,11 +100,9 @@ internal sealed partial class HistoryPanelUiToolkitView
     private void BuildContent(VisualElement parent)
     {
         var content = new VisualElement();
-        content.style.height = Sizes.HistoryContentHeight;
-        content.style.flexGrow = 0f;
-        content.style.flexShrink = 0f;
-        content.style.minHeight = Sizes.HistoryContentHeight;
-        content.style.maxHeight = Sizes.HistoryContentHeight;
+        content.style.flexGrow = 1f;
+        content.style.flexShrink = 1f;
+        content.style.minHeight = 0f;
         content.style.flexDirection = FlexDirection.Column;
         content.style.marginTop = UiSpacing.Xxxl;
         parent.Add(content);
@@ -126,12 +114,11 @@ internal sealed partial class HistoryPanelUiToolkitView
         columns.style.flexDirection = FlexDirection.Row;
         content.Add(columns);
 
-        _runsSection = CreateSectionPanel(Sizes.RunsColumnWidth);
+        _runsSection = CreateSectionPanel(null);
+        _runsSection.style.width = Length.Percent(Sizes.RunsColumnWidthPercent);
         _runsSection.style.flexGrow = 0f;
         _runsSection.style.flexShrink = 0f;
         _runsSection.style.minHeight = 0f;
-        _runsSection.style.minWidth = Sizes.RunsColumnWidth;
-        _runsSection.style.maxWidth = Sizes.RunsColumnWidth;
         columns.Add(_runsSection);
         _runsSection.Add(CreateSectionTitle(HistoryPanelText.RunsTab()));
         _runsList = CreateRunList();
@@ -210,10 +197,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         content.Add(_ghostOpponentEliminatedNotice);
 
         _previewContainer = new VisualElement();
-        _previewContainer.style.height = Sizes.PreviewHeight;
+        _previewContainer.style.height = Length.Percent(Sizes.PreviewHeightPercent);
         _previewContainer.style.flexShrink = 0f;
-        _previewContainer.style.minHeight = Sizes.PreviewHeight;
-        _previewContainer.style.maxHeight = Sizes.PreviewHeight;
+        _previewContainer.style.minHeight = 0f;
         _previewContainer.style.backgroundColor = Colors.HistoryPreviewBackground;
         UiStyle.Radius(_previewContainer.style, Radii.Md);
         _previewContainer.style.position = Position.Relative;

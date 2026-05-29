@@ -42,7 +42,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 - 完全走游戏原生怪物预览，Bazaar++ 不再 patch 或 augment 原生 tooltip
 - `CardSetPreviewRuntime` 会复用原生 `MonsterBoardTooltip` 作为宿主展示 Bazaar++ 组织的 CardSet board 内容
-- HistoryPanel 预览使用共享 `Game/PreviewSurface` 渲染栈
+- HistoryPanel 预览是独立栈（`Game/HistoryPanel/Preview/`），与怪物预览解耦
 - 附魔/升级预览注入由独立的 patch 提供（见后续小节 / `Patches/Tooltips/`），不属于 monster preview 路径
 
 详见 `docs/monster-preview-design.md`。

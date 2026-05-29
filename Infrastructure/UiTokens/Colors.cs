@@ -8,8 +8,7 @@ internal static class Colors
     public static Color White => Color.white;
     public static Color Clear => Color.clear;
 
-    public static Color HistoryOverlay => Rgba(0.02f, 0.03f, 0.05f, 0.82f);
-    public static Color HistoryPanelBackground => Rgba(0.08f, 0.10f, 0.13f, 0.985f);
+    public static Color HistoryPanelBackground => Rgba(0.08f, 0.10f, 0.13f, 1f);
     public static Color HistorySectionBackground => Rgba(0.11f, 0.13f, 0.18f, 0.98f);
     public static Color HistoryListFrameBackground => Rgba(0.09f, 0.11f, 0.15f, 0.96f);
     public static Color HistoryListFrameBorder => Rgba(0.24f, 0.29f, 0.38f, 0.55f);

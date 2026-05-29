@@ -92,6 +92,10 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _panelSettings.sortingOrder = 26;
         _panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
         _panelSettings.referenceResolution = new Vector2Int(1920, 1080);
+        // Match by height (match=1): UI tokens scale with screen height so vertical density
+        // stays constant and ultrawide screens no longer overflow vertically. The panel fills
+        // the screen edge-to-edge regardless; match only governs how the px tokens scale.
+        _panelSettings.match = 1f;
         _panelSettings.clearColor = false;
         _panelSettings.targetDisplay = 0;
 

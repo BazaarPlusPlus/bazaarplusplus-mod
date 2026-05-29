@@ -16,14 +16,6 @@
   预定义对局、共享种子、可复现随机系统、对战系统和回放/校验方案。
 - [decompile-and-data-notes.md](decompile-and-data-notes.md)  
   安装目录、`Magic` 搜索、可反编译程序集、`GameData.db.zip`、Addressables 资源和数据包结构记录。
-- [review-audit-2026-05-27.md](review-audit-2026-05-27.md)  
-  二轮审查记录：反查 reverse docs、源码网络面和现有 `docs/` 设计文档后的结论、修正和保留风险。
-- [design-docs-crosscheck-2026-05-27.md](design-docs-crosscheck-2026-05-27.md)  
-  二轮交叉审计：反查所有设计文档，标出 V3 残留、final-battle 字段冲突和当前可验证接口口径。
-- [third-pass-review-2026-05-27.md](third-pass-review-2026-05-27.md)  
-  第三轮自动复核：重新抽取源码和设计文档中的接口/URL/随机关键词，确认没有新的活跃接口或方案级冲突。
-- [fourth-pass-root-migration-review-2026-05-27.md](fourth-pass-root-migration-review-2026-05-27.md)  
-  第四轮复核与根目录迁移记录：确认文档迁出 `decompiled/` 后的最新结论和 Git 跟踪范围。
 
 ## 结论摘要
 

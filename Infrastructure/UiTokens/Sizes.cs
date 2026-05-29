@@ -4,11 +4,8 @@ namespace BazaarPlusPlus.Infrastructure.UiTokens;
 
 internal static class Sizes
 {
-    public const float HistoryPanelWidth = 1280f;
-    public const float HistoryPanelHeight = 1020f;
-    public const float HistoryContentHeight = 792f;
-    public const float RunsColumnWidth = 500f;
-    public const float PreviewHeight = 284f;
+    public const float RunsColumnWidthPercent = 30f;
+    public const float PreviewHeightPercent = 28f;
     public const float FooterHeight = 56f;
     public const float SectionTitleHeight = 32f;
     public const float ChipMinWidth = 86f;

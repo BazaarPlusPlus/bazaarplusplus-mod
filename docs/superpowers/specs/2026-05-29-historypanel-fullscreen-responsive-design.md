@@ -1,5 +1,9 @@
 # History Panel 全屏化 + 相对布局
 
+> ✅ **已实现（2026-05-29）。** 落地与本文有两处偏差：(1) `match` 采用 `1f`（纯按高），(2) 应用户决定，
+> F9 调参器与预览调试色块**已删除**（本文「非目标」原写保留）。当前状态见
+> [history-panel-known-issues.md](../../history-panel-known-issues.md) §1。
+
 > 设计文档。把 HistoryPanel 从「屏幕居中的固定 1280×1020 小方块」改成「边到边全屏、按相对比例
 > 自适应」的面板，使其在 16:9 / 21:9 超宽 / 4K（以及窗口拖动改尺寸）下行为一致：永不溢出、
 > 竖向密度恒定、预览棋盘正确对位。这是一次**响应式布局改造**，不改视觉风格、不动预览渲染管线。
@@ -20,9 +24,9 @@
 - **不处理「大屏内容空旷」**：用户已确认接受边到边拉伸带来的留白。
 - **不动预览渲染管线**：战斗板预览维持当前的独立 `ScreenSpaceOverlay` Canvas 方案
   （[BattleBoardPreview.cs](../../../Game/HistoryPanel/Preview/BattleBoardPreview.cs)）。
-  注：曾有一版「预览改回 RenderTexture 贴进 UI Toolkit」的设计
-  （[2026-05-29-history-preview-rendertexture-design.md](2026-05-29-history-preview-rendertexture-design.md)），
-  因 URP 下离屏 Camera→RT 无法渲染 uGUI 而废弃、已回退到 overlay 方案。本次在 overlay 方案之上做布局适配。
+  注：曾有一版「预览改回 RenderTexture 贴进 UI Toolkit」的设计，因 URP 下离屏 Camera→RT 无法渲染
+  uGUI 而废弃、已回退到 overlay 方案（决策记录见
+  [history-panel-known-issues.md](../../history-panel-known-issues.md) §2）。本次在 overlay 方案之上做布局适配。
 - **不删除临时 F9 调参器 / 调试色块**（[HistoryPanel.PreviewTunerDebug.cs](../../../Game/HistoryPanel/HistoryPanel.PreviewTunerDebug.cs)），
   仅同步它依赖的缩放口径。
 

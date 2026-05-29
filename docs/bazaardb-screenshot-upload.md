@@ -126,4 +126,4 @@ Migration: V4 已经把所有 schema 合进 `bazaarplusplus-server/migrations/00
 - 若 R2 写入成功但 D1 upsert 失败：服务端在 catch 分支尽力 `BAZAARDB_BUCKET.delete(r2_key)`（best-effort，记 `r2_cleanup_failed` warning）后返回 500；模组下次 tick 会重试。
 - BazaarDB 端 cron 时间表与他们自己的拉取语义不在本仓库的范围内；只要保证 `BAZAARDB_PULL_TOKEN` 一致即可对接。
 - 已废弃的 `bazaarplusplus-installer` BazaarDB 上传链路已被完整删除（包括 OS keyring 凭证条目）；旧用户机器上的 keyring 残留条目处于 inert 状态，不再被任何代码消费。
-- 设计与实现细节见 `docs/superpowers/specs/2026-05-24-bazaardb-upload-in-mod-design.md` 和 `docs/superpowers/plans/2026-05-24-bazaardb-upload-in-mod.md`。
+- 设计与实现细节见 `docs/superpowers/specs/2026-05-24-bazaardb-upload-in-mod-design.md`。
