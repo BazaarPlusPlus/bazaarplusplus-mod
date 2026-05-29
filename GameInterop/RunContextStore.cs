@@ -1,5 +1,4 @@
 #nullable enable
-using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.RunContext;
 
 namespace BazaarPlusPlus.GameInterop;
@@ -12,7 +11,7 @@ internal sealed class RunContextStore : IRunContext
 
     public RunExitKind LastRunExitKind { get; set; } = RunExitKind.Completed;
 
-    public EVictoryCondition LastVictoryCondition { get; set; }
+    public RunVictoryOutcome LastVictoryOutcome { get; set; }
 
     public string LastMessageId { get; set; } = string.Empty;
 
@@ -21,7 +20,7 @@ internal sealed class RunContextStore : IRunContext
         IsInGameRun = false;
         CurrentServerRunId = null;
         LastRunExitKind = RunExitKind.Completed;
-        LastVictoryCondition = default;
+        LastVictoryOutcome = default;
         LastMessageId = string.Empty;
     }
 }

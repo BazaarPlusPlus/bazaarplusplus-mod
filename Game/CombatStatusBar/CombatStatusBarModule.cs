@@ -2,6 +2,7 @@
 using System;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Core.RunContext;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.Events;
@@ -44,8 +45,8 @@ internal sealed class CombatStatusBarModule : IBppFeature
         _runContext.LastMessageId = message.MessageId;
         CombatStatusBar.SetCombatFrameTotal(message.Data?.Frames?.Count ?? 0);
         var winner = message.Data?.Winner;
-        _runContext.LastVictoryCondition =
-            winner == ECombatantId.Player ? EVictoryCondition.Win : EVictoryCondition.Lose;
+        _runContext.LastVictoryOutcome =
+            winner == ECombatantId.Player ? RunVictoryOutcome.Win : RunVictoryOutcome.Lose;
     }
 
     private static void OnCombatFrameAdvanced(CombatFrameAdvanced _)
