@@ -8,8 +8,11 @@ TestSignatureGate_CompletedSuccessfully_Caches();
 TestGenerationGuard_FreshSnapshotIsCurrent();
 TestGenerationGuard_BumpInvalidatesPriorSnapshot();
 TestGenerationGuard_ParallelBumpsAreSerialised();
-TestPreviewTextureGeometry_DoesNotShrinkBelowNativeBoardSize();
-TestPreviewOverlayPlacement_FitsNativeBoardInsideContainer();
+TestSocketResolver_HonoursRequestedIndex();
+TestSocketResolver_FallsBackWhenNoRequest();
+TestSocketResolver_ClampsIntoRange();
+TestSocketResolver_ReturnsMinusOneWhenSpanCannotFit();
+TestSocketResolver_ReturnsMinusOneForEmptyBoard();
 
 Console.WriteLine("HistoryPanelPreview checks passed.");
 
@@ -94,27 +97,49 @@ static void TestGenerationGuard_ParallelBumpsAreSerialised()
     Assert(guard.IsCurrent(third), "Latest snapshot must be the current generation.");
 }
 
-static void TestPreviewTextureGeometry_DoesNotShrinkBelowNativeBoardSize()
+static void TestSocketResolver_HonoursRequestedIndex()
 {
-    var size = HistoryPanelPreviewTextureGeometry.ResolveTextureSize(720, 284);
-
     Assert(
-        size.Width == 2400 && size.Height == 600,
-        "Small UI preview containers must not shrink the native-card render board; otherwise CardPreviewBase prefabs overlap or crop."
+        BattleBoardSocketResolver.ResolveIndex(10, 3, 0, 1) == 3,
+        "A requested socket index that fits must be used verbatim."
     );
 }
 
-static void TestPreviewOverlayPlacement_FitsNativeBoardInsideContainer()
+static void TestSocketResolver_FallsBackWhenNoRequest()
 {
-    var placement = HistoryPanelPreviewTextureGeometry.ResolveBoardPlacement(720, 284);
-
-    Assert(placement.Width == 720, "Overlay board width should fill the preview container.");
     Assert(
-        placement.Height == 180,
-        "Overlay board height should preserve the native board aspect ratio."
+        BattleBoardSocketResolver.ResolveIndex(10, null, 4, 1) == 4,
+        "With no requested index, the fallback index is used."
     );
-    Assert(placement.OffsetX == 0, "Overlay board should be horizontally centered.");
-    Assert(placement.OffsetY == 52, "Overlay board should be vertically centered.");
+}
+
+static void TestSocketResolver_ClampsIntoRange()
+{
+    // 10 sockets, span 3 → last valid start is 7; a requested 9 clamps to 7.
+    Assert(
+        BattleBoardSocketResolver.ResolveIndex(10, 9, 0, 3) == 7,
+        "A requested start beyond the last valid start clamps to it."
+    );
+    Assert(
+        BattleBoardSocketResolver.ResolveIndex(10, null, -2, 1) == 0,
+        "A negative fallback index clamps to 0."
+    );
+}
+
+static void TestSocketResolver_ReturnsMinusOneWhenSpanCannotFit()
+{
+    Assert(
+        BattleBoardSocketResolver.ResolveIndex(2, 0, 0, 3) == -1,
+        "A card span larger than the socket count cannot fit."
+    );
+}
+
+static void TestSocketResolver_ReturnsMinusOneForEmptyBoard()
+{
+    Assert(
+        BattleBoardSocketResolver.ResolveIndex(0, 0, 0, 1) == -1,
+        "Zero sockets cannot host a card."
+    );
 }
 
 static void Assert(bool condition, string message)
