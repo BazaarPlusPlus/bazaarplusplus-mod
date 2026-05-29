@@ -90,6 +90,20 @@ internal static class BppClientCacheBridge
         return !string.IsNullOrWhiteSpace(rank) || rating.HasValue;
     }
 
+    public static bool TryGetPlayerRankSnapshot(out string? rank, out int? rating)
+    {
+        try
+        {
+            return TryGetPlayerRankSnapshot(out rank, out rating, out _);
+        }
+        catch
+        {
+            rank = null;
+            rating = null;
+            return false;
+        }
+    }
+
     public static bool TryGetPlayerLeaderboardPosition(out int? position)
     {
         position = null;

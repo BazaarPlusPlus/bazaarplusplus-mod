@@ -7,7 +7,6 @@ using BazaarGameShared;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
-using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
@@ -21,7 +20,7 @@ internal sealed class PvpBattleSnapshotCollector
         string? runId
     )
     {
-        RunLoggingGameDataReader.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
+        BppClientCacheBridge.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
         var playerHero = TryGetPlayerHeroSafe();
         var playerLevel = TryGetPlayerLevelSafe();
         var (

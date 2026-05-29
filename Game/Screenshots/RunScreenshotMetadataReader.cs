@@ -1,5 +1,4 @@
 #nullable enable
-using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Storage.RunScreenshot;
 using TheBazaar;
@@ -13,7 +12,7 @@ internal static class RunScreenshotMetadataReader
         bool isPrimary = false
     )
     {
-        RunLoggingGameDataReader.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
+        BppClientCacheBridge.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
         BppClientCacheBridge.TryGetPlayerLeaderboardPosition(out var playerPosition);
         var heroName = !string.IsNullOrWhiteSpace(capture.HeroName)
             ? capture.HeroName
