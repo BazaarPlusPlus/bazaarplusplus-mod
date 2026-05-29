@@ -1,3 +1,5 @@
+> **Status: SUPERSEDED - the offscreen-RT bet was reverted to ScreenSpaceOverlay under URP; do not read as current.** Decision: [ADR-0003](../../adr/0003-history-panel-preview-overlay.md); current state: [history-panel.md](../../features/history-panel.md).
+
 # HistoryPanel Native Rendering Migration
 
 ## Scope

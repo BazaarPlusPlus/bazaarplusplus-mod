@@ -1,3 +1,5 @@
+> **Status: IMPLEMENTED (historical).** Both halves shipped: fonts (Infrastructure/Fonts/, SourceHanSansCN-Regular.otf) and design tokens (Infrastructure/UiTokens/).
+
 # Mod UI Typography & Design Token Foundation
 
 > 本文档是 **背景与 Goal 文档**（"phase 0"），用来锁定问题边界、可验收标准与

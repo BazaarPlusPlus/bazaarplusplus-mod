@@ -1,3 +1,5 @@
+> **Status: ASPIRATIONAL - never implemented.** The showcase sidecar / installer renderer were not built. Path refs use the stale BazaarPlusPlus/ dir (now BazaarPlusPlusV4/).
+
 # Combat Replay Skill Showcase (Intro + Outro Template)
 
 **Status:** Draft for implementation planning

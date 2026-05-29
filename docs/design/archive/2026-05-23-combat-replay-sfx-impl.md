@@ -1,3 +1,5 @@
+> **Status: IMPLEMENTED (historical).** As-built home is Game/CombatReplay/Warmup/AudioBankWarmer.EnsureAudioReadyForPlayback (renamed/moved from this doc). Living feature: [combat-replay.md](../../features/combat-replay.md).
+
 # CombatReplay 战斗 SFX 失声：补充诊断与分层修复
 
 **Status:** Implemented (commit `1ce7c38`，等待 saved replay 实跑验证 §5)

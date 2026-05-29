@@ -1,3 +1,5 @@
+> **Status: IMPLEMENTED on the V4 stack.** Intent shipped; all V3 references (ModCFServerV3, V3Routes.cs, mod-api-v3) are obsolete. Living feature: [screenshots.md](../../features/screenshots.md).
+
 # BazaarDB Screenshot Upload in Mod (Replacing Installer Integration)
 
 **Status:** Draft for implementation planning

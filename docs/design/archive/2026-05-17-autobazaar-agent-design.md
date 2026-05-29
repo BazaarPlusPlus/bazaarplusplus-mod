@@ -1,3 +1,5 @@
+> **Status: ASPIRATIONAL - never implemented.** The decision agent now lives in the separate bazaarplusplus-agent repo; the V3 analytics assumptions here are dead post-V4. Kept for design reasoning only.
+
 # AutoBazaar High-Winrate Agent Design
 
 **Status:** Draft for implementation planning

@@ -1,3 +1,5 @@
+> **Status: IMPLEMENTED (historical).** Shipped; as-built generalized to ComponentMount<T> for ~9 features. Durable decision promoted to [ADR-0002](../../adr/0002-mountable-feature-registry.md).
+
 # AutoBazaar Mountable Feature & Encounter Tracking Decoupling
 
 **Status:** Draft for implementation planning

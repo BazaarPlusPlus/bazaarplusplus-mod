@@ -1,3 +1,5 @@
+> **Status: ASPIRATIONAL - never implemented.** No rate-limit patch shipped and the primary beneficiary (AutoBazaar) is parked. Kept for the TargetMethod()-resilience reasoning.
+
 # Bypass Game-Client HTTP Rate Limit Design
 
 **Status:** Draft for plan authoring

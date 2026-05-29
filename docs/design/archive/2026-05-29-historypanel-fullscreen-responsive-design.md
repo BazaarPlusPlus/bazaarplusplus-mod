@@ -1,3 +1,5 @@
+> **Status: IMPLEMENTED (historical).** Shipped 2026-05-29. Current state: [history-panel.md](../../features/history-panel.md).
+
 # History Panel 全屏化 + 相对布局
 
 > ✅ **已实现（2026-05-29）。** 落地与本文有两处偏差：(1) `match` 采用 `1f`（纯按高），(2) 应用户决定，

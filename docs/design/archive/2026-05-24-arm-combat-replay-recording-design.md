@@ -1,3 +1,5 @@
+> **Status: ASPIRATIONAL - never implemented.** None of its named artifacts exist; the recorder still auto-records, which this doc aimed to replace. CONTRADICTS the living [combat-replay.md](../../features/combat-replay.md). Path refs use the stale BazaarPlusPlus/ dir (now BazaarPlusPlusV4/).
+
 # Arm-Then-Record Combat Replay (History Panel Trigger)
 
 **Status:** Draft for implementation planning

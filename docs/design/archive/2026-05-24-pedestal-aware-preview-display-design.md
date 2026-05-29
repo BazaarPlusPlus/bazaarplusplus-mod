@@ -1,3 +1,5 @@
+> **Status: IMPLEMENTED (historical).** Durable decision promoted to [ADR-0004](../../adr/0004-preview-visibility-three-state-mode.md); living feature: [tooltip-preview.md](../../features/tooltip-preview.md).
+
 # Pedestal-Aware Enchant / Upgrade Preview Display
 
 **Status:** Draft for implementation planning
