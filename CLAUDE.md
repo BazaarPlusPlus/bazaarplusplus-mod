@@ -1,3 +1,63 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build & Test Commands
+
+The mod targets `netstandard2.1` (C# 12). Game assemblies are resolved via `ManagedPath` — auto-detected from common Steam install paths, or pass explicitly:
+
+```powershell
+# Build the mod (Debug, auto-copies to BepInEx/plugins/ if game found)
+dotnet build BazaarPlusPlus.csproj
+
+# Build with explicit game assembly path
+dotnet build BazaarPlusPlus.csproj -p:ManagedPath="D:\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed"
+
+# Build both Debug + Release (Release copies to installer repo if present)
+dotnet build BazaarPlusPlus.csproj -t:BuildAll
+
+# Run a single test project
+dotnet test tests\RunLifecycleState.Tests\RunLifecycleState.Tests.csproj
+
+# Run a non-SDK test project (ones without Microsoft.NET.Test.Sdk)
+dotnet run --project tests\ChoiceScreenPedestalResolver.Tests\ChoiceScreenPedestalResolver.Tests.csproj
+
+# Format
+csharpier format .
+```
+
+On macOS/Linux, `run.sh` wraps these: `./run.sh build`, `./run.sh all`, `./run.sh test`, `./run.sh format`, `./run.sh decompile [DllName]`.
+
+Test projects under `tests/` are split per-feature. Some use xUnit + `Microsoft.NET.Test.Sdk` (run via `dotnet test`), others are executable (run via `dotnet run --project`). Check whether the csproj has `Microsoft.NET.Test.Sdk` to determine which.
+
+## Architecture
+
+**Three assemblies** ship as the mod:
+- `BazaarPlusPlus.dll` — the main BepInEx plugin; references game DLLs, Unity, BepInEx
+- `BazaarPlusPlus.ModApi.dll` — HTTP client + DTOs for the cloud backend; zero game/Unity/BepInEx references
+- `BazaarPlusPlus.Storage.dll` — SQLite persistence layer; zero game/Unity/BepInEx references
+
+All three csproj files live in the repo root. `ModApi/` and `Storage/` are the source trees for their respective csproj (via `<Compile Include="...">`). `Directory.Build.props` gives them separate `obj/`/`bin/` dirs.
+
+**Plugin lifecycle** — `Plugin.cs` (BepInEx entry) → `BppComposition` (the manual composition root, no DI container). BppComposition wires:
+1. **Features** (`IBppFeature`) — non-Unity logic modules registered via `BppFeatureRegistry`. Started/stopped with the plugin.
+2. **Mountables** (`IBppMountable`) — Unity-aware components attached to the plugin's `GameObject` via `BppMountableRegistry`. Most use the generic `ComponentMount<T>` adapter.
+3. **Settings dock entries** (`ISettingsDockEntry`) — in-game settings UI entries registered via `SettingsDockEntryRegistry`.
+
+**Layer boundaries:**
+- `Core/` — pure abstractions (config, event bus, paths, runtime interfaces). Zero game DLL references.
+- `GameInterop/` — game DLL coupling layer (`BppClientCacheBridge`, `GameStateProbe`, `RunContextStore`, `IRunContext`, game-typed events like `CombatSimObserved`/`NetMessageObserved`).
+- `Game/` — feature implementations organized by subdirectory (CombatReplay, HistoryPanel, RunLogging, Screenshots, Tooltips, etc.).
+- `Patches/` — Harmony patches, organized by feature area. `BppPatchHost` provides the static service locator that patches use to reach `IBppServices`.
+- `Infrastructure/` — cross-cutting utilities (logging, fonts, UI design tokens).
+
+**Key patterns:**
+- Game assemblies are publicized at build time (`<PublicizeAll>true</PublicizeAll>` via Krafs.Publicizer), so all `internal` game types/members are accessible.
+- `decompiled/` contains ILSpy output of game DLLs — read-only reference, never edited.
+- Harmony patches reach mod services through the static `BppPatchHost` (installed once at startup), not through constructor injection.
+- The event bus (`IBppEventBus`) is in-memory pub/sub used for decoupling features (combat frame events, run lifecycle changes, replay persistence signals).
+- `IEncounterStateProbe` is a pull-based status query ("where is the player now"), deliberately not a timeline tracker (see ADR-0001).
+
 # Project Rules
 
 - Choose verification proportional to the change:
