@@ -17,14 +17,14 @@ This repository only keeps documentation that still matches the current implemen
 - Background upload: run and replay upload, performed only while the client is outside a live run.
 - BazaarDB screenshot upload: optional toggle that pushes end-of-run screenshots plus a summary JSON to the V4 mod backend (`bazaarplusplus-server` repo, deployed at `mod-api-v4.bazaarplusplus.com`) for BazaarDB to pull on a daily cadence (off by default).
 - Anonymous Mode: replaces the local player name with `Anonymous`.
-- **AutoBazaar HTTP endpoint** — local loopback HTTP server (default port 47900) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. See [docs/reference/auto-bazaar-http-api-v1.md](docs/reference/auto-bazaar-http-api-v1.md).
+- **AutoBazaar HTTP endpoint** (currently parked) — local loopback HTTP server (default port 47900) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. **The mount is commented out at `BppComposition.cs:120`, so the HTTP server is not started.** See [docs/features/autobazaar.md](docs/features/autobazaar.md).
 
 ## Installation And Configuration
 
 - Runtime prerequisites: *The Bazaar* and BepInEx 5 must already be installed.
 - For manual installation, copy `BazaarPlusPlus.dll` and the SQLite runtime dependencies from the build output into the game's `BepInEx/plugins/` directory.
 - After the first launch, configuration is written to `BepInEx/config/BazaarPlusPlus.cfg`.
-- Detailed notes for feature-specific settings, hotkeys, and debug surfaces live under `docs/reference/`.
+- Detailed notes for feature-specific settings, hotkeys, and debug surfaces live under [docs/reference/](docs/reference/); see [docs/README.md](docs/README.md) for the full documentation index.
 
 ## Building From Source
 
@@ -45,11 +45,13 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## Data And Network Behavior
 
-- Run logging, combat replay, and end-of-run screenshots store local SQLite data, replay payloads, and screenshot files; player observation data is written to `BazaarPlusPlusV4/Identity/observation.v1.json`. Cloud sync itself carries no authentication credentials.
+- Run logging, combat replay, and end-of-run screenshots store local SQLite data, replay payloads, and screenshot files. Cloud sync itself carries no authentication credentials.
 - Background upload only scans for uploads while the client is outside a live run.
 - The cloud backend (uploads, ghost battles, replay links, BazaarDB screenshot manifest) now lives in a separate repository `bazaarplusplus-server`, deployed at `mod-api-v4.bazaarplusplus.com`. The mod-side HTTP client lives in `BazaarPlusPlus.ModApi.csproj`.
 
 ## Repository Layout
+
+> The Chinese [README.md](README.md) is authoritative for the repository layout; this section is a summary.
 
 - `Plugin.cs`: BepInEx runtime entry point.
 - `Core/`, `Game/`, `Patches/`: main feature implementation.
@@ -60,12 +62,11 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## Documentation Entry Points
 
-- `docs/mod-features-overview.md`: overview of the currently implemented feature set.
-- `docs/run-logging.md`: run logging, history panel, and ghost battles.
-- `docs/run-upload.md`: run-bundle upload behavior, trust model, and constraints.
-- `docs/bazaardb-screenshot-upload.md`: BazaarDB screenshot upload toggle, sidecar table, and server contract.
-- `docs/reference/end-of-run-screenshot-flow.md`: final-run screenshot trigger, storage, and reader contract.
-- `docs/reference/`: hotkeys, settings surfaces, SQLite schema, tooltip internals, and related reference material.
+- [docs/README.md](docs/README.md): **the documentation index** (all docs organized by audience and lifecycle).
+- [docs/mod-features-overview.md](docs/mod-features-overview.md): overview of the currently implemented feature set.
+- [docs/features/](docs/features/): living per-feature docs (run logging & upload, combat replay, history panel, screenshots, tooltip preview, …).
+- [docs/reference/](docs/reference/): stable contracts / inventories (hotkeys, settings surfaces, SQLite schema, AutoBazaar HTTP API).
+- [docs/adr/](docs/adr/): architecture decision records.
 
 ## License
 

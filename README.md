@@ -17,14 +17,14 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 - 后台上传：run / replay 后台上传，仅在未处于 live run 时执行。
 - BazaarDB 截图上传：可选开关，启用后把终局截图与摘要 JSON 推到 V4 mod 后端（`bazaarplusplus-server` 仓库，部署 `mod-api-v4.bazaarplusplus.com`），BazaarDB 再按天拉取（默认关闭）。
 - Anonymous Mode：将本地玩家名替换为 `Anonymous`。
-- **AutoBazaar HTTP 接口** — 本地回环 HTTP 服务（默认端口 47900），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。详见 [docs/reference/auto-bazaar-http-api-v1.md](docs/reference/auto-bazaar-http-api-v1.md)。
+- **AutoBazaar HTTP 接口**（当前 parked）— 本地回环 HTTP 服务（默认端口 47900），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。**该 mount 当前在 `BppComposition.cs:120` 被注释、HTTP 服务不启动。** 详见 [docs/features/autobazaar.md](docs/features/autobazaar.md)。
 
 ## 安装与配置
 
 - 运行前提：已安装《The Bazaar》与 BepInEx 5。
 - 手动安装时，将构建输出中的 `BazaarPlusPlus.dll` 以及同目录下的 SQLite 运行时依赖复制到游戏的 `BepInEx/plugins/`。
 - 首次运行后，配置文件会写入 `BepInEx/config/BazaarPlusPlus.cfg`。
-- 与详细功能相关的配置项、热键和 debug 面板说明见 `docs/reference/`。
+- 与详细功能相关的配置项、热键和 debug 面板说明见 [docs/reference/](docs/reference/)；完整文档索引见 [docs/README.md](docs/README.md)。
 
 ## 从源码构建
 
@@ -45,7 +45,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## 数据与网络行为
 
-- run logging、战斗回放和终局截图会在本地保存 SQLite 数据、replay payload 与截图文件；玩家观察数据写到 `BazaarPlusPlusV4/Identity/observation.v1.json`，云同步本身不携带任何鉴权凭证。
+- run logging、战斗回放和终局截图会在本地保存 SQLite 数据、replay payload 与截图文件；云同步本身不携带任何鉴权凭证。
 - 后台上传会在非 live run 状态下执行上传扫描。
 - 云端后端（上传、ghost battles、replay 链接、BazaarDB 截图清单）现在在独立仓库 `bazaarplusplus-server`，部署于 `mod-api-v4.bazaarplusplus.com`。mod 侧的 HTTP 客户端在 `BazaarPlusPlus.ModApi.csproj` 里。
 
@@ -62,12 +62,11 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 ## 文档入口
 
-- `docs/mod-features-overview.md`：当前功能总览。
-- `docs/run-logging.md`：run logging、history panel、ghost battles。
-- `docs/run-upload.md`：run bundle 上传行为、信任模型和边界。
-- `docs/bazaardb-screenshot-upload.md`：BazaarDB 截图上传开关、sidecar 表与服务端契约。
-- `docs/reference/end-of-run-screenshot-flow.md`：终局截图触发、存储和读取契约。
-- `docs/reference/`：热键、设置表面、SQLite schema、tooltip 实现等参考文档。
+- [docs/README.md](docs/README.md)：**文档总索引**（按受众与生命周期组织所有文档）。
+- [docs/mod-features-overview.md](docs/mod-features-overview.md)：当前功能总览（按功能的深入目录）。
+- [docs/features/](docs/features/)：各功能的现行文档（run logging 与上传、combat replay、history panel、screenshots、tooltip preview 等）。
+- [docs/reference/](docs/reference/)：稳定契约 / 清单（热键、设置表面、SQLite schema、AutoBazaar HTTP API）。
+- [docs/adr/](docs/adr/)：设计决策记录（ADR）。
 
 ## License
 

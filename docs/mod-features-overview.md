@@ -36,7 +36,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 默认关闭，可在 **Bazaar++ 设置坞** 中开启；开关和速度档位会写入配置
 - 逻辑时间基于已处理战斗帧 × 50ms，与墙钟解耦
 
-详见 `docs/combat-status-bar.md`。
+详见 [features/combat-status-bar.md](features/combat-status-bar.md)。
 
 ### 怪物预览（Monster Preview）
 
@@ -45,7 +45,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - HistoryPanel 预览是独立栈（`Game/HistoryPanel/Preview/`），与怪物预览解耦
 - 附魔/升级预览注入由独立的 patch 提供（见后续小节 / `Patches/Tooltips/`），不属于 monster preview 路径
 
-详见 `docs/monster-preview-design.md`。
+详见 [features/monster-preview.md](features/monster-preview.md)。
 
 ### 附魔预览与升级预览（Tooltips）
 
@@ -54,6 +54,8 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **手动覆盖**：按住 `HoldEnchantPreview`（默认 Ctrl）/ `HoldUpgradePreview`（默认 Shift）总是显示对应预览，等级最高，覆盖所有模式
 - **共享决策**：`TooltipModifierRefreshController`、`ItemEnchantPreviewPatch`、`UpgradePreviewTooltipPatch` 共同调用 `Game/Tooltips/TooltipPreviewModePolicy.Resolve`，保证三处行为一致；模式由 `Game/Encounter/ChoiceScreenPedestalResolver` 从 `RunState.SelectionSet` 推导
 - **迁移**：首次启动会把旧的 `[EnchantPreview] AlwaysShow = true/false` 自动迁移到 `[EnchantPreview] Mode = Always / AutoOnPedestalChoice`，并从配置文件移除旧键
+
+详见 [features/tooltip-preview.md](features/tooltip-preview.md) 与 [ADR-0004](adr/0004-preview-visibility-three-state-mode.md)。
 
 ### Streamer / Anonymous 名称（Name Override）
 
@@ -68,7 +70,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 条件满足时可从 HistoryPanel 启动本地 replay 或下载并回放 ghost replay
 - 支持删除 run 及关联 battle 记录
 
-详见 `docs/run-logging.md`。
+详见 [features/run-logging-and-upload.md](features/run-logging-and-upload.md)。
 
 ### 后台上传与 Ghost Battles
 
@@ -77,7 +79,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - `RunBundleUploadService` 上传到 `POST /run-bundles`
 - HistoryPanel 的 ghost sync 用 `?player_account_id=` 调用 `GET /ghost-battles`（不鉴权），按需申请 `POST /ghost-battles/:battleId/replay-link`
 
-详见 `docs/run-upload.md`。
+详见 [features/run-logging-and-upload.md](features/run-logging-and-upload.md)。
 
 ### 战斗回放（Combat Replay）
 
@@ -86,7 +88,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - `CombatReplayRuntime` + `CombatReplayCapturePatch` 负责采集；HistoryPanel 在条件满足时回放
 - **可选 MP4 录制**：默认关闭（`CombatReplayVideo / Enabled`）。开启后会在 saved replay 播放期间把 Game View 抓帧、调用外部 FFmpeg 写到 `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/`，元数据进 SQLite `combat_replay_videos`。FFmpeg 未检测到时静默禁用，不影响 replay 本身
 
-详见 `docs/reference/combat-replay-recording.md`、`docs/combat-replay-video-recording.md`。
+详见 [features/combat-replay.md](features/combat-replay.md)。
 
 ### 终局自动截图（End-of-run Screenshot）
 
@@ -94,7 +96,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 第一次合法 `Continue` 会先保存主截图，再放行原始按钮动作
 - PNG 保存到 `<GameRoot>/BazaarPlusPlusV4/Screenshots`，元数据写入 SQLite `run_screenshots`
 
-详见 `docs/reference/end-of-run-screenshot-flow.md`。
+详见 [features/screenshots.md](features/screenshots.md)。
 
 ### BazaarDB 截图上传
 
@@ -103,7 +105,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 数据流：模组 `POST /bazaardb-screenshots`（无鉴权）→ Worker 写 R2 + D1 → BazaarDB 用 Bearer token 调 `GET /bazaardb/manifest` 拿到 row 列表（行内带公开 `image_url`，指向 `bazaardb-assets-v4.bazaarplusplus.com`）直接走公开桶下载
 - 4xx（除 408 / 429）落 `permanent_failure`，不再重试；5xx / 网络错误保留 `pending` 自动重试；翻开开关 / run 退出时立刻触发一次
 
-详见 `docs/bazaardb-screenshot-upload.md`。
+详见 [features/screenshots.md](features/screenshots.md)。
 
 ### 大厅、设置与本地化
 
@@ -117,14 +119,13 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 面向 **`bazaarplusplus-server`**（独立仓库，Cloudflare Workers + D1 + R2，部署 `mod-api-v4.bazaarplusplus.com`）：
 
-- **共享身份目录**：`<GameRoot>/BazaarPlusPlusV4/Identity/`，当前只写 `observation.v1.json`；旧 `auth.v1.json` 与 `identity.db*` 在 mod 启动时会被一次性清理
+- **玩家身份**：上传所需的 `player_account_id` 在上传时从客户端 profile 解析（`BppClientCacheBridge.TryGetProfileAccountId`），解析不到则跳过上传；当前实现没有持久化的身份文件
 - **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`（不鉴权；服务端只把 `seen_player_accounts` 注册过的玩家或上传者本人作为可投影 opponent）。`player_account_id` 必填，缺失则 400 —— V3 时代的 `"anonymous-player"` sentinel 已删除,mod 在没拿到本机 account id 时直接跳过上传
-- **Player Observation**：mod 把观察到的 `player_account_id` 写入 `observation.v1.json`
 - **Ghost 战斗**：`GET /ghost-battles?player_account_id=…` 查询 against-me 列表（不鉴权）；按需签发 `POST /ghost-battles/:battleId/replay-link`（返回 5 分钟有效的 R2 预签 URL）
 - **Final-battle 标记**：服务端把上传 bundle 中最后一场 battle 在投影时标记 `is_final_battle`（V3 叫 `is_bundle_final_battle`,V4 删掉冗余前缀,sticky 语义:一旦 1 永远 1）；HistoryPanel 在 ghost 视角下用它提示"这场后对手出局"
 - **BazaarDB 截图上传**：`POST /bazaardb-screenshots`（不鉴权）写 R2 + D1，BazaarDB 用 `BAZAARDB_PULL_TOKEN` 拉 `GET /bazaardb/manifest`(行内带公开 `image_url`); image 文件本身走公开桶 `bazaardb-assets-v4.bazaarplusplus.com`,不再经过 Worker proxy
 
-模组侧仅在**非 live run** 时执行上传扫描；`RunUploadController` 统一调度 run-bundle 上传。信任模型与安全限制见 `docs/run-upload.md`。
+模组侧仅在**非 live run** 时执行上传扫描；`RunUploadController` 统一调度 run-bundle 上传。信任模型与安全限制见 [features/run-logging-and-upload.md](features/run-logging-and-upload.md)。
 
 ## 配置摘要（BazaarPlusPlus.cfg）
 
@@ -154,12 +155,14 @@ HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings
 
 ## 进一步阅读
 
-- 仓库总览：`README.md`
-- Run / History / SQLite：`docs/run-logging.md`
-- Run bundle 上传与信任模型：`docs/run-upload.md`
-- BazaarDB 截图上传链路：`docs/bazaardb-screenshot-upload.md`
-- 战斗状态条 / 怪物预览 / 终局截图：`docs/combat-status-bar.md`、`docs/monster-preview-design.md`、`docs/reference/end-of-run-screenshot-flow.md`
+- **文档总索引**：[docs/README.md](README.md)
+- 仓库总览：[../README.md](../README.md)
+- Run / History / 上传：[features/run-logging-and-upload.md](features/run-logging-and-upload.md)；SQLite schema：[reference/sqlite-schema-reference.md](reference/sqlite-schema-reference.md)
+- Ghost battle 数据流（视角翻转）：[features/ghost-battle-data-flow.md](features/ghost-battle-data-flow.md)
+- 战斗回放（含可选 MP4 视频）：[features/combat-replay.md](features/combat-replay.md)
+- 终局截图与 BazaarDB 上传：[features/screenshots.md](features/screenshots.md)
+- 战斗状态条 / 怪物预览 / 附魔升级预览：[features/combat-status-bar.md](features/combat-status-bar.md)、[features/monster-preview.md](features/monster-preview.md)、[features/tooltip-preview.md](features/tooltip-preview.md)
+- 热键 / 设置表面：[reference/hotkeys-reference.md](reference/hotkeys-reference.md)、[reference/settings-and-debug-surfaces.md](reference/settings-and-debug-surfaces.md)
+- AutoBazaar（parked）：[features/autobazaar.md](features/autobazaar.md)（→ [reference/auto-bazaar-http-api-v1.md](reference/auto-bazaar-http-api-v1.md)、[reference/auto-bazaar-decision-surface.md](reference/auto-bazaar-decision-surface.md)）
+- 设计决策（ADR）：[adr/](adr/)；逆向工程笔记：[reverse-engineering/](reverse-engineering/)
 - 服务端部署：见独立仓库 `bazaarplusplus-server/README.md`
-- 热键、设置表面、SQLite schema、tooltip 实现细节：`docs/reference/`
-- AutoBazaar HTTP API 规范：`docs/reference/auto-bazaar-http-api-v1.md`
-- AutoBazaar 决策表面字段推导：`docs/reference/auto-bazaar-decision-surface.md`

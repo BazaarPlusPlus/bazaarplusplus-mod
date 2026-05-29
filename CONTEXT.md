@@ -13,4 +13,4 @@ An encounter that upgrades or enchants one of the player's existing items, rathe
 
 **Encounter status probe**:
 The on-demand, pull-based read of the player's *current* run/encounter state (`IEncounterStateProbe.GetCurrent()`). The project's chosen way to expose "where is the player in the run right now" — as a status query, not a recorded timeline.
-_Avoid_: encounter tracker, run timeline (deliberately not built — see ADR)
+_Avoid_: encounter tracker, run timeline (deliberately not built — see [ADR-0001](docs/adr/0001-encounter-status-probe-not-timeline-tracker.md))
