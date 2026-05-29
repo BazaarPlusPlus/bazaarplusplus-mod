@@ -1,3 +1,4 @@
+#nullable enable
 using BazaarPlusPlus.GameInterop;
 using TheBazaar;
 using UnityEngine;

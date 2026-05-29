@@ -1,3 +1,4 @@
+#nullable enable
 namespace BazaarPlusPlus.Core.GameState;
 
 internal enum ChoiceScreenPedestalKind

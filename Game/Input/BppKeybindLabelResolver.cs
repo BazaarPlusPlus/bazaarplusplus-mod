@@ -1,3 +1,4 @@
+#nullable enable
 using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.Input;

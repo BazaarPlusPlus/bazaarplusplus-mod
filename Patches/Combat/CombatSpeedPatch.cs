@@ -1,3 +1,4 @@
+#nullable enable
 #pragma warning disable CS0436
 using BazaarPlusPlus.Game.CombatStatusBar;
 using HarmonyLib;

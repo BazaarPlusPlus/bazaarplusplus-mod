@@ -1,3 +1,4 @@
+#nullable enable
 #pragma warning disable CS0436
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Core.Events;

@@ -1,3 +1,4 @@
+#nullable enable
 using BazaarPlusPlus.Core.GameState;
 using TheBazaar;
 

@@ -1,3 +1,4 @@
+#nullable enable
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using TheBazaar;

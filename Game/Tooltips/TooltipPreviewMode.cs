@@ -1,3 +1,4 @@
+#nullable enable
 namespace BazaarPlusPlus.Game.Tooltips;
 
 internal enum TooltipPreviewMode

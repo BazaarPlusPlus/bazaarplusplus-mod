@@ -1,3 +1,4 @@
+#nullable enable
 namespace BazaarPlusPlus.Core.RunContext;
 
 // Mod-owned mirror of the game's EVictoryCondition. Keeping a Core-owned enum means IRunContext

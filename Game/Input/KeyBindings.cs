@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus.Game.Input;

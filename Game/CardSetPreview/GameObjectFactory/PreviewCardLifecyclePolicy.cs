@@ -1,3 +1,4 @@
+#nullable enable
 namespace BazaarPlusPlus.Game.PreviewSurface;
 
 internal enum PreviewCardKind

@@ -1,3 +1,4 @@
+#nullable enable
 namespace BazaarPlusPlus.Core.Runtime;
 
 internal static class BppBuild
