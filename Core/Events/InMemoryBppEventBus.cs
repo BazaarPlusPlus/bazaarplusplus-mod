@@ -8,7 +8,12 @@ namespace BazaarPlusPlus.Core.Events;
 internal sealed class InMemoryBppEventBus : IBppEventBus
 {
     private readonly object _syncRoot = new();
-    private readonly Dictionary<Type, List<Delegate>> _handlers = new();
+
+    // Copy-on-write: each event type maps to an immutable handler array that Subscribe/Unsubscribe
+    // replace wholesale. Publish can therefore grab the current array under a brief lock and iterate
+    // it without allocating a per-call snapshot, while a handler that subscribes/unsubscribes during
+    // dispatch still cannot mutate the array the in-flight Publish is walking.
+    private readonly Dictionary<Type, Delegate[]> _handlers = new();
 
     public IDisposable Subscribe<TEvent>(Action<TEvent> handler)
         where TEvent : class
@@ -18,13 +23,17 @@ internal sealed class InMemoryBppEventBus : IBppEventBus
 
         lock (_syncRoot)
         {
-            if (!_handlers.TryGetValue(typeof(TEvent), out var registrations))
+            if (_handlers.TryGetValue(typeof(TEvent), out var existing))
             {
-                registrations = new List<Delegate>();
-                _handlers.Add(typeof(TEvent), registrations);
+                var updated = new Delegate[existing.Length + 1];
+                Array.Copy(existing, updated, existing.Length);
+                updated[existing.Length] = handler;
+                _handlers[typeof(TEvent)] = updated;
             }
-
-            registrations.Add(handler);
+            else
+            {
+                _handlers[typeof(TEvent)] = new Delegate[] { handler };
+            }
         }
 
         return new Subscription(() => Unsubscribe(handler));
@@ -36,18 +45,14 @@ internal sealed class InMemoryBppEventBus : IBppEventBus
         if (eventData == null)
             throw new ArgumentNullException(nameof(eventData));
 
-        List<Delegate>? snapshot;
+        Delegate[]? snapshot;
         lock (_syncRoot)
         {
-            if (
-                !_handlers.TryGetValue(typeof(TEvent), out var registrations)
-                || registrations.Count == 0
-            )
+            if (!_handlers.TryGetValue(typeof(TEvent), out snapshot) || snapshot.Length == 0)
                 return;
-
-            snapshot = new List<Delegate>(registrations);
         }
 
+        // snapshot is immutable (copy-on-write), so iterating it outside the lock is safe.
         foreach (var registration in snapshot)
         {
             try
@@ -75,12 +80,23 @@ internal sealed class InMemoryBppEventBus : IBppEventBus
     {
         lock (_syncRoot)
         {
-            if (!_handlers.TryGetValue(typeof(TEvent), out var registrations))
+            if (!_handlers.TryGetValue(typeof(TEvent), out var existing))
                 return;
 
-            registrations.Remove(handler);
-            if (registrations.Count == 0)
+            var index = Array.IndexOf(existing, (Delegate)handler);
+            if (index < 0)
+                return;
+
+            if (existing.Length == 1)
+            {
                 _handlers.Remove(typeof(TEvent));
+                return;
+            }
+
+            var updated = new Delegate[existing.Length - 1];
+            Array.Copy(existing, 0, updated, 0, index);
+            Array.Copy(existing, index + 1, updated, index, existing.Length - index - 1);
+            _handlers[typeof(TEvent)] = updated;
         }
     }
 

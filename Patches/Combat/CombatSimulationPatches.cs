@@ -26,6 +26,6 @@ class CombatFrameAdvancePatch
     [HarmonyPostfix]
     static void Postfix()
     {
-        BppPatchHost.Services.EventBus.Publish(new CombatFrameAdvanced());
+        BppPatchHost.Services.EventBus.Publish(CombatFrameAdvanced.Instance);
     }
 }
