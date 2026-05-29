@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 
 namespace BazaarPlusPlus.Storage.RunLog;
 
@@ -48,40 +47,9 @@ public sealed class RunLogEvent
 
     public string? StateFingerprint { get; set; }
 
-    public string? SelectionFingerprint { get; set; }
-
-    public IDictionary<string, object?> SelectionContextRules { get; set; } =
-        new Dictionary<string, object?>();
-
-    public IList<RunLogOptionSnapshot> Options { get; set; } = new List<RunLogOptionSnapshot>();
-
-    public long? SelectionSeq { get; set; }
-
-    public string? SelectedInstanceId { get; set; }
-
-    public string? SelectedTemplateId { get; set; }
-
-    public string? SelectedEncounterId { get; set; }
-
-    public string? SelectedName { get; set; }
-
-    public string? SelectedTier { get; set; }
-
-    public string? SelectedEnchant { get; set; }
-
     public string? AbandonedReason { get; set; }
 
     public string? InferredFrom { get; set; }
 
     public double? Confidence { get; set; }
-
-    public bool ShouldSerializeSelectionContextRules()
-    {
-        return SelectionContextRules.Count > 0;
-    }
-
-    public bool ShouldSerializeOptions()
-    {
-        return Options.Count > 0;
-    }
 }
