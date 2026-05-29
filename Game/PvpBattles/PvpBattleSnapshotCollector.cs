@@ -213,7 +213,7 @@ internal sealed class PvpBattleSnapshotCollector
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayCaptureService",
+                "PvpBattleSnapshotCollector",
                 $"Unable to snapshot player hand cards for combat replay capture: {ex.Message}"
             );
             return (false, new List<PvpBattleCardSnapshot>());
@@ -229,7 +229,7 @@ internal sealed class PvpBattleSnapshotCollector
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayCaptureService",
+                "PvpBattleSnapshotCollector",
                 $"Unable to snapshot player skills for combat replay capture: {ex.Message}"
             );
             return (false, new List<PvpBattleCardSnapshot>());
@@ -311,7 +311,7 @@ internal sealed class PvpBattleSnapshotCollector
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayCaptureService",
+                "PvpBattleSnapshotCollector",
                 $"Unable to capture opening {combatantId} hand cards from GameSim: {ex.Message}"
             );
             return (false, new List<PvpBattleCardSnapshot>());
@@ -330,7 +330,7 @@ internal sealed class PvpBattleSnapshotCollector
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayCaptureService",
+                "PvpBattleSnapshotCollector",
                 $"Unable to capture opening {combatantId} hand cards from current Data: {ex.Message}"
             );
             return (false, new List<PvpBattleCardSnapshot>());
@@ -351,7 +351,7 @@ internal sealed class PvpBattleSnapshotCollector
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayCaptureService",
+                "PvpBattleSnapshotCollector",
                 $"Unable to capture opening {combatantId} skills from current Data: {ex.Message}"
             );
             return (false, new List<PvpBattleCardSnapshot>());
@@ -395,7 +395,7 @@ internal sealed class PvpBattleSnapshotCollector
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CombatReplayCaptureService",
+                "PvpBattleSnapshotCollector",
                 $"Unable to capture opening opponent skills from GameSim: {ex.Message}"
             );
             return (false, new List<PvpBattleCardSnapshot>());

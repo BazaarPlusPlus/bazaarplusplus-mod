@@ -4,12 +4,15 @@ using System.Reflection;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
 using BazaarGameShared.TempoNet.Responses;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 
 namespace BazaarPlusPlus.GameInterop;
 
 internal static class BppClientCacheBridge
 {
+    private const string LogComponent = "BppClientCacheBridge";
+
     public static string? TryGetProfileUsername()
     {
         var profile = TryGetProfileValue();
@@ -39,7 +42,13 @@ internal static class BppClientCacheBridge
             if (!string.IsNullOrWhiteSpace(displayName))
                 return displayName;
         }
-        catch { }
+        catch (Exception ex)
+        {
+            BppLog.Debug(
+                LogComponent,
+                $"TryGetProfileDisplayUsername: GetDisplayUsername reflection failed, falling back to Username: {ex.Message}"
+            );
+        }
 
         return ReadStringMember(profile, "Username");
     }
@@ -121,8 +130,12 @@ internal static class BppClientCacheBridge
             value = ReadMember(observable, "Value");
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            BppLog.Debug(
+                LogComponent,
+                $"TryGetObservableValue('{memberName}'): reflection read failed, treating as unavailable: {ex.Message}"
+            );
             return false;
         }
     }

@@ -1,6 +1,8 @@
+#nullable enable
 using System;
 using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar.Tooltips;
 using TheBazaar.Utilities;
 
@@ -8,6 +10,7 @@ namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
 public static class ItemEnchantPreviewFormatting
 {
+    private const string LogComponent = "ItemEnchantPreview";
     private const int PrefixSizePercent = 60;
     private const int EffectSizePercent = 55;
     private const string EnchantmentPrefix = "\u00A0\u00A0· ";
@@ -58,8 +61,12 @@ public static class ItemEnchantPreviewFormatting
         {
             return new LocalizableText(enchantmentType.ToString()).GetLocalizedText();
         }
-        catch
+        catch (Exception ex)
         {
+            BppLog.Debug(
+                LogComponent,
+                $"GetEnchantmentLabel: localization failed for enchant '{enchantmentType}', using raw name: {ex.Message}"
+            );
             return enchantmentType.ToString();
         }
     }
