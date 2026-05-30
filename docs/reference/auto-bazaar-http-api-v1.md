@@ -157,7 +157,7 @@ Card list fields (each element is an `AutoBazaarCardSnapshot`):
 
 ### POST /v1/actions
 
-Submits one action. The call blocks on the HTTP thread until the mod's Unity main thread dequeues and executes the action, or until `HttpEndpointTimeoutSeconds` elapses (which returns `503`).
+Submits one action. The call blocks on the HTTP thread until the mod's Unity main thread dequeues and executes the action, or until the fixed 3 s endpoint timeout elapses (which returns `503`).
 
 **Request body — `AutoBazaarAction`:**
 
@@ -355,7 +355,7 @@ Toggling `Enabled` back to `true` restarts the listener. `tickId` restarts from 
 
 After every non-`Wait` action that the mod dispatched (`executed: true`), a 1.0 second minimum-delay gate is set. Subsequent non-`Wait` POST requests within that window are rejected with `429 cooldown` and `retryAfterSeconds` inside the `extra` object.
 
-`Wait` neither consumes the gate nor resets it. The cooldown gate is independent of `DecisionIntervalSeconds`, which controls the snapshot tick cadence.
+`Wait` neither consumes the gate nor resets it. The cooldown gate is independent of the snapshot tick cadence (a fixed 1.5 s).
 
 ---
 
@@ -364,6 +364,6 @@ After every non-`Wait` action that the mod dispatched (`executed: true`), a 1.0 
 | cfg key | section | default | description |
 |---|---|---|---|
 | `Enabled` | `AutoBazaar` | `true` | Master switch. Edit cfg file; no in-game UI. |
-| `DecisionIntervalSeconds` | `AutoBazaar` | `1.5` | Snapshot tick cadence in seconds. Clamped to `[0.5, 10]` at runtime. |
 | `HttpListenerPort` | `AutoBazaar` | `47900` | Loopback port. Changing this value restarts the listener. |
-| `HttpEndpointTimeoutSeconds` | `AutoBazaar` | `3.0` | Maximum seconds a POST blocks before returning `503`. |
+
+The snapshot tick cadence (`1.5 s`) and the POST blocking timeout (`3 s`) are fixed defaults, no longer configurable.

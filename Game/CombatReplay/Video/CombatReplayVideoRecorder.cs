@@ -172,7 +172,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             return;
         }
 
-        var request = BuildCaptureRequest(evt, services, ffmpegExecutable!, videoDirectoryPath);
+        var request = BuildCaptureRequest(evt, ffmpegExecutable!, videoDirectoryPath);
         if (request == null)
             return;
 
@@ -783,22 +783,17 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
 
     private ReplayVideoCaptureRequest? BuildCaptureRequest(
         CombatReplayPlaybackStarting evt,
-        IBppServices services,
         string ffmpegExecutable,
         string videoDirectoryPath
     )
     {
-        var config = services.Config;
-        var fps = Math.Clamp(config.CombatReplayVideoFps?.Value ?? 30, 10, 60);
-        var crf = Math.Clamp(config.CombatReplayVideoCrf?.Value ?? 23, 0, 51);
-        var preset = config.CombatReplayVideoPreset?.Value ?? "veryfast";
-        if (string.IsNullOrWhiteSpace(preset))
-            preset = "veryfast";
+        // Fixed encoder defaults (formerly the [CombatReplayVideo] cfg knobs).
+        const int fps = 30;
+        const int crf = 23;
+        const string preset = "veryfast";
 
-        var configuredWidth = config.CombatReplayVideoWidth?.Value ?? 0;
-        var configuredHeight = config.CombatReplayVideoHeight?.Value ?? 0;
-        var width = configuredWidth > 0 ? configuredWidth : Screen.width;
-        var height = configuredHeight > 0 ? configuredHeight : Screen.height;
+        var width = Screen.width;
+        var height = Screen.height;
         if (width <= 0 || height <= 0)
         {
             BppLog.Warn(
@@ -814,7 +809,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         if ((height & 1) != 0)
             height--;
 
-        var maxQueued = Math.Max(8, config.CombatReplayVideoMaxQueuedFrames?.Value ?? 90);
+        const int maxQueued = 90;
 
         var nowLocal = DateTimeOffset.Now;
         var datePart = nowLocal.ToString("yyyy-MM-dd");

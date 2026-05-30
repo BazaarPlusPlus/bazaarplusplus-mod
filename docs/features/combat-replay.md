@@ -53,17 +53,17 @@ replay 播放期间把 Unity Game View 抓帧编码为 MP4，落到 `<GameRoot>/
 - **元数据**：SQLite `combat_replay_videos`（列定义见 schema 参考）。
 - **二进制分发**：FFmpeg 现在作为逐平台的兄弟二进制随 mod payload 一起分发（与 SQLite native lib 同构），落在 `BepInEx/plugins/` 下、运行时由 mod 相对自身定位；本项目是公开 GPL 源码项目，接受 GPL，无许可证顾虑。
 
-### Config（`CombatReplayVideo` 段，权威见 `Core/Config/BppConfig.cs`）
+### 编码 / 输出参数（固定值）
 
-仅编码 / 输出参数可配；录制的开 / 关由按钮触发，不在 config 里（详见上文「触发」与「录制可用性」）。
+编码 / 输出参数为固定默认值（写死在 `CombatReplayVideoRecorder.BuildCaptureRequest`，原 `[CombatReplayVideo]` cfg 段已移除）；录制的开 / 关由按钮触发，同样不在 config 里（详见上文「触发」与「录制可用性」）。
 
-| Key | 默认 | 含义 |
+| 参数 | 值 | 含义 |
 |---|---|---|
-| `Fps` | `30` | 帧率 |
-| `Width` / `Height` | `0` | `0` = 跟随 `Screen` |
-| `Crf` | `23` | x264 质量 |
-| `Preset` | `veryfast` | x264 预设 |
-| `MaxQueuedFrames` | `90` | 抓帧队列上限（满则 drop，记 `dropped_frames`） |
+| 帧率 | `30` | |
+| 宽 / 高 | 跟随 `Screen` | `Screen.width` / `Screen.height` |
+| CRF | `23` | x264 质量 |
+| Preset | `veryfast` | x264 预设 |
+| 抓帧队列上限 | `90` | 满则 drop，记 `dropped_frames` |
 
 ### 当前状态
 

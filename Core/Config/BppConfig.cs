@@ -27,23 +27,7 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? AutoBazaarEnabled { get; private set; }
 
-    public ConfigEntry<float>? AutoBazaarDecisionIntervalSeconds { get; private set; }
-
     public ConfigEntry<int>? AutoBazaarHttpListenerPort { get; private set; }
-
-    public ConfigEntry<float>? AutoBazaarHttpEndpointTimeoutSeconds { get; private set; }
-
-    public ConfigEntry<int>? CombatReplayVideoFps { get; private set; }
-
-    public ConfigEntry<int>? CombatReplayVideoWidth { get; private set; }
-
-    public ConfigEntry<int>? CombatReplayVideoHeight { get; private set; }
-
-    public ConfigEntry<int>? CombatReplayVideoCrf { get; private set; }
-
-    public ConfigEntry<string>? CombatReplayVideoPreset { get; private set; }
-
-    public ConfigEntry<int>? CombatReplayVideoMaxQueuedFrames { get; private set; }
 
     public ConfigEntry<bool>? BazaarDbUploadEnabled { get; private set; }
 
@@ -105,60 +89,11 @@ internal sealed class BppConfig : IBppConfig
             true,
             "Master switch for the AutoBazaar HTTP endpoint. When true, a loopback HTTP server starts on the configured port. There is no in-game UI for this toggle; edit the cfg file to disable."
         );
-        AutoBazaarDecisionIntervalSeconds = config.Bind(
-            "AutoBazaar",
-            "DecisionIntervalSeconds",
-            1.5f,
-            "Mod tick cadence for snapshot publication, in seconds. Clamped to [0.5, 10] at runtime."
-        );
         AutoBazaarHttpListenerPort = config.Bind(
             "AutoBazaar",
             "HttpListenerPort",
             47900,
             "Loopback port for the AutoBazaar HTTP listener. Changing this restarts the listener."
-        );
-        AutoBazaarHttpEndpointTimeoutSeconds = config.Bind(
-            "AutoBazaar",
-            "HttpEndpointTimeoutSeconds",
-            3.0f,
-            "Maximum time (seconds) the server will block on a POST /v1/actions before returning 503."
-        );
-        // CombatReplayVideo
-        CombatReplayVideoFps = config.Bind(
-            "CombatReplayVideo",
-            "Fps",
-            30,
-            "Target frames per second for the recorded MP4. Clamped to [10, 60] at runtime."
-        );
-        CombatReplayVideoWidth = config.Bind(
-            "CombatReplayVideo",
-            "Width",
-            0,
-            "Video width in pixels. 0 means use Screen.width at capture start."
-        );
-        CombatReplayVideoHeight = config.Bind(
-            "CombatReplayVideo",
-            "Height",
-            0,
-            "Video height in pixels. 0 means use Screen.height at capture start."
-        );
-        CombatReplayVideoCrf = config.Bind(
-            "CombatReplayVideo",
-            "Crf",
-            23,
-            "x264 constant rate factor (lower = higher quality, larger file). Clamped to [0, 51] at runtime."
-        );
-        CombatReplayVideoPreset = config.Bind(
-            "CombatReplayVideo",
-            "Preset",
-            "veryfast",
-            "x264 preset name. One of: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow, placebo."
-        );
-        CombatReplayVideoMaxQueuedFrames = config.Bind(
-            "CombatReplayVideo",
-            "MaxQueuedFrames",
-            90,
-            "Maximum frames buffered between GPU readback and the FFmpeg encoder. Frames above this are dropped to protect memory. Default 90 ≈ 3 seconds at 30fps."
         );
         // BazaarDB
         BazaarDbUploadEnabled = config.Bind(

@@ -48,11 +48,7 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
         if (_http is null || _queue is null)
             return;
 
-        var interval = Mathf.Clamp(
-            _services.Config.AutoBazaarDecisionIntervalSeconds?.Value ?? 1.5f,
-            0.5f,
-            10f
-        );
+        const float interval = 1.5f;
         if (Time.unscaledTime - _lastTickTime < interval)
             return;
         _lastTickTime = Time.unscaledTime;
@@ -83,9 +79,7 @@ internal sealed class AutoBazaarRuntime : MonoBehaviour
 
         var enabled = _services.Config.AutoBazaarEnabled?.Value == true;
         var desiredPort = _services.Config.AutoBazaarHttpListenerPort?.Value ?? 47900;
-        var desiredTimeoutMs = (int)(
-            (_services.Config.AutoBazaarHttpEndpointTimeoutSeconds?.Value ?? 3f) * 1000
-        );
+        const int desiredTimeoutMs = 3000;
 
         if (!enabled)
         {

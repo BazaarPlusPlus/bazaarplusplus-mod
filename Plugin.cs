@@ -5,7 +5,6 @@ using System.IO;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.HistoryPanel;
-using BazaarPlusPlus.Game.HistoryPanel.Preview;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.RunLogging;
@@ -95,9 +94,7 @@ public class Plugin : BaseUnityPlugin
 
     private ConfigFile CreatePluginConfigFile()
     {
-        var configFile = new ConfigFile(Path.Combine(Paths.ConfigPath, "BazaarPlusPlus.cfg"), true);
-        HistoryPanelPreviewSettings.Initialize(configFile);
-        return configFile;
+        return new ConfigFile(Path.Combine(Paths.ConfigPath, "BazaarPlusPlus.cfg"), true);
     }
 
     private static void InstallStaticUtilities(

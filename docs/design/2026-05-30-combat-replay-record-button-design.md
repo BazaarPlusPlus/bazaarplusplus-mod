@@ -22,6 +22,7 @@ Combat Replay 的可选 MP4 录制当前是「全局配置开关 + 事件订阅 
    - 取舍：相比「录制器 arm-latch」（全局一次性 flag），参数随 session 走无残留状态、ghost 下载失败天然不录、无需在多处清 flag；相比「录制器不订阅事件、调用方直接驱动」，保留了「出画前一刻就绪、回放结束即收尾」的精确时序。代价是 7 个方法签名各加一个 `bool` 参数（机械改动）。
 2. **UI：HistoryPanel 页脚新增独立「录制并回放」按钮**，作用于当前选中对局，与现有纯 Replay 按钮并存。面板在回放开始时关闭（复用现有协调器行为），故**无需逐行「录制中」状态 UI**。
 3. **Config 精简：** 删 `Enabled`、`ForceSpeed1x`、`SuppressBppOverlays`；保留 `Fps`/`Width`/`Height`/`Crf`/`Preset`/`MaxQueuedFrames`（编码/输出参数）。录制可用性 = FFmpeg 存在 + 支持 `AsyncGPUReadback`，不再有功能总开关。
+   - **后续更新（config 裁剪）：** 这 6 个编码参数已在之后的一轮 mod config 裁剪中改为写死在 `CombatReplayVideoRecorder.BuildCaptureRequest`、并移除整个 `[CombatReplayVideo]` cfg 段；现 `CombatReplayVideo` 已无任何可配置项。
 4. **副作用固定：** 录制时**始终**隐藏 BPP overlay（原 `SuppressBppOverlays` 行为固定为 true）；**不再**强制 1x 速度（删 `ForceSpeed1x` 整套逻辑），录制速度跟随回放本身。
 
 ## 详细设计

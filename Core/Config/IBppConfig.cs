@@ -23,23 +23,7 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? AutoBazaarEnabled { get; }
 
-    ConfigEntry<float>? AutoBazaarDecisionIntervalSeconds { get; }
-
     ConfigEntry<int>? AutoBazaarHttpListenerPort { get; }
-
-    ConfigEntry<float>? AutoBazaarHttpEndpointTimeoutSeconds { get; }
-
-    ConfigEntry<int>? CombatReplayVideoFps { get; }
-
-    ConfigEntry<int>? CombatReplayVideoWidth { get; }
-
-    ConfigEntry<int>? CombatReplayVideoHeight { get; }
-
-    ConfigEntry<int>? CombatReplayVideoCrf { get; }
-
-    ConfigEntry<string>? CombatReplayVideoPreset { get; }
-
-    ConfigEntry<int>? CombatReplayVideoMaxQueuedFrames { get; }
 
     ConfigEntry<bool>? BazaarDbUploadEnabled { get; }
 }

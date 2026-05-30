@@ -141,11 +141,9 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `Hotkeys / EnchantPreview`, `Hotkeys / UpgradePreview` | 附魔/升级预览按键路径 |
 | `Localization / ChineseLocaleMode` | 中文术语模式 |
 | `LegendaryPositionDisplay / Mode` | Legendary 位置展示模式 |
-| `CombatReplayVideo / Fps`, `Width`, `Height`, `Crf`, `Preset` | 视频编码参数；`Width=0` / `Height=0` 表示跟随 `Screen` |
-| `CombatReplayVideo / MaxQueuedFrames` | 抓帧队列上限（录制由 HistoryPanel「录制并回放」按钮单次触发，无全局开关） |
 | `BazaarDB / UploadScreenshots` | 是否将终局截图上传到 `bazaarplusplus-server` 供 BazaarDB 拉取，默认 `false` |
 
-HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings`）。
+Combat Replay 录像的编码参数（帧率 / 分辨率 / CRF / preset / 队列上限）为固定默认值，不再暴露为 cfg。
 
 ## 测试与脚本
 
