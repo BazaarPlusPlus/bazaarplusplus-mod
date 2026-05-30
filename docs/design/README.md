@@ -20,6 +20,7 @@ Work designed but not yet (fully) landed; lives at this top level until implemen
 - [`2026-05-30-combat-replay-audio-loopback-capture.md`](2026-05-30-combat-replay-audio-loopback-capture.md) — Combat Replay 录制音频改用 WASAPI loopback（设备输出）采集 + 跨平台 adapter；记录从 FMOD tap 到 loopback 的排查历程与踩坑（已实现并验证）。
 - [`2026-05-31-combat-replay-audio-macos-process-tap.md`](2026-05-31-combat-replay-audio-macos-process-tap.md) — macOS 音频采集后端：CoreAudio 进程级 tap（`AudioHardwareCreateProcessTap`，14.2+）+ 薄 `BppMacAudio.dylib`，C# 退化成与 WASAPI 相同的 pull 循环（已实现并验证；合并后移入 `archive/` 并加 `Status:` banner）。
 - [`2026-05-31-collection-panel-design.md`](2026-05-31-collection-panel-design.md) — 全屏卡牌图鉴面板（仅 Item+Skill）：用 GUID 实例化原生 `CardPreviewBase` + 有界实例池 + 回收式虚拟化网格，原生外框/tooltip 复用；含逐文件源码锚点与 Phase 0 可行性 spike（**Draft，未开工**）。
+- [`2026-05-31-history-panel-hero-portrait-badge-design.md`](2026-05-31-history-panel-hero-portrait-badge-design.md) — HistoryPanel 英雄文本徽章（`VAN`/`PYG`）改真实头像 Sprite：走 `CollectionManager.GetDefaultHeroSkin` + `SkinAssetDataSO.LoadPortraitSpriteAsync`（异步 Addressables，无硬编码 key），在现有 `Label` 上设 `backgroundImage`，文本徽章降级为 fallback；含 token 防陈旧与逐文件源码锚点（**Draft，未开工**）。
 
 ## Archived specs
 
