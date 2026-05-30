@@ -1,19 +1,15 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarGameShared.Domain.Cards;
-using BazaarGameShared.Domain.Cards.Encounter.Pedestal;
-using BazaarGameShared.Domain.Cards.Encounter.Pedestal.Behaviors;
 using BazaarPlusPlus.Core.GameState;
 
 namespace BazaarPlusPlus.Game.Encounter;
 
 /// <summary>The kind of pedestal offered on the choice screen plus, for enchant
-/// pedestals, the enchant type name(s) the offer would apply. The choice screen can
-/// list several pedestals at once, so the names are the union across every offered
-/// enchant pedestal (a fixed pedestal contributes its one type, a random one its
-/// whole pool). Names are strings so the Core snapshot that stores them stays free
-/// of the game's <c>EEnchantmentType</c>.</summary>
+/// pedestals, the enchant type name(s) it would apply. The choice screen can list
+/// several pedestals at once, so the names are the union across every offered enchant
+/// pedestal. Names are strings so the Core snapshot that stores them stays free of the
+/// game's <c>EEnchantmentType</c>.</summary>
 internal readonly struct ChoiceScreenPedestalResult
 {
     public ChoiceScreenPedestalKind Kind { get; init; }
@@ -23,28 +19,33 @@ internal readonly struct ChoiceScreenPedestalResult
         new() { Kind = ChoiceScreenPedestalKind.None, EnchantmentTypeNames = Array.Empty<string>() };
 }
 
+/// <summary>Classifies the choice screen's offered pedestals. Each SelectionSet entry
+/// is a live instance id; the supplied lookup turns it into the stable template id,
+/// which <see cref="PedestalEnchantCatalog"/> maps to kind + enchant type. Reading the
+/// pedestal's own <c>Behavior</c> is useless on the client (it is obfuscated), hence
+/// the catalog.</summary>
 internal static class ChoiceScreenPedestalResolver
 {
     internal static ChoiceScreenPedestalKind Resolve(
         IReadOnlyList<string>? selectionSet,
-        Func<Guid, ITCard?> templateLookup
-    ) => ResolveDetailed(selectionSet, templateLookup).Kind;
+        Func<string, Guid?> templateIdLookup
+    ) => ResolveDetailed(selectionSet, templateIdLookup).Kind;
 
     internal static ChoiceScreenPedestalResult ResolveDetailed(
         IReadOnlyList<string>? selectionSet,
-        Func<Guid, ITCard?> templateLookup
+        Func<string, Guid?> templateIdLookup
     )
     {
         if (selectionSet == null || selectionSet.Count == 0)
             return ChoiceScreenPedestalResult.None;
 
-        if (templateLookup == null)
-            throw new ArgumentNullException(nameof(templateLookup));
+        if (templateIdLookup == null)
+            throw new ArgumentNullException(nameof(templateIdLookup));
 
-        // The choice screen can offer several pedestals at once. Take the first
-        // non-None pedestal's kind (a SelectionSet historically never mixes upgrade
-        // and enchant), but aggregate enchant type names across EVERY offered enchant
-        // pedestal so the preview can match all of them, not just the first.
+        // A choice screen historically never mixes upgrade and enchant pedestals, so
+        // taking the first non-None pedestal's kind is safe; enchant type names are
+        // still aggregated across every offered enchant pedestal so the preview can
+        // match all of them.
         var kind = ChoiceScreenPedestalKind.None;
         var enchantNames = new List<string>();
         var seenNames = new HashSet<string>(StringComparer.Ordinal);
@@ -53,17 +54,18 @@ internal static class ChoiceScreenPedestalResolver
         {
             if (string.IsNullOrEmpty(id))
                 continue;
-            if (!Guid.TryParse(id, out var guid))
-                continue;
-            if (templateLookup(guid) is not TCardEncounterPedestal pedestal)
+
+            var templateId = templateIdLookup(id);
+            if (templateId is null || templateId.Value == Guid.Empty)
                 continue;
 
-            var entryKind = ClassifyKind(pedestal.Behavior);
+            var entryKind = PedestalEnchantCatalog.Classify(templateId.Value, out var enchant);
             if (kind == ChoiceScreenPedestalKind.None && entryKind != ChoiceScreenPedestalKind.None)
                 kind = entryKind;
 
-            foreach (var name in ExtractEnchantNames(pedestal.Behavior))
+            if (enchant.HasValue)
             {
+                var name = enchant.Value.ToString();
                 if (seenNames.Add(name))
                     enchantNames.Add(name);
             }
@@ -78,29 +80,5 @@ internal static class ChoiceScreenPedestalResolver
             EnchantmentTypeNames =
                 enchantNames.Count == 0 ? Array.Empty<string>() : enchantNames.ToArray(),
         };
-    }
-
-    private static ChoiceScreenPedestalKind ClassifyKind(ITPedestalBehavior? behavior) =>
-        behavior switch
-        {
-            TPedestalBehaviorUpgrade => ChoiceScreenPedestalKind.Upgrade,
-            TPedestalBehaviorEnchant => ChoiceScreenPedestalKind.Enchant,
-            TPedestalBehaviorEnchantRandom => ChoiceScreenPedestalKind.Enchant,
-            _ => ChoiceScreenPedestalKind.None,
-        };
-
-    private static IEnumerable<string> ExtractEnchantNames(ITPedestalBehavior? behavior)
-    {
-        switch (behavior)
-        {
-            case TPedestalBehaviorEnchant fixedEnchant:
-                yield return fixedEnchant.Enchantment.ToString();
-                break;
-            case TPedestalBehaviorEnchantRandom randomEnchant
-                when randomEnchant.Enchantments != null:
-                foreach (var entry in randomEnchant.Enchantments)
-                    yield return entry.Enchantment.ToString();
-                break;
-        }
     }
 }

@@ -28,6 +28,10 @@
       Include="..\..\Game\Encounter\ChoiceScreenPedestalResolver.cs"
       Link="ChoiceScreenPedestalResolver.cs"
     />
+    <Compile
+      Include="..\..\Game\Encounter\PedestalEnchantCatalog.cs"
+      Link="PedestalEnchantCatalog.cs"
+    />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>
