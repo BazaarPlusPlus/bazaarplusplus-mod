@@ -2,7 +2,7 @@
 
 Status: Draft
 
-> 范围：**仅 Item + Skill 两类卡牌**（约 1644 张：Item 1146 + Skill 498）。其余 6 类（EncounterStep / EventEncounter / CombatEncounter / PedestalEncounter / PlayerEffect / SocketEffect）不做。
+> 范围：**仅 Item + Skill 两类卡牌**（原始约 1644 张：Item 1146 + Skill 498；过滤缺图后实际目录约 1571 张，C7）。其余 6 类（EncounterStep / EventEncounter / CombatEncounter / PedestalEncounter / PlayerEffect / SocketEffect）不做。
 > 关联：[2026-05-29-historypanel-fullscreen-responsive-design.md](archive/2026-05-29-historypanel-fullscreen-responsive-design.md)（外壳 + overlay 桥接的前身，含 RenderTexture 方案放弃记录）、[adr/0003-history-panel-preview-overlay.md](../adr/0003-history-panel-preview-overlay.md)。
 
 ## 动机
@@ -38,13 +38,13 @@ Status: Draft
 
 | 部件 | 策略 | 参考代码（真实签名） |
 |---|---|---|
-| 挂载 | `new ComponentMount<CollectionPanel>((c, s) => c.Initialize(s))`（不需自定义 Mount，因为只依赖 `IBppServices`） | `BppComposition.cs:92-116`、`Core/Runtime/IBppMountable.cs` |
+| 挂载 | 自定义 `CollectionPanelMount`（需订阅 `ChineseLocaleModeChanged` 事件以失效目录缓存，Unmount 时 Dispose；仿 `HistoryPanelMount`） | `BppComposition.cs:92-116`、`Core/Runtime/IBppMountable.cs`、`HistoryPanel/HistoryPanelMount.cs:57-59` |
 | 全屏 UITK 外壳（UIDocument/PanelSettings/显隐/Dispose） | 逐字复用 `EnsureCreated` 配方 | `Ui/HistoryPanelUiToolkitView.cs:89-128,162-166,285-297` |
 | 「挖洞 + 像素矩形发布」桥接 | 复用 `OnPreviewContainerGeometryChanged`（点→物理像素 + 翻 Y） + `PreviewContainerBoundsChanged` 事件 | `Ui/HistoryPanelUiToolkitView.cs:60,130-152` |
 | overlay Canvas（ScreenSpaceOverlay 27 + RectMask2D） | 复用 `BattleBoardPreview` 的 `EnsureInitialized`/`ApplyTransform`/`SetPosition`/`SetClipSize` | `Preview/BattleBoardPreview.cs:212-302` |
 | 卡工厂（GUID→原生卡） | 复用 `BattleBoardCardFactory` 反射链，**扩展 Skill 分支** | `Preview/BattleBoardCardFactory.cs` |
 | 卡池 | 复用 Take/Return/淘汰形状，**改按 `(type,size)` 分键** + 补 `_skillReference` harvest | `Preview/HistoryPanelPreviewCardPool.cs` |
-| 取消保护 | 逐字复用 | `Preview/HistoryPanelPreviewGenerationGuard.cs` |
+| 取消保护 | **直接复用**（零 HistoryPanel 耦合，移至 `Core/Runtime/` 或 `Infrastructure/`） | `Preview/HistoryPanelPreviewGenerationGuard.cs` |
 | 设计令牌（颜色/尺寸/间距/英雄色/tier 色） | 复用 | `Infrastructure/UiTokens/Colors.cs`、`Sizes.cs`、`Spacing.cs` |
 | 设置坞入口 | 克隆 `HistoryPanelSettingsDockEntry`（`ISettingsDockEntry.Build`） | `HistoryPanel/HistoryPanelSettingsDockEntry.cs`、`Game/Settings/BppSettingsDockDefinition.cs` |
 | 热键 + Escape + IsInCombat 关闭 | 克隆 `HistoryPanel` 的 static 单例 + `Update` 轮询 | `HistoryPanel/HistoryPanel.cs:19-50` |
@@ -52,7 +52,9 @@ Status: Draft
 | 输入硬拦截（可选） | 克隆 `EndOfRunMouseBlocker`（透明 Image + GraphicRaycaster） | `Game/Screenshots/EndOfRunMouseBlocker.cs:54-104` |
 | 目录 / 虚拟化器 / 缓存 / 中继 | **新写**（§5–§9） | —— |
 
-> 注：HistoryPanel 用自定义 `HistoryPanelMount` 是因为它有构造期依赖（`combatReplayRuntime`/`onlineClient` 闭包）；Collection Panel 没有这种依赖，直接用泛型 `ComponentMount<T>` 即可（见 `BppComposition.cs:95,99` 的同类用法）。
+> **共享抽象路线图**：首次实现允许克隆，但以下组件应在 Phase 5 或后续重构中提取为共享模块：(1) `GenerationGuard` → 移至 `Core/Runtime/`（已无 HistoryPanel 耦合）；(2) UITK 外壳 PanelSettings 配方 → 提取 `BppUiToolkitShell.CreatePanelSettings(sortingOrder)` 到 `Infrastructure/`；(3) overlay Canvas EnsureInitialized/ApplyTransform → 提取为参数化的 `NativeCardOverlay` 类；(4) 卡工厂反射链 → 提取共享的 `CardPreviewReflection` 模块。
+>
+> 注：CollectionPanel 需要自定义 `CollectionPanelMount`（而非 `ComponentMount<T>`），因为需要订阅 `ChineseLocaleModeChanged` 事件以在语言切换时失效目录缓存（`CollectionCatalog._cache`），并在 Unmount 时 Dispose 订阅。仿 `HistoryPanelMount.cs:57-59`。
 
 ### 2.2 目录结构（建议）
 
@@ -82,25 +84,33 @@ Game/CollectionPanel/
 ### 2.3 挂载与单例（真实签名）
 
 ```csharp
-// CollectionPanel.cs —— 仿 HistoryPanel.cs:19-50 的 static 单例 + Update 模式
+// CollectionPanel.cs —— 仿 HistoryPanel.cs:160-188 的 Update 模式 + :384-398 的 DetectSceneChange
 internal sealed class CollectionPanel : MonoBehaviour
 {
     private static CollectionPanel? _instance;
     private bool _isVisible;
     private IBppConfig _config = null!;
+    private string _lastSceneToken = string.Empty;
 
     public static bool IsVisible => _instance != null && _instance._isVisible;
 
-    public void Initialize(IBppServices services)   // 由 ComponentMount 调用
+    public void Initialize(IBppServices services)   // 由 CollectionPanelMount 调用
     {
         _instance = this;
         _config = services.Config;
-        // 订阅 locale 变更等（仿 HistoryPanelMount）
+        _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
     }
 
-    public static void OpenFromDockEntry()          // 设置坞 Activate 回调
+    public static void OpenFromDockEntry()
     {
-        if (_instance == null) return;
+        if (_instance == null)
+        {
+            BppLog.Warn("CollectionPanel", "Dock entry requested while CollectionPanel is unavailable.");
+            return;
+        }
+        // 面板互斥：打开自己前关闭 HistoryPanel
+        if (HistoryPanel.IsVisible)
+            HistoryPanel.Instance?.CloseFromExternalRequest();
         _instance._isVisible = true;
         _instance.ApplyVisibility();
         _instance.EnsureCatalogAndRefresh();
@@ -108,20 +118,42 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void Update()
     {
+        DetectSceneChange();
+
+        if (_isVisible && TheBazaar.Data.IsInCombat) { Close(); return; }
+
+        if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig.Value))
+        { Toggle(); return; }
+
         if (!_isVisible) return;
         if (Keyboard.current is { } kb && kb.escapeKey.wasPressedThisFrame) { Close(); return; }
-        if (TheBazaar.Data.IsInCombat) { Close(); return; }
-        // 热键见 §11.2
     }
 
-    private void OnDestroy() { if (ReferenceEquals(_instance, this)) _instance = null; }
+    // 仿 HistoryPanel.cs:384-398
+    private void DetectSceneChange()
+    {
+        var currentSceneToken = GetSceneToken(SceneManager.GetActiveScene());
+        if (string.Equals(currentSceneToken, _lastSceneToken, StringComparison.Ordinal)) return;
+        _lastSceneToken = currentSceneToken;
+        if (_isVisible) Close();
+        DisposeOverlayAndPool();   // Return 所有卡、释放 L2 handle、dispose overlay
+    }
+
+    private void OnDestroy()
+    {
+        if (ReferenceEquals(_instance, this)) _instance = null;
+        DisposeOverlayAndPool();
+    }
+
+    private static string GetSceneToken(Scene scene) =>
+        $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
 }
 ```
 
 ```csharp
 // BppComposition 构造函数里追加（与 :87/:95 同形）：
 _settingsDockRegistry.Register(new CollectionPanelSettingsDockEntry());
-_mountables.Register(new ComponentMount<CollectionPanel>((c, s) => c.Initialize(s)));
+_mountables.Register(new CollectionPanelMount());  // 自定义 Mount：订阅 locale 变更、Unmount 时 Dispose
 ```
 
 ---
@@ -138,11 +170,6 @@ _mountables.Register(new ComponentMount<CollectionPanel>((c, s) => c.Initialize(
 // CollectionCatalog.cs —— 一次性构建并缓存
 internal sealed class CollectionCatalog
 {
-    private static readonly Type? ManagerType =
-        AccessTools.TypeByName("TheBazaar.DataManagement.Json.JsonGameDataManager");
-    private static readonly MethodInfo? GetCardMapMethod =
-        ManagerType != null ? AccessTools.Method(ManagerType, "GetCardMap") : null;
-
     private IReadOnlyList<CollectionCardVm>? _cache;
 
     public bool TryBuild(out IReadOnlyList<CollectionCardVm> cards)
@@ -151,15 +178,17 @@ internal sealed class CollectionCatalog
         cards = Array.Empty<CollectionCardVm>();
 
         var manager = BppStaticDataAccess.TryGet();          // null = 静态数据未就绪（§14 R5）
-        if (manager == null || GetCardMapMethod == null) return false;
+        if (manager == null) return false;
 
-        // ⚠ GetCardMap() 内部对全表 AsParallel 反序列化，首次调用是一次主线程长停顿（§12）。
-        if (GetCardMapMethod.Invoke(manager, Array.Empty<object>()) is not IDictionary map) return false;
+        // 游戏 DLL 已 publicize，直接强转免反射。GetCardMap() 只返回构造时已建完的 Dictionary（§12），
+        // 遍历构建 VM 可安全分帧或后台化（见 §12 性能预算）。
+        var cardManager = (JsonGameDataManager)manager;
+        var map = cardManager.GetCardMap();   // Dictionary<Guid, ITCard>
 
         var list = new List<CollectionCardVm>(map.Count);
-        foreach (DictionaryEntry e in map)
+        foreach (var (_, card) in map)
         {
-            if (e.Value is not TCardBase c) continue;
+            if (card is not TCardBase c) continue;
             if (c.Type != ECardType.Item && c.Type != ECardType.Skill) continue;  // §1 范围
             if (!HasValidArt(c)) continue;                                         // C7：丢弃缺图
             list.Add(CollectionCardVm.From(c));
@@ -169,28 +198,31 @@ internal sealed class CollectionCatalog
         return true;
     }
 
+    // 语言切换时由 CollectionPanelMount 调用
+    public void InvalidateCache() => _cache = null;
+
     // 复刻 CardPreviewBase.HasValidArtKey()（CardPreviewBase.cs:166-173）
     private static bool HasValidArt(TCardBase c) =>
         !string.IsNullOrEmpty(c.ArtKey) && c.ArtKey != "Invalid";
 }
 ```
 
-> `JsonGameDataManager` 是 internal，类型名用 `AccessTools.TypeByName` 解析；因游戏 DLL 已 publicize，拿到实例后也可直接强转免反射。`TCardBase`/`ECardType` 在 `BazaarGameShared`（mod 已引用）。
+> `JsonGameDataManager` 游戏 DLL 已 publicize，直接强转 `(JsonGameDataManager)BppStaticDataAccess.TryGet()` 调 `GetCardMap()` 即可，无需 `AccessTools.TypeByName` 反射。`TCardBase`/`ECardType` 在 `BazaarGameShared`（mod 已引用）。
 
 ### 3.2 VM 投影
 
 ```csharp
-// CollectionCardVm.cs
+// CollectionCardVm.cs —— 不可变投影，筛选/虚拟化器共享引用
 internal sealed class CollectionCardVm
 {
-    public Guid Id;
-    public ECardType Type;          // Item | Skill
-    public ECardSize Size;          // Item: Small/Medium/Large；Skill 恒 Medium，不参与
-    public ETier StartingTier;
-    public IReadOnlyCollection<EHero> Heroes;   // 集合：技能常多英雄
-    public IReadOnlyCollection<ECardTag> Tags;
-    public string DisplayName;      // 当前语言（§10.2），失败回退 InternalName
-    public string ArtKey;
+    public Guid Id { get; init; }
+    public ECardType Type { get; init; }          // Item | Skill
+    public ECardSize Size { get; init; }          // Item: Small/Medium/Large；Skill 恒 Medium，不参与
+    public ETier StartingTier { get; init; }
+    public IReadOnlyCollection<EHero> Heroes { get; init; } = Array.Empty<EHero>();
+    public IReadOnlyCollection<ECardTag> Tags { get; init; } = Array.Empty<ECardTag>();
+    public string DisplayName { get; init; } = string.Empty;   // 当前语言（§10.2），失败回退 InternalName
+    public string ArtKey { get; init; } = string.Empty;
 
     public static CollectionCardVm From(TCardBase c) => new()
     {
@@ -244,7 +276,9 @@ internal static class CollectionFilterEngine
 }
 ```
 
-筛选变化 → `generation.Bump()` 取消在飞渲染 → 用新可见集重置虚拟化器、滚回顶部。
+筛选变化 → `generation.Bump()`（**单次**，不是每张卡 Bump）取消在飞渲染 → 用新可见集重置虚拟化器、滚回顶部。
+
+> ⚠️ **搜索输入必须 debounce**（200–300ms），否则逐字符触发 Apply + 重置虚拟化器。英雄/稀有度 chip 点击无需 debounce。
 
 ---
 
@@ -260,7 +294,9 @@ UITK 外壳 (PanelSettings.sortingOrder = 26)            ← 黑底 + header + �
         └─ N 张 pooled CardPreviewBase（仅可见窗口 + 过扫）
 ```
 
-因 **UITK VisualElement 不能承载 uGUI RectTransform 子节点**（C1 决定卡是 uGUI），沿用 HistoryPanel 已验证的「挖洞 + 兄弟 overlay」桥接。常量沿用 `BattleBoardPreview`：`OverlaySortingOrder = 27`、`DefaultLayer = 30`（`BattleBoardPreview.cs:27-28`）。
+因 **UITK VisualElement 不能承载 uGUI RectTransform 子节点**（C1 决定卡是 uGUI），沿用 HistoryPanel 已验证的「挖洞 + 兄弟 overlay」桥接。常量沿用 `BattleBoardPreview`：`OverlaySortingOrder = 27`、`DefaultLayer = 30`（`BattleBoardPreview.cs:27-28`）。如果启用输入硬拦截（§11.3），卡 overlay 提升到 28，拦截层放 27。
+
+> ⚠️ **面板互斥**：CollectionPanel 和 HistoryPanel 共享 sortingOrder 对（UITK=26, overlay=27），**不可同时可见**。打开一个时必须关闭另一个（§2.3）。
 
 ### 5.2 滚动与桥接
 
@@ -300,6 +336,9 @@ realizedRows  = [firstVisRow - OVERSCAN, lastVisRow + OVERSCAN]   // OVERSCAN = 
 
 ```csharp
 // CollectionGridVirtualizer.cs（精简）
+private float _lastScrollY = float.NaN;
+private readonly List<int> _recycleKeys = new();   // 预分配，避免每帧 LINQ 分配
+
 public void Tick(float scrollY)
 {
     int first = Mathf.Max(0, Mathf.FloorToInt(scrollY / _rowHeight) - Overscan);
@@ -307,44 +346,79 @@ public void Tick(float scrollY)
     int firstIdx = first * _cols;
     int lastIdx  = Mathf.Min(_visible.Count - 1, (last + 1) * _cols - 1);
 
-    // 1) 回收滚出窗口的格子
-    foreach (var (idx, cell) in _realized.Where(kv => kv.Key < firstIdx || kv.Key > lastIdx).ToList())
+    // 1) 回收滚出窗口的格子（预分配 List 收集 key，避免每帧 LINQ 分配）
+    _recycleKeys.Clear();
+    foreach (var kv in _realized)
+        if (kv.Key < firstIdx || kv.Key > lastIdx) _recycleKeys.Add(kv.Key);
+    foreach (var idx in _recycleKeys)
     {
-        cell.Card.OnHoverOut();                                  // §9.3：回收前无条件 OnHoverOut
-        _pool.Return(cell.Card, cell.Vm.Type, cell.Vm.Size);
+        var cell = _realized[idx];
+        TryOnHoverOutSafe(cell.Card);                            // §9.3：回收前无条件 OnHoverOut（null-safe）
+        if (cell.IsSetUpInFlight)
+            cell.MarkPendingReturn();                            // C2 竞态防护：标记 pending-return，Task 完成后真正 Return
+        else
+            _pool.Return(cell.Card, cell.Vm.Type, cell.Vm.Size);
         _realized.Remove(idx);
     }
 
-    // 2) 为新进窗口的格子取卡（限流：本帧只处理 ≤ Budget 个「冷」加载，§7/§12）
+    // 2) 为新进窗口的格子取卡
+    //    限流：本帧「冷」加载不超过帧时间预算（自适应，默认 3ms；非固定张数）
+    float tickStart = Time.realtimeSinceStartup;
     for (int idx = firstIdx; idx <= lastIdx; idx++)
     {
-        if (_realized.TryGetValue(idx, out var existing)) { Reposition(idx, existing.Card); continue; }
-        if (_coldThisFrame >= _budget && IsCold(_visible[idx])) continue;   // 留到下一帧
+        if (_realized.TryGetValue(idx, out var existing)) continue;  // 已实现，Reposition 见下
+        if (IsCold(_visible[idx]) && (Time.realtimeSinceStartup - tickStart) > _coldBudgetMs * 0.001f)
+            continue;   // 留到下一帧
 
         var vm   = _visible[idx];
         var card = _pool.Take(vm.Type, vm.Size, _boardRoot);     // §6.3
-        var task = _factory.Bind(card, vm);                      // §6.2  GUID→Resize→SetUp
+        var bindGeneration = ++_perCardGeneration;                // per-card generation（非全局 Bump）
+        var task = _factory.Bind(card, vm);                      // §6.2
         AttachHover(card);                                       // §9
-        _realized[idx] = new RealizedCell(idx, vm, card);
-        Reposition(idx, card);
-        ShowWhenReady(card, task, _generation.Bump());           // 不阻塞；过期则丢弃
+        var cell = new RealizedCell(idx, vm, card, task, bindGeneration);
+        _realized[idx] = cell;
+        ShowWhenReady(cell);                                     // 不阻塞；generation 不匹配则丢弃
+    }
+
+    // 3) 仅在 scrollY 变化时重写 anchoredPosition（避免无用 Canvas rebuild）
+    // ReSharper disable once CompareOfFloatsByEqualityOperator
+    if (scrollY != _lastScrollY)
+    {
+        _lastScrollY = scrollY;
+        foreach (var kv in _realized)
+            Reposition(kv.Key, kv.Value);
     }
 }
 
-private void Reposition(int idx, Component card)
+private void Reposition(int idx, RealizedCell cell)
 {
     int row = idx / _cols, col = idx % _cols;
     float x =  col * (_cellW + _gap) + _cellW / 2f;
-    float y = -((row * _rowHeight) - _scrollY) - _cellH / 2f;    // 滚动偏移合进 y
-    ((RectTransform)card.transform).anchoredPosition = new Vector2(x, y);
+    float y = -((row * _rowHeight) - _lastScrollY) - _cellH / 2f;
+    cell.CachedRect.anchoredPosition = new Vector2(x, y);  // RectTransform 在 RealizedCell 创建时缓存
+}
+
+// §9.3 null-safe：场景切换/销毁路径中 TooltipParentComponent 可能已拆除
+private static void TryOnHoverOutSafe(Component card)
+{
+    try { card?.OnHoverOut(); } catch { /* swallow NRE from torn-down tooltip system */ }
 }
 ```
 
+**C2 竞态防护：pending-return 机制**
+
+`RealizedCell` 在创建时记录 (bindGeneration, Task)。回收时若 Task 仍 in-flight，不立即 Return 到池，而是标记 `PendingReturn = true`。`ShowWhenReady` 在 Task 完成后检查：
+- `bindGeneration` 不匹配当前卡 → 丢弃（旧 SetUp 覆盖新 SetUp 的竞态）
+- `PendingReturn == true` → 跳过 Show，直接 Return 到池
+
+这保证旧 SetUp 的 LoadFrame/LoadArt 完成后不会修改已被新 VM 占用的卡。
+
 要点：
-- **滚动 = 仅 `Reposition`**（重写 `anchoredPosition`），不碰 SetUp/Addressables；丝滑关键。
-- **换绑 = `Return` 旧 + `Take` + `Bind` 新**；只在格子 idx 进/出窗口时发生，按帧限流。
+- **滚动 = 仅 `Reposition`**（重写 `anchoredPosition`），不碰 SetUp/Addressables；丝滑关键。scrollY 未变时跳过整个循环，避免无用 Canvas rebuild。
+- **换绑 = pending-return + `Take` + `Bind` 新**；只在格子 idx 进/出窗口时发生。
+- **冷加载限流**：自适应帧时间预算（默认 3ms），而非固定张数。144Hz 下自动收紧，空视口时自动放宽。
 - 活实例数恒等于 `realizedRows × cols`（几十张，§12），不膨胀。
-- `ShowWhenReady` 复用 `generation.Bump()/IsCurrent` 模式（`HistoryPanelPreviewGenerationGuard.cs`）：等聚合 Task 完成后 `Show(true)`，期间用 guard 丢弃过期项。
+- `ShowWhenReady` 使用 **per-card generation**（每次 Bind 递增的计数器），而非全局 `generation.Bump()`。全局 Bump 仅在筛选变化时触发（§4），用于取消整个可见集重算。
 
 ### 5.4 尺寸 / 比例（重要：原生比例不可拉伸）
 
@@ -372,22 +446,31 @@ private void Reposition(int idx, Component card)
 
 现有 `BattleBoardCardFactory` 只建 `TCardInstanceItem`。新工厂按类型分支：
 
+> ⚠️ **必须修改 `InvokeSetUpSafe` 签名**：现有 `BattleBoardCardFactory.InvokeSetUpSafe`（`BattleBoardCardFactory.cs:158-161`）第三参数类型是 `TCardInstanceItem`。游戏的 `CardPreviewBase.SetUp` 接受基类 `TCardInstance`，所以反射调用时传 `TCardInstanceSkill` 运行时安全，但 **C# 编译器不允许将 `TCardInstanceSkill` 传给 `TCardInstanceItem` 形参**（两个并列子类型）。CollectionCardFactory 的 `InvokeSetUpSafe` 必须接受 `TCardInstance`（基类），或新增重载。
+
 ```csharp
 // CollectionCardFactory.cs（扩展自 BattleBoardCardFactory）
+private int _instanceCounter;
+
 public Task Bind(Component card, CollectionCardVm vm)
 {
     var staticData = BppStaticDataAccess.TryGet();
-    var template = HistoryPanelPreviewTemplateLookup.GetCardTemplate(staticData, vm.Id); // 反射 GetCardById
+    var template = HistoryPanelPreviewTemplateLookup.GetCardTemplate(staticData, vm.Id);
     if (template == null) return Task.CompletedTask;
 
+    // 仿 BuildSyntheticInstance 补齐 InstanceId/TemplateVersion，避免下游 NPE
     TCardInstance instance = vm.Type == ECardType.Skill
         ? new TCardInstanceSkill { TemplateId = vm.Id, Tier = vm.StartingTier,
+                                   InstanceId = $"bpp-collection-{_instanceCounter++}",
+                                   TemplateVersion = string.Empty,
                                    Attributes = new Dictionary<ECardAttributeType,int>() }
         : new TCardInstanceItem  { TemplateId = vm.Id, Tier = vm.StartingTier,
+                                   InstanceId = $"bpp-collection-{_instanceCounter++}",
+                                   TemplateVersion = string.Empty,
                                    Attributes = new Dictionary<ECardAttributeType,int>() };
 
-    ResizeViaReflection(card);                       // 先 Resize（沿用现有反射封装）
-    return InvokeSetUpSafe(card, template, instance); // SetUp(template,false,instance) → 内部 LoadFrame+LoadArt+CreateTooltipData
+    ResizeViaReflection(card);
+    return InvokeSetUpSafe(card, template, instance); // 签名改为接受 TCardInstance 基类
 }
 ```
 
@@ -415,41 +498,65 @@ private static readonly FieldInfo? SkillReferenceField =
 |---|---|---|---|
 | L0 | 游戏 | `AssetLoader.assetCache/_handleCache/_inflight`（`AssetLoader.cs:154-158`）：**Skill 贴图** + 边框预制体走这里，自动去重缓存 | **啥都不做**（白嫖）。**绝不调 `ReleaseAllCachedAssets()`**（`AssetLoader.cs:939`，会清空全局共享缓存、拔掉别处美术） |
 | L1 | 我们 | **实例池**（§6.3）：按 kind 分键的 `CardPreviewBase`，随窗口 Take/Return + re-SetUp | 主缓存。每键硬上限（30/键），超出 Destroy |
-| L2 | 我们 | **Item 美术 LRU**：`CardPreviewItem.LoadArt` 直接 `Addressables.LoadAssetAsync<CardAssetDataSO>`，**绕过 L0**（C5），不缓存会全常驻 | 自建 `Dictionary<artKey,(SO,handle)>` + LRU（保留最近 ~256 distinct）；淘汰 `Addressables.Release(handle)` |
-| L3 | 我们（可选） | **Item Material 复用**：`UpdateCardImageMaterial` 每次 `new Material`（`CardPreviewItem.cs:51-78`），快滚抖动 | 按 artKey 缓存 `Material`；Harmony patch `UpdateCardImageMaterial` 命中即复用、跳过 new。**等 profiler 证明是瓶颈再上** |
+| L2 | 我们 | **Item 美术 LRU**：`CardPreviewItem.LoadArt` 直接 `Addressables.LoadAssetAsync<CardAssetDataSO>`，**绕过 L0**（C5），不缓存会全常驻 | 自建 `Dictionary<artKey,(SO,handle,refCount)>` + LRU（保留最近 ~256 distinct）；淘汰前检查 refCount==0 才 `Addressables.Release(handle)`（见下方引用计数说明） |
+| L3 | 我们 | **Item Material 共享池**（**Phase 2 同期实现，非可选**）：`UpdateCardImageMaterial` 每次 `new Material`（`CardPreviewItem.cs:51-78`）。40-64 张独立 Material = 40-64 个 draw call（结构性问题，非分配成本），阻止 uGUI 动态合批 | 按 artKey 缓存 `Material`；Harmony patch `UpdateCardImageMaterial` 命中即复用、跳过 new。同 artKey 的卡共享 Material 实例，预计将 draw call 从 40-64 降至 ~15-25 |
 
 ```csharp
-// CollectionCardArtCache.cs —— L2
+// CollectionCardArtCache.cs —— L2（引用计数 + O(1) LRU）
 internal sealed class CollectionCardArtCache
 {
     private readonly int _capacity;
-    private readonly Dictionary<string, AsyncOperationHandle<CardAssetDataSO>> _handles = new();
+    private readonly Dictionary<string, CacheEntry> _entries = new();
     private readonly LinkedList<string> _lru = new();
+    private readonly Dictionary<string, LinkedListNode<string>> _nodeMap = new();  // O(1) Touch
+
+    private sealed class CacheEntry
+    {
+        public AsyncOperationHandle<CardAssetDataSO> Handle;
+        public int RefCount;   // 活跃+池中引用此 artKey 的卡数量
+    }
 
     public async Task<CardAssetDataSO?> Get(string artKey)
     {
-        if (_handles.TryGetValue(artKey, out var h)) { Touch(artKey); return h.Result; }
+        if (_entries.TryGetValue(artKey, out var entry)) { Touch(artKey); return entry.Handle.Result; }
         var handle = Addressables.LoadAssetAsync<CardAssetDataSO>(artKey);
         await handle.Task;
         if (handle.Status != AsyncOperationStatus.Succeeded) return null;
-        _handles[artKey] = handle; _lru.AddFirst(artKey);
+        var node = _lru.AddFirst(artKey);
+        _nodeMap[artKey] = node;
+        _entries[artKey] = new CacheEntry { Handle = handle, RefCount = 0 };
         Evict();
         return handle.Result;
     }
+
+    // 池 Take 时 +1，Return 且清除 Material 后 -1
+    public void AddRef(string artKey) { if (_entries.TryGetValue(artKey, out var e)) e.RefCount++; }
+    public void Release(string artKey) { if (_entries.TryGetValue(artKey, out var e)) e.RefCount = Math.Max(0, e.RefCount - 1); }
 
     private void Evict()
     {
         while (_lru.Count > _capacity)
         {
-            var key = _lru.Last!.Value; _lru.RemoveLast();
-            if (_handles.Remove(key, out var h)) Addressables.Release(h);
+            var key = _lru.Last!.Value;
+            if (_entries.TryGetValue(key, out var entry) && entry.RefCount > 0)
+                break;   // 尾部仍被引用，停止驱逐
+            _lru.RemoveLast(); _nodeMap.Remove(key);
+            if (_entries.Remove(key, out var removed)) Addressables.Release(removed.Handle);
         }
     }
-    private void Touch(string k) { _lru.Remove(k); _lru.AddFirst(k); }
+
+    // O(1)：通过 _nodeMap 直接定位 LinkedListNode，无需线性扫描
+    private void Touch(string k)
+    {
+        if (!_nodeMap.TryGetValue(k, out var node)) return;
+        _lru.Remove(node); _lru.AddFirst(node);
+    }
 }
 ```
 
 > L2/L3 接入点：`LoadArt`/`UpdateCardImageMaterial` 是 `SetUp` 内部调用，干净做法是 **Harmony patch `CardPreviewItem.LoadArt`（或 `UpdateCardImageMaterial`）**，命中缓存就用缓存的 `CardAssetDataSO`/`Material` 跳过原生 Addressables。Skill 不需要 L2/L3（走 L0）。
+>
+> **L2 引用计数要点**：池 Take 一张 Item 卡时调 `AddRef(artKey)`，Return 时先 Destroy 卡的 Material + 置空 `_cardImage.texture`，然后调 `Release(artKey)`。这保证 LRU 驱逐时 `RefCount==0` 的条目不再有任何活跃 Material 引用其 SO 子资产，Release handle 安全。
 
 **关闭面板**：只释放我们自己的句柄（L2 全 `Release` + 清空、L1 Destroy 超额）；L0 交还游戏。Skill 美术若要回收用 `AssetLoader.ReleasePreviouslyLoadedAsset(artKey)`（`AssetLoader.cs:838`），通常留给 L0 自然管理。
 
@@ -514,7 +621,9 @@ internal sealed class CollectionCardHoverRelay : MonoBehaviour, IPointerEnterHan
 
 ### 9.4 interop 注意
 
-tooltip 渲染栈是 uGUI（独立于 UITK 外壳），UITK 面板能正常显示它。风险在**输入**：overlay(27) 的 uGUI 命中要能越过 UITK 面板(26) 的 `pickingMode=Position` 拾取（`HistoryPanelUiToolkitView.cs:121`）。两套排序非简单整数比较，**Phase 0 必须实测**。兜底（Plan B）：禁用命中 Image，改在 `Update` 里手动 hit-test——用发布的像素矩形 + `Input.mousePosition` 算命中格 → 调该卡 `OnHover()/OnHoverOut()`。Plan B 不依赖 GraphicRaycaster 与 UITK 排序协调，更稳但更繁琐，需预先写好。
+tooltip 渲染栈是 uGUI（独立于 UITK 外壳），UITK 面板能正常显示它。风险在**输入**：overlay(27) 的 uGUI 命中要能越过 UITK 面板(26) 的 `pickingMode=Position` 拾取（`HistoryPanelUiToolkitView.cs:121`）。两套排序非简单整数比较，**Phase 0 必须实测**。兜底（Plan B）：禁用命中 Image，改在 `Update` 里手动 hit-test——用发布的像素矩形 + `Mouse.current.position.ReadValue()`（新 Input System，与 mod 其他位置一致；**不用 `Input.mousePosition`**，旧 Input Manager 在游戏设为仅新 Input System 时不更新）算命中格 → 调该卡 `OnHover()/OnHoverOut()`。Plan B 不依赖 GraphicRaycaster 与 UITK 排序协调，更稳但更繁琐，需预先写好。
+
+> ⚠️ Plan B 对 Skill 圆形卡使用矩形近似 hit-test，四角会有误触。显式接受此折中（圆形卡四角面积极小，实际影响可忽略）；如需精确，为 Skill 增加圆形变体（检查鼠标到卡中心距离 vs 半径）。
 
 ---
 
@@ -522,7 +631,7 @@ tooltip 渲染栈是 uGUI（独立于 UITK 外壳），UITK 面板能正常显�
 
 ### 10.1 顶部筛选栏
 
-`CollectionPanelView.FilterBar.cs`：英雄（chips 多选，排除 `Hero8`）、稀有度（chips 多选）、名称（UITK `TextField`）、Item/Skill tab。元素样式复用 `Colors`/`Sizes`/`UiSpacing`。任一变化 → 更新 `CollectionFilterState` → `CollectionFilterEngine.Apply` → 重置虚拟化器。
+`CollectionPanelView.FilterBar.cs`：英雄（chips 多选，排除 `Hero8`）、稀有度（chips 多选）、名称（UITK `TextField`，**200ms debounce**——逐字符触发 Apply + 虚拟化器重置开销过大）、Item/Skill tab。元素样式复用 `Colors`/`Sizes`/`UiSpacing`。任一变化 → 更新 `CollectionFilterState` → `CollectionFilterEngine.Apply` → `generation.Bump()`（全局单次）→ 重置虚拟化器。
 
 ### 10.2 本地化名
 
@@ -580,7 +689,7 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 
 ### 11.3 输入硬拦截（可选）
 
-若要阻止点击/热键漏到游戏，加一个 `EndOfRunMouseBlocker` 式拦截层（`EndOfRunMouseBlocker.cs:54-104`）。**与 §9 命中的张力**：拦截层 sortingOrder 要介于面板(26)与卡(27)之间、或只挡背景区给网格留洞，否则会吞掉卡的 hover。
+若要阻止点击/热键漏到游戏，加一个 `EndOfRunMouseBlocker` 式拦截层（`EndOfRunMouseBlocker.cs:54-104`）。**排序层方案**：因 26 和 27 之间无整数间隙，将卡 overlay 提升到 `sortingOrder=28`，拦截层放 `sortingOrder=27`（介于 UITK 面板(26) 和卡(28) 之间），这样拦截层挡背景区但不吞卡的 hover。
 
 ---
 
@@ -590,33 +699,35 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 |---|---|---|
 | 同时存活原生卡 | Item 峰值 ~40–64（6–8 列 × 4–6 行 + 过扫）；Skill 收紧到 ~70 量级 | §5.3 窗口 × 列数 |
 | 每键池上限 | 30/键（照搬现有池） | `HistoryPanelPreviewCardPool` |
-| 每帧冷加载限流 | ≤ 4 张「冷」`SetUp`/帧（热加载可一次铺满） | 防 Addressables 集中抖动 |
+| 每帧冷加载限流 | 自适应帧时间预算（默认 3ms/帧），而非固定张数。144Hz 下自动收紧，空视口时自动放宽 | 防 Addressables 集中抖动，适应不同刷新率 |
 | Item 美术 LRU | 保留最近 ~256 distinct `CardAssetDataSO` | §7 L2 |
 | 滚动开销 | 仅 `anchoredPosition` 重写，O(可见格) | §5.3 |
 
-**冷 / 热区分**：限流单位应是「本帧新发起的**冷**加载数」而非「新 SetUp 数」。Skill 贴图走 L0 共享缓存，重访同 GUID 几乎瞬时（热），可一次铺满可见窗；Item 首次 Addressables（冷）才严格逐帧。
+**冷 / 热区分**：限流单位是「本帧冷加载已消耗的墙钟时间」（`Time.realtimeSinceStartup` 差值），而非固定张数。Skill 贴图走 L0 共享缓存，重访同 GUID 几乎瞬时（热），可一次铺满可见窗；Item 首次 Addressables（冷）才严格按时间预算限流。
 
-**首次打开停顿**：`GetCardMap()` 内部对全表（含我们不要的类型）`AsParallel` 反序列化 + `[ThreadStatic]` 序列器 + 非原子重赋字典，**后台化有线程安全障碍**。当作**一次主线程长停顿**：首次打开显示 loading，构建完缓存进 `CollectionCatalog`，后续不重读。spike 实测耗时。
+**首次打开构建目录**：`GetCardMap()` 只是 `return _cards`（`decompiled/JsonGameDataManager.cs:64-66`），返回 `Create()` 时已构建完成的不可变 `Dictionary`。`AsParallel` 反序列化只在 `Create()` 内执行（`ReadAllInParallel`），mod 调用 `GetCardMap()` 时字典已经是安全的只读状态。因此遍历字典 + 构建 VM 列表**可以安全地后台化**（`Task.Run` 或分帧 coroutine），消除首次打开的主线程卡顿。Phase 0 spike 实测耗时以决定是否需要分帧。
 
 ---
 
 ## 13. 分阶段实施
 
 ### Phase 0 — 可行性 spike（闸门，先做，1–2 天）
-在游戏里证明五件事全绿，否则各自落兜底：
-1. **overlay 里原生卡能被指针命中、触发 `OnHover` 出 tooltip**（Item + Skill 各一张）→ 不行则 §9.4 手动 hit-test。
-2. **三种 Item size 预制体真实 `(W,H)` 比例** + Skill 方形尺寸 → 回填 §5.4 / §8.2。
-3. **`GetCardMap()` 首次主线程耗时** → 决定 loading 呈现。
-4. **帧率**：加到 30/50/80 张读 `BepInEx/LogOutput.log` 帧时间 → 定过扫窗口。
-5. **Item Material churn**（profiler）→ 决定是否上 §7 L3。
+在游戏里证明五件事全绿，否则各自落兜底。每项有**定量 pass/fail 标准**：
 
-附带确认：`_skillReference` harvest 通、`TCardInstanceSkill` SetUp 通。交付：能 hover 出 tooltip 的原生卡小网格 + 一份实测数字。**这是 go/no-go。**
+1. **overlay 里原生卡能被指针命中、触发 `OnHover` 出 tooltip**（Item + Skill 各一张）→ pass = tooltip 弹出且内容正确；fail → §9.4 手动 hit-test。
+2. **三种 Item size 预制体真实 `(W,H)` 比例** + Skill 方形尺寸 → 回填 §5.4 / §8.2。记录实测 `(nativeWidth, nativeHeight)` 三组 + Skill 尺寸。
+3. **`GetCardMap()` 遍历 + VM 构建耗时** → pass = ≤200ms（可分帧）；≤500ms 可接受但需 loading；>500ms 需后台化（§12 确认线程安全）。
+4. **帧率**：加到 30/50/80 张读 `BepInEx/LogOutput.log` 帧时间 → pass = ≥45fps@80 卡。
+5. **Item Material churn**（profiler）→ 量化 draw call 数。L3 已提升为 Phase 2 必做项，spike 确认 draw call 基线。
+6. **`TLocalizableText` → 当前语言字符串的访问器**（Phase 1 阻塞依赖，不可推迟）→ 确认访问器模式（反射 or 游戏工具方法）并产出可工作的 `LocalizationResolver`。
+
+附带确认：`_skillReference` harvest 通、`TCardInstanceSkill` SetUp 通（含 `InstanceId`/`TemplateVersion` 填充）。交付：能 hover 出 tooltip 的原生卡小网格 + 一份实测数字表。**这是 go/no-go。**
 
 ### Phase 1 — MVP：单类型静态网格
 目录（`CollectionCatalog` 枚举 + 过滤 + VM 缓存）、外壳（克隆 HistoryPanel，黑底 + header + Close + 热键/坞入口）、网格只渲染前 N 张（≈一个过扫窗口）不滚动。交付：能打开、看到一屏 Item、hover 出 tooltip。
 
 ### Phase 2 — 虚拟化滚动（核心性能）
-`CollectionGridVirtualizer`（§5.3）+ 池按 kind 分键 + L2 美术 LRU + generation 取消 + 冷/热限流。加 Skill tab。交付：~1644 张平滑滚动（实测 60fps），Item/Skill 切换。
+`CollectionGridVirtualizer`（§5.3，含 pending-return 竞态防护 + 自适应冷加载预算）+ 池按 kind 分键 + L2 美术 LRU（引用计数）+ **L3 Material 共享池**（draw call 结构性问题，不可推迟）+ per-card generation 取消。加 Skill tab。交付：~1571 张平滑滚动（实测 60fps），Item/Skill 切换。
 
 ### Phase 3 — 筛选系统
 顶部筛选栏（英雄多选 / 稀有度 / 名称搜索 /（可选）玩法标签），变化触发 Bump + 重算可见集。交付：hero/tier/type/搜索可用。
@@ -625,7 +736,7 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 按 §10.3 做 spawner 推导或离线目录。单列设计。
 
 ### Phase 5 — 打磨
-可重绑热键、输入硬拦截、art 淡入、滚动惯性、键盘导航、（必要时）§7 L3 Material 缓存。
+可重绑热键、输入硬拦截、art 淡入、滚动惯性、键盘导航、面板开关过渡动画（alpha 淡入）、共享抽象提取（§2.1 路线图）。
 
 ---
 
@@ -635,17 +746,20 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 |---|---|---|
 | R1 | overlay(27) 的 uGUI 指针能否越过 UITK 面板(26) 命中卡（「tooltip 免费」唯一未验证前提） | Phase 0 实测；兜底 §9.4 手动 hit-test（预先写好） |
 | R2 | 同时存活卡数 / 帧率上限是设计估计 | Phase 0 用 `LogOutput.log` 定数；撑不住则收紧窗口/列数 |
-| R3 | `GetCardMap()` 首次主线程停顿 | loading + 一次性缓存；后台化需先验线程安全 |
+| R3 | `GetCardMap()` 遍历 + VM 构建耗时 | `GetCardMap()` 只返回已建完的不可变字典（§12），遍历可安全后台化/分帧；Phase 0 实测耗时决定是否需要 loading |
 | R4 | `Data.TooltipParentComponent` 在目标场景（主菜单/非战斗）是否就绪且未 block | Phase 0 验；缺失则定位/等待 |
 | R5 | 静态数据未就绪（`BppStaticDataAccess.TryGet()==null`） | 打开时重试/禁用，不假设启动即有 |
 | R6 | `MonsterBoardTooltip` 预制体就绪时机（`FindObjectsOfTypeAll` 只返回已加载对象） | 延后就绪/兜底来源；Phase 0 确认目标场景能 harvest |
 | R7 | Item 比例需求与原生事实冲突（§5.4） | spike 实测原生比例，localScale 适配，回填并与需求方确认契约 |
+| R8 | 游戏更新重命名/移除反射目标（`_skillReference`、`GetCardById`、`SetUp` 等） | 所有反射 harvest 加 null 检查 + `BppLog.Warn`；启动时 smoke test 验证关键目标存在；缺失时禁用面板并在设置坞显示「当前游戏版本不兼容」 |
+| R9 | 场景切换时面板状态未清理（MonoBehaviour 销毁但 UITK/overlay 清理顺序不确定） | `DetectSceneChange`（仿 `HistoryPanel.cs:384-398`）：场景变化时关闭面板、Return 所有卡、释放 L2 handle、dispose overlay（§2.3） |
+| R10 | CollectionPanel 与 HistoryPanel 同时打开导致 overlay z-fight（共享 sortingOrder 27） | 面板互斥：打开一个时关闭另一个（§2.3 `OpenFromDockEntry`）；HistoryPanel 同理需检查 CollectionPanel.IsVisible |
 
 **开放问题**
-- `TLocalizableText` → 当前语言字符串的访问器（§10.2）。
-- 回收换绑到不同卡时是否有旧材质/贴图残留一帧（虽已丢弃缺图卡，仍建议 rebind 时清 `_cardImage.texture`/材质）。
+- 回收换绑到不同卡时是否有旧材质/贴图残留一帧（虽已丢弃缺图卡，仍建议 rebind 时 Destroy Material + 清 `_cardImage.texture`——与 L2 引用计数的 Release 配合）。
 - Item 三尺寸在图鉴里保真原生宽度（推荐）还是强行统一——§5.4 待确认。
 - 稀有度渲染数值：默认按 `StartingTier`（与别处一致）；tier selector 为后续增强。
+- `Hero8` 排除是否硬编码：当前 §10.1 排除 `Hero8`（占位/测试英雄），如果游戏引入第 8 个正式英雄需改为检查是否有关联卡牌。
 
 ---
 
