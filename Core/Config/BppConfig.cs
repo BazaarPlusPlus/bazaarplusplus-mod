@@ -17,6 +17,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; private set; }
 
+    public ConfigEntry<string>? CollectionPanelHotkeyPathConfig { get; private set; }
+
     public ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; private set; }
 
     public ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig
@@ -69,6 +71,12 @@ internal sealed class BppConfig : IBppConfig
             "UpgradePreview",
             "<Keyboard>/shift",
             "Binding path for upgrade preview tooltip mode."
+        );
+        CollectionPanelHotkeyPathConfig = config.Bind(
+            "Hotkeys",
+            "CollectionPanel",
+            "<Keyboard>/f9",
+            "Binding path for the card collection panel toggle."
         );
         ChineseLocaleModeConfig = config.Bind(
             "Localization",

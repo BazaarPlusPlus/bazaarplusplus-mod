@@ -1,0 +1,283 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Grid;
+using BazaarPlusPlus.Infrastructure.Fonts;
+using BazaarPlusPlus.Infrastructure.UiTokens;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
+
+internal sealed class CollectionPanelViewModel
+{
+    public string Title { get; set; } = string.Empty;
+    public string Subtitle { get; set; } = string.Empty;
+    public string CountText { get; set; } = string.Empty;
+    public string? StatusMessage { get; set; }
+    public ECardType ActiveType { get; set; } = ECardType.Item;
+    public HashSet<EHero> SelectedHeroes { get; set; } = new();
+    public HashSet<ETier> SelectedTiers { get; set; } = new();
+    public string Search { get; set; } = string.Empty;
+    public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
+    public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
+    public float ContentHeight { get; set; }
+}
+
+internal sealed partial class CollectionPanelView : IDisposable
+{
+    private readonly Transform _parent;
+    private readonly Action _close;
+    private readonly Action<ECardType> _setActiveType;
+    private readonly Action<EHero> _toggleHero;
+    private readonly Action<ETier> _toggleTier;
+    private readonly Action<string> _setSearch;
+    private readonly Action _clearFilters;
+
+    private GameObject? _rootObject;
+    private UIDocument? _document;
+    private PanelSettings? _panelSettings;
+    private VisualElement? _root;
+    private Label? _title;
+    private Label? _subtitle;
+    private Label? _countLabel;
+    private Label? _statusLabel;
+    private Button? _itemTabButton;
+    private Button? _skillTabButton;
+    private Button? _closeButton;
+    private Button? _clearButton;
+    private Button? _merchantPlaceholderButton;
+    private TextField? _searchField;
+    private VisualElement? _heroChipRow;
+    private VisualElement? _tierChipRow;
+    private VisualElement? _gridViewport;
+    private ScrollView? _gridScrollView;
+    private VisualElement? _gridContentSpacer;
+    private Label? _emptyLabel;
+
+    private readonly Dictionary<EHero, Button> _heroChips = new();
+    private readonly Dictionary<ETier, Button> _tierChips = new();
+    private Rect _lastGridBounds;
+
+    // Panel-open/-close fade state. _opacity is the displayed alpha, _targetOpacity is what
+    // SetVisible asked for; TickOpacity ramps the first toward the second with an
+    // exponential lerp whose time constant is direction-dependent (in vs. out).
+    private float _opacity;
+    private float _targetOpacity;
+
+    public event Action<Rect>? GridViewportBoundsChanged;
+
+    public CollectionPanelView(
+        Transform parent,
+        Action close,
+        Action<ECardType> setActiveType,
+        Action<EHero> toggleHero,
+        Action<ETier> toggleTier,
+        Action<string> setSearch,
+        Action clearFilters
+    )
+    {
+        _parent = parent ?? throw new ArgumentNullException(nameof(parent));
+        _close = close ?? throw new ArgumentNullException(nameof(close));
+        _setActiveType = setActiveType ?? throw new ArgumentNullException(nameof(setActiveType));
+        _toggleHero = toggleHero ?? throw new ArgumentNullException(nameof(toggleHero));
+        _toggleTier = toggleTier ?? throw new ArgumentNullException(nameof(toggleTier));
+        _setSearch = setSearch ?? throw new ArgumentNullException(nameof(setSearch));
+        _clearFilters = clearFilters ?? throw new ArgumentNullException(nameof(clearFilters));
+    }
+
+    public void EnsureCreated()
+    {
+        if (_rootObject != null)
+            return;
+
+        _rootObject = new GameObject("CollectionPanelUiToolkitRoot");
+        _rootObject.transform.SetParent(_parent, false);
+        _panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+        _panelSettings.sortingOrder = 26;
+        _panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+        _panelSettings.referenceResolution = new Vector2Int(1920, 1080);
+        _panelSettings.match = 1f;
+        _panelSettings.clearColor = false;
+        _panelSettings.targetDisplay = 0;
+
+        _document = _rootObject.AddComponent<UIDocument>();
+        _document.panelSettings = _panelSettings;
+        _root = _document.rootVisualElement;
+        _root.style.flexGrow = 1f;
+        _root.style.position = Position.Absolute;
+        _root.style.left = 0f;
+        _root.style.right = 0f;
+        _root.style.top = 0f;
+        _root.style.bottom = 0f;
+        _root.style.display = DisplayStyle.None;
+        BppUiFont.RequestCharactersInTexture(
+            CollectionPanelText.Title()
+                + CollectionPanelText.Subtitle()
+                + CollectionPanelText.ItemsTab()
+                + CollectionPanelText.SkillsTab()
+                + CollectionPanelText.Close()
+                + CollectionPanelText.SearchPlaceholder()
+                + CollectionPanelText.NoMatches()
+                + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#",
+            Sizes.FontButton,
+            FontStyle.Normal
+        );
+        _root.style.unityFont = BppUiFont.Default;
+        _root.pickingMode = PickingMode.Position;
+
+        BuildTree(_root);
+
+        _gridViewport?.RegisterCallback<GeometryChangedEvent>(OnGridViewportGeometryChanged);
+    }
+
+    public void SetVisible(bool visible)
+    {
+        _targetOpacity = visible ? 1f : 0f;
+        if (_root == null)
+            return;
+        if (visible)
+        {
+            // Show the element synchronously so the first ramp frame paints; opacity starts
+            // wherever the previous tick left it (0 on first open, mid-fade if Close was
+            // pressed during an in-flight open animation).
+            _root.style.display = DisplayStyle.Flex;
+            _root.style.opacity = _opacity;
+        }
+    }
+
+    public float CurrentOpacity => _opacity;
+
+    // True until the fade animation has settled and the root has finished hiding (if the
+    // target was 0). CollectionPanel uses this to defer overlay deactivation + virtualizer
+    // disposal until the visual fade-out is complete.
+    public bool IsFadingOrVisible => _targetOpacity > 0f || _opacity > 0.005f;
+
+    public void TickOpacity(float deltaSeconds)
+    {
+        if (_root == null || deltaSeconds <= 0f)
+            return;
+        if (Mathf.Approximately(_opacity, _targetOpacity))
+        {
+            if (_targetOpacity <= 0f && _root.style.display.value != DisplayStyle.None)
+                _root.style.display = DisplayStyle.None;
+            return;
+        }
+        // Asymmetric tau: open is a presentation (slower, more deliberate); close is a
+        // dismissal (snappier, the user just wants the panel gone).
+        var tau =
+            _targetOpacity > _opacity
+                ? CollectionGridConstants.PanelFadeInSeconds
+                : CollectionGridConstants.PanelFadeOutSeconds;
+        var t = 1f - Mathf.Exp(-deltaSeconds / tau);
+        _opacity = Mathf.Lerp(_opacity, _targetOpacity, t);
+        if (Mathf.Abs(_opacity - _targetOpacity) < 0.005f)
+            _opacity = _targetOpacity;
+        _root.style.opacity = _opacity;
+        if (_targetOpacity <= 0f && _opacity <= 0.005f)
+            _root.style.display = DisplayStyle.None;
+    }
+
+    // Snap the ScrollView to the top. Called on filter / tab changes so the user is not
+    // stranded at the bottom of a tiny new visible set — the previous scrollOffset would
+    // otherwise clamp to the new (smaller) max instead of returning to top.
+    public void ResetScroll()
+    {
+        if (_gridScrollView != null)
+            _gridScrollView.scrollOffset = new Vector2(_gridScrollView.scrollOffset.x, 0f);
+    }
+
+    public void Refresh(CollectionPanelViewModel model)
+    {
+        if (_root == null)
+            return;
+
+        _title!.text = model.Title;
+        _subtitle!.text = model.Subtitle;
+        _countLabel!.text = model.CountText;
+        _statusLabel!.text = model.StatusMessage ?? string.Empty;
+        _statusLabel.style.display = string.IsNullOrWhiteSpace(model.StatusMessage)
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
+
+        RefreshTabButton(_itemTabButton!, model.ActiveType == ECardType.Item);
+        RefreshTabButton(_skillTabButton!, model.ActiveType == ECardType.Skill);
+
+        EnsureHeroChips(model.AvailableHeroes);
+        EnsureTierChips(model.AvailableTiers);
+        foreach (var pair in _heroChips)
+            RefreshChip(pair.Value, model.SelectedHeroes.Contains(pair.Key));
+        foreach (var pair in _tierChips)
+            RefreshChip(pair.Value, model.SelectedTiers.Contains(pair.Key));
+
+        if (
+            _searchField != null
+            && !string.Equals(_searchField.value, model.Search, StringComparison.Ordinal)
+        )
+            _searchField.SetValueWithoutNotify(model.Search);
+
+        UpdateContentSpacerHeight(model.ContentHeight);
+
+        if (_emptyLabel != null)
+        {
+            var showEmpty =
+                model.ContentHeight <= 0f && string.IsNullOrWhiteSpace(model.StatusMessage);
+            _emptyLabel.style.display = showEmpty ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+    }
+
+    public void UpdateContentSpacerHeight(float pixelsLogical)
+    {
+        if (_gridContentSpacer == null)
+            return;
+        var height = Mathf.Max(0f, pixelsLogical);
+        _gridContentSpacer.style.height = height;
+        _gridContentSpacer.style.minHeight = height;
+    }
+
+    public float ReadScrollYPixels()
+    {
+        if (_gridScrollView == null || _gridViewport == null)
+            return 0f;
+        return _gridScrollView.scrollOffset.y * _gridViewport.scaledPixelsPerPoint;
+    }
+
+    public void Dispose()
+    {
+        if (_rootObject != null)
+            UnityEngine.Object.Destroy(_rootObject);
+        if (_panelSettings != null)
+            UnityEngine.Object.Destroy(_panelSettings);
+        _rootObject = null;
+        _document = null;
+        _panelSettings = null;
+        _root = null;
+    }
+
+    private void OnGridViewportGeometryChanged(GeometryChangedEvent evt)
+    {
+        if (_gridViewport == null)
+            return;
+        var worldBound = _gridViewport.worldBound;
+        var ppp = _gridViewport.scaledPixelsPerPoint;
+        var bounds = new Rect(
+            Mathf.Round(worldBound.x * ppp),
+            Mathf.Round(Screen.height - worldBound.yMax * ppp),
+            Mathf.Max(1f, Mathf.Round(worldBound.width * ppp)),
+            Mathf.Max(1f, Mathf.Round(worldBound.height * ppp))
+        );
+        if (bounds.width <= 0f || bounds.height <= 0f)
+            return;
+        if (RectApproximately(_lastGridBounds, bounds))
+            return;
+        _lastGridBounds = bounds;
+        GridViewportBoundsChanged?.Invoke(bounds);
+    }
+
+    private static bool RectApproximately(Rect left, Rect right) =>
+        Mathf.Approximately(left.x, right.x)
+        && Mathf.Approximately(left.y, right.y)
+        && Mathf.Approximately(left.width, right.width)
+        && Mathf.Approximately(left.height, right.height);
+}

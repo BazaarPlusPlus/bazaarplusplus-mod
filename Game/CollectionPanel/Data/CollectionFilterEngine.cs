@@ -1,0 +1,82 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using BazaarGameShared.Domain.Core.Types;
+
+namespace BazaarPlusPlus.Game.CollectionPanel.Data;
+
+// Pure function: (catalog + filter state) -> ordered visible list.
+//
+// Ordering is deliberately explicit (tier rank then display name) because ETier's underlying
+// integer values place Diamond=3 before Legendary=4, which would mis-order a naive sort on
+// the raw enum. TierRank() locks the intended ordering.
+internal static class CollectionFilterEngine
+{
+    public static List<CollectionCardVm> Apply(
+        IReadOnlyList<CollectionCardVm> all,
+        CollectionFilterState filter
+    )
+    {
+        var result = new List<CollectionCardVm>(all.Count);
+        var search = filter.Search?.Trim() ?? string.Empty;
+        var hasSearch = search.Length > 0;
+        var heroFilterCount = filter.Heroes.Count;
+        var tierFilterCount = filter.Tiers.Count;
+
+        foreach (var card in all)
+        {
+            if (card.Type != filter.ActiveType)
+                continue;
+            if (heroFilterCount > 0 && !AnyHeroMatch(card.Heroes, filter.Heroes))
+                continue;
+            if (tierFilterCount > 0 && !filter.Tiers.Contains(card.StartingTier))
+                continue;
+            if (
+                hasSearch
+                && card.DisplayName.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0
+                && card.InternalName.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0
+            )
+                continue;
+            result.Add(card);
+        }
+
+        result.Sort(
+            (a, b) =>
+            {
+                var tierOrder = TierRank(a.StartingTier).CompareTo(TierRank(b.StartingTier));
+                if (tierOrder != 0)
+                    return tierOrder;
+                return string.Compare(
+                    a.DisplayName,
+                    b.DisplayName,
+                    StringComparison.CurrentCultureIgnoreCase
+                );
+            }
+        );
+        return result;
+    }
+
+    private static bool AnyHeroMatch(
+        IReadOnlyCollection<EHero> cardHeroes,
+        HashSet<EHero> filterHeroes
+    )
+    {
+        foreach (var hero in cardHeroes)
+        {
+            if (filterHeroes.Contains(hero))
+                return true;
+        }
+        return false;
+    }
+
+    private static int TierRank(ETier tier) =>
+        tier switch
+        {
+            ETier.Bronze => 0,
+            ETier.Silver => 1,
+            ETier.Gold => 2,
+            ETier.Diamond => 3,
+            ETier.Legendary => 4,
+            _ => 99,
+        };
+}

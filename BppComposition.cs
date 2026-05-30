@@ -5,6 +5,7 @@ using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CardSetPreview;
+using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.CombatStatusBar;
@@ -83,6 +84,7 @@ internal sealed class BppComposition : IDisposable
 
         _settingsDockRegistry.Register(new BazaarDbScreenshotUploadSettingsDockEntry());
         _settingsDockRegistry.Register(new ChineseLocaleModeSettingsDockEntry(_eventBus));
+        _settingsDockRegistry.Register(new CollectionPanelSettingsDockEntry());
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());
@@ -93,6 +95,7 @@ internal sealed class BppComposition : IDisposable
             new ComponentMount<BazaarDbScreenshotUploadController>((c, s) => c.Initialize(s))
         );
         _mountables.Register(new ComponentMount<CardSetPreviewRuntime>());
+        _mountables.Register(new CollectionPanelMount());
         _mountables.Register(
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
         );

@@ -17,6 +17,8 @@ internal interface IBppConfig
 
     ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; }
 
+    ConfigEntry<string>? CollectionPanelHotkeyPathConfig { get; }
+
     ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; }
 
     ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig { get; }
