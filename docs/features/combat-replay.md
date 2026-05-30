@@ -67,7 +67,7 @@ replay 播放期间把 Unity Game View 抓帧编码为 MP4，落到 `<GameRoot>/
 
 ### 当前状态
 
-录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / overlay 抑制）、SQLite `combat_replay_videos` 元数据均已落地；录制由 HistoryPanel「录制并回放」按钮单次触发。FFmpeg 已随 mod 分发（见上文「二进制分发」），无需 installer 单独部署。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项、音频。SFX 修复历史归档在 [docs/design/archive/2026-05-23-combat-replay-sfx-impl.md](../design/archive/2026-05-23-combat-replay-sfx-impl.md)。
+录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / overlay 抑制）、SQLite `combat_replay_videos` 元数据均已落地；录制由 HistoryPanel「录制并回放」按钮单次触发。FFmpeg 已随 mod 分发（见上文「二进制分发」），无需 installer 单独部署。**音频**已落地：改用 **WASAPI loopback 录设备输出**（卡牌打击 / 棋盘等 3D 音效由 Resonance Audio 空间化、不在任何 FMOD 通道组上，故 FMOD tap 抓不到；见 [音频 loopback 采集决策](../design/2026-05-30-combat-replay-audio-loopback-capture.md)），下混立体声 48 kHz AAC 合入 MP4。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项。SFX 修复历史归档在 [docs/design/archive/2026-05-23-combat-replay-sfx-impl.md](../design/archive/2026-05-23-combat-replay-sfx-impl.md)。
 
 ## 关键文件
 

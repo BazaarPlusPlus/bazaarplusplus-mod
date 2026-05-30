@@ -4,6 +4,8 @@
 - 状态：设计待定稿（brainstorm 产出，已二次自审，待评审）
 - 影响仓库：`bazaarplusplus-mod`
 
+> **更新（2026-05-30）**：本文的**音频抓取决策**（决策 2：从 FMOD 主 channel group 挂直通 tap DSP）**已被取代**——FMOD tap 抓不到 Resonance Audio 空间化的 3D 战斗音效，已改为 **WASAPI loopback 录设备输出**。详见 [2026-05-30-combat-replay-audio-loopback-capture.md](2026-05-30-combat-replay-audio-loopback-capture.md)。本文的视频侧决策（帧缓冲池消卡顿、墙钟 CFR、异步 mux）不受影响，仍是现行实现。
+
 ## 背景与动机
 
 Combat Replay 的 MP4 录制在 [2026-05-30-combat-replay-record-button-design.md](2026-05-30-combat-replay-record-button-design.md) 落地为「HistoryPanel 按钮单次触发」后，实测暴露并修复了三个潜伏 bug（录制器从未订阅事件总线；bootstrap 存档回放退出不发 `PublishEnded` 致 ffmpeg 不收尾、文件无 moov atom；抓帧未按图形 API 方向处理致上下颠倒）。**这三处修复是本设计的前置依赖，目前在工作树、待提交。**
