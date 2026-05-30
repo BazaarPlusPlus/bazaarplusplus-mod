@@ -52,6 +52,7 @@
     <HostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant())</HostArchitecture>
     <MacSqliteRuntimeRid>osx-x64</MacSqliteRuntimeRid>
     <FixedMacSqliteNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/libe_sqlite3.dylib</FixedMacSqliteNativeFile>
+    <FixedMacAudioTapNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/libBppMacAudio.dylib</FixedMacAudioTapNativeFile>
     <FixedWindowsSqliteNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/e_sqlite3.dll</FixedWindowsSqliteNativeFile>
     <!-- FFmpeg binary source (repackaged zips: a single ffmpeg(.exe) at the zip root) -->
     <WindowsFfmpegZip>$(BPPInstallerSourcePath)/FfmpegSource/windows/ffmpeg.zip</WindowsFfmpegZip>
@@ -186,6 +187,7 @@
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.provider.e_sqlite3.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\e_sqlite3.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\libe_sqlite3.dylib" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\libBppMacAudio.dylib" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.ModApi.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.Storage.dll" />
     </ItemGroup>
@@ -195,6 +197,7 @@
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.core.dll" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.provider.e_sqlite3.dll" />
       <MacSqliteNativeFile Include="$(FixedMacSqliteNativeFile)" />
+      <MacAudioTapNativeFile Include="$(FixedMacAudioTapNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.ModApi.dll" />
       <PluginManagedRuntimeFiles
@@ -218,6 +221,12 @@
       DestinationFiles="$(GamePath)\BepInEx\plugins\libe_sqlite3.dylib"
       SkipUnchangedFiles="true"
       Condition="'@(MacSqliteNativeFile)' != ''"
+    />
+    <Copy
+      SourceFiles="@(MacAudioTapNativeFile)"
+      DestinationFiles="$(GamePath)\BepInEx\plugins\libBppMacAudio.dylib"
+      SkipUnchangedFiles="true"
+      Condition="'@(MacAudioTapNativeFile)' != ''"
     />
     <Copy
       SourceFiles="@(WindowsSqliteNativeFile)"
@@ -261,6 +270,7 @@
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.core.dll" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.provider.e_sqlite3.dll" />
       <MacSqliteNativeFile Include="$(FixedMacSqliteNativeFile)" />
+      <MacAudioTapNativeFile Include="$(FixedMacAudioTapNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.ModApi.dll" />
       <PluginManagedRuntimeFiles

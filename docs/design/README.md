@@ -18,6 +18,7 @@ Work designed but not yet (fully) landed; lives at this top level until implemen
 - [`2026-05-30-ffmpeg-relocation-to-mod-design.md`](2026-05-30-ffmpeg-relocation-to-mod-design.md) — FFmpeg 改为随 mod 分发的兄弟二进制（已实现并验证，待提交；合并后移入 `archive/` 并加 `Status:` banner）。
 - [`2026-05-30-combat-replay-record-button-design.md`](2026-05-30-combat-replay-record-button-design.md) — Combat Replay 视频录制从全局开关自动录每场改为 HistoryPanel 按钮单次触发（已实现并验证，待提交；合并后移入 `archive/` 并加 `Status:` banner）。
 - [`2026-05-30-combat-replay-audio-loopback-capture.md`](2026-05-30-combat-replay-audio-loopback-capture.md) — Combat Replay 录制音频改用 WASAPI loopback（设备输出）采集 + 跨平台 adapter；记录从 FMOD tap 到 loopback 的排查历程与踩坑（已实现并验证）。
+- [`2026-05-31-combat-replay-audio-macos-process-tap.md`](2026-05-31-combat-replay-audio-macos-process-tap.md) — macOS 音频采集后端：CoreAudio 进程级 tap（`AudioHardwareCreateProcessTap`，14.2+）+ 薄 `BppMacAudio.dylib`，C# 退化成与 WASAPI 相同的 pull 循环（已实现并验证；合并后移入 `archive/` 并加 `Status:` banner）。
 
 ## Archived specs
 

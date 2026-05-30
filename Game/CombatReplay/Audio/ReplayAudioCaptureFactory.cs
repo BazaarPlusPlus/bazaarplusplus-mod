@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Runtime.InteropServices;
 using BazaarPlusPlus.Infrastructure;
 
@@ -13,9 +14,11 @@ namespace BazaarPlusPlus.Game.CombatReplay.Audio;
 ///
 /// <list type="bullet">
 /// <item>Windows: <see cref="WasapiLoopbackCaptureTap"/> (WASAPI loopback).</item>
-/// <item>macOS / other: not yet implemented — returns a no-op so the recorder produces a silent video.
-/// To add macOS, implement <see cref="IReplayAudioCaptureTap"/> over a CoreAudio aggregate/loopback
-/// device or ScreenCaptureKit audio and return it here.</item>
+/// <item>macOS (>= 15): <see cref="CoreAudioProcessTapCaptureTap"/> (CoreAudio process tap of the game's
+/// own output PCM, via the native <c>BppMacAudio</c> dylib). The version gate is decided inside the
+/// dylib via <c>NSProcessInfo</c>; a missing dylib degrades to a silent video.</item>
+/// <item>pre-15 macOS / other platforms: not supported — returns a no-op so the recorder produces a
+/// silent video.</item>
 /// </list>
 /// </summary>
 internal static class ReplayAudioCaptureFactory
@@ -25,8 +28,28 @@ internal static class ReplayAudioCaptureFactory
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return new WasapiLoopbackCaptureTap(wavFilePath);
 
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && IsSupported())
+            return new CoreAudioProcessTapCaptureTap(wavFilePath);
+
         return new UnsupportedPlatformAudioCapture(wavFilePath);
     }
+
+    private static bool IsSupported()
+    {
+        try
+        {
+            // >= 15 is decided inside the dylib via NSProcessInfo.
+            return BppMacAudio_IsSupported() != 0;
+        }
+        catch (DllNotFoundException)
+        {
+            // A machine too old to even load the dylib degrades to a silent video instead of throwing.
+            return false;
+        }
+    }
+
+    [DllImport("BppMacAudio")]
+    private static extern int BppMacAudio_IsSupported();
 }
 
 /// <summary>
