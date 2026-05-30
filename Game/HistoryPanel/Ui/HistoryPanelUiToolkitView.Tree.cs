@@ -274,6 +274,12 @@ internal sealed partial class HistoryPanelUiToolkitView
             Sizes.DeleteButtonWidth,
             Sizes.ButtonFooterHeight
         );
+        _recordAndReplayButton = CreateButton(
+            HistoryPanelText.RecordAndReplay(),
+            _recordAndReplay,
+            Sizes.RecordAndReplayButtonWidth,
+            Sizes.ButtonFooterHeight
+        );
         _replayButton = CreateButton(
             HistoryPanelText.Replay(),
             _replay,
@@ -287,9 +293,12 @@ internal sealed partial class HistoryPanelUiToolkitView
             Sizes.ButtonFooterHeight
         );
         StyleButton(_deleteButton, Colors.DeleteBackground, Colors.DeleteText);
+        StyleButton(_recordAndReplayButton, Colors.RecordReplayBackground, Colors.RecordReplayText);
         StyleButton(_replayButton, Colors.ReplayBackground, Colors.ReplayText);
         StyleButton(closeButton, Colors.CloseBackground, Colors.CloseText);
         actions.Add(_deleteButton);
+        _recordAndReplayButton.style.marginLeft = UiSpacing.Lg;
+        actions.Add(_recordAndReplayButton);
         _replayButton.style.marginLeft = UiSpacing.Lg;
         actions.Add(_replayButton);
         closeButton.style.marginLeft = UiSpacing.Lg;

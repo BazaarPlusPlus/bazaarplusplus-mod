@@ -4,10 +4,12 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Infrastructure;
+using UnityEngine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -15,11 +17,13 @@ internal sealed class HistoryPanelReplayService
 {
     private readonly Func<CombatReplayRuntime?> _runtimeAccessor;
     private readonly Func<string?> _replayDirectoryPathAccessor;
+    private readonly Func<string?> _pluginsDirectoryPathAccessor;
     private readonly GhostBattleSyncService? _ghostSyncService;
 
     public HistoryPanelReplayService(
         Func<CombatReplayRuntime?> runtimeAccessor,
         Func<string?> replayDirectoryPathAccessor,
+        Func<string?> pluginsDirectoryPathAccessor,
         GhostBattleSyncService? ghostSyncService = null
     )
     {
@@ -28,7 +32,46 @@ internal sealed class HistoryPanelReplayService
         _replayDirectoryPathAccessor =
             replayDirectoryPathAccessor
             ?? throw new ArgumentNullException(nameof(replayDirectoryPathAccessor));
+        _pluginsDirectoryPathAccessor =
+            pluginsDirectoryPathAccessor
+            ?? throw new ArgumentNullException(nameof(pluginsDirectoryPathAccessor));
         _ghostSyncService = ghostSyncService;
+    }
+
+    // FfmpegLocator.Resolve performs a ~2s liveness probe on its first call and caches the
+    // result process-wide. Kick that off the UI thread (panel open) so the per-refresh
+    // CanRecordReplay gate below only ever reads the warm cache. Safe off the Unity thread:
+    // Resolve does no Unity API calls.
+    public void PrewarmRecordingAvailability()
+    {
+        var pluginsDirectoryPath = _pluginsDirectoryPathAccessor();
+        _ = Task.Run(() => FfmpegLocator.Resolve(pluginsDirectoryPath));
+    }
+
+    // Recording is feasible only when the replay itself can run AND a working ffmpeg is
+    // available AND the device supports async GPU readback (the frame-grab path). Mirrors the
+    // three guards in CombatReplayVideoRecorder. supportsAsyncGPUReadback is a cheap static
+    // getter; FfmpegLocator.Resolve hits the prewarmed cache here (no probe on the UI thread).
+    public bool CanRecordReplay(HistoryBattleRecord? battle, out string reason)
+    {
+        if (!CanReplayBattle(battle, out reason))
+            return false;
+
+        if (!SystemInfo.supportsAsyncGPUReadback)
+        {
+            reason = HistoryPanelText.RecordingUnavailable();
+            return false;
+        }
+
+        var pluginsDirectoryPath = _pluginsDirectoryPathAccessor();
+        if (string.IsNullOrEmpty(FfmpegLocator.Resolve(pluginsDirectoryPath)))
+        {
+            reason = HistoryPanelText.RecordingUnavailable();
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
     }
 
     public bool CanReplayBattle(HistoryBattleRecord? battle, out string reason)
@@ -76,6 +119,7 @@ internal sealed class HistoryPanelReplayService
 
     public async Task<HistoryPanelReplayAttemptResult> ReplayBattleAsync(
         HistoryBattleRecord? battle,
+        bool recordVideo,
         CancellationToken cancellationToken
     )
     {
@@ -86,7 +130,7 @@ internal sealed class HistoryPanelReplayService
             return HistoryPanelReplayAttemptResult.Failure(reason);
 
         if (battle.Source == HistoryBattleSource.Ghost)
-            return await ReplayGhostBattleAsync(battle, cancellationToken);
+            return await ReplayGhostBattleAsync(battle, recordVideo, cancellationToken);
 
         var runtime = _runtimeAccessor();
         if (runtime == null)
@@ -94,7 +138,7 @@ internal sealed class HistoryPanelReplayService
                 HistoryPanelText.CombatReplayRuntimeUnavailable()
             );
 
-        if (!runtime.ReplaySaved(battle.BattleId))
+        if (!runtime.ReplaySaved(battle.BattleId, recordVideo))
             return HistoryPanelReplayAttemptResult.Failure(
                 HistoryPanelText.ReplayRejectedForBattle(battle.BattleId)
             );
@@ -106,6 +150,7 @@ internal sealed class HistoryPanelReplayService
 
     private async Task<HistoryPanelReplayAttemptResult> ReplayGhostBattleAsync(
         HistoryBattleRecord battle,
+        bool recordVideo,
         CancellationToken cancellationToken
     )
     {
@@ -162,7 +207,7 @@ internal sealed class HistoryPanelReplayService
                 HistoryPanelText.ReplayPayloadUnavailable(battle.BattleId)
             );
 
-        if (!runtime.ReplayImportedBattle(manifest, payload))
+        if (!runtime.ReplayImportedBattle(manifest, payload, recordVideo))
             return HistoryPanelReplayAttemptResult.Failure(
                 HistoryPanelText.ReplayRejectedForGhostBattle(battle.BattleId)
             );

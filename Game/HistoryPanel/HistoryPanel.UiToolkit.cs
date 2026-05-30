@@ -20,7 +20,8 @@ internal sealed partial class HistoryPanel
             _uiView = new HistoryPanelUiToolkitView(
                 transform,
                 () => SetHistoryVisible(false),
-                TryReplaySelectedBattle,
+                () => TryReplaySelectedBattle(false),
+                () => TryReplaySelectedBattle(true),
                 TryDeleteSelectedRun,
                 TryRefreshFinalBuilds,
                 SelectRun,
@@ -29,6 +30,10 @@ internal sealed partial class HistoryPanel
                 SetGhostBattleFilter
             );
             _uiView.PreviewContainerBoundsChanged += OnPreviewContainerBoundsChanged;
+
+            // First panel open: warm the FFmpeg locator cache off the UI thread so the record
+            // button's per-refresh availability gate never incurs the ~2s liveness probe.
+            _coordinator?.PrewarmRecordingAvailability();
         }
         _uiView.EnsureCreated();
     }
@@ -69,6 +74,7 @@ internal sealed partial class HistoryPanel
     private HistoryPanelUiToolkitModel BuildUiModel()
     {
         var canReplaySelectedBattle = CanReplaySelectedBattle(out var replayUnavailableReason);
+        var canRecordSelectedBattle = CanRecordSelectedBattle(out _);
         var canDeleteSelectedRun = CanDeleteSelectedRun(out _);
         var visibleBattles =
             _sectionMode == HistorySectionMode.Ghost
@@ -137,6 +143,8 @@ internal sealed partial class HistoryPanel
                     replayUnavailableReason
                 ),
             ReplayButtonEnabled = canReplaySelectedBattle && !_replayActionInProgress,
+            RecordAndReplayButtonText = HistoryPanelText.RecordAndReplay(),
+            RecordAndReplayButtonEnabled = canRecordSelectedBattle && !_replayActionInProgress,
             DeleteButtonText = GetDeleteRunButtonLabel(
                 _sectionMode == HistorySectionMode.Runs
                     && SelectedRun != null
@@ -207,6 +215,10 @@ internal sealed class HistoryPanelUiToolkitModel
     public string ReplayButtonText { get; set; } = string.Empty;
 
     public bool ReplayButtonEnabled { get; set; }
+
+    public string RecordAndReplayButtonText { get; set; } = string.Empty;
+
+    public bool RecordAndReplayButtonEnabled { get; set; }
 
     public string DeleteButtonText { get; set; } = string.Empty;
 

@@ -166,7 +166,7 @@ Columns:
 
 ### `combat_replay_videos`
 
-Stores metadata for MP4 video recordings of saved combat replay playback. The MP4 files themselves live under `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<yyyy-MM-dd>/`; this table indexes them. Only present when the optional video recording feature has been enabled at least once (`CombatReplayVideo / Enabled = true`).
+Stores metadata for MP4 video recordings of saved combat replay playback. The MP4 files themselves live under `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<yyyy-MM-dd>/`; this table indexes them. Only present once at least one combat replay has been recorded via the HistoryPanel "Record and Replay" button.
 
 Columns:
 

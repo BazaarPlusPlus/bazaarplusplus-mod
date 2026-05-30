@@ -9,8 +9,6 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<PreviewVisibilityMode>? EnchantPreviewModeConfig { get; private set; }
 
-    public ConfigEntry<PreviewVisibilityMode>? UpgradePreviewModeConfig { get; private set; }
-
     public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
 
     public ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; private set; }
@@ -35,8 +33,6 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<float>? AutoBazaarHttpEndpointTimeoutSeconds { get; private set; }
 
-    public ConfigEntry<bool>? CombatReplayVideoEnabled { get; private set; }
-
     public ConfigEntry<int>? CombatReplayVideoFps { get; private set; }
 
     public ConfigEntry<int>? CombatReplayVideoWidth { get; private set; }
@@ -46,10 +42,6 @@ internal sealed class BppConfig : IBppConfig
     public ConfigEntry<int>? CombatReplayVideoCrf { get; private set; }
 
     public ConfigEntry<string>? CombatReplayVideoPreset { get; private set; }
-
-    public ConfigEntry<bool>? CombatReplayVideoForceSpeed1x { get; private set; }
-
-    public ConfigEntry<bool>? CombatReplayVideoSuppressBppOverlays { get; private set; }
 
     public ConfigEntry<int>? CombatReplayVideoMaxQueuedFrames { get; private set; }
 
@@ -68,12 +60,6 @@ internal sealed class BppConfig : IBppConfig
             "Mode",
             PreviewVisibilityMode.AutoOnPedestalChoice,
             "When to show enchant preview text in item tooltips. Off = hold Ctrl only. AutoOnPedestalChoice = auto-show while an enchant pedestal is offered on the choice screen, hold Ctrl otherwise. Always = append to every eligible tooltip."
-        );
-        UpgradePreviewModeConfig = config.Bind(
-            "UpgradePreview",
-            "Mode",
-            PreviewVisibilityMode.AutoOnPedestalChoice,
-            "When to show the upgrade preview tooltip variant. Off = hold Shift only. AutoOnPedestalChoice = auto-show while an upgrade pedestal is offered on the choice screen, hold Shift otherwise. Always = always show the upgraded variant for eligible items."
         );
         MigrateLegacyEnchantPreviewAlwaysShow(config);
         EnableCombatStatusBarConfig = config.Bind(
@@ -138,12 +124,6 @@ internal sealed class BppConfig : IBppConfig
             "Maximum time (seconds) the server will block on a POST /v1/actions before returning 503."
         );
         // CombatReplayVideo
-        CombatReplayVideoEnabled = config.Bind(
-            "CombatReplayVideo",
-            "Enabled",
-            false,
-            "Master switch for recording saved combat replays as MP4 videos. FFmpeg now ships with the mod (in BepInEx/plugins) and falls back to PATH. Silently disabled if FFmpeg is missing."
-        );
         CombatReplayVideoFps = config.Bind(
             "CombatReplayVideo",
             "Fps",
@@ -173,18 +153,6 @@ internal sealed class BppConfig : IBppConfig
             "Preset",
             "veryfast",
             "x264 preset name. One of: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow, placebo."
-        );
-        CombatReplayVideoForceSpeed1x = config.Bind(
-            "CombatReplayVideo",
-            "ForceSpeed1x",
-            true,
-            "If true, the combat playback speed is locked to 1x while recording and restored when the replay ends."
-        );
-        CombatReplayVideoSuppressBppOverlays = config.Bind(
-            "CombatReplayVideo",
-            "SuppressBppOverlays",
-            true,
-            "If true, BPP overlays (settings dock, combat status bar) are hidden while recording so they don't appear in the MP4."
         );
         CombatReplayVideoMaxQueuedFrames = config.Bind(
             "CombatReplayVideo",

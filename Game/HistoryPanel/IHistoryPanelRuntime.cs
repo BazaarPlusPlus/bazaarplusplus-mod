@@ -14,5 +14,7 @@ internal interface IHistoryPanelRuntime
 
     string CombatReplayDirectoryPath { get; }
 
+    string PluginsDirectoryPath { get; }
+
     Func<CombatReplayRuntime?> CombatReplayRuntimeAccessor { get; }
 }

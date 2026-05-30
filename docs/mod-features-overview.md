@@ -86,7 +86,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 本地录制 PVP replay payload，保存到 `<GameRoot>/BazaarPlusPlusV4/CombatReplays`
 - battle metadata 和 board snapshot 写入 SQLite `battles` / `battle_snapshots`
 - `CombatReplayRuntime` + `CombatReplayCapturePatch` 负责采集；HistoryPanel 在条件满足时回放
-- **可选 MP4 录制**：默认关闭（`CombatReplayVideo / Enabled`）。开启后会在 saved replay 播放期间把 Game View 抓帧、调用外部 FFmpeg 写到 `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/`，元数据进 SQLite `combat_replay_videos`。FFmpeg 未检测到时静默禁用，不影响 replay 本身
+- **可选 MP4 录制**：由 HistoryPanel「录制并回放」按钮对选中对局单次触发（无全局开关）。回放期间把 Game View 抓帧、调用外部 FFmpeg 写到 `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/`，元数据进 SQLite `combat_replay_videos`。可录条件 = 检测到 FFmpeg + 支持 `AsyncGPUReadback`；不满足时按钮置灰，不影响普通 replay
 
 详见 [features/combat-replay.md](features/combat-replay.md)。
 
@@ -141,9 +141,8 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `Hotkeys / EnchantPreview`, `Hotkeys / UpgradePreview` | 附魔/升级预览按键路径 |
 | `Localization / ChineseLocaleMode` | 中文术语模式 |
 | `LegendaryPositionDisplay / Mode` | Legendary 位置展示模式 |
-| `CombatReplayVideo / Enabled` | 可选战斗回放视频录制总开关（默认 false） |
 | `CombatReplayVideo / Fps`, `Width`, `Height`, `Crf`, `Preset` | 视频编码参数；`Width=0` / `Height=0` 表示跟随 `Screen` |
-| `CombatReplayVideo / ForceSpeed1x`, `SuppressBppOverlays`, `MaxQueuedFrames` | 录制期间锁定 1x 速度、隐藏 BPP overlay、抓帧队列上限 |
+| `CombatReplayVideo / MaxQueuedFrames` | 抓帧队列上限（录制由 HistoryPanel「录制并回放」按钮单次触发，无全局开关） |
 | `BazaarDB / UploadScreenshots` | 是否将终局截图上传到 `bazaarplusplus-server` 供 BazaarDB 拉取，默认 `false` |
 
 HistoryPanel 的预览相关另有独立配置段（`HistoryPanelPreviewSettings`）。

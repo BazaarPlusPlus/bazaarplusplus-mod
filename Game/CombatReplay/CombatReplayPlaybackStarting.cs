@@ -10,4 +10,6 @@ internal sealed class CombatReplayPlaybackStarting
     public PvpBattleManifest? Manifest { get; set; }
 
     public CombatReplayPlaybackSource Source { get; set; }
+
+    public bool RecordVideo { get; set; }
 }

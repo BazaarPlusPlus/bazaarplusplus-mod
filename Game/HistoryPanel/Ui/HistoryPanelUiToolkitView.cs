@@ -13,6 +13,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private readonly Transform _parent;
     private readonly Action _close;
     private readonly Action _replay;
+    private readonly Action _recordAndReplay;
     private readonly Action _delete;
     private readonly Action _refreshFinalBuilds;
     private readonly Action<int> _selectRun;
@@ -52,6 +53,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Label? _footerSecondary;
     private Button? _deleteButton;
     private Button? _replayButton;
+    private Button? _recordAndReplayButton;
     private bool _suppressSelectionCallbacks;
     private Rect _lastPreviewContainerBounds;
 
@@ -61,6 +63,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         Transform parent,
         Action close,
         Action replay,
+        Action recordAndReplay,
         Action delete,
         Action refreshFinalBuilds,
         Action<int> selectRun,
@@ -72,6 +75,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _parent = parent ?? throw new ArgumentNullException(nameof(parent));
         _close = close ?? throw new ArgumentNullException(nameof(close));
         _replay = replay ?? throw new ArgumentNullException(nameof(replay));
+        _recordAndReplay =
+            recordAndReplay ?? throw new ArgumentNullException(nameof(recordAndReplay));
         _delete = delete ?? throw new ArgumentNullException(nameof(delete));
         _refreshFinalBuilds =
             refreshFinalBuilds ?? throw new ArgumentNullException(nameof(refreshFinalBuilds));
@@ -212,6 +217,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 
         _replayButton!.text = model.ReplayButtonText;
         _replayButton.SetEnabled(model.ReplayButtonEnabled);
+        _recordAndReplayButton!.text = model.RecordAndReplayButtonText;
+        _recordAndReplayButton.SetEnabled(model.RecordAndReplayButtonEnabled);
         _deleteButton!.text = model.DeleteButtonText;
         _deleteButton.SetEnabled(model.DeleteButtonEnabled);
         RefreshDeleteButton(_deleteButton, model.DeleteButtonText, model.DeleteButtonEnabled);

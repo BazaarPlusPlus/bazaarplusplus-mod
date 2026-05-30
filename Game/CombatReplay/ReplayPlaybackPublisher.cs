@@ -12,6 +12,7 @@ internal sealed class ReplayPlaybackPublisher
     private string? _activeBattleId;
     private PvpBattleManifest? _activeManifest;
     private CombatReplayPlaybackSource _activeSource;
+    private bool _activeRecordVideo;
     private bool _startingPublished;
 
     public ReplayPlaybackPublisher(IBppServices services)
@@ -24,13 +25,19 @@ internal sealed class ReplayPlaybackPublisher
     public void BeginSession(
         string battleId,
         PvpBattleManifest? manifest,
-        CombatReplayPlaybackSource source
+        CombatReplayPlaybackSource source,
+        bool recordVideo
     )
     {
         _activeBattleId = battleId;
         _activeManifest = manifest;
         _activeSource = source;
+        _activeRecordVideo = recordVideo;
         _startingPublished = false;
+        BppLog.Info(
+            "ReplayPlaybackPublisher",
+            $"BeginSession battle={battleId} source={source} recordVideo={recordVideo}"
+        );
     }
 
     public void PublishStarting()
@@ -50,6 +57,7 @@ internal sealed class ReplayPlaybackPublisher
                     BattleId = battleId,
                     Manifest = _activeManifest,
                     Source = _activeSource,
+                    RecordVideo = _activeRecordVideo,
                 }
             );
             _startingPublished = true;

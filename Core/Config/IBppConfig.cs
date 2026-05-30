@@ -9,8 +9,6 @@ internal interface IBppConfig
 
     ConfigEntry<PreviewVisibilityMode>? EnchantPreviewModeConfig { get; }
 
-    ConfigEntry<PreviewVisibilityMode>? UpgradePreviewModeConfig { get; }
-
     ConfigEntry<bool>? EnableCombatStatusBarConfig { get; }
 
     ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; }
@@ -31,8 +29,6 @@ internal interface IBppConfig
 
     ConfigEntry<float>? AutoBazaarHttpEndpointTimeoutSeconds { get; }
 
-    ConfigEntry<bool>? CombatReplayVideoEnabled { get; }
-
     ConfigEntry<int>? CombatReplayVideoFps { get; }
 
     ConfigEntry<int>? CombatReplayVideoWidth { get; }
@@ -42,10 +38,6 @@ internal interface IBppConfig
     ConfigEntry<int>? CombatReplayVideoCrf { get; }
 
     ConfigEntry<string>? CombatReplayVideoPreset { get; }
-
-    ConfigEntry<bool>? CombatReplayVideoForceSpeed1x { get; }
-
-    ConfigEntry<bool>? CombatReplayVideoSuppressBppOverlays { get; }
 
     ConfigEntry<int>? CombatReplayVideoMaxQueuedFrames { get; }
 

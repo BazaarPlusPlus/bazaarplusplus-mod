@@ -173,10 +173,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (latest == null)
             return false;
 
-        return ReplaySaved(latest.BattleId);
+        return ReplaySaved(latest.BattleId, recordVideo: false);
     }
 
-    public bool ReplaySaved(string battleId)
+    public bool ReplaySaved(string battleId, bool recordVideo)
     {
         if (!CanReplaySavedBattle(battleId, out var reason))
         {
@@ -199,11 +199,21 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         var sequence = controller.LoadReplay(payload);
         PlaybackUiState.InitializedBoardUiControllers.Clear();
         _savedReplayPlaybackActive = true;
-        _ = StartReplayAsync(manifest, sequence, battleId, CombatReplayPlaybackSource.LocalSaved);
+        _ = StartReplayAsync(
+            manifest,
+            sequence,
+            battleId,
+            CombatReplayPlaybackSource.LocalSaved,
+            recordVideo
+        );
         return true;
     }
 
-    public bool ReplayImportedBattle(PvpBattleManifest manifest, PvpReplayPayload payload)
+    public bool ReplayImportedBattle(
+        PvpBattleManifest manifest,
+        PvpReplayPayload payload,
+        bool recordVideo
+    )
     {
         if (manifest == null)
             throw new ArgumentNullException(nameof(manifest));
@@ -227,7 +237,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             manifest,
             sequence,
             manifest.BattleId,
-            CombatReplayPlaybackSource.ImportedGhost
+            CombatReplayPlaybackSource.ImportedGhost,
+            recordVideo
         );
         return true;
     }
@@ -236,12 +247,13 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         PvpBattleManifest manifest,
         CombatSequenceMessages sequence,
         string battleId,
-        CombatReplayPlaybackSource source
+        CombatReplayPlaybackSource source,
+        bool recordVideo
     )
     {
         var attemptedBootstrapFromLobby = false;
         _isReplayStartInProgress = true;
-        _playbackPublisher!.BeginSession(battleId, manifest, source);
+        _playbackPublisher!.BeginSession(battleId, manifest, source, recordVideo);
         try
         {
             _returnToMenuAfterReplay = false;
@@ -347,6 +359,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _savedReplayPlaybackActive = false;
         _isReplayStartInProgress = false;
         _portraitController?.RestoreSelectedHeroOverride();
+        // Bootstrapped saved replays exit through this manual path (the state-exit patch
+        // intercepts the normal transition), so OnStateChanged's PublishEnded never fires for
+        // them. Emit it here too, otherwise the video recorder never gets the "ended" signal and
+        // leaves ffmpeg running on a never-finalized file (no moov atom -> unplayable MP4).
+        _playbackPublisher?.PublishEnded("saved-replay-exit", failed: false);
         _portraitController?.Cleanup();
         PlaybackUiState.InitializedBoardUiControllers.Clear();
 

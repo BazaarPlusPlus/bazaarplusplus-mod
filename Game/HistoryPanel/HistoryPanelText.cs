@@ -38,6 +38,13 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet ReplayText = new("Replay", "回放", "重播", "重播");
 
+    private static readonly LocalizedTextSet RecordAndReplayText = new(
+        "Record and Replay",
+        "录制并回放",
+        "錄製並重播",
+        "錄製並重播"
+    );
+
     private static readonly LocalizedTextSet ReplayUnavailableText = new("Unavailable", "不可用");
 
     private static readonly LocalizedTextSet ReplayDisabledInRunText = new("In Run", "对局中禁用");
@@ -209,6 +216,8 @@ internal static class HistoryPanelText
     internal static string Close() => Resolve(CloseText);
 
     internal static string Replay() => Resolve(ReplayText);
+
+    internal static string RecordAndReplay() => Resolve(RecordAndReplayText);
 
     internal static string ReplayUnavailable() => Resolve(ReplayUnavailableText);
 
@@ -624,6 +633,16 @@ internal static class HistoryPanelText
     internal static string CombatReplayRuntimeUnavailable()
     {
         return FormatSimple("Combat replay runtime is unavailable.", "战斗回放运行时不可用。");
+    }
+
+    internal static string RecordingUnavailable()
+    {
+        return FormatSimple(
+            "FFmpeg not detected; recording is unavailable.",
+            "未检测到 FFmpeg，无法录制。",
+            "未偵測到 FFmpeg，無法錄製。",
+            "未偵測到 FFmpeg，無法錄製。"
+        );
     }
 
     internal static string GhostReplayPayloadUnavailable()

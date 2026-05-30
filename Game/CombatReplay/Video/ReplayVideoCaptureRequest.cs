@@ -28,8 +28,4 @@ internal sealed class ReplayVideoCaptureRequest
     public string Preset { get; init; } = "veryfast";
 
     public int MaxQueuedFrames { get; init; }
-
-    public bool ForceSpeed1x { get; init; }
-
-    public bool SuppressBppOverlays { get; init; }
 }

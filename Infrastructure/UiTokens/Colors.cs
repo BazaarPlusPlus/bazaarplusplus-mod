@@ -104,6 +104,8 @@ internal static class Colors
     public static Color DeleteText => Rgba(1f, 0.93f, 0.90f, 1f);
     public static Color ReplayBackground => Rgba(0.19f, 0.31f, 0.39f, 0.98f);
     public static Color ReplayText => Rgba(0.88f, 0.95f, 1f, 1f);
+    public static Color RecordReplayBackground => Rgba(0.45f, 0.19f, 0.24f, 0.98f);
+    public static Color RecordReplayText => Rgba(1f, 0.90f, 0.92f, 1f);
     public static Color CloseBackground => Rgba(0.29f, 0.20f, 0.20f, 0.98f);
     public static Color CloseText => Rgba(0.98f, 0.92f, 0.90f, 1f);
 

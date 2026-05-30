@@ -1,7 +1,7 @@
 # Combat Replay 视频录制改为 HistoryPanel 按钮触发
 
 - 日期：2026-05-30
-- 状态：设计已定稿，待实现
+- 状态：已实现并验证（build 通过 + 评审通过），待提交；合并后移入 `archive/` 并加 `Status:` banner
 - 影响仓库：`bazaarplusplus-mod`
 
 ## 背景与动机

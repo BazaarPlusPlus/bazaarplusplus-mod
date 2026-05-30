@@ -244,6 +244,19 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         return _replayService.CanReplayBattle(activeSelectedBattle, out reason);
     }
 
+    public bool CanRecordSelectedBattle(
+        HistoryBattleRecord? activeSelectedBattle,
+        out string reason
+    )
+    {
+        return _replayService.CanRecordReplay(activeSelectedBattle, out reason);
+    }
+
+    public void PrewarmRecordingAvailability()
+    {
+        _replayService.PrewarmRecordingAvailability();
+    }
+
     public bool CanDeleteSelectedRun(HistoryRunRecord? selectedRun, out string reason)
     {
         if (_state.SectionMode == HistorySectionMode.Ghost)
@@ -287,7 +300,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         return true;
     }
 
-    public async Task TryReplaySelectedBattleAsync(HistoryBattleRecord? activeSelectedBattle)
+    public async Task TryReplaySelectedBattleAsync(
+        HistoryBattleRecord? activeSelectedBattle,
+        bool recordVideo
+    )
     {
         var battle = activeSelectedBattle;
         if (battle == null)
@@ -307,6 +323,24 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
+        // Recording must be feasible before a record-and-replay request proceeds; otherwise we
+        // surface the reason and refuse rather than silently starting a no-video replay.
+        if (recordVideo)
+        {
+            var canRecord = CanRecordSelectedBattle(battle, out var recordUnavailableReason);
+            BppLog.Info(
+                "HistoryPanel",
+                $"Record-and-replay requested battle={battle.BattleId} canRecord={canRecord}"
+                    + (canRecord ? string.Empty : $" reason={recordUnavailableReason}")
+            );
+            if (!canRecord)
+            {
+                SetStatusMessage(recordUnavailableReason);
+                _requestUiRefresh();
+                return;
+            }
+        }
+
         _state.ReplayActionInProgress = true;
         SetStatusMessage(
             battle.Source == HistoryBattleSource.Ghost && !battle.ReplayDownloaded
@@ -319,7 +353,11 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         HistoryPanelReplayAttemptResult replayResult;
         try
         {
-            replayResult = await _replayService.ReplayBattleAsync(battle, _session.Token);
+            replayResult = await _replayService.ReplayBattleAsync(
+                battle,
+                recordVideo,
+                _session.Token
+            );
         }
         catch (OperationCanceledException)
         {

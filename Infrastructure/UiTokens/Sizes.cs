@@ -19,6 +19,7 @@ internal static class Sizes
     public const float FinalBuildRefreshButtonWidth = 124f;
     public const float DeleteButtonWidth = 130f;
     public const float ReplayButtonWidth = 140f;
+    public const float RecordAndReplayButtonWidth = 190f;
     public const float CloseButtonWidth = 96f;
     public const float StatusHeight = 24f;
     public const float StatusMaxWidth = 220f;

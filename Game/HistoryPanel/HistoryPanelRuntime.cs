@@ -13,12 +13,14 @@ internal sealed class HistoryPanelRuntime : IHistoryPanelRuntime
         IRunContext runContext,
         string? runLogDatabasePath,
         string? combatReplayDirectoryPath,
+        string? pluginsDirectoryPath,
         Func<CombatReplayRuntime?> combatReplayRuntimeAccessor
     )
     {
         _runContext = runContext ?? throw new ArgumentNullException(nameof(runContext));
         RunLogDatabasePath = runLogDatabasePath ?? string.Empty;
         CombatReplayDirectoryPath = combatReplayDirectoryPath ?? string.Empty;
+        PluginsDirectoryPath = pluginsDirectoryPath ?? string.Empty;
         CombatReplayRuntimeAccessor =
             combatReplayRuntimeAccessor
             ?? throw new ArgumentNullException(nameof(combatReplayRuntimeAccessor));
@@ -31,6 +33,8 @@ internal sealed class HistoryPanelRuntime : IHistoryPanelRuntime
     public string RunLogDatabasePath { get; }
 
     public string CombatReplayDirectoryPath { get; }
+
+    public string PluginsDirectoryPath { get; }
 
     public Func<CombatReplayRuntime?> CombatReplayRuntimeAccessor { get; }
 }

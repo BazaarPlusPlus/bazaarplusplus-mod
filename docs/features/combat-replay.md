@@ -1,6 +1,6 @@
 # Combat Replay
 
-PVP combat 的本地录制与回放，外加可选的 MP4 视频录制。录制 / 回放是默认能力；视频录制是独立、默认关闭的附加 feature（`CombatReplayVideo / Enabled = false`）。
+PVP combat 的本地录制与回放，外加可选的 MP4 视频录制。录制 / 回放是默认能力；视频录制是独立的附加 feature，由 HistoryPanel 上的「录制并回放」按钮对选中对局显式发起单次录制（无全局开关）。
 
 本文是 combat replay 子系统的唯一现行文档。SQLite 列定义统一见 [sqlite-schema-reference.md](../reference/sqlite-schema-reference.md)，不在此重复。
 
@@ -43,30 +43,31 @@ PVP combat 的本地录制与回放，外加可选的 MP4 视频录制。录制 
 
 ## Optional：Video Recording（可选 MP4 录制）
 
-saved replay 播放期间把 Unity Game View 抓帧编码为 MP4，落到 `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<yyyy-MM-dd>/<battle_id>.<yyyyMMdd-HHmmss>.mp4`，供离线复盘 / 社区分享。Local 与 ghost replay 一视同仁。
+replay 播放期间把 Unity Game View 抓帧编码为 MP4，落到 `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<yyyy-MM-dd>/<battle_id>.<yyyyMMdd-HHmmss>.mp4`，供离线复盘 / 社区分享。Local 与 ghost replay 一视同仁。
 
-- **默认关闭**，由 `CombatReplayVideo / Enabled` 控制；关闭时录制器不订阅、零开销。
-- **FFmpeg 两级检测，只检测不下载（随 mod 分发）**：`<GameRoot>/BepInEx/plugins/ffmpeg(.exe)`（与 mod 同目录的 bundled 二进制）→ 系统 `PATH`。FFmpeg 随 mod 一起分发，无需单独下载或安装。检测方式是起 `ffmpeg -version`（2s 超时，`ExitCode==0`），结果缓存到 session；都未命中则功能静默禁用并打一行 Info log，不影响 replay 本身。
-- **抓帧 / 编码**：`ScreenCapture.CaptureScreenshotIntoRenderTexture` + `AsyncGPUReadback`（main thread 只 enqueue 到 bounded queue）→ FFmpeg subprocess（rawvideo stdin → libx264 / openh264 → MP4）。`SystemInfo.supportsAsyncGPUReadback` 为 false 时禁用。
+- **触发：单次、显式，由 HistoryPanel 页脚的「录制并回放」按钮发起**，作用于当前选中对局，与现有纯 Replay 按钮并存。点按钮 →（ghost 对局先下载 payload）→ 回放该对局 → 回放期间录制 → 离开 `ReplayState` 自动收尾。没有全局开关、也不会自动录每场回放：录制意图作为参数绑定到本次 session（`CombatReplayPlaybackStarting.RecordVideo`），随 session 走、无残留状态；纯 Replay 按钮与 `ReplayLatest` 不录制。
+- **录制可用性 = FFmpeg 存在 + 支持 `AsyncGPUReadback`，没有功能开关。** 二者任一不满足时「录制并回放」按钮置灰并给出状态提示（如「未检测到 FFmpeg，无法录制」），且不会误启一个无视频的回放。
+- **FFmpeg 两级检测，只检测不下载（随 mod 分发）**：`<GameRoot>/BepInEx/plugins/ffmpeg(.exe)`（与 mod 同目录的 bundled 二进制）→ 系统 `PATH`。FFmpeg 随 mod 一起分发，无需单独下载或安装。检测方式是起 `ffmpeg -version`（2s 超时，`ExitCode==0`），结果缓存到 session；为避免阻塞 UI 线程，首次探活异步预热，按钮可用态读缓存结果。
+- **抓帧 / 编码**：`ScreenCapture.CaptureScreenshotIntoRenderTexture` + `AsyncGPUReadback`（main thread 只 enqueue 到 bounded queue）→ FFmpeg subprocess（rawvideo stdin → libx264 / openh264 → MP4）。`SystemInfo.supportsAsyncGPUReadback` 为 false 时录制不可用。
+- **录制期间的副作用**：**始终**隐藏 BPP 浮层（不可配置）；**不**强制回放速度——速度跟随回放本身。
 - **元数据**：SQLite `combat_replay_videos`（列定义见 schema 参考）。
 - **二进制分发**：FFmpeg 现在作为逐平台的兄弟二进制随 mod payload 一起分发（与 SQLite native lib 同构），落在 `BepInEx/plugins/` 下、运行时由 mod 相对自身定位；本项目是公开 GPL 源码项目，接受 GPL，无许可证顾虑。
 
 ### Config（`CombatReplayVideo` 段，权威见 `Core/Config/BppConfig.cs`）
 
+仅编码 / 输出参数可配；录制的开 / 关由按钮触发，不在 config 里（详见上文「触发」与「录制可用性」）。
+
 | Key | 默认 | 含义 |
 |---|---|---|
-| `Enabled` | `false` | 总开关 |
 | `Fps` | `30` | 帧率 |
 | `Width` / `Height` | `0` | `0` = 跟随 `Screen` |
 | `Crf` | `23` | x264 质量 |
 | `Preset` | `veryfast` | x264 预设 |
-| `ForceSpeed1x` | `true` | 录制期间锁 1x 速度 |
-| `SuppressBppOverlays` | `true` | 录制期间隐藏 BPP 浮层 |
 | `MaxQueuedFrames` | `90` | 抓帧队列上限（满则 drop，记 `dropped_frames`） |
 
 ### 当前状态
 
-Phase 1–3 已落地：录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / speed 恢复 / overlay 抑制）、SQLite `combat_replay_videos` 元数据。FFmpeg 已随 mod 分发（见上文"二进制分发"），无需 installer 单独部署。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项、音频（原 Phase 4）。SFX 修复历史归档在 [docs/design/archive/2026-05-23-combat-replay-sfx-impl.md](../design/archive/2026-05-23-combat-replay-sfx-impl.md)。
+录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / overlay 抑制）、SQLite `combat_replay_videos` 元数据均已落地；录制由 HistoryPanel「录制并回放」按钮单次触发。FFmpeg 已随 mod 分发（见上文「二进制分发」），无需 installer 单独部署。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项、音频。SFX 修复历史归档在 [docs/design/archive/2026-05-23-combat-replay-sfx-impl.md](../design/archive/2026-05-23-combat-replay-sfx-impl.md)。
 
 ## 关键文件
 

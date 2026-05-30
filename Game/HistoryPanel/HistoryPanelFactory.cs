@@ -27,6 +27,7 @@ internal static class HistoryPanelFactory
         var replayService = new HistoryPanelReplayService(
             runtime.CombatReplayRuntimeAccessor,
             () => runtime.CombatReplayDirectoryPath,
+            () => runtime.PluginsDirectoryPath,
             ghostSyncService
         );
         return new HistoryPanelDependencies(runtime, dataService, replayService, ghostSyncService);

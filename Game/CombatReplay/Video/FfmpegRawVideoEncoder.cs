@@ -19,6 +19,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
     private readonly int _crf;
     private readonly string _preset;
     private readonly BlockingCollection<byte[]> _frameQueue;
+    private readonly Action<byte[]>? _onFrameConsumed;
     private readonly StringBuilder _stderrBuffer = new(capacity: 2048);
     private readonly object _stderrLock = new();
     private Process? _process;
@@ -37,7 +38,8 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         int fps,
         int crf,
         string preset,
-        int maxQueuedFrames
+        int maxQueuedFrames,
+        Action<byte[]>? onFrameConsumed = null
     )
     {
         if (string.IsNullOrWhiteSpace(executable))
@@ -62,6 +64,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         _crf = crf;
         _preset = preset;
         _frameQueue = new BlockingCollection<byte[]>(boundedCapacity: maxQueuedFrames);
+        _onFrameConsumed = onFrameConsumed;
     }
 
     public bool IsRunning => _running && !_writerFailed;
@@ -275,6 +278,17 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
                 {
                     stdin.Write(frame, 0, frame.Length);
                     Interlocked.Add(ref _bytesWritten, frame.Length);
+                    try
+                    {
+                        _onFrameConsumed?.Invoke(frame);
+                    }
+                    catch (Exception ex)
+                    {
+                        BppLog.Debug(
+                            "CombatReplayVideo",
+                            $"onFrameConsumed threw: {ex.Message}"
+                        );
+                    }
                 }
                 catch (IOException ex)
                 {
