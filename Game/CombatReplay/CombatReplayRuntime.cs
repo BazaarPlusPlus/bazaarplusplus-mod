@@ -381,7 +381,4 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     // Patches/Combat/CombatReplayVisualPatches.cs calls this static facade — keep the surface.
     public static void HideEncounterPickerOverlays() =>
         HealthBarBinder.HideEncounterPickerOverlays();
-
-    // Patches/Combat/ReplayStateAudioDiagnosticPatch.cs calls this static facade — keep the surface.
-    public static void LogReplayAudioState(string label) => AudioBankWarmer.LogAudioState(label);
 }

@@ -974,9 +974,10 @@ file static class MuxerDebugStemTests
 }
 
 // ---------------------------------------------------------------------------
-// 8) ReplayVideoAudioTapPlan: keep runtime capture to the two proven stable
-//    stems. Child bus probes can be useful diagnostics, but they produced
-//    near-silent or silent stems and should not be mixed into the recording.
+// 8) ReplayVideoAudioTapPlan: a SINGLE all-inclusive stem tapped at the FMOD
+//    CORE master. One stem captures every audible class (music, settlement, VO,
+//    and the Resonance-decoded 3D SFX) and avoids the amix double-count that two
+//    overlapping parent/child taps produced.
 // ---------------------------------------------------------------------------
 file static class AudioTapPlanTests
 {
@@ -986,18 +987,14 @@ file static class AudioTapPlanTests
 
     public static void Run()
     {
-        DerivesStableRootAndSfxWavPaths();
+        DerivesSingleCoreMasterWavPath();
     }
 
-    private static void DerivesStableRootAndSfxWavPaths()
+    private static void DerivesSingleCoreMasterWavPath()
     {
         var paths = DeriveAudioWavPaths(@"C:\replays\battle.20260530-105445.recording.mp4");
 
-        var expected = new[]
-        {
-            @"C:\replays\battle.20260530-105445.audio.wav",
-            @"C:\replays\battle.20260530-105445.sfx.audio.wav",
-        };
+        var expected = new[] { @"C:\replays\battle.20260530-105445.audio.wav" };
 
         TestReflection.Assert(
             paths.Count == expected.Length,

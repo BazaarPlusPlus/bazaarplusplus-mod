@@ -25,7 +25,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     private IDisposable? _uiSuppressionScope;
     private string? _activeRecordingTempPath;
     private string? _activeRecordingFinalPath;
-    private readonly List<FmodAudioCaptureTap> _audioTaps = new();
+    private readonly List<IReplayAudioCaptureTap> _audioTaps = new();
     private List<string>? _activeAudioWavPaths;
     private ReplayVideoAudioMuxer? _muxer;
     private readonly System.Collections.Generic.List<System.Threading.Tasks.Task> _muxTasks = new();
@@ -262,7 +262,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     // one PCM sample, so header-only WAVs cannot truncate the video during -shortest.
     private List<string> StopAudioTaps()
     {
-        var taps = new List<FmodAudioCaptureTap>(_audioTaps);
+        var taps = new List<IReplayAudioCaptureTap>(_audioTaps);
         _audioTaps.Clear();
 
         var capturedWavPaths = new List<string>(taps.Count);
@@ -495,21 +495,12 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
 
     private void StartAudioTaps(string tempVideoPath)
     {
-        // Audio is additive: tap failures must never abort the video recording.
-        // Keep runtime capture to the two proven stable stems. Narrow child-bus
-        // probes produced near-silent or silent files and should not be mixed
-        // into the user's recording while routing remains unresolved.
-        var tapSpecs = ReplayVideoAudioTapPlan.Create(tempVideoPath);
-        _activeAudioWavPaths = new List<string>(tapSpecs.Count);
-        foreach (var tapSpec in tapSpecs)
-        {
-            _activeAudioWavPaths.Add(tapSpec.WavPath);
-            TryStartAudioTap(
-                tapSpec.WavPath,
-                tapSpec.StudioBusPath,
-                tapSpec.AllowCoreMasterFallback
-            );
-        }
+        // Audio is additive: capture failure must never abort the video recording. Capture the device
+        // output (loopback) so we record exactly what the player hears — music, settlement, and the
+        // spatialised combat/board SFX that no FMOD channel group exposes.
+        var wavPath = ReplayVideoAudioTapPlan.DeriveAudioWavPath(tempVideoPath);
+        _activeAudioWavPaths = new List<string> { wavPath };
+        TryStartAudioTap(wavPath);
 
         if (_audioTaps.Count == 0)
         {
@@ -518,15 +509,11 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         }
     }
 
-    private void TryStartAudioTap(
-        string wavPath,
-        string studioBusPath,
-        bool allowCoreMasterFallback
-    )
+    private void TryStartAudioTap(string wavPath)
     {
         try
         {
-            var tap = new FmodAudioCaptureTap(wavPath, studioBusPath, allowCoreMasterFallback);
+            IReplayAudioCaptureTap tap = ReplayAudioCaptureFactory.Create(wavPath);
             if (tap.TryStart())
             {
                 _audioTaps.Add(tap);
@@ -538,10 +525,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "CombatReplayAudio",
-                $"Audio tap unavailable for '{studioBusPath}': {ex.Message}"
-            );
+            BppLog.Warn("CombatReplayAudio", $"Audio capture unavailable: {ex.Message}");
             DeleteWavBestEffort(wavPath);
         }
     }

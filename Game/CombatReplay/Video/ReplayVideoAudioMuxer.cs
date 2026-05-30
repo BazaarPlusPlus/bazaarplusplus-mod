@@ -432,6 +432,10 @@ internal sealed class ReplayVideoAudioMuxer
         }
 
         sb.Append("-c:v copy -c:a aac ");
+        // Downmix to stereo 48 kHz so the AAC track is universally playable. WASAPI loopback captures
+        // the device mix format, which can be 5.1/7.1 surround at non-standard rates, and many players
+        // (incl. Windows Media Player / Photos) reject >2-channel AAC ("encoding settings not supported").
+        sb.Append("-ac 2 -ar 48000 ");
         sb.Append($"-b:a {bitrate}k ");
         sb.Append("-shortest -movflags +faststart ");
         sb.Append(QuoteArg(finalPath));

@@ -16,18 +16,6 @@ namespace BazaarPlusPlus.Game.CombatReplay.Warmup;
 
 internal static class AudioBankWarmer
 {
-    private static readonly string[] DiagnosticBusPathFields =
-    {
-        "MasterBusPath",
-        "BoardDiegeticBusPath",
-        "BoardPresentationBusPath",
-        "CombatBusPath",
-        "MonsterNonVerbalBusPath",
-        "VOBusPath",
-        "EnvironmentSpecificBusPath",
-        "EnvironmentFocusBusPath",
-    };
-
     internal static async Task WarmAudioBanksAsync()
     {
         try
@@ -105,8 +93,6 @@ internal static class AudioBankWarmer
     {
         try
         {
-            LogAudioState("pre-fix");
-
             var gameServiceManager = Singleton<GameServiceManager>.Instance;
             if (gameServiceManager?.GamePaused == true)
             {
@@ -135,201 +121,10 @@ internal static class AudioBankWarmer
 
             StopAllTrackedSfxEventInstances(soundManager);
             ReassertSfxVolumeFromPreferences();
-
-            LogAudioState("post-fix");
         }
         catch (Exception ex)
         {
             BppLog.Warn("AudioBankWarmer", $"Replay audio readiness step failed: {ex.Message}");
-        }
-    }
-
-    internal static void LogAudioState(string label)
-    {
-        try
-        {
-            var soundManager = Services.Get<SoundManager>();
-            if (soundManager == null)
-            {
-                BppLog.Warn(
-                    "AudioBankWarmer",
-                    $"[ReplayAudioDiag/{label}] SoundManager unavailable."
-                );
-                return;
-            }
-
-            var soundManagerType = typeof(SoundManager);
-            foreach (var fieldName in DiagnosticBusPathFields)
-            {
-                LogBusState(label, soundManager, soundManagerType, fieldName);
-            }
-
-            try
-            {
-                var settingsField = soundManagerType.GetField(
-                    "SoundSettings",
-                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public
-                );
-                if (settingsField?.GetValue(null) is SoundSettings soundSettings)
-                {
-                    LogVcaState(label, "SfxVCA", soundSettings.SfxVCA);
-                    LogVcaState(label, "MusicVCA", soundSettings.MusicVCA);
-                    LogVcaState(label, "VoVCA", soundSettings.VoVCA);
-                }
-                else
-                {
-                    BppLog.Info(
-                        "AudioBankWarmer",
-                        $"[ReplayAudioDiag/{label}] SoundSettings static field is null."
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "AudioBankWarmer",
-                    $"[ReplayAudioDiag/{label}] VCA read failed: {ex.Message}"
-                );
-            }
-
-            try
-            {
-                var dict = GetSfxEventInstancesDict(soundManager);
-                if (dict != null)
-                {
-                    var keys = string.Join(",", dict.Keys);
-                    BppLog.Info(
-                        "AudioBankWarmer",
-                        $"[ReplayAudioDiag/{label}] tracked-sfx count={dict.Count} keys=[{keys}]"
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "AudioBankWarmer",
-                    $"[ReplayAudioDiag/{label}] tracked-sfx read failed: {ex.Message}"
-                );
-            }
-
-            try
-            {
-                var pauseSnapshotField = soundManagerType.GetField(
-                    "PauseSnapshot",
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
-                );
-                if (pauseSnapshotField?.GetValue(soundManager) is EventReference pauseSnapshot)
-                {
-                    BppLog.Info(
-                        "AudioBankWarmer",
-                        $"[ReplayAudioDiag/{label}] PauseSnapshot.Guid={pauseSnapshot.Guid} isNull={pauseSnapshot.IsNull}"
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "AudioBankWarmer",
-                    $"[ReplayAudioDiag/{label}] PauseSnapshot read failed: {ex.Message}"
-                );
-            }
-
-            try
-            {
-                var gsm = Singleton<GameServiceManager>.Instance;
-                BppLog.Info(
-                    "AudioBankWarmer",
-                    $"[ReplayAudioDiag/{label}] GamePaused={gsm?.GamePaused} StateName={Data.CurrentState?.StateName}"
-                );
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "AudioBankWarmer",
-                    $"[ReplayAudioDiag/{label}] GamePaused read failed: {ex.Message}"
-                );
-            }
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "AudioBankWarmer",
-                $"[ReplayAudioDiag/{label}] diagnostics failed: {ex.Message}"
-            );
-        }
-    }
-
-    private static void LogBusState(
-        string label,
-        SoundManager soundManager,
-        Type soundManagerType,
-        string fieldName
-    )
-    {
-        try
-        {
-            var field = soundManagerType.GetField(
-                fieldName,
-                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public
-            );
-            var path = field?.GetValue(soundManager) as string;
-            if (string.IsNullOrEmpty(path))
-            {
-                BppLog.Info(
-                    "AudioBankWarmer",
-                    $"[ReplayAudioDiag/{label}] bus.{fieldName}=<no-path>"
-                );
-                return;
-            }
-
-            var bus = RuntimeManager.GetBus(path);
-            if (!bus.isValid())
-            {
-                BppLog.Info(
-                    "AudioBankWarmer",
-                    $"[ReplayAudioDiag/{label}] bus.{fieldName} path={path} invalid"
-                );
-                return;
-            }
-
-            bus.getPaused(out var paused);
-            bus.getVolume(out var vol, out var finalVol);
-            BppLog.Info(
-                "AudioBankWarmer",
-                $"[ReplayAudioDiag/{label}] bus.{fieldName} path={path} paused={paused} vol={vol:F3} final={finalVol:F3}"
-            );
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "AudioBankWarmer",
-                $"[ReplayAudioDiag/{label}] bus.{fieldName} read failed: {ex.Message}"
-            );
-        }
-    }
-
-    private static void LogVcaState(string label, string vcaName, VCA vca)
-    {
-        try
-        {
-            if (!vca.isValid())
-            {
-                BppLog.Info("AudioBankWarmer", $"[ReplayAudioDiag/{label}] vca.{vcaName} invalid");
-                return;
-            }
-
-            vca.getVolume(out var vol, out var finalVol);
-            BppLog.Info(
-                "AudioBankWarmer",
-                $"[ReplayAudioDiag/{label}] vca.{vcaName} vol={vol:F3} final={finalVol:F3}"
-            );
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "AudioBankWarmer",
-                $"[ReplayAudioDiag/{label}] vca.{vcaName} read failed: {ex.Message}"
-            );
         }
     }
 

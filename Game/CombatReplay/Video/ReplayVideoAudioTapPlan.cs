@@ -4,50 +4,18 @@ using System.Collections.Generic;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
-internal readonly struct ReplayVideoAudioTapSpec
-{
-    public ReplayVideoAudioTapSpec(
-        string wavPath,
-        string studioBusPath,
-        bool allowCoreMasterFallback
-    )
-    {
-        WavPath = wavPath ?? throw new ArgumentNullException(nameof(wavPath));
-        StudioBusPath = studioBusPath ?? throw new ArgumentNullException(nameof(studioBusPath));
-        AllowCoreMasterFallback = allowCoreMasterFallback;
-    }
-
-    public string WavPath { get; }
-    public string StudioBusPath { get; }
-    public bool AllowCoreMasterFallback { get; }
-}
-
+/// <summary>
+/// Derives the WAV path the loopback capture writes for a recording — a single, all-inclusive
+/// device-output stem (music, settlement, and the spatialised combat/board SFX).
+/// </summary>
 internal static class ReplayVideoAudioTapPlan
 {
-    internal static IReadOnlyList<ReplayVideoAudioTapSpec> Create(string tempVideoPath) =>
-        new[]
-        {
-            new ReplayVideoAudioTapSpec(
-                DeriveAudioWavPath(tempVideoPath, "audio"),
-                "bus:/",
-                allowCoreMasterFallback: true
-            ),
-            new ReplayVideoAudioTapSpec(
-                DeriveAudioWavPath(tempVideoPath, "sfx.audio"),
-                "bus:/SFX",
-                allowCoreMasterFallback: false
-            ),
-        };
+    internal static string DeriveAudioWavPath(string tempVideoPath) =>
+        DeriveAudioWavPath(tempVideoPath, "audio");
 
-    internal static IReadOnlyList<string> DeriveAudioWavPaths(string tempVideoPath)
-    {
-        var specs = Create(tempVideoPath);
-        var paths = new List<string>(specs.Count);
-        foreach (var spec in specs)
-            paths.Add(spec.WavPath);
-
-        return paths;
-    }
+    /// <summary>The capture WAV path(s) as a list (used by abort cleanup and tests).</summary>
+    internal static IReadOnlyList<string> DeriveAudioWavPaths(string tempVideoPath) =>
+        new[] { DeriveAudioWavPath(tempVideoPath) };
 
     private static string DeriveAudioWavPath(string tempVideoPath, string audioSuffix)
     {

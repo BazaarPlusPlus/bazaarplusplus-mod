@@ -1,0 +1,63 @@
+#nullable enable
+using System.Runtime.InteropServices;
+using BazaarPlusPlus.Infrastructure;
+
+namespace BazaarPlusPlus.Game.CombatReplay.Audio;
+
+/// <summary>
+/// Selects the platform-appropriate replay-audio capture backend.
+///
+/// Capture records the system audio OUTPUT (loopback) — exactly what the player hears — because the
+/// game spatialises its 3D combat/board SFX with Google Resonance Audio, whose decoded signal never
+/// appears on any tappable FMOD channel group; only device-output capture records it.
+///
+/// <list type="bullet">
+/// <item>Windows: <see cref="WasapiLoopbackCaptureTap"/> (WASAPI loopback).</item>
+/// <item>macOS / other: not yet implemented — returns a no-op so the recorder produces a silent video.
+/// To add macOS, implement <see cref="IReplayAudioCaptureTap"/> over a CoreAudio aggregate/loopback
+/// device or ScreenCaptureKit audio and return it here.</item>
+/// </list>
+/// </summary>
+internal static class ReplayAudioCaptureFactory
+{
+    public static IReplayAudioCaptureTap Create(string wavFilePath)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return new WasapiLoopbackCaptureTap(wavFilePath);
+
+        return new UnsupportedPlatformAudioCapture(wavFilePath);
+    }
+}
+
+/// <summary>
+/// No-op capture for platforms that do not yet have a loopback backend (e.g. macOS). Its
+/// <see cref="TryStart"/> returns false, so the recorder proceeds with a silent video and nothing is
+/// captured. Replace by returning a real backend from <see cref="ReplayAudioCaptureFactory"/>.
+/// </summary>
+internal sealed class UnsupportedPlatformAudioCapture : IReplayAudioCaptureTap
+{
+    private readonly string _wavFilePath;
+
+    public UnsupportedPlatformAudioCapture(string wavFilePath) => _wavFilePath = wavFilePath;
+
+    public bool IsCapturing => false;
+    public bool CapturedAnySamples => false;
+    public long CapturedSampleFloats => 0;
+    public string WavFilePath => _wavFilePath;
+    public string CapturePointLabel => "unsupported-platform";
+    public double RmsAmplitude => 0.0;
+    public float PeakAmplitude => 0f;
+
+    public bool TryStart()
+    {
+        BppLog.Warn(
+            "CombatReplayAudio",
+            $"Replay audio capture is not implemented on '{RuntimeInformation.OSDescription}'; recording a silent video."
+        );
+        return false;
+    }
+
+    public void Stop() { }
+
+    public void Dispose() { }
+}
