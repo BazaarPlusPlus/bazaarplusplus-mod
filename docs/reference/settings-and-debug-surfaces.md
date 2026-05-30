@@ -10,7 +10,6 @@
 - `Anonymous Mode` -> `EnableNameOverrideConfig`
 - `Legendary Position` -> `LegendaryPositionDisplayModeConfig`
 - `Enchant Preview` -> `EnchantPreviewModeConfig`（3 态：OFF / AUTO / ON，click 循环切换）
-- `Upgrade Preview` -> `UpgradePreviewModeConfig`（3 态：OFF / AUTO / ON，click 循环切换）
 - `Combat Status Bar` -> `EnableCombatStatusBarConfig`
 - `BazaarDB Upload` -> `BazaarDbUploadEnabled`
 - `Chinese Locale` -> `ChineseLocaleModeConfig`

@@ -15,6 +15,28 @@ Assert(
     "Candidate selection should dedupe inputs and exclude the current enchantment."
 );
 
+var restrictedToOffered = ItemEnchantPreviewCandidateSelector.SelectCandidates(
+    currentEnchantment: EEnchantmentType.Heavy,
+    allEnchantments: [EEnchantmentType.Heavy, EEnchantmentType.Icy, EEnchantmentType.Turbo],
+    restrictToEnchantmentNames: ["icy"]
+);
+
+Assert(
+    restrictedToOffered.SequenceEqual([EEnchantmentType.Icy]),
+    "A pedestal restriction should keep only the offered enchant type(s), matched case-insensitively."
+);
+
+var emptyRestriction = ItemEnchantPreviewCandidateSelector.SelectCandidates(
+    currentEnchantment: EEnchantmentType.Heavy,
+    allEnchantments: [EEnchantmentType.Heavy, EEnchantmentType.Icy, EEnchantmentType.Turbo],
+    restrictToEnchantmentNames: []
+);
+
+Assert(
+    emptyRestriction.SequenceEqual([EEnchantmentType.Icy, EEnchantmentType.Turbo]),
+    "An empty restriction (manual Ctrl / Always / empty random pool) should keep the full candidate list."
+);
+
 Assert(
     ItemEnchantPreviewEligibility.IsEligible(
         ECardType.Item,

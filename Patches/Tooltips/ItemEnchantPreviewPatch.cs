@@ -55,8 +55,14 @@ public static class CardTooltipDataPassivePatch
             if (mode != TooltipPreviewMode.Enchant)
                 return;
 
+            // On an enchant pedestal choice screen, restrict the preview to the
+            // enchant type(s) that pedestal would apply; empty otherwise (manual
+            // Ctrl / Always) so the full preview is kept.
+            var restrictTo = services.EncounterState?.GetCurrent().ChoiceScreenEnchantmentTypeNames;
+
             var previewSegments = ItemEnchantPreviewService.BuildPreviewSegments(
-                __instance.CardInstance
+                __instance.CardInstance,
+                restrictTo
             );
             if (previewSegments.Count == 0)
                 return;

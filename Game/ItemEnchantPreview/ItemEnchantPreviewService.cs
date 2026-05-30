@@ -9,12 +9,18 @@ namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
 public static class ItemEnchantPreviewService
 {
-    public static List<TooltipSegment> BuildPreviewSegments(Card card)
+    public static List<TooltipSegment> BuildPreviewSegments(
+        Card card,
+        IReadOnlyCollection<string>? restrictToEnchantmentNames = null
+    )
     {
-        return BuildPreviewSegments(card as ItemCard);
+        return BuildPreviewSegments(card as ItemCard, restrictToEnchantmentNames);
     }
 
-    public static List<TooltipSegment> BuildPreviewSegments(ItemCard itemCard)
+    public static List<TooltipSegment> BuildPreviewSegments(
+        ItemCard itemCard,
+        IReadOnlyCollection<string>? restrictToEnchantmentNames = null
+    )
     {
         var empty = new List<TooltipSegment>();
         if (
@@ -29,7 +35,8 @@ public static class ItemEnchantPreviewService
 
         var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
             itemCard.Enchantment,
-            enchantments.Keys
+            enchantments.Keys,
+            restrictToEnchantmentNames
         );
 
         var segments = new List<TooltipSegment>();

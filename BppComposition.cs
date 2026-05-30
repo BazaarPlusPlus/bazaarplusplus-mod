@@ -20,7 +20,6 @@ using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Tooltips;
-using BazaarPlusPlus.Game.UpgradePreview;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Storage.Paths;
@@ -89,7 +88,6 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());
         _settingsDockRegistry.Register(new LegendaryPositionSettingsDockEntry());
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
-        _settingsDockRegistry.Register(new UpgradePreviewSettingsDockEntry());
 
         _mountables.Register(
             new ComponentMount<BazaarDbScreenshotUploadController>((c, s) => c.Initialize(s))

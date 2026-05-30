@@ -15,31 +15,22 @@ internal static class TooltipPreviewModePolicy
         IEncounterStateProbe? encounterState
     )
     {
+        // Upgrade preview is hold-Shift only — it has no visibility mode of its own.
         if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
             return TooltipPreviewMode.Upgrade;
         if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview))
             return TooltipPreviewMode.Enchant;
 
-        var upgradeMode = config?.UpgradePreviewModeConfig?.Value ?? DefaultMode;
         var enchantMode = config?.EnchantPreviewModeConfig?.Value ?? DefaultMode;
-
-        if (upgradeMode == PreviewVisibilityMode.Always)
-            return TooltipPreviewMode.Upgrade;
         if (enchantMode == PreviewVisibilityMode.Always)
             return TooltipPreviewMode.Enchant;
-
-        var upgradeAuto = upgradeMode == PreviewVisibilityMode.AutoOnPedestalChoice;
-        var enchantAuto = enchantMode == PreviewVisibilityMode.AutoOnPedestalChoice;
-        if (!upgradeAuto && !enchantAuto)
+        if (enchantMode != PreviewVisibilityMode.AutoOnPedestalChoice)
             return TooltipPreviewMode.Normal;
 
         var kind =
             encounterState?.GetCurrent().ChoiceScreenPedestalKind ?? ChoiceScreenPedestalKind.None;
-        if (kind == ChoiceScreenPedestalKind.Upgrade && upgradeAuto)
-            return TooltipPreviewMode.Upgrade;
-        if (kind == ChoiceScreenPedestalKind.Enchant && enchantAuto)
-            return TooltipPreviewMode.Enchant;
-
-        return TooltipPreviewMode.Normal;
+        return kind == ChoiceScreenPedestalKind.Enchant
+            ? TooltipPreviewMode.Enchant
+            : TooltipPreviewMode.Normal;
     }
 }

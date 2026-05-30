@@ -24,6 +24,14 @@ internal readonly struct EncounterStateSnapshot
     /// in ChoiceState or the offered SelectionSet contains no relevant pedestal.</summary>
     public ChoiceScreenPedestalKind ChoiceScreenPedestalKind { get; init; }
 
+    /// <summary>Enum names of the enchant type(s) the offered enchant pedestal
+    /// would apply — one entry for a fixed pedestal, the full weighted pool for a
+    /// random one. Empty unless <see cref="ChoiceScreenPedestalKind"/> is
+    /// <see cref="ChoiceScreenPedestalKind.Enchant"/>. Kept as strings (not the
+    /// game's EEnchantmentType) so this Core snapshot stays free of game-DLL
+    /// references, mirroring <see cref="InteractionFilterTemplateIds"/>.</summary>
+    public IReadOnlyList<string> ChoiceScreenEnchantmentTypeNames { get; init; }
+
     public static EncounterStateSnapshot Empty { get; } =
         new()
         {
@@ -32,5 +40,6 @@ internal readonly struct EncounterStateSnapshot
             InteractionFilterTemplateIds = Array.Empty<string>(),
             PedestalEligibleInstanceIds = new HashSet<string>(),
             ChoiceScreenPedestalKind = ChoiceScreenPedestalKind.None,
+            ChoiceScreenEnchantmentTypeNames = Array.Empty<string>(),
         };
 }

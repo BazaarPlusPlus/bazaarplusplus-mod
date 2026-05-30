@@ -2,6 +2,7 @@ using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Encounter.Combat;
 using BazaarGameShared.Domain.Cards.Encounter.Pedestal;
 using BazaarGameShared.Domain.Cards.Encounter.Pedestal.Behaviors;
+using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Encounter;
 using BazaarPlusPlus.Core.GameState;
 
@@ -107,10 +108,52 @@ AssertEqual(
     "Two pedestals of the same kind should resolve to that kind."
 );
 
+// Several pedestals can be offered at once; ResolveDetailed aggregates every offered
+// enchant type rather than stopping at the first.
+var fieryGuid = Guid.NewGuid();
+var icyGuid = Guid.NewGuid();
+var multiEnchantTemplates = new Dictionary<Guid, ITCard>
+{
+    [fieryGuid] = new TCardEncounterPedestal
+    {
+        Behavior = new TPedestalBehaviorEnchant { Enchantment = EEnchantmentType.Fiery },
+    },
+    [icyGuid] = new TCardEncounterPedestal
+    {
+        Behavior = new TPedestalBehaviorEnchant { Enchantment = EEnchantmentType.Icy },
+    },
+};
+ITCard? MultiLookup(Guid id) =>
+    multiEnchantTemplates.TryGetValue(id, out var card) ? card : null;
+
+var multiResult = ChoiceScreenPedestalResolver.ResolveDetailed(
+    new[] { fieryGuid.ToString(), icyGuid.ToString() },
+    MultiLookup
+);
+
+AssertEqual(
+    ChoiceScreenPedestalKind.Enchant,
+    multiResult.Kind,
+    "Multiple offered enchant pedestals should resolve to Enchant."
+);
+
+AssertTrue(
+    multiResult.EnchantmentTypeNames.Count == 2
+        && multiResult.EnchantmentTypeNames.Contains("Fiery")
+        && multiResult.EnchantmentTypeNames.Contains("Icy"),
+    "Multiple offered enchant pedestals should aggregate every offered enchant type."
+);
+
 Console.WriteLine("ChoiceScreenPedestalResolver checks passed.");
 
 static void AssertEqual<T>(T expected, T actual, string message)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual))
         throw new InvalidOperationException($"{message} Expected: {expected}, Actual: {actual}");
+}
+
+static void AssertTrue(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
 }
