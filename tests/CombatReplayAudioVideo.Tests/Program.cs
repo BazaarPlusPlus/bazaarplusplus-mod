@@ -15,6 +15,9 @@ WavHeaderTests.Run();
 CfrPacerTests.Run();
 FramePoolTests.Run();
 ZeroDurationMuxGuardTests.Run();
+MuxerArgumentTests.Run();
+MuxerDebugStemTests.Run();
+AudioTapPlanTests.Run();
 
 Console.WriteLine("CombatReplayAudioVideo tests passed.");
 
@@ -826,6 +829,205 @@ file static class ZeroDurationMuxGuardTests
         return (bool)(
             method.Invoke(null, new object[] { muxedSize, silentSize })
             ?? throw new InvalidOperationException("IsLikelyZeroDurationOutput returned null.")
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 6) ReplayVideoAudioMuxer.BuildArguments: multi-WAV capture must mix the base
+//    bus audio and SFX bus audio into one AAC input via amix.
+// ---------------------------------------------------------------------------
+file static class MuxerArgumentTests
+{
+    private static readonly Type MuxerType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer"
+    );
+
+    public static void Run()
+    {
+        MultiWavArgumentsUseAmix();
+    }
+
+    private static void MultiWavArgumentsUseAmix()
+    {
+        var args = BuildArguments(
+            "silent recording.mp4",
+            new[] { "base audio.wav", "sfx audio.wav" },
+            "final output.mp4",
+            192
+        );
+
+        TestReflection.Assert(
+            args.Contains("-i \"silent recording.mp4\""),
+            "Mux arguments should include the quoted video input."
+        );
+        TestReflection.Assert(
+            args.Contains("-i \"base audio.wav\"") && args.Contains("-i \"sfx audio.wav\""),
+            "Mux arguments should include both quoted WAV inputs."
+        );
+        TestReflection.Assert(
+            args.Contains("[1:a][2:a]amix=inputs=2:normalize=0[aout]"),
+            "Multi-WAV mux should mix audio inputs with amix normalize=0."
+        );
+        TestReflection.Assert(
+            args.Contains("-map 0:v:0 -map \"[aout]\""),
+            "Multi-WAV mux should map the amix output as the audio stream."
+        );
+        TestReflection.Assert(
+            args.Contains("-c:v copy -c:a aac") && args.Contains("-b:a 192k"),
+            "Mux arguments should keep video copy and AAC bitrate settings."
+        );
+    }
+
+    private static string BuildArguments(
+        string silentVideoTempPath,
+        IReadOnlyList<string> wavPaths,
+        string finalPath,
+        int audioBitrateKbps
+    )
+    {
+        var method =
+            MuxerType.GetMethod(
+                "BuildArguments",
+                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static,
+                binder: null,
+                types: new[]
+                {
+                    typeof(string),
+                    typeof(IReadOnlyList<string>),
+                    typeof(string),
+                    typeof(int),
+                },
+                modifiers: null
+            )
+            ?? throw new InvalidOperationException(
+                "ReplayVideoAudioMuxer.BuildArguments(string,IReadOnlyList<string>,string,int) not found."
+            );
+        return (string)(
+            method.Invoke(
+                null,
+                new object[] { silentVideoTempPath, wavPaths, finalPath, audioBitrateKbps }
+            ) ?? throw new InvalidOperationException("BuildArguments returned null.")
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 7) ReplayVideoAudioMuxer debug stem naming: successful runtime muxes delete
+//    temp WAVs, so debug builds preserve stable sibling copies for listening
+//    to each captured bus before amix.
+// ---------------------------------------------------------------------------
+file static class MuxerDebugStemTests
+{
+    private static readonly Type MuxerType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer"
+    );
+
+    public static void Run()
+    {
+        TwoCapturedStemsUseStableNames();
+    }
+
+    private static void TwoCapturedStemsUseStableNames()
+    {
+        var targets = BuildDebugStemCopyTargets(
+            @"C:\replays\battle.20260530-104759.mp4",
+            new[]
+            {
+                @"C:\replays\battle.20260530-104759.audio.wav",
+                @"C:\replays\battle.20260530-104759.sfx.audio.wav",
+            }
+        );
+
+        TestReflection.Assert(targets.Count == 2, "Two captured WAVs should have two debug stems.");
+        TestReflection.Assert(
+            targets[0] == @"C:\replays\battle.20260530-104759.debug.audio.wav",
+            $"Base-bus debug stem path was {targets[0]}."
+        );
+        TestReflection.Assert(
+            targets[1] == @"C:\replays\battle.20260530-104759.debug.sfx.wav",
+            $"SFX-bus debug stem path was {targets[1]}."
+        );
+    }
+
+    private static IReadOnlyList<string> BuildDebugStemCopyTargets(
+        string finalPath,
+        IReadOnlyList<string> wavPaths
+    )
+    {
+        var method =
+            MuxerType.GetMethod(
+                "BuildDebugStemCopyTargets",
+                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static,
+                binder: null,
+                types: new[] { typeof(string), typeof(IReadOnlyList<string>) },
+                modifiers: null
+            )
+            ?? throw new InvalidOperationException(
+                "ReplayVideoAudioMuxer.BuildDebugStemCopyTargets(string,IReadOnlyList<string>) not found."
+            );
+        return (IReadOnlyList<string>)(
+            method.Invoke(null, new object[] { finalPath, wavPaths })
+            ?? throw new InvalidOperationException("BuildDebugStemCopyTargets returned null.")
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 8) ReplayVideoAudioTapPlan: keep runtime capture to the two proven stable
+//    stems. Child bus probes can be useful diagnostics, but they produced
+//    near-silent or silent stems and should not be mixed into the recording.
+// ---------------------------------------------------------------------------
+file static class AudioTapPlanTests
+{
+    private static readonly Type TapPlanType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioTapPlan"
+    );
+
+    public static void Run()
+    {
+        DerivesStableRootAndSfxWavPaths();
+    }
+
+    private static void DerivesStableRootAndSfxWavPaths()
+    {
+        var paths = DeriveAudioWavPaths(@"C:\replays\battle.20260530-105445.recording.mp4");
+
+        var expected = new[]
+        {
+            @"C:\replays\battle.20260530-105445.audio.wav",
+            @"C:\replays\battle.20260530-105445.sfx.audio.wav",
+        };
+
+        TestReflection.Assert(
+            paths.Count == expected.Length,
+            $"Expected {expected.Length} audio tap paths, got {paths.Count}."
+        );
+        for (var i = 0; i < expected.Length; i++)
+        {
+            TestReflection.Assert(
+                paths[i] == expected[i],
+                $"Audio tap path {i} was {paths[i]}, expected {expected[i]}."
+            );
+        }
+    }
+
+    private static IReadOnlyList<string> DeriveAudioWavPaths(string tempVideoPath)
+    {
+        var method =
+            TapPlanType.GetMethod(
+                "DeriveAudioWavPaths",
+                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static,
+                binder: null,
+                types: new[] { typeof(string) },
+                modifiers: null
+            )
+            ?? throw new InvalidOperationException(
+                "ReplayVideoAudioTapPlan.DeriveAudioWavPaths(string) not found."
+            );
+        return (IReadOnlyList<string>)(
+            method.Invoke(null, new object[] { tempVideoPath })
+            ?? throw new InvalidOperationException("DeriveAudioWavPaths returned null.")
         );
     }
 }

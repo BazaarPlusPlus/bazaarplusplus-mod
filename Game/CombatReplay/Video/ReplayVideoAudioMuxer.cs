@@ -78,6 +78,21 @@ internal sealed class ReplayVideoAudioMuxer
         string finalPath,
         Action<MuxResult>? onCompleted = null,
         int audioBitrateKbps = 192
+    ) =>
+        DispatchAsync(
+            silentVideoTempPath,
+            string.IsNullOrWhiteSpace(wavPath) ? null : new[] { wavPath },
+            finalPath,
+            onCompleted,
+            audioBitrateKbps
+        );
+
+    public Task DispatchAsync(
+        string silentVideoTempPath,
+        IReadOnlyList<string>? wavPaths,
+        string finalPath,
+        Action<MuxResult>? onCompleted = null,
+        int audioBitrateKbps = 192
     )
     {
         var task = Task.Run(() =>
@@ -85,7 +100,7 @@ internal sealed class ReplayVideoAudioMuxer
             MuxResult result;
             try
             {
-                result = MuxOrPromote(silentVideoTempPath, wavPath, finalPath, audioBitrateKbps);
+                result = MuxOrPromote(silentVideoTempPath, wavPaths, finalPath, audioBitrateKbps);
             }
             catch (Exception ex)
             {
@@ -128,13 +143,27 @@ internal sealed class ReplayVideoAudioMuxer
         string? wavPath,
         string finalPath,
         int audioBitrateKbps = 192
+    ) =>
+        MuxOrPromote(
+            silentVideoTempPath,
+            string.IsNullOrWhiteSpace(wavPath) ? null : new[] { wavPath },
+            finalPath,
+            audioBitrateKbps
+        );
+
+    public MuxResult MuxOrPromote(
+        string silentVideoTempPath,
+        IReadOnlyList<string>? wavPaths,
+        string finalPath,
+        int audioBitrateKbps = 192
     )
     {
-        if (string.IsNullOrWhiteSpace(wavPath) || !File.Exists(wavPath))
+        var usableWavPaths = GetExistingWavPaths(wavPaths);
+        if (usableWavPaths.Count == 0)
         {
             return PromoteAndReport(
                 silentVideoTempPath,
-                wavPath,
+                wavPaths,
                 finalPath,
                 MuxStatus.FellBackToSilent,
                 reason: "no audio WAV available",
@@ -146,7 +175,7 @@ internal sealed class ReplayVideoAudioMuxer
         {
             return PromoteAndReport(
                 silentVideoTempPath,
-                wavPath,
+                usableWavPaths,
                 finalPath,
                 MuxStatus.FellBackToSilent,
                 reason: "ffmpeg has no AAC encoder",
@@ -154,7 +183,7 @@ internal sealed class ReplayVideoAudioMuxer
             );
         }
 
-        return Mux(silentVideoTempPath, wavPath!, finalPath, audioBitrateKbps);
+        return Mux(silentVideoTempPath, usableWavPaths, finalPath, audioBitrateKbps);
     }
 
     /// <summary>
@@ -167,9 +196,16 @@ internal sealed class ReplayVideoAudioMuxer
         string wavPath,
         string finalPath,
         int audioBitrateKbps = 192
+    ) => Mux(silentVideoTempPath, new[] { wavPath }, finalPath, audioBitrateKbps);
+
+    public MuxResult Mux(
+        string silentVideoTempPath,
+        IReadOnlyList<string> wavPaths,
+        string finalPath,
+        int audioBitrateKbps = 192
     )
     {
-        var arguments = BuildArguments(silentVideoTempPath, wavPath, finalPath, audioBitrateKbps);
+        var arguments = BuildArguments(silentVideoTempPath, wavPaths, finalPath, audioBitrateKbps);
 
         Process? process = null;
         var stderr = new StringBuilder(capacity: 2048);
@@ -192,7 +228,7 @@ internal sealed class ReplayVideoAudioMuxer
             {
                 return FallBack(
                     silentVideoTempPath,
-                    wavPath,
+                    wavPaths,
                     finalPath,
                     "ffmpeg mux process failed to start"
                 );
@@ -229,7 +265,7 @@ internal sealed class ReplayVideoAudioMuxer
                 drainThread.Join(500);
                 return FallBack(
                     silentVideoTempPath,
-                    wavPath,
+                    wavPaths,
                     finalPath,
                     $"ffmpeg mux timed out after {MuxTimeoutMs}ms"
                 );
@@ -252,15 +288,18 @@ internal sealed class ReplayVideoAudioMuxer
                 {
                     return FallBack(
                         silentVideoTempPath,
-                        wavPath,
+                        wavPaths,
                         finalPath,
                         $"ffmpeg exit 0 but output is empty/zero-duration "
                             + $"({mixedSize} bytes vs silent {silentSize} bytes). stderr tail: {stderrTail}"
                     );
                 }
 
+#if DEBUG
+                PreserveDebugAudioStems(finalPath, wavPaths);
+#endif
                 TryDelete(silentVideoTempPath);
-                TryDelete(wavPath);
+                TryDelete(wavPaths);
                 BppLog.Info(
                     LogComponent,
                     $"Muxed replay audio into '{finalPath}' ({mixedSize} bytes)."
@@ -270,7 +309,7 @@ internal sealed class ReplayVideoAudioMuxer
 
             return FallBack(
                 silentVideoTempPath,
-                wavPath,
+                wavPaths,
                 finalPath,
                 $"ffmpeg exit code {exitCode}. stderr tail: {stderrTail}"
             );
@@ -279,7 +318,7 @@ internal sealed class ReplayVideoAudioMuxer
         {
             return FallBack(
                 silentVideoTempPath,
-                wavPath,
+                wavPaths,
                 finalPath,
                 $"{ex.GetType().Name}: {ex.Message}"
             );
@@ -299,7 +338,7 @@ internal sealed class ReplayVideoAudioMuxer
 
     private MuxResult PromoteAndReport(
         string silentVideoTempPath,
-        string? wavPath,
+        IReadOnlyList<string>? wavPaths,
         string finalPath,
         MuxStatus status,
         string reason,
@@ -321,7 +360,7 @@ internal sealed class ReplayVideoAudioMuxer
         try
         {
             var size = PromoteSilentToFinal(silentVideoTempPath, finalPath);
-            TryDelete(wavPath);
+            TryDelete(wavPaths);
             return new MuxResult(status, finalPath, size, reason);
         }
         catch (Exception ex)
@@ -336,7 +375,7 @@ internal sealed class ReplayVideoAudioMuxer
 
     private MuxResult FallBack(
         string silentVideoTempPath,
-        string? wavPath,
+        IReadOnlyList<string>? wavPaths,
         string finalPath,
         string reason
     )
@@ -346,7 +385,7 @@ internal sealed class ReplayVideoAudioMuxer
         try
         {
             var size = PromoteSilentToFinal(silentVideoTempPath, finalPath);
-            TryDelete(wavPath);
+            TryDelete(wavPaths);
             return new MuxResult(MuxStatus.FellBackToSilent, finalPath, size, reason);
         }
         catch (Exception ex)
@@ -355,19 +394,43 @@ internal sealed class ReplayVideoAudioMuxer
         }
     }
 
-    private string BuildArguments(
+    private static string BuildArguments(
         string silentVideoTempPath,
         string wavPath,
         string finalPath,
         int audioBitrateKbps
+    ) => BuildArguments(silentVideoTempPath, new[] { wavPath }, finalPath, audioBitrateKbps);
+
+    private static string BuildArguments(
+        string silentVideoTempPath,
+        IReadOnlyList<string> wavPaths,
+        string finalPath,
+        int audioBitrateKbps
     )
     {
+        if (wavPaths == null || wavPaths.Count == 0)
+            throw new ArgumentException("At least one WAV path is required.", nameof(wavPaths));
+
         var bitrate = audioBitrateKbps > 0 ? audioBitrateKbps : 192;
         var sb = new StringBuilder();
         sb.Append("-hide_banner -loglevel warning -nostdin -y ");
         sb.Append("-i ").Append(QuoteArg(silentVideoTempPath)).Append(' ');
-        sb.Append("-i ").Append(QuoteArg(wavPath)).Append(' ');
-        sb.Append("-map 0:v:0 -map 1:a:0 ");
+        for (var i = 0; i < wavPaths.Count; i++)
+            sb.Append("-i ").Append(QuoteArg(wavPaths[i])).Append(' ');
+
+        if (wavPaths.Count == 1)
+        {
+            sb.Append("-map 0:v:0 -map 1:a:0 ");
+        }
+        else
+        {
+            sb.Append("-filter_complex ");
+            for (var i = 0; i < wavPaths.Count; i++)
+                sb.Append('[').Append(i + 1).Append(":a]");
+            sb.Append($"amix=inputs={wavPaths.Count}:normalize=0[aout] ");
+            sb.Append("-map 0:v:0 -map \"[aout]\" ");
+        }
+
         sb.Append("-c:v copy -c:a aac ");
         sb.Append($"-b:a {bitrate}k ");
         sb.Append("-shortest -movflags +faststart ");
@@ -639,6 +702,126 @@ internal sealed class ReplayVideoAudioMuxer
                 $"Failed to delete '{path}': {ex.GetType().Name} {ex.Message}"
             );
         }
+    }
+
+    private static void TryDelete(IReadOnlyList<string>? paths)
+    {
+        if (paths == null)
+            return;
+
+        foreach (var path in paths)
+            TryDelete(path);
+    }
+
+    private static void PreserveDebugAudioStems(string finalPath, IReadOnlyList<string> wavPaths)
+    {
+        var targetPaths = BuildDebugStemCopyTargets(finalPath, wavPaths);
+        for (var i = 0; i < wavPaths.Count; i++)
+        {
+            var sourcePath = wavPaths[i];
+            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+                continue;
+
+            var targetPath = targetPaths[i];
+            try
+            {
+                var directory = Path.GetDirectoryName(targetPath);
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
+
+                File.Copy(sourcePath, targetPath, overwrite: true);
+                BppLog.Info(
+                    LogComponent,
+                    $"Preserved replay audio debug stem '{targetPath}' from '{sourcePath}'."
+                );
+            }
+            catch (Exception ex)
+            {
+                BppLog.Debug(
+                    LogComponent,
+                    $"Failed to preserve replay audio debug stem '{targetPath}': {ex.GetType().Name} {ex.Message}"
+                );
+            }
+        }
+    }
+
+    private static IReadOnlyList<string> BuildDebugStemCopyTargets(
+        string finalPath,
+        IReadOnlyList<string> wavPaths
+    )
+    {
+        var targets = new List<string>(wavPaths.Count);
+        var directory = Path.GetDirectoryName(finalPath);
+        var finalStem = Path.GetFileNameWithoutExtension(finalPath);
+        if (string.IsNullOrEmpty(finalStem))
+            finalStem = "combat-replay";
+
+        for (var i = 0; i < wavPaths.Count; i++)
+        {
+            var label = BuildDebugStemLabel(finalStem, wavPaths[i], i);
+            var fileName = $"{finalStem}.debug.{label}.wav";
+            targets.Add(
+                string.IsNullOrEmpty(directory) ? fileName : Path.Combine(directory, fileName)
+            );
+        }
+
+        return targets;
+    }
+
+    private static string BuildDebugStemLabel(string finalStem, string wavPath, int index)
+    {
+        var wavStem = Path.GetFileNameWithoutExtension(wavPath);
+        if (!string.IsNullOrEmpty(wavStem))
+        {
+            var prefix = finalStem + ".";
+            if (wavStem.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var suffix = wavStem.Substring(prefix.Length);
+                if (suffix.Equals("audio", StringComparison.OrdinalIgnoreCase))
+                    return "audio";
+                if (suffix.Equals("sfx.audio", StringComparison.OrdinalIgnoreCase))
+                    return "sfx";
+                if (suffix.EndsWith(".audio", StringComparison.OrdinalIgnoreCase))
+                    return SanitizeDebugStemLabel(suffix.Substring(0, suffix.Length - 6));
+                return SanitizeDebugStemLabel(suffix);
+            }
+        }
+
+        return index == 0 ? "audio" : $"audio{index + 1}";
+    }
+
+    private static string SanitizeDebugStemLabel(string label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+            return "audio";
+
+        var builder = new StringBuilder(label.Length);
+        foreach (var ch in label)
+        {
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))
+                builder.Append(char.ToLowerInvariant(ch));
+            else if (ch == '-' || ch == '_' || ch == '.')
+                builder.Append(ch);
+            else
+                builder.Append('_');
+        }
+
+        return builder.Length == 0 ? "audio" : builder.ToString();
+    }
+
+    private static List<string> GetExistingWavPaths(IReadOnlyList<string>? wavPaths)
+    {
+        var existing = new List<string>();
+        if (wavPaths == null)
+            return existing;
+
+        foreach (var wavPath in wavPaths)
+        {
+            if (!string.IsNullOrWhiteSpace(wavPath) && File.Exists(wavPath))
+                existing.Add(wavPath);
+        }
+
+        return existing;
     }
 
     private static void ForceKill(Process process)

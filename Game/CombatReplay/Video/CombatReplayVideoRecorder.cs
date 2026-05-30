@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
@@ -24,8 +25,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     private IDisposable? _uiSuppressionScope;
     private string? _activeRecordingTempPath;
     private string? _activeRecordingFinalPath;
-    private FmodAudioCaptureTap? _audioTap;
-    private string? _activeAudioWavPath;
+    private readonly List<FmodAudioCaptureTap> _audioTaps = new();
+    private List<string>? _activeAudioWavPaths;
     private ReplayVideoAudioMuxer? _muxer;
     private readonly System.Collections.Generic.List<System.Threading.Tasks.Task> _muxTasks = new();
     private readonly object _muxTasksLock = new();
@@ -110,10 +111,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             }
             catch (Exception ex)
             {
-                BppLog.Debug(
-                    "CombatReplayVideo",
-                    $"Mux drain on destroy incomplete: {ex.Message}"
-                );
+                BppLog.Debug("CombatReplayVideo", $"Mux drain on destroy incomplete: {ex.Message}");
             }
         }
     }
@@ -205,11 +203,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         {
             StopCaptureCoroutine();
             var result = session.Finalize(reason);
-            // closes + unlocks the WAV before the muxer reads it, and reports
-            // whether the tap ever pushed PCM. A header-only WAV (the tap opened
-            // the file but captured zero samples) still File.Exists, so the
-            // mux must be gated on captured-any-samples, not file presence.
-            var capturedAudio = StopAudioTap();
+            // Closes + unlocks the WAVs before the muxer reads them, returning
+            // only paths whose tap actually pushed PCM. Header-only WAVs are
+            // deleted inside StopAudioTaps.
+            var wavPaths = StopAudioTaps();
 
             // Capture locals before nulling instance fields: the mux runs on a
             // background thread after this method returns, so it must not read
@@ -217,24 +214,15 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             var tempVideoPath = _activeRecordingTempPath ?? result.OutputFilePath;
             var finalPath = _activeRecordingFinalPath ?? StripTempSuffix(result.OutputFilePath);
             var videoDir = _services?.Paths.CombatReplayVideoDirectoryPath;
-            var wavPath = _activeAudioWavPath;
             var store = _metadataStore;
 
             DisposeUiState();
             _activeSession = null;
             _activeRecordingTempPath = null;
             _activeRecordingFinalPath = null;
-            _activeAudioWavPath = null;
+            _activeAudioWavPaths = null;
 
-            DispatchMuxOrPromote(
-                result,
-                tempVideoPath,
-                finalPath,
-                videoDir,
-                wavPath,
-                capturedAudio,
-                store
-            );
+            DispatchMuxOrPromote(result, tempVideoPath, finalPath, videoDir, wavPaths, store);
 
             BppLog.Info(
                 "CombatReplayVideo",
@@ -248,7 +236,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 $"Failed to finalize replay video recording for {evt.BattleId}.",
                 ex
             );
-            StopAudioTap();
+            var wavPaths = _activeAudioWavPaths;
+            StopAudioTaps();
             try
             {
                 session.Dispose();
@@ -259,54 +248,67 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             }
             DisposeUiState();
             DeleteTempFile();
-            if (_activeAudioWavPath != null)
-            {
-                try
-                {
-                    if (File.Exists(_activeAudioWavPath))
-                        File.Delete(_activeAudioWavPath);
-                }
-                catch
-                {
-                    // ignore
-                }
-            }
+            DeleteWavBestEffort(wavPaths);
             _activeSession = null;
             _activeRecordingTempPath = null;
             _activeRecordingFinalPath = null;
-            _activeAudioWavPath = null;
+            _activeAudioWavPaths = null;
         }
     }
 
-    // Exception-safe, idempotent. Stops the audio tap (removeDSP + release + joins
-    // the WAV writer thread + closes the file) so the WAV is complete and unlocked
-    // before the muxer reads it. Calling this before a new BeginRecording also
-    // guarantees the previous DSP is gone before the new tap's addDSP — no two
-    // taps on the master bus at once. Returns true iff the tap captured at least
-    // one PCM sample (read before teardown), so the caller can avoid muxing an
-    // empty, header-only WAV.
-    private bool StopAudioTap()
+    // Exception-safe, idempotent. Stops all audio taps (removeDSP + release + joins
+    // the WAV writer threads + closes the files) so the WAVs are complete and unlocked
+    // before the muxer reads them. Returns only WAV paths whose tap captured at least
+    // one PCM sample, so header-only WAVs cannot truncate the video during -shortest.
+    private List<string> StopAudioTaps()
     {
-        var tap = _audioTap;
-        _audioTap = null;
-        if (tap == null)
-            return false;
+        var taps = new List<FmodAudioCaptureTap>(_audioTaps);
+        _audioTaps.Clear();
 
-        // Read the sample-captured flag before Stop(): the writer thread is joined
-        // inside Stop, but the underlying ring's write counter is set on the mixer
-        // thread and is already final by the time playback ended.
-        var capturedAnySamples = tap.CapturedAnySamples;
-
-        try
+        var capturedWavPaths = new List<string>(taps.Count);
+        foreach (var tap in taps)
         {
-            tap.Stop();
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn("CombatReplayAudio", $"Audio tap stop failed: {ex.Message}");
+            // Read before Stop(): the ring counter is written by the mixer thread and
+            // remains available after teardown, but this keeps the decision explicit.
+            var capturedAnySamples = tap.CapturedAnySamples;
+            var sampleFloats = tap.CapturedSampleFloats;
+            var wavPath = tap.WavFilePath;
+
+            try
+            {
+                tap.Stop();
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn("CombatReplayAudio", $"Audio tap stop failed: {ex.Message}");
+            }
+
+            var fileSize = FfmpegRawVideoEncoder.TryGetFileSize(wavPath);
+            var rmsDb = FormatAmplitudeDb(tap.RmsAmplitude);
+            var peakDb = FormatAmplitudeDb(tap.PeakAmplitude);
+            BppLog.Info(
+                "CombatReplayAudio",
+                $"Audio tap stopped source={tap.CapturePointLabel} captured={capturedAnySamples} sampleFloats={sampleFloats} rms_db={rmsDb} peak_db={peakDb} size_bytes={fileSize} file={wavPath}"
+            );
+
+            if (capturedAnySamples && File.Exists(wavPath))
+                capturedWavPaths.Add(wavPath);
+            else
+                DeleteWavBestEffort(wavPath);
         }
 
-        return capturedAnySamples;
+        return capturedWavPaths;
+    }
+
+    private static string FormatAmplitudeDb(double amplitude)
+    {
+        if (amplitude <= 0 || double.IsNaN(amplitude) || double.IsInfinity(amplitude))
+            return "-inf";
+
+        return (20.0 * Math.Log10(amplitude)).ToString(
+            "F1",
+            System.Globalization.CultureInfo.InvariantCulture
+        );
     }
 
     // Central post-finalize logic. Called from the OnPlaybackEnded success path with
@@ -322,8 +324,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         string tempVideoPath,
         string finalPath,
         string? videoDir,
-        string? wavPath,
-        bool capturedAudio,
+        IReadOnlyList<string>? wavPaths,
         CombatReplayVideoMetadataStore? store
     )
     {
@@ -331,7 +332,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         {
             FinalizeOutputFileFor(result, tempVideoPath, finalPath);
             TrySaveFinishMetadataFor(store, videoDir, finalPath, result, null);
-            DeleteWavBestEffort(wavPath);
+            DeleteWavBestEffort(wavPaths);
             return;
         }
 
@@ -339,11 +340,12 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         // WavStreamWriter writes a 44-byte header on open, so a tap that captured
         // zero PCM still leaves a present-but-empty WAV. Muxing that with -shortest
         // yields a zero-duration output and would destroy the good silent video.
-        if (!capturedAudio || string.IsNullOrEmpty(wavPath) || !File.Exists(wavPath))
+        var usableWavPaths = GetExistingWavPaths(wavPaths);
+        if (usableWavPaths.Count == 0)
         {
             // No usable audio track: promote the silent video to the final path now
             // and discard the empty WAV.
-            DeleteWavBestEffort(wavPath);
+            DeleteWavBestEffort(wavPaths);
             try
             {
                 ReplayVideoAudioMuxer.PromoteSilentToFinal(tempVideoPath, finalPath);
@@ -382,7 +384,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 );
             }
 
-            DeleteWavBestEffort(wavPath);
+            DeleteWavBestEffort(usableWavPaths);
             TrySaveFinishMetadataFor(
                 store,
                 videoDir,
@@ -401,7 +403,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         // with the recomputed size of whatever landed (muxed or promoted).
         var task = _muxer.DispatchAsync(
             tempVideoPath,
-            wavPath,
+            usableWavPaths,
             finalPath,
             onCompleted: mux =>
                 TrySaveFinishMetadataFor(
@@ -436,21 +438,28 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         }
     }
 
-    // Mirrors StripTempSuffix: the audio WAV is the sibling of the temp video,
-    // ".recording.mp4" -> ".audio.wav", so the path can be re-derived without a
-    // DTO field on the capture request.
-    private static string DeriveAudioWavPath(string tempVideoPath)
+    private static void DeleteWavBestEffort(IReadOnlyList<string>? wavPaths)
     {
-        const string suffix = ".recording.mp4";
-        if (
-            string.IsNullOrEmpty(tempVideoPath)
-            || !tempVideoPath.EndsWith(suffix, StringComparison.Ordinal)
-        )
+        if (wavPaths == null)
+            return;
+
+        foreach (var wavPath in wavPaths)
+            DeleteWavBestEffort(wavPath);
+    }
+
+    private static List<string> GetExistingWavPaths(IReadOnlyList<string>? wavPaths)
+    {
+        var existing = new List<string>();
+        if (wavPaths == null)
+            return existing;
+
+        foreach (var wavPath in wavPaths)
         {
-            return tempVideoPath + ".audio.wav";
+            if (!string.IsNullOrWhiteSpace(wavPath) && File.Exists(wavPath))
+                existing.Add(wavPath);
         }
 
-        return tempVideoPath.Substring(0, tempVideoPath.Length - suffix.Length) + ".audio.wav";
+        return existing;
     }
 
     private void BeginRecording(ReplayVideoCaptureRequest request, IBppServices services)
@@ -470,29 +479,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         _activeRecordingTempPath = request.OutputFilePath;
         _activeRecordingFinalPath = StripTempSuffix(request.OutputFilePath);
 
-        // Audio is additive: a tap failure must never abort the (silent) video
-        // recording. Attach it alongside the video session, deriving the WAV
-        // sibling path from the temp video path so no DTO field is needed.
-        _activeAudioWavPath = DeriveAudioWavPath(request.OutputFilePath);
-        try
-        {
-            var tap = new FmodAudioCaptureTap(_activeAudioWavPath);
-            if (tap.TryStart())
-            {
-                _audioTap = tap;
-            }
-            else
-            {
-                _audioTap = null;
-                _activeAudioWavPath = null;
-            }
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn("CombatReplayAudio", $"Audio tap unavailable: {ex.Message}");
-            _audioTap = null;
-            _activeAudioWavPath = null;
-        }
+        StartAudioTaps(request.OutputFilePath);
 
         _uiSuppressionScope = BeginUiSuppression();
 
@@ -504,6 +491,59 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             "CombatReplayVideo",
             $"Recording started battle={request.BattleId} source={request.Source} -> {request.OutputFilePath}"
         );
+    }
+
+    private void StartAudioTaps(string tempVideoPath)
+    {
+        // Audio is additive: tap failures must never abort the video recording.
+        // Keep runtime capture to the two proven stable stems. Narrow child-bus
+        // probes produced near-silent or silent files and should not be mixed
+        // into the user's recording while routing remains unresolved.
+        var tapSpecs = ReplayVideoAudioTapPlan.Create(tempVideoPath);
+        _activeAudioWavPaths = new List<string>(tapSpecs.Count);
+        foreach (var tapSpec in tapSpecs)
+        {
+            _activeAudioWavPaths.Add(tapSpec.WavPath);
+            TryStartAudioTap(
+                tapSpec.WavPath,
+                tapSpec.StudioBusPath,
+                tapSpec.AllowCoreMasterFallback
+            );
+        }
+
+        if (_audioTaps.Count == 0)
+        {
+            DeleteWavBestEffort(_activeAudioWavPaths);
+            _activeAudioWavPaths = null;
+        }
+    }
+
+    private void TryStartAudioTap(
+        string wavPath,
+        string studioBusPath,
+        bool allowCoreMasterFallback
+    )
+    {
+        try
+        {
+            var tap = new FmodAudioCaptureTap(wavPath, studioBusPath, allowCoreMasterFallback);
+            if (tap.TryStart())
+            {
+                _audioTaps.Add(tap);
+                return;
+            }
+
+            tap.Dispose();
+            DeleteWavBestEffort(wavPath);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CombatReplayAudio",
+                $"Audio tap unavailable for '{studioBusPath}': {ex.Message}"
+            );
+            DeleteWavBestEffort(wavPath);
+        }
     }
 
     private void TrySaveStartMetadata(ReplayVideoCaptureRequest request, IBppServices services)
@@ -663,7 +703,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         // Tear the tap down synchronously: removeDSP + release before any new
         // recording's addDSP (covers superseded, OnDisable, OnDestroy, and the
         // scene-change-driven OnDisable). Abort never muxes — it deletes temps.
-        StopAudioTap();
+        var wavPaths = _activeAudioWavPaths;
+        StopAudioTaps();
 
         if (session != null)
         {
@@ -671,8 +712,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             {
                 var result = session.Finalize(reason);
                 var tempPath = _activeRecordingTempPath ?? result.OutputFilePath;
-                var finalPath =
-                    _activeRecordingFinalPath ?? StripTempSuffix(result.OutputFilePath);
+                var finalPath = _activeRecordingFinalPath ?? StripTempSuffix(result.OutputFilePath);
                 FinalizeOutputFileFor(result, tempPath, finalPath);
                 TrySaveFinishMetadataFor(
                     _metadataStore,
@@ -704,31 +744,22 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
 
         DisposeUiState();
         DeleteTempFile();
-        if (_activeAudioWavPath != null)
-        {
-            try
-            {
-                if (File.Exists(_activeAudioWavPath))
-                    File.Delete(_activeAudioWavPath);
-            }
-            catch
-            {
-                // ignore
-            }
-        }
+        DeleteWavBestEffort(wavPaths);
         _activeRecordingTempPath = null;
         _activeRecordingFinalPath = null;
-        _activeAudioWavPath = null;
+        _activeAudioWavPaths = null;
     }
 
     private void CleanupAfterAbort()
     {
-        StopAudioTap();
+        var wavPaths = _activeAudioWavPaths;
+        StopAudioTaps();
         DisposeUiState();
         DeleteTempFile();
+        DeleteWavBestEffort(wavPaths);
         _activeRecordingTempPath = null;
         _activeRecordingFinalPath = null;
-        _activeAudioWavPath = null;
+        _activeAudioWavPaths = null;
     }
 
     private static IDisposable? BeginUiSuppression()

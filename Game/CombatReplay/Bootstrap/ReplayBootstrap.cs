@@ -106,11 +106,11 @@ internal static class ReplayBootstrap
         await AppStateHandlerInstaller.WaitForPresentationReadyAsync();
         await PresentationWarmer.WarmPresentationAssetsAsync(manifest, sequence);
         await AudioBankWarmer.WarmAudioBanksAsync();
-        AudioBankWarmer.EnsureAudioReadyForPlayback();
         HealthBarBinder.HideEncounterPickerOverlays();
         HealthBarBinder.EnsureOpponentPortraitVisible();
         HealthBarBinder.RefillOpponentHealthBar();
         onBeforeReplayPlayback?.Invoke();
+        AudioBankWarmer.EnsureAudioReadyForPlayback();
         replayState.Replay();
         HealthBarBinder.EnsureOpponentPortraitVisible();
         Singleton<BoardManager>.Instance.ShowReplayAndRecapButtons(show: false, deactivate: true);
