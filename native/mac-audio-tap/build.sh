@@ -15,3 +15,19 @@ clang -arch arm64 -fobjc-arc \
   -O2 -dynamiclib -o libBppMacAudio.dylib BppMacAudio.m
 
 echo "built libBppMacAudio.dylib"
+
+# Copy the prebuilt into the installer repo — the location the mod build actually consumes
+# (BazaarPlusPlus.csproj -> BPPInstallerSourcePath), alongside libe_sqlite3.dylib. The default
+# assumes the standard sibling-repo workspace layout; override with BPP_INSTALLER_PLUGINS_DIR.
+# When the installer repo is absent (e.g. a mod-only checkout) the copy is skipped cleanly — the
+# dylib still builds locally and this is not an error.
+dest_dir="${BPP_INSTALLER_PLUGINS_DIR:-../../../bazaarplusplus-installer/src-tauri/resources/SourceForBuild/macos/BepInEx/plugins}"
+if [ -d "$dest_dir" ]; then
+  cp libBppMacAudio.dylib "$dest_dir/libBppMacAudio.dylib"
+  echo "copied libBppMacAudio.dylib -> $dest_dir/"
+  echo "  (remember to commit the refreshed dylib in the installer repo if it changed)"
+else
+  echo "note: installer plugins dir not found, skipped copy:"
+  echo "      $dest_dir"
+  echo "      set BPP_INSTALLER_PLUGINS_DIR, or copy libBppMacAudio.dylib there before building the mod."
+fi
