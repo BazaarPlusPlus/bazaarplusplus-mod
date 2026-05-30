@@ -16,7 +16,11 @@ internal readonly struct ChoiceScreenPedestalResult
     public IReadOnlyList<string> EnchantmentTypeNames { get; init; }
 
     public static ChoiceScreenPedestalResult None { get; } =
-        new() { Kind = ChoiceScreenPedestalKind.None, EnchantmentTypeNames = Array.Empty<string>() };
+        new()
+        {
+            Kind = ChoiceScreenPedestalKind.None,
+            EnchantmentTypeNames = Array.Empty<string>(),
+        };
 }
 
 /// <summary>Classifies the choice screen's offered pedestals. Each SelectionSet entry

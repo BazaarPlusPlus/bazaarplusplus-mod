@@ -11,10 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile
-      Include="../../Game/Lobby/SelectionPoolState.cs"
-      Link="Lobby/SelectionPoolState.cs"
-    />
+    <Compile Include="../../Game/Lobby/SelectionPoolState.cs" Link="Lobby/SelectionPoolState.cs" />
     <Compile
       Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolPreferences.cs"
       Link="RandomHeroPool/RandomHeroPoolPreferences.cs"

@@ -60,7 +60,10 @@
     <WindowsFfmpegLicense>$(BPPInstallerSourcePath)/FfmpegSource/windows/LICENSE.txt</WindowsFfmpegLicense>
     <MacFfmpegLicense>$(BPPInstallerSourcePath)/FfmpegSource/macos/LICENSE.txt</MacFfmpegLicense>
     <!-- Host platform's FFmpeg zip, used by the Debug copy-to-game step -->
-    <HostFfmpegZip Condition="$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))">$(WindowsFfmpegZip)</HostFfmpegZip>
+    <HostFfmpegZip
+      Condition="$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))"
+      >$(WindowsFfmpegZip)</HostFfmpegZip
+    >
     <HostFfmpegZip Condition="'$(HostFfmpegZip)' == ''">$(MacFfmpegZip)</HostFfmpegZip>
   </PropertyGroup>
   <!-- Candidate install paths for common Steam locations -->

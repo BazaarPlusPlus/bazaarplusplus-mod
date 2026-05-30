@@ -80,7 +80,10 @@ internal sealed class ItemBoardOverlay : IDisposable
         MonsterBoardTooltipBindings.HandlePoolingMethod?.Invoke(_view, null);
         RenderItems(monster.Player.Hand.Items);
         if (input.Carpet != null)
-            MonsterBoardTooltipBindings.SetCarpetMethod?.Invoke(_view, new object[] { input.Carpet });
+            MonsterBoardTooltipBindings.SetCarpetMethod?.Invoke(
+                _view,
+                new object[] { input.Carpet }
+            );
 
         if (input.AnchoredPosition.HasValue)
             SetAnchoredPosition(input.AnchoredPosition.Value);
@@ -303,7 +306,10 @@ internal sealed class ItemBoardOverlay : IDisposable
         if (_hasPinnedAnchoredPosition)
         {
             _viewRect.anchoredPosition = _pinnedAnchoredPosition;
-            _sponsorPanel.UpdateSponsorPlacement(_viewRect.localScale.x, _viewRect.anchoredPosition);
+            _sponsorPanel.UpdateSponsorPlacement(
+                _viewRect.localScale.x,
+                _viewRect.anchoredPosition
+            );
             return;
         }
 
@@ -311,7 +317,10 @@ internal sealed class ItemBoardOverlay : IDisposable
         if (sourceRect == null)
         {
             _viewRect.anchoredPosition = new Vector2(260f, -20f);
-            _sponsorPanel.UpdateSponsorPlacement(_viewRect.localScale.x, _viewRect.anchoredPosition);
+            _sponsorPanel.UpdateSponsorPlacement(
+                _viewRect.localScale.x,
+                _viewRect.anchoredPosition
+            );
             return;
         }
 
@@ -332,7 +341,10 @@ internal sealed class ItemBoardOverlay : IDisposable
         )
         {
             _viewRect.anchoredPosition = localPoint;
-            _sponsorPanel.UpdateSponsorPlacement(_viewRect.localScale.x, _viewRect.anchoredPosition);
+            _sponsorPanel.UpdateSponsorPlacement(
+                _viewRect.localScale.x,
+                _viewRect.anchoredPosition
+            );
             return;
         }
 
@@ -346,7 +358,8 @@ internal sealed class ItemBoardOverlay : IDisposable
             return;
 
         if (
-            MonsterBoardTooltipBindings.SkillParentField?.GetValue(_view) is RectTransform skillParent
+            MonsterBoardTooltipBindings.SkillParentField?.GetValue(_view)
+            is RectTransform skillParent
         )
             skillParent.gameObject.SetActive(false);
 
@@ -376,7 +389,8 @@ internal sealed class ItemBoardOverlay : IDisposable
         }
 
         if (
-            MonsterBoardTooltipBindings.SkillParentField?.GetValue(_view) is RectTransform skillParent
+            MonsterBoardTooltipBindings.SkillParentField?.GetValue(_view)
+            is RectTransform skillParent
         )
             FlushChildren(skillParent);
     }

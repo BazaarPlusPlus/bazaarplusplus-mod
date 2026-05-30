@@ -1,6 +1,6 @@
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.Encounter;
 using BazaarPlusPlus.Core.GameState;
+using BazaarPlusPlus.Game.Encounter;
 
 // Real datamined template ids from PedestalEnchantCatalog.
 var fiery = Guid.Parse("e36bfb52-5c63-4f59-815d-912af7917620");
@@ -15,7 +15,11 @@ AssertEqual(ChoiceScreenPedestalKind.Enchant, fieryKind, "Fiery pedestal classif
 AssertTrue(fieryEnchant == EEnchantmentType.Fiery, "Fiery pedestal yields the Fiery enchant.");
 
 var upgradeKind = PedestalEnchantCatalog.Classify(upgrade, out var upgradeEnchant);
-AssertEqual(ChoiceScreenPedestalKind.Upgrade, upgradeKind, "Upgrade pedestal classifies as Upgrade.");
+AssertEqual(
+    ChoiceScreenPedestalKind.Upgrade,
+    upgradeKind,
+    "Upgrade pedestal classifies as Upgrade."
+);
 AssertTrue(!upgradeEnchant.HasValue, "Upgrade pedestal has no specific enchant.");
 
 var artistKind = PedestalEnchantCatalog.Classify(randomArtist, out var artistEnchant);
@@ -71,9 +75,14 @@ AssertEqual(
 );
 
 var fieryResult = ChoiceScreenPedestalResolver.ResolveDetailed(new[] { "inst_fiery" }, lookup);
-AssertEqual(ChoiceScreenPedestalKind.Enchant, fieryResult.Kind, "Single Fiery pedestal resolves to Enchant.");
+AssertEqual(
+    ChoiceScreenPedestalKind.Enchant,
+    fieryResult.Kind,
+    "Single Fiery pedestal resolves to Enchant."
+);
 AssertTrue(
-    fieryResult.EnchantmentTypeNames.Count == 1 && fieryResult.EnchantmentTypeNames.Contains("Fiery"),
+    fieryResult.EnchantmentTypeNames.Count == 1
+        && fieryResult.EnchantmentTypeNames.Contains("Fiery"),
     "Fiery pedestal exposes exactly the Fiery enchant name."
 );
 
@@ -88,7 +97,11 @@ var multiResult = ChoiceScreenPedestalResolver.ResolveDetailed(
     new[] { "inst_fiery", "inst_icy", "inst_event" },
     lookup
 );
-AssertEqual(ChoiceScreenPedestalKind.Enchant, multiResult.Kind, "Multiple enchant pedestals resolve to Enchant.");
+AssertEqual(
+    ChoiceScreenPedestalKind.Enchant,
+    multiResult.Kind,
+    "Multiple enchant pedestals resolve to Enchant."
+);
 AssertTrue(
     multiResult.EnchantmentTypeNames.Count == 2
         && multiResult.EnchantmentTypeNames.Contains("Fiery")

@@ -12,8 +12,7 @@ internal sealed class ItemEnchantPreviewSettingsDockEntry : PreviewVisibilityMod
 
     protected override string Key => "EnchantPreview";
 
-    protected override Func<string, string> ResolveLabel =>
-        EnchantPreviewSettingsMenuLabel.Resolve;
+    protected override Func<string, string> ResolveLabel => EnchantPreviewSettingsMenuLabel.Resolve;
 
     protected override ConfigEntry<PreviewVisibilityMode>? GetModeConfig(IBppConfig config) =>
         config.EnchantPreviewModeConfig;

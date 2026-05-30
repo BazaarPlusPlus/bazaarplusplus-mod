@@ -7,7 +7,8 @@ public static class RunBundleArtifactCodec
 {
     public const string ContentType = "application/x-bpp-runbundle+msgpack+gzip";
 
-    public static byte[] Serialize(RunArtifact artifact) => MessagePackGzipCodec.Serialize(artifact);
+    public static byte[] Serialize(RunArtifact artifact) =>
+        MessagePackGzipCodec.Serialize(artifact);
 
     public static RunArtifact? Deserialize(byte[] artifactBytes) =>
         MessagePackGzipCodec.Deserialize<RunArtifact>(artifactBytes);

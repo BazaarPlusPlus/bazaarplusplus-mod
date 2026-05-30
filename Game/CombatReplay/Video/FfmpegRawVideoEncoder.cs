@@ -284,10 +284,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
                     }
                     catch (Exception ex)
                     {
-                        BppLog.Debug(
-                            "CombatReplayVideo",
-                            $"onFrameConsumed threw: {ex.Message}"
-                        );
+                        BppLog.Debug("CombatReplayVideo", $"onFrameConsumed threw: {ex.Message}");
                     }
                 }
                 catch (IOException ex)

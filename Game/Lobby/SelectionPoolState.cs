@@ -35,10 +35,7 @@ public abstract class SelectionPoolState<TSelf>
             throw new ArgumentNullException(nameof(selectedIds));
         }
 
-        _availableIds = availableIds
-            .Where(IsValidId)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        _availableIds = availableIds.Where(IsValidId).Distinct(StringComparer.Ordinal).ToArray();
 
         if (_availableIds.Length == 0)
         {

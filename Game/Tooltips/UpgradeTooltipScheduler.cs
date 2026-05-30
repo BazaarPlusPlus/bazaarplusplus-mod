@@ -20,7 +20,8 @@ internal static class UpgradeTooltipScheduler
         IEncounterStateProbe? encounterState
     )
     {
-        return TooltipPreviewModePolicy.Resolve(config, encounterState) == TooltipPreviewMode.Upgrade;
+        return TooltipPreviewModePolicy.Resolve(config, encounterState)
+            == TooltipPreviewMode.Upgrade;
     }
 
     internal static bool TryScheduleUpgradeTooltip(
@@ -54,7 +55,13 @@ internal static class UpgradeTooltipScheduler
             return false;
 
         controller.StartCoroutine(
-            RefreshUpgradePreviewWhenReady(controller, card, resolvedTooltipData, config, encounterState)
+            RefreshUpgradePreviewWhenReady(
+                controller,
+                card,
+                resolvedTooltipData,
+                config,
+                encounterState
+            )
         );
         return true;
     }
