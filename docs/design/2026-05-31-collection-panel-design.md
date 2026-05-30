@@ -1,6 +1,6 @@
 # Collection Panel 设计规格（卡牌图鉴面板）
 
-Status: Draft
+Status: Implemented (Phase 1–3 + L2/L3 shipped 2026-05-31). Phase 0 spike numbers, Phase 4 (merchant filter), and most of Phase 5 (polish) are deferred. See §16 for the as-built record, the deviations from this document, and the open follow-up list.
 
 > 范围：**仅 Item + Skill 两类卡牌**（原始约 1644 张：Item 1146 + Skill 498；过滤缺图后实际目录约 1571 张，C7）。其余 6 类（EncounterStep / EventEncounter / CombatEncounter / PedestalEncounter / PlayerEffect / SocketEffect）不做。
 > 关联：[2026-05-29-historypanel-fullscreen-responsive-design.md](archive/2026-05-29-historypanel-fullscreen-responsive-design.md)（外壳 + overlay 桥接的前身，含 RenderTexture 方案放弃记录）、[adr/0003-history-panel-preview-overlay.md](../adr/0003-history-panel-preview-overlay.md)。
@@ -591,6 +591,8 @@ cols = clamp(floor((viewportW - 2*padding + gap) / (cellW + gap)), minCols, maxC
 
 ## 9. 交互：悬停 Tooltip
 
+> **As-built note (2026-05-31):** the panel ships with Plan B (polled hit-test) as the default dispatch path, not Plan A. The original Plan A presentation below is preserved for reference, but production code lives in `CollectionGridVirtualizer.PollHover` and the relay is invoked manually rather than via `IPointerEnter/Exit`. See §9.4 and §16.
+
 ### 9.1 一行中继（C6）
 
 `OnHover()` 内部已做完屏幕空间判定 + 锁定/次级 tooltip 分支（`CardPreviewBase.cs:190-211`），只需在每张活动卡上挂中继：
@@ -619,11 +621,15 @@ internal sealed class CollectionCardHoverRelay : MonoBehaviour, IPointerEnterHan
 
 硬规则：**任何卡 `Return` 前无条件 `OnHoverOut()`**（见 §5.3 `Tick`），否则：(a) 卡被回收但指针因瞬移没触发 `OnPointerExit` → tooltip 悬挂指向已回收 transform；(b) 锁定态下 `OnHover` 走次级控制器，回收后次级状态悬挂。换绑前若该卡正 hover，先 `OnHoverOut()` 再 `Bind`。
 
-### 9.4 interop 注意
+### 9.4 interop 注意 — Plan B 是发布默认
 
-tooltip 渲染栈是 uGUI（独立于 UITK 外壳），UITK 面板能正常显示它。风险在**输入**：overlay(27) 的 uGUI 命中要能越过 UITK 面板(26) 的 `pickingMode=Position` 拾取（`HistoryPanelUiToolkitView.cs:121`）。两套排序非简单整数比较，**Phase 0 必须实测**。兜底（Plan B）：禁用命中 Image，改在 `Update` 里手动 hit-test——用发布的像素矩形 + `Mouse.current.position.ReadValue()`（新 Input System，与 mod 其他位置一致；**不用 `Input.mousePosition`**，旧 Input Manager 在游戏设为仅新 Input System 时不更新）算命中格 → 调该卡 `OnHover()/OnHoverOut()`。Plan B 不依赖 GraphicRaycaster 与 UITK 排序协调，更稳但更繁琐，需预先写好。
+tooltip 渲染栈是 uGUI（独立于 UITK 外壳），UITK 面板能正常显示它。风险在**输入**：原 Plan A 要求 overlay(27) 的 uGUI 命中越过 UITK 面板(26) 的 `pickingMode=Position` 拾取，两套排序非简单整数比较，且**额外引入了 wheel 吞噬问题**——游戏 `CardPreviewBase` 预制体的 `_cardImage` (`RawImage`) 默认 `raycastTarget=true`，鼠标在卡上滚动滚轮时 overlay 的 raycaster 命中 `_cardImage` 但祖先链没有 `IScrollHandler`，事件直接被丢弃，UITK ScrollView 收不到。
 
-> ⚠️ Plan B 对 Skill 圆形卡使用矩形近似 hit-test，四角会有误触。显式接受此折中（圆形卡四角面积极小，实际影响可忽略）；如需精确，为 Skill 增加圆形变体（检查鼠标到卡中心距离 vs 半径）。
+**Plan B (实施默认)**：禁用每卡命中 Image，不给 overlay Canvas 挂 `GraphicRaycaster`，每帧用 `Mouse.current.position.ReadValue()`（新 Input System，与 mod 其他位置一致；**不用 `Input.mousePosition`**）算命中格 → 调该卡 `OnHover()/OnHoverOut()`。优势：UITK 始终是最顶层可交互 Canvas，所有 click / wheel / 文本输入直达；劣势：1 帧延迟（不可感知），Skill 圆形卡用矩形近似 hit-test 四角误触（圆形卡四角面积极小，实际影响可忽略）。
+
+**Plan A (诊断备用)**：每卡挂透明 hit Image + overlay 挂 `GraphicRaycaster`。代码路径仍在源里，由 `CollectionGridConstants.UsePolledHover = false` 切换。要让 Plan A 真正可用，还需补一个 `IScrollHandler` 挂在 overlay 根上把 wheel 转发到 UITK ScrollView；目前未实现，仅适合调试。
+
+> ⚠️ 任一 Plan 都要求 `Data.TooltipParentComponent` 在目标场景就绪且未 block (R4)。Phase 0 验证在主菜单是否就绪是仍然必要的。
 
 ---
 
@@ -687,9 +693,13 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 
 > 现有 `BppHotkeyActionId` 只有两个 hold 修饰键（`HoldEnchantPreview/HoldUpgradePreview`，`BppHotkeyActionId.cs`），它们用 `IsHeld(actionId)`。toggle 类用 `WasPressedThisFrame(path)` 更合适，无需扩 enum/switch。热键默认值须登记到 `docs/reference/hotkeys-reference.md`。Escape 关闭 + `TheBazaar.Data.IsInCombat` 强关见 §2.3 `Update`（仿 `HistoryPanel.cs:39-50`）。门控复用 `!IsInCombat`。
 
-### 11.3 输入硬拦截（可选）
+### 11.3 输入硬拦截（试过，已弃）
 
-若要阻止点击/热键漏到游戏，加一个 `EndOfRunMouseBlocker` 式拦截层（`EndOfRunMouseBlocker.cs:54-104`）。**排序层方案**：因 26 和 27 之间无整数间隙，将卡 overlay 提升到 `sortingOrder=28`，拦截层放 `sortingOrder=27`（介于 UITK 面板(26) 和卡(28) 之间），这样拦截层挡背景区但不吞卡的 hover。
+~~若要阻止点击/热键漏到游戏，加一个 `EndOfRunMouseBlocker` 式拦截层…~~
+
+**Status (2026-05-31):** Implemented and reverted. 全屏透明 `Image(raycastTarget=true)` + `GraphicRaycaster` 放在 sortingOrder 27（卡上 28），结果在 EventSystem 的"取最高 sortingOrder 命中"规则下吞掉了所有不在卡上的 click 与 wheel，UITK 收不到任何事件——关闭按钮、tab、筛选 chip、搜索框、滚动条全部失灵。
+
+经实测，UITK 全屏 + `pickingMode=Position` 已经把事件吃干净，根本不漏到游戏。这一层是没有真实需求的过度实现，已删除。设计原文标"可选"是对的，但 Phase 0 应当先实测漏不漏，而不是预先加。详见 §16 经验 #1。
 
 ---
 
@@ -711,7 +721,9 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 
 ## 13. 分阶段实施
 
-### Phase 0 — 可行性 spike（闸门，先做，1–2 天）
+> **As-built status (2026-05-31)**: Phase 1 ✅ / Phase 2 ✅ / Phase 3 ✅ / Phase 0 ⏸ (未做，靠占位常量兜住) / Phase 4 ⏸ (留了 disabled「Merchant (soon)」chip) / Phase 5 🟡 (L3 + Plan B 已做，其余未做)。
+
+### Phase 0 — 可行性 spike（闸门，先做，1–2 天）  ⏸ Deferred
 在游戏里证明五件事全绿，否则各自落兜底。每项有**定量 pass/fail 标准**：
 
 1. **overlay 里原生卡能被指针命中、触发 `OnHover` 出 tooltip**（Item + Skill 各一张）→ pass = tooltip 弹出且内容正确；fail → §9.4 手动 hit-test。
@@ -723,20 +735,24 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 
 附带确认：`_skillReference` harvest 通、`TCardInstanceSkill` SetUp 通（含 `InstanceId`/`TemplateVersion` 填充）。交付：能 hover 出 tooltip 的原生卡小网格 + 一份实测数字表。**这是 go/no-go。**
 
-### Phase 1 — MVP：单类型静态网格
+### Phase 1 — MVP：单类型静态网格  ✅ Shipped
 目录（`CollectionCatalog` 枚举 + 过滤 + VM 缓存）、外壳（克隆 HistoryPanel，黑底 + header + Close + 热键/坞入口）、网格只渲染前 N 张（≈一个过扫窗口）不滚动。交付：能打开、看到一屏 Item、hover 出 tooltip。
 
-### Phase 2 — 虚拟化滚动（核心性能）
+### Phase 2 — 虚拟化滚动（核心性能）  ✅ Shipped
 `CollectionGridVirtualizer`（§5.3，含 pending-return 竞态防护 + 自适应冷加载预算）+ 池按 kind 分键 + L2 美术 LRU（引用计数）+ **L3 Material 共享池**（draw call 结构性问题，不可推迟）+ per-card generation 取消。加 Skill tab。交付：~1571 张平滑滚动（实测 60fps），Item/Skill 切换。
 
-### Phase 3 — 筛选系统
+### Phase 3 — 筛选系统  ✅ Shipped
 顶部筛选栏（英雄多选 / 稀有度 / 名称搜索 /（可选）玩法标签），变化触发 Bump + 重算可见集。交付：hero/tier/type/搜索可用。
 
-### Phase 4 — 商人筛选（后续，需新数据）
+### Phase 4 — 商人筛选（后续，需新数据）  ⏸ Deferred
 按 §10.3 做 spawner 推导或离线目录。单列设计。
 
-### Phase 5 — 打磨
-可重绑热键、输入硬拦截、art 淡入、滚动惯性、键盘导航、面板开关过渡动画（alpha 淡入）、共享抽象提取（§2.1 路线图）。
+### Phase 5 — 打磨  🟡 Partial
+- ✅ L3 Material 共享池（Phase 2 同期做完）
+- ✅ Plan B 手动 hit-test（默认即用，见 §9.4）
+- ⏸ 可重绑热键、art 淡入、滚动惯性、键盘导航、面板开关过渡动画（alpha 淡入）
+- ⏸ ~~输入硬拦截~~（实施后回退，见 §11.3）
+- ⏸ 共享抽象提取（§2.1 路线图）
 
 ---
 
@@ -744,7 +760,7 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 
 | # | 风险 | 缓解 |
 |---|---|---|
-| R1 | overlay(27) 的 uGUI 指针能否越过 UITK 面板(26) 命中卡（「tooltip 免费」唯一未验证前提） | Phase 0 实测；兜底 §9.4 手动 hit-test（预先写好） |
+| R1 | overlay(27) 的 uGUI 指针能否越过 UITK 面板(26) 命中卡（「tooltip 免费」唯一未验证前提） | **Sidestepped (2026-05-31)**：默认走 Plan B 手动 hit-test，不依赖 overlay raycaster 与 UITK 拾取协调；同时也躲掉了"卡上 wheel 被 raycaster 吞"的次生问题（见 §9.4）。R1 仅在切回 Plan A (`UsePolledHover = false`) 时才需要实测。 |
 | R2 | 同时存活卡数 / 帧率上限是设计估计 | Phase 0 用 `LogOutput.log` 定数；撑不住则收紧窗口/列数 |
 | R3 | `GetCardMap()` 遍历 + VM 构建耗时 | `GetCardMap()` 只返回已建完的不可变字典（§12），遍历可安全后台化/分帧；Phase 0 实测耗时决定是否需要 loading |
 | R4 | `Data.TooltipParentComponent` 在目标场景（主菜单/非战斗）是否就绪且未 block | Phase 0 验；缺失则定位/等待 |
@@ -776,6 +792,17 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 - `BazaarGameShared/.../Cards/TCardBase.cs`、`Cards/ITCard.cs` — 全筛选字段。
 - `BazaarGameShared/.../Core.Types/ECardSize.cs`、`ETier`、`EHero`、`ECardType`、`ECardTag` — 枚举。
 
+**mod 侧（已实施 — Collection Panel 本体，见 §16 完整清单）**
+- `Game/CollectionPanel/CollectionPanel.cs` — 单例 / Update / 场景检测 / HistoryPanel 互斥。
+- `Game/CollectionPanel/CollectionPanelMount.cs` — 自定义 mountable，订阅 `ChineseLocaleModeChanged`。
+- `Game/CollectionPanel/Data/CollectionCatalog.cs` — `JsonGameDataManager.GetCardMap()` → VM 列表。
+- `Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs` — 回收式 virtualizer + Plan B `PollHover`。
+- `Game/CollectionPanel/Grid/CollectionCardArtCache.cs` — L2 LRU（refcount）。
+- `Game/CollectionPanel/Grid/CollectionCardMaterialCache.cs` — L3 per-artKey Material。
+- `Game/CollectionPanel/Grid/CollectionPanelOwnedMarker.cs` — Harmony patch gating marker。
+- `Patches/CollectionPanel/CollectionItemLoadArtPatch.cs` — `CardPreviewItem.LoadArt` Prefix，仅 marker 卡走 L2/L3。
+- `Patches/CollectionPanel/CollectionCardPreviewDestroyPatch.cs` — `CardPreviewBase.OnDestroy` Prefix，保护共享 Material + 释放 L2 refcount。
+
 **mod 侧（可复用 / 克隆）**
 - `Game/HistoryPanel/Preview/BattleBoardCardFactory.cs` — GUID→SetUp 反射链（扩展 Skill）。
 - `Game/HistoryPanel/Preview/HistoryPanelPreviewCardPool.cs` — 池（改 (type,size) 分键 + 补 `_skillReference`）。
@@ -793,3 +820,138 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 - `Game/Settings/ISettingsDockEntry.cs`、`BppSettingsDockDefinition.cs`。
 - `Game/Screenshots/EndOfRunMouseBlocker.cs` — 透明命中 Image + GraphicRaycaster 范式。
 - `Patches/`（如 `ShopForecastLogPatch.cs`）— 商人 spawner 出货证据（§10.3 后续）。
+
+---
+
+## 16. As-built record (2026-05-31)
+
+### 16.1 文件清单
+
+25 个新文件 + 对 `BppComposition.cs` / `BppConfig.cs` / `IBppConfig.cs` 的小幅扩展。
+
+```
+Game/CollectionPanel/
+├── CollectionPanel.cs                       # 单例 + Update + 场景检测 + HistoryPanel 互斥
+├── CollectionPanelMount.cs                  # mountable，订阅 ChineseLocaleModeChanged
+├── CollectionPanelSettingsDockEntry.cs      # 设置坞 Order=1
+├── CollectionPanelSettingsMenuLabel.cs      # 坞标签（6 语言）
+├── CollectionPanelText.cs                   # 面板内文案（6 语言）
+├── Data/
+│   ├── CollectionCardVm.cs                  # 不可变投影
+│   ├── CollectionCatalog.cs                 # JsonGameDataManager → VM 列表（缓存）
+│   ├── CollectionFilterEngine.cs            # 纯函数 (VM 列表 + 状态) → 有序可见集
+│   ├── CollectionFilterState.cs             # 选中状态
+│   └── CollectionLocalizationResolver.cs    # TCardLocalization → 当前语言
+├── Grid/
+│   ├── CollectionCardArtCache.cs            # L2：CardAssetDataSO LRU + refcount
+│   ├── CollectionCardCacheHost.cs           # 静态汇合点（panel ↔ Harmony 补丁）
+│   ├── CollectionCardFactory.cs             # GUID → Item/Skill 原生卡
+│   ├── CollectionCardHoverRelay.cs          # OnHover/OnHoverOut 中继（反射）
+│   ├── CollectionCardMaterialCache.cs       # L3：按 artKey 共享 Material
+│   ├── CollectionCardPool.cs                # (type,size) 分键池 + harvest _skillReference
+│   ├── CollectionGridConstants.cs           # cell 尺寸 / 列数 / 排序层 / UsePolledHover 开关
+│   ├── CollectionGridOverlay.cs             # 兄弟 ScreenSpaceOverlay Canvas(27) + RectMask2D
+│   ├── CollectionGridVirtualizer.cs         # 回收式 virtualizer + PollHover
+│   └── CollectionPanelOwnedMarker.cs        # marker，gate Harmony 补丁
+└── Ui/
+    ├── CollectionPanelView.cs               # UITK 外壳 + 视口几何 → 像素 rect 桥接
+    ├── CollectionPanelView.Tree.cs          # BuildTree（header/筛选栏/grid 视口）
+    └── CollectionPanelView.Filters.cs       # chip 渲染 + 通用 UI 工厂方法
+Patches/CollectionPanel/
+├── CollectionCardPreviewDestroyPatch.cs     # Prefix CardPreviewBase.OnDestroy
+└── CollectionItemLoadArtPatch.cs            # Prefix CardPreviewItem.LoadArt（仅 marker 卡）
+```
+
+### 16.2 事件夹心（最终落地）
+
+```
+游戏 Canvas (sortingOrder 0)
+   └─ 任何事件不会到达（被 UITK 全屏覆盖）
+UITK 面板 (sortingOrder 26, pickingMode=Position)
+   └─ header / 筛选栏 / ScrollView 视口 / 内容 spacer
+      └─ 处理所有 click / scroll wheel / text input
+卡 overlay Canvas (sortingOrder 27, RectMask2D)
+   └─ 默认无 GraphicRaycaster — 纯视觉层
+      └─ N 张 pooled CardPreviewBase（窗口 + overscan）
+```
+
+Hover 路径：`CollectionPanel.Update()` 每帧 poll `Mouse.current.position` → `CollectionGridVirtualizer.PollHover()` → 命中 cell 的 `HoverRelay.OnPointerEnter` → 反射 `CardPreviewBase.OnHover` → 游戏原生 tooltip 系统。
+
+L2/L3 路径：池在 Instantiate 时挂 `CollectionPanelOwnedMarker`；`CardPreviewItem.LoadArt` Harmony Prefix 见到 marker 就走我们的实现，从两层缓存里取 SO / Material；不见 marker 就走原版。HistoryPanel / 商店 / 棋盘的卡完全不受影响。
+
+### 16.3 偏离设计的关键决策
+
+| # | 偏离 | 决策与理由 |
+|---|---|---|
+| D1 | Plan B 是默认（设计期望 Plan A） | Plan A 实测有隐性问题：游戏 `CardPreviewBase._cardImage` 默认 `raycastTarget=true`，overlay 的 raycaster 命中后 wheel 事件被丢弃，UITK ScrollView 收不到滚动。Plan B 不依赖 raycaster，UITK 始终是最顶层。Plan A 代码保留，由 `UsePolledHover = false` 切换，但要让 Plan A 可用还需补 `IScrollHandler` 转发，目前未做。 |
+| D2 | 删掉了"输入硬拦截层" | 设计 §11.3 标"可选"。中途加了之后吞掉所有非卡区的 click / wheel（详见 §11.3 当前状态）。UITK 全屏 + `pickingMode=Position` 已经够了，删除后回到设计原本的两层结构。 |
+| D3 | `CollectionPanelMount` 自定义 | `ComponentMount<T>` 不支持事件订阅。需要订阅 `ChineseLocaleModeChanged` 失效目录缓存，所以单写一个，`Unmount` 时 `Dispose` 订阅。 |
+| D4 | 面板互斥 (HistoryPanel vs CollectionPanel) | 共享同一组 sortingOrder（26/27），同显会 z-fight 且 Escape 不知道关哪个。`OpenFromDockEntry` 打开时检查 `HistoryPanel.IsVisible`，命中则调 `ToggleFromHotkey()` 关掉它再开自己。 |
+
+### 16.4 经验
+
+1. **设计文档标"可选"的条目，先实测确认问题真的存在再实施**。§11.3 输入硬拦截解决的问题（事件漏到游戏）在 UITK 全屏 + `pickingMode=Position` 安排下并不存在，反而引入了"吞掉所有应该发给 UITK 的事件"这个更严重的问题。代码审查时应当先问"这是在防什么"，而不是"设计提到了我就加"。
+2. **反射调用的字段在 publicizer 后是可见的，但行为依赖不会写在反编译源码的注释里**。`RawImage` 默认 `raycastTarget=true` 这种隐性约定，只有把整条事件链画到滚轮 / 拖拽这一层才能预先发现。设计 R1 只问到了"hover 能不能触发"，没问到"卡区域内的 wheel 会不会被吞"。后续做类似 uGUI + UITK 混合 UI 时，事件流图需要画到滚轮 / 拖拽这一层。
+3. **Harmony Prefix + marker gating 是处理"只改我们的实例、不动游戏其他用法"的最干净办法**。L2/L3 实施一次过，全靠 `CollectionPanelOwnedMarker` 把作用域圈死。这套模式可复用到后续任何需要"插原生类生命周期"的 BPP 场景。
+
+### 16.5 已知 Follow-ups（仍然 open，按优先级）
+
+| # | 项 | 触发条件 / 说明 |
+|---|---|---|
+| F1 | Phase 0 spike 数字回填 | `CollectionGridConstants` 里 cell 尺寸（Item 230×300 / Skill 200×200 / gap 14）是占位。需游戏内实测 Item 三档 + Skill 预制体真实 `(W, H)`，回填。 |
+| F2 | Phase 4 商人筛选 | 设计 §10.3 单列后续，需推导 spawner `SpawningFilters` 或离线挖目录。 |
+| F3 | 共享抽象提取（Phase 5 剩余） | 设计 §2.1 路线图：`GenerationGuard` → `Core/Runtime/`、UITK 外壳 PanelSettings 配方提取、overlay 类参数化、PendingReturn cell 迁出 `_realized` 到 `_orphanedPending`。纯重构，不影响功能。 |
+| F4 | 热键重绑 UI（Phase 5 剩余） | 当前 `CollectionPanelHotkeyPathConfig` 默认 `<Keyboard>/f9`，可改 cfg 但没有 in-game 重绑入口。用户明确不做。 |
+| F5 | 键盘导航（Phase 5 剩余） | 方向键 / Tab / Enter 在网格内移动焦点 + 触发 hover。用户明确不做。 |
+| F6 | 真正的滚动惯性 | UITK ScrollView 默认 wheel 是 instant snap，已通过 `MouseWheelScrollPoints=300` 调成更大单步；momentum-style 平滑滚动尝试过一次（见 §16.6 P5）被回退。要重做需 IScrollHandler 转发或自渲染 ScrollView。 |
+| F7 | Plan A 滚轮转发 | 若想让 `UsePolledHover=false`（Plan A）路径可用，需补 `IScrollHandler` 挂到 overlay 根上把 wheel 事件转发到 UITK ScrollView。目前不在路径上，仅诊断备用。 |
+
+### 16.6 实施过程中遇到的问题
+
+按发生顺序记录；每条都对应代码或文档里能查到的修复点。
+
+| # | 问题 | 触发 / 症状 | 根因 | 解决方案 | 文件 |
+|---|---|---|---|---|---|
+| P1 | 输入硬拦截层吞掉所有面板事件 | 关闭按钮 / 筛选 chip / 搜索框 / 滚动条全部点不动 | 全屏透明 `Image(raycastTarget=true)` + `GraphicRaycaster` 放在 sortingOrder 27（卡 28），EventSystem 的"取最高 sortingOrder 命中"规则下 27 永远赢，UITK(26) 收不到事件 | 删掉 `CollectionPanelInputBlocker.cs`，overlay 回到 27，UITK `pickingMode=Position` 已足够防止事件漏到游戏 | `CollectionGridConstants.cs`、`CollectionGridOverlay.cs`、`CollectionPanel.cs`、删 `CollectionPanelInputBlocker.cs` |
+| P2 | Plan A hover 把卡区滚轮事件吞掉 | 鼠标在卡上滚动滚轮，ScrollView 无反应；鼠标在卡间隙处滚动正常 | 游戏 `CardPreviewItem._cardImage`（`RawImage`）默认 `raycastTarget=true`；overlay 的 `GraphicRaycaster` 命中卡上的 `RawImage` 后，`ExecuteEvents.ExecuteHierarchy<IScrollHandler>` 在祖先链找不到处理器，事件被丢弃，UITK ScrollView 收不到 | 默认改为 Plan B（轮询 `Mouse.current.position` 派发 hover），overlay 不挂 `GraphicRaycaster`，卡也不加 hit Image | `CollectionGridConstants.cs`、`CollectionGridOverlay.cs`、`CollectionGridVirtualizer.cs`、`CollectionPanel.cs` |
+| P3 | `HoverFallbackEnabled` 命名误导 | 字面意思是"Plan B 是兜底"，但实际它是默认 | 命名留自最初按 Plan A 设计的时期 | 改名为 `UsePolledHover`，默认 `true`，注释明确"raycaster 路径是诊断备用，且有 wheel 吞噬问题" | `CollectionGridConstants.cs` 等 4 个引用点 |
+| P4 | hover-before-SetUp race / NRE 风险 | 鼠标已经在 cell 上但 SetUp 还没到 `CreateTooltipData`；理论上 OnHover 会读 null `_tooltipData`；UX 上也会给还没显示出来的卡弹 tooltip | `PollHover` 命中 cell 后立刻 dispatch，没等 `SetUpTask` 完成 | 在 cell.SetUpTask.IsCompletedSuccessfully 之前不 dispatch；加 `_hoverDispatched` 标记，cell 就绪后下一帧自动重试 | `CollectionGridVirtualizer.cs` |
+| P5 | smooth-wheel 拦截器整个 wheel 没反应 | 加完 `OnWheel + StopPropagation + TickScroll lerp` 后，滚轮完全不工作 | `WheelEvent` 在 ScrollView 上的回调和 StopPropagation 的 trickle/bubble 时序与预期不符；无 in-game debugger 难以定位 | 直接回退 smooth-wheel，回归 UITK 默认；`mouseWheelScrollSize` 200 → 300 让单步更舒服。保留 `ResetScroll()`（筛选切换时归零），那是独立有用的修复 | `CollectionPanelView.cs`、`CollectionPanelView.Tree.cs`、`CollectionPanel.cs`、`CollectionGridConstants.cs` |
+| P6 | 面板关闭后停留 ~350ms | 按 Escape / F9 / Close 后画面上仍有半透明残影 | 开 / 关共用 `tau = 0.12s`，关闭其实需要更快 | 拆成 `PanelFadeInSeconds = 0.12`（开，presentation）+ `PanelFadeOutSeconds = 0.04`（关，dismissal）；`TickOpacity` 根据方向选 tau | `CollectionGridConstants.cs`、`CollectionPanelView.cs` |
+
+### 16.7 已完成任务时间线
+
+按完成顺序（同一行表示一次提交内一起做）：
+
+1. **基础设施读取与确认** — 阅读 `HistoryPanel*` 全套（mount / view / overlay / pool / factory / generation guard）；阅读 decompiled 的 `CardPreviewBase` / `CardPreviewItem` / `CardPreviewSkill` / `MonsterBoardTooltip` / `JsonGameDataManager` / `TCardBase` / `TCardInstance{Item,Skill}` / `TCardLocalization` 等以确认反射目标和字段。
+2. **Phase 1 数据层** — `CollectionCardVm` / `CollectionFilterState` / `CollectionCatalog`（`JsonGameDataManager.GetCardMap` 强转 + 过滤 + 缓存）/ `CollectionFilterEngine`（纯函数）/ `CollectionLocalizationResolver`（`TCardBase.Localization.Title.Text`）。
+3. **Phase 1 文案与 dock 入口** — `CollectionPanelText`（6 语言）/ `CollectionPanelSettingsMenuLabel`（dock 标签 6 语言）/ `CollectionPanelSettingsDockEntry`（Order=1）。
+4. **Phase 2 渲染层** — `CollectionCardPool`（`(type, size)` 分键 + harvest `_skillReference`）/ `CollectionCardFactory`（Item / Skill 双路 SetUp 反射）/ `CollectionGridOverlay`（兄弟 `ScreenSpaceOverlay` Canvas）/ `CollectionGridConstants`（占位 cell 尺寸 + 限流预算）/ `CollectionCardHoverRelay`（中继）/ `CollectionGridVirtualizer`（回收式 + pending-return 竞态防护 + per-card generation）。
+5. **Phase 3 UI 外壳** — `CollectionPanelView.cs` + `CollectionPanelView.Tree.cs` + `CollectionPanelView.Filters.cs` 三个 partial：UITK 全屏外壳（sortingOrder=26, `pickingMode=Position`）+ 筛选栏（hero / tier chips + 200ms debounce 搜索 + Item/Skill tab + 「Merchant (soon)」disabled 占位）+ ScrollView 视口。
+6. **挂载和单例** — `CollectionPanelMount`（自订；订阅 `ChineseLocaleModeChanged` 失效目录缓存）/ `CollectionPanel`（单例 + Update 热键 / Escape / IsInCombat + DetectSceneChange + HistoryPanel 互斥）/ `BppConfig` + `IBppConfig` 加 `CollectionPanelHotkeyPathConfig`（默认 `<Keyboard>/f9`）/ `BppComposition` 注册。
+7. **首次构建通过** — 修了 4 个编译错误（`HistoryPanel` 命名空间 vs 类型歧义需别名；`HistoryPanelCardPreviewReflection` using 缺；`Scroller.valueChanged` 在 publicizer 后字段/属性歧义；改为每帧 poll `scrollOffset.y`）。
+8. **L2/L3 缓存基础设施** — `CollectionCardArtCache`（CardAssetDataSO LRU + refcount）/ `CollectionCardMaterialCache`（per-artKey Material）/ `CollectionCardCacheHost`（静态汇合点）/ `CollectionPanelOwnedMarker`（gate Harmony）。
+9. **Harmony 补丁** — `CollectionItemLoadArtPatch`（仅 marker 卡走两层缓存）/ `CollectionCardPreviewDestroyPatch`（null `_cardMaterial` 保护共享 Material + 释放 L2 refcount）。
+10. **Plan A → Plan B 切换** — 加完输入硬拦截层后发现面板不能操作（P1），删除 blocker；再发现卡区域滚轮也被吞（P2），把默认改为 Plan B 手动 hit-test。
+11. **`HoverFallbackEnabled` → `UsePolledHover` 改名** — 反映新的语义（P3）。
+12. **hover race 防御** — `_hoverDispatched` retry（P4）。
+13. **设计文档第一轮 amend** — 状态从 Draft 改成 Implemented；§9 invert Plan A/B；§11.3 标 rejected；§13 phase status 标记；§14 R1 updated；§15 加 mod-side 锚点；§16 As-built record (16.1–16.5)。
+14. **Phase 5 polish 之 art fade-in** — pool Instantiate 时挂 `CanvasGroup` + Take 时归零 alpha；`RealizedCell.FadeActive`/`FadeAlpha`；`CollectionGridVirtualizer.TickFades(dt)` 指数 lerp。
+15. **Phase 5 polish 之 panel transitions** — `CollectionPanelView._opacity` / `_targetOpacity` / `TickOpacity(dt)` / `CurrentOpacity` / `IsFadingOrVisible`；`CollectionGridOverlay` 加 `CanvasGroup` + `SetAlpha`；`CollectionPanel.Update` 协调（fade 完成前不 Dispose virtualizer / 不 SetActive(false) overlay）。
+16. **Phase 5 polish 之 smooth wheel** — 加 `OnWheel` 拦截 + `TickScroll` lerp，整体破坏滚轮（P5）。
+17. **smooth wheel 回退** — 删 `OnWheel`/`TickScroll`/`_scrollTargetY`/`ComputeMaxScroll`；保留 `ResetScroll()`（筛选切换归零，独立有用）；`mouseWheelScrollSize` 200 → 300。
+18. **关闭残影修复** — 拆出 `PanelFadeInSeconds` / `PanelFadeOutSeconds`，`TickOpacity` 按方向选 tau（P6）。
+19. **设计文档第二轮 amend（本次）** — 增加本节 §16.6–§16.8；清理 §16.5 已修项；更新 §16.5 follow-ups。
+
+### 16.8 当前进度（按 Phase）
+
+| Phase | 状态 | 备注 |
+|---|---|---|
+| Phase 0 — 可行性 spike | ⏸ Deferred | 需游戏内实测：Item 三种 size 预制体真实 `(W, H)` / Skill 方形尺寸 / 帧率上限 / `GetCardMap()` 遍历耗时 / `TooltipParentComponent` 在主菜单是否就绪。`CollectionGridConstants` 里是占位数字，撑用。 |
+| Phase 1 — MVP 单类型静态网格 | ✅ Shipped | 目录 / 外壳 / dock 入口 / 热键 / 一屏 Item 渲染 / hover tooltip 全通。 |
+| Phase 2 — 虚拟化滚动 | ✅ Shipped | recycler virtualizer + (type, size) 分键池 + L2 LRU + L3 Material 共享 + per-card generation 取消 + Item/Skill tab。 |
+| Phase 3 — 筛选系统 | ✅ Shipped | 英雄多选 chips / 稀有度多选 chips / 200ms debounce 名称搜索 / Item/Skill tab / Clear 按钮 / 「Merchant (soon)」disabled 占位。 |
+| Phase 4 — 商人筛选 | ⏸ Deferred | 设计 §10.3 单列后续。 |
+| Phase 5 — 打磨 | 🟡 Partial | ✅ L3 Material 共享池<br>✅ Plan B 手动 hit-test<br>✅ Card art 淡入<br>✅ 面板开关过渡（asymmetric fade）<br>✅ ~~输入硬拦截~~（实施后回退，见 P1）<br>⏸ 真正的滚动惯性（尝试过被回退，见 P5；UITK 默认 `mouseWheelScrollSize=300` 兜底）<br>⏸ 热键重绑 UI（用户明确不做）<br>⏸ 键盘导航（用户明确不做）<br>⏸ 共享抽象提取（§2.1 路线图） |
+
+**整体可发布性**：当前实施满足设计 §1 范围（仅 Item + Skill，~1571 张）所声明的全部功能性要求。Phase 0 的占位数字会在某些机型 / 屏幕分辨率下显得偏紧或偏松，但不影响功能正确。建议先开放给少量用户实测 Phase 0 的几个数值，再回填 `CollectionGridConstants` 后正式发布。
