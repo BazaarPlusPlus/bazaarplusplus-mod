@@ -251,5 +251,20 @@ internal sealed partial class CollectionPanelView
         _emptyLabel.style.height = 80f;
         _emptyLabel.style.display = DisplayStyle.None;
         _gridViewport.Add(_emptyLabel);
+
+        _loadingLabel = CreateLabel(
+            Sizes.FontBody,
+            FontStyle.Bold,
+            Colors.HistoryFooterSecondaryText
+        );
+        _loadingLabel.pickingMode = PickingMode.Ignore;
+        _loadingLabel.style.position = Position.Absolute;
+        _loadingLabel.style.left = 0f;
+        _loadingLabel.style.right = 0f;
+        _loadingLabel.style.top = 0f;
+        _loadingLabel.style.bottom = 0f;
+        _loadingLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _loadingLabel.style.display = DisplayStyle.None;
+        _gridViewport.Add(_loadingLabel);
     }
 }

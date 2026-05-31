@@ -17,6 +17,7 @@ internal sealed class CollectionPanelViewModel
     public string Subtitle { get; set; } = string.Empty;
     public string CountText { get; set; } = string.Empty;
     public string? StatusMessage { get; set; }
+    public bool IsLoading { get; set; }
     public ECardType ActiveType { get; set; } = ECardType.Item;
     public HashSet<EHero> SelectedHeroes { get; set; } = new();
     public HashSet<ETier> SelectedTiers { get; set; } = new();
@@ -67,6 +68,11 @@ internal sealed partial class CollectionPanelView : IDisposable
     private ScrollView? _gridScrollView;
     private VisualElement? _gridContentSpacer;
     private Label? _emptyLabel;
+    private Label? _loadingLabel;
+    private bool _loadingVisible;
+    private string _loadingMessage = string.Empty;
+    private float _loadingFrameElapsed;
+    private int _loadingFrameIndex;
 
     private readonly Dictionary<EHero, Button> _heroChips = new();
     private readonly Dictionary<ETier, Button> _tierChips = new();
@@ -79,6 +85,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     // exponential lerp whose time constant is direction-dependent (in vs. out).
     private float _opacity;
     private float _targetOpacity;
+
+    private static readonly string[] LoadingFrames = { "|", "/", "-", "\\" };
 
     public event Action<Rect>? GridViewportBoundsChanged;
 
@@ -141,7 +149,7 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.PackagesToggle()
                 + CollectionPanelText.SearchPlaceholder()
                 + CollectionPanelText.NoMatches()
-                + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#",
+                + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#\\",
             Sizes.FontButton,
             FontStyle.Normal
         );
@@ -200,6 +208,31 @@ internal sealed partial class CollectionPanelView : IDisposable
             _root.style.display = DisplayStyle.None;
     }
 
+    public void TickLoading(float deltaSeconds)
+    {
+        if (!_loadingVisible || _loadingLabel == null)
+            return;
+
+        _loadingFrameElapsed += Mathf.Max(0f, deltaSeconds);
+        if (_loadingFrameElapsed < 0.16f)
+            return;
+
+        _loadingFrameElapsed = 0f;
+        _loadingFrameIndex = (_loadingFrameIndex + 1) % LoadingFrames.Length;
+        UpdateLoadingLabelText();
+    }
+
+    private void UpdateLoadingLabelText()
+    {
+        if (_loadingLabel == null)
+            return;
+
+        var message = string.IsNullOrWhiteSpace(_loadingMessage)
+            ? CollectionPanelText.CatalogLoading()
+            : _loadingMessage;
+        _loadingLabel.text = $"{LoadingFrames[_loadingFrameIndex]} {message}";
+    }
+
     // Snap the ScrollView to the top. Called on filter / tab changes so the user is not
     // stranded at the bottom of a tiny new visible set — the previous scrollOffset would
     // otherwise clamp to the new (smaller) max instead of returning to top.
@@ -221,6 +254,13 @@ internal sealed partial class CollectionPanelView : IDisposable
         _statusLabel.style.display = string.IsNullOrWhiteSpace(model.StatusMessage)
             ? DisplayStyle.None
             : DisplayStyle.Flex;
+        _loadingVisible = model.IsLoading;
+        _loadingMessage = model.StatusMessage ?? CollectionPanelText.CatalogLoading();
+        if (_loadingLabel != null)
+        {
+            _loadingLabel.style.display = model.IsLoading ? DisplayStyle.Flex : DisplayStyle.None;
+            UpdateLoadingLabelText();
+        }
 
         RefreshTabButton(_itemTabButton!, model.ActiveType == ECardType.Item);
         RefreshTabButton(_skillTabButton!, model.ActiveType == ECardType.Skill);
@@ -259,7 +299,9 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_emptyLabel != null)
         {
             var showEmpty =
-                model.ContentHeight <= 0f && string.IsNullOrWhiteSpace(model.StatusMessage);
+                model.ContentHeight <= 0f
+                && string.IsNullOrWhiteSpace(model.StatusMessage)
+                && !model.IsLoading;
             _emptyLabel.style.display = showEmpty ? DisplayStyle.Flex : DisplayStyle.None;
         }
     }
