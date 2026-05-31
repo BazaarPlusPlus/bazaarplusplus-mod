@@ -2,41 +2,58 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Cards;
-using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.DataManagement.Json;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
-// Enumerates the game's runtime card map into a cached list of CollectionCardVms. The map
-// itself is built once during JsonGameDataManager.Create() and is immutable thereafter
-// (decompiled/TheBazaar.DataManagement.Json/JsonGameDataManager.cs:64-66), so iterating it
-// from any frame after Data.IsManagerCreated() returns true is safe.
-//
-// Scope (design C7 + section 3.1):
-//   - Only ECardType.Item and ECardType.Skill (~1644 templates; ~1571 after the art filter).
-//   - Cards with missing/Invalid ArtKey or explicit debug/template markers are dropped.
-//
-// Cache invalidation: CollectionPanelMount calls InvalidateCache() when the user changes
-// the BPP Chinese locale mode so DisplayName regenerates on next build.
 internal sealed class CollectionCatalog
 {
     private IReadOnlyList<CollectionCardVm>? _cache;
+    private object? _cacheSource;
+    private int _cacheSourceTemplateCount;
 
-    public bool TryBuild(out IReadOnlyList<CollectionCardVm> cards)
+    public bool TryGetCached(out CollectionCatalogBuildResult result)
     {
-        if (_cache != null)
+        result = EmptyResult(wasCacheHit: false);
+        var source = BppStaticDataAccess.TryGet();
+        if (source == null || _cache == null)
+            return false;
+
+        if (!ReferenceEquals(source, _cacheSource))
         {
-            cards = _cache;
-            return true;
+            InvalidateCache("static-data-manager-changed");
+            return false;
         }
 
-        cards = Array.Empty<CollectionCardVm>();
+        result = new CollectionCatalogBuildResult(
+            _cache,
+            _cacheSourceTemplateCount,
+            _cacheSourceTemplateCount,
+            _cache.Count,
+            Math.Max(0, _cacheSourceTemplateCount - _cache.Count),
+            wasCacheHit: true
+        );
+        BppLog.Info(
+            "CollectionCatalog",
+            $"Catalog cache hit: {result.AcceptedCount} cards from {result.SourceTemplateCount} templates."
+        );
+        return true;
+    }
+
+    public bool TryCreateBuildSession(
+        out CollectionCatalogBuildSession? session,
+        out string unavailableReason
+    )
+    {
+        session = null;
+        unavailableReason = string.Empty;
 
         var managerObject = BppStaticDataAccess.TryGet();
         if (managerObject is not JsonGameDataManager manager)
         {
+            unavailableReason = "static-data-not-ready";
             BppLog.Debug(
                 "CollectionCatalog",
                 "Static data manager not yet ready; catalog build deferred."
@@ -51,34 +68,64 @@ internal sealed class CollectionCatalog
         }
         catch (Exception ex)
         {
+            unavailableReason = "get-card-map-threw";
             BppLog.Error("CollectionCatalog", "GetCardMap() threw", ex);
             return false;
         }
 
         if (map == null)
         {
+            unavailableReason = "card-map-null";
             BppLog.Warn("CollectionCatalog", "GetCardMap() returned null.");
             return false;
         }
 
-        var list = new List<CollectionCardVm>(map.Count);
-        foreach (var entry in map)
-        {
-            if (entry.Value is not TCardBase template)
-                continue;
-            if (!CollectionCardClassifier.IsCatalogCard(template))
-                continue;
-            list.Add(CollectionCardVm.From(template));
-        }
-
-        _cache = list;
-        cards = list;
-        BppLog.Info(
-            "CollectionCatalog",
-            $"Catalog built: {list.Count} cards from {map.Count} templates."
-        );
+        session = new CollectionCatalogBuildSession(managerObject, map);
         return true;
     }
 
-    public void InvalidateCache() => _cache = null;
+    public CollectionCatalogBuildResult Commit(CollectionCatalogBuildSession session)
+    {
+        if (session == null)
+            throw new ArgumentNullException(nameof(session));
+        if (!session.IsComplete)
+            throw new InvalidOperationException("Catalog build session is not complete.");
+
+        _cache = session.Cards;
+        _cacheSource = session.Source;
+        _cacheSourceTemplateCount = session.SourceTemplateCount;
+
+        var result = new CollectionCatalogBuildResult(
+            session.Cards,
+            session.SourceTemplateCount,
+            session.ScannedCount,
+            session.AcceptedCount,
+            session.RejectedCount,
+            wasCacheHit: false
+        );
+        BppLog.Info(
+            "CollectionCatalog",
+            $"Catalog built: {result.AcceptedCount} cards from {result.SourceTemplateCount} templates, rejected={result.RejectedCount}."
+        );
+        return result;
+    }
+
+    public void InvalidateCache(string reason)
+    {
+        if (_cache != null)
+            BppLog.Info("CollectionCatalog", $"Catalog cache invalidated: reason={reason}.");
+        _cache = null;
+        _cacheSource = null;
+        _cacheSourceTemplateCount = 0;
+    }
+
+    private static CollectionCatalogBuildResult EmptyResult(bool wasCacheHit) =>
+        new(
+            Array.Empty<CollectionCardVm>(),
+            sourceTemplateCount: 0,
+            scannedCount: 0,
+            acceptedCount: 0,
+            rejectedCount: 0,
+            wasCacheHit: wasCacheHit
+        );
 }

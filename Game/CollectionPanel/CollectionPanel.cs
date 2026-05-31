@@ -316,7 +316,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         _artCache?.DisposeAll();
         _artCache = null;
         _catalogCards = Array.Empty<CollectionCardVm>();
-        _catalog.InvalidateCache();
+        _catalog.InvalidateCache("runtime-dispose");
     }
 
     private void EnsureView()
@@ -451,8 +451,47 @@ internal sealed class CollectionPanel : MonoBehaviour
             yield break;
 
         var started = diagnostics.Now();
-        RebuildCatalogIfPossible();
+        CollectionCatalogBuildResult? catalogResult = null;
+        if (_catalog.TryGetCached(out var cached))
+        {
+            catalogResult = cached;
+            _catalogCards = cached.Cards;
+            ClearStatus();
+        }
+        else if (_catalog.TryCreateBuildSession(out var session, out var unavailableReason))
+        {
+            var buildSession = session!;
+            using (buildSession)
+            {
+                while (true)
+                {
+                    var frameStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+                    if (buildSession.Step(() => ShouldPauseCatalogBuild(frameStartedAt)))
+                        break;
+                    if (!IsLoadGenerationCurrent(generation))
+                        yield break;
+                    yield return null;
+                }
+
+                catalogResult = _catalog.Commit(buildSession);
+                _catalogCards = catalogResult.Cards;
+                ClearStatus();
+            }
+        }
+        else
+        {
+            _catalogCards = Array.Empty<CollectionCardVm>();
+            SetStatus(CollectionPanelText.CatalogUnavailable());
+            diagnostics.AddValue("unavailableReason", unavailableReason);
+        }
         diagnostics.AddSegment("catalog", started);
+        if (catalogResult != null)
+        {
+            diagnostics.AddValue("catalogCacheHit", catalogResult.WasCacheHit ? "true" : "false");
+            diagnostics.AddValue("sourceTemplates", catalogResult.SourceTemplateCount);
+            diagnostics.AddValue("accepted", catalogResult.AcceptedCount);
+            diagnostics.AddValue("rejected", catalogResult.RejectedCount);
+        }
 
         if (!IsLoadGenerationCurrent(generation))
             yield break;
@@ -476,6 +515,15 @@ internal sealed class CollectionPanel : MonoBehaviour
     private bool IsLoadGenerationCurrent(int generation) =>
         generation == _loadGeneration && _isVisible;
 
+    private static bool ShouldPauseCatalogBuild(long startedAt)
+    {
+        var elapsedMs =
+            (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt)
+            * 1000.0
+            / System.Diagnostics.Stopwatch.Frequency;
+        return elapsedMs >= CatalogBuildFrameBudgetMs;
+    }
+
     private void ApplyEmptyVisibleSet()
     {
         if (_virtualizer == null)
@@ -484,22 +532,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
         _view?.ResetScroll();
         _scrollY = 0f;
-    }
-
-    private void RebuildCatalogIfPossible()
-    {
-        if (_catalogCards.Count > 0)
-            return;
-        if (_catalog.TryBuild(out var cards))
-        {
-            _catalogCards = cards;
-            ClearStatus();
-        }
-        else
-        {
-            _catalogCards = Array.Empty<CollectionCardVm>();
-            SetStatus(CollectionPanelText.CatalogUnavailable());
-        }
     }
 
     private void ApplyFilters()
@@ -596,9 +628,8 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void InvalidateCatalog(string reason)
     {
-        _ = reason;
         _catalogCards = Array.Empty<CollectionCardVm>();
-        _catalog.InvalidateCache();
+        _catalog.InvalidateCache(reason);
     }
 
     private static string GetSceneToken(Scene scene) =>
