@@ -287,7 +287,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         _lastSceneToken = token;
         if (_isVisible)
             Close();
-        DisposeRuntime();
+        DisposeUnityRuntime();
     }
 
     private void OnDestroy()
@@ -299,6 +299,13 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void DisposeRuntime()
     {
+        DisposeUnityRuntime();
+        InvalidateCatalog("runtime-dispose");
+    }
+
+    private void DisposeUnityRuntime()
+    {
+        CancelPanelLoad();
         _virtualizer?.Dispose();
         _virtualizer = null;
         // Destroy card GameObjects first so their patched OnDestroy can null _cardMaterial
@@ -315,8 +322,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         _materialCache = null;
         _artCache?.DisposeAll();
         _artCache = null;
-        _catalogCards = Array.Empty<CollectionCardVm>();
-        _catalog.InvalidateCache("runtime-dispose");
     }
 
     private void EnsureView()
