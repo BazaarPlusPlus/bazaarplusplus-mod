@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -87,6 +88,36 @@ internal sealed partial class CollectionPanelView
         foreach (var size in sizes)
         {
             if (!_sizeChips.ContainsKey(size))
+                return false;
+        }
+        return true;
+    }
+
+    private void EnsureMerchantChips(IReadOnlyList<CollectionMerchantKind> merchants)
+    {
+        if (_merchantChipRow == null)
+            return;
+        if (MerchantChipsMatch(merchants))
+            return;
+        ClearChipRow(_merchantChips, _merchantChipRow, keepFirst: true);
+        foreach (var merchant in merchants)
+        {
+            var chip = CreateChipButton(
+                CollectionPanelText.Merchant(merchant),
+                () => _toggleMerchant(merchant)
+            );
+            _merchantChips[merchant] = chip;
+            _merchantChipRow.Add(chip);
+        }
+    }
+
+    private bool MerchantChipsMatch(IReadOnlyList<CollectionMerchantKind> merchants)
+    {
+        if (merchants.Count != _merchantChips.Count)
+            return false;
+        foreach (var merchant in merchants)
+        {
+            if (!_merchantChips.ContainsKey(merchant))
                 return false;
         }
         return true;

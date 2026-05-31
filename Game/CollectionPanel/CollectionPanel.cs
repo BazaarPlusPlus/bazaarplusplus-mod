@@ -52,6 +52,25 @@ internal sealed class CollectionPanel : MonoBehaviour
         ECardSize.Large,
     };
 
+    private static readonly CollectionMerchantKind[] MerchantOrder = new[]
+    {
+        CollectionMerchantKind.General,
+        CollectionMerchantKind.Burn,
+        CollectionMerchantKind.Poison,
+        CollectionMerchantKind.Freeze,
+        CollectionMerchantKind.Slow,
+        CollectionMerchantKind.Haste,
+        CollectionMerchantKind.Speed,
+        CollectionMerchantKind.Toughness,
+        CollectionMerchantKind.Strength,
+        CollectionMerchantKind.Heal,
+        CollectionMerchantKind.Economy,
+        CollectionMerchantKind.Shield,
+        CollectionMerchantKind.Health,
+        CollectionMerchantKind.Joy,
+        CollectionMerchantKind.Flying,
+    };
+
     private readonly CollectionCatalog _catalog = new();
     private readonly CollectionFilterState _filter = new();
     private readonly List<CollectionCardVm> _visibleScratch = new();
@@ -314,6 +333,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 if (_filter.ActiveType == type)
                     return;
                 _filter.ActiveType = type;
+                PruneUnavailableMerchants(type);
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -342,6 +362,14 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ApplyFilters();
                 RefreshView();
             },
+            toggleMerchant: merchant =>
+            {
+                if (!_filter.Merchants.Remove(merchant))
+                    _filter.Merchants.Add(merchant);
+                _scrollY = 0f;
+                ApplyFilters();
+                RefreshView();
+            },
             togglePackages: () =>
             {
                 _filter.IncludePackages = !_filter.IncludePackages;
@@ -358,6 +386,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 _filter.Heroes.Clear();
                 _filter.Tiers.Clear();
+                _filter.Tags.Clear();
                 _filter.Sizes.Clear();
                 _filter.Merchants.Clear();
                 _filter.IncludePackages = false;
@@ -443,14 +472,47 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedHeroes = new HashSet<EHero>(_filter.Heroes),
             SelectedTiers = new HashSet<ETier>(_filter.Tiers),
             SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
+            SelectedMerchants = new HashSet<CollectionMerchantKind>(_filter.Merchants),
             IncludePackages = _filter.IncludePackages,
             Search = _filter.Search,
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
+            AvailableMerchants = AvailableMerchantsFor(_filter.ActiveType),
             ContentHeight = _virtualizer.ContentHeight,
         };
         _view.Refresh(model);
+    }
+
+    private IReadOnlyList<CollectionMerchantKind> AvailableMerchantsFor(ECardType activeType)
+    {
+        var result = new List<CollectionMerchantKind>();
+        foreach (var merchant in MerchantOrder)
+        {
+            if (HasMerchantFor(activeType, merchant))
+                result.Add(merchant);
+        }
+        return result;
+    }
+
+    private void PruneUnavailableMerchants(ECardType activeType)
+    {
+        _filter.Merchants.RemoveWhere(merchant => !HasMerchantFor(activeType, merchant));
+    }
+
+    private bool HasMerchantFor(ECardType activeType, CollectionMerchantKind merchant)
+    {
+        foreach (var card in _catalogCards)
+        {
+            if (card.Type != activeType)
+                continue;
+            foreach (var cardMerchant in card.Merchants)
+            {
+                if (cardMerchant == merchant)
+                    return true;
+            }
+        }
+        return false;
     }
 
     private void SetStatus(string message)

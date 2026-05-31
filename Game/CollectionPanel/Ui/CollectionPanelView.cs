@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
@@ -20,11 +21,14 @@ internal sealed class CollectionPanelViewModel
     public HashSet<EHero> SelectedHeroes { get; set; } = new();
     public HashSet<ETier> SelectedTiers { get; set; } = new();
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
+    public HashSet<CollectionMerchantKind> SelectedMerchants { get; set; } = new();
     public bool IncludePackages { get; set; }
     public string Search { get; set; } = string.Empty;
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
     public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();
+    public IReadOnlyList<CollectionMerchantKind> AvailableMerchants { get; set; } =
+        Array.Empty<CollectionMerchantKind>();
     public float ContentHeight { get; set; }
 }
 
@@ -36,6 +40,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action<EHero> _toggleHero;
     private readonly Action<ETier> _toggleTier;
     private readonly Action<ECardSize> _toggleSize;
+    private readonly Action<CollectionMerchantKind> _toggleMerchant;
     private readonly Action _togglePackages;
     private readonly Action<string> _setSearch;
     private readonly Action _clearFilters;
@@ -53,11 +58,11 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _closeButton;
     private Button? _clearButton;
     private Button? _packageToggleButton;
-    private Button? _merchantPlaceholderButton;
     private TextField? _searchField;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
     private VisualElement? _sizeChipRow;
+    private VisualElement? _merchantChipRow;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
     private VisualElement? _gridContentSpacer;
@@ -66,6 +71,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Dictionary<EHero, Button> _heroChips = new();
     private readonly Dictionary<ETier, Button> _tierChips = new();
     private readonly Dictionary<ECardSize, Button> _sizeChips = new();
+    private readonly Dictionary<CollectionMerchantKind, Button> _merchantChips = new();
     private Rect _lastGridBounds;
 
     // Panel-open/-close fade state. _opacity is the displayed alpha, _targetOpacity is what
@@ -83,6 +89,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action<EHero> toggleHero,
         Action<ETier> toggleTier,
         Action<ECardSize> toggleSize,
+        Action<CollectionMerchantKind> toggleMerchant,
         Action togglePackages,
         Action<string> setSearch,
         Action clearFilters
@@ -94,6 +101,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _toggleHero = toggleHero ?? throw new ArgumentNullException(nameof(toggleHero));
         _toggleTier = toggleTier ?? throw new ArgumentNullException(nameof(toggleTier));
         _toggleSize = toggleSize ?? throw new ArgumentNullException(nameof(toggleSize));
+        _toggleMerchant = toggleMerchant ?? throw new ArgumentNullException(nameof(toggleMerchant));
         _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
         _setSearch = setSearch ?? throw new ArgumentNullException(nameof(setSearch));
         _clearFilters = clearFilters ?? throw new ArgumentNullException(nameof(clearFilters));
@@ -220,12 +228,15 @@ internal sealed partial class CollectionPanelView : IDisposable
         EnsureHeroChips(model.AvailableHeroes);
         EnsureTierChips(model.AvailableTiers);
         EnsureSizeChips(model.AvailableSizes);
+        EnsureMerchantChips(model.AvailableMerchants);
         foreach (var pair in _heroChips)
             RefreshChip(pair.Value, model.SelectedHeroes.Contains(pair.Key));
         foreach (var pair in _tierChips)
             RefreshChip(pair.Value, model.SelectedTiers.Contains(pair.Key));
         foreach (var pair in _sizeChips)
             RefreshChip(pair.Value, model.SelectedSizes.Contains(pair.Key));
+        foreach (var pair in _merchantChips)
+            RefreshChip(pair.Value, model.SelectedMerchants.Contains(pair.Key));
         if (_packageToggleButton != null)
             RefreshChip(_packageToggleButton, model.IncludePackages);
 
@@ -233,6 +244,9 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_sizeChipRow != null)
             _sizeChipRow.style.display =
                 model.ActiveType == ECardType.Item ? DisplayStyle.Flex : DisplayStyle.None;
+        if (_merchantChipRow != null)
+            _merchantChipRow.style.display =
+                model.AvailableMerchants.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
 
         if (
             _searchField != null

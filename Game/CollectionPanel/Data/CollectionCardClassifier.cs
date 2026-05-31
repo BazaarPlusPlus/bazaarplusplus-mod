@@ -12,7 +12,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 internal static class CollectionCardClassifier
 {
     private static readonly string[] PackageNameMarkers = { "Package" };
-    private static readonly string[] NonCatalogNameMarkers = { "[DEBUG]", "[TEMPLATE]" };
+    private static readonly string[] NonCatalogNameMarkers = { "[DEBUG]", "TEMPLATE" };
 
     private static readonly Dictionary<Guid, CollectionMerchantKind[]> ManualMerchantIdRules =
         new();
@@ -104,7 +104,8 @@ internal static class CollectionCardClassifier
 
     private static bool HasValidArtKey(string? artKey) =>
         !string.IsNullOrEmpty(artKey)
-        && !string.Equals(artKey, "Invalid", StringComparison.Ordinal);
+        && !string.Equals(artKey, "Invalid", StringComparison.Ordinal)
+        && artKey.IndexOf("Placeholder", StringComparison.OrdinalIgnoreCase) < 0;
 
     private static bool ContainsAnyMarker(string? value, IReadOnlyList<string> markers)
     {

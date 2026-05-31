@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.Settings;
 using TheBazaar;
 
@@ -43,10 +44,10 @@ internal static class CollectionPanelText
     );
     private static readonly LocalizedTextSet SizeHeaderText = new("Size", "尺寸", "尺寸", "尺寸");
     private static readonly LocalizedTextSet MerchantHeaderText = new(
-        "Merchant (soon)",
-        "商人（即将到来）",
-        "商人（即將到來）",
-        "商人（即將到來）"
+        "Merchant",
+        "商人",
+        "商人",
+        "商人"
     );
     private static readonly LocalizedTextSet PackagesToggleText = new(
         "Packages",
@@ -123,6 +124,27 @@ internal static class CollectionPanelText
             ECardSize.Medium => FormatSimple("Medium", "中型", "中型", "中型"),
             ECardSize.Large => FormatSimple("Large", "大型", "大型", "大型"),
             _ => size.ToString(),
+        };
+
+    internal static string Merchant(CollectionMerchantKind merchant) =>
+        merchant switch
+        {
+            CollectionMerchantKind.General => FormatSimple("General", "通用", "通用", "通用"),
+            CollectionMerchantKind.Burn => FormatSimple("Burn", "燃烧", "燃燒", "燃燒"),
+            CollectionMerchantKind.Poison => FormatSimple("Poison", "中毒", "中毒", "中毒"),
+            CollectionMerchantKind.Freeze => FormatSimple("Freeze", "冻结", "凍結", "凍結"),
+            CollectionMerchantKind.Slow => FormatSimple("Slow", "减速", "減速", "減速"),
+            CollectionMerchantKind.Haste => FormatSimple("Haste", "加速", "加速", "加速"),
+            CollectionMerchantKind.Speed => FormatSimple("Speed", "速度", "速度", "速度"),
+            CollectionMerchantKind.Toughness => FormatSimple("Toughness", "韧性", "韌性", "韌性"),
+            CollectionMerchantKind.Strength => FormatSimple("Strength", "力量", "力量", "力量"),
+            CollectionMerchantKind.Heal => FormatSimple("Heal", "治疗", "治療", "治療"),
+            CollectionMerchantKind.Economy => FormatSimple("Economy", "经济", "經濟", "經濟"),
+            CollectionMerchantKind.Shield => FormatSimple("Shield", "护盾", "護盾", "護盾"),
+            CollectionMerchantKind.Health => FormatSimple("Health", "生命", "生命", "生命"),
+            CollectionMerchantKind.Joy => FormatSimple("Joy", "欢乐", "歡樂", "歡樂"),
+            CollectionMerchantKind.Flying => FormatSimple("Flying", "飞行", "飛行", "飛行"),
+            _ => merchant.ToString(),
         };
 
     internal static string Hero(EHero hero) =>

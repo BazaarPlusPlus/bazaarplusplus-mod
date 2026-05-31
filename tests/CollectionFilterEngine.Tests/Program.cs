@@ -43,6 +43,54 @@ AssertSequence(
     "Merchant filters match cards classified for at least one selected merchant."
 );
 
+var burnMerchantSkill = Card(
+    "Burn Merchant Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    merchants: new[] { CollectionMerchantKind.Burn }
+);
+var healMerchantSkill = Card(
+    "Heal Merchant Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    merchants: new[] { CollectionMerchantKind.Heal }
+);
+var skillMerchantFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
+skillMerchantFilter.Merchants.Add(CollectionMerchantKind.Burn);
+var skillMerchantResult = CollectionFilterEngine.Apply(
+    new[] { healMerchantSkill, burnMerchantSkill, normal },
+    skillMerchantFilter
+);
+AssertSequence(
+    skillMerchantResult,
+    new[] { burnMerchantSkill.Id },
+    "Merchant filters also narrow the Skill tab."
+);
+
+var weaponSkill = Card(
+    "Weapon Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    tags: new[] { ECardTag.Weapon }
+);
+var potionSkill = Card(
+    "Potion Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    tags: new[] { ECardTag.Potion }
+);
+var skillTagFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
+skillTagFilter.Tags.Add(ECardTag.Weapon);
+var skillTagResult = CollectionFilterEngine.Apply(
+    new[] { potionSkill, weaponSkill, normal },
+    skillTagFilter
+);
+AssertSequence(
+    skillTagResult,
+    new[] { weaponSkill.Id },
+    "Tag filters are available for future skill filtering rules."
+);
+
 AssertFalse(
     CollectionCardClassifier.IsCatalogCard(
         ECardType.Item,
@@ -62,6 +110,18 @@ AssertFalse(
 AssertTrue(
     CollectionCardClassifier.IsCatalogCard(ECardType.Skill, "Assets/Cards/Skill.png", "Real Skill"),
     "Normal Item/Skill cards with art are catalog cards."
+);
+AssertFalse(
+    CollectionCardClassifier.IsCatalogCard(
+        ECardType.Skill,
+        "Icon_Skill_Placeholder.png",
+        "Aggressive Mutations"
+    ),
+    "Placeholder skill art is not a catalog-ready skill."
+);
+AssertFalse(
+    CollectionCardClassifier.IsCatalogCard(ECardType.Skill, "Placeholder", "[SKILL TEMPLATE]"),
+    "Skill template placeholders do not enter the catalog."
 );
 AssertTrue(
     CollectionCardClassifier.IsPackageName("Vanessa Starter Package"),
@@ -83,15 +143,18 @@ Console.WriteLine("CollectionFilterEngine checks passed.");
 static CollectionCardVm Card(
     string name,
     ETier tier,
+    ECardType type = ECardType.Item,
     bool isPackage = false,
+    IReadOnlyCollection<ECardTag>? tags = null,
     IReadOnlyCollection<CollectionMerchantKind>? merchants = null
 ) =>
     new()
     {
         Id = Guid.NewGuid(),
-        Type = ECardType.Item,
+        Type = type,
         Size = ECardSize.Medium,
         StartingTier = tier,
+        Tags = tags ?? Array.Empty<ECardTag>(),
         DisplayName = name,
         InternalName = name,
         IsPackage = isPackage,

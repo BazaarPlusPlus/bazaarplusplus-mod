@@ -121,7 +121,7 @@ internal sealed partial class CollectionPanelView
         }
         column.Add(_searchField);
 
-        // Clear + package toggle + merchant placeholder.
+        // Clear + package toggle.
         var actionsRow = new VisualElement();
         actionsRow.style.flexDirection = FlexDirection.Row;
         actionsRow.style.alignItems = Align.Center;
@@ -145,16 +145,6 @@ internal sealed partial class CollectionPanelView
         );
         _packageToggleButton.style.marginLeft = UiSpacing.Md;
         actionsRow.Add(_packageToggleButton);
-
-        _merchantPlaceholderButton = CreateButton(
-            CollectionPanelText.MerchantHeader(),
-            () => { },
-            Sizes.FinalBuildRefreshButtonWidth,
-            Sizes.ButtonStandardHeight
-        );
-        _merchantPlaceholderButton.style.marginLeft = UiSpacing.Md;
-        _merchantPlaceholderButton.SetEnabled(false);
-        actionsRow.Add(_merchantPlaceholderButton);
 
         // Hero filter.
         _heroChipRow = new VisualElement();
@@ -181,6 +171,23 @@ internal sealed partial class CollectionPanelView
         tierLabel.style.marginBottom = UiSpacing.Xs;
         _tierChipRow.Add(tierLabel);
         column.Add(_tierChipRow);
+
+        // Merchant filter.
+        _merchantChipRow = new VisualElement();
+        _merchantChipRow.style.flexDirection = FlexDirection.Row;
+        _merchantChipRow.style.flexWrap = Wrap.Wrap;
+        _merchantChipRow.style.alignItems = Align.Center;
+        _merchantChipRow.style.marginTop = UiSpacing.Lg;
+        var merchantLabel = CreateLabel(
+            Sizes.FontSmall,
+            FontStyle.Bold,
+            Colors.HistorySubtitleText
+        );
+        merchantLabel.text = CollectionPanelText.MerchantHeader();
+        merchantLabel.style.marginRight = UiSpacing.Md;
+        merchantLabel.style.marginBottom = UiSpacing.Xs;
+        _merchantChipRow.Add(merchantLabel);
+        column.Add(_merchantChipRow);
 
         // Size filter (Items only — Refresh hides this row on the Skill tab).
         _sizeChipRow = new VisualElement();
