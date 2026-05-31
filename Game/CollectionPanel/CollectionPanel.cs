@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Config;
@@ -19,6 +20,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel;
 internal sealed class CollectionPanel : MonoBehaviour
 {
     private const float SearchDebounceSeconds = 0.20f;
+    private const float CatalogBuildFrameBudgetMs = 4f;
 
     private static CollectionPanel? _instance;
     public static bool IsVisible => _instance != null && _instance._isVisible;
@@ -96,6 +98,9 @@ internal sealed class CollectionPanel : MonoBehaviour
     private bool _viewportBoundsDirty;
     private Rect _viewportBoundsPx;
     private float _scrollY;
+    private Coroutine? _loadCoroutine;
+    private int _loadGeneration;
+    private bool _isLoadingCatalog;
 
     public void Initialize(IBppServices services)
     {
@@ -111,14 +116,9 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         if (_instance == null)
             return;
-        _instance._catalog.InvalidateCache();
-        _instance._catalogCards = Array.Empty<CollectionCardVm>();
+        _instance.InvalidateCatalog("locale-change");
         if (_instance._isVisible)
-        {
-            _instance.RebuildCatalogIfPossible();
-            _instance.ApplyFilters();
-            _instance.RefreshView();
-        }
+            _instance.StartPanelLoad();
     }
 
     internal static void OpenFromDockEntry()
@@ -164,16 +164,14 @@ internal sealed class CollectionPanel : MonoBehaviour
         _view!.SetVisible(true);
         _overlay?.SetVisible(true);
         _overlay?.SetAlpha(_view!.CurrentOpacity);
-
-        RebuildCatalogIfPossible();
-        ApplyFilters();
-        RefreshView();
+        StartPanelLoad();
     }
 
     private void Close()
     {
         if (!_isVisible)
             return;
+        CancelPanelLoad();
         _isVisible = false;
         // SetVisible(false) flips the fade target to 0; Update keeps ticking the fade and
         // mirroring opacity to the overlay until CurrentOpacity reaches ~0, at which point
@@ -210,6 +208,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         // Drive the panel fade every frame regardless of _isVisible so a Close mid-frame
         // can finish its fade-out animation before we tear runtime down.
         _view?.TickOpacity(dt);
+        _view?.TickLoading(dt);
         if (_view != null && _overlay != null)
             _overlay.SetAlpha(_view.CurrentOpacity);
 
@@ -420,6 +419,73 @@ internal sealed class CollectionPanel : MonoBehaviour
         _virtualizer = new CollectionGridVirtualizer(_overlay, _factory);
     }
 
+    private void StartPanelLoad()
+    {
+        CancelPanelLoad();
+        var generation = ++_loadGeneration;
+        _loadCoroutine = StartCoroutine(LoadPanelAsync(generation));
+    }
+
+    private void CancelPanelLoad()
+    {
+        _loadGeneration++;
+        if (_loadCoroutine != null)
+        {
+            StopCoroutine(_loadCoroutine);
+            _loadCoroutine = null;
+        }
+        _isLoadingCatalog = false;
+    }
+
+    private IEnumerator LoadPanelAsync(int generation)
+    {
+        var diagnostics = new CollectionPanelLoadDiagnostics();
+        _isLoadingCatalog = true;
+        SetStatus(CollectionPanelText.CatalogLoading());
+        ApplyEmptyVisibleSet();
+        RefreshView();
+
+        yield return null;
+
+        if (!IsLoadGenerationCurrent(generation))
+            yield break;
+
+        var started = diagnostics.Now();
+        RebuildCatalogIfPossible();
+        diagnostics.AddSegment("catalog", started);
+
+        if (!IsLoadGenerationCurrent(generation))
+            yield break;
+
+        started = diagnostics.Now();
+        ApplyFilters();
+        diagnostics.AddSegment("filter", started);
+
+        started = diagnostics.Now();
+        _isLoadingCatalog = false;
+        if (_catalogCards.Count > 0)
+            ClearStatus();
+        RefreshView();
+        diagnostics.AddSegment("refresh", started);
+        diagnostics.AddValue("catalogCards", _catalogCards.Count);
+        diagnostics.AddValue("visibleCards", _virtualizer?.VisibleCount ?? 0);
+        diagnostics.Log(_catalogCards.Count > 0 ? "loaded" : "unavailable");
+        _loadCoroutine = null;
+    }
+
+    private bool IsLoadGenerationCurrent(int generation) =>
+        generation == _loadGeneration && _isVisible;
+
+    private void ApplyEmptyVisibleSet()
+    {
+        if (_virtualizer == null)
+            return;
+
+        _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
+        _view?.ResetScroll();
+        _scrollY = 0f;
+    }
+
     private void RebuildCatalogIfPossible()
     {
         if (_catalogCards.Count > 0)
@@ -468,6 +534,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             Subtitle = CollectionPanelText.Subtitle(),
             CountText = CollectionPanelText.MatchCount(_virtualizer.VisibleCount),
             StatusMessage = _statusVisible ? _statusMessage : null,
+            IsLoading = _isLoadingCatalog,
             ActiveType = _filter.ActiveType,
             SelectedHeroes = new HashSet<EHero>(_filter.Heroes),
             SelectedTiers = new HashSet<ETier>(_filter.Tiers),
@@ -525,6 +592,13 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         _statusMessage = null;
         _statusVisible = false;
+    }
+
+    private void InvalidateCatalog(string reason)
+    {
+        _ = reason;
+        _catalogCards = Array.Empty<CollectionCardVm>();
+        _catalog.InvalidateCache();
     }
 
     private static string GetSceneToken(Scene scene) =>
