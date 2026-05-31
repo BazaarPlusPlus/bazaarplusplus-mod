@@ -44,8 +44,15 @@ build() {
 }
 
 build_all() {
+    local prod="${1:-false}"
+    local args=(-t:BuildAll -verbosity detailed)
+
+    if [[ "$prod" == "true" ]]; then
+        args+=(-p:BuildProductionPackage=true)
+    fi
+
     clear_macos_sqlite_quarantine
-    dotnet build BazaarPlusPlus.csproj -t:BuildAll -verbosity detailed
+    dotnet build BazaarPlusPlus.csproj "${args[@]}"
     clear_macos_sqlite_quarantine
 }
 
@@ -102,15 +109,33 @@ decompile_all() {
     done
 }
 
-case "$1" in
-    all)  build_all ;;
+usage() {
+    echo "Usage: $0 {all [--prod]|build|test|format|decompile [DllName]|decompile-all}"
+}
+
+case "${1:-}" in
+    all)
+        shift
+        prod=false
+        while (($# > 0)); do
+            case "$1" in
+                --prod) prod=true ;;
+                *)
+                    usage
+                    exit 1
+                    ;;
+            esac
+            shift
+        done
+        build_all "$prod"
+        ;;
     build)      build ;;
     test)       test_all ;;
     format)     format ;;
     decompile)  decompile "$@" ;;
     decompile-all) decompile_all ;;
     *)
-        echo "Usage: $0 {all|build|test|format|decompile [DllName]|decompile-all}"
+        usage
         exit 1
         ;;
 esac

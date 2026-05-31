@@ -2,7 +2,9 @@
 using Microsoft.Data.Sqlite;
 
 var schemaType = RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
-var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
+var repositoryType = RequireType(
+    "BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelRepository"
+);
 var ctor = repositoryType.GetConstructor([typeof(string)]);
 Assert(
     ctor != null,

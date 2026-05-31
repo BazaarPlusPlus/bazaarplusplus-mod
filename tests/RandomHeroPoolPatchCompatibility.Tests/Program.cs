@@ -46,6 +46,10 @@ static string[] ResolveDependencyDirectories()
         @"C:\Program Files (x86)\Steam\steamapps\common\The Bazaar",
         @"D:\Program Files (x86)\Steam\steamapps\common\The Bazaar",
         @"E:\Program Files (x86)\Steam\steamapps\common\The Bazaar",
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Library/Application Support/Steam/steamapps/common/The Bazaar"
+        ),
     };
 
     return gameRootCandidates
@@ -55,6 +59,14 @@ static string[] ResolveDependencyDirectories()
             {
                 AppContext.BaseDirectory,
                 Path.Combine(gameRoot, "TheBazaar_Data", "Managed"),
+                Path.Combine(
+                    gameRoot,
+                    "TheBazaar.app",
+                    "Contents",
+                    "Resources",
+                    "Data",
+                    "Managed"
+                ),
                 Path.Combine(gameRoot, "BepInEx", "core"),
                 Path.Combine(gameRoot, "BepInEx", "plugins"),
             }

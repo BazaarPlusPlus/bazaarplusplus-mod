@@ -7,9 +7,13 @@ using Newtonsoft.Json.Linq;
 
 var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleSyncService");
 var apiClientType = RequireModApiType("BazaarPlusPlus.ModApi.Clients.GhostBattleClient");
-var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRepository");
-var dataServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelDataService");
-var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryBattleRecord");
+var repositoryType = RequireType(
+    "BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelRepository"
+);
+var dataServiceType = RequireType(
+    "BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelDataService"
+);
+var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Data.HistoryBattleRecord");
 var formatterType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelFormatter");
 var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
 var coordinatorStateType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelState");
