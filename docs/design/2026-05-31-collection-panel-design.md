@@ -1,13 +1,13 @@
 # Collection Panel 设计规格（卡牌图鉴面板）
 
-Status: Implemented (Phase 1–3 + L2/L3 shipped 2026-05-31). Phase 0 spike numbers, Phase 4 (merchant filter), and most of Phase 5 (polish) are deferred. See §16 for the as-built record, the deviations from this document, and the open follow-up list.
+Status: Implemented with follow-ups (Phase 1–3 + L2/L3 + fixed-grid redesign + hidden-tag/manual-rule merchant chips + first-load P0/P1/P2 shipped 2026-05-31). Full merchant-source filtering from spawner/offline sale data, hotkey rebinding UI, keyboard navigation, true scroll inertia, Plan A wheel forwarding, and shared abstraction extraction remain deferred. See §16 for the as-built record and §17 for the fixed-grid redesign that supersedes the early dynamic-column sizing notes.
 
-> 范围：**仅 Item + Skill 两类卡牌**（原始约 1644 张：Item 1146 + Skill 498；过滤缺图后实际目录约 1571 张，C7）。其余 6 类（EncounterStep / EventEncounter / CombatEncounter / PedestalEncounter / PlayerEffect / SocketEffect）不做。
+> 范围：**仅 Item + Skill 两类卡牌**。2026-05-31 实机日志：从 `2888` 个模板接受 `1725` 张目录卡，默认 Item tab 可见 `1105` 张；其余 6 类（EncounterStep / EventEncounter / CombatEncounter / PedestalEncounter / PlayerEffect / SocketEffect）不做。
 > 关联：[2026-05-29-historypanel-fullscreen-responsive-design.md](archive/2026-05-29-historypanel-fullscreen-responsive-design.md)（外壳 + overlay 桥接的前身，含 RenderTexture 方案放弃记录）、[adr/0003-history-panel-preview-overlay.md](../adr/0003-history-panel-preview-overlay.md)。
 
 ## 动机
 
-把 BazaarDB 式的卡牌数据库搬进游戏：一个全屏黑底面板，网格展示卡牌，顶部筛选栏可按英雄 / 类型 / 稀有度 / 名称筛选（商人维度后续做），悬停出原生 tooltip。从 BPP 设置坞和热键打开。
+把 BazaarDB 式的卡牌数据库搬进游戏：一个全屏黑底面板，网格展示卡牌，筛选栏可按英雄 / 类型 / 稀有度 / 名称 / Item 尺寸 / 已知商人标签筛选，悬停出原生 tooltip。从 BPP 设置坞和热键打开。完整商人来源仍需后续从 spawner 或离线目录推导。
 
 **核心渲染决策**：不自研扁平 PNG 渲染，而是用卡牌 GUID 实例化**游戏自己的原生卡牌实例**（`CardPreviewBase`，与 HistoryPanel / 商店同一条路径），让卡面、外框、悬停 tooltip 全部由游戏原生提供。datamine 的 `index.json` 只作离线参考；磁盘 PNG 仅作可选兜底。性能靠**虚拟化网格 + 有界原生实例池**解决。
 
@@ -25,7 +25,7 @@ Status: Implemented (Phase 1–3 + L2/L3 shipped 2026-05-31). Phase 0 spike numb
 | C4 | 外框免费：`SetUp` 内 `LoadFrame(tier)` 按稀有度从 `CardTierFrameSO`（5 档预制体）取一个塞进 `_frameContainer`。**Item 用方框、Skill 用圆框**，因为 `MonsterBoardTooltip` 持有两套独立引用（`_smallItemReference/_mediumItemReference/_largeItemReference` vs `_skillReference`）。 | `CardPreviewBase.cs:138-164`、`TheBazaar/CardTierFrameSO.cs`、`MonsterBoardTooltip.cs:22-31` |
 | C5 | 两条美术管线不同：**Item** 走 `Addressables.LoadAssetAsync<CardAssetDataSO>` 且每次 `new Material`（**绕过 `AssetLoader` 共享缓存**）；**Skill** 走 `AssetLoader.LoadAssetAsyncByAddress<Texture>`（**命中共享缓存**）。`CardPreviewItem.Resize()` 用 `LayoutElement` 定尺寸；`CardPreviewSkill.Resize()` 空操作。 | `CardPreviewItem.cs:31-101`、`CardPreviewSkill.cs:10-28` |
 | C6 | 悬停 tooltip 不自动，但接线极廉价：`CardPreviewBase` **无** `IPointerEnterHandler`；`OnHover()/OnHoverOut()` 是 `[UsedImplicitly]` public 方法，需挂中继去调。`OnHover()` 内部已处理屏幕空间判定 + 锁定/次级 tooltip。 | `CardPreviewBase.cs:190-224` |
-| C7 | 缺数据 = `ArtKey` 空或 `"Invalid"`（73 张 Item，0 张 Skill），多为 `[DEBUG]`/`[TEMPLATE]`/废弃旧卡。原生 `LoadArt` 对它们 no-op（空白卡面）。**运行时按 `HasValidArtKey()` 过滤即可，无需硬编码 GUID。** | `CardPreviewBase.cs:166-173` |
+| C7 | 缺数据 / 非目录卡包括 `ArtKey` 空、`"Invalid"`、`"Placeholder"`、`.mat` 旧材质 key，以及 `[DEBUG]`/`TEMPLATE` 内部名。原生 `LoadArt` 对部分坏 art key 会空白或失败；目录构建阶段过滤，无需硬编码 GUID。 | `CollectionCardClassifier.cs:14-53`、`CollectionCardClassifier.cs:105-109` |
 | C8 | `ECardSize { Small=1, Medium=2, Large=3 }`（棋盘 1/2/3 槽宽，等高）。`ETier { Bronze, Silver, Gold, Diamond, Legendary }` —— **Diamond=3 在 Legendary=4 之前**，稀有度排序须显式定义。 | `Core.Types/ECardSize.cs`、`ETier` |
 | C9 | 另一条原生路 `AssetLoader.ConstructAndInstantiateCardVisuals(ITCard,...)` + `ItemVisualsController` 是 **3D 世界空间**（`Renderer`、`dropShadow`、`Update()` 里 billboard 朝向相机），**不适合 2D uGUI 网格**，已排除。 | `AssetLoader.cs:540-585`、`CardFrames/ItemVisualsController.cs:66-78` |
 | C10 | 外壳是 UI Toolkit（`PanelSettings.sortingOrder=26`），原生卡在兄弟 `ScreenSpaceOverlay` Canvas（`sortingOrder=27`）+ `RectMask2D`，靠"挖洞 + 像素矩形同步"桥接。RenderTexture 方案 URP 下渲染不出 uGUI，已弃。 | `Ui/HistoryPanelUiToolkitView.cs:96-152`、`Preview/BattleBoardPreview.cs:27-28,238-302` |
@@ -172,7 +172,9 @@ internal sealed class CollectionCatalog
 {
     private IReadOnlyList<CollectionCardVm>? _cache;
 
-    public bool TryBuild(out IReadOnlyList<CollectionCardVm> cards)
+    // Current code splits this into TryGetCached/TryCreateBuildSession/Commit;
+    // this sketch shows the projection and filtering contract.
+    public bool BuildProjectionSketch(out IReadOnlyList<CollectionCardVm> cards)
     {
         if (_cache != null) { cards = _cache; return true; }
         cards = Array.Empty<CollectionCardVm>();
@@ -201,9 +203,13 @@ internal sealed class CollectionCatalog
     // 语言切换时由 CollectionPanelMount 调用
     public void InvalidateCache() => _cache = null;
 
-    // 复刻 CardPreviewBase.HasValidArtKey()（CardPreviewBase.cs:166-173）
+    // 当前实现见 CollectionCardClassifier.HasValidArtKey()
     private static bool HasValidArt(TCardBase c) =>
-        !string.IsNullOrEmpty(c.ArtKey) && c.ArtKey != "Invalid";
+        !string.IsNullOrEmpty(c.ArtKey)
+        && c.ArtKey != "Invalid"
+        && !c.ArtKey.Contains("Placeholder", StringComparison.OrdinalIgnoreCase)
+        && !c.ArtKey.EndsWith(".mat", StringComparison.OrdinalIgnoreCase)
+        && !ContainsAnyMarker(c.InternalName, NonCatalogNameMarkers);
 }
 ```
 
@@ -236,7 +242,7 @@ internal sealed class CollectionCardVm
 
 ### 3.3 缺数据处理（C7）
 
-按指示「有缺失直接不管」：`CollectionCatalog` 构建时用 `HasValidArt` 丢弃，缺图卡（73 张 Item，含 `[DEBUG]`/`[TEMPLATE]`）根本不进目录。无需占位图、无需 PNG 兜底、无需硬编码 GUID。
+按指示「有缺失直接不管」：`CollectionCatalog` 构建时用 `CollectionCardClassifier.IsCatalogCard(...)` 丢弃坏 art key、旧材质 key、debug/template 卡和非 Item/Skill 卡，这些条目根本不进目录。无需占位图、无需 PNG 兜底、无需硬编码 GUID。当前实机日志接受 `1725` / 拒绝 `1163`。
 
 ---
 
@@ -251,7 +257,7 @@ internal sealed class CollectionCardVm
 | 稀有度 | `StartingTier` | 多选 | 排序显式定义（C8） |
 | 名称 | `DisplayName` | 包含匹配 | 当前语言 |
 | 玩法标签（可选） | `Tags` | 集合任一命中 | 无需新数据 |
-| **商人** | —— | §10.3 | **v1 不做**，UI disabled 占位 |
+| **商人** | `Merchants`（`CollectionMerchantKind[]`） | 集合任一命中 | 已有 hidden-tag / manual-rule chips；完整 sale-source 推导见 §10.3 |
 
 ```csharp
 // CollectionFilterEngine.cs —— 纯函数
@@ -260,10 +266,17 @@ internal static class CollectionFilterEngine
     public static List<CollectionCardVm> Apply(IReadOnlyList<CollectionCardVm> all, CollectionFilterState f)
     {
         IEnumerable<CollectionCardVm> q = all.Where(c => c.Type == f.ActiveType);       // 当前 tab
+        if (!f.IncludePackages) q = q.Where(c => !c.IsPackage);
         if (f.Heroes.Count > 0) q = q.Where(c => c.Heroes.Any(f.Heroes.Contains));
         if (f.Tiers.Count  > 0) q = q.Where(c => f.Tiers.Contains(c.StartingTier));
+        if (f.Tags.Count   > 0) q = q.Where(c => c.Tags.Any(f.Tags.Contains));
+        if (f.ActiveType == ECardType.Item && f.Sizes.Count > 0)
+            q = q.Where(c => f.Sizes.Contains(c.Size));
+        if (f.Merchants.Count > 0) q = q.Where(c => c.Merchants.Any(f.Merchants.Contains));
         if (!string.IsNullOrWhiteSpace(f.Search))
-            q = q.Where(c => c.DisplayName.IndexOf(f.Search, StringComparison.OrdinalIgnoreCase) >= 0);
+            q = q.Where(c =>
+                c.DisplayName.IndexOf(f.Search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                c.InternalName.IndexOf(f.Search, StringComparison.OrdinalIgnoreCase) >= 0);
         return q.OrderBy(c => TierRank(c.StartingTier))
                 .ThenBy(c => c.DisplayName, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
@@ -637,17 +650,19 @@ tooltip 渲染栈是 uGUI（独立于 UITK 外壳），UITK 面板能正常显�
 
 ### 10.1 顶部筛选栏
 
-`CollectionPanelView.FilterBar.cs`：英雄（chips 多选，排除 `Hero8`）、稀有度（chips 多选）、名称（UITK `TextField`，**200ms debounce**——逐字符触发 Apply + 虚拟化器重置开销过大）、Item/Skill tab。元素样式复用 `Colors`/`Sizes`/`UiSpacing`。任一变化 → 更新 `CollectionFilterState` → `CollectionFilterEngine.Apply` → `generation.Bump()`（全局单次）→ 重置虚拟化器。
+`CollectionPanelView.Tree.cs` + `CollectionPanelView.Filters.cs`：左操作列包含 Item/Skill tab、搜索、Clear、商人 chips、英雄 chips、稀有度 chips、Item 尺寸 chips 和状态文本。名称搜索用 UITK `TextField`，**200ms debounce**——逐字符触发 Apply + 虚拟化器重置开销过大。任一变化 → 更新 `CollectionFilterState` → `CollectionFilterEngine.Apply` → `generation.Bump()`（全局单次）→ 重置虚拟化器。
 
 ### 10.2 本地化名
 
 `TCardBase.Localization`（`TCardLocalization`）解析为当前 UI 语言（游戏用 `PlayerPreferences.Data.LanguageCode`，见 `BppHotkeyService.cs:189` 的同款用法）。`LocalizationResolver.Resolve` 的访问器待确认（§14 开放问题）；失败回退 `InternalName`。index.json 的 `name.translations`（含 zh-CN 等 7 语言）作离线兜底。
 
-### 10.3 商人筛选（v1 不做，后续推导）
+### 10.3 商人筛选（已做标签型 chips；完整来源后续推导）
 
-游戏里**没有**静态「商人→卡」表（已核实）：`MerchantSO`/`TMonster` 不含售卖卡；`CardSetPreviewSponsorCatalog` 的 Sponsor 是金主鸣谢（红鲱鱼）；商店出货是运行时 spawner 按 `SpawningFilters`（`CardIdFilters/ItemTierFilters`）+ Hero/Day/Hour 动态生成（mod 的 `ShopForecastLogPatch.cs`）。
+游戏里**没有**静态「商人→卡」表（已核实）：`MerchantSO`/`TMonster` 不含售卖卡；`CardSetPreviewSponsorCatalog` 的 Sponsor 是金主鸣谢，不是售卖来源；商店出货是运行时 spawner 按 `SpawningFilters`（`CardIdFilters/ItemTierFilters`）+ Hero/Day/Hour 动态生成（mod 的 `ShopForecastLogPatch.cs`）。
 
-v1 在 UI 放 disabled 的「商人（即将到来）」占位。后续做**推导逻辑**（已确认单独做）：枚举每个商人的 spawner `SpawningFilters` 展开 `CardIdFilters` + tier/hero 约束得近似售卖集；或离线挖一份「商人→[guid]」目录随 mod 发布（先例：编译进 DLL 的字典字面量，或 `Data/BuildRecommendations/*.json` 嵌入 JSON）。单列后续设计，不阻塞本面板。
+当前实现提供标签型商人 chips：`CollectionCardClassifier.ResolveMerchants(...)` 从 `EHiddenTag.*Merchant`、`ECardTag.Merchant` 和预留 manual-rule 表投影到 `CollectionMerchantKind`，`CollectionFilterEngine` 按 `card.Merchants` 任一命中过滤，UI 只展示当前 tab 中真实可用的 merchant chips。
+
+后续仍需做**完整售卖来源推导**：枚举每个商人的 spawner `SpawningFilters` 展开 `CardIdFilters` + tier/hero 约束得近似售卖集；或离线挖一份「商人→[guid]」目录随 mod 发布（先例：编译进 DLL 的字典字面量，或 `Data/BuildRecommendations/*.json` 嵌入 JSON）。这部分单列后续设计，不阻塞当前面板。
 
 ---
 
@@ -721,7 +736,7 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 
 ## 13. 分阶段实施
 
-> **As-built status (2026-05-31)**: Phase 1 ✅ / Phase 2 ✅ / Phase 3 ✅ / Phase 0 ⏸ (未做，靠占位常量兜住) / Phase 4 ⏸ (留了 disabled「Merchant (soon)」chip) / Phase 5 🟡 (L3 + Plan B 已做，其余未做)。
+> **As-built status (2026-05-31)**: Phase 1 ✅ / Phase 2 ✅ / Phase 3 ✅ / fixed-grid redesign ✅ / first-load P0/P1/P2 ✅ / Phase 0 formal measurement ⏸ / Phase 4 merchant-source filtering ⏸ / Phase 5 🟡 (L3, Plan B, art fade, panel fade 已做；热键重绑 UI、键盘导航、真滚动惯性、共享抽象提取未做)。
 
 ### Phase 0 — 可行性 spike（闸门，先做，1–2 天）  ⏸ Deferred
 在游戏里证明五件事全绿，否则各自落兜底。每项有**定量 pass/fail 标准**：
@@ -739,18 +754,21 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 目录（`CollectionCatalog` 枚举 + 过滤 + VM 缓存）、外壳（克隆 HistoryPanel，黑底 + header + Close + 热键/坞入口）、网格只渲染前 N 张（≈一个过扫窗口）不滚动。交付：能打开、看到一屏 Item、hover 出 tooltip。
 
 ### Phase 2 — 虚拟化滚动（核心性能）  ✅ Shipped
-`CollectionGridVirtualizer`（§5.3，含 pending-return 竞态防护 + 自适应冷加载预算）+ 池按 kind 分键 + L2 美术 LRU（引用计数）+ **L3 Material 共享池**（draw call 结构性问题，不可推迟）+ per-card generation 取消。加 Skill tab。交付：~1571 张平滑滚动（实测 60fps），Item/Skill 切换。
+`CollectionGridVirtualizer`（§5.3，含 pending-return 竞态防护 + 自适应冷加载预算）+ 池按 kind 分键 + L2 美术 LRU（引用计数）+ **L3 Material 共享池**（draw call 结构性问题，不可推迟）+ per-card generation 取消。加 Skill tab。交付：`1725` 张目录卡虚拟化滚动，Item/Skill 切换。
 
 ### Phase 3 — 筛选系统  ✅ Shipped
-顶部筛选栏（英雄多选 / 稀有度 / 名称搜索 /（可选）玩法标签），变化触发 Bump + 重算可见集。交付：hero/tier/type/搜索可用。
+左操作列筛选（英雄多选 / 稀有度 / 名称搜索 / Item 尺寸 / hidden-tag merchant chips /（可选）玩法标签），变化触发 Bump + 重算可见集。交付：hero/tier/type/search/size/merchant 可用。
 
-### Phase 4 — 商人筛选（后续，需新数据）  ⏸ Deferred
-按 §10.3 做 spawner 推导或离线目录。单列设计。
+### Phase 4 — 完整商人来源筛选（后续，需新数据）  🟡 Partial
+已落地 hidden-tag/manual-rule merchant chips；完整 spawner 推导或离线目录仍按 §10.3 单列设计。
 
 ### Phase 5 — 打磨  🟡 Partial
 - ✅ L3 Material 共享池（Phase 2 同期做完）
 - ✅ Plan B 手动 hit-test（默认即用，见 §9.4）
-- ⏸ 可重绑热键、art 淡入、滚动惯性、键盘导航、面板开关过渡动画（alpha 淡入）
+- ✅ art 淡入
+- ✅ 面板开关过渡动画（asymmetric alpha fade）
+- ✅ first-load loading shell + 分帧 catalog 构建 + catalog cache hit 日志（详见 first-load performance spec）
+- ⏸ 可重绑热键、滚动惯性、键盘导航
 - ⏸ ~~输入硬拦截~~（实施后回退，见 §11.3）
 - ⏸ 共享抽象提取（§2.1 路线图）
 
@@ -898,7 +916,7 @@ L2/L3 路径：池在 Instantiate 时挂 `CollectionPanelOwnedMarker`；`CardPre
 
 | # | 项 | 触发条件 / 说明 |
 |---|---|---|
-| F1 | Phase 0 spike 数字回填 | `CollectionGridConstants` 里 cell 尺寸（Item 230×300 / Skill 200×200 / gap 14）是占位。需游戏内实测 Item 三档 + Skill 预制体真实 `(W, H)`，回填。 |
+| F1 | Phase 0 formal measurement backfill | 固定规格网格已取代早期 `Item 230×300 / Skill 200×200` 占位常量；仍需补正式实测记录：Item 三档 + Skill 预制体真实 `(W, H)`、帧率上限、TooltipParentComponent 主菜单就绪性、cold native bind/art cost。 |
 | F2 | Phase 4 商人筛选 | 设计 §10.3 单列后续，需推导 spawner `SpawningFilters` 或离线挖目录。 |
 | F3 | 共享抽象提取（Phase 5 剩余） | 设计 §2.1 路线图：`GenerationGuard` → `Core/Runtime/`、UITK 外壳 PanelSettings 配方提取、overlay 类参数化、PendingReturn cell 迁出 `_realized` 到 `_orphanedPending`。纯重构，不影响功能。 |
 | F4 | 热键重绑 UI（Phase 5 剩余） | 当前 `CollectionPanelHotkeyPathConfig` 默认 `<Keyboard>/f9`，可改 cfg 但没有 in-game 重绑入口。用户明确不做。 |
@@ -926,8 +944,8 @@ L2/L3 路径：池在 Instantiate 时挂 `CollectionPanelOwnedMarker`；`CardPre
 1. **基础设施读取与确认** — 阅读 `HistoryPanel*` 全套（mount / view / overlay / pool / factory / generation guard）；阅读 decompiled 的 `CardPreviewBase` / `CardPreviewItem` / `CardPreviewSkill` / `MonsterBoardTooltip` / `JsonGameDataManager` / `TCardBase` / `TCardInstance{Item,Skill}` / `TCardLocalization` 等以确认反射目标和字段。
 2. **Phase 1 数据层** — `CollectionCardVm` / `CollectionFilterState` / `CollectionCatalog`（`JsonGameDataManager.GetCardMap` 强转 + 过滤 + 缓存）/ `CollectionFilterEngine`（纯函数）/ `CollectionLocalizationResolver`（`TCardBase.Localization.Title.Text`）。
 3. **Phase 1 文案与 dock 入口** — `CollectionPanelText`（6 语言）/ `CollectionPanelSettingsMenuLabel`（dock 标签 6 语言）/ `CollectionPanelSettingsDockEntry`（Order=1）。
-4. **Phase 2 渲染层** — `CollectionCardPool`（`(type, size)` 分键 + harvest `_skillReference`）/ `CollectionCardFactory`（Item / Skill 双路 SetUp 反射）/ `CollectionGridOverlay`（兄弟 `ScreenSpaceOverlay` Canvas）/ `CollectionGridConstants`（占位 cell 尺寸 + 限流预算）/ `CollectionCardHoverRelay`（中继）/ `CollectionGridVirtualizer`（回收式 + pending-return 竞态防护 + per-card generation）。
-5. **Phase 3 UI 外壳** — `CollectionPanelView.cs` + `CollectionPanelView.Tree.cs` + `CollectionPanelView.Filters.cs` 三个 partial：UITK 全屏外壳（sortingOrder=26, `pickingMode=Position`）+ 筛选栏（hero / tier chips + 200ms debounce 搜索 + Item/Skill tab + 「Merchant (soon)」disabled 占位）+ ScrollView 视口。
+4. **Phase 2 渲染层** — `CollectionCardPool`（`(type, size)` 分键 + harvest `_skillReference`）/ `CollectionCardFactory`（Item / Skill 双路 SetUp 反射）/ `CollectionGridOverlay`（兄弟 `ScreenSpaceOverlay` Canvas）/ `CollectionGridConstants`（固定网格参数 + 限流预算）/ `CollectionCardHoverRelay`（中继）/ `CollectionGridVirtualizer`（回收式 + pending-return 竞态防护 + per-card generation）。
+5. **Phase 3 UI 外壳** — `CollectionPanelView.cs` + `CollectionPanelView.Tree.cs` + `CollectionPanelView.Filters.cs` 三个 partial：UITK 全屏外壳（sortingOrder=26, `pickingMode=Position`）+ 左操作列（hero / tier / size / merchant chips + 200ms debounce 搜索 + Item/Skill tab + Clear）+ ScrollView 视口。
 6. **挂载和单例** — `CollectionPanelMount`（自订；订阅 `ChineseLocaleModeChanged` 失效目录缓存）/ `CollectionPanel`（单例 + Update 热键 / Escape / IsInCombat + DetectSceneChange + HistoryPanel 互斥）/ `BppConfig` + `IBppConfig` 加 `CollectionPanelHotkeyPathConfig`（默认 `<Keyboard>/f9`）/ `BppComposition` 注册。
 7. **首次构建通过** — 修了 4 个编译错误（`HistoryPanel` 命名空间 vs 类型歧义需别名；`HistoryPanelCardPreviewReflection` using 缺；`Scroller.valueChanged` 在 publicizer 后字段/属性歧义；改为每帧 poll `scrollOffset.y`）。
 8. **L2/L3 缓存基础设施** — `CollectionCardArtCache`（CardAssetDataSO LRU + refcount）/ `CollectionCardMaterialCache`（per-artKey Material）/ `CollectionCardCacheHost`（静态汇合点）/ `CollectionPanelOwnedMarker`（gate Harmony）。
@@ -941,20 +959,21 @@ L2/L3 路径：池在 Instantiate 时挂 `CollectionPanelOwnedMarker`；`CardPre
 16. **Phase 5 polish 之 smooth wheel** — 加 `OnWheel` 拦截 + `TickScroll` lerp，整体破坏滚轮（P5）。
 17. **smooth wheel 回退** — 删 `OnWheel`/`TickScroll`/`_scrollTargetY`/`ComputeMaxScroll`；保留 `ResetScroll()`（筛选切换归零，独立有用）；`mouseWheelScrollSize` 200 → 300。
 18. **关闭残影修复** — 拆出 `PanelFadeInSeconds` / `PanelFadeOutSeconds`，`TickOpacity` 按方向选 tau（P6）。
-19. **设计文档第二轮 amend（本次）** — 增加本节 §16.6–§16.8；清理 §16.5 已修项；更新 §16.5 follow-ups。
+19. **设计文档第二轮 amend** — 增加本节 §16.6–§16.8；清理 §16.5 已修项；更新 §16.5 follow-ups。
+20. **fixed-grid + first-load + merchant drift amend（本次）** — 同步 §10/§13/§16 到当前 hidden-tag merchant chips、固定网格和 P0/P1/P2 first-load 实现状态。
 
 ### 16.8 当前进度（按 Phase）
 
 | Phase | 状态 | 备注 |
 |---|---|---|
-| Phase 0 — 可行性 spike | ⏸ Deferred | 需游戏内实测：Item 三种 size 预制体真实 `(W, H)` / Skill 方形尺寸 / 帧率上限 / `GetCardMap()` 遍历耗时 / `TooltipParentComponent` 在主菜单是否就绪。`CollectionGridConstants` 里是占位数字，撑用。 |
+| Phase 0 — 可行性 spike | 🟡 Partially covered by shipped behavior | 已通过实机打开验证原生卡/tooltip/滚轮/hover 可用，并已记录 first-load catalog timing；仍缺正式数字表：Item 三种 size 预制体真实 `(W, H)` / Skill 方形尺寸 / 帧率上限 / TooltipParentComponent 主菜单就绪性 / cold native bind-art cost。 |
 | Phase 1 — MVP 单类型静态网格 | ✅ Shipped | 目录 / 外壳 / dock 入口 / 热键 / 一屏 Item 渲染 / hover tooltip 全通。 |
 | Phase 2 — 虚拟化滚动 | ✅ Shipped | recycler virtualizer + (type, size) 分键池 + L2 LRU + L3 Material 共享 + per-card generation 取消 + Item/Skill tab。 |
-| Phase 3 — 筛选系统 | ✅ Shipped | 英雄多选 chips / 稀有度多选 chips / 200ms debounce 名称搜索 / Item/Skill tab / Clear 按钮 / 「Merchant (soon)」disabled 占位。 |
-| Phase 4 — 商人筛选 | ⏸ Deferred | 设计 §10.3 单列后续。 |
-| Phase 5 — 打磨 | 🟡 Partial | ✅ L3 Material 共享池<br>✅ Plan B 手动 hit-test<br>✅ Card art 淡入<br>✅ 面板开关过渡（asymmetric fade）<br>✅ ~~输入硬拦截~~（实施后回退，见 P1）<br>⏸ 真正的滚动惯性（尝试过被回退，见 P5；UITK 默认 `mouseWheelScrollSize=300` 兜底）<br>⏸ 热键重绑 UI（用户明确不做）<br>⏸ 键盘导航（用户明确不做）<br>⏸ 共享抽象提取（§2.1 路线图） |
+| Phase 3 — 筛选系统 | ✅ Shipped | 英雄多选 chips / 稀有度多选 chips / Item 尺寸 chips / 200ms debounce 名称搜索 / Item/Skill tab / Clear 按钮 / hidden-tag/manual-rule merchant chips。 |
+| Phase 4 — 完整商人来源筛选 | 🟡 Partial | 标签型 merchant chips 已落地；spawner 推导或离线目录仍按 §10.3 单列后续。 |
+| Phase 5 — 打磨 | 🟡 Partial | ✅ L3 Material 共享池<br>✅ Plan B 手动 hit-test<br>✅ Card art 淡入<br>✅ 面板开关过渡（asymmetric fade）<br>✅ first-load loading shell / 分帧 catalog / cache-hit diagnostics<br>✅ ~~输入硬拦截~~（实施后回退，见 P1）<br>⏸ 真正的滚动惯性（尝试过被回退，见 P5；UITK 默认 `mouseWheelScrollSize=300` 兜底）<br>⏸ 热键重绑 UI（用户明确不做）<br>⏸ 键盘导航（用户明确不做）<br>⏸ 共享抽象提取（§2.1 路线图） |
 
-**整体可发布性**：当前实施满足设计 §1 范围（仅 Item + Skill，~1571 张）所声明的全部功能性要求。Phase 0 的占位数字会在某些机型 / 屏幕分辨率下显得偏紧或偏松，但不影响功能正确。建议先开放给少量用户实测 Phase 0 的几个数值，再回填 `CollectionGridConstants` 后正式发布。
+**整体可发布性**：当前实施满足设计 §1 范围（仅 Item + Skill，实机目录 `1725` 张）所声明的核心功能性要求。固定规格网格已取代早期占位尺寸；Phase 0 仍缺正式数字表（native prefab size / 帧率上限 / TooltipParentComponent 主菜单就绪性 / cold native bind-art cost），但不影响当前功能正确。
 
 ---
 

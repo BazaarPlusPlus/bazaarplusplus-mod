@@ -1,6 +1,6 @@
 # Collection Panel First-Load Performance Plan
 
-Status: Draft. No implementation has landed from this document yet.
+Status: Partially implemented (P0/P1/P2 shipped 2026-05-31 on `master`). The panel now paints a loading shell before catalog work, builds catalog metadata through a cancellable frame-budgeted coroutine, rejects known bad art keys, negative-caches failed panel-owned item art loads, and keeps pure VM catalog metadata across normal scene runtime disposal. P3 default-order precomputation, P4 persisted VM snapshot, and P5 opportunistic prewarm remain deferred until runtime timing justifies them.
 
 Related spec: [2026-05-31-collection-panel-design.md](2026-05-31-collection-panel-design.md).
 
@@ -8,7 +8,9 @@ Related spec: [2026-05-31-collection-panel-design.md](2026-05-31-collection-pane
 
 This document targets the slow first visible load of the Collection Panel built under `Game/CollectionPanel/`.
 
-The first-open path currently runs `EnsureView()`, `RebuildCatalogIfPossible()`, `ApplyFilters()`, and `RefreshView()` synchronously from `CollectionPanel.Open()` before the normal frame loop can finish realizing cards through the virtualizer: `Game/CollectionPanel/CollectionPanel.cs:141-151`.
+Before this plan landed, the first-open path ran `EnsureView()`, catalog rebuild, filter, and view refresh synchronously from `CollectionPanel.Open()` before the normal frame loop could paint a loading state.
+
+Current code shows the shell first and then starts `LoadPanelAsync(...)`: `Game/CollectionPanel/CollectionPanel.cs:160-167` and `Game/CollectionPanel/CollectionPanel.cs:427-517`.
 
 Card realization after the panel is open is already virtualized and budgeted per frame, so this plan separates catalog/filter work from native card binding work instead of treating the panel as one monolithic load step: `Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs:106-165`.
 
@@ -24,15 +26,36 @@ The revised plan below therefore treats the advisor review as unavailable eviden
 
 ## Current Load Shape
 
+As implemented, `Open()` creates/activates the UITK shell and overlay, then calls `StartPanelLoad()` instead of synchronously rebuilding the catalog: `Game/CollectionPanel/CollectionPanel.cs:160-167`.
+
+`LoadPanelAsync(...)` immediately publishes `CatalogLoading()`, clears the visible set, refreshes the view, yields one frame, then loads catalog metadata, applies filters, refreshes, and logs `CollectionPanelLoad` timing: `Game/CollectionPanel/CollectionPanel.cs:445-517`.
+
+Catalog loading now first checks `CollectionCatalog.TryGetCached(...)`, then falls back to `CollectionCatalogBuildSession.Step(...)` with a per-frame budget. Cache identity is guarded by the static data manager object, and cache invalidation logs a reason: `Game/CollectionPanel/Data/CollectionCatalog.cs:17-43`, `Game/CollectionPanel/Data/CollectionCatalog.cs:45-119`, and `Game/CollectionPanel/Data/CollectionCatalogBuildSession.cs`.
+
+Scene changes call the Unity-runtime disposal path and leave the VM catalog intact; locale changes and `OnDestroy()` still invalidate it: `Game/CollectionPanel/CollectionPanel.cs:115-121`, `Game/CollectionPanel/CollectionPanel.cs:287-322`, and `Game/CollectionPanel/CollectionPanel.cs:634-638`.
+
+Fresh runtime evidence from the implementation session:
+
+```text
+[BPP][CollectionCatalog] Catalog built: 1725 cards from 2888 templates, rejected=1163.
+[BPP][CollectionPanelLoad] outcome=loaded, total=4797.5ms, catalog=3296.1ms, catalogCacheHit=false, sourceTemplates=2888, accepted=1725, rejected=1163, filter=2.7ms, refresh=0.9ms, catalogCards=1725, visibleCards=1105
+[BPP][CollectionCatalog] Catalog cache hit: 1725 cards from 2888 templates.
+[BPP][CollectionPanelLoad] outcome=loaded, total=11.8ms, catalog=0.0ms, catalogCacheHit=true, sourceTemplates=2888, accepted=1725, rejected=1163, filter=2.2ms, refresh=0.4ms, catalogCards=1725, visibleCards=1105
+```
+
+## Original Load Shape
+
+The following facts describe the pre-implementation state that motivated this plan. Keep them as historical context, not current code truth.
+
 `CollectionPanel.Open()` creates the UITK view and overlay before it tries to build the catalog, which means UI construction cost and data construction cost are both paid on the first open: `Game/CollectionPanel/CollectionPanel.cs:141-151`.
 
 `EnsureView()` creates the `CollectionPanelView`, `CollectionGridOverlay`, art/material caches, card pool, card factory, and virtualizer in one block: `Game/CollectionPanel/CollectionPanel.cs:304-392`.
 
-`RebuildCatalogIfPossible()` only skips work when `_catalogCards.Count > 0`, so a scene-change disposal that clears `_catalogCards` forces a future open to rebuild the catalog: `Game/CollectionPanel/CollectionPanel.cs:394-408`.
+The original `RebuildCatalogIfPossible()` path only skipped work when `_catalogCards.Count > 0`, so a scene-change disposal that cleared `_catalogCards` forced a future open to rebuild the catalog.
 
-`DisposeRuntime()` currently disposes Unity-owned runtime objects and also clears `_catalogCards` plus `CollectionCatalog._cache`, which couples scene cleanup to catalog invalidation: `Game/CollectionPanel/CollectionPanel.cs:282-302`.
+Before P2, `DisposeRuntime()` disposed Unity-owned runtime objects and also cleared `_catalogCards` plus `CollectionCatalog._cache`, which coupled scene cleanup to catalog invalidation.
 
-`CollectionCatalog.TryBuild()` gets the game's static data manager, calls `JsonGameDataManager.GetCardMap()`, scans every card template, filters each template, and projects each accepted `TCardBase` into a `CollectionCardVm`: `Game/CollectionPanel/Data/CollectionCatalog.cs:27-80`.
+The original one-shot catalog build got the game's static data manager, called `JsonGameDataManager.GetCardMap()`, scanned every card template, filtered each template, and projected each accepted `TCardBase` into a `CollectionCardVm`. The current code keeps the same projection but routes it through `CollectionCatalog.TryCreateBuildSession(...)` and `CollectionCatalogBuildSession.Step(...)`: `Game/CollectionPanel/Data/CollectionCatalog.cs:45-110` and `Game/CollectionPanel/Data/CollectionCatalogBuildSession.cs:33-66`.
 
 The decompiled game manager stores cards in `_cards`, and `GetCardMap()` only returns that dictionary, so a BPP catalog snapshot cannot skip the game's static data creation step: `decompiled/TheBazaarRuntime/TheBazaar.DataManagement.Json/JsonGameDataManager.cs:29-67`.
 
@@ -54,7 +77,7 @@ The original idea that game-version content is stable is directionally right for
 
 A persisted BPP VM snapshot is not the first optimization to implement, because it cannot skip `Data.CreateManager()` or `JsonGameDataManager.Create()` and only replaces BPP's projection/sort work after the game manager already exists: `decompiled/TheBazaarRuntime/TheBazaar/Data.cs:503-516` and `Game/CollectionPanel/Data/CollectionCatalog.cs:64-75`.
 
-The current in-memory catalog cache is useful but short-lived, because `DisposeRuntime()` invalidates it on scene changes even though the cached VMs do not own Unity resources: `Game/CollectionPanel/CollectionPanel.cs:300-301` and `Game/CollectionPanel/Data/CollectionCatalog.cs:25-83`.
+Before P2, the in-memory catalog cache was useful but short-lived because scene changes invalidated it even though the cached VMs do not own Unity resources. Scene changes now call `DisposeUnityRuntime()` and keep the VM catalog intact: `Game/CollectionPanel/CollectionPanel.cs:282-322` and `Game/CollectionPanel/Data/CollectionCatalog.cs:17-43`.
 
 Locale changes still must invalidate the catalog, because `DisplayName` is resolved from the live card localization text when the VM is created: `Game/CollectionPanel/CollectionPanel.cs:91-102` and `Game/CollectionPanel/Data/CollectionLocalizationResolver.cs:16-31`.
 
@@ -62,19 +85,23 @@ The Item art path is more expensive and riskier than the Skill art path because 
 
 The Collection Panel patch already replaces Item art loading for panel-owned cards, but `CollectionCardArtCache.Get(...)` only caches successful handles and does not remember failed art keys: `Patches/CollectionPanel/CollectionItemLoadArtPatch.cs:21-34` and `Game/CollectionPanel/Grid/CollectionCardArtCache.cs:39-102`.
 
-The current catalog classifier only rejects non Item/Skill cards, empty art keys, `"Invalid"` art keys, and internal names containing `[DEBUG]` or `[TEMPLATE]`: `Game/CollectionPanel/Data/CollectionCardClassifier.cs:14-53`.
+Before P1, the catalog classifier only rejected non Item/Skill cards, empty art keys, `"Invalid"` art keys, and internal names containing `[DEBUG]` or `[TEMPLATE]`.
 
-The current classifier does not reject `"Placeholder"` art keys or template names such as `[SMALL ITEM TEMPLATE]`, so catalog entries can survive filtering and later fail on Addressables load: `Game/CollectionPanel/Data/CollectionCardClassifier.cs:105-120` and `decompiled/TheBazaarRuntime/TheBazaar.UI/CardPreviewItem.cs:86-93`.
+The current classifier rejects `"Placeholder"` art keys, `.mat` art keys, and template-name markers before those entries reach the panel: `Game/CollectionPanel/Data/CollectionCardClassifier.cs:14-15` and `Game/CollectionPanel/Data/CollectionCardClassifier.cs:105-109`.
 
-The local runtime log from 2026-05-31 showed `CollectionCatalog` building `1734` cards from `2888` templates and then repeated `CollectionCardArtCache` failures for `artKey='Placeholder'`, so invalid art filtering is a proven local symptom even though it still needs a fresh measurement run before being called the main bottleneck.
+The pre-fix runtime log from 2026-05-31 showed `CollectionCatalog` building `1734` cards from `2888` templates and then repeated `CollectionCardArtCache` failures for `artKey='Placeholder'`. The post-fix runtime log built `1725` cards from the same `2888` templates with placeholder/template rejection counted in the catalog result.
 
 ## Revised Priority Order
 
 ### P0: Add Load Instrumentation
 
+Status: Partially landed.
+
+The shipped instrumentation records catalog, filter, refresh, cache-hit/source counts, accepted/rejected counts, catalog card count, and visible card count under `[BPP][CollectionPanelLoad]`. It does not yet separately time `EnsureView()` or the first-window native card bind/art path, so those remain optional future instrumentation if logs show native realization is still the user-visible delay.
+
 Add a small, removable or debug-level timing helper around the first-open path before changing behavior.
 
-Measure `EnsureView()`, `CollectionCatalog.TryBuild(...)`, `CollectionFilterEngine.Apply(...)`, `RefreshView(...)`, and the first several `CollectionCardFactory.TryBind(...)` calls because those are the boundaries visible in the current open and virtualizer paths: `Game/CollectionPanel/CollectionPanel.cs:141-151` and `Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs:155-165`.
+The remaining instrumentation gap is `EnsureView()` and the first several `CollectionCardFactory.TryBind(...)` calls; shipped logs already cover the catalog build session, filter pass, refresh pass, cache-hit state, source counts, and visible count: `Game/CollectionPanel/CollectionPanel.cs:445-517` and `Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs:155-165`.
 
 Log catalog source counts, accepted counts, rejected placeholder/template counts, filter result count, and first-window bind count because those values decide whether the fix should focus on data projection or native card binding: `Game/CollectionPanel/Data/CollectionCatalog.cs:64-79` and `Game/CollectionPanel/Data/CollectionFilterEngine.cs:20-65`.
 
@@ -83,6 +110,10 @@ Keep these logs under the existing BPP log style and component names because run
 Acceptance for P0 is one log block that can distinguish catalog build time, filter/sort time, and first-window bind/art time on a cold panel open.
 
 ### P1: Harden Catalog Rejection And Art Failure Caching
+
+Status: Landed.
+
+`CollectionCardClassifier.HasValidArtKey(...)` now rejects `Placeholder` art keys and `.mat` art keys. The existing template-name marker is broad enough to catch `[SMALL ITEM TEMPLATE]` because it matches the substring `TEMPLATE`. `CollectionCardArtCache` now keeps a per-cache-lifetime `_failedKeys` set for cache-owned failed Addressables loads and clears it in `DisposeAll()`.
 
 Extend `CollectionCardClassifier.HasValidArtKey(...)` so `"Placeholder"` and legacy material keys ending in `.mat` are not treated as valid catalog art: `Game/CollectionPanel/Data/CollectionCardClassifier.cs:105-107`.
 
@@ -98,6 +129,10 @@ Acceptance for P1 is that fresh runtime logs no longer show repeated failures fo
 
 ### P2: Keep The VM Catalog Across Scene Runtime Disposal
 
+Status: Landed.
+
+`DisposeRuntime()` is split into Unity runtime disposal plus explicit catalog invalidation. Scene transitions call only `DisposeUnityRuntime()`, while locale changes and object destruction invalidate the VM catalog. `CollectionCatalog` also checks static-data manager identity before serving a cache hit.
+
 Split Unity runtime disposal from catalog invalidation so scene changes tear down card GameObjects, overlay Canvas, and art/material caches without discarding `CollectionCardVm` metadata: `Game/CollectionPanel/CollectionPanel.cs:282-302`.
 
 Keep invalidation on locale changes because `CollectionCardVm.DisplayName` is computed once during VM creation: `Game/CollectionPanel/CollectionPanel.cs:91-102` and `Game/CollectionPanel/Data/CollectionCardVm.From.cs:21-23`.
@@ -109,6 +144,10 @@ Keep art/material caches scene-bound because they hold Unity/Addressables object
 Acceptance for P2 is that opening the panel after a non-locale scene transition logs a catalog cache hit instead of `Catalog built`, while card pool and overlay still reset cleanly.
 
 ### P3: Precompute Default Ordering Only If Measurement Justifies It
+
+Status: Deferred.
+
+The fresh runtime log showed `filter=2.7ms` cold and `filter=2.2ms` on cache-hit reopen, so this is not currently the first-load bottleneck.
 
 If P0 shows `CollectionFilterEngine.Apply(...)` is a meaningful share of first-open cost, add precomputed default Item and Skill ordered lists at catalog build time: `Game/CollectionPanel/Data/CollectionFilterEngine.cs:52-65`.
 
@@ -122,6 +161,10 @@ Acceptance for P3 is that default first-open avoids a full result sort and exist
 
 ### P4: Add A Persisted Snapshot Only After P0-P3 Show Remaining Catalog Cost
 
+Status: Deferred.
+
+Cold process catalog projection still showed a meaningful catalog segment (`catalog=3296.1ms`) even after the loading shell and frame-budgeted build, so this remains the next candidate if product goals require faster cold-process first content, but it has not been implemented.
+
 Persisting `CollectionCardVm` snapshots should be treated as a second-phase optimization, not the first patch.
 
 A persisted snapshot must include a BPP snapshot schema version, classifier version, locale mode, active game version, and game data manifest or DB fingerprint because every one of those inputs can change the VM list or display names: `Game/CollectionPanel/Data/CollectionCardVm.From.cs:21-26`, `Game/CollectionPanel/Data/CollectionCardClassifier.cs:44-63`, and `decompiled/TheBazaarRuntime/TheBazaar.AppFramework/AppLoader.cs:86-89`.
@@ -130,11 +173,15 @@ The snapshot should live under the BPP data root, following the existing `BepInE
 
 On a snapshot hit, the panel still must wait until `BppStaticDataAccess.TryGet()` succeeds because card binding still needs live game templates by GUID: `GameInterop/BppStaticDataAccess.cs:13-19` and `Game/CollectionPanel/Grid/CollectionCardFactory.cs:42-47`.
 
-On a snapshot miss or parse failure, the panel should fall back to `CollectionCatalog.TryBuild(...)` and rewrite the snapshot after a successful build: `Game/CollectionPanel/Data/CollectionCatalog.cs:27-80`.
+On a snapshot miss or parse failure, the panel should fall back to the live `CollectionCatalog.TryCreateBuildSession(...)` / `CollectionCatalogBuildSession.Step(...)` path and rewrite the snapshot after a successful build: `Game/CollectionPanel/Data/CollectionCatalog.cs:45-110` and `Game/CollectionPanel/Data/CollectionCatalogBuildSession.cs:33-66`.
 
 Acceptance for P4 is that a second process launch on the same game data and locale loads VM metadata from disk without changing visible card count or filter results.
 
 ### P5: Opportunistic Prewarm
+
+Status: Deferred.
+
+No catalog or prefab-reference prewarm has been implemented. The current path remains lazy and succeeds without prewarm.
 
 Catalog prewarm can run after the static data manager is ready, but it must not create Unity card instances or Addressables handles outside the panel lifecycle: `GameInterop/BppStaticDataAccess.cs:13-19` and `Game/CollectionPanel/CollectionPanel.cs:385-392`.
 
@@ -148,9 +195,9 @@ Acceptance for P5 is that a prewarmed open is faster in logs but a non-prewarmed
 
 P0 and P1 are safe to implement together if the instrumentation is committed as normal debug/diagnostic logging rather than temporary noisy logs.
 
-P2 should be implemented by separating `DisposeRuntime()` into a Unity-runtime disposal path and a catalog invalidation path, rather than by simply deleting the two invalidation lines from the existing method: `Game/CollectionPanel/CollectionPanel.cs:282-302`.
+P2 landed by separating `DisposeRuntime()` into a Unity-runtime disposal path and a catalog invalidation path, rather than by simply deleting cache invalidation: `Game/CollectionPanel/CollectionPanel.cs:300-322` and `Game/CollectionPanel/CollectionPanel.cs:634-638`.
 
-P2 should add a clear log line for catalog cache hit, cache miss, locale invalidation, and static-data-source invalidation because otherwise later performance regressions will be hard to attribute: `Game/CollectionPanel/Data/CollectionCatalog.cs:29-32` and `Game/CollectionPanel/CollectionPanel.cs:394-408`.
+P2 added clear log lines for catalog cache hit, catalog built, cache invalidation, and static-data-source invalidation because otherwise later performance regressions would be hard to attribute: `Game/CollectionPanel/Data/CollectionCatalog.cs:17-43` and `Game/CollectionPanel/Data/CollectionCatalog.cs:106-119`.
 
 P3 should avoid exposing mutable cached lists to callers that might sort or modify them, because `CollectionGridVirtualizer.SetVisible(...)` stores the list reference and reads it later during `Tick()`: `Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs:79-89` and `Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs:312-345`.
 
@@ -174,12 +221,12 @@ Verify hover, wheel scroll, click-miss, and tooltip behavior after any overlay o
 
 ## Rollout Criteria
 
-Ship P0/P1 first if the fresh logs show repeated invalid art failures or if classifier tests reveal template placeholders entering the catalog.
+P0/P1/P2 have shipped.
 
-Ship P2 if the logs show repeated catalog builds across scene transitions and no static-data-source invalidation occurs during normal play.
+Do not ship P3 unless logs show filter/sort time becoming visible again.
 
-Ship P3 only if P0 shows sort/filter time is still visible after P1/P2.
+Consider P4 if cold process launch still needs faster first content after accepting the complexity of snapshot schema/version/locale/game-data invalidation.
 
-Ship P4 only if a cold process launch still spends meaningful time in catalog projection after P1-P3 and the snapshot invalidation key is demonstrably stable.
+Consider P5 only if runtime logs prove prewarm improves real open latency without making panel open depend on tooltip-prefab availability.
 
 Do not claim first-load performance is fixed from build/test success alone; the acceptance signal is runtime timing in `BepInEx/LogOutput.log` plus manual in-game panel interaction checks.
