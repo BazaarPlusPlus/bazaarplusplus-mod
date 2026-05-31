@@ -16,7 +16,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 //
 // Scope (design C7 + section 3.1):
 //   - Only ECardType.Item and ECardType.Skill (~1644 templates; ~1571 after the art filter).
-//   - Cards with missing or "Invalid" ArtKey are dropped (no placeholder rendering).
+//   - Cards with missing/Invalid ArtKey or explicit debug/template markers are dropped.
 //
 // Cache invalidation: CollectionPanelMount calls InvalidateCache() when the user changes
 // the BPP Chinese locale mode so DisplayName regenerates on next build.
@@ -66,9 +66,7 @@ internal sealed class CollectionCatalog
         {
             if (entry.Value is not TCardBase template)
                 continue;
-            if (template.Type != ECardType.Item && template.Type != ECardType.Skill)
-                continue;
-            if (!HasValidArt(template))
+            if (!CollectionCardClassifier.IsCatalogCard(template))
                 continue;
             list.Add(CollectionCardVm.From(template));
         }
@@ -83,9 +81,4 @@ internal sealed class CollectionCatalog
     }
 
     public void InvalidateCache() => _cache = null;
-
-    // Mirrors CardPreviewBase.HasValidArtKey() (decompiled/TheBazaar.UI/CardPreviewBase.cs:166-173).
-    private static bool HasValidArt(TCardBase template) =>
-        !string.IsNullOrEmpty(template.ArtKey)
-        && !string.Equals(template.ArtKey, "Invalid", StringComparison.Ordinal);
 }

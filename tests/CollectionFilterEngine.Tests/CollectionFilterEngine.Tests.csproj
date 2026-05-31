@@ -25,20 +25,20 @@
       Link="CollectionCardVm.cs"
     />
     <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionFilterEngine.cs"
+      Link="CollectionFilterEngine.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionFilterState.cs"
+      Link="CollectionFilterState.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionCardClassifier.cs"
+      Link="CollectionCardClassifier.cs"
+    />
+    <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionMerchantKind.cs"
       Link="CollectionMerchantKind.cs"
-    />
-    <Compile
-      Include="..\..\Game\CollectionPanel\Grid\CollectionGridConstants.cs"
-      Link="CollectionGridConstants.cs"
-    />
-    <Compile
-      Include="..\..\Game\CollectionPanel\Grid\CollectionGridCell.cs"
-      Link="CollectionGridCell.cs"
-    />
-    <Compile
-      Include="..\..\Game\CollectionPanel\Grid\CollectionGridLayout.cs"
-      Link="CollectionGridLayout.cs"
     />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>

@@ -342,6 +342,13 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ApplyFilters();
                 RefreshView();
             },
+            togglePackages: () =>
+            {
+                _filter.IncludePackages = !_filter.IncludePackages;
+                _scrollY = 0f;
+                ApplyFilters();
+                RefreshView();
+            },
             setSearch: value =>
             {
                 _pendingSearch = value ?? string.Empty;
@@ -352,6 +359,8 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _filter.Heroes.Clear();
                 _filter.Tiers.Clear();
                 _filter.Sizes.Clear();
+                _filter.Merchants.Clear();
+                _filter.IncludePackages = false;
                 _filter.Search = string.Empty;
                 _appliedSearch = string.Empty;
                 _pendingSearch = string.Empty;
@@ -434,6 +443,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedHeroes = new HashSet<EHero>(_filter.Heroes),
             SelectedTiers = new HashSet<ETier>(_filter.Tiers),
             SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
+            IncludePackages = _filter.IncludePackages,
             Search = _filter.Search,
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,

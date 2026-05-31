@@ -22,6 +22,8 @@ internal sealed partial class CollectionCardVm
                 CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName,
             InternalName = template.InternalName,
             ArtKey = template.ArtKey,
+            IsPackage = CollectionCardClassifier.IsPackage(template),
+            Merchants = CollectionCardClassifier.ResolveMerchants(template),
         };
     }
 }

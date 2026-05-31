@@ -20,6 +20,7 @@ internal sealed class CollectionPanelViewModel
     public HashSet<EHero> SelectedHeroes { get; set; } = new();
     public HashSet<ETier> SelectedTiers { get; set; } = new();
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
+    public bool IncludePackages { get; set; }
     public string Search { get; set; } = string.Empty;
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
@@ -35,6 +36,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action<EHero> _toggleHero;
     private readonly Action<ETier> _toggleTier;
     private readonly Action<ECardSize> _toggleSize;
+    private readonly Action _togglePackages;
     private readonly Action<string> _setSearch;
     private readonly Action _clearFilters;
 
@@ -50,6 +52,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _skillTabButton;
     private Button? _closeButton;
     private Button? _clearButton;
+    private Button? _packageToggleButton;
     private Button? _merchantPlaceholderButton;
     private TextField? _searchField;
     private VisualElement? _heroChipRow;
@@ -80,6 +83,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action<EHero> toggleHero,
         Action<ETier> toggleTier,
         Action<ECardSize> toggleSize,
+        Action togglePackages,
         Action<string> setSearch,
         Action clearFilters
     )
@@ -90,6 +94,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _toggleHero = toggleHero ?? throw new ArgumentNullException(nameof(toggleHero));
         _toggleTier = toggleTier ?? throw new ArgumentNullException(nameof(toggleTier));
         _toggleSize = toggleSize ?? throw new ArgumentNullException(nameof(toggleSize));
+        _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
         _setSearch = setSearch ?? throw new ArgumentNullException(nameof(setSearch));
         _clearFilters = clearFilters ?? throw new ArgumentNullException(nameof(clearFilters));
     }
@@ -125,6 +130,7 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.ItemsTab()
                 + CollectionPanelText.SkillsTab()
                 + CollectionPanelText.Close()
+                + CollectionPanelText.PackagesToggle()
                 + CollectionPanelText.SearchPlaceholder()
                 + CollectionPanelText.NoMatches()
                 + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#",
@@ -220,6 +226,8 @@ internal sealed partial class CollectionPanelView : IDisposable
             RefreshChip(pair.Value, model.SelectedTiers.Contains(pair.Key));
         foreach (var pair in _sizeChips)
             RefreshChip(pair.Value, model.SelectedSizes.Contains(pair.Key));
+        if (_packageToggleButton != null)
+            RefreshChip(_packageToggleButton, model.IncludePackages);
 
         // Size only narrows Items; hide the whole row on the Skill tab.
         if (_sizeChipRow != null)

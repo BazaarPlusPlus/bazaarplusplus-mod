@@ -48,6 +48,12 @@ internal static class CollectionPanelText
         "商人（即將到來）",
         "商人（即將到來）"
     );
+    private static readonly LocalizedTextSet PackagesToggleText = new(
+        "Packages",
+        "包裹",
+        "包裹",
+        "包裹"
+    );
     private static readonly LocalizedTextSet AllText = new("All", "全部", "全部", "全部");
 
     private static readonly LocalizedTextSet CatalogLoadingText = new(
@@ -88,6 +94,8 @@ internal static class CollectionPanelText
     internal static string SizeHeader() => Resolve(SizeHeaderText);
 
     internal static string MerchantHeader() => Resolve(MerchantHeaderText);
+
+    internal static string PackagesToggle() => Resolve(PackagesToggleText);
 
     internal static string All() => Resolve(AllText);
 

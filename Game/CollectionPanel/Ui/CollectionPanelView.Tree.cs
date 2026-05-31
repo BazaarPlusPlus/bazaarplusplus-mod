@@ -121,10 +121,11 @@ internal sealed partial class CollectionPanelView
         }
         column.Add(_searchField);
 
-        // Clear + merchant placeholder.
+        // Clear + package toggle + merchant placeholder.
         var actionsRow = new VisualElement();
         actionsRow.style.flexDirection = FlexDirection.Row;
         actionsRow.style.alignItems = Align.Center;
+        actionsRow.style.flexWrap = Wrap.Wrap;
         actionsRow.style.marginTop = UiSpacing.Md;
         column.Add(actionsRow);
 
@@ -135,6 +136,15 @@ internal sealed partial class CollectionPanelView
             Sizes.ButtonStandardHeight
         );
         actionsRow.Add(_clearButton);
+
+        _packageToggleButton = CreateButton(
+            CollectionPanelText.PackagesToggle(),
+            _togglePackages,
+            Sizes.ChipMinWidth,
+            Sizes.ButtonStandardHeight
+        );
+        _packageToggleButton.style.marginLeft = UiSpacing.Md;
+        actionsRow.Add(_packageToggleButton);
 
         _merchantPlaceholderButton = CreateButton(
             CollectionPanelText.MerchantHeader(),

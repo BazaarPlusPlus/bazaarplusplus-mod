@@ -20,4 +20,7 @@ internal sealed partial class CollectionCardVm
     public string DisplayName { get; init; } = string.Empty;
     public string InternalName { get; init; } = string.Empty;
     public string ArtKey { get; init; } = string.Empty;
+    public bool IsPackage { get; init; }
+    public IReadOnlyCollection<CollectionMerchantKind> Merchants { get; init; } =
+        Array.Empty<CollectionMerchantKind>();
 }

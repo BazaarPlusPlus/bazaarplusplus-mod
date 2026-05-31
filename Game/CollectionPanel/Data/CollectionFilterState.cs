@@ -15,6 +15,8 @@ internal sealed class CollectionFilterState
     // Item card size (Small/Medium/Large). Only meaningful on the Item tab — Skills are a single
     // size, so the engine ignores this set when ActiveType is Skill and the UI hides the row.
     public HashSet<ECardSize> Sizes { get; } = new();
+    public HashSet<CollectionMerchantKind> Merchants { get; } = new();
+    public bool IncludePackages { get; set; }
     public string Search { get; set; } = string.Empty;
 
     public void Reset()
@@ -23,6 +25,8 @@ internal sealed class CollectionFilterState
         Heroes.Clear();
         Tiers.Clear();
         Sizes.Clear();
+        Merchants.Clear();
+        IncludePackages = false;
         Search = string.Empty;
     }
 }

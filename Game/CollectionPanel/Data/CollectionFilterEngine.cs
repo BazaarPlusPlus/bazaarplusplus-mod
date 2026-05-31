@@ -22,6 +22,7 @@ internal static class CollectionFilterEngine
         var hasSearch = search.Length > 0;
         var heroFilterCount = filter.Heroes.Count;
         var tierFilterCount = filter.Tiers.Count;
+        var merchantFilterCount = filter.Merchants.Count;
         // Size only narrows Items; Skills are a single size, so skip it on the Skill tab.
         var sizeFilterCount = filter.ActiveType == ECardType.Item ? filter.Sizes.Count : 0;
 
@@ -29,11 +30,15 @@ internal static class CollectionFilterEngine
         {
             if (card.Type != filter.ActiveType)
                 continue;
+            if (!filter.IncludePackages && card.IsPackage)
+                continue;
             if (heroFilterCount > 0 && !AnyHeroMatch(card.Heroes, filter.Heroes))
                 continue;
             if (tierFilterCount > 0 && !filter.Tiers.Contains(card.StartingTier))
                 continue;
             if (sizeFilterCount > 0 && !filter.Sizes.Contains(card.Size))
+                continue;
+            if (merchantFilterCount > 0 && !AnyMerchantMatch(card.Merchants, filter.Merchants))
                 continue;
             if (
                 hasSearch
@@ -68,6 +73,19 @@ internal static class CollectionFilterEngine
         foreach (var hero in cardHeroes)
         {
             if (filterHeroes.Contains(hero))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool AnyMerchantMatch(
+        IReadOnlyCollection<CollectionMerchantKind> cardMerchants,
+        HashSet<CollectionMerchantKind> filterMerchants
+    )
+    {
+        foreach (var merchant in cardMerchants)
+        {
+            if (filterMerchants.Contains(merchant))
                 return true;
         }
         return false;
