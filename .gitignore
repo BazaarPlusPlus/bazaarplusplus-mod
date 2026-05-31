@@ -9,6 +9,7 @@ libs/
 decompiled/
 
 # IDE
+.trae/
 .idea/
 .vs/
 .vscode/
