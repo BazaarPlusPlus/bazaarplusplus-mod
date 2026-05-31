@@ -25,8 +25,8 @@
       Link="CardSetPreviewModeStatusText.cs"
     />
     <Compile
-      Include="../../Game/CardSetPreview/CardSetPreviewSponsorTextFormatter.cs"
-      Link="CardSetPreviewSponsorTextFormatter.cs"
+      Include="../../Game/Supporters/BPPSupporterAttributionText.cs"
+      Link="BPPSupporterAttributionText.cs"
     />
     <Compile Include="../../Game/Settings/LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
     <Compile Include="Program.cs" />

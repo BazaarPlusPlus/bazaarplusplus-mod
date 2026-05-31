@@ -1,4 +1,5 @@
 using BazaarPlusPlus.Game.CardSetPreview;
+using BazaarPlusPlus.Game.Supporters;
 
 TestRecommendationModesExposeOnlyCurrentAndTenWin();
 TestRecommendationModeFlow();
@@ -75,20 +76,19 @@ static void TestCardSetPreviewHotkeys()
 static void TestCardSetPreviewSponsorText()
 {
     Assert(
-        CardSetPreviewSponsorTextFormatter.FormatSupportedBy("Alice", "en") == "Supported by Alice",
+        BPPSupporterAttributionText.FormatSupportedBy("Alice", "en") == "Supported by Alice",
         "English sponsor text should preserve the existing Supported by wording."
     );
     Assert(
-        CardSetPreviewSponsorTextFormatter.FormatSupportedBy("Alice", "zh-CN") == "由 Alice 支持",
+        BPPSupporterAttributionText.FormatSupportedBy("Alice", "zh-CN") == "由 Alice 支持",
         "Chinese sponsor text should preserve the existing localized wording."
     );
     Assert(
-        CardSetPreviewSponsorTextFormatter.FormatSupportedBy(" Alice ", "zh-Hant")
-            == "由 Alice 支持",
+        BPPSupporterAttributionText.FormatSupportedBy(" Alice ", "zh-Hant") == "由 Alice 支持",
         "Sponsor text should trim names before formatting."
     );
     Assert(
-        CardSetPreviewSponsorTextFormatter.FormatSupportedBy(" ", "zh-CN") == string.Empty,
+        BPPSupporterAttributionText.FormatSupportedBy(" ", "zh-CN") == string.Empty,
         "Blank sponsor names should not produce a visible sponsor label."
     );
 }

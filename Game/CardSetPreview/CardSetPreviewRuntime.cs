@@ -6,6 +6,7 @@ using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using UnityEngine;
@@ -207,7 +208,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         _recommendationIndex = 0;
         var hero = Data.Run?.Player?.Hero.ToString() ?? "-";
 
-        _currentSponsor = CardSetPreviewSponsorCatalog.PickDisplay();
+        _currentSponsor = PickSponsorDisplay();
         if (_selectedCards.Count > 0)
             _itemBoard.ShowTemplateSet(BuildCurrentRequest());
         ShowModeIndicator();
@@ -245,7 +246,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
             return false;
 
         _recommendationIndex = WrapIndex(_recommendationIndex + delta, recommendations.Count);
-        _currentSponsor = CardSetPreviewSponsorCatalog.PickDisplay();
+        _currentSponsor = PickSponsorDisplay();
         _itemBoard.ShowTemplateSet(BuildCurrentRequest());
         ShowModeIndicator();
         BppLog.Info(
@@ -266,7 +267,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         }
 
         _recommendationIndex = 0;
-        _currentSponsor = CardSetPreviewSponsorCatalog.PickDisplay();
+        _currentSponsor = PickSponsorDisplay();
         ShowModeIndicator();
         if (_itemBoard.ShowTemplateSet(BuildCurrentRequest()))
             return;
@@ -278,6 +279,21 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
     {
         _itemBoard.Hide();
         BppLog.Info("CardSetPreviewRuntime", $"HidePreview reason={reason}");
+    }
+
+    private static CardSetPreviewSponsorSelection PickSponsorDisplay()
+    {
+        var supporter = BPPSupporters.Sample();
+        if (!supporter.HasValue)
+            return new CardSetPreviewSponsorSelection();
+
+        var languageCode = PlayerPreferences.Data?.LanguageCode ?? string.Empty;
+        return new CardSetPreviewSponsorSelection
+        {
+            Text = BPPSupporterAttributionText.FormatSupportedBy(supporter.Name, languageCode),
+            Name = supporter.Name,
+            Tier = supporter.Tier,
+        };
     }
 
     private ItemBoardTemplateSetRequest BuildCurrentRequest()

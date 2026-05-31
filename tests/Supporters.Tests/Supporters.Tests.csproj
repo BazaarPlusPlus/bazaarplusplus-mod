@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json;
+    </RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Compile
+      Include="../../Game/Supporters/BPPSupporterAttributionText.cs"
+      Link="BPPSupporterAttributionText.cs"
+    />
+    <Compile
+      Include="../../Game/Supporters/BPPSupporterEntry.cs"
+      Link="BPPSupporterEntry.cs"
+    />
+    <Compile
+      Include="../../Game/Supporters/BPPSupporterSample.cs"
+      Link="BPPSupporterSample.cs"
+    />
+    <Compile
+      Include="../../Game/Supporters/BPPSupporterSampler.cs"
+      Link="BPPSupporterSampler.cs"
+    />
+    <Compile Include="../../Game/Settings/LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>
