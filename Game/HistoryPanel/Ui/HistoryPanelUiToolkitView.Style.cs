@@ -103,6 +103,33 @@ internal sealed partial class HistoryPanelUiToolkitView
         return button;
     }
 
+    private static Button CreateRailButton(string text, Action onClick)
+    {
+        var button = new Button(() => onClick()) { text = text };
+        button.style.width = Length.Percent(100f);
+        button.style.height = Sizes.ButtonFooterHeight;
+        button.style.flexGrow = 0f;
+        button.style.flexShrink = 0f;
+        button.style.unityFont = GetUiFont();
+        button.style.unityTextAlign = TextAnchor.MiddleCenter;
+        button.style.justifyContent = Justify.Center;
+        button.style.alignItems = Align.Center;
+        UiStyle.Padding(button.style, UiSpacing.None);
+        button.style.backgroundColor = Colors.HistoryButtonBackground;
+        button.style.color = Colors.White;
+        UiStyle.Border(button.style, Borders.Thin, Colors.HistoryButtonBorder);
+        UiStyle.Radius(button.style, Radii.Md);
+
+        var textElement = button.Q<TextElement>();
+        if (textElement != null)
+        {
+            textElement.style.unityTextAlign = TextAnchor.MiddleCenter;
+            textElement.style.flexGrow = 1f;
+            textElement.style.unityFont = GetUiFont();
+        }
+        return button;
+    }
+
     private static void StyleButton(Button button, Color background, Color textColor)
     {
         button.style.backgroundColor = background;

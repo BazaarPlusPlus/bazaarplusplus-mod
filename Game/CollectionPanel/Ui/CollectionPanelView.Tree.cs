@@ -13,9 +13,6 @@ internal sealed partial class CollectionPanelView
 {
     private void BuildTree(VisualElement root)
     {
-        // Two columns side by side: the operation area (title, close, tabs, search, filters) on
-        // the left, the preview grid filling the right at full height. No top header bar, so the
-        // grid owns the whole vertical space.
         var panel = new VisualElement();
         panel.style.flexGrow = 1f;
         panel.style.backgroundColor = Colors.HistoryPanelBackground;
@@ -26,28 +23,27 @@ internal sealed partial class CollectionPanelView
         panel.style.flexDirection = FlexDirection.Row;
         root.Add(panel);
 
-        BuildOperationColumn(panel);
         BuildGrid(panel);
+        BuildOperationRail(panel);
     }
 
-    // Left operation column: everything the user interacts with. Stacked vertically so the grid
-    // can keep the full panel height to its right.
-    private void BuildOperationColumn(VisualElement parent)
+    private void BuildOperationRail(VisualElement parent)
     {
-        var column = new VisualElement();
-        column.style.flexDirection = FlexDirection.Column;
-        column.style.flexGrow = 0f;
-        column.style.flexShrink = 0f;
-        column.style.flexBasis = Length.Percent(24f);
-        column.style.minWidth = 300f;
-        column.style.maxWidth = 560f;
-        parent.Add(column);
+        var rail = new VisualElement();
+        rail.style.flexDirection = FlexDirection.Column;
+        rail.style.flexGrow = 0f;
+        rail.style.flexShrink = 0f;
+        rail.style.flexBasis = Length.Percent(Sizes.OperationRailWidthPercent);
+        rail.style.minWidth = Sizes.OperationRailMinWidth;
+        rail.style.maxWidth = Sizes.OperationRailMaxWidth;
+        rail.style.marginLeft = UiSpacing.ColumnGap;
+        parent.Add(rail);
 
         // Title + Close (Close lives here in the operation area, not a top bar).
         var titleRow = new VisualElement();
         titleRow.style.flexDirection = FlexDirection.Row;
         titleRow.style.alignItems = Align.Center;
-        column.Add(titleRow);
+        rail.Add(titleRow);
 
         _title = CreateLabel(Sizes.FontTitle, FontStyle.Bold, Colors.HistoryTitleText);
         _title.style.flexGrow = 1f;
@@ -66,7 +62,7 @@ internal sealed partial class CollectionPanelView
         _subtitle = CreateLabel(Sizes.FontBody, FontStyle.Normal, Colors.HistorySubtitleText);
         _subtitle.style.whiteSpace = WhiteSpace.Normal;
         _subtitle.style.marginTop = UiSpacing.Md;
-        column.Add(_subtitle);
+        rail.Add(_subtitle);
 
         _countLabel = CreateLabel(Sizes.FontBody, FontStyle.Bold, Colors.HistoryChipText);
         _countLabel.style.backgroundColor = Colors.HistoryChipBackground;
@@ -77,14 +73,14 @@ internal sealed partial class CollectionPanelView
         _countLabel.style.marginTop = UiSpacing.Md;
         UiStyle.HorizontalPadding(_countLabel.style, UiSpacing.Md);
         UiStyle.Radius(_countLabel.style, Radii.Md);
-        column.Add(_countLabel);
+        rail.Add(_countLabel);
 
         // Item / Skill tabs.
         var tabsRow = new VisualElement();
         tabsRow.style.flexDirection = FlexDirection.Row;
         tabsRow.style.alignItems = Align.Center;
         tabsRow.style.marginTop = UiSpacing.Xl;
-        column.Add(tabsRow);
+        rail.Add(tabsRow);
 
         _itemTabButton = CreateButton(
             CollectionPanelText.ItemsTab(),
@@ -119,7 +115,7 @@ internal sealed partial class CollectionPanelView
             inputField.style.color = Colors.White;
             UiStyle.Border(inputField.style, Borders.Thin, Colors.HistoryStatusBorder);
         }
-        column.Add(_searchField);
+        rail.Add(_searchField);
 
         // Clear + package toggle.
         var actionsRow = new VisualElement();
@@ -127,7 +123,7 @@ internal sealed partial class CollectionPanelView
         actionsRow.style.alignItems = Align.Center;
         actionsRow.style.flexWrap = Wrap.Wrap;
         actionsRow.style.marginTop = UiSpacing.Md;
-        column.Add(actionsRow);
+        rail.Add(actionsRow);
 
         _clearButton = CreateButton(
             CollectionPanelText.All(),
@@ -157,7 +153,7 @@ internal sealed partial class CollectionPanelView
         heroLabel.style.marginRight = UiSpacing.Md;
         heroLabel.style.marginBottom = UiSpacing.Xs;
         _heroChipRow.Add(heroLabel);
-        column.Add(_heroChipRow);
+        rail.Add(_heroChipRow);
 
         // Tier filter.
         _tierChipRow = new VisualElement();
@@ -170,7 +166,7 @@ internal sealed partial class CollectionPanelView
         tierLabel.style.marginRight = UiSpacing.Md;
         tierLabel.style.marginBottom = UiSpacing.Xs;
         _tierChipRow.Add(tierLabel);
-        column.Add(_tierChipRow);
+        rail.Add(_tierChipRow);
 
         // Merchant filter.
         _merchantChipRow = new VisualElement();
@@ -187,7 +183,7 @@ internal sealed partial class CollectionPanelView
         merchantLabel.style.marginRight = UiSpacing.Md;
         merchantLabel.style.marginBottom = UiSpacing.Xs;
         _merchantChipRow.Add(merchantLabel);
-        column.Add(_merchantChipRow);
+        rail.Add(_merchantChipRow);
 
         // Size filter (Items only — Refresh hides this row on the Skill tab).
         _sizeChipRow = new VisualElement();
@@ -200,13 +196,13 @@ internal sealed partial class CollectionPanelView
         sizeLabel.style.marginRight = UiSpacing.Md;
         sizeLabel.style.marginBottom = UiSpacing.Xs;
         _sizeChipRow.Add(sizeLabel);
-        column.Add(_sizeChipRow);
+        rail.Add(_sizeChipRow);
 
         _statusLabel = CreateLabel(Sizes.FontSmall, FontStyle.Normal, Colors.HistoryStatusText);
         _statusLabel.style.marginTop = UiSpacing.Lg;
         _statusLabel.style.whiteSpace = WhiteSpace.Normal;
         _statusLabel.style.display = DisplayStyle.None;
-        column.Add(_statusLabel);
+        rail.Add(_statusLabel);
     }
 
     private void BuildGrid(VisualElement parent)
@@ -216,7 +212,6 @@ internal sealed partial class CollectionPanelView
         _gridViewport.style.flexShrink = 1f;
         _gridViewport.style.minHeight = 0f;
         _gridViewport.style.minWidth = 0f;
-        _gridViewport.style.marginLeft = UiSpacing.ColumnGap;
         // Recessed "display case" base: darker than the surrounding panel so the slot grid and
         // native card frames read as a lit shelf inside a frame.
         _gridViewport.style.backgroundColor = Colors.CollectionGridCaseBackground;

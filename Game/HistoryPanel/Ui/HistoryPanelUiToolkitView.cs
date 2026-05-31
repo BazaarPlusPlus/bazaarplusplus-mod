@@ -188,7 +188,13 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _runsBattleSubtitle!.text = model.RunsBattleSubtitle;
         _runsBattleSubtitle.style.display = DisplayStyle.None;
         _footerPrimary!.text = model.FooterPrimaryText;
+        _footerPrimary.style.display = string.IsNullOrWhiteSpace(model.FooterPrimaryText)
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
         _footerSecondary!.text = model.FooterSecondaryText;
+        _footerSecondary.style.display = string.IsNullOrWhiteSpace(model.FooterSecondaryText)
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
         _ghostOpponentEliminatedNotice!.text = model.GhostOpponentEliminatedNoticeText;
         _ghostOpponentEliminatedNotice.style.display = string.IsNullOrWhiteSpace(
             model.GhostOpponentEliminatedNoticeText

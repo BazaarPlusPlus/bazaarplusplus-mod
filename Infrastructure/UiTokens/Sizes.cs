@@ -4,6 +4,11 @@ namespace BazaarPlusPlus.Infrastructure.UiTokens;
 
 internal static class Sizes
 {
+    public const float OperationRailWidthPercent = 24f;
+    public const float OperationRailMinWidth = 300f;
+    public const float OperationRailMaxWidth = 560f;
+    public const float HistorySelectorRowHeightPercent = 36f;
+    public const float HistorySelectorRowMinHeight = 240f;
     public const float RunsColumnWidthPercent = 30f;
     public const float PreviewHeightPercent = 28f;
     public const float FooterHeight = 56f;
