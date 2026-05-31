@@ -22,6 +22,8 @@ internal static class CollectionFilterEngine
         var hasSearch = search.Length > 0;
         var heroFilterCount = filter.Heroes.Count;
         var tierFilterCount = filter.Tiers.Count;
+        // Size only narrows Items; Skills are a single size, so skip it on the Skill tab.
+        var sizeFilterCount = filter.ActiveType == ECardType.Item ? filter.Sizes.Count : 0;
 
         foreach (var card in all)
         {
@@ -30,6 +32,8 @@ internal static class CollectionFilterEngine
             if (heroFilterCount > 0 && !AnyHeroMatch(card.Heroes, filter.Heroes))
                 continue;
             if (tierFilterCount > 0 && !filter.Tiers.Contains(card.StartingTier))
+                continue;
+            if (sizeFilterCount > 0 && !filter.Sizes.Contains(card.Size))
                 continue;
             if (
                 hasSearch

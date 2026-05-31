@@ -45,6 +45,13 @@ internal sealed class CollectionPanel : MonoBehaviour
         ETier.Legendary,
     };
 
+    private static readonly ECardSize[] SizeOrder = new[]
+    {
+        ECardSize.Small,
+        ECardSize.Medium,
+        ECardSize.Large,
+    };
+
     private readonly CollectionCatalog _catalog = new();
     private readonly CollectionFilterState _filter = new();
     private readonly List<CollectionCardVm> _visibleScratch = new();
@@ -227,6 +234,11 @@ internal sealed class CollectionPanel : MonoBehaviour
             _overlay.SetPosition(_viewportBoundsPx.position);
             _overlay.SetClipSize(_viewportBoundsPx.size);
             _virtualizer.SetViewport(_viewportBoundsPx.width, _viewportBoundsPx.height);
+            // The base unit (and therefore ContentHeight) is derived from the viewport width,
+            // so re-publish the scroll-spacer height once real bounds arrive — otherwise the
+            // first-open estimate computed at the placeholder width leaves the bottom rows
+            // unreachable.
+            _view?.UpdateContentSpacerHeight(_virtualizer.ContentHeight);
         }
 
         // UITK's default wheel handler updates scrollOffset directly; we just read the
@@ -322,6 +334,14 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ApplyFilters();
                 RefreshView();
             },
+            toggleSize: size =>
+            {
+                if (!_filter.Sizes.Remove(size))
+                    _filter.Sizes.Add(size);
+                _scrollY = 0f;
+                ApplyFilters();
+                RefreshView();
+            },
             setSearch: value =>
             {
                 _pendingSearch = value ?? string.Empty;
@@ -331,6 +351,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 _filter.Heroes.Clear();
                 _filter.Tiers.Clear();
+                _filter.Sizes.Clear();
                 _filter.Search = string.Empty;
                 _appliedSearch = string.Empty;
                 _pendingSearch = string.Empty;
@@ -412,9 +433,11 @@ internal sealed class CollectionPanel : MonoBehaviour
             ActiveType = _filter.ActiveType,
             SelectedHeroes = new HashSet<EHero>(_filter.Heroes),
             SelectedTiers = new HashSet<ETier>(_filter.Tiers),
+            SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
             Search = _filter.Search,
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
+            AvailableSizes = SizeOrder,
             ContentHeight = _virtualizer.ContentHeight,
         };
         _view.Refresh(model);

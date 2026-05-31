@@ -11,6 +11,10 @@ internal sealed class CollectionFilterState
     public ECardType ActiveType { get; set; } = ECardType.Item;
     public HashSet<EHero> Heroes { get; } = new();
     public HashSet<ETier> Tiers { get; } = new();
+
+    // Item card size (Small/Medium/Large). Only meaningful on the Item tab — Skills are a single
+    // size, so the engine ignores this set when ActiveType is Skill and the UI hides the row.
+    public HashSet<ECardSize> Sizes { get; } = new();
     public string Search { get; set; } = string.Empty;
 
     public void Reset()
@@ -18,6 +22,7 @@ internal sealed class CollectionFilterState
         ActiveType = ECardType.Item;
         Heroes.Clear();
         Tiers.Clear();
+        Sizes.Clear();
         Search = string.Empty;
     }
 }

@@ -18,10 +18,10 @@ internal static class CollectionPanelText
     );
 
     private static readonly LocalizedTextSet SubtitleText = new(
-        "Browse every Item and Skill in the game. Filter by hero, rarity or name. Hover a card to see the in-game tooltip.",
-        "浏览游戏里所有的物品和技能。可按英雄 / 稀有度 / 名称筛选；悬停查看原生 tooltip。",
-        "瀏覽遊戲裡所有的物品和技能。可按英雄 / 稀有度 / 名稱篩選；懸停查看原生 tooltip。",
-        "瀏覽遊戲裡所有的物品和技能。可按英雄 / 稀有度 / 名稱篩選；懸停查看原生 tooltip。"
+        "Browse every Item and Skill in the game. Filter by hero, size, rarity or name. Hover a card to see the in-game tooltip.",
+        "浏览游戏里所有的物品和技能。可按英雄 / 尺寸 / 稀有度 / 名称筛选；悬停查看原生 tooltip。",
+        "瀏覽遊戲裡所有的物品和技能。可按英雄 / 尺寸 / 稀有度 / 名稱篩選；懸停查看原生 tooltip。",
+        "瀏覽遊戲裡所有的物品和技能。可按英雄 / 尺寸 / 稀有度 / 名稱篩選；懸停查看原生 tooltip。"
     );
 
     private static readonly LocalizedTextSet ItemsTabText = new("Items", "物品", "物品", "物品");
@@ -41,6 +41,7 @@ internal static class CollectionPanelText
         "稀有度",
         "稀有度"
     );
+    private static readonly LocalizedTextSet SizeHeaderText = new("Size", "尺寸", "尺寸", "尺寸");
     private static readonly LocalizedTextSet MerchantHeaderText = new(
         "Merchant (soon)",
         "商人（即将到来）",
@@ -84,6 +85,8 @@ internal static class CollectionPanelText
 
     internal static string TierHeader() => Resolve(TierHeaderText);
 
+    internal static string SizeHeader() => Resolve(SizeHeaderText);
+
     internal static string MerchantHeader() => Resolve(MerchantHeaderText);
 
     internal static string All() => Resolve(AllText);
@@ -103,6 +106,15 @@ internal static class CollectionPanelText
             ETier.Diamond => FormatSimple("Diamond", "钻石", "鑽石", "鑽石"),
             ETier.Legendary => FormatSimple("Legendary", "传说", "傳說", "傳說"),
             _ => tier.ToString(),
+        };
+
+    internal static string Size(ECardSize size) =>
+        size switch
+        {
+            ECardSize.Small => FormatSimple("Small", "小型", "小型", "小型"),
+            ECardSize.Medium => FormatSimple("Medium", "中型", "中型", "中型"),
+            ECardSize.Large => FormatSimple("Large", "大型", "大型", "大型"),
+            _ => size.ToString(),
         };
 
     internal static string Hero(EHero hero) =>

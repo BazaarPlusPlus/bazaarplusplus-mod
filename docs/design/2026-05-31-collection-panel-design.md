@@ -955,3 +955,41 @@ L2/L3 路径：池在 Instantiate 时挂 `CollectionPanelOwnedMarker`；`CardPre
 | Phase 5 — 打磨 | 🟡 Partial | ✅ L3 Material 共享池<br>✅ Plan B 手动 hit-test<br>✅ Card art 淡入<br>✅ 面板开关过渡（asymmetric fade）<br>✅ ~~输入硬拦截~~（实施后回退，见 P1）<br>⏸ 真正的滚动惯性（尝试过被回退，见 P5；UITK 默认 `mouseWheelScrollSize=300` 兜底）<br>⏸ 热键重绑 UI（用户明确不做）<br>⏸ 键盘导航（用户明确不做）<br>⏸ 共享抽象提取（§2.1 路线图） |
 
 **整体可发布性**：当前实施满足设计 §1 范围（仅 Item + Skill，~1571 张）所声明的全部功能性要求。Phase 0 的占位数字会在某些机型 / 屏幕分辨率下显得偏紧或偏松，但不影响功能正确。建议先开放给少量用户实测 Phase 0 的几个数值，再回填 `CollectionGridConstants` 后正式发布。
+
+---
+
+## 17. 固定规格图鉴网格 redesign (2026-05-31)
+
+把原来的「动态分栏列表」改成**固定规格图鉴网格**。**取代 §5.3 的 `index % cols` 定位、§8.2 的响应式列数，以及 F1 里那批占位 cell 尺寸**（cell 尺寸不再是单卡常量，而是按视口推导的基础单位）。其余子系统（卡池、原生卡工厂、L2/L3 缓存、tooltip 中继、淡入动画、overlay 桥接）原样复用。
+
+### 17.1 核心规则
+
+- **固定 8 单位列**，与屏宽无关：屏宽只改变基础单位大小（轻微缩放）和整体水平居中 / 留白，**不改变每行数量**。
+- **Skill**：一行 8 个方形 slot，`col = i % 8`、`shelf = i / 8`，无任何文字。
+- **Item**：span-aware shelf packing。小卡 `宽1×高2`、中卡 `宽2×高2`、大卡 `宽3×高2`（单位格）；等高，宽度按 `ECardSize` 横向扩展（`ECardSize { Small=1, Medium=2, Large=3 }` 直接当 span）。从左到右填，剩余宽度放不下当前卡就换到下一条 2 单位高的 shelf。
+- 每张卡仍是原生 `CardPreviewBase`，等比缩放居中塞进其 span 格（`localScale`，绝不拉伸 `sizeDelta`），格内留 `CellContentInset` 边距让 slot 底色露出做边框。
+
+### 17.2 实现结构
+
+| 件 | 角色 |
+|---|---|
+| `CollectionGridConstants` | 删 `Item/SkillMin/MaxColumns`、`Item/SkillCellWidth/Height`、`Cell*For`、`Min/MaxColumnsFor`；加 `Columns=8`、`Item/SkillRowSpan`、`Item{Small,Medium,Large}Span`、`GridOuterPadding`、`Min/MaxUnitWidth`、`CellContentInset`、`ItemWidthSpan(size)`、`RowSpanFor(type)`。保持 UnityEngine-free（编进单测）。 |
+| `CollectionGridCell` | 三个值类型：`CollectionGridCell(col/shelf/widthSpan)`、`CollectionGridShelf(first/last index)`、`CollectionGridRect`（纯像素矩形，**非 `UnityEngine.Rect`**，让 layout 可单测）。 |
+| `CollectionGridLayout` | 纯函数 span-aware packing → `Cells[]` + `Shelves[]` + `ShelfHeightUnits` + `TotalRowUnits`；`ContentRectFor(index, unit, gap, originX, originY)` / `ShelfPitch` / `ContentHeight` 做像素化。UnityEngine-free，单测在 `tests/CollectionGridLayout.Tests`（exe-runner）。 |
+| `CollectionGridVirtualizer` | 从 `index/cols` 升级为 layout-driven：`RecomputePixelization` 按视口推导 `_unit`（`clamp((W-2pad-7gap)/8, Min, Max)`）+ `_originX`（多余宽度→居中）。可见窗口改成「可见 shelf 区间 → 连续 index 区间」，回收 / 限流 / pending-return 竞态 / per-card generation 全部保留。定位 / 缩放 / hover 命中都走预计算 rect。 |
+| `CollectionGridSlotLayer` | 新增「陈列感」视觉：board 第一个子节点（在卡之下），每个可见格一个很弱的圆角半透明 slot 底，外加一个 hover 高亮。**所有 Image `raycastTarget=false`**（否则重演 §16.6 P1/P2 的滚轮 / 点击吞噬）。 |
+
+### 17.3 关键不变量与坑
+
+- **单位一致性**：`_unit` 由视口**像素**宽推导，与现有 overlay 像素定位、`ContentHeight`→spacer 约定完全一致；没有改动滚动 / `scaledPixelsPerPoint` 契约。
+- **首开 spacer 必须在 `SetViewport` 后重发**：`ContentHeight` 依赖 `_unit`，而首次 `SetVisible` 时视口还是 0（`_unit=MinUnitWidth`）。`CollectionPanel.Update` 的 `_viewportBoundsDirty` 分支在 `SetViewport` 后补一次 `UpdateContentSpacerHeight`，否则真实单位下内容更高、底部行滚不到。（旧动态列模型下该 bug 是「滚过头」，无害；新模型下变成「滚不到底」，必须修。）
+- **VM 拆分**：`CollectionCardVm` 拆成 POCO（`CollectionCardVm.cs`，只引 `BazaarGameShared` 枚举）+ `From(TCardBase)`（`CollectionCardVm.From.cs`），让单测能只编 POCO + layout + 常量。
+
+### 17.4 视觉调优（实测反馈后迭代）
+
+游戏里看过后的几轮调整：
+
+- **每 tab 独立列数 + 尺寸上限**（取代 §17.2 的单一 `Columns=8`）：当前 `ItemColumns=10`、`SkillColumns=7`（技能是纯图标，列数少于物品但比物品大）；`ItemMaxUnitWidth=172` / `SkillMaxUnitWidth=272`（上限只在超宽屏夹紧，常规屏由区域宽度驱动）。列数与上限随 `ColumnsFor`/`MaxUnitWidthFor` 落到 `CollectionGridLayout`（`Columns`/`MaxUnitWidth` 两个属性随 tab 携带），`RecomputePixelization` 直接读 `_layout.Columns`/`_layout.MaxUnitWidth`，无需 virtualizer 记 `_activeType`。
+- **Item 卡等高对齐**：原 `min(w, h)` fit 让窄的小卡受宽度限制、比中 / 大卡略矮。改为**按 cell 高缩放**（原生 Item 卡同一 prefab 高度 → 同一 cell 高 → 同一缩放 → 等高）。加宽度兜底：`maxWidth = cellWidth + gap`，由于该界恰为 `span*(unit+gap)`，**clamp 后的缩放与 span 无关**，宽受限时仍保持等高（代价：小卡可能向 gutter 轻微溢出几像素，不与邻格重叠）。
+- **左操作区 + 右全高预览**：`BuildTree` 现在是单层横排 `panel(row)` = 左操作列（`BuildOperationColumn`，`flexBasis 24%`，clamp 300–560px）+ 右预览网格（`flexGrow`，占满整列高度）。**取消了顶部 header 条**：标题 / 副标题 / 计数 / **关闭按钮**全部并进左操作列（自上而下：标题+关闭、副标题、计数 chip、Item/Skill tab、搜索、清除+商人、英雄、稀有度、尺寸、状态），网格因此独享整屏高度并向右铺满。`BuildHeader`/`BuildFilterBar` 合并为 `BuildOperationColumn`。
+- **尺寸筛选**：新增 Small/Medium/Large 多选 chip 行（仿英雄 / 稀有度）。`CollectionFilterState.Sizes` + `CollectionFilterEngine` 加一条 `card.Size` 过滤，**仅在 Item tab 生效**（Skill 单一尺寸：引擎在 Skill tab 跳过该过滤，`Refresh` 在 Skill tab 隐藏该 chip 行）。文案 `SizeHeader()` / `Size(ECardSize)` 六语言。

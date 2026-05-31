@@ -19,9 +19,11 @@ internal sealed class CollectionPanelViewModel
     public ECardType ActiveType { get; set; } = ECardType.Item;
     public HashSet<EHero> SelectedHeroes { get; set; } = new();
     public HashSet<ETier> SelectedTiers { get; set; } = new();
+    public HashSet<ECardSize> SelectedSizes { get; set; } = new();
     public string Search { get; set; } = string.Empty;
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
+    public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();
     public float ContentHeight { get; set; }
 }
 
@@ -32,6 +34,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action<ECardType> _setActiveType;
     private readonly Action<EHero> _toggleHero;
     private readonly Action<ETier> _toggleTier;
+    private readonly Action<ECardSize> _toggleSize;
     private readonly Action<string> _setSearch;
     private readonly Action _clearFilters;
 
@@ -51,6 +54,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private TextField? _searchField;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
+    private VisualElement? _sizeChipRow;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
     private VisualElement? _gridContentSpacer;
@@ -58,6 +62,7 @@ internal sealed partial class CollectionPanelView : IDisposable
 
     private readonly Dictionary<EHero, Button> _heroChips = new();
     private readonly Dictionary<ETier, Button> _tierChips = new();
+    private readonly Dictionary<ECardSize, Button> _sizeChips = new();
     private Rect _lastGridBounds;
 
     // Panel-open/-close fade state. _opacity is the displayed alpha, _targetOpacity is what
@@ -74,6 +79,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action<ECardType> setActiveType,
         Action<EHero> toggleHero,
         Action<ETier> toggleTier,
+        Action<ECardSize> toggleSize,
         Action<string> setSearch,
         Action clearFilters
     )
@@ -83,6 +89,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _setActiveType = setActiveType ?? throw new ArgumentNullException(nameof(setActiveType));
         _toggleHero = toggleHero ?? throw new ArgumentNullException(nameof(toggleHero));
         _toggleTier = toggleTier ?? throw new ArgumentNullException(nameof(toggleTier));
+        _toggleSize = toggleSize ?? throw new ArgumentNullException(nameof(toggleSize));
         _setSearch = setSearch ?? throw new ArgumentNullException(nameof(setSearch));
         _clearFilters = clearFilters ?? throw new ArgumentNullException(nameof(clearFilters));
     }
@@ -206,10 +213,18 @@ internal sealed partial class CollectionPanelView : IDisposable
 
         EnsureHeroChips(model.AvailableHeroes);
         EnsureTierChips(model.AvailableTiers);
+        EnsureSizeChips(model.AvailableSizes);
         foreach (var pair in _heroChips)
             RefreshChip(pair.Value, model.SelectedHeroes.Contains(pair.Key));
         foreach (var pair in _tierChips)
             RefreshChip(pair.Value, model.SelectedTiers.Contains(pair.Key));
+        foreach (var pair in _sizeChips)
+            RefreshChip(pair.Value, model.SelectedSizes.Contains(pair.Key));
+
+        // Size only narrows Items; hide the whole row on the Skill tab.
+        if (_sizeChipRow != null)
+            _sizeChipRow.style.display =
+                model.ActiveType == ECardType.Item ? DisplayStyle.Flex : DisplayStyle.None;
 
         if (
             _searchField != null
@@ -227,11 +242,20 @@ internal sealed partial class CollectionPanelView : IDisposable
         }
     }
 
-    public void UpdateContentSpacerHeight(float pixelsLogical)
+    public void UpdateContentSpacerHeight(float contentHeightPixels)
     {
-        if (_gridContentSpacer == null)
+        if (_gridContentSpacer == null || _gridViewport == null)
             return;
-        var height = Mathf.Max(0f, pixelsLogical);
+        // ContentHeight is in overlay physical pixels, but the spacer height is UITK points and
+        // ReadScrollYPixels multiplies scrollOffset (points) by scaledPixelsPerPoint to recover
+        // the pixel offset the virtualizer consumes. So the spacer must be points = px / ppp, or
+        // the scroll range and the card content diverge on any non-1.0 UI scale (1440p/4K), which
+        // both strands the bottom rows and lets the view over-scroll into empty space. At ppp = 1
+        // (1080p with the 1080 reference) this is a no-op.
+        var ppp = _gridViewport.scaledPixelsPerPoint;
+        if (ppp <= 0f)
+            ppp = 1f;
+        var height = Mathf.Max(0f, contentHeightPixels / ppp);
         _gridContentSpacer.style.height = height;
         _gridContentSpacer.style.minHeight = height;
     }

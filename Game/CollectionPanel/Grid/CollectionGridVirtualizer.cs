@@ -34,17 +34,24 @@ internal sealed class CollectionGridVirtualizer
     private readonly CollectionCardFactory _factory;
     private readonly Dictionary<int, RealizedCell> _realized = new();
     private readonly List<int> _recycleScratch = new();
+    private readonly List<CollectionGridRect> _slotRects = new();
+    private readonly CollectionGridSlotLayer? _slots;
 
     private IReadOnlyList<CollectionCardVm> _visible = Array.Empty<CollectionCardVm>();
-    private ECardType _activeType = ECardType.Item;
+    private CollectionGridLayout _layout = CollectionGridLayout.Empty;
     private float _viewportWidth;
     private float _viewportHeight;
     private float _scrollY;
-    private float _cellWidth;
-    private float _cellHeight;
-    private float _gap;
-    private int _columns = 1;
-    private int _totalRows;
+
+    // Pixelization of the fixed unit grid for the current viewport. _unit is one column's
+    // width (px), derived from the viewport so the 8-column grid fills the width then clamps;
+    // _originX/_originY are the display-case inset (horizontal centering + uniform padding).
+    private float _unit;
+    private float _gap = CollectionGridConstants.GridGap;
+    private float _originX = CollectionGridConstants.GridOuterPadding;
+    private float _originY = CollectionGridConstants.GridOuterPadding;
+    private bool _scaleDirty = true;
+
     private int _generation;
     private int _perCellGeneration;
     private float _lastScrollY = float.NaN;
@@ -55,12 +62,16 @@ internal sealed class CollectionGridVirtualizer
     {
         _overlay = overlay;
         _factory = factory;
+        if (overlay.BoardRoot != null)
+            _slots = new CollectionGridSlotLayer(overlay.BoardRoot);
     }
 
-    public int Columns => _columns;
-    public int TotalRows => _totalRows;
-    public float RowHeight => _cellHeight + _gap;
-    public float ContentHeight => _totalRows * RowHeight;
+    // Content height in overlay pixels: top + bottom display-case padding plus the packed
+    // shelves. Consumed by the UITK ScrollView spacer so the scrollbar range is correct.
+    public float ContentHeight =>
+        _layout.ShelfCount == 0
+            ? 0f
+            : 2f * CollectionGridConstants.GridOuterPadding + _layout.ContentHeight(_unit, _gap);
     public int VisibleCount => _visible.Count;
 
     // SetVisible swaps in a new ordered visible set (typically after filter change) and
@@ -69,12 +80,11 @@ internal sealed class CollectionGridVirtualizer
     {
         BumpGeneration();
         _visible = visible ?? Array.Empty<CollectionCardVm>();
-        _activeType = activeType;
-        _cellWidth = CollectionGridConstants.CellWidthFor(activeType);
-        _cellHeight = CollectionGridConstants.CellHeightFor(activeType);
         _gap = CollectionGridConstants.GridGap;
+        _layout = CollectionGridLayout.Build(_visible, activeType);
+        RecomputePixelization();
         RecycleAll();
-        RecomputeLayout();
+        _slots?.Clear();
         _lastScrollY = float.NaN;
     }
 
@@ -87,7 +97,7 @@ internal sealed class CollectionGridVirtualizer
             return;
         _viewportWidth = Mathf.Max(0f, width);
         _viewportHeight = Mathf.Max(0f, height);
-        RecomputeLayout();
+        RecomputePixelization();
         _lastScrollY = float.NaN;
     }
 
@@ -96,25 +106,37 @@ internal sealed class CollectionGridVirtualizer
     public void Tick()
     {
         var board = _overlay.BoardRoot;
-        if (board == null || _visible.Count == 0 || _columns <= 0 || _cellHeight <= 0f)
+        if (board == null || _visible.Count == 0 || _layout.ShelfCount == 0 || _unit <= 0f)
         {
             if (_realized.Count > 0)
                 RecycleAll();
+            _slots?.Clear();
             return;
         }
 
-        var rowHeight = RowHeight;
-        var firstRow = Mathf.Max(
+        // Visible window is a contiguous shelf range. Shelves are a uniform pitch within a tab
+        // (Items 2 units, Skills 1 unit tall), so the first/last visible shelf is a division,
+        // and each shelf maps directly onto a contiguous visible-index span.
+        var shelfPitch = _layout.ShelfPitch(_unit, _gap);
+        // Clamp BOTH ends into [0, maxShelf] before indexing ShelfAt. _scrollY can transiently
+        // overshoot the packed content — a frame during a viewport resize before the ScrollView
+        // re-clamps its offset, or a DPI scroll-range mismatch — which would otherwise push
+        // firstShelf past the last shelf (or lastShelf below 0) and throw IndexOutOfRange.
+        var maxShelf = _layout.ShelfCount - 1;
+        var firstShelf = Mathf.Clamp(
+            Mathf.FloorToInt((_scrollY - _originY) / shelfPitch)
+                - CollectionGridConstants.RowOverscan,
             0,
-            Mathf.FloorToInt(_scrollY / rowHeight) - CollectionGridConstants.RowOverscan
+            maxShelf
         );
-        var lastRow = Mathf.Min(
-            _totalRows - 1,
-            Mathf.FloorToInt((_scrollY + _viewportHeight) / rowHeight)
-                + CollectionGridConstants.RowOverscan
+        var lastShelf = Mathf.Clamp(
+            Mathf.FloorToInt((_scrollY + _viewportHeight - _originY) / shelfPitch)
+                + CollectionGridConstants.RowOverscan,
+            0,
+            maxShelf
         );
-        var firstIdx = firstRow * _columns;
-        var lastIdx = Mathf.Min(_visible.Count - 1, (lastRow + 1) * _columns - 1);
+        var firstIdx = _layout.ShelfAt(firstShelf).FirstIndex;
+        var lastIdx = _layout.ShelfAt(lastShelf).LastIndex;
 
         // 1) Recycle cells that scrolled out of window.
         _recycleScratch.Clear();
@@ -142,14 +164,22 @@ internal sealed class CollectionGridVirtualizer
             TryRealize(idx);
         }
 
-        // 3) Reposition realized cells whenever the scroll offset moved. Skipping when
-        // the value is unchanged avoids forcing a Canvas rebuild on idle frames.
+        // 3) Reposition realized cells whenever the scroll offset moved (or the base unit
+        // changed on a viewport resize, _scaleDirty). Skipping when nothing changed avoids
+        // forcing a Canvas rebuild on idle frames. Slots track the same window so the grid
+        // order is visible even where cards have not finished loading.
         // ReSharper disable once CompareOfFloatsByEqualityOperator
-        if (_scrollY != _lastScrollY)
+        if (_scrollY != _lastScrollY || _scaleDirty)
         {
             _lastScrollY = _scrollY;
             foreach (var pair in _realized)
+            {
                 Reposition(pair.Key, pair.Value);
+                if (_scaleDirty)
+                    ApplyCellScale(pair.Key, pair.Value);
+            }
+            _scaleDirty = false;
+            SyncSlots(firstIdx, lastIdx);
         }
     }
 
@@ -157,6 +187,7 @@ internal sealed class CollectionGridVirtualizer
     {
         BumpGeneration();
         RecycleAll();
+        _slots?.Clear();
         _visible = Array.Empty<CollectionCardVm>();
         _hoverPollIndex = -1;
         _hoverDispatched = false;
@@ -174,7 +205,7 @@ internal sealed class CollectionGridVirtualizer
     // with the same idx retry until the cell becomes ready.
     public void PollHover(Vector2 mousePixels, Rect viewportBoundsPx)
     {
-        if (_visible.Count == 0 || _columns <= 0)
+        if (_visible.Count == 0 || _layout.ShelfCount == 0 || _unit <= 0f)
         {
             DispatchHoverOut();
             return;
@@ -190,27 +221,37 @@ internal sealed class CollectionGridVirtualizer
         var localY = viewportBoundsPx.height - (mousePixels.y - viewportBoundsPx.y);
         var contentY = localY + _scrollY;
 
-        var colSpan = _cellWidth + _gap;
-        var rowSpan = _cellHeight + _gap;
-        var col = Mathf.FloorToInt(localX / colSpan);
-        var row = Mathf.FloorToInt(contentY / rowSpan);
-        if (col < 0 || col >= _columns || row < 0 || row >= _totalRows)
+        // Hit-test against precomputed cell rects: find the shelf band under the cursor, then
+        // the cell within it whose span rect contains the point. Rects exclude the gutter, so a
+        // cursor in the gap matches nothing and dispatches hover-out — same as the old gap reject.
+        var shelfPitch = _layout.ShelfPitch(_unit, _gap);
+        if (shelfPitch <= 0f)
+        {
+            DispatchHoverOut();
+            return;
+        }
+        var shelf = Mathf.FloorToInt((contentY - _originY) / shelfPitch);
+        if (shelf < 0 || shelf >= _layout.ShelfCount)
         {
             DispatchHoverOut();
             return;
         }
 
-        // Reject hits inside the cell gap — those land in nothing visually.
-        var inCol = localX - col * colSpan;
-        var inRow = contentY - row * rowSpan;
-        if (inCol > _cellWidth || inRow > _cellHeight)
+        var band = _layout.ShelfAt(shelf);
+        var idx = -1;
+        for (var candidate = band.FirstIndex; candidate <= band.LastIndex; candidate++)
         {
-            DispatchHoverOut();
-            return;
+            if (
+                _layout
+                    .ContentRectFor(candidate, _unit, _gap, _originX, _originY)
+                    .Contains(localX, contentY)
+            )
+            {
+                idx = candidate;
+                break;
+            }
         }
-
-        var idx = row * _columns + col;
-        if (idx < 0 || idx >= _visible.Count)
+        if (idx < 0)
         {
             DispatchHoverOut();
             return;
@@ -222,6 +263,17 @@ internal sealed class CollectionGridVirtualizer
             _hoverPollIndex = idx;
             _hoverDispatched = false;
         }
+
+        // Move the display-case hover highlight to the pointed cell (board-local rect, y down).
+        var hoverRect = _layout.ContentRectFor(idx, _unit, _gap, _originX, _originY);
+        _slots?.SetHover(
+            new CollectionGridRect(
+                hoverRect.X,
+                hoverRect.Y - _scrollY,
+                hoverRect.Width,
+                hoverRect.Height
+            )
+        );
 
         // Already fired OnHover for this cell — nothing to do until the cursor leaves.
         if (_hoverDispatched)
@@ -240,6 +292,9 @@ internal sealed class CollectionGridVirtualizer
 
     private void DispatchHoverOut()
     {
+        // Hide the display-case highlight on every hover-out path (outside the viewport, in a
+        // gutter, off the grid, or moving to a new cell).
+        _slots?.SetHover(null);
         if (_hoverPollIndex < 0 || !_hoverDispatched)
         {
             _hoverPollIndex = -1;
@@ -286,19 +341,35 @@ internal sealed class CollectionGridVirtualizer
         );
         _realized[index] = cell;
         Reposition(index, cell);
-        ApplyCellScale(cell);
+        ApplyCellScale(index, cell);
         _ = ShowWhenReady(cell, _generation);
     }
 
-    private void ApplyCellScale(RealizedCell cell)
+    // Scale the native card to fit its span cell, centered, never stretched. The cell is shrunk
+    // by CellContentInset on every side so the slot background reads as a frame around the card.
+    private void ApplyCellScale(int index, RealizedCell cell)
     {
         var rect = cell.CachedRect;
         if (rect == null)
             return;
+        var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
+        var inset = CollectionGridConstants.CellContentInset;
         var sizeDelta = rect.sizeDelta;
         var natW = Mathf.Max(1f, sizeDelta.x);
         var natH = Mathf.Max(1f, sizeDelta.y);
-        var scale = Mathf.Min(_cellWidth / natW, _cellHeight / natH);
+
+        // Scale to the cell HEIGHT so every card in a shelf renders the same height. Native item
+        // cards share one prefab height and a shelf shares one cell height, so a height-based
+        // scale aligns small/medium/large tops and bottoms — the old min(w,h) fit left the
+        // narrow small cards width-limited and therefore slightly shorter. Clamp so a card never
+        // grows past its cell width + one gutter (prevents overlapping the neighbour); because
+        // that bound is exactly span*(unit+gap), the clamped scale is identical across spans, so
+        // the uniform height survives even when a card is width-limited.
+        var targetH = Mathf.Max(1f, cellRect.Height * (1f - 2f * inset));
+        var scale = targetH / natH;
+        var maxWidth = cellRect.Width + _gap;
+        if (natW * scale > maxWidth)
+            scale = maxWidth / natW;
         if (scale <= 0f || float.IsNaN(scale) || float.IsInfinity(scale))
             scale = 1f;
         rect.localScale = new Vector3(scale, scale, 1f);
@@ -309,18 +380,33 @@ internal sealed class CollectionGridVirtualizer
         var rect = cell.CachedRect;
         if (rect == null)
             return;
-        var row = index / _columns;
-        var col = index % _columns;
-        var cellOriginX = col * (_cellWidth + _gap);
-        var cellOriginY = row * (_cellHeight + _gap) - _scrollY;
+        var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
+        var screenTop = cellRect.Y - _scrollY;
         // Board pivot is top-left, so y goes negative. Place card pivot at cell center.
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(0f, 1f);
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = new Vector2(
-            cellOriginX + _cellWidth * 0.5f,
-            -(cellOriginY + _cellHeight * 0.5f)
+            cellRect.X + cellRect.Width * 0.5f,
+            -(screenTop + cellRect.Height * 0.5f)
         );
+    }
+
+    // Push the visible window's board-local cell rects to the slot layer. Driven by the layout
+    // window (not the realized-card set), so every visible cell shows its display-case slot
+    // immediately, before its native card art has loaded. Board space is top-left origin, y
+    // increasing downward, so content Y is offset by the current scroll.
+    private void SyncSlots(int firstIdx, int lastIdx)
+    {
+        if (_slots == null)
+            return;
+        _slotRects.Clear();
+        for (var idx = firstIdx; idx <= lastIdx; idx++)
+        {
+            var r = _layout.ContentRectFor(idx, _unit, _gap, _originX, _originY);
+            _slotRects.Add(new CollectionGridRect(r.X, r.Y - _scrollY, r.Width, r.Height));
+        }
+        _slots.Sync(_slotRects);
     }
 
     private static void EnsureHitTarget(GameObject host)
@@ -435,23 +521,27 @@ internal sealed class CollectionGridVirtualizer
 
     private void BumpGeneration() => _generation++;
 
-    private void RecomputeLayout()
+    // Derive the per-viewport base unit and display-case origin. The grid is always 8 columns:
+    // the unit fills the available width then clamps to [Min, Max]; once clamped, any surplus
+    // width becomes centering margin (originX) rather than extra columns. originY is the fixed
+    // top padding. Marks the realized cards for a rescale on the next reposition pass.
+    private void RecomputePixelization()
     {
-        if (_visible.Count == 0 || _cellWidth <= 0f || _viewportWidth <= 0f)
+        _scaleDirty = true;
+        var columns = _layout.Columns;
+        var pad = CollectionGridConstants.GridOuterPadding;
+        _originY = pad;
+        if (_viewportWidth <= 0f)
         {
-            _columns = Mathf.Max(1, CollectionGridConstants.MinColumnsFor(_activeType));
-            _totalRows = 0;
+            _unit = CollectionGridConstants.MinUnitWidth;
+            _originX = pad;
             return;
         }
-        var available = _viewportWidth + _gap;
-        var per = _cellWidth + _gap;
-        var raw = Mathf.FloorToInt(available / per);
-        _columns = Mathf.Clamp(
-            raw,
-            CollectionGridConstants.MinColumnsFor(_activeType),
-            CollectionGridConstants.MaxColumnsFor(_activeType)
-        );
-        _totalRows = Mathf.CeilToInt(_visible.Count / (float)_columns);
+        var available = _viewportWidth - 2f * pad - (columns - 1) * _gap;
+        var rawUnit = available / columns;
+        _unit = Mathf.Clamp(rawUnit, CollectionGridConstants.MinUnitWidth, _layout.MaxUnitWidth);
+        var gridWidth = columns * _unit + (columns - 1) * _gap;
+        _originX = Mathf.Max(pad, (_viewportWidth - gridWidth) * 0.5f);
     }
 
     private sealed class RealizedCell

@@ -152,6 +152,14 @@ internal static class Colors
 
     public static Color InfoChipBorder(Color accent) => Rgba(accent.r, accent.g, accent.b, 0.95f);
 
+    // Collection Panel display-case grid. Slot backgrounds are a very weak translucent fill so
+    // the fixed 8-column order reads without competing with the native card frames; the hover
+    // highlight is a soft accent that glows around the pointed cell. The grid region itself sits
+    // on a darker recessed "case" base.
+    public static Color CollectionGridCaseBackground => Rgba(0.05f, 0.06f, 0.09f, 1f);
+    public static Color CollectionSlotBackground => Rgba(1f, 1f, 1f, 0.04f);
+    public static Color CollectionSlotHover => Rgba(0.45f, 0.62f, 0.95f, 0.22f);
+
     public static Color WithAlpha(Color color, float alpha) =>
         Rgba(color.r, color.g, color.b, alpha);
 

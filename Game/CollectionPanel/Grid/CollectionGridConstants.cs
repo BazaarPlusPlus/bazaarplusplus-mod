@@ -3,24 +3,39 @@ using BazaarGameShared.Domain.Core.Types;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
-// Placeholder cell geometry per tab. Numbers are conservative initial guesses; the design's
-// Phase 0 spike measures real prefab (nativeWidth, nativeHeight) for the three Item sizes
-// and the Skill prefab and feeds them back here. Keeping the values in one place makes the
-// later edit a one-file change.
+// Fixed "display-case" grid spec. The catalog is laid out on a fixed per-tab column count
+// regardless of viewport width: screen width only changes the base unit size and horizontal
+// centering, never the column count. Items use ItemColumns unit columns (span 1/2/3 wide by
+// ECardSize, ItemRowSpan tall); Skills use fewer, larger SkillColumns square icons. See the
+// design doc §17 for the redesign that superseded the old dynamic min/max column model.
 internal static class CollectionGridConstants
 {
-    public const float ItemCellWidth = 230f;
-    public const float ItemCellHeight = 300f;
+    // Per-tab column counts. Items use a dense unit grid; Skills are fewer, larger pure icons.
+    public const int ItemColumns = 10;
+    public const int SkillColumns = 7;
+    public const int SkillRowSpan = 1;
+    public const int ItemRowSpan = 2;
+    public const int ItemSmallSpan = 1;
+    public const int ItemMediumSpan = 2;
+    public const int ItemLargeSpan = 3;
 
-    public const float SkillCellWidth = 200f;
-    public const float SkillCellHeight = 200f;
-
+    // Fixed gutter between cells (both axes) and inner padding of the display-case region, in
+    // overlay pixels. The base unit (one column's width) is derived per-viewport so the grid
+    // fills the available width, then clamped to [Min, Max*]; any extra width is absorbed as
+    // centering margin rather than more columns. The per-tab max caps how large cells grow on
+    // very wide screens (Skills are allowed roughly twice the Item cap so icons read large).
+    // MinUnitWidth is only a degenerate floor: the columns are fixed, so on a narrow viewport
+    // the cells must shrink to stay inside the clip (there is no horizontal scroll) — keep it
+    // small enough that a real game window never clamps up and overflows the rightmost columns.
     public const float GridGap = 14f;
+    public const float GridOuterPadding = 18f;
+    public const float MinUnitWidth = 24f;
+    public const float ItemMaxUnitWidth = 172f;
+    public const float SkillMaxUnitWidth = 272f;
 
-    public const int ItemMinColumns = 4;
-    public const int ItemMaxColumns = 10;
-    public const int SkillMinColumns = 6;
-    public const int SkillMaxColumns = 14;
+    // Fraction of a cell kept as breathing room on every side so the native card sits inside
+    // its slot (the slot background then reads as a frame around it) instead of touching edges.
+    public const float CellContentInset = 0.06f;
 
     public const int RowOverscan = 1;
 
@@ -64,15 +79,23 @@ internal static class CollectionGridConstants
     // built-in instant snap instead and just give each notch enough travel to feel meaty.
     public const float MouseWheelScrollPoints = 300f;
 
-    public static float CellWidthFor(ECardType type) =>
-        type == ECardType.Skill ? SkillCellWidth : ItemCellWidth;
+    // Unit width a card occupies on the 8-column grid. Skills never call this (always 1).
+    public static int ItemWidthSpan(ECardSize size) =>
+        size switch
+        {
+            ECardSize.Large => ItemLargeSpan,
+            ECardSize.Medium => ItemMediumSpan,
+            _ => ItemSmallSpan,
+        };
 
-    public static float CellHeightFor(ECardType type) =>
-        type == ECardType.Skill ? SkillCellHeight : ItemCellHeight;
+    // Cell height in row-units: Items are two units tall (uniform height, width varies by
+    // size); Skills are a single square unit.
+    public static int RowSpanFor(ECardType type) =>
+        type == ECardType.Skill ? SkillRowSpan : ItemRowSpan;
 
-    public static int MinColumnsFor(ECardType type) =>
-        type == ECardType.Skill ? SkillMinColumns : ItemMinColumns;
+    public static int ColumnsFor(ECardType type) =>
+        type == ECardType.Skill ? SkillColumns : ItemColumns;
 
-    public static int MaxColumnsFor(ECardType type) =>
-        type == ECardType.Skill ? SkillMaxColumns : ItemMaxColumns;
+    public static float MaxUnitWidthFor(ECardType type) =>
+        type == ECardType.Skill ? SkillMaxUnitWidth : ItemMaxUnitWidth;
 }

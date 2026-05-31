@@ -65,6 +65,33 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
+    private void EnsureSizeChips(IReadOnlyList<ECardSize> sizes)
+    {
+        if (_sizeChipRow == null)
+            return;
+        if (SizeChipsMatch(sizes))
+            return;
+        ClearChipRow(_sizeChips, _sizeChipRow, keepFirst: true);
+        foreach (var size in sizes)
+        {
+            var chip = CreateChipButton(CollectionPanelText.Size(size), () => _toggleSize(size));
+            _sizeChips[size] = chip;
+            _sizeChipRow.Add(chip);
+        }
+    }
+
+    private bool SizeChipsMatch(IReadOnlyList<ECardSize> sizes)
+    {
+        if (sizes.Count != _sizeChips.Count)
+            return false;
+        foreach (var size in sizes)
+        {
+            if (!_sizeChips.ContainsKey(size))
+                return false;
+        }
+        return true;
+    }
+
     private static void ClearChipRow<T>(
         Dictionary<T, Button> chips,
         VisualElement row,
