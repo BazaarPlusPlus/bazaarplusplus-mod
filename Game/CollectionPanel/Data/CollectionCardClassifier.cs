@@ -105,7 +105,8 @@ internal static class CollectionCardClassifier
     private static bool HasValidArtKey(string? artKey) =>
         !string.IsNullOrEmpty(artKey)
         && !string.Equals(artKey, "Invalid", StringComparison.Ordinal)
-        && artKey.IndexOf("Placeholder", StringComparison.OrdinalIgnoreCase) < 0;
+        && artKey.IndexOf("Placeholder", StringComparison.OrdinalIgnoreCase) < 0
+        && !artKey.EndsWith(".mat", StringComparison.OrdinalIgnoreCase);
 
     private static bool ContainsAnyMarker(string? value, IReadOnlyList<string> markers)
     {

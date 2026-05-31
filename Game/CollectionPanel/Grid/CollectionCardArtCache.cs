@@ -28,6 +28,7 @@ internal sealed class CollectionCardArtCache
     private readonly Dictionary<string, LinkedListNode<string>> _nodeMap = new(
         StringComparer.Ordinal
     );
+    private readonly HashSet<string> _failedKeys = new(StringComparer.Ordinal);
 
     public CollectionCardArtCache(int capacity = DefaultCapacity)
     {
@@ -39,6 +40,9 @@ internal sealed class CollectionCardArtCache
     public async Task<CardAssetDataSO?> Get(string artKey)
     {
         if (string.IsNullOrEmpty(artKey))
+            return null;
+
+        if (_failedKeys.Contains(artKey))
             return null;
 
         if (_entries.TryGetValue(artKey, out var existing))
@@ -59,6 +63,7 @@ internal sealed class CollectionCardArtCache
                 "CollectionCardArtCache",
                 $"Addressables.LoadAssetAsync threw for artKey='{artKey}': {ex.Message}"
             );
+            _failedKeys.Add(artKey);
             return null;
         }
 
@@ -76,6 +81,7 @@ internal sealed class CollectionCardArtCache
             {
                 // best-effort
             }
+            _failedKeys.Add(artKey);
             return null;
         }
 
@@ -136,6 +142,7 @@ internal sealed class CollectionCardArtCache
         _entries.Clear();
         _lru.Clear();
         _nodeMap.Clear();
+        _failedKeys.Clear();
     }
 
     private void Evict()

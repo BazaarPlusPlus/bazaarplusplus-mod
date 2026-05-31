@@ -123,6 +123,22 @@ AssertFalse(
     CollectionCardClassifier.IsCatalogCard(ECardType.Skill, "Placeholder", "[SKILL TEMPLATE]"),
     "Skill template placeholders do not enter the catalog."
 );
+AssertFalse(
+    CollectionCardClassifier.IsCatalogCard(
+        ECardType.Item,
+        "Assets/Cards/LegacyItem.mat",
+        "Legacy Material Item"
+    ),
+    "Legacy material art keys do not enter the catalog."
+);
+AssertFalse(
+    CollectionCardClassifier.IsCatalogCard(
+        ECardType.Item,
+        "Assets/Cards/Template.png",
+        "[SMALL ITEM TEMPLATE]"
+    ),
+    "Bracketed item template names do not enter the catalog."
+);
 AssertTrue(
     CollectionCardClassifier.IsPackageName("Vanessa Starter Package"),
     "Package detection is centralized for future rule hardening."
