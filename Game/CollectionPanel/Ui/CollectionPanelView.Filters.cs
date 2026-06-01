@@ -176,10 +176,6 @@ internal sealed partial class CollectionPanelView
         chip.style.marginBottom = UiSpacing.Xs;
         StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
 
-        var textElement = chip.Q<TextElement>();
-        if (textElement != null)
-            textElement.style.display = DisplayStyle.None;
-
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
         icon.style.width = Sizes.HeroChipIconSize;
         icon.style.height = Sizes.HeroChipIconSize;
