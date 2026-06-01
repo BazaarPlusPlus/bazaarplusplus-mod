@@ -53,14 +53,14 @@ internal static class BPPSupporterSampler
         return entry != null && !string.IsNullOrWhiteSpace(entry.Name) && entry.Tier > 0;
     }
 
-    private static float ResolveTierWeight(int tier)
+    private static int ResolveTierWeight(int tier)
     {
         return tier switch
         {
-            4 => 6f,
-            3 => 4f,
-            2 => 2f,
-            _ => 1f,
+            4 => 6,
+            3 => 3,
+            2 => 2,
+            _ => 1,
         };
     }
 

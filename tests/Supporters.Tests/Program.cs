@@ -72,22 +72,22 @@ static void TestTierWeightsSelectDefaultBronzeSilverAndGoldBuckets()
     AssertEqual(
         "Default",
         BPPSupporterSampler.Sample(entries, Rolls(0f, 0f)).Name,
-        "The default tier occupies the first 1/13 of the tier roll."
+        "The default tier occupies the first 1/12 of the tier roll."
     );
     AssertEqual(
         "Bronze",
-        BPPSupporterSampler.Sample(entries, Rolls(1f / 13f + 0.001f, 0f)).Name,
-        "Tier 2 should be selected after the default 1/13 range."
+        BPPSupporterSampler.Sample(entries, Rolls(1f / 12f + 0.001f, 0f)).Name,
+        "Tier 2 should be selected after the default 1/12 range."
     );
     AssertEqual(
         "Silver",
-        BPPSupporterSampler.Sample(entries, Rolls(3f / 13f + 0.001f, 0f)).Name,
+        BPPSupporterSampler.Sample(entries, Rolls(3f / 12f + 0.001f, 0f)).Name,
         "Tier 3 should be selected after the default plus tier-2 ranges."
     );
     AssertEqual(
         "Gold",
-        BPPSupporterSampler.Sample(entries, Rolls(7f / 13f + 0.001f, 0f)).Name,
-        "Tier 4 should receive the final 6/13 range."
+        BPPSupporterSampler.Sample(entries, Rolls(6f / 12f + 0.001f, 0f)).Name,
+        "Tier 4 should receive the final 6/12 range."
     );
 }
 

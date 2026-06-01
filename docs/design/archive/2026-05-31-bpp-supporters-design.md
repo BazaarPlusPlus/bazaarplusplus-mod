@@ -76,14 +76,14 @@ The sampler filters invalid entries, groups entries by tier, picks a tier bucket
 The tier weights are private implementation details:
 
 ```csharp
-private static float ResolveTierWeight(int tier)
+private static int ResolveTierWeight(int tier)
 {
     return tier switch
     {
-        4 => 6f,
-        3 => 4f,
-        2 => 2f,
-        _ => 1f,
+        4 => 6,
+        3 => 3,
+        2 => 2,
+        _ => 1,
     };
 }
 ```
