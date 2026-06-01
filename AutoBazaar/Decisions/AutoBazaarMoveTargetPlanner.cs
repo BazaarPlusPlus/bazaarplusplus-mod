@@ -1,13 +1,13 @@
 #nullable enable
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
 /// <summary>
 /// Pure static helper that enumerates legal item placements within a section.
 /// No game-type dependencies — fully testable in isolation.
 /// </summary>
-internal static class AutoBazaarMoveTargetPlanner
+public static class AutoBazaarMoveTargetPlanner
 {
     /// <summary>
     /// Given an item of size <paramref name="itemSize"/> and a target section with

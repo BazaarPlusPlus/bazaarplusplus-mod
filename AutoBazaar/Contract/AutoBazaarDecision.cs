@@ -1,14 +1,14 @@
 #nullable enable
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
-internal static class AutoBazaarSchema
+public static class AutoBazaarSchema
 {
     public const string Version = "1.2.0";
 }
 
-internal enum AutoBazaarActionKind
+public enum AutoBazaarActionKind
 {
     Wait,
     StartOrContinueRun,
@@ -23,7 +23,7 @@ internal enum AutoBazaarActionKind
     ExitState,
 }
 
-internal enum AutoBazaarActionGroup
+public enum AutoBazaarActionGroup
 {
     Wait,
     Flow,
@@ -36,7 +36,7 @@ internal enum AutoBazaarActionGroup
     Exit,
 }
 
-internal enum AutoBazaarRunStateName
+public enum AutoBazaarRunStateName
 {
     Unknown,
     StartRun,
@@ -52,7 +52,7 @@ internal enum AutoBazaarRunStateName
     EndRunDefeat,
 }
 
-internal enum AutoBazaarCardKind
+public enum AutoBazaarCardKind
 {
     Item,
     Skill,
@@ -60,7 +60,7 @@ internal enum AutoBazaarCardKind
     Unknown,
 }
 
-internal enum AutoBazaarCardLocation
+public enum AutoBazaarCardLocation
 {
     Selection,
     Board,
@@ -69,7 +69,7 @@ internal enum AutoBazaarCardLocation
     Unknown,
 }
 
-internal enum AutoBazaarTargetSection
+public enum AutoBazaarTargetSection
 {
     Hand,
     Stash,
@@ -77,7 +77,7 @@ internal enum AutoBazaarTargetSection
     Fuse,
 }
 
-internal sealed class AutoBazaarCardSnapshot
+public sealed class AutoBazaarCardSnapshot
 {
     public string InstanceId { get; init; } = "";
     public AutoBazaarCardKind Kind { get; init; }
@@ -114,7 +114,7 @@ internal sealed class AutoBazaarCardSnapshot
     public bool? CanSell { get; init; }
 }
 
-internal sealed class AutoBazaarCardAbilitySnapshot
+public sealed class AutoBazaarCardAbilitySnapshot
 {
     public string Id { get; init; } = "";
     public string? InternalName { get; init; }
@@ -126,7 +126,7 @@ internal sealed class AutoBazaarCardAbilitySnapshot
     public string? Priority { get; init; }
 }
 
-internal sealed class AutoBazaarDecisionOption
+public sealed class AutoBazaarDecisionOption
 {
     public AutoBazaarActionKind ActionKind { get; init; }
     public AutoBazaarActionGroup Group { get; init; }
@@ -139,7 +139,7 @@ internal sealed class AutoBazaarDecisionOption
     public AutoBazaarCardSnapshot? Card { get; init; }
 }
 
-internal sealed class AutoBazaarContext
+public sealed class AutoBazaarContext
 {
     public string SchemaVersion { get; init; } = AutoBazaarSchema.Version;
     public ulong TickId { get; init; }
@@ -190,7 +190,7 @@ internal sealed class AutoBazaarContext
         System.Array.Empty<AutoBazaarDecisionOption>();
 }
 
-internal sealed class AutoBazaarAction
+public sealed class AutoBazaarAction
 {
     public string? SchemaVersion { get; set; }
     public AutoBazaarActionKind ActionKind { get; set; }

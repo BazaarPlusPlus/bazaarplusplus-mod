@@ -5,20 +5,19 @@ using System.Reflection;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.AutoBazaar;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.Game.AutoBazaarHost;
 
-internal readonly record struct AutoBazaarDispatchResult(bool Executed, string? Error);
-
-internal static class AutoBazaarActionDispatcher
+internal sealed class AutoBazaarGameActionDispatcher : IAutoBazaarActionDispatcher
 {
     /// <summary>Main thread only. Routes the action through AppState.CurrentState.*Command()
     /// so the game's UI animation + state-validation chain runs the same way a real click does.</summary>
-    public static AutoBazaarDispatchResult Execute(
+    public AutoBazaarDispatchResult Execute(
         AutoBazaarAction action,
         AutoBazaarContextSnapshot snapshot
     )

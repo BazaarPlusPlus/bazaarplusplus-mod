@@ -27,10 +27,6 @@ internal sealed class BppConfig : IBppConfig
         private set;
     }
 
-    public ConfigEntry<bool>? AutoBazaarEnabled { get; private set; }
-
-    public ConfigEntry<int>? AutoBazaarHttpListenerPort { get; private set; }
-
     public ConfigEntry<bool>? BazaarDbUploadEnabled { get; private set; }
 
     public void Initialize(ConfigFile config)
@@ -89,19 +85,6 @@ internal sealed class BppConfig : IBppConfig
             "Mode",
             LegendaryPositionDisplayMode.Default,
             "How BazaarPlusPlus should rewrite native Legendary leaderboard position labels. Default keeps the original value, Blank clears it, Fixed999999 forces 999999, and PositionWithRating shows '#position | rating'."
-        );
-        // AutoBazaar
-        AutoBazaarEnabled = config.Bind(
-            "AutoBazaar",
-            "Enabled",
-            true,
-            "Master switch for the AutoBazaar HTTP endpoint. When true, a loopback HTTP server starts on the configured port. There is no in-game UI for this toggle; edit the cfg file to disable."
-        );
-        AutoBazaarHttpListenerPort = config.Bind(
-            "AutoBazaar",
-            "HttpListenerPort",
-            47900,
-            "Loopback port for the AutoBazaar HTTP listener. Changing this restarts the listener."
         );
         // BazaarDB
         BazaarDbUploadEnabled = config.Bind(

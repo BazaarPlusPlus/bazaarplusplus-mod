@@ -24,43 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Game\AutoBazaar\AutoBazaarDecision.cs" Link="AutoBazaarDecision.cs" />
-    <Compile
-      Include="..\..\Game\AutoBazaar\IsExternalInitPolyfill.cs"
-      Link="IsExternalInitPolyfill.cs"
-    />
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarContextSnapshot.cs"
-      Link="AutoBazaarContextSnapshot.cs"
-    />
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarMoveTargetPlanner.cs"
-      Link="AutoBazaarMoveTargetPlanner.cs"
-    />
-    <Compile Include="..\..\Game\AutoBazaar\AutoBazaarUlid.cs" Link="AutoBazaarUlid.cs" />
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarActionValidator.cs"
-      Link="AutoBazaarActionValidator.cs"
-    />
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarResponseJson.cs"
-      Link="AutoBazaarResponseJson.cs"
-    />
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarDecisionLog.cs"
-      Link="AutoBazaarDecisionLog.cs"
-    />
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarActionQueue.cs"
-      Link="AutoBazaarActionQueue.cs"
-    />
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarHttpServer.cs"
-      Link="AutoBazaarHttpServer.cs"
-    />
-    <Compile
-      Include="..\..\Game\AutoBazaar\AutoBazaarTargetSelectionActions.cs"
-      Link="AutoBazaarTargetSelectionActions.cs"
-    />
+    <ProjectReference Include="..\..\BazaarPlusPlus.AutoBazaar.csproj" />
   </ItemGroup>
 </Project>

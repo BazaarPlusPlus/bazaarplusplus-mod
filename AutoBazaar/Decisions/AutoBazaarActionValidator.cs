@@ -2,9 +2,9 @@
 using System;
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
-internal enum AutoBazaarValidationCode
+public enum AutoBazaarValidationCode
 {
     Ok,
     Invalid,
@@ -13,14 +13,14 @@ internal enum AutoBazaarValidationCode
     Unavailable,
 }
 
-internal readonly record struct AutoBazaarValidationResult(
+public readonly record struct AutoBazaarValidationResult(
     AutoBazaarValidationCode Code,
     int HttpStatus,
     string? Details,
     IReadOnlyDictionary<string, object?>? Extra
 );
 
-internal static class AutoBazaarActionValidator
+public static class AutoBazaarActionValidator
 {
     // Hardcoded sets — no dependency on game enums.
     private static readonly HashSet<string> _validHeroes = new(StringComparer.OrdinalIgnoreCase)

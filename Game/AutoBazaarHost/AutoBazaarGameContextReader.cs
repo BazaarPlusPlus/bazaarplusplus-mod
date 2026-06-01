@@ -9,29 +9,41 @@ using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
+using BazaarPlusPlus.AutoBazaar;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.GameInterop.Encounter;
-using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.Game.AutoBazaarHost;
 
 /// <summary>
 /// Reads live game state and produces an <see cref="AutoBazaarContext"/> snapshot.
 /// Main thread only. Pure read — never mutates any state.
 /// </summary>
-internal static class AutoBazaarContextBuilder
+internal sealed class AutoBazaarGameContextReader : IAutoBazaarContextReader
 {
+    private readonly IBppServices _services;
+    private readonly IAutoBazaarOptions _options;
+    private readonly IAutoBazaarLogger _logger;
+
+    public AutoBazaarGameContextReader(
+        IBppServices services,
+        IAutoBazaarOptions options,
+        IAutoBazaarLogger logger
+    )
+    {
+        _services = services ?? throw new ArgumentNullException(nameof(services));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
     /// <summary>
     /// Build a context from live game state. Never throws — exceptions produce a
     /// degenerate context with <c>StateName=Unknown</c> and <c>AvailableActions=[Wait]</c>.
     /// </summary>
-    public static AutoBazaarContext Build(
-        IBppServices services,
-        double actionCooldownRemainingSeconds
-    )
+    public AutoBazaarContext Build(double actionCooldownRemainingSeconds)
     {
-        bool isEnabled = services.Config.AutoBazaarEnabled?.Value == true;
+        bool isEnabled = _options.Enabled;
 
         if (!isEnabled)
         {
@@ -40,11 +52,11 @@ internal static class AutoBazaarContextBuilder
 
         try
         {
-            return BuildCore(services, isEnabled, actionCooldownRemainingSeconds);
+            return BuildCore(_services, isEnabled, actionCooldownRemainingSeconds);
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", "context build failed", ex);
+            _logger.Error("context build failed", ex);
             return MakeDegenerate(isEnabled: true, actionCooldownRemainingSeconds);
         }
     }

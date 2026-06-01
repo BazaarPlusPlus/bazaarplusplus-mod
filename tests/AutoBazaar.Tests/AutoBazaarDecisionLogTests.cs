@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using BazaarPlusPlus.Game.AutoBazaar;
+using BazaarPlusPlus.AutoBazaar;
 using Xunit;
 
 public class AutoBazaarDecisionLogTests

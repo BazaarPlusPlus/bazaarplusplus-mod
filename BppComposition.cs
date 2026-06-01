@@ -4,6 +4,7 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.AutoBazaarHost;
 using BazaarPlusPlus.Game.CardSetPreview;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CombatReplay;
@@ -117,7 +118,7 @@ internal sealed class BppComposition : IDisposable
             )
         );
 
-        // _mountables.Register(new AutoBazaarMount());
+        // _mountables.Register(new AutoBazaarHostMount(configFile));
     }
 
     public void AttachCombatReplayRuntime(CombatReplayRuntime runtime) =>

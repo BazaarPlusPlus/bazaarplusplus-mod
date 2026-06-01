@@ -6,14 +6,13 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Infrastructure;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
-internal sealed class AutoBazaarHttpServer : IDisposable
+public sealed class AutoBazaarHttpServer : IDisposable
 {
     private const int MaxBodyBytes = 65536;
 
@@ -27,6 +26,7 @@ internal sealed class AutoBazaarHttpServer : IDisposable
     private readonly string _endpointJsonPath;
     private readonly Func<AutoBazaarContextSnapshot?> _snapshotGetter;
     private readonly AutoBazaarActionQueue _queue;
+    private readonly IAutoBazaarLogger _logger;
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
     private int _started;
@@ -38,13 +38,15 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         int port,
         string endpointJsonPath,
         Func<AutoBazaarContextSnapshot?> snapshotGetter,
-        AutoBazaarActionQueue queue
+        AutoBazaarActionQueue queue,
+        IAutoBazaarLogger logger
     )
     {
         Port = port;
         _endpointJsonPath = endpointJsonPath;
         _snapshotGetter = snapshotGetter;
         _queue = queue;
+        _logger = logger;
     }
 
     public void Start()
@@ -66,7 +68,7 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", "endpoint.json write failed", ex);
+            _logger.Error("endpoint.json write failed", ex);
         }
 
         IsRunning = true;
@@ -99,7 +101,7 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", "endpoint.json delete failed", ex);
+            _logger.Error("endpoint.json delete failed", ex);
         }
     }
 
@@ -152,11 +154,7 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                "AutoBazaar",
-                $"HTTP handler threw on {ctx.Request.Url?.AbsolutePath}",
-                ex
-            );
+            _logger.Error($"HTTP handler threw on {ctx.Request.Url?.AbsolutePath}", ex);
             try
             {
                 WriteErrorEnvelope(ctx, 500, "internal", ex.GetType().Name);
@@ -234,7 +232,7 @@ internal sealed class AutoBazaarHttpServer : IDisposable
         }
         catch (IOException ex)
         {
-            BppLog.Error("AutoBazaar", "POST body read failed", ex);
+            _logger.Error("POST body read failed", ex);
             WriteErrorEnvelope(ctx, 400, "invalid", "read failed");
             return;
         }

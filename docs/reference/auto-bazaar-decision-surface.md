@@ -1,14 +1,14 @@
 # AutoBazaar Decision Surface — Internal Reference
 
-> **Status: parked.** The AutoBazaar mount is commented out at `BppComposition.cs:120`; the HTTP surface this doc derives is not currently served. Preserved for re-enable. The wire contract itself is owned by [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md); this doc owns the builder-side derivation.
+> **Status: parked.** The AutoBazaar host mount is commented out in `BppComposition.cs`; the HTTP surface this doc derives is not currently served. Preserved for re-enable. The wire contract itself is owned by [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md); this doc owns the game-reader-side derivation.
 
 ## Scope
 
-Companion to [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md). Documents how `AutoBazaarContextBuilder` populates each `AutoBazaarContext` field from live game state. Intended for contributors modifying `AutoBazaarContextBuilder.cs`.
+Companion to [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md). Documents how `Game/AutoBazaarHost/AutoBazaarGameContextReader.cs` populates each `AutoBazaarContext` field from live game state. Intended for contributors modifying the host-side game reader.
 
 ## Source of Truth
 
-`AutoBazaarContextBuilder.cs` is authoritative; this doc is a derivation reference. Read alongside `decompiled/` to confirm game-side types and property names.
+`Game/AutoBazaarHost/AutoBazaarGameContextReader.cs` is authoritative for game-state derivation; `AutoBazaar/` owns the pure wire DTOs, validation, HTTP transport, queueing, and runtime controller. Read alongside `decompiled/` to confirm game-side types and property names.
 
 ## Top-Level Scalar Mapping
 
@@ -17,7 +17,7 @@ Companion to [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md). Documents
 | `SchemaVersion` | Const `"1.2.0"` |
 | `TickId` | Assigned by `AutoBazaarContextSnapshotPublisher` (incremented on each publish) |
 | `ServerTimeUtc` | `DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)` (ISO-8601) |
-| `IsEnabled` | `services.Config.AutoBazaarEnabled?.Value == true` |
+| `IsEnabled` | `AutoBazaarBepInExOptions.Enabled` (`[AutoBazaar] Enabled`) |
 | `IsInRun` | `Data.Run != null && AppState.CurrentState is RunAppState` |
 | `HasActiveRun` | `Data.HasActiveRun` (computed property on `Data`) |
 | `CanStartOrContinueRun` | `AutoBazaarSceneProbe.IsAtHeroSelectAndReadyForNewRun()` — true iff `SceneManager.GetActiveScene().name == "HeroSelectScene"` AND `AppState.CurrentState == null` AND `ClientCache.Profile.Value != null` |
@@ -42,7 +42,7 @@ Companion to [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md). Documents
 | `RerollsRemaining` | `(int)(Data.CurrentState?.RerollsRemaining ?? 0u)` |
 | `CurrentEncounterId` | `Data.CurrentState?.CurrentEncounterId` (already `string?`) |
 | `CurrentEncounterType` | Looks for a live `Data.Entities` card whose `TemplateId` matches `CurrentEncounterId`; uses `card.Template.GetType().Name` when available, otherwise `card.Type.ToString()` |
-| `ActionCooldownRemainingSeconds` | Passed in by `AutoBazaarRuntime`, computed from `_lastActionTime` |
+| `ActionCooldownRemainingSeconds` | Passed in by `AutoBazaarRuntimeController`, computed from the last non-wait action time and `IAutoBazaarOptions.ActionMinDelay` |
 | `InteractableTemplateIds` | `AutoBazaarInteractionFilterProbe.ReadCurrentFilter()` — reflection on `AppState._iteractionFilter`. Null/omitted when the list is empty or reflection fails. |
 
 ## State Mapping
@@ -96,7 +96,7 @@ Each action's inclusion criterion in terms of game-state paths:
 
 ## Error Handling
 
-`AutoBazaarContextBuilder.Build` wraps its body in try/catch. On any exception it logs via `BppLog.Error("AutoBazaar", ...)` and returns a degenerate context:
+`AutoBazaarGameContextReader.Build` wraps its body in try/catch. On any exception it logs through `IAutoBazaarLogger` and returns a degenerate context:
 
 - `IsEnabled` — from config (same as normal path)
 - `StateName` — `Unknown`

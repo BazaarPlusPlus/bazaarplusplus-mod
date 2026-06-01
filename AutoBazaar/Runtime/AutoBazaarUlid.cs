@@ -2,9 +2,9 @@
 using System;
 using System.Security.Cryptography;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
-internal static class AutoBazaarUlid
+public static class AutoBazaarUlid
 {
     private const string Alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     private static readonly object _gate = new();

@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.AutoBazaar;
+using BazaarPlusPlus.AutoBazaar;
 using Xunit;
 
 public class AutoBazaarActionQueueTests

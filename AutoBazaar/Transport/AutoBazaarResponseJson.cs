@@ -4,9 +4,9 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
-internal static class AutoBazaarResponseJson
+public static class AutoBazaarResponseJson
 {
     private static readonly JsonSerializerSettings Settings = new()
     {

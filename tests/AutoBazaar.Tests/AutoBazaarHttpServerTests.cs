@@ -5,19 +5,8 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.AutoBazaar;
+using BazaarPlusPlus.AutoBazaar;
 using Xunit;
-
-// Minimal shim so AutoBazaarHttpServer.cs compiles in the test project without BepInEx.
-namespace BazaarPlusPlus.Infrastructure
-{
-    internal static class BppLog
-    {
-        internal static void Error(string component, string message) { }
-
-        internal static void Error(string component, string message, Exception ex) { }
-    }
-}
 
 public class AutoBazaarHttpServerTests
 {
@@ -44,7 +33,13 @@ public class AutoBazaarHttpServerTests
                 System.IO.Path.GetTempPath(),
                 $"endpoint-{Guid.NewGuid():N}.json"
             );
-            Server = new AutoBazaarHttpServer(Port, EndpointJsonPath, () => CurrentSnapshot, Queue);
+            Server = new AutoBazaarHttpServer(
+                Port,
+                EndpointJsonPath,
+                () => CurrentSnapshot,
+                Queue,
+                new TestLogger()
+            );
             Server.Start();
         }
 
@@ -75,6 +70,15 @@ public class AutoBazaarHttpServerTests
             listener.Stop();
             return port;
         }
+    }
+
+    private sealed class TestLogger : IAutoBazaarLogger
+    {
+        public void Info(string message) { }
+
+        public void Warning(string message) { }
+
+        public void Error(string message, Exception? exception = null) { }
     }
 
     private static HttpClient Http() => new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

@@ -7,9 +7,9 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
-internal sealed class AutoBazaarDecisionLogEntry
+public sealed class AutoBazaarDecisionLogEntry
 {
     public string Ts { get; set; } = "";
     public ulong TickId { get; set; }
@@ -22,7 +22,7 @@ internal sealed class AutoBazaarDecisionLogEntry
     public string? Reason { get; set; }
 }
 
-internal sealed class AutoBazaarDecisionLog
+public sealed class AutoBazaarDecisionLog
 {
     private static readonly JsonSerializerSettings Settings = new()
     {

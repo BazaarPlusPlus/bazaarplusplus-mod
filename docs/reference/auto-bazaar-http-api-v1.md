@@ -1,6 +1,6 @@
 # AutoBazaar HTTP API v1
 
-> **Status: parked.** The AutoBazaar mount is commented out at `BppComposition.cs:120`, so this loopback HTTP server is **not started** in current builds. The wire contract below is preserved verbatim for re-enable (and is consumed by the external `bazaarplusplus-agent` repo) — uncomment the mount to activate. Field names (`stateName`, `availableActions`, `actionKind`, `cardInstanceId`, `targetSection`, `targetSockets`, `reason`) are stable wire contracts; do not rename. Field-by-field derivation lives in the companion [auto-bazaar-decision-surface.md](auto-bazaar-decision-surface.md).
+> **Status: parked.** The AutoBazaar host mount is commented out in `BppComposition.cs`, so this loopback HTTP server is **not started** in current builds. The wire contract below is preserved verbatim for re-enable (and is consumed by the external `bazaarplusplus-agent` repo) — uncomment `AutoBazaarHostMount` to activate. Field names (`stateName`, `availableActions`, `actionKind`, `cardInstanceId`, `targetSection`, `targetSockets`, `reason`) are stable wire contracts; do not rename. Field-by-field derivation lives in the companion [auto-bazaar-decision-surface.md](auto-bazaar-decision-surface.md).
 
 The AutoBazaar HTTP API exposes the current game state and accepts one action at a time, acting as pure transport and validation. All strategy, persistence, and training logic belong to external tools; the mod makes no decisions itself. The endpoint runs on loopback and is reachable at `http://127.0.0.1:<port>/v1/`.
 

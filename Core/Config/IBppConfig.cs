@@ -23,9 +23,5 @@ internal interface IBppConfig
 
     ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig { get; }
 
-    ConfigEntry<bool>? AutoBazaarEnabled { get; }
-
-    ConfigEntry<int>? AutoBazaarHttpListenerPort { get; }
-
     ConfigEntry<bool>? BazaarDbUploadEnabled { get; }
 }

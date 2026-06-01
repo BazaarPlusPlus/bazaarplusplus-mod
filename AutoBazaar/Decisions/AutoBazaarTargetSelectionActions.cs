@@ -1,14 +1,14 @@
 #nullable enable
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
-internal static class AutoBazaarTargetSelectionActions
+public static class AutoBazaarTargetSelectionActions
 {
     /// <summary>Lightweight value snapshot of an owned card, with everything the
     /// emitter needs to build a SelectItem decision option targeting it. Decoupled
     /// from game types so the helper stays unit-testable.</summary>
-    internal readonly record struct OwnedCardRef(
+    public readonly record struct OwnedCardRef(
         string InstanceId,
         string TemplateId,
         AutoBazaarTargetSection Section,

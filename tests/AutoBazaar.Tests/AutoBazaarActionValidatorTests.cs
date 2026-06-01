@@ -1,6 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
-using BazaarPlusPlus.Game.AutoBazaar;
+using BazaarPlusPlus.AutoBazaar;
 using Xunit;
 
 public class AutoBazaarActionValidatorTests

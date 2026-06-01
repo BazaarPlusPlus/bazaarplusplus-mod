@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Threading;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
-internal sealed class AutoBazaarContextSnapshot
+public sealed class AutoBazaarContextSnapshot
 {
     public AutoBazaarContext Context { get; }
     public ulong TickId => Context.TickId;
@@ -20,7 +20,7 @@ internal sealed class AutoBazaarContextSnapshot
     }
 }
 
-internal sealed class AutoBazaarContextSnapshotPublisher
+public sealed class AutoBazaarContextSnapshotPublisher
 {
     private ulong _tickId;
     private AutoBazaarContextSnapshot? _current;

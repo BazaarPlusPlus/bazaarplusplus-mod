@@ -5,7 +5,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.Game.AutoBazaarHost;
 
 /// <summary>
 /// Handles UI-level plumbing that the AutoBazaar runtime needs each tick:

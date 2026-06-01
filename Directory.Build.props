@@ -17,4 +17,9 @@
     <BaseIntermediateOutputPath>obj\Storage\</BaseIntermediateOutputPath>
     <BaseOutputPath>bin\Storage\</BaseOutputPath>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.AutoBazaar'">
+    <BaseIntermediateOutputPath>obj\AutoBazaar\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\AutoBazaar\</BaseOutputPath>
+  </PropertyGroup>
 </Project>

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using BazaarPlusPlus.Game.AutoBazaar;
+using BazaarPlusPlus.AutoBazaar;
 using Xunit;
 
 public class AutoBazaarUlidTests

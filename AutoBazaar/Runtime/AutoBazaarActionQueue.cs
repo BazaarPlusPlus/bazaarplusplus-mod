@@ -4,9 +4,9 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace BazaarPlusPlus.Game.AutoBazaar;
+namespace BazaarPlusPlus.AutoBazaar;
 
-internal sealed class AutoBazaarServerResponse
+public sealed class AutoBazaarServerResponse
 {
     public int HttpStatus { get; }
     public string JsonBody { get; }
@@ -18,7 +18,7 @@ internal sealed class AutoBazaarServerResponse
     }
 }
 
-internal sealed class PendingAction
+public sealed class PendingAction
 {
     private readonly TaskCompletionSource<AutoBazaarServerResponse> _tcs = new(
         TaskCreationOptions.RunContinuationsAsynchronously
@@ -57,7 +57,7 @@ internal sealed class PendingAction
     }
 }
 
-internal sealed class AutoBazaarActionQueue : IDisposable
+public sealed class AutoBazaarActionQueue : IDisposable
 {
     private readonly ConcurrentQueue<PendingAction> _queue = new();
     private readonly int _timeoutMs;
