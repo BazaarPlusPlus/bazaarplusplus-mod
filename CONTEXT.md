@@ -12,5 +12,5 @@ _Avoid_: node, map node
 An encounter that upgrades or enchants one of the player's existing items, rather than granting a new one. Whether the current Choice screen offers an upgrade pedestal, enchant pedestal, or neither is what drives the upgrade/enchant preview's "smart" mode.
 
 **Encounter status probe**:
-The on-demand, pull-based read of the player's *current* run/encounter state (`IEncounterStateProbe.GetCurrent()`). The project's chosen way to expose "where is the player in the run right now" — as a status query, not a recorded timeline.
+The on-demand, pull-based read of the player's *current* run/encounter state (`IEncounterStateProbe.GetEncounterIds()`, `GetChoicePedestal()`, `GetTargetingState()`). The project's chosen way to expose "where is the player in the run right now" — as status queries, not a recorded timeline.
 _Avoid_: encounter tracker, run timeline (deliberately not built — see [ADR-0001](docs/adr/0001-encounter-status-probe-not-timeline-tracker.md))

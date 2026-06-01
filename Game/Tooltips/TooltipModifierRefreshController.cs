@@ -55,12 +55,22 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
 
     private ResolveInputs ReadResolveInputs()
     {
-        return new ResolveInputs(
-            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview),
-            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview),
-            _config?.EnchantPreviewModeConfig?.Value,
-            _encounterState?.GetCurrent().ChoiceScreenPedestalKind ?? ChoiceScreenPedestalKind.None
-        );
+        var holdUpgrade = BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview);
+        var holdEnchant = BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview);
+        var enchantMode = _config?.EnchantPreviewModeConfig?.Value;
+        var pedestalKind = ChoiceScreenPedestalKind.None;
+        if (
+            !holdUpgrade
+            && !holdEnchant
+            && (enchantMode ?? PreviewVisibilityMode.AutoOnPedestalChoice)
+                == PreviewVisibilityMode.AutoOnPedestalChoice
+        )
+        {
+            pedestalKind =
+                _encounterState?.GetChoicePedestal().Kind ?? ChoiceScreenPedestalKind.None;
+        }
+
+        return new ResolveInputs(holdUpgrade, holdEnchant, enchantMode, pedestalKind);
     }
 
     private readonly record struct ResolveInputs(

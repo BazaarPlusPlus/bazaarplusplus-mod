@@ -1,6 +1,6 @@
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.GameState;
-using BazaarPlusPlus.Game.Encounter;
+using BazaarPlusPlus.GameInterop.Encounter;
 
 // Real datamined template ids from PedestalEnchantCatalog.
 var fiery = Guid.Parse("e36bfb52-5c63-4f59-815d-912af7917620");
@@ -107,6 +107,27 @@ AssertTrue(
         && multiResult.EnchantmentTypeNames.Contains("Fiery")
         && multiResult.EnchantmentTypeNames.Contains("Icy"),
     "Multiple offered enchant pedestals aggregate every offered enchant type."
+);
+
+var directTemplateResult = ChoiceScreenPedestalResolver.ResolveDetailedFromTemplateIds(
+    new[] { fiery, icy, unknown, Guid.Empty }
+);
+AssertEqual(
+    ChoiceScreenPedestalKind.Enchant,
+    directTemplateResult.Kind,
+    "Resolved template ids classify offered enchant pedestals without a selection lookup."
+);
+AssertTrue(
+    directTemplateResult.EnchantmentTypeNames.Count == 2
+        && directTemplateResult.EnchantmentTypeNames.Contains("Fiery")
+        && directTemplateResult.EnchantmentTypeNames.Contains("Icy"),
+    "Resolved template ids aggregate enchant types and skip unknown or empty template ids."
+);
+
+AssertEqual(
+    ChoiceScreenPedestalKind.None,
+    ChoiceScreenPedestalResolver.ResolveFromTemplateIds(Array.Empty<Guid>()),
+    "Empty resolved template ids classify as None."
 );
 
 Console.WriteLine("ChoiceScreenPedestalResolver checks passed.");

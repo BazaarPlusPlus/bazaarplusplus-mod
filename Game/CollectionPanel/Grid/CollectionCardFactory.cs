@@ -1,15 +1,14 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.HistoryPanel.Preview;
-using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 
@@ -32,7 +31,7 @@ internal sealed class CollectionCardFactory
         _parent = parent;
     }
 
-    public bool ReflectionReady => HistoryPanelCardPreviewReflection.SetUpMethod != null;
+    public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
 
     public CollectionCardBinding? TryBind(CollectionCardVm vm)
     {
@@ -43,7 +42,7 @@ internal sealed class CollectionCardFactory
         if (staticData == null)
             return null;
 
-        var template = HistoryPanelPreviewTemplateLookup.GetCardTemplate(staticData, vm.Id);
+        var template = BppStaticDataAccess.GetCardTemplate(staticData, vm.Id);
         if (template == null)
         {
             BppLog.Warn(
@@ -55,18 +54,23 @@ internal sealed class CollectionCardFactory
 
         var kind =
             vm.Type == ECardType.Skill
-                ? CollectionCardKind.ForSkill()
-                : CollectionCardKind.ForItem(vm.Size);
+                ? NativeCardPreviewKind.ForSkill()
+                : NativeCardPreviewKind.ForItem(vm.Size);
         var card = _pool.Take(kind, _parent);
         if (card == null)
             return null;
 
         var instance = BuildSyntheticInstance(vm);
-        var setUpTask = InvokeSetUpSafe(card, template, instance);
+        var setUpTask = NativeCardPreviewRuntime.InvokeSetUpSafe(
+            card,
+            template,
+            instance,
+            "CollectionCardFactory"
+        );
         return new CollectionCardBinding(card, kind, setUpTask);
     }
 
-    public void Return(Component? card, CollectionCardKind kind) => _pool.Return(card, kind);
+    public void Return(Component? card, NativeCardPreviewKind kind) => _pool.Return(card, kind);
 
     private TCardInstance BuildSyntheticInstance(CollectionCardVm vm)
     {
@@ -94,50 +98,13 @@ internal sealed class CollectionCardFactory
             Attributes = attributes,
         };
     }
-
-    // Accepts TCardInstance (base) so the same helper can launch both Item and Skill SetUp.
-    // The reflected SetUp on CardPreviewBase declares its instance parameter as the base
-    // class, so the JIT signature matches in both branches.
-    private static async Task InvokeSetUpSafe(
-        Component card,
-        TCardBase template,
-        TCardInstance instance
-    )
-    {
-        var method = HistoryPanelCardPreviewReflection.SetUpMethod;
-        if (method == null)
-            return;
-
-        try
-        {
-            var raw = method.Invoke(card, new object[] { template, false, instance });
-            if (raw is Task task)
-                await task;
-        }
-        catch (TargetInvocationException ex)
-        {
-            BppLog.Warn(
-                "CollectionCardFactory",
-                $"CardPreviewBase.SetUp threw for template={template.Id}: {ex.InnerException?.Message ?? ex.Message}"
-            );
-            throw;
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "CollectionCardFactory",
-                $"CardPreviewBase.SetUp invocation failed for template={template.Id}: {ex.Message}"
-            );
-            throw;
-        }
-    }
 }
 
 // One realized card + the bind kind we hand back to the pool on Return + the SetUp task we
 // must await before flipping the card visible (to avoid showing a frame mid-LoadArt).
 internal readonly struct CollectionCardBinding
 {
-    public CollectionCardBinding(Component card, CollectionCardKind kind, Task setUpTask)
+    public CollectionCardBinding(Component card, NativeCardPreviewKind kind, Task setUpTask)
     {
         Card = card;
         Kind = kind;
@@ -145,6 +112,6 @@ internal readonly struct CollectionCardBinding
     }
 
     public Component Card { get; }
-    public CollectionCardKind Kind { get; }
+    public NativeCardPreviewKind Kind { get; }
     public Task SetUpTask { get; }
 }

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.HistoryPanel.Preview;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.UI;
@@ -454,7 +454,11 @@ internal sealed class CollectionGridVirtualizer
         try
         {
             cell.Card.gameObject.SetActive(true);
-            HistoryPanelCardPreviewReflection.ShowMethod?.Invoke(cell.Card, new object[] { true });
+            NativeCardPreviewRuntime.Show(
+                cell.Card,
+                show: true,
+                logComponent: "CollectionGridVirtualizer"
+            );
             // Show(true) re-activates _cardImage / _frameContainer; the CanvasGroup at the
             // root was zeroed on Take, so the card still renders transparent. Hand the cell
             // off to TickFades to ramp it up.
@@ -550,7 +554,7 @@ internal sealed class CollectionGridVirtualizer
             int index,
             CollectionCardVm vm,
             Component card,
-            CollectionCardKind kind,
+            NativeCardPreviewKind kind,
             Task setUpTask,
             int generation,
             CollectionCardHoverRelay hoverRelay,
@@ -570,7 +574,7 @@ internal sealed class CollectionGridVirtualizer
         public int Index { get; }
         public CollectionCardVm Vm { get; }
         public Component Card { get; }
-        public CollectionCardKind Kind { get; }
+        public NativeCardPreviewKind Kind { get; }
         public Task SetUpTask { get; }
         public int Generation { get; }
         public CollectionCardHoverRelay HoverRelay { get; }

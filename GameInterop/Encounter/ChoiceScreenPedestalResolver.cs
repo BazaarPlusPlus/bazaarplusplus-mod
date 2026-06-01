@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.GameState;
 
-namespace BazaarPlusPlus.Game.Encounter;
+namespace BazaarPlusPlus.GameInterop.Encounter;
 
 /// <summary>The kind of pedestal offered on the choice screen plus, for enchant
 /// pedestals, the enchant type name(s) it would apply. The choice screen can list
@@ -35,6 +35,10 @@ internal static class ChoiceScreenPedestalResolver
         Func<string, Guid?> templateIdLookup
     ) => ResolveDetailed(selectionSet, templateIdLookup).Kind;
 
+    internal static ChoiceScreenPedestalKind ResolveFromTemplateIds(
+        IReadOnlyList<Guid>? templateIds
+    ) => ResolveDetailedFromTemplateIds(templateIds).Kind;
+
     internal static ChoiceScreenPedestalResult ResolveDetailed(
         IReadOnlyList<string>? selectionSet,
         Func<string, Guid?> templateIdLookup
@@ -46,6 +50,29 @@ internal static class ChoiceScreenPedestalResolver
         if (templateIdLookup == null)
             throw new ArgumentNullException(nameof(templateIdLookup));
 
+        var templateIds = new List<Guid>(selectionSet.Count);
+        foreach (var id in selectionSet)
+        {
+            if (string.IsNullOrEmpty(id))
+                continue;
+
+            var templateId = templateIdLookup(id);
+            if (templateId is null)
+                continue;
+
+            templateIds.Add(templateId.Value);
+        }
+
+        return ResolveDetailedFromTemplateIds(templateIds);
+    }
+
+    internal static ChoiceScreenPedestalResult ResolveDetailedFromTemplateIds(
+        IReadOnlyList<Guid>? templateIds
+    )
+    {
+        if (templateIds == null || templateIds.Count == 0)
+            return ChoiceScreenPedestalResult.None;
+
         // A choice screen historically never mixes upgrade and enchant pedestals, so
         // taking the first non-None pedestal's kind is safe; enchant type names are
         // still aggregated across every offered enchant pedestal so the preview can
@@ -54,16 +81,12 @@ internal static class ChoiceScreenPedestalResolver
         var enchantNames = new List<string>();
         var seenNames = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var id in selectionSet)
+        foreach (var templateId in templateIds)
         {
-            if (string.IsNullOrEmpty(id))
+            if (templateId == Guid.Empty)
                 continue;
 
-            var templateId = templateIdLookup(id);
-            if (templateId is null || templateId.Value == Guid.Empty)
-                continue;
-
-            var entryKind = PedestalEnchantCatalog.Classify(templateId.Value, out var enchant);
+            var entryKind = PedestalEnchantCatalog.Classify(templateId, out var enchant);
             if (kind == ChoiceScreenPedestalKind.None && entryKind != ChoiceScreenPedestalKind.None)
                 kind = entryKind;
 

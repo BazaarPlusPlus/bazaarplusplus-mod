@@ -9,7 +9,7 @@ using TheBazaar.AppFramework;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.HeroPortraits;
+namespace BazaarPlusPlus.GameInterop.HeroPortraits;
 
 internal static class HeroPortraitSpriteProvider
 {

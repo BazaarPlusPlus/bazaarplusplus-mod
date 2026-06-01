@@ -50,10 +50,17 @@ All three csproj files live in the repo root. `ModApi/` and `Storage/` are the s
 
 **Layer boundaries:**
 - `Core/` — pure abstractions (config, event bus, paths, runtime interfaces). Zero game DLL references.
-- `GameInterop/` — game DLL coupling layer (`BppClientCacheBridge`, `GameStateProbe`, `RunContextStore`, `IRunContext`, game-typed events like `CombatSimObserved`/`NetMessageObserved`).
+- `GameInterop/` — game DLL coupling layer (`BppClientCacheBridge`, `GameStateProbe`, `RunContextStore`, `IRunContext`, game-typed events like `CombatSimObserved`/`NetMessageObserved`, shared native adapters like encounter reads, static card data, card preview prefabs, and hero portrait assets).
 - `Game/` — feature implementations organized by subdirectory (CombatReplay, HistoryPanel, RunLogging, Screenshots, Tooltips, etc.).
 - `Patches/` — Harmony patches, organized by feature area. `BppPatchHost` provides the static service locator that patches use to reach `IBppServices`.
 - `Infrastructure/` — cross-cutting utilities (logging, fonts, UI design tokens).
+
+**Architecture layering rules:**
+- Put reusable adapters over The Bazaar/Unity runtime surfaces in `GameInterop/`: `AppState`/`Data` status reads, `ClientCache` reflection, static card data, native card-preview prefabs/reflection, shared game asset lookup, and game-typed event payloads.
+- Keep feature workflows, UI state, product policy, filtering/classification rules, upload decisions, and storage orchestration in `Game/`. Do not move logic into `GameInterop/` only because it mentions game enums or DTOs.
+- If two features need the same runtime/prefab/static-data behavior, extract the adapter to `GameInterop/<Concept>/` and have both features consume that seam. Do not make one feature import another feature's internal implementation only to reuse a game-runtime adapter.
+- Patches may target feature services through `BppPatchHost`, but shared Harmony reflection helpers or native runtime adapters should live in `GameInterop/` or `Infrastructure/`, not inside a feature directory.
+- Add or extend architecture tests when establishing a new boundary that the compiler cannot enforce.
 
 **Key patterns:**
 - Game assemblies are publicized at build time (`<PublicizeAll>true</PublicizeAll>` via Krafs.Publicizer), so all `internal` game types/members are accessible.

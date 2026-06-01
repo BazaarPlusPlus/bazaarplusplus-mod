@@ -10,6 +10,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
@@ -115,10 +116,11 @@ internal static class AutoBazaarContextBuilder
         bool canReroll =
             canHandleOp(StateOps.Reroll) && rerollsRemaining > 0 && playerGold >= rerollCost;
 
-        var encounter = services.EncounterState.GetCurrent();
+        var encounterIds = services.EncounterState.GetEncounterIds();
+        var targeting = services.EncounterState.GetTargetingState();
 
-        string? currentEncounterId = encounter.CurrentEncounterId;
-        string? currentEncounterType = encounter.CurrentEncounterType;
+        string? currentEncounterId = encounterIds.CurrentEncounterId;
+        string? currentEncounterType = EncounterTypeResolver.Resolve(currentEncounterId);
 
         // --- Card inventories ---
         bool canSell = canHandleOp(StateOps.SellItem);
@@ -142,7 +144,7 @@ internal static class AutoBazaarContextBuilder
         // Target-selection mode (upgrade/enchant): when AppState._iteractionFilter
         // is non-empty, the game restricts SelectItem to owned cards whose
         // templateId is in the filter. Offer-based clicks silently no-op.
-        var interactionFilterList = encounter.InteractionFilterTemplateIds;
+        var interactionFilterList = targeting.InteractionFilterTemplateIds;
         ISet<string>? interactionFilter =
             interactionFilterList.Count > 0 ? new HashSet<string>(interactionFilterList) : null;
 
@@ -161,7 +163,7 @@ internal static class AutoBazaarContextBuilder
             canMove,
             canSell,
             run,
-            encounter.PedestalEligibleInstanceIds
+            targeting.PedestalEligibleInstanceIds
         );
 
         if (interactionFilter is not null)

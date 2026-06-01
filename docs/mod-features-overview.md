@@ -23,7 +23,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好 9 个 `IBppMountable`（第 10 个 `AutoBazaarMount` 在 `BppComposition.cs:120` 注释掉，parked） |
 | `BppComposition.cs` | 创建 `IBppServices`，注册 `RunLifecycleModule`、`CombatReplayModule`、`CombatStatusBarModule`，并把所有 `IBppMountable`（feature runtime）和 `ISettingsDockEntry`（设置坞入口）汇总到两个 registry |
 | `Core/` | 纯抽象：配置、事件总线、路径、run context、运行时服务接口 |
-| `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`BppStaticDataAccess`，以及带 game type 的事件 + `IRunContext` 接口 |
+| `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`Encounter/`、`StaticCards/`、`CardPreview/`、`HeroPortraits/`，以及带 game type 的事件 + `IRunContext` 接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
 挂载的 9 个 `IBppMountable`（实际注册见 `BppComposition.cs:95-118`；多数是泛型 `ComponentMount<T>`，仅 `HistoryPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<CardSetPreviewRuntime>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbScreenshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`ComponentMount<TooltipModifierRefreshController>`。第 10 个 `AutoBazaarMount` 在 `BppComposition.cs:120` 被注释（parked）。新增 feature 只需在 `BppComposition` 加一行 `_mountables.Register(...)`。
@@ -52,7 +52,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **可视性模式**：附魔与升级各有独立的 3 态配置（`Off` / `AutoOnPedestalChoice` / `Always`），默认 `AutoOnPedestalChoice`
 - **自动触发**：在 `ChoiceState` 选择屏遇到对应种类 pedestal 时，hover 物品自动展示匹配的预览；非 pedestal 选项或非 ChoiceState 不会自动触发
 - **手动覆盖**：按住 `HoldEnchantPreview`（默认 Ctrl）/ `HoldUpgradePreview`（默认 Shift）总是显示对应预览，等级最高，覆盖所有模式
-- **共享决策**：`TooltipModifierRefreshController`、`ItemEnchantPreviewPatch`、`UpgradePreviewTooltipPatch` 共同调用 `Game/Tooltips/TooltipPreviewModePolicy.Resolve`，保证三处行为一致；模式由 `Game/Encounter/ChoiceScreenPedestalResolver` 从 `RunState.SelectionSet` 推导
+- **共享决策**：`TooltipModifierRefreshController`、`ItemEnchantPreviewPatch`、`UpgradePreviewTooltipPatch` 共同调用 `Game/Tooltips/TooltipPreviewModePolicy.Resolve`，保证三处行为一致；模式由 `GameInterop/Encounter/ChoiceScreenPedestalResolver` 从 `RunState.SelectionSet` 推导
 - **迁移**：首次启动会把旧的 `[EnchantPreview] AlwaysShow = true/false` 自动迁移到 `[EnchantPreview] Mode = Always / AutoOnPedestalChoice`，并从配置文件移除旧键
 
 详见 [features/tooltip-preview.md](features/tooltip-preview.md) 与 [ADR-0004](adr/0004-preview-visibility-three-state-mode.md)。

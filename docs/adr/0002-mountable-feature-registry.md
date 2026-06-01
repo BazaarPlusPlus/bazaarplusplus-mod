@@ -6,7 +6,7 @@
 
 Non-`MonoBehaviour` modules already had a clean pattern: `IBppFeature` (`Start()`/`Stop()`) + `BppFeatureRegistry`, owned by `BppComposition`. `MonoBehaviour` features had no equivalent — each of ~10 (AutoBazaar, combat replay, history panel, status bar, run logging, screenshots, tooltip refresh, video recorder, …) was hand-wired in three places in `Plugin.cs` (`using`, `AttachRuntimeComponents`, `DetachRuntimeComponents`). To DLL-disable one you had to touch all three, and a cfg flag like `AutoBazaarEnabled` only gated the inner HTTP listener — the `MonoBehaviour`, its `Update` tick, snapshot publisher, and reflection probes still loaded and ran every frame.
 
-AutoBazaar was the first user (see [archived spec](../design/archive/2026-05-22-autobazaar-mountable-and-encounter-decoupling-design.md)). The same change also extracted AutoBazaar's incidental encounter reads into a `Game/Encounter/` module behind a pull-based `IEncounterStateProbe` — the probe surface that [ADR-0001](0001-encounter-status-probe-not-timeline-tracker.md) settles on and that [tooltip-preview.md](../features/tooltip-preview.md) consumes.
+AutoBazaar was the first user (see [archived spec](../design/archive/2026-05-22-autobazaar-mountable-and-encounter-decoupling-design.md)). The same change also extracted AutoBazaar's incidental encounter reads into a pull-based `IEncounterStateProbe`; that adapter now lives under `GameInterop/Encounter/`, matching its game-runtime read surface. This is the probe surface that [ADR-0001](0001-encounter-status-probe-not-timeline-tracker.md) settles on and that [tooltip-preview.md](../features/tooltip-preview.md) consumes.
 
 ## Consequences
 

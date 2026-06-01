@@ -137,7 +137,7 @@ Split Unity runtime disposal from catalog invalidation so scene changes tear dow
 
 Keep invalidation on locale changes because `CollectionCardVm.DisplayName` is computed once during VM creation: `Game/CollectionPanel/CollectionPanel.cs:91-102` and `Game/CollectionPanel/Data/CollectionCardVm.From.cs:21-23`.
 
-Guard the cache by static-data manager identity or an equivalent source token so a forced game data manager recreation does not leave BPP with stale VMs: `GameInterop/BppStaticDataAccess.cs:13-19` and `decompiled/TheBazaarRuntime/TheBazaar/Data.cs:503-516`.
+Guard the cache by static-data manager identity or an equivalent source token so a forced game data manager recreation does not leave BPP with stale VMs: `GameInterop/StaticCards/BppStaticDataAccess.cs:13-19` and `decompiled/TheBazaarRuntime/TheBazaar/Data.cs:503-516`.
 
 Keep art/material caches scene-bound because they hold Unity/Addressables objects and already have explicit `DisposeAll()` lifecycles: `Game/CollectionPanel/Grid/CollectionCardArtCache.cs:120-139` and `Game/CollectionPanel/Grid/CollectionCardMaterialCache.cs:53-71`.
 
@@ -171,7 +171,7 @@ A persisted snapshot must include a BPP snapshot schema version, classifier vers
 
 The snapshot should live under the BPP data root, following the existing `BepInExPathProvider` convention for `BazaarPlusPlusV4`: `Core/Paths/BepInExPathProvider.cs:20-40`.
 
-On a snapshot hit, the panel still must wait until `BppStaticDataAccess.TryGet()` succeeds because card binding still needs live game templates by GUID: `GameInterop/BppStaticDataAccess.cs:13-19` and `Game/CollectionPanel/Grid/CollectionCardFactory.cs:42-47`.
+On a snapshot hit, the panel still must wait until `BppStaticDataAccess.TryGet()` succeeds because card binding still needs live game templates by GUID: `GameInterop/StaticCards/BppStaticDataAccess.cs:13-19` and `Game/CollectionPanel/Grid/CollectionCardFactory.cs:42-47`.
 
 On a snapshot miss or parse failure, the panel should fall back to the live `CollectionCatalog.TryCreateBuildSession(...)` / `CollectionCatalogBuildSession.Step(...)` path and rewrite the snapshot after a successful build: `Game/CollectionPanel/Data/CollectionCatalog.cs:45-110` and `Game/CollectionPanel/Data/CollectionCatalogBuildSession.cs:33-66`.
 
@@ -183,7 +183,7 @@ Status: Deferred.
 
 No catalog or prefab-reference prewarm has been implemented. The current path remains lazy and succeeds without prewarm.
 
-Catalog prewarm can run after the static data manager is ready, but it must not create Unity card instances or Addressables handles outside the panel lifecycle: `GameInterop/BppStaticDataAccess.cs:13-19` and `Game/CollectionPanel/CollectionPanel.cs:385-392`.
+Catalog prewarm can run after the static data manager is ready, but it must not create Unity card instances or Addressables handles outside the panel lifecycle: `GameInterop/StaticCards/BppStaticDataAccess.cs:13-19` and `Game/CollectionPanel/CollectionPanel.cs:385-392`.
 
 Prefab-reference prewarm is only useful after `MonsterBoardTooltip` prefab references exist, because `CollectionCardPool.TryEnsurePrefabRefs()` searches `Resources.FindObjectsOfTypeAll(...)`: `Game/CollectionPanel/Grid/CollectionCardPool.cs:93-148`.
 

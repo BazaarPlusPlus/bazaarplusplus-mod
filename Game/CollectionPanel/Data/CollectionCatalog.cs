@@ -2,9 +2,8 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Cards;
-using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
-using TheBazaar.DataManagement.Json;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -50,21 +49,31 @@ internal sealed class CollectionCatalog
         session = null;
         unavailableReason = string.Empty;
 
-        var managerObject = BppStaticDataAccess.TryGet();
-        if (managerObject is not JsonGameDataManager manager)
-        {
-            unavailableReason = "static-data-not-ready";
-            BppLog.Debug(
-                "CollectionCatalog",
-                "Static data manager not yet ready; catalog build deferred."
-            );
-            return false;
-        }
-
+        object? managerObject;
         Dictionary<Guid, ITCard>? map;
         try
         {
-            map = manager.GetCardMap();
+            if (
+                !BppStaticDataAccess.TryGetCardMap(
+                    out managerObject,
+                    out map,
+                    out unavailableReason
+                )
+            )
+            {
+                if (unavailableReason == "static-data-not-ready")
+                {
+                    BppLog.Debug(
+                        "CollectionCatalog",
+                        "Static data manager not yet ready; catalog build deferred."
+                    );
+                }
+                else if (unavailableReason == "card-map-null")
+                {
+                    BppLog.Warn("CollectionCatalog", "GetCardMap() returned null.");
+                }
+                return false;
+            }
         }
         catch (Exception ex)
         {
@@ -73,7 +82,7 @@ internal sealed class CollectionCatalog
             return false;
         }
 
-        if (map == null)
+        if (managerObject == null || map == null)
         {
             unavailableReason = "card-map-null";
             BppLog.Warn("CollectionCatalog", "GetCardMap() returned null.");

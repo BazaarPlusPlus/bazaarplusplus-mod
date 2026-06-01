@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 using System.Reflection;
-using BazaarPlusPlus.Game.HistoryPanel.Preview;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -54,16 +54,7 @@ internal sealed class CollectionCardHoverRelay
 
     private static MethodInfo? ResolveHoverMethod(string name)
     {
-        var type = HistoryPanelCardPreviewReflection.CardPreviewBaseType;
-        if (type == null)
-            return null;
-        return type.GetMethod(
-            name,
-            BindingFlags.Public | BindingFlags.Instance,
-            null,
-            Type.EmptyTypes,
-            null
-        );
+        return NativeCardPreviewReflection.ResolvePublicInstanceMethod(name);
     }
 
     private static void InvokeSafe(Component target, MethodInfo? method, string label)

@@ -8,7 +8,7 @@ using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.Encounter;
+namespace BazaarPlusPlus.GameInterop.Encounter;
 
 /// <summary>Reads the active <c>PedestalState</c>'s eligible-card set once per tick.
 /// Calls <c>PedestalState.ValidateCards()</c> via reflection (it's private but

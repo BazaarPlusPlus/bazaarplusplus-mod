@@ -5,7 +5,7 @@ using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.Encounter;
+namespace BazaarPlusPlus.GameInterop.Encounter;
 
 /// <summary>Reads <c>AppState._iteractionFilter</c> via reflection. When the
 /// filter is non-empty, the game is in a target-selection state (upgrade,

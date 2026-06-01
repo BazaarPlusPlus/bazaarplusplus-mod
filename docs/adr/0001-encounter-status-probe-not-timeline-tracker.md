@@ -1,6 +1,6 @@
 # Use an on-demand encounter status probe, not a run-timeline tracker
 
-We expose the player's current run/encounter state through an on-demand, pull-based probe (`IEncounterStateProbe.GetCurrent()`) and deliberately do **not** record an event-sourced timeline of a run's decision flow.
+We expose the player's current run/encounter state through an on-demand, pull-based probe (`IEncounterStateProbe`) and deliberately do **not** record an event-sourced timeline of a run's decision flow. The probe is split by read cost: lightweight encounter ids, choice-screen pedestal classification, and heavier target-selection legality.
 
 ## Context
 
@@ -12,4 +12,4 @@ It required a large amount of fragile capture code — PVPCombat attribution car
 
 - Encounter state is queryable as **"now"**, not as history. If a real timeline consumer ever materializes (e.g. server-side run-path reconstruction or analytics on decision chains), reopen this decision.
 - The dead encounter-selection scaffolding in `Storage/RunLog` — `RunLogOptionSnapshot`, `RunLogPendingSelectionState`, and `RunLogEvent`'s selection fields (`Options`, `SelectionSeq`, `SelectionFingerprint`, `SelectionContextRules`, `Selected*`) — is removed rather than wired up.
-- Subsystems that need current encounter facts read the probe snapshot, or — for message-bound readers like PvpBattles whose data is a per-battle network-message snapshot, not "now" — share the probe's pure resolvers (id resolution, the PVPCombat carve-out rule) rather than reading the probe directly.
+- Subsystems that need current encounter facts read the narrow probe snapshot they need, or — for message-bound readers like PvpBattles whose data is a per-battle network-message snapshot, not "now" — share the probe's pure resolvers (id resolution, the PVPCombat carve-out rule) rather than reading the probe directly.

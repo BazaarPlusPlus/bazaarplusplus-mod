@@ -1,14 +1,13 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
-using BazaarPlusPlus.GameInterop;
-using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
@@ -39,7 +38,7 @@ internal sealed class BattleBoardCardFactory
         _layer = layer;
     }
 
-    public bool ReflectionReady => HistoryPanelCardPreviewReflection.SetUpMethod != null;
+    public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
 
     // Ensure the pool exists and its prefab refs are resolved. Returns false when the native
     // MonsterBoardTooltip prefabs are not yet available.
@@ -64,10 +63,7 @@ internal sealed class BattleBoardCardFactory
         if (staticData == null)
             return null;
 
-        var template = HistoryPanelPreviewTemplateLookup.GetCardTemplate(
-            staticData,
-            spec.TemplateId
-        );
+        var template = BppStaticDataAccess.GetCardTemplate(staticData, spec.TemplateId);
         if (template == null)
             return null;
 
@@ -86,29 +82,22 @@ internal sealed class BattleBoardCardFactory
             return null;
 
         var instance = BuildSyntheticInstance(spec, index);
-        var setUpTask = InvokeSetUpSafe(card, template, instance);
+        var setUpTask = NativeCardPreviewRuntime.InvokeSetUpSafe(
+            card,
+            template,
+            instance,
+            "BattleBoardPreview"
+        );
         return new BattleBoardSpawn(card, setUpTask);
     }
 
     public void Show(IReadOnlyList<Component> cards)
     {
-        var show = HistoryPanelCardPreviewReflection.ShowMethod;
-        if (show == null)
-            return;
-
-        var args = new object[] { true };
         foreach (var card in cards)
         {
             if (card == null)
                 continue;
-            try
-            {
-                show.Invoke(card, args);
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn("BattleBoardPreview", $"CardPreviewBase.Show threw: {ex.Message}");
-            }
+            NativeCardPreviewRuntime.Show(card, show: true, logComponent: "BattleBoardPreview");
         }
     }
 
@@ -153,66 +142,5 @@ internal sealed class BattleBoardCardFactory
                     ? new Dictionary<ECardAttributeType, int>(spec.Attributes)
                     : new Dictionary<ECardAttributeType, int>(),
         };
-    }
-
-    private static async Task InvokeSetUpSafe(
-        Component card,
-        TCardBase template,
-        TCardInstanceItem instance
-    )
-    {
-        var method = HistoryPanelCardPreviewReflection.SetUpMethod;
-        if (method == null)
-            return;
-
-        try
-        {
-            var raw = method.Invoke(card, new object[] { template, false, instance });
-            if (raw is Task task)
-                await task;
-        }
-        catch (TargetInvocationException ex)
-        {
-            BppLog.Warn(
-                "BattleBoardPreview",
-                $"CardPreviewBase.SetUp threw for template={template?.Id}: {ex.InnerException?.Message ?? ex.Message}"
-            );
-            throw;
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "BattleBoardPreview",
-                $"CardPreviewBase.SetUp invocation failed for template={template?.Id}: {ex.Message}"
-            );
-            throw;
-        }
-    }
-}
-
-internal static class HistoryPanelPreviewTemplateLookup
-{
-    private static MethodInfo? _getCardByIdMethod;
-    private static Type? _lastStaticDataType;
-
-    public static TCardBase? GetCardTemplate(object? staticData, Guid templateId)
-    {
-        if (staticData == null || templateId == Guid.Empty)
-            return null;
-
-        var staticType = staticData.GetType();
-        if (!ReferenceEquals(_lastStaticDataType, staticType))
-        {
-            _lastStaticDataType = staticType;
-            _getCardByIdMethod = staticType.GetMethod(
-                "GetCardById",
-                BindingFlags.Public | BindingFlags.Instance,
-                null,
-                new[] { typeof(Guid) },
-                null
-            );
-        }
-
-        return _getCardByIdMethod?.Invoke(staticData, new object[] { templateId }) as TCardBase;
     }
 }

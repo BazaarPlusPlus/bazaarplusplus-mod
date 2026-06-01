@@ -2,7 +2,7 @@
 
 Status: Draft
 
-> Supersession note: CollectionPanel is taking the first implementation pass through `Game/HeroPortraits/HeroPortraitSpriteProvider`. When HistoryPanel work starts, reuse that provider and only add HistoryPanel-specific `Label` badge rendering and ListView stale-bind protection here.
+> Supersession note: CollectionPanel is taking the first implementation pass through `GameInterop/HeroPortraits/HeroPortraitSpriteProvider`. When HistoryPanel work starts, reuse that provider and only add HistoryPanel-specific `Label` badge rendering and ListView stale-bind protection here.
 
 > 范围：把 HistoryPanel run 行 / battle 行里那个三字母英雄 **文本徽章**（如 `VAN`/`PYG`，由 `GetHeroBadgeStyle` 生成）换成英雄**真实头像 Sprite**，文本徽章降级为加载失败/无图时的 fallback。**仅 UI 渲染层改动**，不动数据层、不动 SQLite、不动上传。
 > 关联：[../features/history-panel.md](../features/history-panel.md)（HistoryPanel 布局 / 行结构）、[archive/2026-05-29-historypanel-fullscreen-responsive-design.md](archive/2026-05-29-historypanel-fullscreen-responsive-design.md)（全屏外壳前身）、[2026-05-31-collection-panel-design.md](2026-05-31-collection-panel-design.md)（同样用「GUID/枚举 → 游戏原生资源」的取图思路）。

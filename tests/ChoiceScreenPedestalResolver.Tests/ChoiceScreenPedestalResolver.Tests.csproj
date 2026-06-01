@@ -25,11 +25,11 @@
       Link="ChoiceScreenPedestalKind.cs"
     />
     <Compile
-      Include="..\..\Game\Encounter\ChoiceScreenPedestalResolver.cs"
+      Include="..\..\GameInterop\Encounter\ChoiceScreenPedestalResolver.cs"
       Link="ChoiceScreenPedestalResolver.cs"
     />
     <Compile
-      Include="..\..\Game\Encounter\PedestalEnchantCatalog.cs"
+      Include="..\..\GameInterop\Encounter\PedestalEnchantCatalog.cs"
       Link="PedestalEnchantCatalog.cs"
     />
     <Reference Include="BazaarGameShared">

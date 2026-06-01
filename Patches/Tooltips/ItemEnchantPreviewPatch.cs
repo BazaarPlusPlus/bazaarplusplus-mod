@@ -1,6 +1,7 @@
 #nullable enable
 #pragma warning disable CS0436
 using System.Text;
+using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Infrastructure;
@@ -51,14 +52,21 @@ public static class CardTooltipDataPassivePatch
                 return;
 
             var services = BppPatchHost.Services;
-            var mode = TooltipPreviewModePolicy.Resolve(services.Config, services.EncounterState);
+            ChoicePedestalSnapshot? choicePedestal =
+                TooltipPreviewModePolicy.ShouldReadChoicePedestal(services.Config)
+                    ? services.EncounterState?.GetChoicePedestal()
+                    : null;
+            var mode = TooltipPreviewModePolicy.Resolve(services.Config, choicePedestal);
             if (mode != TooltipPreviewMode.Enchant)
                 return;
 
             // On an enchant pedestal choice screen, restrict the preview to the
             // enchant type(s) that pedestal would apply; empty otherwise (manual
             // Ctrl / Always) so the full preview is kept.
-            var restrictTo = services.EncounterState?.GetCurrent().ChoiceScreenEnchantmentTypeNames;
+            var restrictTo = TooltipPreviewModePolicy.ResolveEnchantRestriction(
+                services.Config,
+                choicePedestal
+            );
 
             var previewSegments = ItemEnchantPreviewService.BuildPreviewSegments(
                 __instance.CardInstance,

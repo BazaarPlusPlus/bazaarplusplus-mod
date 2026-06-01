@@ -8,7 +8,7 @@ Enchant and upgrade tooltip previews each have an independent three-state visibi
 
 The old behaviour had no notion of relevance: enchant preview was shown on every eligible tooltip whenever `EnchantPreviewAlwaysShow` (default `true`) was set — noisy and a spoiler when no encounter was offering an enchant — while upgrade preview was invisible unless the player held Shift. Neither reflected whether a pedestal was actually being offered *right now*.
 
-The game already exposes that signal: while the player is on the map choosing (`ChoiceState`), `RunState.SelectionSet` lists the offered encounter template GUIDs, and a pedestal card's `Behavior` (`TPedestalBehaviorUpgrade` vs `TPedestalBehaviorEnchant`/`EnchantRandom`) says which kind it is. A single `SelectionSet` never offers both an upgrade and an enchant pedestal at once, so the state is a plain enum, not flags. This rides the existing `Game/Encounter/EncounterStateProbe` snapshot (see [ADR-0002](0002-mountable-feature-registry.md)) plus `ChoiceScreenPedestalResolver`, with no new event plumbing and no UI patches.
+The game already exposes that signal: while the player is on the map choosing (`ChoiceState`), `RunState.SelectionSet` lists the offered encounter template GUIDs, and a pedestal card's `Behavior` (`TPedestalBehaviorUpgrade` vs `TPedestalBehaviorEnchant`/`EnchantRandom`) says which kind it is. A single `SelectionSet` never offers both an upgrade and an enchant pedestal at once, so the state is a plain enum, not flags. This rides the existing `GameInterop/Encounter/EncounterStateProbe` read adapter (see [ADR-0002](0002-mountable-feature-registry.md)) plus `ChoiceScreenPedestalResolver`, with no new event plumbing and no UI patches.
 
 ## Consequences
 

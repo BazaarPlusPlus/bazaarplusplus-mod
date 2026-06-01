@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.GameState;
 
-namespace BazaarPlusPlus.Game.Encounter;
+namespace BazaarPlusPlus.GameInterop.Encounter;
 
 /// <summary>Maps a pedestal encounter's stable <c>TemplateId</c> to its effect.
 ///

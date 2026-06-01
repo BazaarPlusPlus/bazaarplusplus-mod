@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.HeroPortraits;
+using BazaarPlusPlus.GameInterop.HeroPortraits;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;

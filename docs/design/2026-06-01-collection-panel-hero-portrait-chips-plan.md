@@ -4,7 +4,7 @@
 
 **Goal:** Replace CollectionPanel hero filter text chips with readable hero chips that show the game's native hero portrait sprite when available, while keeping text fallback and preparing the same sprite provider for a later HistoryPanel badge pass.
 
-**Architecture:** Add a small shared hero portrait sprite provider under `Game/HeroPortraits/` that uses the game's own `CollectionManager.GetDefaultHeroSkin(EHero)` -> `SkinAssetDataSO.LoadPortraitSpriteAsync()` path, with per-hero cache and in-flight task coalescing. CollectionPanel consumes that provider from its UITK hero chip factory by rendering a child icon inside each existing `Button`, leaving filter state, catalog, overlay, card virtualizer, and selection behavior unchanged.
+**Architecture:** Add a small shared hero portrait sprite provider under `GameInterop/HeroPortraits/` that uses the game's own `CollectionManager.GetDefaultHeroSkin(EHero)` -> `SkinAssetDataSO.LoadPortraitSpriteAsync()` path, with per-hero cache and in-flight task coalescing. CollectionPanel consumes that provider from its UITK hero chip factory by rendering a child icon inside each existing `Button`, leaving filter state, catalog, overlay, card virtualizer, and selection behavior unchanged.
 
 **Tech Stack:** C# 12, Unity UI Toolkit, Unity `Sprite`, The Bazaar `CollectionManager` / `SkinAssetDataSO`, BepInEx logging through `BppLog`, existing `Infrastructure/UiTokens` tokens.
 
@@ -22,7 +22,7 @@
 
 ## File Structure
 
-- Create `Game/HeroPortraits/HeroPortraitSpriteProvider.cs`
+- Create `GameInterop/HeroPortraits/HeroPortraitSpriteProvider.cs`
   - Shared game-coupled asset provider for default hero portrait sprites.
   - Owns per-hero completed cache and in-flight task coalescing.
   - Skips `EHero.Common` and `EHero.Hero8`.
@@ -51,11 +51,11 @@
 ### Task 1: Add Shared Hero Portrait Sprite Provider
 
 **Files:**
-- Create: `Game/HeroPortraits/HeroPortraitSpriteProvider.cs`
+- Create: `GameInterop/HeroPortraits/HeroPortraitSpriteProvider.cs`
 
 - [ ] **Step 1: Create the provider file**
 
-Create `Game/HeroPortraits/HeroPortraitSpriteProvider.cs`:
+Create `GameInterop/HeroPortraits/HeroPortraitSpriteProvider.cs`:
 
 ```csharp
 #nullable enable
@@ -68,7 +68,7 @@ using TheBazaar;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.HeroPortraits;
+namespace BazaarPlusPlus.GameInterop.HeroPortraits;
 
 internal static class HeroPortraitSpriteProvider
 {
@@ -177,7 +177,7 @@ Expected: build succeeds.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Game/HeroPortraits/HeroPortraitSpriteProvider.cs
+git add GameInterop/HeroPortraits/HeroPortraitSpriteProvider.cs
 git commit -m "Add shared hero portrait sprite provider"
 ```
 
@@ -238,7 +238,7 @@ git commit -m "Add collection hero chip UI state"
 In `Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs`, add this `using` with the other project namespaces:
 
 ```csharp
-using BazaarPlusPlus.Game.HeroPortraits;
+using BazaarPlusPlus.GameInterop.HeroPortraits;
 using UnityEngine.UIElements;
 ```
 
@@ -524,7 +524,7 @@ Expected:
 After Task 4 succeeds, add this note near the top of `docs/design/2026-05-31-history-panel-hero-portrait-badge-design.md`, below `Status: Draft`:
 
 ```markdown
-> Supersession note: CollectionPanel is taking the first implementation pass through `Game/HeroPortraits/HeroPortraitSpriteProvider`. When HistoryPanel work starts, reuse that provider and only add HistoryPanel-specific `Label` badge rendering and ListView stale-bind protection here.
+> Supersession note: CollectionPanel is taking the first implementation pass through `GameInterop/HeroPortraits/HeroPortraitSpriteProvider`. When HistoryPanel work starts, reuse that provider and only add HistoryPanel-specific `Label` badge rendering and ListView stale-bind protection here.
 ```
 
 - [ ] **Step 2: Update `docs/design/README.md` if implementation lands**

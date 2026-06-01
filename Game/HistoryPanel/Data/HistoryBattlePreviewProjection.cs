@@ -6,9 +6,8 @@ using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Socket;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect.AuraActions;
-using BazaarPlusPlus.Game.HistoryPanel.Preview;
 using BazaarPlusPlus.Game.PvpBattles;
-using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
@@ -352,9 +351,7 @@ internal static class HistoryBattlePreviewProjection
 
     private static object? GetTemplate(object? staticData, Guid templateId)
     {
-        // Delegate to the cached GetCardById(Guid) reflection lookup shared with the preview
-        // renderer so the MethodInfo is resolved once per static-data type rather than per call.
-        return HistoryPanelPreviewTemplateLookup.GetCardTemplate(staticData, templateId);
+        return BppStaticDataAccess.GetCardTemplate(staticData, templateId);
     }
 
     private static ETier ParseTier(string? value)

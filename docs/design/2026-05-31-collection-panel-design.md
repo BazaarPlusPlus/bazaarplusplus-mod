@@ -48,7 +48,7 @@ Status: Implemented with follow-ups (Phase 1–3 + L2/L3 + fixed-grid redesign +
 | 设计令牌（颜色/尺寸/间距/英雄色/tier 色） | 复用 | `Infrastructure/UiTokens/Colors.cs`、`Sizes.cs`、`Spacing.cs` |
 | 设置坞入口 | 克隆 `HistoryPanelSettingsDockEntry`（`ISettingsDockEntry.Build`） | `HistoryPanel/HistoryPanelSettingsDockEntry.cs`、`Game/Settings/BppSettingsDockDefinition.cs` |
 | 热键 + Escape + IsInCombat 关闭 | 克隆 `HistoryPanel` 的 static 单例 + `Update` 轮询 | `HistoryPanel/HistoryPanel.cs:19-50` |
-| 静态数据访问 | 复用 `BppStaticDataAccess.TryGet()`（返回 `object?`） | `GameInterop/BppStaticDataAccess.cs` |
+| 静态数据访问 | 复用 `BppStaticDataAccess.TryGet()`（返回 `object?`） | `GameInterop/StaticCards/BppStaticDataAccess.cs` |
 | 输入硬拦截（可选） | 克隆 `EndOfRunMouseBlocker`（透明 Image + GraphicRaycaster） | `Game/Screenshots/EndOfRunMouseBlocker.cs:54-104` |
 | 目录 / 虚拟化器 / 缓存 / 中继 | **新写**（§5–§9） | —— |
 
@@ -833,7 +833,7 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 - `Core/Runtime/IBppMountable.cs`、`BppMountableRegistry.cs`、`ComponentMount<T>` — 挂载。
 - `Core/Runtime/IBppServices.cs` — 服务聚合（EventBus/Config/Paths/RunContext/GameStateProbe/EncounterState/Logger）。
 - `Game/Input/BppHotkeyService.cs`、`BppHotkeyActionId.cs` — 热键。
-- `GameInterop/BppStaticDataAccess.cs` — `TryGet()` 静态数据（`object?`）。
+- `GameInterop/StaticCards/BppStaticDataAccess.cs` — `TryGet()` 静态数据（`object?`）。
 - `Infrastructure/UiTokens/Colors.cs`（含 `Hero*Background`/`Rank*`/`HistoryPanelBackground`）、`Sizes.cs`、`Spacing.cs`。
 - `Game/Settings/ISettingsDockEntry.cs`、`BppSettingsDockDefinition.cs`。
 - `Game/Screenshots/EndOfRunMouseBlocker.cs` — 透明命中 Image + GraphicRaycaster 范式。
