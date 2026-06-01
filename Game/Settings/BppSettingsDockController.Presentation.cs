@@ -23,7 +23,7 @@ internal sealed partial class BppSettingsDockController
         rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
         rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        rectTransform.localScale = Vector3.one;
+        rectTransform.localScale = new Vector3(DockButtonScale, DockButtonScale, 1f);
         rectTransform.localRotation = Quaternion.identity;
         rectTransform.localPosition = new Vector3(
             anchorCenterLocal.x + offsetX,
@@ -37,7 +37,7 @@ internal sealed partial class BppSettingsDockController
         rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
         rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        rectTransform.localScale = Vector3.one;
+        rectTransform.localScale = new Vector3(DockButtonScale, DockButtonScale, 1f);
         rectTransform.localRotation = Quaternion.identity;
         rectTransform.sizeDelta = new Vector2(DockButtonWidth, DockButtonHeight);
         rectTransform.anchoredPosition = new Vector2(DockButtonOffsetX, DockButtonOffsetY);
@@ -45,10 +45,15 @@ internal sealed partial class BppSettingsDockController
 
     private static void ConfigurePanelRect(RectTransform rectTransform)
     {
-        rectTransform.anchorMin = new Vector2(0f, 0.5f);
-        rectTransform.anchorMax = new Vector2(0f, 0.5f);
-        rectTransform.pivot = new Vector2(1f, 0.5f);
-        rectTransform.localScale = Vector3.one;
+        // Anchor and pivot at the dock button's bottom edge so the panel grows
+        // upward from the dock instead of being vertically centered on it.
+        rectTransform.anchorMin = new Vector2(0f, 0f);
+        rectTransform.anchorMax = new Vector2(0f, 0f);
+        rectTransform.pivot = new Vector2(1f, 0f);
+        // The panel is a child of the dock button, so divide out DockButtonScale to keep
+        // its on-screen size at PanelExpandedScale instead of compounding to ~1.875x.
+        var panelScale = PanelExpandedScale / DockButtonScale;
+        rectTransform.localScale = new Vector3(panelScale, panelScale, 1f);
         rectTransform.localRotation = Quaternion.identity;
         rectTransform.anchoredPosition = new Vector2(-8f, 0f);
         rectTransform.sizeDelta = new Vector2(

@@ -19,7 +19,9 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
     private const float DockButtonHeight = 44f;
     private const float DockButtonOffsetX = -20f;
     private const float DockButtonOffsetY = 100f;
+    private const float DockButtonScale = 1.25f;
     private const float PanelWidth = 456f;
+    private const float PanelExpandedScale = 1.5f;
     private const float PanelPadding = 18f;
     private const float PanelTopPadding = 16f;
     private const float PanelBottomPadding = 28f;
@@ -213,12 +215,6 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
         );
         var panelRect = panelObject.GetComponent<RectTransform>();
         panelRect.SetParent(_dockButtonRect, worldPositionStays: false);
-        panelRect.anchorMin = new Vector2(0f, 0.5f);
-        panelRect.anchorMax = new Vector2(0f, 0.5f);
-        panelRect.pivot = new Vector2(1f, 0.5f);
-        panelRect.localScale = Vector3.one;
-        panelRect.localRotation = Quaternion.identity;
-        panelRect.anchoredPosition = new Vector2(-8f, 0f);
         ConfigurePanelRect(panelRect);
         ConfigurePanelVisual(panelObject);
 
