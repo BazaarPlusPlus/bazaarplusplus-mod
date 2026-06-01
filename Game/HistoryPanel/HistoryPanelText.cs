@@ -22,10 +22,10 @@ internal static class HistoryPanelText
     );
 
     private static readonly LocalizedTextSet SubtitleText = new(
-        "Review runs, inspect ghost battles, and jump back into any replay you want. Support BazaarPlusPlus at bazaarplusplus.com. -- Xinyu YANG",
-        "查看对局、检查幽灵战斗，并快速回放你想看的任意一场。欢迎前往 bazaarplusplus.com 支持 BazaarPlusPlus。-- Xinyu YANG",
-        "檢視對局、檢查幽靈戰鬥，並快速重播你想看的任意一場。歡迎前往 bazaarplusplus.com 支持 BazaarPlusPlus。-- Xinyu YANG",
-        "檢視對局、檢查幽靈戰鬥，並快速重播你想看的任意一場。歡迎前往 bazaarplusplus.com 支持 BazaarPlusPlus。-- Xinyu YANG"
+        "Supported by the BazaarPlusPlus community.",
+        "由 BazaarPlusPlus 玩家社区支持。",
+        "由 BazaarPlusPlus 玩家社群支持。",
+        "由 BazaarPlusPlus 玩家社群支持。"
     );
 
     private static readonly LocalizedTextSet RunsTabText = new("Runs", "对局", "對局", "對局");

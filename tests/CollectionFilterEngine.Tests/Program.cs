@@ -1,6 +1,20 @@
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 
+var defaultState = new CollectionFilterState();
+AssertFalse(
+    defaultState.HasActiveFilters,
+    "Default collection filter state should not be resettable."
+);
+defaultState.Search = "wand";
+AssertTrue(defaultState.HasActiveFilters, "Search text should make filters resettable.");
+defaultState.Reset();
+defaultState.IncludePackages = true;
+AssertTrue(defaultState.HasActiveFilters, "Including packages should make filters resettable.");
+defaultState.Reset();
+defaultState.SortPriority = CollectionSortPriority.Size;
+AssertTrue(defaultState.HasActiveFilters, "Changing sort priority should make filters resettable.");
+
 var normal = Card("Normal", ETier.Bronze);
 var package = Card("Starter Package", ETier.Silver, isPackage: true);
 
@@ -19,6 +33,31 @@ AssertSequence(
     includePackageResult,
     new[] { normal.Id, package.Id },
     "IncludePackages restores package cards to the visible set."
+);
+
+var bronzeLarge = Card("A Bronze Large", ETier.Bronze, size: ECardSize.Large);
+var bronzeSmall = Card("B Bronze Small", ETier.Bronze, size: ECardSize.Small);
+var silverLarge = Card("C Silver Large", ETier.Silver, size: ECardSize.Large);
+var silverSmall = Card("D Silver Small", ETier.Silver, size: ECardSize.Small);
+var tierSizeResult = CollectionFilterEngine.Apply(
+    new[] { silverSmall, bronzeLarge, silverLarge, bronzeSmall },
+    new CollectionFilterState()
+);
+AssertSequence(
+    tierSizeResult,
+    new[] { bronzeSmall.Id, bronzeLarge.Id, silverSmall.Id, silverLarge.Id },
+    "Visible cards sort by tier first, then by size within each tier."
+);
+
+var sizePriorityFilter = new CollectionFilterState { SortPriority = CollectionSortPriority.Size };
+var sizePriorityResult = CollectionFilterEngine.Apply(
+    new[] { silverSmall, bronzeLarge, silverLarge, bronzeSmall },
+    sizePriorityFilter
+);
+AssertSequence(
+    sizePriorityResult,
+    new[] { bronzeSmall.Id, silverSmall.Id, bronzeLarge.Id, silverLarge.Id },
+    "Size sort priority sorts by size first, then by tier within each size."
 );
 
 var burnMerchant = Card(
@@ -160,6 +199,7 @@ static CollectionCardVm Card(
     string name,
     ETier tier,
     ECardType type = ECardType.Item,
+    ECardSize size = ECardSize.Medium,
     bool isPackage = false,
     IReadOnlyCollection<ECardTag>? tags = null,
     IReadOnlyCollection<CollectionMerchantKind>? merchants = null
@@ -168,7 +208,7 @@ static CollectionCardVm Card(
     {
         Id = Guid.NewGuid(),
         Type = type,
-        Size = ECardSize.Medium,
+        Size = size,
         StartingTier = tier,
         Tags = tags ?? Array.Empty<ECardTag>(),
         DisplayName = name,

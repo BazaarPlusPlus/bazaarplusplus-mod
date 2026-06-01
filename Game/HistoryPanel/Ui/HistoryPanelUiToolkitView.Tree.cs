@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -36,9 +37,9 @@ internal sealed partial class HistoryPanelUiToolkitView
 
         var selectorRow = new VisualElement();
         selectorRow.style.flexDirection = FlexDirection.Row;
-        selectorRow.style.flexGrow = 0f;
-        selectorRow.style.flexShrink = 0f;
-        selectorRow.style.height = Length.Percent(Sizes.HistorySelectorRowHeightPercent);
+        selectorRow.style.flexGrow = 1f;
+        selectorRow.style.flexShrink = 1f;
+        selectorRow.style.maxHeight = Length.Percent(Sizes.HistorySelectorRowHeightPercent);
         selectorRow.style.minHeight = Sizes.HistorySelectorRowMinHeight;
         selectorRow.style.minWidth = 0f;
         core.Add(selectorRow);
@@ -110,15 +111,16 @@ internal sealed partial class HistoryPanelUiToolkitView
         parent.Add(_ghostOpponentEliminatedNotice);
 
         _previewContainer = new VisualElement();
-        _previewContainer.style.flexGrow = 1f;
-        _previewContainer.style.flexShrink = 1f;
+        _previewContainer.style.flexGrow = 0f;
+        _previewContainer.style.flexShrink = 0f;
+        _previewContainer.style.height = Length.Percent(Sizes.PreviewHeightPercent);
         _previewContainer.style.minHeight = 0f;
         _previewContainer.style.backgroundColor = Colors.HistoryPreviewBackground;
         UiStyle.Radius(_previewContainer.style, Radii.Md);
         UiStyle.Border(_previewContainer.style, Borders.Thin, Colors.HistoryListFrameBorder);
         _previewContainer.style.position = Position.Relative;
         _previewContainer.style.overflow = Overflow.Hidden;
-        _previewContainer.style.marginTop = UiSpacing.Lg;
+        _previewContainer.style.marginTop = UiSpacing.ColumnGap;
         parent.Add(_previewContainer);
 
         _previewImage = new Image();
@@ -169,17 +171,31 @@ internal sealed partial class HistoryPanelUiToolkitView
         rail.style.marginLeft = UiSpacing.ColumnGap;
         parent.Add(rail);
 
-        _title = CreateLabel(Sizes.FontTitle, FontStyle.Bold, Colors.HistoryTitleText);
-        rail.Add(_title);
+        var titleRow = new VisualElement();
+        titleRow.style.flexDirection = FlexDirection.Row;
+        titleRow.style.alignItems = Align.Center;
+        rail.Add(titleRow);
 
-        _subtitle = CreateLabel(Sizes.FontBody, FontStyle.Normal, Colors.HistorySubtitleText);
-        _subtitle.style.whiteSpace = WhiteSpace.Normal;
-        _subtitle.style.marginTop = UiSpacing.Md;
+        _title = CreateLabel(Sizes.FontTitle, FontStyle.Bold, Colors.HistoryTitleText);
+        _title.style.flexGrow = 1f;
+        _title.style.flexShrink = 1f;
+        titleRow.Add(_title);
+
+        _closeButton = CreateButton(
+            HistoryPanelText.Close(),
+            _close,
+            Sizes.CloseButtonWidth,
+            Sizes.ButtonStandardHeight
+        );
+        StyleButton(_closeButton, Colors.CloseBackground, Colors.CloseText);
+        titleRow.Add(_closeButton);
+
+        _subtitle = BPPSupporterAttributionRow.Create();
         rail.Add(_subtitle);
 
         var chipRow = new VisualElement();
         chipRow.style.flexDirection = FlexDirection.Row;
-        chipRow.style.flexWrap = Wrap.Wrap;
+        chipRow.style.flexWrap = Wrap.NoWrap;
         chipRow.style.alignItems = Align.Center;
         chipRow.style.marginTop = UiSpacing.Lg;
         rail.Add(chipRow);
@@ -188,9 +204,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         _battleChip = CreateChip();
         _databaseChip = CreateChip();
         chipRow.Add(_countChip);
-        _battleChip.style.marginLeft = UiSpacing.Md;
+        _battleChip.style.marginLeft = UiSpacing.Sm;
         chipRow.Add(_battleChip);
-        _databaseChip.style.marginLeft = UiSpacing.Md;
+        _databaseChip.style.marginLeft = UiSpacing.Sm;
         chipRow.Add(_databaseChip);
 
         _statusLabel = CreateLabel(Sizes.FontCorner, FontStyle.Normal, Colors.HistoryStatusText);
@@ -199,9 +215,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         _statusLabel.style.flexShrink = 1f;
         _statusLabel.style.whiteSpace = WhiteSpace.Normal;
         _statusLabel.style.minHeight = Sizes.StatusHeight;
-        _statusLabel.style.maxWidth = Sizes.StatusMaxWidth;
-        _statusLabel.style.marginTop = UiSpacing.Md;
-        _statusLabel.style.alignSelf = Align.FlexStart;
+        _statusLabel.style.width = Length.Percent(100f);
+        _statusLabel.style.marginTop = UiSpacing.Sm;
+        _statusLabel.style.alignSelf = Align.Stretch;
         UiStyle.HorizontalPadding(_statusLabel.style, UiSpacing.Lg);
         _statusLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
         _statusLabel.style.backgroundColor = Colors.HistoryStatusBackground;
@@ -211,22 +227,24 @@ internal sealed partial class HistoryPanelUiToolkitView
 
         var tabsRow = new VisualElement();
         tabsRow.style.flexDirection = FlexDirection.Row;
-        tabsRow.style.flexWrap = Wrap.Wrap;
+        tabsRow.style.flexWrap = Wrap.NoWrap;
         tabsRow.style.alignItems = Align.Center;
-        tabsRow.style.marginTop = UiSpacing.Xl;
+        tabsRow.style.marginTop = UiSpacing.Lg;
         rail.Add(tabsRow);
 
         _runsTabButton = CreateButton(
             HistoryPanelText.RunsTab(),
             () => _setSectionMode(HistorySectionMode.Runs),
-            Sizes.RunsTabWidth,
-            Sizes.ButtonStandardHeight
+            0f,
+            Sizes.ButtonStandardHeight,
+            fixedWidth: false
         );
         _ghostTabButton = CreateButton(
             HistoryPanelText.GhostTab(),
             () => _setSectionMode(HistorySectionMode.Ghost),
-            Sizes.RunsTabWidth,
-            Sizes.ButtonStandardHeight
+            0f,
+            Sizes.ButtonStandardHeight,
+            fixedWidth: false
         );
         _finalBuildRefreshButton = CreateButton(
             HistoryPanelText.RefreshFinalBuilds(),
@@ -235,44 +253,56 @@ internal sealed partial class HistoryPanelUiToolkitView
             Sizes.ButtonStandardHeight
         );
         tabsRow.Add(_runsTabButton);
-        _ghostTabButton.style.marginLeft = UiSpacing.Md;
+        _ghostTabButton.style.marginLeft = UiSpacing.Sm;
         tabsRow.Add(_ghostTabButton);
         _finalBuildRefreshButton.style.marginLeft = UiSpacing.Md;
         tabsRow.Add(_finalBuildRefreshButton);
 
         _ghostFilterRow = new VisualElement();
         _ghostFilterRow.style.flexDirection = FlexDirection.Row;
-        _ghostFilterRow.style.flexWrap = Wrap.Wrap;
+        _ghostFilterRow.style.flexWrap = Wrap.NoWrap;
         _ghostFilterRow.style.alignItems = Align.Center;
         _ghostFilterRow.style.display = DisplayStyle.None;
-        _ghostFilterRow.style.marginTop = UiSpacing.Md;
+        _ghostFilterRow.style.marginTop = UiSpacing.Sm;
         rail.Add(_ghostFilterRow);
 
         _ghostAllButton = CreateButton(
             HistoryPanelText.FilterAll(),
             () => _setGhostFilter(GhostBattleFilter.All),
-            Sizes.GhostAllButtonWidth,
-            Sizes.ButtonCompactHeight
+            0f,
+            Sizes.ButtonCompactHeight,
+            fixedWidth: false
         );
         _ghostWonButton = CreateButton(
             HistoryPanelText.FilterIWon(),
             () => _setGhostFilter(GhostBattleFilter.IWon),
-            Sizes.GhostFilterButtonWidth,
-            Sizes.ButtonCompactHeight
+            0f,
+            Sizes.ButtonCompactHeight,
+            fixedWidth: false
         );
         _ghostLostButton = CreateButton(
             HistoryPanelText.FilterILost(),
             () => _setGhostFilter(GhostBattleFilter.ILost),
-            Sizes.GhostFilterButtonWidth,
-            Sizes.ButtonCompactHeight
+            0f,
+            Sizes.ButtonCompactHeight,
+            fixedWidth: false
         );
         _ghostFilterRow.Add(_ghostAllButton);
-        _ghostWonButton.style.marginLeft = UiSpacing.Md;
+        _ghostWonButton.style.marginLeft = UiSpacing.Sm;
         _ghostFilterRow.Add(_ghostWonButton);
-        _ghostLostButton.style.marginLeft = UiSpacing.Md;
+        _ghostLostButton.style.marginLeft = UiSpacing.Sm;
         _ghostFilterRow.Add(_ghostLostButton);
 
         rail.Add(CreateSpacer());
+
+        var footerBlock = new VisualElement();
+        footerBlock.style.flexDirection = FlexDirection.Column;
+        footerBlock.style.flexShrink = 0f;
+        footerBlock.style.backgroundColor = Colors.HistoryFooterBackground;
+        UiStyle.Radius(footerBlock.style, Radii.Md);
+        UiStyle.Border(footerBlock.style, Borders.Thin, Colors.HistoryListFrameBorder);
+        UiStyle.Padding(footerBlock.style, UiSpacing.Xl);
+        rail.Add(footerBlock);
 
         _footerPrimary = CreateLabel(Sizes.FontFooterPrimary, FontStyle.Bold, Colors.White);
         _footerSecondary = CreateLabel(
@@ -282,17 +312,17 @@ internal sealed partial class HistoryPanelUiToolkitView
         );
         _footerPrimary.style.display = DisplayStyle.None;
         _footerPrimary.style.whiteSpace = WhiteSpace.Normal;
-        _footerPrimary.style.marginTop = UiSpacing.Lg;
-        rail.Add(_footerPrimary);
+        footerBlock.Add(_footerPrimary);
 
         _footerSecondary.style.display = DisplayStyle.None;
         _footerSecondary.style.whiteSpace = WhiteSpace.Normal;
-        _footerSecondary.style.marginTop = UiSpacing.Md;
-        rail.Add(_footerSecondary);
+        _footerSecondary.style.marginTop = UiSpacing.Sm;
+        footerBlock.Add(_footerSecondary);
 
         var actions = new VisualElement();
         actions.style.flexDirection = FlexDirection.Column;
-        actions.style.marginTop = UiSpacing.Lg;
+        actions.style.flexShrink = 0f;
+        actions.style.marginTop = UiSpacing.Md;
         rail.Add(actions);
 
         _deleteButton = CreateRailButton(HistoryPanelText.Delete(), _delete);
@@ -301,18 +331,14 @@ internal sealed partial class HistoryPanelUiToolkitView
             _recordAndReplay
         );
         _replayButton = CreateRailButton(HistoryPanelText.Replay(), _replay);
-        var closeButton = CreateRailButton(HistoryPanelText.Close(), _close);
         StyleButton(_deleteButton, Colors.DeleteBackground, Colors.DeleteText);
         StyleButton(_recordAndReplayButton, Colors.RecordReplayBackground, Colors.RecordReplayText);
         StyleButton(_replayButton, Colors.ReplayBackground, Colors.ReplayText);
-        StyleButton(closeButton, Colors.CloseBackground, Colors.CloseText);
-        actions.Add(_deleteButton);
+        actions.Add(_replayButton);
         _recordAndReplayButton.style.marginTop = UiSpacing.Md;
         actions.Add(_recordAndReplayButton);
-        _replayButton.style.marginTop = UiSpacing.Md;
-        actions.Add(_replayButton);
-        closeButton.style.marginTop = UiSpacing.Md;
-        actions.Add(closeButton);
+        _deleteButton.style.marginTop = UiSpacing.Md;
+        actions.Add(_deleteButton);
     }
 
     private ListView CreateRunList()

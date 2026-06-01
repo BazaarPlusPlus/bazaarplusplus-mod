@@ -4,19 +4,29 @@ namespace BazaarPlusPlus.Infrastructure.UiTokens;
 
 internal static class Sizes
 {
-    public const float OperationRailWidthPercent = 24f;
-    public const float OperationRailMinWidth = 300f;
-    public const float OperationRailMaxWidth = 560f;
-    public const float HistorySelectorRowHeightPercent = 36f;
-    public const float HistorySelectorRowMinHeight = 240f;
-    public const float RunsColumnWidthPercent = 30f;
-    public const float PreviewHeightPercent = 28f;
+    public const float OperationRailWidthPercent = 32f;
+    public const float OperationRailMinWidth = 360f;
+    public const float OperationRailMaxWidth = 680f;
+    public const float HistorySelectorRowHeightPercent = 67f;
+    public const float HistorySelectorRowMinHeight = 270f;
+    public const float RunsColumnWidthPercent = 52f;
+    public const float PreviewHeightPercent = 33f;
     public const float FooterHeight = 56f;
     public const float SectionTitleHeight = 32f;
     public const float ChipMinWidth = 86f;
     public const float ChipHeight = 32f;
-    public const float HeroChipIconSize = 24f;
-    public const float HeroChipMinWidth = 118f;
+    public const float SupporterAttributionHeight = 24f;
+    public const float SupporterAttributionNameMaxWidth = 118f;
+    public const float SupporterActionMinWidth = 74f;
+    public const float SearchResetButtonWidth = 68f;
+    public const float PackageToggleWidth = 104f;
+    public const float PackageSwitchWidth = 30f;
+    public const float PackageSwitchHeight = 16f;
+    public const float PackageSwitchKnobSize = 12f;
+    public const float PackageSwitchKnobOffLeft = 2f;
+    public const float PackageSwitchKnobOnLeft = 16f;
+    public const float HeroChipIconSize = 48f;
+    public const float HeroChipButtonSize = 56f;
     public const float ButtonStandardHeight = 32f;
     public const float ButtonCompactHeight = 24f;
     public const float ButtonFooterHeight = 36f;

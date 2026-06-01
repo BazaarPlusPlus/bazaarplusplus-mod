@@ -1,7 +1,9 @@
 #nullable enable
 using System;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
+using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -59,26 +61,14 @@ internal sealed partial class CollectionPanelView
         StyleButton(_closeButton, Colors.CloseBackground, Colors.CloseText);
         titleRow.Add(_closeButton);
 
-        _subtitle = CreateLabel(Sizes.FontBody, FontStyle.Normal, Colors.HistorySubtitleText);
-        _subtitle.style.whiteSpace = WhiteSpace.Normal;
-        _subtitle.style.marginTop = UiSpacing.Md;
+        _subtitle = BPPSupporterAttributionRow.Create();
         rail.Add(_subtitle);
-
-        _countLabel = CreateLabel(Sizes.FontBody, FontStyle.Bold, Colors.HistoryChipText);
-        _countLabel.style.backgroundColor = Colors.HistoryChipBackground;
-        _countLabel.style.height = Sizes.ChipHeight;
-        _countLabel.style.minWidth = Sizes.ChipMinWidth;
-        _countLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-        _countLabel.style.alignSelf = Align.FlexStart;
-        _countLabel.style.marginTop = UiSpacing.Md;
-        UiStyle.HorizontalPadding(_countLabel.style, UiSpacing.Md);
-        UiStyle.Radius(_countLabel.style, Radii.Md);
-        rail.Add(_countLabel);
 
         // Item / Skill tabs.
         var tabsRow = new VisualElement();
         tabsRow.style.flexDirection = FlexDirection.Row;
         tabsRow.style.alignItems = Align.Center;
+        tabsRow.style.flexWrap = Wrap.Wrap;
         tabsRow.style.marginTop = UiSpacing.Xl;
         rail.Add(tabsRow);
 
@@ -98,111 +88,305 @@ internal sealed partial class CollectionPanelView
         _skillTabButton.style.marginLeft = UiSpacing.Md;
         tabsRow.Add(_skillTabButton);
 
-        // Search field (stretches to the column width).
-        _searchField = new TextField();
-        _searchField.style.marginTop = UiSpacing.Md;
-        _searchField.style.height = Sizes.ButtonStandardHeight;
-        _searchField.style.flexGrow = 0f;
-        _searchField.style.flexShrink = 0f;
-        _searchField.style.unityFont = BppUiFont.Default;
-        _searchField.style.color = Colors.White;
-        _searchField.RegisterValueChangedCallback(evt => _setSearch(evt.newValue ?? string.Empty));
-        var inputField = _searchField.Q<VisualElement>(TextField.textInputUssName);
-        if (inputField != null)
-        {
-            inputField.style.unityFont = BppUiFont.Default;
-            inputField.style.backgroundColor = Colors.HistoryStatusBackground;
-            inputField.style.color = Colors.White;
-            UiStyle.Border(inputField.style, Borders.Thin, Colors.HistoryStatusBorder);
-        }
-        rail.Add(_searchField);
+        var tabsSpacer = new VisualElement();
+        tabsSpacer.style.flexGrow = 1f;
+        tabsSpacer.style.flexShrink = 1f;
+        tabsSpacer.style.minWidth = UiSpacing.Md;
+        tabsRow.Add(tabsSpacer);
 
-        // Clear + package toggle.
-        var actionsRow = new VisualElement();
-        actionsRow.style.flexDirection = FlexDirection.Row;
-        actionsRow.style.alignItems = Align.Center;
-        actionsRow.style.flexWrap = Wrap.Wrap;
-        actionsRow.style.marginTop = UiSpacing.Md;
-        rail.Add(actionsRow);
+        var sortGroup = new VisualElement();
+        sortGroup.style.flexDirection = FlexDirection.Row;
+        sortGroup.style.alignItems = Align.Center;
+        sortGroup.style.flexShrink = 0f;
+        sortGroup.style.marginLeft = UiSpacing.Md;
+        tabsRow.Add(sortGroup);
+
+        var sortLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        sortLabel.text = CollectionPanelText.SortHeader();
+        sortLabel.style.marginRight = UiSpacing.Xs;
+        sortGroup.Add(sortLabel);
+
+        _sortQualityButton = CreateInlineSortButton(
+            CollectionPanelText.SortQuality(),
+            () => _setSortPriority(CollectionSortPriority.Quality)
+        );
+        _sortSizeButton = CreateInlineSortButton(
+            CollectionPanelText.SortSize(),
+            () => _setSortPriority(CollectionSortPriority.Size)
+        );
+        sortGroup.Add(_sortQualityButton);
+        _sortSizeButton.style.marginLeft = UiSpacing.Xs;
+        sortGroup.Add(_sortSizeButton);
+
+        _countLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryStatusText);
+        _countLabel.style.backgroundColor = Colors.HistoryStatusBackground;
+        _countLabel.style.height = Sizes.ButtonCompactHeight;
+        _countLabel.style.minWidth = Sizes.ChipMinWidth;
+        _countLabel.style.flexShrink = 0f;
+        _countLabel.style.marginLeft = UiSpacing.Md;
+        _countLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _countLabel.style.alignSelf = Align.Center;
+        UiStyle.HorizontalPadding(_countLabel.style, UiSpacing.Md);
+        UiStyle.Radius(_countLabel.style, Radii.Md);
+        UiStyle.Border(_countLabel.style, Borders.Thin, Colors.HistoryStatusBorder);
+        tabsRow.Add(_countLabel);
+
+        var toolsRow = new VisualElement();
+        toolsRow.style.flexDirection = FlexDirection.Row;
+        toolsRow.style.alignItems = Align.Center;
+        toolsRow.style.flexWrap = Wrap.NoWrap;
+        toolsRow.style.marginTop = UiSpacing.Md;
+        rail.Add(toolsRow);
+
+        _searchShell = CreateSearchShell();
+        toolsRow.Add(_searchShell);
 
         _clearButton = CreateButton(
-            CollectionPanelText.All(),
+            CollectionPanelText.Reset(),
             _clearFilters,
-            Sizes.GhostAllButtonWidth,
+            Sizes.SearchResetButtonWidth,
             Sizes.ButtonStandardHeight
         );
-        actionsRow.Add(_clearButton);
+        _clearButton.style.marginLeft = UiSpacing.Sm;
+        toolsRow.Add(_clearButton);
 
-        _packageToggleButton = CreateButton(
-            CollectionPanelText.PackagesToggle(),
-            _togglePackages,
-            Sizes.ChipMinWidth,
-            Sizes.ButtonStandardHeight
-        );
-        _packageToggleButton.style.marginLeft = UiSpacing.Md;
-        actionsRow.Add(_packageToggleButton);
+        _packageToggleButton = CreatePackageToggleButton();
+        _packageToggleButton.style.marginLeft = UiSpacing.Sm;
+        toolsRow.Add(_packageToggleButton);
 
         // Hero filter.
-        _heroChipRow = new VisualElement();
-        _heroChipRow.style.flexDirection = FlexDirection.Row;
-        _heroChipRow.style.flexWrap = Wrap.Wrap;
-        _heroChipRow.style.alignItems = Align.Center;
-        _heroChipRow.style.marginTop = UiSpacing.Xl;
-        var heroLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
-        heroLabel.text = CollectionPanelText.HeroHeader();
-        heroLabel.style.marginRight = UiSpacing.Md;
-        heroLabel.style.marginBottom = UiSpacing.Xs;
-        _heroChipRow.Add(heroLabel);
-        rail.Add(_heroChipRow);
+        CreateFilterSection(rail, CollectionPanelText.HeroHeader(), UiSpacing.Xl, out _heroChipRow);
+        _heroChipRow.style.flexWrap = Wrap.NoWrap;
+        _heroChipRow.style.justifyContent = Justify.SpaceBetween;
 
         // Tier filter.
-        _tierChipRow = new VisualElement();
-        _tierChipRow.style.flexDirection = FlexDirection.Row;
-        _tierChipRow.style.flexWrap = Wrap.Wrap;
-        _tierChipRow.style.alignItems = Align.Center;
-        _tierChipRow.style.marginTop = UiSpacing.Lg;
-        var tierLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
-        tierLabel.text = CollectionPanelText.TierHeader();
-        tierLabel.style.marginRight = UiSpacing.Md;
-        tierLabel.style.marginBottom = UiSpacing.Xs;
-        _tierChipRow.Add(tierLabel);
-        rail.Add(_tierChipRow);
+        CreateFilterSection(rail, CollectionPanelText.TierHeader(), UiSpacing.Lg, out _tierChipRow);
+        _tierChipRow.style.flexWrap = Wrap.NoWrap;
+        _tierChipRow.style.justifyContent = Justify.SpaceBetween;
 
         // Merchant filter.
-        _merchantChipRow = new VisualElement();
-        _merchantChipRow.style.flexDirection = FlexDirection.Row;
-        _merchantChipRow.style.flexWrap = Wrap.Wrap;
-        _merchantChipRow.style.alignItems = Align.Center;
-        _merchantChipRow.style.marginTop = UiSpacing.Lg;
-        var merchantLabel = CreateLabel(
-            Sizes.FontSmall,
-            FontStyle.Bold,
-            Colors.HistorySubtitleText
+        _merchantFilterSection = CreateFilterSection(
+            rail,
+            CollectionPanelText.MerchantHeader(),
+            UiSpacing.Lg,
+            out _merchantChipRow
         );
-        merchantLabel.text = CollectionPanelText.MerchantHeader();
-        merchantLabel.style.marginRight = UiSpacing.Md;
-        merchantLabel.style.marginBottom = UiSpacing.Xs;
-        _merchantChipRow.Add(merchantLabel);
-        rail.Add(_merchantChipRow);
 
         // Size filter (Items only — Refresh hides this row on the Skill tab).
-        _sizeChipRow = new VisualElement();
-        _sizeChipRow.style.flexDirection = FlexDirection.Row;
-        _sizeChipRow.style.flexWrap = Wrap.Wrap;
-        _sizeChipRow.style.alignItems = Align.Center;
-        _sizeChipRow.style.marginTop = UiSpacing.Lg;
-        var sizeLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
-        sizeLabel.text = CollectionPanelText.SizeHeader();
-        sizeLabel.style.marginRight = UiSpacing.Md;
-        sizeLabel.style.marginBottom = UiSpacing.Xs;
-        _sizeChipRow.Add(sizeLabel);
-        rail.Add(_sizeChipRow);
+        _sizeFilterSection = CreateFilterSection(
+            rail,
+            CollectionPanelText.SizeHeader(),
+            UiSpacing.Lg,
+            out _sizeChipRow
+        );
+        _sizeChipRow.style.flexWrap = Wrap.NoWrap;
+        _sizeChipRow.style.justifyContent = Justify.SpaceBetween;
 
         _statusLabel = CreateLabel(Sizes.FontSmall, FontStyle.Normal, Colors.HistoryStatusText);
         _statusLabel.style.marginTop = UiSpacing.Lg;
         _statusLabel.style.whiteSpace = WhiteSpace.Normal;
         _statusLabel.style.display = DisplayStyle.None;
         rail.Add(_statusLabel);
+    }
+
+    private static Button CreateInlineSortButton(string text, Action onClick)
+    {
+        var button = CreateButton(text, onClick, Sizes.RunsTabWidth, Sizes.ButtonStandardHeight);
+        button.style.flexShrink = 1f;
+        StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        return button;
+    }
+
+    private static VisualElement CreateFilterSection(
+        VisualElement parent,
+        string title,
+        float marginTop,
+        out VisualElement chipRow
+    )
+    {
+        var section = new VisualElement();
+        section.style.flexDirection = FlexDirection.Column;
+        section.style.marginTop = marginTop;
+        parent.Add(section);
+
+        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        label.text = title;
+        label.style.marginBottom = UiSpacing.Sm;
+        section.Add(label);
+
+        chipRow = new VisualElement();
+        chipRow.style.flexDirection = FlexDirection.Row;
+        chipRow.style.flexWrap = Wrap.Wrap;
+        chipRow.style.alignItems = Align.Center;
+        chipRow.style.alignSelf = Align.Stretch;
+        section.Add(chipRow);
+
+        return section;
+    }
+
+    private VisualElement CreateSearchShell()
+    {
+        var shell = new VisualElement();
+        shell.style.flexDirection = FlexDirection.Row;
+        shell.style.alignItems = Align.Center;
+        shell.style.flexGrow = 1f;
+        shell.style.flexShrink = 1f;
+        shell.style.minWidth = 0f;
+        shell.style.height = Sizes.ButtonStandardHeight;
+        shell.style.position = Position.Relative;
+        shell.style.backgroundColor = Colors.HistoryStatusBackground;
+        UiStyle.Radius(shell.style, Radii.Md);
+        UiStyle.Border(shell.style, Borders.Thin, Colors.HistoryStatusBorder);
+        UiStyle.HorizontalPadding(shell.style, UiSpacing.Md);
+        shell.Add(CreateSearchIcon());
+
+        _searchField = new TextField();
+        _searchField.tooltip = CollectionPanelText.SearchPlaceholder();
+        _searchField.style.flexGrow = 1f;
+        _searchField.style.flexShrink = 1f;
+        _searchField.style.minWidth = 0f;
+        _searchField.style.height = Sizes.ButtonStandardHeight;
+        _searchField.style.minHeight = Sizes.ButtonStandardHeight;
+        _searchField.style.unityFont = BppUiFont.Default;
+        _searchField.style.unityTextAlign = TextAnchor.MiddleLeft;
+        _searchField.style.color = Colors.White;
+        _searchField.style.backgroundColor = Colors.Clear;
+        _searchField.style.marginLeft = UiSpacing.Md;
+        _searchField.style.marginTop = 0f;
+        _searchField.style.marginBottom = 0f;
+        _searchField.style.paddingTop = 0f;
+        _searchField.style.paddingBottom = 0f;
+        _searchField.style.justifyContent = Justify.Center;
+        UiStyle.BorderWidth(_searchField.style, Borders.None);
+        _searchField.RegisterValueChangedCallback(evt =>
+        {
+            var value = evt.newValue ?? string.Empty;
+            RefreshSearchPlaceholder(value);
+            _setSearch(value);
+        });
+        _searchField.RegisterCallback<FocusInEvent>(_ => StyleSearchShell(true));
+        _searchField.RegisterCallback<FocusOutEvent>(_ => StyleSearchShell(false));
+
+        var inputField = _searchField.Q<VisualElement>(TextField.textInputUssName);
+        if (inputField != null)
+            StyleSearchInputField(inputField);
+        shell.Add(_searchField);
+
+        _searchPlaceholderLabel = CreateLabel(
+            Sizes.FontSmall,
+            FontStyle.Normal,
+            Colors.WithAlpha(Colors.HistorySubtitleText, 0.66f)
+        );
+        _searchPlaceholderLabel.text = CollectionPanelText.SearchPlaceholder();
+        _searchPlaceholderLabel.pickingMode = PickingMode.Ignore;
+        _searchPlaceholderLabel.style.position = Position.Absolute;
+        _searchPlaceholderLabel.style.left = 38f;
+        _searchPlaceholderLabel.style.right = UiSpacing.Md;
+        _searchPlaceholderLabel.style.top = 0f;
+        _searchPlaceholderLabel.style.bottom = 0f;
+        _searchPlaceholderLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
+        shell.Add(_searchPlaceholderLabel);
+        return shell;
+    }
+
+    private static void StyleSearchInputField(VisualElement inputField)
+    {
+        inputField.style.flexGrow = 1f;
+        inputField.style.height = Sizes.ButtonStandardHeight;
+        inputField.style.minHeight = 0f;
+        inputField.style.marginTop = 0f;
+        inputField.style.marginBottom = 0f;
+        inputField.style.paddingTop = 0f;
+        inputField.style.paddingBottom = 0f;
+        inputField.style.unityFont = BppUiFont.Default;
+        inputField.style.unityTextAlign = TextAnchor.MiddleLeft;
+        inputField.style.backgroundColor = Colors.Clear;
+        inputField.style.color = Colors.White;
+        inputField.style.justifyContent = Justify.Center;
+        UiStyle.BorderWidth(inputField.style, Borders.None);
+
+        var textElement = inputField.Q<TextElement>();
+        if (textElement == null)
+            return;
+
+        textElement.style.height = Sizes.ButtonStandardHeight;
+        textElement.style.unityFont = BppUiFont.Default;
+        textElement.style.unityTextAlign = TextAnchor.MiddleLeft;
+        textElement.style.marginTop = 0f;
+        textElement.style.marginBottom = 0f;
+        textElement.style.paddingTop = 0f;
+        textElement.style.paddingBottom = 0f;
+    }
+
+    private static VisualElement CreateSearchIcon()
+    {
+        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(icon.style, 18f, 18f);
+        icon.style.position = Position.Relative;
+        icon.style.flexShrink = 0f;
+
+        var lens = new VisualElement { pickingMode = PickingMode.Ignore };
+        lens.style.position = Position.Absolute;
+        lens.style.left = 2f;
+        lens.style.top = 2f;
+        UiStyle.FixedSize(lens.style, 10f, 10f);
+        UiStyle.Radius(lens.style, 5f);
+        UiStyle.Border(lens.style, Borders.Accent, Colors.HistorySubtitleText);
+        icon.Add(lens);
+
+        var handle = new VisualElement { pickingMode = PickingMode.Ignore };
+        handle.style.position = Position.Absolute;
+        handle.style.left = 11f;
+        handle.style.top = 13f;
+        UiStyle.FixedSize(handle.style, 7f, 2f);
+        handle.style.backgroundColor = Colors.HistorySubtitleText;
+        UiStyle.Radius(handle.style, 1f);
+        icon.Add(handle);
+        return icon;
+    }
+
+    private Button CreatePackageToggleButton()
+    {
+        var button = CreateButton(
+            string.Empty,
+            _togglePackages,
+            Sizes.PackageToggleWidth,
+            Sizes.ButtonStandardHeight
+        );
+        button.style.flexDirection = FlexDirection.Row;
+        button.style.justifyContent = Justify.SpaceBetween;
+        button.style.alignItems = Align.Center;
+        UiStyle.HorizontalPadding(button.style, UiSpacing.Md);
+
+        _packageToggleLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
+        _packageToggleLabel.text = CollectionPanelText.PackagesToggle();
+        _packageToggleLabel.style.flexShrink = 0f;
+        button.Add(_packageToggleLabel);
+
+        _packageSwitchTrack = new VisualElement { pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(
+            _packageSwitchTrack.style,
+            Sizes.PackageSwitchWidth,
+            Sizes.PackageSwitchHeight
+        );
+        _packageSwitchTrack.style.position = Position.Relative;
+        _packageSwitchTrack.style.marginLeft = UiSpacing.Sm;
+        UiStyle.Radius(_packageSwitchTrack.style, Sizes.PackageSwitchHeight / 2f);
+        UiStyle.Border(_packageSwitchTrack.style, Borders.Thin, Colors.HistoryStatusBorder);
+        button.Add(_packageSwitchTrack);
+
+        _packageSwitchKnob = new VisualElement { pickingMode = PickingMode.Ignore };
+        _packageSwitchKnob.style.position = Position.Absolute;
+        _packageSwitchKnob.style.left = Sizes.PackageSwitchKnobOffLeft;
+        _packageSwitchKnob.style.top = 1f;
+        UiStyle.FixedSize(
+            _packageSwitchKnob.style,
+            Sizes.PackageSwitchKnobSize,
+            Sizes.PackageSwitchKnobSize
+        );
+        UiStyle.Radius(_packageSwitchKnob.style, Sizes.PackageSwitchKnobSize / 2f);
+        _packageSwitchTrack.Add(_packageSwitchKnob);
+        return button;
     }
 
     private void BuildGrid(VisualElement parent)

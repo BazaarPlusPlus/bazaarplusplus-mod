@@ -22,9 +22,7 @@ internal sealed partial class CollectionPanelView
         ClearHeroChipRow();
         foreach (var hero in heroes)
         {
-            var chip = HeroPortraitSpriteProvider.IsRenderableHero(hero)
-                ? CreateHeroChipButton(hero, () => _toggleHero(hero))
-                : CreateChipButton(CollectionPanelText.Hero(hero), () => _toggleHero(hero));
+            var chip = CreateHeroChipButton(hero, () => _toggleHero(hero));
             _heroChips[hero] = chip;
             _heroChipRow.Add(chip);
         }
@@ -36,12 +34,19 @@ internal sealed partial class CollectionPanelView
             return;
         if (TierChipsMatch(tiers))
             return;
-        ClearChipRow(_tierChips, _tierChipRow, keepFirst: true);
+        ClearChipRow(_tierChips, _tierChipRow, keepFirst: false);
+        var index = 0;
         foreach (var tier in tiers)
         {
-            var chip = CreateChipButton(CollectionPanelText.Tier(tier), () => _toggleTier(tier));
+            var chip = CreateChipButton(
+                CollectionPanelText.Tier(tier),
+                () => _toggleTier(tier),
+                true
+            );
+            chip.style.marginLeft = index > 0 ? UiSpacing.Sm : 0f;
             _tierChips[tier] = chip;
             _tierChipRow.Add(chip);
+            index++;
         }
     }
 
@@ -75,12 +80,19 @@ internal sealed partial class CollectionPanelView
             return;
         if (SizeChipsMatch(sizes))
             return;
-        ClearChipRow(_sizeChips, _sizeChipRow, keepFirst: true);
+        ClearChipRow(_sizeChips, _sizeChipRow, keepFirst: false);
+        var index = 0;
         foreach (var size in sizes)
         {
-            var chip = CreateChipButton(CollectionPanelText.Size(size), () => _toggleSize(size));
+            var chip = CreateChipButton(
+                CollectionPanelText.Size(size),
+                () => _toggleSize(size),
+                true
+            );
+            chip.style.marginLeft = index > 0 ? UiSpacing.Sm : 0f;
             _sizeChips[size] = chip;
             _sizeChipRow.Add(chip);
+            index++;
         }
     }
 
@@ -102,7 +114,7 @@ internal sealed partial class CollectionPanelView
             return;
         if (MerchantChipsMatch(merchants))
             return;
-        ClearChipRow(_merchantChips, _merchantChipRow, keepFirst: true);
+        ClearChipRow(_merchantChips, _merchantChipRow, keepFirst: false);
         foreach (var merchant in merchants)
         {
             var chip = CreateChipButton(
@@ -136,7 +148,6 @@ internal sealed partial class CollectionPanelView
 
         _heroChips.Clear();
         _heroChipIcons.Clear();
-        _heroChipLabels.Clear();
     }
 
     private static void ClearChipRow<T>(
@@ -155,10 +166,23 @@ internal sealed partial class CollectionPanelView
             row.Clear();
     }
 
-    private Button CreateChipButton(string text, Action onClick)
+    private Button CreateChipButton(string text, Action onClick, bool fillRow = false)
     {
-        var chip = CreateButton(text, onClick, Sizes.ChipMinWidth + 12f, Sizes.ChipHeight);
-        chip.style.marginRight = UiSpacing.Sm;
+        var chip = CreateButton(
+            text,
+            onClick,
+            fillRow ? 0f : Sizes.ChipMinWidth + 12f,
+            Sizes.ChipHeight,
+            fixedWidth: !fillRow
+        );
+        if (fillRow)
+        {
+            chip.style.flexBasis = 0f;
+            chip.style.flexGrow = 1f;
+            chip.style.flexShrink = 1f;
+            chip.style.minWidth = 0f;
+        }
+        chip.style.marginRight = fillRow ? 0f : UiSpacing.Sm;
         chip.style.marginBottom = UiSpacing.Xs;
         StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
         return chip;
@@ -167,38 +191,70 @@ internal sealed partial class CollectionPanelView
     private Button CreateHeroChipButton(EHero hero, Action onClick)
     {
         var labelText = CollectionPanelText.Hero(hero);
-        var chip = CreateButton(string.Empty, onClick, Sizes.HeroChipMinWidth, Sizes.ChipHeight);
+        var chip = CreateButton(
+            string.Empty,
+            onClick,
+            Sizes.HeroChipButtonSize,
+            Sizes.HeroChipButtonSize
+        );
         chip.tooltip = labelText;
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.justifyContent = Justify.Center;
         chip.style.alignItems = Align.Center;
-        chip.style.marginRight = UiSpacing.Sm;
         chip.style.marginBottom = UiSpacing.Xs;
         StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
 
-        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        icon.style.width = Sizes.HeroChipIconSize;
-        icon.style.height = Sizes.HeroChipIconSize;
-        icon.style.minWidth = Sizes.HeroChipIconSize;
-        icon.style.minHeight = Sizes.HeroChipIconSize;
-        icon.style.marginRight = UiSpacing.Xs;
-        icon.style.display = DisplayStyle.None;
-        icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
-        icon.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
-        UiStyle.Radius(icon.style, Sizes.HeroChipIconSize / 2f);
+        var icon = CreateHeroChipIcon(hero);
         chip.Add(icon);
 
-        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
-        label.text = labelText;
-        label.pickingMode = PickingMode.Ignore;
-        label.style.unityTextAlign = TextAnchor.MiddleCenter;
-        label.style.flexShrink = 1f;
-        chip.Add(label);
-
         _heroChipIcons[hero] = icon;
-        _heroChipLabels[hero] = label;
-        LoadHeroChipIcon(hero, icon);
+        if (HeroPortraitSpriteProvider.IsRenderableHero(hero))
+            LoadHeroChipIcon(hero, icon);
         return chip;
+    }
+
+    private static VisualElement CreateHeroChipIcon(EHero hero)
+    {
+        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(icon.style, Sizes.HeroChipIconSize, Sizes.HeroChipIconSize);
+        icon.style.position = Position.Relative;
+        icon.style.backgroundColor = Colors.HistoryStatusBackground;
+        icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+        icon.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
+        UiStyle.Border(icon.style, Borders.Thin, Colors.HistoryButtonBorder);
+        UiStyle.Radius(icon.style, Sizes.HeroChipIconSize / 2f);
+
+        if (!HeroPortraitSpriteProvider.IsRenderableHero(hero))
+            AddCommonHeroGlyph(icon);
+
+        return icon;
+    }
+
+    private static void AddCommonHeroGlyph(VisualElement icon)
+    {
+        AddCommonHeroDot(icon, 21f, 21f, 6f, Colors.HistoryChipText);
+        AddCommonHeroDot(icon, 9f, 9f, 5f, Colors.HistorySubtitleText);
+        AddCommonHeroDot(icon, 34f, 9f, 5f, Colors.HistorySubtitleText);
+        AddCommonHeroDot(icon, 9f, 34f, 5f, Colors.HistorySubtitleText);
+        AddCommonHeroDot(icon, 34f, 34f, 5f, Colors.HistorySubtitleText);
+    }
+
+    private static void AddCommonHeroDot(
+        VisualElement parent,
+        float left,
+        float top,
+        float size,
+        Color color
+    )
+    {
+        var dot = new VisualElement { pickingMode = PickingMode.Ignore };
+        dot.style.position = Position.Absolute;
+        dot.style.left = left;
+        dot.style.top = top;
+        UiStyle.FixedSize(dot.style, size, size);
+        dot.style.backgroundColor = color;
+        UiStyle.Radius(dot.style, size / 2f);
+        parent.Add(dot);
     }
 
     private static void LoadHeroChipIcon(EHero hero, VisualElement icon)
@@ -230,12 +286,10 @@ internal sealed partial class CollectionPanelView
     {
         if (sprite == null)
         {
-            icon.style.display = DisplayStyle.None;
             icon.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
             return;
         }
 
-        icon.style.display = DisplayStyle.Flex;
         icon.style.backgroundImage = new StyleBackground(sprite);
         icon.MarkDirtyRepaint();
     }
@@ -259,11 +313,98 @@ internal sealed partial class CollectionPanelView
         }
     }
 
+    private void RefreshResetButton(bool enabled)
+    {
+        if (_clearButton == null)
+            return;
+
+        _clearButton.text = CollectionPanelText.Reset();
+        _clearButton.SetEnabled(enabled);
+        if (enabled)
+        {
+            StyleButton(_clearButton, Colors.HistoryButtonBackground, Colors.HistoryChipText);
+            _clearButton.style.opacity = 1f;
+        }
+        else
+        {
+            StyleButton(
+                _clearButton,
+                Colors.WithAlpha(Colors.HistoryStatusBackground, 0.52f),
+                Colors.WithAlpha(Colors.HistoryStatusText, 0.54f)
+            );
+            _clearButton.style.opacity = 0.82f;
+        }
+    }
+
+    private void RefreshPackageToggle(bool selected, bool visible)
+    {
+        if (_packageToggleButton == null)
+            return;
+
+        _packageToggleButton.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+        if (!visible)
+            return;
+
+        StyleButton(
+            _packageToggleButton,
+            selected ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
+            selected ? Colors.ButtonSelectedText : Colors.HistoryChipText
+        );
+
+        if (_packageToggleLabel != null)
+            _packageToggleLabel.style.color = selected
+                ? Colors.ButtonSelectedText
+                : Colors.HistoryChipText;
+
+        if (_packageSwitchTrack != null)
+        {
+            _packageSwitchTrack.style.backgroundColor = selected
+                ? Colors.WithAlpha(Colors.ButtonSelectedText, 0.22f)
+                : Colors.HistoryStatusBackground;
+            UiStyle.BorderColor(
+                _packageSwitchTrack.style,
+                selected ? Colors.ButtonSelectedText : Colors.HistoryStatusBorder
+            );
+        }
+
+        if (_packageSwitchKnob != null)
+        {
+            _packageSwitchKnob.style.left = selected
+                ? Sizes.PackageSwitchKnobOnLeft
+                : Sizes.PackageSwitchKnobOffLeft;
+            _packageSwitchKnob.style.backgroundColor = selected
+                ? Colors.ButtonSelectedText
+                : Colors.HistoryStatusText;
+        }
+    }
+
+    private void StyleSearchShell(bool focused)
+    {
+        if (_searchShell == null)
+            return;
+
+        _searchShell.style.backgroundColor = focused
+            ? Colors.WithAlpha(Colors.HistoryStatusBackground, 0.92f)
+            : Colors.HistoryStatusBackground;
+        UiStyle.BorderColor(
+            _searchShell.style,
+            focused ? Colors.RunRowSelectedAccent : Colors.HistoryStatusBorder
+        );
+    }
+
+    private void RefreshSearchPlaceholder(string search)
+    {
+        if (_searchPlaceholderLabel == null)
+            return;
+
+        _searchPlaceholderLabel.style.display = string.IsNullOrWhiteSpace(search)
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
+    }
+
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)
     {
         RefreshChip(chip, selected);
-        if (_heroChipLabels.TryGetValue(hero, out var label))
-            label.style.color = selected ? Colors.ButtonSelectedText : Colors.HistoryChipText;
     }
 
     private static void RefreshTabButton(Button button, bool selected)
@@ -285,10 +426,17 @@ internal sealed partial class CollectionPanelView
         return label;
     }
 
-    private static Button CreateButton(string text, Action onClick, float width, float height)
+    private static Button CreateButton(
+        string text,
+        Action onClick,
+        float width,
+        float height,
+        bool fixedWidth = true
+    )
     {
         var button = new Button(() => onClick()) { text = text };
-        UiStyle.FixedWidth(button.style, width);
+        if (fixedWidth)
+            UiStyle.FixedWidth(button.style, width);
         button.style.height = height;
         button.style.flexGrow = 0f;
         button.style.flexShrink = 0f;

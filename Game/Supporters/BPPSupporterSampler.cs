@@ -7,6 +7,32 @@ namespace BazaarPlusPlus.Game.Supporters;
 
 internal static class BPPSupporterSampler
 {
+    internal static IReadOnlyList<BPPSupporterSample> SampleMany(
+        IReadOnlyList<BPPSupporterEntry> entries,
+        int count,
+        int startIndex,
+        int shuffleSeed
+    )
+    {
+        if (entries == null || count <= 0)
+            return Array.Empty<BPPSupporterSample>();
+
+        var shuffled = BuildShuffledBag(entries, shuffleSeed);
+        if (shuffled.Count == 0)
+            return Array.Empty<BPPSupporterSample>();
+
+        var samples = new List<BPPSupporterSample>(Math.Min(count, shuffled.Count));
+        var cursor = PositiveModulo(startIndex, shuffled.Count);
+        while (samples.Count < count && samples.Count < shuffled.Count)
+        {
+            var entry = shuffled[cursor];
+            samples.Add(new BPPSupporterSample { Name = entry.Name.Trim(), Tier = entry.Tier });
+            cursor = (cursor + 1) % shuffled.Count;
+        }
+
+        return samples;
+    }
+
     internal static BPPSupporterSample Sample(
         IReadOnlyList<BPPSupporterEntry> entries,
         Func<float> randomValue
@@ -62,6 +88,56 @@ internal static class BPPSupporterSampler
             2 => 2,
             _ => 1,
         };
+    }
+
+    private static IReadOnlyList<BPPSupporterEntry> BuildShuffledBag(
+        IReadOnlyList<BPPSupporterEntry> entries,
+        int shuffleSeed
+    )
+    {
+        var unique = new Dictionary<string, BPPSupporterEntry>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in entries)
+        {
+            if (!IsRenderable(entry))
+                continue;
+
+            var name = entry.Name.Trim();
+            if (!unique.TryGetValue(name, out var existing) || entry.Tier > existing.Tier)
+                unique[name] = new BPPSupporterEntry { Name = name, Tier = entry.Tier };
+        }
+
+        return unique
+            .Values.OrderBy(entry => StableHash(entry.Name, entry.Tier, shuffleSeed))
+            .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static int PositiveModulo(int value, int divisor)
+    {
+        var result = value % divisor;
+        return result < 0 ? result + divisor : result;
+    }
+
+    private static uint StableHash(string name, int tier, int seed)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            hash = Mix(hash, (uint)seed);
+            hash = Mix(hash, (uint)tier);
+            foreach (var ch in name)
+                hash = Mix(hash, char.ToUpperInvariant(ch));
+            return hash;
+        }
+    }
+
+    private static uint Mix(uint hash, uint value)
+    {
+        unchecked
+        {
+            hash ^= value;
+            return hash * 16777619u;
+        }
     }
 
     private static T? PickWeighted<T>(

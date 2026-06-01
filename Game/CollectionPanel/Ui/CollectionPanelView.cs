@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
+using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -15,6 +17,8 @@ internal sealed class CollectionPanelViewModel
 {
     public string Title { get; set; } = string.Empty;
     public string Subtitle { get; set; } = string.Empty;
+    public IReadOnlyList<BPPSupporterSample> Supporters { get; set; } =
+        Array.Empty<BPPSupporterSample>();
     public string CountText { get; set; } = string.Empty;
     public string? StatusMessage { get; set; }
     public bool IsLoading { get; set; }
@@ -24,6 +28,9 @@ internal sealed class CollectionPanelViewModel
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
     public HashSet<CollectionMerchantKind> SelectedMerchants { get; set; } = new();
     public bool IncludePackages { get; set; }
+    public bool HasPackages { get; set; }
+    public bool HasActiveFilters { get; set; }
+    public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
     public string Search { get; set; } = string.Empty;
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
@@ -43,6 +50,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action<ECardSize> _toggleSize;
     private readonly Action<CollectionMerchantKind> _toggleMerchant;
     private readonly Action _togglePackages;
+    private readonly Action<CollectionSortPriority> _setSortPriority;
     private readonly Action<string> _setSearch;
     private readonly Action _clearFilters;
 
@@ -51,7 +59,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private PanelSettings? _panelSettings;
     private VisualElement? _root;
     private Label? _title;
-    private Label? _subtitle;
+    private VisualElement? _subtitle;
     private Label? _countLabel;
     private Label? _statusLabel;
     private Button? _itemTabButton;
@@ -59,11 +67,20 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _closeButton;
     private Button? _clearButton;
     private Button? _packageToggleButton;
+    private Label? _packageToggleLabel;
+    private VisualElement? _packageSwitchTrack;
+    private VisualElement? _packageSwitchKnob;
+    private Button? _sortQualityButton;
+    private Button? _sortSizeButton;
+    private VisualElement? _searchShell;
+    private Label? _searchPlaceholderLabel;
     private TextField? _searchField;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
     private VisualElement? _sizeChipRow;
     private VisualElement? _merchantChipRow;
+    private VisualElement? _sizeFilterSection;
+    private VisualElement? _merchantFilterSection;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
     private VisualElement? _gridContentSpacer;
@@ -76,7 +93,6 @@ internal sealed partial class CollectionPanelView : IDisposable
 
     private readonly Dictionary<EHero, Button> _heroChips = new();
     private readonly Dictionary<EHero, VisualElement> _heroChipIcons = new();
-    private readonly Dictionary<EHero, Label> _heroChipLabels = new();
     private readonly Dictionary<ETier, Button> _tierChips = new();
     private readonly Dictionary<ECardSize, Button> _sizeChips = new();
     private readonly Dictionary<CollectionMerchantKind, Button> _merchantChips = new();
@@ -101,6 +117,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action<ECardSize> toggleSize,
         Action<CollectionMerchantKind> toggleMerchant,
         Action togglePackages,
+        Action<CollectionSortPriority> setSortPriority,
         Action<string> setSearch,
         Action clearFilters
     )
@@ -113,6 +130,8 @@ internal sealed partial class CollectionPanelView : IDisposable
         _toggleSize = toggleSize ?? throw new ArgumentNullException(nameof(toggleSize));
         _toggleMerchant = toggleMerchant ?? throw new ArgumentNullException(nameof(toggleMerchant));
         _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
+        _setSortPriority =
+            setSortPriority ?? throw new ArgumentNullException(nameof(setSortPriority));
         _setSearch = setSearch ?? throw new ArgumentNullException(nameof(setSearch));
         _clearFilters = clearFilters ?? throw new ArgumentNullException(nameof(clearFilters));
     }
@@ -149,6 +168,10 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.SkillsTab()
                 + CollectionPanelText.Close()
                 + CollectionPanelText.PackagesToggle()
+                + CollectionPanelText.Reset()
+                + CollectionPanelText.SortHeader()
+                + CollectionPanelText.SortQuality()
+                + CollectionPanelText.SortSize()
                 + CollectionPanelText.SearchPlaceholder()
                 + CollectionPanelText.NoMatches()
                 + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#\\",
@@ -250,7 +273,7 @@ internal sealed partial class CollectionPanelView : IDisposable
             return;
 
         _title!.text = model.Title;
-        _subtitle!.text = model.Subtitle;
+        BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle);
         _countLabel!.text = model.CountText;
         _statusLabel!.text = model.StatusMessage ?? string.Empty;
         _statusLabel.style.display = string.IsNullOrWhiteSpace(model.StatusMessage)
@@ -280,14 +303,20 @@ internal sealed partial class CollectionPanelView : IDisposable
         foreach (var pair in _merchantChips)
             RefreshChip(pair.Value, model.SelectedMerchants.Contains(pair.Key));
         if (_packageToggleButton != null)
-            RefreshChip(_packageToggleButton, model.IncludePackages);
+            RefreshPackageToggle(model.IncludePackages, model.HasPackages);
+        if (_clearButton != null)
+            RefreshResetButton(model.HasActiveFilters);
+        if (_sortQualityButton != null)
+            RefreshChip(_sortQualityButton, model.SortPriority == CollectionSortPriority.Quality);
+        if (_sortSizeButton != null)
+            RefreshChip(_sortSizeButton, model.SortPriority == CollectionSortPriority.Size);
 
         // Size only narrows Items; hide the whole row on the Skill tab.
-        if (_sizeChipRow != null)
-            _sizeChipRow.style.display =
+        if (_sizeFilterSection != null)
+            _sizeFilterSection.style.display =
                 model.ActiveType == ECardType.Item ? DisplayStyle.Flex : DisplayStyle.None;
-        if (_merchantChipRow != null)
-            _merchantChipRow.style.display =
+        if (_merchantFilterSection != null)
+            _merchantFilterSection.style.display =
                 model.AvailableMerchants.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
 
         if (
@@ -295,6 +324,7 @@ internal sealed partial class CollectionPanelView : IDisposable
             && !string.Equals(_searchField.value, model.Search, StringComparison.Ordinal)
         )
             _searchField.SetValueWithoutNotify(model.Search);
+        RefreshSearchPlaceholder(model.Search);
 
         UpdateContentSpacerHeight(model.ContentHeight);
 

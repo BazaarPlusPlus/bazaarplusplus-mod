@@ -5,6 +5,10 @@ TestEmptyInputReturnsNoSample();
 TestInvalidEntriesAreIgnored();
 TestTierWeightsSelectDefaultBronzeSilverAndGoldBuckets();
 TestTierBucketSelectionUsesUniformIndexRanges();
+TestSampleManyReturnsDistinctSupporters();
+TestSampleManyRotatesThroughEverySupporterBeforeRepeating();
+TestSupportedByPrefixAndSuffix();
+TestSponsorActionText();
 
 Console.WriteLine("Supporters checks passed.");
 
@@ -109,6 +113,96 @@ static void TestTierBucketSelectionUsesUniformIndexRanges()
         "Cara",
         BPPSupporterSampler.Sample(entries, Rolls(0f, 0.67f)).Name,
         "The final third of a tier bucket should select the third entry."
+    );
+}
+
+static void TestSampleManyReturnsDistinctSupporters()
+{
+    var entries = new[]
+    {
+        Entry("Alice", 4),
+        Entry("Bob", 4),
+        Entry("Cara", 4),
+        Entry("Dora", 4),
+        Entry("Alice", 4),
+    };
+
+    var samples = BPPSupporterSampler.SampleMany(entries, 4, startIndex: 0, shuffleSeed: 17);
+
+    AssertEqual(
+        4,
+        samples.Count,
+        "SampleMany should return the requested count when enough unique names exist."
+    );
+    AssertEqual(
+        4,
+        samples.Select(sample => sample.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+        "SampleMany should not repeat supporter names in one attribution row."
+    );
+    AssertTrue(
+        samples.All(sample => sample.Tier == 4),
+        "SampleMany should preserve supporter tiers."
+    );
+}
+
+static void TestSampleManyRotatesThroughEverySupporterBeforeRepeating()
+{
+    var entries = new[]
+    {
+        Entry("Alice", 4),
+        Entry("Bob", 3),
+        Entry("Cara", 2),
+        Entry("Dora", 1),
+        Entry("Evan", 4),
+    };
+
+    var first = BPPSupporterSampler.SampleMany(entries, 2, startIndex: 0, shuffleSeed: 23);
+    var second = BPPSupporterSampler.SampleMany(entries, 2, startIndex: 2, shuffleSeed: 23);
+    var third = BPPSupporterSampler.SampleMany(entries, 2, startIndex: 4, shuffleSeed: 23);
+    var names = first.Concat(second).Concat(third).Take(5).Select(sample => sample.Name).ToList();
+
+    AssertEqual(
+        5,
+        names.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+        "Pseudo-random supporter sampling should rotate through the whole shuffled bag before repeating names."
+    );
+}
+
+static void TestSupportedByPrefixAndSuffix()
+{
+    AssertEqual(
+        "Supported by",
+        BPPSupporterAttributionText.FormatSupportedByPrefix("en"),
+        "English attribution row should start with Supported by."
+    );
+    AssertEqual(
+        string.Empty,
+        BPPSupporterAttributionText.FormatSupportedBySuffix("en"),
+        "English attribution row should not need a suffix."
+    );
+    AssertEqual(
+        "由",
+        BPPSupporterAttributionText.FormatSupportedByPrefix("zh-CN"),
+        "Chinese attribution row should start with 由."
+    );
+    AssertEqual(
+        "支持",
+        BPPSupporterAttributionText.FormatSupportedBySuffix("zh-CN"),
+        "Chinese attribution row should end with 支持."
+    );
+}
+
+static void TestSponsorActionText()
+{
+    AssertEqual(
+        "Sponsor",
+        BPPSupporterAttributionText.FormatSponsorAction("en"),
+        "English attribution row should expose a sponsor action."
+    );
+    AssertEqual(
+        "赞助",
+        BPPSupporterAttributionText.FormatSponsorAction("zh-CN"),
+        "Chinese attribution row should expose a localized sponsor action."
     );
 }
 

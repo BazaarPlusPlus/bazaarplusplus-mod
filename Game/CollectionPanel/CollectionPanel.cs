@@ -9,6 +9,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -30,12 +31,12 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         EHero.Common,
         EHero.Vanessa,
-        EHero.Pygmalien,
         EHero.Dooley,
-        EHero.Mak,
-        EHero.Jules,
+        EHero.Pygmalien,
         EHero.Karnok,
+        EHero.Mak,
         EHero.Stelle,
+        EHero.Jules,
     };
 
     private static readonly ETier[] TierOrder = new[]
@@ -87,6 +88,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     private CollectionCardMaterialCache? _materialCache;
 
     private IReadOnlyList<CollectionCardVm> _catalogCards = Array.Empty<CollectionCardVm>();
+    private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
     private bool _isVisible;
     private bool _initialized;
     private string _lastSceneToken = string.Empty;
@@ -158,6 +160,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         }
 
         EnsureView();
+        _supporters = BPPSupporters.SampleMany(4);
         _isVisible = true;
         // SetVisible starts the fade-in ramp; overlay activates so its CanvasGroup starts
         // mirroring the view's opacity (Update pushes the live value each frame).
@@ -381,10 +384,20 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ApplyFilters();
                 RefreshView();
             },
+            setSortPriority: priority =>
+            {
+                if (_filter.SortPriority == priority)
+                    return;
+                _filter.SortPriority = priority;
+                _scrollY = 0f;
+                ApplyFilters();
+                RefreshView();
+            },
             setSearch: value =>
             {
                 _pendingSearch = value ?? string.Empty;
                 _pendingSearchAt = Time.unscaledTime;
+                RefreshView();
             },
             clearFilters: () =>
             {
@@ -394,6 +407,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _filter.Sizes.Clear();
                 _filter.Merchants.Clear();
                 _filter.IncludePackages = false;
+                _filter.SortPriority = CollectionSortPriority.Quality;
                 _filter.Search = string.Empty;
                 _appliedSearch = string.Empty;
                 _pendingSearch = string.Empty;
@@ -569,6 +583,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         {
             Title = CollectionPanelText.Title(),
             Subtitle = CollectionPanelText.Subtitle(),
+            Supporters = _supporters,
             CountText = CollectionPanelText.MatchCount(_virtualizer.VisibleCount),
             StatusMessage = _statusVisible ? _statusMessage : null,
             IsLoading = _isLoadingCatalog,
@@ -578,7 +593,10 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
             SelectedMerchants = new HashSet<CollectionMerchantKind>(_filter.Merchants),
             IncludePackages = _filter.IncludePackages,
-            Search = _filter.Search,
+            HasPackages = HasPackages(),
+            HasActiveFilters = HasActiveFilters(),
+            SortPriority = _filter.SortPriority,
+            Search = GetVisibleSearchText(),
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
@@ -597,6 +615,30 @@ internal sealed class CollectionPanel : MonoBehaviour
                 result.Add(merchant);
         }
         return result;
+    }
+
+    private bool HasPackages()
+    {
+        foreach (var card in _catalogCards)
+        {
+            if (card.IsPackage)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasActiveFilters()
+    {
+        if (_filter.HasActiveFilters)
+            return true;
+
+        return !float.IsNaN(_pendingSearchAt) && !string.IsNullOrWhiteSpace(_pendingSearch);
+    }
+
+    private string GetVisibleSearchText()
+    {
+        return float.IsNaN(_pendingSearchAt) ? _filter.Search : _pendingSearch;
     }
 
     private void PruneUnavailableMerchants(ECardType activeType)

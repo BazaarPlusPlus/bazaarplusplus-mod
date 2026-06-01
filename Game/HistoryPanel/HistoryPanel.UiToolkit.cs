@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ui;
+using BazaarPlusPlus.Game.Supporters;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -99,9 +100,7 @@ internal sealed partial class HistoryPanel
             ActiveSelectedBattle == null ? HistoryPanelText.SelectBattleForFooter()
             : string.IsNullOrWhiteSpace(snapshotSummary) ? selectedBattleTimestampText
             : $"{selectedBattleTimestampText} | {snapshotSummary}";
-        var footerSecondaryText = string.IsNullOrWhiteSpace(_statusMessage)
-            ? battleSummary
-            : $"{_statusMessage} | {battleSummary}";
+        var footerSecondaryText = battleSummary;
         var ghostOpponentEliminatedNoticeText = HistoryPanelFormatter.IsGhostOpponentEliminated(
             ActiveSelectedBattle
         )
@@ -112,6 +111,7 @@ internal sealed partial class HistoryPanel
         {
             Title = HistoryPanelText.Title(),
             Subtitle = HistoryPanelText.Subtitle(),
+            Supporters = _supporters,
             CountChipText =
                 _sectionMode == HistorySectionMode.Ghost
                     ? HistoryPanelText.CountGhost(FilteredGhostBattles.Count)
@@ -189,6 +189,9 @@ internal sealed class HistoryPanelUiToolkitModel
     public string Title { get; set; } = string.Empty;
 
     public string Subtitle { get; set; } = string.Empty;
+
+    public IReadOnlyList<BPPSupporterSample> Supporters { get; set; } =
+        new List<BPPSupporterSample>();
 
     public string CountChipText { get; set; } = string.Empty;
 

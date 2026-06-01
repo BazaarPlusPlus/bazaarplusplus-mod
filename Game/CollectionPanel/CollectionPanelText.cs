@@ -19,10 +19,10 @@ internal static class CollectionPanelText
     );
 
     private static readonly LocalizedTextSet SubtitleText = new(
-        "Browse every Item and Skill in the game. Filter by hero, size, rarity or name. Hover a card to see the in-game tooltip.",
-        "浏览游戏里所有的物品和技能。可按英雄 / 尺寸 / 稀有度 / 名称筛选；悬停查看原生 tooltip。",
-        "瀏覽遊戲裡所有的物品和技能。可按英雄 / 尺寸 / 稀有度 / 名稱篩選；懸停查看原生 tooltip。",
-        "瀏覽遊戲裡所有的物品和技能。可按英雄 / 尺寸 / 稀有度 / 名稱篩選；懸停查看原生 tooltip。"
+        "Supported by the BazaarPlusPlus community.",
+        "由 BazaarPlusPlus 玩家社区支持。",
+        "由 BazaarPlusPlus 玩家社群支持。",
+        "由 BazaarPlusPlus 玩家社群支持。"
     );
 
     private static readonly LocalizedTextSet ItemsTabText = new("Items", "物品", "物品", "物品");
@@ -37,12 +37,20 @@ internal static class CollectionPanelText
 
     private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄", "英雄");
     private static readonly LocalizedTextSet TierHeaderText = new(
-        "Rarity",
-        "稀有度",
-        "稀有度",
-        "稀有度"
+        "Quality",
+        "品质",
+        "品質",
+        "品質"
     );
     private static readonly LocalizedTextSet SizeHeaderText = new("Size", "尺寸", "尺寸", "尺寸");
+    private static readonly LocalizedTextSet SortHeaderText = new("Sort", "排序", "排序", "排序");
+    private static readonly LocalizedTextSet SortQualityText = new(
+        "Quality",
+        "品质",
+        "品質",
+        "品質"
+    );
+    private static readonly LocalizedTextSet SortSizeText = new("Size", "尺寸", "尺寸", "尺寸");
     private static readonly LocalizedTextSet MerchantHeaderText = new(
         "Merchant",
         "商人",
@@ -55,7 +63,7 @@ internal static class CollectionPanelText
         "包裹",
         "包裹"
     );
-    private static readonly LocalizedTextSet AllText = new("All", "全部", "全部", "全部");
+    private static readonly LocalizedTextSet ResetText = new("Reset", "重置", "重置", "重置");
 
     private static readonly LocalizedTextSet CatalogLoadingText = new(
         "Loading card data...",
@@ -94,11 +102,17 @@ internal static class CollectionPanelText
 
     internal static string SizeHeader() => Resolve(SizeHeaderText);
 
+    internal static string SortHeader() => Resolve(SortHeaderText);
+
+    internal static string SortQuality() => Resolve(SortQualityText);
+
+    internal static string SortSize() => Resolve(SortSizeText);
+
     internal static string MerchantHeader() => Resolve(MerchantHeaderText);
 
     internal static string PackagesToggle() => Resolve(PackagesToggleText);
 
-    internal static string All() => Resolve(AllText);
+    internal static string Reset() => Resolve(ResetText);
 
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 

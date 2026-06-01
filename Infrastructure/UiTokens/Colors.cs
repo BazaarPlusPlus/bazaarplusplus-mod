@@ -120,6 +120,11 @@ internal static class Colors
     public static Color RankDiamondText => Rgba(0.84f, 0.97f, 1f, 1f);
     public static Color RankDefaultBackground => Rgba(0.24f, 0.28f, 0.36f, 0.98f);
 
+    public static Color SupporterTier1Text => Rgba(0.78f, 0.83f, 0.90f, 0.90f);
+    public static Color SupporterTier2Text => Rgba(1f, 0.66f, 0.34f, 1f);
+    public static Color SupporterTier3Text => Rgba(0.78f, 0.86f, 1f, 1f);
+    public static Color SupporterTier4Text => Rgba(1f, 0.78f, 0.20f, 1f);
+
     public static Color HeroUnknownBackground => Rgba(0.20f, 0.29f, 0.38f, 0.95f);
     public static Color HeroVanessaBackground => FromRgb(192, 33, 33);
     public static Color HeroPygmalienBackground => FromRgb(39, 103, 192);

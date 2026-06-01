@@ -6,6 +6,7 @@ using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Preview;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using UnityEngine;
@@ -37,6 +38,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private BattleBoardPreview? _battleBoardPreview;
     private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
+    private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
     private string _lastSceneToken = string.Empty;
     private bool _initialized;
     private bool _uiFontPrewarmedForScene;
@@ -189,8 +191,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void SetHistoryVisible(bool visible)
     {
+        var wasVisible = IsVisible;
         if (visible)
             EnsureUi();
+
+        if (visible && !wasVisible)
+            _supporters = BPPSupporters.SampleMany(4);
 
         IsVisible = visible;
         if (visible)

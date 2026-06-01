@@ -4,6 +4,12 @@ using BazaarGameShared.Domain.Core.Types;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
+internal enum CollectionSortPriority
+{
+    Quality,
+    Size,
+}
+
 // Mutable selection state held by CollectionPanel; pure data. The filter engine reads
 // this and produces an ordered visible set.
 internal sealed class CollectionFilterState
@@ -18,7 +24,18 @@ internal sealed class CollectionFilterState
     public HashSet<ECardSize> Sizes { get; } = new();
     public HashSet<CollectionMerchantKind> Merchants { get; } = new();
     public bool IncludePackages { get; set; }
+    public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
     public string Search { get; set; } = string.Empty;
+
+    public bool HasActiveFilters =>
+        Heroes.Count > 0
+        || Tiers.Count > 0
+        || Tags.Count > 0
+        || Sizes.Count > 0
+        || Merchants.Count > 0
+        || IncludePackages
+        || SortPriority != CollectionSortPriority.Quality
+        || !string.IsNullOrWhiteSpace(Search);
 
     public void Reset()
     {
@@ -29,6 +46,7 @@ internal sealed class CollectionFilterState
         Sizes.Clear();
         Merchants.Clear();
         IncludePackages = false;
+        SortPriority = CollectionSortPriority.Quality;
         Search = string.Empty;
     }
 }

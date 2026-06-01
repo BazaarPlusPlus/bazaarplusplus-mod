@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -26,7 +28,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private PanelSettings? _panelSettings;
     private VisualElement? _root;
     private Label? _title;
-    private Label? _subtitle;
+    private VisualElement? _subtitle;
     private Label? _countChip;
     private Label? _battleChip;
     private Label? _databaseChip;
@@ -54,6 +56,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Button? _deleteButton;
     private Button? _replayButton;
     private Button? _recordAndReplayButton;
+    private Button? _closeButton;
     private bool _suppressSelectionCallbacks;
     private Rect _lastPreviewContainerBounds;
 
@@ -171,7 +174,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
             return;
 
         _title!.text = model.Title;
-        _subtitle!.text = model.Subtitle;
+        _closeButton!.text = HistoryPanelText.Close();
+        BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle);
         _countChip!.text = model.CountChipText;
         _battleChip!.text = model.BattleChipText;
         _databaseChip!.text = model.DatabaseChipText;

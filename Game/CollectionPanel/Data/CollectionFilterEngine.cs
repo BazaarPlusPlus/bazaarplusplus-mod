@@ -7,9 +7,9 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
 // Pure function: (catalog + filter state) -> ordered visible list.
 //
-// Ordering is deliberately explicit (tier rank then display name) because ETier's underlying
-// integer values place Diamond=3 before Legendary=4, which would mis-order a naive sort on
-// the raw enum. TierRank() locks the intended ordering.
+// Ordering is deliberately explicit: selected priority first, then the other card facet, then
+// display name.
+// The rank helpers keep visible ordering independent from raw enum integer values.
 internal static class CollectionFilterEngine
 {
     public static List<CollectionCardVm> Apply(
@@ -55,9 +55,12 @@ internal static class CollectionFilterEngine
         result.Sort(
             (a, b) =>
             {
-                var tierOrder = TierRank(a.StartingTier).CompareTo(TierRank(b.StartingTier));
-                if (tierOrder != 0)
-                    return tierOrder;
+                var facetOrder =
+                    filter.SortPriority == CollectionSortPriority.Size
+                        ? CompareBySizeThenTier(a, b)
+                        : CompareByTierThenSize(a, b);
+                if (facetOrder != 0)
+                    return facetOrder;
                 return string.Compare(
                     a.DisplayName,
                     b.DisplayName,
@@ -66,6 +69,22 @@ internal static class CollectionFilterEngine
             }
         );
         return result;
+    }
+
+    private static int CompareByTierThenSize(CollectionCardVm a, CollectionCardVm b)
+    {
+        var tierOrder = TierRank(a.StartingTier).CompareTo(TierRank(b.StartingTier));
+        if (tierOrder != 0)
+            return tierOrder;
+        return SizeRank(a.Size).CompareTo(SizeRank(b.Size));
+    }
+
+    private static int CompareBySizeThenTier(CollectionCardVm a, CollectionCardVm b)
+    {
+        var sizeOrder = SizeRank(a.Size).CompareTo(SizeRank(b.Size));
+        if (sizeOrder != 0)
+            return sizeOrder;
+        return TierRank(a.StartingTier).CompareTo(TierRank(b.StartingTier));
     }
 
     private static bool AnyHeroMatch(
@@ -115,6 +134,15 @@ internal static class CollectionFilterEngine
             ETier.Gold => 2,
             ETier.Diamond => 3,
             ETier.Legendary => 4,
+            _ => 99,
+        };
+
+    private static int SizeRank(ECardSize size) =>
+        size switch
+        {
+            ECardSize.Small => 0,
+            ECardSize.Medium => 1,
+            ECardSize.Large => 2,
             _ => 99,
         };
 }

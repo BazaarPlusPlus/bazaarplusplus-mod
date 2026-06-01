@@ -57,8 +57,13 @@ internal sealed partial class HistoryPanelUiToolkitView
     {
         var chip = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
         chip.style.backgroundColor = Colors.HistoryChipBackground;
-        chip.style.minWidth = Sizes.ChipMinWidth;
+        chip.style.flexBasis = 0f;
+        chip.style.flexGrow = 1f;
+        chip.style.flexShrink = 1f;
+        chip.style.minWidth = 0f;
         chip.style.height = Sizes.ChipHeight;
+        chip.style.whiteSpace = WhiteSpace.NoWrap;
+        chip.style.overflow = Overflow.Hidden;
         UiStyle.HorizontalPadding(chip.style, UiSpacing.Md);
         chip.style.unityTextAlign = TextAnchor.MiddleCenter;
         UiStyle.Radius(chip.style, Radii.Md);
@@ -76,13 +81,25 @@ internal sealed partial class HistoryPanelUiToolkitView
         return label;
     }
 
-    private static Button CreateButton(string text, Action onClick, float width, float height)
+    private static Button CreateButton(
+        string text,
+        Action onClick,
+        float width,
+        float height,
+        bool fixedWidth = true
+    )
     {
         var button = new Button(() => onClick()) { text = text };
-        UiStyle.FixedWidth(button.style, width);
+        if (fixedWidth)
+            UiStyle.FixedWidth(button.style, width);
+        else
+        {
+            button.style.flexBasis = 0f;
+            button.style.minWidth = 0f;
+        }
         button.style.height = height;
-        button.style.flexGrow = 0f;
-        button.style.flexShrink = 0f;
+        button.style.flexGrow = fixedWidth ? 0f : 1f;
+        button.style.flexShrink = fixedWidth ? 0f : 1f;
         button.style.unityFont = GetUiFont();
         button.style.unityTextAlign = TextAnchor.MiddleCenter;
         button.style.justifyContent = Justify.Center;
