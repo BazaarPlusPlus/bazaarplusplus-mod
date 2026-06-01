@@ -164,14 +164,6 @@ internal sealed partial class CollectionPanelView
         _tierChipRow.style.flexWrap = Wrap.NoWrap;
         _tierChipRow.style.justifyContent = Justify.SpaceBetween;
 
-        // Merchant filter.
-        _merchantFilterSection = CreateFilterSection(
-            rail,
-            CollectionPanelText.MerchantHeader(),
-            UiSpacing.Lg,
-            out _merchantChipRow
-        );
-
         // Size filter (Items only — Refresh hides this row on the Skill tab).
         _sizeFilterSection = CreateFilterSection(
             rail,
@@ -181,6 +173,17 @@ internal sealed partial class CollectionPanelView
         );
         _sizeChipRow.style.flexWrap = Wrap.NoWrap;
         _sizeChipRow.style.justifyContent = Justify.SpaceBetween;
+
+        // Source filter (merchant portraits on Items, trainer portraits on Skills).
+        _sourceFilterSection = CreateFilterSection(
+            rail,
+            CollectionPanelText.SourceHeader(ECardType.Item),
+            UiSpacing.Lg,
+            out _sourceChipRow,
+            out _sourceFilterLabel
+        );
+        _sourceChipRow.style.flexWrap = Wrap.Wrap;
+        _sourceChipRow.style.justifyContent = Justify.FlexStart;
 
         _statusLabel = CreateLabel(Sizes.FontSmall, FontStyle.Normal, Colors.HistoryStatusText);
         _statusLabel.style.marginTop = UiSpacing.Lg;
@@ -202,6 +205,14 @@ internal sealed partial class CollectionPanelView
         string title,
         float marginTop,
         out VisualElement chipRow
+    ) => CreateFilterSection(parent, title, marginTop, out chipRow, out _);
+
+    private static VisualElement CreateFilterSection(
+        VisualElement parent,
+        string title,
+        float marginTop,
+        out VisualElement chipRow,
+        out Label label
     )
     {
         var section = new VisualElement();
@@ -209,7 +220,7 @@ internal sealed partial class CollectionPanelView
         section.style.marginTop = marginTop;
         parent.Add(section);
 
-        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
         label.text = title;
         label.style.marginBottom = UiSpacing.Sm;
         section.Add(label);

@@ -19,7 +19,7 @@ internal static class HeroPortraitSpriteProvider
     private static readonly Dictionary<EHero, Task<Sprite?>> InFlightLoads = new();
 
     internal static bool IsRenderableHero(EHero hero) =>
-        hero != EHero.Common && hero != EHero.Hero8;
+        hero != EHero.Common && !string.Equals(hero.ToString(), "Hero8", StringComparison.Ordinal);
 
     internal static bool TryGetCached(EHero hero, out Sprite? sprite)
     {

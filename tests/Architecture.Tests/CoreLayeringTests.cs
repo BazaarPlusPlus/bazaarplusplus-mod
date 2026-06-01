@@ -114,6 +114,42 @@ public class CoreLayeringTests
         );
     }
 
+    [Fact]
+    public void GameInterop_does_not_depend_on_Game_feature_namespaces()
+    {
+        var repoRoot = RepoRoot();
+        var gameInteropDir = Path.Combine(repoRoot, "GameInterop");
+        Assert.True(
+            Directory.Exists(gameInteropDir),
+            $"Could not locate GameInterop directory at '{gameInteropDir}'."
+        );
+
+        var violations = new List<string>();
+        foreach (
+            var file in Directory.EnumerateFiles(
+                gameInteropDir,
+                "*.cs",
+                SearchOption.AllDirectories
+            )
+        )
+        {
+            var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+            foreach (var rawLine in File.ReadLines(file))
+            {
+                var line = rawLine.Trim();
+                if (line.StartsWith("using BazaarPlusPlus.Game.", StringComparison.Ordinal))
+                    violations.Add($"{relative}: {line}");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "GameInterop must stay reusable and must not import Game feature namespaces. "
+                + "Pass primitive ids/DTOs across the boundary instead. Offending imports:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
     // The compile-time path of this source file anchors the repo root without loading any
     // game-coupled assembly at runtime: <repo>/tests/Architecture.Tests/CoreLayeringTests.cs.
     private static string RepoRoot([CallerFilePath] string thisFile = "")

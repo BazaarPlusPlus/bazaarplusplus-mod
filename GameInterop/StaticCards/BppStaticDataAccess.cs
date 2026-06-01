@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using TheBazaar;
 using TheBazaar.DataManagement.Json;
@@ -8,9 +9,8 @@ using TheBazaar.DataManagement.Json;
 namespace BazaarPlusPlus.GameInterop.StaticCards;
 
 /// <summary>
-/// <c>Data.GetStatic()</c> returns the manager synchronously. This helper centralises
-/// the readiness check so a future change to the upstream API only needs updating in
-/// one place.
+/// <c>Data.GetStatic()</c> has shipped as both a synchronous manager return and a completed
+/// task-returning accessor. This helper centralises that version seam.
 /// </summary>
 internal static class BppStaticDataAccess
 {
@@ -19,7 +19,11 @@ internal static class BppStaticDataAccess
         if (!Data.IsManagerCreated())
             return null;
 
-        return Data.GetStatic();
+        object? staticData = Data.GetStatic();
+        if (staticData is Task<JsonGameDataManager> task)
+            return task.GetAwaiter().GetResult();
+
+        return staticData;
     }
 
     public static TCardBase? GetCardTemplate(object? staticData, Guid templateId)

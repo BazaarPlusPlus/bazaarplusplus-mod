@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using TheBazaar;
 
 namespace BazaarPlusPlus.GameInterop.Encounter;
@@ -39,7 +40,8 @@ internal static class EncounterTypeResolver
     {
         try
         {
-            var template = Data.GetStatic()?.GetCardById(templateId);
+            var staticData = BppStaticDataAccess.TryGet();
+            var template = BppStaticDataAccess.GetCardTemplate(staticData, templateId);
             return template?.GetType().Name ?? template?.Type.ToString();
         }
         catch

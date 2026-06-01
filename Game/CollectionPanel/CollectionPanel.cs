@@ -6,10 +6,12 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.Game.CollectionPanel.Encounters;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.GameInterop.EncounterOffers;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -22,6 +24,8 @@ internal sealed class CollectionPanel : MonoBehaviour
 {
     private const float SearchDebounceSeconds = 0.20f;
     private const float CatalogBuildFrameBudgetMs = 4f;
+    private const float SourcePoolRetrySeconds = 0.25f;
+    private const int SourcePoolMaxRetryAttempts = 12;
 
     private static CollectionPanel? _instance;
     public static bool IsVisible => _instance != null && _instance._isVisible;
@@ -55,28 +59,11 @@ internal sealed class CollectionPanel : MonoBehaviour
         ECardSize.Large,
     };
 
-    private static readonly CollectionMerchantKind[] MerchantOrder = new[]
-    {
-        CollectionMerchantKind.General,
-        CollectionMerchantKind.Burn,
-        CollectionMerchantKind.Poison,
-        CollectionMerchantKind.Freeze,
-        CollectionMerchantKind.Slow,
-        CollectionMerchantKind.Haste,
-        CollectionMerchantKind.Speed,
-        CollectionMerchantKind.Toughness,
-        CollectionMerchantKind.Strength,
-        CollectionMerchantKind.Heal,
-        CollectionMerchantKind.Economy,
-        CollectionMerchantKind.Shield,
-        CollectionMerchantKind.Health,
-        CollectionMerchantKind.Joy,
-        CollectionMerchantKind.Flying,
-    };
-
     private readonly CollectionCatalog _catalog = new();
     private readonly CollectionFilterState _filter = new();
     private readonly List<CollectionCardVm> _visibleScratch = new();
+    private readonly CollectionSourceOfferPoolCache _offerPoolCache = new();
+    private readonly CollectionSourcePoolRetryState _sourcePoolRetry = new();
 
     private IBppConfig _config = null!;
     private CollectionPanelView? _view;
@@ -103,6 +90,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     private Coroutine? _loadCoroutine;
     private int _loadGeneration;
     private bool _isLoadingCatalog;
+    private bool _isResolvingSourcePool;
 
     public void Initialize(IBppServices services)
     {
@@ -175,6 +163,8 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (!_isVisible)
             return;
         CancelPanelLoad();
+        ResetSourcePoolRetry();
+        _isResolvingSourcePool = false;
         _isVisible = false;
         // SetVisible(false) flips the fade target to 0; Update keeps ticking the fade and
         // mirroring opacity to the overlay until CurrentOpacity reaches ~0, at which point
@@ -244,10 +234,13 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _appliedSearch = _pendingSearch;
                 _filter.Search = _pendingSearch;
                 _pendingSearchAt = float.NaN;
+                ResetSourcePoolRetry();
                 ApplyFilters();
                 RefreshView();
             }
         }
+
+        TickSourcePoolRetry();
 
         if (_viewportBoundsDirty && _virtualizer != null && _overlay != null)
         {
@@ -340,15 +333,17 @@ internal sealed class CollectionPanel : MonoBehaviour
                 if (_filter.ActiveType == type)
                     return;
                 _filter.ActiveType = type;
-                PruneUnavailableMerchants(type);
+                PruneInvisibleSourceSelections();
+                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
             },
             toggleHero: hero =>
             {
-                if (!_filter.Heroes.Remove(hero))
-                    _filter.Heroes.Add(hero);
+                _filter.ToggleHero(hero);
+                PruneInvisibleSourceSelections();
+                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -357,6 +352,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 if (!_filter.Tiers.Remove(tier))
                     _filter.Tiers.Add(tier);
+                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -365,14 +361,15 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 if (!_filter.Sizes.Remove(size))
                     _filter.Sizes.Add(size);
+                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
             },
-            toggleMerchant: merchant =>
+            toggleSource: sourceKey =>
             {
-                if (!_filter.Merchants.Remove(merchant))
-                    _filter.Merchants.Add(merchant);
+                _filter.ToggleSource(_filter.ActiveType, sourceKey);
+                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -380,6 +377,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             togglePackages: () =>
             {
                 _filter.IncludePackages = !_filter.IncludePackages;
+                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -389,6 +387,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 if (_filter.SortPriority == priority)
                     return;
                 _filter.SortPriority = priority;
+                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -401,17 +400,13 @@ internal sealed class CollectionPanel : MonoBehaviour
             },
             clearFilters: () =>
             {
-                _filter.Heroes.Clear();
-                _filter.Tiers.Clear();
-                _filter.Tags.Clear();
-                _filter.Sizes.Clear();
-                _filter.Merchants.Clear();
-                _filter.IncludePackages = false;
-                _filter.SortPriority = CollectionSortPriority.Quality;
-                _filter.Search = string.Empty;
+                var activeType = _filter.ActiveType;
+                _filter.Reset();
+                _filter.ActiveType = activeType;
                 _appliedSearch = string.Empty;
                 _pendingSearch = string.Empty;
                 _pendingSearchAt = float.NaN;
+                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -448,6 +443,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void CancelPanelLoad()
     {
         _loadGeneration++;
+        ResetSourcePoolRetry();
         if (_loadCoroutine != null)
         {
             StopCoroutine(_loadCoroutine);
@@ -558,20 +554,57 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (_virtualizer == null)
             return;
         _visibleScratch.Clear();
-        if (_catalogCards.Count > 0)
+        if (_catalogCards.Count == 0)
         {
-            var ordered = CollectionFilterEngine.Apply(_catalogCards, _filter);
-            _virtualizer.SetVisible(ordered, _filter.ActiveType);
+            _isResolvingSourcePool = false;
+            _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
         }
         else
         {
-            _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
+            var sourceEntry = ResolveSelectedSourceEntry();
+            IReadOnlyCollection<Guid>? offerPool = null;
+            if (sourceEntry != null)
+            {
+                var heroFilters = ResolveSelectedHeroFilters();
+                var cacheKey = _offerPoolCache.BuildKey(sourceEntry, heroFilters);
+                var offerPoolResult = _offerPoolCache.GetOrResolve(sourceEntry, heroFilters);
+                if (offerPoolResult.Status == EncounterOfferPoolStatus.Loading)
+                {
+                    _isResolvingSourcePool = true;
+                    SetStatus(CollectionPanelText.SourcePoolLoading());
+                    var retrying = ScheduleSourcePoolRetry(cacheKey, offerPoolResult.Reason);
+                    if (!retrying)
+                        _isResolvingSourcePool = false;
+                    _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
+                    ResetVisibleScroll();
+                    return;
+                }
+
+                ResetSourcePoolRetry();
+                _isResolvingSourcePool = false;
+                if (offerPoolResult.Status == EncounterOfferPoolStatus.Unavailable)
+                {
+                    SetStatus(CollectionPanelText.SourcePoolUnavailable(offerPoolResult.Reason));
+                    _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
+                    ResetVisibleScroll();
+                    return;
+                }
+
+                if (offerPoolResult.Status == EncounterOfferPoolStatus.Ready)
+                    offerPool = offerPoolResult.TemplateIds;
+            }
+            else
+            {
+                ResetSourcePoolRetry();
+                _isResolvingSourcePool = false;
+            }
+
+            if (!_isLoadingCatalog)
+                ClearStatus();
+            var ordered = CollectionFilterEngine.Apply(_catalogCards, _filter, offerPool);
+            _virtualizer.SetVisible(ordered, _filter.ActiveType);
         }
-        // Reset the actual ScrollView scrollOffset and cancel any in-flight smooth-wheel
-        // animation, otherwise switching from a large set to a small one strands the user
-        // at the bottom (scrollOffset clamps to the new max instead of returning to top).
-        _view?.ResetScroll();
-        _scrollY = 0f;
+        ResetVisibleScroll();
     }
 
     private void RefreshView()
@@ -591,28 +624,42 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedHeroes = new HashSet<EHero>(_filter.Heroes),
             SelectedTiers = new HashSet<ETier>(_filter.Tiers),
             SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
-            SelectedMerchants = new HashSet<CollectionMerchantKind>(_filter.Merchants),
+            SelectedSourceKey = _filter.GetSelectedSourceKey(_filter.ActiveType),
             IncludePackages = _filter.IncludePackages,
             HasPackages = HasPackages(),
             HasActiveFilters = HasActiveFilters(),
+            SourceSelectorEnabled = !_isLoadingCatalog && !_isResolvingSourcePool,
             SortPriority = _filter.SortPriority,
             Search = GetVisibleSearchText(),
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
-            AvailableMerchants = AvailableMerchantsFor(_filter.ActiveType),
+            AvailableSources = AvailableSourcesFor(_filter.ActiveType),
             ContentHeight = _virtualizer.ContentHeight,
         };
         _view.Refresh(model);
     }
 
-    private IReadOnlyList<CollectionMerchantKind> AvailableMerchantsFor(ECardType activeType)
+    private IReadOnlyList<CollectionSourceOptionViewModel> AvailableSourcesFor(ECardType activeType)
     {
-        var result = new List<CollectionMerchantKind>();
-        foreach (var merchant in MerchantOrder)
+        var kind =
+            activeType == ECardType.Skill
+                ? EncounterPortraitKind.Trainer
+                : EncounterPortraitKind.Merchant;
+        var result = new List<CollectionSourceOptionViewModel>();
+        foreach (var entry in MerchantTrainerCatalog.For(kind, _filter.SelectedConcreteHero))
         {
-            if (HasMerchantFor(activeType, merchant))
-                result.Add(merchant);
+            result.Add(
+                new CollectionSourceOptionViewModel
+                {
+                    SourceKey = entry.SourceKey,
+                    DisplayName = entry.Name,
+                    Description = entry.Description,
+                    Kind = entry.Kind,
+                    RepresentativeTemplateId =
+                        entry.TemplateIds.Count > 0 ? entry.TemplateIds[0] : Guid.Empty,
+                }
+            );
         }
         return result;
     }
@@ -641,24 +688,108 @@ internal sealed class CollectionPanel : MonoBehaviour
         return float.IsNaN(_pendingSearchAt) ? _filter.Search : _pendingSearch;
     }
 
-    private void PruneUnavailableMerchants(ECardType activeType)
+    private bool PruneInvisibleSourceSelections()
     {
-        _filter.Merchants.RemoveWhere(merchant => !HasMerchantFor(activeType, merchant));
+        var selectedHero = _filter.SelectedConcreteHero;
+        var visibleMerchants = SourceKeysFor(EncounterPortraitKind.Merchant, selectedHero);
+        var visibleTrainers = SourceKeysFor(EncounterPortraitKind.Trainer, selectedHero);
+        return _filter.PruneSelectedSources(visibleMerchants, visibleTrainers);
     }
 
-    private bool HasMerchantFor(ECardType activeType, CollectionMerchantKind merchant)
+    private static IReadOnlyList<string> SourceKeysFor(
+        EncounterPortraitKind kind,
+        EHero? selectedHero
+    )
     {
-        foreach (var card in _catalogCards)
+        var keys = new List<string>();
+        foreach (var entry in MerchantTrainerCatalog.For(kind, selectedHero))
+            keys.Add(entry.SourceKey);
+        return keys;
+    }
+
+    private MerchantTrainerEntry? ResolveSelectedSourceEntry()
+    {
+        var sourceKey = _filter.GetSelectedSourceKey(_filter.ActiveType);
+        if (string.IsNullOrWhiteSpace(sourceKey))
+            return null;
+
+        if (!MerchantTrainerCatalog.TryGetBySourceKey(sourceKey!, out var entry) || entry == null)
         {
-            if (card.Type != activeType)
-                continue;
-            foreach (var cardMerchant in card.Merchants)
-            {
-                if (cardMerchant == merchant)
-                    return true;
-            }
+            _filter.ClearSelectedSource(_filter.ActiveType);
+            return null;
         }
-        return false;
+
+        var expectedKind =
+            _filter.ActiveType == ECardType.Skill
+                ? EncounterPortraitKind.Trainer
+                : EncounterPortraitKind.Merchant;
+        if (entry.Kind != expectedKind)
+        {
+            _filter.ClearSelectedSource(_filter.ActiveType);
+            return null;
+        }
+
+        var selectedHero = _filter.SelectedConcreteHero;
+        if (selectedHero.HasValue && !entry.AppliesToHero(selectedHero.Value))
+        {
+            _filter.ClearSelectedSource(_filter.ActiveType);
+            return null;
+        }
+
+        return entry;
+    }
+
+    private IReadOnlyList<EHero> ResolveSelectedHeroFilters()
+    {
+        var heroes = new List<EHero>();
+        foreach (var hero in HeroOrder)
+        {
+            if (_filter.Heroes.Contains(hero))
+                heroes.Add(hero);
+        }
+        return heroes;
+    }
+
+    private void TickSourcePoolRetry()
+    {
+        if (!_sourcePoolRetry.TryConsumeDueRetry(Time.unscaledTime))
+            return;
+
+        ApplyFilters();
+        RefreshView();
+    }
+
+    private bool ScheduleSourcePoolRetry(string cacheKey, string? reason)
+    {
+        var result = _sourcePoolRetry.Schedule(
+            cacheKey,
+            Time.unscaledTime,
+            SourcePoolRetrySeconds,
+            SourcePoolMaxRetryAttempts
+        );
+        if (result.IsExhausted)
+        {
+            if (result.ShouldLogWarning)
+                BppLog.Warn(
+                    "CollectionPanel",
+                    $"Source offer pool unavailable after retry key={cacheKey} reason={reason}"
+                );
+            SetStatus(CollectionPanelText.SourcePoolUnavailable(reason));
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ResetSourcePoolRetry() => _sourcePoolRetry.Reset();
+
+    private void ResetVisibleScroll()
+    {
+        // Reset the actual ScrollView scrollOffset and cancel any in-flight smooth-wheel
+        // animation, otherwise switching from a large set to a small one strands the user
+        // at the bottom (scrollOffset clamps to the new max instead of returning to top).
+        _view?.ResetScroll();
+        _scrollY = 0f;
     }
 
     private void SetStatus(string message)

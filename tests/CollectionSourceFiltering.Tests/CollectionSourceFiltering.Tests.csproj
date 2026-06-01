@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json;
+    </RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
+    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/Assembly-CSharp.dll')">
+    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="..\..\Game\CollectionPanel\Encounters\EncounterPortraitKind.cs"
+      Link="EncounterPortraitKind.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Encounters\MerchantTrainerEntry.cs"
+      Link="MerchantTrainerEntry.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Encounters\MerchantTrainerCatalog.cs"
+      Link="MerchantTrainerCatalog.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\CollectionSourceOfferPoolCacheKey.cs"
+      Link="CollectionSourceOfferPoolCacheKey.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\CollectionSourcePoolRetryState.cs"
+      Link="CollectionSourcePoolRetryState.cs"
+    />
+    <Compile
+      Include="..\..\GameInterop\EncounterOffers\EncounterOfferHeroMapper.cs"
+      Link="EncounterOfferHeroMapper.cs"
+    />
+    <Compile
+      Include="..\..\GameInterop\EncounterOffers\EncounterOfferPoolRules.cs"
+      Link="EncounterOfferPoolRules.cs"
+    />
+    <Reference Include="BazaarBattleService">
+      <HintPath>$(ManagedPath)/BazaarBattleService.dll</HintPath>
+    </Reference>
+    <Reference Include="BazaarGameShared">
+      <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

@@ -9,11 +9,92 @@ AssertFalse(
 defaultState.Search = "wand";
 AssertTrue(defaultState.HasActiveFilters, "Search text should make filters resettable.");
 defaultState.Reset();
+defaultState.SelectedMerchantSourceKey = "merchant:aila";
+AssertTrue(
+    defaultState.HasActiveFilters,
+    "Selected merchant source should make filters resettable."
+);
+defaultState.Reset();
+AssertFalse(defaultState.HasActiveFilters, "Reset should clear selected merchant source filters.");
+defaultState.SelectedTrainerSourceKey = "trainer:juliette";
+AssertTrue(
+    defaultState.HasActiveFilters,
+    "Selected trainer source should make filters resettable."
+);
+defaultState.Reset();
 defaultState.IncludePackages = true;
 AssertTrue(defaultState.HasActiveFilters, "Including packages should make filters resettable.");
 defaultState.Reset();
 defaultState.SortPriority = CollectionSortPriority.Size;
 AssertTrue(defaultState.HasActiveFilters, "Changing sort priority should make filters resettable.");
+
+var heroState = new CollectionFilterState();
+heroState.ToggleHero(EHero.Vanessa);
+AssertValues(
+    heroState.Heroes.ToArray(),
+    new[] { EHero.Vanessa },
+    "Selecting a concrete hero should add that hero."
+);
+heroState.ToggleHero(EHero.Dooley);
+AssertValues(
+    heroState.Heroes.ToArray(),
+    new[] { EHero.Dooley },
+    "Selecting a second concrete hero should replace the first."
+);
+heroState.ToggleHero(EHero.Common);
+AssertSet(
+    heroState.Heroes,
+    new[] { EHero.Common, EHero.Dooley },
+    "Common should coexist with one concrete hero."
+);
+heroState.ToggleHero(EHero.Dooley);
+AssertValues(
+    heroState.Heroes.ToArray(),
+    new[] { EHero.Common },
+    "Toggling off the selected concrete hero should leave Common selected."
+);
+
+var sourceState = new CollectionFilterState();
+sourceState.ToggleSource(ECardType.Item, "merchant:aila");
+AssertEqual(
+    "merchant:aila",
+    sourceState.SelectedMerchantSourceKey,
+    "Item source selection should store the merchant source key."
+);
+sourceState.ToggleSource(ECardType.Item, "merchant:helt");
+AssertEqual(
+    "merchant:helt",
+    sourceState.SelectedMerchantSourceKey,
+    "Selecting another item source should replace the prior merchant source."
+);
+sourceState.ToggleSource(ECardType.Item, "merchant:helt");
+AssertEqual(
+    null,
+    sourceState.SelectedMerchantSourceKey,
+    "Selecting the active item source again should clear it."
+);
+sourceState.ToggleSource(ECardType.Skill, "trainer:juliette");
+AssertEqual(
+    "trainer:juliette",
+    sourceState.SelectedTrainerSourceKey,
+    "Skill source selection should store the trainer source key."
+);
+sourceState.SelectedMerchantSourceKey = "merchant:hidden";
+sourceState.SelectedTrainerSourceKey = "trainer:visible";
+AssertTrue(
+    sourceState.PruneSelectedSources(new[] { "merchant:visible" }, new[] { "trainer:visible" }),
+    "Pruning should report a change when a selected source is no longer visible."
+);
+AssertEqual(
+    null,
+    sourceState.SelectedMerchantSourceKey,
+    "Pruning should clear invisible merchant source selection."
+);
+AssertEqual(
+    "trainer:visible",
+    sourceState.SelectedTrainerSourceKey,
+    "Pruning should preserve visible trainer source selection."
+);
 
 var normal = Card("Normal", ETier.Bronze);
 var package = Card("Starter Package", ETier.Silver, isPackage: true);
@@ -80,6 +161,34 @@ AssertSequence(
     merchantResult,
     new[] { burnMerchant.Id },
     "Merchant filters match cards classified for at least one selected merchant."
+);
+
+var offerPoolResult = CollectionFilterEngine.Apply(
+    new[] { healMerchant, burnMerchant, normal },
+    new CollectionFilterState(),
+    new[] { burnMerchant.Id, Guid.NewGuid() }
+);
+AssertSequence(
+    offerPoolResult,
+    new[] { burnMerchant.Id },
+    "Resolved offer pool should AND with the normal visible card filters."
+);
+
+var vanessaBronze = Card("Vanessa Bronze", ETier.Bronze, heroes: new[] { EHero.Vanessa });
+var dooleyBronze = Card("Dooley Bronze", ETier.Bronze, heroes: new[] { EHero.Dooley });
+var vanessaSilver = Card("Vanessa Silver", ETier.Silver, heroes: new[] { EHero.Vanessa });
+var sourceAndHeroFilter = new CollectionFilterState { Search = "Vanessa" };
+sourceAndHeroFilter.Heroes.Add(EHero.Vanessa);
+sourceAndHeroFilter.Tiers.Add(ETier.Bronze);
+var sourceAndHeroResult = CollectionFilterEngine.Apply(
+    new[] { dooleyBronze, vanessaSilver, vanessaBronze },
+    sourceAndHeroFilter,
+    new[] { vanessaBronze.Id, vanessaSilver.Id, dooleyBronze.Id }
+);
+AssertSequence(
+    sourceAndHeroResult,
+    new[] { vanessaBronze.Id },
+    "Resolved offer pool should preserve AND semantics with hero, tier, and search filters."
 );
 
 var burnMerchantSkill = Card(
@@ -202,7 +311,8 @@ static CollectionCardVm Card(
     ECardSize size = ECardSize.Medium,
     bool isPackage = false,
     IReadOnlyCollection<ECardTag>? tags = null,
-    IReadOnlyCollection<CollectionMerchantKind>? merchants = null
+    IReadOnlyCollection<CollectionMerchantKind>? merchants = null,
+    IReadOnlyCollection<EHero>? heroes = null
 ) =>
     new()
     {
@@ -215,6 +325,7 @@ static CollectionCardVm Card(
         InternalName = name,
         IsPackage = isPackage,
         Merchants = merchants ?? Array.Empty<CollectionMerchantKind>(),
+        Heroes = heroes ?? Array.Empty<EHero>(),
     };
 
 static void AssertSequence(
@@ -242,6 +353,26 @@ static void AssertValues<T>(IReadOnlyList<T> actual, IReadOnlyList<T> expected, 
                 $"{message} At {i}: expected {expected[i]}, got {actual[i]}."
             );
     }
+}
+
+static void AssertSet<T>(
+    IReadOnlyCollection<T> actual,
+    IReadOnlyCollection<T> expected,
+    string message
+)
+{
+    var actualSet = new HashSet<T>(actual);
+    var expectedSet = new HashSet<T>(expected);
+    if (!actualSet.SetEquals(expectedSet))
+        throw new InvalidOperationException(
+            $"{message} Expected [{string.Join(", ", expectedSet)}], got [{string.Join(", ", actualSet)}]."
+        );
+}
+
+static void AssertEqual<T>(T expected, T actual, string message)
+{
+    if (!EqualityComparer<T>.Default.Equals(expected, actual))
+        throw new InvalidOperationException($"{message} Expected {expected}, got {actual}.");
 }
 
 static void AssertTrue(bool condition, string message)

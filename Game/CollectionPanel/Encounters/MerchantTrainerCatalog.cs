@@ -31,6 +31,10 @@ internal static class MerchantTrainerCatalog
         Array.Empty<MerchantTrainerEntry>();
     private static IReadOnlyDictionary<Guid, MerchantTrainerEntry> _byTemplateId =
         new Dictionary<Guid, MerchantTrainerEntry>();
+    private static IReadOnlyDictionary<string, MerchantTrainerEntry> _bySourceKey = new Dictionary<
+        string,
+        MerchantTrainerEntry
+    >(StringComparer.Ordinal);
 
     /// <summary>All curated merchant/trainer identities (47 merchants + 23 trainers at patch 14.1).</summary>
     public static IReadOnlyList<MerchantTrainerEntry> Entries
@@ -49,6 +53,13 @@ internal static class MerchantTrainerCatalog
         return _byTemplateId.TryGetValue(templateId, out entry);
     }
 
+    /// <summary>Resolve a stable source key to its merchant/trainer entry.</summary>
+    public static bool TryGetBySourceKey(string sourceKey, out MerchantTrainerEntry? entry)
+    {
+        EnsureLoaded();
+        return _bySourceKey.TryGetValue(sourceKey, out entry);
+    }
+
     /// <summary>Entries that should be shown for <paramref name="hero"/> (empty Heroes == all heroes).</summary>
     public static IEnumerable<MerchantTrainerEntry> ForHero(EHero hero)
     {
@@ -56,6 +67,15 @@ internal static class MerchantTrainerCatalog
         foreach (var entry in _entries)
             if (entry.AppliesToHero(hero))
                 yield return entry;
+    }
+
+    public static IEnumerable<MerchantTrainerEntry> For(
+        EncounterPortraitKind kind,
+        EHero? selectedHero
+    )
+    {
+        EnsureLoaded();
+        return VisibleEntries(_entries, kind, selectedHero);
     }
 
     private static void EnsureLoaded()
@@ -76,6 +96,7 @@ internal static class MerchantTrainerCatalog
                     var entries = Build(json!);
                     _entries = entries;
                     _byTemplateId = BuildIndex(entries);
+                    _bySourceKey = BuildSourceKeyIndex(entries);
                     BppLog.Info(
                         LogComponent,
                         $"Loaded merchant/trainer catalog entries={entries.Count} templateIds={_byTemplateId.Count}"
@@ -100,7 +121,7 @@ internal static class MerchantTrainerCatalog
         if (dto?.Entries == null)
             return Array.Empty<MerchantTrainerEntry>();
 
-        var result = new List<MerchantTrainerEntry>(dto.Entries.Count);
+        var candidates = new List<EntryBuildCandidate>(dto.Entries.Count);
         foreach (var entry in dto.Entries)
         {
             if (entry == null || string.IsNullOrWhiteSpace(entry.Name))
@@ -114,19 +135,69 @@ internal static class MerchantTrainerCatalog
                 ? EncounterPortraitKind.Trainer
                 : EncounterPortraitKind.Merchant;
 
-            result.Add(
-                new MerchantTrainerEntry(
+            var heroes = ParseHeroes(entry.Heroes);
+            candidates.Add(
+                new EntryBuildCandidate(
+                    BuildBaseSourceKey(kind, entry.Name!, entry.Tier ?? string.Empty, heroes),
                     entry.Name!,
                     kind,
                     entry.Tier ?? string.Empty,
-                    ParseHeroes(entry.Heroes),
+                    heroes,
                     entry.Description ?? string.Empty,
                     templateIds
                 )
             );
         }
 
+        var baseKeyCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var candidate in candidates)
+        {
+            baseKeyCounts.TryGetValue(candidate.BaseSourceKey, out var count);
+            baseKeyCounts[candidate.BaseSourceKey] = count + 1;
+        }
+
+        var usedKeys = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<MerchantTrainerEntry>(candidates.Count);
+        foreach (var candidate in candidates)
+        {
+            var sourceKey =
+                baseKeyCounts[candidate.BaseSourceKey] == 1
+                    ? candidate.BaseSourceKey
+                    : $"{candidate.BaseSourceKey}:{BuildTemplateIdsFingerprint(candidate.TemplateIds)}";
+            if (!usedKeys.Add(sourceKey))
+                throw new InvalidOperationException(
+                    $"Duplicate merchant/trainer source key: {sourceKey}"
+                );
+
+            result.Add(
+                new MerchantTrainerEntry(
+                    sourceKey,
+                    candidate.Name,
+                    candidate.Kind,
+                    candidate.Tier,
+                    candidate.Heroes,
+                    candidate.Description,
+                    candidate.TemplateIds
+                )
+            );
+        }
         return result;
+    }
+
+    internal static IEnumerable<MerchantTrainerEntry> VisibleEntries(
+        IReadOnlyList<MerchantTrainerEntry> entries,
+        EncounterPortraitKind kind,
+        EHero? selectedHero
+    )
+    {
+        foreach (var entry in entries)
+        {
+            if (entry.Kind != kind)
+                continue;
+            if (selectedHero.HasValue && !entry.AppliesToHero(selectedHero.Value))
+                continue;
+            yield return entry;
+        }
     }
 
     /// <summary>Map hero display names to <see cref="EHero"/>. Empty/unknown names are dropped. Internal for testing.</summary>
@@ -163,6 +234,72 @@ internal static class MerchantTrainerCatalog
         foreach (var id in entry.TemplateIds)
             map[id] = entry; // template ids are unique across entries by construction
         return map;
+    }
+
+    private static IReadOnlyDictionary<string, MerchantTrainerEntry> BuildSourceKeyIndex(
+        IReadOnlyList<MerchantTrainerEntry> entries
+    )
+    {
+        var map = new Dictionary<string, MerchantTrainerEntry>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+            map[entry.SourceKey] = entry;
+        return map;
+    }
+
+    private static string BuildBaseSourceKey(
+        EncounterPortraitKind kind,
+        string name,
+        string tier,
+        IReadOnlyList<EHero> heroes
+    )
+    {
+        var heroKey =
+            heroes.Count == 0
+                ? "global"
+                : string.Join(
+                    "+",
+                    heroes
+                        .Select(hero => hero.ToString())
+                        .OrderBy(value => value, StringComparer.Ordinal)
+                );
+        return string.Join(
+            ":",
+            kind.ToString().ToLowerInvariant(),
+            Slug(name),
+            Slug(tier),
+            Slug(heroKey)
+        );
+    }
+
+    private static string BuildTemplateIdsFingerprint(IReadOnlyList<Guid> templateIds) =>
+        string.Join(
+            "-",
+            templateIds.OrderBy(id => id).Select(id => id.ToString("N").Substring(0, 12))
+        );
+
+    private static string Slug(string value)
+    {
+        var chars = new List<char>(value.Length);
+        var lastWasSeparator = false;
+        foreach (var raw in value.Trim().ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(raw))
+            {
+                chars.Add(raw);
+                lastWasSeparator = false;
+                continue;
+            }
+
+            if (!lastWasSeparator && chars.Count > 0)
+            {
+                chars.Add('-');
+                lastWasSeparator = true;
+            }
+        }
+
+        if (chars.Count > 0 && chars[chars.Count - 1] == '-')
+            chars.RemoveAt(chars.Count - 1);
+        return chars.Count == 0 ? "unknown" : new string(chars.ToArray());
     }
 
     private static string? ReadEmbeddedJson(string suffix)
@@ -210,5 +347,41 @@ internal static class MerchantTrainerCatalog
 
         [JsonProperty("templateIds")]
         public List<string>? TemplateIds { get; set; }
+    }
+
+    private sealed class EntryBuildCandidate
+    {
+        public EntryBuildCandidate(
+            string baseSourceKey,
+            string name,
+            EncounterPortraitKind kind,
+            string tier,
+            IReadOnlyList<EHero> heroes,
+            string description,
+            IReadOnlyList<Guid> templateIds
+        )
+        {
+            BaseSourceKey = baseSourceKey;
+            Name = name;
+            Kind = kind;
+            Tier = tier;
+            Heroes = heroes;
+            Description = description;
+            TemplateIds = templateIds;
+        }
+
+        public string BaseSourceKey { get; }
+
+        public string Name { get; }
+
+        public EncounterPortraitKind Kind { get; }
+
+        public string Tier { get; }
+
+        public IReadOnlyList<EHero> Heroes { get; }
+
+        public string Description { get; }
+
+        public IReadOnlyList<Guid> TemplateIds { get; }
     }
 }

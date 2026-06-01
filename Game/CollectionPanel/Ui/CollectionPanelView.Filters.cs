@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.GameInterop.EncounterPortraits;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
@@ -108,31 +109,28 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
-    private void EnsureMerchantChips(IReadOnlyList<CollectionMerchantKind> merchants)
+    private void EnsureSourceChips(IReadOnlyList<CollectionSourceOptionViewModel> sources)
     {
-        if (_merchantChipRow == null)
+        if (_sourceChipRow == null)
             return;
-        if (MerchantChipsMatch(merchants))
+        if (SourceChipsMatch(sources))
             return;
-        ClearChipRow(_merchantChips, _merchantChipRow, keepFirst: false);
-        foreach (var merchant in merchants)
+        ClearSourceChipRow();
+        foreach (var source in sources)
         {
-            var chip = CreateChipButton(
-                CollectionPanelText.Merchant(merchant),
-                () => _toggleMerchant(merchant)
-            );
-            _merchantChips[merchant] = chip;
-            _merchantChipRow.Add(chip);
+            var chip = CreateSourceChipButton(source, () => _toggleSource(source.SourceKey));
+            _sourceChips[source.SourceKey] = chip;
+            _sourceChipRow.Add(chip);
         }
     }
 
-    private bool MerchantChipsMatch(IReadOnlyList<CollectionMerchantKind> merchants)
+    private bool SourceChipsMatch(IReadOnlyList<CollectionSourceOptionViewModel> sources)
     {
-        if (merchants.Count != _merchantChips.Count)
+        if (sources.Count != _sourceChips.Count)
             return false;
-        foreach (var merchant in merchants)
+        foreach (var source in sources)
         {
-            if (!_merchantChips.ContainsKey(merchant))
+            if (!_sourceChips.ContainsKey(source.SourceKey))
                 return false;
         }
         return true;
@@ -148,6 +146,19 @@ internal sealed partial class CollectionPanelView
 
         _heroChips.Clear();
         _heroChipIcons.Clear();
+    }
+
+    private void ClearSourceChipRow()
+    {
+        foreach (var button in _sourceChips.Values)
+        {
+            if (button.parent != null)
+                button.parent.Remove(button);
+        }
+
+        _sourceChips.Clear();
+        _sourceChipIcons.Clear();
+        _sourceChipRow?.Clear();
     }
 
     private static void ClearChipRow<T>(
@@ -213,6 +224,32 @@ internal sealed partial class CollectionPanelView
         return chip;
     }
 
+    private Button CreateSourceChipButton(CollectionSourceOptionViewModel source, Action onClick)
+    {
+        var chip = CreateButton(
+            string.Empty,
+            onClick,
+            Sizes.HeroChipButtonSize,
+            Sizes.HeroChipButtonSize
+        );
+        chip.tooltip = string.IsNullOrWhiteSpace(source.Description)
+            ? source.DisplayName
+            : $"{source.DisplayName} - {source.Description}";
+        chip.style.flexDirection = FlexDirection.Row;
+        chip.style.justifyContent = Justify.Center;
+        chip.style.alignItems = Align.Center;
+        chip.style.marginRight = UiSpacing.Sm;
+        chip.style.marginBottom = UiSpacing.Xs;
+        StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
+
+        var icon = CreateSourceChipIcon(source.DisplayName);
+        chip.Add(icon);
+
+        _sourceChipIcons[source.SourceKey] = icon;
+        LoadSourceChipIcon(source.SourceKey, source.RepresentativeTemplateId, icon);
+        return chip;
+    }
+
     private static VisualElement CreateHeroChipIcon(EHero hero)
     {
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
@@ -227,6 +264,30 @@ internal sealed partial class CollectionPanelView
         if (!HeroPortraitSpriteProvider.IsRenderableHero(hero))
             AddCommonHeroGlyph(icon);
 
+        return icon;
+    }
+
+    private static VisualElement CreateSourceChipIcon(string displayName)
+    {
+        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(icon.style, Sizes.HeroChipIconSize, Sizes.HeroChipIconSize);
+        icon.style.position = Position.Relative;
+        icon.style.backgroundColor = Colors.HistoryStatusBackground;
+        icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+        icon.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
+        UiStyle.Border(icon.style, Borders.Thin, Colors.HistoryButtonBorder);
+        UiStyle.Radius(icon.style, Sizes.HeroChipIconSize / 2f);
+
+        var initials = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
+        initials.text = GetInitials(displayName);
+        initials.pickingMode = PickingMode.Ignore;
+        initials.style.position = Position.Absolute;
+        initials.style.left = 0f;
+        initials.style.right = 0f;
+        initials.style.top = 0f;
+        initials.style.bottom = 0f;
+        initials.style.unityTextAlign = TextAnchor.MiddleCenter;
+        icon.Add(initials);
         return icon;
     }
 
@@ -271,6 +332,24 @@ internal sealed partial class CollectionPanelView
         _ = ApplyHeroChipIconWhenLoadedAsync(hero, icon);
     }
 
+    private static void LoadSourceChipIcon(
+        string sourceKey,
+        Guid representativeTemplateId,
+        VisualElement icon
+    )
+    {
+        icon.userData = sourceKey;
+
+        if (EncounterPortraitSpriteProvider.TryGetCached(representativeTemplateId, out var cached))
+        {
+            ApplySourceChipIcon(icon, cached);
+            return;
+        }
+
+        ApplySourceChipIcon(icon, null);
+        _ = ApplySourceChipIconWhenLoadedAsync(sourceKey, representativeTemplateId, icon);
+    }
+
     private static async System.Threading.Tasks.Task ApplyHeroChipIconWhenLoadedAsync(
         EHero hero,
         VisualElement icon
@@ -280,6 +359,20 @@ internal sealed partial class CollectionPanelView
         if (!Equals(icon.userData, hero))
             return;
         ApplyHeroChipIcon(icon, sprite);
+    }
+
+    private static async System.Threading.Tasks.Task ApplySourceChipIconWhenLoadedAsync(
+        string sourceKey,
+        Guid representativeTemplateId,
+        VisualElement icon
+    )
+    {
+        var sprite = await EncounterPortraitSpriteProvider.LoadPortraitAsync(
+            representativeTemplateId
+        );
+        if (!Equals(icon.userData, sourceKey))
+            return;
+        ApplySourceChipIcon(icon, sprite);
     }
 
     private static void ApplyHeroChipIcon(VisualElement icon, Sprite? sprite)
@@ -292,6 +385,41 @@ internal sealed partial class CollectionPanelView
 
         icon.style.backgroundImage = new StyleBackground(sprite);
         icon.MarkDirtyRepaint();
+    }
+
+    private static void ApplySourceChipIcon(VisualElement icon, Sprite? sprite)
+    {
+        if (sprite == null)
+        {
+            icon.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
+            return;
+        }
+
+        icon.style.backgroundImage = new StyleBackground(sprite);
+        icon.MarkDirtyRepaint();
+    }
+
+    private static string GetInitials(string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName))
+            return "?";
+
+        var initials = new List<char>(2);
+        foreach (
+            var part in displayName.Split(
+                new[] { ' ', '-', '_' },
+                StringSplitOptions.RemoveEmptyEntries
+            )
+        )
+        {
+            initials.Add(char.ToUpperInvariant(part[0]));
+            if (initials.Count == 2)
+                break;
+        }
+
+        if (initials.Count == 0)
+            return "?";
+        return new string(initials.ToArray());
     }
 
     private static void RefreshChip(Button chip, bool selected)

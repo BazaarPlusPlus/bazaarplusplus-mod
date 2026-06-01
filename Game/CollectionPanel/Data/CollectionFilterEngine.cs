@@ -14,12 +14,15 @@ internal static class CollectionFilterEngine
 {
     public static List<CollectionCardVm> Apply(
         IReadOnlyList<CollectionCardVm> all,
-        CollectionFilterState filter
+        CollectionFilterState filter,
+        IReadOnlyCollection<Guid>? offerPool = null
     )
     {
         var result = new List<CollectionCardVm>(all.Count);
         var search = filter.Search?.Trim() ?? string.Empty;
         var hasSearch = search.Length > 0;
+        var offerPoolSet =
+            offerPool == null ? null : offerPool as HashSet<Guid> ?? new HashSet<Guid>(offerPool);
         var heroFilterCount = filter.Heroes.Count;
         var tierFilterCount = filter.Tiers.Count;
         var tagFilterCount = filter.Tags.Count;
@@ -30,6 +33,8 @@ internal static class CollectionFilterEngine
         foreach (var card in all)
         {
             if (card.Type != filter.ActiveType)
+                continue;
+            if (offerPoolSet != null && !offerPoolSet.Contains(card.Id))
                 continue;
             if (!filter.IncludePackages && card.IsPackage)
                 continue;

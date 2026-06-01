@@ -57,6 +57,12 @@ internal static class CollectionPanelText
         "商人",
         "商人"
     );
+    private static readonly LocalizedTextSet TrainerHeaderText = new(
+        "Trainer",
+        "训练师",
+        "訓練師",
+        "訓練師"
+    );
     private static readonly LocalizedTextSet PackagesToggleText = new(
         "Packages",
         "包裹",
@@ -76,6 +82,18 @@ internal static class CollectionPanelText
         "暂时无法读取卡牌数据，请稍后或在主菜单中重试。",
         "暫時無法讀取卡牌資料，請稍後或在主選單中重試。",
         "暫時無法讀取卡牌資料，請稍後或在主選單中重試。"
+    );
+    private static readonly LocalizedTextSet SourcePoolLoadingText = new(
+        "Loading source offers...",
+        "正在加载来源选池...",
+        "正在載入來源選池...",
+        "正在載入來源選池..."
+    );
+    private static readonly LocalizedTextSet SourcePoolUnavailableText = new(
+        "Source offers are unavailable right now.",
+        "暂时无法读取这个来源的选池。",
+        "暫時無法讀取這個來源的選池。",
+        "暫時無法讀取這個來源的選池。"
     );
     private static readonly LocalizedTextSet NoMatchesText = new(
         "No cards match the current filters.",
@@ -110,6 +128,9 @@ internal static class CollectionPanelText
 
     internal static string MerchantHeader() => Resolve(MerchantHeaderText);
 
+    internal static string SourceHeader(ECardType activeType) =>
+        activeType == ECardType.Skill ? Resolve(TrainerHeaderText) : Resolve(MerchantHeaderText);
+
     internal static string PackagesToggle() => Resolve(PackagesToggleText);
 
     internal static string Reset() => Resolve(ResetText);
@@ -117,6 +138,14 @@ internal static class CollectionPanelText
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 
     internal static string CatalogUnavailable() => Resolve(CatalogUnavailableText);
+
+    internal static string SourcePoolLoading() => Resolve(SourcePoolLoadingText);
+
+    internal static string SourcePoolUnavailable(string? reason)
+    {
+        var message = Resolve(SourcePoolUnavailableText);
+        return string.IsNullOrWhiteSpace(reason) ? message : $"{message} ({reason})";
+    }
 
     internal static string NoMatches() => Resolve(NoMatchesText);
 

@@ -14,6 +14,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Encounters;
 internal sealed class MerchantTrainerEntry
 {
     public MerchantTrainerEntry(
+        string sourceKey,
         string name,
         EncounterPortraitKind kind,
         string tier,
@@ -22,6 +23,7 @@ internal sealed class MerchantTrainerEntry
         IReadOnlyList<Guid> templateIds
     )
     {
+        SourceKey = sourceKey;
         Name = name;
         Kind = kind;
         Tier = tier;
@@ -29,6 +31,9 @@ internal sealed class MerchantTrainerEntry
         Description = description;
         TemplateIds = templateIds;
     }
+
+    /// <summary>Stable UI/cache identity for this curated source entry.</summary>
+    public string SourceKey { get; }
 
     public string Name { get; }
 

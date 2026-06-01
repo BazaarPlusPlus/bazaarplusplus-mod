@@ -1,9 +1,11 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameClient.Domain.Tooltips;
+using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
@@ -69,7 +71,7 @@ public static class ItemEnchantPreviewRenderer
             try
             {
                 var builder = TooltipBuilder.Create(
-                    new TooltipContext(
+                    CreateTooltipContext(
                         previewCard,
                         previewCard.Template!,
                         new ValueContext(Data.Run, previewCard)
@@ -89,7 +91,7 @@ public static class ItemEnchantPreviewRenderer
     private static string RenderWithCardTooltipData(ItemCard previewCard, string localized)
     {
         var builder = TooltipBuilder.Create(
-            new TooltipContext(
+            CreateTooltipContext(
                 previewCard,
                 previewCard.Template!,
                 new ValueContext(Data.Run, previewCard)
@@ -104,6 +106,36 @@ public static class ItemEnchantPreviewRenderer
         var rendered =
             CardTooltipRenderMethod.Invoke(tooltipData, new object[] { builder }) as string;
         return string.IsNullOrWhiteSpace(rendered) ? RenderTooltipBuilder(builder) : rendered;
+    }
+
+    private static TooltipContext CreateTooltipContext(
+        Card instance,
+        ITCard template,
+        ValueContext valueContext
+    )
+    {
+        var constructor = typeof(TooltipContext).GetConstructor(
+            new[] { typeof(Card), typeof(ITCard), typeof(ValueContext) }
+        );
+        if (constructor != null)
+            return (TooltipContext)
+                constructor.Invoke(new object[] { instance, template, valueContext });
+
+        var context = default(TooltipContext);
+        object boxed = context;
+        SetTooltipContextField(boxed, nameof(TooltipContext.Instance), instance);
+        SetTooltipContextField(boxed, nameof(TooltipContext.Template), template);
+        SetTooltipContextField(boxed, nameof(TooltipContext.ValueContext), valueContext);
+        return (TooltipContext)boxed;
+    }
+
+    private static void SetTooltipContextField(object context, string fieldName, object value)
+    {
+        var field = typeof(TooltipContext).GetField(
+            fieldName,
+            BindingFlags.Instance | BindingFlags.Public
+        );
+        field?.SetValue(context, value);
     }
 
     private static string GetLocalizedText(TLocalizableText content)
