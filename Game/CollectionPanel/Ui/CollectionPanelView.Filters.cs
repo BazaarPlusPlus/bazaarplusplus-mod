@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.Game.HeroPortraits;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -18,10 +19,12 @@ internal sealed partial class CollectionPanelView
             return;
         if (HeroChipsMatch(heroes))
             return;
-        ClearChipRow(_heroChips, _heroChipRow, keepFirst: true);
+        ClearHeroChipRow();
         foreach (var hero in heroes)
         {
-            var chip = CreateChipButton(CollectionPanelText.Hero(hero), () => _toggleHero(hero));
+            var chip = HeroPortraitSpriteProvider.IsRenderableHero(hero)
+                ? CreateHeroChipButton(hero, () => _toggleHero(hero))
+                : CreateChipButton(CollectionPanelText.Hero(hero), () => _toggleHero(hero));
             _heroChips[hero] = chip;
             _heroChipRow.Add(chip);
         }
@@ -123,6 +126,19 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
+    private void ClearHeroChipRow()
+    {
+        foreach (var button in _heroChips.Values)
+        {
+            if (button.parent != null)
+                button.parent.Remove(button);
+        }
+
+        _heroChips.Clear();
+        _heroChipIcons.Clear();
+        _heroChipLabels.Clear();
+    }
+
     private static void ClearChipRow<T>(
         Dictionary<T, Button> chips,
         VisualElement row,
@@ -148,6 +164,86 @@ internal sealed partial class CollectionPanelView
         return chip;
     }
 
+    private Button CreateHeroChipButton(EHero hero, Action onClick)
+    {
+        var labelText = CollectionPanelText.Hero(hero);
+        var chip = CreateButton(string.Empty, onClick, Sizes.HeroChipMinWidth, Sizes.ChipHeight);
+        chip.tooltip = labelText;
+        chip.style.flexDirection = FlexDirection.Row;
+        chip.style.justifyContent = Justify.Center;
+        chip.style.alignItems = Align.Center;
+        chip.style.marginRight = UiSpacing.Sm;
+        chip.style.marginBottom = UiSpacing.Xs;
+        StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
+
+        var textElement = chip.Q<TextElement>();
+        if (textElement != null)
+            textElement.style.display = DisplayStyle.None;
+
+        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+        icon.style.width = Sizes.HeroChipIconSize;
+        icon.style.height = Sizes.HeroChipIconSize;
+        icon.style.minWidth = Sizes.HeroChipIconSize;
+        icon.style.minHeight = Sizes.HeroChipIconSize;
+        icon.style.marginRight = UiSpacing.Xs;
+        icon.style.display = DisplayStyle.None;
+        icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+        icon.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
+        UiStyle.Radius(icon.style, Sizes.HeroChipIconSize / 2f);
+        chip.Add(icon);
+
+        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
+        label.text = labelText;
+        label.pickingMode = PickingMode.Ignore;
+        label.style.unityTextAlign = TextAnchor.MiddleCenter;
+        label.style.flexShrink = 1f;
+        chip.Add(label);
+
+        _heroChipIcons[hero] = icon;
+        _heroChipLabels[hero] = label;
+        LoadHeroChipIcon(hero, icon);
+        return chip;
+    }
+
+    private static void LoadHeroChipIcon(EHero hero, VisualElement icon)
+    {
+        icon.userData = hero;
+
+        if (HeroPortraitSpriteProvider.TryGetCached(hero, out var cached))
+        {
+            ApplyHeroChipIcon(icon, cached);
+            return;
+        }
+
+        ApplyHeroChipIcon(icon, null);
+        _ = ApplyHeroChipIconWhenLoadedAsync(hero, icon);
+    }
+
+    private static async System.Threading.Tasks.Task ApplyHeroChipIconWhenLoadedAsync(
+        EHero hero,
+        VisualElement icon
+    )
+    {
+        var sprite = await HeroPortraitSpriteProvider.LoadDefaultPortraitAsync(hero);
+        if (!Equals(icon.userData, hero))
+            return;
+        ApplyHeroChipIcon(icon, sprite);
+    }
+
+    private static void ApplyHeroChipIcon(VisualElement icon, Sprite? sprite)
+    {
+        if (sprite == null)
+        {
+            icon.style.display = DisplayStyle.None;
+            icon.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
+            return;
+        }
+
+        icon.style.display = DisplayStyle.Flex;
+        icon.style.backgroundImage = new StyleBackground(sprite);
+        icon.MarkDirtyRepaint();
+    }
+
     private static void RefreshChip(Button chip, bool selected)
     {
         if (selected)
@@ -165,6 +261,13 @@ internal sealed partial class CollectionPanelView
             chip.style.color = Colors.HistoryChipText;
             UiStyle.BorderColor(chip.style, Colors.ButtonBorderFor(Colors.HistoryChipBackground));
         }
+    }
+
+    private void RefreshHeroChip(EHero hero, Button chip, bool selected)
+    {
+        RefreshChip(chip, selected);
+        if (_heroChipLabels.TryGetValue(hero, out var label))
+            label.style.color = selected ? Colors.ButtonSelectedText : Colors.HistoryChipText;
     }
 
     private static void RefreshTabButton(Button button, bool selected)

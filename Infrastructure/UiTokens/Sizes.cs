@@ -15,6 +15,8 @@ internal static class Sizes
     public const float SectionTitleHeight = 32f;
     public const float ChipMinWidth = 86f;
     public const float ChipHeight = 32f;
+    public const float HeroChipIconSize = 24f;
+    public const float HeroChipMinWidth = 118f;
     public const float ButtonStandardHeight = 32f;
     public const float ButtonCompactHeight = 24f;
     public const float ButtonFooterHeight = 36f;

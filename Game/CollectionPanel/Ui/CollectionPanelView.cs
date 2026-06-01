@@ -75,6 +75,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private int _loadingFrameIndex;
 
     private readonly Dictionary<EHero, Button> _heroChips = new();
+    private readonly Dictionary<EHero, VisualElement> _heroChipIcons = new();
+    private readonly Dictionary<EHero, Label> _heroChipLabels = new();
     private readonly Dictionary<ETier, Button> _tierChips = new();
     private readonly Dictionary<ECardSize, Button> _sizeChips = new();
     private readonly Dictionary<CollectionMerchantKind, Button> _merchantChips = new();
@@ -270,7 +272,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         EnsureSizeChips(model.AvailableSizes);
         EnsureMerchantChips(model.AvailableMerchants);
         foreach (var pair in _heroChips)
-            RefreshChip(pair.Value, model.SelectedHeroes.Contains(pair.Key));
+            RefreshHeroChip(pair.Key, pair.Value, model.SelectedHeroes.Contains(pair.Key));
         foreach (var pair in _tierChips)
             RefreshChip(pair.Value, model.SelectedTiers.Contains(pair.Key));
         foreach (var pair in _sizeChips)
