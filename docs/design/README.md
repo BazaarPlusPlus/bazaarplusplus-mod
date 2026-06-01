@@ -23,6 +23,7 @@ Work designed but not yet (fully) landed; lives at this top level until implemen
 - [`2026-05-31-collection-panel-first-load-performance.md`](2026-05-31-collection-panel-first-load-performance.md) — Collection Panel 首次加载性能优化方案：loading shell、分段测量、无效 art key / negative cache、VM catalog 跨 scene runtime dispose 已落地；默认排序预计算、持久化 snapshot、prewarm 仍按运行日志决定（**Partially implemented**）。
 - [`2026-05-31-sell-hotkey-regression-debug-plan.md`](2026-05-31-sell-hotkey-regression-debug-plan.md) — 安装 BazaarPlusPlus 后官方出售物品快捷键偶发失效的生产调试方案：梳理 native SellItem 输入链路、tooltip/keybind/raycast 失效假设、诊断日志和修复验证矩阵（**Draft，未开工**）。
 - [`2026-05-31-history-panel-hero-portrait-badge-design.md`](2026-05-31-history-panel-hero-portrait-badge-design.md) — HistoryPanel 英雄文本徽章（`VAN`/`PYG`）改真实头像 Sprite：走 `CollectionManager.GetDefaultHeroSkin` + `SkinAssetDataSO.LoadPortraitSpriteAsync`（异步 Addressables，无硬编码 key），在现有 `Label` 上设 `backgroundImage`，文本徽章降级为 fallback；含 token 防陈旧与逐文件源码锚点（**Draft，未开工**）。
+- [`2026-06-01-collection-panel-hero-portrait-chips-plan.md`](2026-06-01-collection-panel-hero-portrait-chips-plan.md) — CollectionPanel hero filter chips use the game's default hero portrait sprites through a shared provider; HistoryPanel badge adoption remains a follow-up.
 
 ## Archived specs
 
