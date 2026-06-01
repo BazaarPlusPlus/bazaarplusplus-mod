@@ -6,7 +6,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
-// Span-aware, viewport-independent packing for the fixed 8-unit-column catalog grid. Skills
+// Span-aware, viewport-independent packing for the fixed per-tab catalog grid. Skills
 // pack one square unit each (Columns per row). Items shelf-pack left-to-right by unit width
 // (small 1 / medium 2 / large 3), wrapping to the next ItemRowSpan-tall shelf when the current
 // row can't fit the next card. The result is pure grid coordinates (col / shelf / span); the

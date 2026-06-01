@@ -40,6 +40,10 @@
       Include="..\..\Game\CollectionPanel\Grid\CollectionGridLayout.cs"
       Link="CollectionGridLayout.cs"
     />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Grid\CollectionGridPixelization.cs"
+      Link="CollectionGridPixelization.cs"
+    />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>

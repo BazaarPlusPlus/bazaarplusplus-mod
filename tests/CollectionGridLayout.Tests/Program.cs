@@ -24,7 +24,7 @@ AssertShelf(skillLayout.ShelfAt(2), 14, 18, "Skill shelf 2 covers the tail 14..1
 var trio = new[] { Item(ECardSize.Small), Item(ECardSize.Small), Item(ECardSize.Medium) };
 var trioLayout = CollectionGridLayout.Build(trio, ECardType.Item);
 
-AssertEqual(1, trioLayout.ShelfCount, "[S,S,M] fits one shelf (1+1+2 = 4 <= 8 units).");
+AssertEqual(1, trioLayout.ShelfCount, "[S,S,M] fits one shelf (1+1+2 = 4 <= 10 units).");
 AssertEqual(2, trioLayout.ShelfHeightUnits, "Item shelves are two units tall.");
 AssertEqual(2, trioLayout.TotalRowUnits, "One item shelf == 2 row-units.");
 AssertCell(trioLayout.CellAt(0), 0, 0, 1, "Small item spans 1 unit at col0.");
@@ -109,6 +109,30 @@ AssertApprox(
 );
 AssertApprox(220f, wrapLayout.ShelfPitch(100f, 10f), "Item shelf pitch is 2 * 110.");
 AssertApprox(110f, skillLayout.ShelfPitch(100f, 10f), "Skill shelf pitch is 1 * 110.");
+
+// --- Pixelization keeps the grid envelope stable across Item / Skill tabs ---
+var wideViewport = 2600f;
+var itemPixels = CollectionGridPixelization.ForViewport(
+    wideViewport,
+    CollectionGridConstants.ItemColumns,
+    CollectionGridConstants.ItemMaxUnitWidth
+);
+var skillPixels = CollectionGridPixelization.ForViewport(
+    wideViewport,
+    CollectionGridConstants.SkillColumns,
+    CollectionGridConstants.SkillMaxUnitWidth
+);
+
+AssertApprox(
+    itemPixels.GridWidth,
+    skillPixels.GridWidth,
+    "Item and Skill grids should occupy the same total width in the preview area."
+);
+AssertApprox(
+    itemPixels.OriginX,
+    skillPixels.OriginX,
+    "Item and Skill grids should share the same horizontal origin in the preview area."
+);
 
 // --- Degenerate: empty visible set ---
 var empty = CollectionGridLayout.Build(System.Array.Empty<CollectionCardVm>(), ECardType.Item);

@@ -43,9 +43,9 @@ internal sealed class CollectionGridVirtualizer
     private float _viewportHeight;
     private float _scrollY;
 
-    // Pixelization of the fixed unit grid for the current viewport. _unit is one column's
-    // width (px), derived from the viewport so the 8-column grid fills the width then clamps;
-    // _originX/_originY are the display-case inset (horizontal centering + uniform padding).
+    // Pixelization of the fixed unit grid for the current viewport. _unit is one column's width
+    // (px), derived from a shared cross-tab grid envelope so Item/Skill switches do not move the
+    // display-case edges; _originX/_originY are the inset (horizontal centering + uniform padding).
     private float _unit;
     private float _gap = CollectionGridConstants.GridGap;
     private float _originX = CollectionGridConstants.GridOuterPadding;
@@ -525,27 +525,22 @@ internal sealed class CollectionGridVirtualizer
 
     private void BumpGeneration() => _generation++;
 
-    // Derive the per-viewport base unit and display-case origin. The grid is always 8 columns:
-    // the unit fills the available width then clamps to [Min, Max]; once clamped, any surplus
-    // width becomes centering margin (originX) rather than extra columns. originY is the fixed
-    // top padding. Marks the realized cards for a rescale on the next reposition pass.
+    // Derive the per-viewport base unit and display-case origin. The grid width is shared across
+    // tabs first, then the active tab's column count maps that envelope to a unit size; once the
+    // shared width clamps, any surplus width becomes centering margin rather than extra columns.
+    // originY is the fixed top padding. Marks realized cards for rescale on the next reposition.
     private void RecomputePixelization()
     {
         _scaleDirty = true;
         var columns = _layout.Columns;
-        var pad = CollectionGridConstants.GridOuterPadding;
-        _originY = pad;
-        if (_viewportWidth <= 0f)
-        {
-            _unit = CollectionGridConstants.MinUnitWidth;
-            _originX = pad;
-            return;
-        }
-        var available = _viewportWidth - 2f * pad - (columns - 1) * _gap;
-        var rawUnit = available / columns;
-        _unit = Mathf.Clamp(rawUnit, CollectionGridConstants.MinUnitWidth, _layout.MaxUnitWidth);
-        var gridWidth = columns * _unit + (columns - 1) * _gap;
-        _originX = Mathf.Max(pad, (_viewportWidth - gridWidth) * 0.5f);
+        var pixels = CollectionGridPixelization.ForViewport(
+            _viewportWidth,
+            columns,
+            _layout.MaxUnitWidth
+        );
+        _unit = pixels.Unit;
+        _originX = pixels.OriginX;
+        _originY = pixels.OriginY;
     }
 
     private sealed class RealizedCell

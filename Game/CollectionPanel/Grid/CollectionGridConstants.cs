@@ -79,7 +79,7 @@ internal static class CollectionGridConstants
     // built-in instant snap instead and just give each notch enough travel to feel meaty.
     public const float MouseWheelScrollPoints = 300f;
 
-    // Unit width a card occupies on the 8-column grid. Skills never call this (always 1).
+    // Unit width an item card occupies on the item grid. Skills never call this (always 1).
     public static int ItemWidthSpan(ECardSize size) =>
         size switch
         {
