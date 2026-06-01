@@ -20,6 +20,7 @@
   <!-- Embedded resources -->
   <ItemGroup>
     <EmbeddedResource Include="Data\BuildRecommendations\final-builds-top50.json" />
+    <EmbeddedResource Include="Data\Encounters\merchant-trainer-portraits.json" />
     <EmbeddedResource Include="Resources\Fonts\SourceHanSansCN-Regular.otf" />
     <EmbeddedResource Include="Resources\Fonts\SourceHanSansCN-LICENSE.txt" />
   </ItemGroup>
