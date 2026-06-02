@@ -615,7 +615,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 var offerPoolResult = _offerPoolCache.GetOrResolve(
                     sourceEntry,
-                    _filter.SelectedConcreteHero,
+                    _filter.SelectedHero,
                     _catalogCards
                 );
                 if (offerPoolResult.Status == CollectionSourceOfferPoolStatus.Ready)
@@ -678,7 +678,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ? CollectionSourceKind.Trainer
                 : CollectionSourceKind.Merchant;
         var result = new List<CollectionSourceOptionViewModel>();
-        foreach (var entry in CollectionSourceCatalog.For(kind, _filter.SelectedConcreteHero))
+        foreach (var entry in CollectionSourceCatalog.For(kind, _filter.SelectedHero))
         {
             result.Add(
                 new CollectionSourceOptionViewModel
@@ -720,7 +720,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private bool PruneInvisibleSourceSelections()
     {
-        var selectedHero = _filter.SelectedConcreteHero;
+        var selectedHero = _filter.SelectedHero;
         var visibleMerchants = SourceKeysFor(CollectionSourceKind.Merchant, selectedHero);
         var visibleTrainers = SourceKeysFor(CollectionSourceKind.Trainer, selectedHero);
         return _filter.PruneSelectedSources(visibleMerchants, visibleTrainers);
@@ -759,7 +759,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             return null;
         }
 
-        var selectedHero = _filter.SelectedConcreteHero;
+        var selectedHero = _filter.SelectedHero;
         if (selectedHero.HasValue && !entry.AppliesToHero(selectedHero.Value))
         {
             _filter.ClearSelectedSource(_filter.ActiveType);

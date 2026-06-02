@@ -132,7 +132,7 @@ All rule fields are ANDed together. Array fields are ANY within that field.
 
 Supported `heroMode` values:
 
-- `SelectedHero`: follow the currently selected UI hero. If a concrete hero is selected, match that hero plus `Common`. If no concrete hero is selected, do not crop by hero.
+- `SelectedHero`: follow the currently selected UI hero, including `Common`. If a hero is selected, match only that hero. If no hero is selected, do not crop by hero.
 - `AllHeroes`: ignore the current UI hero and allow all heroes to pass into the remaining conditions.
 - `FixedHero`: ignore the current UI hero and match only the `hero` field.
 - `NeutralOnly`: ignore the current UI hero and match only `Common` / neutral cards.
@@ -205,7 +205,7 @@ Runtime classes/enums:
 - `OfferRule`
 - `AppliesToHero(EHero hero)`
 
-`AppliesToHero` should preserve the current semantics: empty `AvailableHeroes` means global and should be visible for every concrete hero.
+`AppliesToHero` should preserve the current semantics: empty `AvailableHeroes` means global and should be visible for every selected hero, including `Common`.
 
 ## Source Filtering Flow
 
@@ -215,13 +215,13 @@ Runtime classes/enums:
 4. The UI shows source chips for the active tab:
    - Item tab: `CollectionSourceKind.Merchant`.
    - Skill tab: `CollectionSourceKind.Trainer`.
-5. The UI filters visible source chips by selected concrete hero using `availableHeroes`.
+5. The UI filters visible source chips by selected hero, including `Common`, using `availableHeroes`.
 6. The user selects one source chip.
 7. `CollectionSourceOfferPoolResolver` applies the selected entry's `offerRule` to the already-built `CollectionCardVm` catalog and returns a set of candidate template ids.
 8. `CollectionFilterEngine` receives that set as a source whitelist and ANDs it with the rest of the active filters.
 9. The virtual grid receives the ordered visible list and renders only visible-window cards.
 
-With a source selected, the normal hero filter should not crop the result a second time (the engine receives `ApplyHeroFilter = false`). The source rule owns hero semantics through `heroMode`. The resolver still receives the currently selected concrete hero on its **own** input (as today via `ResolveSelectedHeroFilters` → the resolver's hero argument, `CollectionPanel.cs:663`); this is separate from `CollectionFilterContext`, which only governs the post-resolution engine pass and carries no hero.
+With a source selected, the normal hero filter should not crop the result a second time (the engine receives `ApplyHeroFilter = false`). The source rule owns hero semantics through `heroMode`. The resolver still receives the currently selected hero, including `Common`, on its **own** input (via `CollectionFilterState.SelectedHero`); this is separate from `CollectionFilterContext`, which only governs the post-resolution engine pass and carries no hero.
 
 `availableHeroes` (chip visibility) and `heroMode` (offered-card scope) are independent by design and can legitimately differ. Concretely in the live catalog: a `FixedHero` merchant's chip is **shown to other heroes** (its fixed `hero` is deliberately **absent** from `availableHeroes`), and some `AllHeroes`-rule sources carry a non-empty `availableHeroes`. The pool only runs when a chip is selectable, and a chip is only selectable when visible, so this is not a user-facing contradiction. Because the two are genuinely independent, catalog validation deliberately does **not** assert a relationship between them (see Catalog Validation).
 
@@ -240,7 +240,7 @@ Candidate card type is derived from source `kind`:
 
 Hero matching:
 
-- `SelectedHero`: if the UI has a selected concrete hero, accept cards whose `Heroes` contains that hero or `EHero.Common`; otherwise accept all heroes.
+- `SelectedHero`: if the UI has a selected hero, including `EHero.Common`, accept cards whose `Heroes` contains that hero; otherwise accept all heroes.
 - `AllHeroes`: accept all heroes.
 - `FixedHero`: accept cards whose `Heroes` contains the configured fixed hero.
 - `NeutralOnly`: accept cards whose `Heroes` contains `EHero.Common`.

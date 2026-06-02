@@ -42,16 +42,35 @@ AssertValues(
     "Selecting a second concrete hero should replace the first."
 );
 heroState.ToggleHero(EHero.Common);
-AssertSet(
-    heroState.Heroes,
-    new[] { EHero.Common, EHero.Dooley },
-    "Common should coexist with one concrete hero."
+AssertValues(
+    heroState.Heroes.ToArray(),
+    new[] { EHero.Common },
+    "Selecting Common should replace the selected concrete hero."
+);
+AssertEqual(
+    EHero.Common,
+    heroState.ToSelectionState().SelectedHero,
+    "Common should round-trip as the selected hero, not as no selected hero."
+);
+heroState.ToggleHero(EHero.Common);
+AssertValues(
+    heroState.Heroes.ToArray(),
+    Array.Empty<EHero>(),
+    "Toggling off Common should clear the hero filter."
 );
 heroState.ToggleHero(EHero.Dooley);
 AssertValues(
     heroState.Heroes.ToArray(),
-    new[] { EHero.Common },
-    "Toggling off the selected concrete hero should leave Common selected."
+    new[] { EHero.Dooley },
+    "Selecting a concrete hero after Common should still select only that hero."
+);
+var ambiguousHeroState = new CollectionFilterState();
+ambiguousHeroState.Heroes.Add(EHero.Common);
+ambiguousHeroState.Heroes.Add(EHero.Vanessa);
+AssertEqual(
+    null,
+    ambiguousHeroState.SelectedHero,
+    "Ambiguous multi-hero state should not pick a HashSet-dependent selected hero."
 );
 
 var defaultSelection = CollectionPanelSelectionState.Default;
@@ -485,20 +504,6 @@ static void AssertValues<T>(IReadOnlyList<T> actual, IReadOnlyList<T> expected, 
                 $"{message} At {i}: expected {expected[i]}, got {actual[i]}."
             );
     }
-}
-
-static void AssertSet<T>(
-    IReadOnlyCollection<T> actual,
-    IReadOnlyCollection<T> expected,
-    string message
-)
-{
-    var actualSet = new HashSet<T>(actual);
-    var expectedSet = new HashSet<T>(expected);
-    if (!actualSet.SetEquals(expectedSet))
-        throw new InvalidOperationException(
-            $"{message} Expected [{string.Join(", ", expectedSet)}], got [{string.Join(", ", actualSet)}]."
-        );
 }
 
 static void AssertEqual<T>(T expected, T actual, string message)

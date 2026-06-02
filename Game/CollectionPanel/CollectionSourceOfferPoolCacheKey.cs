@@ -25,7 +25,7 @@ internal static class CollectionSourceOfferPoolCacheKey
 
     private static string BuildHeroKey(EHero? selectedHero)
     {
-        if (!selectedHero.HasValue || selectedHero.Value == EHero.Common)
+        if (!selectedHero.HasValue)
             return "no-selected-hero";
         return selectedHero.Value.ToString();
     }

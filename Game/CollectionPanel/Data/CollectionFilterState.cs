@@ -41,15 +41,14 @@ internal sealed class CollectionFilterState
         || SortPriority != CollectionSortPriority.Quality
         || !string.IsNullOrWhiteSpace(Search);
 
-    public EHero? SelectedConcreteHero
+    public EHero? SelectedHero
     {
         get
         {
+            if (Heroes.Count != 1)
+                return null;
             foreach (var hero in Heroes)
-            {
-                if (hero != EHero.Common)
-                    return hero;
-            }
+                return hero;
             return null;
         }
     }
@@ -74,21 +73,17 @@ internal sealed class CollectionFilterState
     }
 
     public CollectionPanelSelectionState ToSelectionState() =>
-        new(SelectedConcreteHero, SelectedMerchantSourceKey);
+        new(SelectedHero, SelectedMerchantSourceKey);
 
     public void ToggleHero(EHero hero)
     {
-        if (hero == EHero.Common)
+        if (Heroes.Count == 1 && Heroes.Contains(hero))
         {
-            if (!Heroes.Remove(hero))
-                Heroes.Add(hero);
+            Heroes.Clear();
             return;
         }
 
-        if (Heroes.Remove(hero))
-            return;
-
-        Heroes.RemoveWhere(selected => selected != EHero.Common);
+        Heroes.Clear();
         Heroes.Add(hero);
     }
 

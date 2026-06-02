@@ -266,6 +266,15 @@ AssertFalse(
     string.Equals(noHeroCacheKey, heroCacheKey, StringComparison.Ordinal),
     "Source offer cache key should vary by selected hero."
 );
+var commonCacheKey = CollectionSourceOfferPoolCacheKey.Build(vanessaAila, EHero.Common);
+AssertFalse(
+    string.Equals(noHeroCacheKey, commonCacheKey, StringComparison.Ordinal),
+    "Source offer cache key should distinguish Common from no selected hero."
+);
+AssertFalse(
+    string.Equals(heroCacheKey, commonCacheKey, StringComparison.Ordinal),
+    "Source offer cache key should distinguish Common from concrete heroes."
+);
 
 var visibleForVanessa = CollectionSourceCatalog
     .VisibleEntries(entries, CollectionSourceKind.Merchant, EHero.Vanessa)
@@ -284,6 +293,15 @@ AssertValues(
     visibleWithoutHero,
     new[] { "Aila", "Aila", "Nufu", "Nufu" },
     "Without a concrete hero selected, merchant source selector should show all merchants."
+);
+var visibleForCommon = CollectionSourceCatalog
+    .VisibleEntries(entries, CollectionSourceKind.Merchant, EHero.Common)
+    .Select(entry => entry.Name)
+    .ToArray();
+AssertValues(
+    visibleForCommon,
+    new[] { "Nufu", "Nufu" },
+    "Common should behave like a selected hero and show only global merchant sources."
 );
 var visibleTrainers = CollectionSourceCatalog
     .VisibleEntries(entries, CollectionSourceKind.Trainer, EHero.Vanessa)
@@ -321,8 +339,18 @@ AssertEqual(
 );
 AssertSet(
     selectedHeroResult.OfferedCardIds,
-    selectedHeroCards.Take(2).Select(card => card.Id).ToArray(),
-    "SelectedHero rules should match the selected hero plus Common cards."
+    new[] { selectedHeroCards[0].Id },
+    "SelectedHero rules should match only the selected concrete hero, not Common cards."
+);
+var selectedCommonResult = CollectionSourceOfferPoolResolver.Resolve(
+    selectedHeroRule,
+    EHero.Common,
+    selectedHeroCards
+);
+AssertSet(
+    selectedCommonResult.OfferedCardIds,
+    new[] { selectedHeroCards[1].Id },
+    "SelectedHero rules should match only Common cards when Common is selected."
 );
 var selectedHeroDisabledResult = CollectionSourceOfferPoolResolver.Resolve(
     selectedHeroRule,

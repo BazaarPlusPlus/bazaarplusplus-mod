@@ -75,10 +75,9 @@ internal static class CollectionSourceOfferPoolResolver
                 return Contains(cardHeroes, EHero.Common);
 
             case CollectionSourceHeroMode.SelectedHero:
-                if (!selectedHero.HasValue || selectedHero.Value == EHero.Common)
+                if (!selectedHero.HasValue)
                     return true;
-                return Contains(cardHeroes, selectedHero.Value)
-                    || Contains(cardHeroes, EHero.Common);
+                return Contains(cardHeroes, selectedHero.Value);
 
             default:
                 return false;
