@@ -126,6 +126,27 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void CollectionPanel_opens_from_native_clone_button_not_hotkey_or_settings_dock()
+    {
+        var repoRoot = RepoRoot();
+        var compositionSource = File.ReadAllText(Path.Combine(repoRoot, "BppComposition.cs"));
+        var configSource = File.ReadAllText(
+            Path.Combine(repoRoot, "Core", "Config", "BppConfig.cs")
+        );
+        var configInterfaceSource = File.ReadAllText(
+            Path.Combine(repoRoot, "Core", "Config", "IBppConfig.cs")
+        );
+        var collectionPanelSource = File.ReadAllText(
+            Path.Combine(repoRoot, "Game", "CollectionPanel", "CollectionPanel.cs")
+        );
+
+        Assert.DoesNotContain("CollectionPanelSettingsDockEntry", compositionSource);
+        Assert.DoesNotContain("CollectionPanelHotkeyPathConfig", configSource);
+        Assert.DoesNotContain("CollectionPanelHotkeyPathConfig", configInterfaceSource);
+        Assert.DoesNotContain("WasPressedThisFrame(togglePath", collectionPanelSource);
+    }
+
+    [Fact]
     public void HistoryPanel_and_CardSetPreview_do_not_depend_on_each_others_preview_internals()
     {
         var repoRoot = RepoRoot();

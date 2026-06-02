@@ -31,7 +31,6 @@ using UnityEngine;
 using BazaarPlusPlus.Game.AutoBazaarHost;
 #endif
 
-
 namespace BazaarPlusPlus;
 
 internal sealed class BppComposition : IDisposable
@@ -88,7 +87,6 @@ internal sealed class BppComposition : IDisposable
 
         _settingsDockRegistry.Register(new BazaarDbScreenshotUploadSettingsDockEntry());
         _settingsDockRegistry.Register(new ChineseLocaleModeSettingsDockEntry(_eventBus));
-        _settingsDockRegistry.Register(new CollectionPanelSettingsDockEntry());
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());

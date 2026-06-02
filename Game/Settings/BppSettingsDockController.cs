@@ -8,7 +8,9 @@ using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.Settings;
 
-internal sealed partial class BppSettingsDockController : MonoBehaviour
+internal sealed partial class BppSettingsDockController
+    : MonoBehaviour,
+        IBppNativeSettingsButtonCloneOwner
 {
     private const string LogCategory = "BppSettingsDock";
     private const string HeaderObjectName = "BPP_SettingsDockHeader";
@@ -51,84 +53,13 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
             return;
         }
 
-        var hostRect = anchorButton.transform.parent as RectTransform;
-        if (hostRect == null)
-            return;
-
-        // Clone the native button before adding this controller to the anchor.
-        // Otherwise Unity instantiates a controller-bearing clone and its
-        // OnEnable can run before field initializers are in place.
-        var dockButton =
-            hostRect.Find(placement.DockButtonObjectName) as RectTransform
-            ?? CreateStrippedDockButton(anchorButton, hostRect, placement);
+        var dockButton = BppNativeSettingsButtonClone.FindOrCreate(anchorButton, placement);
         if (dockButton == null)
             return;
 
         var controller =
             existingController ?? anchorButton.gameObject.AddComponent<BppSettingsDockController>();
         controller.Initialize(anchorButton, placement, dockButton);
-    }
-
-    private static RectTransform? CreateStrippedDockButton(
-        Button anchorButton,
-        RectTransform hostRect,
-        BppSettingsDockPlacement placement
-    )
-    {
-        var cloneObject = UnityEngine.Object.Instantiate(
-            anchorButton.gameObject,
-            hostRect,
-            worldPositionStays: false
-        );
-        cloneObject.name = placement.DockButtonObjectName;
-
-        StripNativeButtonBehavior(cloneObject);
-
-        var rect = cloneObject.GetComponent<RectTransform>();
-        if (rect == null)
-            return null;
-
-        ConfigureDockButtonRect(rect, anchorButton.transform as RectTransform);
-
-        BppLog.Debug(
-            LogCategory,
-            $"Clone '{placement.Key}': hasDockController={cloneObject.GetComponent<BppSettingsDockController>() != null}, "
-                + $"hasBazaarButtonController={cloneObject.GetComponent<BazaarButtonController>() != null}, "
-                + $"hasButtonCustom={cloneObject.GetComponent<ButtonCustom>() != null}, "
-                + $"localScale={rect.localScale}, lossyScale={rect.lossyScale}"
-        );
-
-        return rect;
-    }
-
-    private static void StripNativeButtonBehavior(GameObject cloneObject)
-    {
-        foreach (var custom in cloneObject.GetComponentsInChildren<ButtonCustom>(true))
-            UnityEngine.Object.DestroyImmediate(custom);
-
-        foreach (var native in cloneObject.GetComponentsInChildren<BazaarButtonController>(true))
-            UnityEngine.Object.DestroyImmediate(native);
-
-        foreach (var nestedButton in cloneObject.GetComponentsInChildren<Button>(true))
-        {
-            if (nestedButton.gameObject != cloneObject)
-                UnityEngine.Object.DestroyImmediate(nestedButton);
-        }
-
-        var button = cloneObject.GetComponent<Button>() ?? cloneObject.AddComponent<Button>();
-        var targetGraphic = cloneObject.GetComponent<Image>();
-        if (targetGraphic == null)
-        {
-            targetGraphic = cloneObject.AddComponent<Image>();
-            targetGraphic.color = new Color(1f, 1f, 1f, 0f);
-        }
-
-        targetGraphic.raycastTarget = true;
-        button.onClick.RemoveAllListeners();
-        button.transition = Selectable.Transition.ColorTint;
-        button.navigation = new Navigation { mode = Navigation.Mode.None };
-        button.interactable = true;
-        button.targetGraphic = targetGraphic;
     }
 
     internal static IDisposable? BeginScreenshotSuppression()
@@ -437,16 +368,22 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
         var centerWorld = (corners[0] + corners[2]) * 0.5f;
         var leftWorld = (corners[0] + corners[1]) * 0.5f;
         var rightWorld = (corners[2] + corners[3]) * 0.5f;
+        var topWorld = (corners[1] + corners[2]) * 0.5f;
+        var bottomWorld = (corners[0] + corners[3]) * 0.5f;
 
         var centerLocal = parentRect.InverseTransformPoint(centerWorld);
         var leftLocal = parentRect.InverseTransformPoint(leftWorld);
         var rightLocal = parentRect.InverseTransformPoint(rightWorld);
+        var topLocal = parentRect.InverseTransformPoint(topWorld);
+        var bottomLocal = parentRect.InverseTransformPoint(bottomWorld);
 
         var dockPosition = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
             centerLocal.x,
             centerLocal.y,
             leftLocal.x,
             rightLocal.x,
+            topLocal.y,
+            bottomLocal.y,
             _dockButtonRect.localPosition.z,
             _placement
         );

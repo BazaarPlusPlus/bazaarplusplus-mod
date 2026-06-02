@@ -6,6 +6,7 @@ internal enum BppSettingsDockSide
 {
     LeftOfAnchor,
     RightOfAnchor,
+    AboveAnchor,
 }
 
 internal enum BppSettingsDockPanelDirection
@@ -47,6 +48,14 @@ internal readonly struct BppSettingsDockPlacement
         new(
             key,
             BppSettingsDockSide.LeftOfAnchor,
+            BppSettingsDockPanelDirection.UpLeft,
+            DefaultSiblingGap
+        );
+
+    internal static BppSettingsDockPlacement AboveSettingButton(string key) =>
+        new(
+            key,
+            BppSettingsDockSide.AboveAnchor,
             BppSettingsDockPanelDirection.UpLeft,
             DefaultSiblingGap
         );

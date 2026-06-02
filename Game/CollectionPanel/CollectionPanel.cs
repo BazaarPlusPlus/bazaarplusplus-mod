@@ -10,7 +10,6 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
-using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
@@ -108,24 +107,14 @@ internal sealed class CollectionPanel : MonoBehaviour
             _instance.StartPanelLoad();
     }
 
-    internal static void OpenFromDockEntry()
+    internal static void OpenFromDockButton()
     {
         if (_instance == null)
         {
-            BppLog.Warn("CollectionPanel", "Dock entry requested before CollectionPanel mounted.");
+            BppLog.Warn("CollectionPanel", "Dock button requested before CollectionPanel mounted.");
             return;
         }
         _instance.Open(_instance.ResolveOpenSelection());
-    }
-
-    internal static void OpenFromDockEntry(CollectionPanelSelectionState selection)
-    {
-        if (_instance == null)
-        {
-            BppLog.Warn("CollectionPanel", "Dock entry requested before CollectionPanel mounted.");
-            return;
-        }
-        _instance.Open(selection);
     }
 
     internal static CollectionPanelSelectionState GetCurrentSelectionState() =>
@@ -265,19 +254,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (_isVisible && TheBazaar.Data.IsInCombat)
         {
             Close();
-            return;
-        }
-
-        var togglePath = _config.CollectionPanelHotkeyPathConfig?.Value;
-        if (
-            !string.IsNullOrWhiteSpace(togglePath)
-            && BppHotkeyService.WasPressedThisFrame(togglePath!)
-        )
-        {
-            if (_isVisible)
-                Close();
-            else
-                Open();
             return;
         }
 

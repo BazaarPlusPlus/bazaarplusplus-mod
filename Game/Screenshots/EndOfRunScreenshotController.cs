@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Storage.RunScreenshot;
@@ -332,6 +333,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private static IDisposable? BeginUiSuppression()
     {
         return UiSuppressionScope.Begin(
+            CollectionPanelDockButtonController.BeginScreenshotSuppression,
             BppSettingsDockController.BeginScreenshotSuppression,
             CombatStatusBarFeature.BeginScreenshotSuppression
         );

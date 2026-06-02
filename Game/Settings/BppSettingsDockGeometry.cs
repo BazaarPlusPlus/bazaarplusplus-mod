@@ -19,14 +19,30 @@ internal static class BppSettingsDockGeometry
         float anchorCenterLocalY,
         float anchorLeftLocalX,
         float anchorRightLocalX,
+        float anchorTopLocalY,
+        float anchorBottomLocalY,
         float currentLocalZ,
         BppSettingsDockPlacement placement
     )
     {
         var widthLocal = Math.Abs(anchorRightLocalX - anchorLeftLocalX);
+        var heightLocal = Math.Abs(anchorTopLocalY - anchorBottomLocalY);
         var worldLeftDirectionLocal = (float)Math.Sign(anchorLeftLocalX - anchorRightLocalX);
         if (worldLeftDirectionLocal == 0f)
             worldLeftDirectionLocal = -1f;
+
+        var worldUpDirectionLocal = (float)Math.Sign(anchorTopLocalY - anchorBottomLocalY);
+        if (worldUpDirectionLocal == 0f)
+            worldUpDirectionLocal = 1f;
+
+        if (placement.Side == BppSettingsDockSide.AboveAnchor)
+        {
+            return new BppSettingsDockLocalPosition(
+                anchorCenterLocalX,
+                anchorCenterLocalY + worldUpDirectionLocal * (heightLocal + placement.SiblingGap),
+                currentLocalZ
+            );
+        }
 
         var direction =
             placement.Side == BppSettingsDockSide.LeftOfAnchor

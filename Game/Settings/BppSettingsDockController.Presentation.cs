@@ -10,24 +10,6 @@ namespace BazaarPlusPlus.Game.Settings;
 
 internal sealed partial class BppSettingsDockController
 {
-    private static void ConfigureDockButtonRect(
-        RectTransform rectTransform,
-        RectTransform? anchorRect
-    )
-    {
-        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        rectTransform.localRotation = Quaternion.identity;
-
-        if (anchorRect == null)
-            return;
-
-        var anchorSize = anchorRect.rect.size;
-        if (anchorSize.x > 0.0001f && anchorSize.y > 0.0001f)
-            rectTransform.sizeDelta = anchorSize;
-    }
-
     private void ConfigurePanelRect(RectTransform rectTransform, BppSettingsDockPlacement placement)
     {
         rectTransform.anchorMin = new Vector2(0f, 1f);

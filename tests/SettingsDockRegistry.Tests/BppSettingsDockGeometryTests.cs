@@ -29,8 +29,10 @@ public class BppSettingsDockGeometryTests
             anchorCenterLocalY: 40f,
             anchorLeftLocalX: 60f,
             anchorRightLocalX: 140f,
+            anchorTopLocalY: 70f,
+            anchorBottomLocalY: 10f,
             currentLocalZ: 7f,
-            placement
+            placement: placement
         );
 
         Assert.Equal(2f, result.X);
@@ -48,12 +50,56 @@ public class BppSettingsDockGeometryTests
             anchorCenterLocalY: 40f,
             anchorLeftLocalX: 140f,
             anchorRightLocalX: 60f,
+            anchorTopLocalY: 70f,
+            anchorBottomLocalY: 10f,
             currentLocalZ: 7f,
-            placement
+            placement: placement
         );
 
         Assert.Equal(198f, result.X);
         Assert.Equal(40f, result.Y);
+        Assert.Equal(7f, result.Z);
+    }
+
+    [Fact]
+    public void CalculateDockButtonLocalPosition_places_clone_above_anchor_with_gap()
+    {
+        var placement = BppSettingsDockPlacement.AboveSettingButton("CollectionPanel");
+
+        var result = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
+            anchorCenterLocalX: 100f,
+            anchorCenterLocalY: 40f,
+            anchorLeftLocalX: 60f,
+            anchorRightLocalX: 140f,
+            anchorTopLocalY: 70f,
+            anchorBottomLocalY: 10f,
+            currentLocalZ: 7f,
+            placement
+        );
+
+        Assert.Equal(100f, result.X);
+        Assert.Equal(118f, result.Y);
+        Assert.Equal(7f, result.Z);
+    }
+
+    [Fact]
+    public void CalculateDockButtonLocalPosition_places_clone_world_above_when_local_axis_is_flipped()
+    {
+        var placement = BppSettingsDockPlacement.AboveSettingButton("CollectionPanel");
+
+        var result = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
+            anchorCenterLocalX: 100f,
+            anchorCenterLocalY: 40f,
+            anchorLeftLocalX: 60f,
+            anchorRightLocalX: 140f,
+            anchorTopLocalY: 10f,
+            anchorBottomLocalY: 70f,
+            currentLocalZ: 7f,
+            placement
+        );
+
+        Assert.Equal(100f, result.X);
+        Assert.Equal(-38f, result.Y);
         Assert.Equal(7f, result.Z);
     }
 

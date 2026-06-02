@@ -1,6 +1,7 @@
 #pragma warning disable CS0436
 #nullable enable
 using System;
+using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -22,11 +23,11 @@ internal static class BppSettingsDockAwakePatch
     {
         try
         {
-            AttachDock(
+            AttachButtons(
                 MainMenuSettingOptionButtonField?.GetValue(__instance) as Button,
                 "MainMenu"
             );
-            AttachDock(
+            AttachButtons(
                 HeroSelectSettingOptionButtonField?.GetValue(__instance) as Button,
                 "HeroSelect"
             );
@@ -37,11 +38,15 @@ internal static class BppSettingsDockAwakePatch
         }
     }
 
-    private static void AttachDock(Button? button, string key)
+    private static void AttachButtons(Button? button, string key)
     {
         if (button == null)
             return;
 
+        CollectionPanelDockButtonController.Attach(
+            button,
+            BppSettingsDockPlacement.AboveSettingButton($"CollectionPanel_{key}")
+        );
         BppSettingsDockController.Attach(button, BppSettingsDockPlacement.LeftOfSettingButton(key));
     }
 }
@@ -62,10 +67,16 @@ internal static class BppSettingsDockFightMenuPatch
             var settingButtonCustom = SettingButtonField?.GetValue(__instance) as ButtonCustom;
             var button = settingButtonCustom?.GetButton();
             if (button != null)
+            {
+                CollectionPanelDockButtonController.Attach(
+                    button,
+                    BppSettingsDockPlacement.AboveSettingButton("CollectionPanel_FightMenu")
+                );
                 BppSettingsDockController.Attach(
                     button,
                     BppSettingsDockPlacement.LeftOfSettingButton("FightMenu")
                 );
+            }
         }
         catch (Exception ex)
         {
