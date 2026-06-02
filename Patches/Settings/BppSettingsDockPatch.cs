@@ -22,8 +22,14 @@ internal static class BppSettingsDockAwakePatch
     {
         try
         {
-            AttachDock(MainMenuSettingOptionButtonField?.GetValue(__instance) as Button);
-            AttachDock(HeroSelectSettingOptionButtonField?.GetValue(__instance) as Button);
+            AttachDock(
+                MainMenuSettingOptionButtonField?.GetValue(__instance) as Button,
+                "MainMenu"
+            );
+            AttachDock(
+                HeroSelectSettingOptionButtonField?.GetValue(__instance) as Button,
+                "HeroSelect"
+            );
         }
         catch (Exception ex)
         {
@@ -31,12 +37,12 @@ internal static class BppSettingsDockAwakePatch
         }
     }
 
-    private static void AttachDock(Button? button)
+    private static void AttachDock(Button? button, string key)
     {
         if (button == null)
             return;
 
-        BppSettingsDockController.Attach(button);
+        BppSettingsDockController.Attach(button, BppSettingsDockPlacement.LeftOfSettingButton(key));
     }
 }
 
@@ -56,7 +62,10 @@ internal static class BppSettingsDockFightMenuPatch
             var settingButtonCustom = SettingButtonField?.GetValue(__instance) as ButtonCustom;
             var button = settingButtonCustom?.GetButton();
             if (button != null)
-                BppSettingsDockController.Attach(button);
+                BppSettingsDockController.Attach(
+                    button,
+                    BppSettingsDockPlacement.LeftOfSettingButton("FightMenu")
+                );
         }
         catch (Exception ex)
         {

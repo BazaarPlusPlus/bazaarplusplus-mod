@@ -10,52 +10,44 @@ namespace BazaarPlusPlus.Game.Settings;
 
 internal sealed partial class BppSettingsDockController
 {
-    private static void SyncFloatingButton(
-        RectTransform? rectTransform,
-        Vector3 anchorCenterLocal,
-        float offsetX,
-        float offsetY
+    private static void ConfigureDockButtonRect(
+        RectTransform rectTransform,
+        RectTransform? anchorRect
     )
     {
-        if (rectTransform == null)
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.localRotation = Quaternion.identity;
+
+        if (anchorRect == null)
             return;
 
-        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        rectTransform.localScale = new Vector3(DockButtonScale, DockButtonScale, 1f);
-        rectTransform.localRotation = Quaternion.identity;
-        rectTransform.localPosition = new Vector3(
-            anchorCenterLocal.x + offsetX,
-            anchorCenterLocal.y + offsetY,
-            rectTransform.localPosition.z
+        var anchorSize = anchorRect.rect.size;
+        if (anchorSize.x > 0.0001f && anchorSize.y > 0.0001f)
+            rectTransform.sizeDelta = anchorSize;
+    }
+
+    private void ConfigurePanelRect(RectTransform rectTransform, BppSettingsDockPlacement placement)
+    {
+        rectTransform.anchorMin = new Vector2(0f, 1f);
+        rectTransform.anchorMax = new Vector2(0f, 1f);
+        rectTransform.pivot =
+            placement.PanelDirection == BppSettingsDockPanelDirection.UpRight
+                ? new Vector2(0f, 0f)
+                : new Vector2(1f, 0f);
+
+        var cloneScale = _dockButtonRect != null ? _dockButtonRect.localScale.x : 1f;
+        var panelScale = BppSettingsDockGeometry.CalculatePanelLocalScale(
+            PanelExpandedScale,
+            cloneScale
         );
-    }
-
-    private static void ConfigureDockButtonRect(RectTransform rectTransform)
-    {
-        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        rectTransform.localScale = new Vector3(DockButtonScale, DockButtonScale, 1f);
-        rectTransform.localRotation = Quaternion.identity;
-        rectTransform.sizeDelta = new Vector2(DockButtonWidth, DockButtonHeight);
-        rectTransform.anchoredPosition = new Vector2(DockButtonOffsetX, DockButtonOffsetY);
-    }
-
-    private static void ConfigurePanelRect(RectTransform rectTransform)
-    {
-        // Anchor and pivot at the dock button's bottom edge so the panel grows
-        // upward from the dock instead of being vertically centered on it.
-        rectTransform.anchorMin = new Vector2(0f, 0f);
-        rectTransform.anchorMax = new Vector2(0f, 0f);
-        rectTransform.pivot = new Vector2(1f, 0f);
-        // The panel is a child of the dock button, so divide out DockButtonScale to keep
-        // its on-screen size at PanelExpandedScale instead of compounding to ~1.875x.
-        var panelScale = PanelExpandedScale / DockButtonScale;
         rectTransform.localScale = new Vector3(panelScale, panelScale, 1f);
         rectTransform.localRotation = Quaternion.identity;
-        rectTransform.anchoredPosition = new Vector2(-8f, 0f);
+        rectTransform.anchoredPosition =
+            placement.PanelDirection == BppSettingsDockPanelDirection.UpRight
+                ? new Vector2(8f, 0f)
+                : new Vector2(-8f, 0f);
         rectTransform.sizeDelta = new Vector2(
             PanelWidth,
             CalculatePanelHeight(BppSettingsDockCatalog.Definitions.Count)
@@ -95,40 +87,6 @@ internal sealed partial class BppSettingsDockController
             PanelTopPadding + HeaderHeight + HeaderSpacing + (index * (RowHeight + RowSpacing));
         rowRect.offsetMin = new Vector2(PanelPadding, -(rowTop + RowHeight));
         rowRect.offsetMax = new Vector2(-PanelPadding, -rowTop);
-    }
-
-    private static void ConfigureDockButtonVisual(GameObject dockButtonObject)
-    {
-        var background = dockButtonObject.GetComponent<Image>();
-        background.color = new Color(0.16f, 0.16f, 0.18f, 0.95f);
-        background.raycastTarget = true;
-
-        var outline = dockButtonObject.GetComponent<Outline>();
-        outline.effectColor = new Color(0f, 0f, 0f, 0.50f);
-        outline.effectDistance = new Vector2(1f, -1f);
-        outline.useGraphicAlpha = true;
-    }
-
-    private void CreateDockButtonLabel(Transform parent)
-    {
-        var label = CreateText(
-            DockButtonLabelObjectName,
-            parent,
-            13f,
-            TextAlignmentOptions.Center,
-            new Color(0.98f, 0.94f, 0.82f, 1f)
-        );
-        if (label == null)
-            return;
-
-        var labelRect = label.rectTransform;
-        labelRect.anchorMin = Vector2.zero;
-        labelRect.anchorMax = Vector2.one;
-        labelRect.offsetMin = Vector2.zero;
-        labelRect.offsetMax = Vector2.zero;
-        label.text = "BazaarPlusPlus";
-        label.textWrappingMode = TextWrappingModes.NoWrap;
-        label.overflowMode = TextOverflowModes.Ellipsis;
     }
 
     private TextMeshProUGUI? CreateText(

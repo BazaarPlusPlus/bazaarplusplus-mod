@@ -11,15 +11,7 @@ namespace BazaarPlusPlus.Game.Settings;
 internal sealed partial class BppSettingsDockController : MonoBehaviour
 {
     private const string LogCategory = "BppSettingsDock";
-    private const string DockButtonObjectName = "BPP_SettingsDockButton";
-    private const string DockButtonLabelObjectName = "BPP_SettingsDockButtonLabel";
-    private const string PanelObjectName = "BPP_SettingsDockPanel";
     private const string HeaderObjectName = "BPP_SettingsDockHeader";
-    private const float DockButtonWidth = 124f;
-    private const float DockButtonHeight = 44f;
-    private const float DockButtonOffsetX = -20f;
-    private const float DockButtonOffsetY = 100f;
-    private const float DockButtonScale = 1.25f;
     private const float PanelWidth = 456f;
     private const float PanelExpandedScale = 1.5f;
     private const float PanelPadding = 18f;
@@ -43,17 +35,100 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
     private Material? _uiFontMaterial;
     private bool _isExpanded;
     private int _screenshotSuppressionCount;
+    private BppSettingsDockPlacement _placement;
     private static bool _fontResolutionLogged;
 
-    internal static void Attach(Button anchorButton)
+    internal static void Attach(Button anchorButton, BppSettingsDockPlacement placement)
     {
         if (anchorButton == null)
             return;
 
+        var existingController = anchorButton.GetComponent<BppSettingsDockController>();
+        if (existingController != null && existingController._dockButtonRect != null)
+        {
+            existingController.SyncDockButtonPlacement();
+            existingController.ApplyScreenshotSuppressionVisibility();
+            return;
+        }
+
+        var hostRect = anchorButton.transform.parent as RectTransform;
+        if (hostRect == null)
+            return;
+
+        // Clone the native button before adding this controller to the anchor.
+        // Otherwise Unity instantiates a controller-bearing clone and its
+        // OnEnable can run before field initializers are in place.
+        var dockButton =
+            hostRect.Find(placement.DockButtonObjectName) as RectTransform
+            ?? CreateStrippedDockButton(anchorButton, hostRect, placement);
+        if (dockButton == null)
+            return;
+
         var controller =
-            anchorButton.GetComponent<BppSettingsDockController>()
-            ?? anchorButton.gameObject.AddComponent<BppSettingsDockController>();
-        controller.Initialize(anchorButton);
+            existingController ?? anchorButton.gameObject.AddComponent<BppSettingsDockController>();
+        controller.Initialize(anchorButton, placement, dockButton);
+    }
+
+    private static RectTransform? CreateStrippedDockButton(
+        Button anchorButton,
+        RectTransform hostRect,
+        BppSettingsDockPlacement placement
+    )
+    {
+        var cloneObject = UnityEngine.Object.Instantiate(
+            anchorButton.gameObject,
+            hostRect,
+            worldPositionStays: false
+        );
+        cloneObject.name = placement.DockButtonObjectName;
+
+        StripNativeButtonBehavior(cloneObject);
+
+        var rect = cloneObject.GetComponent<RectTransform>();
+        if (rect == null)
+            return null;
+
+        ConfigureDockButtonRect(rect, anchorButton.transform as RectTransform);
+
+        BppLog.Debug(
+            LogCategory,
+            $"Clone '{placement.Key}': hasDockController={cloneObject.GetComponent<BppSettingsDockController>() != null}, "
+                + $"hasBazaarButtonController={cloneObject.GetComponent<BazaarButtonController>() != null}, "
+                + $"hasButtonCustom={cloneObject.GetComponent<ButtonCustom>() != null}, "
+                + $"localScale={rect.localScale}, lossyScale={rect.lossyScale}"
+        );
+
+        return rect;
+    }
+
+    private static void StripNativeButtonBehavior(GameObject cloneObject)
+    {
+        foreach (var custom in cloneObject.GetComponentsInChildren<ButtonCustom>(true))
+            UnityEngine.Object.DestroyImmediate(custom);
+
+        foreach (var native in cloneObject.GetComponentsInChildren<BazaarButtonController>(true))
+            UnityEngine.Object.DestroyImmediate(native);
+
+        foreach (var nestedButton in cloneObject.GetComponentsInChildren<Button>(true))
+        {
+            if (nestedButton.gameObject != cloneObject)
+                UnityEngine.Object.DestroyImmediate(nestedButton);
+        }
+
+        var button = cloneObject.GetComponent<Button>() ?? cloneObject.AddComponent<Button>();
+        var targetGraphic = cloneObject.GetComponent<Image>();
+        if (targetGraphic == null)
+        {
+            targetGraphic = cloneObject.AddComponent<Image>();
+            targetGraphic.color = new Color(1f, 1f, 1f, 0f);
+        }
+
+        targetGraphic.raycastTarget = true;
+        button.onClick.RemoveAllListeners();
+        button.transition = Selectable.Transition.ColorTint;
+        button.navigation = new Navigation { mode = Navigation.Mode.None };
+        button.interactable = true;
+        button.targetGraphic = targetGraphic;
     }
 
     internal static IDisposable? BeginScreenshotSuppression()
@@ -81,12 +156,25 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
             controller.RefreshView();
     }
 
-    private void Initialize(Button anchorButton)
+    private void Initialize(
+        Button anchorButton,
+        BppSettingsDockPlacement placement,
+        RectTransform dockButton
+    )
     {
         _anchorButton = anchorButton;
-        ResolveTextStyle();
-        if (!TryEnsureDockButton())
+        _placement = placement;
+        _dockButtonRect = dockButton;
+        _dockButton = dockButton.GetComponent<Button>();
+        if (_dockButton == null)
             return;
+
+        ResolveTextStyle();
+        _dockButton.onClick.RemoveAllListeners();
+        _dockButton.onClick.AddListener(OnDockButtonClicked);
+
+        SyncDockButtonPlacement();
+        ApplyScreenshotSuppressionVisibility();
 
         if (!TryEnsurePanel())
             return;
@@ -104,61 +192,6 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
     private void OnDisable()
     {
         SetExpanded(false);
-    }
-
-    private bool TryEnsureDockButton()
-    {
-        if (_anchorButton == null)
-            return false;
-
-        var hostRect = _anchorButton.transform.parent as RectTransform;
-        if (hostRect == null)
-            return false;
-
-        var existingRect = hostRect.Find(DockButtonObjectName) as RectTransform;
-        if (existingRect != null)
-        {
-            _dockButtonRect = existingRect;
-            _dockButton = existingRect.GetComponent<Button>();
-            if (_dockButton == null)
-                return false;
-
-            var existingLabel = existingRect.Find(DockButtonLabelObjectName);
-            if (existingLabel == null)
-                CreateDockButtonLabel(existingRect);
-
-            _dockButton.onClick.RemoveListener(OnDockButtonClicked);
-            _dockButton.onClick.AddListener(OnDockButtonClicked);
-            ConfigureDockButtonRect(existingRect);
-            ConfigureDockButtonVisual(existingRect.gameObject);
-            SyncDockButtonPlacement();
-            ApplyScreenshotSuppressionVisibility();
-            return true;
-        }
-
-        var dockButtonObject = new GameObject(
-            DockButtonObjectName,
-            typeof(RectTransform),
-            typeof(Image),
-            typeof(Button),
-            typeof(Outline)
-        );
-        var dockRect = dockButtonObject.GetComponent<RectTransform>();
-        dockRect.SetParent(hostRect, worldPositionStays: false);
-        ConfigureDockButtonRect(dockRect);
-        ConfigureDockButtonVisual(dockButtonObject);
-
-        _dockButtonRect = dockRect;
-        _dockButton = dockButtonObject.GetComponent<Button>();
-        _dockButton.transition = Selectable.Transition.ColorTint;
-        _dockButton.navigation = new Navigation { mode = Navigation.Mode.None };
-        _dockButton.targetGraphic = dockButtonObject.GetComponent<Image>();
-        _dockButton.onClick.AddListener(OnDockButtonClicked);
-
-        CreateDockButtonLabel(dockRect);
-        SyncDockButtonPlacement();
-        ApplyScreenshotSuppressionVisibility();
-        return true;
     }
 
     private IDisposable BeginInstanceScreenshotSuppression()
@@ -188,11 +221,11 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
         if (_dockButtonRect == null)
             return false;
 
-        var existingPanel = _dockButtonRect.Find(PanelObjectName) as RectTransform;
+        var existingPanel = _dockButtonRect.Find(_placement.PanelObjectName) as RectTransform;
         if (existingPanel != null)
         {
             _panelRoot = existingPanel;
-            ConfigurePanelRect(existingPanel);
+            ConfigurePanelRect(existingPanel, _placement);
             ConfigurePanelVisual(existingPanel.gameObject);
             _headerLabel = existingPanel.Find(HeaderObjectName)?.GetComponent<TextMeshProUGUI>();
             if (_headerLabel == null)
@@ -208,14 +241,14 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
         }
 
         var panelObject = new GameObject(
-            PanelObjectName,
+            _placement.PanelObjectName,
             typeof(RectTransform),
             typeof(Image),
             typeof(Outline)
         );
         var panelRect = panelObject.GetComponent<RectTransform>();
         panelRect.SetParent(_dockButtonRect, worldPositionStays: false);
-        ConfigurePanelRect(panelRect);
+        ConfigurePanelRect(panelRect, _placement);
         ConfigurePanelVisual(panelObject);
 
         _headerLabel = CreateText(
@@ -346,8 +379,6 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
 
             _panelRoot.gameObject.SetActive(expanded);
         }
-
-        UpdateDockButtonAccent();
     }
 
     private void ActivateDefinition(BppSettingsDockDefinition definition)
@@ -370,8 +401,6 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
 
         foreach (var row in _rows)
             ApplyRowState(row);
-
-        UpdateDockButtonAccent();
     }
 
     private void ApplyRowState(DockSettingRowView row)
@@ -392,56 +421,38 @@ internal sealed partial class BppSettingsDockController : MonoBehaviour
             : new Color(0.75f, 0.78f, 0.82f, 0.98f);
     }
 
-    private void UpdateDockButtonAccent()
-    {
-        if (_dockButtonRect == null)
-            return;
-
-        var image = _dockButtonRect.GetComponent<Image>();
-        var outline = _dockButtonRect.GetComponent<Outline>();
-        if (image == null || outline == null)
-            return;
-
-        var enabledCount = 0;
-        foreach (var definition in BppSettingsDockCatalog.Definitions)
-        {
-            if (definition.IsActive())
-                enabledCount++;
-        }
-
-        image.color =
-            _isExpanded ? new Color(0.72f, 0.34f, 0.15f, 0.98f)
-            : enabledCount > 0 ? new Color(0.40f, 0.21f, 0.13f, 0.96f)
-            : new Color(0.16f, 0.16f, 0.18f, 0.95f);
-        outline.effectColor = _isExpanded
-            ? new Color(0.98f, 0.87f, 0.55f, 0.82f)
-            : new Color(0f, 0f, 0f, 0.50f);
-    }
-
     private void SyncDockButtonPlacement()
     {
-        if (_anchorButton == null)
+        if (_anchorButton == null || _dockButtonRect == null)
             return;
 
-        var referenceRect = _dockButtonRect;
-        if (referenceRect == null)
-            return;
-
-        var parentRect = referenceRect.parent as RectTransform;
+        var parentRect = _dockButtonRect.parent as RectTransform;
         var anchorRect = _anchorButton.transform as RectTransform;
         if (parentRect == null || anchorRect == null)
             return;
 
         var corners = new Vector3[4];
         anchorRect.GetWorldCorners(corners);
-        var anchorCenterWorld = (corners[0] + corners[2]) * 0.5f;
-        var anchorCenterLocal = parentRect.InverseTransformPoint(anchorCenterWorld);
-        SyncFloatingButton(
-            _dockButtonRect,
-            anchorCenterLocal,
-            DockButtonOffsetX,
-            DockButtonOffsetY
+
+        var centerWorld = (corners[0] + corners[2]) * 0.5f;
+        var leftWorld = (corners[0] + corners[1]) * 0.5f;
+        var rightWorld = (corners[2] + corners[3]) * 0.5f;
+
+        var centerLocal = parentRect.InverseTransformPoint(centerWorld);
+        var leftLocal = parentRect.InverseTransformPoint(leftWorld);
+        var rightLocal = parentRect.InverseTransformPoint(rightWorld);
+
+        var dockPosition = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
+            centerLocal.x,
+            centerLocal.y,
+            leftLocal.x,
+            rightLocal.x,
+            _dockButtonRect.localPosition.z,
+            _placement
         );
+        _dockButtonRect.localPosition = new Vector3(dockPosition.X, dockPosition.Y, dockPosition.Z);
+        _dockButtonRect.localRotation = Quaternion.identity;
+        _dockButtonRect.SetAsLastSibling();
     }
 
     private sealed class DockSettingRowView
