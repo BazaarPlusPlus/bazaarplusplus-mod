@@ -1,6 +1,6 @@
 # AutoBazaar HTTP API v1
 
-> **Status: parked.** The AutoBazaar host mount is commented out in `BppComposition.cs`, so this loopback HTTP server is **not started** in current builds. The wire contract below is preserved verbatim for re-enable (and is consumed by the external `bazaarplusplus-agent` repo) — uncomment `AutoBazaarHostMount` to activate. Field names (`stateName`, `availableActions`, `actionKind`, `cardInstanceId`, `targetSection`, `targetSockets`, `reason`) are stable wire contracts; do not rename. Field-by-field derivation lives in the companion [auto-bazaar-decision-surface.md](auto-bazaar-decision-surface.md).
+> **Status: optional host.** Default mod builds do not compile `Game/AutoBazaarHost/`, do not reference `BazaarPlusPlus.AutoBazaar.csproj`, and do not copy `BazaarPlusPlus.AutoBazaar.dll`. Build with `./run.sh build --with-autobazaar-host` or `-p:EnableAutoBazaarHost=true` to install the host, then set `[AutoBazaar] Enabled = true` in `BepInEx/config/BazaarPlusPlus.cfg` to start the loopback HTTP server. Field names (`stateName`, `availableActions`, `actionKind`, `cardInstanceId`, `targetSection`, `targetSockets`, `reason`) are stable wire contracts; do not rename. Field-by-field derivation lives in the companion [auto-bazaar-decision-surface.md](auto-bazaar-decision-surface.md).
 
 The AutoBazaar HTTP API exposes the current game state and accepts one action at a time, acting as pure transport and validation. All strategy, persistence, and training logic belong to external tools; the mod makes no decisions itself. The endpoint runs on loopback and is reachable at `http://127.0.0.1:<port>/v1/`.
 
@@ -363,7 +363,7 @@ After every non-`Wait` action that the mod dispatched (`executed: true`), a 1.0 
 
 | cfg key | section | default | description |
 |---|---|---|---|
-| `Enabled` | `AutoBazaar` | `true` | Master switch. Edit cfg file; no in-game UI. |
+| `Enabled` | `AutoBazaar` | `false` | Runtime switch. Only has an effect when the mod was built with `EnableAutoBazaarHost=true`; edit cfg file, no in-game UI. |
 | `HttpListenerPort` | `AutoBazaar` | `47900` | Loopback port. Changing this value restarts the listener. |
 
 The snapshot tick cadence (`1.5 s`) and the POST blocking timeout (`3 s`) are fixed defaults, no longer configurable.

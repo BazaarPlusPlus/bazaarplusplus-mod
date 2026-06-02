@@ -2,7 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Xml.Linq;
 using Xunit;
 
 namespace Architecture.Tests;
@@ -219,18 +221,96 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Main_project_references_AutoBazaar_assembly_without_implicit_source_compile()
+    public void Main_project_keeps_AutoBazaar_host_physically_optional()
     {
         var repoRoot = RepoRoot();
         var mainProject = Path.Combine(repoRoot, "BazaarPlusPlus.csproj");
         Assert.True(File.Exists(mainProject), $"Could not locate main project at '{mainProject}'.");
 
-        var text = File.ReadAllText(mainProject);
-        Assert.Contains("ProjectReference Include=\"BazaarPlusPlus.AutoBazaar.csproj\"", text);
-        Assert.Contains("Compile Remove=\"AutoBazaar/**\"", text);
-        Assert.DoesNotContain("Compile Include=\"AutoBazaar/", text);
-        Assert.DoesNotContain("Compile Include=\"AutoBazaar\\", text);
+        var project = XDocument.Load(mainProject);
+        var elements = project.Descendants().ToList();
+
+        Assert.Contains(
+            elements,
+            e =>
+                e.Name.LocalName == "EnableAutoBazaarHost"
+                && e.Value.Trim() == "false"
+                && IsCondition(e, "'$(EnableAutoBazaarHost)' == ''")
+        );
+        Assert.Contains(
+            elements,
+            e =>
+                e.Name.LocalName == "DefineConstants"
+                && e.Value.Contains("BPP_AUTOBAZAAR_HOST", StringComparison.Ordinal)
+                && IsAutoBazaarHostEnabledCondition(e)
+        );
+
+        Assert.Contains(
+            elements,
+            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "AutoBazaar/**"
+        );
+        Assert.Contains(
+            elements,
+            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "Game/AutoBazaarHost/**"
+        );
+        Assert.Contains(
+            elements,
+            e =>
+                e.Name.LocalName == "Compile"
+                && Attribute(e, "Include") == "Game/AutoBazaarHost/**/*.cs"
+                && IsAutoBazaarHostEnabledCondition(e)
+        );
+        Assert.DoesNotContain(
+            elements,
+            e =>
+                e.Name.LocalName == "Compile"
+                && (
+                    Attribute(e, "Include")?.StartsWith("AutoBazaar/", StringComparison.Ordinal)
+                    ?? false
+                )
+        );
+
+        Assert.Contains(
+            elements,
+            e =>
+                e.Name.LocalName == "ProjectReference"
+                && Attribute(e, "Include") == "BazaarPlusPlus.AutoBazaar.csproj"
+                && IsAutoBazaarHostEnabledCondition(e)
+        );
+
+        var autoBazaarArtifactIncludes = elements
+            .Where(e =>
+                e.Name.LocalName == "PluginManagedRuntimeFiles"
+                && (
+                    Attribute(e, "Include")
+                        ?.Contains("BazaarPlusPlus.AutoBazaar.dll", StringComparison.Ordinal)
+                    ?? false
+                )
+            )
+            .ToList();
+        Assert.NotEmpty(autoBazaarArtifactIncludes);
+        Assert.All(
+            autoBazaarArtifactIncludes,
+            e => Assert.True(IsAutoBazaarHostEnabledCondition(e))
+        );
     }
+
+    private static bool IsAutoBazaarHostEnabledCondition(XElement element) =>
+        IsCondition(element, "'$(EnableAutoBazaarHost)' == 'true'");
+
+    private static bool IsCondition(XElement element, string expectedConditionPart) =>
+        (
+            (Attribute(element, "Condition") ?? string.Empty)
+            + " "
+            + (
+                element.Parent is null
+                    ? string.Empty
+                    : Attribute(element.Parent, "Condition") ?? string.Empty
+            )
+        ).Contains(expectedConditionPart, StringComparison.Ordinal);
+
+    private static string? Attribute(XElement element, string name) =>
+        element.Attribute(name)?.Value;
 
     // The compile-time path of this source file anchors the repo root without loading any
     // game-coupled assembly at runtime: <repo>/tests/Architecture.Tests/CoreLayeringTests.cs.

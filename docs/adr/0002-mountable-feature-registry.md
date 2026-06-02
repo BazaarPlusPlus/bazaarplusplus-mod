@@ -1,6 +1,6 @@
 # Mount MonoBehaviour features through a one-line mountable registry
 
-`MonoBehaviour` features are registered as `IBppMountable` entries in `BppComposition` and mounted in one pass by `BppMountableRegistry.MountAll(host)`, rather than hand-wired imperatively in `Plugin.cs`. Turning a feature on or off is adding or removing one `_mountables.Register(...)` line at composition time.
+`MonoBehaviour` features are registered as `IBppMountable` entries in `BppComposition` and mounted in one pass by `BppMountableRegistry.MountAll(host)`, rather than hand-wired imperatively in `Plugin.cs`. A normal feature can be turned on or off by adding or removing one `_mountables.Register(...)` line at composition time; features that need physical install isolation can put that registration behind a build property.
 
 ## Context
 
@@ -10,7 +10,7 @@ AutoBazaar was the first user (see [archived spec](../design/archive/2026-05-22-
 
 ## Consequences
 
-- A feature's entire lifecycle (no component attached, no tick, no probes, no listener) is controlled by the presence of its registration line. AutoBazaar's `AutoBazaarHostMount` line is currently commented out in `BppComposition.cs` — that is how the subsystem is "parked" (see [autobazaar.md](../features/autobazaar.md)).
+- A feature's entire lifecycle (no component attached, no tick, no probes, no listener) is controlled by the presence of its registration line. AutoBazaar goes further: its host registration, source compilation, project reference, and artifact copy are all guarded by `EnableAutoBazaarHost=true` / `BPP_AUTOBAZAAR_HOST` so default builds physically omit the host (see [autobazaar.md](../features/autobazaar.md)).
 - **As-built divergence from the spec**: the spec scoped this to AutoBazaar only and listed migrating the other features as a non-goal. In practice the abstraction generalized to a `ComponentMount<T>` helper and ~9 features now register through it (`ComponentMount<RunLoggingController>`, `ComponentMount<CombatStatusBar>`, ...); only `HistoryPanelMount` stays bespoke (it needs `Func<>` lazy resolution of the online client + combat replay runtime). The current registrations live in `BppComposition.cs`.
 - New features are expected to register here rather than re-introduce hand-wiring in `Plugin.cs`. The only bootstrap-special case is `CombatReplayRuntime`, which must be constructed before `composition.Start()`.
 

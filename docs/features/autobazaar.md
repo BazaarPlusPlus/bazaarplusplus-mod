@@ -1,8 +1,8 @@
-# AutoBazaar（parked）
+# AutoBazaar（optional host）
 
 AutoBazaar 是一个本地回环 HTTP 决策表面：把当前游戏状态发布为版本化快照（`GET /v1/context`），并接受外部 agent 提交的单个动作（`POST /v1/actions`）。mod 只做传输与校验，所有策略决策属于外部工具（决策 agent 现住在独立仓库 `bazaarplusplus-agent`）。
 
-> **状态：parked。** host mount 在 `BppComposition.cs` 被注释（`// _mountables.Register(new AutoBazaarHostMount(configFile));`），loopback HTTP server 当前**不启动**。纯协议、transport、validation、queue 与 runtime controller 位于根目录 `AutoBazaar/`（`BazaarPlusPlus.AutoBazaar.csproj`），Unity / BepInEx / 游戏 DLL 适配层位于 `Game/AutoBazaarHost/`。取消注释 host mount 即可重新启用——这是有意的「parked，不是 dead」状态，清理时勿删。
+> **状态：默认物理不安装。** 主插件默认构建不编译 `Game/AutoBazaarHost/`，也不引用或复制 `BazaarPlusPlus.AutoBazaar.dll`。需要安装 Host 时显式构建：`./run.sh build --with-autobazaar-host`（底层 MSBuild 属性是 `-p:EnableAutoBazaarHost=true`）。安装后还要把 `BepInEx/config/BazaarPlusPlus.cfg` 里的 `[AutoBazaar] Enabled` 改为 `true`，loopback HTTP server 才会启动。纯协议、transport、validation、queue 与 runtime controller 位于根目录 `AutoBazaar/`（`BazaarPlusPlus.AutoBazaar.csproj`），Unity / BepInEx / 游戏 DLL 适配层位于 `Game/AutoBazaarHost/`。
 
 ## 文档
 

@@ -20,8 +20,8 @@ internal sealed class AutoBazaarBepInExOptions : IAutoBazaarOptions
         _enabled = config.Bind(
             "AutoBazaar",
             "Enabled",
-            true,
-            "Master switch for the AutoBazaar HTTP endpoint. When true, a loopback HTTP server starts on the configured port. There is no in-game UI for this toggle; edit the cfg file to disable."
+            false,
+            "Runtime switch for the AutoBazaar HTTP endpoint. This only has an effect when the mod was built with EnableAutoBazaarHost=true."
         );
         _httpListenerPort = config.Bind(
             "AutoBazaar",

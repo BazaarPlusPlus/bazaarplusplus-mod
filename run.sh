@@ -39,21 +39,60 @@ clear_macos_sqlite_quarantine() {
     done
 }
 
+print_autobazaar_host_mode() {
+    local autobazaar_host="${1:-false}"
+    if [[ "$autobazaar_host" == "true" ]]; then
+        echo -e "${CYAN}== AutoBazaar Host: ${GREEN}enabled${CYAN} ==${RESET}"
+    else
+        echo -e "${CYAN}== AutoBazaar Host: disabled ==${RESET}"
+    fi
+}
+
 build() {
-    dotnet build BazaarPlusPlus.csproj -verbosity detailed
+    local autobazaar_host="${1:-false}"
+    local args=(-verbosity detailed)
+
+    if [[ "$autobazaar_host" == "true" ]]; then
+        args+=(-p:EnableAutoBazaarHost=true)
+    fi
+
+    print_autobazaar_host_mode "$autobazaar_host"
+    dotnet build BazaarPlusPlus.csproj "${args[@]}"
 }
 
 build_all() {
     local prod="${1:-false}"
+    local autobazaar_host="${2:-false}"
     local args=(-t:BuildAll -verbosity detailed)
 
     if [[ "$prod" == "true" ]]; then
         args+=(-p:BuildProductionPackage=true)
     fi
+    if [[ "$autobazaar_host" == "true" ]]; then
+        args+=(-p:EnableAutoBazaarHost=true)
+    fi
 
+    print_autobazaar_host_mode "$autobazaar_host"
     clear_macos_sqlite_quarantine
     dotnet build BazaarPlusPlus.csproj "${args[@]}"
     clear_macos_sqlite_quarantine
+}
+
+parse_build_options() {
+    local autobazaar_host=false
+
+    while (($# > 0)); do
+        case "$1" in
+            --with-autobazaar-host|--autobazaar) autobazaar_host=true ;;
+            *)
+                usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
+
+    build "$autobazaar_host"
 }
 
 test_all() {
@@ -110,16 +149,31 @@ decompile_all() {
 }
 
 usage() {
-    echo "Usage: $0 {all [--prod]|build|test|format|decompile [DllName]|decompile-all}"
+    cat <<EOF
+Usage:
+  $0 build [--with-autobazaar-host]
+  $0 all [--prod] [--with-autobazaar-host]
+  $0 test
+  $0 format
+  $0 decompile [DllName]
+  $0 decompile-all
+
+Options:
+  --with-autobazaar-host  Build and copy the optional AutoBazaar host assembly.
+  --autobazaar            Alias for --with-autobazaar-host.
+  --prod                  With all: also build the production installer package.
+EOF
 }
 
 case "${1:-}" in
     all)
         shift
         prod=false
+        autobazaar_host=false
         while (($# > 0)); do
             case "$1" in
                 --prod) prod=true ;;
+                --with-autobazaar-host|--autobazaar) autobazaar_host=true ;;
                 *)
                     usage
                     exit 1
@@ -127,9 +181,12 @@ case "${1:-}" in
             esac
             shift
         done
-        build_all "$prod"
+        build_all "$prod" "$autobazaar_host"
         ;;
-    build)      build ;;
+    build)
+        shift
+        parse_build_options "$@"
+        ;;
     test)       test_all ;;
     format)     format ;;
     decompile)  decompile "$@" ;;

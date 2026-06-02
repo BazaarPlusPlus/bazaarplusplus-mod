@@ -14,19 +14,19 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 大厅与展示类小功能：随机英雄池面板、主菜单版本号、Legendary 段位展示文案、中文术语切换
 - **Anonymous Mode**：可选将显示名改为 `Anonymous`
 - 终局自动截图：终局 `Continue` 前自动保存主截图和元数据
-- **AutoBazaar HTTP 接口**（**当前 parked**）：本地回环 HTTP 服务（默认端口 47900），对外暴露决策上下文（`GET /v1/context`）并接受外部动作（`POST /v1/actions`）；纯传输与校验层，Mod 本身不做策略决策。**注意：`AutoBazaarHostMount` 在 `BppComposition.cs` 被注释掉，HTTP 服务当前不启动；wire 契约与源码保留，取消注释即重新启用。** 详见 [auto-bazaar-http-api-v1.md](reference/auto-bazaar-http-api-v1.md)。
+- **AutoBazaar HTTP 接口**（**默认不安装 Host**）：本地回环 HTTP 服务（默认端口 47900），对外暴露决策上下文（`GET /v1/context`）并接受外部动作（`POST /v1/actions`）；纯传输与校验层，Mod 本身不做策略决策。构建时需显式传 `-p:EnableAutoBazaarHost=true` 才会编译 Host 并复制 `BazaarPlusPlus.AutoBazaar.dll`；安装后还需 `[AutoBazaar] Enabled = true` 才会启动 HTTP 服务。详见 [auto-bazaar-http-api-v1.md](reference/auto-bazaar-http-api-v1.md)。
 
 ## 运行时骨架
 
 | 层次 | 作用 |
 | --- | --- |
-| `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好 9 个 `IBppMountable`（第 10 个 `AutoBazaarHostMount` 在 `BppComposition.cs` 注释掉，parked） |
+| `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好默认的 `IBppMountable`；`AutoBazaarHostMount` 只在 `EnableAutoBazaarHost=true` 构建中加入 |
 | `BppComposition.cs` | 创建 `IBppServices`，注册 `RunLifecycleModule`、`CombatReplayModule`、`CombatStatusBarModule`，并把所有 `IBppMountable`（feature runtime）和 `ISettingsDockEntry`（设置坞入口）汇总到两个 registry |
 | `Core/` | 纯抽象：配置、事件总线、路径、run context、运行时服务接口 |
 | `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`Encounter/`、`StaticCards/`、`CardPreview/`、`HeroPortraits/`，以及带 game type 的事件 + `IRunContext` 接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
-挂载的 9 个 `IBppMountable`（实际注册见 `BppComposition.cs`；多数是泛型 `ComponentMount<T>`，仅 `HistoryPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<CardSetPreviewRuntime>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbScreenshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`ComponentMount<TooltipModifierRefreshController>`。第 10 个 `AutoBazaarHostMount` 在 `BppComposition.cs` 被注释（parked）。AutoBazaar 的纯协议/transport/validation/runtime controller 在根目录 `AutoBazaar/` 和 `BazaarPlusPlus.AutoBazaar.csproj`，Unity 与游戏 DLL 适配层在 `Game/AutoBazaarHost/`。新增 feature 只需在 `BppComposition` 加一行 `_mountables.Register(...)`。
+默认挂载的 `IBppMountable`（实际注册见 `BppComposition.cs`；多数是泛型 `ComponentMount<T>`，仅 `HistoryPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<CardSetPreviewRuntime>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbScreenshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`ComponentMount<TooltipModifierRefreshController>`。`AutoBazaarHostMount` 受 `BPP_AUTOBAZAAR_HOST` 编译符号保护，只有 `EnableAutoBazaarHost=true` 构建会编译并注册。AutoBazaar 的纯协议/transport/validation/runtime controller 在根目录 `AutoBazaar/` 和 `BazaarPlusPlus.AutoBazaar.csproj`，Unity 与游戏 DLL 适配层在 `Game/AutoBazaarHost/`。
 
 ## 游戏内功能模块
 
@@ -160,6 +160,6 @@ Combat Replay 录像的编码参数（帧率 / 分辨率 / CRF / preset / 队列
 - 终局截图与 BazaarDB 上传：[features/screenshots.md](features/screenshots.md)
 - 战斗状态条 / 怪物预览 / 附魔升级预览：[features/combat-status-bar.md](features/combat-status-bar.md)、[features/monster-preview.md](features/monster-preview.md)、[features/tooltip-preview.md](features/tooltip-preview.md)
 - 热键 / 设置表面：[reference/hotkeys-reference.md](reference/hotkeys-reference.md)、[reference/settings-and-debug-surfaces.md](reference/settings-and-debug-surfaces.md)
-- AutoBazaar（parked）：[features/autobazaar.md](features/autobazaar.md)（→ [reference/auto-bazaar-http-api-v1.md](reference/auto-bazaar-http-api-v1.md)、[reference/auto-bazaar-decision-surface.md](reference/auto-bazaar-decision-surface.md)）
+- AutoBazaar（optional host）：[features/autobazaar.md](features/autobazaar.md)（→ [reference/auto-bazaar-http-api-v1.md](reference/auto-bazaar-http-api-v1.md)、[reference/auto-bazaar-decision-surface.md](reference/auto-bazaar-decision-surface.md)）
 - 设计决策（ADR）：[adr/](adr/)；逆向工程笔记：[reverse-engineering/](reverse-engineering/)
 - 服务端部署：见独立仓库 `bazaarplusplus-server/README.md`

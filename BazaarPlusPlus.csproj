@@ -17,6 +17,12 @@
     <BuildProductionPackage Condition="'$(BuildProductionPackage)' == ''"
       >false</BuildProductionPackage
     >
+    <EnableAutoBazaarHost Condition="'$(EnableAutoBazaarHost)' == ''"
+      >false</EnableAutoBazaarHost
+    >
+    <DefineConstants Condition="'$(EnableAutoBazaarHost)' == 'true'"
+      >$(DefineConstants);BPP_AUTOBAZAAR_HOST</DefineConstants
+    >
   </PropertyGroup>
 
   <!-- Embedded resources -->
@@ -47,10 +53,17 @@
     <Compile Remove="AutoBazaar/**" />
     <EmbeddedResource Remove="AutoBazaar/**" />
     <None Remove="AutoBazaar/**" />
+    <Compile Remove="Game/AutoBazaarHost/**" />
+    <EmbeddedResource Remove="Game/AutoBazaarHost/**" />
+    <None Remove="Game/AutoBazaarHost/**" />
     <Compile Remove="**/bin/**;**/obj/**" />
     <EmbeddedResource Remove="**/bin/**;**/obj/**" />
     <None Remove="**/bin/**;**/obj/**" />
     <Content Remove="**/bin/**;**/obj/**" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableAutoBazaarHost)' == 'true'">
+    <Compile Include="Game/AutoBazaarHost/**/*.cs" />
   </ItemGroup>
   <!-- Project paths -->
   <PropertyGroup>
@@ -125,7 +138,10 @@
   <ItemGroup>
     <ProjectReference Include="BazaarPlusPlus.ModApi.csproj" />
     <ProjectReference Include="BazaarPlusPlus.Storage.csproj" />
-    <ProjectReference Include="BazaarPlusPlus.AutoBazaar.csproj" />
+    <ProjectReference
+      Include="BazaarPlusPlus.AutoBazaar.csproj"
+      Condition="'$(EnableAutoBazaarHost)' == 'true'"
+    />
   </ItemGroup>
 
   <!-- Game assembly references -->
@@ -218,7 +234,7 @@
       />
       <PluginManagedRuntimeFiles
         Include="$(TargetDir)BazaarPlusPlus.AutoBazaar.dll"
-        Condition="Exists('$(TargetDir)BazaarPlusPlus.AutoBazaar.dll')"
+        Condition="'$(EnableAutoBazaarHost)' == 'true' and Exists('$(TargetDir)BazaarPlusPlus.AutoBazaar.dll')"
       />
     </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
@@ -295,9 +311,18 @@
       />
       <PluginManagedRuntimeFiles
         Include="$(TargetDir)BazaarPlusPlus.AutoBazaar.dll"
-        Condition="Exists('$(TargetDir)BazaarPlusPlus.AutoBazaar.dll')"
+        Condition="'$(EnableAutoBazaarHost)' == 'true' and Exists('$(TargetDir)BazaarPlusPlus.AutoBazaar.dll')"
       />
     </ItemGroup>
+    <ItemGroup>
+      <InstallerFilesToDelete
+        Include="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/BazaarPlusPlus.AutoBazaar.dll"
+      />
+      <InstallerFilesToDelete
+        Include="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/BazaarPlusPlus.AutoBazaar.dll"
+      />
+    </ItemGroup>
+    <Delete Files="@(InstallerFilesToDelete)" />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
       DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).dll"
@@ -379,11 +404,15 @@
 
   <!-- Build all -->
   <Target Name="BuildAll">
-    <MSBuild Projects="$(MSBuildProjectFile)" Targets="Build" Properties="Configuration=Debug" />
     <MSBuild
       Projects="$(MSBuildProjectFile)"
       Targets="Build"
-      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage)"
+      Properties="Configuration=Debug;EnableAutoBazaarHost=$(EnableAutoBazaarHost)"
+    />
+    <MSBuild
+      Projects="$(MSBuildProjectFile)"
+      Targets="Build"
+      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);EnableAutoBazaarHost=$(EnableAutoBazaarHost)"
     />
   </Target>
 </Project>

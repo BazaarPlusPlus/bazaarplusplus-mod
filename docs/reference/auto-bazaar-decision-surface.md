@@ -1,6 +1,6 @@
 # AutoBazaar Decision Surface — Internal Reference
 
-> **Status: parked.** The AutoBazaar host mount is commented out in `BppComposition.cs`; the HTTP surface this doc derives is not currently served. Preserved for re-enable. The wire contract itself is owned by [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md); this doc owns the game-reader-side derivation.
+> **Status: optional host.** Default mod builds do not install the AutoBazaar host. Build with `-p:EnableAutoBazaarHost=true` and set `[AutoBazaar] Enabled = true` to serve the HTTP surface this doc derives. The wire contract itself is owned by [auto-bazaar-http-api-v1.md](auto-bazaar-http-api-v1.md); this doc owns the game-reader-side derivation.
 
 ## Scope
 
