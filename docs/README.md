@@ -34,7 +34,7 @@
 ## 领域决策与术语
 
 - [../CONTEXT.md](../CONTEXT.md) — 领域术语表（Encounter / Pedestal / Encounter status probe …）。
-- [adr/](adr/) — 架构决策记录：[0001](adr/0001-encounter-status-probe-not-timeline-tracker.md) 状态探针、[0002](adr/0002-mountable-feature-registry.md) mountable 注册表、[0003](adr/0003-history-panel-preview-overlay.md) 预览 overlay、[0004](adr/0004-preview-visibility-three-state-mode.md) 3 态预览模式。
+- [adr/](adr/) — 架构决策记录：[0001](adr/0001-encounter-status-probe-not-timeline-tracker.md) 状态探针、[0002](adr/0002-mountable-feature-registry.md) mountable 注册表、[0003](adr/0003-history-panel-preview-overlay.md) 预览 overlay、[0004](adr/0004-preview-visibility-three-state-mode.md) 3 态预览模式、[0005](adr/0005-autobazaar-isolated-transport-core.md) AutoBazaar 隔离核心。
 
 ## 设计历史（`design/`）
 

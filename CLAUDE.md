@@ -87,25 +87,26 @@ All three csproj files live in the repo root. `ModApi/` and `Storage/` are the s
 - Keep agent-authored docs minimal; do not add or rewrite README-style files unless the task explicitly requires user-facing documentation
 - When a model is serialized with MessagePack in the Unity/Mono runtime, keep the serialized DTO graph `public`; `internal` DTOs can still fail at runtime with `MethodAccessException` even when their properties are public
 - When designing server-side SQL, analyze each query for scan shape before shipping: determine whether it can degrade into a full table scan, estimate the expected read/write count cost at production scale, and check for fan-out or write/read amplification on hot paths
-
-# Pull Request Hygiene
-
-When an agent opens or updates a pull request, it must:
-
-- Use a clear, correctly capitalized, imperative PR title
-- Avoid conventional commit prefixes in PR titles (`fix:`, `feat:`, `docs:`, etc.)
-- Avoid trailing punctuation in PR titles
-- Optionally prefix the title with a module or feature name when one area is the clear scope
-- Include a `Release Notes:` section as the final section in the PR body
-- Use one bullet under `Release Notes:`:
-  - `- Added ...`, `- Fixed ...`, or `- Improved ...` for user-facing changes, or
-  - `- N/A` for docs-only and other non-user-facing changes
-- Format release notes exactly with a blank line after the heading, for example:
-```text
-Release Notes:
-
-- N/A
-```
+- Treat the current repo code and `decompiled/` as the source of truth; other design docs are reference and may be stale — re-review them against live code, and ground conclusions in `file:line` citations rather than prose reasoning
+- For game-behavior bugs, root-cause against the decompiled game source before forming a hypothesis or writing a fix; do not trust draft specs or memory, do not ship a surface fix, and when the obvious fix fails enumerate alternative cause mechanisms instead of writing another speculative patch
+- Before asserting a native/platform API's signature or availability (e.g. macOS audio capture), verify it against the real SDK headers; never state native API facts from memory
+- Before writing filtering/classification rules over game data, query the live static data (e.g. the game's static card data / `GameData.db`) to confirm the fields actually exist and the lookup is reachable
+- Key game entities (merchants, trainers, cards) by their stable template ID, not by display text — display names are ambiguous and unstable
+- When the user says a problem has failed repeatedly, stop spelunking implementation/decompiled source and first write a doc capturing background, the current problem, candidate approaches, and the verification method
+- Run an independent red-team review of a large refactor/design plan before implementing, and revise from it; keep such a review strictly review-only — surface weaknesses/risks/bad assumptions with `file:line` evidence and apply no patches
+- After revising a design (or receiving a review), send the revised plan back for confirmation before implementing — do not continue straight into code
+- When refactoring for cleanliness, take the breaking change for the cleanest end-state and bump the major version rather than preserving back-compat shims
+- When replacing a subsystem or migrating to a prototype, remove the old implementation entirely and ship only the new version in-place — do not leave the old path as a fallback or stand up a merged build chain that runs both
+- When the user rejects a design/layout direction, scrap the approach and redesign holistically — do not patch the rejected design
+- Before keeping a DTO/model, verify it has a real producer and a real consumer across the repo; treat unused DTO scaffolding as dead code to delete, not to preserve
+- Do not build standalone probe/diagnostic scaffolding to validate a hypothesis — add a temporary probe on the main path (the user builds + reloads to verify), or drop it and record it as a to-verify item in the design doc, then ship
+- Do not silently enter a mode or auto-advance UI state without a visible, user-exitable indication
+- When CJK text renders as tofu boxes, route the text to a CJK-capable font; do not "fix" it by editing the copy
+- Touch only the named target of a delete/change request; do not opportunistically widen scope or adjust unrelated config
+- Reuse the game's native UI components and the codebase's established prior-art patterns (e.g. `MonsterBoardTooltip`/`MonsterPreview`/`CardPreviewBase`, `CardSetPreview`, the run-bundle upload path) instead of hand-rolling a new render/upload chain
+- On completion, follow the settled wrap-up: review your own diff, commit, merge the working branch to `master`, push, then delete branches already merged; do not commit before reviewing or when not asked
+- Keep commits scoped: when `./run.sh format`/csharpier reformats files outside your change, revert those formatter-only edits before committing
+- A long-running automation task must self-heal — auto-relaunch the game process on crash/exit and continue until the goal is met, rather than stopping on the first failure
 
 # Rules Hygiene
 
@@ -113,7 +114,7 @@ These rules are read by every agent session. Keep them high-signal.
 
 ## After any agentic session
 
-If you discover a non-obvious pattern that would help future sessions, include a **"Suggested rule additions"** heading in your PR description with the proposed text. Do **not** edit these rules inline during normal feature or fix work. Reviewers decide what gets merged.
+If you discover a non-obvious pattern that would help future sessions, include a **"Suggested rule additions"** heading in your wrap-up summary (or the commit message) with the proposed text. Do **not** edit these rules inline during normal feature or fix work. The user decides what gets added.
 
 ## High bar for new rules
 
