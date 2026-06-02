@@ -160,6 +160,8 @@ Supported `heroMode` values:
 }
 ```
 
+**`NeutralOnly` migration note (Curio):** the sole `NeutralOnly` source today is **Curio** (`Sells Bronze-tier Neutral items`). This entry is an **intentional, documented behavior change** from the pre-migration `description` switch. The old resolver ANDed the active UI-hero filter on top of the neutral match, so selecting Curio while a concrete hero was selected returned an **empty** pool. The new resolver follows the `NeutralOnly` definition above — it ignores the selected UI hero and returns `Common` / neutral cards regardless of which hero (or none) is selected. This is a deliberate bug-fix, not silent drift: it is the one entry where the equivalence claim below does not hold (see Catalog Validation), and it is pinned by a dedicated resolver test (`NeutralOnly` selected-hero invariance).
+
 `startingTier` modes:
 
 - `AtMost`: candidate `StartingTier` rank is less than or equal to the configured tier.
@@ -221,7 +223,7 @@ Runtime classes/enums:
 
 With a source selected, the normal hero filter should not crop the result a second time (the engine receives `ApplyHeroFilter = false`). The source rule owns hero semantics through `heroMode`. The resolver still receives the currently selected concrete hero on its **own** input (as today via `ResolveSelectedHeroFilters` → the resolver's hero argument, `CollectionPanel.cs:663`); this is separate from `CollectionFilterContext`, which only governs the post-resolution engine pass and carries no hero.
 
-`availableHeroes` (chip visibility) and `heroMode` (offered-card scope) are independent by design and can legitimately differ — e.g. an `AllHeroes`-rule source whose chip is shown only to some heroes. The pool only runs when a chip is selectable, and a chip is only selectable when visible, so this is not a user-facing contradiction; but catalog validation should assert the intended relationship so a future edit cannot make them silently incoherent (see Catalog Validation).
+`availableHeroes` (chip visibility) and `heroMode` (offered-card scope) are independent by design and can legitimately differ. Concretely in the live catalog: a `FixedHero` merchant's chip is **shown to other heroes** (its fixed `hero` is deliberately **absent** from `availableHeroes`), and some `AllHeroes`-rule sources carry a non-empty `availableHeroes`. The pool only runs when a chip is selectable, and a chip is only selectable when visible, so this is not a user-facing contradiction. Because the two are genuinely independent, catalog validation deliberately does **not** assert a relationship between them (see Catalog Validation).
 
 When the active tab or the selected hero changes such that the selected source no longer applies, the selected source must be cleared / re-validated. The existing clear-on-mismatch logic (`CollectionPanel.cs:826-841`) must be preserved through the refactor.
 
@@ -268,13 +270,14 @@ Validation has two tiers with different migration-step dependencies.
 - `kind` and `heroMode` enum values are valid; rule arrays contain valid enum values.
 - `FixedHero` always has a valid `hero`; `NeutralOnly` does not also specify `hero`.
 - Every `startingTier` has a valid `mode` and `tier`.
-- For `AllHeroes` / `NeutralOnly` / `FixedHero` sources, assert the intended chip/pool relationship (e.g. an `AllHeroes`-rule source should have `availableHeroes = []` unless documented; `FixedHero`'s hero should appear in `availableHeroes`), so `availableHeroes` and `heroMode` cannot silently disagree.
+- `availableHeroes` (chip visibility) and `heroMode` (offer-pool hero gate) are **independent by design** — do **not** assert a coherence relationship between them (see Source Filtering Flow). In the live catalog a `FixedHero` merchant's chip is **intentionally shown to other heroes**, so its fixed `hero` is deliberately **absent** from `availableHeroes`; and some `AllHeroes`-rule sources legitimately carry a non-empty `availableHeroes` for chip-visibility reasons. An earlier draft suggested asserting "`FixedHero`'s hero should appear in `availableHeroes`" — that is **backwards** for the live data and would false-reject real entries, so it is intentionally not validated.
 
 **Resolver-coverage validation** — gated on the new resolver (Migration step 5+):
 
 - Every current catalog entry resolves to `Ready` (never `Unavailable`) against a representative card catalog.
 - The "representative card catalog" must be a fixture that, per rule shape, contains at least one matching and one non-matching card; assert the resolved whitelist is non-empty and excludes the non-match. (A resolver can return `Ready` with an *empty* whitelist if the fixture happens to contain no matching card, so `!= Unavailable` alone is too weak.)
-- One-time equivalence check: for every current entry, the new structured `offerRule` produces the same template-id whitelist as today's `description` switch — so the migration does not silently change filter results.
+- One-time equivalence check: for every current entry, the new structured `offerRule` produces the same template-id whitelist as today's `description` switch — so the migration does not silently change filter results. **Known, documented exception:** the sole `NeutralOnly` source (**Curio**) intentionally diverges — with a concrete hero selected the old switch returned an empty pool, the new resolver returns `Common` / neutral cards (see the `NeutralOnly` migration note). It is the only entry whose output changed, and it is a deliberate bug-fix pinned by a resolver test rather than a silent change.
+- **Status (post-implementation):** this equivalence check was never committed as an executable test, and the old `description` switch was deleted in the same change, so it can no longer be run as designed. A post-implementation review replayed all 70 entries and found **Curio** to be the only behavioral divergence; treat the migration as equivalence-verified-by-review with that one documented exception, not by an automated test.
 
 This validation guarantees internal consistency of the entries that are **present**; it does not prove completeness against game content. Detecting a merchant/trainer that exists in-game but is absent from the catalog would require an independent encounter roster to diff against (e.g. an extractor-produced index checked into `Data/`, regenerated per game version). If that completeness guarantee is wanted, specify the oracle explicitly; otherwise "an unexpressed merchant/trainer fails loudly" means a *present* entry whose rule the resolver cannot express (a malformed `offerRule`), which the resolver-coverage test catches.
 

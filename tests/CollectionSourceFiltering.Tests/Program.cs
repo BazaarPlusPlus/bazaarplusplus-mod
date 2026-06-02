@@ -435,6 +435,53 @@ AssertSet(
     "NeutralOnly rules should require Common cards and still enforce starting tier."
 );
 
+// NeutralOnly ignores the selected UI hero entirely: it returns Common/neutral cards
+// regardless of which concrete hero (or none) is selected. This is an INTENTIONAL,
+// documented divergence from the pre-migration description switch, which ANDed the UI
+// hero filter and returned an empty pool when a concrete hero was selected (the sole
+// NeutralOnly source, Curio). See the design doc "NeutralOnly migration note (Curio)".
+var neutralHeroEntry = BuildSingleEntry(
+    "Neutral Hero Invariance",
+    CollectionSourceKind.Merchant,
+    """{ "heroMode": "NeutralOnly" }"""
+);
+var neutralCommonCard = CatalogCard(
+    Guid.Parse("d0000000-0000-0000-0000-000000000001"),
+    ECardType.Item,
+    [EHero.Common]
+);
+var neutralVanessaCard = CatalogCard(
+    Guid.Parse("d0000000-0000-0000-0000-000000000002"),
+    ECardType.Item,
+    [EHero.Vanessa]
+);
+var neutralHeroCards = new[] { neutralCommonCard, neutralVanessaCard };
+var neutralWithVanessa = CollectionSourceOfferPoolResolver
+    .Resolve(neutralHeroEntry, EHero.Vanessa, neutralHeroCards)
+    .OfferedCardIds;
+AssertSet(
+    neutralWithVanessa,
+    new[] { neutralCommonCard.Id },
+    "NeutralOnly must return only Common cards and exclude the selected concrete hero's card "
+        + "(intentional divergence from the old description switch, which returned empty)."
+);
+var neutralWithNoHero = CollectionSourceOfferPoolResolver
+    .Resolve(neutralHeroEntry, selectedHero: null, neutralHeroCards)
+    .OfferedCardIds;
+AssertSet(
+    neutralWithNoHero,
+    neutralWithVanessa.ToArray(),
+    "NeutralOnly output must be invariant to the selected UI hero (no concrete hero vs Vanessa)."
+);
+var neutralWithOtherHero = CollectionSourceOfferPoolResolver
+    .Resolve(neutralHeroEntry, EHero.Dooley, neutralHeroCards)
+    .OfferedCardIds;
+AssertSet(
+    neutralWithOtherHero,
+    neutralWithVanessa.ToArray(),
+    "NeutralOnly output must be invariant to the selected UI hero (Dooley vs Vanessa)."
+);
+
 var exactTierEntry = BuildSingleEntry(
     "Exact Gold",
     CollectionSourceKind.Merchant,
