@@ -31,7 +31,7 @@ internal sealed class CollectionFilterState
     public string Search { get; set; } = string.Empty;
 
     public bool HasActiveFilters =>
-        Heroes.Count > 0
+        Heroes.Count > 1
         || Tiers.Count > 0
         || Tags.Count > 0
         || Sizes.Count > 0
@@ -63,8 +63,7 @@ internal sealed class CollectionFilterState
             throw new System.ArgumentNullException(nameof(selection));
 
         Heroes.Clear();
-        if (selection.SelectedHero.HasValue)
-            Heroes.Add(selection.SelectedHero.Value);
+        Heroes.Add(selection.SelectedHero ?? CollectionPanelSelectionState.DefaultHero);
 
         Merchants.Clear();
         if (selection.SelectedSourceKind == CollectionSourceKind.Trainer)
@@ -96,10 +95,7 @@ internal sealed class CollectionFilterState
     public void ToggleHero(EHero hero)
     {
         if (Heroes.Count == 1 && Heroes.Contains(hero))
-        {
-            Heroes.Clear();
             return;
-        }
 
         Heroes.Clear();
         Heroes.Add(hero);
@@ -176,8 +172,10 @@ internal sealed class CollectionFilterState
 
     public void Reset()
     {
+        var selectedHero = SelectedHero ?? CollectionPanelSelectionState.DefaultHero;
         ActiveType = ECardType.Item;
         Heroes.Clear();
+        Heroes.Add(selectedHero);
         Tiers.Clear();
         Tags.Clear();
         Sizes.Clear();

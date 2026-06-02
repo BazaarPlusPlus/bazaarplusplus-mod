@@ -10,6 +10,11 @@ AssertFalse(
 defaultState.Search = "wand";
 AssertTrue(defaultState.HasActiveFilters, "Search text should make filters resettable.");
 defaultState.Reset();
+AssertValues(
+    defaultState.Heroes.ToArray(),
+    new[] { EHero.Vanessa },
+    "Reset should restore a fallback hero when no hero was selected."
+);
 defaultState.SelectedMerchantSourceKey = "merchant:aila";
 AssertTrue(
     defaultState.HasActiveFilters,
@@ -56,14 +61,25 @@ AssertEqual(
 heroState.ToggleHero(EHero.Common);
 AssertValues(
     heroState.Heroes.ToArray(),
-    Array.Empty<EHero>(),
-    "Toggling off Common should clear the hero filter."
+    new[] { EHero.Common },
+    "Toggling the only selected hero should keep that hero selected."
 );
 heroState.ToggleHero(EHero.Dooley);
 AssertValues(
     heroState.Heroes.ToArray(),
     new[] { EHero.Dooley },
     "Selecting a concrete hero after Common should still select only that hero."
+);
+heroState.IncludePackages = true;
+heroState.Reset();
+AssertValues(
+    heroState.Heroes.ToArray(),
+    new[] { EHero.Dooley },
+    "Reset should preserve the current selected hero because the hero row cannot be empty."
+);
+AssertFalse(
+    heroState.HasActiveFilters,
+    "A single mandatory hero selection should not keep the reset action enabled by itself."
 );
 var ambiguousHeroState = new CollectionFilterState();
 ambiguousHeroState.Heroes.Add(EHero.Common);
