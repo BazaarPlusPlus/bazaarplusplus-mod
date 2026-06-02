@@ -20,7 +20,25 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // itself is torn down (scene change or panel mount unmounts).
 internal sealed class CollectionCardMaterialCache
 {
+    private const int DefaultCapacity = 256;
+
     private readonly Dictionary<string, Material> _materials = new();
+    private readonly CollectionCardMaterialLru _lru;
+
+    public CollectionCardMaterialCache(int capacity = DefaultCapacity)
+    {
+        _lru = new CollectionCardMaterialLru(capacity);
+    }
+
+    public void Acquire(string artKey)
+    {
+        DestroyEvicted(_lru.Acquire(artKey));
+    }
+
+    public void Release(string artKey)
+    {
+        _lru.Release(artKey);
+    }
 
     public Material? GetOrCreate(string artKey, CardAssetDataSO assetData, Shader? shaderOverride)
     {
@@ -68,5 +86,28 @@ internal sealed class CollectionCardMaterialCache
             }
         }
         _materials.Clear();
+        _lru.Clear();
+    }
+
+    private void DestroyEvicted(IReadOnlyList<string> evictedKeys)
+    {
+        foreach (var artKey in evictedKeys)
+        {
+            if (!_materials.TryGetValue(artKey, out var material))
+                continue;
+            _materials.Remove(artKey);
+            try
+            {
+                if (material != null)
+                    Object.Destroy(material);
+            }
+            catch (System.Exception ex)
+            {
+                BppLog.Debug(
+                    "CollectionCardMaterialCache",
+                    $"Evict Destroy failed for artKey='{artKey}': {ex.Message}"
+                );
+            }
+        }
     }
 }

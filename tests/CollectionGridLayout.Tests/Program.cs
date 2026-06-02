@@ -134,6 +134,56 @@ AssertApprox(
     "Item and Skill grids should share the same horizontal origin in the preview area."
 );
 
+// --- Material cache LRU: evicts only unreferenced materials and stays bounded when possible ---
+var materialLru = new CollectionCardMaterialLru(capacity: 2);
+AssertValues(
+    materialLru.Acquire("a"),
+    Array.Empty<string>(),
+    "First material acquire should not evict."
+);
+materialLru.Release("a");
+materialLru.Acquire("b");
+materialLru.Release("b");
+AssertValues(
+    materialLru.Acquire("c"),
+    new[] { "a" },
+    "LRU should evict the oldest unreferenced material when capacity is exceeded."
+);
+AssertFalse(materialLru.Contains("a"), "Evicted material key should leave the LRU.");
+AssertTrue(materialLru.Contains("b"), "Newer unreferenced material should stay resident.");
+AssertTrue(materialLru.Contains("c"), "Newest material should stay resident.");
+
+var referencedLru = new CollectionCardMaterialLru(capacity: 2);
+referencedLru.Acquire("active-a");
+referencedLru.Acquire("idle-b");
+referencedLru.Release("idle-b");
+AssertValues(
+    referencedLru.Acquire("active-c"),
+    new[] { "idle-b" },
+    "LRU should skip referenced entries and evict an idle entry instead."
+);
+AssertTrue(referencedLru.Contains("active-a"), "Referenced oldest material should not be evicted.");
+AssertTrue(referencedLru.Contains("active-c"), "New referenced material should remain tracked.");
+
+var allReferencedLru = new CollectionCardMaterialLru(capacity: 1);
+allReferencedLru.Acquire("active-a");
+AssertValues(
+    allReferencedLru.Acquire("active-b"),
+    Array.Empty<string>(),
+    "LRU should temporarily exceed capacity rather than evict a referenced material."
+);
+AssertEqual(
+    2,
+    allReferencedLru.Count,
+    "All-referenced material cache should report the temporary over-capacity state."
+);
+allReferencedLru.Release("active-a");
+AssertValues(
+    allReferencedLru.Acquire("active-c"),
+    new[] { "active-a" },
+    "Once an old material is released, a later acquire should evict it."
+);
+
 // --- Degenerate: empty visible set ---
 var empty = CollectionGridLayout.Build(System.Array.Empty<CollectionCardVm>(), ECardType.Item);
 AssertEqual(0, empty.Count, "Empty layout has no cells.");
@@ -200,6 +250,29 @@ static void AssertApprox(float expected, float actual, string message)
 {
     if (!Approx(expected, actual))
         throw new InvalidOperationException($"{message} Expected: {expected}, Actual: {actual}");
+}
+
+static void AssertTrue(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}
+
+static void AssertFalse(bool condition, string message) => AssertTrue(!condition, message);
+
+static void AssertValues<T>(IReadOnlyList<T> actual, IReadOnlyList<T> expected, string message)
+{
+    if (actual.Count != expected.Count)
+        throw new InvalidOperationException(
+            $"{message} Expected {expected.Count} values, got {actual.Count}."
+        );
+    for (var i = 0; i < actual.Count; i++)
+    {
+        if (!EqualityComparer<T>.Default.Equals(actual[i], expected[i]))
+            throw new InvalidOperationException(
+                $"{message} At {i}: expected {expected[i]}, got {actual[i]}."
+            );
+    }
 }
 
 static bool Approx(float a, float b) => System.Math.Abs(a - b) < 0.001f;

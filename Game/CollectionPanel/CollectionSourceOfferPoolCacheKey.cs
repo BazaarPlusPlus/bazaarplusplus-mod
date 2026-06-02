@@ -3,18 +3,18 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.CollectionPanel.Encounters;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
 internal static class CollectionSourceOfferPoolCacheKey
 {
-    public static string Build(MerchantTrainerEntry source, IReadOnlyList<EHero> heroFilters) =>
+    public static string Build(CollectionSourceEntry source, EHero? selectedHero) =>
         string.Join(
             "|",
             source.SourceKey,
-            BuildTemplateIdsFingerprint(source.TemplateIds),
-            BuildHeroKey(heroFilters)
+            BuildTemplateIdsFingerprint(source.SourceTemplateIds),
+            BuildHeroKey(selectedHero)
         );
 
     private static string BuildTemplateIdsFingerprint(IReadOnlyList<Guid> templateIds) =>
@@ -23,16 +23,10 @@ internal static class CollectionSourceOfferPoolCacheKey
             templateIds.OrderBy(id => id).Select(id => id.ToString("N").Substring(0, 12))
         );
 
-    private static string BuildHeroKey(IReadOnlyList<EHero> heroFilters)
+    private static string BuildHeroKey(EHero? selectedHero)
     {
-        if (heroFilters.Count == 0)
-            return "no-hero-filter";
-
-        return string.Join(
-            ",",
-            heroFilters
-                .Select(hero => hero.ToString())
-                .OrderBy(value => value, StringComparer.Ordinal)
-        );
+        if (!selectedHero.HasValue || selectedHero.Value == EHero.Common)
+            return "no-selected-hero";
+        return selectedHero.Value.ToString();
     }
 }

@@ -29,6 +29,14 @@
       Link="CollectionFilterEngine.cs"
     />
     <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionFilterContext.cs"
+      Link="CollectionFilterContext.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionCardFacetRanks.cs"
+      Link="CollectionCardFacetRanks.cs"
+    />
+    <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionFilterState.cs"
       Link="CollectionFilterState.cs"
     />
@@ -39,6 +47,10 @@
     <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionCardClassifier.cs"
       Link="CollectionCardClassifier.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionCardClassification.cs"
+      Link="CollectionCardClassification.cs"
     />
     <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionMerchantKind.cs"

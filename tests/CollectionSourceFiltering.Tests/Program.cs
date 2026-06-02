@@ -1,66 +1,70 @@
-using BazaarBattleService;
-using BazaarBattleService.Models;
-using BazaarGameShared.Domain.Cards;
-using BazaarGameShared.Domain.Cards.Encounter.Event;
-using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarGameShared.Domain.Runs;
-using BazaarGameShared.Domain.Spawning.SpawnFilters;
-using BazaarGameShared.Domain.Spawning.SpawnFilters.Constraints;
-using BazaarGameShared.Domain.Spawning.SpawnGroups;
-using BazaarGameShared.Domain.Spawning.SpawningContexts;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Encounters;
-using BazaarPlusPlus.GameInterop.EncounterOffers;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 var ailaId1 = Guid.Parse("11111111-1111-1111-1111-111111111111");
 var ailaId2 = Guid.Parse("22222222-2222-2222-2222-222222222222");
 var globalMerchantId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 var pygTrainerId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+var collisionId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
-var entries = MerchantTrainerCatalog.Build(
+var entries = CollectionSourceCatalog.Build(
     $$"""
     {
+      "schemaVersion": 2,
       "entries": [
         {
           "name": "Aila",
           "kind": "Merchant",
-          "tier": "Silver",
-          "heroes": ["Vanessa"],
+          "availableHeroes": ["Vanessa"],
           "description": "Sells Crit items",
-          "templateIds": ["{{ailaId1}}", "{{ailaId2}}"]
+          "portraitTemplateId": "{{ailaId1}}",
+          "sourceTemplateIds": ["{{ailaId1}}", "{{ailaId2}}"],
+          "offerRule": { "heroMode": "SelectedHero", "hiddenTagsAny": ["Crit", "CritReference"] }
         },
         {
           "name": "Aila",
           "kind": "Merchant",
-          "tier": "Silver",
-          "heroes": ["Dooley"],
+          "availableHeroes": ["Dooley"],
           "description": "Sells Crit items",
-          "templateIds": ["55555555-5555-5555-5555-555555555555"]
+          "portraitTemplateId": "{{collisionId}}",
+          "sourceTemplateIds": ["{{collisionId}}"],
+          "offerRule": { "heroMode": "SelectedHero", "hiddenTagsAny": ["Crit", "CritReference"] }
         },
         {
           "name": "Nufu",
           "kind": "Merchant",
-          "tier": "Gold",
-          "heroes": [],
+          "availableHeroes": [],
           "description": "Sells common items",
-          "templateIds": ["{{globalMerchantId}}"]
+          "portraitTemplateId": "{{globalMerchantId}}",
+          "sourceTemplateIds": ["{{globalMerchantId}}"],
+          "offerRule": { "heroMode": "SelectedHero" }
         },
         {
           "name": "Professor Riggs",
           "kind": "Trainer",
-          "tier": "Bronze",
-          "heroes": ["Pygmalien"],
+          "availableHeroes": ["Pygmalien"],
           "description": "Teaches skills",
-          "templateIds": ["{{pygTrainerId}}"]
+          "portraitTemplateId": "{{pygTrainerId}}",
+          "sourceTemplateIds": ["{{pygTrainerId}}"],
+          "offerRule": { "heroMode": "SelectedHero" }
+        },
+        {
+          "name": "Nufu",
+          "kind": "Merchant",
+          "availableHeroes": [],
+          "description": "Second collision entry",
+          "portraitTemplateId": "66666666-6666-6666-6666-666666666666",
+          "sourceTemplateIds": ["66666666-6666-6666-6666-666666666666"],
+          "offerRule": { "heroMode": "AllHeroes" }
         }
       ]
     }
     """
 );
 
-AssertEqual(4, entries.Count, "Catalog build should keep valid entries.");
+AssertEqual(5, entries.Count, "Catalog build should keep valid v2 entries.");
 AssertTrue(
     entries.All(entry => !string.IsNullOrWhiteSpace(entry.SourceKey)),
     "Every source entry should receive a stable source key."
@@ -70,29 +74,109 @@ AssertEqual(
     entries.Select(entry => entry.SourceKey).Distinct(StringComparer.Ordinal).Count(),
     "Source keys should be unique across current catalog identities."
 );
-AssertTrue(
-    MerchantTrainerCatalog
-        .Build(
-            File.ReadAllText(Path.Combine("Data", "Encounters", "merchant-trainer-portraits.json"))
-        )
-        .Any(entry =>
-            string.Equals(
-                entry.SourceKey,
-                CollectionPanelSelectionState.DefaultMerchantSourceKey,
-                StringComparison.Ordinal
-            )
-        ),
-    "Default selected merchant source key should exist in the current merchant catalog."
-);
-var dooleyAila = entries.Single(entry =>
-    entry.Kind == EncounterPortraitKind.Merchant
+
+var vanessaAila = entries.Single(entry =>
+    entry.Kind == CollectionSourceKind.Merchant
     && string.Equals(entry.Name, "Aila", StringComparison.Ordinal)
-    && entry.Heroes.Contains(EHero.Dooley)
+    && entry.AvailableHeroes.Contains(EHero.Vanessa)
 );
+AssertEqual(
+    "merchant:aila:vanessa",
+    vanessaAila.SourceKey,
+    "Generated source keys should drop source tier and include visible hero identity."
+);
+AssertValues(
+    vanessaAila.SourceTemplateIds.ToArray(),
+    new[] { ailaId1, ailaId2 },
+    "Source identity must preserve all source template ids for encounter lookup."
+);
+AssertEqual(
+    ailaId1,
+    vanessaAila.PortraitTemplateId,
+    "Portrait template id should be distinct but drawn from the source id set."
+);
+
+var nufuKeys = entries
+    .Where(entry => entry.Kind == CollectionSourceKind.Merchant && entry.Name == "Nufu")
+    .Select(entry => entry.SourceKey)
+    .ToArray();
+AssertEqual(2, nufuKeys.Length, "Fixture should exercise a forced source-key collision.");
+AssertTrue(
+    nufuKeys.All(key => key.StartsWith("merchant:nufu:global:", StringComparison.Ordinal)),
+    "Colliding tier-less source keys should receive a template-id fingerprint suffix."
+);
+
+AssertThrows<InvalidOperationException>(
+    () => CollectionSourceCatalog.Build("""{ "schemaVersion": 1, "entries": [] }"""),
+    "Schema v1 source catalogs should fail validation."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        CollectionSourceCatalog.Build(
+            $$"""
+            {
+              "schemaVersion": 2,
+              "entries": [
+                {
+                  "name": "Broken",
+                  "kind": "Merchant",
+                  "availableHeroes": [],
+                  "description": "Broken",
+                  "portraitTemplateId": "{{globalMerchantId}}",
+                  "sourceTemplateIds": ["{{globalMerchantId}}"],
+                  "offerRule": { "heroMode": "Bogus" }
+                }
+              ]
+            }
+            """
+        ),
+    "Unknown enum values should fail catalog validation instead of silently defaulting."
+);
+
+var currentCatalogPath = Path.Combine("Data", "CollectionSources", "collection-sources.json");
+var currentCatalogJson = File.ReadAllText(currentCatalogPath);
+var currentCatalog = CollectionSourceCatalog.Build(currentCatalogJson);
+AssertEqual(
+    70,
+    currentCatalog.Count,
+    "Current source catalog should preserve the 70 known sources."
+);
+AssertTrue(
+    currentCatalog.Any(entry =>
+        string.Equals(
+            entry.SourceKey,
+            CollectionPanelSelectionState.DefaultMerchantSourceKey,
+            StringComparison.Ordinal
+        )
+    ),
+    "Default selected merchant source key should exist in the current source catalog."
+);
+AssertEqual(
+    currentCatalog.Count,
+    currentCatalog.Select(entry => entry.SourceKey).Distinct(StringComparer.Ordinal).Count(),
+    "Current source catalog keys should be unique."
+);
+foreach (var source in currentCatalog)
+{
+    AssertTrue(source.PortraitTemplateId != Guid.Empty, $"{source.SourceKey} needs a portrait id.");
+    AssertTrue(
+        source.SourceTemplateIds.Contains(source.PortraitTemplateId),
+        $"{source.SourceKey} should include portraitTemplateId in sourceTemplateIds."
+    );
+    AssertTrue(source.SourceTemplateIds.Count > 0, $"{source.SourceKey} needs source ids.");
+    if (source.OfferRule.HeroMode == CollectionSourceHeroMode.FixedHero)
+        AssertTrue(source.OfferRule.Hero.HasValue, $"{source.SourceKey} needs a fixed hero.");
+    if (source.OfferRule.HeroMode == CollectionSourceHeroMode.NeutralOnly)
+        AssertFalse(
+            source.OfferRule.Hero.HasValue,
+            $"{source.SourceKey} neutral-only rules should not carry hero."
+        );
+}
+
 var openOutsideRun = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: false,
     currentHero: EHero.Dooley,
-    currentEncounterTemplateId: dooleyAila.TemplateIds[0],
+    currentEncounterTemplateId: vanessaAila.SourceTemplateIds[0],
     choiceSelectionTemplateIds: Array.Empty<Guid>(),
     entries
 );
@@ -101,10 +185,15 @@ AssertEqual(
     openOutsideRun,
     "Opening outside an in-game run should fall back to VAN + Ande."
 );
+var dooleyAila = entries.Single(entry =>
+    entry.Kind == CollectionSourceKind.Merchant
+    && string.Equals(entry.Name, "Aila", StringComparison.Ordinal)
+    && entry.AvailableHeroes.Contains(EHero.Dooley)
+);
 var openOnCurrentMerchant = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: true,
     currentHero: EHero.Dooley,
-    currentEncounterTemplateId: dooleyAila.TemplateIds[0],
+    currentEncounterTemplateId: dooleyAila.SourceTemplateIds[0],
     choiceSelectionTemplateIds: Array.Empty<Guid>(),
     entries
 );
@@ -112,6 +201,11 @@ AssertEqual(
     new CollectionPanelSelectionState(EHero.Dooley, dooleyAila.SourceKey),
     openOnCurrentMerchant,
     "Opening during a run should select the current concrete hero and merchant source."
+);
+var globalNufu = entries.First(entry =>
+    entry.Kind == CollectionSourceKind.Merchant
+    && string.Equals(entry.Name, "Nufu", StringComparison.Ordinal)
+    && entry.OfferRule.HeroMode == CollectionSourceHeroMode.SelectedHero
 );
 var openOnChoiceMerchant = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: true,
@@ -121,7 +215,7 @@ var openOnChoiceMerchant = CollectionPanelOpenSelectionResolver.Resolve(
     entries
 );
 AssertEqual(
-    new CollectionPanelSelectionState(EHero.Vanessa, "merchant:nufu:gold:global"),
+    new CollectionPanelSelectionState(EHero.Vanessa, globalNufu.SourceKey),
     openOnChoiceMerchant,
     "Opening on the choice screen should select the first available merchant source, ignoring trainers."
 );
@@ -143,7 +237,7 @@ AssertEqual(
 var openWithoutConcreteHero = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: true,
     currentHero: EHero.Common,
-    currentEncounterTemplateId: dooleyAila.TemplateIds[0],
+    currentEncounterTemplateId: dooleyAila.SourceTemplateIds[0],
     choiceSelectionTemplateIds: Array.Empty<Guid>(),
     entries
 );
@@ -152,15 +246,10 @@ AssertEqual(
     openWithoutConcreteHero,
     "Opening during a run without a concrete hero should fall back to VAN + Ande."
 );
-AssertValues(
-    entries[0].TemplateIds.ToArray(),
-    new[] { ailaId1, ailaId2 },
-    "Source identity must preserve all template ids for resolver union."
-);
 
-var noHeroCacheKey = CollectionSourceOfferPoolCacheKey.Build(entries[0], Array.Empty<EHero>());
+var noHeroCacheKey = CollectionSourceOfferPoolCacheKey.Build(vanessaAila, selectedHero: null);
 AssertTrue(
-    noHeroCacheKey.StartsWith(entries[0].SourceKey + "|", StringComparison.Ordinal),
+    noHeroCacheKey.StartsWith(vanessaAila.SourceKey + "|", StringComparison.Ordinal),
     "Source offer cache key should include the stable source key."
 );
 AssertTrue(
@@ -169,50 +258,35 @@ AssertTrue(
     "Source offer cache key should include a fingerprint of all source template ids."
 );
 AssertTrue(
-    noHeroCacheKey.EndsWith("|no-hero-filter", StringComparison.Ordinal),
-    "Source offer cache key should distinguish the no-hero-filter state."
+    noHeroCacheKey.EndsWith("|no-selected-hero", StringComparison.Ordinal),
+    "Source offer cache key should distinguish the no-selected-hero state."
 );
-
-var heroCacheKey = CollectionSourceOfferPoolCacheKey.Build(
-    entries[0],
-    new[] { EHero.Vanessa, EHero.Common }
-);
-var reorderedHeroCacheKey = CollectionSourceOfferPoolCacheKey.Build(
-    entries[0],
-    new[] { EHero.Common, EHero.Vanessa }
-);
-AssertEqual(
-    reorderedHeroCacheKey,
-    heroCacheKey,
-    "Source offer cache key should canonicalize hero filter order."
-);
+var heroCacheKey = CollectionSourceOfferPoolCacheKey.Build(vanessaAila, EHero.Vanessa);
 AssertFalse(
     string.Equals(noHeroCacheKey, heroCacheKey, StringComparison.Ordinal),
-    "Source offer cache key should vary by hero filter."
+    "Source offer cache key should vary by selected hero."
 );
 
-var visibleForVanessa = MerchantTrainerCatalog
-    .VisibleEntries(entries, EncounterPortraitKind.Merchant, EHero.Vanessa)
+var visibleForVanessa = CollectionSourceCatalog
+    .VisibleEntries(entries, CollectionSourceKind.Merchant, EHero.Vanessa)
     .Select(entry => entry.Name)
     .ToArray();
 AssertValues(
     visibleForVanessa,
-    new[] { "Aila", "Nufu" },
+    new[] { "Aila", "Nufu", "Nufu" },
     "Visible merchant sources should include selected hero sources plus global sources."
 );
-
-var visibleWithoutHero = MerchantTrainerCatalog
-    .VisibleEntries(entries, EncounterPortraitKind.Merchant, selectedHero: null)
+var visibleWithoutHero = CollectionSourceCatalog
+    .VisibleEntries(entries, CollectionSourceKind.Merchant, selectedHero: null)
     .Select(entry => entry.Name)
     .ToArray();
 AssertValues(
     visibleWithoutHero,
-    new[] { "Aila", "Aila", "Nufu" },
+    new[] { "Aila", "Aila", "Nufu", "Nufu" },
     "Without a concrete hero selected, merchant source selector should show all merchants."
 );
-
-var visibleTrainers = MerchantTrainerCatalog
-    .VisibleEntries(entries, EncounterPortraitKind.Trainer, EHero.Vanessa)
+var visibleTrainers = CollectionSourceCatalog
+    .VisibleEntries(entries, CollectionSourceKind.Trainer, EHero.Vanessa)
     .ToArray();
 AssertEqual(
     0,
@@ -220,396 +294,339 @@ AssertEqual(
     "Item and Skill source selectors should stay kind-specific."
 );
 
-AssertTrue(
-    EncounterOfferHeroMapper.TryToRuntime(EHero.Karnok, out var runtimeKarnok),
-    "Karnok should have an explicit runtime hero mapping."
+var selectedHeroRule = BuildSingleEntry(
+    "Selected Hero",
+    CollectionSourceKind.Merchant,
+    """{ "heroMode": "SelectedHero" }"""
 );
-AssertEqual(
-    BazaarTypes.EBazaarHero.Hero7,
-    runtimeKarnok,
-    "Karnok should map to old-runtime Hero7."
-);
-AssertTrue(
-    EncounterOfferHeroMapper.TryFromRuntime(BazaarTypes.EBazaarHero.Hero7, out var uiKarnok),
-    "Old-runtime Hero7 should map back to Karnok."
-);
-AssertEqual(EHero.Karnok, uiKarnok, "Old-runtime Hero7 should map back to Karnok.");
-AssertFalse(
-    EncounterOfferHeroMapper.TryToRuntime((EHero)999, out _),
-    "Unknown heroes should be unsupported rather than silently mapped by enum value."
-);
-
-var sourceAndUiHeroes = EncounterOfferPoolRules.ResolveRuntimeHeroFilters(
-    new[] { BazaarTypes.EBazaarHero.Vanessa, BazaarTypes.EBazaarHero.Pygmalien },
-    new[] { EHero.Common, EHero.Vanessa }
-);
-AssertEqual(
-    EncounterOfferHeroFilterStatus.Ready,
-    sourceAndUiHeroes.Status,
-    "Source hero filters should drive the offered pool when the source carries them."
-);
-AssertValues(
-    sourceAndUiHeroes.RuntimeHeroes.ToArray(),
-    new[] { BazaarTypes.EBazaarHero.Vanessa, BazaarTypes.EBazaarHero.Pygmalien },
-    "UI hero filters should not crop source-owned hero filters."
-);
-
-var emptyIntersection = EncounterOfferPoolRules.ResolveRuntimeHeroFilters(
-    new[] { BazaarTypes.EBazaarHero.Dooley },
-    new[] { EHero.Vanessa }
-);
-AssertEqual(
-    EncounterOfferHeroFilterStatus.Ready,
-    emptyIntersection.Status,
-    "A source that sells another hero's cards should still resolve for the selected run hero."
-);
-AssertValues(
-    emptyIntersection.RuntimeHeroes.ToArray(),
-    new[] { BazaarTypes.EBazaarHero.Dooley },
-    "The source-owned hero filter should be preserved even when the selected run hero differs."
-);
-
-var unsupportedHero = EncounterOfferPoolRules.ResolveRuntimeHeroFilters(
-    Array.Empty<BazaarTypes.EBazaarHero>(),
-    new[] { (EHero)999 }
-);
-AssertEqual(
-    EncounterOfferHeroFilterStatus.UnsupportedHero,
-    unsupportedHero.Status,
-    "Unsupported UI heroes should be reported instead of ignored."
-);
-
-AssertTrue(
-    EncounterOfferPoolRules.IsCandidateTierEligible(
-        BazaarCard.EItemTier.Silver,
-        new[] { BazaarCard.EItemTier.Gold }
+var selectedHeroCards = new[]
+{
+    CatalogCard(
+        Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001"),
+        ECardType.Item,
+        [EHero.Vanessa]
     ),
-    "Source ItemTierFilters should allow candidates at or below any source tier."
+    CatalogCard(Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002"), ECardType.Item, [EHero.Common]),
+    CatalogCard(Guid.Parse("aaaaaaaa-0000-0000-0000-000000000003"), ECardType.Item, [EHero.Dooley]),
+};
+var selectedHeroResult = CollectionSourceOfferPoolResolver.Resolve(
+    selectedHeroRule,
+    EHero.Vanessa,
+    selectedHeroCards
 );
-AssertFalse(
-    EncounterOfferPoolRules.IsCandidateTierEligible(
-        BazaarCard.EItemTier.Diamond,
-        new[] { BazaarCard.EItemTier.Gold }
-    ),
-    "Source ItemTierFilters should reject candidates above all source tiers."
+AssertEqual(
+    CollectionSourceOfferPoolStatus.Ready,
+    selectedHeroResult.Status,
+    "SelectedHero rules should resolve without runtime fallback."
 );
-AssertTrue(
-    EncounterOfferPoolRules.IsCandidateTierEligible(
-        BazaarCard.EItemTier.Diamond,
-        Array.Empty<BazaarCard.EItemTier>()
-    ),
-    "Missing ItemTierFilters should not crop the source pool."
+AssertSet(
+    selectedHeroResult.OfferedCardIds,
+    selectedHeroCards.Take(2).Select(card => card.Id).ToArray(),
+    "SelectedHero rules should match the selected hero plus Common cards."
+);
+var selectedHeroDisabledResult = CollectionSourceOfferPoolResolver.Resolve(
+    selectedHeroRule,
+    selectedHero: null,
+    selectedHeroCards
+);
+AssertSet(
+    selectedHeroDisabledResult.OfferedCardIds,
+    selectedHeroCards.Select(card => card.Id).ToArray(),
+    "SelectedHero rules should not crop by hero when no concrete hero is selected."
+);
+var noneSelectedResult = CollectionSourceOfferPoolResolver.Resolve(
+    source: null,
+    selectedHero: EHero.Vanessa,
+    selectedHeroCards
+);
+AssertEqual(
+    CollectionSourceOfferPoolStatus.NoneSelected,
+    noneSelectedResult.Status,
+    "Resolver should report NoneSelected when no source chip is active."
 );
 
-var staticSourceId = Guid.Parse("66666666-6666-6666-6666-666666666666");
-var staticSourceOwnedHeroId = Guid.Parse("66666666-6666-6666-6666-777777777777");
-var staticNoGroupsSourceId = Guid.Parse("66666666-6666-6666-6666-888888888888");
-var staticVanessaWeaponId = Guid.Parse("77777777-7777-7777-7777-777777777777");
-var staticDooleyWeaponId = Guid.Parse("88888888-8888-8888-8888-888888888888");
-var staticMediumItemId = Guid.Parse("99999999-9999-9999-9999-999999999999");
-var staticSkillId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-var staticSource = new TCardEncounterEvent
+var fixedHeroEntry = BuildSingleEntry(
+    "Fixed Jules",
+    CollectionSourceKind.Merchant,
+    """{ "heroMode": "FixedHero", "hero": "Jules" }"""
+);
+var fixedHeroCards = new[]
 {
-    Id = staticSourceId,
-    InternalName = "Static Aila",
-    SelectionContext = new TSelectionContext
-    {
-        SpawnContext = new TSpawnContextQuery
-        {
-            Groups =
-            [
-                new TSpawnGroup
-                {
-                    Filters =
-                    [
-                        new TSpawnFilterQuery
-                        {
-                            Constraints = new ConstraintAnd
-                            {
-                                Constraints =
-                                [
-                                    new ConstraintCardType { Types = [ECardType.Item] },
-                                    new ConstraintTag { Tags = [ECardTag.Weapon] },
-                                ],
-                            },
-                        },
-                    ],
-                },
-            ],
-        },
-    },
+    CatalogCard(Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001"), ECardType.Item, [EHero.Jules]),
+    CatalogCard(Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002"), ECardType.Item, [EHero.Dooley]),
 };
-var staticSourceOwnedHero = new TCardEncounterEvent
+var fixedHeroResult = CollectionSourceOfferPoolResolver.Resolve(
+    fixedHeroEntry,
+    EHero.Dooley,
+    fixedHeroCards
+);
+AssertSet(
+    fixedHeroResult.OfferedCardIds,
+    new[] { fixedHeroCards[0].Id },
+    "FixedHero rules should use the source hero, not the selected UI hero."
+);
+
+var allHeroEntry = BuildSingleEntry(
+    "All Crit",
+    CollectionSourceKind.Merchant,
+    """{ "heroMode": "AllHeroes", "hiddenTagsAny": ["Crit"] }"""
+);
+var allHeroCards = new[]
 {
-    Id = staticSourceOwnedHeroId,
-    InternalName = "Static Dooley Merchant",
-    SelectionContext = new TSelectionContext
-    {
-        SpawnContext = new TSpawnContextQuery
-        {
-            Groups =
-            [
-                new TSpawnGroup
-                {
-                    Filters =
-                    [
-                        new TSpawnFilterQuery
-                        {
-                            Constraints = new ConstraintAnd
-                            {
-                                Constraints =
-                                [
-                                    new ConstraintCardType { Types = [ECardType.Item] },
-                                    new ConstraintHero { Heroes = [EHero.Dooley] },
-                                ],
-                            },
-                        },
-                    ],
-                },
-            ],
-        },
-    },
-};
-var staticNoGroupsSource = new TCardEncounterEvent
-{
-    Id = staticNoGroupsSourceId,
-    InternalName = "Static Unresolved Merchant",
-    SelectionContext = new TSelectionContext { SpawnContext = new TSpawnContextQuery() },
-};
-var staticMap = new Dictionary<Guid, ITCard>
-{
-    [staticSourceId] = staticSource,
-    [staticSourceOwnedHeroId] = staticSourceOwnedHero,
-    [staticNoGroupsSourceId] = staticNoGroupsSource,
-    [staticVanessaWeaponId] = StaticItem(
-        staticVanessaWeaponId,
-        "Vanessa Weapon",
-        ETier.Bronze,
+    CatalogCard(
+        Guid.Parse("cccccccc-0000-0000-0000-000000000001"),
+        ECardType.Item,
         [EHero.Vanessa],
-        [ECardTag.Weapon]
+        hiddenTags: [EHiddenTag.Crit]
     ),
-    [staticDooleyWeaponId] = StaticItem(
-        staticDooleyWeaponId,
-        "Dooley Weapon",
-        ETier.Bronze,
+    CatalogCard(
+        Guid.Parse("cccccccc-0000-0000-0000-000000000002"),
+        ECardType.Item,
         [EHero.Dooley],
-        [ECardTag.Weapon]
+        hiddenTags: [EHiddenTag.Crit]
     ),
-    [staticMediumItemId] = StaticItem(
-        staticMediumItemId,
-        "Vanessa Medium",
-        ETier.Bronze,
-        [EHero.Vanessa],
-        [ECardTag.Tool]
-    ),
-    [staticSkillId] = StaticItem(
-        staticSkillId,
-        "Vanessa Skill",
-        ETier.Bronze,
-        [EHero.Vanessa],
-        [ECardTag.Weapon],
-        type: ECardType.Skill
-    ),
+    CatalogCard(Guid.Parse("cccccccc-0000-0000-0000-000000000003"), ECardType.Item, [EHero.Dooley]),
 };
-var staticPool = EncounterOfferStaticPoolResolver.ResolveOfferedTemplateIds(
-    [staticSourceId],
-    [EHero.Vanessa],
-    staticMap
+var allHeroResult = CollectionSourceOfferPoolResolver.Resolve(
+    allHeroEntry,
+    EHero.Vanessa,
+    allHeroCards
 );
-AssertEqual(
-    EncounterOfferPoolStatus.Ready,
-    staticPool.Status,
-    "Static source pool resolver should be usable when GameServiceManager is unavailable."
-);
-AssertValues(
-    staticPool.TemplateIds.OrderBy(id => id).ToArray(),
-    [staticVanessaWeaponId],
-    "Static source pool should apply source constraints and UI hero filters."
-);
-var staticSourceOwnedHeroPool = EncounterOfferStaticPoolResolver.ResolveOfferedTemplateIds(
-    [staticSourceOwnedHeroId],
-    [EHero.Vanessa],
-    staticMap
-);
-AssertEqual(
-    EncounterOfferPoolStatus.Ready,
-    staticSourceOwnedHeroPool.Status,
-    "Static source pool resolver should support source-owned hero constraints."
-);
-AssertValues(
-    staticSourceOwnedHeroPool.TemplateIds.OrderBy(id => id).ToArray(),
-    [staticDooleyWeaponId],
-    "Static source-owned hero constraints should not be cropped by the selected run hero."
-);
-var staticNoGroupsPool = EncounterOfferStaticPoolResolver.ResolveOfferedTemplateIds(
-    [staticNoGroupsSourceId],
-    [EHero.Vanessa],
-    staticMap
-);
-AssertEqual(
-    EncounterOfferPoolStatus.Unavailable,
-    staticNoGroupsPool.Status,
-    "Static sources without evaluable groups should not masquerade as an empty ready pool."
+AssertSet(
+    allHeroResult.OfferedCardIds,
+    allHeroCards.Take(2).Select(card => card.Id).ToArray(),
+    "AllHeroes rules should ignore the selected UI hero and still apply other predicates."
 );
 
-var julesSourceId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
-var julesItemId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
-var dooleyItemId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
-var vanessaCritId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
-var dooleyCritId = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
-var dooleyNonCritId = Guid.Parse("11111111-2222-3333-4444-555555555555");
-var sourceRuleCards = new[]
+var neutralEntry = BuildSingleEntry(
+    "Neutral Bronze",
+    CollectionSourceKind.Merchant,
+    """{ "heroMode": "NeutralOnly", "startingTier": { "mode": "AtMost", "tier": "Bronze" } }"""
+);
+var neutralCards = new[]
 {
-    CatalogCard(julesItemId, ECardType.Item, [EHero.Jules]),
-    CatalogCard(dooleyItemId, ECardType.Item, [EHero.Dooley]),
-    CatalogCard(vanessaCritId, ECardType.Item, [EHero.Vanessa], hiddenTags: [EHiddenTag.Crit]),
-    CatalogCard(dooleyCritId, ECardType.Item, [EHero.Dooley], hiddenTags: [EHiddenTag.Crit]),
-    CatalogCard(dooleyNonCritId, ECardType.Item, [EHero.Dooley]),
+    CatalogCard(
+        Guid.Parse("dddddddd-0000-0000-0000-000000000001"),
+        ECardType.Item,
+        [EHero.Common],
+        tier: ETier.Bronze
+    ),
+    CatalogCard(
+        Guid.Parse("dddddddd-0000-0000-0000-000000000002"),
+        ECardType.Item,
+        [EHero.Common],
+        tier: ETier.Silver
+    ),
+    CatalogCard(
+        Guid.Parse("dddddddd-0000-0000-0000-000000000003"),
+        ECardType.Item,
+        [EHero.Vanessa],
+        tier: ETier.Bronze
+    ),
 };
-var julesSourcePool = CollectionSourceRuleOfferPoolResolver.Resolve(
-    new MerchantTrainerEntry(
-        "merchant:jules",
-        "Jules",
-        EncounterPortraitKind.Merchant,
-        "Diamond",
-        [EHero.Dooley],
-        "Sells items from this Hero",
-        [julesSourceId]
-    ),
-    [EHero.Dooley],
-    sourceRuleCards
+var neutralResult = CollectionSourceOfferPoolResolver.Resolve(
+    neutralEntry,
+    EHero.Vanessa,
+    neutralCards
 );
-AssertEqual(
-    EncounterOfferPoolStatus.Ready,
-    julesSourcePool.Status,
-    "Curated source rules should resolve without GameServiceManager."
+AssertSet(
+    neutralResult.OfferedCardIds,
+    new[] { neutralCards[0].Id },
+    "NeutralOnly rules should require Common cards and still enforce starting tier."
 );
-AssertValues(
-    julesSourcePool.TemplateIds.ToArray(),
-    [julesItemId],
-    "Hero merchants should sell the source hero's items, not the selected run hero's items."
+
+var exactTierEntry = BuildSingleEntry(
+    "Exact Gold",
+    CollectionSourceKind.Merchant,
+    """{ "heroMode": "AllHeroes", "startingTier": { "mode": "Exact", "tier": "Gold" } }"""
 );
-var anyHeroCritPool = CollectionSourceRuleOfferPoolResolver.Resolve(
-    new MerchantTrainerEntry(
-        "merchant:aimbot",
-        "Aimbot",
-        EncounterPortraitKind.Merchant,
-        "Silver",
-        [EHero.Dooley, EHero.Vanessa],
-        "Sells Crit items from any Hero",
-        [julesSourceId]
-    ),
-    [EHero.Vanessa],
-    sourceRuleCards
-);
-AssertEqual(
-    EncounterOfferPoolStatus.Ready,
-    anyHeroCritPool.Status,
-    "Any-hero source rules should resolve without GameServiceManager."
-);
-AssertValues(
-    anyHeroCritPool.TemplateIds.OrderBy(id => id).ToArray(),
-    new[] { dooleyCritId, vanessaCritId }.OrderBy(id => id).ToArray(),
-    "Any-hero source rules should not be cropped by the selected run hero."
-);
-var currentCatalogJson = File.ReadAllText(
-    Path.Combine("Data", "Encounters", "merchant-trainer-portraits.json")
-);
-foreach (var sourceEntry in MerchantTrainerCatalog.Build(currentCatalogJson))
+var exactTierCards = new[]
 {
-    var probePool = CollectionSourceRuleOfferPoolResolver.Resolve(
+    CatalogCard(
+        Guid.Parse("eeeeeeee-0000-0000-0000-000000000001"),
+        ECardType.Item,
+        [EHero.Common],
+        tier: ETier.Silver
+    ),
+    CatalogCard(
+        Guid.Parse("eeeeeeee-0000-0000-0000-000000000002"),
+        ECardType.Item,
+        [EHero.Common],
+        tier: ETier.Gold
+    ),
+};
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(exactTierEntry, EHero.Vanessa, exactTierCards)
+        .OfferedCardIds,
+    new[] { exactTierCards[1].Id },
+    "Exact starting-tier rules should not behave like AtMost."
+);
+
+var complexEntry = BuildSingleEntry(
+    "Complex",
+    CollectionSourceKind.Merchant,
+    """
+    {
+      "heroMode": "AllHeroes",
+      "sizesAny": ["Small"],
+      "tagsAny": ["Tool"],
+      "tagsNone": ["Weapon"],
+      "hiddenTagsAny": ["Burn"],
+      "enchantableOnly": true
+    }
+    """
+);
+var complexCards = new[]
+{
+    CatalogCard(
+        Guid.Parse("ffffffff-0000-0000-0000-000000000001"),
+        ECardType.Item,
+        [EHero.Common],
+        tags: [ECardTag.Tool],
+        hiddenTags: [EHiddenTag.Burn],
+        size: ECardSize.Small,
+        isEnchantable: true
+    ),
+    CatalogCard(
+        Guid.Parse("ffffffff-0000-0000-0000-000000000002"),
+        ECardType.Item,
+        [EHero.Common],
+        tags: [ECardTag.Tool, ECardTag.Weapon],
+        hiddenTags: [EHiddenTag.Burn],
+        size: ECardSize.Small,
+        isEnchantable: true
+    ),
+    CatalogCard(
+        Guid.Parse("ffffffff-0000-0000-0000-000000000003"),
+        ECardType.Item,
+        [EHero.Common],
+        tags: [ECardTag.Tool],
+        hiddenTags: [EHiddenTag.Burn],
+        size: ECardSize.Medium,
+        isEnchantable: true
+    ),
+};
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(complexEntry, EHero.Vanessa, complexCards)
+        .OfferedCardIds,
+    new[] { complexCards[0].Id },
+    "Structured rules should AND size, tag include/exclude, hidden tag, and enchantable predicates."
+);
+
+foreach (var sourceEntry in currentCatalog)
+{
+    var selectedHero = RepresentativeSelectedHero(sourceEntry);
+    var match = MatchingCard(sourceEntry, selectedHero, GuidFromIndex(sourceEntry.SourceKey, 1));
+    var nonMatch = MatchingCard(
         sourceEntry,
-        Array.Empty<EHero>(),
-        sourceRuleCards
+        selectedHero,
+        GuidFromIndex(sourceEntry.SourceKey, 2),
+        sourceEntry.Kind == CollectionSourceKind.Merchant ? ECardType.Skill : ECardType.Item
+    );
+    var probePool = CollectionSourceOfferPoolResolver.Resolve(
+        sourceEntry,
+        selectedHero,
+        new[] { match, nonMatch }
+    );
+    AssertEqual(
+        CollectionSourceOfferPoolStatus.Ready,
+        probePool.Status,
+        $"Current source catalog entry should resolve as Ready: {sourceEntry.SourceKey}."
     );
     AssertTrue(
-        probePool.Status != EncounterOfferPoolStatus.Unavailable,
-        $"Current source catalog entry should have a static rule: {sourceEntry.SourceKey}."
+        probePool.OfferedCardIds.Contains(match.Id),
+        $"Representative match should be included for {sourceEntry.SourceKey}."
+    );
+    AssertFalse(
+        probePool.OfferedCardIds.Contains(nonMatch.Id),
+        $"Representative non-match should be excluded for {sourceEntry.SourceKey}."
     );
 }
-
-var retry = new CollectionSourcePoolRetryState();
-var firstSchedule = retry.Schedule("source-a", now: 10f, retrySeconds: 0.25f, maxAttempts: 2);
-AssertFalse(firstSchedule.IsExhausted, "First loading retry should schedule a retry.");
-AssertFalse(retry.TryConsumeDueRetry(10.20f), "Retry should not fire before its due time.");
-AssertTrue(retry.TryConsumeDueRetry(10.25f), "Retry should fire at its due time.");
-AssertEqual(1, retry.Attempts, "Due retry should increment the attempt count.");
-AssertTrue(float.IsNaN(retry.NextRetryAt), "Consumed retry should clear the pending due time.");
-
-var secondSchedule = retry.Schedule("source-a", now: 10.25f, retrySeconds: 0.25f, maxAttempts: 2);
-AssertFalse(secondSchedule.IsExhausted, "Retry below max attempts should reschedule.");
-AssertTrue(retry.TryConsumeDueRetry(10.50f), "Second retry should fire.");
-AssertEqual(2, retry.Attempts, "Second due retry should reach the max attempt count.");
-
-var exhausted = retry.Schedule("source-a", now: 10.50f, retrySeconds: 0.25f, maxAttempts: 2);
-AssertTrue(exhausted.IsExhausted, "Retry should report exhaustion at max attempts.");
-AssertTrue(exhausted.ShouldLogWarning, "First exhaustion should request one warning log.");
-var exhaustedAgain = retry.Schedule("source-a", now: 10.75f, retrySeconds: 0.25f, maxAttempts: 2);
-AssertTrue(exhaustedAgain.IsExhausted, "Same exhausted key should stay exhausted.");
-AssertFalse(
-    exhaustedAgain.ShouldLogWarning,
-    "Repeated exhaustion for the same key should not request another warning log."
-);
-
-var changedKey = retry.Schedule("source-b", now: 11f, retrySeconds: 0.25f, maxAttempts: 2);
-AssertFalse(changedKey.IsExhausted, "Changing retry key should reset exhaustion state.");
-AssertEqual(0, retry.Attempts, "Changing retry key should reset attempt count.");
-AssertEqual("source-b", retry.PendingKey, "Changing retry key should update the pending key.");
-retry.Reset();
-AssertEqual(null, retry.PendingKey, "Reset should clear retry key.");
-AssertEqual(0, retry.Attempts, "Reset should clear retry attempts.");
-AssertTrue(float.IsNaN(retry.NextRetryAt), "Reset should clear scheduled retry time.");
 
 Console.WriteLine("Collection source filtering checks passed.");
 
-static void AssertValues<T>(IReadOnlyList<T> actual, IReadOnlyList<T> expected, string message)
-{
-    if (actual.Count != expected.Count)
-        throw new InvalidOperationException(
-            $"{message} Expected {expected.Count} values, got {actual.Count}."
-        );
-    for (var i = 0; i < actual.Count; i++)
-    {
-        if (!EqualityComparer<T>.Default.Equals(actual[i], expected[i]))
-            throw new InvalidOperationException(
-                $"{message} At {i}: expected {expected[i]}, got {actual[i]}."
-            );
-    }
-}
-
-static void AssertEqual<T>(T expected, T actual, string message)
-{
-    if (!EqualityComparer<T>.Default.Equals(expected, actual))
-        throw new InvalidOperationException($"{message} Expected {expected}, got {actual}.");
-}
-
-static void AssertTrue(bool condition, string message)
-{
-    if (!condition)
-        throw new InvalidOperationException(message);
-}
-
-static void AssertFalse(bool condition, string message) => AssertTrue(!condition, message);
-
-static TCardItem StaticItem(
-    Guid id,
+static CollectionSourceEntry BuildSingleEntry(
     string name,
-    ETier tier,
-    IEnumerable<EHero> heroes,
-    IEnumerable<ECardTag> tags,
-    ECardType type = ECardType.Item
-) =>
-    new()
+    CollectionSourceKind kind,
+    string offerRuleJson
+)
+{
+    var id = GuidFromIndex(name, 7);
+    return CollectionSourceCatalog
+        .Build(
+            $$"""
+            {
+              "schemaVersion": 2,
+              "entries": [
+                {
+                  "name": "{{name}}",
+                  "kind": "{{kind}}",
+                  "availableHeroes": [],
+                  "description": "{{name}} fixture",
+                  "portraitTemplateId": "{{id}}",
+                  "sourceTemplateIds": ["{{id}}"],
+                  "offerRule": {{offerRuleJson}}
+                }
+              ]
+            }
+            """
+        )
+        .Single();
+}
+
+static EHero? RepresentativeSelectedHero(CollectionSourceEntry entry)
+{
+    if (entry.OfferRule.HeroMode != CollectionSourceHeroMode.SelectedHero)
+        return EHero.Vanessa;
+    if (entry.AvailableHeroes.Count > 0)
+        return entry.AvailableHeroes[0];
+    return EHero.Vanessa;
+}
+
+static CollectionCardVm MatchingCard(
+    CollectionSourceEntry entry,
+    EHero? selectedHero,
+    Guid id,
+    ECardType? cardType = null
+)
+{
+    var rule = entry.OfferRule;
+    var tags = rule.TagsAny.Count > 0 ? new[] { rule.TagsAny[0] } : Array.Empty<ECardTag>();
+    if (rule.TagsNone.Contains(ECardTag.Tool) && tags.Length == 0)
+        tags = new[] { ECardTag.Food };
+    else if (tags.Length == 0)
+        tags = new[] { ECardTag.Tool };
+
+    return new CollectionCardVm
     {
         Id = id,
-        InternalName = name,
-        StartingTier = tier,
-        Type = type,
-        Heroes = new HashSet<EHero>(heroes),
-        Tags = new HashSet<ECardTag>(tags),
-        ArtKey = name,
-        SpawningEligibility = ESpawnEligibility.Always,
+        Type =
+            cardType
+            ?? (entry.Kind == CollectionSourceKind.Merchant ? ECardType.Item : ECardType.Skill),
+        Size = rule.SizesAny.Count > 0 ? rule.SizesAny[0] : ECardSize.Medium,
+        StartingTier = rule.StartingTier?.Tier ?? ETier.Bronze,
+        Heroes = rule.HeroMode switch
+        {
+            CollectionSourceHeroMode.SelectedHero => selectedHero.HasValue
+                ? new[] { selectedHero.Value }
+                : new[] { EHero.Dooley },
+            CollectionSourceHeroMode.FixedHero => new[] { rule.Hero!.Value },
+            CollectionSourceHeroMode.NeutralOnly => new[] { EHero.Common },
+            _ => new[] { EHero.Dooley },
+        },
+        Tags = tags,
+        HiddenTags =
+            rule.HiddenTagsAny.Count > 0
+                ? new[] { rule.HiddenTagsAny[0] }
+                : Array.Empty<EHiddenTag>(),
+        DisplayName = id.ToString("N"),
+        InternalName = id.ToString("N"),
+        ArtKey = id.ToString("N"),
+        IsEnchantable = rule.EnchantableOnly,
     };
+}
 
 static CollectionCardVm CatalogCard(
     Guid id,
@@ -635,3 +652,70 @@ static CollectionCardVm CatalogCard(
         ArtKey = id.ToString("N"),
         IsEnchantable = isEnchantable,
     };
+
+static Guid GuidFromIndex(string seed, int index)
+{
+    var bytes = System.Text.Encoding.UTF8.GetBytes(seed + "|" + index);
+    var buffer = new byte[16];
+    for (var i = 0; i < bytes.Length; i++)
+        buffer[i % buffer.Length] = (byte)(buffer[i % buffer.Length] ^ bytes[i]);
+    return new Guid(buffer);
+}
+
+static void AssertValues<T>(IReadOnlyList<T> actual, IReadOnlyList<T> expected, string message)
+{
+    if (actual.Count != expected.Count)
+        throw new InvalidOperationException(
+            $"{message} Expected {expected.Count} values, got {actual.Count}."
+        );
+    for (var i = 0; i < actual.Count; i++)
+    {
+        if (!EqualityComparer<T>.Default.Equals(actual[i], expected[i]))
+            throw new InvalidOperationException(
+                $"{message} At {i}: expected {expected[i]}, got {actual[i]}."
+            );
+    }
+}
+
+static void AssertSet<T>(
+    IReadOnlyCollection<T> actual,
+    IReadOnlyCollection<T> expected,
+    string message
+)
+{
+    var actualSet = new HashSet<T>(actual);
+    var expectedSet = new HashSet<T>(expected);
+    if (!actualSet.SetEquals(expectedSet))
+        throw new InvalidOperationException(
+            $"{message} Expected [{string.Join(", ", expectedSet)}], got [{string.Join(", ", actualSet)}]."
+        );
+}
+
+static void AssertEqual<T>(T expected, T actual, string message)
+{
+    if (!EqualityComparer<T>.Default.Equals(expected, actual))
+        throw new InvalidOperationException($"{message} Expected {expected}, got {actual}.");
+}
+
+static void AssertTrue(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}
+
+static void AssertFalse(bool condition, string message) => AssertTrue(!condition, message);
+
+static void AssertThrows<TException>(Action action, string message)
+    where TException : Exception
+{
+    try
+    {
+        action();
+    }
+    catch (TException)
+    {
+        return;
+    }
+
+    throw new InvalidOperationException(message);
+}

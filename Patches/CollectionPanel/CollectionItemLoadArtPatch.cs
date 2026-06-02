@@ -53,24 +53,35 @@ internal static class CollectionItemLoadArtPatch
                 || string.Equals(artKey, "Invalid", StringComparison.Ordinal)
             )
             {
-                ReleasePreviousArtKey(marker, artCache);
+                ReleaseCurrentArtKey(marker, artCache, materialCache);
                 marker.CurrentArtKey = null;
                 return;
             }
 
             // Release the prior assignment first so refcounts stay accurate when the card is
             // rebound to a different artKey through the pool.
-            if (!string.Equals(marker.CurrentArtKey, artKey, StringComparison.Ordinal))
-                ReleasePreviousArtKey(marker, artCache);
-
-            artCache.AddRef(artKey);
-            marker.CurrentArtKey = artKey;
+            var changedArtKey = !string.Equals(
+                marker.CurrentArtKey,
+                artKey,
+                StringComparison.Ordinal
+            );
+            if (changedArtKey)
+            {
+                ReleaseCurrentArtKey(marker, artCache, materialCache);
+                artCache.AddRef(artKey);
+                materialCache.Acquire(artKey);
+                marker.CurrentArtKey = artKey;
+            }
 
             var assetData = await artCache.Get(artKey);
             if (instance == null)
                 return;
             if (assetData == null || assetData.cardMaterial == null)
+            {
+                if (changedArtKey)
+                    ReleaseCurrentArtKey(marker, artCache, materialCache);
                 return;
+            }
 
             var material = materialCache.GetOrCreate(
                 artKey,
@@ -78,7 +89,11 @@ internal static class CollectionItemLoadArtPatch
                 instance._cardMaterialShader
             );
             if (material == null)
+            {
+                if (changedArtKey)
+                    ReleaseCurrentArtKey(marker, artCache, materialCache);
                 return;
+            }
 
             // Shared material across cards: do NOT destroy the previous _cardMaterial — it is
             // either the same shared instance or another shared instance still in use by
@@ -96,12 +111,17 @@ internal static class CollectionItemLoadArtPatch
         }
     }
 
-    private static void ReleasePreviousArtKey(
+    private static void ReleaseCurrentArtKey(
         CollectionPanelOwnedMarker marker,
-        CollectionCardArtCache artCache
+        CollectionCardArtCache artCache,
+        CollectionCardMaterialCache materialCache
     )
     {
         if (!string.IsNullOrEmpty(marker.CurrentArtKey))
+        {
             artCache.Release(marker.CurrentArtKey!);
+            materialCache.Release(marker.CurrentArtKey!);
+            marker.CurrentArtKey = null;
+        }
     }
 }

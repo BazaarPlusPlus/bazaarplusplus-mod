@@ -6,7 +6,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
 internal sealed class CollectionPanelSelectionState
 {
-    public const string DefaultMerchantSourceKey = "merchant:ande:bronze:global";
+    public const string DefaultMerchantSourceKey = "merchant:ande:global";
 
     public static CollectionPanelSelectionState Default { get; } =
         new(EHero.Vanessa, DefaultMerchantSourceKey);

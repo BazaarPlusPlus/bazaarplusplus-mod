@@ -26,9 +26,11 @@ internal static class CollectionCardPreviewDestroyPatch
             return;
 
         var artCache = CollectionCardCacheHost.ArtCache;
+        var materialCache = CollectionCardCacheHost.MaterialCache;
         if (artCache != null && !string.IsNullOrEmpty(marker.CurrentArtKey))
         {
             artCache.Release(marker.CurrentArtKey!);
+            materialCache?.Release(marker.CurrentArtKey!);
             marker.CurrentArtKey = null;
         }
 

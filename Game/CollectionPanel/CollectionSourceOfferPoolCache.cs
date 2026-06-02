@@ -3,50 +3,34 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Encounters;
-using BazaarPlusPlus.GameInterop.EncounterOffers;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
 internal sealed class CollectionSourceOfferPoolCache
 {
-    private readonly Dictionary<string, EncounterOfferPoolResult> _cache = new(
+    private readonly Dictionary<string, CollectionSourceOfferPoolResult> _cache = new(
         StringComparer.Ordinal
     );
 
-    public EncounterOfferPoolResult GetOrResolve(
-        MerchantTrainerEntry source,
-        IReadOnlyList<EHero> heroFilters,
+    public CollectionSourceOfferPoolResult GetOrResolve(
+        CollectionSourceEntry source,
+        EHero? selectedHero,
         IReadOnlyList<CollectionCardVm> catalogCards
     )
     {
-        var key = BuildKey(source, heroFilters);
+        var key = BuildKey(source, selectedHero);
         if (_cache.TryGetValue(key, out var cached))
             return cached;
 
-        var result = CollectionSourceRuleOfferPoolResolver.Resolve(
-            source,
-            heroFilters,
-            catalogCards
-        );
-        if (result.Status == EncounterOfferPoolStatus.Unavailable)
-        {
-            result = EncounterOfferPoolResolver.ResolveOfferedTemplateIds(
-                source.TemplateIds,
-                heroFilters
-            );
-        }
-
-        if (
-            result.Status == EncounterOfferPoolStatus.Ready
-            || result.Status == EncounterOfferPoolStatus.Unavailable
-        )
+        var result = CollectionSourceOfferPoolResolver.Resolve(source, selectedHero, catalogCards);
+        if (result.Status == CollectionSourceOfferPoolStatus.Ready)
             _cache[key] = result;
         return result;
     }
 
-    public string BuildKey(MerchantTrainerEntry source, IReadOnlyList<EHero> heroFilters) =>
-        CollectionSourceOfferPoolCacheKey.Build(source, heroFilters);
+    public string BuildKey(CollectionSourceEntry source, EHero? selectedHero) =>
+        CollectionSourceOfferPoolCacheKey.Build(source, selectedHero);
 
     public void Clear() => _cache.Clear();
 }

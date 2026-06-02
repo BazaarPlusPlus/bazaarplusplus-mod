@@ -9,7 +9,13 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 // dragging in TCardBase / CollectionLocalizationResolver.
 internal sealed partial class CollectionCardVm
 {
-    public static CollectionCardVm From(TCardBase template)
+    public static CollectionCardVm From(TCardBase template) =>
+        From(template, CollectionCardClassifier.Classify(template));
+
+    internal static CollectionCardVm From(
+        TCardBase template,
+        CollectionCardClassification classification
+    )
     {
         return new CollectionCardVm
         {
@@ -28,8 +34,8 @@ internal sealed partial class CollectionCardVm
                 template is TCardItem item
                 && item.Enchantments != null
                 && item.Enchantments.Count > 0,
-            IsPackage = CollectionCardClassifier.IsPackage(template),
-            Merchants = CollectionCardClassifier.ResolveMerchants(template),
+            IsPackage = classification.IsPackage,
+            Merchants = classification.Merchants,
         };
     }
 }

@@ -7,12 +7,11 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Encounters;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.Supporters;
-using BazaarPlusPlus.GameInterop.EncounterOffers;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -25,8 +24,6 @@ internal sealed class CollectionPanel : MonoBehaviour
 {
     private const float SearchDebounceSeconds = 0.20f;
     private const float CatalogBuildFrameBudgetMs = 4f;
-    private const float SourcePoolRetrySeconds = 0.25f;
-    private const int SourcePoolMaxRetryAttempts = 12;
 
     private static CollectionPanel? _instance;
     public static bool IsVisible => _instance != null && _instance._isVisible;
@@ -62,9 +59,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private readonly CollectionCatalog _catalog = new();
     private readonly CollectionFilterState _filter = new();
-    private readonly List<CollectionCardVm> _visibleScratch = new();
     private readonly CollectionSourceOfferPoolCache _offerPoolCache = new();
-    private readonly CollectionSourcePoolRetryState _sourcePoolRetry = new();
 
     private IBppConfig _config = null!;
     private CollectionPanelView? _view;
@@ -92,7 +87,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     private Coroutine? _loadCoroutine;
     private int _loadGeneration;
     private bool _isLoadingCatalog;
-    private bool _isResolvingSourcePool;
 
     public void Initialize(IBppServices services)
     {
@@ -149,7 +143,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             hero,
             encounterIds.CurrentEncounterTemplateId,
             encounterIds.ChoiceSelectionTemplateIds,
-            MerchantTrainerCatalog.Entries
+            CollectionSourceCatalog.Entries
         );
 
         BppLog.Debug(
@@ -248,7 +242,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         _filter.ApplySelection(selection);
         PruneInvisibleSourceSelections();
-        ResetSourcePoolRetry();
         _scrollY = 0f;
     }
 
@@ -257,8 +250,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (!_isVisible)
             return;
         CancelPanelLoad();
-        ResetSourcePoolRetry();
-        _isResolvingSourcePool = false;
         _isVisible = false;
         // SetVisible(false) flips the fade target to 0; Update keeps ticking the fade and
         // mirroring opacity to the overlay until CurrentOpacity reaches ~0, at which point
@@ -328,13 +319,10 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _appliedSearch = _pendingSearch;
                 _filter.Search = _pendingSearch;
                 _pendingSearchAt = float.NaN;
-                ResetSourcePoolRetry();
                 ApplyFilters();
                 RefreshView();
             }
         }
-
-        TickSourcePoolRetry();
 
         if (_viewportBoundsDirty && _virtualizer != null && _overlay != null)
         {
@@ -428,7 +416,6 @@ internal sealed class CollectionPanel : MonoBehaviour
                     return;
                 _filter.ActiveType = type;
                 PruneInvisibleSourceSelections();
-                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -437,7 +424,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 _filter.ToggleHero(hero);
                 PruneInvisibleSourceSelections();
-                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -446,7 +432,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 if (!_filter.Tiers.Remove(tier))
                     _filter.Tiers.Add(tier);
-                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -455,7 +440,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 if (!_filter.Sizes.Remove(size))
                     _filter.Sizes.Add(size);
-                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -463,7 +447,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             toggleSource: sourceKey =>
             {
                 _filter.ToggleSource(_filter.ActiveType, sourceKey);
-                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -471,7 +454,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             togglePackages: () =>
             {
                 _filter.IncludePackages = !_filter.IncludePackages;
-                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -481,7 +463,6 @@ internal sealed class CollectionPanel : MonoBehaviour
                 if (_filter.SortPriority == priority)
                     return;
                 _filter.SortPriority = priority;
-                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -500,7 +481,6 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _appliedSearch = string.Empty;
                 _pendingSearch = string.Empty;
                 _pendingSearchAt = float.NaN;
-                ResetSourcePoolRetry();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -537,7 +517,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void CancelPanelLoad()
     {
         _loadGeneration++;
-        ResetSourcePoolRetry();
         if (_loadCoroutine != null)
         {
             StopCoroutine(_loadCoroutine);
@@ -647,55 +626,24 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         if (_virtualizer == null)
             return;
-        _visibleScratch.Clear();
         if (_catalogCards.Count == 0)
         {
-            _isResolvingSourcePool = false;
             _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
         }
         else
         {
             var sourceEntry = ResolveSelectedSourceEntry();
             var hasSelectedSource = sourceEntry != null;
-            IReadOnlyCollection<Guid>? offerPool = null;
+            IReadOnlyCollection<Guid>? offeredCardIds = null;
             if (sourceEntry != null)
             {
-                var heroFilters = ResolveSelectedHeroFilters();
-                var cacheKey = _offerPoolCache.BuildKey(sourceEntry, heroFilters);
                 var offerPoolResult = _offerPoolCache.GetOrResolve(
                     sourceEntry,
-                    heroFilters,
+                    _filter.SelectedConcreteHero,
                     _catalogCards
                 );
-                if (offerPoolResult.Status == EncounterOfferPoolStatus.Loading)
-                {
-                    _isResolvingSourcePool = true;
-                    SetStatus(CollectionPanelText.SourcePoolLoading());
-                    var retrying = ScheduleSourcePoolRetry(cacheKey, offerPoolResult.Reason);
-                    if (!retrying)
-                        _isResolvingSourcePool = false;
-                    _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
-                    ResetVisibleScroll();
-                    return;
-                }
-
-                ResetSourcePoolRetry();
-                _isResolvingSourcePool = false;
-                if (offerPoolResult.Status == EncounterOfferPoolStatus.Unavailable)
-                {
-                    SetStatus(CollectionPanelText.SourcePoolUnavailable(offerPoolResult.Reason));
-                    _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
-                    ResetVisibleScroll();
-                    return;
-                }
-
-                if (offerPoolResult.Status == EncounterOfferPoolStatus.Ready)
-                    offerPool = offerPoolResult.TemplateIds;
-            }
-            else
-            {
-                ResetSourcePoolRetry();
-                _isResolvingSourcePool = false;
+                if (offerPoolResult.Status == CollectionSourceOfferPoolStatus.Ready)
+                    offeredCardIds = offerPoolResult.OfferedCardIds;
             }
 
             if (!_isLoadingCatalog)
@@ -703,8 +651,11 @@ internal sealed class CollectionPanel : MonoBehaviour
             var ordered = CollectionFilterEngine.Apply(
                 _catalogCards,
                 _filter,
-                offerPool,
-                applyHeroFilter: !hasSelectedSource
+                new CollectionFilterContext
+                {
+                    OfferedCardIds = offeredCardIds,
+                    ApplyHeroFilter = !hasSelectedSource,
+                }
             );
             _virtualizer.SetVisible(ordered, _filter.ActiveType);
         }
@@ -732,7 +683,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             IncludePackages = _filter.IncludePackages,
             HasPackages = HasPackages(),
             HasActiveFilters = HasActiveFilters(),
-            SourceSelectorEnabled = !_isLoadingCatalog && !_isResolvingSourcePool,
+            SourceSelectorEnabled = !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
             Search = GetVisibleSearchText(),
             AvailableHeroes = HeroOrder,
@@ -748,10 +699,10 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         var kind =
             activeType == ECardType.Skill
-                ? EncounterPortraitKind.Trainer
-                : EncounterPortraitKind.Merchant;
+                ? CollectionSourceKind.Trainer
+                : CollectionSourceKind.Merchant;
         var result = new List<CollectionSourceOptionViewModel>();
-        foreach (var entry in MerchantTrainerCatalog.For(kind, _filter.SelectedConcreteHero))
+        foreach (var entry in CollectionSourceCatalog.For(kind, _filter.SelectedConcreteHero))
         {
             result.Add(
                 new CollectionSourceOptionViewModel
@@ -760,8 +711,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                     DisplayName = entry.Name,
                     Description = entry.Description,
                     Kind = entry.Kind,
-                    RepresentativeTemplateId =
-                        entry.TemplateIds.Count > 0 ? entry.TemplateIds[0] : Guid.Empty,
+                    RepresentativeTemplateId = entry.PortraitTemplateId,
                 }
             );
         }
@@ -795,29 +745,29 @@ internal sealed class CollectionPanel : MonoBehaviour
     private bool PruneInvisibleSourceSelections()
     {
         var selectedHero = _filter.SelectedConcreteHero;
-        var visibleMerchants = SourceKeysFor(EncounterPortraitKind.Merchant, selectedHero);
-        var visibleTrainers = SourceKeysFor(EncounterPortraitKind.Trainer, selectedHero);
+        var visibleMerchants = SourceKeysFor(CollectionSourceKind.Merchant, selectedHero);
+        var visibleTrainers = SourceKeysFor(CollectionSourceKind.Trainer, selectedHero);
         return _filter.PruneSelectedSources(visibleMerchants, visibleTrainers);
     }
 
     private static IReadOnlyList<string> SourceKeysFor(
-        EncounterPortraitKind kind,
+        CollectionSourceKind kind,
         EHero? selectedHero
     )
     {
         var keys = new List<string>();
-        foreach (var entry in MerchantTrainerCatalog.For(kind, selectedHero))
+        foreach (var entry in CollectionSourceCatalog.For(kind, selectedHero))
             keys.Add(entry.SourceKey);
         return keys;
     }
 
-    private MerchantTrainerEntry? ResolveSelectedSourceEntry()
+    private CollectionSourceEntry? ResolveSelectedSourceEntry()
     {
         var sourceKey = _filter.GetSelectedSourceKey(_filter.ActiveType);
         if (string.IsNullOrWhiteSpace(sourceKey))
             return null;
 
-        if (!MerchantTrainerCatalog.TryGetBySourceKey(sourceKey!, out var entry) || entry == null)
+        if (!CollectionSourceCatalog.TryGetBySourceKey(sourceKey!, out var entry) || entry == null)
         {
             _filter.ClearSelectedSource(_filter.ActiveType);
             return null;
@@ -825,8 +775,8 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         var expectedKind =
             _filter.ActiveType == ECardType.Skill
-                ? EncounterPortraitKind.Trainer
-                : EncounterPortraitKind.Merchant;
+                ? CollectionSourceKind.Trainer
+                : CollectionSourceKind.Merchant;
         if (entry.Kind != expectedKind)
         {
             _filter.ClearSelectedSource(_filter.ActiveType);
@@ -842,50 +792,6 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         return entry;
     }
-
-    private IReadOnlyList<EHero> ResolveSelectedHeroFilters()
-    {
-        var heroes = new List<EHero>();
-        foreach (var hero in HeroOrder)
-        {
-            if (_filter.Heroes.Contains(hero))
-                heroes.Add(hero);
-        }
-        return heroes;
-    }
-
-    private void TickSourcePoolRetry()
-    {
-        if (!_sourcePoolRetry.TryConsumeDueRetry(Time.unscaledTime))
-            return;
-
-        ApplyFilters();
-        RefreshView();
-    }
-
-    private bool ScheduleSourcePoolRetry(string cacheKey, string? reason)
-    {
-        var result = _sourcePoolRetry.Schedule(
-            cacheKey,
-            Time.unscaledTime,
-            SourcePoolRetrySeconds,
-            SourcePoolMaxRetryAttempts
-        );
-        if (result.IsExhausted)
-        {
-            if (result.ShouldLogWarning)
-                BppLog.Warn(
-                    "CollectionPanel",
-                    $"Source offer pool unavailable after retry key={cacheKey} reason={reason}"
-                );
-            SetStatus(CollectionPanelText.SourcePoolUnavailable(reason));
-            return false;
-        }
-
-        return true;
-    }
-
-    private void ResetSourcePoolRetry() => _sourcePoolRetry.Reset();
 
     private void ResetVisibleScroll()
     {
@@ -911,6 +817,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void InvalidateCatalog(string reason)
     {
         _catalogCards = Array.Empty<CollectionCardVm>();
+        _offerPoolCache.Clear();
         _catalog.InvalidateCache(reason);
     }
 

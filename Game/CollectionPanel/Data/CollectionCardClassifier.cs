@@ -41,16 +41,52 @@ internal static class CollectionCardClassifier
         (EHiddenTag.Merchant, CollectionMerchantKind.General),
     };
 
-    public static bool IsCatalogCard(TCardBase template) =>
-        IsCatalogCard(template.Type, template.ArtKey, template.InternalName);
+    public static bool IsCatalogCard(TCardBase template) => Classify(template).IsCatalogCard;
 
     public static bool IsCatalogCard(ECardType type, string? artKey, string? internalName)
     {
+        return Classify(type, artKey, internalName).IsCatalogCard;
+    }
+
+    public static CollectionCardClassification Classify(TCardBase template)
+    {
+        var classification = Classify(template.Type, template.ArtKey, template.InternalName);
+        return new CollectionCardClassification
+        {
+            IsCatalogCard = classification.IsCatalogCard,
+            EligibilityReason = classification.EligibilityReason,
+            IsPackage = IsPackage(template),
+            Merchants = ResolveMerchants(template),
+        };
+    }
+
+    public static CollectionCardClassification Classify(
+        ECardType type,
+        string? artKey,
+        string? internalName
+    )
+    {
         if (type != ECardType.Item && type != ECardType.Skill)
-            return false;
-        if (!HasValidArtKey(artKey))
-            return false;
-        return !ContainsAnyMarker(internalName, NonCatalogNameMarkers);
+            return Rejected(CollectionCardEligibilityReason.UnsupportedType, internalName);
+        if (string.IsNullOrEmpty(artKey))
+            return Rejected(CollectionCardEligibilityReason.MissingArtKey, internalName);
+        if (string.Equals(artKey, "Invalid", StringComparison.Ordinal))
+            return Rejected(CollectionCardEligibilityReason.InvalidArtKey, internalName);
+        if (artKey.IndexOf("Placeholder", StringComparison.OrdinalIgnoreCase) >= 0)
+            return Rejected(CollectionCardEligibilityReason.PlaceholderArtKey, internalName);
+        if (artKey.EndsWith(".mat", StringComparison.OrdinalIgnoreCase))
+            return Rejected(CollectionCardEligibilityReason.MaterialArtKey, internalName);
+        if (ContainsMarker(internalName, "[DEBUG]"))
+            return Rejected(CollectionCardEligibilityReason.DebugTemplate, internalName);
+        if (ContainsMarker(internalName, "TEMPLATE"))
+            return Rejected(CollectionCardEligibilityReason.TemplateInternalName, internalName);
+
+        return new CollectionCardClassification
+        {
+            IsCatalogCard = true,
+            EligibilityReason = CollectionCardEligibilityReason.Accepted,
+            IsPackage = IsPackageName(internalName),
+        };
     }
 
     public static bool IsPackage(TCardBase template) => IsPackageName(template.InternalName);
@@ -102,11 +138,16 @@ internal static class CollectionCardClassifier
         return merchants;
     }
 
-    private static bool HasValidArtKey(string? artKey) =>
-        !string.IsNullOrEmpty(artKey)
-        && !string.Equals(artKey, "Invalid", StringComparison.Ordinal)
-        && artKey.IndexOf("Placeholder", StringComparison.OrdinalIgnoreCase) < 0
-        && !artKey.EndsWith(".mat", StringComparison.OrdinalIgnoreCase);
+    private static CollectionCardClassification Rejected(
+        CollectionCardEligibilityReason reason,
+        string? internalName
+    ) =>
+        new()
+        {
+            IsCatalogCard = false,
+            EligibilityReason = reason,
+            IsPackage = IsPackageName(internalName),
+        };
 
     private static bool ContainsAnyMarker(string? value, IReadOnlyList<string> markers)
     {
@@ -119,6 +160,13 @@ internal static class CollectionCardClassifier
                 return true;
         }
         return false;
+    }
+
+    private static bool ContainsMarker(string? value, string marker)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+        return value!.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static bool Contains<T>(IReadOnlyCollection<T>? values, T expected)

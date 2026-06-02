@@ -44,6 +44,10 @@
       Include="..\..\Game\CollectionPanel\Grid\CollectionGridPixelization.cs"
       Link="CollectionGridPixelization.cs"
     />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Grid\CollectionCardMaterialLru.cs"
+      Link="CollectionCardMaterialLru.cs"
+    />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>

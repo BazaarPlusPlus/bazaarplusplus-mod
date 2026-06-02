@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Encounters;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
@@ -14,7 +14,7 @@ internal static class CollectionPanelOpenSelectionResolver
         EHero? currentHero,
         Guid? currentEncounterTemplateId,
         IReadOnlyCollection<Guid>? choiceSelectionTemplateIds,
-        IEnumerable<MerchantTrainerEntry> entries
+        IEnumerable<CollectionSourceEntry> entries
     )
     {
         if (!isInGameRun || !IsConcreteHero(currentHero))
@@ -38,7 +38,7 @@ internal static class CollectionPanelOpenSelectionResolver
         EHero hero,
         Guid? currentEncounterTemplateId,
         IReadOnlyCollection<Guid>? choiceSelectionTemplateIds,
-        IEnumerable<MerchantTrainerEntry> entries
+        IEnumerable<CollectionSourceEntry> entries
     )
     {
         if (currentEncounterTemplateId.HasValue)
@@ -71,17 +71,17 @@ internal static class CollectionPanelOpenSelectionResolver
     private static string? FindMerchantSourceKey(
         EHero hero,
         Guid templateId,
-        IEnumerable<MerchantTrainerEntry> entries
+        IEnumerable<CollectionSourceEntry> entries
     )
     {
         foreach (var entry in entries)
         {
-            if (entry.Kind != EncounterPortraitKind.Merchant)
+            if (entry.Kind != CollectionSourceKind.Merchant)
                 continue;
             if (!entry.AppliesToHero(hero))
                 continue;
 
-            foreach (var candidate in entry.TemplateIds)
+            foreach (var candidate in entry.SourceTemplateIds)
                 if (candidate == templateId)
                     return entry.SourceKey;
         }

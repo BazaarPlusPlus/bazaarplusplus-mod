@@ -3,8 +3,8 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Encounters;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.Infrastructure.Fonts;
@@ -47,7 +47,7 @@ internal sealed class CollectionSourceOptionViewModel
     public string SourceKey { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
-    public EncounterPortraitKind Kind { get; init; }
+    public CollectionSourceKind Kind { get; init; }
     public Guid RepresentativeTemplateId { get; init; }
 }
 

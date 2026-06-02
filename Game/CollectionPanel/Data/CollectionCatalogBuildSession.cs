@@ -52,13 +52,14 @@ internal sealed class CollectionCatalogBuildSession : IDisposable
                 continue;
             }
 
-            if (!CollectionCardClassifier.IsCatalogCard(template))
+            var classification = CollectionCardClassifier.Classify(template);
+            if (!classification.IsCatalogCard)
             {
                 RejectedCount++;
                 continue;
             }
 
-            _cards.Add(CollectionCardVm.From(template));
+            _cards.Add(CollectionCardVm.From(template, classification));
             AcceptedCount++;
         }
 

@@ -83,18 +83,6 @@ internal static class CollectionPanelText
         "暫時無法讀取卡牌資料，請稍後或在主選單中重試。",
         "暫時無法讀取卡牌資料，請稍後或在主選單中重試。"
     );
-    private static readonly LocalizedTextSet SourcePoolLoadingText = new(
-        "Loading source offers...",
-        "正在加载来源选池...",
-        "正在載入來源選池...",
-        "正在載入來源選池..."
-    );
-    private static readonly LocalizedTextSet SourcePoolUnavailableText = new(
-        "Source offers are unavailable right now.",
-        "暂时无法读取这个来源的选池。",
-        "暫時無法讀取這個來源的選池。",
-        "暫時無法讀取這個來源的選池。"
-    );
     private static readonly LocalizedTextSet NoMatchesText = new(
         "No cards match the current filters.",
         "没有符合当前筛选条件的卡。",
@@ -138,14 +126,6 @@ internal static class CollectionPanelText
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 
     internal static string CatalogUnavailable() => Resolve(CatalogUnavailableText);
-
-    internal static string SourcePoolLoading() => Resolve(SourcePoolLoadingText);
-
-    internal static string SourcePoolUnavailable(string? reason)
-    {
-        var message = Resolve(SourcePoolUnavailableText);
-        return string.IsNullOrWhiteSpace(reason) ? message : $"{message} ({reason})";
-    }
 
     internal static string NoMatches() => Resolve(NoMatchesText);
 

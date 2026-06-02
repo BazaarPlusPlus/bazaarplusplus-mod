@@ -25,24 +25,44 @@
 
   <ItemGroup>
     <Compile
-      Include="..\..\Game\CollectionPanel\Encounters\EncounterPortraitKind.cs"
-      Link="EncounterPortraitKind.cs"
+      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceCatalog.cs"
+      Link="CollectionSourceCatalog.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Encounters\MerchantTrainerEntry.cs"
-      Link="MerchantTrainerEntry.cs"
+      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceDtos.cs"
+      Link="CollectionSourceDtos.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Encounters\MerchantTrainerCatalog.cs"
-      Link="MerchantTrainerCatalog.cs"
+      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceEntry.cs"
+      Link="CollectionSourceEntry.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Encounters\CollectionSourceRuleOfferPoolResolver.cs"
-      Link="CollectionSourceRuleOfferPoolResolver.cs"
+      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceEnums.cs"
+      Link="CollectionSourceEnums.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceOfferPoolResolver.cs"
+      Link="CollectionSourceOfferPoolResolver.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceOfferPoolResult.cs"
+      Link="CollectionSourceOfferPoolResult.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceOfferRule.cs"
+      Link="CollectionSourceOfferRule.cs"
     />
     <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionCardVm.cs"
       Link="CollectionCardVm.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionCardClassification.cs"
+      Link="CollectionCardClassification.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionCardFacetRanks.cs"
+      Link="CollectionCardFacetRanks.cs"
     />
     <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionMerchantKind.cs"
@@ -59,26 +79,6 @@
     <Compile
       Include="..\..\Game\CollectionPanel\CollectionSourceOfferPoolCacheKey.cs"
       Link="CollectionSourceOfferPoolCacheKey.cs"
-    />
-    <Compile
-      Include="..\..\Game\CollectionPanel\CollectionSourcePoolRetryState.cs"
-      Link="CollectionSourcePoolRetryState.cs"
-    />
-    <Compile
-      Include="..\..\GameInterop\EncounterOffers\EncounterOfferHeroMapper.cs"
-      Link="EncounterOfferHeroMapper.cs"
-    />
-    <Compile
-      Include="..\..\GameInterop\EncounterOffers\EncounterOfferPoolResult.cs"
-      Link="EncounterOfferPoolResult.cs"
-    />
-    <Compile
-      Include="..\..\GameInterop\EncounterOffers\EncounterOfferPoolRules.cs"
-      Link="EncounterOfferPoolRules.cs"
-    />
-    <Compile
-      Include="..\..\GameInterop\EncounterOffers\EncounterOfferStaticPoolResolver.cs"
-      Link="EncounterOfferStaticPoolResolver.cs"
     />
     <Reference Include="BazaarBattleService">
       <HintPath>$(ManagedPath)/BazaarBattleService.dll</HintPath>
