@@ -1,6 +1,7 @@
 # Goal: Collection Panel 商人 / 训练师选池筛选
 
-> Status: Draft
+> Status: SUPERSEDED by `../2026-06-02-collection-panel-source-catalog-schema.md`
+> Superseded reason: This draft planned to reuse game source-card / runtime resolver semantics. The current direction uses a BPP-owned structured source catalog and removes game resolver fallback.
 > Date: 2026-06-02
 > Scope: Collection Panel 中新增“我遇到这个商人 / 训练师时，预期可能看到哪些物品或技能”的选池筛选能力。
 > **For agentic workers:** REQUIRED SUB-SKILL: use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this goal task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

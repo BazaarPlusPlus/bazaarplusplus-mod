@@ -24,13 +24,14 @@ Work designed but not yet (fully) landed; lives at this top level until implemen
 - [`2026-05-31-sell-hotkey-regression-debug-plan.md`](2026-05-31-sell-hotkey-regression-debug-plan.md) — 安装 BazaarPlusPlus 后官方出售物品快捷键偶发失效的生产调试方案：梳理 native SellItem 输入链路、tooltip/keybind/raycast 失效假设、诊断日志和修复验证矩阵（**Draft，未开工**）。
 - [`2026-05-31-history-panel-hero-portrait-badge-design.md`](2026-05-31-history-panel-hero-portrait-badge-design.md) — HistoryPanel 英雄文本徽章（`VAN`/`PYG`）改真实头像 Sprite：走 `CollectionManager.GetDefaultHeroSkin` + `SkinAssetDataSO.LoadPortraitSpriteAsync`（异步 Addressables，无硬编码 key），在现有 `Label` 上设 `backgroundImage`，文本徽章降级为 fallback；含 token 防陈旧与逐文件源码锚点（**Draft，未开工**）。
 - [`2026-06-01-collection-panel-hero-portrait-chips-plan.md`](2026-06-01-collection-panel-hero-portrait-chips-plan.md) — CollectionPanel hero filter chips use the game's default hero portrait sprites through a shared provider; HistoryPanel badge adoption remains a follow-up.
-- [`2026-06-02-collection-panel-offer-source-filtering.md`](2026-06-02-collection-panel-offer-source-filtering.md) — CollectionPanel 商人 / 训练师来源筛选 Goal：复用 source card 自带选池 filter，显示理论候选池，不做手写匹配或当前 roll 预测。
+- [`2026-06-02-collection-panel-source-catalog-schema.md`](2026-06-02-collection-panel-source-catalog-schema.md) — CollectionPanel 商人 / 训练师来源筛选改为 BPP 自有结构化 source catalog：schema、规则语义、contract tests、旧 game resolver fallback 删除边界。
 - [`2026-06-02-item-board-preview-abstraction.md`](2026-06-02-item-board-preview-abstraction.md) — 抽出单卡 native `CardPreviewBase` primitive 与共享 item-board preview surface；HistoryPanel 与 CardSetPreview 已迁移，live `MonsterBoardTooltip` clone path 已移除（startup/resource runtime validation complete, manual interaction validation pending）。
 
 ## Archived specs
 
-All remaining archived specs are `IMPLEMENTED (historical)` — shipped; the living truth is the linked ADR / feature doc / code:
+Archived specs are historical; each file carries its own `Status:` banner.
 
+- `2026-06-02-collection-panel-offer-source-filtering.md` → superseded by [`2026-06-02-collection-panel-source-catalog-schema.md`](2026-06-02-collection-panel-source-catalog-schema.md)
 - `2026-05-22-autobazaar-mountable-and-encounter-decoupling-design.md` → [ADR-0002](../adr/0002-mountable-feature-registry.md)
 - `2026-05-23-combat-replay-sfx-impl.md` → [combat-replay.md](../features/combat-replay.md)
 - `2026-05-24-pedestal-aware-preview-display-design.md` → [ADR-0004](../adr/0004-preview-visibility-three-state-mode.md), [tooltip-preview.md](../features/tooltip-preview.md)
