@@ -34,6 +34,8 @@ Test projects under `tests/` are split per-feature. Some use xUnit + `Microsoft.
 
 This mod is a **BepInEx 5.x plugin** (`BepInEx.Core` 5.*). At runtime, BepInEx writes all console output to disk at `<GameDir>\BepInEx\LogOutput.log` — the sibling of the `BepInEx\plugins\` folder the build copies into. To debug, read that file; mod log lines are prefixed `[BPP][<Component>]` (logged via `BppLog` → BepInEx `ManualLogSource`). `Debug`-level lines are only emitted from Debug builds; `Info`/`Warning`/`Error` always emit.
 
+For runtime validation that needs launching the game, launch The Bazaar through Steam so Steam runtime state is present; on macOS run `open "steam://run/1617400"` (Steam App ID 1617400). Direct `TheBazaar.app` or `run_bepinex.sh` launches are fallback paths only when explicitly requested.
+
 ## Architecture
 
 **Three assemblies** ship as the mod:

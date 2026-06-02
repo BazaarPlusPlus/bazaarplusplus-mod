@@ -7,6 +7,25 @@
 
 ---
 
+## 实现进展（2026-06-02）— 模板 ID 目录已落地
+
+第一阶段（"把它维护成一个 template ID 对应的东西"）已实现，采用 **策展 roster × extractor `index.json` → 签入目录** 方案（参考 `CardSetPreview` / `final-builds` 的嵌入资源模式）。**关键改动：放弃按文本/运行时标签分类，改为按 template ID 精确命中**——因为名称不唯一（Aila=8 个 ID、Jay Jay=11 个）且与无关 encounter 同名碰撞（"Advanced Training"、"Bjorn's Gift Exchange"、Bronze/Pygmalien 的 "Nufu" 等）。
+
+新增 / 改动：
+- `tools/encounter-portraits/build_catalog.py` —— 生成器：内嵌 bazaardb 70 条 roster（哪些是商人/训练师 + 卖/教标签），交叉 extractor `index.json`（`name.source`→template `id`/`heroes`/`tier`），按 **名称+英雄集+品级** 解析出每个身份的**全部 template ID**，并自动剔除同名碰撞。游戏更新时：重跑 extractor → 按需更新 roster → 重跑本脚本 → 提交 JSON。
+- `Data/Encounters/merchant-trainer-portraits.json` —— 签入目录（嵌入资源）：**70 条身份（47 商人 + 23 训练师）→ 109 个 template ID**，含 kind/tier/heroes/description。
+- `Game/CollectionPanel/Encounters/MerchantTrainerCatalog.cs` —— 加载器（仿 `CardSetBuildDataRepository` 嵌入资源加载）：`TryGet(Guid templateId, out entry)`、`ForHero(EHero)`、`Entries`。
+- `Game/CollectionPanel/Encounters/MerchantTrainerEntry.cs` / `EncounterPortraitKind.cs` —— 运行时模型（含 `AppliesToHero`，空 Heroes = Common = 全英雄）。
+- `BazaarPlusPlus.csproj` —— 新增 `EmbeddedResource`。Debug 构建已通过。
+
+**这取代原 §3.2/§4 的"运行时按 `card.Merchants` 分类"**：现在 `MerchantTrainerCatalog` 是"哪些 template ID 是商人/训练师 + 元数据"的唯一权威来源，英雄关联即 `entry.Heroes`（`ForHero` 已实现 Common-或-空集语义）。
+
+**仍待做（下一步，不在本次范围）：**
+- `GameInterop/EncounterPortraits/EncounterPortraitSpriteProvider.cs` —— 按 template ID 经 `ArtKey → EncounterAssetDataSO → LoadPortraitSpriteAsync` 取 `Sprite`（见 §3.1）。**动工前先做 Step 0 运行时验证**（取 Aimbot + Bjorn 的某个 template ID，确认出非 null portrait）。
+- CollectionPanel UI（§5/§7）：`MerchantTrainerCatalog.ForHero(selectedHero)` → 每条取一个 `TemplateId` 调 Provider 出图，复用英雄 chip 的 `ApplyHeroChipIcon` 绑定与 tracked-element-map。
+
+---
+
 ## 0.0 bazaardb 实地核对（先读：它推翻了"训练师无头像"的初判）
 
 通过 Chrome 实地核对 [bazaardb.gg](https://bazaardb.gg)（基于游戏 patch 14.1 的卡数据库），确立了 Merchant/Trainer 的**分类法真值**，与反编译枚举完全吻合：
