@@ -54,6 +54,66 @@ AssertValues(
     "Toggling off the selected concrete hero should leave Common selected."
 );
 
+var defaultSelection = CollectionPanelSelectionState.Default;
+AssertEqual(
+    EHero.Vanessa,
+    defaultSelection.SelectedHero,
+    "Default panel selection should start on VAN/Vanessa."
+);
+AssertEqual(
+    "merchant:ande:bronze:global",
+    defaultSelection.SelectedMerchantSourceKey,
+    "Default panel selection should start on Ande."
+);
+var selectionState = new CollectionFilterState();
+selectionState.Merchants.Add(CollectionMerchantKind.Burn);
+selectionState.SelectedTrainerSourceKey = "trainer:old";
+selectionState.ApplySelection(defaultSelection);
+AssertValues(
+    selectionState.Heroes.ToArray(),
+    new[] { EHero.Vanessa },
+    "Applying the default selection should select Vanessa in the filter state."
+);
+AssertEqual(
+    "merchant:ande:bronze:global",
+    selectionState.SelectedMerchantSourceKey,
+    "Applying the default selection should select Ande in the filter state."
+);
+AssertFalse(
+    selectionState.Merchants.Contains(CollectionMerchantKind.Burn),
+    "Applying a panel selection should clear stale merchant-kind filters."
+);
+AssertEqual(
+    null,
+    selectionState.SelectedTrainerSourceKey,
+    "Applying a merchant selection should clear stale trainer source selection."
+);
+AssertEqual(
+    defaultSelection,
+    selectionState.ToSelectionState(),
+    "Filter state should round-trip the selected hero and merchant through the selection interface."
+);
+var runtimeSelection = new CollectionPanelSelectionState(
+    EHero.Dooley,
+    "merchant:jules:diamond:dooley+karnok+mak+pygmalien+stelle+vanessa"
+);
+selectionState.ApplySelection(runtimeSelection);
+AssertValues(
+    selectionState.Heroes.ToArray(),
+    new[] { EHero.Dooley },
+    "Runtime selection should replace the previous selected hero."
+);
+AssertEqual(
+    "merchant:jules:diamond:dooley+karnok+mak+pygmalien+stelle+vanessa",
+    selectionState.SelectedMerchantSourceKey,
+    "Runtime selection should replace the previous selected merchant."
+);
+AssertEqual(
+    runtimeSelection,
+    selectionState.ToSelectionState(),
+    "Runtime selection should be readable back from the filter state."
+);
+
 var sourceState = new CollectionFilterState();
 sourceState.ToggleSource(ECardType.Item, "merchant:aila");
 AssertEqual(

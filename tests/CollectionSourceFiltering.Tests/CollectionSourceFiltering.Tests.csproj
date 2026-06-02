@@ -49,6 +49,14 @@
       Link="CollectionMerchantKind.cs"
     />
     <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionPanelSelectionState.cs"
+      Link="CollectionPanelSelectionState.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\CollectionPanelOpenSelectionResolver.cs"
+      Link="CollectionPanelOpenSelectionResolver.cs"
+    />
+    <Compile
       Include="..\..\Game\CollectionPanel\CollectionSourceOfferPoolCacheKey.cs"
       Link="CollectionSourceOfferPoolCacheKey.cs"
     />

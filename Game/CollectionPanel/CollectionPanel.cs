@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Encounters;
@@ -74,6 +75,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     private CollectionCardArtCache? _artCache;
     private CollectionCardMaterialCache? _materialCache;
 
+    private IBppServices _services = null!;
     private IReadOnlyList<CollectionCardVm> _catalogCards = Array.Empty<CollectionCardVm>();
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
     private bool _isVisible;
@@ -98,6 +100,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         _initialized = true;
         _instance = this;
+        _services = services;
         _config = services.Config;
         _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
     }
@@ -118,10 +121,92 @@ internal sealed class CollectionPanel : MonoBehaviour
             BppLog.Warn("CollectionPanel", "Dock entry requested before CollectionPanel mounted.");
             return;
         }
-        _instance.Open();
+        _instance.Open(_instance.ResolveOpenSelection());
     }
 
-    private void Open()
+    internal static void OpenFromDockEntry(CollectionPanelSelectionState selection)
+    {
+        if (_instance == null)
+        {
+            BppLog.Warn("CollectionPanel", "Dock entry requested before CollectionPanel mounted.");
+            return;
+        }
+        _instance.Open(selection);
+    }
+
+    internal static CollectionPanelSelectionState GetCurrentSelectionState() =>
+        _instance?._filter.ToSelectionState() ?? CollectionPanelSelectionState.Default;
+
+    private void Open() => Open(ResolveOpenSelection());
+
+    private CollectionPanelSelectionState ResolveOpenSelection()
+    {
+        var isInGameRun = IsInGameRunForOpen();
+        var hero = isInGameRun ? TryReadCurrentHero() : null;
+        var encounterIds = isInGameRun ? TryReadEncounterIds() : EncounterIdsSnapshot.Empty;
+        var selection = CollectionPanelOpenSelectionResolver.Resolve(
+            isInGameRun,
+            hero,
+            encounterIds.CurrentEncounterTemplateId,
+            encounterIds.ChoiceSelectionTemplateIds,
+            MerchantTrainerCatalog.Entries
+        );
+
+        BppLog.Debug(
+            "CollectionPanel",
+            $"Open selection resolved inRun={isInGameRun} hero={selection.SelectedHero?.ToString() ?? "none"} merchant={selection.SelectedMerchantSourceKey ?? "none"}"
+        );
+        return selection;
+    }
+
+    private bool IsInGameRunForOpen()
+    {
+        try
+        {
+            return _services.RunContext.IsInGameRun
+                || _services.GameStateProbe.ComputeIsInGameRun();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn("CollectionPanel", $"Open selection run-state read failed: {ex.Message}");
+            return _services.RunContext.IsInGameRun;
+        }
+    }
+
+    private static EHero? TryReadCurrentHero()
+    {
+        try
+        {
+            var runHero = TheBazaar.Data.Run?.Player?.Hero;
+            if (CollectionPanelOpenSelectionResolver.IsConcreteHero(runHero))
+                return runHero;
+
+            var selectedHero = TheBazaar.Data.SelectedHero;
+            return CollectionPanelOpenSelectionResolver.IsConcreteHero(selectedHero)
+                ? selectedHero
+                : null;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn("CollectionPanel", $"Open selection hero read failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private EncounterIdsSnapshot TryReadEncounterIds()
+    {
+        try
+        {
+            return _services.EncounterState.GetEncounterIds();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn("CollectionPanel", $"Open selection encounter read failed: {ex.Message}");
+            return EncounterIdsSnapshot.Empty;
+        }
+    }
+
+    private void Open(CollectionPanelSelectionState selection)
     {
         if (TheBazaar.Data.IsInCombat)
         {
@@ -147,6 +232,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             }
         }
 
+        ApplyOpenSelection(selection);
         EnsureView();
         _supporters = BPPSupporters.SampleMany(4);
         _isVisible = true;
@@ -156,6 +242,14 @@ internal sealed class CollectionPanel : MonoBehaviour
         _overlay?.SetVisible(true);
         _overlay?.SetAlpha(_view!.CurrentOpacity);
         StartPanelLoad();
+    }
+
+    private void ApplyOpenSelection(CollectionPanelSelectionState selection)
+    {
+        _filter.ApplySelection(selection);
+        PruneInvisibleSourceSelections();
+        ResetSourcePoolRetry();
+        _scrollY = 0f;
     }
 
     private void Close()

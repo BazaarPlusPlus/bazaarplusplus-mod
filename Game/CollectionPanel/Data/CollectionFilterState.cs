@@ -57,6 +57,25 @@ internal sealed class CollectionFilterState
     public string? GetSelectedSourceKey(ECardType activeType) =>
         activeType == ECardType.Skill ? SelectedTrainerSourceKey : SelectedMerchantSourceKey;
 
+    public void ApplySelection(CollectionPanelSelectionState selection)
+    {
+        if (selection == null)
+            throw new System.ArgumentNullException(nameof(selection));
+
+        Heroes.Clear();
+        if (selection.SelectedHero.HasValue)
+            Heroes.Add(selection.SelectedHero.Value);
+
+        Merchants.Clear();
+        SelectedMerchantSourceKey = selection.SelectedMerchantSourceKey;
+        SelectedTrainerSourceKey = null;
+        if (!string.IsNullOrWhiteSpace(SelectedMerchantSourceKey))
+            ActiveType = ECardType.Item;
+    }
+
+    public CollectionPanelSelectionState ToSelectionState() =>
+        new(SelectedConcreteHero, SelectedMerchantSourceKey);
+
     public void ToggleHero(EHero hero)
     {
         if (hero == EHero.Common)

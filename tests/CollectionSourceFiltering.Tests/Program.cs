@@ -70,6 +70,88 @@ AssertEqual(
     entries.Select(entry => entry.SourceKey).Distinct(StringComparer.Ordinal).Count(),
     "Source keys should be unique across current catalog identities."
 );
+AssertTrue(
+    MerchantTrainerCatalog
+        .Build(
+            File.ReadAllText(Path.Combine("Data", "Encounters", "merchant-trainer-portraits.json"))
+        )
+        .Any(entry =>
+            string.Equals(
+                entry.SourceKey,
+                CollectionPanelSelectionState.DefaultMerchantSourceKey,
+                StringComparison.Ordinal
+            )
+        ),
+    "Default selected merchant source key should exist in the current merchant catalog."
+);
+var dooleyAila = entries.Single(entry =>
+    entry.Kind == EncounterPortraitKind.Merchant
+    && string.Equals(entry.Name, "Aila", StringComparison.Ordinal)
+    && entry.Heroes.Contains(EHero.Dooley)
+);
+var openOutsideRun = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: false,
+    currentHero: EHero.Dooley,
+    currentEncounterTemplateId: dooleyAila.TemplateIds[0],
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries
+);
+AssertEqual(
+    CollectionPanelSelectionState.Default,
+    openOutsideRun,
+    "Opening outside an in-game run should fall back to VAN + Ande."
+);
+var openOnCurrentMerchant = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: true,
+    currentHero: EHero.Dooley,
+    currentEncounterTemplateId: dooleyAila.TemplateIds[0],
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries
+);
+AssertEqual(
+    new CollectionPanelSelectionState(EHero.Dooley, dooleyAila.SourceKey),
+    openOnCurrentMerchant,
+    "Opening during a run should select the current concrete hero and merchant source."
+);
+var openOnChoiceMerchant = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: true,
+    currentHero: EHero.Vanessa,
+    currentEncounterTemplateId: null,
+    choiceSelectionTemplateIds: new[] { pygTrainerId, globalMerchantId },
+    entries
+);
+AssertEqual(
+    new CollectionPanelSelectionState(EHero.Vanessa, "merchant:nufu:gold:global"),
+    openOnChoiceMerchant,
+    "Opening on the choice screen should select the first available merchant source, ignoring trainers."
+);
+var openWithoutMerchant = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: true,
+    currentHero: EHero.Vanessa,
+    currentEncounterTemplateId: pygTrainerId,
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries
+);
+AssertEqual(
+    new CollectionPanelSelectionState(
+        EHero.Vanessa,
+        CollectionPanelSelectionState.DefaultMerchantSourceKey
+    ),
+    openWithoutMerchant,
+    "Opening during a run without a usable merchant should keep the run hero and fall back to Ande."
+);
+var openWithoutConcreteHero = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: true,
+    currentHero: EHero.Common,
+    currentEncounterTemplateId: dooleyAila.TemplateIds[0],
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries
+);
+AssertEqual(
+    CollectionPanelSelectionState.Default,
+    openWithoutConcreteHero,
+    "Opening during a run without a concrete hero should fall back to VAN + Ande."
+);
 AssertValues(
     entries[0].TemplateIds.ToArray(),
     new[] { ailaId1, ailaId2 },

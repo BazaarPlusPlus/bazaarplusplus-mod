@@ -33,6 +33,10 @@
       Link="CollectionFilterState.cs"
     />
     <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionPanelSelectionState.cs"
+      Link="CollectionPanelSelectionState.cs"
+    />
+    <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionCardClassifier.cs"
       Link="CollectionCardClassifier.cs"
     />
