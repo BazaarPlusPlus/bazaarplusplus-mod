@@ -191,6 +191,20 @@ AssertSequence(
     "Resolved offer pool should preserve AND semantics with hero, tier, and search filters."
 );
 
+var sourceOwnedHeroFilter = new CollectionFilterState();
+sourceOwnedHeroFilter.Heroes.Add(EHero.Vanessa);
+var sourceOwnedHeroResult = CollectionFilterEngine.Apply(
+    new[] { dooleyBronze, vanessaBronze },
+    sourceOwnedHeroFilter,
+    new[] { dooleyBronze.Id },
+    applyHeroFilter: false
+);
+AssertSequence(
+    sourceOwnedHeroResult,
+    new[] { dooleyBronze.Id },
+    "Selected source pools should not be cropped by the run-hero selector a second time."
+);
+
 var burnMerchantSkill = Card(
     "Burn Merchant Skill",
     ETier.Bronze,

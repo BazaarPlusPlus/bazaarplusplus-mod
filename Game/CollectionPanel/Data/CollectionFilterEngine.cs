@@ -15,7 +15,8 @@ internal static class CollectionFilterEngine
     public static List<CollectionCardVm> Apply(
         IReadOnlyList<CollectionCardVm> all,
         CollectionFilterState filter,
-        IReadOnlyCollection<Guid>? offerPool = null
+        IReadOnlyCollection<Guid>? offerPool = null,
+        bool applyHeroFilter = true
     )
     {
         var result = new List<CollectionCardVm>(all.Count);
@@ -23,7 +24,7 @@ internal static class CollectionFilterEngine
         var hasSearch = search.Length > 0;
         var offerPoolSet =
             offerPool == null ? null : offerPool as HashSet<Guid> ?? new HashSet<Guid>(offerPool);
-        var heroFilterCount = filter.Heroes.Count;
+        var heroFilterCount = applyHeroFilter ? filter.Heroes.Count : 0;
         var tierFilterCount = filter.Tiers.Count;
         var tagFilterCount = filter.Tags.Count;
         var merchantFilterCount = filter.Merchants.Count;

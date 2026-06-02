@@ -183,7 +183,7 @@ internal sealed partial class CollectionPanelView
             out _sourceFilterLabel
         );
         _sourceChipRow.style.flexWrap = Wrap.Wrap;
-        _sourceChipRow.style.justifyContent = Justify.FlexStart;
+        _sourceChipRow.style.justifyContent = Justify.SpaceBetween;
 
         _statusLabel = CreateLabel(Sizes.FontSmall, FontStyle.Normal, Colors.HistoryStatusText);
         _statusLabel.style.marginTop = UiSpacing.Lg;

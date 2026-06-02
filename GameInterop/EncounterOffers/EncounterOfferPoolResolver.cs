@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarBattleService.Models;
+using BazaarBattleService.Repositories.CardRepository;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.AppFramework;
 
@@ -27,13 +29,42 @@ internal static class EncounterOfferPoolResolver
         var repo = dealer?.cardRepo;
         LogRuntimeProbe(manager != null, dealer != null, repo != null);
 
-        if (manager == null)
-            return EncounterOfferPoolResult.Loading("game-service-manager-not-ready");
-        if (dealer == null)
-            return EncounterOfferPoolResult.Loading("card-dealer-not-ready");
         if (repo == null)
-            return EncounterOfferPoolResult.Loading("old-runtime-card-repo-not-ready");
+        {
+            var staticResult = ResolveWithStaticData(sourceTemplateIds, uiHeroFilters);
+            if (staticResult.Status == EncounterOfferPoolStatus.Ready)
+                return staticResult;
 
+            if (manager == null)
+                return EncounterOfferPoolResult.Loading("game-service-manager-not-ready");
+            if (dealer == null)
+                return EncounterOfferPoolResult.Loading("card-dealer-not-ready");
+            return EncounterOfferPoolResult.Loading("old-runtime-card-repo-not-ready");
+        }
+
+        return ResolveWithRuntimeRepo(repo, sourceTemplateIds, uiHeroFilters);
+    }
+
+    private static EncounterOfferPoolResult ResolveWithRuntimeRepo(
+        ICardRepository repo,
+        IReadOnlyList<Guid> sourceTemplateIds,
+        IReadOnlyList<BazaarGameShared.Domain.Core.Types.EHero> uiHeroFilters
+    )
+    {
+        var runtimeResult = ResolveWithRuntimeRepoOnly(repo, sourceTemplateIds, uiHeroFilters);
+        if (runtimeResult.Status != EncounterOfferPoolStatus.Unavailable)
+            return runtimeResult;
+
+        var staticResult = ResolveWithStaticData(sourceTemplateIds, uiHeroFilters);
+        return staticResult.Status == EncounterOfferPoolStatus.Ready ? staticResult : runtimeResult;
+    }
+
+    private static EncounterOfferPoolResult ResolveWithRuntimeRepoOnly(
+        ICardRepository repo,
+        IReadOnlyList<Guid> sourceTemplateIds,
+        IReadOnlyList<BazaarGameShared.Domain.Core.Types.EHero> uiHeroFilters
+    )
+    {
         var offeredTemplateIds = new HashSet<Guid>();
         var sourceCardsResolved = 0;
 
@@ -123,6 +154,32 @@ internal static class EncounterOfferPoolResolver
             return EncounterOfferPoolResult.Unavailable("source-cards-unavailable");
 
         return EncounterOfferPoolResult.Ready(offeredTemplateIds);
+    }
+
+    private static EncounterOfferPoolResult ResolveWithStaticData(
+        IReadOnlyList<Guid> sourceTemplateIds,
+        IReadOnlyList<BazaarGameShared.Domain.Core.Types.EHero> uiHeroFilters
+    )
+    {
+        try
+        {
+            if (!BppStaticDataAccess.TryGetCardMap(out _, out var map, out var unavailableReason))
+                return EncounterOfferPoolResult.Loading(unavailableReason);
+
+            if (map == null)
+                return EncounterOfferPoolResult.Loading("static-card-map-null");
+
+            return EncounterOfferStaticPoolResolver.ResolveOfferedTemplateIds(
+                sourceTemplateIds,
+                uiHeroFilters,
+                map
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(LogComponent, $"Static source offer resolver failed: {ex.Message}");
+            return EncounterOfferPoolResult.Unavailable("static-source-pool-threw");
+        }
     }
 
     private static void LogRuntimeProbe(bool hasManager, bool hasDealer, bool hasRepo)

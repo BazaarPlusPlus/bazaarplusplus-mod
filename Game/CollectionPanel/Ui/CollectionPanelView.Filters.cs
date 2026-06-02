@@ -238,7 +238,7 @@ internal sealed partial class CollectionPanelView
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.justifyContent = Justify.Center;
         chip.style.alignItems = Align.Center;
-        chip.style.marginRight = UiSpacing.Sm;
+        chip.style.marginRight = 0f;
         chip.style.marginBottom = UiSpacing.Xs;
         StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
 
@@ -279,6 +279,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Radius(icon.style, Sizes.HeroChipIconSize / 2f);
 
         var initials = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
+        initials.name = SourceChipInitialsName;
         initials.text = GetInitials(displayName);
         initials.pickingMode = PickingMode.Ignore;
         initials.style.position = Position.Absolute;
@@ -389,13 +390,18 @@ internal sealed partial class CollectionPanelView
 
     private static void ApplySourceChipIcon(VisualElement icon, Sprite? sprite)
     {
+        var initials = icon.Q<Label>(SourceChipInitialsName);
         if (sprite == null)
         {
             icon.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
+            if (initials != null)
+                initials.style.display = DisplayStyle.Flex;
             return;
         }
 
         icon.style.backgroundImage = new StyleBackground(sprite);
+        if (initials != null)
+            initials.style.display = DisplayStyle.None;
         icon.MarkDirtyRepaint();
     }
 

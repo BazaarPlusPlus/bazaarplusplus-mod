@@ -562,12 +562,17 @@ internal sealed class CollectionPanel : MonoBehaviour
         else
         {
             var sourceEntry = ResolveSelectedSourceEntry();
+            var hasSelectedSource = sourceEntry != null;
             IReadOnlyCollection<Guid>? offerPool = null;
             if (sourceEntry != null)
             {
                 var heroFilters = ResolveSelectedHeroFilters();
                 var cacheKey = _offerPoolCache.BuildKey(sourceEntry, heroFilters);
-                var offerPoolResult = _offerPoolCache.GetOrResolve(sourceEntry, heroFilters);
+                var offerPoolResult = _offerPoolCache.GetOrResolve(
+                    sourceEntry,
+                    heroFilters,
+                    _catalogCards
+                );
                 if (offerPoolResult.Status == EncounterOfferPoolStatus.Loading)
                 {
                     _isResolvingSourcePool = true;
@@ -601,7 +606,12 @@ internal sealed class CollectionPanel : MonoBehaviour
 
             if (!_isLoadingCatalog)
                 ClearStatus();
-            var ordered = CollectionFilterEngine.Apply(_catalogCards, _filter, offerPool);
+            var ordered = CollectionFilterEngine.Apply(
+                _catalogCards,
+                _filter,
+                offerPool,
+                applyHeroFilter: !hasSelectedSource
+            );
             _virtualizer.SetVisible(ordered, _filter.ActiveType);
         }
         ResetVisibleScroll();

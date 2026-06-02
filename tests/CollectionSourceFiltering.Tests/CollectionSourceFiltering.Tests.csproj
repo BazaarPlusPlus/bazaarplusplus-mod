@@ -37,6 +37,18 @@
       Link="MerchantTrainerCatalog.cs"
     />
     <Compile
+      Include="..\..\Game\CollectionPanel\Encounters\CollectionSourceRuleOfferPoolResolver.cs"
+      Link="CollectionSourceRuleOfferPoolResolver.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionCardVm.cs"
+      Link="CollectionCardVm.cs"
+    />
+    <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionMerchantKind.cs"
+      Link="CollectionMerchantKind.cs"
+    />
+    <Compile
       Include="..\..\Game\CollectionPanel\CollectionSourceOfferPoolCacheKey.cs"
       Link="CollectionSourceOfferPoolCacheKey.cs"
     />
@@ -49,8 +61,16 @@
       Link="EncounterOfferHeroMapper.cs"
     />
     <Compile
+      Include="..\..\GameInterop\EncounterOffers\EncounterOfferPoolResult.cs"
+      Link="EncounterOfferPoolResult.cs"
+    />
+    <Compile
       Include="..\..\GameInterop\EncounterOffers\EncounterOfferPoolRules.cs"
       Link="EncounterOfferPoolRules.cs"
+    />
+    <Compile
+      Include="..\..\GameInterop\EncounterOffers\EncounterOfferStaticPoolResolver.cs"
+      Link="EncounterOfferStaticPoolResolver.cs"
     />
     <Reference Include="BazaarBattleService">
       <HintPath>$(ManagedPath)/BazaarBattleService.dll</HintPath>

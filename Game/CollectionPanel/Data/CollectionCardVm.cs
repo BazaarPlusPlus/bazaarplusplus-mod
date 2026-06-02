@@ -17,9 +17,11 @@ internal sealed partial class CollectionCardVm
     public ETier StartingTier { get; init; }
     public IReadOnlyCollection<EHero> Heroes { get; init; } = Array.Empty<EHero>();
     public IReadOnlyCollection<ECardTag> Tags { get; init; } = Array.Empty<ECardTag>();
+    public IReadOnlyCollection<EHiddenTag> HiddenTags { get; init; } = Array.Empty<EHiddenTag>();
     public string DisplayName { get; init; } = string.Empty;
     public string InternalName { get; init; } = string.Empty;
     public string ArtKey { get; init; } = string.Empty;
+    public bool IsEnchantable { get; init; }
     public bool IsPackage { get; init; }
     public IReadOnlyCollection<CollectionMerchantKind> Merchants { get; init; } =
         Array.Empty<CollectionMerchantKind>();

@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Cards.Item;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -18,10 +19,15 @@ internal sealed partial class CollectionCardVm
             StartingTier = template.StartingTier,
             Heroes = template.Heroes,
             Tags = template.Tags,
+            HiddenTags = template.HiddenTags,
             DisplayName =
                 CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName,
             InternalName = template.InternalName,
             ArtKey = template.ArtKey,
+            IsEnchantable =
+                template is TCardItem item
+                && item.Enchantments != null
+                && item.Enchantments.Count > 0,
             IsPackage = CollectionCardClassifier.IsPackage(template),
             Merchants = CollectionCardClassifier.ResolveMerchants(template),
         };

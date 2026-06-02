@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Encounters;
 using BazaarPlusPlus.GameInterop.EncounterOffers;
 
@@ -15,17 +16,27 @@ internal sealed class CollectionSourceOfferPoolCache
 
     public EncounterOfferPoolResult GetOrResolve(
         MerchantTrainerEntry source,
-        IReadOnlyList<EHero> heroFilters
+        IReadOnlyList<EHero> heroFilters,
+        IReadOnlyList<CollectionCardVm> catalogCards
     )
     {
         var key = BuildKey(source, heroFilters);
         if (_cache.TryGetValue(key, out var cached))
             return cached;
 
-        var result = EncounterOfferPoolResolver.ResolveOfferedTemplateIds(
-            source.TemplateIds,
-            heroFilters
+        var result = CollectionSourceRuleOfferPoolResolver.Resolve(
+            source,
+            heroFilters,
+            catalogCards
         );
+        if (result.Status == EncounterOfferPoolStatus.Unavailable)
+        {
+            result = EncounterOfferPoolResolver.ResolveOfferedTemplateIds(
+                source.TemplateIds,
+                heroFilters
+            );
+        }
+
         if (
             result.Status == EncounterOfferPoolStatus.Ready
             || result.Status == EncounterOfferPoolStatus.Unavailable

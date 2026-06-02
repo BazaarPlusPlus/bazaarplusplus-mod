@@ -53,6 +53,8 @@ internal sealed class CollectionSourceOptionViewModel
 
 internal sealed partial class CollectionPanelView : IDisposable
 {
+    private const string SourceChipInitialsName = "bpp-source-chip-initials";
+
     private readonly Transform _parent;
     private readonly Action _close;
     private readonly Action<ECardType> _setActiveType;

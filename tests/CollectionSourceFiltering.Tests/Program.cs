@@ -1,7 +1,16 @@
 using BazaarBattleService;
 using BazaarBattleService.Models;
+using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Cards.Encounter.Event;
+using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Runs;
+using BazaarGameShared.Domain.Spawning.SpawnFilters;
+using BazaarGameShared.Domain.Spawning.SpawnFilters.Constraints;
+using BazaarGameShared.Domain.Spawning.SpawnGroups;
+using BazaarGameShared.Domain.Spawning.SpawningContexts;
 using BazaarPlusPlus.Game.CollectionPanel;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Encounters;
 using BazaarPlusPlus.GameInterop.EncounterOffers;
 
@@ -67,10 +76,7 @@ AssertValues(
     "Source identity must preserve all template ids for resolver union."
 );
 
-var noHeroCacheKey = CollectionSourceOfferPoolCacheKey.Build(
-    entries[0],
-    Array.Empty<EHero>()
-);
+var noHeroCacheKey = CollectionSourceOfferPoolCacheKey.Build(entries[0], Array.Empty<EHero>());
 AssertTrue(
     noHeroCacheKey.StartsWith(entries[0].SourceKey + "|", StringComparison.Ordinal),
     "Source offer cache key should include the stable source key."
@@ -158,12 +164,12 @@ var sourceAndUiHeroes = EncounterOfferPoolRules.ResolveRuntimeHeroFilters(
 AssertEqual(
     EncounterOfferHeroFilterStatus.Ready,
     sourceAndUiHeroes.Status,
-    "Source hero filters and UI hero filters should intersect when both exist."
+    "Source hero filters should drive the offered pool when the source carries them."
 );
 AssertValues(
     sourceAndUiHeroes.RuntimeHeroes.ToArray(),
-    new[] { BazaarTypes.EBazaarHero.Vanessa },
-    "Hero filter intersection should preserve only shared heroes."
+    new[] { BazaarTypes.EBazaarHero.Vanessa, BazaarTypes.EBazaarHero.Pygmalien },
+    "UI hero filters should not crop source-owned hero filters."
 );
 
 var emptyIntersection = EncounterOfferPoolRules.ResolveRuntimeHeroFilters(
@@ -171,9 +177,14 @@ var emptyIntersection = EncounterOfferPoolRules.ResolveRuntimeHeroFilters(
     new[] { EHero.Vanessa }
 );
 AssertEqual(
-    EncounterOfferHeroFilterStatus.EmptyIntersection,
+    EncounterOfferHeroFilterStatus.Ready,
     emptyIntersection.Status,
-    "Disjoint source and UI hero filters should produce no candidates."
+    "A source that sells another hero's cards should still resolve for the selected run hero."
+);
+AssertValues(
+    emptyIntersection.RuntimeHeroes.ToArray(),
+    new[] { BazaarTypes.EBazaarHero.Dooley },
+    "The source-owned hero filter should be preserved even when the selected run hero differs."
 );
 
 var unsupportedHero = EncounterOfferPoolRules.ResolveRuntimeHeroFilters(
@@ -208,19 +219,240 @@ AssertTrue(
     "Missing ItemTierFilters should not crop the source pool."
 );
 
+var staticSourceId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+var staticSourceOwnedHeroId = Guid.Parse("66666666-6666-6666-6666-777777777777");
+var staticNoGroupsSourceId = Guid.Parse("66666666-6666-6666-6666-888888888888");
+var staticVanessaWeaponId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+var staticDooleyWeaponId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+var staticMediumItemId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+var staticSkillId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+var staticSource = new TCardEncounterEvent
+{
+    Id = staticSourceId,
+    InternalName = "Static Aila",
+    SelectionContext = new TSelectionContext
+    {
+        SpawnContext = new TSpawnContextQuery
+        {
+            Groups =
+            [
+                new TSpawnGroup
+                {
+                    Filters =
+                    [
+                        new TSpawnFilterQuery
+                        {
+                            Constraints = new ConstraintAnd
+                            {
+                                Constraints =
+                                [
+                                    new ConstraintCardType { Types = [ECardType.Item] },
+                                    new ConstraintTag { Tags = [ECardTag.Weapon] },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+};
+var staticSourceOwnedHero = new TCardEncounterEvent
+{
+    Id = staticSourceOwnedHeroId,
+    InternalName = "Static Dooley Merchant",
+    SelectionContext = new TSelectionContext
+    {
+        SpawnContext = new TSpawnContextQuery
+        {
+            Groups =
+            [
+                new TSpawnGroup
+                {
+                    Filters =
+                    [
+                        new TSpawnFilterQuery
+                        {
+                            Constraints = new ConstraintAnd
+                            {
+                                Constraints =
+                                [
+                                    new ConstraintCardType { Types = [ECardType.Item] },
+                                    new ConstraintHero { Heroes = [EHero.Dooley] },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+};
+var staticNoGroupsSource = new TCardEncounterEvent
+{
+    Id = staticNoGroupsSourceId,
+    InternalName = "Static Unresolved Merchant",
+    SelectionContext = new TSelectionContext { SpawnContext = new TSpawnContextQuery() },
+};
+var staticMap = new Dictionary<Guid, ITCard>
+{
+    [staticSourceId] = staticSource,
+    [staticSourceOwnedHeroId] = staticSourceOwnedHero,
+    [staticNoGroupsSourceId] = staticNoGroupsSource,
+    [staticVanessaWeaponId] = StaticItem(
+        staticVanessaWeaponId,
+        "Vanessa Weapon",
+        ETier.Bronze,
+        [EHero.Vanessa],
+        [ECardTag.Weapon]
+    ),
+    [staticDooleyWeaponId] = StaticItem(
+        staticDooleyWeaponId,
+        "Dooley Weapon",
+        ETier.Bronze,
+        [EHero.Dooley],
+        [ECardTag.Weapon]
+    ),
+    [staticMediumItemId] = StaticItem(
+        staticMediumItemId,
+        "Vanessa Medium",
+        ETier.Bronze,
+        [EHero.Vanessa],
+        [ECardTag.Tool]
+    ),
+    [staticSkillId] = StaticItem(
+        staticSkillId,
+        "Vanessa Skill",
+        ETier.Bronze,
+        [EHero.Vanessa],
+        [ECardTag.Weapon],
+        type: ECardType.Skill
+    ),
+};
+var staticPool = EncounterOfferStaticPoolResolver.ResolveOfferedTemplateIds(
+    [staticSourceId],
+    [EHero.Vanessa],
+    staticMap
+);
+AssertEqual(
+    EncounterOfferPoolStatus.Ready,
+    staticPool.Status,
+    "Static source pool resolver should be usable when GameServiceManager is unavailable."
+);
+AssertValues(
+    staticPool.TemplateIds.OrderBy(id => id).ToArray(),
+    [staticVanessaWeaponId],
+    "Static source pool should apply source constraints and UI hero filters."
+);
+var staticSourceOwnedHeroPool = EncounterOfferStaticPoolResolver.ResolveOfferedTemplateIds(
+    [staticSourceOwnedHeroId],
+    [EHero.Vanessa],
+    staticMap
+);
+AssertEqual(
+    EncounterOfferPoolStatus.Ready,
+    staticSourceOwnedHeroPool.Status,
+    "Static source pool resolver should support source-owned hero constraints."
+);
+AssertValues(
+    staticSourceOwnedHeroPool.TemplateIds.OrderBy(id => id).ToArray(),
+    [staticDooleyWeaponId],
+    "Static source-owned hero constraints should not be cropped by the selected run hero."
+);
+var staticNoGroupsPool = EncounterOfferStaticPoolResolver.ResolveOfferedTemplateIds(
+    [staticNoGroupsSourceId],
+    [EHero.Vanessa],
+    staticMap
+);
+AssertEqual(
+    EncounterOfferPoolStatus.Unavailable,
+    staticNoGroupsPool.Status,
+    "Static sources without evaluable groups should not masquerade as an empty ready pool."
+);
+
+var julesSourceId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+var julesItemId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+var dooleyItemId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+var vanessaCritId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+var dooleyCritId = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+var dooleyNonCritId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+var sourceRuleCards = new[]
+{
+    CatalogCard(julesItemId, ECardType.Item, [EHero.Jules]),
+    CatalogCard(dooleyItemId, ECardType.Item, [EHero.Dooley]),
+    CatalogCard(vanessaCritId, ECardType.Item, [EHero.Vanessa], hiddenTags: [EHiddenTag.Crit]),
+    CatalogCard(dooleyCritId, ECardType.Item, [EHero.Dooley], hiddenTags: [EHiddenTag.Crit]),
+    CatalogCard(dooleyNonCritId, ECardType.Item, [EHero.Dooley]),
+};
+var julesSourcePool = CollectionSourceRuleOfferPoolResolver.Resolve(
+    new MerchantTrainerEntry(
+        "merchant:jules",
+        "Jules",
+        EncounterPortraitKind.Merchant,
+        "Diamond",
+        [EHero.Dooley],
+        "Sells items from this Hero",
+        [julesSourceId]
+    ),
+    [EHero.Dooley],
+    sourceRuleCards
+);
+AssertEqual(
+    EncounterOfferPoolStatus.Ready,
+    julesSourcePool.Status,
+    "Curated source rules should resolve without GameServiceManager."
+);
+AssertValues(
+    julesSourcePool.TemplateIds.ToArray(),
+    [julesItemId],
+    "Hero merchants should sell the source hero's items, not the selected run hero's items."
+);
+var anyHeroCritPool = CollectionSourceRuleOfferPoolResolver.Resolve(
+    new MerchantTrainerEntry(
+        "merchant:aimbot",
+        "Aimbot",
+        EncounterPortraitKind.Merchant,
+        "Silver",
+        [EHero.Dooley, EHero.Vanessa],
+        "Sells Crit items from any Hero",
+        [julesSourceId]
+    ),
+    [EHero.Vanessa],
+    sourceRuleCards
+);
+AssertEqual(
+    EncounterOfferPoolStatus.Ready,
+    anyHeroCritPool.Status,
+    "Any-hero source rules should resolve without GameServiceManager."
+);
+AssertValues(
+    anyHeroCritPool.TemplateIds.OrderBy(id => id).ToArray(),
+    new[] { dooleyCritId, vanessaCritId }.OrderBy(id => id).ToArray(),
+    "Any-hero source rules should not be cropped by the selected run hero."
+);
+var currentCatalogJson = File.ReadAllText(
+    Path.Combine("Data", "Encounters", "merchant-trainer-portraits.json")
+);
+foreach (var sourceEntry in MerchantTrainerCatalog.Build(currentCatalogJson))
+{
+    var probePool = CollectionSourceRuleOfferPoolResolver.Resolve(
+        sourceEntry,
+        Array.Empty<EHero>(),
+        sourceRuleCards
+    );
+    AssertTrue(
+        probePool.Status != EncounterOfferPoolStatus.Unavailable,
+        $"Current source catalog entry should have a static rule: {sourceEntry.SourceKey}."
+    );
+}
+
 var retry = new CollectionSourcePoolRetryState();
 var firstSchedule = retry.Schedule("source-a", now: 10f, retrySeconds: 0.25f, maxAttempts: 2);
 AssertFalse(firstSchedule.IsExhausted, "First loading retry should schedule a retry.");
-AssertFalse(
-    retry.TryConsumeDueRetry(10.20f),
-    "Retry should not fire before its due time."
-);
+AssertFalse(retry.TryConsumeDueRetry(10.20f), "Retry should not fire before its due time.");
 AssertTrue(retry.TryConsumeDueRetry(10.25f), "Retry should fire at its due time.");
 AssertEqual(1, retry.Attempts, "Due retry should increment the attempt count.");
-AssertTrue(
-    float.IsNaN(retry.NextRetryAt),
-    "Consumed retry should clear the pending due time."
-);
+AssertTrue(float.IsNaN(retry.NextRetryAt), "Consumed retry should clear the pending due time.");
 
 var secondSchedule = retry.Schedule("source-a", now: 10.25f, retrySeconds: 0.25f, maxAttempts: 2);
 AssertFalse(secondSchedule.IsExhausted, "Retry below max attempts should reschedule.");
@@ -276,3 +508,48 @@ static void AssertTrue(bool condition, string message)
 }
 
 static void AssertFalse(bool condition, string message) => AssertTrue(!condition, message);
+
+static TCardItem StaticItem(
+    Guid id,
+    string name,
+    ETier tier,
+    IEnumerable<EHero> heroes,
+    IEnumerable<ECardTag> tags,
+    ECardType type = ECardType.Item
+) =>
+    new()
+    {
+        Id = id,
+        InternalName = name,
+        StartingTier = tier,
+        Type = type,
+        Heroes = new HashSet<EHero>(heroes),
+        Tags = new HashSet<ECardTag>(tags),
+        ArtKey = name,
+        SpawningEligibility = ESpawnEligibility.Always,
+    };
+
+static CollectionCardVm CatalogCard(
+    Guid id,
+    ECardType type,
+    IEnumerable<EHero> heroes,
+    IEnumerable<ECardTag>? tags = null,
+    IEnumerable<EHiddenTag>? hiddenTags = null,
+    ECardSize size = ECardSize.Medium,
+    ETier tier = ETier.Bronze,
+    bool isEnchantable = false
+) =>
+    new()
+    {
+        Id = id,
+        Type = type,
+        Size = size,
+        StartingTier = tier,
+        Heroes = heroes.ToArray(),
+        Tags = tags?.ToArray() ?? Array.Empty<ECardTag>(),
+        HiddenTags = hiddenTags?.ToArray() ?? Array.Empty<EHiddenTag>(),
+        DisplayName = id.ToString("N"),
+        InternalName = id.ToString("N"),
+        ArtKey = id.ToString("N"),
+        IsEnchantable = isEnchantable,
+    };

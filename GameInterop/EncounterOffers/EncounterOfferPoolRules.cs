@@ -79,26 +79,13 @@ internal static class EncounterOfferPoolRules
             AddDistinct(uiHeroes, uiHero);
         }
 
-        if (sourceUiHeroes.Count == 0 && uiHeroes.Count == 0)
-            return EncounterOfferHeroFilterResult.Ready(Array.Empty<BazaarTypes.EBazaarHero>());
-
-        if (sourceUiHeroes.Count == 0)
-            return TryMapUiHeroes(uiHeroes);
-
-        if (uiHeroes.Count == 0)
+        if (sourceUiHeroes.Count > 0)
             return TryMapUiHeroes(sourceUiHeroes);
 
-        var intersection = new List<EHero>();
-        foreach (var uiHero in uiHeroes)
-        {
-            if (sourceUiHeroes.Contains(uiHero))
-                intersection.Add(uiHero);
-        }
+        if (uiHeroes.Count > 0)
+            return TryMapUiHeroes(uiHeroes);
 
-        if (intersection.Count == 0)
-            return EncounterOfferHeroFilterResult.EmptyIntersection();
-
-        return TryMapUiHeroes(intersection);
+        return EncounterOfferHeroFilterResult.Ready(Array.Empty<BazaarTypes.EBazaarHero>());
     }
 
     public static bool IsCandidateTierEligible(
