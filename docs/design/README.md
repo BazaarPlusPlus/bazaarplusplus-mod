@@ -25,6 +25,7 @@ Work designed but not yet (fully) landed; lives at this top level until implemen
 - [`2026-05-31-history-panel-hero-portrait-badge-design.md`](2026-05-31-history-panel-hero-portrait-badge-design.md) — HistoryPanel 英雄文本徽章（`VAN`/`PYG`）改真实头像 Sprite：走 `CollectionManager.GetDefaultHeroSkin` + `SkinAssetDataSO.LoadPortraitSpriteAsync`（异步 Addressables，无硬编码 key），在现有 `Label` 上设 `backgroundImage`，文本徽章降级为 fallback；含 token 防陈旧与逐文件源码锚点（**Draft，未开工**）。
 - [`2026-06-01-collection-panel-hero-portrait-chips-plan.md`](2026-06-01-collection-panel-hero-portrait-chips-plan.md) — CollectionPanel hero filter chips use the game's default hero portrait sprites through a shared provider; HistoryPanel badge adoption remains a follow-up.
 - [`2026-06-02-collection-panel-offer-source-filtering.md`](2026-06-02-collection-panel-offer-source-filtering.md) — CollectionPanel 商人 / 训练师来源筛选 Goal：复用 source card 自带选池 filter，显示理论候选池，不做手写匹配或当前 roll 预测。
+- [`2026-06-02-item-board-preview-abstraction.md`](2026-06-02-item-board-preview-abstraction.md) — 抽出单卡 native `CardPreviewBase` primitive 与共享 item-board preview surface；HistoryPanel 先无行为迁移，CardSetPreview 再移除 live `MonsterBoardTooltip` clone path。
 
 ## Archived specs
 
