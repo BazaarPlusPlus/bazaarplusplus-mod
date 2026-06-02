@@ -11,7 +11,8 @@ internal sealed partial class CombatStatusBar
 {
     private const float BarHeight = Sizes.CombatStatusBarHeight;
     private const float BarBottomMargin = 0f;
-    private const float SegmentSpacing = UiSpacing.Xs;
+    private const float SegmentSpacing = 14f;
+    private const float SegmentHorizontalInset = 10f;
     private const int CanvasSortingOrder = 10;
 
     private static readonly Color BarColorIdle = new(0.06f, 0.07f, 0.09f, 0.90f);
@@ -30,7 +31,13 @@ internal sealed partial class CombatStatusBar
     private static readonly Color SpeedButtonColorActive = new(0.48f, 0.33f, 0.13f, 0.95f);
     private static readonly Color SpeedButtonPressedColorIdle = new(0.35f, 0.39f, 0.46f, 1f);
     private static readonly Color SpeedButtonPressedColorActive = new(0.66f, 0.47f, 0.16f, 1f);
-    private static readonly Color SpeedButtonDisabledColor = new(0.22f, 0.24f, 0.28f, 0.45f);
+    private static readonly Color SpeedButtonUnavailableColorIdle = new(0.18f, 0.21f, 0.25f, 0.62f);
+    private static readonly Color SpeedButtonUnavailableColorActive = new(
+        0.34f,
+        0.24f,
+        0.12f,
+        0.68f
+    );
     private static readonly Color PausedBaseColorIdle = new(0.28f, 0.33f, 0.40f, 0.95f);
     private static readonly Color PausedBaseColorActive = new(0.54f, 0.40f, 0.16f, 0.96f);
     private static readonly Color UnpausedBaseColorIdle = new(0.24f, 0.27f, 0.33f, 0.90f);
@@ -39,7 +46,8 @@ internal sealed partial class CombatStatusBar
     private static readonly Color PausedPressedColorActive = new(0.68f, 0.50f, 0.18f, 1f);
     private static readonly Color UnpausedPressedColorIdle = new(0.32f, 0.36f, 0.43f, 1f);
     private static readonly Color UnpausedPressedColorActive = new(0.56f, 0.41f, 0.15f, 1f);
-    private static readonly Color PauseDisabledColor = new(0.22f, 0.24f, 0.28f, 0.45f);
+    private static readonly Color OutlineColorIdle = new(0.48f, 0.52f, 0.58f, 0.24f);
+    private static readonly Color OutlineColorActive = new(0.96f, 0.72f, 0.34f, 0.40f);
 
     private static Sprite? _roundedSprite;
     private static Font? _uiFont;
@@ -49,14 +57,11 @@ internal sealed partial class CombatStatusBar
     private RectTransform? _barRoot;
     private Image? _barBackground;
     private Image? _barGlow;
+    private Outline? _barOutline;
 
     private Text? _timeLabel;
     private Text? _timeValue;
     private Image? _timeBackground;
-
-    private Text? _frameLabel;
-    private Text? _frameValue;
-    private Image? _frameBackground;
 
     private Text? _speedLabel;
     private Button? _decrementButton;
@@ -75,12 +80,10 @@ internal sealed partial class CombatStatusBar
     private Image? _pauseBackground;
 
     private Image? _timeDivider;
-    private Image? _frameDivider;
     private Image? _speedDivider;
 
     private string? _renderedTimeLabel;
     private string? _renderedTimeText;
-    private string? _renderedFrameText;
     private string? _renderedPauseButtonText;
 
     private void EnsureUi()
@@ -124,26 +127,49 @@ internal sealed partial class CombatStatusBar
         _barRoot.anchorMax = new Vector2(0.5f, 0f);
         _barRoot.pivot = new Vector2(0.5f, 0f);
         _barRoot.anchoredPosition = new Vector2(0f, BarBottomMargin);
-        _barRoot.sizeDelta = new Vector2(462f, BarHeight);
+        _barRoot.sizeDelta = new Vector2(0f, BarHeight);
 
         _barBackground = AddImage(_barRoot.gameObject, Colors.CombatBarBackground);
+        _barOutline = _barRoot.gameObject.AddComponent<Outline>();
+        _barOutline.effectDistance = new Vector2(1f, -1f);
+        _barOutline.effectColor = OutlineColorIdle;
+        _barOutline.useGraphicAlpha = false;
+
         _barGlow = AddChildImage("BarGlow", _barRoot, Colors.CombatBarGlow);
         _barGlow.rectTransform.offsetMin = new Vector2(3f, 3f);
         _barGlow.rectTransform.offsetMax = new Vector2(-3f, -3f);
+        var glowLayout = _barGlow.gameObject.AddComponent<LayoutElement>();
+        glowLayout.ignoreLayout = true;
 
         var layout = _barRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
         layout.spacing = SegmentSpacing;
-        layout.padding = new RectOffset(4, 4, 4, 4);
+        layout.padding = new RectOffset(18, 18, 8, 8);
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlHeight = true;
         layout.childControlWidth = true;
         layout.childForceExpandHeight = true;
         layout.childForceExpandWidth = false;
 
-        var timeSegment = CreateReadoutSegment(
+        var fitter = _barRoot.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+
+        var speedContent = CreateInteractiveSegment(
+            "SpeedSegment",
+            _barRoot,
+            92f,
+            out _speedBackground,
+            out _speedLabel
+        );
+        SetLabel(_speedLabel, "Speed");
+        CreateSpeedContent(speedContent);
+
+        _speedDivider = CreateDivider(_barRoot);
+
+        CreateReadoutSegment(
             "TimeSegment",
             _barRoot,
-            116f,
+            132f,
             out _timeBackground,
             out _timeLabel,
             out _timeValue
@@ -152,39 +178,15 @@ internal sealed partial class CombatStatusBar
 
         _timeDivider = CreateDivider(_barRoot);
 
-        var frameSegment = CreateReadoutSegment(
-            "FrameSegment",
-            _barRoot,
-            116f,
-            out _frameBackground,
-            out _frameLabel,
-            out _frameValue
-        );
-        SetLabel(_frameLabel, "Frame");
-
-        _frameDivider = CreateDivider(_barRoot);
-
-        var speedSegment = CreateInteractiveSegment(
-            "SpeedSegment",
-            _barRoot,
-            84f,
-            out _speedBackground,
-            out _speedLabel
-        );
-        SetLabel(_speedLabel, "Speed");
-        CreateSpeedContent(speedSegment);
-
-        _speedDivider = CreateDivider(_barRoot);
-
-        var pauseSegment = CreateInteractiveSegment(
+        var pauseContent = CreateInteractiveSegment(
             "PauseSegment",
             _barRoot,
-            110f,
+            92f,
             out _pauseBackground,
             out _pauseLabel
         );
         SetLabel(_pauseLabel, "Pause");
-        CreatePauseContent(pauseSegment);
+        CreatePauseContent(pauseContent);
     }
 
     private void DisposeUi()
@@ -198,12 +200,10 @@ internal sealed partial class CombatStatusBar
         _barRoot = null;
         _barBackground = null;
         _barGlow = null;
+        _barOutline = null;
         _timeLabel = null;
         _timeValue = null;
         _timeBackground = null;
-        _frameLabel = null;
-        _frameValue = null;
-        _frameBackground = null;
         _speedLabel = null;
         _decrementButton = null;
         _decrementButtonText = null;
@@ -219,11 +219,9 @@ internal sealed partial class CombatStatusBar
         _pauseButtonBackground = null;
         _pauseBackground = null;
         _timeDivider = null;
-        _frameDivider = null;
         _speedDivider = null;
         _renderedTimeLabel = null;
         _renderedTimeText = null;
-        _renderedFrameText = null;
         _renderedPauseButtonText = null;
     }
 
@@ -252,20 +250,20 @@ internal sealed partial class CombatStatusBar
 
         SetImageColor(_barBackground, barColor);
         SetImageColor(_barGlow, glowColor);
+        SetOutlineColor(
+            _barOutline,
+            Color.Lerp(OutlineColorIdle, OutlineColorActive, _visualBlend)
+        );
         SetImageColor(_timeBackground, segmentColor);
-        SetImageColor(_frameBackground, segmentColor);
         SetImageColor(_speedBackground, segmentColor);
         SetImageColor(_pauseBackground, segmentColor);
         SetImageColor(_timeDivider, dividerColor);
-        SetImageColor(_frameDivider, dividerColor);
         SetImageColor(_speedDivider, dividerColor);
 
         SetTextColor(_timeLabel, labelColor);
-        SetTextColor(_frameLabel, labelColor);
         SetTextColor(_speedLabel, labelColor);
         SetTextColor(_pauseLabel, labelColor);
         SetTextColor(_timeValue, valueColor);
-        SetTextColor(_frameValue, valueColor);
 
         var timeLabel = GetDisplayedTimeLabel();
         if (!string.Equals(_renderedTimeLabel, timeLabel, StringComparison.Ordinal))
@@ -284,16 +282,6 @@ internal sealed partial class CombatStatusBar
             _timeValue.text = timeText;
         }
 
-        var frameText = GetDisplayedFrameText();
-        if (
-            _frameValue != null
-            && !string.Equals(_renderedFrameText, frameText, StringComparison.Ordinal)
-        )
-        {
-            _renderedFrameText = frameText;
-            _frameValue.text = frameText;
-        }
-
         var speedButtonColor = Color.Lerp(
             SpeedButtonColorIdle,
             SpeedButtonColorActive,
@@ -304,25 +292,31 @@ internal sealed partial class CombatStatusBar
             SpeedButtonPressedColorActive,
             _visualBlend
         );
-        var speedButtonDisabledColor = SpeedButtonDisabledColor;
+        var speedButtonUnavailableColor = Color.Lerp(
+            SpeedButtonUnavailableColorIdle,
+            SpeedButtonUnavailableColorActive,
+            _visualBlend
+        );
         ApplyButtonColors(
             _decrementButton,
             _decrementButtonBackground,
             _decrementButtonText,
+            CombatStatusBarButtonKind.Speed,
             CanStepCombatSpeed(-1),
             speedButtonColor,
             speedButtonPressedColor,
-            speedButtonDisabledColor,
+            speedButtonUnavailableColor,
             valueColor
         );
         ApplyButtonColors(
             _incrementButton,
             _incrementButtonBackground,
             _incrementButtonText,
+            CombatStatusBarButtonKind.Speed,
             CanStepCombatSpeed(1),
             speedButtonColor,
             speedButtonPressedColor,
-            speedButtonDisabledColor,
+            speedButtonUnavailableColor,
             valueColor
         );
         RefreshSpeedDot();
@@ -334,15 +328,15 @@ internal sealed partial class CombatStatusBar
         var pausePressedColor = IsCombatPaused
             ? Color.Lerp(PausedPressedColorIdle, PausedPressedColorActive, _visualBlend)
             : Color.Lerp(UnpausedPressedColorIdle, UnpausedPressedColorActive, _visualBlend);
-        var pauseDisabledColor = PauseDisabledColor;
         ApplyButtonColors(
             _pauseButton,
             _pauseButtonBackground,
             _pauseButtonText,
+            CombatStatusBarButtonKind.Pause,
             pauseInteractable,
             pauseBaseColor,
             pausePressedColor,
-            pauseDisabledColor,
+            pauseBaseColor,
             valueColor
         );
         var pauseButtonText = IsCombatPaused ? ">" : "||";
@@ -361,8 +355,8 @@ internal sealed partial class CombatStatusBar
         var row = CreateRect("SpeedRow", parent);
         row.anchorMin = Vector2.zero;
         row.anchorMax = Vector2.one;
-        row.offsetMin = new Vector2(8f, 8f);
-        row.offsetMax = new Vector2(-8f, -22f);
+        row.offsetMin = Vector2.zero;
+        row.offsetMax = Vector2.zero;
 
         var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
         layout.spacing = 5f;
@@ -423,8 +417,8 @@ internal sealed partial class CombatStatusBar
         var buttonArea = CreateRect("PauseButtonArea", parent);
         buttonArea.anchorMin = Vector2.zero;
         buttonArea.anchorMax = Vector2.one;
-        buttonArea.offsetMin = new Vector2(12f, 6f);
-        buttonArea.offsetMax = new Vector2(-12f, -20f);
+        buttonArea.offsetMin = Vector2.zero;
+        buttonArea.offsetMax = Vector2.zero;
 
         (_pauseButton, _pauseButtonBackground, _pauseButtonText) = CreateButton(
             "PauseButton",
@@ -449,12 +443,13 @@ internal sealed partial class CombatStatusBar
     )
     {
         var segment = CreateSegmentShell(name, parent, width, out background);
-        label = CreateText("Label", segment, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
-        AnchorTopStretch(label.rectTransform, 6f, 12f);
+        var stack = CreateSegmentStack(segment);
+        label = CreateText("Label", stack, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
+        AddFixedLayout(label.rectTransform, 12f);
 
-        value = CreateText("Value", segment, 15, FontStyle.Bold, TextAnchor.MiddleCenter);
+        value = CreateText("Value", stack, 15, FontStyle.Bold, TextAnchor.MiddleCenter);
         value.verticalOverflow = VerticalWrapMode.Overflow;
-        StretchToParent(value.rectTransform, 8f, 8f, 18f, 6f);
+        AddFixedLayout(value.rectTransform, 18f);
         return segment;
     }
 
@@ -467,9 +462,32 @@ internal sealed partial class CombatStatusBar
     )
     {
         var segment = CreateSegmentShell(name, parent, width, out background);
-        label = CreateText("Label", segment, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
-        AnchorTopStretch(label.rectTransform, 6f, 12f);
-        return segment;
+        var stack = CreateSegmentStack(segment);
+        label = CreateText("Label", stack, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
+        AddFixedLayout(label.rectTransform, 12f);
+
+        var content = CreateRect("Content", stack);
+        var contentLayout = content.gameObject.AddComponent<LayoutElement>();
+        contentLayout.minHeight = 24f;
+        contentLayout.preferredHeight = 24f;
+        contentLayout.flexibleWidth = 1f;
+        contentLayout.flexibleHeight = 0f;
+        return content;
+    }
+
+    private RectTransform CreateSegmentStack(Transform parent)
+    {
+        var stack = CreateRect("Stack", parent);
+        StretchToParent(stack, SegmentHorizontalInset, SegmentHorizontalInset, 5f, 5f);
+
+        var layout = stack.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.spacing = 2f;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        return stack;
     }
 
     private RectTransform CreateSegmentShell(
@@ -495,9 +513,9 @@ internal sealed partial class CombatStatusBar
         layoutElement.preferredWidth = 1f;
         layoutElement.minWidth = 1f;
         layoutElement.flexibleHeight = 1f;
-        var image = AddImage(divider.gameObject, Color.white);
-        divider.offsetMin = new Vector2(0f, 8f);
-        divider.offsetMax = new Vector2(0f, -8f);
+        var image = AddChildImage("DividerLine", divider, Color.white);
+        image.rectTransform.offsetMin = new Vector2(0f, 4f);
+        image.rectTransform.offsetMax = new Vector2(0f, -4f);
         return image;
     }
 
@@ -539,13 +557,13 @@ internal sealed partial class CombatStatusBar
         return rect;
     }
 
-    private static void AnchorTopStretch(RectTransform rect, float top, float height)
+    private static void AddFixedLayout(RectTransform rect, float preferredHeight)
     {
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.pivot = new Vector2(0.5f, 1f);
-        rect.anchoredPosition = new Vector2(0f, -top);
-        rect.sizeDelta = new Vector2(0f, height);
+        var layoutElement = rect.gameObject.AddComponent<LayoutElement>();
+        layoutElement.minHeight = preferredHeight;
+        layoutElement.preferredHeight = preferredHeight;
+        layoutElement.flexibleHeight = 0f;
+        layoutElement.flexibleWidth = 1f;
     }
 
     private static void StretchToParent(
@@ -618,22 +636,46 @@ internal sealed partial class CombatStatusBar
         Button? button,
         Image? background,
         Text? label,
+        CombatStatusBarButtonKind kind,
         bool interactable,
         Color normalColor,
         Color pressedColor,
-        Color disabledColor,
+        Color unavailableColor,
         Color textColor
     )
     {
         if (button == null || background == null || label == null)
             return;
 
-        button.interactable = interactable;
-        button.colors = BuildColorBlock(normalColor, pressedColor, disabledColor);
-        background.color = interactable ? normalColor : disabledColor;
-        label.color = interactable
-            ? textColor
-            : new Color(textColor.r, textColor.g, textColor.b, 0.45f);
+        var visuals = ResolveButtonVisuals(
+            kind,
+            interactable,
+            new CombatStatusBarButtonPalette(
+                ToRgba(normalColor),
+                ToRgba(pressedColor),
+                ToRgba(unavailableColor),
+                ToRgba(textColor)
+            )
+        );
+
+        button.interactable = visuals.Interactable;
+        button.colors = BuildColorBlock(
+            ToUnityColor(visuals.Normal),
+            ToUnityColor(visuals.Pressed),
+            ToUnityColor(visuals.Disabled)
+        );
+        background.color = ToUnityColor(visuals.Background);
+        label.color = ToUnityColor(visuals.Text);
+    }
+
+    private static CombatStatusBarRgba ToRgba(Color color)
+    {
+        return new CombatStatusBarRgba(color.r, color.g, color.b, color.a);
+    }
+
+    private static Color ToUnityColor(CombatStatusBarRgba color)
+    {
+        return new Color(color.R, color.G, color.B, color.A);
     }
 
     private static void SetImageColor(Image? image, Color color)
@@ -646,6 +688,12 @@ internal sealed partial class CombatStatusBar
     {
         if (text != null)
             text.color = color;
+    }
+
+    private static void SetOutlineColor(Outline? outline, Color color)
+    {
+        if (outline != null)
+            outline.effectColor = color;
     }
 
     private static void SetLabel(Text? label, string content)

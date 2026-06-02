@@ -5,6 +5,36 @@ using TheBazaar;
 
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 
+internal enum CombatStatusBarButtonKind
+{
+    Speed,
+    Pause,
+}
+
+internal readonly record struct CombatStatusBarRgba(float R, float G, float B, float A)
+{
+    internal CombatStatusBarRgba WithAlpha(float alpha)
+    {
+        return new CombatStatusBarRgba(R, G, B, alpha);
+    }
+}
+
+internal readonly record struct CombatStatusBarButtonPalette(
+    CombatStatusBarRgba Normal,
+    CombatStatusBarRgba Pressed,
+    CombatStatusBarRgba Unavailable,
+    CombatStatusBarRgba Text
+);
+
+internal readonly record struct CombatStatusBarButtonVisuals(
+    bool Interactable,
+    CombatStatusBarRgba Normal,
+    CombatStatusBarRgba Pressed,
+    CombatStatusBarRgba Disabled,
+    CombatStatusBarRgba Background,
+    CombatStatusBarRgba Text
+);
+
 internal sealed partial class CombatStatusBar
 {
     private static readonly float[] SpeedSteps = { 0.5f, 0.67f, 1f };
@@ -107,11 +137,6 @@ internal sealed partial class CombatStatusBar
             : "-:--:--";
     }
 
-    internal static string GetDisplayedFrameText()
-    {
-        return IsCombatPlaybackActive ? GetCurrentCombatFrameIndex().ToString() : "Standby";
-    }
-
     internal static float AdvanceVisualBlend(float current, bool active, float deltaTime)
     {
         var target = active ? 1f : 0f;
@@ -155,6 +180,29 @@ internal sealed partial class CombatStatusBar
         gameServiceManager.PauseOrUnpauseGame(paused);
         IsCombatPaused = gameServiceManager.GamePaused;
         return IsCombatPaused;
+    }
+
+    internal static CombatStatusBarButtonVisuals ResolveButtonVisuals(
+        CombatStatusBarButtonKind kind,
+        bool interactable,
+        CombatStatusBarButtonPalette palette
+    )
+    {
+        var disabledColor =
+            kind == CombatStatusBarButtonKind.Pause ? palette.Normal : palette.Unavailable;
+        var textColor =
+            interactable || kind == CombatStatusBarButtonKind.Pause
+                ? palette.Text
+                : palette.Text.WithAlpha(0.45f);
+
+        return new CombatStatusBarButtonVisuals(
+            Interactable: interactable,
+            Normal: palette.Normal,
+            Pressed: palette.Pressed,
+            Disabled: disabledColor,
+            Background: interactable ? palette.Normal : disabledColor,
+            Text: textColor
+        );
     }
 
     private static string FormatElapsed(TimeSpan elapsed)

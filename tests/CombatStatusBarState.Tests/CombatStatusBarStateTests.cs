@@ -1,3 +1,4 @@
+using System.Reflection;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
@@ -58,32 +59,70 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void GetDisplayedFrameText_ReflectsStandbyAndCurrentFrameIndex()
+    public void FrameDisplayText_IsNotPartOfCombatStatusBarState()
     {
-        Assert.Equal("Standby", CombatStatusBar.GetDisplayedFrameText());
+        var frameTextMethod = typeof(CombatStatusBar).GetMethod(
+            "GetDisplayedFrameText",
+            BindingFlags.NonPublic | BindingFlags.Static
+        );
 
-        CombatStatusBar.BeginCombatPlayback();
-        Assert.Equal("0", CombatStatusBar.GetDisplayedFrameText());
-
-        CombatStatusBar.AdvanceCombatFrame();
-        Assert.Equal("0", CombatStatusBar.GetDisplayedFrameText());
-
-        CombatStatusBar.AdvanceCombatFrame();
-        Assert.Equal("1", CombatStatusBar.GetDisplayedFrameText());
+        Assert.Null(frameTextMethod);
     }
 
     [Fact]
-    public void DisplayedTimeText_UsesDisplayedFrameIndex()
+    public void DisplayedTimeText_StillUsesLogicalFrameIndex()
     {
         CombatStatusBar.BeginCombatPlayback();
 
         CombatStatusBar.AdvanceCombatFrame();
-        Assert.Equal("0", CombatStatusBar.GetDisplayedFrameText());
         Assert.Equal("0:00:00", CombatStatusBar.GetDisplayedTimeText());
 
         CombatStatusBar.AdvanceCombatFrame();
-        Assert.Equal("1", CombatStatusBar.GetDisplayedFrameText());
         Assert.Equal("0:00:05", CombatStatusBar.GetDisplayedTimeText());
+    }
+
+    [Fact]
+    public void ButtonVisuals_KeepPauseBrightWhenDisabled()
+    {
+        var palette = new CombatStatusBarButtonPalette(
+            Normal: new CombatStatusBarRgba(0.7f, 0.6f, 0.2f, 1f),
+            Pressed: new CombatStatusBarRgba(0.9f, 0.7f, 0.3f, 1f),
+            Unavailable: new CombatStatusBarRgba(0.2f, 0.2f, 0.2f, 0.45f),
+            Text: new CombatStatusBarRgba(1f, 0.95f, 0.85f, 1f)
+        );
+
+        var result = CombatStatusBar.ResolveButtonVisuals(
+            CombatStatusBarButtonKind.Pause,
+            interactable: false,
+            palette
+        );
+
+        Assert.False(result.Interactable);
+        Assert.Equal(palette.Normal, result.Disabled);
+        Assert.Equal(palette.Normal, result.Background);
+        Assert.Equal(palette.Text, result.Text);
+    }
+
+    [Fact]
+    public void ButtonVisuals_DimSpeedWhenUnavailable()
+    {
+        var palette = new CombatStatusBarButtonPalette(
+            Normal: new CombatStatusBarRgba(0.7f, 0.6f, 0.2f, 1f),
+            Pressed: new CombatStatusBarRgba(0.9f, 0.7f, 0.3f, 1f),
+            Unavailable: new CombatStatusBarRgba(0.35f, 0.28f, 0.16f, 0.55f),
+            Text: new CombatStatusBarRgba(1f, 0.95f, 0.85f, 1f)
+        );
+
+        var result = CombatStatusBar.ResolveButtonVisuals(
+            CombatStatusBarButtonKind.Speed,
+            interactable: false,
+            palette
+        );
+
+        Assert.False(result.Interactable);
+        Assert.Equal(palette.Unavailable, result.Disabled);
+        Assert.Equal(palette.Unavailable, result.Background);
+        Assert.Equal(new CombatStatusBarRgba(1f, 0.95f, 0.85f, 0.45f), result.Text);
     }
 
     [Fact]
