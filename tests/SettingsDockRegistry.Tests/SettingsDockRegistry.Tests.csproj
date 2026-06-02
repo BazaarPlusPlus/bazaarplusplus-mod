@@ -11,6 +11,15 @@
     </RestoreAdditionalProjectSources>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
+    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/Assembly-CSharp.dll')">
+    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
@@ -26,5 +35,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\BazaarPlusPlus.csproj" />
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <None Include="$(ManagedPath)/UnityEngine.CoreModule.dll" Link="UnityEngine.CoreModule.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

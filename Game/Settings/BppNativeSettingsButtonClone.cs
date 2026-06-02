@@ -27,6 +27,12 @@ internal static class BppNativeSettingsButtonClone
         if (existing != null)
         {
             ConfigureRect(existing, anchorButton.transform as RectTransform);
+            BppDockButtonVisuals.Apply(
+                existing.gameObject,
+                placement.ButtonIconKind,
+                explicitIcon: null,
+                freshClone: false
+            );
             return existing;
         }
 
@@ -37,7 +43,14 @@ internal static class BppNativeSettingsButtonClone
         );
         cloneObject.name = placement.DockButtonObjectName;
 
+        var nativeIcon = BppDockButtonVisuals.ResolveNativeIconImage(cloneObject);
         StripNativeButtonBehavior(cloneObject);
+        BppDockButtonVisuals.Apply(
+            cloneObject,
+            placement.ButtonIconKind,
+            nativeIcon,
+            freshClone: true
+        );
 
         var rect = cloneObject.GetComponent<RectTransform>();
         if (rect == null)
@@ -101,7 +114,6 @@ internal static class BppNativeSettingsButtonClone
 
         targetGraphic.raycastTarget = true;
         button.onClick.RemoveAllListeners();
-        button.transition = Selectable.Transition.ColorTint;
         button.navigation = new Navigation { mode = Navigation.Mode.None };
         button.interactable = true;
         button.targetGraphic = targetGraphic;

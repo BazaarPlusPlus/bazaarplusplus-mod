@@ -1,4 +1,5 @@
 using BazaarPlusPlus.Game.Settings;
+using UnityEngine;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests.SettingsDockRegistry;
@@ -8,8 +9,14 @@ public class BppSettingsDockGeometryTests
     [Fact]
     public void LeftOfSettingButton_creates_per_anchor_object_names()
     {
-        var mainMenu = BppSettingsDockPlacement.LeftOfSettingButton("MainMenu");
-        var heroSelect = BppSettingsDockPlacement.LeftOfSettingButton("HeroSelect");
+        var mainMenu = BppSettingsDockPlacement.LeftOfSettingButton(
+            "MainMenu",
+            BppDockButtonIconKind.SettingsDock
+        );
+        var heroSelect = BppSettingsDockPlacement.LeftOfSettingButton(
+            "HeroSelect",
+            BppDockButtonIconKind.SettingsDock
+        );
 
         Assert.NotEqual(mainMenu.DockButtonObjectName, heroSelect.DockButtonObjectName);
         Assert.NotEqual(mainMenu.PanelObjectName, heroSelect.PanelObjectName);
@@ -17,12 +24,16 @@ public class BppSettingsDockGeometryTests
         Assert.Contains("HeroSelect", heroSelect.PanelObjectName);
         Assert.Equal(BppSettingsDockSide.LeftOfAnchor, mainMenu.Side);
         Assert.Equal(BppSettingsDockPanelDirection.UpLeft, mainMenu.PanelDirection);
+        Assert.Equal(BppDockButtonIconKind.SettingsDock, mainMenu.ButtonIconKind);
     }
 
     [Fact]
     public void CalculateDockButtonLocalPosition_places_clone_left_of_anchor_with_gap()
     {
-        var placement = BppSettingsDockPlacement.LeftOfSettingButton("MainMenu");
+        var placement = BppSettingsDockPlacement.LeftOfSettingButton(
+            "MainMenu",
+            BppDockButtonIconKind.SettingsDock
+        );
 
         var result = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
             anchorCenterLocalX: 100f,
@@ -43,7 +54,10 @@ public class BppSettingsDockGeometryTests
     [Fact]
     public void CalculateDockButtonLocalPosition_places_clone_world_left_when_local_axis_is_flipped()
     {
-        var placement = BppSettingsDockPlacement.LeftOfSettingButton("HeroSelect");
+        var placement = BppSettingsDockPlacement.LeftOfSettingButton(
+            "HeroSelect",
+            BppDockButtonIconKind.SettingsDock
+        );
 
         var result = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
             anchorCenterLocalX: 100f,
@@ -64,7 +78,10 @@ public class BppSettingsDockGeometryTests
     [Fact]
     public void CalculateDockButtonLocalPosition_places_clone_above_anchor_with_gap()
     {
-        var placement = BppSettingsDockPlacement.AboveSettingButton("CollectionPanel");
+        var placement = BppSettingsDockPlacement.AboveSettingButton(
+            "CollectionPanel",
+            BppDockButtonIconKind.CollectionPanel
+        );
 
         var result = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
             anchorCenterLocalX: 100f,
@@ -80,12 +97,16 @@ public class BppSettingsDockGeometryTests
         Assert.Equal(100f, result.X);
         Assert.Equal(118f, result.Y);
         Assert.Equal(7f, result.Z);
+        Assert.Equal(BppDockButtonIconKind.CollectionPanel, placement.ButtonIconKind);
     }
 
     [Fact]
     public void CalculateDockButtonLocalPosition_places_clone_world_above_when_local_axis_is_flipped()
     {
-        var placement = BppSettingsDockPlacement.AboveSettingButton("CollectionPanel");
+        var placement = BppSettingsDockPlacement.AboveSettingButton(
+            "CollectionPanel",
+            BppDockButtonIconKind.CollectionPanel
+        );
 
         var result = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
             anchorCenterLocalX: 100f,
@@ -118,5 +139,18 @@ public class BppSettingsDockGeometryTests
         );
 
         Assert.Equal(expected, result, precision: 4);
+    }
+
+    [Fact]
+    public void DockButtonHoverColors_are_distinct_per_button_kind()
+    {
+        var settings = BppDockButtonVisuals.ResolveColors(BppDockButtonIconKind.SettingsDock);
+        var collection = BppDockButtonVisuals.ResolveColors(BppDockButtonIconKind.CollectionPanel);
+
+        Assert.NotEqual(settings.Highlighted, collection.Highlighted);
+        Assert.Equal(Color.white, settings.Normal);
+        Assert.Equal(Color.white, collection.Normal);
+        Assert.True(settings.FadeDuration > 0f);
+        Assert.True(collection.FadeDuration > 0f);
     }
 }

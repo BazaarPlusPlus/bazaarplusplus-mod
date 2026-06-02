@@ -45,9 +45,15 @@ internal static class BppSettingsDockAwakePatch
 
         CollectionPanelDockButtonController.Attach(
             button,
-            BppSettingsDockPlacement.AboveSettingButton($"CollectionPanel_{key}")
+            BppSettingsDockPlacement.AboveSettingButton(
+                $"CollectionPanel_{key}",
+                BppDockButtonIconKind.CollectionPanel
+            )
         );
-        BppSettingsDockController.Attach(button, BppSettingsDockPlacement.LeftOfSettingButton(key));
+        BppSettingsDockController.Attach(
+            button,
+            BppSettingsDockPlacement.LeftOfSettingButton(key, BppDockButtonIconKind.SettingsDock)
+        );
     }
 }
 
@@ -70,11 +76,17 @@ internal static class BppSettingsDockFightMenuPatch
             {
                 CollectionPanelDockButtonController.Attach(
                     button,
-                    BppSettingsDockPlacement.AboveSettingButton("CollectionPanel_FightMenu")
+                    BppSettingsDockPlacement.AboveSettingButton(
+                        "CollectionPanel_FightMenu",
+                        BppDockButtonIconKind.CollectionPanel
+                    )
                 );
                 BppSettingsDockController.Attach(
                     button,
-                    BppSettingsDockPlacement.LeftOfSettingButton("FightMenu")
+                    BppSettingsDockPlacement.LeftOfSettingButton(
+                        "FightMenu",
+                        BppDockButtonIconKind.SettingsDock
+                    )
                 );
             }
         }
