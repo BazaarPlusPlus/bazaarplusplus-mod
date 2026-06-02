@@ -108,6 +108,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
 
         TryHandleDisplayModeSwitch(keyboard);
         TryHandleRecommendationNavigation(keyboard);
+        PollPreviewHover();
     }
 
     public bool TryHandleCardClick(CardController? controller, PointerEventData? eventData)
@@ -137,7 +138,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         var changed =
             button == PointerEventData.InputButton.Left ? TryAdd(entry) : TryRemove(entry.Key);
         if (changed)
-            StartRenderForSelection(controller, card);
+            StartRenderForSelection();
 
         BppLog.Info(
             "CardSetPreviewRuntime",
@@ -256,7 +257,7 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         return true;
     }
 
-    private void StartRenderForSelection(CardController controller, Card sourceCard)
+    private void StartRenderForSelection()
     {
         if (_selectedCards.Count == 0)
         {
@@ -269,10 +270,8 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         _recommendationIndex = 0;
         _currentSponsor = PickSponsorDisplay();
         ShowModeIndicator();
-        if (_itemBoard.ShowTemplateSet(BuildCurrentRequest()))
-            return;
-
-        StartCoroutine(RenderWhenTooltipHostReady(controller, sourceCard));
+        if (!_itemBoard.ShowTemplateSet(BuildCurrentRequest()))
+            BppLog.Warn("CardSetPreviewRuntime", "Item board preview unavailable.");
     }
 
     private void HidePreview(string reason)
@@ -497,43 +496,12 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
         return true;
     }
 
-    private System.Collections.IEnumerator RenderWhenTooltipHostReady(
-        CardController controller,
-        Card sourceCard
-    )
+    private void PollPreviewHover()
     {
-        const int maxFramesToWait = 10;
-        var tooltipParent = Data.TooltipParentComponent;
-        if (tooltipParent == null)
-            yield break;
+        var mouse = Mouse.current;
+        if (mouse == null)
+            return;
 
-        var tooltipData = controller.GetTooltipData();
-        tooltipParent.HideCardTooltipController();
-        if (tooltipData != null)
-            tooltipParent.ShowCardTooltipController(
-                controller.transform,
-                controller.TooltipOffset,
-                tooltipData
-            );
-
-        for (var i = 0; i < maxFramesToWait; i++)
-        {
-            if (controller == null || controller.CardData != sourceCard)
-                yield break;
-
-            var tooltipController = tooltipParent.GetCardTooltipController(sourceCard);
-            if (tooltipController == null)
-            {
-                yield return null;
-                continue;
-            }
-
-            if (!_itemBoard.ShowTemplateSet(tooltipController, BuildCurrentRequest()))
-            {
-                yield break;
-            }
-            tooltipParent.HideCardTooltipController();
-            yield break;
-        }
+        _itemBoard.PollHover(mouse.position.ReadValue());
     }
 }

@@ -9,20 +9,20 @@
 
   <ItemGroup>
     <Compile
-      Include="../../Game/HistoryPanel/Preview/HistoryPanelPreviewSignatureGate.cs"
-      Link="HistoryPanelPreviewSignatureGate.cs"
-    />
-    <Compile
-      Include="../../Game/HistoryPanel/Preview/HistoryPanelPreviewGenerationGuard.cs"
-      Link="HistoryPanelPreviewGenerationGuard.cs"
-    />
-    <Compile
       Include="../../Game/HistoryPanel/Preview/HistoryPanelPreviewTextureGeometry.cs"
       Link="HistoryPanelPreviewTextureGeometry.cs"
     />
     <Compile
-      Include="../../Game/HistoryPanel/Preview/BattleBoardSocketResolver.cs"
-      Link="BattleBoardSocketResolver.cs"
+      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewSignatureGate.cs"
+      Link="ItemBoardPreviewSignatureGate.cs"
+    />
+    <Compile
+      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewGenerationGuard.cs"
+      Link="ItemBoardPreviewGenerationGuard.cs"
+    />
+    <Compile
+      Include="../../GameInterop/ItemBoardPreview/ItemBoardSocketResolver.cs"
+      Link="ItemBoardSocketResolver.cs"
     />
     <Compile Include="Program.cs" />
   </ItemGroup>

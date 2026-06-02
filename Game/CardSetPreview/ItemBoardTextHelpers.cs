@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CardSetPreview;
 
-// Pure text / CJK / transform-path helpers extracted from ItemBoardOverlay.
+// Pure text / CJK / transform-path helpers for CardSet item-board chrome.
 // All members are stateless and side-effect free.
 internal static class ItemBoardTextHelpers
 {

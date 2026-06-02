@@ -23,7 +23,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好默认的 `IBppMountable`；`AutoBazaarHostMount` 只在 `EnableAutoBazaarHost=true` 构建中加入 |
 | `BppComposition.cs` | 创建 `IBppServices`，注册 `RunLifecycleModule`、`CombatReplayModule`、`CombatStatusBarModule`，并把所有 `IBppMountable`（feature runtime）和 `ISettingsDockEntry`（设置坞入口）汇总到两个 registry |
 | `Core/` | 纯抽象：配置、事件总线、路径、run context、运行时服务接口 |
-| `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`Encounter/`、`StaticCards/`、`CardPreview/`、`HeroPortraits/`，以及带 game type 的事件 + `IRunContext` 接口 |
+| `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`Encounter/`、`StaticCards/`、`CardPreview/`、`ItemBoardPreview/`、`HeroPortraits/`，以及带 game type 的事件 + `IRunContext` 接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
 默认挂载的 `IBppMountable`（实际注册见 `BppComposition.cs`；多数是泛型 `ComponentMount<T>`，仅 `HistoryPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<CardSetPreviewRuntime>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbScreenshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`ComponentMount<TooltipModifierRefreshController>`。`AutoBazaarHostMount` 受 `BPP_AUTOBAZAAR_HOST` 编译符号保护，只有 `EnableAutoBazaarHost=true` 构建会编译并注册。AutoBazaar 的纯协议/transport/validation/runtime controller 在根目录 `AutoBazaar/` 和 `BazaarPlusPlus.AutoBazaar.csproj`，Unity 与游戏 DLL 适配层在 `Game/AutoBazaarHost/`。
@@ -41,8 +41,8 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 ### 怪物预览（Monster Preview）
 
 - 完全走游戏原生怪物预览，Bazaar++ 不再 patch 或 augment 原生 tooltip
-- `CardSetPreviewRuntime` 会复用原生 `MonsterBoardTooltip` 作为宿主展示 Bazaar++ 组织的 CardSet board 内容
-- HistoryPanel 预览是独立栈（`Game/HistoryPanel/Preview/`），与怪物预览解耦
+- `CardSetPreviewRuntime` 通过共享 `GameInterop/ItemBoardPreview` surface 展示 Bazaar++ 组织的 CardSet board 内容；不再创建或克隆真实 `MonsterBoardTooltip`
+- HistoryPanel 的 `BattleBoardPreview` 是同一 shared surface 的 feature wrapper，与怪物预览解耦
 - 附魔/升级预览注入由独立的 patch 提供（见后续小节 / `Patches/Tooltips/`），不属于 monster preview 路径
 
 详见 [features/monster-preview.md](features/monster-preview.md)。

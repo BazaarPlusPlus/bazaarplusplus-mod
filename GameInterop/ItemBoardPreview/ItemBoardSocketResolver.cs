@@ -1,13 +1,9 @@
 #nullable enable
 using System;
 
-namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
+namespace BazaarPlusPlus.GameInterop.ItemBoardPreview;
 
-// Pure socket-placement math for the battle-board preview: given the socket count, an optional
-// requested socket index, a fallback index, and the card's slot span, pick the start socket the
-// card should occupy — or -1 when a card of that span cannot fit. No Unity or game dependencies,
-// so it is unit-testable in isolation.
-internal static class BattleBoardSocketResolver
+internal static class ItemBoardSocketResolver
 {
     public static int ResolveIndex(
         int socketCount,

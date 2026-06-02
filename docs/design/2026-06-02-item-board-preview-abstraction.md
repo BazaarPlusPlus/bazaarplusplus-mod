@@ -1,6 +1,6 @@
 # Item-board preview abstraction target
 
-Status: DRAFT TARGET - not implemented.
+Status: IMPLEMENTED - automated verification complete; runtime startup/resource validation complete; manual interaction validation pending.
 
 This document records the target architecture for replacing CardSetPreview's
 live `MonsterBoardTooltip` clone path with a shared native card-preview
@@ -39,49 +39,54 @@ The end state is:
 - Do not reintroduce offscreen Camera -> RenderTexture rendering for uGUI card
   previews. The validated path is `ScreenSpaceOverlay` + `RectMask2D`.
 
-## Current evidence
+## Implementation evidence
 
-HistoryPanel already has most of the desired surface shape. `BattleBoardPreview`
-owns a `ScreenSpaceOverlay` canvas, clip rect, board rect, sockets, active
-cards, setup tasks, and generation guard
-([BattleBoardPreview.cs](../../Game/HistoryPanel/Preview/BattleBoardPreview.cs#L20-L41)).
-Its public knobs are position, clip size, and card scale
-([BattleBoardPreview.cs](../../Game/HistoryPanel/Preview/BattleBoardPreview.cs#L63-L109)).
-Its render path awaits all setup tasks before showing and packing cards
-([BattleBoardPreview.cs](../../Game/HistoryPanel/Preview/BattleBoardPreview.cs#L111-L180)).
+The shared single-card primitive now lives in `GameInterop/CardPreview/`:
+`NativeCardPreviewSpec`, `NativeCardPreviewHandle`, `NativeCardPreviewPool`,
+`NativeCardPreviewFactory`, and `NativeCardPreviewHoverRelay`. It reuses
+`NativeCardPreviewRuntime` and `NativeCardPreviewPrefabResolver` for native
+`CardPreviewBase` reflection, prefab lookup, `Resize`, `Show`, and async
+`SetUp`.
 
-HistoryPanel also has the single-card lifecycle in feature-local code:
-`BattleBoardCardFactory` resolves static templates, picks a socket, takes a
-pooled card, builds a synthetic `TCardInstanceItem`, invokes native setup, and
-shows/returns cards
-([BattleBoardCardFactory.cs](../../Game/HistoryPanel/Preview/BattleBoardCardFactory.cs#L28-L110)).
-`HistoryPanelPreviewCardPool` handles prefab lookup, pooling, layer application,
-resize, return, and destroy
-([HistoryPanelPreviewCardPool.cs](../../Game/HistoryPanel/Preview/HistoryPanelPreviewCardPool.cs#L11-L138)).
+The shared item-board surface now lives in `GameInterop/ItemBoardPreview/`:
+`ItemBoardPreviewSurface`, `ItemBoardPreviewOptions`, `ItemBoardPreviewPhase`,
+`ItemBoardPreviewLayoutMode`, `ItemBoardSocketLayout`,
+`ItemBoardSocketResolver`, `ItemBoardPreviewGenerationGuard`, and
+`ItemBoardPreviewSignatureGate`. It owns the `ScreenSpaceOverlay` canvas,
+`RectMask2D` clipping, 10 sockets, generation cancellation, optional signature
+cache, packed/socketed layout, and setup-gated polled hover.
 
-CardSetPreview is the path to replace. `ItemBoardOverlay` currently clones the
-native `MonsterBoardTooltip` from a live `CardTooltipController`, hides skill
-and health visuals, drives `MonsterBoardTooltip` methods by reflection, and
-renders a synthetic monster
-([ItemBoardOverlay.cs](../../Game/CardSetPreview/ItemBoardOverlay.cs#L16-L137)).
-`CardSetPreviewRuntime` starts with an existing item-board if possible, but
-otherwise creates a real card tooltip and waits up to ten frames for a
-`CardTooltipController` host
-([CardSetPreviewRuntime.cs](../../Game/CardSetPreview/CardSetPreviewRuntime.cs#L259-L276),
-[CardSetPreviewRuntime.cs](../../Game/CardSetPreview/CardSetPreviewRuntime.cs#L500-L538)).
+`Game/HistoryPanel/Preview/BattleBoardPreview.cs` is now a thin wrapper that
+maps `HistoryItemSpec` to `NativeCardPreviewSpec` and delegates rendering to
+`ItemBoardPreviewSurface`. The feature-local `BattleBoardCardFactory`,
+`HistoryPanelPreviewCardPool`, socket resolver, layout, generation guard, and
+signature gate files were removed.
 
-The low-level adapter already exists in `GameInterop/CardPreview`.
-`NativeCardPreviewRuntime` safely invokes `Resize`, `Show`, and async `SetUp`
-([NativeCardPreviewRuntime.cs](../../GameInterop/CardPreview/NativeCardPreviewRuntime.cs#L42-L104)).
-That is not yet a complete "show me one card" component because callers still
-own template lookup, instance construction, prefab pooling, parent placement,
-generation, and hover safety.
+`Game/CardSetPreview/ItemBoardService.cs` now owns one
+`ItemBoardPreviewSurface` plus CardSet-specific sponsor chrome. It maps
+`ItemBoardTemplateSetRequest.Items` to `NativeCardPreviewSpec`. The old live
+tooltip path files were removed:
 
-CollectionPanel provides the input lesson that should apply to CardSetPreview:
-hover dispatch should wait until the card's `SetUpTask` completed successfully
-before invoking native hover, because `CardPreviewBase.OnHover` reads tooltip
-data created during setup
-([CollectionGridVirtualizer.cs](../../Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs#L196-L290)).
+```text
+Game/CardSetPreview/MonsterBoardTooltipBindings.cs
+Game/CardSetPreview/SyntheticMonsterFactory.cs
+Game/CardSetPreview/ItemBoardRenderInput.cs
+Game/CardSetPreview/ItemBoardOverlay.cs
+```
+
+`CardSetPreviewRuntime` now calls `ShowTemplateSet(request)` directly and no
+longer starts `RenderWhenTooltipHostReady`.
+
+Debug runtime validation was built and launched through Steam on 2026-06-02.
+`BepInEx/LogOutput.log` showed `BazaarPlusPlus 4.0.0` loading, plugin
+initialization completing, the game reaching lobby, and
+`CollectionCardPool` acquiring native card preview prefab refs and 10 sockets.
+No `MethodAccessException`, `MissingMethodException`, `ItemBoardService`,
+`BattleBoardPreview`, or `CardPreviewBase.SetUp` errors appeared in the
+startup/resource log. Full HistoryPanel and CardSetPreview click-through
+validation remains pending because the available UI automation could read the
+game window and press keys, but could not deliver coordinate clicks or Unity
+hotkeys reliably.
 
 ## Target architecture
 
@@ -346,20 +351,22 @@ dotnet build BazaarPlusPlus.csproj --no-restore
 
 Runtime validation:
 
-1. Build Debug and launch The Bazaar through Steam.
-2. Open HistoryPanel and verify preview position, scale, packed layout, and
+1. Build Debug and launch The Bazaar through Steam. Completed on 2026-06-02.
+2. Inspect startup log for plugin load and native card preview resource
+   acquisition. Completed on 2026-06-02.
+3. Open HistoryPanel and verify preview position, scale, packed layout, and
    hover tooltip.
-3. Enable CardSetPreview with CapsLock.
-4. Left-click item cards to add, right-click to remove.
-5. Switch `A` / `D` display modes and `W` / `S` candidates.
-6. Verify selected-set and ten-win recommendation boards render without first
+4. Enable CardSetPreview with CapsLock.
+5. Left-click item cards to add, right-click to remove.
+6. Switch `A` / `D` display modes and `W` / `S` candidates.
+7. Verify selected-set and ten-win recommendation boards render without first
    opening a real card tooltip.
-7. Hover CardSetPreview cards and confirm native tooltips appear only after
+8. Hover CardSetPreview cards and confirm native tooltips appear only after
    cards are fully loaded.
-8. Disable mode and verify overlay, hover tooltip, and input state are cleaned
+9. Disable mode and verify overlay, hover tooltip, and input state are cleaned
    up.
-9. Inspect `BepInEx/LogOutput.log` for `CardPreviewBase.SetUp`, prefab
-   resolver, generation, and CardSet render errors.
+10. Inspect `BepInEx/LogOutput.log` for `CardPreviewBase.SetUp`, prefab
+    resolver, generation, and CardSet render errors.
 
 ## Implementation sequence
 

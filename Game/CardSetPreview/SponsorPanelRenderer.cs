@@ -10,10 +10,8 @@ using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.CardSetPreview;
 
-// Owns the sponsor panel chrome (background, outline, rich-text label) that
-// ItemBoardOverlay overlays on top of the cloned MonsterBoardTooltip. Build,
-// styling, color, rich-text, and placement logic moved verbatim from
-// ItemBoardOverlay; the overlay now delegates to this renderer.
+// Owns the CardSet-specific sponsor panel chrome (background, outline, rich-text label)
+// rendered alongside the shared item-board preview surface.
 internal sealed class SponsorPanelRenderer
 {
     private const string SponsorPanelObjectName = "BppItemBoardSponsorPanel";
@@ -321,7 +319,7 @@ internal sealed class SponsorPanelRenderer
             _resolvedSponsorFontLogged = true;
 
         BppLog.Info(
-            "ItemBoardOverlay",
+            "ItemBoardService",
             $"Resolved sponsor TMP font '{_resolvedSponsorFont?.name ?? "<null>"}' material='{_resolvedSponsorFontMaterial?.name ?? "<null>"}' source='{templatePath}' text='{template.text ?? string.Empty}'"
         );
     }

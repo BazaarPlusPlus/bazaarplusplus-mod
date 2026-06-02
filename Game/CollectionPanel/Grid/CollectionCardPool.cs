@@ -9,7 +9,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
 // Per-kind pool of CardPreviewBase instances cloned from MonsterBoardTooltip's four prefab
 // fields (_smallItemReference / _mediumItemReference / _largeItemReference / _skillReference).
-// Mirrors HistoryPanelPreviewCardPool's Take/Return/eviction shape, but is keyed by
+// Mirrors the native card-preview Take/Return/eviction shape, but is keyed by
 // (ECardType, ECardSize) instead of just ECardSize so the Skill prefab can be served without
 // pretending it is an Item.
 //

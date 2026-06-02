@@ -26,6 +26,15 @@ public class CoreLayeringTests
         "Core/Runtime/BppRuntimeServices.cs",
     };
 
+    private static readonly HashSet<string> AllowedFeaturePreviewBoundaryFiles = new(
+        StringComparer.Ordinal
+    )
+    {
+        // Existing data-service wiring for final-build refresh. This test is about preview
+        // internals; moving final-build data ownership is outside the item-board preview pass.
+        "Game/HistoryPanel/Storage/HistoryPanelDataService.cs",
+    };
+
     [Fact]
     public void Core_does_not_depend_on_Game_GameInterop_or_game_assemblies()
     {
@@ -117,6 +126,65 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void HistoryPanel_and_CardSetPreview_do_not_depend_on_each_others_preview_internals()
+    {
+        var repoRoot = RepoRoot();
+        var rules = new[]
+        {
+            new PreviewBoundaryRule(
+                Path.Combine(repoRoot, "Game", "HistoryPanel"),
+                "BazaarPlusPlus.Game.CardSetPreview",
+                "HistoryPanel"
+            ),
+            new PreviewBoundaryRule(
+                Path.Combine(repoRoot, "Game", "CardSetPreview"),
+                "BazaarPlusPlus.Game.HistoryPanel.Preview",
+                "CardSetPreview"
+            ),
+        };
+
+        var violations = new List<string>();
+        foreach (var rule in rules)
+        {
+            Assert.True(
+                Directory.Exists(rule.Directory),
+                $"Could not locate {rule.FeatureName} directory at '{rule.Directory}'."
+            );
+
+            foreach (
+                var file in Directory.EnumerateFiles(
+                    rule.Directory,
+                    "*.cs",
+                    SearchOption.AllDirectories
+                )
+            )
+            {
+                var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+                foreach (var rawLine in File.ReadLines(file))
+                {
+                    var line = rawLine.Trim();
+                    if (
+                        line.StartsWith(
+                            $"using {rule.DisallowedNamespace}",
+                            StringComparison.Ordinal
+                        ) && !AllowedFeaturePreviewBoundaryFiles.Contains(relative)
+                    )
+                    {
+                        violations.Add($"{relative}: {line}");
+                    }
+                }
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "HistoryPanel and CardSetPreview must share runtime preview behavior through "
+                + "GameInterop instead of importing each other's feature internals. Offending imports:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
+    [Fact]
     public void GameInterop_does_not_depend_on_Game_feature_namespaces()
     {
         var repoRoot = RepoRoot();
@@ -153,6 +221,12 @@ public class CoreLayeringTests
                 + string.Join("\n", violations)
         );
     }
+
+    private readonly record struct PreviewBoundaryRule(
+        string Directory,
+        string DisallowedNamespace,
+        string FeatureName
+    );
 
     [Fact]
     public void AutoBazaar_core_does_not_depend_on_host_or_game_runtime_namespaces()

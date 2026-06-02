@@ -2,53 +2,55 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.GameInterop.CardPreview;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace BazaarPlusPlus.Game.HistoryPanel.Preview;
+namespace BazaarPlusPlus.GameInterop.CardPreview;
 
-// Owns a small per-size pool of CardPreviewBase instances cloned from prefabs reflected off
-// MonsterBoardTooltip. Both the game type names and the prefab refs are resolved at runtime
-// via reflection so the mod compiles against the CI reference DLLs even though the actual
-// types live in the live game assemblies. Prefab refs + socket templates are static /
-// cross-scene; pooled instances are owned per-renderer.
-internal sealed class HistoryPanelPreviewCardPool
+internal sealed class NativeCardPreviewPool
 {
-    private const int DefaultMaxPoolSizePerSize = 30;
+    private const int DefaultMaxPoolSizePerKind = 30;
 
     private readonly int _layer;
-    private readonly int _maxPoolSizePerSize;
-    private readonly Dictionary<ECardSize, Queue<Component>> _pool = new();
+    private readonly bool _requireSockets;
+    private readonly string _logComponent;
+    private readonly int _maxPoolSizePerKind;
+    private readonly Dictionary<NativeCardPreviewKind, Queue<Component>> _pool = new();
 
-    public HistoryPanelPreviewCardPool(
+    public NativeCardPreviewPool(
         int layer,
-        int maxPoolSizePerSize = DefaultMaxPoolSizePerSize
+        bool requireSockets,
+        string logComponent,
+        int maxPoolSizePerKind = DefaultMaxPoolSizePerKind
     )
     {
         _layer = layer;
-        _maxPoolSizePerSize = Math.Max(1, maxPoolSizePerSize);
+        _requireSockets = requireSockets;
+        _logComponent = string.IsNullOrWhiteSpace(logComponent)
+            ? "NativeCardPreviewPool"
+            : logComponent;
+        _maxPoolSizePerKind = Math.Max(1, maxPoolSizePerKind);
     }
 
-    public static NativeCardPreviewSocketTemplate[]? TryGetSocketTemplates() =>
-        NativeCardPreviewPrefabResolver.TryGetSocketTemplates();
-
-    public bool TryEnsurePrefabRefs() =>
-        NativeCardPreviewPrefabResolver.TryEnsureResolved(
-            requireSkill: false,
-            requireSockets: true,
-            "HistoryPanelPreviewCardPool"
-        );
-
-    public Component? Take(ECardSize size, Transform parent)
+    public bool TryEnsurePrefabRefs(bool requireSkill)
     {
-        if (!TryEnsurePrefabRefs())
+        return NativeCardPreviewPrefabResolver.TryEnsureResolved(
+            requireSkill,
+            _requireSockets,
+            _logComponent
+        );
+    }
+
+    public Component? Take(NativeCardPreviewKind kind, Transform parent)
+    {
+        var requireSkill = kind.Type == ECardType.Skill;
+        if (!TryEnsurePrefabRefs(requireSkill))
             return null;
 
-        if (!_pool.TryGetValue(size, out var queue))
+        if (!_pool.TryGetValue(kind, out var queue))
         {
             queue = new Queue<Component>();
-            _pool[size] = queue;
+            _pool[kind] = queue;
         }
 
         Component? card = null;
@@ -66,19 +68,21 @@ internal sealed class HistoryPanelPreviewCardPool
         {
             if (
                 !NativeCardPreviewPrefabResolver.TryGetPrefab(
-                    NativeCardPreviewKind.ForItem(size),
-                    requireSkill: false,
-                    requireSockets: true,
-                    "HistoryPanelPreviewCardPool",
+                    kind,
+                    requireSkill,
+                    _requireSockets,
+                    _logComponent,
                     out var prefab
                 )
                 || prefab == null
             )
+            {
                 return null;
+            }
 
             card = Object.Instantiate(prefab, parent, worldPositionStays: false);
             if (card != null)
-                card.name = $"HistoryPanelPreviewCard_{size}";
+                card.name = $"BppNativeCardPreview_{kind}";
         }
         else
         {
@@ -92,26 +96,30 @@ internal sealed class HistoryPanelPreviewCardPool
         card.transform.localRotation = Quaternion.identity;
         card.gameObject.SetActive(true);
         NativeCardPreviewReflection.ApplyLayerRecursive(card.gameObject, _layer);
-        NativeCardPreviewRuntime.Resize(card, "HistoryPanelPreviewCardPool");
-
+        NativeCardPreviewRuntime.Resize(card, _logComponent);
         return card;
     }
 
-    public void Return(Component? card)
+    public void Return(NativeCardPreviewHandle? handle)
+    {
+        if (handle == null)
+            return;
+        Return(handle.Card, handle.Kind);
+    }
+
+    public void Return(Component? card, NativeCardPreviewKind kind)
     {
         if (card == null)
             return;
 
         card.gameObject.SetActive(false);
-
-        var size = NativeCardPreviewRuntime.ResolveCardSize(card);
-        if (!_pool.TryGetValue(size, out var queue))
+        if (!_pool.TryGetValue(kind, out var queue))
         {
             queue = new Queue<Component>();
-            _pool[size] = queue;
+            _pool[kind] = queue;
         }
 
-        if (queue.Count >= _maxPoolSizePerSize)
+        if (queue.Count >= _maxPoolSizePerKind)
         {
             var evicted = queue.Dequeue();
             if (evicted != null)

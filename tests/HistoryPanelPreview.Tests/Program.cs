@@ -1,4 +1,4 @@
-using BazaarPlusPlus.Game.HistoryPanel.Preview;
+using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 
 TestSignatureGate_NullAggregate_DoesNotCache();
 TestSignatureGate_IncompleteAggregate_DoesNotCache();
@@ -19,7 +19,7 @@ Console.WriteLine("HistoryPanelPreview checks passed.");
 static void TestSignatureGate_NullAggregate_DoesNotCache()
 {
     Assert(
-        !HistoryPanelPreviewSignatureGate.ShouldCache(null),
+        !ItemBoardPreviewSignatureGate.ShouldCache(null),
         "Null aggregate must not cache the signature."
     );
 }
@@ -28,7 +28,7 @@ static void TestSignatureGate_IncompleteAggregate_DoesNotCache()
 {
     var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
     Assert(
-        !HistoryPanelPreviewSignatureGate.ShouldCache(tcs.Task),
+        !ItemBoardPreviewSignatureGate.ShouldCache(tcs.Task),
         "An incomplete aggregate must not cache the signature (caller should still be waiting)."
     );
 }
@@ -38,7 +38,7 @@ static void TestSignatureGate_FaultedAggregate_DoesNotCache()
     var tcs = new TaskCompletionSource<bool>();
     tcs.SetException(new InvalidOperationException("simulated SetUp failure"));
     Assert(
-        !HistoryPanelPreviewSignatureGate.ShouldCache(tcs.Task),
+        !ItemBoardPreviewSignatureGate.ShouldCache(tcs.Task),
         "A faulted aggregate must not cache; next selection should retry."
     );
 }
@@ -48,7 +48,7 @@ static void TestSignatureGate_CanceledAggregate_DoesNotCache()
     var tcs = new TaskCompletionSource<bool>();
     tcs.SetCanceled();
     Assert(
-        !HistoryPanelPreviewSignatureGate.ShouldCache(tcs.Task),
+        !ItemBoardPreviewSignatureGate.ShouldCache(tcs.Task),
         "A canceled aggregate must not cache; the frame is incomplete."
     );
 }
@@ -58,14 +58,14 @@ static void TestSignatureGate_CompletedSuccessfully_Caches()
     var tcs = new TaskCompletionSource<bool>();
     tcs.SetResult(true);
     Assert(
-        HistoryPanelPreviewSignatureGate.ShouldCache(tcs.Task),
+        ItemBoardPreviewSignatureGate.ShouldCache(tcs.Task),
         "A completed-OK aggregate must cache so identical selections short-circuit."
     );
 }
 
 static void TestGenerationGuard_FreshSnapshotIsCurrent()
 {
-    var guard = new HistoryPanelPreviewGenerationGuard();
+    var guard = new ItemBoardPreviewGenerationGuard();
     var snapshot = guard.Bump();
     Assert(
         guard.IsCurrent(snapshot),
@@ -75,7 +75,7 @@ static void TestGenerationGuard_FreshSnapshotIsCurrent()
 
 static void TestGenerationGuard_BumpInvalidatesPriorSnapshot()
 {
-    var guard = new HistoryPanelPreviewGenerationGuard();
+    var guard = new ItemBoardPreviewGenerationGuard();
     var firstSnapshot = guard.Bump();
     guard.Bump();
     Assert(
@@ -86,7 +86,7 @@ static void TestGenerationGuard_BumpInvalidatesPriorSnapshot()
 
 static void TestGenerationGuard_ParallelBumpsAreSerialised()
 {
-    var guard = new HistoryPanelPreviewGenerationGuard();
+    var guard = new ItemBoardPreviewGenerationGuard();
     var first = guard.Bump();
     var second = guard.Bump();
     var third = guard.Bump();
@@ -100,7 +100,7 @@ static void TestGenerationGuard_ParallelBumpsAreSerialised()
 static void TestSocketResolver_HonoursRequestedIndex()
 {
     Assert(
-        BattleBoardSocketResolver.ResolveIndex(10, 3, 0, 1) == 3,
+        ItemBoardSocketResolver.ResolveIndex(10, 3, 0, 1) == 3,
         "A requested socket index that fits must be used verbatim."
     );
 }
@@ -108,7 +108,7 @@ static void TestSocketResolver_HonoursRequestedIndex()
 static void TestSocketResolver_FallsBackWhenNoRequest()
 {
     Assert(
-        BattleBoardSocketResolver.ResolveIndex(10, null, 4, 1) == 4,
+        ItemBoardSocketResolver.ResolveIndex(10, null, 4, 1) == 4,
         "With no requested index, the fallback index is used."
     );
 }
@@ -117,11 +117,11 @@ static void TestSocketResolver_ClampsIntoRange()
 {
     // 10 sockets, span 3 → last valid start is 7; a requested 9 clamps to 7.
     Assert(
-        BattleBoardSocketResolver.ResolveIndex(10, 9, 0, 3) == 7,
+        ItemBoardSocketResolver.ResolveIndex(10, 9, 0, 3) == 7,
         "A requested start beyond the last valid start clamps to it."
     );
     Assert(
-        BattleBoardSocketResolver.ResolveIndex(10, null, -2, 1) == 0,
+        ItemBoardSocketResolver.ResolveIndex(10, null, -2, 1) == 0,
         "A negative fallback index clamps to 0."
     );
 }
@@ -129,7 +129,7 @@ static void TestSocketResolver_ClampsIntoRange()
 static void TestSocketResolver_ReturnsMinusOneWhenSpanCannotFit()
 {
     Assert(
-        BattleBoardSocketResolver.ResolveIndex(2, 0, 0, 3) == -1,
+        ItemBoardSocketResolver.ResolveIndex(2, 0, 0, 3) == -1,
         "A card span larger than the socket count cannot fit."
     );
 }
@@ -137,7 +137,7 @@ static void TestSocketResolver_ReturnsMinusOneWhenSpanCannotFit()
 static void TestSocketResolver_ReturnsMinusOneForEmptyBoard()
 {
     Assert(
-        BattleBoardSocketResolver.ResolveIndex(0, 0, 0, 1) == -1,
+        ItemBoardSocketResolver.ResolveIndex(0, 0, 0, 1) == -1,
         "Zero sockets cannot host a card."
     );
 }

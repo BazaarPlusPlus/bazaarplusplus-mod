@@ -186,7 +186,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             return;
 
         if (keyboard.escapeKey.wasPressedThisFrame)
+        {
             SetHistoryVisible(false);
+            return;
+        }
+
+        PollPreviewHover();
     }
 
     private void SetHistoryVisible(bool visible)
@@ -374,6 +379,15 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         StopPreviewRender();
         _battleBoardPreview?.Dispose();
         _battleBoardPreview = null;
+    }
+
+    private void PollPreviewHover()
+    {
+        var mouse = Mouse.current;
+        if (mouse == null)
+            return;
+
+        _battleBoardPreview?.PollHover(mouse.position.ReadValue());
     }
 
     private void EnsureInitialized(string source)
