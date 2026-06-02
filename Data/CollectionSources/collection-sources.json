@@ -1,8 +1,19 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
+  "groups": [
+    "generalist",
+    "tier-specialist",
+    "size-specialist",
+    "other-hero",
+    "all-hero",
+    "tag-type-specialist",
+    "trainer"
+  ],
   "entries": [
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 1,
       "name": "Aero",
       "availableHeroes": [
         "Stelle"
@@ -22,6 +33,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 0,
       "name": "Aila",
       "availableHeroes": [],
       "description": "Sells Weapons",
@@ -45,6 +58,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "all-hero",
+      "order": 2,
       "name": "Aimbot",
       "availableHeroes": [
         "Dooley",
@@ -68,6 +83,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "size-specialist",
+      "order": 0,
       "name": "Ande",
       "availableHeroes": [],
       "description": "Sells Small items",
@@ -88,6 +105,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "size-specialist",
+      "order": 4,
       "name": "Barkun",
       "availableHeroes": [],
       "description": "Sells Medium and Large items. Buys your Small items at +1 Value",
@@ -105,6 +124,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 12,
       "name": "Chronos",
       "availableHeroes": [],
       "description": "Sells Haste items",
@@ -123,6 +144,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 13,
       "name": "Cobweb",
       "availableHeroes": [],
       "description": "Sells Slow items",
@@ -141,6 +164,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 18,
       "name": "Colt",
       "availableHeroes": [
         "Vanessa"
@@ -160,6 +185,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tier-specialist",
+      "order": 1,
       "name": "Curio",
       "availableHeroes": [],
       "description": "Sells Bronze-tier Neutral items",
@@ -177,6 +204,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "other-hero",
+      "order": 1,
       "name": "Dooley",
       "availableHeroes": [
         "Jules",
@@ -198,6 +227,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 5,
       "name": "Eli",
       "availableHeroes": [
         "Mak"
@@ -216,6 +247,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 10,
       "name": "Flex",
       "availableHeroes": [
         "Karnok",
@@ -236,6 +269,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 17,
       "name": "Freiya",
       "availableHeroes": [],
       "description": "Sells Freeze items",
@@ -253,6 +288,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "all-hero",
+      "order": 4,
       "name": "Gaseo",
       "availableHeroes": [],
       "description": "Sells Apparel from any Hero",
@@ -269,6 +306,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 7,
       "name": "Gastro",
       "availableHeroes": [
         "Jules"
@@ -287,6 +326,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tier-specialist",
+      "order": 3,
       "name": "Goldie",
       "availableHeroes": [],
       "description": "Sells Gold-tier items",
@@ -305,6 +346,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 15,
       "name": "Hef",
       "availableHeroes": [],
       "description": "Sells Burn items",
@@ -323,6 +366,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 11,
       "name": "Herma",
       "availableHeroes": [
         "Jules",
@@ -350,6 +395,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "generalist",
+      "order": 0,
       "name": "Jay Jay",
       "availableHeroes": [],
       "description": "Sells items",
@@ -373,6 +420,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "other-hero",
+      "order": 6,
       "name": "Jules",
       "availableHeroes": [
         "Dooley",
@@ -394,6 +443,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "other-hero",
+      "order": 3,
       "name": "Karnok",
       "availableHeroes": [
         "Dooley",
@@ -415,6 +466,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 9,
       "name": "Kev's Armory",
       "availableHeroes": [
         "Dooley",
@@ -441,6 +494,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tier-specialist",
+      "order": 0,
       "name": "Kina",
       "availableHeroes": [],
       "description": "Sells non-Weapon items",
@@ -460,6 +515,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 16,
       "name": "Knightshade",
       "availableHeroes": [],
       "description": "Sells Poison items",
@@ -478,6 +535,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tier-specialist",
+      "order": 4,
       "name": "Luxe",
       "availableHeroes": [],
       "description": "Sells Diamond-tier items",
@@ -495,6 +554,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "other-hero",
+      "order": 4,
       "name": "Mak",
       "availableHeroes": [
         "Dooley",
@@ -516,6 +577,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "size-specialist",
+      "order": 3,
       "name": "Midsworth",
       "availableHeroes": [],
       "description": "Sells Small and Large items. Buys your Medium items at +2 value",
@@ -534,6 +597,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "size-specialist",
+      "order": 1,
       "name": "Mittel",
       "availableHeroes": [],
       "description": "Sells Medium items",
@@ -553,6 +618,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 8,
       "name": "Mr. Morland",
       "availableHeroes": [
         "Pygmalien"
@@ -571,6 +638,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 2,
       "name": "Nautica",
       "availableHeroes": [
         "Vanessa"
@@ -589,6 +658,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 6,
       "name": "Orion",
       "availableHeroes": [],
       "description": "Sells Tools",
@@ -606,6 +677,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "all-hero",
+      "order": 5,
       "name": "Pinfeather",
       "availableHeroes": [
         "Dooley",
@@ -630,6 +703,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "size-specialist",
+      "order": 5,
       "name": "Pol",
       "availableHeroes": [],
       "description": "Sells Large items",
@@ -646,6 +721,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "all-hero",
+      "order": 0,
       "name": "Prospero",
       "availableHeroes": [
         "Pygmalien"
@@ -669,6 +746,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "other-hero",
+      "order": 2,
       "name": "Pygmalien",
       "availableHeroes": [
         "Dooley",
@@ -690,6 +769,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "size-specialist",
+      "order": 2,
       "name": "Quixel",
       "availableHeroes": [],
       "description": "Sells Small and Medium items. Buys your Large items at +3 value",
@@ -708,6 +789,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "generalist",
+      "order": 2,
       "name": "Serafina",
       "availableHeroes": [],
       "description": "Sells Enchanted items",
@@ -722,6 +805,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 3,
       "name": "Shelter Shelby",
       "availableHeroes": [
         "Karnok",
@@ -741,6 +826,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tier-specialist",
+      "order": 2,
       "name": "Silvia",
       "availableHeroes": [],
       "description": "Sells Silver-tier items",
@@ -759,6 +846,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "other-hero",
+      "order": 5,
       "name": "Stelle",
       "availableHeroes": [
         "Dooley",
@@ -780,6 +869,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "all-hero",
+      "order": 6,
       "name": "Tatiana",
       "availableHeroes": [],
       "description": "Sells Toys from any Hero",
@@ -796,6 +887,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "all-hero",
+      "order": 3,
       "name": "The Antiquarian",
       "availableHeroes": [],
       "description": "Sells Relics from any Hero",
@@ -812,6 +905,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "all-hero",
+      "order": 1,
       "name": "The Tester",
       "availableHeroes": [
         "Dooley",
@@ -832,6 +927,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 4,
       "name": "Tinker",
       "availableHeroes": [
         "Dooley"
@@ -850,6 +947,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 14,
       "name": "Tok's Clocks",
       "availableHeroes": [
         "Dooley",
@@ -878,6 +977,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "generalist",
+      "order": 1,
       "name": "Valpak",
       "availableHeroes": [],
       "description": "Sells items. Always sells discounted items",
@@ -891,6 +992,8 @@
     },
     {
       "kind": "Merchant",
+      "group": "other-hero",
+      "order": 0,
       "name": "Vanessa",
       "availableHeroes": [
         "Dooley",
@@ -912,6 +1015,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 11,
       "name": "Adira",
       "availableHeroes": [],
       "description": "Teaches Diamond-tier Skills",
@@ -929,6 +1034,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 9,
       "name": "Argenta",
       "availableHeroes": [],
       "description": "Teaches Silver-tier Skills",
@@ -947,6 +1054,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 19,
       "name": "Bjorn",
       "availableHeroes": [
         "Dooley",
@@ -969,6 +1078,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 20,
       "name": "C4",
       "availableHeroes": [
         "Vanessa"
@@ -988,6 +1099,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 1,
       "name": "Cymon",
       "availableHeroes": [
         "Dooley"
@@ -1004,6 +1117,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 13,
       "name": "Fortis",
       "availableHeroes": [
         "Dooley",
@@ -1027,6 +1142,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 3,
       "name": "Kelsa",
       "availableHeroes": [
         "Karnok"
@@ -1043,6 +1160,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 17,
       "name": "Malafang",
       "availableHeroes": [
         "Dooley",
@@ -1068,6 +1187,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 2,
       "name": "Mr. Tuskari",
       "availableHeroes": [
         "Pygmalien"
@@ -1084,6 +1205,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 6,
       "name": "Nonna",
       "availableHeroes": [
         "Jules"
@@ -1100,6 +1223,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 7,
       "name": "Nufu",
       "availableHeroes": [],
       "description": "Sells Skills",
@@ -1113,6 +1238,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 0,
       "name": "Old Zane",
       "availableHeroes": [
         "Vanessa"
@@ -1129,6 +1256,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 10,
       "name": "Orlin",
       "availableHeroes": [],
       "description": "Teaches Gold-tier Skills",
@@ -1146,6 +1275,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 8,
       "name": "Pip",
       "availableHeroes": [],
       "description": "Gives you 2 Gold and teaches Bronze-tier Skills",
@@ -1165,6 +1296,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 18,
       "name": "Professor Riggle",
       "availableHeroes": [
         "Dooley",
@@ -1187,6 +1320,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 14,
       "name": "Regenald",
       "availableHeroes": [
         "Jules",
@@ -1214,6 +1349,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 12,
       "name": "Ryukon",
       "availableHeroes": [],
       "description": "Teaches Weapon Skills",
@@ -1230,6 +1367,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 16,
       "name": "Slohmor Lumbra",
       "availableHeroes": [
         "Dooley",
@@ -1254,6 +1393,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 5,
       "name": "Uncle Odi",
       "availableHeroes": [
         "Stelle"
@@ -1270,6 +1411,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 21,
       "name": "Vermir",
       "availableHeroes": [
         "Dooley",
@@ -1293,6 +1436,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 15,
       "name": "Zara",
       "availableHeroes": [
         "Dooley",
@@ -1318,6 +1463,8 @@
     },
     {
       "kind": "Trainer",
+      "group": "trainer",
+      "order": 4,
       "name": "Zosima",
       "availableHeroes": [
         "Mak"
@@ -1330,22 +1477,6 @@
       "offerRule": {
         "heroMode": "FixedHero",
         "hero": "Mak"
-      }
-    },
-    {
-      "kind": "Trainer",
-      "name": "Zurphin's Safari",
-      "availableHeroes": [],
-      "description": "Sells Monster Skills",
-      "portraitTemplateId": "b81a1c81-0a16-462a-8247-04653354b79d",
-      "sourceTemplateIds": [
-        "b81a1c81-0a16-462a-8247-04653354b79d"
-      ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Dinosaur"
-        ]
       }
     }
   ]

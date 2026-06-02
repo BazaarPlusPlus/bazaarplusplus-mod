@@ -1,35 +1,40 @@
 #nullable enable
 using System;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
 internal sealed class CollectionPanelSelectionState
 {
-    public const string DefaultMerchantSourceKey = "merchant:ande:global";
+    public const string DefaultMerchantSourceKey = "merchant:jay-jay:global";
 
     public static CollectionPanelSelectionState Default { get; } =
-        new(EHero.Vanessa, DefaultMerchantSourceKey);
+        new(EHero.Vanessa, DefaultMerchantSourceKey, CollectionSourceKind.Merchant);
 
-    public CollectionPanelSelectionState(EHero? selectedHero, string? selectedMerchantSourceKey)
+    public CollectionPanelSelectionState(
+        EHero? selectedHero,
+        string? selectedSourceKey,
+        CollectionSourceKind selectedSourceKind
+    )
     {
         SelectedHero = selectedHero;
-        SelectedMerchantSourceKey = NormalizeSourceKey(selectedMerchantSourceKey);
+        SelectedSourceKey = NormalizeSourceKey(selectedSourceKey);
+        SelectedSourceKind = selectedSourceKind;
     }
 
     public EHero? SelectedHero { get; }
 
-    public string? SelectedMerchantSourceKey { get; }
+    public string? SelectedSourceKey { get; }
+
+    public CollectionSourceKind SelectedSourceKind { get; }
 
     public override bool Equals(object? obj)
     {
         return obj is CollectionPanelSelectionState other
             && SelectedHero == other.SelectedHero
-            && string.Equals(
-                SelectedMerchantSourceKey,
-                other.SelectedMerchantSourceKey,
-                StringComparison.Ordinal
-            );
+            && SelectedSourceKind == other.SelectedSourceKind
+            && string.Equals(SelectedSourceKey, other.SelectedSourceKey, StringComparison.Ordinal);
     }
 
     public override int GetHashCode()
@@ -38,12 +43,13 @@ internal sealed class CollectionPanelSelectionState
         {
             var hash = 17;
             hash = (hash * 31) + SelectedHero.GetHashCode();
+            hash = (hash * 31) + SelectedSourceKind.GetHashCode();
             hash =
                 (hash * 31)
                 + (
-                    SelectedMerchantSourceKey == null
+                    SelectedSourceKey == null
                         ? 0
-                        : StringComparer.Ordinal.GetHashCode(SelectedMerchantSourceKey)
+                        : StringComparer.Ordinal.GetHashCode(SelectedSourceKey)
                 );
             return hash;
         }

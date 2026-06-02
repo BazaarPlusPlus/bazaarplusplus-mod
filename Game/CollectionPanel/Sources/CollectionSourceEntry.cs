@@ -16,7 +16,10 @@ internal sealed class CollectionSourceEntry
         string description,
         Guid portraitTemplateId,
         IReadOnlyList<Guid> sourceTemplateIds,
-        CollectionSourceOfferRule offerRule
+        CollectionSourceOfferRule offerRule,
+        string group,
+        int order,
+        int groupDisplayIndex
     )
     {
         SourceKey = sourceKey;
@@ -27,6 +30,9 @@ internal sealed class CollectionSourceEntry
         PortraitTemplateId = portraitTemplateId;
         SourceTemplateIds = sourceTemplateIds;
         OfferRule = offerRule;
+        Group = group;
+        Order = order;
+        GroupDisplayIndex = groupDisplayIndex;
     }
 
     public string SourceKey { get; }
@@ -44,6 +50,12 @@ internal sealed class CollectionSourceEntry
     public IReadOnlyList<Guid> SourceTemplateIds { get; }
 
     public CollectionSourceOfferRule OfferRule { get; }
+
+    public string Group { get; }
+
+    public int Order { get; }
+
+    public int GroupDisplayIndex { get; }
 
     public bool AppliesToHero(EHero hero) =>
         AvailableHeroes.Count == 0 || AvailableHeroes.Contains(hero);

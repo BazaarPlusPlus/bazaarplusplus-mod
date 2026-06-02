@@ -12,11 +12,19 @@ var collisionId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 var entries = CollectionSourceCatalog.Build(
     $$"""
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
+      "groups": [
+        "generalist",
+        "all-hero",
+        "tag-type-specialist",
+        "trainer"
+      ],
       "entries": [
         {
           "name": "Aila",
           "kind": "Merchant",
+          "group": "tag-type-specialist",
+          "order": 0,
           "availableHeroes": ["Vanessa"],
           "description": "Sells Crit items",
           "portraitTemplateId": "{{ailaId1}}",
@@ -26,6 +34,8 @@ var entries = CollectionSourceCatalog.Build(
         {
           "name": "Aila",
           "kind": "Merchant",
+          "group": "tag-type-specialist",
+          "order": 1,
           "availableHeroes": ["Dooley"],
           "description": "Sells Crit items",
           "portraitTemplateId": "{{collisionId}}",
@@ -35,6 +45,8 @@ var entries = CollectionSourceCatalog.Build(
         {
           "name": "Nufu",
           "kind": "Merchant",
+          "group": "generalist",
+          "order": 0,
           "availableHeroes": [],
           "description": "Sells common items",
           "portraitTemplateId": "{{globalMerchantId}}",
@@ -44,6 +56,8 @@ var entries = CollectionSourceCatalog.Build(
         {
           "name": "Professor Riggs",
           "kind": "Trainer",
+          "group": "trainer",
+          "order": 0,
           "availableHeroes": ["Pygmalien"],
           "description": "Teaches skills",
           "portraitTemplateId": "{{pygTrainerId}}",
@@ -53,6 +67,8 @@ var entries = CollectionSourceCatalog.Build(
         {
           "name": "Nufu",
           "kind": "Merchant",
+          "group": "all-hero",
+          "order": 0,
           "availableHeroes": [],
           "description": "Second collision entry",
           "portraitTemplateId": "66666666-6666-6666-6666-666666666666",
@@ -64,7 +80,7 @@ var entries = CollectionSourceCatalog.Build(
     """
 );
 
-AssertEqual(5, entries.Count, "Catalog build should keep valid v2 entries.");
+AssertEqual(5, entries.Count, "Catalog build should keep valid v3 entries.");
 AssertTrue(
     entries.All(entry => !string.IsNullOrWhiteSpace(entry.SourceKey)),
     "Every source entry should receive a stable source key."
@@ -115,11 +131,14 @@ AssertThrows<InvalidOperationException>(
         CollectionSourceCatalog.Build(
             $$"""
             {
-              "schemaVersion": 2,
+              "schemaVersion": 3,
+              "groups": ["generalist"],
               "entries": [
                 {
                   "name": "Broken",
                   "kind": "Merchant",
+                  "group": "generalist",
+                  "order": 0,
                   "availableHeroes": [],
                   "description": "Broken",
                   "portraitTemplateId": "{{globalMerchantId}}",
@@ -132,14 +151,158 @@ AssertThrows<InvalidOperationException>(
         ),
     "Unknown enum values should fail catalog validation instead of silently defaulting."
 );
+AssertThrows<InvalidOperationException>(
+    () =>
+        CollectionSourceCatalog.Build(
+            $$"""
+            {
+              "schemaVersion": 3,
+              "entries": [
+                {
+                  "name": "Broken",
+                  "kind": "Merchant",
+                  "group": "generalist",
+                  "order": 0,
+                  "availableHeroes": [],
+                  "description": "Broken",
+                  "portraitTemplateId": "{{globalMerchantId}}",
+                  "sourceTemplateIds": ["{{globalMerchantId}}"],
+                  "offerRule": { "heroMode": "SelectedHero" }
+                }
+              ]
+            }
+            """
+        ),
+    "Schema v3 source catalogs should require a top-level groups list."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        CollectionSourceCatalog.Build(
+            $$"""
+            {
+              "schemaVersion": 3,
+              "groups": ["generalist", "generalist"],
+              "entries": [
+                {
+                  "name": "Broken",
+                  "kind": "Merchant",
+                  "group": "generalist",
+                  "order": 0,
+                  "availableHeroes": [],
+                  "description": "Broken",
+                  "portraitTemplateId": "{{globalMerchantId}}",
+                  "sourceTemplateIds": ["{{globalMerchantId}}"],
+                  "offerRule": { "heroMode": "SelectedHero" }
+                }
+              ]
+            }
+            """
+        ),
+    "Duplicate group ids should fail catalog validation."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        CollectionSourceCatalog.Build(
+            $$"""
+            {
+              "schemaVersion": 3,
+              "groups": ["generalist"],
+              "entries": [
+                {
+                  "name": "Broken",
+                  "kind": "Merchant",
+                  "group": "typo",
+                  "order": 0,
+                  "availableHeroes": [],
+                  "description": "Broken",
+                  "portraitTemplateId": "{{globalMerchantId}}",
+                  "sourceTemplateIds": ["{{globalMerchantId}}"],
+                  "offerRule": { "heroMode": "SelectedHero" }
+                }
+              ]
+            }
+            """
+        ),
+    "Entry groups should fail validation when they are not declared in groups."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        CollectionSourceCatalog.Build(
+            $$"""
+            {
+              "schemaVersion": 3,
+              "groups": ["generalist"],
+              "entries": [
+                {
+                  "name": "Broken",
+                  "kind": "Merchant",
+                  "group": "generalist",
+                  "availableHeroes": [],
+                  "description": "Broken",
+                  "portraitTemplateId": "{{globalMerchantId}}",
+                  "sourceTemplateIds": ["{{globalMerchantId}}"],
+                  "offerRule": { "heroMode": "SelectedHero" }
+                }
+              ]
+            }
+            """
+        ),
+    "Entry order should be required instead of silently defaulting to zero."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        CollectionSourceCatalog.Build(
+            $$"""
+            {
+              "schemaVersion": 3,
+              "groups": ["generalist"],
+              "entries": [
+                {
+                  "name": "One",
+                  "kind": "Merchant",
+                  "group": "generalist",
+                  "order": 0,
+                  "availableHeroes": [],
+                  "description": "One",
+                  "portraitTemplateId": "{{globalMerchantId}}",
+                  "sourceTemplateIds": ["{{globalMerchantId}}"],
+                  "offerRule": { "heroMode": "SelectedHero" }
+                },
+                {
+                  "name": "Two",
+                  "kind": "Trainer",
+                  "group": "generalist",
+                  "order": 1,
+                  "availableHeroes": [],
+                  "description": "Two",
+                  "portraitTemplateId": "{{globalMerchantId}}",
+                  "sourceTemplateIds": ["{{globalMerchantId}}"],
+                  "offerRule": { "heroMode": "SelectedHero" }
+                }
+              ]
+            }
+            """
+        ),
+    "A source template id should belong to exactly one collection source entry."
+);
 
 var currentCatalogPath = Path.Combine("Data", "CollectionSources", "collection-sources.json");
 var currentCatalogJson = File.ReadAllText(currentCatalogPath);
 var currentCatalog = CollectionSourceCatalog.Build(currentCatalogJson);
 AssertEqual(
-    70,
+    69,
     currentCatalog.Count,
-    "Current source catalog should preserve the 70 known sources."
+    "Current source catalog should preserve the 69 known sources after removing Zurphin's Safari."
+);
+AssertEqual(
+    47,
+    currentCatalog.Count(entry => entry.Kind == CollectionSourceKind.Merchant),
+    "Current source catalog should preserve the 47 known merchants."
+);
+AssertEqual(
+    22,
+    currentCatalog.Count(entry => entry.Kind == CollectionSourceKind.Trainer),
+    "Current source catalog should preserve the 22 known trainers."
 );
 AssertTrue(
     currentCatalog.Any(entry =>
@@ -155,6 +318,11 @@ AssertEqual(
     currentCatalog.Count,
     currentCatalog.Select(entry => entry.SourceKey).Distinct(StringComparer.Ordinal).Count(),
     "Current source catalog keys should be unique."
+);
+AssertEqual(
+    currentCatalog.SelectMany(entry => entry.SourceTemplateIds).Count(),
+    currentCatalog.SelectMany(entry => entry.SourceTemplateIds).Distinct().Count(),
+    "Current source template ids should be unique across source entries."
 );
 foreach (var source in currentCatalog)
 {
@@ -173,6 +341,45 @@ foreach (var source in currentCatalog)
         );
 }
 
+var vanessaMerchantRoster = CollectionSourceRoster.Build(
+    CollectionSourceCatalog.VisibleEntries(
+        currentCatalog,
+        CollectionSourceKind.Merchant,
+        EHero.Vanessa
+    )
+);
+AssertNondecreasing(
+    vanessaMerchantRoster.Select(item => item.Entry.GroupDisplayIndex).ToArray(),
+    "Merchant roster should be sorted by declared group display order."
+);
+AssertValues(
+    FirstGroupLayerCounts(vanessaMerchantRoster, 4),
+    new[] { 3, 5, 6, 6 },
+    "The visible Vanessa merchant roster should preserve the locked 3/5/6/6 top layers."
+);
+AssertValues(
+    vanessaMerchantRoster.Where(item => item.BreakAfter).Select(item => item.Entry.Group).ToArray(),
+    new[] { "generalist", "tier-specialist" },
+    "Merchant roster should force row breaks only after generalist and tier layers."
+);
+var vanessaTrainerRoster = CollectionSourceRoster.Build(
+    CollectionSourceCatalog.VisibleEntries(
+        currentCatalog,
+        CollectionSourceKind.Trainer,
+        EHero.Vanessa
+    )
+);
+AssertValues(
+    vanessaTrainerRoster.Take(6).Select(item => item.Entry.Name).ToArray(),
+    new[] { "Old Zane", "Nufu", "Pip", "Argenta", "Orlin", "Adira" },
+    "Trainer roster should start with the current hero's trainer, then Nufu and tier trainers."
+);
+AssertEqual(
+    0,
+    vanessaTrainerRoster.Count(item => item.BreakAfter),
+    "Trainer roster should not force row breaks because its first row self-aligns to six chips."
+);
+
 var openOutsideRun = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: false,
     currentHero: EHero.Dooley,
@@ -183,7 +390,7 @@ var openOutsideRun = CollectionPanelOpenSelectionResolver.Resolve(
 AssertEqual(
     CollectionPanelSelectionState.Default,
     openOutsideRun,
-    "Opening outside an in-game run should fall back to VAN + Ande."
+    "Opening outside an in-game run should fall back to VAN + Jay Jay."
 );
 var dooleyAila = entries.Single(entry =>
     entry.Kind == CollectionSourceKind.Merchant
@@ -198,9 +405,33 @@ var openOnCurrentMerchant = CollectionPanelOpenSelectionResolver.Resolve(
     entries
 );
 AssertEqual(
-    new CollectionPanelSelectionState(EHero.Dooley, dooleyAila.SourceKey),
+    new CollectionPanelSelectionState(
+        EHero.Dooley,
+        dooleyAila.SourceKey,
+        CollectionSourceKind.Merchant
+    ),
     openOnCurrentMerchant,
     "Opening during a run should select the current concrete hero and merchant source."
+);
+var pygTrainer = entries.Single(entry =>
+    entry.Kind == CollectionSourceKind.Trainer
+    && string.Equals(entry.Name, "Professor Riggs", StringComparison.Ordinal)
+);
+var openOnCurrentTrainer = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: true,
+    currentHero: EHero.Pygmalien,
+    currentEncounterTemplateId: pygTrainer.SourceTemplateIds[0],
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries
+);
+AssertEqual(
+    new CollectionPanelSelectionState(
+        EHero.Pygmalien,
+        pygTrainer.SourceKey,
+        CollectionSourceKind.Trainer
+    ),
+    openOnCurrentTrainer,
+    "Opening during a run at a trainer should select the trainer source and Skill tab."
 );
 var globalNufu = entries.First(entry =>
     entry.Kind == CollectionSourceKind.Merchant
@@ -211,13 +442,33 @@ var openOnChoiceMerchant = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: true,
     currentHero: EHero.Vanessa,
     currentEncounterTemplateId: null,
+    choiceSelectionTemplateIds: new[] { globalMerchantId, pygTrainerId },
+    entries
+);
+AssertEqual(
+    new CollectionPanelSelectionState(
+        EHero.Vanessa,
+        globalNufu.SourceKey,
+        CollectionSourceKind.Merchant
+    ),
+    openOnChoiceMerchant,
+    "Opening on the choice screen should select the first matching source in SelectionSet order."
+);
+var openOnChoiceTrainer = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: true,
+    currentHero: EHero.Pygmalien,
+    currentEncounterTemplateId: null,
     choiceSelectionTemplateIds: new[] { pygTrainerId, globalMerchantId },
     entries
 );
 AssertEqual(
-    new CollectionPanelSelectionState(EHero.Vanessa, globalNufu.SourceKey),
-    openOnChoiceMerchant,
-    "Opening on the choice screen should select the first available merchant source, ignoring trainers."
+    new CollectionPanelSelectionState(
+        EHero.Pygmalien,
+        pygTrainer.SourceKey,
+        CollectionSourceKind.Trainer
+    ),
+    openOnChoiceTrainer,
+    "Opening on a trainer choice should select the trainer source when it is the first visible match."
 );
 var openWithoutMerchant = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: true,
@@ -229,10 +480,11 @@ var openWithoutMerchant = CollectionPanelOpenSelectionResolver.Resolve(
 AssertEqual(
     new CollectionPanelSelectionState(
         EHero.Vanessa,
-        CollectionPanelSelectionState.DefaultMerchantSourceKey
+        CollectionPanelSelectionState.DefaultMerchantSourceKey,
+        CollectionSourceKind.Merchant
     ),
     openWithoutMerchant,
-    "Opening during a run without a usable merchant should keep the run hero and fall back to Ande."
+    "Opening during a run without a usable source should keep the run hero and fall back to Jay Jay."
 );
 var openWithoutConcreteHero = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: true,
@@ -244,7 +496,7 @@ var openWithoutConcreteHero = CollectionPanelOpenSelectionResolver.Resolve(
 AssertEqual(
     CollectionPanelSelectionState.Default,
     openWithoutConcreteHero,
-    "Opening during a run without a concrete hero should fall back to VAN + Ande."
+    "Opening during a run without a concrete hero should fall back to VAN + Jay Jay."
 );
 
 var noHeroCacheKey = CollectionSourceOfferPoolCacheKey.Build(vanessaAila, selectedHero: null);
@@ -633,11 +885,14 @@ static CollectionSourceEntry BuildSingleEntry(
         .Build(
             $$"""
             {
-              "schemaVersion": 2,
+              "schemaVersion": 3,
+              "groups": ["fixture"],
               "entries": [
                 {
                   "name": "{{name}}",
                   "kind": "{{kind}}",
+                  "group": "fixture",
+                  "order": 0,
                   "availableHeroes": [],
                   "description": "{{name}} fixture",
                   "portraitTemplateId": "{{id}}",
@@ -748,6 +1003,50 @@ static void AssertValues<T>(IReadOnlyList<T> actual, IReadOnlyList<T> expected, 
         if (!EqualityComparer<T>.Default.Equals(actual[i], expected[i]))
             throw new InvalidOperationException(
                 $"{message} At {i}: expected {expected[i]}, got {actual[i]}."
+            );
+    }
+}
+
+static int[] FirstGroupLayerCounts(IReadOnlyList<CollectionSourceRosterItem> roster, int layerCount)
+{
+    var result = new List<int>(layerCount);
+    string? currentGroup = null;
+    var count = 0;
+    foreach (var item in roster)
+    {
+        if (currentGroup == null)
+        {
+            currentGroup = item.Entry.Group;
+            count = 1;
+            continue;
+        }
+
+        if (string.Equals(currentGroup, item.Entry.Group, StringComparison.Ordinal))
+        {
+            count++;
+            continue;
+        }
+
+        result.Add(count);
+        if (result.Count == layerCount)
+            break;
+        currentGroup = item.Entry.Group;
+        count = 1;
+    }
+
+    if (result.Count < layerCount && currentGroup != null)
+        result.Add(count);
+
+    return result.ToArray();
+}
+
+static void AssertNondecreasing(IReadOnlyList<int> actual, string message)
+{
+    for (var i = 1; i < actual.Count; i++)
+    {
+        if (actual[i] < actual[i - 1])
+            throw new InvalidOperationException(
+                $"{message} Value at {i} ({actual[i]}) is less than value at {i - 1} ({actual[i - 1]})."
             );
     }
 }

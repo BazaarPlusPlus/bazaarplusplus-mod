@@ -9,6 +9,9 @@ internal sealed class CollectionSourceCatalogDto
     [JsonProperty("schemaVersion")]
     public int SchemaVersion { get; set; }
 
+    [JsonProperty("groups")]
+    public List<string>? Groups { get; set; }
+
     [JsonProperty("entries")]
     public List<CollectionSourceEntryDto>? Entries { get; set; }
 }
@@ -20,6 +23,12 @@ internal sealed class CollectionSourceEntryDto
 
     [JsonProperty("kind")]
     public string? Kind { get; set; }
+
+    [JsonProperty("group")]
+    public string? Group { get; set; }
+
+    [JsonProperty("order")]
+    public int? Order { get; set; }
 
     [JsonProperty("availableHeroes")]
     public List<string>? AvailableHeroes { get; set; }

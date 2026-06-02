@@ -45,6 +45,10 @@
       Link="CollectionPanelSelectionState.cs"
     />
     <Compile
+      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceEnums.cs"
+      Link="CollectionSourceEnums.cs"
+    />
+    <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionCardClassifier.cs"
       Link="CollectionCardClassifier.cs"
     />

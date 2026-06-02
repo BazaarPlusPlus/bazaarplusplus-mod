@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -66,14 +67,31 @@ internal sealed class CollectionFilterState
             Heroes.Add(selection.SelectedHero.Value);
 
         Merchants.Clear();
-        SelectedMerchantSourceKey = selection.SelectedMerchantSourceKey;
+        if (selection.SelectedSourceKind == CollectionSourceKind.Trainer)
+        {
+            ActiveType = ECardType.Skill;
+            SelectedMerchantSourceKey = null;
+            SelectedTrainerSourceKey = selection.SelectedSourceKey;
+            return;
+        }
+
+        ActiveType = ECardType.Item;
+        SelectedMerchantSourceKey = selection.SelectedSourceKey;
         SelectedTrainerSourceKey = null;
-        if (!string.IsNullOrWhiteSpace(SelectedMerchantSourceKey))
-            ActiveType = ECardType.Item;
     }
 
-    public CollectionPanelSelectionState ToSelectionState() =>
-        new(SelectedHero, SelectedMerchantSourceKey);
+    public CollectionPanelSelectionState ToSelectionState()
+    {
+        var kind =
+            ActiveType == ECardType.Skill
+                ? CollectionSourceKind.Trainer
+                : CollectionSourceKind.Merchant;
+        return new CollectionPanelSelectionState(
+            SelectedHero,
+            GetSelectedSourceKey(ActiveType),
+            kind
+        );
+    }
 
     public void ToggleHero(EHero hero)
     {

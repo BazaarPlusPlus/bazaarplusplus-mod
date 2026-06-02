@@ -120,19 +120,23 @@ internal sealed partial class CollectionPanelView
         {
             var chip = CreateSourceChipButton(source, () => _toggleSource(source.SourceKey));
             _sourceChips[source.SourceKey] = chip;
+            _sourceChipOrder.Add(source.SourceKey);
             _sourceChipRow.Add(chip);
+            if (source.BreakAfter)
+                _sourceChipRow.Add(CreateSourceChipBreak());
         }
+        ApplySourceChipSizing(_sourceChipRow.resolvedStyle.width);
     }
 
     private bool SourceChipsMatch(IReadOnlyList<CollectionSourceOptionViewModel> sources)
     {
         if (sources.Count != _sourceChips.Count)
             return false;
-        foreach (var source in sources)
-        {
-            if (!_sourceChips.ContainsKey(source.SourceKey))
+        if (_sourceChipOrder.Count != sources.Count)
+            return false;
+        for (var i = 0; i < sources.Count; i++)
+            if (!string.Equals(_sourceChipOrder[i], sources[i].SourceKey, StringComparison.Ordinal))
                 return false;
-        }
         return true;
     }
 
@@ -158,7 +162,40 @@ internal sealed partial class CollectionPanelView
 
         _sourceChips.Clear();
         _sourceChipIcons.Clear();
+        _sourceChipOrder.Clear();
         _sourceChipRow?.Clear();
+    }
+
+    private static VisualElement CreateSourceChipBreak()
+    {
+        var spacer = new VisualElement { pickingMode = PickingMode.Ignore };
+        spacer.style.flexBasis = Length.Percent(100);
+        spacer.style.flexGrow = 0f;
+        spacer.style.flexShrink = 0f;
+        spacer.style.height = 1f;
+        return spacer;
+    }
+
+    private void OnSourceChipRowGeometryChanged(GeometryChangedEvent evt) =>
+        ApplySourceChipSizing(evt.newRect.width);
+
+    private void ApplySourceChipSizing(float rowWidth)
+    {
+        if (float.IsNaN(rowWidth) || rowWidth <= 0f)
+            return;
+
+        var gap = UiSpacing.Sm;
+        var box = Mathf.Max(Sizes.SourceChipMinSize, Mathf.Floor(rowWidth / 6f - gap));
+        if (Mathf.Abs(box - _appliedSourceChipBox) < 0.5f)
+            return;
+
+        _appliedSourceChipBox = box;
+        var icon = Mathf.Round(box * Sizes.SourceChipIconRatio);
+        foreach (var pair in _sourceChips)
+        {
+            if (_sourceChipIcons.TryGetValue(pair.Key, out var iconElement))
+                ResizeSourceChip(pair.Value, iconElement, box, icon);
+        }
     }
 
     private static void ClearChipRow<T>(
@@ -229,8 +266,9 @@ internal sealed partial class CollectionPanelView
         var chip = CreateButton(
             string.Empty,
             onClick,
-            Sizes.HeroChipButtonSize,
-            Sizes.HeroChipButtonSize
+            CurrentSourceChipBox(),
+            CurrentSourceChipBox(),
+            fixedWidth: false
         );
         chip.tooltip = string.IsNullOrWhiteSpace(source.Description)
             ? source.DisplayName
@@ -238,12 +276,14 @@ internal sealed partial class CollectionPanelView
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.justifyContent = Justify.Center;
         chip.style.alignItems = Align.Center;
-        chip.style.marginRight = 0f;
+        chip.style.marginRight = UiSpacing.Sm;
         chip.style.marginBottom = UiSpacing.Xs;
         StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
 
         var icon = CreateSourceChipIcon(source.DisplayName);
         chip.Add(icon);
+        var box = CurrentSourceChipBox();
+        ResizeSourceChip(chip, icon, box, Mathf.Round(box * Sizes.SourceChipIconRatio));
 
         _sourceChipIcons[source.SourceKey] = icon;
         LoadSourceChipIcon(source.SourceKey, source.RepresentativeTemplateId, icon);
@@ -270,13 +310,12 @@ internal sealed partial class CollectionPanelView
     private static VisualElement CreateSourceChipIcon(string displayName)
     {
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        UiStyle.FixedSize(icon.style, Sizes.HeroChipIconSize, Sizes.HeroChipIconSize);
         icon.style.position = Position.Relative;
         icon.style.backgroundColor = Colors.HistoryStatusBackground;
         icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
         icon.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
         UiStyle.Border(icon.style, Borders.Thin, Colors.HistoryButtonBorder);
-        UiStyle.Radius(icon.style, Sizes.HeroChipIconSize / 2f);
+        ResizeSourceIcon(icon, Mathf.Round(Sizes.SourceChipMinSize * Sizes.SourceChipIconRatio));
 
         var initials = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
         initials.name = SourceChipInitialsName;
@@ -290,6 +329,31 @@ internal sealed partial class CollectionPanelView
         initials.style.unityTextAlign = TextAnchor.MiddleCenter;
         icon.Add(initials);
         return icon;
+    }
+
+    private float CurrentSourceChipBox() =>
+        _appliedSourceChipBox > 0f ? _appliedSourceChipBox : Sizes.SourceChipMinSize;
+
+    private static void ResizeSourceChip(Button chip, VisualElement icon, float box, float iconSize)
+    {
+        chip.style.width = box;
+        chip.style.minWidth = box;
+        chip.style.maxWidth = box;
+        chip.style.height = box;
+        chip.style.minHeight = box;
+        chip.style.maxHeight = box;
+        ResizeSourceIcon(icon, iconSize);
+    }
+
+    private static void ResizeSourceIcon(VisualElement icon, float iconSize)
+    {
+        icon.style.width = iconSize;
+        icon.style.minWidth = iconSize;
+        icon.style.maxWidth = iconSize;
+        icon.style.height = iconSize;
+        icon.style.minHeight = iconSize;
+        icon.style.maxHeight = iconSize;
+        UiStyle.Radius(icon.style, iconSize / 2f);
     }
 
     private static void AddCommonHeroGlyph(VisualElement icon)

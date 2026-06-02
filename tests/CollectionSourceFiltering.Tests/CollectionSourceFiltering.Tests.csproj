@@ -53,6 +53,10 @@
       Link="CollectionSourceOfferRule.cs"
     />
     <Compile
+      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceRoster.cs"
+      Link="CollectionSourceRoster.cs"
+    />
+    <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionCardVm.cs"
       Link="CollectionCardVm.cs"
     />

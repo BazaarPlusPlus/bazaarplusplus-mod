@@ -1,5 +1,6 @@
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 var defaultState = new CollectionFilterState();
 AssertFalse(
@@ -80,9 +81,14 @@ AssertEqual(
     "Default panel selection should start on VAN/Vanessa."
 );
 AssertEqual(
-    "merchant:ande:global",
-    defaultSelection.SelectedMerchantSourceKey,
-    "Default panel selection should start on Ande."
+    "merchant:jay-jay:global",
+    defaultSelection.SelectedSourceKey,
+    "Default panel selection should start on Jay Jay."
+);
+AssertEqual(
+    CollectionSourceKind.Merchant,
+    defaultSelection.SelectedSourceKind,
+    "Default panel selection should target the Item merchant source rail."
 );
 var selectionState = new CollectionFilterState();
 selectionState.Merchants.Add(CollectionMerchantKind.Burn);
@@ -94,9 +100,9 @@ AssertValues(
     "Applying the default selection should select Vanessa in the filter state."
 );
 AssertEqual(
-    "merchant:ande:global",
+    "merchant:jay-jay:global",
     selectionState.SelectedMerchantSourceKey,
-    "Applying the default selection should select Ande in the filter state."
+    "Applying the default selection should select Jay Jay in the filter state."
 );
 AssertFalse(
     selectionState.Merchants.Contains(CollectionMerchantKind.Burn),
@@ -114,7 +120,8 @@ AssertEqual(
 );
 var runtimeSelection = new CollectionPanelSelectionState(
     EHero.Dooley,
-    "merchant:jules:diamond:dooley+karnok+mak+pygmalien+stelle+vanessa"
+    "merchant:jules:diamond:dooley+karnok+mak+pygmalien+stelle+vanessa",
+    CollectionSourceKind.Merchant
 );
 selectionState.ApplySelection(runtimeSelection);
 AssertValues(
@@ -131,6 +138,44 @@ AssertEqual(
     runtimeSelection,
     selectionState.ToSelectionState(),
     "Runtime selection should be readable back from the filter state."
+);
+var trainerSelection = new CollectionPanelSelectionState(
+    EHero.Pygmalien,
+    "trainer:mr-tuskari:pygmalien",
+    CollectionSourceKind.Trainer
+);
+selectionState.SelectedMerchantSourceKey = "merchant:stale";
+selectionState.ApplySelection(trainerSelection);
+AssertEqual(
+    ECardType.Skill,
+    selectionState.ActiveType,
+    "Applying a trainer runtime selection should route the panel to the Skill tab."
+);
+AssertEqual(
+    "trainer:mr-tuskari:pygmalien",
+    selectionState.SelectedTrainerSourceKey,
+    "Applying a trainer runtime selection should store the trainer source key."
+);
+AssertEqual(
+    null,
+    selectionState.SelectedMerchantSourceKey,
+    "Applying a trainer runtime selection should clear stale merchant source selection."
+);
+AssertEqual(
+    trainerSelection,
+    selectionState.ToSelectionState(),
+    "Trainer source selection should round-trip through the selection interface."
+);
+selectionState.ApplySelection(runtimeSelection);
+AssertEqual(
+    ECardType.Item,
+    selectionState.ActiveType,
+    "Applying a merchant runtime selection should route the panel back to the Item tab."
+);
+AssertEqual(
+    null,
+    selectionState.SelectedTrainerSourceKey,
+    "Applying a merchant runtime selection should clear stale trainer source selection."
 );
 
 var sourceState = new CollectionFilterState();

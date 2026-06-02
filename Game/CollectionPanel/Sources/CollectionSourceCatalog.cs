@@ -12,7 +12,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 internal static class CollectionSourceCatalog
 {
-    private const int ExpectedSchemaVersion = 2;
+    private const int ExpectedSchemaVersion = 3;
     private const string LogComponent = "CollectionSourceCatalog";
     private const string ResourceSuffix = "collection-sources.json";
 
@@ -105,7 +105,19 @@ internal static class CollectionSourceCatalog
         if (dto.Entries == null)
             throw new InvalidOperationException("Collection source catalog entries are missing.");
 
+        if (dto.Groups == null || dto.Groups.Count == 0)
+            throw new InvalidOperationException("Collection source catalog groups are missing.");
+        var groupOrder = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var g = 0; g < dto.Groups.Count; g++)
+        {
+            var groupId = RequiredText(dto.Groups[g], $"groups[{g}]");
+            if (groupOrder.ContainsKey(groupId))
+                throw new InvalidOperationException($"Duplicate group id '{groupId}' in groups.");
+            groupOrder[groupId] = g;
+        }
+
         var candidates = new List<EntryBuildCandidate>(dto.Entries.Count);
+        var usedSourceTemplateIds = new Dictionary<Guid, string>();
         for (var i = 0; i < dto.Entries.Count; i++)
         {
             var entry = dto.Entries[i];
@@ -114,6 +126,13 @@ internal static class CollectionSourceCatalog
 
             var name = RequiredText(entry.Name, $"entries[{i}].name");
             var kind = ParseEnum<CollectionSourceKind>(entry.Kind, $"entries[{i}].kind");
+            var group = RequiredText(entry.Group, $"entries[{i}].group");
+            if (!groupOrder.TryGetValue(group, out var groupDisplayIndex))
+                throw new InvalidOperationException(
+                    $"entries[{i}].group '{group}' is not declared in groups."
+                );
+            if (entry.Order is not int order)
+                throw new InvalidOperationException($"entries[{i}].order is required.");
             var availableHeroes = ParseEnumList<EHero>(
                 entry.AvailableHeroes,
                 $"entries[{i}].availableHeroes"
@@ -131,6 +150,14 @@ internal static class CollectionSourceCatalog
                 throw new InvalidOperationException(
                     $"entries[{i}].sourceTemplateIds must include portraitTemplateId {portraitTemplateId}."
                 );
+            foreach (var sourceTemplateId in sourceTemplateIds)
+            {
+                if (usedSourceTemplateIds.TryGetValue(sourceTemplateId, out var existing))
+                    throw new InvalidOperationException(
+                        $"entries[{i}].sourceTemplateIds contains duplicate source template id {sourceTemplateId}; already used by {existing}."
+                    );
+                usedSourceTemplateIds[sourceTemplateId] = $"entries[{i}]";
+            }
             var offerRule = BuildOfferRule(entry.OfferRule, $"entries[{i}].offerRule");
 
             candidates.Add(
@@ -142,7 +169,10 @@ internal static class CollectionSourceCatalog
                     description,
                     portraitTemplateId,
                     sourceTemplateIds,
-                    offerRule
+                    offerRule,
+                    group,
+                    order,
+                    groupDisplayIndex
                 )
             );
         }
@@ -176,7 +206,10 @@ internal static class CollectionSourceCatalog
                     candidate.Description,
                     candidate.PortraitTemplateId,
                     candidate.SourceTemplateIds,
-                    candidate.OfferRule
+                    candidate.OfferRule,
+                    candidate.Group,
+                    candidate.Order,
+                    candidate.GroupDisplayIndex
                 )
             );
         }
@@ -392,7 +425,10 @@ internal static class CollectionSourceCatalog
             string description,
             Guid portraitTemplateId,
             IReadOnlyList<Guid> sourceTemplateIds,
-            CollectionSourceOfferRule offerRule
+            CollectionSourceOfferRule offerRule,
+            string group,
+            int order,
+            int groupDisplayIndex
         )
         {
             BaseSourceKey = baseSourceKey;
@@ -403,6 +439,9 @@ internal static class CollectionSourceCatalog
             PortraitTemplateId = portraitTemplateId;
             SourceTemplateIds = sourceTemplateIds;
             OfferRule = offerRule;
+            Group = group;
+            Order = order;
+            GroupDisplayIndex = groupDisplayIndex;
         }
 
         public string BaseSourceKey { get; }
@@ -420,5 +459,11 @@ internal static class CollectionSourceCatalog
         public IReadOnlyList<Guid> SourceTemplateIds { get; }
 
         public CollectionSourceOfferRule OfferRule { get; }
+
+        public string Group { get; }
+
+        public int Order { get; }
+
+        public int GroupDisplayIndex { get; }
     }
 }

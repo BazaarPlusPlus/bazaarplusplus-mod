@@ -49,6 +49,7 @@ internal sealed class CollectionSourceOptionViewModel
     public string Description { get; init; } = string.Empty;
     public CollectionSourceKind Kind { get; init; }
     public Guid RepresentativeTemplateId { get; init; }
+    public bool BreakAfter { get; init; }
 }
 
 internal sealed partial class CollectionPanelView : IDisposable
@@ -113,7 +114,9 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Dictionary<string, VisualElement> _sourceChipIcons = new(
         StringComparer.Ordinal
     );
+    private readonly List<string> _sourceChipOrder = new();
     private Rect _lastGridBounds;
+    private float _appliedSourceChipBox = -1f;
 
     // Panel-open/-close fade state. _opacity is the displayed alpha, _targetOpacity is what
     // SetVisible asked for; TickOpacity ramps the first toward the second with an

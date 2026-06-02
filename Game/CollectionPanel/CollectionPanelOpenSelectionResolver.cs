@@ -21,20 +21,25 @@ internal static class CollectionPanelOpenSelectionResolver
             return CollectionPanelSelectionState.Default;
 
         var hero = currentHero!.Value;
-        var sourceKey =
-            ResolveMerchantSourceKey(
-                hero,
-                currentEncounterTemplateId,
-                choiceSelectionTemplateIds,
-                entries
-            ) ?? CollectionPanelSelectionState.DefaultMerchantSourceKey;
+        var source = ResolveSource(
+            hero,
+            currentEncounterTemplateId,
+            choiceSelectionTemplateIds,
+            entries
+        );
 
-        return new CollectionPanelSelectionState(hero, sourceKey);
+        return source == null
+            ? new CollectionPanelSelectionState(
+                hero,
+                CollectionPanelSelectionState.DefaultMerchantSourceKey,
+                CollectionSourceKind.Merchant
+            )
+            : new CollectionPanelSelectionState(hero, source.SourceKey, source.Kind);
     }
 
     internal static bool IsConcreteHero(EHero? hero) => hero.HasValue && hero.Value != EHero.Common;
 
-    private static string? ResolveMerchantSourceKey(
+    private static CollectionSourceEntry? ResolveSource(
         EHero hero,
         Guid? currentEncounterTemplateId,
         IReadOnlyCollection<Guid>? choiceSelectionTemplateIds,
@@ -43,13 +48,9 @@ internal static class CollectionPanelOpenSelectionResolver
     {
         if (currentEncounterTemplateId.HasValue)
         {
-            var currentSourceKey = FindMerchantSourceKey(
-                hero,
-                currentEncounterTemplateId.Value,
-                entries
-            );
-            if (!string.IsNullOrWhiteSpace(currentSourceKey))
-                return currentSourceKey;
+            var currentSource = FindSource(hero, currentEncounterTemplateId.Value, entries);
+            if (currentSource != null)
+                return currentSource;
         }
 
         if (choiceSelectionTemplateIds == null || choiceSelectionTemplateIds.Count == 0)
@@ -60,15 +61,15 @@ internal static class CollectionPanelOpenSelectionResolver
             if (templateId == Guid.Empty)
                 continue;
 
-            var sourceKey = FindMerchantSourceKey(hero, templateId, entries);
-            if (!string.IsNullOrWhiteSpace(sourceKey))
-                return sourceKey;
+            var source = FindSource(hero, templateId, entries);
+            if (source != null)
+                return source;
         }
 
         return null;
     }
 
-    private static string? FindMerchantSourceKey(
+    private static CollectionSourceEntry? FindSource(
         EHero hero,
         Guid templateId,
         IEnumerable<CollectionSourceEntry> entries
@@ -76,14 +77,12 @@ internal static class CollectionPanelOpenSelectionResolver
     {
         foreach (var entry in entries)
         {
-            if (entry.Kind != CollectionSourceKind.Merchant)
-                continue;
             if (!entry.AppliesToHero(hero))
                 continue;
 
             foreach (var candidate in entry.SourceTemplateIds)
                 if (candidate == templateId)
-                    return entry.SourceKey;
+                    return entry;
         }
 
         return null;

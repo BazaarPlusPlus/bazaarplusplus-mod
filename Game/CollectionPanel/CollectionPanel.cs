@@ -137,10 +137,25 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         BppLog.Debug(
             "CollectionPanel",
-            $"Open selection resolved inRun={isInGameRun} hero={selection.SelectedHero?.ToString() ?? "none"} merchant={selection.SelectedMerchantSourceKey ?? "none"}"
+            "Open selection resolved "
+                + $"inRun={isInGameRun} "
+                + $"hero={selection.SelectedHero?.ToString() ?? "none"} "
+                + $"currentEncounterId={encounterIds.CurrentEncounterId ?? "none"} "
+                + $"currentEncounterTemplateId={encounterIds.CurrentEncounterTemplateId?.ToString() ?? "none"} "
+                + $"sourceKind={selection.SelectedSourceKind} "
+                + $"source={selection.SelectedSourceKey ?? "none"} "
+                + $"matched={IsMatchedOpenSelection(selection)}"
         );
         return selection;
     }
+
+    private static bool IsMatchedOpenSelection(CollectionPanelSelectionState selection) =>
+        selection.SelectedSourceKind != CollectionSourceKind.Merchant
+        || !string.Equals(
+            selection.SelectedSourceKey,
+            CollectionPanelSelectionState.DefaultMerchantSourceKey,
+            StringComparison.Ordinal
+        );
 
     private bool IsInGameRunForOpen()
     {
@@ -677,9 +692,13 @@ internal sealed class CollectionPanel : MonoBehaviour
             activeType == ECardType.Skill
                 ? CollectionSourceKind.Trainer
                 : CollectionSourceKind.Merchant;
-        var result = new List<CollectionSourceOptionViewModel>();
-        foreach (var entry in CollectionSourceCatalog.For(kind, _filter.SelectedHero))
+        var roster = CollectionSourceRoster.Build(
+            CollectionSourceCatalog.For(kind, _filter.SelectedHero)
+        );
+        var result = new List<CollectionSourceOptionViewModel>(roster.Count);
+        foreach (var item in roster)
         {
+            var entry = item.Entry;
             result.Add(
                 new CollectionSourceOptionViewModel
                 {
@@ -688,6 +707,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                     Description = entry.Description,
                     Kind = entry.Kind,
                     RepresentativeTemplateId = entry.PortraitTemplateId,
+                    BreakAfter = item.BreakAfter,
                 }
             );
         }

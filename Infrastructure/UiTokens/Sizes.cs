@@ -27,6 +27,8 @@ internal static class Sizes
     public const float PackageSwitchKnobOnLeft = 16f;
     public const float HeroChipIconSize = 48f;
     public const float HeroChipButtonSize = 56f;
+    public const float SourceChipIconRatio = 48f / 56f;
+    public const float SourceChipMinSize = 40f;
     public const float ButtonStandardHeight = 32f;
     public const float ButtonCompactHeight = 24f;
     public const float ButtonFooterHeight = 36f;
