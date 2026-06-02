@@ -52,6 +52,10 @@
       Link="CombatStatusBar.State.cs"
     />
     <Compile
+      Include="..\..\Game\CombatStatusBar\CombatStatusBar.RoundedSprite.cs"
+      Link="CombatStatusBar.RoundedSprite.cs"
+    />
+    <Compile
       Include="..\..\Game\ItemEnchantPreview\EnchantPreview.SettingsMenuLabel.cs"
       Link="EnchantPreview.SettingsMenuLabel.cs"
     />

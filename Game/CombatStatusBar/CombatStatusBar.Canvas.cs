@@ -714,6 +714,7 @@ internal sealed partial class CombatStatusBar
 
         const int size = 32;
         const int radius = 12;
+        const float edgeSoftness = 1.5f;
         var texture = new Texture2D(size, size, TextureFormat.ARGB32, false)
         {
             filterMode = FilterMode.Bilinear,
@@ -724,7 +725,7 @@ internal sealed partial class CombatStatusBar
         {
             for (var x = 0; x < size; x++)
             {
-                var alpha = IsInsideRoundedRect(x, y, size, radius) ? 1f : 0f;
+                var alpha = ResolveRoundedRectAlpha(x + 0.5f, y + 0.5f, size, radius, edgeSoftness);
                 texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
             }
         }
@@ -740,14 +741,5 @@ internal sealed partial class CombatStatusBar
             new Vector4(radius, radius, radius, radius)
         );
         return _roundedSprite;
-    }
-
-    private static bool IsInsideRoundedRect(int x, int y, int size, int radius)
-    {
-        var clampedX = Mathf.Clamp(x, radius, size - radius - 1);
-        var clampedY = Mathf.Clamp(y, radius, size - radius - 1);
-        var deltaX = x - clampedX;
-        var deltaY = y - clampedY;
-        return (deltaX * deltaX) + (deltaY * deltaY) <= radius * radius;
     }
 }

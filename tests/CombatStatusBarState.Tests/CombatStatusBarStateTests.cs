@@ -126,6 +126,36 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
+    public void RoundedSpriteAlpha_UsesSoftCornerEdge()
+    {
+        var outsideCorner = CombatStatusBar.ResolveRoundedRectAlpha(
+            pixelCenterX: 0.5f,
+            pixelCenterY: 0.5f,
+            size: 32,
+            radius: 12f,
+            edgeSoftness: 1.5f
+        );
+        var softEdge = CombatStatusBar.ResolveRoundedRectAlpha(
+            pixelCenterX: 3.5f,
+            pixelCenterY: 3.5f,
+            size: 32,
+            radius: 12f,
+            edgeSoftness: 1.5f
+        );
+        var insideCenter = CombatStatusBar.ResolveRoundedRectAlpha(
+            pixelCenterX: 16f,
+            pixelCenterY: 16f,
+            size: 32,
+            radius: 12f,
+            edgeSoftness: 1.5f
+        );
+
+        Assert.Equal(0f, outsideCorner, precision: 3);
+        Assert.InRange(softEdge, 0.05f, 0.95f);
+        Assert.Equal(1f, insideCenter, precision: 3);
+    }
+
+    [Fact]
     public void CombatSpeed_UsesRequestedDiscreteSteps()
     {
         Assert.Equal(1f, CombatStatusBar.CombatSpeedMultiplier, 3);
