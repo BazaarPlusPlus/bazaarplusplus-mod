@@ -30,7 +30,14 @@ internal static class HistoryPanelFactory
             () => runtime.PluginsDirectoryPath,
             ghostSyncService
         );
-        return new HistoryPanelDependencies(runtime, dataService, replayService, ghostSyncService);
+        var serverHealthProbe = new HistoryPanelServerHealthProbe(onlineClient);
+        return new HistoryPanelDependencies(
+            runtime,
+            dataService,
+            replayService,
+            ghostSyncService,
+            serverHealthProbe
+        );
     }
 
     private static GhostBattleSyncService? CreateGhostSyncService(

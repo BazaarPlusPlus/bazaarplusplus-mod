@@ -36,6 +36,7 @@ internal static class Sizes
     public const float GhostAllButtonWidth = 70f;
     public const float GhostFilterButtonWidth = 78f;
     public const float FinalBuildRefreshButtonWidth = 124f;
+    public const float ServerHealthButtonWidth = 108f;
     public const float DeleteButtonWidth = 130f;
     public const float ReplayButtonWidth = 140f;
     public const float RecordAndReplayButtonWidth = 190f;

@@ -203,11 +203,20 @@ internal sealed partial class HistoryPanelUiToolkitView
         _countChip = CreateChip();
         _battleChip = CreateChip();
         _databaseChip = CreateChip();
+        _checkServerHealthButton = CreateButton(
+            HistoryPanelText.CheckServerHealth(),
+            _checkServerHealth,
+            Sizes.ServerHealthButtonWidth,
+            Sizes.ButtonStandardHeight
+        );
+        StyleButton(_checkServerHealthButton, Colors.ReplayBackground, Colors.ReplayText);
         chipRow.Add(_countChip);
         _battleChip.style.marginLeft = UiSpacing.Sm;
         chipRow.Add(_battleChip);
         _databaseChip.style.marginLeft = UiSpacing.Sm;
         chipRow.Add(_databaseChip);
+        _checkServerHealthButton.style.marginLeft = UiSpacing.Sm;
+        chipRow.Add(_checkServerHealthButton);
 
         _statusLabel = CreateLabel(Sizes.FontCorner, FontStyle.Normal, Colors.HistoryStatusText);
         _statusLabel.style.display = DisplayStyle.None;

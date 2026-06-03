@@ -25,6 +25,7 @@ internal sealed partial class HistoryPanel
                 () => TryReplaySelectedBattle(true),
                 TryDeleteSelectedRun,
                 TryRefreshFinalBuilds,
+                TryCheckServerHealth,
                 SelectRun,
                 SelectBattle,
                 SetSectionMode,
@@ -106,6 +107,9 @@ internal sealed partial class HistoryPanel
         )
             ? HistoryPanelText.GhostOpponentEliminatedNotice()
             : string.Empty;
+        var serverHealthDisplay = _state.ServerHealthProbeInProgress
+            ? HistoryPanelServerHealthFormatter.Checking()
+            : HistoryPanelServerHealthFormatter.Idle();
 
         return new HistoryPanelUiToolkitModel
         {
@@ -121,6 +125,8 @@ internal sealed partial class HistoryPanel
                     ? HistoryPanelText.CountBattles(FilteredGhostBattles.Count)
                     : HistoryPanelText.CountBattles(_battles.Count),
             DatabaseChipText = HistoryPanelText.DatabaseChip(GetDatabaseChipText()),
+            ServerHealthButtonText = serverHealthDisplay.ButtonText,
+            ServerHealthButtonEnabled = serverHealthDisplay.ButtonEnabled,
             SectionMode = _sectionMode,
             GhostBattleFilter = _ghostBattleFilter,
             StatusMessage = _statusMessage,
@@ -198,6 +204,10 @@ internal sealed class HistoryPanelUiToolkitModel
     public string BattleChipText { get; set; } = string.Empty;
 
     public string DatabaseChipText { get; set; } = string.Empty;
+
+    public string ServerHealthButtonText { get; set; } = string.Empty;
+
+    public bool ServerHealthButtonEnabled { get; set; }
 
     public HistorySectionMode SectionMode { get; set; }
 

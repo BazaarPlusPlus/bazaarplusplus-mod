@@ -60,6 +60,8 @@ internal sealed class HistoryPanelState
 
     public bool ReplayActionInProgress { get; set; }
 
+    public bool ServerHealthProbeInProgress { get; set; }
+
     public bool FilteredGhostBattlesDirty { get; set; } = true;
 
     public bool IsVisible { get; set; }

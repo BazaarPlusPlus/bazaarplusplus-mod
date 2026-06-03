@@ -18,6 +18,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private readonly Action _recordAndReplay;
     private readonly Action _delete;
     private readonly Action _refreshFinalBuilds;
+    private readonly Action _checkServerHealth;
     private readonly Action<int> _selectRun;
     private readonly Action<int> _selectBattle;
     private readonly Action<HistorySectionMode> _setSectionMode;
@@ -32,6 +33,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Label? _countChip;
     private Label? _battleChip;
     private Label? _databaseChip;
+    private Button? _checkServerHealthButton;
     private Button? _runsTabButton;
     private Button? _ghostTabButton;
     private Button? _finalBuildRefreshButton;
@@ -69,6 +71,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         Action recordAndReplay,
         Action delete,
         Action refreshFinalBuilds,
+        Action checkServerHealth,
         Action<int> selectRun,
         Action<int> selectBattle,
         Action<HistorySectionMode> setSectionMode,
@@ -83,6 +86,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _delete = delete ?? throw new ArgumentNullException(nameof(delete));
         _refreshFinalBuilds =
             refreshFinalBuilds ?? throw new ArgumentNullException(nameof(refreshFinalBuilds));
+        _checkServerHealth =
+            checkServerHealth ?? throw new ArgumentNullException(nameof(checkServerHealth));
         _selectRun = selectRun ?? throw new ArgumentNullException(nameof(selectRun));
         _selectBattle = selectBattle ?? throw new ArgumentNullException(nameof(selectBattle));
         _setSectionMode = setSectionMode ?? throw new ArgumentNullException(nameof(setSectionMode));
@@ -179,6 +184,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _countChip!.text = model.CountChipText;
         _battleChip!.text = model.BattleChipText;
         _databaseChip!.text = model.DatabaseChipText;
+        _checkServerHealthButton!.text = model.ServerHealthButtonText;
+        _checkServerHealthButton.SetEnabled(model.ServerHealthButtonEnabled);
         _statusLabel!.text = model.StatusMessage ?? string.Empty;
         _statusLabel.style.display = string.IsNullOrWhiteSpace(model.StatusMessage)
             ? DisplayStyle.None

@@ -12,11 +12,21 @@ internal sealed class HistoryPanelDependencies
         HistoryPanelReplayService replayService,
         GhostBattleSyncService? ghostSyncService
     )
+        : this(runtime, dataService, replayService, ghostSyncService, null) { }
+
+    public HistoryPanelDependencies(
+        IHistoryPanelRuntime runtime,
+        HistoryPanelDataService dataService,
+        HistoryPanelReplayService replayService,
+        GhostBattleSyncService? ghostSyncService,
+        IHistoryPanelServerHealthProbe? serverHealthProbe
+    )
     {
         Runtime = runtime;
         DataService = dataService;
         ReplayService = replayService;
         GhostSyncService = ghostSyncService;
+        ServerHealthProbe = serverHealthProbe;
     }
 
     public IHistoryPanelRuntime Runtime { get; }
@@ -26,4 +36,6 @@ internal sealed class HistoryPanelDependencies
     public HistoryPanelReplayService ReplayService { get; }
 
     public GhostBattleSyncService? GhostSyncService { get; }
+
+    public IHistoryPanelServerHealthProbe? ServerHealthProbe { get; }
 }

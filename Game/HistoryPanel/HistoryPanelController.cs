@@ -94,6 +94,12 @@ internal sealed partial class HistoryPanel
             _ = _coordinator.TryRefreshFinalBuildsAsync();
     }
 
+    private void TryCheckServerHealth()
+    {
+        if (_coordinator != null)
+            _ = _coordinator.TryCheckServerHealthAsync();
+    }
+
     private void ClearDeleteRunConfirmation()
     {
         _state.DeleteRunConfirmationRunId = null;

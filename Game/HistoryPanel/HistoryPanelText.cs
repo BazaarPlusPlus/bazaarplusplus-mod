@@ -69,6 +69,41 @@ internal static class HistoryPanelText
         "拉取陣容"
     );
 
+    private static readonly LocalizedTextSet CheckServerHealthText = new(
+        "Check Server",
+        "检测连通",
+        "檢測連通",
+        "檢測連通"
+    );
+
+    private static readonly LocalizedTextSet CheckingServerHealthText = new(
+        "Checking...",
+        "检测中...",
+        "檢測中...",
+        "檢測中..."
+    );
+
+    private static readonly LocalizedTextSet CheckingServerConnectivityText = new(
+        "Checking game-server connectivity...",
+        "正在检测游戏与服务器联通性...",
+        "正在檢測遊戲與伺服器連通性...",
+        "正在檢測遊戲與伺服器連通性..."
+    );
+
+    private static readonly LocalizedTextSet ServerHealthUnavailableText = new(
+        "Connectivity check is unavailable right now.",
+        "连通性检测暂不可用。",
+        "連通性檢測暫不可用。",
+        "連通性檢測暫不可用。"
+    );
+
+    private static readonly LocalizedTextSet ServerHealthAlreadyRunningText = new(
+        "Connectivity check is already in progress.",
+        "连通性检测进行中。",
+        "連通性檢測進行中。",
+        "連通性檢測進行中。"
+    );
+
     private static readonly LocalizedTextSet RunsSectionSubtitleText = new(
         "Choose one run to see its recorded battles.",
         "选择一个 run 查看记录到的战斗。",
@@ -232,6 +267,16 @@ internal static class HistoryPanelText
     internal static string Working() => Resolve(WorkingText);
 
     internal static string RefreshFinalBuilds() => Resolve(RefreshFinalBuildsText);
+
+    internal static string CheckServerHealth() => Resolve(CheckServerHealthText);
+
+    internal static string CheckingServerHealth() => Resolve(CheckingServerHealthText);
+
+    internal static string CheckingServerConnectivity() => Resolve(CheckingServerConnectivityText);
+
+    internal static string ServerHealthUnavailable() => Resolve(ServerHealthUnavailableText);
+
+    internal static string ServerHealthAlreadyRunning() => Resolve(ServerHealthAlreadyRunningText);
 
     internal static string RunsSectionSubtitle() => Resolve(RunsSectionSubtitleText);
 
@@ -460,6 +505,26 @@ internal static class HistoryPanelText
     internal static string LoadedRuns(int count)
     {
         return FormatSimple($"{count} runs loaded.", $"已载入 {count} 场对局。");
+    }
+
+    internal static string ServerHealthConnected(long roundTripMilliseconds)
+    {
+        return FormatSimple(
+            $"Game and server connected in {roundTripMilliseconds} ms.",
+            $"游戏与服务器已联通，耗时 {roundTripMilliseconds} ms。",
+            $"遊戲與伺服器已連通，耗時 {roundTripMilliseconds} ms。",
+            $"遊戲與伺服器已連通，耗時 {roundTripMilliseconds} ms。"
+        );
+    }
+
+    internal static string ServerHealthFailed(long roundTripMilliseconds, string details)
+    {
+        return FormatSimple(
+            $"Game-server check failed after {roundTripMilliseconds} ms: {details}",
+            $"游戏与服务器联通性检测失败，耗时 {roundTripMilliseconds} ms：{details}",
+            $"遊戲與伺服器連通性檢測失敗，耗時 {roundTripMilliseconds} ms：{details}",
+            $"遊戲與伺服器連通性檢測失敗，耗時 {roundTripMilliseconds} ms：{details}"
+        );
     }
 
     internal static string DatabaseFileMissing()

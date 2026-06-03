@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.ModApi.Clients;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -15,6 +16,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     private readonly IHistoryPanelRuntime _runtime;
     private readonly HistoryPanelDataService _dataService;
     private readonly HistoryPanelReplayService _replayService;
+    private readonly IHistoryPanelServerHealthProbe? _serverHealthProbe;
     private readonly Action _requestUiRefresh;
     private readonly Action _requestPreviewRefresh;
     private readonly Action<bool> _requestVisibilityChange;
@@ -34,6 +36,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _runtime = dependencies.Runtime;
         _dataService = dependencies.DataService;
         _replayService = dependencies.ReplayService;
+        _serverHealthProbe = dependencies.ServerHealthProbe;
         _requestUiRefresh =
             requestUiRefresh ?? throw new ArgumentNullException(nameof(requestUiRefresh));
         _requestPreviewRefresh =
@@ -61,6 +64,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.GhostSyncInProgress = false;
         _state.ReplayActionInProgress = false;
         _state.FinalBuildRefreshInProgress = false;
+        _state.ServerHealthProbeInProgress = false;
         ClearDeleteRunConfirmation();
         _session.End();
     }
@@ -457,6 +461,79 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             : HistoryPanelText.DatabaseMissing();
     }
 
+    public async Task TryCheckServerHealthAsync()
+    {
+        if (_state.ServerHealthProbeInProgress)
+        {
+            SetStatusMessage(HistoryPanelText.ServerHealthAlreadyRunning());
+            _requestUiRefresh();
+            return;
+        }
+
+        if (_serverHealthProbe == null)
+        {
+            var unavailable = HistoryPanelServerHealthFormatter.Unavailable();
+            SetStatusMessage(unavailable.StatusMessage);
+            _requestUiRefresh();
+            return;
+        }
+
+        _state.ServerHealthProbeInProgress = true;
+        var checking = HistoryPanelServerHealthFormatter.Checking();
+        SetStatusMessage(checking.StatusMessage);
+        _requestUiRefresh();
+
+        var sessionVersion = _session.Version;
+        ModApiHealthProbeResult result;
+        try
+        {
+            result = await _serverHealthProbe.ProbeAsync(_session.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!_session.IsCurrent(sessionVersion))
+                return;
+
+            _state.ServerHealthProbeInProgress = false;
+            SetStatusMessage(null);
+            _requestUiRefresh();
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (!_session.IsCurrent(sessionVersion))
+                return;
+
+            _state.ServerHealthProbeInProgress = false;
+            SetStatusMessage(HistoryPanelText.ServerHealthFailed(0, ex.Message));
+            BppLog.Error("HistoryPanel", "Failed to check server health", ex);
+            _requestUiRefresh();
+            return;
+        }
+
+        if (!_session.IsCurrent(sessionVersion))
+            return;
+
+        _state.ServerHealthProbeInProgress = false;
+        var display = HistoryPanelServerHealthFormatter.FromProbeResult(result);
+        SetStatusMessage(display.StatusMessage);
+        if (result.Succeeded)
+        {
+            BppLog.Info(
+                "HistoryPanel",
+                $"Server health check succeeded rttMs={result.RoundTripMilliseconds}"
+            );
+        }
+        else
+        {
+            BppLog.Warn(
+                "HistoryPanel",
+                $"Server health check failed rttMs={result.RoundTripMilliseconds} error={result.Error}"
+            );
+        }
+        _requestUiRefresh();
+    }
+
     public async Task TrySyncGhostBattlesAsync()
     {
         if (_state.GhostSyncInProgress)
@@ -641,6 +718,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             !_state.ReplayActionInProgress
             && !_state.GhostSyncInProgress
             && !_state.FinalBuildRefreshInProgress
+            && !_state.ServerHealthProbeInProgress
         )
             SetStatusMessage(null);
     }
