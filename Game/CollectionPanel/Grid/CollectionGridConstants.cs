@@ -77,7 +77,7 @@ internal static class CollectionGridConstants
     // tried to lerp scrollOffset itself but the WheelEvent interaction with ScrollView's
     // default handler killed wheel scrolling entirely on this UITK version; we ship the
     // built-in instant snap instead and just give each notch enough travel to feel meaty.
-    public const float MouseWheelScrollPoints = 300f;
+    public const float MouseWheelScrollPoints = 120f;
 
     // Unit width an item card occupies on the item grid. Skills never call this (always 1).
     public static int ItemWidthSpan(ECardSize size) =>
