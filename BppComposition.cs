@@ -85,7 +85,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_combatReplayModule);
         _featureRegistry.Register(_combatStatusBarModule);
 
-        _settingsDockRegistry.Register(new BazaarDbScreenshotUploadSettingsDockEntry());
+        _settingsDockRegistry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
         _settingsDockRegistry.Register(new ChineseLocaleModeSettingsDockEntry(_eventBus));
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
@@ -94,7 +94,7 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
 
         _mountables.Register(
-            new ComponentMount<BazaarDbScreenshotUploadController>((c, s) => c.Initialize(s))
+            new ComponentMount<BazaarDbSnapshotUploadController>((c, s) => c.Initialize(s))
         );
         _mountables.Register(new ComponentMount<CardSetPreviewRuntime>());
         _mountables.Register(new CollectionPanelMount());

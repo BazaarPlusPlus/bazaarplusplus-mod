@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.Storage.RunLog;
 
 public static class RunLogSchema
 {
-    public static int LocalDatabaseSchemaVersion => 14;
+    public static int LocalDatabaseSchemaVersion => 15;
 
     public static int RowSchemaVersion => 11;
 
@@ -33,7 +33,7 @@ public static class RunLogSchema
 
     public static string RunSyncStateTableName => "run_sync_state";
 
-    public static string BazaarDbScreenshotUploadsTableName => "bazaardb_screenshot_uploads";
+    public static string BazaarDbSnapshotUploadsTableName => "bazaardb_snapshot_uploads";
 
     public static string CaptureSourceEndOfRunAuto => "end_of_run_auto";
 
@@ -206,14 +206,14 @@ public static class RunLogSchema
                 FOREIGN KEY (run_id) REFERENCES {RunsTableName}(run_id) ON DELETE CASCADE
             );
 
-            CREATE TABLE IF NOT EXISTS {BazaarDbScreenshotUploadsTableName} (
-                screenshot_id          TEXT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS {BazaarDbSnapshotUploadsTableName} (
+                snapshot_id            TEXT PRIMARY KEY,
                 status                 TEXT NOT NULL,
                 attempts               INTEGER NOT NULL DEFAULT 0,
                 last_attempted_at_utc  TEXT NULL,
                 last_error             TEXT NULL,
                 uploaded_at_utc        TEXT NULL,
-                FOREIGN KEY (screenshot_id) REFERENCES {RunScreenshotsTableName}(screenshot_id) ON DELETE CASCADE
+                FOREIGN KEY (snapshot_id) REFERENCES {RunScreenshotsTableName}(screenshot_id) ON DELETE CASCADE
             );
 
             CREATE INDEX IF NOT EXISTS idx_{RunEventsTableName}_ts_utc
@@ -250,8 +250,8 @@ public static class RunLogSchema
             CREATE INDEX IF NOT EXISTS idx_{CombatReplayVideosTableName}_battle
                 ON {CombatReplayVideosTableName}(battle_id, started_at_utc DESC);
 
-            CREATE INDEX IF NOT EXISTS idx_{BazaarDbScreenshotUploadsTableName}_status
-                ON {BazaarDbScreenshotUploadsTableName}(status);
+            CREATE INDEX IF NOT EXISTS idx_{BazaarDbSnapshotUploadsTableName}_status
+                ON {BazaarDbSnapshotUploadsTableName}(status);
             """;
 
     public static void EnsureInitialized(SqliteConnection connection)

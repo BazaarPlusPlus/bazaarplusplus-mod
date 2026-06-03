@@ -26,6 +26,12 @@ internal static class RoutesTests
         if (!routes.CreateReplayLink("b-1").EndsWith("/ghost-battles/b-1/replay-link"))
             throw new InvalidOperationException("Unexpected CreateReplayLink shape");
 
+        if (
+            routes.CreateBazaarDbSnapshotUpload("snap 1")
+            != "https://mod-api-v4.bazaarplusplus.com/bazaardb/snapshots/snap%201"
+        )
+            throw new InvalidOperationException("Unexpected CreateBazaarDbSnapshotUpload shape");
+
         if (ModApiRoutes.TryCreate(null) != null)
             throw new InvalidOperationException("TryCreate must return null for null input");
         if (ModApiRoutes.TryCreate("not-a-url") != null)

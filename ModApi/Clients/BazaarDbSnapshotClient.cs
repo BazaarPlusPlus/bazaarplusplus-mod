@@ -8,53 +8,53 @@ using BazaarPlusPlus.ModApi.Models;
 
 namespace BazaarPlusPlus.ModApi.Clients;
 
-public sealed class BazaarDbScreenshotClient
+public sealed class BazaarDbSnapshotClient
 {
     private readonly HttpClient _httpClient;
     private readonly ModApiRoutes _routes;
 
-    public BazaarDbScreenshotClient(HttpClient httpClient, ModApiRoutes routes)
+    public BazaarDbSnapshotClient(HttpClient httpClient, ModApiRoutes routes)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _routes = routes ?? throw new ArgumentNullException(nameof(routes));
     }
 
-    public async Task<BazaarDbScreenshotUploadResult> UploadScreenshotAsync(
-        BazaarDbScreenshotUploadRequest payload,
+    public async Task<BazaarDbSnapshotUploadResult> UploadSnapshotAsync(
+        BazaarDbSnapshotUploadRequest payload,
         CancellationToken cancellationToken
     )
     {
         if (payload == null)
             throw new ArgumentNullException(nameof(payload));
 
+        var route = _routes.CreateBazaarDbSnapshotUpload(payload.Snapshot.Id);
         var result = await ModApiJsonPost.PostJsonAsync(
             _httpClient,
-            _routes.UploadBazaarDbScreenshot,
+            route,
             payload,
             cancellationToken
         );
         if (result.IsSuccess)
-            return BazaarDbScreenshotUploadResult.Success();
+            return BazaarDbSnapshotUploadResult.Success();
 
         var formattedError = ModApiErrorFormatter.FormatHttpFailure(
             result.StatusCode,
             result.FailureBody!
         );
         return IsPermanentClientError(result.StatusCode)
-            ? BazaarDbScreenshotUploadResult.PermanentFailure(formattedError)
-            : BazaarDbScreenshotUploadResult.TransientFailure(formattedError);
+            ? BazaarDbSnapshotUploadResult.PermanentFailure(formattedError)
+            : BazaarDbSnapshotUploadResult.TransientFailure(formattedError);
     }
 
     private static bool IsPermanentClientError(int statusCode)
     {
-        // 4xx except 408 (Request Timeout) and 429 (Too Many Requests) — design §10.1 maps both to transient.
         return statusCode >= 400 && statusCode < 500 && statusCode != 408 && statusCode != 429;
     }
 }
 
-public readonly struct BazaarDbScreenshotUploadResult
+public readonly struct BazaarDbSnapshotUploadResult
 {
-    private BazaarDbScreenshotUploadResult(bool succeeded, bool permanent, string? error)
+    private BazaarDbSnapshotUploadResult(bool succeeded, bool permanent, string? error)
     {
         Succeeded = succeeded;
         Permanent = permanent;
@@ -67,11 +67,11 @@ public readonly struct BazaarDbScreenshotUploadResult
 
     public string? Error { get; }
 
-    public static BazaarDbScreenshotUploadResult Success() => new(true, false, null);
+    public static BazaarDbSnapshotUploadResult Success() => new(true, false, null);
 
-    public static BazaarDbScreenshotUploadResult TransientFailure(string error) =>
+    public static BazaarDbSnapshotUploadResult TransientFailure(string error) =>
         new(false, false, error);
 
-    public static BazaarDbScreenshotUploadResult PermanentFailure(string error) =>
+    public static BazaarDbSnapshotUploadResult PermanentFailure(string error) =>
         new(false, true, error);
 }

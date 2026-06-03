@@ -273,14 +273,14 @@ Snapshot / sim DTO：
 | `GET /ghost-battles` | `GhostBattleImportRecord` | `BattleId`、`RecordedAtUtc`、`Day`、`Hour`、`EncounterId`、player/opponent fields、`CombatKind`、`Result`、`WinnerCombatantId`、`LoserCombatantId`、`IsBundleFinalBattle`、`ReplayAvailable`、`ReplayDownloaded`、`LastSyncedAtUtc` |
 | `POST /ghost-battles/{battleId}/replay-link` | response JSON | `download_url` |
 | `GET download_url` | bytes | replay payload bytes |
-| `POST /bazaardb-screenshots` | `BazaarDbScreenshotUploadRequest` | `SchemaVersion`、`SubmittedAtUtc`、`PlayerAccountId`、`ScreenshotId`、`RunId`、`HeroName`、`FinalDays`、`FinalVictories`、`PlayerName`、`PlayerRank`、`PlayerRating`、`PlayerPosition`、`CapturedAtUtc`、`ImageFormat`、`ImageBytes` |
+| `POST /bazaardb/snapshots/<snapshot_id>` | `BazaarDbSnapshotUploadRequest` | `SchemaVersion`、`Snapshot`、`Player`、`Run`、`Image`、`Client` |
 
 业务点：
 
 - 上传类接口不是游戏启动/玩法必要条件；离线模式应默认禁用，或只写本地队列。
 - `ghost-battles` 的 replay payload 可以作为本地 PVP/opponent cache 的来源，但应明确是用户曾同步过的数据。
-- 当前 mod client 不附加鉴权 header；`RunBundleUploadRequest.PlayerAccountId`、`GhostBattleClient.QueryAgainstMeAsync(playerAccountId)`、`BazaarDbScreenshotUploadRequest.PlayerAccountId` 是主要身份输入。
-- `ModApiRoutes.BazaarDbManifestBase` 只是 route 常量；当前 mod client 未发现 manifest 拉取逻辑。现有设计文档中 manifest 是 BazaarDB 服务端拉取路径。
+- 当前 mod client 不附加鉴权 header；`RunBundleUploadRequest.PlayerAccountId`、`GhostBattleClient.QueryAgainstMeAsync(playerAccountId)`、`BazaarDbSnapshotUploadRequest.Player.AccountId` 是主要身份输入。
+- BazaarDB 拉取不在游戏进程内执行；服务端通过 `POST /bazaardb/peek` 返回私有 R2 的短期预签 URL，外部 BazaarDB puller 落地后调用 `POST /bazaardb/confirm`。
 
 ## AutoBazaar 本地 HTTP DTO
 

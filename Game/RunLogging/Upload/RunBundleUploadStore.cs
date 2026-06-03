@@ -261,6 +261,8 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
             OpponentPrestige = manifest.Participants.OpponentPrestige,
             OpponentVictories = manifest.Participants.OpponentVictories,
             Result = manifest.Outcome.Result,
+            WinnerCombatantId = manifest.Outcome.WinnerCombatantId,
+            LoserCombatantId = manifest.Outcome.LoserCombatantId,
         };
     }
 

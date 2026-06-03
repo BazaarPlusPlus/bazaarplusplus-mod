@@ -10,13 +10,13 @@ using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
-internal sealed class BazaarDbScreenshotUploadStore : SqliteStoreBase
+internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
 {
-    private const int UploadPayloadSchemaVersion = 1;
+    private const int UploadPayloadSchemaVersion = 2;
 
     private readonly string _screenshotsDirectoryPath;
 
-    public BazaarDbScreenshotUploadStore(string databasePath, string screenshotsDirectoryPath)
+    public BazaarDbSnapshotUploadStore(string databasePath, string screenshotsDirectoryPath)
         : base(databasePath)
     {
         if (string.IsNullOrWhiteSpace(screenshotsDirectoryPath))
@@ -32,22 +32,22 @@ internal sealed class BazaarDbScreenshotUploadStore : SqliteStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            INSERT OR IGNORE INTO {RunLogSchema.BazaarDbScreenshotUploadsTableName}
-                (screenshot_id, status, attempts, last_attempted_at_utc, last_error, uploaded_at_utc)
+            INSERT OR IGNORE INTO {RunLogSchema.BazaarDbSnapshotUploadsTableName}
+                (snapshot_id, status, attempts, last_attempted_at_utc, last_error, uploaded_at_utc)
             SELECT s.screenshot_id, 'pending', 0, NULL, NULL, NULL
             FROM {RunLogSchema.RunScreenshotsTableName} AS s
             WHERE s.capture_source = $captureSource
               AND NOT EXISTS (
                   SELECT 1
-                  FROM {RunLogSchema.BazaarDbScreenshotUploadsTableName} AS u
-                  WHERE u.screenshot_id = s.screenshot_id
+                  FROM {RunLogSchema.BazaarDbSnapshotUploadsTableName} AS u
+                  WHERE u.snapshot_id = s.screenshot_id
               );
             """;
         command.Parameters.AddWithValue("$captureSource", RunLogSchema.CaptureSourceEndOfRunAuto);
         command.ExecuteNonQuery();
     }
 
-    public IReadOnlyList<string> GetPendingScreenshotIds(int limit)
+    public IReadOnlyList<string> GetPendingSnapshotIds(int limit)
     {
         if (limit <= 0)
             return Array.Empty<string>();
@@ -55,10 +55,10 @@ internal sealed class BazaarDbScreenshotUploadStore : SqliteStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            SELECT u.screenshot_id
-            FROM {RunLogSchema.BazaarDbScreenshotUploadsTableName} AS u
+            SELECT u.snapshot_id
+            FROM {RunLogSchema.BazaarDbSnapshotUploadsTableName} AS u
             INNER JOIN {RunLogSchema.RunScreenshotsTableName} AS s
-                ON s.screenshot_id = u.screenshot_id
+                ON s.screenshot_id = u.snapshot_id
             WHERE u.status = 'pending'
             ORDER BY s.captured_at_utc ASC
             LIMIT $limit;
@@ -77,17 +77,14 @@ internal sealed class BazaarDbScreenshotUploadStore : SqliteStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            SELECT 1 FROM {RunLogSchema.BazaarDbScreenshotUploadsTableName}
+            SELECT 1 FROM {RunLogSchema.BazaarDbSnapshotUploadsTableName}
             WHERE status = 'pending'
             LIMIT 1;
             """;
         return command.ExecuteScalar() != null;
     }
 
-    public BazaarDbScreenshotUploadSnapshot? TryBuildSnapshot(
-        string screenshotId,
-        string playerAccountId
-    )
+    public BazaarDbSnapshotUploadRecord? TryBuildSnapshot(string snapshotId, string playerAccountId)
     {
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
@@ -107,7 +104,7 @@ internal sealed class BazaarDbScreenshotUploadStore : SqliteStoreBase
             WHERE screenshot_id = $id
             LIMIT 1;
             """;
-        command.Parameters.AddWithValue("$id", screenshotId);
+        command.Parameters.AddWithValue("$id", snapshotId);
         using var reader = command.ExecuteReader();
         if (!reader.Read())
             return null;
@@ -123,77 +120,100 @@ internal sealed class BazaarDbScreenshotUploadStore : SqliteStoreBase
 
         var playerName = TryResolvePlayerName();
 
-        return new BazaarDbScreenshotUploadSnapshot
+        var capturedAtUtc = reader.GetString(reader.GetOrdinal("captured_at_utc"));
+        return new BazaarDbSnapshotUploadRecord
         {
-            ScreenshotId = screenshotId,
-            Payload = new BazaarDbScreenshotUploadRequest
+            SnapshotId = snapshotId,
+            Payload = new BazaarDbSnapshotUploadRequest
             {
                 SchemaVersion = UploadPayloadSchemaVersion,
-                SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
-                PlayerAccountId = playerAccountId,
-                ScreenshotId = screenshotId,
-                RunId = GetNullableString(reader, "run_id"),
-                HeroName = GetNullableString(reader, "hero_name"),
-                FinalDays = GetNullableInt32(reader, "day"),
-                FinalVictories = GetNullableInt32(reader, "victories_at_capture"),
-                PlayerName = playerName,
-                PlayerRank = GetNullableString(reader, "player_rank"),
-                PlayerRating = GetNullableInt32(reader, "player_rating"),
-                PlayerPosition = GetNullableInt32(reader, "player_position"),
-                CapturedAtUtc = reader.GetString(reader.GetOrdinal("captured_at_utc")),
-                ImageFormat = "png",
-                ImageBytes = bytes,
+                Snapshot = new BazaarDbSnapshotMetadata
+                {
+                    Id = snapshotId,
+                    Source = RunLogSchema.CaptureSourceEndOfRunAuto,
+                    CapturedAtUtc = capturedAtUtc,
+                },
+                Player = new BazaarDbSnapshotPlayer
+                {
+                    AccountId = playerAccountId,
+                    DisplayName = playerName,
+                    Rank = GetNullableString(reader, "player_rank"),
+                    Rating = GetNullableInt32(reader, "player_rating"),
+                    LeaderboardPosition = GetNullableInt32(reader, "player_position"),
+                },
+                Run = new BazaarDbSnapshotRun
+                {
+                    Id = GetNullableString(reader, "run_id"),
+                    Day = GetNullableInt32(reader, "day"),
+                    Wins = GetNullableInt32(reader, "victories_at_capture"),
+                    Losses = null,
+                    Hero = new BazaarDbSnapshotHero
+                    {
+                        Id = null,
+                        Name = GetNullableString(reader, "hero_name"),
+                    },
+                },
+                Image = new BazaarDbSnapshotImage
+                {
+                    ContentType = "image/png",
+                    Encoding = "base64",
+                    DataBase64 = Convert.ToBase64String(bytes),
+                },
+                Client = new BazaarDbSnapshotClientInfo
+                {
+                    SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
+                },
             },
         };
     }
 
-    public void MarkUploaded(string screenshotId, DateTime uploadedAtUtc)
+    public void MarkUploaded(string snapshotId, DateTime uploadedAtUtc)
     {
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            UPDATE {RunLogSchema.BazaarDbScreenshotUploadsTableName}
+            UPDATE {RunLogSchema.BazaarDbSnapshotUploadsTableName}
             SET status = 'uploaded',
                 uploaded_at_utc = $uploadedAtUtc,
                 last_attempted_at_utc = $uploadedAtUtc,
                 last_error = NULL
-            WHERE screenshot_id = $id;
+            WHERE snapshot_id = $id;
             """;
-        command.Parameters.AddWithValue("$id", screenshotId);
+        command.Parameters.AddWithValue("$id", snapshotId);
         command.Parameters.AddWithValue("$uploadedAtUtc", uploadedAtUtc.ToString("o"));
         command.ExecuteNonQuery();
     }
 
-    public void MarkTransientFailure(string screenshotId, DateTime attemptedAtUtc, string error)
+    public void MarkTransientFailure(string snapshotId, DateTime attemptedAtUtc, string error)
     {
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            UPDATE {RunLogSchema.BazaarDbScreenshotUploadsTableName}
+            UPDATE {RunLogSchema.BazaarDbSnapshotUploadsTableName}
             SET attempts = attempts + 1,
                 last_attempted_at_utc = $attemptedAtUtc,
                 last_error = $error
-            WHERE screenshot_id = $id;
+            WHERE snapshot_id = $id;
             """;
-        command.Parameters.AddWithValue("$id", screenshotId);
+        command.Parameters.AddWithValue("$id", snapshotId);
         command.Parameters.AddWithValue("$attemptedAtUtc", attemptedAtUtc.ToString("o"));
         command.Parameters.AddWithValue("$error", error ?? string.Empty);
         command.ExecuteNonQuery();
     }
 
-    public void MarkPermanentFailure(string screenshotId, DateTime attemptedAtUtc, string error)
+    public void MarkPermanentFailure(string snapshotId, DateTime attemptedAtUtc, string error)
     {
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            UPDATE {RunLogSchema.BazaarDbScreenshotUploadsTableName}
+            UPDATE {RunLogSchema.BazaarDbSnapshotUploadsTableName}
             SET status = 'permanent_failure',
                 attempts = attempts + 1,
                 last_attempted_at_utc = $attemptedAtUtc,
                 last_error = $error
-            WHERE screenshot_id = $id;
+            WHERE snapshot_id = $id;
             """;
-        command.Parameters.AddWithValue("$id", screenshotId);
+        command.Parameters.AddWithValue("$id", snapshotId);
         command.Parameters.AddWithValue("$attemptedAtUtc", attemptedAtUtc.ToString("o"));
         command.Parameters.AddWithValue("$error", error ?? string.Empty);
         command.ExecuteNonQuery();

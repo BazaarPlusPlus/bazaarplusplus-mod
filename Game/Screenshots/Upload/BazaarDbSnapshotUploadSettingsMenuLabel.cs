@@ -3,7 +3,7 @@ using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
-internal static class BazaarDbScreenshotUploadSettingsMenuLabel
+internal static class BazaarDbSnapshotUploadSettingsMenuLabel
 {
     private static readonly LocalizedTextSet Labels = new(
         "Upload screenshots to BazaarDB",

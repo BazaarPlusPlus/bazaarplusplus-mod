@@ -15,7 +15,7 @@ This repository only keeps documentation that still matches the current implemen
 - Combat replay: saves local PvP replay payloads; `HistoryPanel` can replay saved battles when the required conditions are met.
 - End-of-run automatic screenshots: saves the primary final-run screenshot and SQLite metadata before `Continue`.
 - Background upload: run and replay upload, performed only while the client is outside a live run.
-- BazaarDB screenshot upload: optional toggle that pushes end-of-run screenshots plus a summary JSON to the V4 mod backend (`bazaarplusplus-server` repo, deployed at `mod-api-v4.bazaarplusplus.com`) for BazaarDB to pull on a daily cadence (off by default).
+- BazaarDB screenshot upload: optional toggle that pushes end-of-run snapshot DTOs to the V4 mod backend (`bazaarplusplus-server` repo, deployed at `mod-api-v4.bazaarplusplus.com`) for BazaarDB to pull through the peek/confirm delivery queue (off by default).
 - Anonymous Mode: replaces the local player name with `Anonymous`.
 - **AutoBazaar HTTP endpoint** (currently parked) — local loopback HTTP server (default port 47900) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. **The mount is commented out at `BppComposition.cs:120`, so the HTTP server is not started.** See [docs/features/autobazaar.md](docs/features/autobazaar.md).
 
@@ -47,7 +47,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 - Run logging, combat replay, and end-of-run screenshots store local SQLite data, replay payloads, and screenshot files. Cloud sync itself carries no authentication credentials.
 - Background upload only scans for uploads while the client is outside a live run.
-- The cloud backend (uploads, ghost battles, replay links, BazaarDB screenshot manifest) now lives in a separate repository `bazaarplusplus-server`, deployed at `mod-api-v4.bazaarplusplus.com`. The mod-side HTTP client lives in `BazaarPlusPlus.ModApi.csproj`.
+- The cloud backend (uploads, ghost battles, replay links, BazaarDB snapshot delivery) now lives in a separate repository `bazaarplusplus-server`, deployed at `mod-api-v4.bazaarplusplus.com`. The mod-side HTTP client lives in `BazaarPlusPlus.ModApi.csproj`.
 
 ## Repository Layout
 

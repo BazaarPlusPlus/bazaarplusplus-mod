@@ -5,9 +5,9 @@ using System.Reflection;
 using Microsoft.Data.Sqlite;
 
 var serviceType = RequireType(
-    "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbScreenshotUploadService"
+    "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadService"
 );
-var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbScreenshotUploadStore");
+var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadStore");
 var routesType = RequireModApiType("BazaarPlusPlus.ModApi.ModApiRoutes");
 
 var ctor = serviceType.GetConstructor(
@@ -18,7 +18,7 @@ var ctor = serviceType.GetConstructor(
 );
 Assert(
     ctor != null,
-    "BazaarDbScreenshotUploadService should take (store, routes, httpClient, playerAccountIdResolver)."
+    "BazaarDbSnapshotUploadService should take (store, routes, httpClient, playerAccountIdResolver)."
 );
 
 var tempRoot = Path.Combine(
@@ -37,7 +37,7 @@ try
         "BazaarPlusPlus.Storage.RunScreenshot.RunScreenshotSqliteStore"
     );
     Activator.CreateInstance(screenshotStoreType, dbPath);
-    SeedRunScreenshotWithFile(
+    SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
         "shot-1",
@@ -89,6 +89,28 @@ try
             "First request should be the health probe."
         );
         Assert(
+            handler.Requests[1].Method == HttpMethod.Post
+                && handler.Requests[1].RequestUri?.AbsolutePath == "/bazaardb/snapshots/shot-1",
+            "Second request should POST to the snapshot id path."
+        );
+        Assert(
+            handler.ContentTypes[1] == "application/json",
+            "Snapshot upload should use application/json."
+        );
+        var uploadJson = handler.Bodies[1];
+        Assert(
+            uploadJson.Contains("\"schema_version\":2", StringComparison.Ordinal),
+            "Snapshot upload DTO should use schema_version 2."
+        );
+        Assert(
+            uploadJson.Contains("\"snapshot\":{\"id\":\"shot-1\"", StringComparison.Ordinal),
+            "Snapshot upload DTO should include snapshot.id."
+        );
+        Assert(
+            !uploadJson.Contains("\"screenshot_id\"", StringComparison.Ordinal),
+            "Snapshot upload DTO should not emit old screenshot_id."
+        );
+        Assert(
             GetUploadStatus(dbPath, "shot-1") == "uploaded",
             "Happy-path row should be marked uploaded."
         );
@@ -112,7 +134,7 @@ try
     }
 
     // Test 3: transient HTTP 503 keeps row pending and increments attempts
-    SeedRunScreenshotWithFile(
+    SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
         "shot-2",
@@ -189,7 +211,7 @@ try
     }
 
     // Test 5: missing image file → permanent_failure
-    SeedRunScreenshotMissingFile(dbPath, "shot-3");
+    SeedRunSnapshotMissingFile(dbPath, "shot-3");
     ensureBackfilled.Invoke(store, []);
     {
         var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.OK)
@@ -214,7 +236,7 @@ try
     }
 
     // Test 6: health failure leaves pending rows untouched for the next retry
-    SeedRunScreenshotWithFile(
+    SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
         "shot-health-fail",
@@ -233,7 +255,7 @@ try
 
         Assert(
             GetUploadStatus(dbPath, "shot-health-fail") == "pending",
-            "Health failure should leave pending screenshots pending for retry."
+            "Health failure should leave pending snapshots pending for retry."
         );
         Assert(
             GetUploadAttempts(dbPath, "shot-health-fail") == 0,
@@ -244,7 +266,7 @@ try
     }
 
     // Test 7: missing account id should not probe health or count attempts
-    SeedRunScreenshotWithFile(
+    SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
         "shot-no-account",
@@ -261,7 +283,7 @@ try
 
         Assert(
             GetUploadStatus(dbPath, "shot-no-account") == "pending",
-            "Missing account id should leave pending screenshots pending for retry."
+            "Missing account id should leave pending snapshots pending for retry."
         );
         Assert(
             GetUploadAttempts(dbPath, "shot-no-account") == 0,
@@ -283,9 +305,9 @@ finally
     catch { }
 }
 
-Console.WriteLine("BazaarDbScreenshotUploadService checks passed.");
+Console.WriteLine("BazaarDbSnapshotUploadService checks passed.");
 
-static void SeedRunScreenshotWithFile(
+static void SeedRunSnapshotWithFile(
     string dbPath,
     string screenshotsDir,
     string id,
@@ -314,7 +336,7 @@ static void SeedRunScreenshotWithFile(
     cmd.ExecuteNonQuery();
 }
 
-static void SeedRunScreenshotMissingFile(string dbPath, string id)
+static void SeedRunSnapshotMissingFile(string dbPath, string id)
 {
     using var connection = new SqliteConnection($"Data Source={dbPath}");
     connection.Open();
@@ -338,8 +360,7 @@ static string GetUploadStatus(string dbPath, string id)
     using var connection = new SqliteConnection($"Data Source={dbPath}");
     connection.Open();
     using var command = connection.CreateCommand();
-    command.CommandText =
-        "SELECT status FROM bazaardb_screenshot_uploads WHERE screenshot_id = $id;";
+    command.CommandText = "SELECT status FROM bazaardb_snapshot_uploads WHERE snapshot_id = $id;";
     command.Parameters.AddWithValue("$id", id);
     return (string?)command.ExecuteScalar() ?? string.Empty;
 }
@@ -349,8 +370,7 @@ static long GetUploadAttempts(string dbPath, string id)
     using var connection = new SqliteConnection($"Data Source={dbPath}");
     connection.Open();
     using var command = connection.CreateCommand();
-    command.CommandText =
-        "SELECT attempts FROM bazaardb_screenshot_uploads WHERE screenshot_id = $id;";
+    command.CommandText = "SELECT attempts FROM bazaardb_snapshot_uploads WHERE snapshot_id = $id;";
     command.Parameters.AddWithValue("$id", id);
     return (long)(command.ExecuteScalar() ?? 0L);
 }
@@ -385,12 +405,21 @@ internal sealed class RecordingHandler : HttpMessageHandler
 
     public List<HttpRequestMessage> Requests { get; } = new();
 
+    public List<string> Bodies { get; } = new();
+
+    public List<string?> ContentTypes { get; } = new();
+
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken
     )
     {
         Requests.Add(request);
+        Bodies.Add(
+            request.Content?.ReadAsStringAsync(cancellationToken).GetAwaiter().GetResult()
+                ?? string.Empty
+        );
+        ContentTypes.Add(request.Content?.Headers.ContentType?.MediaType);
         return Task.FromResult(_responder(request));
     }
 }

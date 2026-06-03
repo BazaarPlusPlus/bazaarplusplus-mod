@@ -83,7 +83,7 @@ internal sealed class BppConfig : IBppConfig
             "BazaarDB",
             "UploadScreenshots",
             false,
-            "When enabled, end-of-run screenshots and their summary (hero, days, MMR, rank, position, etc.) are uploaded to our server and forwarded to BazaarDB. Includes screenshots from past runs. You can turn this off at any time; we will stop uploading and never delete what was already sent."
+            "When enabled, end-of-run screenshot snapshots are uploaded to our server for BazaarDB delivery. Includes screenshots from past runs. You can turn this off at any time; we will stop uploading and never delete what was already sent."
         );
     }
 

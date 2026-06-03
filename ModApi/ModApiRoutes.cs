@@ -10,8 +10,6 @@ public sealed class ModApiRoutes
         ApiBaseUri = apiBaseUri;
         UploadRunBundle = BuildAbsolute("/run-bundles");
         QueryGhostBattles = BuildAbsolute("/ghost-battles");
-        UploadBazaarDbScreenshot = BuildAbsolute("/bazaardb-screenshots");
-        BazaarDbManifestBase = BuildAbsolute("/bazaardb/manifest");
         Health = BuildAbsolute("/health");
     }
 
@@ -21,10 +19,6 @@ public sealed class ModApiRoutes
 
     public string QueryGhostBattles { get; }
 
-    public string UploadBazaarDbScreenshot { get; }
-
-    public string BazaarDbManifestBase { get; }
-
     public string Health { get; }
 
     public string CreateReplayLink(string battleId)
@@ -33,6 +27,14 @@ public sealed class ModApiRoutes
             throw new ArgumentException("Battle id is required.", nameof(battleId));
 
         return BuildAbsolute($"/ghost-battles/{Uri.EscapeDataString(battleId.Trim())}/replay-link");
+    }
+
+    public string CreateBazaarDbSnapshotUpload(string snapshotId)
+    {
+        if (string.IsNullOrWhiteSpace(snapshotId))
+            throw new ArgumentException("Snapshot id is required.", nameof(snapshotId));
+
+        return $"{ApiBaseUri.ToString().TrimEnd('/')}/bazaardb/snapshots/{Uri.EscapeDataString(snapshotId.Trim())}";
     }
 
     public static ModApiRoutes? TryCreate(string? apiBaseUrl)

@@ -154,6 +154,12 @@ public sealed class BattleProjection
 
     [JsonProperty("result")]
     public string? Result { get; set; }
+
+    [JsonProperty("winner_combatant_id")]
+    public string? WinnerCombatantId { get; set; }
+
+    [JsonProperty("loser_combatant_id")]
+    public string? LoserCombatantId { get; set; }
 }
 
 public sealed class RunArtifact

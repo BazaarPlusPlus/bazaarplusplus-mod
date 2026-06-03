@@ -16,7 +16,7 @@ Source of truth:
 - `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
 - `Storage/RunScreenshot/RunScreenshotSqliteStore.cs`
 - `Game/CombatReplay/Video/CombatReplayVideoMetadataStore.cs`
-- `Game/Screenshots/Upload/BazaarDbScreenshotUploadStore.cs`
+- `Game/Screenshots/Upload/BazaarDbSnapshotUploadStore.cs`
 - `Game/HistoryPanel/Storage/HistoryPanelRepository.cs`
 - `Game/RunLogging/Upload/RunBundleUploadStore.cs`
 - `bazaarplusplus-server/migrations/0001_v4_initial.sql`
@@ -25,12 +25,12 @@ Source of truth:
 ## Local Client SQLite
 
 - Database file: `<GameRoot>/BazaarPlusPlusV4/bazaarplusplus.db`
-- Local schema version: `14` (`RunLogSchema.LocalDatabaseSchemaVersion`)
+- Local schema version: `15` (`RunLogSchema.LocalDatabaseSchemaVersion`)
 - Row schema version: `11`
 - Upload payload schema version: `1`
-- Runtime pragmas include `foreign_keys = ON`, `user_version = 14`, `busy_timeout = 2000`, and WAL mode.
+- Runtime pragmas include `foreign_keys = ON`, `user_version = 15`, `busy_timeout = 2000`, and WAL mode.
 
-> Version history: `v11→v12` added the `combat_replay_videos` table; `v13` added the `bazaardb_screenshot_uploads` sidecar; `v14` added battle-time player/opponent prestige and victories to `battles`. The bootstrap is a single `CREATE TABLE IF NOT EXISTS` pass (`RunLogSchema.BootstrapSql`), so a fresh database is created directly at the current version rather than migrated step by step.
+> Version history: `v11→v12` added the `combat_replay_videos` table; `v13` added the BazaarDB upload sidecar; `v14` added battle-time player/opponent prestige and victories to `battles`; `v15` renamed the sidecar to `bazaardb_snapshot_uploads` with `snapshot_id`. The bootstrap is a single `CREATE TABLE IF NOT EXISTS` pass (`RunLogSchema.BootstrapSql`), so a fresh database is created directly at the current version rather than migrated step by step.
 
 Current tables:
 
@@ -42,7 +42,7 @@ Current tables:
 - `combat_replay_videos`
 - `sync_cursors`
 - `run_sync_state`
-- `bazaardb_screenshot_uploads`
+- `bazaardb_snapshot_uploads`
 
 Older logical names like `run_checkpoints`, `run_status`, `pvp_battles`, `ghost_battles`, and `replay_sync_state` now map onto the tables above. They are not separate tables.
 
@@ -219,20 +219,20 @@ Columns:
 - `retry_count INTEGER NOT NULL DEFAULT 0`
 - `last_error TEXT NULL`
 
-### `bazaardb_screenshot_uploads`
+### `bazaardb_snapshot_uploads`
 
-Sidecar upload-queue table for the optional BazaarDB screenshot upload feature (`BazaarDB / UploadScreenshots`). One row per `run_screenshots` row that has been (or is being) pushed to `bazaarplusplus-server`. Only present once the feature has been enabled at least once; rows are backfilled for every existing `capture_source = 'end_of_run_auto'` screenshot via `INSERT OR IGNORE`, so flipping the switch on uploads historical screenshots too.
+Sidecar upload-queue table for the optional BazaarDB snapshot upload feature (`BazaarDB / UploadScreenshots`). One row per `run_screenshots` row that has been (or is being) pushed to `bazaarplusplus-server` as a Snapshot DTO. Only present once the feature has been enabled at least once; rows are backfilled for every existing `capture_source = 'end_of_run_auto'` screenshot via `INSERT OR IGNORE`, so flipping the switch on uploads historical screenshots too.
 
 Columns:
 
-- `screenshot_id TEXT PRIMARY KEY` — references `run_screenshots.screenshot_id` (`ON DELETE CASCADE`)
+- `snapshot_id TEXT PRIMARY KEY` — references `run_screenshots.screenshot_id` (`ON DELETE CASCADE`)
 - `status TEXT NOT NULL` — `pending`, `uploaded`, or `permanent_failure`
 - `attempts INTEGER NOT NULL DEFAULT 0`
 - `last_attempted_at_utc TEXT NULL`
 - `last_error TEXT NULL`
 - `uploaded_at_utc TEXT NULL`
 
-Write path: `Game/Screenshots/Upload/BazaarDbScreenshotUploadStore.cs` (`MarkUploaded` → `uploaded`; 4xx except 408/429 → `permanent_failure`; 5xx / network errors stay `pending` for retry).
+Write path: `Game/Screenshots/Upload/BazaarDbSnapshotUploadStore.cs` (`MarkUploaded` → `uploaded`; 4xx except 408/429 → `permanent_failure`; 5xx / network errors stay `pending` for retry).
 
 ### Local Indexes
 
@@ -271,8 +271,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
 CREATE INDEX IF NOT EXISTS idx_combat_replay_videos_battle
     ON combat_replay_videos(battle_id, started_at_utc DESC);
 
-CREATE INDEX IF NOT EXISTS idx_bazaardb_screenshot_uploads_status
-    ON bazaardb_screenshot_uploads(status);
+CREATE INDEX IF NOT EXISTS idx_bazaardb_snapshot_uploads_status
+    ON bazaardb_snapshot_uploads(status);
 ```
 
 ## V4 Upload Payload Model
@@ -291,7 +291,7 @@ The V4 server schema lives in a separate repo (`bazaarplusplus-server`) and is t
 
 - `runs` — collapsed `run_bundles + runs` (V3 had two; V4 has one)
 - `battles` — projection for `GET /ghost-battles`
-- `bazaardb_screenshots` — BazaarDB screenshot manifest
+- `bazaardb_delivery` — BazaarDB Snapshot DTO delivery queue
 
 V4 explicitly removed (vs V3): `run_bundles` table, `replay_tokens` table, all `installation_id` columns, `battles.player_account_id_in_payload`, `battles.replay_available`, and the former `seen_player_accounts` opponent filter. Battle bundle-final flag is named `is_final_battle` (V3 had the redundant `is_bundle_final_` prefix).
 
@@ -310,4 +310,4 @@ Authoritative references:
 - Server SQL is for lookup; the uploaded artifact body lives in R2 and is served via short-lived presigned URLs from `POST /ghost-battles/:battle_id/replay-link`.
 - The server is fully unauthenticated for mod-side endpoints; identity comes from `player_account_id` in `POST /run-bundles` bodies and `GET /ghost-battles` query strings. The server fully ingests valid battle projections, and ghost sync filters by `opponent_account_id`.
 - `is_final_battle` is a server-side sticky flag carried through ghost sync so `HistoryPanel` can explain final-battle elimination outcomes without reading sibling battles or R2 artifacts.
-- BazaarDB manifest endpoint (`GET /bazaardb/manifest`) is the only mod-API endpoint that requires a Bearer token (`BAZAARDB_PULL_TOKEN`), since manifest rows carry identifying metadata. Image bytes themselves come from a public R2 custom domain (`bazaardb-assets-v4.bazaarplusplus.com`), keyed by a high-entropy `screenshot_id` GUID so URLs aren't enumerable in practice.
+- BazaarDB pull endpoints (`POST /bazaardb/peek` and `POST /bazaardb/confirm`) require a Bearer token (`BAZAARDB_PULL_TOKEN`). Snapshot DTOs live in private R2 and are exposed to BazaarDB only through short-lived presigned URLs returned by `peek`; `confirm` marks delivered rows done and deletes the corresponding R2 object best-effort.

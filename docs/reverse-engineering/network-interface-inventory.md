@@ -283,8 +283,8 @@ run session header：
 | POST | `/ghost-battles/{battleId}/replay-link` | none | `{ download_url }` | 为 ghost battle 获取 replay 下载链接。现有设计文档说明该 URL 是短 TTL 预签下载链接；客户端只要求响应里存在 `download_url`。 |
 | GET | `download_url` | none | bytes | 下载 replay payload。 |
 | GET | `/health` | none | JSON `{ status, server_time_utc }` | Bazaar++ 服务可用性探测；上传/同步工作前记录 RTT、探测时间和服务端时间戳。 |
-| POST | `/bazaardb-screenshots` | `BazaarDbScreenshotUploadRequest`：账号、截图、run、hero、rank、图片 bytes 等 | success/failure | 上传 BazaarDB 截图；当前客户端不附加鉴权 header；4xx 除 408/429 视作永久失败。 |
-| GET | `/bazaardb/manifest...` | manifest path | manifest JSON | route 已定义，但当前 mod client 未发现调用；现有设计文档描述为 BazaarDB 服务端拉取 manifest，而不是游戏进程主动拉取。 |
+| POST | `/bazaardb/snapshots/<snapshot_id>` | `BazaarDbSnapshotUploadRequest`：snapshot、player、run、image、client | success/failure | 上传 BazaarDB Snapshot DTO；当前客户端不附加鉴权 header；4xx 除 408/429 视作永久失败。 |
+| POST | `/bazaardb/peek` / `/bazaardb/confirm` | bearer-gated puller protocol | delivery batch / confirmation result | BazaarDB 服务端拉取与确认路径；当前 mod client 不调用。 |
 
 ### Mod 额外远端数据
 

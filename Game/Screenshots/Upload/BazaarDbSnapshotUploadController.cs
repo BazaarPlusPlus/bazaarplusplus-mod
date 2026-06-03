@@ -13,18 +13,18 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
-internal sealed class BazaarDbScreenshotUploadController : MonoBehaviour
+internal sealed class BazaarDbSnapshotUploadController : MonoBehaviour
 {
-    private static BazaarDbScreenshotUploadController? _current;
+    private static BazaarDbSnapshotUploadController? _current;
 
     private IBppServices? _services;
-    private BazaarDbScreenshotUploadService? _uploadService;
+    private BazaarDbSnapshotUploadService? _uploadService;
     private HttpClient? _httpClient;
     private CancellationTokenSource? _shutdown;
     private StartupUploadAttemptGate? _startupGate;
     private IDisposable? _runLifecycleSubscription;
     private readonly StartupUploadAttemptRunner _startupRunner = new(
-        "BazaarDbScreenshotUploadController",
+        "BazaarDbSnapshotUploadController",
         "Skipping BazaarDB screenshot upload because a live run is active.",
         "Starting BazaarDB screenshot upload attempt.",
         "BazaarDB screenshot upload failed"
@@ -55,7 +55,7 @@ internal sealed class BazaarDbScreenshotUploadController : MonoBehaviour
             )
             {
                 BppLog.Warn(
-                    "BazaarDbScreenshotUploadController",
+                    "BazaarDbSnapshotUploadController",
                     "BazaarDB screenshot upload is enabled but database or screenshots paths are invalid."
                 );
                 return;
@@ -65,15 +65,15 @@ internal sealed class BazaarDbScreenshotUploadController : MonoBehaviour
             if (routes == null)
                 return;
 
-            var store = new BazaarDbScreenshotUploadStore(databasePath, screenshotsDirectoryPath);
+            var store = new BazaarDbSnapshotUploadStore(databasePath, screenshotsDirectoryPath);
             _httpClient = BppHttpClientFactory.Create(
                 productVersion: BppPluginVersion.Current,
-                userAgentSuffix: "BazaarDbScreenshotUpload",
+                userAgentSuffix: "BazaarDbSnapshotUpload",
                 timeout: TimeSpan.FromSeconds(
                     Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds)
                 )
             );
-            _uploadService = new BazaarDbScreenshotUploadService(
+            _uploadService = new BazaarDbSnapshotUploadService(
                 store,
                 routes,
                 _httpClient,
@@ -93,14 +93,14 @@ internal sealed class BazaarDbScreenshotUploadController : MonoBehaviour
             );
 
             BppLog.Info(
-                "BazaarDbScreenshotUploadController",
+                "BazaarDbSnapshotUploadController",
                 $"BazaarDB screenshot uploader armed. enabled={IsEnabled()}, startup_delay={startupDelaySeconds}s, retry_interval={retryIntervalSeconds}s."
             );
         }
         catch (Exception ex)
         {
             BppLog.Error(
-                "BazaarDbScreenshotUploadController",
+                "BazaarDbSnapshotUploadController",
                 $"Failed to initialize BazaarDB screenshot upload service: {ex}"
             );
         }
@@ -168,7 +168,7 @@ internal sealed class BazaarDbScreenshotUploadController : MonoBehaviour
 
         _current?._startupGate?.ArmImmediateAttempt(Time.unscaledTime);
         BppLog.Info(
-            "BazaarDbScreenshotUploadController",
+            "BazaarDbSnapshotUploadController",
             "BazaarDB screenshot upload toggle armed an immediate attempt."
         );
     }

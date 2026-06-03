@@ -3,12 +3,12 @@ using System.Reflection;
 using Microsoft.Data.Sqlite;
 
 var schemaType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
-var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbScreenshotUploadStore");
+var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadStore");
 
 var ctor = storeType.GetConstructor([typeof(string), typeof(string)]);
 Assert(
     ctor != null,
-    "BazaarDbScreenshotUploadStore should expose a constructor taking the database path and screenshots directory."
+    "BazaarDbSnapshotUploadStore should expose a constructor taking the database path and screenshots directory."
 );
 
 var tempRoot = Path.Combine(
@@ -30,9 +30,9 @@ try
     );
     Activator.CreateInstance(screenshotStoreType, dbPath);
 
-    SeedRunScreenshotRow(dbPath, "shot-A", capturedAtUtc: "2026-04-08T20:30:25.000Z");
-    SeedRunScreenshotRow(dbPath, "shot-B", capturedAtUtc: "2026-04-08T20:31:25.000Z");
-    SeedRunScreenshotRow(
+    SeedRunSnapshotRow(dbPath, "shot-A", capturedAtUtc: "2026-04-08T20:30:25.000Z");
+    SeedRunSnapshotRow(dbPath, "shot-B", capturedAtUtc: "2026-04-08T20:31:25.000Z");
+    SeedRunSnapshotRow(
         dbPath,
         "shot-other-source",
         capturedAtUtc: "2026-04-08T20:32:25.000Z",
@@ -44,23 +44,20 @@ try
         "EnsureBackfilled",
         BindingFlags.Public | BindingFlags.Instance
     );
-    Assert(
-        ensureBackfilled != null,
-        "BazaarDbScreenshotUploadStore should expose EnsureBackfilled."
-    );
+    Assert(ensureBackfilled != null, "BazaarDbSnapshotUploadStore should expose EnsureBackfilled.");
     ensureBackfilled!.Invoke(store, []);
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
     {
         connection.Open();
         Assert(
-            CountRows(connection, "bazaardb_screenshot_uploads") == 2,
+            CountRows(connection, "bazaardb_snapshot_uploads") == 2,
             "EnsureBackfilled should insert exactly one pending row per end-of-run screenshot."
         );
         Assert(
             GetString(
                 connection,
-                "SELECT status FROM bazaardb_screenshot_uploads WHERE screenshot_id = $id;",
+                "SELECT status FROM bazaardb_snapshot_uploads WHERE snapshot_id = $id;",
                 "shot-A"
             ) == "pending",
             "Backfilled rows should start in 'pending' status."
@@ -73,35 +70,32 @@ try
     {
         connection.Open();
         Assert(
-            CountRows(connection, "bazaardb_screenshot_uploads") == 2,
+            CountRows(connection, "bazaardb_snapshot_uploads") == 2,
             "EnsureBackfilled should be idempotent (INSERT OR IGNORE)."
         );
     }
 
     var getPending = storeType.GetMethod(
-        "GetPendingScreenshotIds",
+        "GetPendingSnapshotIds",
         BindingFlags.Public | BindingFlags.Instance
     );
-    Assert(
-        getPending != null,
-        "BazaarDbScreenshotUploadStore should expose GetPendingScreenshotIds."
-    );
+    Assert(getPending != null, "BazaarDbSnapshotUploadStore should expose GetPendingSnapshotIds.");
     var pending = (System.Collections.Generic.IReadOnlyList<string>)
         getPending!.Invoke(store, [10])!;
-    Assert(pending.Count == 2, "GetPendingScreenshotIds should return both backfilled rows.");
+    Assert(pending.Count == 2, "GetPendingSnapshotIds should return both backfilled rows.");
     Assert(pending[0] == "shot-A", "Pending ordering should be by captured_at_utc ASC.");
     Assert(pending[1] == "shot-B", "Pending ordering should be by captured_at_utc ASC.");
 
     var pendingLimited = (System.Collections.Generic.IReadOnlyList<string>)
         getPending.Invoke(store, [1])!;
-    Assert(pendingLimited.Count == 1, "GetPendingScreenshotIds should respect the limit argument.");
+    Assert(pendingLimited.Count == 1, "GetPendingSnapshotIds should respect the limit argument.");
 
     // MarkUploaded
     var markUploaded = storeType.GetMethod(
         "MarkUploaded",
         BindingFlags.Public | BindingFlags.Instance
     );
-    Assert(markUploaded != null, "BazaarDbScreenshotUploadStore should expose MarkUploaded.");
+    Assert(markUploaded != null, "BazaarDbSnapshotUploadStore should expose MarkUploaded.");
     markUploaded!.Invoke(
         store,
         ["shot-A", DateTimeOffset.Parse("2026-04-08T21:00:00.000Z").UtcDateTime]
@@ -112,7 +106,7 @@ try
         Assert(
             GetString(
                 connection,
-                "SELECT status FROM bazaardb_screenshot_uploads WHERE screenshot_id = $id;",
+                "SELECT status FROM bazaardb_snapshot_uploads WHERE snapshot_id = $id;",
                 "shot-A"
             ) == "uploaded",
             "MarkUploaded should set status to 'uploaded'."
@@ -126,7 +120,7 @@ try
     );
     Assert(
         markTransient != null,
-        "BazaarDbScreenshotUploadStore should expose MarkTransientFailure."
+        "BazaarDbSnapshotUploadStore should expose MarkTransientFailure."
     );
     markTransient!.Invoke(
         store,
@@ -138,7 +132,7 @@ try
         Assert(
             GetString(
                 connection,
-                "SELECT status FROM bazaardb_screenshot_uploads WHERE screenshot_id = $id;",
+                "SELECT status FROM bazaardb_snapshot_uploads WHERE snapshot_id = $id;",
                 "shot-B"
             ) == "pending",
             "MarkTransientFailure should keep status as 'pending'."
@@ -146,7 +140,7 @@ try
         Assert(
             GetInt64(
                 connection,
-                "SELECT attempts FROM bazaardb_screenshot_uploads WHERE screenshot_id = $id;",
+                "SELECT attempts FROM bazaardb_snapshot_uploads WHERE snapshot_id = $id;",
                 "shot-B"
             ) == 1,
             "MarkTransientFailure should increment attempts."
@@ -160,7 +154,7 @@ try
     );
     Assert(
         markPermanent != null,
-        "BazaarDbScreenshotUploadStore should expose MarkPermanentFailure."
+        "BazaarDbSnapshotUploadStore should expose MarkPermanentFailure."
     );
     markPermanent!.Invoke(
         store,
@@ -172,7 +166,7 @@ try
         Assert(
             GetString(
                 connection,
-                "SELECT status FROM bazaardb_screenshot_uploads WHERE screenshot_id = $id;",
+                "SELECT status FROM bazaardb_snapshot_uploads WHERE snapshot_id = $id;",
                 "shot-B"
             ) == "permanent_failure",
             "MarkPermanentFailure should flip status to 'permanent_failure'."
@@ -193,9 +187,9 @@ finally
     catch { }
 }
 
-Console.WriteLine("BazaarDbScreenshotUploadStore checks passed.");
+Console.WriteLine("BazaarDbSnapshotUploadStore checks passed.");
 
-static void SeedRunScreenshotRow(
+static void SeedRunSnapshotRow(
     string dbPath,
     string screenshotId,
     string capturedAtUtc,

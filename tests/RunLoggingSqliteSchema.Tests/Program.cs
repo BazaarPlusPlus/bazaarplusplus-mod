@@ -4,7 +4,7 @@ using System.Reflection;
 var schemaType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 14,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 15,
     "Local database schema version mismatch."
 );
 Assert(
@@ -40,7 +40,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 14;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 15;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
@@ -121,6 +121,15 @@ Assert(
         && bootstrapSql.Contains("player_position INTEGER NULL", StringComparison.Ordinal)
         && bootstrapSql.Contains("is_primary INTEGER NOT NULL DEFAULT 0", StringComparison.Ordinal),
     "Bootstrap SQL should define screenshot metadata columns."
+);
+Assert(
+    bootstrapSql.Contains("CREATE TABLE IF NOT EXISTS bazaardb_snapshot_uploads", StringComparison.Ordinal)
+        && bootstrapSql.Contains("snapshot_id            TEXT PRIMARY KEY", StringComparison.Ordinal)
+        && bootstrapSql.Contains(
+            "FOREIGN KEY (snapshot_id) REFERENCES run_screenshots(screenshot_id) ON DELETE CASCADE",
+            StringComparison.Ordinal
+        ),
+    "Bootstrap SQL should define BazaarDB snapshot upload tracking columns."
 );
 Assert(
     bootstrapSql.Contains(
