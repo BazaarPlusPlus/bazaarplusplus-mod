@@ -2,36 +2,6 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
-var defaultState = new CollectionFilterState();
-AssertFalse(
-    defaultState.HasActiveFilters,
-    "Default collection filter state should not be resettable."
-);
-defaultState.Reset();
-AssertValues(
-    defaultState.Heroes.ToArray(),
-    new[] { EHero.Vanessa },
-    "Reset should restore a fallback hero when no hero was selected."
-);
-defaultState.SelectedMerchantSourceKey = "merchant:aila";
-AssertTrue(
-    defaultState.HasActiveFilters,
-    "Selected merchant source should make filters resettable."
-);
-defaultState.Reset();
-AssertFalse(defaultState.HasActiveFilters, "Reset should clear selected merchant source filters.");
-defaultState.SelectedTrainerSourceKey = "trainer:juliette";
-AssertTrue(
-    defaultState.HasActiveFilters,
-    "Selected trainer source should make filters resettable."
-);
-defaultState.Reset();
-defaultState.IncludePackages = true;
-AssertTrue(defaultState.HasActiveFilters, "Including packages should make filters resettable.");
-defaultState.Reset();
-defaultState.SortPriority = CollectionSortPriority.Size;
-AssertTrue(defaultState.HasActiveFilters, "Changing sort priority should make filters resettable.");
-
 var heroState = new CollectionFilterState();
 heroState.ToggleHero(EHero.Vanessa);
 AssertValues(
@@ -67,17 +37,6 @@ AssertValues(
     heroState.Heroes.ToArray(),
     new[] { EHero.Dooley },
     "Selecting a concrete hero after Common should still select only that hero."
-);
-heroState.IncludePackages = true;
-heroState.Reset();
-AssertValues(
-    heroState.Heroes.ToArray(),
-    new[] { EHero.Dooley },
-    "Reset should preserve the current selected hero because the hero row cannot be empty."
-);
-AssertFalse(
-    heroState.HasActiveFilters,
-    "A single mandatory hero selection should not keep the reset action enabled by itself."
 );
 var ambiguousHeroState = new CollectionFilterState();
 ambiguousHeroState.Heroes.Add(EHero.Common);

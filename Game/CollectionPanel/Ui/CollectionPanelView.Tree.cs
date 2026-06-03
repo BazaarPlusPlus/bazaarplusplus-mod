@@ -40,7 +40,7 @@ internal sealed partial class CollectionPanelView
         rail.style.marginLeft = UiSpacing.ColumnGap;
         parent.Add(rail);
 
-        // Title + Close (Close lives here in the operation area, not a top bar).
+        // Title + count + Close (Close lives here in the operation area, not a top bar).
         var titleRow = new VisualElement();
         titleRow.style.flexDirection = FlexDirection.Row;
         titleRow.style.alignItems = Align.Center;
@@ -50,6 +50,10 @@ internal sealed partial class CollectionPanelView
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
         titleRow.Add(_title);
+
+        _countLabel = CreateCountLabel();
+        _countLabel.style.marginRight = UiSpacing.Sm;
+        titleRow.Add(_countLabel);
 
         _closeButton = CreateButton(
             CollectionPanelText.Close(),
@@ -84,35 +88,12 @@ internal sealed partial class CollectionPanelView
 
         primaryControlsRow.Add(CreateOperationSpacer());
 
-        _clearButton = CreateButton(
-            CollectionPanelText.Reset(),
-            _clearFilters,
-            Sizes.SearchResetButtonWidth,
-            Sizes.ButtonStandardHeight
-        );
-        primaryControlsRow.Add(_clearButton);
-
-        _countLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryStatusText);
-        _countLabel.style.backgroundColor = Colors.HistoryStatusBackground;
-        _countLabel.style.height = Sizes.ButtonCompactHeight;
-        UiStyle.FixedWidth(_countLabel.style, Sizes.CollectionMatchCountWidth);
-        _countLabel.style.flexShrink = 0f;
-        _countLabel.style.marginLeft = UiSpacing.Sm;
-        _countLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-        _countLabel.style.alignSelf = Align.Center;
-        UiStyle.HorizontalPadding(_countLabel.style, UiSpacing.Md);
-        UiStyle.Radius(_countLabel.style, Radii.Md);
-        UiStyle.Border(_countLabel.style, Borders.Thin, Colors.HistoryStatusBorder);
-        primaryControlsRow.Add(_countLabel);
-
-        var secondaryControlsRow = CreateOperationRow(UiSpacing.Md);
-        rail.Add(secondaryControlsRow);
-
         var sortGroup = new VisualElement();
         sortGroup.style.flexDirection = FlexDirection.Row;
         sortGroup.style.alignItems = Align.Center;
         sortGroup.style.flexShrink = 0f;
-        secondaryControlsRow.Add(sortGroup);
+        sortGroup.style.marginTop = UiSpacing.Xs;
+        primaryControlsRow.Add(sortGroup);
 
         var sortLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
         sortLabel.text = CollectionPanelText.SortHeader();
@@ -131,10 +112,10 @@ internal sealed partial class CollectionPanelView
         _sortSizeButton.style.marginLeft = UiSpacing.Xs;
         sortGroup.Add(_sortSizeButton);
 
-        secondaryControlsRow.Add(CreateOperationSpacer());
-
         _packageToggleButton = CreatePackageToggleButton();
-        secondaryControlsRow.Add(_packageToggleButton);
+        _packageToggleButton.style.marginLeft = UiSpacing.Sm;
+        _packageToggleButton.style.marginTop = UiSpacing.Xs;
+        primaryControlsRow.Add(_packageToggleButton);
 
         // Hero filter.
         CreateFilterSection(rail, CollectionPanelText.HeroHeader(), UiSpacing.Xl, out _heroChipRow);
@@ -181,7 +162,7 @@ internal sealed partial class CollectionPanelView
         var row = new VisualElement();
         row.style.flexDirection = FlexDirection.Row;
         row.style.alignItems = Align.Center;
-        row.style.flexWrap = Wrap.NoWrap;
+        row.style.flexWrap = Wrap.Wrap;
         row.style.marginTop = marginTop;
         return row;
     }
@@ -193,6 +174,21 @@ internal sealed partial class CollectionPanelView
         spacer.style.flexShrink = 1f;
         spacer.style.minWidth = UiSpacing.Md;
         return spacer;
+    }
+
+    private static Label CreateCountLabel()
+    {
+        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryStatusText);
+        label.style.backgroundColor = Colors.HistoryStatusBackground;
+        label.style.height = Sizes.ButtonCompactHeight;
+        UiStyle.FixedWidth(label.style, Sizes.CollectionMatchCountWidth);
+        label.style.flexShrink = 0f;
+        label.style.unityTextAlign = TextAnchor.MiddleCenter;
+        label.style.alignSelf = Align.Center;
+        UiStyle.HorizontalPadding(label.style, UiSpacing.Md);
+        UiStyle.Radius(label.style, Radii.Md);
+        UiStyle.Border(label.style, Borders.Thin, Colors.HistoryStatusBorder);
+        return label;
     }
 
     private static Button CreateInlineSortButton(string text, Action onClick)

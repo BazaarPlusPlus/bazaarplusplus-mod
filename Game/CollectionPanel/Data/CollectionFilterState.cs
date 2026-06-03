@@ -29,17 +29,6 @@ internal sealed class CollectionFilterState
     public bool IncludePackages { get; set; }
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
-    public bool HasActiveFilters =>
-        Heroes.Count > 1
-        || Tiers.Count > 0
-        || Tags.Count > 0
-        || Sizes.Count > 0
-        || Merchants.Count > 0
-        || !string.IsNullOrWhiteSpace(SelectedMerchantSourceKey)
-        || !string.IsNullOrWhiteSpace(SelectedTrainerSourceKey)
-        || IncludePackages
-        || SortPriority != CollectionSortPriority.Quality;
-
     public EHero? SelectedHero
     {
         get
@@ -166,22 +155,6 @@ internal sealed class CollectionFilterState
         }
 
         return changed;
-    }
-
-    public void Reset()
-    {
-        var selectedHero = SelectedHero ?? CollectionPanelSelectionState.DefaultHero;
-        ActiveType = ECardType.Item;
-        Heroes.Clear();
-        Heroes.Add(selectedHero);
-        Tiers.Clear();
-        Tags.Clear();
-        Sizes.Clear();
-        Merchants.Clear();
-        SelectedMerchantSourceKey = null;
-        SelectedTrainerSourceKey = null;
-        IncludePackages = false;
-        SortPriority = CollectionSortPriority.Quality;
     }
 
     private static bool ContainsOrdinal(IReadOnlyCollection<string> values, string value)

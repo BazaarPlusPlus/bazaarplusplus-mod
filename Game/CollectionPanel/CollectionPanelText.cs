@@ -62,7 +62,6 @@ internal static class CollectionPanelText
         "包裹",
         "包裹"
     );
-    private static readonly LocalizedTextSet ResetText = new("Reset", "重置", "重置", "重置");
 
     private static readonly LocalizedTextSet CatalogLoadingText = new(
         "Loading card data...",
@@ -111,8 +110,6 @@ internal static class CollectionPanelText
         activeType == ECardType.Skill ? Resolve(TrainerHeaderText) : Resolve(MerchantHeaderText);
 
     internal static string PackagesToggle() => Resolve(PackagesToggleText);
-
-    internal static string Reset() => Resolve(ResetText);
 
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 

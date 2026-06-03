@@ -510,29 +510,6 @@ internal sealed partial class CollectionPanelView
         }
     }
 
-    private void RefreshResetButton(bool enabled)
-    {
-        if (_clearButton == null)
-            return;
-
-        _clearButton.text = CollectionPanelText.Reset();
-        _clearButton.SetEnabled(enabled);
-        if (enabled)
-        {
-            StyleButton(_clearButton, Colors.HistoryButtonBackground, Colors.HistoryChipText);
-            _clearButton.style.opacity = 1f;
-        }
-        else
-        {
-            StyleButton(
-                _clearButton,
-                Colors.WithAlpha(Colors.HistoryStatusBackground, 0.52f),
-                Colors.WithAlpha(Colors.HistoryStatusText, 0.54f)
-            );
-            _clearButton.style.opacity = 0.82f;
-        }
-    }
-
     private void RefreshPackageToggle(bool selected, bool visible)
     {
         if (_packageToggleButton == null)

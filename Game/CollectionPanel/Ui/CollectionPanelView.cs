@@ -30,7 +30,6 @@ internal sealed class CollectionPanelViewModel
     public string? SelectedSourceKey { get; set; }
     public bool IncludePackages { get; set; }
     public bool HasPackages { get; set; }
-    public bool HasActiveFilters { get; set; }
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
@@ -64,7 +63,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action<string> _toggleSource;
     private readonly Action _togglePackages;
     private readonly Action<CollectionSortPriority> _setSortPriority;
-    private readonly Action _clearFilters;
 
     private GameObject? _rootObject;
     private UIDocument? _document;
@@ -77,7 +75,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _itemTabButton;
     private Button? _skillTabButton;
     private Button? _closeButton;
-    private Button? _clearButton;
     private Button? _packageToggleButton;
     private Label? _packageToggleLabel;
     private VisualElement? _packageSwitchTrack;
@@ -132,8 +129,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action<ECardSize> toggleSize,
         Action<string> toggleSource,
         Action togglePackages,
-        Action<CollectionSortPriority> setSortPriority,
-        Action clearFilters
+        Action<CollectionSortPriority> setSortPriority
     )
     {
         _parent = parent ?? throw new ArgumentNullException(nameof(parent));
@@ -146,7 +142,6 @@ internal sealed partial class CollectionPanelView : IDisposable
         _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
         _setSortPriority =
             setSortPriority ?? throw new ArgumentNullException(nameof(setSortPriority));
-        _clearFilters = clearFilters ?? throw new ArgumentNullException(nameof(clearFilters));
     }
 
     public void EnsureCreated()
@@ -181,7 +176,6 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.SkillsTab()
                 + CollectionPanelText.Close()
                 + CollectionPanelText.PackagesToggle()
-                + CollectionPanelText.Reset()
                 + CollectionPanelText.SortHeader()
                 + CollectionPanelText.SortQuality()
                 + CollectionPanelText.SortSize()
@@ -323,8 +317,6 @@ internal sealed partial class CollectionPanelView : IDisposable
         }
         if (_packageToggleButton != null)
             RefreshPackageToggle(model.IncludePackages, model.HasPackages);
-        if (_clearButton != null)
-            RefreshResetButton(model.HasActiveFilters);
         if (_sortQualityButton != null)
             RefreshChip(_sortQualityButton, model.SortPriority == CollectionSortPriority.Quality);
         if (_sortSizeButton != null)

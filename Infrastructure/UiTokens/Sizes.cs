@@ -20,7 +20,6 @@ internal static class Sizes
     public const int SupporterAttributionNameFont = 14;
     public const float SupporterAttributionNameMaxWidth = 118f;
     public const float SupporterActionMinWidth = 74f;
-    public const float SearchResetButtonWidth = 68f;
     public const float CollectionMatchCountWidth = 96f;
     public const float CollectionSizeFilterSectionMinHeight =
         FontSmall + UiSpacing.Sm + ChipHeight + UiSpacing.Xs;

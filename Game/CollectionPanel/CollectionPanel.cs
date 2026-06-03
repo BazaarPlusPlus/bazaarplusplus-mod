@@ -438,15 +438,6 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
-            },
-            clearFilters: () =>
-            {
-                var activeType = _filter.ActiveType;
-                _filter.Reset();
-                _filter.ActiveType = activeType;
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
             }
         );
 
@@ -645,7 +636,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedSourceKey = _filter.GetSelectedSourceKey(_filter.ActiveType),
             IncludePackages = _filter.IncludePackages,
             HasPackages = HasPackages(),
-            HasActiveFilters = _filter.HasActiveFilters,
             SourceSelectorEnabled = !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
             AvailableHeroes = HeroOrder,
