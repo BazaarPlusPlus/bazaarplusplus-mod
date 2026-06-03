@@ -26,6 +26,7 @@ Work designed but not yet (fully) landed; lives at this top level until implemen
 - [`2026-06-01-collection-panel-hero-portrait-chips-plan.md`](2026-06-01-collection-panel-hero-portrait-chips-plan.md) — CollectionPanel hero filter chips use the game's default hero portrait sprites through a shared provider; HistoryPanel badge adoption remains a follow-up.
 - [`2026-06-02-collection-panel-source-catalog-schema.md`](2026-06-02-collection-panel-source-catalog-schema.md) — CollectionPanel 商人 / 训练师来源筛选改为 BPP 自有结构化 source catalog：schema、规则语义、contract tests、旧 game resolver fallback 删除边界。
 - [`2026-06-02-item-board-preview-abstraction.md`](2026-06-02-item-board-preview-abstraction.md) — 抽出单卡 native `CardPreviewBase` primitive 与共享 item-board preview surface；HistoryPanel 与 CardSetPreview 已迁移，live `MonsterBoardTooltip` clone path 已移除（startup/resource runtime validation complete, manual interaction validation pending）。
+- [`2026-06-03-settings-dock-anchor-and-collection-grid-scroll-plan.md`](2026-06-03-settings-dock-anchor-and-collection-grid-scroll-plan.md) — 两处 playtest 微调：设置 dock 面板生成锚点从按钮上边界改到下边界（仍向上弹出）；CollectionPanel 网格滚轮每格跳跃量 300→~120（保留即时跳转，不加滚动条）。（**Draft，未开工**）
 
 ## Archived specs
 

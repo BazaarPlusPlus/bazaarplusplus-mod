@@ -121,7 +121,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 面向 **`bazaarplusplus-server`**（独立仓库，Cloudflare Workers + D1 + R2，部署 `mod-api-v4.bazaarplusplus.com`）：
 
 - **玩家身份**：上传所需的 `player_account_id` 在上传时从客户端 profile 解析（`BppClientCacheBridge.TryGetProfileAccountId`），解析不到则跳过上传；当前实现没有持久化的身份文件
-- **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`（不鉴权；服务端只把 `seen_player_accounts` 注册过的玩家或上传者本人作为可投影 opponent）。`player_account_id` 必填，缺失则 400 —— V3 时代的 `"anonymous-player"` sentinel 已删除,mod 在没拿到本机 account id 时直接跳过上传
+- **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`（不鉴权；服务端全量写入有效的 battle projections）。`player_account_id` 必填，缺失则 400 —— V3 时代的 `"anonymous-player"` sentinel 已删除,mod 在没拿到本机 account id 时直接跳过上传
 - **Ghost 战斗**：`GET /ghost-battles?player_account_id=…` 查询 against-me 列表（不鉴权）；按需签发 `POST /ghost-battles/:battleId/replay-link`（返回 5 分钟有效的 R2 预签 URL）
 - **Final-battle 标记**：服务端把上传 bundle 中最后一场 battle 在投影时标记 `is_final_battle`（V3 叫 `is_bundle_final_battle`,V4 删掉冗余前缀,sticky 语义:一旦 1 永远 1）；HistoryPanel 在 ghost 视角下用它提示"这场后对手出局"
 - **BazaarDB 截图上传**：`POST /bazaardb-screenshots`（不鉴权）写 R2 + D1，BazaarDB 用 `BAZAARDB_PULL_TOKEN` 拉 `GET /bazaardb/manifest`(行内带公开 `image_url`); image 文件本身走公开桶 `bazaardb-assets-v4.bazaarplusplus.com`,不再经过 Worker proxy

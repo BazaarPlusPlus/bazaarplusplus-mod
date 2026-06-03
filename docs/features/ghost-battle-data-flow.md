@@ -82,8 +82,7 @@ The response is **raw uploader-perspective data** — no flip yet:
 - `opponent_*` = me
 - `result = "Win"` means the uploader won (i.e., *I lost* my mirror match)
 - `is_final_battle` (V4 wire key; V3 used `is_bundle_final_battle`) marks
-  whether this was the uploader's final battle in that run bundle and also
-  passed the server projection gate. The mod's local C# field name remains
+  whether this was the uploader's final battle in that run bundle. The mod's local C# field name remains
   `IsBundleFinalBattle` — only the wire key changed.
 
 ## 4. Import (Client Parses Response)
@@ -139,7 +138,7 @@ Files:
 | `Result` | `ProjectResultToLocal(result)` — `Win`↔`Lost`, `Won`↔`Lost` | My outcome |
 | `WinnerCombatantId` | `ProjectCombatantIdToLocal(...)` — `Player`↔`Opponent` | Who won from my POV |
 | `LoserCombatantId` | `ProjectCombatantIdToLocal(...)` | Who lost from my POV |
-| `IsBundleFinalBattle` | `is_bundle_final_battle` (local SQLite column; mod schema independent of the V4 wire rename) | Whether this was the uploader's final bundle battle and passed the projection gate |
+| `IsBundleFinalBattle` | `is_bundle_final_battle` (local SQLite column; mod schema independent of the V4 wire rename) | Whether this was the uploader's final bundle battle |
 | `Source` | — | `HistoryBattleSource.Ghost` |
 | `ReplayAvailable / ReplayDownloaded` | `replay_available / replay_downloaded` | Whether replay payload can/has been fetched |
 

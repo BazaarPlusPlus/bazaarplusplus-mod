@@ -42,9 +42,9 @@ ghost 同步与 replay 下载（V4 wire，服务端在独立仓库 `bazaarpluspl
 ### 信任模型与安全限制
 
 - 服务端对 mod 侧端点**全部不鉴权**；身份只来自 `POST /run-bundles` body 与 `GET /ghost-battles` query 里的 `player_account_id`。
-- 服务端只把 `seen_player_accounts` 注册过的玩家、或上传者本人，作为可投影的 opponent。
+- 服务端全量写入有效的 battle projections；`GET /ghost-battles` 再按 `opponent_account_id` 查询 against-me 列表。
 - `player_account_id` 必填——V3 时代的 `"anonymous-player"` sentinel 已删除；mod 在没拿到本机 account id 时**直接跳过上传**，不再发占位符。
-- battle gate 允许「artifact 已收但 battle 暂不可查询」，这是当前接受的产品取舍，不是实现遗漏。
+- replay artifact 和 battle projections 在同一个 D1 batch 后对外可查询；若 D1 batch 失败，服务端会尽力清理已写入的 R2 artifact。
 
 ## 关键文件
 

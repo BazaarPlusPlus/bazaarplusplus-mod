@@ -291,10 +291,9 @@ The V4 server schema lives in a separate repo (`bazaarplusplus-server`) and is t
 
 - `runs` — collapsed `run_bundles + runs` (V3 had two; V4 has one)
 - `battles` — projection for `GET /ghost-battles`
-- `seen_player_accounts` — ghost-battle opponent allow-list (V4 dropped `last_seen_at_utc`)
 - `bazaardb_screenshots` — BazaarDB screenshot manifest
 
-V4 explicitly removed (vs V3): `run_bundles` table, `replay_tokens` table, all `installation_id` columns, `battles.player_account_id_in_payload`, `battles.replay_available`, `seen_player_accounts.last_seen_at_utc`. Battle bundle-final flag is named `is_final_battle` (V3 had the redundant `is_bundle_final_` prefix).
+V4 explicitly removed (vs V3): `run_bundles` table, `replay_tokens` table, all `installation_id` columns, `battles.player_account_id_in_payload`, `battles.replay_available`, and the former `seen_player_accounts` opponent filter. Battle bundle-final flag is named `is_final_battle` (V3 had the redundant `is_bundle_final_` prefix).
 
 Authoritative references:
 
@@ -307,8 +306,8 @@ Authoritative references:
 
 - Local SQLite is the client-side capture and projection cache.
 - Local replay payload files are the heavy binary source for replay.
-- Run-bundle upload packages local run + battle state into one MessagePack artifact (to R2) plus lightweight SQL projections written via `db.batch()` (`runs` upsert + per-battle ON CONFLICT INSERT + `seen_player_accounts` INSERT OR IGNORE, in that order).
+- Run-bundle upload packages local run + battle state into one MessagePack artifact (to R2) plus lightweight SQL projections written via `db.batch()` (`runs` upsert + per-battle ON CONFLICT upsert).
 - Server SQL is for lookup; the uploaded artifact body lives in R2 and is served via short-lived presigned URLs from `POST /ghost-battles/:battle_id/replay-link`.
-- The server is fully unauthenticated for mod-side endpoints; identity comes from `player_account_id` in `POST /run-bundles` bodies and `GET /ghost-battles` query strings, with `seen_player_accounts` acting as the opponent allow-list for ghost battle projection (plus a literal `opponent_account_id = uploader` OR branch for self-battles, since D1 doesn't guarantee intra-batch read-after-write visibility against `seen_player_accounts`).
+- The server is fully unauthenticated for mod-side endpoints; identity comes from `player_account_id` in `POST /run-bundles` bodies and `GET /ghost-battles` query strings. The server fully ingests valid battle projections, and ghost sync filters by `opponent_account_id`.
 - `is_final_battle` is a server-side sticky flag carried through ghost sync so `HistoryPanel` can explain final-battle elimination outcomes without reading sibling battles or R2 artifacts.
 - BazaarDB manifest endpoint (`GET /bazaardb/manifest`) is the only mod-API endpoint that requires a Bearer token (`BAZAARDB_PULL_TOKEN`), since manifest rows carry identifying metadata. Image bytes themselves come from a public R2 custom domain (`bazaardb-assets-v4.bazaarplusplus.com`), keyed by a high-entropy `screenshot_id` GUID so URLs aren't enumerable in practice.
