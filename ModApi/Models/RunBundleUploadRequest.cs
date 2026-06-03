@@ -86,7 +86,7 @@ public sealed class RunProjection
     [JsonProperty("final_player_position")]
     public int? FinalPlayerPosition { get; set; }
 
-    [JsonProperty("battles")]
+    [JsonIgnore]
     public List<BattleProjection> Battles { get; set; } = new();
 }
 

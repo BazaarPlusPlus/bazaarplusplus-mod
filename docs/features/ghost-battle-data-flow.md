@@ -45,7 +45,6 @@ INSERT INTO battles (
   opponent_account_id,           -- whoever the uploader fought
   opponent_name, opponent_hero, opponent_rank, opponent_rating, opponent_level,
   result,                        -- from uploader's POV ("Win" = uploader won)
-  is_final_battle,               -- sticky boolean: once 1, MAX() keeps it 1
   ...
 )
 ```
@@ -54,10 +53,7 @@ V4 dropped the V3 `player_account_id_in_payload` reconciliation column (server n
 
 **Invariant after this step**: every row on the server holds the uploader's
 view. `player_*` is the uploader, `opponent_*` is whoever they fought.
-`is_final_battle` is a sticky fact set by the uploader (V3 had the redundant
-`is_bundle_final_` prefix); the upsert uses `MAX(battles.is_final_battle,
-excluded.is_final_battle)` so out-of-order retransmits cannot flip a final
-battle back to non-final.
+The current V4 wire contract does not include a final-battle marker.
 
 ## 3. Ghost Query (Server → Local Player's Client)
 
@@ -81,9 +77,7 @@ The response is **raw uploader-perspective data** — no flip yet:
 - `player_*` = uploader (some other player who fought my ghost)
 - `opponent_*` = me
 - `result = "Win"` means the uploader won (i.e., *I lost* my mirror match)
-- `is_final_battle` (V4 wire key; V3 used `is_bundle_final_battle`) marks
-  whether this was the uploader's final battle in that run bundle. The mod's local C# field name remains
-  `IsBundleFinalBattle` — only the wire key changed.
+- No final-battle marker is returned by the current V4 API.
 
 ## 4. Import (Client Parses Response)
 
@@ -92,15 +86,14 @@ File: [`ModApi/Clients/GhostBattleClient.cs`](../../ModApi/Clients/GhostBattleCl
 
 Fields are deserialized into `GhostBattleImportRecord` **1:1** — the client
 does not rewrite perspective during import. The current server response does
-not include `hour`, `encounter_id`, `combat_kind`, `winner_combatant_id`, or
-`loser_combatant_id`, so those fields stay null/default unless a later API
-version adds them.
+not include `hour`, `encounter_id`, or `combat_kind`, so those fields stay
+null/default unless a later API version adds them.
 
 - `PlayerName / PlayerAccountId / PlayerHero / ...` = uploader
 - `OpponentName / OpponentAccountId / OpponentHero / ...` = me
 - `Result` = uploader-perspective win/loss string
 - `WinnerCombatantId` ∈ { `Player`, `Opponent` } — `Player` means uploader won.
-- `IsBundleFinalBattle` = parsed from V4 wire key `is_final_battle`.
+- `IsBundleFinalBattle` = defaults false; current V4 wire does not carry this field.
 - `ReplayAvailable` = constant `true` (V4 server no longer ships a per-row
   flag; the V4 invariant is "battle row exists ⇒ R2 artifact exists", since
   R2.put precedes the D1 batch and orphan cleanup runs on D1 failure).
@@ -115,7 +108,7 @@ Ghost rows are written to the local SQLite `battles` table with
 `opponent_*` columns continue to carry uploader-perspective values — storage
 matches what the server returned.
 
-The local SQLite still uses the column name `is_bundle_final_battle` (mod-side schema, decoupled from the V4 wire rename).
+The local SQLite still uses the column name `is_bundle_final_battle` (mod-side schema, decoupled from the current V4 wire).
 
 This is a deliberate choice: the repository stores facts, and perspective
 translation happens at read time.
@@ -138,7 +131,7 @@ Files:
 | `Result` | `ProjectResultToLocal(result)` — `Win`↔`Lost`, `Won`↔`Lost` | My outcome |
 | `WinnerCombatantId` | `ProjectCombatantIdToLocal(...)` — `Player`↔`Opponent` | Who won from my POV |
 | `LoserCombatantId` | `ProjectCombatantIdToLocal(...)` | Who lost from my POV |
-| `IsBundleFinalBattle` | `is_bundle_final_battle` (local SQLite column; mod schema independent of the V4 wire rename) | Whether this was the uploader's final bundle battle |
+| `IsBundleFinalBattle` | `is_bundle_final_battle` (local SQLite column; not populated by current V4 ghost wire) | Local-only bundle-final marker; current remote imports default false |
 | `Source` | — | `HistoryBattleSource.Ghost` |
 | `ReplayAvailable / ReplayDownloaded` | `replay_available / replay_downloaded` | Whether replay payload can/has been fetched |
 
@@ -158,6 +151,7 @@ The history panel binds the projected record directly:
 - Player-side pills bind to `battle.PlayerHero` / related — show my mirror.
 - The selected-battle notice shows "opponent eliminated" only when
   `IsBundleFinalBattle` is true and the projected local-player outcome is a win.
+  Current V4 ghost imports do not set that marker.
 
 Because projection already reframed the row into local-player perspective, the
 view has no ghost-specific branching for participant display.
@@ -201,7 +195,7 @@ is a product-level choice, not a bug.
   player_*   = uploader
   opponent_* = me
   result     = uploader POV
-  is_bundle_final_battle = raw bundle-final flag
+  final-battle marker is not part of current V4 wire
         │
         ▼ GET /ghost-battles
         │  (WHERE opponent_account_id = me)
@@ -219,7 +213,7 @@ is a product-level choice, not a bug.
    Player* = me (mirror)
    Opponent* = uploader
    Result / WinnerCombatantId from my POV
-   IsBundleFinalBattle = raw bundle-final flag
+   IsBundleFinalBattle = local marker, false for current V4 remote imports
         │
         ├─▶ History Panel list / filters (local-POV)
         │
@@ -235,8 +229,9 @@ is a product-level choice, not a bug.
 - All ghost-specific UI / filtering / summary code consumes projected
   `HistoryBattleRecord` values, not raw columns. If a new ghost feature reads
   raw columns directly, extend the projector instead.
-- `is_bundle_final_battle` stays raw through sync/persistence/projection; combine
-  it with projected local outcome only at UI decision points.
+- `is_bundle_final_battle` is a local marker; current V4 remote imports leave it
+  false, and UI code combines it with projected local outcome only at decision
+  points.
 - Replay payload + manifest are forwarded untouched; do not try to "fix"
   player/opponent labels there without also remapping the combat message
   stream.

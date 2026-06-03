@@ -270,7 +270,7 @@ Snapshot / sim DTO：
 | `CardSetCaptureArtifact` | card set | `Label`、`Status`、`Source`、`Items` |
 | `CardSetItemArtifact` | card item | `InstanceId`、`TemplateId`、`Type`、`Size`、`Section`、`Socket`、`Name`、`Tier`、`Enchant`、`Tags`、`Attributes` |
 | `ReplayPayloadArtifact` | replay bytes | `BattleId`、`Version`、`SpawnMessageBytes`、`CombatMessageBytes`、`DespawnMessageBytes` |
-| `GET /ghost-battles` | `GhostBattleImportRecord` | `BattleId`、`RecordedAtUtc`、`Day`、`Hour`、`EncounterId`、player/opponent fields、`CombatKind`、`Result`、`WinnerCombatantId`、`LoserCombatantId`、`IsBundleFinalBattle`、`ReplayAvailable`、`ReplayDownloaded`、`LastSyncedAtUtc` |
+| `GET /ghost-battles` | `GhostBattleImportRecord` | `BattleId`、`RecordedAtUtc`、`Day`、player/opponent fields、`Result`、`WinnerCombatantId`、`LoserCombatantId`、`ReplayAvailable`、`ReplayDownloaded`、`LastSyncedAtUtc`；current V4 wire does not include `IsBundleFinalBattle` |
 | `POST /ghost-battles/{battleId}/replay-link` | response JSON | `download_url` |
 | `GET download_url` | bytes | replay payload bytes |
 | `POST /bazaardb/snapshots/<snapshot_id>` | `BazaarDbSnapshotUploadRequest` | `SchemaVersion`、`Snapshot`、`Player`、`Run`、`Image`、`Client` |

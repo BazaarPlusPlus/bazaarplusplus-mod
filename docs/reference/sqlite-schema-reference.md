@@ -107,7 +107,7 @@ Columns:
 - player side: `player_name`, `player_account_id`, `player_hero`, `player_rank`, `player_rating`, `player_level`, `player_prestige`, `player_victories`
 - opponent side: `opponent_name`, `opponent_account_id`, `opponent_hero`, `opponent_rank`, `opponent_rating`, `opponent_level`, `opponent_prestige`, `opponent_victories`
 - outcome: `result`, `winner_combatant_id`, `loser_combatant_id`
-- bundle marker: `is_bundle_final_battle` — this is the **local column** name. It projects to the **server wire / D1** field `is_final_battle` (the V4 rename dropped the redundant `is_bundle_` prefix; see [V4 Server D1 Schema](#v4-server-d1-schema)). Both names are correct at their respective layers — this is not a drift to "fix".
+- bundle marker: `is_bundle_final_battle` — this is a **local column**. Current V4 API does not upload or return a final-battle wire field.
 - replay state: `replay_available`, `replay_downloaded`, `has_local_payload`, `replay_dirty`, `replay_last_attempt_at_utc`, `replay_last_uploaded_at_utc`, `replay_retry_count`, `replay_last_error`
 - sync/lifecycle: `last_synced_at_utc`, `deleted_at_utc`
 
@@ -283,7 +283,7 @@ The upload request has three layers:
 - `run_projection`: queryable run summary
 - `battle_projections[]`: queryable battle metadata
 
-`artifact_bytes` stores the raw replay payloads and card-set snapshots inside R2. D1 stores only metadata and query projections. The server treats `is_final_battle = true` in any incoming battle projection as sticky — once set it stays set, so out-of-order retransmits of mid-run battles can never flip a final battle back to non-final.
+`artifact_bytes` stores the raw replay payloads and card-set snapshots inside R2. D1 stores only metadata and query projections. Current V4 run-bundle uploads use top-level `battle_projections[]` for battle metadata and do not carry a final-battle marker.
 
 ## V4 Server D1 Schema
 
@@ -293,7 +293,7 @@ The V4 server schema lives in a separate repo (`bazaarplusplus-server`) and is t
 - `battles` — projection for `GET /ghost-battles`
 - `bazaardb_delivery` — BazaarDB Snapshot DTO delivery queue
 
-V4 explicitly removed (vs V3): `run_bundles` table, `replay_tokens` table, all `installation_id` columns, `battles.player_account_id_in_payload`, `battles.replay_available`, and the former `seen_player_accounts` opponent filter. Battle bundle-final flag is named `is_final_battle` (V3 had the redundant `is_bundle_final_` prefix).
+V4 explicitly removed (vs V3): `run_bundles` table, `replay_tokens` table, all `installation_id` columns, `battles.player_account_id_in_payload`, `battles.replay_available`, and the former `seen_player_accounts` opponent filter. The current wire contract also omits the battle bundle-final flag; any retained D1 column is schema residue, not API contract.
 
 Authoritative references:
 
@@ -306,8 +306,8 @@ Authoritative references:
 
 - Local SQLite is the client-side capture and projection cache.
 - Local replay payload files are the heavy binary source for replay.
-- Run-bundle upload packages local run + battle state into one MessagePack artifact (to R2) plus lightweight SQL projections written via `db.batch()` (`runs` upsert + per-battle ON CONFLICT upsert).
+- Run-bundle upload packages local run + battle state into one MessagePack artifact (to R2) plus lightweight SQL projections written via `db.batch()` (`runs` insert + per-battle ON CONFLICT upsert).
 - Server SQL is for lookup; the uploaded artifact body lives in R2 and is served via short-lived presigned URLs from `POST /ghost-battles/:battle_id/replay-link`.
 - The server is fully unauthenticated for mod-side endpoints; identity comes from `player_account_id` in `POST /run-bundles` bodies and `GET /ghost-battles` query strings. The server fully ingests valid battle projections, and ghost sync filters by `opponent_account_id`.
-- `is_final_battle` is a server-side sticky flag carried through ghost sync so `HistoryPanel` can explain final-battle elimination outcomes without reading sibling battles or R2 artifacts.
+- Current V4 ghost sync does not carry a final-battle marker, so remote imports leave the local `is_bundle_final_battle` marker false.
 - BazaarDB pull endpoints (`POST /bazaardb/peek` and `POST /bazaardb/confirm`) require a Bearer token (`BAZAARDB_PULL_TOKEN`). Snapshot DTOs live in private R2 and are exposed to BazaarDB only through short-lived presigned URLs returned by `peek`; `confirm` marks delivered rows done and deletes the corresponding R2 object best-effort.

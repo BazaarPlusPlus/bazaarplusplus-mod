@@ -123,7 +123,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **玩家身份**：上传所需的 `player_account_id` 在上传时从客户端 profile 解析（`BppClientCacheBridge.TryGetProfileAccountId`），解析不到则跳过上传；当前实现没有持久化的身份文件
 - **Run Bundle 上传**：已完成 run 与关联 replay artifact 合并上传到 `POST /run-bundles`（不鉴权；服务端全量写入有效的 battle projections）。`player_account_id` 必填，缺失则 400 —— V3 时代的 `"anonymous-player"` sentinel 已删除,mod 在没拿到本机 account id 时直接跳过上传
 - **Ghost 战斗**：`GET /ghost-battles?player_account_id=…` 查询 against-me 列表（不鉴权）；按需签发 `POST /ghost-battles/:battleId/replay-link`（返回 5 分钟有效的 R2 预签 URL）
-- **Final-battle 标记**：服务端把上传 bundle 中最后一场 battle 在投影时标记 `is_final_battle`（V3 叫 `is_bundle_final_battle`,V4 删掉冗余前缀,sticky 语义:一旦 1 永远 1）；HistoryPanel 在 ghost 视角下用它提示"这场后对手出局"
+- **Final-battle 标记**：当前 V4 API 不上传也不返回 final-battle wire 字段；mod 本地仍保留 `is_bundle_final_battle` 历史列，但远端 ghost 导入默认不触发"这场后对手出局"提示
 - **BazaarDB 截图上传**：`POST /bazaardb/snapshots/<snapshot_id>`（不鉴权）把 Snapshot DTO 原样写入私有 R2 + D1 delivery queue；BazaarDB 用 `BAZAARDB_PULL_TOKEN` 串行 `POST /bazaardb/peek` / `POST /bazaardb/confirm`，下载走短期预签 URL
 
 模组侧仅在**非 live run** 时执行上传扫描；`RunUploadController` 统一调度 run-bundle 上传。信任模型与安全限制见 [features/run-logging-and-upload.md](features/run-logging-and-upload.md)。

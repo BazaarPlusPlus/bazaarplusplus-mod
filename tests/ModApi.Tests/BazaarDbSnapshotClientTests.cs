@@ -15,6 +15,7 @@ internal static class BazaarDbSnapshotClientTests
     {
         UploadsSnapshotDtoToIdPathWithJsonContentType();
         SerializesBattleProjectionWinnerLoserFields();
+        DoesNotSerializeRunProjectionBattles();
         Console.WriteLine("BazaarDbSnapshotClientTests passed.");
     }
 
@@ -123,6 +124,44 @@ internal static class BazaarDbSnapshotClientTests
         Assert(
             (string?)json["loser_combatant_id"] == "Opponent",
             "BattleProjection should serialize loser_combatant_id."
+        );
+    }
+
+    private static void DoesNotSerializeRunProjectionBattles()
+    {
+        var json = JObject.FromObject(
+            new RunBundleUploadRequest
+            {
+                SchemaVersion = 1,
+                PlayerAccountId = "acct-1",
+                SubmittedAtUtc = "2026-06-03T12:00:00.000Z",
+                ArtifactCodec = RunBundleArtifactCodec.ContentType,
+                ArtifactBytes = [1, 2, 3],
+                RunProjection = new RunProjection
+                {
+                    RunId = "run-1",
+                    Status = "completed",
+                    EndedAtUtc = "2026-06-03T12:30:00.000Z",
+                    Battles =
+                    [
+                        new BattleProjection { BattleId = "battle-nested", RunId = "run-1" },
+                    ],
+                },
+                BattleProjections =
+                [
+                    new BattleProjection { BattleId = "battle-top-level", RunId = "run-1" },
+                ],
+            },
+            Newtonsoft.Json.JsonSerializer.Create(ModApiSerialization.SerializerSettings)
+        );
+
+        Assert(
+            json["run_projection"]?["battles"] == null,
+            "RunProjection.Battles is not part of the V4 wire contract."
+        );
+        Assert(
+            json["battle_projections"] is JArray,
+            "Top-level battle_projections should remain the upload projection source."
         );
     }
 

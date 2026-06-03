@@ -7,9 +7,7 @@ using Newtonsoft.Json.Linq;
 
 var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleSyncService");
 var apiClientType = RequireModApiType("BazaarPlusPlus.ModApi.Clients.GhostBattleClient");
-var repositoryType = RequireType(
-    "BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelRepository"
-);
+var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelRepository");
 var dataServiceType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelDataService"
 );
@@ -433,8 +431,7 @@ var rawBattlePayload = JObject.Parse(
       "combat_kind": "PVPCombat",
       "result": "Won",
       "winner_combatant_id": "Player",
-      "loser_combatant_id": "Opponent",
-      "is_final_battle": true
+      "loser_combatant_id": "Opponent"
     }
     """
 );
@@ -469,8 +466,9 @@ Assert(
     "Ghost import should preserve winner_combatant_id without flipping."
 );
 Assert(
-    (bool)(importRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(importRecord) ?? false),
-    "Ghost import should preserve the bundle-final battle marker."
+    (bool)(importRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(importRecord) ?? true)
+        is false,
+    "Ghost import should default bundle-final battle marker off after the wire field was removed."
 );
 Assert(
     (int?)importRecordType.GetProperty("PlayerPrestige")?.GetValue(importRecord) == 18
@@ -496,8 +494,7 @@ var localWinBattlePayload = JObject.Parse(
       "combat_kind": "PVPCombat",
       "result": "Lost",
       "winner_combatant_id": "Opponent",
-      "loser_combatant_id": "Player",
-      "is_final_battle": true
+      "loser_combatant_id": "Player"
     }
     """
 );
@@ -561,9 +558,10 @@ try
     );
     Assert(
         (bool)(
-            battleRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(projectedBattle) ?? false
-        ),
-        "Ghost repository reads should preserve the bundle-final battle marker."
+            battleRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(projectedBattle) ?? true
+        )
+            is false,
+        "Ghost repository reads should keep bundle-final marker off after the wire field was removed."
     );
     Assert(
         (int?)battleRecordType.GetProperty("PlayerPrestige")?.GetValue(projectedBattle) == 12
@@ -576,15 +574,15 @@ try
     );
     Assert(
         (bool)isGhostOpponentEliminated!.Invoke(null, [projectedBattle])! is false,
-        "A bundle-final ghost battle should not show elimination text when the local player lost."
+        "A ghost battle without bundle-final metadata should not show elimination text when the local player lost."
     );
     Assert(
         (string?)battleRecordType.GetProperty("Result")?.GetValue(projectedLocalWinBattle) == "Won",
         "Ghost repository reads should project a remote loss into a local-player win."
     );
     Assert(
-        (bool)isGhostOpponentEliminated.Invoke(null, [projectedLocalWinBattle])!,
-        "A bundle-final ghost battle should show elimination text when the local player won."
+        (bool)isGhostOpponentEliminated.Invoke(null, [projectedLocalWinBattle])! is false,
+        "A ghost battle without bundle-final metadata should not show elimination text when the local player won."
     );
 
     var resolvedOutcome = resolveGhostBattleOutcome!.Invoke(null, [projectedBattle]);
