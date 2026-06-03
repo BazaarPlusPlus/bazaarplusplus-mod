@@ -122,6 +122,12 @@ public sealed class BattleProjection
     [JsonProperty("player_level")]
     public int? PlayerLevel { get; set; }
 
+    [JsonProperty("player_prestige")]
+    public int? PlayerPrestige { get; set; }
+
+    [JsonProperty("player_victories")]
+    public int? PlayerVictories { get; set; }
+
     [JsonProperty("opponent_name")]
     public string? OpponentName { get; set; }
 
@@ -139,6 +145,12 @@ public sealed class BattleProjection
 
     [JsonProperty("opponent_level")]
     public int? OpponentLevel { get; set; }
+
+    [JsonProperty("opponent_prestige")]
+    public int? OpponentPrestige { get; set; }
+
+    [JsonProperty("opponent_victories")]
+    public int? OpponentVictories { get; set; }
 
     [JsonProperty("result")]
     public string? Result { get; set; }
@@ -221,6 +233,12 @@ public sealed class BattleParticipantsArtifact
     [JsonProperty("player_level")]
     public int? PlayerLevel { get; set; }
 
+    [JsonProperty("player_prestige")]
+    public int? PlayerPrestige { get; set; }
+
+    [JsonProperty("player_victories")]
+    public int? PlayerVictories { get; set; }
+
     [JsonProperty("opponent_name")]
     public string? OpponentName { get; set; }
 
@@ -238,6 +256,12 @@ public sealed class BattleParticipantsArtifact
 
     [JsonProperty("opponent_level")]
     public int? OpponentLevel { get; set; }
+
+    [JsonProperty("opponent_prestige")]
+    public int? OpponentPrestige { get; set; }
+
+    [JsonProperty("opponent_victories")]
+    public int? OpponentVictories { get; set; }
 }
 
 public sealed class BattleSnapshotsArtifact

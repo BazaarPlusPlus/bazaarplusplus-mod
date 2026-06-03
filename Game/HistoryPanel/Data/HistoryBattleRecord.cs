@@ -17,11 +17,15 @@ internal sealed class HistoryBattleRecord
         string? playerRank,
         int? playerRating,
         int? playerLevel,
+        int? playerPrestige,
+        int? playerVictories,
         string? opponentName,
         string? opponentHero,
         string? opponentRank,
         int? opponentRating,
         int? opponentLevel,
+        int? opponentPrestige,
+        int? opponentVictories,
         string? opponentAccountId,
         string? combatKind,
         string? result,
@@ -45,11 +49,15 @@ internal sealed class HistoryBattleRecord
         PlayerRank = playerRank;
         PlayerRating = playerRating;
         PlayerLevel = playerLevel;
+        PlayerPrestige = playerPrestige;
+        PlayerVictories = playerVictories;
         OpponentName = opponentName;
         OpponentHero = opponentHero;
         OpponentRank = opponentRank;
         OpponentRating = opponentRating;
         OpponentLevel = opponentLevel;
+        OpponentPrestige = opponentPrestige;
+        OpponentVictories = opponentVictories;
         OpponentAccountId = opponentAccountId;
         CombatKind = combatKind;
         Result = result;
@@ -83,6 +91,10 @@ internal sealed class HistoryBattleRecord
 
     public int? PlayerLevel { get; }
 
+    public int? PlayerPrestige { get; }
+
+    public int? PlayerVictories { get; }
+
     public string? OpponentName { get; }
 
     public string? OpponentHero { get; }
@@ -92,6 +104,10 @@ internal sealed class HistoryBattleRecord
     public int? OpponentRating { get; }
 
     public int? OpponentLevel { get; }
+
+    public int? OpponentPrestige { get; }
+
+    public int? OpponentVictories { get; }
 
     public string? OpponentAccountId { get; }
 

@@ -40,11 +40,15 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
             b.player_rank,
             b.player_rating,
             b.player_level,
+            b.player_prestige,
+            b.player_victories,
             b.opponent_name,
             b.opponent_hero,
             b.opponent_rank,
             b.opponent_rating,
             b.opponent_level,
+            b.opponent_prestige,
+            b.opponent_victories,
             b.opponent_account_id,
             b.combat_kind,
             b.result,
@@ -91,11 +95,15 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
                 player_rank,
                 player_rating,
                 player_level,
+                player_prestige,
+                player_victories,
                 opponent_name,
                 opponent_hero,
                 opponent_rank,
                 opponent_rating,
                 opponent_level,
+                opponent_prestige,
+                opponent_victories,
                 opponent_account_id,
                 combat_kind,
                 result,
@@ -116,11 +124,15 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
                 $playerRank,
                 $playerRating,
                 $playerLevel,
+                $playerPrestige,
+                $playerVictories,
                 $opponentName,
                 $opponentHero,
                 $opponentRank,
                 $opponentRating,
                 $opponentLevel,
+                $opponentPrestige,
+                $opponentVictories,
                 $opponentAccountId,
                 $combatKind,
                 $result,
@@ -140,11 +152,15 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
                 player_rank = excluded.player_rank,
                 player_rating = excluded.player_rating,
                 player_level = excluded.player_level,
+                player_prestige = excluded.player_prestige,
+                player_victories = excluded.player_victories,
                 opponent_name = excluded.opponent_name,
                 opponent_hero = excluded.opponent_hero,
                 opponent_rank = excluded.opponent_rank,
                 opponent_rating = excluded.opponent_rating,
                 opponent_level = excluded.opponent_level,
+                opponent_prestige = excluded.opponent_prestige,
+                opponent_victories = excluded.opponent_victories,
                 opponent_account_id = excluded.opponent_account_id,
                 combat_kind = excluded.combat_kind,
                 result = excluded.result,
@@ -179,6 +195,8 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
         );
         AddNullableInt32(command, "$playerRating", manifest.Participants.PlayerRating);
         AddNullableInt32(command, "$playerLevel", manifest.Participants.PlayerLevel);
+        AddNullableInt32(command, "$playerPrestige", manifest.Participants.PlayerPrestige);
+        AddNullableInt32(command, "$playerVictories", manifest.Participants.PlayerVictories);
         command.Parameters.AddWithValue(
             "$opponentName",
             (object?)manifest.Participants.OpponentName ?? DBNull.Value
@@ -193,6 +211,8 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
         );
         AddNullableInt32(command, "$opponentRating", manifest.Participants.OpponentRating);
         AddNullableInt32(command, "$opponentLevel", manifest.Participants.OpponentLevel);
+        AddNullableInt32(command, "$opponentPrestige", manifest.Participants.OpponentPrestige);
+        AddNullableInt32(command, "$opponentVictories", manifest.Participants.OpponentVictories);
         command.Parameters.AddWithValue(
             "$opponentAccountId",
             (object?)manifest.Participants.OpponentAccountId ?? DBNull.Value
@@ -416,11 +436,15 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
                 PlayerRank = GetNullableString(reader, "player_rank"),
                 PlayerRating = GetNullableInt32(reader, "player_rating"),
                 PlayerLevel = GetNullableInt32(reader, "player_level"),
+                PlayerPrestige = GetNullableInt32(reader, "player_prestige"),
+                PlayerVictories = GetNullableInt32(reader, "player_victories"),
                 OpponentName = GetNullableString(reader, "opponent_name"),
                 OpponentHero = GetNullableString(reader, "opponent_hero"),
                 OpponentRank = GetNullableString(reader, "opponent_rank"),
                 OpponentRating = GetNullableInt32(reader, "opponent_rating"),
                 OpponentLevel = GetNullableInt32(reader, "opponent_level"),
+                OpponentPrestige = GetNullableInt32(reader, "opponent_prestige"),
+                OpponentVictories = GetNullableInt32(reader, "opponent_victories"),
                 OpponentAccountId = GetNullableString(reader, "opponent_account_id"),
             },
             Outcome = new PvpBattleOutcome

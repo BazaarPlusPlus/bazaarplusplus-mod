@@ -28,6 +28,15 @@ var catalogInterfaceType = RequireType(
 var catalogStoreType = RequireType(
     "BazaarPlusPlus.Game.PvpBattles.Persistence.PvpBattleSqliteStore"
 );
+var uploadStoreType = RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunBundleUploadStore");
+var buildBattleProjectionMethod = uploadStoreType.GetMethod(
+    "BuildBattleProjection",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
+var buildArtifactBattleMethod = uploadStoreType.GetMethod(
+    "BuildArtifactBattle",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
 
 Assert(
     Type.GetType("BazaarPlusPlus.Game.CombatReplay.CombatReplayRecord, BazaarPlusPlus") == null,
@@ -85,6 +94,10 @@ Assert(
         && catalogInterfaceType.GetMethod("Delete") != null
         && catalogInterfaceType.GetMethod("ListBattleIds") != null,
     "The PVP battle catalog should expose Delete and ListBattleIds so replay maintenance can reconcile stored manifests when needed."
+);
+Assert(
+    buildBattleProjectionMethod != null && buildArtifactBattleMethod != null,
+    "RunBundleUploadStore should keep battle projection and artifact mapping testable."
 );
 var persistenceQueueType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.CombatReplayPersistenceQueue"
@@ -351,11 +364,15 @@ try
         encounterId: "encounter-abc",
         playerName: "Local Player",
         playerAccountId: "player-account-001",
+        playerPrestige: 18,
+        playerVictories: 3,
         opponentName: "Test Opponent",
         opponentHero: "Vanessa",
         opponentRank: "Legend",
         opponentRating: 2048,
         opponentLevel: 12,
+        opponentPrestige: 12,
+        opponentVictories: 6,
         opponentAccountId: "opponent-account-001",
         result: "win",
         winnerCombatantId: "Player",
@@ -393,6 +410,41 @@ try
             CreateSnapshotList("o-skill-1", "tpl-o-skill")
         )
     );
+    var battleProjection =
+        buildBattleProjectionMethod!.Invoke(null, [manifest!])
+        ?? throw new InvalidOperationException("BuildBattleProjection should return a projection.");
+    var battleProjectionType = battleProjection.GetType();
+    Assert(
+        Equals(GetProperty(battleProjectionType, battleProjection, "PlayerPrestige"), 18)
+            && Equals(GetProperty(battleProjectionType, battleProjection, "PlayerVictories"), 3)
+            && Equals(GetProperty(battleProjectionType, battleProjection, "OpponentPrestige"), 12)
+            && Equals(GetProperty(battleProjectionType, battleProjection, "OpponentVictories"), 6),
+        "Run bundle battle projection should include participant prestige and victories."
+    );
+    var artifactBattle =
+        buildArtifactBattleMethod!.Invoke(null, [manifest!, payload!])
+        ?? throw new InvalidOperationException("BuildArtifactBattle should return an artifact.");
+    var artifactBattleType = artifactBattle.GetType();
+    var artifactParticipants =
+        GetProperty(artifactBattleType, artifactBattle, "Participants")
+        ?? throw new InvalidOperationException("Artifact battle should include participants.");
+    var artifactParticipantsType = artifactParticipants.GetType();
+    Assert(
+        Equals(GetProperty(artifactParticipantsType, artifactParticipants, "PlayerPrestige"), 18)
+            && Equals(
+                GetProperty(artifactParticipantsType, artifactParticipants, "PlayerVictories"),
+                3
+            )
+            && Equals(
+                GetProperty(artifactParticipantsType, artifactParticipants, "OpponentPrestige"),
+                12
+            )
+            && Equals(
+                GetProperty(artifactParticipantsType, artifactParticipants, "OpponentVictories"),
+                6
+            ),
+        "Run bundle artifact participants should include participant prestige and victories."
+    );
     Invoke(catalogType, battleCatalog!, "Save", new object?[] { manifest! });
     var loadedManifest = Invoke(
         catalogType,
@@ -408,6 +460,23 @@ try
             StringComparison.Ordinal
         ),
         "Catalog should preserve manifest metadata."
+    );
+    var loadedParticipants =
+        GetProperty(manifestType, loadedManifest!, "Participants")
+        ?? throw new InvalidOperationException("Loaded manifest should include participants.");
+    var loadedParticipantsType = loadedParticipants.GetType();
+    Assert(
+        Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerPrestige"), 18)
+            && Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerVictories"), 3)
+            && Equals(
+                GetProperty(loadedParticipantsType, loadedParticipants, "OpponentPrestige"),
+                12
+            )
+            && Equals(
+                GetProperty(loadedParticipantsType, loadedParticipants, "OpponentVictories"),
+                6
+            ),
+        "Catalog should preserve battle participant prestige and victories."
     );
 
     using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -446,6 +515,22 @@ try
             "battles should persist the opponent account id."
         );
         Assert(
+            GetInt32(
+                connection,
+                "SELECT player_prestige FROM battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 18,
+            "battles should persist the player prestige."
+        );
+        Assert(
+            GetInt32(
+                connection,
+                "SELECT player_victories FROM battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 3,
+            "battles should persist the player victories."
+        );
+        Assert(
             GetString(
                 connection,
                 "SELECT opponent_hero FROM battles WHERE battle_id = $battleId;",
@@ -476,6 +561,22 @@ try
                 "battle-001"
             ) == 12,
             "battles should persist the opponent level."
+        );
+        Assert(
+            GetInt32(
+                connection,
+                "SELECT opponent_prestige FROM battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 12,
+            "battles should persist the opponent prestige."
+        );
+        Assert(
+            GetInt32(
+                connection,
+                "SELECT opponent_victories FROM battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 6,
+            "battles should persist the opponent victories."
         );
         Assert(
             GetString(
@@ -762,11 +863,15 @@ try
     );
     SetProperty(candidateType, participantCandidate!, "PlayerRank", "Legendary 5");
     SetProperty(candidateType, participantCandidate!, "PlayerRating", 502);
+    SetProperty(candidateType, participantCandidate!, "PlayerPrestige", 18);
+    SetProperty(candidateType, participantCandidate!, "PlayerVictories", 3);
     SetProperty(candidateType, participantCandidate!, "OpponentName", "Snapshot Opponent");
     SetProperty(candidateType, participantCandidate!, "OpponentHero", "Vanessa");
     SetProperty(candidateType, participantCandidate!, "OpponentRank", "Legendary");
     SetProperty(candidateType, participantCandidate!, "OpponentRating", 728);
     SetProperty(candidateType, participantCandidate!, "OpponentLevel", 9);
+    SetProperty(candidateType, participantCandidate!, "OpponentPrestige", 12);
+    SetProperty(candidateType, participantCandidate!, "OpponentVictories", 6);
     SetProperty(candidateType, participantCandidate!, "OpponentAccountId", "opponent-snapshot-id");
     var participants = Invoke(
         collectorType,
@@ -785,6 +890,11 @@ try
         "BuildParticipants should preserve the player rank and rating captured on the opening candidate."
     );
     Assert(
+        Equals(GetProperty(participantsType, participants, "PlayerPrestige"), 18)
+            && Equals(GetProperty(participantsType, participants, "PlayerVictories"), 3),
+        "BuildParticipants should preserve player prestige and victories captured on the opening candidate."
+    );
+    Assert(
         string.Equals(
             (string?)GetProperty(participantsType, participants, "OpponentName"),
             "Snapshot Opponent",
@@ -796,6 +906,11 @@ try
                 StringComparison.Ordinal
             ),
         "BuildParticipants should preserve opponent identity captured on the opening candidate."
+    );
+    Assert(
+        Equals(GetProperty(participantsType, participants, "OpponentPrestige"), 12)
+            && Equals(GetProperty(participantsType, participants, "OpponentVictories"), 6),
+        "BuildParticipants should preserve opponent prestige and victories captured on the opening candidate."
     );
 
     var loader = Activator.CreateInstance(loaderType);
@@ -834,11 +949,15 @@ try
         encounterId: "encounter-missing-payload",
         playerName: "Local Player",
         playerAccountId: "player-account-001",
+        playerPrestige: 18,
+        playerVictories: 3,
         opponentName: "Missing Payload Opponent",
         opponentHero: "Pygmalien",
         opponentRank: "Master",
         opponentRating: 2199,
         opponentLevel: 14,
+        opponentPrestige: 12,
+        opponentVictories: 6,
         opponentAccountId: "opponent-account-missing-payload",
         result: "loss",
         winnerCombatantId: "Opponent",
@@ -1123,11 +1242,15 @@ static object CreateManifestFixture(
     string encounterId,
     string playerName,
     string playerAccountId,
+    int playerPrestige,
+    int playerVictories,
     string opponentName,
     string opponentHero,
     string opponentRank,
     int opponentRating,
     int opponentLevel,
+    int opponentPrestige,
+    int opponentVictories,
     string opponentAccountId,
     string result,
     string winnerCombatantId,
@@ -1145,11 +1268,15 @@ static object CreateManifestFixture(
     var participants = Activator.CreateInstance(participantsType)!;
     SetProperty(participantsType, participants, "PlayerName", playerName);
     SetProperty(participantsType, participants, "PlayerAccountId", playerAccountId);
+    SetProperty(participantsType, participants, "PlayerPrestige", playerPrestige);
+    SetProperty(participantsType, participants, "PlayerVictories", playerVictories);
     SetProperty(participantsType, participants, "OpponentName", opponentName);
     SetProperty(participantsType, participants, "OpponentHero", opponentHero);
     SetProperty(participantsType, participants, "OpponentRank", opponentRank);
     SetProperty(participantsType, participants, "OpponentRating", opponentRating);
     SetProperty(participantsType, participants, "OpponentLevel", opponentLevel);
+    SetProperty(participantsType, participants, "OpponentPrestige", opponentPrestige);
+    SetProperty(participantsType, participants, "OpponentVictories", opponentVictories);
     SetProperty(participantsType, participants, "OpponentAccountId", opponentAccountId);
 
     var outcome = Activator.CreateInstance(outcomeType)!;

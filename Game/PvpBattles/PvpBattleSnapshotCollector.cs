@@ -23,12 +23,16 @@ internal sealed class PvpBattleSnapshotCollector
         BppClientCacheBridge.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
         var playerHero = TryGetPlayerHeroSafe();
         var playerLevel = TryGetPlayerLevelSafe();
+        var playerPrestige = TryGetPlayerPrestigeSafe();
+        var playerVictories = TryGetPlayerVictoriesSafe();
         var (
             opponentName,
             opponentHero,
             opponentRank,
             opponentRating,
             opponentLevel,
+            opponentPrestige,
+            opponentVictories,
             opponentAccountId
         ) = CaptureOpponentIdentityAtOpening(message);
         var candidate = new PvpBattleSequenceCandidate
@@ -38,11 +42,15 @@ internal sealed class PvpBattleSnapshotCollector
             PlayerRank = playerRank,
             PlayerRating = playerRating,
             PlayerLevel = playerLevel,
+            PlayerPrestige = playerPrestige,
+            PlayerVictories = playerVictories,
             OpponentName = opponentName,
             OpponentHero = opponentHero,
             OpponentRank = opponentRank,
             OpponentRating = opponentRating,
             OpponentLevel = opponentLevel,
+            OpponentPrestige = opponentPrestige,
+            OpponentVictories = opponentVictories,
             OpponentAccountId = opponentAccountId,
             SpawnMessage = message,
         };
@@ -94,11 +102,15 @@ internal sealed class PvpBattleSnapshotCollector
             PlayerRank = candidate.PlayerRank,
             PlayerRating = candidate.PlayerRating,
             PlayerLevel = candidate.PlayerLevel,
+            PlayerPrestige = candidate.PlayerPrestige,
+            PlayerVictories = candidate.PlayerVictories,
             OpponentName = candidate.OpponentName,
             OpponentHero = candidate.OpponentHero,
             OpponentRank = candidate.OpponentRank,
             OpponentRating = candidate.OpponentRating,
             OpponentLevel = candidate.OpponentLevel,
+            OpponentPrestige = candidate.OpponentPrestige,
+            OpponentVictories = candidate.OpponentVictories,
             OpponentAccountId = candidate.OpponentAccountId,
         };
     }
@@ -481,12 +493,23 @@ internal sealed class PvpBattleSnapshotCollector
             fallback: null
         );
 
+    private static int? TryGetPlayerPrestigeSafe() =>
+        Safe<int?>(
+            () => Data.Run?.Player?.GetAttributeValue(EPlayerAttributeType.Prestige),
+            fallback: null
+        );
+
+    private static int? TryGetPlayerVictoriesSafe() =>
+        Safe<int?>(() => Data.Run == null ? null : unchecked((int)Data.Run.Victories), null);
+
     private static (
         string? Name,
         string? Hero,
         string? Rank,
         int? Rating,
         int? Level,
+        int? Prestige,
+        int? Victories,
         string? AccountId
     ) CaptureOpponentIdentityAtOpening(NetMessageGameSim? message)
     {
@@ -499,6 +522,8 @@ internal sealed class PvpBattleSnapshotCollector
                 var rank = opponent?.Rank?.ToString();
                 int? rating = opponent != null ? opponent.Rating : null;
                 int? level = opponent != null ? opponent.Level : null;
+                int? prestige = opponent != null ? opponent.Prestige : null;
+                int? victories = opponent != null ? unchecked((int)opponent.Victories) : null;
                 var accountId = opponent?.PlayerLoadout?.accountId;
                 return (
                     string.IsNullOrWhiteSpace(name) ? null : name,
@@ -506,10 +531,12 @@ internal sealed class PvpBattleSnapshotCollector
                     string.IsNullOrWhiteSpace(rank) ? null : rank,
                     rating,
                     level,
+                    prestige,
+                    victories,
                     string.IsNullOrWhiteSpace(accountId) ? null : accountId
                 );
             },
-            fallback: (null, null, null, null, null, null)
+            fallback: (null, null, null, null, null, null, null, null)
         );
     }
 

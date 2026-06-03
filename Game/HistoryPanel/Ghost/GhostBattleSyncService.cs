@@ -216,12 +216,16 @@ internal sealed class GhostBattleSyncService
                 PlayerRank = battle.Participants.PlayerRank,
                 PlayerRating = battle.Participants.PlayerRating,
                 PlayerLevel = battle.Participants.PlayerLevel,
+                PlayerPrestige = battle.Participants.PlayerPrestige,
+                PlayerVictories = battle.Participants.PlayerVictories,
                 OpponentName = battle.Participants.OpponentName,
                 OpponentAccountId = battle.Participants.OpponentAccountId,
                 OpponentHero = battle.Participants.OpponentHero,
                 OpponentRank = battle.Participants.OpponentRank,
                 OpponentRating = battle.Participants.OpponentRating,
                 OpponentLevel = battle.Participants.OpponentLevel,
+                OpponentPrestige = battle.Participants.OpponentPrestige,
+                OpponentVictories = battle.Participants.OpponentVictories,
             },
             Outcome = new PvpBattleOutcome
             {

@@ -4,7 +4,7 @@ using System.Reflection;
 var schemaType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 13,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 14,
     "Local database schema version mismatch."
 );
 Assert(
@@ -40,7 +40,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 13;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 14;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
@@ -86,6 +86,10 @@ Assert(
         && bootstrapSql.Contains("opponent_rank", StringComparison.Ordinal)
         && bootstrapSql.Contains("opponent_rating", StringComparison.Ordinal)
         && bootstrapSql.Contains("opponent_level", StringComparison.Ordinal)
+        && bootstrapSql.Contains("player_prestige", StringComparison.Ordinal)
+        && bootstrapSql.Contains("player_victories", StringComparison.Ordinal)
+        && bootstrapSql.Contains("opponent_prestige", StringComparison.Ordinal)
+        && bootstrapSql.Contains("opponent_victories", StringComparison.Ordinal)
         && bootstrapSql.Contains("opponent_account_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("winner_combatant_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("loser_combatant_id", StringComparison.Ordinal)

@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.Storage.RunLog;
 
 public static class RunLogSchema
 {
-    public static int LocalDatabaseSchemaVersion => 13;
+    public static int LocalDatabaseSchemaVersion => 14;
 
     public static int RowSchemaVersion => 11;
 
@@ -110,12 +110,16 @@ public static class RunLogSchema
                 player_rank TEXT NULL,
                 player_rating INTEGER NULL,
                 player_level INTEGER NULL,
+                player_prestige INTEGER NULL,
+                player_victories INTEGER NULL,
                 opponent_name TEXT NULL,
                 opponent_account_id TEXT NULL,
                 opponent_hero TEXT NULL,
                 opponent_rank TEXT NULL,
                 opponent_rating INTEGER NULL,
                 opponent_level INTEGER NULL,
+                opponent_prestige INTEGER NULL,
+                opponent_victories INTEGER NULL,
                 result TEXT NULL,
                 winner_combatant_id TEXT NULL,
                 loser_combatant_id TEXT NULL,

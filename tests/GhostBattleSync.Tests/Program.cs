@@ -178,6 +178,8 @@ battleParticipantsArtifactType.GetProperty("PlayerHero")!.SetValue(participantsA
 battleParticipantsArtifactType.GetProperty("PlayerRank")!.SetValue(participantsArtifact, "Bronze");
 battleParticipantsArtifactType.GetProperty("PlayerRating")!.SetValue(participantsArtifact, 1200);
 battleParticipantsArtifactType.GetProperty("PlayerLevel")!.SetValue(participantsArtifact, 9);
+battleParticipantsArtifactType.GetProperty("PlayerPrestige")!.SetValue(participantsArtifact, 18);
+battleParticipantsArtifactType.GetProperty("PlayerVictories")!.SetValue(participantsArtifact, 3);
 battleParticipantsArtifactType
     .GetProperty("OpponentName")!
     .SetValue(participantsArtifact, "LocalPlayer");
@@ -192,6 +194,8 @@ battleParticipantsArtifactType
     .SetValue(participantsArtifact, "Legendary");
 battleParticipantsArtifactType.GetProperty("OpponentRating")!.SetValue(participantsArtifact, 1500);
 battleParticipantsArtifactType.GetProperty("OpponentLevel")!.SetValue(participantsArtifact, 12);
+battleParticipantsArtifactType.GetProperty("OpponentPrestige")!.SetValue(participantsArtifact, 12);
+battleParticipantsArtifactType.GetProperty("OpponentVictories")!.SetValue(participantsArtifact, 6);
 runArtifactBattleType.GetProperty("Participants")!.SetValue(battleArtifact, participantsArtifact);
 
 var snapshotsArtifact =
@@ -307,6 +311,23 @@ Assert(
         == 1500,
     "Artifact extraction should preserve the local opponent rating."
 );
+Assert(
+    (int?)extractedParticipantsType.GetProperty("PlayerPrestige")?.GetValue(extractedParticipants)
+        == 18
+        && (int?)
+            extractedParticipantsType
+                .GetProperty("PlayerVictories")
+                ?.GetValue(extractedParticipants) == 3
+        && (int?)
+            extractedParticipantsType
+                .GetProperty("OpponentPrestige")
+                ?.GetValue(extractedParticipants) == 12
+        && (int?)
+            extractedParticipantsType
+                .GetProperty("OpponentVictories")
+                ?.GetValue(extractedParticipants) == 6,
+    "Artifact extraction should preserve participant prestige and victories."
+);
 
 var ghostPayloadStorePath = Path.Combine(
     Path.GetTempPath(),
@@ -400,10 +421,14 @@ var rawBattlePayload = JObject.Parse(
       "player_rank": "Bronze",
       "player_rating": 1200,
       "player_level": 9,
+      "player_prestige": 18,
+      "player_victories": 3,
       "opponent_hero": "Vanessa",
       "opponent_rank": "Legendary",
       "opponent_rating": 1500,
       "opponent_level": 12,
+      "opponent_prestige": 12,
+      "opponent_victories": 6,
       "opponent_account_id": "local-account-001",
       "combat_kind": "PVPCombat",
       "result": "Won",
@@ -446,6 +471,13 @@ Assert(
 Assert(
     (bool)(importRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(importRecord) ?? false),
     "Ghost import should preserve the bundle-final battle marker."
+);
+Assert(
+    (int?)importRecordType.GetProperty("PlayerPrestige")?.GetValue(importRecord) == 18
+        && (int?)importRecordType.GetProperty("PlayerVictories")?.GetValue(importRecord) == 3
+        && (int?)importRecordType.GetProperty("OpponentPrestige")?.GetValue(importRecord) == 12
+        && (int?)importRecordType.GetProperty("OpponentVictories")?.GetValue(importRecord) == 6,
+    "Ghost import should preserve participant prestige and victories."
 );
 
 var localWinRecordedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-4).ToString("o");
@@ -532,6 +564,15 @@ try
             battleRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(projectedBattle) ?? false
         ),
         "Ghost repository reads should preserve the bundle-final battle marker."
+    );
+    Assert(
+        (int?)battleRecordType.GetProperty("PlayerPrestige")?.GetValue(projectedBattle) == 12
+            && (int?)battleRecordType.GetProperty("PlayerVictories")?.GetValue(projectedBattle) == 6
+            && (int?)battleRecordType.GetProperty("OpponentPrestige")?.GetValue(projectedBattle)
+                == 18
+            && (int?)battleRecordType.GetProperty("OpponentVictories")?.GetValue(projectedBattle)
+                == 3,
+        "Ghost repository reads should project participant prestige and victories into local-player perspective."
     );
     Assert(
         (bool)isGhostOpponentEliminated!.Invoke(null, [projectedBattle])! is false,

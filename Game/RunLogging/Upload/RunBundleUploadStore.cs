@@ -250,12 +250,16 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
             PlayerRank = manifest.Participants.PlayerRank,
             PlayerRating = manifest.Participants.PlayerRating,
             PlayerLevel = manifest.Participants.PlayerLevel,
+            PlayerPrestige = manifest.Participants.PlayerPrestige,
+            PlayerVictories = manifest.Participants.PlayerVictories,
             OpponentName = manifest.Participants.OpponentName,
             OpponentAccountId = manifest.Participants.OpponentAccountId,
             OpponentHero = manifest.Participants.OpponentHero,
             OpponentRank = manifest.Participants.OpponentRank,
             OpponentRating = manifest.Participants.OpponentRating,
             OpponentLevel = manifest.Participants.OpponentLevel,
+            OpponentPrestige = manifest.Participants.OpponentPrestige,
+            OpponentVictories = manifest.Participants.OpponentVictories,
             Result = manifest.Outcome.Result,
         };
     }
@@ -288,12 +292,16 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
                 PlayerRank = manifest.Participants.PlayerRank,
                 PlayerRating = manifest.Participants.PlayerRating,
                 PlayerLevel = manifest.Participants.PlayerLevel,
+                PlayerPrestige = manifest.Participants.PlayerPrestige,
+                PlayerVictories = manifest.Participants.PlayerVictories,
                 OpponentName = manifest.Participants.OpponentName,
                 OpponentAccountId = manifest.Participants.OpponentAccountId,
                 OpponentHero = manifest.Participants.OpponentHero,
                 OpponentRank = manifest.Participants.OpponentRank,
                 OpponentRating = manifest.Participants.OpponentRating,
                 OpponentLevel = manifest.Participants.OpponentLevel,
+                OpponentPrestige = manifest.Participants.OpponentPrestige,
+                OpponentVictories = manifest.Participants.OpponentVictories,
             },
             Snapshots = new BattleSnapshotsArtifact
             {

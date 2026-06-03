@@ -25,12 +25,12 @@ Source of truth:
 ## Local Client SQLite
 
 - Database file: `<GameRoot>/BazaarPlusPlusV4/bazaarplusplus.db`
-- Local schema version: `13` (`RunLogSchema.LocalDatabaseSchemaVersion`)
+- Local schema version: `14` (`RunLogSchema.LocalDatabaseSchemaVersion`)
 - Row schema version: `11`
 - Upload payload schema version: `1`
-- Runtime pragmas include `foreign_keys = ON`, `user_version = 13`, `busy_timeout = 2000`, and WAL mode.
+- Runtime pragmas include `foreign_keys = ON`, `user_version = 14`, `busy_timeout = 2000`, and WAL mode.
 
-> Version history: `v11→v12` added the `combat_replay_videos` table; `v13` added the `bazaardb_screenshot_uploads` sidecar. The bootstrap is a single `CREATE TABLE IF NOT EXISTS` pass (`RunLogSchema.BootstrapSql`), so a fresh database is created directly at the current version rather than migrated step by step.
+> Version history: `v11→v12` added the `combat_replay_videos` table; `v13` added the `bazaardb_screenshot_uploads` sidecar; `v14` added battle-time player/opponent prestige and victories to `battles`. The bootstrap is a single `CREATE TABLE IF NOT EXISTS` pass (`RunLogSchema.BootstrapSql`), so a fresh database is created directly at the current version rather than migrated step by step.
 
 Current tables:
 
@@ -104,8 +104,8 @@ Columns:
 
 - identity: `battle_id`, `source`, `run_id`, `local_player_account_id`
 - timing: `recorded_at_utc`, `day`, `hour`, `encounter_id`, `combat_kind`
-- player side: `player_name`, `player_account_id`, `player_hero`, `player_rank`, `player_rating`, `player_level`
-- opponent side: `opponent_name`, `opponent_account_id`, `opponent_hero`, `opponent_rank`, `opponent_rating`, `opponent_level`
+- player side: `player_name`, `player_account_id`, `player_hero`, `player_rank`, `player_rating`, `player_level`, `player_prestige`, `player_victories`
+- opponent side: `opponent_name`, `opponent_account_id`, `opponent_hero`, `opponent_rank`, `opponent_rating`, `opponent_level`, `opponent_prestige`, `opponent_victories`
 - outcome: `result`, `winner_combatant_id`, `loser_combatant_id`
 - bundle marker: `is_bundle_final_battle` — this is the **local column** name. It projects to the **server wire / D1** field `is_final_battle` (the V4 rename dropped the redundant `is_bundle_` prefix; see [V4 Server D1 Schema](#v4-server-d1-schema)). Both names are correct at their respective layers — this is not a drift to "fix".
 - replay state: `replay_available`, `replay_downloaded`, `has_local_payload`, `replay_dirty`, `replay_last_attempt_at_utc`, `replay_last_uploaded_at_utc`, `replay_retry_count`, `replay_last_error`

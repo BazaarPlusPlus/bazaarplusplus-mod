@@ -130,11 +130,15 @@ internal sealed partial class HistoryPanelRepository
                 b.player_rank,
                 b.player_rating,
                 b.player_level,
+                b.player_prestige,
+                b.player_victories,
                 b.opponent_name,
                 b.opponent_hero,
                 b.opponent_rank,
                 b.opponent_rating,
                 b.opponent_level,
+                b.opponent_prestige,
+                b.opponent_victories,
                 b.opponent_account_id,
                 b.combat_kind,
                 b.result,
@@ -224,11 +228,15 @@ internal sealed partial class HistoryPanelRepository
                 player_rank,
                 player_rating,
                 player_level,
+                player_prestige,
+                player_victories,
                 opponent_name,
                 opponent_hero,
                 opponent_rank,
                 opponent_rating,
                 opponent_level,
+                opponent_prestige,
+                opponent_victories,
                 opponent_account_id,
                 combat_kind,
                 result,
@@ -296,11 +304,15 @@ internal sealed partial class HistoryPanelRepository
                     player_rank,
                     player_rating,
                     player_level,
+                    player_prestige,
+                    player_victories,
                     opponent_name,
                     opponent_hero,
                     opponent_rank,
                     opponent_rating,
                     opponent_level,
+                    opponent_prestige,
+                    opponent_victories,
                     opponent_account_id,
                     combat_kind,
                     result,
@@ -325,11 +337,15 @@ internal sealed partial class HistoryPanelRepository
                     $playerRank,
                     $playerRating,
                     $playerLevel,
+                    $playerPrestige,
+                    $playerVictories,
                     $opponentName,
                     $opponentHero,
                     $opponentRank,
                     $opponentRating,
                     $opponentLevel,
+                    $opponentPrestige,
+                    $opponentVictories,
                     $opponentAccountId,
                     $combatKind,
                     $result,
@@ -354,11 +370,15 @@ internal sealed partial class HistoryPanelRepository
                     player_rank = excluded.player_rank,
                     player_rating = excluded.player_rating,
                     player_level = excluded.player_level,
+                    player_prestige = excluded.player_prestige,
+                    player_victories = excluded.player_victories,
                     opponent_name = excluded.opponent_name,
                     opponent_hero = excluded.opponent_hero,
                     opponent_rank = excluded.opponent_rank,
                     opponent_rating = excluded.opponent_rating,
                     opponent_level = excluded.opponent_level,
+                    opponent_prestige = excluded.opponent_prestige,
+                    opponent_victories = excluded.opponent_victories,
                     opponent_account_id = excluded.opponent_account_id,
                     combat_kind = excluded.combat_kind,
                     result = excluded.result,
@@ -417,6 +437,14 @@ internal sealed partial class HistoryPanelRepository
                 (object?)battle.PlayerLevel ?? DBNull.Value
             );
             insertCommand.Parameters.AddWithValue(
+                "$playerPrestige",
+                (object?)battle.PlayerPrestige ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerVictories",
+                (object?)battle.PlayerVictories ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
                 "$opponentName",
                 (object?)battle.OpponentName ?? DBNull.Value
             );
@@ -435,6 +463,14 @@ internal sealed partial class HistoryPanelRepository
             insertCommand.Parameters.AddWithValue(
                 "$opponentLevel",
                 (object?)battle.OpponentLevel ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentPrestige",
+                (object?)battle.OpponentPrestige ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentVictories",
+                (object?)battle.OpponentVictories ?? DBNull.Value
             );
             insertCommand.Parameters.AddWithValue(
                 "$opponentAccountId",

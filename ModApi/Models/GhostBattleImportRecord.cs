@@ -27,6 +27,10 @@ public sealed class GhostBattleImportRecord
 
     public int? PlayerLevel { get; set; }
 
+    public int? PlayerPrestige { get; set; }
+
+    public int? PlayerVictories { get; set; }
+
     public string? OpponentName { get; set; }
 
     public string? OpponentHero { get; set; }
@@ -36,6 +40,10 @@ public sealed class GhostBattleImportRecord
     public int? OpponentRating { get; set; }
 
     public int? OpponentLevel { get; set; }
+
+    public int? OpponentPrestige { get; set; }
+
+    public int? OpponentVictories { get; set; }
 
     public string? OpponentAccountId { get; set; }
 
