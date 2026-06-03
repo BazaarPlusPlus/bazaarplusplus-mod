@@ -138,6 +138,11 @@ Assert(
     "Formatting should expose the configured enchantment color."
 );
 
+Assert(
+    ItemEnchantPreviewFormatting.PreviewHeaderText == "BazaarPlusPlus",
+    "Enchant preview tooltip header should use the full product name."
+);
+
 var segment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
     "Freeze for 2 seconds"

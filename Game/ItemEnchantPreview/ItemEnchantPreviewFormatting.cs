@@ -10,6 +10,8 @@ namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
 public static class ItemEnchantPreviewFormatting
 {
+    public const string PreviewHeaderText = "BazaarPlusPlus";
+
     private const string LogComponent = "ItemEnchantPreview";
     private const int PrefixSizePercent = 60;
     private const int EffectSizePercent = 55;

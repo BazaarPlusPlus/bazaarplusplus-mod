@@ -81,7 +81,8 @@ public static class CardTooltipDataPassivePatch
                 passiveBuilder.Append('\n');
             }
 
-            passiveBuilder.Append("Bazaar++\n");
+            passiveBuilder.Append(ItemEnchantPreviewFormatting.PreviewHeaderText);
+            passiveBuilder.Append('\n');
 
             foreach (var segment in previewSegments)
             {
