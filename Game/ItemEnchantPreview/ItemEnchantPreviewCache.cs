@@ -52,7 +52,7 @@ public static class ItemEnchantPreviewCache
             }
         }
 
-        segments = null;
+        segments = new List<TooltipSegment>();
         return false;
     }
 

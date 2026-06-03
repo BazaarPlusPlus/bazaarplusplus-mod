@@ -18,7 +18,7 @@ public static class ItemEnchantPreviewService
     }
 
     public static List<TooltipSegment> BuildPreviewSegments(
-        ItemCard itemCard,
+        ItemCard? itemCard,
         IReadOnlyCollection<string>? restrictToEnchantmentNames = null
     )
     {
