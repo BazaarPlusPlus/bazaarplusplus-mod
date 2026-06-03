@@ -399,6 +399,103 @@ AssertSequence(
     "Tag filters are available for future skill filtering rules."
 );
 
+var vanessaExclusiveSkill = Card(
+    "Vanessa Exclusive Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    heroes: new[] { EHero.Vanessa }
+);
+var sharedHeroSkill = Card(
+    "Shared Hero Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    heroes: new[] { EHero.Vanessa, EHero.Dooley }
+);
+var commonSkill = Card(
+    "Common Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    heroes: new[] { EHero.Common }
+);
+var commonSharedSkill = Card(
+    "Common Shared Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    heroes: new[] { EHero.Common, EHero.Vanessa }
+);
+var missingHeroSkill = Card(
+    "Missing Hero Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    heroes: Array.Empty<EHero>()
+);
+var exclusiveSkillFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
+exclusiveSkillFilter.Heroes.Add(EHero.Vanessa);
+var exclusiveSkillResult = CollectionFilterEngine.Apply(
+    new[]
+    {
+        sharedHeroSkill,
+        commonSkill,
+        commonSharedSkill,
+        missingHeroSkill,
+        vanessaExclusiveSkill,
+    },
+    exclusiveSkillFilter
+);
+AssertSequence(
+    exclusiveSkillResult,
+    new[] { vanessaExclusiveSkill.Id },
+    "Skill hero filtering should return only skills exclusive to the selected hero."
+);
+
+var exclusiveSkillSourceResult = CollectionFilterEngine.Apply(
+    new[]
+    {
+        sharedHeroSkill,
+        commonSkill,
+        commonSharedSkill,
+        missingHeroSkill,
+        vanessaExclusiveSkill,
+    },
+    exclusiveSkillFilter,
+    new CollectionFilterContext
+    {
+        OfferedCardIds = new[]
+        {
+            sharedHeroSkill.Id,
+            commonSkill.Id,
+            commonSharedSkill.Id,
+            missingHeroSkill.Id,
+            vanessaExclusiveSkill.Id,
+        },
+        ApplyHeroFilter = true,
+    }
+);
+AssertSequence(
+    exclusiveSkillSourceResult,
+    new[] { vanessaExclusiveSkill.Id },
+    "Trainer/source pools should still be ANDed with exclusive skill hero filtering."
+);
+
+var commonSkillFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
+commonSkillFilter.Heroes.Add(EHero.Common);
+var commonSkillResult = CollectionFilterEngine.Apply(
+    new[]
+    {
+        sharedHeroSkill,
+        commonSkill,
+        commonSharedSkill,
+        missingHeroSkill,
+        vanessaExclusiveSkill,
+    },
+    commonSkillFilter
+);
+AssertSequence(
+    commonSkillResult,
+    new[] { commonSkill.Id },
+    "Common skill filtering should only show skills explicitly scoped to Common/global."
+);
+
 AssertFalse(
     CollectionCardClassifier
         .Classify(ECardType.Item, "Assets/Cards/Debug.png", "[DEBUG] Item")

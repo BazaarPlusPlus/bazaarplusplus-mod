@@ -11,7 +11,6 @@ namespace BazaarPlusPlus.Game.Supporters.Ui;
 
 internal static class BPPSupporterAttributionRow
 {
-    private const string SupportUrl = "https://bazaarplusplus.com/";
     private const string SponsorIcon = "♥";
 
     public static VisualElement Create()
@@ -147,7 +146,7 @@ internal static class BPPSupporterAttributionRow
     private static Button CreateSponsorButton(string text)
     {
         var button = new Button(OpenSupportPage) { text = $"{SponsorIcon} {text}" };
-        button.tooltip = SupportUrl;
+        button.tooltip = BPPSupporterLinks.ResolveSponsorUrl(GetLanguageCode());
         button.style.height = Sizes.SupporterAttributionHeight;
         button.style.minWidth = Sizes.SupporterActionMinWidth;
         button.style.flexGrow = 0f;
@@ -183,7 +182,7 @@ internal static class BPPSupporterAttributionRow
 
     private static void OpenSupportPage()
     {
-        Application.OpenURL(SupportUrl);
+        Application.OpenURL(BPPSupporterLinks.ResolveSponsorUrl(GetLanguageCode()));
     }
 
     private static string GetLanguageCode()

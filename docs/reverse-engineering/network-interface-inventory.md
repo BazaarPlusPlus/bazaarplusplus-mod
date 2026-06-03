@@ -282,6 +282,7 @@ run session header：
 | GET | `/ghost-battles?player_account_id=<id>&limit=<1..200>` | none | `{ battles: [...] }` -> `GhostBattleImportRecord[]` | 同步“against me”的 ghost battle 列表；`player_account_id` 为空时客户端直接返回 `player_account_id_required`，不会请求网络。 |
 | POST | `/ghost-battles/{battleId}/replay-link` | none | `{ download_url }` | 为 ghost battle 获取 replay 下载链接。现有设计文档说明该 URL 是短 TTL 预签下载链接；客户端只要求响应里存在 `download_url`。 |
 | GET | `download_url` | none | bytes | 下载 replay payload。 |
+| GET | `/health` | none | JSON `{ status, server_time_utc }` | Bazaar++ 服务可用性探测；上传/同步工作前记录 RTT、探测时间和服务端时间戳。 |
 | POST | `/bazaardb-screenshots` | `BazaarDbScreenshotUploadRequest`：账号、截图、run、hero、rank、图片 bytes 等 | success/failure | 上传 BazaarDB 截图；当前客户端不附加鉴权 header；4xx 除 408/429 视作永久失败。 |
 | GET | `/bazaardb/manifest...` | manifest path | manifest JSON | route 已定义，但当前 mod client 未发现调用；现有设计文档描述为 BazaarDB 服务端拉取 manifest，而不是游戏进程主动拉取。 |
 

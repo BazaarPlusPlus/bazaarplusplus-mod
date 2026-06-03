@@ -614,6 +614,44 @@ AssertSet(
     selectedHeroCards.Select(card => card.Id).ToArray(),
     "SelectedHero rules should not crop by hero when no concrete hero is selected."
 );
+var selectedHeroTrainerRule = BuildSingleEntry(
+    "Selected Hero Trainer",
+    CollectionSourceKind.Trainer,
+    """{ "heroMode": "SelectedHero" }"""
+);
+var selectedHeroTrainerCards = new[]
+{
+    CatalogCard(
+        Guid.Parse("aaaaaaaa-1000-0000-0000-000000000001"),
+        ECardType.Skill,
+        [EHero.Vanessa]
+    ),
+    CatalogCard(
+        Guid.Parse("aaaaaaaa-1000-0000-0000-000000000002"),
+        ECardType.Skill,
+        [EHero.Vanessa, EHero.Dooley]
+    ),
+    CatalogCard(
+        Guid.Parse("aaaaaaaa-1000-0000-0000-000000000003"),
+        ECardType.Skill,
+        [EHero.Common]
+    ),
+    CatalogCard(
+        Guid.Parse("aaaaaaaa-1000-0000-0000-000000000004"),
+        ECardType.Skill,
+        Array.Empty<EHero>()
+    ),
+};
+var selectedHeroTrainerPool = CollectionSourceOfferPoolResolver.Resolve(
+    selectedHeroTrainerRule,
+    EHero.Vanessa,
+    selectedHeroTrainerCards
+);
+AssertSet(
+    selectedHeroTrainerPool.OfferedCardIds,
+    new[] { selectedHeroTrainerCards[0].Id, selectedHeroTrainerCards[1].Id },
+    "Source pools may include shared selected-hero skills; final Skill filtering owns exclusivity."
+);
 var noneSelectedResult = CollectionSourceOfferPoolResolver.Resolve(
     source: null,
     selectedHero: EHero.Vanessa,

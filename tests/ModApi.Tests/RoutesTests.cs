@@ -20,6 +20,9 @@ internal static class RoutesTests
                 $"Unexpected QueryGhostBattles: {routes.QueryGhostBattles}"
             );
 
+        if (routes.Health != "https://mod-api-v4.bazaarplusplus.com/health")
+            throw new InvalidOperationException($"Unexpected Health: {routes.Health}");
+
         if (!routes.CreateReplayLink("b-1").EndsWith("/ghost-battles/b-1/replay-link"))
             throw new InvalidOperationException("Unexpected CreateReplayLink shape");
 

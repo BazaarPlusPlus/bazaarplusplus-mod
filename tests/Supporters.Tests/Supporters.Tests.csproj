@@ -17,6 +17,7 @@
       Include="../../Game/Supporters/BPPSupporterAttributionText.cs"
       Link="BPPSupporterAttributionText.cs"
     />
+    <Compile Include="../../Game/Supporters/BPPSupporterLinks.cs" Link="BPPSupporterLinks.cs" />
     <Compile
       Include="../../Game/Supporters/BPPSupporterEntry.cs"
       Link="BPPSupporterEntry.cs"

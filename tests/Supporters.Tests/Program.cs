@@ -9,6 +9,7 @@ TestSampleManyReturnsDistinctSupporters();
 TestSampleManyRotatesThroughEverySupporterBeforeRepeating();
 TestSupportedByPrefixAndSuffix();
 TestSponsorActionText();
+TestSponsorLinks();
 
 Console.WriteLine("Supporters checks passed.");
 
@@ -203,6 +204,39 @@ static void TestSponsorActionText()
         "赞助",
         BPPSupporterAttributionText.FormatSponsorAction("zh-CN"),
         "Chinese attribution row should expose a localized sponsor action."
+    );
+}
+
+static void TestSponsorLinks()
+{
+    AssertEqual(
+        "https://bazaarplusplus.com",
+        BPPSupporterLinks.ResolveSponsorUrl("zh-CN"),
+        "Chinese sponsor URL should use the canonical no-query domain."
+    );
+    AssertEqual(
+        "https://bazaarplusplus.com",
+        BPPSupporterLinks.ResolveSponsorUrl("zh-Hant"),
+        "Traditional Chinese sponsor URL should use the canonical no-query domain."
+    );
+    AssertEqual(
+        "https://bazaarplusplus.com/?lang=en",
+        BPPSupporterLinks.ResolveSponsorUrl("en"),
+        "English sponsor URL should force the English site."
+    );
+    AssertEqual(
+        "https://bazaarplusplus.com/?lang=en",
+        BPPSupporterLinks.ResolveSponsorUrl("de-DE"),
+        "Non-Chinese sponsor URL should force the English site."
+    );
+    AssertEqual(
+        "https://bazaarplusplus.com/?lang=en",
+        BPPSupporterLinks.ResolveSponsorUrl(string.Empty),
+        "Unknown language should fall back to English."
+    );
+    AssertFalse(
+        BPPSupporterLinks.ResolveSponsorUrl("en").Contains("?lang=en?lang=en"),
+        "Sponsor URL should not append duplicate lang parameters."
     );
 }
 

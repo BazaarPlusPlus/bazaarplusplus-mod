@@ -12,6 +12,7 @@ public sealed class ModApiRoutes
         QueryGhostBattles = BuildAbsolute("/ghost-battles");
         UploadBazaarDbScreenshot = BuildAbsolute("/bazaardb-screenshots");
         BazaarDbManifestBase = BuildAbsolute("/bazaardb/manifest");
+        Health = BuildAbsolute("/health");
     }
 
     public Uri ApiBaseUri { get; }
@@ -23,6 +24,8 @@ public sealed class ModApiRoutes
     public string UploadBazaarDbScreenshot { get; }
 
     public string BazaarDbManifestBase { get; }
+
+    public string Health { get; }
 
     public string CreateReplayLink(string battleId)
     {

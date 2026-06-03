@@ -42,7 +42,7 @@ internal static class CollectionFilterEngine
                 continue;
             if (!filter.IncludePackages && card.IsPackage)
                 continue;
-            if (heroFilterCount > 0 && !AnyHeroMatch(card.Heroes, filter.Heroes))
+            if (heroFilterCount > 0 && !CollectionHeroScope.MatchesFilter(card, filter))
                 continue;
             if (tierFilterCount > 0 && !filter.Tiers.Contains(card.StartingTier))
                 continue;
@@ -94,19 +94,6 @@ internal static class CollectionFilterEngine
         if (sizeOrder != 0)
             return sizeOrder;
         return TierRank(a.StartingTier).CompareTo(TierRank(b.StartingTier));
-    }
-
-    private static bool AnyHeroMatch(
-        IReadOnlyCollection<EHero> cardHeroes,
-        HashSet<EHero> filterHeroes
-    )
-    {
-        foreach (var hero in cardHeroes)
-        {
-            if (filterHeroes.Contains(hero))
-                return true;
-        }
-        return false;
     }
 
     private static bool AnyTagMatch(

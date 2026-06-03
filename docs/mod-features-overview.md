@@ -103,6 +103,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - `BazaarDB / UploadScreenshots` 默认关闭；开启后 `BazaarDbScreenshotUploadController` 在非 live run 时按 180s 间隔扫描待上传截图
 - Sidecar 表 `bazaardb_screenshot_uploads` 用 `INSERT OR IGNORE` 回填 `run_screenshots` 中所有 `capture_source = 'end_of_run_auto'` 的行——开关从关切到开就能把历史截图一并补传
 - 数据流：模组 `POST /bazaardb-screenshots`（无鉴权）→ Worker 写 R2 + D1 → BazaarDB 用 Bearer token 调 `GET /bazaardb/manifest` 拿到 row 列表（行内带公开 `image_url`，指向 `bazaardb-assets-v4.bazaarplusplus.com`）直接走公开桶下载
+- 上传前先请求 `GET /health` 记录 RTT、探测时间和服务端时间戳；失败时只记录日志并等待下一轮重试，不标记截图上传失败，也不阻塞游戏主流程
 - 4xx（除 408 / 429）落 `permanent_failure`，不再重试；5xx / 网络错误保留 `pending` 自动重试；翻开开关 / run 退出时立刻触发一次
 
 详见 [features/screenshots.md](features/screenshots.md)。

@@ -645,7 +645,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 new CollectionFilterContext
                 {
                     OfferedCardIds = offeredCardIds,
-                    ApplyHeroFilter = !hasSelectedSource,
+                    ApplyHeroFilter = !hasSelectedSource || _filter.ActiveType == ECardType.Skill,
                 }
             );
             _virtualizer.SetVisible(ordered, _filter.ActiveType);

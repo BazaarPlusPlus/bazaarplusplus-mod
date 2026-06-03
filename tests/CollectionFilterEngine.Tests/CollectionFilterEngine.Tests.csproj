@@ -33,6 +33,10 @@
       Link="CollectionFilterContext.cs"
     />
     <Compile
+      Include="..\..\Game\CollectionPanel\Data\CollectionHeroScope.cs"
+      Link="CollectionHeroScope.cs"
+    />
+    <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionCardFacetRanks.cs"
       Link="CollectionCardFacetRanks.cs"
     />

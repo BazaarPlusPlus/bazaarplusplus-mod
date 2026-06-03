@@ -58,6 +58,16 @@ try
     {
         var handler = new RecordingHandler(req =>
         {
+            if (req.Method == HttpMethod.Get && req.RequestUri?.AbsolutePath == "/health")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "{\"status\":\"ok\",\"server_time_utc\":\"2026-06-03T00:00:00.000Z\"}"
+                    ),
+                };
+            }
+
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("{\"status\":\"ok\"}"),
@@ -69,7 +79,15 @@ try
         var task = (Task)uploadMethod.Invoke(service, [CancellationToken.None])!;
         task.GetAwaiter().GetResult();
 
-        Assert(handler.Requests.Count == 1, "Service should POST exactly one request.");
+        Assert(
+            handler.Requests.Count == 2,
+            "Service should GET health then POST one upload request."
+        );
+        Assert(
+            handler.Requests[0].Method == HttpMethod.Get
+                && handler.Requests[0].RequestUri?.AbsolutePath == "/health",
+            "First request should be the health probe."
+        );
         Assert(
             GetUploadStatus(dbPath, "shot-1") == "uploaded",
             "Happy-path row should be marked uploaded."
@@ -77,7 +95,23 @@ try
         client.Dispose();
     }
 
-    // Test 2: transient HTTP 503 keeps row pending and increments attempts
+    // Test 2: no pending rows should not probe health
+    {
+        var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.OK));
+        var client = new HttpClient(handler);
+        var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => "acct-9")]);
+        var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;
+        var task = (Task)uploadMethod.Invoke(service, [CancellationToken.None])!;
+        task.GetAwaiter().GetResult();
+
+        Assert(
+            handler.Requests.Count == 0,
+            "Service should not probe health when there are no pending uploads."
+        );
+        client.Dispose();
+    }
+
+    // Test 3: transient HTTP 503 keeps row pending and increments attempts
     SeedRunScreenshotWithFile(
         dbPath,
         screenshotsDir,
@@ -86,11 +120,22 @@ try
     );
     ensureBackfilled.Invoke(store, []);
     {
-        var handler = new RecordingHandler(req => new HttpResponseMessage(
-            HttpStatusCode.ServiceUnavailable
-        )
+        var handler = new RecordingHandler(req =>
         {
-            Content = new StringContent("boom"),
+            if (req.Method == HttpMethod.Get && req.RequestUri?.AbsolutePath == "/health")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "{\"status\":\"ok\",\"server_time_utc\":\"2026-06-03T00:00:00.000Z\"}"
+                    ),
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+            {
+                Content = new StringContent("boom"),
+            };
         });
         var client = new HttpClient(handler);
         var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => "acct-9")]);
@@ -106,14 +151,28 @@ try
             GetUploadAttempts(dbPath, "shot-2") == 1,
             "Transient failure should increment attempts."
         );
+        Assert(handler.Requests.Count == 2, "Transient upload should GET health then POST once.");
         client.Dispose();
     }
 
-    // Test 3: permanent HTTP 400 flips to permanent_failure
+    // Test 4: permanent HTTP 400 flips to permanent_failure
     {
-        var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.BadRequest)
+        var handler = new RecordingHandler(req =>
         {
-            Content = new StringContent("{\"reason\":\"schema_mismatch\"}"),
+            if (req.Method == HttpMethod.Get && req.RequestUri?.AbsolutePath == "/health")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "{\"status\":\"ok\",\"server_time_utc\":\"2026-06-03T00:00:00.000Z\"}"
+                    ),
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent("{\"reason\":\"schema_mismatch\"}"),
+            };
         });
         var client = new HttpClient(handler);
         var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => "acct-9")]);
@@ -125,10 +184,11 @@ try
             GetUploadStatus(dbPath, "shot-2") == "permanent_failure",
             "HTTP 400 should be classified as a permanent failure."
         );
+        Assert(handler.Requests.Count == 2, "Permanent upload should GET health then POST once.");
         client.Dispose();
     }
 
-    // Test 4: missing image file → permanent_failure
+    // Test 5: missing image file → permanent_failure
     SeedRunScreenshotMissingFile(dbPath, "shot-3");
     ensureBackfilled.Invoke(store, []);
     {
@@ -149,6 +209,67 @@ try
         Assert(
             handler.Requests.Count == 0,
             "Service should not POST when the image file is missing."
+        );
+        client.Dispose();
+    }
+
+    // Test 6: health failure leaves pending rows untouched for the next retry
+    SeedRunScreenshotWithFile(
+        dbPath,
+        screenshotsDir,
+        "shot-health-fail",
+        "2026-04-08_20-32-25-000_final_run-r1.png"
+    );
+    ensureBackfilled.Invoke(store, []);
+    {
+        var handler = new RecordingHandler(req => new HttpResponseMessage(
+            HttpStatusCode.ServiceUnavailable
+        ));
+        var client = new HttpClient(handler);
+        var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => "acct-9")]);
+        var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;
+        var task = (Task)uploadMethod.Invoke(service, [CancellationToken.None])!;
+        task.GetAwaiter().GetResult();
+
+        Assert(
+            GetUploadStatus(dbPath, "shot-health-fail") == "pending",
+            "Health failure should leave pending screenshots pending for retry."
+        );
+        Assert(
+            GetUploadAttempts(dbPath, "shot-health-fail") == 0,
+            "Health failure should not count as a screenshot upload attempt."
+        );
+        Assert(handler.Requests.Count == 1, "Health failure should not continue into upload POST.");
+        client.Dispose();
+    }
+
+    // Test 7: missing account id should not probe health or count attempts
+    SeedRunScreenshotWithFile(
+        dbPath,
+        screenshotsDir,
+        "shot-no-account",
+        "2026-04-08_20-33-25-000_final_run-r1.png"
+    );
+    ensureBackfilled.Invoke(store, []);
+    {
+        var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.OK));
+        var client = new HttpClient(handler);
+        var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => " ")]);
+        var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;
+        var task = (Task)uploadMethod.Invoke(service, [CancellationToken.None])!;
+        task.GetAwaiter().GetResult();
+
+        Assert(
+            GetUploadStatus(dbPath, "shot-no-account") == "pending",
+            "Missing account id should leave pending screenshots pending for retry."
+        );
+        Assert(
+            GetUploadAttempts(dbPath, "shot-no-account") == 0,
+            "Missing account id should not count as a screenshot upload attempt."
+        );
+        Assert(
+            handler.Requests.Count == 0,
+            "Service should not probe health before the player account id is available."
         );
         client.Dispose();
     }

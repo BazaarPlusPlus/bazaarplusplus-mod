@@ -57,6 +57,7 @@ internal sealed class BazaarDbScreenshotUploadService
         }
 
         var client = new BazaarDbScreenshotClient(_httpClient, _routes);
+        ModApiHealthProbeResult? healthProbe = null;
         foreach (var screenshotId in pending)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -72,6 +73,27 @@ internal sealed class BazaarDbScreenshotUploadService
                         "build_snapshot_failed"
                     );
                     continue;
+                }
+
+                if (!healthProbe.HasValue)
+                {
+                    healthProbe = await new ModApiHealthClient(_httpClient, _routes)
+                        .ProbeAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                    if (!healthProbe.Value.Succeeded)
+                    {
+                        BppLog.Warn(
+                            "BazaarDbScreenshotUploadService",
+                            $"Bazaar++ service health probe failed error={healthProbe.Value.Error ?? "unknown"} rtt_ms={healthProbe.Value.RoundTripMilliseconds} probed_at_utc={healthProbe.Value.ProbedAtUtc:O}; retrying later."
+                        );
+                        return;
+                    }
+
+                    var serverTimeUtc = healthProbe.Value.ServerTimeUtc?.ToString("O") ?? "unknown";
+                    BppLog.Debug(
+                        "BazaarDbScreenshotUploadService",
+                        $"Bazaar++ service health ok rtt_ms={healthProbe.Value.RoundTripMilliseconds} server_time_utc={serverTimeUtc} probed_at_utc={healthProbe.Value.ProbedAtUtc:O}."
+                    );
                 }
 
                 var result = await client.UploadScreenshotAsync(
