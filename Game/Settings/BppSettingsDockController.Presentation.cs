@@ -12,8 +12,8 @@ internal sealed partial class BppSettingsDockController
 {
     private void ConfigurePanelRect(RectTransform rectTransform, BppSettingsDockPlacement placement)
     {
-        rectTransform.anchorMin = new Vector2(0f, 0f);
-        rectTransform.anchorMax = new Vector2(0f, 0f);
+        rectTransform.anchorMin = new Vector2(0f, 1f);
+        rectTransform.anchorMax = new Vector2(0f, 1f);
         rectTransform.pivot =
             placement.PanelDirection == BppSettingsDockPanelDirection.UpRight
                 ? new Vector2(0f, 0f)
