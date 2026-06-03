@@ -21,7 +21,6 @@ namespace BazaarPlusPlus.Game.CollectionPanel;
 
 internal sealed class CollectionPanel : MonoBehaviour
 {
-    private const float SearchDebounceSeconds = 0.20f;
     private const float CatalogBuildFrameBudgetMs = 4f;
 
     private static CollectionPanel? _instance;
@@ -75,9 +74,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     private bool _isVisible;
     private bool _initialized;
     private string _lastSceneToken = string.Empty;
-    private string _pendingSearch = string.Empty;
-    private string _appliedSearch = string.Empty;
-    private float _pendingSearchAt = float.NaN;
     private bool _statusVisible;
     private string? _statusMessage;
     private bool _viewportBoundsDirty;
@@ -300,21 +296,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         }
 
-        if (!string.IsNullOrEmpty(_pendingSearch) || _pendingSearch != _appliedSearch)
-        {
-            if (
-                !float.IsNaN(_pendingSearchAt)
-                && Time.unscaledTime - _pendingSearchAt >= SearchDebounceSeconds
-            )
-            {
-                _appliedSearch = _pendingSearch;
-                _filter.Search = _pendingSearch;
-                _pendingSearchAt = float.NaN;
-                ApplyFilters();
-                RefreshView();
-            }
-        }
-
         if (_viewportBoundsDirty && _virtualizer != null && _overlay != null)
         {
             _viewportBoundsDirty = false;
@@ -458,20 +439,11 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ApplyFilters();
                 RefreshView();
             },
-            setSearch: value =>
-            {
-                _pendingSearch = value ?? string.Empty;
-                _pendingSearchAt = Time.unscaledTime;
-                RefreshView();
-            },
             clearFilters: () =>
             {
                 var activeType = _filter.ActiveType;
                 _filter.Reset();
                 _filter.ActiveType = activeType;
-                _appliedSearch = string.Empty;
-                _pendingSearch = string.Empty;
-                _pendingSearchAt = float.NaN;
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -673,10 +645,9 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedSourceKey = _filter.GetSelectedSourceKey(_filter.ActiveType),
             IncludePackages = _filter.IncludePackages,
             HasPackages = HasPackages(),
-            HasActiveFilters = HasActiveFilters(),
+            HasActiveFilters = _filter.HasActiveFilters,
             SourceSelectorEnabled = !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
-            Search = GetVisibleSearchText(),
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
@@ -723,19 +694,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         }
 
         return false;
-    }
-
-    private bool HasActiveFilters()
-    {
-        if (_filter.HasActiveFilters)
-            return true;
-
-        return !float.IsNaN(_pendingSearchAt) && !string.IsNullOrWhiteSpace(_pendingSearch);
-    }
-
-    private string GetVisibleSearchText()
-    {
-        return float.IsNaN(_pendingSearchAt) ? _filter.Search : _pendingSearch;
     }
 
     private bool PruneInvisibleSourceSelections()

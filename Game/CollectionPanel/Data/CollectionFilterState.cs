@@ -28,7 +28,6 @@ internal sealed class CollectionFilterState
     public string? SelectedTrainerSourceKey { get; set; }
     public bool IncludePackages { get; set; }
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
-    public string Search { get; set; } = string.Empty;
 
     public bool HasActiveFilters =>
         Heroes.Count > 1
@@ -39,8 +38,7 @@ internal sealed class CollectionFilterState
         || !string.IsNullOrWhiteSpace(SelectedMerchantSourceKey)
         || !string.IsNullOrWhiteSpace(SelectedTrainerSourceKey)
         || IncludePackages
-        || SortPriority != CollectionSortPriority.Quality
-        || !string.IsNullOrWhiteSpace(Search);
+        || SortPriority != CollectionSortPriority.Quality;
 
     public EHero? SelectedHero
     {
@@ -184,7 +182,6 @@ internal sealed class CollectionFilterState
         SelectedTrainerSourceKey = null;
         IncludePackages = false;
         SortPriority = CollectionSortPriority.Quality;
-        Search = string.Empty;
     }
 
     private static bool ContainsOrdinal(IReadOnlyCollection<string> values, string value)

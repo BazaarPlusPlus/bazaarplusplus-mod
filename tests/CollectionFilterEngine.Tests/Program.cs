@@ -7,8 +7,6 @@ AssertFalse(
     defaultState.HasActiveFilters,
     "Default collection filter state should not be resettable."
 );
-defaultState.Search = "wand";
-AssertTrue(defaultState.HasActiveFilters, "Search text should make filters resettable.");
 defaultState.Reset();
 AssertValues(
     defaultState.Heroes.ToArray(),
@@ -317,7 +315,7 @@ AssertSequence(
 var vanessaBronze = Card("Vanessa Bronze", ETier.Bronze, heroes: new[] { EHero.Vanessa });
 var dooleyBronze = Card("Dooley Bronze", ETier.Bronze, heroes: new[] { EHero.Dooley });
 var vanessaSilver = Card("Vanessa Silver", ETier.Silver, heroes: new[] { EHero.Vanessa });
-var sourceAndHeroFilter = new CollectionFilterState { Search = "Vanessa" };
+var sourceAndHeroFilter = new CollectionFilterState();
 sourceAndHeroFilter.Heroes.Add(EHero.Vanessa);
 sourceAndHeroFilter.Tiers.Add(ETier.Bronze);
 var sourceAndHeroResult = CollectionFilterEngine.Apply(
@@ -331,7 +329,7 @@ var sourceAndHeroResult = CollectionFilterEngine.Apply(
 AssertSequence(
     sourceAndHeroResult,
     new[] { vanessaBronze.Id },
-    "Resolved offer pool should preserve AND semantics with hero, tier, and search filters."
+    "Resolved offer pool should preserve AND semantics with hero and tier filters."
 );
 
 var sourceOwnedHeroFilter = new CollectionFilterState();

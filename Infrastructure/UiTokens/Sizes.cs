@@ -16,9 +16,14 @@ internal static class Sizes
     public const float ChipMinWidth = 86f;
     public const float ChipHeight = 32f;
     public const float SupporterAttributionHeight = 24f;
+    public const float SupporterAttributionReservedHeight = 48f;
+    public const int SupporterAttributionNameFont = 14;
     public const float SupporterAttributionNameMaxWidth = 118f;
     public const float SupporterActionMinWidth = 74f;
     public const float SearchResetButtonWidth = 68f;
+    public const float CollectionMatchCountWidth = 96f;
+    public const float CollectionSizeFilterSectionMinHeight =
+        FontSmall + UiSpacing.Sm + ChipHeight + UiSpacing.Xs;
     public const float PackageToggleWidth = 104f;
     public const float PackageSwitchWidth = 30f;
     public const float PackageSwitchHeight = 16f;

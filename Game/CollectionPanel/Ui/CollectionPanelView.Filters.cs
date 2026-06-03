@@ -125,7 +125,6 @@ internal sealed partial class CollectionPanelView
             if (source.BreakAfter)
                 _sourceChipRow.Add(CreateSourceChipBreak());
         }
-        ApplySourceChipSizing(_sourceChipRow.resolvedStyle.width);
     }
 
     private bool SourceChipsMatch(IReadOnlyList<CollectionSourceOptionViewModel> sources)
@@ -574,30 +573,6 @@ internal sealed partial class CollectionPanelView
                 ? Colors.ButtonSelectedText
                 : Colors.HistoryStatusText;
         }
-    }
-
-    private void StyleSearchShell(bool focused)
-    {
-        if (_searchShell == null)
-            return;
-
-        _searchShell.style.backgroundColor = focused
-            ? Colors.WithAlpha(Colors.HistoryStatusBackground, 0.92f)
-            : Colors.HistoryStatusBackground;
-        UiStyle.BorderColor(
-            _searchShell.style,
-            focused ? Colors.RunRowSelectedAccent : Colors.HistoryStatusBorder
-        );
-    }
-
-    private void RefreshSearchPlaceholder(string search)
-    {
-        if (_searchPlaceholderLabel == null)
-            return;
-
-        _searchPlaceholderLabel.style.display = string.IsNullOrWhiteSpace(search)
-            ? DisplayStyle.Flex
-            : DisplayStyle.None;
     }
 
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)

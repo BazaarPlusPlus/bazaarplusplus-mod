@@ -20,7 +20,7 @@ internal static class BPPSupporterAttributionRow
         row.style.flexWrap = Wrap.Wrap;
         row.style.alignItems = Align.Center;
         row.style.marginTop = UiSpacing.Sm;
-        row.style.minHeight = Sizes.SupporterAttributionHeight;
+        UiStyle.FixedHeight(row.style, Sizes.SupporterAttributionReservedHeight);
         return row;
     }
 
@@ -119,7 +119,7 @@ internal static class BPPSupporterAttributionRow
     {
         var label = new Label(sample.Name);
         label.tooltip = sample.Name;
-        label.style.fontSize = Sizes.FontSmall;
+        label.style.fontSize = Sizes.SupporterAttributionNameFont;
         label.style.unityFont = BppUiFont.Default;
         label.style.unityFontStyleAndWeight = FontStyle.Bold;
         label.style.maxWidth = Sizes.SupporterAttributionNameMaxWidth;
@@ -178,6 +178,11 @@ internal static class BPPSupporterAttributionRow
 
         BppUiFont.RequestCharactersInTexture(text, Sizes.FontSmall, FontStyle.Normal);
         BppUiFont.RequestCharactersInTexture(text, Sizes.FontSmall, FontStyle.Bold);
+        BppUiFont.RequestCharactersInTexture(
+            text,
+            Sizes.SupporterAttributionNameFont,
+            FontStyle.Bold
+        );
     }
 
     private static void OpenSupportPage()

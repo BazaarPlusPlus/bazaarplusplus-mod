@@ -20,8 +20,6 @@ internal static class CollectionFilterEngine
     {
         context ??= new CollectionFilterContext();
         var result = new List<CollectionCardVm>(all.Count);
-        var search = filter.Search?.Trim() ?? string.Empty;
-        var hasSearch = search.Length > 0;
         var offerPoolSet =
             context.OfferedCardIds == null
                 ? null
@@ -51,12 +49,6 @@ internal static class CollectionFilterEngine
             if (sizeFilterCount > 0 && !filter.Sizes.Contains(card.Size))
                 continue;
             if (merchantFilterCount > 0 && !AnyMerchantMatch(card.Merchants, filter.Merchants))
-                continue;
-            if (
-                hasSearch
-                && card.DisplayName.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0
-                && card.InternalName.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0
-            )
                 continue;
             result.Add(card);
         }

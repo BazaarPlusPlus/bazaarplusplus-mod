@@ -33,7 +33,6 @@ internal sealed class CollectionPanelViewModel
     public bool HasActiveFilters { get; set; }
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
-    public string Search { get; set; } = string.Empty;
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
     public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();
@@ -65,7 +64,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action<string> _toggleSource;
     private readonly Action _togglePackages;
     private readonly Action<CollectionSortPriority> _setSortPriority;
-    private readonly Action<string> _setSearch;
     private readonly Action _clearFilters;
 
     private GameObject? _rootObject;
@@ -86,9 +84,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private VisualElement? _packageSwitchKnob;
     private Button? _sortQualityButton;
     private Button? _sortSizeButton;
-    private VisualElement? _searchShell;
-    private Label? _searchPlaceholderLabel;
-    private TextField? _searchField;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
     private VisualElement? _sizeChipRow;
@@ -138,7 +133,6 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action<string> toggleSource,
         Action togglePackages,
         Action<CollectionSortPriority> setSortPriority,
-        Action<string> setSearch,
         Action clearFilters
     )
     {
@@ -152,7 +146,6 @@ internal sealed partial class CollectionPanelView : IDisposable
         _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
         _setSortPriority =
             setSortPriority ?? throw new ArgumentNullException(nameof(setSortPriority));
-        _setSearch = setSearch ?? throw new ArgumentNullException(nameof(setSearch));
         _clearFilters = clearFilters ?? throw new ArgumentNullException(nameof(clearFilters));
     }
 
@@ -192,7 +185,6 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.SortHeader()
                 + CollectionPanelText.SortQuality()
                 + CollectionPanelText.SortSize()
-                + CollectionPanelText.SearchPlaceholder()
                 + CollectionPanelText.NoMatches()
                 + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#\\",
             Sizes.FontButton,
@@ -338,22 +330,21 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_sortSizeButton != null)
             RefreshChip(_sortSizeButton, model.SortPriority == CollectionSortPriority.Size);
 
-        // Size only narrows Items; hide the whole row on the Skill tab.
+        // Size only narrows Items; keep the section's reserved layout slot on Skills.
         if (_sizeFilterSection != null)
-            _sizeFilterSection.style.display =
-                model.ActiveType == ECardType.Item ? DisplayStyle.Flex : DisplayStyle.None;
+            _sizeFilterSection.style.display = DisplayStyle.Flex;
+        if (_sizeChipRow != null)
+        {
+            var showSizeChips = model.ActiveType == ECardType.Item;
+            _sizeChipRow.style.visibility = showSizeChips ? Visibility.Visible : Visibility.Hidden;
+            _sizeChipRow.SetEnabled(showSizeChips);
+            _sizeChipRow.pickingMode = showSizeChips ? PickingMode.Position : PickingMode.Ignore;
+        }
         if (_sourceFilterSection != null)
             _sourceFilterSection.style.display =
                 model.AvailableSources.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
         if (_sourceFilterLabel != null)
             _sourceFilterLabel.text = CollectionPanelText.SourceHeader(model.ActiveType);
-
-        if (
-            _searchField != null
-            && !string.Equals(_searchField.value, model.Search, StringComparison.Ordinal)
-        )
-            _searchField.SetValueWithoutNotify(model.Search);
-        RefreshSearchPlaceholder(model.Search);
 
         UpdateContentSpacerHeight(model.ContentHeight);
 

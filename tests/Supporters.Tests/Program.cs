@@ -7,6 +7,8 @@ TestTierWeightsSelectDefaultBronzeSilverAndGoldBuckets();
 TestTierBucketSelectionUsesUniformIndexRanges();
 TestSampleManyReturnsDistinctSupporters();
 TestSampleManyRotatesThroughEverySupporterBeforeRepeating();
+TestSampleManyDispersesLongNamesAcrossAttributionWindows();
+TestSampleManyLongNameDispersalKeepsFullRotation();
 TestSupportedByPrefixAndSuffix();
 TestSponsorActionText();
 TestSponsorLinks();
@@ -77,22 +79,22 @@ static void TestTierWeightsSelectDefaultBronzeSilverAndGoldBuckets()
     AssertEqual(
         "Default",
         BPPSupporterSampler.Sample(entries, Rolls(0f, 0f)).Name,
-        "The default tier occupies the first 1/12 of the tier roll."
+        "The default tier occupies the first 1/15 of the tier roll."
     );
     AssertEqual(
         "Bronze",
-        BPPSupporterSampler.Sample(entries, Rolls(1f / 12f + 0.001f, 0f)).Name,
-        "Tier 2 should be selected after the default 1/12 range."
+        BPPSupporterSampler.Sample(entries, Rolls(1f / 15f + 0.001f, 0f)).Name,
+        "Tier 2 should be selected after the default 1/15 range."
     );
     AssertEqual(
         "Silver",
-        BPPSupporterSampler.Sample(entries, Rolls(3f / 12f + 0.001f, 0f)).Name,
+        BPPSupporterSampler.Sample(entries, Rolls(3f / 15f + 0.001f, 0f)).Name,
         "Tier 3 should be selected after the default plus tier-2 ranges."
     );
     AssertEqual(
         "Gold",
-        BPPSupporterSampler.Sample(entries, Rolls(6f / 12f + 0.001f, 0f)).Name,
-        "Tier 4 should receive the final 6/12 range."
+        BPPSupporterSampler.Sample(entries, Rolls(6f / 15f + 0.001f, 0f)).Name,
+        "Tier 4 should receive the final 9/15 range."
     );
 }
 
@@ -169,6 +171,42 @@ static void TestSampleManyRotatesThroughEverySupporterBeforeRepeating()
     );
 }
 
+static void TestSampleManyDispersesLongNamesAcrossAttributionWindows()
+{
+    var entries = LongNameWindowEntries();
+    const int rowSize = 4;
+
+    for (var startIndex = 0; startIndex <= entries.Length - rowSize; startIndex++)
+    {
+        var samples = BPPSupporterSampler.SampleMany(entries, rowSize, startIndex, shuffleSeed: 0);
+
+        AssertEqual(
+            rowSize,
+            samples.Count,
+            "Long-name dispersal should still fill the attribution row when enough short names exist."
+        );
+        AssertTrue(
+            samples.Count(sample => IsLongSupporterName(sample.Name)) <= 1,
+            $"Attribution window starting at {startIndex} should include at most one long supporter name."
+        );
+    }
+}
+
+static void TestSampleManyLongNameDispersalKeepsFullRotation()
+{
+    var entries = LongNameWindowEntries();
+    var first = BPPSupporterSampler.SampleMany(entries, 4, startIndex: 0, shuffleSeed: 0);
+    var second = BPPSupporterSampler.SampleMany(entries, 4, startIndex: 4, shuffleSeed: 0);
+    var third = BPPSupporterSampler.SampleMany(entries, 4, startIndex: 8, shuffleSeed: 0);
+    var names = first.Concat(second).Concat(third).Select(sample => sample.Name).ToList();
+
+    AssertEqual(
+        entries.Length,
+        names.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+        "Long-name dispersal should keep the shuffled-bag rotation contract intact."
+    );
+}
+
 static void TestSupportedByPrefixAndSuffix()
 {
     AssertEqual(
@@ -241,6 +279,25 @@ static void TestSponsorLinks()
 }
 
 static BPPSupporterEntry Entry(string name, int tier) => new() { Name = name, Tier = tier };
+
+static BPPSupporterEntry[] LongNameWindowEntries() =>
+    new[]
+    {
+        Entry("Alexandria", 4),
+        Entry("Bob", 3),
+        Entry("Cleo", 2),
+        Entry("Dominique", 4),
+        Entry("Eli", 1),
+        Entry("Fay", 4),
+        Entry("Gus", 3),
+        Entry("Hiro", 2),
+        Entry("Isabella", 4),
+        Entry("Jay", 1),
+        Entry("Kai", 4),
+        Entry("Lia", 3),
+    };
+
+static bool IsLongSupporterName(string name) => name.Trim().Length > 7;
 
 static Func<float> Rolls(params float[] values)
 {

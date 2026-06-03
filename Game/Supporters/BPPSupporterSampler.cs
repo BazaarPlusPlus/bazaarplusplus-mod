@@ -7,6 +7,9 @@ namespace BazaarPlusPlus.Game.Supporters;
 
 internal static class BPPSupporterSampler
 {
+    private const int AttributionRowWindow = 4;
+    private const int LongNameCharThreshold = 7;
+
     internal static IReadOnlyList<BPPSupporterSample> SampleMany(
         IReadOnlyList<BPPSupporterEntry> entries,
         int count,
@@ -83,7 +86,7 @@ internal static class BPPSupporterSampler
     {
         return tier switch
         {
-            4 => 6,
+            4 => 9,
             3 => 3,
             2 => 2,
             _ => 1,
@@ -106,10 +109,61 @@ internal static class BPPSupporterSampler
                 unique[name] = new BPPSupporterEntry { Name = name, Tier = entry.Tier };
         }
 
-        return unique
+        var shuffled = unique
             .Values.OrderBy(entry => StableHash(entry.Name, entry.Tier, shuffleSeed))
             .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        return DisperseLongNames(shuffled);
+    }
+
+    private static IReadOnlyList<BPPSupporterEntry> DisperseLongNames(
+        IReadOnlyList<BPPSupporterEntry> entries
+    )
+    {
+        if (entries.Count <= AttributionRowWindow)
+            return entries;
+
+        var longNames = new List<BPPSupporterEntry>();
+        var shortNames = new Queue<BPPSupporterEntry>();
+        foreach (var entry in entries)
+        {
+            if (IsLongAttributionName(entry))
+                longNames.Add(entry);
+            else
+                shortNames.Enqueue(entry);
+        }
+
+        if (longNames.Count <= 1)
+            return entries;
+
+        var arranged = new BPPSupporterEntry?[entries.Count];
+        if (longNames.Count <= entries.Count / AttributionRowWindow)
+        {
+            for (var index = 0; index < longNames.Count; index++)
+                arranged[index * AttributionRowWindow] = longNames[index];
+        }
+        else
+        {
+            for (var index = 0; index < longNames.Count; index++)
+            {
+                var slot = Math.Min(
+                    entries.Count - 1,
+                    (int)Math.Floor(index * (double)entries.Count / longNames.Count)
+                );
+                while (arranged[slot] != null)
+                    slot = (slot + 1) % entries.Count;
+                arranged[slot] = longNames[index];
+            }
+        }
+
+        for (var index = 0; index < arranged.Length; index++)
+        {
+            if (arranged[index] == null && shortNames.Count > 0)
+                arranged[index] = shortNames.Dequeue();
+        }
+
+        return arranged.Select(entry => entry!).ToList();
     }
 
     private static int PositiveModulo(int value, int divisor)
@@ -130,6 +184,9 @@ internal static class BPPSupporterSampler
             return hash;
         }
     }
+
+    private static bool IsLongAttributionName(BPPSupporterEntry entry) =>
+        entry.Name.Trim().Length > LongNameCharThreshold;
 
     private static uint Mix(uint hash, uint value)
     {
