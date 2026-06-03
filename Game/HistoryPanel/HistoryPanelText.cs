@@ -3,8 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using BazaarPlusPlus.Game.Settings;
-using TheBazaar;
+using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -391,7 +390,7 @@ internal static class HistoryPanelText
 
     internal static string BoardSummary(int items, int skills)
     {
-        var languageCode = GetLanguageCode();
+        var languageCode = L.CurrentLanguageCode;
         if (LanguageCodeMatcher.IsChinese(languageCode))
             return ResolveChinese(
                 $"{items} 物品 · {skills} 技能",
@@ -404,7 +403,7 @@ internal static class HistoryPanelText
 
     internal static string RunRecord(int wins, int losses)
     {
-        var languageCode = GetLanguageCode();
+        var languageCode = L.CurrentLanguageCode;
         if (LanguageCodeMatcher.IsChinese(languageCode))
             return ResolveChinese(
                 $"{wins}胜 - {losses}负",
@@ -424,7 +423,7 @@ internal static class HistoryPanelText
         if (string.Equals(normalized, "Legendary", StringComparison.OrdinalIgnoreCase))
             return rating?.ToString() ?? FormatSimple("LEG", "传说", "傳說", "傳說");
 
-        if (LanguageCodeMatcher.IsChinese(GetLanguageCode()))
+        if (LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode))
         {
             return normalized switch
             {
@@ -441,7 +440,7 @@ internal static class HistoryPanelText
 
     internal static string RunWins(int count)
     {
-        var languageCode = GetLanguageCode();
+        var languageCode = L.CurrentLanguageCode;
         if (LanguageCodeMatcher.IsChinese(languageCode))
             return ResolveChinese($"{count} 胜", $"{count} 勝", $"{count} 勝");
 
@@ -450,7 +449,7 @@ internal static class HistoryPanelText
 
     internal static string PlayerHeroPill(string shortCode)
     {
-        var languageCode = GetLanguageCode();
+        var languageCode = L.CurrentLanguageCode;
         if (LanguageCodeMatcher.IsChinese(languageCode))
             return ResolveChinese($"我方 {shortCode}", $"我方 {shortCode}", $"我方 {shortCode}");
 
@@ -464,7 +463,7 @@ internal static class HistoryPanelText
         string opponentLevel
     )
     {
-        var languageCode = GetLanguageCode();
+        var languageCode = L.CurrentLanguageCode;
         if (LanguageCodeMatcher.IsChinese(languageCode))
         {
             return ResolveChinese(
@@ -484,7 +483,7 @@ internal static class HistoryPanelText
         int opponentSkills
     )
     {
-        var languageCode = GetLanguageCode();
+        var languageCode = L.CurrentLanguageCode;
         if (LanguageCodeMatcher.IsChinese(languageCode))
         {
             return ResolveChinese(
@@ -830,7 +829,7 @@ internal static class HistoryPanelText
 
     internal static string FontAtlasSample()
     {
-        var languageCode = GetLanguageCode();
+        var languageCode = L.CurrentLanguageCode;
         if (FontAtlasSampleCache.TryGetValue(languageCode, out var cachedSample))
             return cachedSample;
 
@@ -847,7 +846,7 @@ internal static class HistoryPanelText
             if (field.GetValue(null) is not LocalizedTextSet set)
                 continue;
 
-            var resolved = set.Resolve(languageCode);
+            var resolved = set.Resolve(languageCode, L.CurrentMode);
             if (!string.IsNullOrWhiteSpace(resolved))
                 parts.Add(resolved);
         }
@@ -887,11 +886,11 @@ internal static class HistoryPanelText
         );
     }
 
-    private static string Resolve(LocalizedTextSet set) => set.Resolve(GetLanguageCode());
+    private static string Resolve(LocalizedTextSet set) => L.Resolve(set);
 
     private static string FormatCount(int count, string noun)
     {
-        var languageCode = GetLanguageCode();
+        var languageCode = L.CurrentLanguageCode;
         if (LanguageCodeMatcher.IsChinese(languageCode))
             return $"{noun} {count}";
 
@@ -910,13 +909,14 @@ internal static class HistoryPanelText
         string? chineseHongKong
     )
     {
-        var languageCode = GetLanguageCode();
+        var languageCode = L.CurrentLanguageCode;
         if (LanguageCodeMatcher.IsChinese(languageCode))
         {
-            return BppChineseLocalization.ResolveChineseText(
+            return ChineseScriptConverter.Convert(
                 chineseMainland,
                 chineseTaiwan,
-                chineseHongKong
+                chineseHongKong,
+                L.CurrentMode
             );
         }
 
@@ -929,27 +929,16 @@ internal static class HistoryPanelText
         string? chineseHongKong
     )
     {
-        return BppChineseLocalization.ResolveChineseText(
+        return ChineseScriptConverter.Convert(
             chineseMainland,
             chineseTaiwan,
-            chineseHongKong
+            chineseHongKong,
+            L.CurrentMode
         );
     }
 
     private static string Pluralize(int count, string singular, string plural)
     {
         return count == 1 ? singular : plural;
-    }
-
-    private static string GetLanguageCode()
-    {
-        try
-        {
-            return PlayerPreferences.Data.LanguageCode ?? string.Empty;
-        }
-        catch
-        {
-            return string.Empty;
-        }
     }
 }

@@ -13,4 +13,8 @@
     <Compile Include="Program.cs" />
     <EmbeddedResource Include="Resources/embedded-font-test.txt" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../BazaarPlusPlus.Localization.csproj" />
+  </ItemGroup>
 </Project>

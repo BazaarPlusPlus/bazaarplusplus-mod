@@ -1,23 +1,11 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarPlusPlus.Core.Config;
 
-namespace BazaarPlusPlus.Game.Settings;
+namespace BazaarPlusPlus.Localization;
 
-internal static class BppChineseLocalization
+internal static class ChineseScriptConverter
 {
-    private static IBppConfig? _config;
-
-    public static void Install(IBppConfig config) =>
-        _config = config ?? throw new ArgumentNullException(nameof(config));
-
-    private static IBppConfig Config =>
-        _config
-        ?? throw new InvalidOperationException(
-            "BppChineseLocalization.Install must be called at startup."
-        );
-
     private static readonly Dictionary<char, string> TraditionalCharacterMap = new()
     {
         ['与'] = "與",
@@ -460,11 +448,6 @@ internal static class BppChineseLocalization
         ['龙'] = "龍",
     };
 
-    internal static BppChineseLocaleMode GetCurrentMode()
-    {
-        return Config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland;
-    }
-
     internal static BppChineseLocaleMode GetNextMode(BppChineseLocaleMode mode)
     {
         return mode switch
@@ -475,12 +458,7 @@ internal static class BppChineseLocalization
         };
     }
 
-    internal static string ResolveChineseText(string mainland, string? taiwan, string? hongKong)
-    {
-        return ResolveChineseText(mainland, taiwan, hongKong, GetCurrentMode());
-    }
-
-    internal static string ResolveChineseText(
+    internal static string Convert(
         string mainland,
         string? taiwan,
         string? hongKong,

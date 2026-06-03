@@ -2,6 +2,7 @@
 using System;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.Settings;
 
@@ -23,7 +24,7 @@ internal sealed class ChineseLocaleModeSettingsDockEntry : ISettingsDockEntry
         return new(
             "ChineseLocaleMode",
             ResolveChineseLocaleModeLabel,
-            _ => BppChineseLocalization.ResolveModeStatus(ReadChineseLocaleMode()),
+            _ => ChineseScriptConverter.ResolveModeStatus(ReadChineseLocaleMode()),
             IsChineseLocaleOverrideActive,
             CycleChineseLocaleMode,
             collapseAfterActivate: false
@@ -38,7 +39,7 @@ internal sealed class ChineseLocaleModeSettingsDockEntry : ISettingsDockEntry
 
     private static string ResolveChineseLocaleModeLabel(string languageCode)
     {
-        return new LocalizedTextSet("Chinese Locale", "中文模式").Resolve(languageCode);
+        return L.Resolve(new LocalizedTextSet("Chinese Locale", "中文模式"));
     }
 
     private BppChineseLocaleMode ReadChineseLocaleMode()
@@ -50,7 +51,7 @@ internal sealed class ChineseLocaleModeSettingsDockEntry : ISettingsDockEntry
     {
         var config = Config.ChineseLocaleModeConfig;
         if (config != null)
-            config.Value = BppChineseLocalization.GetNextMode(config.Value);
+            config.Value = ChineseScriptConverter.GetNextMode(config.Value);
 
         _eventBus.Publish(new ChineseLocaleModeChanged());
     }

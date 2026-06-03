@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.Settings;
 

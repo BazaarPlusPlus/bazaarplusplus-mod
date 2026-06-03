@@ -3,6 +3,7 @@
 using System;
 using System.Linq;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Localization;
 using HarmonyLib;
 using TheBazaar.UI;
 using TMPro;
@@ -42,7 +43,7 @@ internal static class NativeKeybindLabelAwakePatch
             if (label == null)
                 continue;
 
-            label.text = ResolveMonsterPreviewLabel(PlayerPreferences.Data.LanguageCode);
+            label.text = ResolveMonsterPreviewLabel();
         }
     }
 
@@ -80,9 +81,9 @@ internal static class NativeKeybindLabelAwakePatch
             );
     }
 
-    private static string ResolveMonsterPreviewLabel(string languageCode)
+    private static string ResolveMonsterPreviewLabel()
     {
-        return MonsterPreviewLabel.Resolve(languageCode);
+        return L.Resolve(MonsterPreviewLabel);
     }
 }
 

@@ -1,5 +1,5 @@
 #nullable enable
-using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.Supporters;
 

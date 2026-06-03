@@ -24,9 +24,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\BazaarPlusPlus.Localization.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\..\Infrastructure\UiSuppressionScope.cs" Link="UiSuppressionScope.cs" />
-    <Compile Include="..\..\Game\Settings\LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
-    <Compile Include="..\..\Game\Settings\LocalizedTextSet.cs" Link="LocalizedTextSet.cs" />
     <Compile
       Include="..\..\Game\Settings\SettingsMenuToggleBridge.cs"
       Link="SettingsMenuToggleBridge.cs"
@@ -34,10 +36,6 @@
     <Compile
       Include="..\..\Game\Settings\BppSettingsDockDefinition.cs"
       Link="BppSettingsDockDefinition.cs"
-    />
-    <Compile
-      Include="..\..\Game\Settings\SimplifiedChineseLanguage.cs"
-      Link="SimplifiedChineseLanguage.cs"
     />
     <Compile
       Include="..\..\Game\CombatStatusBar\CombatStatusBar.SettingsMenuBridge.cs"

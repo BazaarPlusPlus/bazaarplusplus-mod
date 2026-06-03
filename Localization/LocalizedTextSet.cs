@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 
-namespace BazaarPlusPlus.Game.Settings;
+namespace BazaarPlusPlus.Localization;
 
 internal readonly struct LocalizedTextSet
 {
@@ -73,14 +73,15 @@ internal readonly struct LocalizedTextSet
 
     internal string Italian { get; }
 
-    internal string Resolve(string languageCode)
+    internal string Resolve(string languageCode, BppChineseLocaleMode mode)
     {
         if (LanguageCodeMatcher.IsChinese(languageCode))
         {
-            return BppChineseLocalization.ResolveChineseText(
+            return ChineseScriptConverter.Convert(
                 ChineseMainland,
                 ChineseTaiwan,
-                ChineseHongKong
+                ChineseHongKong,
+                mode
             );
         }
 

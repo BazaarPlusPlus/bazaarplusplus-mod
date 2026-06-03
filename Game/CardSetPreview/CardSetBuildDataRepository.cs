@@ -10,6 +10,7 @@ using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Localization;
 using BazaarPlusPlus.ModApi.Http;
 using Newtonsoft.Json;
 using TheBazaar;
@@ -600,7 +601,7 @@ internal sealed class CardSetBuildDataRepository
 
     private static string ResolveFinalBuildLabel()
     {
-        return FinalBuildLabel.Resolve(PlayerPreferences.Data?.LanguageCode ?? string.Empty);
+        return L.Resolve(FinalBuildLabel);
     }
 
     private sealed class FinalBuildRoot

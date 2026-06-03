@@ -22,4 +22,9 @@
     <BaseIntermediateOutputPath>obj\AutoBazaar\</BaseIntermediateOutputPath>
     <BaseOutputPath>bin\AutoBazaar\</BaseOutputPath>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.Localization'">
+    <BaseIntermediateOutputPath>obj\Localization\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\Localization\</BaseOutputPath>
+  </PropertyGroup>
 </Project>

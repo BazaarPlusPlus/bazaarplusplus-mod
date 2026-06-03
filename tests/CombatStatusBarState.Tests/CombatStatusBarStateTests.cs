@@ -292,6 +292,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
         string expected
     )
     {
+        LocalizationTestHost.Install(languageCode);
         var result = CombatStatusBarSettingsMenuLabel.Resolve(languageCode);
 
         Assert.Equal(expected, result);
@@ -327,6 +328,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
         string expected
     )
     {
+        LocalizationTestHost.Install(languageCode);
         var result = NameOverrideSettingsMenuLabel.Resolve(languageCode);
 
         Assert.Equal(expected, result);
@@ -342,6 +344,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
         string expected
     )
     {
+        LocalizationTestHost.Install(languageCode);
         var result = EnchantPreviewSettingsMenuLabel.Resolve(languageCode);
 
         Assert.Equal(expected, result);

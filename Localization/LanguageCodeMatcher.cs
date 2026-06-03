@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 
-namespace BazaarPlusPlus.Game.Settings;
+namespace BazaarPlusPlus.Localization;
 
 internal static class LanguageCodeMatcher
 {
@@ -17,9 +17,6 @@ internal static class LanguageCodeMatcher
             "zh-HK",
             "zh-MO"
         );
-
-    internal static bool IsSimplifiedChinese(string languageCode) =>
-        Matches(languageCode, "zh-CN", "zh-Hans", "zh-SG");
 
     internal static bool IsGerman(string languageCode) =>
         Matches(languageCode, "de", "de-DE", "de-AT", "de-CH");

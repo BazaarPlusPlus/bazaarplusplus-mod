@@ -8,6 +8,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Localization;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -420,34 +421,31 @@ internal sealed class CardSetPreviewRuntime : MonoBehaviour
 
     private static string GetDisplayModeLabel(CardSetBuildRecommendationMode mode)
     {
-        var languageCode = PlayerPreferences.Data?.LanguageCode ?? string.Empty;
         return mode switch
         {
-            CardSetBuildRecommendationMode.FinalBuild => FinalBuildLabel.Resolve(languageCode),
-            _ => SelectedSetLabel.Resolve(languageCode),
+            CardSetBuildRecommendationMode.FinalBuild => L.Resolve(FinalBuildLabel),
+            _ => L.Resolve(SelectedSetLabel),
         };
     }
 
     private static string ResolveNoMatchLabel()
     {
-        return NoMatchLabel.Resolve(PlayerPreferences.Data?.LanguageCode ?? string.Empty);
+        return L.Resolve(NoMatchLabel);
     }
 
     private static string ResolveCandidateLabel()
     {
-        return CandidateLabel.Resolve(PlayerPreferences.Data?.LanguageCode ?? string.Empty);
+        return L.Resolve(CandidateLabel);
     }
 
     private static string ResolveNoCandidateWarningLabel()
     {
-        return NoCandidateWarningLabel.Resolve(
-            PlayerPreferences.Data?.LanguageCode ?? string.Empty
-        );
+        return L.Resolve(NoCandidateWarningLabel);
     }
 
     private static string ResolveDataFromLabel()
     {
-        return DataFromLabel.Resolve(PlayerPreferences.Data?.LanguageCode ?? string.Empty);
+        return L.Resolve(DataFromLabel);
     }
 
     private bool TryAdd(SelectedCardEntry entry)

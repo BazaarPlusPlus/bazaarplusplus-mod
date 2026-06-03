@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.LegendaryPosition;
 
@@ -44,7 +45,7 @@ internal sealed class LegendaryPositionSettingsDockEntry : ISettingsDockEntry
 
     private static string ResolveStatus(LegendaryPositionDisplayMode mode, string languageCode)
     {
-        if (BazaarPlusPlus.Game.Settings.LanguageCodeMatcher.IsChinese(languageCode))
+        if (LanguageCodeMatcher.IsChinese(languageCode))
         {
             return mode switch
             {

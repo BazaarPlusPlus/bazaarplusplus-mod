@@ -55,6 +55,9 @@
     <Compile Remove="AutoBazaar/**" />
     <EmbeddedResource Remove="AutoBazaar/**" />
     <None Remove="AutoBazaar/**" />
+    <Compile Remove="Localization/**" />
+    <EmbeddedResource Remove="Localization/**" />
+    <None Remove="Localization/**" />
     <Compile Remove="Game/AutoBazaarHost/**" />
     <EmbeddedResource Remove="Game/AutoBazaarHost/**" />
     <None Remove="Game/AutoBazaarHost/**" />
@@ -140,6 +143,7 @@
   <ItemGroup>
     <ProjectReference Include="BazaarPlusPlus.ModApi.csproj" />
     <ProjectReference Include="BazaarPlusPlus.Storage.csproj" />
+    <ProjectReference Include="BazaarPlusPlus.Localization.csproj" />
     <ProjectReference
       Include="BazaarPlusPlus.AutoBazaar.csproj"
       Condition="'$(EnableAutoBazaarHost)' == 'true'"
@@ -222,6 +226,7 @@
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\libBppMacAudio.dylib" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.ModApi.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.Storage.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.Localization.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.AutoBazaar.dll" />
     </ItemGroup>
     <ItemGroup>
@@ -233,6 +238,7 @@
       <MacAudioTapNativeFile Include="$(FixedMacAudioTapNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.ModApi.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.Localization.dll" />
       <PluginManagedRuntimeFiles
         Include="$(TargetDir)BazaarPlusPlus.Storage.dll"
         Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')"
@@ -310,6 +316,7 @@
       <MacAudioTapNativeFile Include="$(FixedMacAudioTapNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.ModApi.dll" />
+      <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.Localization.dll" />
       <PluginManagedRuntimeFiles
         Include="$(TargetDir)BazaarPlusPlus.Storage.dll"
         Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')"

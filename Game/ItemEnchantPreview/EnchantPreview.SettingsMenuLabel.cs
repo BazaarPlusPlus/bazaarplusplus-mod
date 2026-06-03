@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
@@ -16,6 +17,6 @@ internal static class EnchantPreviewSettingsMenuLabel
 
     internal static string Resolve(string languageCode)
     {
-        return Labels.Resolve(languageCode);
+        return Labels.Resolve(languageCode, L.CurrentMode);
     }
 }

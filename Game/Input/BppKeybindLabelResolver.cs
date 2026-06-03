@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.Input;
 
@@ -45,19 +46,25 @@ internal static class BppKeybindLabelResolver
     {
         return actionId switch
         {
-            BppHotkeyActionId.HoldEnchantPreview => EnchantPreviewLabel.Resolve(languageCode),
-            BppHotkeyActionId.HoldUpgradePreview => UpgradePreviewLabel.Resolve(languageCode),
+            BppHotkeyActionId.HoldEnchantPreview => EnchantPreviewLabel.Resolve(
+                languageCode,
+                L.CurrentMode
+            ),
+            BppHotkeyActionId.HoldUpgradePreview => UpgradePreviewLabel.Resolve(
+                languageCode,
+                L.CurrentMode
+            ),
             _ => actionId.ToString(),
         };
     }
 
     internal static string ResolveRebindPrompt(string languageCode)
     {
-        return RebindPrompt.Resolve(languageCode);
+        return RebindPrompt.Resolve(languageCode, L.CurrentMode);
     }
 
     internal static string ResolveUnsupportedKey(string languageCode)
     {
-        return UnsupportedKey.Resolve(languageCode);
+        return UnsupportedKey.Resolve(languageCode, L.CurrentMode);
     }
 }

@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -43,21 +44,21 @@ internal static class HistoryPanelSettingsMenuLabel
 
     internal static string Resolve(string languageCode)
     {
-        return Labels.Resolve(languageCode);
+        return Labels.Resolve(languageCode, L.CurrentMode);
     }
 
     internal static string ResolveOpenStatus(string languageCode)
     {
-        return OpenStatuses.Resolve(languageCode);
+        return OpenStatuses.Resolve(languageCode, L.CurrentMode);
     }
 
     internal static string ResolveViewStatus(string languageCode)
     {
-        return ViewStatuses.Resolve(languageCode);
+        return ViewStatuses.Resolve(languageCode, L.CurrentMode);
     }
 
     internal static string ResolveInRunStatus(string languageCode)
     {
-        return InRunStatuses.Resolve(languageCode);
+        return InRunStatuses.Resolve(languageCode, L.CurrentMode);
     }
 }

@@ -28,7 +28,10 @@
       Include="../../Game/Supporters/BPPSupporterAttributionText.cs"
       Link="BPPSupporterAttributionText.cs"
     />
-    <Compile Include="../../Game/Settings/LanguageCodeMatcher.cs" Link="LanguageCodeMatcher.cs" />
     <Compile Include="Program.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../BazaarPlusPlus.Localization.csproj" />
   </ItemGroup>
 </Project>

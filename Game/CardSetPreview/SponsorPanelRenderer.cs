@@ -3,6 +3,7 @@ using System;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
+using BazaarPlusPlus.Localization;
 using TheBazaar;
 using TMPro;
 using UnityEngine;

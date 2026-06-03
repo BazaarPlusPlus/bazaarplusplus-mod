@@ -1,5 +1,6 @@
 #nullable enable
-namespace BazaarPlusPlus.Core.Config;
+
+namespace BazaarPlusPlus.Localization;
 
 internal enum BppChineseLocaleMode
 {

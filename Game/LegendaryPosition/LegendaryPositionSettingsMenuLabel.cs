@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.LegendaryPosition;
 
@@ -14,6 +15,6 @@ internal static class LegendaryPositionSettingsMenuLabel
 
     internal static string Resolve(string languageCode)
     {
-        return Labels.Resolve(languageCode);
+        return Labels.Resolve(languageCode, L.CurrentMode);
     }
 }

@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarPlusPlus.Localization;
 using BepInEx.Configuration;
 
 namespace BazaarPlusPlus.Core.Config;

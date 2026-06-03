@@ -9,7 +9,9 @@ using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Localization;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Http;
@@ -103,7 +105,7 @@ public class Plugin : BaseUnityPlugin
     )
     {
         LegendaryPositionDisplayFormatter.Install(services.Config);
-        BppChineseLocalization.Install(services.Config);
+        L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config));
         BppSettingsDockCatalog.Install(services.Config, settingsDockRegistry);
         BppHotkeyService.Install(services.Config);
         RunLoggingGameDataReader.Install(services.RunContext);
