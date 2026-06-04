@@ -261,8 +261,17 @@ CREATE INDEX IF NOT EXISTS idx_battles_replay_dirty
 CREATE INDEX IF NOT EXISTS idx_run_sync_state_dirty
     ON run_sync_state(dirty, last_attempt_at_utc);
 
+CREATE INDEX IF NOT EXISTS idx_run_sync_state_dirty_retry
+    ON run_sync_state(dirty, retry_count, last_attempt_at_utc, run_id);
+
+CREATE INDEX IF NOT EXISTS idx_battles_source_run_recorded
+    ON battles(source, run_id, recorded_at_utc ASC, battle_id ASC);
+
 CREATE INDEX IF NOT EXISTS idx_run_screenshots_run_id_captured_at_utc
     ON run_screenshots(run_id, captured_at_utc DESC);
+
+CREATE INDEX IF NOT EXISTS idx_run_screenshots_source_captured
+    ON run_screenshots(capture_source, captured_at_utc ASC, screenshot_id ASC);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
     ON run_screenshots(run_id)
@@ -275,15 +284,15 @@ CREATE INDEX IF NOT EXISTS idx_bazaardb_snapshot_uploads_status
     ON bazaardb_snapshot_uploads(status);
 ```
 
-## V4 Upload Payload Model
+## V5 Run Bundle Upload Payload Model
 
-The upload request has three layers:
+The V5 run-bundle upload is multipart and has three logical layers:
 
-- `artifact_bytes`: gzip-compressed MessagePack blob, content type `application/x-bpp-runbundle+msgpack+gzip`
-- `run_projection`: queryable run summary
-- `battle_projections[]`: queryable battle metadata
+- `metadata` part: JSON with `schema_version = 5`, `player_account_id`, `submitted_at_utc`, `artifact_codec`, `run_projection`, and `battle_projections[]`
+- `artifact` part: raw gzip-compressed MessagePack blob, content type `application/x-bpp-runbundle+msgpack+gzip`
+- local upload queues: `run_sync_state` and `bazaardb_snapshot_uploads` drive background retries
 
-`artifact_bytes` stores the raw replay payloads and card-set snapshots inside R2. D1 stores only metadata and query projections. Current V4 run-bundle uploads use top-level `battle_projections[]` for battle metadata and do not carry a final-battle marker.
+R2 stores the raw artifact bytes. D1 stores only metadata and query projections. Current V5 run-bundle uploads use top-level `battle_projections[]` for battle metadata and do not carry a final-battle marker; the old JSON `artifact_bytes` field is no longer emitted by the mod.
 
 ## V4 Server D1 Schema
 

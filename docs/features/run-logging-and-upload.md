@@ -29,8 +29,8 @@ SQLite 列定义统一见 [sqlite-schema-reference.md](../reference/sqlite-schem
 1. 正常 run logging 持续写入本地 SQLite。
 2. `ReplicatedRunLogStore` 把 `run_sync_state` 标记 dirty；combat replay 落盘后把关联 battle 的 `replay_dirty` 标记 dirty。
 3. `RunUploadController` 在启动延迟后、或 run 退出 / replay 落盘完成后扫描待上传的 completed runs。
-4. `RunBundleUploadStore` 组装 run projection、battle projections 与 gzip MessagePack replay artifact。
-5. `RunBundleUploadService` 编排上传，经 `RunBundleClient` 执行 `POST /run-bundles`（不附鉴权头）。
+4. `RunBundleUploadStore` 组装 metadata（run projection、top-level battle projections）与 gzip MessagePack replay artifact。SQLite run row 会先复制到内存，随后才读取 replay payload 文件，避免在打开 reader 时做文件 IO / 压缩。
+5. `RunBundleUploadService` 编排上传，经 `RunBundleClient` 执行 multipart `POST /run-bundles`（不附鉴权头）：`metadata` part 是 JSON，`artifact` part 是 raw `application/x-bpp-runbundle+msgpack+gzip` bytes。
 6. 服务端写入有效的 top-level `battle_projections[]`；当前 wire 不携带 final-battle 标记。
 7. 上传成功后清除 run 与关联 replay 的 dirty 标记。
 
@@ -41,10 +41,21 @@ ghost 同步与 replay 下载（V4 wire，服务端在独立仓库 `bazaarpluspl
 
 ### 信任模型与安全限制
 
-- 服务端对 mod 侧端点**全部不鉴权**；身份只来自 `POST /run-bundles` body 与 `GET /ghost-battles` query 里的 `player_account_id`。
+- 服务端对 mod 侧端点**全部不鉴权**；身份只来自 `POST /run-bundles` metadata part 与 `GET /ghost-battles` query 里的 `player_account_id`。
 - 服务端全量写入有效的 battle projections；`GET /ghost-battles` 再按 `opponent_account_id` 查询 against-me 列表。
 - `player_account_id` 必填——V3 时代的 `"anonymous-player"` sentinel 已删除；mod 在没拿到本机 account id 时**直接跳过上传**，不再发占位符。
 - replay artifact 和 battle projections 在同一个 D1 batch 后对外可查询；若 D1 batch 失败，服务端会尽力清理已写入的 R2 artifact。
+
+### Run Bundle Wire Contract
+
+`POST /run-bundles` 是 breaking V5 contract，只接受 `multipart/form-data`：
+
+| Part | Content-Type | Purpose |
+|---|---|---|
+| `metadata` | `application/json` | `schema_version = 5`、`player_account_id`、`submitted_at_utc`、`artifact_codec`、`run_projection`、`battle_projections[]` |
+| `artifact` | `application/x-bpp-runbundle+msgpack+gzip` | `RunBundleArtifactCodec.Serialize(...)` 产生的 gzip MessagePack bytes，filename `run-bundle.mpack.gz` |
+
+`battle_projections[]` 仍是服务端 D1 battle query projection 来源；服务端不会解析 artifact 来补 projections。旧 JSON `artifact_bytes` 路径已删除。
 
 ## 关键文件
 

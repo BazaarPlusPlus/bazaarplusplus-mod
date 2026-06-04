@@ -278,12 +278,12 @@ run session header：
 
 | 方法 | 路径/URL | 请求结构 | 响应结构 | 业务 |
 |---|---|---|---|---|
-| POST | `/run-bundles` | `RunBundleUploadRequest`：`SchemaVersion`、`PlayerAccountId`、`SubmittedAtUtc`、`ArtifactCodec`、`ArtifactBytes`、`RunProjection`、`BattleProjections` 等 | success/failure string | 上传 run bundle 和战斗 projection；当前客户端不附加鉴权 header，`PlayerAccountId` 必须由 payload 提供。 |
+| POST | `/run-bundles` | multipart：`metadata` JSON（`SchemaVersion`、`PlayerAccountId`、`SubmittedAtUtc`、`ArtifactCodec`、`RunProjection`、`BattleProjections`）+ `artifact` raw `application/x-bpp-runbundle+msgpack+gzip` bytes | success/failure string | 上传 run bundle 和战斗 projection；当前客户端不附加鉴权 header，`PlayerAccountId` 必须由 metadata 提供。 |
 | GET | `/ghost-battles?player_account_id=<id>&limit=<1..200>` | none | `{ battles: [...] }` -> `GhostBattleImportRecord[]` | 同步“against me”的 ghost battle 列表；`player_account_id` 为空时客户端直接返回 `player_account_id_required`，不会请求网络。 |
 | POST | `/ghost-battles/{battleId}/replay-link` | none | `{ download_url }` | 为 ghost battle 获取 replay 下载链接。现有设计文档说明该 URL 是短 TTL 预签下载链接；客户端只要求响应里存在 `download_url`。 |
 | GET | `download_url` | none | bytes | 下载 replay payload。 |
 | GET | `/health` | none | JSON `{ status, server_time_utc }` | Bazaar++ 服务可用性探测；上传/同步工作前记录 RTT、探测时间和服务端时间戳。 |
-| POST | `/bazaardb/snapshots/<snapshot_id>` | `BazaarDbSnapshotUploadRequest`：snapshot、player、run、image、client | success/failure | 上传 BazaarDB Snapshot DTO；当前客户端不附加鉴权 header；4xx 除 408/429 视作永久失败。 |
+| POST | `/bazaardb/snapshots/<snapshot_id>` | `BazaarDbSnapshotUploadRequest`：snapshot、player、run、image、client；image bytes 由原 PNG 或 `UploadCache` PNG/JPEG derivative 提供，上传 bytes 上限 2 MiB | success/failure | 上传 BazaarDB Snapshot DTO；当前客户端不附加鉴权 header；4xx 除 408/429 视作永久失败。 |
 | POST | `/bazaardb/peek` / `/bazaardb/confirm` | bearer-gated puller protocol | delivery batch / confirmation result | BazaarDB 服务端拉取与确认路径；当前 mod client 不调用。 |
 
 ### Mod 额外远端数据

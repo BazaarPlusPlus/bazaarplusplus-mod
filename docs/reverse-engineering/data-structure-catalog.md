@@ -259,7 +259,7 @@ Snapshot / sim DTO：
 
 | 接口 | DTO | 字段 |
 |---|---|---|
-| `POST /run-bundles` | `RunBundleUploadRequest` | `SchemaVersion`、`PlayerAccountId`、`SubmittedAtUtc`、`ArtifactCodec`、`ArtifactBytes`、`RunProjection`、`BattleProjections` |
+| `POST /run-bundles` | multipart `metadata` (`RunBundleUploadRequest`) + `artifact` (`RunArtifact`) | metadata: `SchemaVersion`、`PlayerAccountId`、`SubmittedAtUtc`、`ArtifactCodec`、`RunProjection`、`BattleProjections`；artifact: gzip-compressed MessagePack bytes |
 | `RunBundleUploadRequest.RunProjection` | `RunProjection` | `RunId`、`Status`、`HeroId`、`HeroName`、`PlayerRank`、`PlayerRating`、`PlayerPosition`、`StartedAtUtc`、`EndedAtUtc`、`FinalDay`、`FinalWins`、`FinalLosses`、`FinalPlayerRank`、`FinalPlayerRating`、`FinalPlayerPosition`、`Battles` |
 | `RunBundleUploadRequest.BattleProjection` | `BattleProjection` | `BattleId`、`RecordedAtUtc`、`RunId`、`Day`、`PlayerName`、`PlayerAccountId`、`PlayerHero`、`PlayerRank`、`PlayerRating`、`PlayerLevel`、`OpponentName`、`OpponentAccountId`、`OpponentHero`、`OpponentRank`、`OpponentRating`、`OpponentLevel`、`Result` |
 | `RunArtifact` | run artifact | `RunId`、`Battles` |
