@@ -6,6 +6,8 @@ namespace BazaarPlusPlus.Core.Config;
 
 internal sealed class BppConfig : IBppConfig
 {
+    internal const PreviewVisibilityMode DefaultEnchantPreviewMode = PreviewVisibilityMode.Always;
+
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
 
     public ConfigEntry<PreviewVisibilityMode>? EnchantPreviewModeConfig { get; private set; }
@@ -39,7 +41,7 @@ internal sealed class BppConfig : IBppConfig
         EnchantPreviewModeConfig = config.Bind(
             "EnchantPreview",
             "Mode",
-            PreviewVisibilityMode.AutoOnPedestalChoice,
+            DefaultEnchantPreviewMode,
             "When to show enchant preview text in item tooltips. Off = hold Ctrl only. AutoOnPedestalChoice = auto-show while an enchant pedestal is offered on the choice screen, hold Ctrl otherwise. Always = append to every eligible tooltip."
         );
         MigrateLegacyEnchantPreviewAlwaysShow(config);

@@ -73,4 +73,23 @@ public class SettingsDockRegistryTests
         Assert.Equal(1, pairs[1].Order);
         Assert.Equal("B", pairs[1].Definition.Key);
     }
+
+    [Theory]
+    [InlineData(0, "zh-CN", "按键显示")]
+    [InlineData(1, "zh-CN", "智能切换")]
+    [InlineData(2, "zh-CN", "常驻显示")]
+    [InlineData(0, "en", "OFF")]
+    [InlineData(1, "en", "AUTO")]
+    [InlineData(2, "en", "ON")]
+    public void ResolvePreviewVisibilityModeStatus_returns_localized_dock_status(
+        int modeValue,
+        string languageCode,
+        string expected
+    )
+    {
+        var mode = (PreviewVisibilityMode)modeValue;
+        var result = BppSettingsDockCatalog.ResolvePreviewVisibilityModeStatus(mode, languageCode);
+
+        Assert.Equal(expected, result);
+    }
 }

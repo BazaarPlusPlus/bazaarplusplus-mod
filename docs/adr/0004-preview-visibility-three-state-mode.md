@@ -2,7 +2,9 @@
 
 > **Update 2026-05-30:** Upgrade preview later reverted to hold-Shift-only — its three-state mode, `UpgradePreviewModeConfig`, and settings-dock entry were removed, because an upgrade preview is an on-demand check rather than a spoiler, so the auto-on-pedestal layer added no value. Enchant preview keeps the three-state mode described below, and additionally now filters the preview to the *specific* enchant type(s) the offered pedestal applies — the per-type filtering called out as out of scope below — taking the union across every enchant pedestal when several are offered at once. The text below records the original decision.
 
-Enchant and upgrade tooltip previews each have an independent three-state visibility mode — `Off` / `AutoOnPedestalChoice` / `Always`, default `AutoOnPedestalChoice` — replacing the old boolean `EnchantPreviewAlwaysShow`. The hold-key (`HoldEnchantPreview` / `HoldUpgradePreview`) remains the manual override in every mode.
+> **Update 2026-06-04:** Fresh installs now default `EnchantPreview / Mode` to `Always`; the original `AutoOnPedestalChoice` mode remains available from the settings dock.
+
+The original decision introduced an independent three-state visibility mode — `Off` / `AutoOnPedestalChoice` / `Always` — to replace the old boolean `EnchantPreviewAlwaysShow`. The hold-key (`HoldEnchantPreview` / `HoldUpgradePreview`) remains the manual override in every mode.
 
 ## Context
 

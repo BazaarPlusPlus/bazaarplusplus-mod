@@ -6,7 +6,7 @@ namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
 internal sealed class BazaarDbSnapshotUploadSettingsDockEntry : ISettingsDockEntry
 {
-    public int Order => 6;
+    public int Order => 7;
 
     public BppSettingsDockDefinition Build(IBppConfig config) =>
         new(

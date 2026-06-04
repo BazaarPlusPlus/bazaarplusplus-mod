@@ -47,10 +47,10 @@ internal static class BppSettingsDockCatalog
         {
             return mode switch
             {
-                PreviewVisibilityMode.Off => "关闭",
-                PreviewVisibilityMode.AutoOnPedestalChoice => "智能",
-                PreviewVisibilityMode.Always => "总是",
-                _ => "智能",
+                PreviewVisibilityMode.Off => "按键显示",
+                PreviewVisibilityMode.AutoOnPedestalChoice => "智能切换",
+                PreviewVisibilityMode.Always => "常驻显示",
+                _ => "智能切换",
             };
         }
 

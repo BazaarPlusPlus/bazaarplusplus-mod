@@ -283,8 +283,8 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("zh-Hans", "战斗状态栏")]
-    [InlineData("zh-CN", "战斗状态栏")]
+    [InlineData("zh-Hans", "战斗状态")]
+    [InlineData("zh-CN", "战斗状态")]
     [InlineData("en", "Combat Status Bar")]
     [InlineData("", "Combat Status Bar")]
     public void SettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(

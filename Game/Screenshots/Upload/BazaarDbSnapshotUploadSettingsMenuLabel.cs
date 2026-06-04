@@ -8,7 +8,7 @@ internal static class BazaarDbSnapshotUploadSettingsMenuLabel
 {
     private static readonly LocalizedTextSet Labels = new(
         "Upload screenshots to BazaarDB",
-        "上传截图到 BazaarDB",
+        "BazaarDB 数据共建",
         "Screenshots zu BazaarDB hochladen",
         "Subir capturas a BazaarDB",
         "스크린샷을 BazaarDB에 업로드",

@@ -62,7 +62,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         if (
             !holdUpgrade
             && !holdEnchant
-            && (enchantMode ?? PreviewVisibilityMode.AutoOnPedestalChoice)
+            && (enchantMode ?? BppConfig.DefaultEnchantPreviewMode)
                 == PreviewVisibilityMode.AutoOnPedestalChoice
         )
         {

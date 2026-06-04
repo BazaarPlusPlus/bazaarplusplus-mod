@@ -49,9 +49,9 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 ### 附魔预览与升级预览（Tooltips）
 
-- **可视性模式**：附魔与升级各有独立的 3 态配置（`Off` / `AutoOnPedestalChoice` / `Always`），默认 `AutoOnPedestalChoice`
-- **自动触发**：在 `ChoiceState` 选择屏遇到对应种类 pedestal 时，hover 物品自动展示匹配的预览；非 pedestal 选项或非 ChoiceState 不会自动触发
-- **手动覆盖**：按住 `HoldEnchantPreview`（默认 Ctrl）/ `HoldUpgradePreview`（默认 Shift）总是显示对应预览，等级最高，覆盖所有模式
+- **可视性模式**：附魔预览有独立的 3 态配置（`Off` / `AutoOnPedestalChoice` / `Always`），默认 `Always`
+- **自动触发**：附魔 `AutoOnPedestalChoice` 模式下，在 `ChoiceState` 选择屏遇到附魔 pedestal 时，hover 物品自动展示附魔预览；非 pedestal 选项或非 ChoiceState 不会自动触发
+- **手动覆盖**：按住 `HoldEnchantPreview`（默认 Ctrl）总是显示附魔预览；升级预览没有可视性模式，只在按住 `HoldUpgradePreview`（默认 Shift）时显示
 - **共享决策**：`TooltipModifierRefreshController`、`ItemEnchantPreviewPatch`、`UpgradePreviewTooltipPatch` 共同调用 `Game/Tooltips/TooltipPreviewModePolicy.Resolve`，保证三处行为一致；模式由 `GameInterop/Encounter/ChoiceScreenPedestalResolver` 从 `RunState.SelectionSet` 推导
 - **迁移**：首次启动会把旧的 `[EnchantPreview] AlwaysShow = true/false` 自动迁移到 `[EnchantPreview] Mode = Always / AutoOnPedestalChoice`，并从配置文件移除旧键
 
@@ -135,8 +135,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | Section / Key | 含义 |
 | --- | --- |
 | `StreamerMode / EnableNameOverride` | Anonymous 显示名 |
-| `EnchantPreview / Mode` | 附魔预览可视性模式：`Off` / `AutoOnPedestalChoice` / `Always`（默认 Auto） |
-| `UpgradePreview / Mode` | 升级预览可视性模式：同上（默认 Auto） |
+| `EnchantPreview / Mode` | 附魔预览可视性模式：`Off` / `AutoOnPedestalChoice` / `Always`（默认 Always） |
 | `CombatStatusBar / Enabled` | 战斗状态条开关 |
 | `CombatStatusBar / SpeedMultiplier` | 默认战斗速度档位 |
 | `Hotkeys / EnchantPreview`, `Hotkeys / UpgradePreview` | 附魔/升级预览按键路径 |

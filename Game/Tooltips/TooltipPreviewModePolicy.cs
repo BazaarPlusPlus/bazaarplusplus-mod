@@ -8,7 +8,7 @@ namespace BazaarPlusPlus.Game.Tooltips;
 
 internal static class TooltipPreviewModePolicy
 {
-    private const PreviewVisibilityMode DefaultMode = PreviewVisibilityMode.AutoOnPedestalChoice;
+    private const PreviewVisibilityMode DefaultMode = BppConfig.DefaultEnchantPreviewMode;
 
     internal static TooltipPreviewMode Resolve(
         IBppConfig? config,

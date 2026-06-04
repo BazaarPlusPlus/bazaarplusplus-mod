@@ -36,7 +36,7 @@ internal abstract class PreviewVisibilityModeDockEntry : ISettingsDockEntry
         );
 
     private PreviewVisibilityMode ReadMode(IBppConfig config) =>
-        GetModeConfig(config)?.Value ?? PreviewVisibilityMode.AutoOnPedestalChoice;
+        GetModeConfig(config)?.Value ?? BppConfig.DefaultEnchantPreviewMode;
 
     private bool IsOverrideActive(IBppConfig config) =>
         ReadMode(config) != PreviewVisibilityMode.Off;
