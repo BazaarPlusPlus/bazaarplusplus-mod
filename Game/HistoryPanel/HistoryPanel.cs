@@ -3,10 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
-using BazaarPlusPlus.Game.HistoryPanel.Preview;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using UnityEngine;
@@ -20,6 +21,8 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed partial class HistoryPanel : MonoBehaviour
 {
     private const string ToggleHistoryPanelBindingPath = "<Keyboard>/f8";
+    private const string OverlayPanelId = "HistoryPanel";
+    private const int OverlaySortingBand = 27;
     private static readonly HashSet<string> UiDiagnosticScenes = new(StringComparer.Ordinal)
     {
         "CollectionUIScene",
@@ -35,7 +38,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private HistoryPanelDataService _dataService = null!;
     private HistoryPanelReplayService _replayService = null!;
     private HistoryPanelPreviewSource? _previewSource;
-    private BattleBoardPreview? _battleBoardPreview;
+    private BppItemBoardPreview? _battleBoardPreview;
     private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
@@ -153,6 +156,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (ReferenceEquals(Instance, this))
             Instance = null;
 
+        BppOverlayPanelMutex.Unregister(OverlayPanelId);
         _coordinator?.Dispose();
         DisposePreviewRenderer();
         _dependencies = null;
@@ -197,6 +201,9 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private void SetHistoryVisible(bool visible)
     {
         var wasVisible = IsVisible;
+        if (visible && !wasVisible)
+            BppOverlayPanelMutex.CloseOthers(OverlayPanelId, OverlaySortingBand);
+
         if (visible)
             EnsureUi();
 
@@ -312,24 +319,24 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             _battles
         );
         _previewCoroutine = StartCoroutine(
-            _battleBoardPreview.Render(previewData.Items, previewData.Signature, OnPreviewPhase)
+            _battleBoardPreview.Render(previewData.Board, OnPreviewPhase)
         );
     }
 
-    private void OnPreviewPhase(BattleBoardRenderPhase phase)
+    private void OnPreviewPhase(ItemBoardPreviewPhase phase)
     {
         switch (phase)
         {
-            case BattleBoardRenderPhase.Empty:
+            case ItemBoardPreviewPhase.Empty:
                 SetPreviewStatus(HistoryPanelText.NoLocallyRenderableCards(), true);
                 break;
-            case BattleBoardRenderPhase.InitFailed:
+            case ItemBoardPreviewPhase.InitFailed:
                 SetPreviewStatus(HistoryPanelText.PreviewRendererInitFailed(), true);
                 break;
-            case BattleBoardRenderPhase.Loading:
+            case ItemBoardPreviewPhase.Loading:
                 SetPreviewStatus(HistoryPanelText.LoadingPreview(), true);
                 break;
-            case BattleBoardRenderPhase.Done:
+            case ItemBoardPreviewPhase.Done:
                 SetPreviewStatus(null, false);
                 break;
         }
@@ -348,14 +355,23 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void EnsurePreviewRenderer()
     {
-        _battleBoardPreview ??= new BattleBoardPreview();
+        _battleBoardPreview ??= new BppItemBoardPreview(
+            new ItemBoardPreviewOptions
+            {
+                Layer = 30,
+                SortingOrder = 27,
+                LayoutMode = ItemBoardPreviewLayoutMode.Socketed,
+                ShowHover = true,
+                LogComponent = "HistoryPanelPreview",
+            }
+        );
         if (_hasPreviewContainerBounds)
             ApplyPreviewContainerBounds(_previewContainerBounds);
     }
 
-    // Translates a screen-space UI Toolkit container Rect into the three BattleBoardPreview
+    // Translates a screen-space UI Toolkit container Rect into the three item-board preview
     // knobs: position (bottom-left of the overlay clip), clip size, and an auto-fit card scale
-    // that fits the 2400x600 native board into the available area. The container Rect already
+    // that fits the native board into the available area. The container Rect already
     // arrives in physical pixels (the view scales worldBound by scaledPixelsPerPoint), so this
     // is a direct mapping with no resolution-dependent fudge factor. Returns true if the card
     // scale changed so the caller knows to re-render.
@@ -365,8 +381,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             return false;
 
         var autoFitScale = Mathf.Min(
-            bounds.width / HistoryPanelPreviewTextureGeometry.NativeBoardWidth,
-            bounds.height / HistoryPanelPreviewTextureGeometry.NativeBoardHeight
+            bounds.width / ItemBoardSocketLayout.NativeBoardWidth,
+            bounds.height / ItemBoardSocketLayout.NativeBoardHeight
         );
 
         _battleBoardPreview.SetPosition(new Vector2(bounds.x, bounds.y));
@@ -398,6 +414,14 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _initialized = true;
         Instance = this;
         _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
+        BppOverlayPanelMutex.Register(
+            new BppOverlayPanelRegistration(
+                OverlayPanelId,
+                OverlaySortingBand,
+                () => IsVisible,
+                () => Instance?.SetHistoryVisible(false)
+            )
+        );
         PrewarmUiFontState($"init:{source}");
     }
 

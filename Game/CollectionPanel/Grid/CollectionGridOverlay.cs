@@ -11,7 +11,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // that rect to its clip RectTransform so the grid scrolls underneath the same hole that
 // the UITK viewport opens.
 //
-// Mirrors BattleBoardPreview's overlay scaffolding (sortingOrder, RectMask2D, ApplyTransform
+// Mirrors item-board preview overlay scaffolding (sortingOrder, RectMask2D, ApplyTransform
 // math). A GraphicRaycaster is added only when the raycaster-hover dispatch path is
 // selected via CollectionGridConstants.UsePolledHover = false; under the default
 // (polled hover) the overlay is purely visual and UITK at sortingOrder 26 receives every

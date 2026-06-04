@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.GameInterop.ItemBoardPreview;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 using BazaarPlusPlus.ModApi.Http;
@@ -16,9 +18,9 @@ using Newtonsoft.Json;
 using TheBazaar;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.CardSetPreview;
+namespace BazaarPlusPlus.Game.BuildRecommendations;
 
-internal sealed class CardSetBuildDataRepository
+internal sealed class BuildRecommendationRepository
 {
     private const string FinalBuildsResourceSuffix = "final-builds-top50.json";
     private const string FinalBuildsRemoteUrl =
@@ -49,7 +51,7 @@ internal sealed class CardSetBuildDataRepository
     public bool TryFindFinalRecommendation(
         string? hero,
         IReadOnlyCollection<Guid> templateIds,
-        out CardSetBuildRecommendation recommendation
+        out BuildRecommendation recommendation
     )
     {
         var recommendations = FindFinalRecommendations(hero, templateIds);
@@ -57,18 +59,18 @@ internal sealed class CardSetBuildDataRepository
         return recommendation != null;
     }
 
-    public IReadOnlyList<CardSetBuildRecommendation> FindFinalRecommendations(
+    public IReadOnlyList<BuildRecommendation> FindFinalRecommendations(
         string? hero,
         IReadOnlyCollection<Guid> templateIds
     )
     {
         var finalRoot = EnsureFinalRoot();
         if (finalRoot?.Heroes == null || string.IsNullOrWhiteSpace(hero))
-            return Array.Empty<CardSetBuildRecommendation>();
+            return Array.Empty<BuildRecommendation>();
 
         return finalRoot.Heroes.TryGetValue(hero, out var heroBucket)
             ? FindRecommendations(heroBucket, templateIds, ResolveFinalBuildLabel())
-            : Array.Empty<CardSetBuildRecommendation>();
+            : Array.Empty<BuildRecommendation>();
     }
 
     private static FinalBuildRoot? EnsureFinalRoot()
@@ -104,7 +106,7 @@ internal sealed class CardSetBuildDataRepository
         {
             shouldRefreshInBackground = true;
             BppLog.Info(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 "Using expired final builds cache; remote refresh was queued in the background."
             );
             return staleRoot;
@@ -139,7 +141,7 @@ internal sealed class CardSetBuildDataRepository
                 RefreshFinalBuildsFromRemoteInBackground(reason)
             );
             BppLog.Info(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Queued background final builds refresh reason={reason}."
             );
         }
@@ -147,7 +149,7 @@ internal sealed class CardSetBuildDataRepository
         {
             EndBackgroundFinalBuildRefresh();
             BppLog.Warn(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Failed to queue background final builds refresh reason={reason}: {ex.Message}"
             );
         }
@@ -186,14 +188,14 @@ internal sealed class CardSetBuildDataRepository
                 }
 
                 BppLog.Info(
-                    "CardSetBuildDataRepository",
+                    "BuildRecommendationRepository",
                     $"Background final builds refresh succeeded reason={reason}."
                 );
                 return;
             }
 
             BppLog.Warn(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Background final builds refresh failed reason={reason} error={error ?? "unknown"}."
             );
         }
@@ -227,7 +229,7 @@ internal sealed class CardSetBuildDataRepository
                 return false;
 
             BppLog.Info(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Loaded final builds from cache path={cacheFilePath} "
                     + $"expired={_utcNow() >= expiresAtUtc} expiresAtUtc={expiresAtUtc:O}"
             );
@@ -236,7 +238,7 @@ internal sealed class CardSetBuildDataRepository
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Failed to read final builds cache {ResolveFinalBuildsCacheFilePath()}: {ex.Message}"
             );
             return false;
@@ -274,7 +276,7 @@ internal sealed class CardSetBuildDataRepository
 
             TryWriteFinalBuildCache(json);
             BppLog.Info(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Loaded final builds from remote url={FinalBuildsRemoteUrl}"
             );
             return true;
@@ -283,7 +285,7 @@ internal sealed class CardSetBuildDataRepository
         {
             error = ex.Message;
             BppLog.Warn(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Failed to refresh final builds from {FinalBuildsRemoteUrl}: {ex.Message}"
             );
             return false;
@@ -298,7 +300,7 @@ internal sealed class CardSetBuildDataRepository
             if (parsed?.Heroes == null)
             {
                 BppLog.Warn(
-                    "CardSetBuildDataRepository",
+                    "BuildRecommendationRepository",
                     $"Final builds JSON from {source} did not contain heroes."
                 );
                 return null;
@@ -309,7 +311,7 @@ internal sealed class CardSetBuildDataRepository
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Failed to parse final builds JSON from {source}: {ex.Message}"
             );
             return null;
@@ -331,7 +333,7 @@ internal sealed class CardSetBuildDataRepository
         catch (Exception ex)
         {
             BppLog.Warn(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Failed to write final builds cache {ResolveFinalBuildsCacheFilePath()}: {ex.Message}"
             );
         }
@@ -424,7 +426,7 @@ internal sealed class CardSetBuildDataRepository
             if (resourceName == null)
             {
                 BppLog.Warn(
-                    "CardSetBuildDataRepository",
+                    "BuildRecommendationRepository",
                     $"Embedded resource not found suffix={resourceSuffix}"
                 );
                 return null;
@@ -438,7 +440,7 @@ internal sealed class CardSetBuildDataRepository
             var json = reader.ReadToEnd();
             var parsed = JsonConvert.DeserializeObject<T>(json);
             BppLog.Info(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Loaded embedded build data resource={resourceName} parsed={(parsed != null)}"
             );
             return parsed;
@@ -446,7 +448,7 @@ internal sealed class CardSetBuildDataRepository
         catch (Exception ex)
         {
             BppLog.Error(
-                "CardSetBuildDataRepository",
+                "BuildRecommendationRepository",
                 $"Failed to load embedded build data suffix={resourceSuffix}",
                 ex
             );
@@ -454,14 +456,14 @@ internal sealed class CardSetBuildDataRepository
         }
     }
 
-    private static IReadOnlyList<CardSetBuildRecommendation> FindRecommendations(
+    private static IReadOnlyList<BuildRecommendation> FindRecommendations(
         BuildQueryBucket? bucket,
         IReadOnlyCollection<Guid> templateIds,
         string modeLabel
     )
     {
         if (bucket?.Builds == null || templateIds == null || templateIds.Count == 0)
-            return Array.Empty<CardSetBuildRecommendation>();
+            return Array.Empty<BuildRecommendation>();
 
         var selectedCardIds = templateIds
             .Where(id => id != Guid.Empty)
@@ -470,7 +472,7 @@ internal sealed class CardSetBuildDataRepository
             .OrderBy(id => id, StringComparer.Ordinal)
             .ToArray();
         if (selectedCardIds.Length == 0)
-            return Array.Empty<CardSetBuildRecommendation>();
+            return Array.Empty<BuildRecommendation>();
 
         IReadOnlyList<int>? matchedBuildIds = null;
         var preserveIncomingOrder = false;
@@ -493,7 +495,7 @@ internal sealed class CardSetBuildDataRepository
             foreach (var cardId in selectedCardIds)
             {
                 if (!bucket.CardIndex.TryGetValue(cardId, out var buildIds) || buildIds.Count == 0)
-                    return Array.Empty<CardSetBuildRecommendation>();
+                    return Array.Empty<BuildRecommendation>();
 
                 if (intersection == null)
                 {
@@ -503,14 +505,14 @@ internal sealed class CardSetBuildDataRepository
 
                 intersection.IntersectWith(buildIds);
                 if (intersection.Count == 0)
-                    return Array.Empty<CardSetBuildRecommendation>();
+                    return Array.Empty<BuildRecommendation>();
             }
 
             matchedBuildIds = intersection?.OrderBy(id => id).ToArray();
         }
 
         if (matchedBuildIds == null || matchedBuildIds.Count == 0)
-            return Array.Empty<CardSetBuildRecommendation>();
+            return Array.Empty<BuildRecommendation>();
 
         var candidates = matchedBuildIds
             .Select(
@@ -527,7 +529,7 @@ internal sealed class CardSetBuildDataRepository
             .Where(candidate => candidate.Build?.PlayerCards?.Count > 0)
             .ToList();
         if (candidates.Count == 0)
-            return Array.Empty<CardSetBuildRecommendation>();
+            return Array.Empty<BuildRecommendation>();
 
         var orderedCandidates = preserveIncomingOrder
             ? candidates
@@ -539,7 +541,7 @@ internal sealed class CardSetBuildDataRepository
         var recommendations = orderedCandidates
             .Select(
                 (candidate, index) =>
-                    new CardSetBuildRecommendation
+                    new BuildRecommendation
                     {
                         ModeLabel = modeLabel,
                         Source = candidate.Build!.Source ?? string.Empty,
@@ -547,20 +549,27 @@ internal sealed class CardSetBuildDataRepository
                         GoldScore = candidate.Build.GoldScore,
                         ResultIndex = index,
                         ResultCount = orderedCandidates.Count,
-                        Items = ProjectPlayerCards(candidate.Build.PlayerCards),
+                        Board = BppItemBoardSlotPlanner.Plan(
+                            new BppItemBoard(
+                                BppItemBoardId.FinalBuild,
+                                BppItemBoardType.Reference,
+                                ProjectPlayerCards(candidate.Build.PlayerCards),
+                                candidate.Build.SetSignature
+                            )
+                        ),
                     }
             )
-            .Where(recommendation => recommendation.Items.Count > 0)
+            .Where(recommendation => recommendation.Board.Cards.Count > 0)
             .ToArray();
         return recommendations;
     }
 
-    private static IReadOnlyList<ItemBoardItemSpec> ProjectPlayerCards(
+    private static IReadOnlyList<BppItemBoardCard> ProjectPlayerCards(
         IReadOnlyList<PlayerCardEntry>? playerCards
     )
     {
         if (playerCards == null || playerCards.Count == 0)
-            return Array.Empty<ItemBoardItemSpec>();
+            return Array.Empty<BppItemBoardCard>();
 
         return playerCards
             .Where(entry => entry != null && Guid.TryParse(entry.CardId, out _))
@@ -575,17 +584,43 @@ internal sealed class CardSetBuildDataRepository
                 var hasEnchant =
                     !string.IsNullOrWhiteSpace(entry.Enchant)
                     && !string.Equals(entry.Enchant, "None", StringComparison.OrdinalIgnoreCase);
-                return new ItemBoardItemSpec
+                var templateId = Guid.Parse(entry.CardId!);
+                var size = ResolveCardSize(templateId);
+                return new BppItemBoardCard
                 {
-                    TemplateId = Guid.Parse(entry.CardId!),
+                    TemplateId = templateId,
+                    InstanceId = $"final-build-{entry.Slot?.ToString() ?? "unsocketed"}",
+                    Order = entry.Slot ?? 0,
                     Tier = MapRecommendationTier(entry.Tier),
-                    SocketId = entry.Slot.HasValue
+                    Size = size,
+                    Span = BppItemBoardSpan.Resolve(size),
+                    SourceSocketId = entry.Slot.HasValue
                         ? (EContainerSocketId?)Mathf.Clamp(entry.Slot.Value, 0, 9)
                         : null,
                     EnchantmentType = hasEnchant ? enchantType : null,
                 };
             })
             .ToArray();
+    }
+
+    private static ECardSize ResolveCardSize(Guid templateId)
+    {
+        try
+        {
+            var staticData = BppStaticDataAccess.TryGet();
+            var template = BppStaticDataAccess.GetCardTemplate(staticData, templateId);
+            return template?.Size switch
+            {
+                ECardSize.Small => ECardSize.Small,
+                ECardSize.Medium => ECardSize.Medium,
+                ECardSize.Large => ECardSize.Large,
+                _ => ECardSize.Small,
+            };
+        }
+        catch
+        {
+            return ECardSize.Small;
+        }
     }
 
     private static ETier MapRecommendationTier(int? rawTier)

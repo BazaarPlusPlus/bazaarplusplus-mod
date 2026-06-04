@@ -5,10 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json;
+    </RestoreAdditionalProjectSources>
   </PropertyGroup>
 
   <PropertyGroup>
-    <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
     <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
   </PropertyGroup>
 
@@ -18,8 +21,12 @@
 
   <ItemGroup>
     <Compile
-      Include="../../GameInterop/CardPreview/NativeCardPreviewSpec.cs"
-      Link="NativeCardPreviewSpec.cs"
+      Include="../../Game/LiveBuildPanel/Data/LiveBuildCandidateState.cs"
+      Link="LiveBuildCandidateState.cs"
+    />
+    <Compile
+      Include="../../Game/LiveBuildPanel/Data/LiveItemBoardRowVm.cs"
+      Link="LiveItemBoardRowVm.cs"
     />
     <Compile Include="../../GameInterop/ItemBoardPreview/BppItemBoard.cs" Link="BppItemBoard.cs" />
     <Compile
@@ -31,32 +38,12 @@
       Link="BppItemBoardId.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardPreviewMapper.cs"
-      Link="BppItemBoardPreviewMapper.cs"
-    />
-    <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs"
-      Link="BppItemBoardSlotPlanner.cs"
-    />
-    <Compile
       Include="../../GameInterop/ItemBoardPreview/BppItemBoardSpan.cs"
       Link="BppItemBoardSpan.cs"
     />
     <Compile
       Include="../../GameInterop/ItemBoardPreview/BppItemBoardType.cs"
       Link="BppItemBoardType.cs"
-    />
-    <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewSignatureGate.cs"
-      Link="ItemBoardPreviewSignatureGate.cs"
-    />
-    <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewGenerationGuard.cs"
-      Link="ItemBoardPreviewGenerationGuard.cs"
-    />
-    <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardSocketResolver.cs"
-      Link="ItemBoardSocketResolver.cs"
     />
     <Compile Include="Program.cs" />
   </ItemGroup>

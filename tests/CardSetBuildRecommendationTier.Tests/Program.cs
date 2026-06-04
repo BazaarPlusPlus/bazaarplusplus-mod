@@ -6,8 +6,9 @@ TestDefaultFinalBuildCachePathUsesGameRootDirectory();
 TestFreshFinalBuildCacheIsUsedWithoutRemoteDownload();
 TestExpiredFinalBuildCacheUsesStaleCacheAndQueuesRemoteRefresh();
 TestManualFinalBuildRefreshBypassesFreshCache();
+TestFinalBuildRecommendationReturnsBoardContract();
 
-Console.WriteLine("CardSetBuildRecommendationTier checks passed.");
+Console.WriteLine("BuildRecommendation checks passed.");
 
 static void RegisterAssemblyResolution()
 {
@@ -26,7 +27,7 @@ static void TestRecommendationTierMapping()
 {
     var assembly = Assembly.Load("BazaarPlusPlus");
     var repositoryType = assembly.GetType(
-        "BazaarPlusPlus.Game.CardSetPreview.CardSetBuildDataRepository"
+        "BazaarPlusPlus.Game.BuildRecommendations.BuildRecommendationRepository"
     )!;
     var playerCardEntryType = repositoryType.GetNestedType(
         "PlayerCardEntry",
@@ -51,7 +52,7 @@ static void TestDefaultFinalBuildCachePathUsesGameRootDirectory()
     );
     Assert(
         buildPathMethod != null,
-        "Expected CardSetBuildDataRepository to expose default cache path construction."
+        "Expected BuildRecommendationRepository to expose default cache path construction."
     );
 
     var gameRootPath = Path.Combine(Path.GetTempPath(), $"bpp-game-root-{Guid.NewGuid():N}");
@@ -94,6 +95,57 @@ static void TestFreshFinalBuildCacheIsUsedWithoutRemoteDownload()
             sources[0] == "fresh-cache",
             "Fresh cached final builds should override the embedded resource."
         );
+    }
+    finally
+    {
+        ResetFinalBuildRemoteForTests(repositoryType);
+        TryDelete(cachePath);
+    }
+}
+
+static void TestFinalBuildRecommendationReturnsBoardContract()
+{
+    var repositoryType = GetRepositoryType();
+    var now = new DateTime(2026, 04, 25, 12, 0, 0, DateTimeKind.Utc);
+    var cachePath = Path.Combine(
+        Path.GetTempPath(),
+        $"bpp-final-build-cache-{Guid.NewGuid():N}.json"
+    );
+    var selectedCardId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    File.WriteAllText(
+        cachePath,
+        CreateFinalBuildPayload("BoardHero", selectedCardId, "board-contract")
+    );
+    File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
+
+    ConfigureFinalBuildRemoteForTests(
+        repositoryType,
+        cachePath,
+        now,
+        _ => throw new InvalidOperationException("Fresh cache should not download remote data.")
+    );
+
+    try
+    {
+        var repository = Activator.CreateInstance(repositoryType)!;
+        var method = repositoryType.GetMethod("FindFinalRecommendations")!;
+        var recommendations = (System.Collections.IEnumerable)
+            method.Invoke(repository, ["BoardHero", new[] { selectedCardId }])!;
+        var recommendation = recommendations.Cast<object>().Single();
+        var board = recommendation.GetType().GetProperty("Board")!.GetValue(recommendation)!;
+
+        Assert(
+            board.GetType().GetProperty("Id")!.GetValue(board)!.ToString() == "FinalBuild",
+            "Matched recommendation should expose BppItemBoard.Id=FinalBuild."
+        );
+        Assert(
+            board.GetType().GetProperty("Type")!.GetValue(board)!.ToString() == "Reference",
+            "Matched recommendation should expose BppItemBoard.Type=Reference."
+        );
+
+        var cards = (System.Collections.ICollection)
+            board.GetType().GetProperty("Cards")!.GetValue(board)!;
+        Assert(cards.Count == 1, "Matched recommendation board should expose renderable cards.");
     }
     finally
     {
@@ -261,7 +313,9 @@ static void AssertMappedTier(
 static Type GetRepositoryType()
 {
     var assembly = Assembly.Load("BazaarPlusPlus");
-    return assembly.GetType("BazaarPlusPlus.Game.CardSetPreview.CardSetBuildDataRepository")!;
+    return assembly.GetType(
+        "BazaarPlusPlus.Game.BuildRecommendations.BuildRecommendationRepository"
+    )!;
 }
 
 static void ConfigureFinalBuildRemoteForTests(
@@ -309,7 +363,7 @@ static bool RefreshFinalBuildsFromRemote(Type repositoryType, out string? error)
         "TryRefreshFinalBuildsFromRemote",
         BindingFlags.NonPublic | BindingFlags.Static
     );
-    Assert(method != null, "Expected CardSetBuildDataRepository to expose manual refresh.");
+    Assert(method != null, "Expected BuildRecommendationRepository to expose manual refresh.");
     object?[] parameters = [null];
     var refreshed = (bool)method!.Invoke(null, parameters)!;
     error = (string?)parameters[0];

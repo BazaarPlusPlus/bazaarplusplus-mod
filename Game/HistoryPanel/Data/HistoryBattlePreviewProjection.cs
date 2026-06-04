@@ -7,6 +7,7 @@ using BazaarGameShared.Domain.Cards.Socket;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect.AuraActions;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
@@ -24,7 +25,15 @@ internal static class HistoryBattlePreviewProjection
 
     public static HistoryBattlePreviewData BuildEmpty(string signature = "")
     {
-        return new HistoryBattlePreviewData(Array.Empty<HistoryItemSpec>(), signature);
+        return new HistoryBattlePreviewData(
+            new BppItemBoard(
+                BppItemBoardId.Historical,
+                BppItemBoardType.Reference,
+                Array.Empty<BppItemBoardCard>(),
+                signature
+            ),
+            signature
+        );
     }
 
     public static HistoryBattlePreviewData BuildPlayer(
@@ -48,8 +57,13 @@ internal static class HistoryBattlePreviewProjection
         string signature
     )
     {
-        var items = BuildItemSpecs(itemCapture?.Items);
-        return new HistoryBattlePreviewData(items, signature);
+        var board = new BppItemBoard(
+            BppItemBoardId.Historical,
+            BppItemBoardType.Reference,
+            BuildItemBoardCards(itemCapture?.Items),
+            signature
+        );
+        return new HistoryBattlePreviewData(board, signature);
     }
 
     public static HistoryBattleSnapshotCounts CountSnapshots(
@@ -97,9 +111,11 @@ internal static class HistoryBattlePreviewProjection
         return count;
     }
 
-    private static List<HistoryItemSpec> BuildItemSpecs(IList<PvpBattleCardSnapshot>? itemSnapshots)
+    private static List<BppItemBoardCard> BuildItemBoardCards(
+        IList<PvpBattleCardSnapshot>? itemSnapshots
+    )
     {
-        var specs = new List<HistoryItemSpec>();
+        var specs = new List<BppItemBoardCard>();
         if (itemSnapshots == null || itemSnapshots.Count == 0)
             return specs;
 
@@ -132,12 +148,16 @@ internal static class HistoryBattlePreviewProjection
             ApplySocketEffectAttributes(snapshot, attributes, socketEffectsBySocket);
 
             specs.Add(
-                new HistoryItemSpec
+                new BppItemBoardCard
                 {
                     TemplateId = templateId,
+                    InstanceId = snapshot.InstanceId ?? string.Empty,
+                    Order = specs.Count,
                     Tier = ParseTier(snapshot.Tier),
+                    Size = snapshot.Size,
+                    Span = BppItemBoardSpan.Resolve(snapshot.Size),
                     EnchantmentType = ParseEnchantmentType(snapshot.Enchant),
-                    SocketId = snapshot.Socket,
+                    SourceSocketId = snapshot.Socket,
                     Attributes = attributes,
                 }
             );

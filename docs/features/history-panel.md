@@ -1,6 +1,6 @@
 # History Panel
 
-游戏内 `HistoryPanel` 是 run logging 的读侧 UI：浏览本地 runs、本地 PVP battles、ghost battles 与保存的棋盘快照，按条件启动本地 / ghost replay，并可删除 run 及其关联 battle。大厅内通过 Bazaar++ 设置坞的 **Game History** 入口打开，或 `F8` 切换；面板内另有 preview 调试热键（见 [hotkeys-reference.md](../reference/hotkeys-reference.md)）。
+游戏内 `HistoryPanel` 是 run logging 的读侧 UI：浏览本地 runs、本地 PVP battles、ghost battles 与保存的棋盘快照，按条件启动本地 / ghost replay，并可删除 run 及其关联 battle。大厅内通过 Bazaar++ 设置坞的 **Game History** 入口打开，或 `F8` 切换。
 
 数据来源与上传语义见 [run-logging-and-upload.md](run-logging-and-upload.md)；SQLite 列定义见 [sqlite-schema-reference.md](../reference/sqlite-schema-reference.md)。本文记录面板的**当前布局、预览渲染与行级视觉**状态。
 
@@ -16,9 +16,9 @@
 
 ## 预览渲染：overlay 而非 RenderTexture
 
-战斗板预览维持独立 `ScreenSpaceOverlay` Canvas（`Game/HistoryPanel/Preview/BattleBoardPreview.cs`）+ 读容器 `worldBound` 同步坐标，**不**用「离屏 Camera 渲染卡片到 RenderTexture 再贴进 UI Toolkit Image」。曾实现过 RT 方案，但在 URP 下离屏 Camera→RT 无法渲染 uGUI（`CardPreviewBase`），已回退到 overlay 并删除 RT 相关代码。该决策见 [ADR-0003](../adr/0003-history-panel-preview-overlay.md)；勿再提议改回 RT。
+战斗板预览维持独立 `ScreenSpaceOverlay` Canvas（`GameInterop/ItemBoardPreview/BppItemBoardPreview.cs` + `ItemBoardPreviewSurface.cs`）+ 读容器 `worldBound` 同步坐标，**不**用「离屏 Camera 渲染卡片到 RenderTexture 再贴进 UI Toolkit Image」。曾实现过 RT 方案，但在 URP 下离屏 Camera→RT 无法渲染 uGUI（`CardPreviewBase`），已回退到 overlay 并删除 RT 相关代码。该决策见 [ADR-0003](../adr/0003-history-panel-preview-overlay.md)；勿再提议改回 RT。
 
-`HistoryPanel` 的预览栈与怪物预览 / CardSet overlay 完全解耦（见 [monster-preview.md](monster-preview.md)）。
+`HistoryPanel` 的预览栈与怪物预览 / LiveBuildPanel overlay 完全解耦（见 [monster-preview.md](monster-preview.md)）。
 
 ## Ghost 出局行级指示（Knocked Out）
 
@@ -44,6 +44,7 @@ HistoryPanelFormatter.IsGhostOpponentEliminated(battle)
 
 - `Game/HistoryPanel/HistoryPanel.cs`
 - `Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs`、`HistoryPanelUiToolkitView.Tree.cs`、`HistoryPanelUiToolkitView.Rows.cs`
-- `Game/HistoryPanel/Preview/BattleBoardPreview.cs`
+- `GameInterop/ItemBoardPreview/BppItemBoardPreview.cs`
+- `GameInterop/ItemBoardPreview/BppItemBoard.cs`
 - `Game/HistoryPanel/Storage/HistoryPanelRepository.cs`
 - `Game/HistoryPanel/HistoryPanelReplayService.cs`、`HistoryPanelFormatter.cs`、`HistoryPanelText.cs`

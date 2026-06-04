@@ -1,9 +1,9 @@
 #nullable enable
-using System.Collections.Generic;
+using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 
-namespace BazaarPlusPlus.Game.CardSetPreview;
+namespace BazaarPlusPlus.Game.BuildRecommendations;
 
-internal sealed class CardSetBuildRecommendation
+internal sealed class BuildRecommendation
 {
     public string ModeLabel { get; set; } = string.Empty;
 
@@ -17,5 +17,5 @@ internal sealed class CardSetBuildRecommendation
 
     public int ResultCount { get; set; }
 
-    public IReadOnlyList<ItemBoardItemSpec> Items { get; set; } = new List<ItemBoardItemSpec>();
+    public BppItemBoard Board { get; set; } = BppItemBoard.Empty;
 }

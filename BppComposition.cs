@@ -4,7 +4,6 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.CardSetPreview;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
@@ -12,6 +11,7 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
+using BazaarPlusPlus.Game.LiveBuildPanel;
 using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLifecycle;
@@ -92,12 +92,12 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());
         _settingsDockRegistry.Register(new LegendaryPositionSettingsDockEntry());
+        _settingsDockRegistry.Register(new LiveBuildPanelSettingsDockEntry());
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
 
         _mountables.Register(
             new ComponentMount<BazaarDbSnapshotUploadController>((c, s) => c.Initialize(s))
         );
-        _mountables.Register(new ComponentMount<CardSetPreviewRuntime>());
         _mountables.Register(new CollectionPanelMount());
         _mountables.Register(
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
@@ -115,6 +115,7 @@ internal sealed class BppComposition : IDisposable
                 onlineClient: () => _onlineClientRef
             )
         );
+        _mountables.Register(new LiveBuildPanelMount());
         _mountables.Register(new ComponentMount<RunLoggingController>((c, s) => c.Initialize(s)));
         _mountables.Register(new ComponentMount<RunUploadController>((c, s) => c.Initialize(s)));
         _mountables.Register(

@@ -11,18 +11,20 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
+using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
-using HistoryPanelHost = BazaarPlusPlus.Game.HistoryPanel.HistoryPanel;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
 internal sealed class CollectionPanel : MonoBehaviour
 {
     private const float CatalogBuildFrameBudgetMs = 4f;
+    private const string OverlayPanelId = "CollectionPanel";
+    private const int OverlaySortingBand = 27;
 
     private static CollectionPanel? _instance;
     public static bool IsVisible => _instance != null && _instance._isVisible;
@@ -98,6 +100,14 @@ internal sealed class CollectionPanel : MonoBehaviour
         _services = services;
         _config = services.Config;
         _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
+        BppOverlayPanelMutex.Register(
+            new BppOverlayPanelRegistration(
+                OverlayPanelId,
+                OverlaySortingBand,
+                () => _instance?._isVisible == true,
+                () => _instance?.Close()
+            )
+        );
     }
 
     internal static void NotifyLocaleChanged()
@@ -231,23 +241,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         }
 
-        // Panel mutex: collection + history share the same overlay sorting band (26/27),
-        // showing both would z-fight, and the user cannot resolve which Escape press targets
-        // which panel. Close the other before showing this one.
-        if (HistoryPanelHost.IsVisible)
-        {
-            try
-            {
-                HistoryPanelHost.Instance?.ToggleFromHotkey();
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    "CollectionPanel",
-                    $"Failed to close HistoryPanel before opening CollectionPanel: {ex.Message}"
-                );
-            }
-        }
+        BppOverlayPanelMutex.CloseOthers(OverlayPanelId, OverlaySortingBand);
 
         ApplyOpenSelection(selection);
         // Temporary main-path probe: EnsureView() is heavy one-time UITK construction (visual
@@ -401,6 +395,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         if (ReferenceEquals(_instance, this))
             _instance = null;
+        BppOverlayPanelMutex.Unregister(OverlayPanelId);
         DisposeRuntime();
     }
 

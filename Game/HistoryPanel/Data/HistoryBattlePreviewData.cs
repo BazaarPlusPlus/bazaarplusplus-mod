@@ -1,25 +1,36 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
+using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Data;
 
 internal sealed class HistoryBattlePreviewData
 {
     public static readonly HistoryBattlePreviewData Empty = new(
-        Array.Empty<HistoryItemSpec>(),
+        new BppItemBoard(
+            BppItemBoardId.Historical,
+            BppItemBoardType.Reference,
+            Array.Empty<BppItemBoardCard>()
+        ),
         string.Empty
     );
 
-    public HistoryBattlePreviewData(IReadOnlyList<HistoryItemSpec> items, string signature)
+    public HistoryBattlePreviewData(BppItemBoard? board, string signature)
     {
-        Items = items ?? Array.Empty<HistoryItemSpec>();
         Signature = signature ?? string.Empty;
+        Board =
+            board
+            ?? new BppItemBoard(
+                BppItemBoardId.Historical,
+                BppItemBoardType.Reference,
+                Array.Empty<BppItemBoardCard>(),
+                Signature
+            );
     }
 
-    public IReadOnlyList<HistoryItemSpec> Items { get; }
+    public BppItemBoard Board { get; }
 
     public string Signature { get; }
 
-    public bool HasRenderableCards => Items.Count > 0;
+    public bool HasRenderableCards => Board.Cards.Count > 0;
 }

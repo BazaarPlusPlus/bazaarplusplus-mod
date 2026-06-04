@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.CardSetPreview;
+using BazaarPlusPlus.Game.BuildRecommendations;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
@@ -183,9 +183,10 @@ internal sealed class HistoryPanelDataService
             var result = await Task.Run(
                     () =>
                     {
-                        var succeeded = CardSetBuildDataRepository.TryRefreshFinalBuildsFromRemote(
-                            out var error
-                        );
+                        var succeeded =
+                            BuildRecommendationRepository.TryRefreshFinalBuildsFromRemote(
+                                out var error
+                            );
                         return (Succeeded: succeeded, Error: error);
                     },
                     cancellationToken

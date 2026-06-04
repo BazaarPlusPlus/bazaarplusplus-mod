@@ -26,15 +26,6 @@ public class CoreLayeringTests
         "Core/Runtime/BppRuntimeServices.cs",
     };
 
-    private static readonly HashSet<string> AllowedFeaturePreviewBoundaryFiles = new(
-        StringComparer.Ordinal
-    )
-    {
-        // Existing data-service wiring for final-build refresh. This test is about preview
-        // internals; moving final-build data ownership is outside the item-board preview pass.
-        "Game/HistoryPanel/Storage/HistoryPanelDataService.cs",
-    };
-
     [Fact]
     public void Core_does_not_depend_on_Game_GameInterop_or_game_assemblies()
     {
@@ -147,20 +138,25 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void HistoryPanel_and_CardSetPreview_do_not_depend_on_each_others_preview_internals()
+    public void HistoryPanel_and_LiveBuildPanel_do_not_depend_on_each_others_internals()
     {
         var repoRoot = RepoRoot();
+        Assert.False(
+            Directory.Exists(Path.Combine(repoRoot, "Game", "CardSetPreview")),
+            "Game/CardSetPreview was replaced by LiveBuildPanel plus BuildRecommendations and must not be restored."
+        );
+
         var rules = new[]
         {
             new PreviewBoundaryRule(
                 Path.Combine(repoRoot, "Game", "HistoryPanel"),
-                "BazaarPlusPlus.Game.CardSetPreview",
+                "BazaarPlusPlus.Game.LiveBuildPanel",
                 "HistoryPanel"
             ),
             new PreviewBoundaryRule(
-                Path.Combine(repoRoot, "Game", "CardSetPreview"),
-                "BazaarPlusPlus.Game.HistoryPanel.Preview",
-                "CardSetPreview"
+                Path.Combine(repoRoot, "Game", "LiveBuildPanel"),
+                "BazaarPlusPlus.Game.HistoryPanel",
+                "LiveBuildPanel"
             ),
         };
 
@@ -188,7 +184,7 @@ public class CoreLayeringTests
                         line.StartsWith(
                             $"using {rule.DisallowedNamespace}",
                             StringComparison.Ordinal
-                        ) && !AllowedFeaturePreviewBoundaryFiles.Contains(relative)
+                        )
                     )
                     {
                         violations.Add($"{relative}: {line}");
@@ -199,8 +195,8 @@ public class CoreLayeringTests
 
         Assert.True(
             violations.Count == 0,
-            "HistoryPanel and CardSetPreview must share runtime preview behavior through "
-                + "GameInterop instead of importing each other's feature internals. Offending imports:\n"
+            "HistoryPanel and LiveBuildPanel must share runtime preview behavior through "
+                + "GameInterop.ItemBoardPreview instead of importing each other's feature internals. Offending imports:\n"
                 + string.Join("\n", violations)
         );
     }
