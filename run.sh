@@ -39,51 +39,51 @@ clear_macos_sqlite_quarantine() {
     done
 }
 
-print_autobazaar_host_mode() {
-    local autobazaar_host="${1:-false}"
-    if [[ "$autobazaar_host" == "true" ]]; then
-        echo -e "${CYAN}== AutoBazaar Host: ${GREEN}enabled${CYAN} ==${RESET}"
+print_bazaaragent_host_mode() {
+    local bazaaragent_host="${1:-false}"
+    if [[ "$bazaaragent_host" == "true" ]]; then
+        echo -e "${CYAN}== BazaarAgent Host: ${GREEN}enabled${CYAN} ==${RESET}"
     else
-        echo -e "${CYAN}== AutoBazaar Host: disabled ==${RESET}"
+        echo -e "${CYAN}== BazaarAgent Host: disabled ==${RESET}"
     fi
 }
 
 build() {
-    local autobazaar_host="${1:-false}"
+    local bazaaragent_host="${1:-false}"
     local args=(-verbosity detailed)
 
-    if [[ "$autobazaar_host" == "true" ]]; then
-        args+=(-p:EnableAutoBazaarHost=true)
+    if [[ "$bazaaragent_host" == "true" ]]; then
+        args+=(-p:EnableBazaarAgentHost=true)
     fi
 
-    print_autobazaar_host_mode "$autobazaar_host"
+    print_bazaaragent_host_mode "$bazaaragent_host"
     dotnet build BazaarPlusPlus.csproj "${args[@]}"
 }
 
 build_all() {
     local prod="${1:-false}"
-    local autobazaar_host="${2:-false}"
+    local bazaaragent_host="${2:-false}"
     local args=(-t:BuildAll -verbosity detailed)
 
     if [[ "$prod" == "true" ]]; then
         args+=(-p:BuildProductionPackage=true)
     fi
-    if [[ "$autobazaar_host" == "true" ]]; then
-        args+=(-p:EnableAutoBazaarHost=true)
+    if [[ "$bazaaragent_host" == "true" ]]; then
+        args+=(-p:EnableBazaarAgentHost=true)
     fi
 
-    print_autobazaar_host_mode "$autobazaar_host"
+    print_bazaaragent_host_mode "$bazaaragent_host"
     clear_macos_sqlite_quarantine
     dotnet build BazaarPlusPlus.csproj "${args[@]}"
     clear_macos_sqlite_quarantine
 }
 
 parse_build_options() {
-    local autobazaar_host=false
+    local bazaaragent_host=false
 
     while (($# > 0)); do
         case "$1" in
-            --with-autobazaar-host|--autobazaar) autobazaar_host=true ;;
+            --with-bazaaragent-host|--bazaaragent) bazaaragent_host=true ;;
             *)
                 usage
                 exit 1
@@ -92,7 +92,7 @@ parse_build_options() {
         shift
     done
 
-    build "$autobazaar_host"
+    build "$bazaaragent_host"
 }
 
 test_all() {
@@ -151,16 +151,16 @@ decompile_all() {
 usage() {
     cat <<EOF
 Usage:
-  $0 build [--with-autobazaar-host]
-  $0 all [--prod] [--with-autobazaar-host]
+  $0 build [--with-bazaaragent-host]
+  $0 all [--prod] [--with-bazaaragent-host]
   $0 test
   $0 format
   $0 decompile [DllName]
   $0 decompile-all
 
 Options:
-  --with-autobazaar-host  Build and copy the optional AutoBazaar host assembly.
-  --autobazaar            Alias for --with-autobazaar-host.
+  --with-bazaaragent-host  Build and copy the optional BazaarAgent host assembly.
+  --bazaaragent            Alias for --with-bazaaragent-host.
   --prod                  With all: also build the production installer package.
 EOF
 }
@@ -169,11 +169,11 @@ case "${1:-}" in
     all)
         shift
         prod=false
-        autobazaar_host=false
+        bazaaragent_host=false
         while (($# > 0)); do
             case "$1" in
                 --prod) prod=true ;;
-                --with-autobazaar-host|--autobazaar) autobazaar_host=true ;;
+                --with-bazaaragent-host|--bazaaragent) bazaaragent_host=true ;;
                 *)
                     usage
                     exit 1
@@ -181,7 +181,7 @@ case "${1:-}" in
             esac
             shift
         done
-        build_all "$prod" "$autobazaar_host"
+        build_all "$prod" "$bazaaragent_host"
         ;;
     build)
         shift

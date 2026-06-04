@@ -14,7 +14,7 @@ AutoBazaar remains parked at runtime: the mount is not registered in normal buil
 - Move AutoBazaar ownership to a root-level module instead of `Game/AutoBazaar`.
 - Build AutoBazaar core as its own assembly through `BazaarPlusPlus.AutoBazaar.csproj`.
 - Keep the main BepInEx plugin as the only owner of Unity lifecycle, BepInEx config binding, and game-runtime access.
-- Preserve the existing HTTP wire contract documented in `docs/reference/auto-bazaar-http-api-v1.md`.
+- Preserve the existing HTTP wire contract documented in `docs/reference/bazaar-agent-http-api-v1.md`.
 - Preserve the current parked runtime behavior unless a later task explicitly re-enables the mount.
 - Make the dependency rules enforceable with project references and architecture tests, not just comments.
 

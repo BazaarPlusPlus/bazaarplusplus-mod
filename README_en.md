@@ -17,7 +17,7 @@ This repository only keeps documentation that still matches the current implemen
 - Background upload: run and replay upload, performed only while the client is outside a live run.
 - BazaarDB screenshot upload: optional toggle that pushes end-of-run snapshot DTOs to the V4 mod backend (`bazaarplusplus-server` repo, deployed at `mod-api-v4.bazaarplusplus.com`) for BazaarDB to pull through the peek/confirm delivery queue (off by default).
 - Anonymous Mode: replaces the local player name with `Anonymous`.
-- **AutoBazaar HTTP endpoint** (currently parked) — local loopback HTTP server (default port 47900) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. **The mount is commented out at `BppComposition.cs:120`, so the HTTP server is not started.** See [docs/features/autobazaar.md](docs/features/autobazaar.md).
+- **BazaarAgent HTTP endpoint** (currently parked) — local loopback HTTP server (default port 47900) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. **The mount is commented out at `BppComposition.cs:120`, so the HTTP server is not started.** See [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md).
 
 ## Installation And Configuration
 
@@ -65,7 +65,7 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 - [docs/README.md](docs/README.md): **the documentation index** (all docs organized by audience and lifecycle).
 - [docs/mod-features-overview.md](docs/mod-features-overview.md): overview of the currently implemented feature set.
 - [docs/features/](docs/features/): living per-feature docs (run logging & upload, combat replay, history panel, screenshots, tooltip preview, …).
-- [docs/reference/](docs/reference/): stable contracts / inventories (hotkeys, settings surfaces, SQLite schema, AutoBazaar HTTP API).
+- [docs/reference/](docs/reference/): stable contracts / inventories (hotkeys, settings surfaces, SQLite schema, BazaarAgent HTTP API).
 - [docs/adr/](docs/adr/): architecture decision records.
 
 ## License

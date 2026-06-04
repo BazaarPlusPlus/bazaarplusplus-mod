@@ -4,7 +4,7 @@ AutoBazaar lives in its own assembly (`AutoBazaar/` → `BazaarPlusPlus.AutoBaza
 
 ## Context
 
-AutoBazaar began under `Game/AutoBazaar`, which made it look like an ordinary game feature. It is not — it is a separately-owned automation bridge whose only stable surface is the versioned HTTP wire contract (`docs/reference/auto-bazaar-http-api-v1.md`). Leaving it mixed in with feature/UI/Unity code made it impossible to remove or test in isolation, let `MonoBehaviour` ticks and reflection probes run even when disabled, and blurred the line that the mod must never contain play policy.
+AutoBazaar began under `Game/AutoBazaar`, which made it look like an ordinary game feature. It is not — it is a separately-owned automation bridge whose only stable surface is the versioned HTTP wire contract (`docs/reference/bazaar-agent-http-api-v1.md`). Leaving it mixed in with feature/UI/Unity code made it impossible to remove or test in isolation, let `MonoBehaviour` ticks and reflection probes run even when disabled, and blurred the line that the mod must never contain play policy.
 
 Two facts shaped the decision. First, AutoBazaar is parked by default, so its runtime must be physically omittable without leaving dead Unity work behind (the broader mountable story is [ADR-0002](0002-mountable-feature-registry.md)). Second, the intelligence is intentionally external: the mod's job is dumb, auditable transport, and the strategy — the swappable rule/`claude`/`deepseek` decision providers — lives in the `bazaarplusplus-agent` process, not here.
 
@@ -17,4 +17,4 @@ Two facts shaped the decision. First, AutoBazaar is parked by default, so its ru
 - Reusable adapters over The Bazaar runtime stay in `GameInterop/`, not in AutoBazaar core; AutoBazaar-specific schema, validation, decision-log format, and available-action derivation stay in the core.
 - Reopen if AutoBazaar ever needs to become its own BepInEx plugin, or if play policy is ever pulled into the mod (it should not be — policy belongs to `bazaarplusplus-agent`).
 
-Full design detail: [docs/superpowers/specs/2026-06-02-autobazaar-module-isolation-design.md](../superpowers/specs/2026-06-02-autobazaar-module-isolation-design.md). Feature overview and build flags: [docs/features/autobazaar.md](../features/autobazaar.md).
+Full design detail: [docs/superpowers/specs/2026-06-02-autobazaar-module-isolation-design.md](../superpowers/specs/2026-06-02-autobazaar-module-isolation-design.md). Feature overview and build flags: [docs/features/bazaar-agent.md](../features/bazaar-agent.md).

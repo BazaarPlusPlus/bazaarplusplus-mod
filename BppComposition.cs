@@ -28,8 +28,8 @@ using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using UnityEngine;
-#if BPP_AUTOBAZAAR_HOST
-using BazaarPlusPlus.Game.AutoBazaarHost;
+#if BPP_BAZAARAGENT_HOST
+using BazaarPlusPlus.Game.BazaarAgentHost;
 #endif
 
 namespace BazaarPlusPlus;
@@ -123,9 +123,9 @@ internal sealed class BppComposition : IDisposable
             )
         );
 
-#if BPP_AUTOBAZAAR_HOST
+#if BPP_BAZAARAGENT_HOST
         _mountables.Register(
-            new AutoBazaarHostMount(
+            new BazaarAgentHostMount(
                 configFile,
                 () => _combatReplayModule.Runtime?.IsReplayStartInProgress == true
             )

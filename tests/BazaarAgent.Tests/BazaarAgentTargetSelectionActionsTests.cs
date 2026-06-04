@@ -1,0 +1,326 @@
+using System.Collections.Generic;
+using BazaarPlusPlus.BazaarAgent;
+using Xunit;
+
+public class BazaarAgentTargetSelectionActionsTests
+{
+    private static BazaarAgentTargetSelectionActions.OwnedCardRef Card(
+        string id,
+        string templateId,
+        BazaarAgentTargetSection section,
+        string leftSocket,
+        int size
+    ) => new(id, templateId, section, leftSocket, size);
+
+    [Fact]
+    public void Emit_EmptyFilter_ReturnsEmpty()
+    {
+        var emit = BazaarAgentTargetSelectionActions.Emit(
+            new HashSet<string>(),
+            new[] { Card("itm_a", "t1", BazaarAgentTargetSection.Hand, "Socket_2", 1) }
+        );
+        Assert.Empty(emit);
+    }
+
+    [Fact]
+    public void Emit_FilterMatchesOneCard_SingleOption()
+    {
+        var emit = BazaarAgentTargetSelectionActions.Emit(
+            new HashSet<string> { "t1" },
+            new[]
+            {
+                Card("itm_a", "t1", BazaarAgentTargetSection.Hand, "Socket_2", 1),
+                Card("itm_b", "t2", BazaarAgentTargetSection.Hand, "Socket_3", 1),
+            }
+        );
+        Assert.Single(emit);
+        var o = emit[0];
+        Assert.Equal(BazaarAgentActionKind.SelectItem, o.ActionKind);
+        Assert.Equal(BazaarAgentActionGroup.Offer, o.Group);
+        Assert.Equal("itm_a", o.CardInstanceId);
+        Assert.Equal(BazaarAgentTargetSection.Hand, o.TargetSection);
+        Assert.NotNull(o.TargetSockets);
+        Assert.Single(o.TargetSockets!);
+        Assert.Equal("Socket_2", o.TargetSockets![0]);
+        Assert.StartsWith("SelectItem:itm_a", o.DisplayKey);
+    }
+
+    [Fact]
+    public void Emit_FilterMatchesMultipleCards_OnePerCard()
+    {
+        var emit = BazaarAgentTargetSelectionActions.Emit(
+            new HashSet<string> { "t1", "t2" },
+            new[]
+            {
+                Card("itm_a", "t1", BazaarAgentTargetSection.Hand, "Socket_2", 1),
+                Card("itm_b", "t2", BazaarAgentTargetSection.Stash, "Socket_5", 1),
+                Card("itm_c", "t3", BazaarAgentTargetSection.Hand, "Socket_7", 1),
+            }
+        );
+        Assert.Equal(2, emit.Count);
+        var ids = new HashSet<string>();
+        foreach (var o in emit)
+            ids.Add(o.CardInstanceId!);
+        Assert.Contains("itm_a", ids);
+        Assert.Contains("itm_b", ids);
+        Assert.DoesNotContain("itm_c", ids);
+    }
+
+    [Fact]
+    public void Emit_MultiCellItem_SocketsContiguousFromLeft()
+    {
+        var emit = BazaarAgentTargetSelectionActions.Emit(
+            new HashSet<string> { "t1" },
+            new[] { Card("itm_a", "t1", BazaarAgentTargetSection.Hand, "Socket_3", 3) }
+        );
+        Assert.Single(emit);
+        Assert.Equal(new[] { "Socket_3", "Socket_4", "Socket_5" }, emit[0].TargetSockets);
+    }
+
+    [Fact]
+    public void Emit_SkillCard_DoesNotEmitSelectItem()
+    {
+        var emit = BazaarAgentTargetSelectionActions.Emit(
+            new HashSet<string> { "ts1" },
+            new[] { Card("skl_a", "ts1", BazaarAgentTargetSection.Skill, "", 1) }
+        );
+        Assert.Empty(emit);
+    }
+
+    [Fact]
+    public void Emit_DuplicateInstanceId_DeduplicatedToOneEmit()
+    {
+        var emit = BazaarAgentTargetSelectionActions.Emit(
+            new HashSet<string> { "t1" },
+            new[]
+            {
+                Card("itm_a", "t1", BazaarAgentTargetSection.Hand, "Socket_2", 1),
+                Card("itm_a", "t1", BazaarAgentTargetSection.Hand, "Socket_2", 1),
+            }
+        );
+        Assert.Single(emit);
+    }
+
+    // -------------------------------------------------------------------------
+    // ApplyTargetSelectionFilter
+    // -------------------------------------------------------------------------
+
+    private static BazaarAgentCardSnapshot Snap(
+        string instanceId,
+        string templateId,
+        string size = "Small",
+        string? socketId = null,
+        BazaarAgentCardLocation location = BazaarAgentCardLocation.Selection
+    ) =>
+        new()
+        {
+            InstanceId = instanceId,
+            TemplateId = templateId,
+            Size = size,
+            SocketId = socketId,
+            Location = location,
+        };
+
+    private static BazaarAgentDecisionOption SelectItemOption(
+        string instanceId,
+        BazaarAgentTargetSection section,
+        params string[] sockets
+    ) =>
+        new()
+        {
+            ActionKind = BazaarAgentActionKind.SelectItem,
+            Group = BazaarAgentActionGroup.Offer,
+            DisplayKey = $"SelectItem:{instanceId}:{section}:{string.Join(",", sockets)}",
+            CardInstanceId = instanceId,
+            TargetSection = section,
+            TargetSockets = sockets,
+        };
+
+    private static readonly BazaarAgentDecisionOption WaitOpt = new()
+    {
+        ActionKind = BazaarAgentActionKind.Wait,
+        Group = BazaarAgentActionGroup.Wait,
+        DisplayKey = "Wait",
+    };
+
+    [Fact]
+    public void Apply_KeepsOfferSelectItem_WhenTemplateIsInFilter()
+    {
+        // Common upgrade-encounter shape: filter = [offer_template_only]
+        var actions = new[]
+        {
+            WaitOpt,
+            SelectItemOption("itm_offer", BazaarAgentTargetSection.Hand, "Socket_3", "Socket_4"),
+            SelectItemOption("itm_offer", BazaarAgentTargetSection.Hand, "Socket_4", "Socket_5"),
+        };
+        var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
+            actions,
+            new HashSet<string> { "tpl_X" },
+            boardItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            chestItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            playerSkills: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            selectionOptionsCards: new[] { Snap("itm_offer", "tpl_X", size: "Medium") }
+        );
+
+        Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.Wait);
+        var selects = new List<BazaarAgentDecisionOption>(result);
+        selects.RemoveAll(a => a.ActionKind != BazaarAgentActionKind.SelectItem);
+        Assert.Equal(2, selects.Count);
+        Assert.All(selects, s => Assert.Equal("itm_offer", s.CardInstanceId));
+    }
+
+    [Fact]
+    public void Apply_DropsOfferSelectItem_WhenTemplateNotInFilter()
+    {
+        var actions = new[]
+        {
+            WaitOpt,
+            SelectItemOption("itm_a", BazaarAgentTargetSection.Hand, "Socket_3"),
+            SelectItemOption("itm_b", BazaarAgentTargetSection.Hand, "Socket_4"),
+        };
+        var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
+            actions,
+            new HashSet<string> { "tpl_KEEP" },
+            boardItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            chestItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            playerSkills: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            selectionOptionsCards: new[] { Snap("itm_a", "tpl_KEEP"), Snap("itm_b", "tpl_OTHER") }
+        );
+
+        var selects = result.Where(a => a.ActionKind == BazaarAgentActionKind.SelectItem).ToList();
+        Assert.Single(selects);
+        Assert.Equal("itm_a", selects[0].CardInstanceId);
+    }
+
+    [Fact]
+    public void Apply_EmitsOwnedCardSelectItem_WhenFilterContainsOwnedTemplate()
+    {
+        // BuySpecificCardCondition._canInteractWithOwnedCards=true variant
+        var actions = new[] { WaitOpt };
+        var owned = new[]
+        {
+            Snap(
+                "itm_owned",
+                "tpl_OWNED",
+                size: "Small",
+                socketId: "Socket_3",
+                location: BazaarAgentCardLocation.Board
+            ),
+        };
+        var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
+            actions,
+            new HashSet<string> { "tpl_OWNED" },
+            boardItems: owned,
+            chestItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            playerSkills: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            selectionOptionsCards: System.Array.Empty<BazaarAgentCardSnapshot>()
+        );
+
+        var selects = result.Where(a => a.ActionKind == BazaarAgentActionKind.SelectItem).ToList();
+        Assert.Single(selects);
+        Assert.Equal("itm_owned", selects[0].CardInstanceId);
+        Assert.Equal(BazaarAgentTargetSection.Hand, selects[0].TargetSection);
+    }
+
+    [Fact]
+    public void Apply_DoesNotEmitOwnedSkillAsSelectItem()
+    {
+        var actions = new[] { WaitOpt };
+        var skill = new[]
+        {
+            Snap("skl_owned", "tpl_SKILL", size: "Small", location: BazaarAgentCardLocation.Skill),
+        };
+        var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
+            actions,
+            new HashSet<string> { "tpl_SKILL" },
+            boardItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            chestItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            playerSkills: skill,
+            selectionOptionsCards: System.Array.Empty<BazaarAgentCardSnapshot>()
+        );
+
+        Assert.DoesNotContain(result, a => a.ActionKind == BazaarAgentActionKind.SelectItem);
+    }
+
+    [Fact]
+    public void Apply_PreservesNonSelectItemActions()
+    {
+        var reroll = new BazaarAgentDecisionOption
+        {
+            ActionKind = BazaarAgentActionKind.Reroll,
+            Group = BazaarAgentActionGroup.Reroll,
+            DisplayKey = "Reroll",
+        };
+        var exit = new BazaarAgentDecisionOption
+        {
+            ActionKind = BazaarAgentActionKind.ExitState,
+            Group = BazaarAgentActionGroup.Exit,
+            DisplayKey = "ExitState",
+        };
+        var actions = new[] { WaitOpt, reroll, exit };
+        var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
+            actions,
+            new HashSet<string> { "tpl_X" },
+            boardItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            chestItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            playerSkills: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            selectionOptionsCards: System.Array.Empty<BazaarAgentCardSnapshot>()
+        );
+
+        Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.Wait);
+        Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.Reroll);
+        Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.ExitState);
+        Assert.DoesNotContain(result, a => a.ActionKind == BazaarAgentActionKind.SelectItem);
+    }
+
+    [Fact]
+    public void Apply_DropsOfferSelectItem_WhenInstanceIdNotInLookup()
+    {
+        // Defensive: SelectItem entry references an instanceId that's not in any
+        // of the snapshot lists (e.g., card removed mid-build). Dropped.
+        var actions = new[]
+        {
+            WaitOpt,
+            SelectItemOption("itm_ghost", BazaarAgentTargetSection.Hand, "Socket_0"),
+        };
+        var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
+            actions,
+            new HashSet<string> { "tpl_X" },
+            boardItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            chestItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            playerSkills: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            selectionOptionsCards: System.Array.Empty<BazaarAgentCardSnapshot>()
+        );
+
+        Assert.DoesNotContain(result, a => a.ActionKind == BazaarAgentActionKind.SelectItem);
+    }
+
+    [Fact]
+    public void Apply_DedupsOwnedEmit_WhenAlreadyKeptByTemplateMatch()
+    {
+        // If an owned card's templateId is in the filter AND the action list also
+        // contained a SelectItem for that same owned instanceId (defensive only —
+        // builder doesn't currently produce owned SelectItem in availableActions),
+        // we should not emit a duplicate.
+        var owned = Snap(
+            "itm_o",
+            "tpl_X",
+            size: "Small",
+            socketId: "Socket_3",
+            location: BazaarAgentCardLocation.Board
+        );
+        var alreadyKept = SelectItemOption("itm_o", BazaarAgentTargetSection.Hand, "Socket_3");
+        var actions = new[] { WaitOpt, alreadyKept };
+        var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
+            actions,
+            new HashSet<string> { "tpl_X" },
+            boardItems: new[] { owned },
+            chestItems: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            playerSkills: System.Array.Empty<BazaarAgentCardSnapshot>(),
+            selectionOptionsCards: System.Array.Empty<BazaarAgentCardSnapshot>()
+        );
+
+        var selects = result.Where(a => a.ActionKind == BazaarAgentActionKind.SelectItem).ToList();
+        Assert.Single(selects); // only the kept one; owned-emit skipped via dedup
+    }
+}

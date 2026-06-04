@@ -318,7 +318,7 @@ public class CoreLayeringTests
                 var line = rawLine.Trim();
                 if (line.StartsWith("using BazaarPlusPlus.Game.", StringComparison.Ordinal))
                     violations.Add($"{relative}: {line}");
-                if (line.StartsWith("using BazaarPlusPlus.AutoBazaar", StringComparison.Ordinal))
+                if (line.StartsWith("using BazaarPlusPlus.BazaarAgent", StringComparison.Ordinal))
                     violations.Add($"{relative}: {line}");
             }
         }
@@ -338,13 +338,13 @@ public class CoreLayeringTests
     );
 
     [Fact]
-    public void AutoBazaar_core_does_not_depend_on_host_or_game_runtime_namespaces()
+    public void BazaarAgent_core_does_not_depend_on_host_or_game_runtime_namespaces()
     {
         var repoRoot = RepoRoot();
-        var autoBazaarDir = Path.Combine(repoRoot, "AutoBazaar");
+        var autoBazaarDir = Path.Combine(repoRoot, "BazaarAgent");
         Assert.True(
             Directory.Exists(autoBazaarDir),
-            $"Could not locate AutoBazaar directory at '{autoBazaarDir}'."
+            $"Could not locate BazaarAgent directory at '{autoBazaarDir}'."
         );
 
         var violations = new List<string>();
@@ -377,34 +377,34 @@ public class CoreLayeringTests
 
         Assert.True(
             violations.Count == 0,
-            "AutoBazaar core must stay independent from Unity, BepInEx, Harmony, game DLLs, "
-                + "Game features, and GameInterop. Put those dependencies in Game/AutoBazaarHost. "
+            "BazaarAgent core must stay independent from Unity, BepInEx, Harmony, game DLLs, "
+                + "Game features, and GameInterop. Put those dependencies in Game/BazaarAgentHost. "
                 + "Offending imports:\n"
                 + string.Join("\n", violations)
         );
     }
 
     [Fact]
-    public void AutoBazaar_tests_reference_project_instead_of_source_linking_game_files()
+    public void BazaarAgent_tests_reference_project_instead_of_source_linking_game_files()
     {
         var repoRoot = RepoRoot();
         var testProject = Path.Combine(
             repoRoot,
             "tests",
-            "AutoBazaar.Tests",
-            "AutoBazaar.Tests.csproj"
+            "BazaarAgent.Tests",
+            "BazaarAgent.Tests.csproj"
         );
         Assert.True(File.Exists(testProject), $"Could not locate test project at '{testProject}'.");
 
         var text = File.ReadAllText(testProject);
-        Assert.Contains("BazaarPlusPlus.AutoBazaar.csproj", text);
-        Assert.DoesNotContain("Game\\AutoBazaar", text);
-        Assert.DoesNotContain("Game/AutoBazaar", text);
+        Assert.Contains("BazaarPlusPlus.BazaarAgent.csproj", text);
+        Assert.DoesNotContain("Game\\BazaarAgent", text);
+        Assert.DoesNotContain("Game/BazaarAgent", text);
         Assert.DoesNotContain("<Compile Include=\"..\\..\\Game", text);
     }
 
     [Fact]
-    public void Main_project_keeps_AutoBazaar_host_physically_optional()
+    public void Main_project_keeps_BazaarAgent_host_physically_optional()
     {
         var repoRoot = RepoRoot();
         var mainProject = Path.Combine(repoRoot, "BazaarPlusPlus.csproj");
@@ -416,39 +416,40 @@ public class CoreLayeringTests
         Assert.Contains(
             elements,
             e =>
-                e.Name.LocalName == "EnableAutoBazaarHost"
+                e.Name.LocalName == "EnableBazaarAgentHost"
                 && e.Value.Trim() == "false"
-                && IsCondition(e, "'$(EnableAutoBazaarHost)' == ''")
+                && IsCondition(e, "'$(EnableBazaarAgentHost)' == ''")
         );
         Assert.Contains(
             elements,
             e =>
                 e.Name.LocalName == "DefineConstants"
-                && e.Value.Contains("BPP_AUTOBAZAAR_HOST", StringComparison.Ordinal)
-                && IsAutoBazaarHostEnabledCondition(e)
+                && e.Value.Contains("BPP_BAZAARAGENT_HOST", StringComparison.Ordinal)
+                && IsBazaarAgentHostEnabledCondition(e)
         );
 
         Assert.Contains(
             elements,
-            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "AutoBazaar/**"
+            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "BazaarAgent/**"
         );
         Assert.Contains(
             elements,
-            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "Game/AutoBazaarHost/**"
+            e =>
+                e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "Game/BazaarAgentHost/**"
         );
         Assert.Contains(
             elements,
             e =>
                 e.Name.LocalName == "Compile"
-                && Attribute(e, "Include") == "Game/AutoBazaarHost/**/*.cs"
-                && IsAutoBazaarHostEnabledCondition(e)
+                && Attribute(e, "Include") == "Game/BazaarAgentHost/**/*.cs"
+                && IsBazaarAgentHostEnabledCondition(e)
         );
         Assert.DoesNotContain(
             elements,
             e =>
                 e.Name.LocalName == "Compile"
                 && (
-                    Attribute(e, "Include")?.StartsWith("AutoBazaar/", StringComparison.Ordinal)
+                    Attribute(e, "Include")?.StartsWith("BazaarAgent/", StringComparison.Ordinal)
                     ?? false
                 )
         );
@@ -457,8 +458,8 @@ public class CoreLayeringTests
             elements,
             e =>
                 e.Name.LocalName == "ProjectReference"
-                && Attribute(e, "Include") == "BazaarPlusPlus.AutoBazaar.csproj"
-                && IsAutoBazaarHostEnabledCondition(e)
+                && Attribute(e, "Include") == "BazaarPlusPlus.BazaarAgent.csproj"
+                && IsBazaarAgentHostEnabledCondition(e)
         );
 
         var autoBazaarArtifactIncludes = elements
@@ -466,7 +467,7 @@ public class CoreLayeringTests
                 e.Name.LocalName == "PluginManagedRuntimeFiles"
                 && (
                     Attribute(e, "Include")
-                        ?.Contains("BazaarPlusPlus.AutoBazaar.dll", StringComparison.Ordinal)
+                        ?.Contains("BazaarPlusPlus.BazaarAgent.dll", StringComparison.Ordinal)
                     ?? false
                 )
             )
@@ -474,12 +475,12 @@ public class CoreLayeringTests
         Assert.NotEmpty(autoBazaarArtifactIncludes);
         Assert.All(
             autoBazaarArtifactIncludes,
-            e => Assert.True(IsAutoBazaarHostEnabledCondition(e))
+            e => Assert.True(IsBazaarAgentHostEnabledCondition(e))
         );
     }
 
-    private static bool IsAutoBazaarHostEnabledCondition(XElement element) =>
-        IsCondition(element, "'$(EnableAutoBazaarHost)' == 'true'");
+    private static bool IsBazaarAgentHostEnabledCondition(XElement element) =>
+        IsCondition(element, "'$(EnableBazaarAgentHost)' == 'true'");
 
     private static bool IsCondition(XElement element, string expectedConditionPart) =>
         (
