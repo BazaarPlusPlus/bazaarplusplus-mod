@@ -350,7 +350,8 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         SetStatusMessage(
             battle.Source == HistoryBattleSource.Ghost && !battle.ReplayDownloaded
                 ? HistoryPanelText.DownloadingGhostReplay()
-                : HistoryPanelText.StartingReplay()
+                : HistoryPanelText.StartingReplay(),
+            StatusSeverity.Pending
         );
         _requestUiRefresh();
 
@@ -380,7 +381,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 return;
 
             _state.ReplayActionInProgress = false;
-            SetStatusMessage(HistoryPanelText.ReplayFailed(ex.Message));
+            SetStatusMessage(HistoryPanelText.ReplayFailed(ex.Message), StatusSeverity.Failure);
             BppLog.Error("HistoryPanel", "Failed to replay selected battle", ex);
             _requestUiRefresh();
             return;
@@ -390,7 +391,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
 
         _state.ReplayActionInProgress = false;
-        SetStatusMessage(replayResult.StatusMessage);
+        SetStatusMessage(
+            replayResult.StatusMessage,
+            replayResult.Succeeded ? StatusSeverity.Success : StatusSeverity.Failure
+        );
         if (!replayResult.Succeeded)
         {
             _requestUiRefresh();
@@ -431,7 +435,8 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (!_dataService.TryDeleteRun(run.RunId, out var battleIds, out var error))
         {
             SetStatusMessage(
-                HistoryPanelText.RunDeleteFailed(error?.Message ?? HistoryPanelText.Unknown())
+                HistoryPanelText.RunDeleteFailed(error?.Message ?? HistoryPanelText.Unknown()),
+                StatusSeverity.Failure
             );
             BppLog.Error(
                 "HistoryPanel",
@@ -448,7 +453,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             battleIds.Count
         );
         RefreshData();
-        SetStatusMessage(deletedMessage);
+        SetStatusMessage(deletedMessage, StatusSeverity.Success);
         _requestUiRefresh();
     }
 
@@ -481,7 +486,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         _state.ServerHealthProbeInProgress = true;
         var checking = HistoryPanelServerHealthFormatter.Checking();
-        SetStatusMessage(checking.StatusMessage);
+        SetStatusMessage(checking.StatusMessage, StatusSeverity.Pending);
         _requestUiRefresh();
 
         var sessionVersion = _session.Version;
@@ -506,7 +511,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 return;
 
             _state.ServerHealthProbeInProgress = false;
-            SetStatusMessage(HistoryPanelText.ServerHealthFailed(0, ex.Message));
+            SetStatusMessage(
+                HistoryPanelText.ServerHealthFailed(0, ex.Message),
+                StatusSeverity.Failure
+            );
             BppLog.Error("HistoryPanel", "Failed to check server health", ex);
             _requestUiRefresh();
             return;
@@ -517,7 +525,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         _state.ServerHealthProbeInProgress = false;
         var display = HistoryPanelServerHealthFormatter.FromProbeResult(result);
-        SetStatusMessage(display.StatusMessage);
+        SetStatusMessage(
+            display.StatusMessage,
+            result.Succeeded ? StatusSeverity.Success : StatusSeverity.Failure
+        );
         if (result.Succeeded)
         {
             BppLog.Info(
@@ -552,7 +563,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         }
 
         _state.GhostSyncInProgress = true;
-        SetStatusMessage(HistoryPanelText.SyncingGhostBattles());
+        SetStatusMessage(HistoryPanelText.SyncingGhostBattles(), StatusSeverity.Pending);
         _requestUiRefresh();
 
         var sessionVersion = _session.Version;
@@ -577,7 +588,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 return;
 
             _state.GhostSyncInProgress = false;
-            SetStatusMessage(HistoryPanelText.GhostSyncFailed(ex.Message));
+            SetStatusMessage(HistoryPanelText.GhostSyncFailed(ex.Message), StatusSeverity.Failure);
             BppLog.Error("HistoryPanel", "Failed to sync ghost battles", ex);
             _requestUiRefresh();
             return;
@@ -587,7 +598,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
 
         _state.GhostSyncInProgress = false;
-        SetStatusMessage(syncResult.StatusMessage);
+        SetStatusMessage(
+            syncResult.StatusMessage,
+            syncResult.Succeeded ? StatusSeverity.Success : StatusSeverity.Failure
+        );
         if (!syncResult.Succeeded)
         {
             if (syncResult.Error != null)
@@ -599,7 +613,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (_state.SectionMode == HistorySectionMode.Ghost)
         {
             RefreshGhostData();
-            SetStatusMessage(syncResult.StatusMessage);
+            SetStatusMessage(syncResult.StatusMessage, StatusSeverity.Success);
             _requestUiRefresh();
         }
         else
@@ -616,7 +630,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         }
 
         _state.FinalBuildRefreshInProgress = true;
-        SetStatusMessage(HistoryPanelText.RefreshingFinalBuilds());
+        SetStatusMessage(HistoryPanelText.RefreshingFinalBuilds(), StatusSeverity.Pending);
         _requestUiRefresh();
 
         var sessionVersion = _session.Version;
@@ -641,7 +655,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 return;
 
             _state.FinalBuildRefreshInProgress = false;
-            SetStatusMessage(HistoryPanelText.FinalBuildRefreshFailed(ex.Message));
+            SetStatusMessage(
+                HistoryPanelText.FinalBuildRefreshFailed(ex.Message),
+                StatusSeverity.Failure
+            );
             BppLog.Error("HistoryPanel", "Failed to refresh final builds", ex);
             _requestUiRefresh();
             return;
@@ -651,7 +668,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
 
         _state.FinalBuildRefreshInProgress = false;
-        SetStatusMessage(refreshResult.StatusMessage);
+        SetStatusMessage(
+            refreshResult.StatusMessage,
+            refreshResult.Succeeded ? StatusSeverity.Success : StatusSeverity.Failure
+        );
         if (!refreshResult.Succeeded && refreshResult.Error != null)
             BppLog.Error("HistoryPanel", "Failed to refresh final builds", refreshResult.Error);
         _requestUiRefresh();
@@ -724,11 +744,22 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             SetStatusMessage(null);
     }
 
-    private void SetStatusMessage(string? statusMessage, bool isDeleteConfirmation = false)
+    private void SetStatusMessage(
+        string? statusMessage,
+        StatusSeverity severity = StatusSeverity.Neutral,
+        bool isDeleteConfirmation = false
+    )
     {
         _state.StatusMessage = statusMessage;
         _state.DeleteRunConfirmationStatusActive =
             isDeleteConfirmation && !string.IsNullOrWhiteSpace(statusMessage);
+        // Severity travels with the message so the banner colour can't desync from in-flight flags
+        // (the source of the phase-1 Pending timing coupling). An empty message clears to Neutral;
+        // a delete confirmation always reads as Confirm regardless of the caller's severity.
+        _state.StatusSeverity =
+            string.IsNullOrWhiteSpace(statusMessage) ? StatusSeverity.Neutral
+            : isDeleteConfirmation ? StatusSeverity.Confirm
+            : severity;
     }
 
     private void InvalidateFilteredGhostBattles()

@@ -44,6 +44,8 @@ internal sealed class HistoryPanelState
 
     public string? StatusMessage { get; set; }
 
+    public StatusSeverity StatusSeverity { get; set; }
+
     public string? DeleteRunConfirmationRunId { get; set; }
 
     public float DeleteRunConfirmationUntil { get; set; }

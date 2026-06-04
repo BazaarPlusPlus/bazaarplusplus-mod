@@ -115,7 +115,7 @@ internal sealed partial class HistoryPanel
             ? HistoryPanelServerHealthFormatter.Checking()
             : HistoryPanelServerHealthFormatter.Idle();
 
-        var statusSeverity = ResolveStatusSeverity();
+        var statusSeverity = _state.StatusSeverity;
         var databaseChipSeverity = ResolveDatabaseChipSeverity();
 
         return new HistoryPanelUiToolkitModel
@@ -202,21 +202,6 @@ internal sealed partial class HistoryPanel
         return string.IsNullOrWhiteSpace(replayUnavailableReason)
             ? _replayService.GetReplayActionLabel(battle)
             : HistoryPanelText.ReplayUnavailable();
-    }
-
-    private StatusSeverity ResolveStatusSeverity()
-    {
-        if (_state.DeleteRunConfirmationStatusActive)
-            return StatusSeverity.Confirm;
-
-        if (
-            _state.GhostSyncInProgress
-            || _state.ServerHealthProbeInProgress
-            || _state.FinalBuildRefreshInProgress
-        )
-            return StatusSeverity.Pending;
-
-        return StatusSeverity.Neutral;
     }
 
     // Connected -> Success(green); Missing (fresh install, File.Exists=false) -> Neutral, NOT an
