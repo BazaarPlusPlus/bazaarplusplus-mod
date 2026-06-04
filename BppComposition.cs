@@ -124,7 +124,12 @@ internal sealed class BppComposition : IDisposable
         );
 
 #if BPP_AUTOBAZAAR_HOST
-        _mountables.Register(new AutoBazaarHostMount(configFile));
+        _mountables.Register(
+            new AutoBazaarHostMount(
+                configFile,
+                () => _combatReplayModule.Runtime?.IsReplayStartInProgress == true
+            )
+        );
 #endif
     }
 

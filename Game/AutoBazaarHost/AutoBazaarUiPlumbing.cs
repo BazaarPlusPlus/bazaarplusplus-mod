@@ -1,8 +1,7 @@
 #nullable enable
 using System;
 using System.Reflection;
-using BazaarPlusPlus.Game.CombatReplay;
-using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.AutoBazaar;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.AutoBazaarHost;
@@ -13,21 +12,32 @@ namespace BazaarPlusPlus.Game.AutoBazaarHost;
 /// dismissing known one-shot overlay dialogs (v1: PvP first-victory tutorial).
 /// </summary>
 /// <remarks>Main thread only. All methods are idempotent. Errors are logged and swallowed.</remarks>
-internal static class AutoBazaarUiPlumbing
+internal sealed class AutoBazaarUiPlumbing
 {
+    private readonly IAutoBazaarLogger _logger;
+    private readonly Func<bool> _isReplayStartInProgress;
+
+    public AutoBazaarUiPlumbing(IAutoBazaarLogger logger, Func<bool> isReplayStartInProgress)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _isReplayStartInProgress =
+            isReplayStartInProgress
+            ?? throw new ArgumentNullException(nameof(isReplayStartInProgress));
+    }
+
     // -------------------------------------------------------------------------
     // Reflection cache — filled on first successful lookup to avoid per-tick cost
     // -------------------------------------------------------------------------
 
     // ReplayState._exitRequested (private bool)
-    private static FieldInfo? _exitRequestedField;
+    private FieldInfo? _exitRequestedField;
 
     // -------------------------------------------------------------------------
     // Entry point
     // -------------------------------------------------------------------------
 
     /// <summary>Main thread only. Idempotent. Errors are logged and swallowed.</summary>
-    public static void Tick()
+    public void Tick()
     {
         TryAdvanceReplay();
         TryDismissKnownOverlays();
@@ -37,14 +47,14 @@ internal static class AutoBazaarUiPlumbing
     // Replay auto-advance
     // -------------------------------------------------------------------------
 
-    private static void TryAdvanceReplay()
+    private void TryAdvanceReplay()
     {
         try
         {
             var state = AppState.CurrentState;
             if (state is not ReplayState replay)
                 return;
-            if (CombatReplayRuntime.Instance?.IsReplayStartInProgress == true)
+            if (_isReplayStartInProgress())
                 return;
 
             // Guard 1: replay animation must have finished.
@@ -73,13 +83,13 @@ internal static class AutoBazaarUiPlumbing
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", "TryAdvanceReplay failed", ex);
+            _logger.Error("TryAdvanceReplay failed", ex);
         }
     }
 
-    private static MethodInfo? _exitRecapReplayStateMethod;
+    private MethodInfo? _exitRecapReplayStateMethod;
 
-    private static void TryExitRecapReplayState()
+    private void TryExitRecapReplayState()
     {
         try
         {
@@ -115,7 +125,7 @@ internal static class AutoBazaarUiPlumbing
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", "TryExitRecapReplayState failed (non-fatal)", ex);
+            _logger.Error("TryExitRecapReplayState failed (non-fatal)", ex);
         }
     }
 
@@ -123,7 +133,7 @@ internal static class AutoBazaarUiPlumbing
     // Known-overlay dismissal
     // -------------------------------------------------------------------------
 
-    private static void TryDismissKnownOverlays()
+    private void TryDismissKnownOverlays()
     {
         try
         {
@@ -152,7 +162,7 @@ internal static class AutoBazaarUiPlumbing
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", "TryDismissKnownOverlays failed", ex);
+            _logger.Error("TryDismissKnownOverlays failed", ex);
         }
     }
 
@@ -160,7 +170,7 @@ internal static class AutoBazaarUiPlumbing
     // Reflection helpers (cached)
     // -------------------------------------------------------------------------
 
-    private static bool ExitAlreadyRequested(ReplayState replay)
+    private bool ExitAlreadyRequested(ReplayState replay)
     {
         try
         {

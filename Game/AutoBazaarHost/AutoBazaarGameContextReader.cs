@@ -52,7 +52,7 @@ internal sealed class AutoBazaarGameContextReader : IAutoBazaarContextReader
 
         try
         {
-            return BuildCore(_services, isEnabled, actionCooldownRemainingSeconds);
+            return BuildCore(_services, _logger, isEnabled, actionCooldownRemainingSeconds);
         }
         catch (Exception ex)
         {
@@ -67,6 +67,7 @@ internal sealed class AutoBazaarGameContextReader : IAutoBazaarContextReader
 
     private static AutoBazaarContext BuildCore(
         IBppServices services,
+        IAutoBazaarLogger logger,
         bool isEnabled,
         double actionCooldownRemainingSeconds
     )
@@ -82,7 +83,7 @@ internal sealed class AutoBazaarGameContextReader : IAutoBazaarContextReader
         // mod can offer is StartOrContinueRun — but only when actually at hero-select.
         if (appState == null || stateName == AutoBazaarRunStateName.Unknown)
         {
-            bool canStartEarly = AutoBazaarSceneProbe.IsAtHeroSelectAndReadyForNewRun();
+            bool canStartEarly = AutoBazaarSceneProbe.IsAtHeroSelectAndReadyForNewRun(logger);
             var lobbyActions = canStartEarly
                 ? new[] { WaitOption(), StartOrContinueRunOption() }
                 : new[] { WaitOption() };
@@ -105,7 +106,7 @@ internal sealed class AutoBazaarGameContextReader : IAutoBazaarContextReader
         bool hasActiveRun = Data.HasActiveRun;
         // CanStartOrContinueRun: true on the hero-select scene with profile loaded
         // and no active AppState — see AutoBazaarSceneProbe for the conservative check.
-        bool canStartOrContinueRun = AutoBazaarSceneProbe.IsAtHeroSelectAndReadyForNewRun();
+        bool canStartOrContinueRun = AutoBazaarSceneProbe.IsAtHeroSelectAndReadyForNewRun(logger);
 
         string? runId = null;
         if (run != null && run.GameModeId != default(Guid))

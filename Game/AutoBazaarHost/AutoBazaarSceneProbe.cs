@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 using System.Reflection;
-using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.AutoBazaar;
 using HarmonyLib;
 using TheBazaar;
 using UnityEngine.SceneManagement;
@@ -24,21 +24,20 @@ internal static class AutoBazaarSceneProbe
 
     private static (bool sceneOk, bool appStateNull, bool profileLoaded)? _lastDiagnosis;
 
-    public static bool IsAtHeroSelectAndReadyForNewRun()
+    public static bool IsAtHeroSelectAndReadyForNewRun(IAutoBazaarLogger logger)
     {
         try
         {
             var sceneName = SceneManager.GetActiveScene().name;
             var sceneOk = string.Equals(sceneName, HeroSelectSceneName, StringComparison.Ordinal);
             var appStateNull = AppState.CurrentState == null;
-            var profileLoaded = TryReadProfileLoaded();
+            var profileLoaded = TryReadProfileLoaded(logger);
 
             var snapshot = (sceneOk, appStateNull, profileLoaded);
             if (_lastDiagnosis != snapshot)
             {
                 _lastDiagnosis = snapshot;
-                BppLog.Info(
-                    "AutoBazaar",
+                logger.Info(
                     $"SceneProbe: scene='{sceneName}' (ok={sceneOk}) appStateNull={appStateNull} profileLoaded={profileLoaded}"
                 );
             }
@@ -47,12 +46,12 @@ internal static class AutoBazaarSceneProbe
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", "IsAtHeroSelectAndReadyForNewRun failed", ex);
+            logger.Error("IsAtHeroSelectAndReadyForNewRun failed", ex);
             return false;
         }
     }
 
-    private static bool TryReadProfileLoaded()
+    private static bool TryReadProfileLoaded(IAutoBazaarLogger logger)
     {
         if (!_reflectionAttempted)
         {
@@ -60,7 +59,7 @@ internal static class AutoBazaarSceneProbe
             var clientCacheType = AccessTools.TypeByName("TheBazaar.ClientCache");
             if (clientCacheType is null)
             {
-                BppLog.Info("AutoBazaar", "TheBazaar.ClientCache not found via reflection");
+                logger.Info("TheBazaar.ClientCache not found via reflection");
                 return false;
             }
             _clientCacheProfileField = clientCacheType.GetField(

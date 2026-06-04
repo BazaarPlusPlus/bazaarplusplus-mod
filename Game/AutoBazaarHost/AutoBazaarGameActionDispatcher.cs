@@ -7,7 +7,6 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.AutoBazaar;
 using BazaarPlusPlus.GameInterop;
-using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 
@@ -15,6 +14,13 @@ namespace BazaarPlusPlus.Game.AutoBazaarHost;
 
 internal sealed class AutoBazaarGameActionDispatcher : IAutoBazaarActionDispatcher
 {
+    private readonly IAutoBazaarLogger _logger;
+
+    public AutoBazaarGameActionDispatcher(IAutoBazaarLogger logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
     /// <summary>Main thread only. Routes the action through AppState.CurrentState.*Command()
     /// so the game's UI animation + state-validation chain runs the same way a real click does.</summary>
     public AutoBazaarDispatchResult Execute(
@@ -28,7 +34,7 @@ internal sealed class AutoBazaarGameActionDispatcher : IAutoBazaarActionDispatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("AutoBazaar", $"dispatch threw for {action.ActionKind}", ex);
+            _logger.Error($"dispatch threw for {action.ActionKind}", ex);
             return new(false, $"dispatcher exception: {ex.GetType().Name}");
         }
     }

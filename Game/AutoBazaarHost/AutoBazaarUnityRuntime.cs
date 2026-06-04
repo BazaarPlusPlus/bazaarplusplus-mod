@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using BazaarPlusPlus.AutoBazaar;
 using BazaarPlusPlus.Core.Runtime;
 using BepInEx.Configuration;
@@ -12,12 +13,17 @@ internal sealed class AutoBazaarUnityRuntime : MonoBehaviour
 
     internal AutoBazaarContextSnapshot? CurrentSnapshot => _controller?.CurrentSnapshot;
 
-    public void Initialize(IBppServices services, ConfigFile configFile)
+    public void Initialize(
+        IBppServices services,
+        ConfigFile configFile,
+        Func<bool> isReplayStartInProgress
+    )
     {
         var logger = new AutoBazaarBppLogger();
         var options = new AutoBazaarBepInExOptions(configFile);
         var contextReader = new AutoBazaarGameContextReader(services, options, logger);
-        var dispatcher = new AutoBazaarGameActionDispatcher();
+        var dispatcher = new AutoBazaarGameActionDispatcher(logger);
+        var uiPlumbing = new AutoBazaarUiPlumbing(logger, isReplayStartInProgress);
 
         _controller = new AutoBazaarRuntimeController(
             options,
@@ -25,7 +31,7 @@ internal sealed class AutoBazaarUnityRuntime : MonoBehaviour
             dispatcher,
             logger,
             new SystemAutoBazaarClock(),
-            AutoBazaarUiPlumbing.Tick
+            uiPlumbing.Tick
         );
 
         logger.Info("AutoBazaarUnityRuntime initialized");

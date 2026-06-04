@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using BazaarPlusPlus.Core.Runtime;
 using BepInEx.Configuration;
 using UnityEngine;
@@ -9,17 +10,19 @@ namespace BazaarPlusPlus.Game.AutoBazaarHost;
 internal sealed class AutoBazaarHostMount : IBppMountable
 {
     private readonly ConfigFile _configFile;
+    private readonly Func<bool> _isReplayStartInProgress;
     private AutoBazaarUnityRuntime? _runtime;
 
-    public AutoBazaarHostMount(ConfigFile configFile)
+    public AutoBazaarHostMount(ConfigFile configFile, Func<bool> isReplayStartInProgress)
     {
         _configFile = configFile;
+        _isReplayStartInProgress = isReplayStartInProgress;
     }
 
     public void Mount(GameObject host, IBppServices services)
     {
         _runtime = host.AddComponent<AutoBazaarUnityRuntime>();
-        _runtime.Initialize(services, _configFile);
+        _runtime.Initialize(services, _configFile, _isReplayStartInProgress);
     }
 
     public void Unmount(GameObject host)
