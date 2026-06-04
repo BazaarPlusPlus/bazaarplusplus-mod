@@ -28,10 +28,10 @@ internal sealed class CollectionFilterState
     public string? SelectedTrainerSourceKey { get; set; }
     public bool IncludePackages { get; set; }
 
-    // User-selected run "Day" filter; null means no day filtering. Only meaningful in-run — the
-    // panel defaults it from Data.Run.Day each time it opens. Deliberately not part of
-    // CollectionPanelSelectionState's cross-session round-trip; recomputed from run state on open.
-    public int? SelectedRunDay { get; set; }
+    // User-selected run "Day" filter; null means no day filtering. Starts enabled so the panel
+    // binds it to Data.Run.Day on open; outside a run, OutOfRunDay keeps the toggle visibly active
+    // without narrowing the catalog.
+    public int? SelectedRunDay { get; set; } = DayTierSchedule.OutOfRunDay;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
     public EHero? SelectedHero

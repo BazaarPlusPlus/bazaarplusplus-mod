@@ -29,7 +29,7 @@ internal sealed class CollectionPanelViewModel
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
     public string? SelectedSourceKey { get; set; }
     public bool IncludePackages { get; set; }
-    public bool HasPackages { get; set; }
+    public bool ShowPackageToggle { get; set; } = true;
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
@@ -324,7 +324,7 @@ internal sealed partial class CollectionPanelView : IDisposable
             pair.Value.style.opacity = model.SourceSelectorEnabled ? 1f : 0.58f;
         }
         if (_packageToggleButton != null)
-            RefreshPackageToggle(model.IncludePackages, model.HasPackages);
+            RefreshPackageToggle(model.IncludePackages, model.ShowPackageToggle);
         if (_dayToggleButton != null)
             RefreshDayToggle(model.DayFilterValue, model.DayFilterActive);
         if (_sortQualityButton != null)

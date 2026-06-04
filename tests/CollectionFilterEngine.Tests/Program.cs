@@ -63,6 +63,11 @@ AssertEqual(
     defaultSelection.SelectedSourceKind,
     "Default panel selection should target the Item merchant source rail."
 );
+AssertEqual(
+    DayTierSchedule.OutOfRunDay,
+    new CollectionFilterState().SelectedRunDay,
+    "New filter state should start with the day filter selected."
+);
 var selectionState = new CollectionFilterState();
 selectionState.Merchants.Add(CollectionMerchantKind.Burn);
 selectionState.SelectedTrainerSourceKey = "trainer:old";

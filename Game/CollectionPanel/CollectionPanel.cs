@@ -743,7 +743,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
             SelectedSourceKey = _filter.GetSelectedSourceKey(_filter.ActiveType),
             IncludePackages = _filter.IncludePackages,
-            HasPackages = HasPackages(),
+            ShowPackageToggle = true,
             SourceSelectorEnabled = !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
             DayFilterActive = _filter.SelectedRunDay != null,
@@ -783,17 +783,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             );
         }
         return result;
-    }
-
-    private bool HasPackages()
-    {
-        foreach (var card in _catalogCards)
-        {
-            if (card.IsPackage)
-                return true;
-        }
-
-        return false;
     }
 
     private bool PruneInvisibleSourceSelections()
