@@ -34,36 +34,32 @@ internal static class BppStaticDataAccess
         return manager.GetCardById(templateId) as TCardBase;
     }
 
-    public static bool TryGetCardMap(
-        out object? managerObject,
-        out Dictionary<Guid, ITCard>? map,
-        out string unavailableReason
-    )
+    /// <summary>
+    /// Non-blocking handle to the static data manager. Returns the manager as an opaque object
+    /// only when it is fully materialised (created, and any task-returning <c>GetStatic()</c>
+    /// already completed); returns <c>null</c> otherwise. Unlike <see cref="TryGet"/> this never
+    /// blocks the main thread waiting on the static-data task.
+    /// </summary>
+    public static object? TryGetReadyManagerObject()
     {
-        managerObject = TryGet();
-        map = null;
-        unavailableReason = string.Empty;
+        if (!Data.IsManagerCreated())
+            return null;
 
-        if (managerObject is not JsonGameDataManager manager)
-        {
-            unavailableReason = "static-data-not-ready";
-            return false;
-        }
+        object? staticData = Data.GetStatic();
+        if (staticData is Task<JsonGameDataManager> task)
+            return task.IsCompleted ? task.Result : null;
 
-        try
-        {
-            map = manager.GetCardMap();
-        }
-        catch
-        {
-            unavailableReason = "get-card-map-threw";
-            throw;
-        }
-
-        if (map != null)
-            return true;
-
-        unavailableReason = "card-map-null";
-        return false;
+        return staticData as JsonGameDataManager;
     }
+
+    /// <summary>
+    /// Materialises the full card map (<c>JsonGameDataManager.GetCardMap()</c> → <c>ReadAllCards</c>:
+    /// a full-table SQLite read plus polymorphic JSON deserialize — the dominant first-open cost).
+    /// Intended to run on a worker thread: the game opens its own SQLite connection, deserializes
+    /// on PLINQ workers, builds a fresh dictionary, and publishes it via an atomic reference
+    /// assignment, so calling it off the main thread does not tear the shared map. <paramref
+    /// name="source"/> must come from <see cref="TryGetReadyManagerObject"/> or <see cref="TryGet"/>.
+    /// </summary>
+    public static Dictionary<Guid, ITCard>? LoadCardMap(object? source) =>
+        source is JsonGameDataManager manager ? manager.GetCardMap() : null;
 }

@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
@@ -12,6 +13,8 @@ internal sealed class CollectionCatalog
     private IReadOnlyList<CollectionCardVm>? _cache;
     private object? _cacheSource;
     private int _cacheSourceTemplateCount;
+    private Task<Dictionary<Guid, ITCard>?>? _cardMapTask;
+    private object? _cardMapTaskSource;
 
     public bool TryGetCached(out CollectionCatalogBuildResult result)
     {
@@ -41,7 +44,42 @@ internal sealed class CollectionCatalog
         return true;
     }
 
+    /// <summary>
+    /// True once an off-thread card-map load has been kicked for the current static-data source.
+    /// </summary>
+    public bool HasCardMapLoadStarted => _cardMapTask != null;
+
+    /// <summary>
+    /// Kicks (or returns the in-flight) off-thread load of the full game card map so the heavy
+    /// <c>ReadAllCards</c> SQLite read never runs on the Unity main thread. Idempotent per
+    /// static-data manager: repeated calls for the same source share one Task; a changed source
+    /// (runtime swap) re-kicks. Returns <c>null</c> only when static data is not ready yet
+    /// (non-blocking). <paramref name="source"/> is the manager the Task loads from.
+    /// </summary>
+    public Task<Dictionary<Guid, ITCard>?>? BeginCardMapLoad(out object? source)
+    {
+        source = BppStaticDataAccess.TryGetReadyManagerObject();
+        if (source == null)
+            return null;
+
+        if (_cardMapTask != null && ReferenceEquals(_cardMapTaskSource, source))
+            return _cardMapTask;
+
+        var captured = source;
+        _cardMapTaskSource = source;
+        _cardMapTask = Task.Run(() => BppStaticDataAccess.LoadCardMap(captured));
+        return _cardMapTask;
+    }
+
+    /// <summary>
+    /// Builds a catalog session from a card map already materialised by
+    /// <see cref="BeginCardMapLoad"/> (kept off the main thread). The session then enumerates the
+    /// map on the time-sliced build loop. Exceptions from the off-thread load are surfaced by the
+    /// caller via the Task; a null <paramref name="map"/> yields an unavailable reason here.
+    /// </summary>
     public bool TryCreateBuildSession(
+        object? source,
+        Dictionary<Guid, ITCard>? map,
         out CollectionCatalogBuildSession? session,
         out string unavailableReason
     )
@@ -49,47 +87,24 @@ internal sealed class CollectionCatalog
         session = null;
         unavailableReason = string.Empty;
 
-        object? managerObject;
-        Dictionary<Guid, ITCard>? map;
-        try
+        if (source == null)
         {
-            if (
-                !BppStaticDataAccess.TryGetCardMap(
-                    out managerObject,
-                    out map,
-                    out unavailableReason
-                )
-            )
-            {
-                if (unavailableReason == "static-data-not-ready")
-                {
-                    BppLog.Debug(
-                        "CollectionCatalog",
-                        "Static data manager not yet ready; catalog build deferred."
-                    );
-                }
-                else if (unavailableReason == "card-map-null")
-                {
-                    BppLog.Warn("CollectionCatalog", "GetCardMap() returned null.");
-                }
-                return false;
-            }
-        }
-        catch (Exception ex)
-        {
-            unavailableReason = "get-card-map-threw";
-            BppLog.Error("CollectionCatalog", "GetCardMap() threw", ex);
+            unavailableReason = "static-data-not-ready";
+            BppLog.Debug(
+                "CollectionCatalog",
+                "Static data manager not yet ready; catalog build deferred."
+            );
             return false;
         }
 
-        if (managerObject == null || map == null)
+        if (map == null)
         {
             unavailableReason = "card-map-null";
             BppLog.Warn("CollectionCatalog", "GetCardMap() returned null.");
             return false;
         }
 
-        session = new CollectionCatalogBuildSession(managerObject, map);
+        session = new CollectionCatalogBuildSession(source, map);
         return true;
     }
 

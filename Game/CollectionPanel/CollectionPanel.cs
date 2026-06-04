@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.GameState;
@@ -227,7 +228,29 @@ internal sealed class CollectionPanel : MonoBehaviour
         }
 
         ApplyOpenSelection(selection);
+        // Temporary main-path probe: EnsureView() is heavy one-time UITK construction (visual
+        // tree + CJK glyph raster + cold OTF extract) that runs on the click frame BEFORE the
+        // panel is shown and is invisible to CollectionPanelLoadDiagnostics (created later in the
+        // coroutine). Time the first construction so its click-frame cost is attributable.
+        var ensureViewStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        var firstViewConstruction = _view == null;
         EnsureView();
+        if (firstViewConstruction)
+        {
+            var ensureViewMs =
+                (System.Diagnostics.Stopwatch.GetTimestamp() - ensureViewStartedAt)
+                * 1000.0
+                / System.Diagnostics.Stopwatch.Frequency;
+            BppLog.Info(
+                "CollectionPanelLoad",
+                "openPrologue ensureView="
+                    + ensureViewMs.ToString(
+                        "0.0",
+                        System.Globalization.CultureInfo.InvariantCulture
+                    )
+                    + "ms (first view construction)"
+            );
+        }
         _supporters = BPPSupporters.SampleMany(4);
         _isVisible = true;
         // SetVisible starts the fade-in ramp; overlay activates so its CanvasGroup starts
@@ -261,6 +284,13 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void Update()
     {
         DetectSceneChange();
+
+        // Opportunistically warm the card catalog off-thread once static data is ready, so the
+        // first panel open does not pay the full-table card read (JsonGameDataManager.GetCardMap
+        // -> ReadAllCards) on the main thread. The catalog kicks a single shared Task per
+        // static-data source; the first open then awaits it instead of blocking.
+        if (!_catalog.HasCardMapLoadStarted)
+            _catalog.BeginCardMapLoad(out _);
 
         if (_isVisible && TheBazaar.Data.IsInCombat)
         {
@@ -500,31 +530,71 @@ internal sealed class CollectionPanel : MonoBehaviour
             _catalogCards = cached.Cards;
             ClearStatus();
         }
-        else if (_catalog.TryCreateBuildSession(out var session, out var unavailableReason))
+        else
         {
-            var buildSession = session!;
-            using (buildSession)
+            // First open (cache miss): acquire the full card map OFF the main thread. The heavy
+            // cost is JsonGameDataManager.GetCardMap() -> ReadAllCards (~22 MB full-table SQLite
+            // read + polymorphic deserialize); running it synchronously here froze the click path
+            // because it sits before the time-sliced Step loop and cannot be preempted. Await the
+            // shared prewarm Task (kicked from Update / reused here) while the loading shell +
+            // spinner keep animating, then build the catalog from the materialised map.
+            var acquireStarted = diagnostics.Now();
+            var loadTask = _catalog.BeginCardMapLoad(out var source);
+            if (loadTask != null)
             {
-                while (true)
+                while (!loadTask.IsCompleted)
                 {
-                    var frameStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
-                    if (buildSession.Step(() => ShouldPauseCatalogBuild(frameStartedAt)))
-                        break;
                     if (!IsLoadGenerationCurrent(generation))
                         yield break;
                     yield return null;
                 }
-
-                catalogResult = _catalog.Commit(buildSession);
-                _catalogCards = catalogResult.Cards;
-                ClearStatus();
             }
-        }
-        else
-        {
-            _catalogCards = Array.Empty<CollectionCardVm>();
-            SetStatus(CollectionPanelText.CatalogUnavailable());
-            diagnostics.AddValue("unavailableReason", unavailableReason);
+            diagnostics.AddSegment("catalogAcquire", acquireStarted);
+
+            var map = loadTask is { Status: TaskStatus.RanToCompletion } ? loadTask.Result : null;
+            if (loadTask is { IsFaulted: true })
+            {
+                // A faulted Task always carries a non-null AggregateException.
+                BppLog.Error(
+                    "CollectionPanel",
+                    "Off-thread card map load failed.",
+                    loadTask.Exception!.GetBaseException()
+                );
+            }
+
+            if (
+                _catalog.TryCreateBuildSession(
+                    source,
+                    map,
+                    out var session,
+                    out var unavailableReason
+                )
+            )
+            {
+                var buildSession = session!;
+                using (buildSession)
+                {
+                    while (true)
+                    {
+                        var frameStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+                        if (buildSession.Step(() => ShouldPauseCatalogBuild(frameStartedAt)))
+                            break;
+                        if (!IsLoadGenerationCurrent(generation))
+                            yield break;
+                        yield return null;
+                    }
+
+                    catalogResult = _catalog.Commit(buildSession);
+                    _catalogCards = catalogResult.Cards;
+                    ClearStatus();
+                }
+            }
+            else
+            {
+                _catalogCards = Array.Empty<CollectionCardVm>();
+                SetStatus(CollectionPanelText.CatalogUnavailable());
+                diagnostics.AddValue("unavailableReason", unavailableReason);
+            }
         }
         diagnostics.AddSegment("catalog", started);
         if (catalogResult != null)
