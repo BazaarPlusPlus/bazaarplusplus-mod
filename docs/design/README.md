@@ -31,7 +31,7 @@ Work designed but not yet (fully) landed; lives at this top level until implemen
 - [`2026-06-02-merchant-trainer-portrait-plan.md`](2026-06-02-merchant-trainer-portrait-plan.md) — 商人/训练师头像方案（**活计划；实际经 `CollectionSources/` 子系统落地，与原 `Game/CollectionPanel/Encounters/` 设计不同，「实现进展」段已订正**）。
 - [`2026-06-03-collection-search-removal-sponsor-tweaks-rail-stability.md`](2026-06-03-collection-search-removal-sponsor-tweaks-rail-stability.md) — CollectionPanel 搜索移除 + sponsor 归因 + 操作 rail 稳定性（**✅ 搜索移除已落地（commit f701dce）**）。
 - [`2026-06-03-localization-module-extraction-refactor-prompt.md`](2026-06-03-localization-module-extraction-refactor-prompt.md) — 本地化抽取 executor prompt（**spent；§3 现状描述为抽取前状态，已加注**）。
-- [`2026-06-04-collection-panel-day-filter-design.md`](2026-06-04-collection-panel-day-filter-design.md) — CollectionPanel 新增「天数 / Day」**仅对局内**筛选维度：把当前（或所选）天映射为等级上限（硬编码 Day 1=青铜 / 2–5=白银 / 6–7=黄金 / 8+=钻石，Legendary 随 Diamond），保留 `StartingTier ≤ 上限` 的卡，与现有 Tier 行独立 AND；纯过滤逻辑由 exe-runner 单测覆盖（**✅ 已实现（代码 + 单测 + Debug 构建通过），待游戏内手测验证**）。
+- [`2026-06-04-collection-panel-day-filter-design.md`](2026-06-04-collection-panel-day-filter-design.md) — CollectionPanel 新增「天数 / Day」筛选：把当前运行天映射为等级上限（硬编码 Day 1=青铜 / 2–5=白银 / 6–7=黄金 / 8+=钻石，Legendary 随 Diamond），保留 `StartingTier ≤ 上限` 的卡，与现有 Tier 行独立 AND；纯过滤逻辑由 exe-runner 单测覆盖。**2026-06-05 改版**：天数选择器 → 顶部「天数」toggle（克隆「包裹」开关，默认关闭、局外按 20）（**✅ 已实现（代码 + 单测 + Debug 构建通过），待游戏内手测验证**）。
 
 ## Archived specs
 

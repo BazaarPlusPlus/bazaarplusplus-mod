@@ -112,6 +112,12 @@ internal sealed partial class CollectionPanelView
         _sortSizeButton.style.marginLeft = UiSpacing.Xs;
         sortGroup.Add(_sortSizeButton);
 
+        // Day filter toggle: same control shape as the package toggle, just left of it.
+        _dayToggleButton = CreateDayToggleButton();
+        _dayToggleButton.style.marginLeft = UiSpacing.Sm;
+        _dayToggleButton.style.marginTop = UiSpacing.Xs;
+        primaryControlsRow.Add(_dayToggleButton);
+
         _packageToggleButton = CreatePackageToggleButton();
         _packageToggleButton.style.marginLeft = UiSpacing.Sm;
         _packageToggleButton.style.marginTop = UiSpacing.Xs;
@@ -121,15 +127,6 @@ internal sealed partial class CollectionPanelView
         CreateFilterSection(rail, CollectionPanelText.HeroHeader(), UiSpacing.Xl, out _heroChipRow);
         _heroChipRow.style.flexWrap = Wrap.NoWrap;
         _heroChipRow.style.justifyContent = Justify.SpaceBetween;
-
-        // Day filter (in-run only — sits above Tier so "the day caps the tier ceiling" reads top
-        // down; Refresh hides this section out of run). Default Wrap lets the numeric chips wrap.
-        _dayFilterSection = CreateFilterSection(
-            rail,
-            CollectionPanelText.DayHeader(),
-            UiSpacing.Lg,
-            out _dayChipRow
-        );
 
         // Tier filter.
         CreateFilterSection(rail, CollectionPanelText.TierHeader(), UiSpacing.Lg, out _tierChipRow);
@@ -284,6 +281,50 @@ internal sealed partial class CollectionPanelView
         );
         UiStyle.Radius(_packageSwitchKnob.style, Sizes.PackageSwitchKnobSize / 2f);
         _packageSwitchTrack.Add(_packageSwitchKnob);
+        return button;
+    }
+
+    private Button CreateDayToggleButton()
+    {
+        var button = CreateButton(
+            string.Empty,
+            _toggleDayFilter,
+            Sizes.PackageToggleWidth,
+            Sizes.ButtonStandardHeight
+        );
+        button.style.flexDirection = FlexDirection.Row;
+        button.style.justifyContent = Justify.SpaceBetween;
+        button.style.alignItems = Align.Center;
+        UiStyle.HorizontalPadding(button.style, UiSpacing.Md);
+
+        _dayToggleLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
+        _dayToggleLabel.text = CollectionPanelText.DayHeader();
+        _dayToggleLabel.style.flexShrink = 0f;
+        button.Add(_dayToggleLabel);
+
+        _daySwitchTrack = new VisualElement { pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(
+            _daySwitchTrack.style,
+            Sizes.PackageSwitchWidth,
+            Sizes.PackageSwitchHeight
+        );
+        _daySwitchTrack.style.position = Position.Relative;
+        _daySwitchTrack.style.marginLeft = UiSpacing.Sm;
+        UiStyle.Radius(_daySwitchTrack.style, Sizes.PackageSwitchHeight / 2f);
+        UiStyle.Border(_daySwitchTrack.style, Borders.Thin, Colors.HistoryStatusBorder);
+        button.Add(_daySwitchTrack);
+
+        _daySwitchKnob = new VisualElement { pickingMode = PickingMode.Ignore };
+        _daySwitchKnob.style.position = Position.Absolute;
+        _daySwitchKnob.style.left = Sizes.PackageSwitchKnobOffLeft;
+        _daySwitchKnob.style.top = 1f;
+        UiStyle.FixedSize(
+            _daySwitchKnob.style,
+            Sizes.PackageSwitchKnobSize,
+            Sizes.PackageSwitchKnobSize
+        );
+        UiStyle.Radius(_daySwitchKnob.style, Sizes.PackageSwitchKnobSize / 2f);
+        _daySwitchTrack.Add(_daySwitchKnob);
         return button;
     }
 

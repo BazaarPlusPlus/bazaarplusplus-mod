@@ -1,6 +1,6 @@
 # CollectionPanel「天数 (Day)」筛选 设计
 
-> **Status:** ✅ 已实现（代码 + exe-runner 单测 + Debug 构建通过，2026-06-04）；待游戏内手测验证，验证后物理移入 `archive/`。
+> **Status:** ✅ 已实现（代码 + exe-runner 单测 + Debug 构建通过）。**UI 于 2026-06-05 改版**：天数选择器 → 顶部 toggle（见下「修订」；本文「设计详述 §5–§7」为原选择器方案，作历史保留）。待游戏内手测验证，验证后物理移入 `archive/`。
 
 **Goal:** 在 CollectionPanel 增加一个**仅对局内 (in-run) 生效**的「天数 / Day」筛选维度。它把当前（或用户所选）天数翻译成一个**等级上限**，只保留 `StartingTier ≤ 上限` 的卡，从而回答「这一天我可能被开出哪些卡」。复用面板已有的「打开时读取英雄 / 商人运行态」机制来默认选中当前天。
 
@@ -13,8 +13,14 @@
 | # | 决策点 | 选定 |
 |---|---|---|
 | 1 | Day→等级 数据来源 | **硬编码阈值**（非运行时读游戏表）：Day 1 = 青铜 / 2–5 = +白银 / 6–7 = +黄金 / 8+ = +钻石 |
-| 2 | 交互形态 | **可选天数选择器，默认 = 当前天**（仅对局内显示） |
+| 2 | 交互形态 | ~~可选天数选择器，默认 = 当前天（仅对局内显示）~~ → **2026-06-05 改版：顶部「天数」toggle**（克隆「包裹」开关，默认关闭、点击参与筛选） |
 | 3 | 与现有「品质/等级 Tier」筛选关系 | **独立 AND**，互不改写 |
+
+> **修订（2026-06-05）：天数选择器 → 顶部 toggle。** 落地后反馈无需逐天可选，遂移除 1–15 天数芯片选择器，改为顶部控制行（与「包裹」并列）的「天数」开关，逻辑对齐包裹 toggle：
+> - **开** = 按**当前运行天**参与筛选；局外（或读不到 `Data.Run.Day`）按 `DayTierSchedule.OutOfRunDay = 20`（落在钻石档 ⇒ 不收窄）。**关** = 不按天筛选。
+> - **默认关闭**、开关状态**跨开面板保留**（同包裹）；天数值每次打开按运行态刷新（`ApplyOpenSelection` 重钉）；始终显示（不再「仅对局内」隐藏）。
+> - **过滤语义不变**：仍是 `SelectedRunDay → CeilingTier → StartingTier ≤ 上限` 的独立 AND；`CollectionFilterEngine`/`DayTierSchedule.CeilingTier`/`AllowsStartingTier` 与 exe-runner 单测**原样保留**，仅 UI/state 装配改动。
+> - **增删**：移除 `EnsureDayChips`/`_dayChips`/Tree 天数区段、`AvailableDays`/`ShowDayFilter`、`BuildDayRange`、`DefaultMaxPickerDay`、`Sizes.DayChipWidth`；新增 `DayTierSchedule.OutOfRunDay`、`CreateDayToggleButton`/`RefreshDayToggle`、VM `DayFilterActive`。
 
 ---
 

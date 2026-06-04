@@ -84,9 +84,9 @@ internal sealed class CollectionPanel : MonoBehaviour
     private int _loadGeneration;
     private bool _isLoadingCatalog;
 
-    // Captured once per open in ResolveOpenSelection: whether the panel opened during a run and,
-    // if so, that run's current day. Drive the in-run-only Day filter; recomputed on every open.
-    private bool _isInGameRun;
+    // The run's current day, captured once per open in ResolveOpenSelection (null out of run, or
+    // when Data.Run is unreadable). The Day toggle filters by this value, falling back to
+    // DayTierSchedule.OutOfRunDay. Recomputed on every open.
     private int? _currentRunDay;
 
     public void Initialize(IBppServices services)
@@ -149,9 +149,8 @@ internal sealed class CollectionPanel : MonoBehaviour
                 + $"matched={IsMatchedOpenSelection(selection)}"
         );
 
-        // The day does not change while the panel is open, so capture run context once here.
-        // Both Open() entry paths call ResolveOpenSelection before applying the selection.
-        _isInGameRun = isInGameRun;
+        // The day does not change while the panel is open, so capture it once here. Both Open()
+        // entry paths call ResolveOpenSelection before applying the selection.
         _currentRunDay = isInGameRun ? TryReadCurrentDay() : null;
         return selection;
     }
@@ -287,9 +286,11 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void ApplyOpenSelection(CollectionPanelSelectionState selection)
     {
         _filter.ApplySelection(selection);
-        // Default the in-run Day filter to the run's current day (null out of run). _currentRunDay
-        // was just captured in ResolveOpenSelection, which always runs before this.
-        _filter.SelectedRunDay = _currentRunDay;
+        // The Day toggle's on/off persists across opens (like the package toggle); when it is on,
+        // re-pin it to the freshly-read day. _currentRunDay was just captured in
+        // ResolveOpenSelection, which always runs before this.
+        if (_filter.SelectedRunDay != null)
+            _filter.SelectedRunDay = _currentRunDay ?? DayTierSchedule.OutOfRunDay;
         PruneInvisibleSourceSelections();
         _scrollY = 0f;
     }
@@ -464,10 +465,13 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ApplyFilters();
                 RefreshView();
             },
-            toggleDay: day =>
+            toggleDayFilter: () =>
             {
-                // Re-click the selected day to clear it (back to no day filter — all tiers shown).
-                _filter.SelectedRunDay = _filter.SelectedRunDay == day ? (int?)null : day;
+                // Toggle whether the day participates in filtering. On uses the current run day
+                // (or OutOfRunDay out of run); off clears the day filter entirely.
+                _filter.SelectedRunDay = _filter.SelectedRunDay is null
+                    ? _currentRunDay ?? DayTierSchedule.OutOfRunDay
+                    : (int?)null;
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -742,9 +746,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             HasPackages = HasPackages(),
             SourceSelectorEnabled = !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
-            ShowDayFilter = _isInGameRun,
-            AvailableDays = BuildDayRange(_currentRunDay),
-            SelectedRunDay = _filter.SelectedRunDay,
+            DayFilterActive = _filter.SelectedRunDay != null,
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
@@ -752,16 +754,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             ContentHeight = _virtualizer.ContentHeight,
         };
         _view.Refresh(model);
-    }
-
-    // 1..max, where max extends past the default picker bound when the current run is deeper.
-    private static IReadOnlyList<int> BuildDayRange(int? currentDay)
-    {
-        var max = Math.Max(DayTierSchedule.DefaultMaxPickerDay, currentDay ?? 0);
-        var days = new int[max];
-        for (var i = 0; i < max; i++)
-            days[i] = i + 1;
-        return days;
     }
 
     private IReadOnlyList<CollectionSourceOptionViewModel> AvailableSourcesFor(ECardType activeType)

@@ -9,9 +9,9 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 // revisit after balance patches. All thresholds live here as the single source of truth.
 internal static class DayTierSchedule
 {
-    // Default upper bound for the day picker (matches the game's default NumDays). When the
-    // current run day exceeds this, BuildDayRange extends the range out to the current day.
-    public const int DefaultMaxPickerDay = 10;
+    // Day used when out of a run (and as an in-run fallback when the run day can't be read). Day 20
+    // sits in the Diamond ceiling band, so turning the filter on out of run narrows nothing.
+    public const int OutOfRunDay = 20;
 
     public static ETier CeilingTier(int day) =>
         day switch

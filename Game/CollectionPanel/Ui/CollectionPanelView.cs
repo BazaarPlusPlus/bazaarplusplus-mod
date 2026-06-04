@@ -33,11 +33,8 @@ internal sealed class CollectionPanelViewModel
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
-    // In-run-only Day filter. ShowDayFilter gates the whole section; AvailableDays is the picker
-    // range (1..N); SelectedRunDay is the highlighted day, or null when no day is filtered.
-    public bool ShowDayFilter { get; set; }
-    public IReadOnlyList<int> AvailableDays { get; set; } = Array.Empty<int>();
-    public int? SelectedRunDay { get; set; }
+    // Day filter toggle state (on = filtering by the current run day, or OutOfRunDay out of run).
+    public bool DayFilterActive { get; set; }
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
     public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();
@@ -65,7 +62,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action<ECardType> _setActiveType;
     private readonly Action<EHero> _toggleHero;
     private readonly Action<ETier> _toggleTier;
-    private readonly Action<int> _toggleDay;
+    private readonly Action _toggleDayFilter;
     private readonly Action<ECardSize> _toggleSize;
     private readonly Action<string> _toggleSource;
     private readonly Action _togglePackages;
@@ -86,16 +83,18 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _packageToggleLabel;
     private VisualElement? _packageSwitchTrack;
     private VisualElement? _packageSwitchKnob;
+    private Button? _dayToggleButton;
+    private Label? _dayToggleLabel;
+    private VisualElement? _daySwitchTrack;
+    private VisualElement? _daySwitchKnob;
     private Button? _sortQualityButton;
     private Button? _sortSizeButton;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
-    private VisualElement? _dayChipRow;
     private VisualElement? _sizeChipRow;
     private Label? _sourceFilterLabel;
     private VisualElement? _sourceChipRow;
     private VisualElement? _sizeFilterSection;
-    private VisualElement? _dayFilterSection;
     private VisualElement? _sourceFilterSection;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
@@ -110,7 +109,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Dictionary<EHero, Button> _heroChips = new();
     private readonly Dictionary<EHero, VisualElement> _heroChipIcons = new();
     private readonly Dictionary<ETier, Button> _tierChips = new();
-    private readonly Dictionary<int, Button> _dayChips = new();
     private readonly Dictionary<ECardSize, Button> _sizeChips = new();
     private readonly Dictionary<string, Button> _sourceChips = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VisualElement> _sourceChipIcons = new(
@@ -136,7 +134,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action<ECardType> setActiveType,
         Action<EHero> toggleHero,
         Action<ETier> toggleTier,
-        Action<int> toggleDay,
+        Action toggleDayFilter,
         Action<ECardSize> toggleSize,
         Action<string> toggleSource,
         Action togglePackages,
@@ -148,7 +146,8 @@ internal sealed partial class CollectionPanelView : IDisposable
         _setActiveType = setActiveType ?? throw new ArgumentNullException(nameof(setActiveType));
         _toggleHero = toggleHero ?? throw new ArgumentNullException(nameof(toggleHero));
         _toggleTier = toggleTier ?? throw new ArgumentNullException(nameof(toggleTier));
-        _toggleDay = toggleDay ?? throw new ArgumentNullException(nameof(toggleDay));
+        _toggleDayFilter =
+            toggleDayFilter ?? throw new ArgumentNullException(nameof(toggleDayFilter));
         _toggleSize = toggleSize ?? throw new ArgumentNullException(nameof(toggleSize));
         _toggleSource = toggleSource ?? throw new ArgumentNullException(nameof(toggleSource));
         _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
@@ -311,15 +310,12 @@ internal sealed partial class CollectionPanelView : IDisposable
 
         EnsureHeroChips(model.AvailableHeroes);
         EnsureTierChips(model.AvailableTiers);
-        EnsureDayChips(model.AvailableDays);
         EnsureSizeChips(model.AvailableSizes);
         EnsureSourceChips(model.AvailableSources);
         foreach (var pair in _heroChips)
             RefreshHeroChip(pair.Key, pair.Value, model.SelectedHeroes.Contains(pair.Key));
         foreach (var pair in _tierChips)
             RefreshChip(pair.Value, model.SelectedTiers.Contains(pair.Key));
-        foreach (var pair in _dayChips)
-            RefreshChip(pair.Value, model.SelectedRunDay == pair.Key);
         foreach (var pair in _sizeChips)
             RefreshChip(pair.Value, model.SelectedSizes.Contains(pair.Key));
         foreach (var pair in _sourceChips)
@@ -333,16 +329,12 @@ internal sealed partial class CollectionPanelView : IDisposable
         }
         if (_packageToggleButton != null)
             RefreshPackageToggle(model.IncludePackages, model.HasPackages);
+        if (_dayToggleButton != null)
+            RefreshDayToggle(model.DayFilterActive);
         if (_sortQualityButton != null)
             RefreshChip(_sortQualityButton, model.SortPriority == CollectionSortPriority.Quality);
         if (_sortSizeButton != null)
             RefreshChip(_sortSizeButton, model.SortPriority == CollectionSortPriority.Size);
-
-        // Day filter is in-run only; hide the whole section (header + chips) when out of run.
-        if (_dayFilterSection != null)
-            _dayFilterSection.style.display = model.ShowDayFilter
-                ? DisplayStyle.Flex
-                : DisplayStyle.None;
 
         // Size only narrows Items; keep the section's reserved layout slot on Skills.
         if (_sizeFilterSection != null)

@@ -580,6 +580,11 @@ AssertEqual(
     DayTierSchedule.CeilingTier(12),
     "Days beyond the table stay Diamond-capped."
 );
+AssertEqual(
+    ETier.Diamond,
+    DayTierSchedule.CeilingTier(DayTierSchedule.OutOfRunDay),
+    "OutOfRunDay sits in the Diamond band, so the out-of-run filter narrows nothing."
+);
 
 // --- Day filter: SelectedRunDay keeps StartingTier <= ceiling(day); ANDs with other dimensions. ---
 var dayBronze = Card("Day Bronze", ETier.Bronze);

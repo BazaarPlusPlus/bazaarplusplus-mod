@@ -75,39 +75,6 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
-    private void EnsureDayChips(IReadOnlyList<int> days)
-    {
-        if (_dayChipRow == null)
-            return;
-        if (DayChipsMatch(days))
-            return;
-        ClearChipRow(_dayChips, _dayChipRow, keepFirst: false);
-        foreach (var day in days)
-        {
-            var chip = CreateChipButton(
-                day.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                () => _toggleDay(day)
-            );
-            // Numeric day chips are narrow and uniform; override the wide default chip width and
-            // let the section's default Wrap flow them onto multiple lines.
-            UiStyle.FixedWidth(chip.style, Sizes.DayChipWidth);
-            _dayChips[day] = chip;
-            _dayChipRow.Add(chip);
-        }
-    }
-
-    private bool DayChipsMatch(IReadOnlyList<int> days)
-    {
-        if (days.Count != _dayChips.Count)
-            return false;
-        foreach (var day in days)
-        {
-            if (!_dayChips.ContainsKey(day))
-                return false;
-        }
-        return true;
-    }
-
     private void EnsureSizeChips(IReadOnlyList<ECardSize> sizes)
     {
         if (_sizeChipRow == null)
@@ -580,6 +547,45 @@ internal sealed partial class CollectionPanelView
                 ? Sizes.PackageSwitchKnobOnLeft
                 : Sizes.PackageSwitchKnobOffLeft;
             _packageSwitchKnob.style.backgroundColor = selected
+                ? Colors.ButtonSelectedText
+                : Colors.HistoryStatusText;
+        }
+    }
+
+    // Always visible (unlike the package toggle); active = day participates in filtering.
+    private void RefreshDayToggle(bool active)
+    {
+        if (_dayToggleButton == null)
+            return;
+
+        StyleButton(
+            _dayToggleButton,
+            active ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
+            active ? Colors.ButtonSelectedText : Colors.HistoryChipText
+        );
+
+        if (_dayToggleLabel != null)
+            _dayToggleLabel.style.color = active
+                ? Colors.ButtonSelectedText
+                : Colors.HistoryChipText;
+
+        if (_daySwitchTrack != null)
+        {
+            _daySwitchTrack.style.backgroundColor = active
+                ? Colors.WithAlpha(Colors.ButtonSelectedText, 0.22f)
+                : Colors.HistoryStatusBackground;
+            UiStyle.BorderColor(
+                _daySwitchTrack.style,
+                active ? Colors.ButtonSelectedText : Colors.HistoryStatusBorder
+            );
+        }
+
+        if (_daySwitchKnob != null)
+        {
+            _daySwitchKnob.style.left = active
+                ? Sizes.PackageSwitchKnobOnLeft
+                : Sizes.PackageSwitchKnobOffLeft;
+            _daySwitchKnob.style.backgroundColor = active
                 ? Colors.ButtonSelectedText
                 : Colors.HistoryStatusText;
         }
