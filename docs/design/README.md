@@ -15,10 +15,10 @@ Dated, point-in-time design documents (`YYYY-MM-DD-<slug>.md`). A spec captures 
 
 Work designed but not yet (fully) landed; lives at this top level until implemented, then moves to `archive/` with a status banner.
 
-- [`2026-05-30-ffmpeg-relocation-to-mod-design.md`](2026-05-30-ffmpeg-relocation-to-mod-design.md) — FFmpeg 改为随 mod 分发的兄弟二进制（已实现并验证，待提交；合并后移入 `archive/` 并加 `Status:` banner）。
-- [`2026-05-30-combat-replay-record-button-design.md`](2026-05-30-combat-replay-record-button-design.md) — Combat Replay 视频录制从全局开关自动录每场改为 HistoryPanel 按钮单次触发（已实现并验证，待提交；合并后移入 `archive/` 并加 `Status:` banner）。
-- [`2026-05-30-combat-replay-audio-loopback-capture.md`](2026-05-30-combat-replay-audio-loopback-capture.md) — Combat Replay 录制音频改用 WASAPI loopback（设备输出）采集 + 跨平台 adapter；记录从 FMOD tap 到 loopback 的排查历程与踩坑（已实现并验证）。
-- [`2026-05-31-combat-replay-audio-macos-process-tap.md`](2026-05-31-combat-replay-audio-macos-process-tap.md) — macOS 音频采集后端：CoreAudio 进程级 tap（`AudioHardwareCreateProcessTap`，14.2+）+ 薄 `BppMacAudio.dylib`，C# 退化成与 WASAPI 相同的 pull 循环（已实现并验证；合并后移入 `archive/` 并加 `Status:` banner）。
+- [`2026-05-30-ffmpeg-relocation-to-mod-design.md`](2026-05-30-ffmpeg-relocation-to-mod-design.md) — FFmpeg 改为随 mod 分发的兄弟二进制（**✅ 已实现并合并**；物理移入 `archive/` 与链接重指为待办）。
+- [`2026-05-30-combat-replay-record-button-design.md`](2026-05-30-combat-replay-record-button-design.md) — Combat Replay 视频录制从全局开关自动录每场改为 HistoryPanel 按钮单次触发（**✅ 已实现并合并**；物理移入 `archive/` 为待办）。
+- [`2026-05-30-combat-replay-audio-loopback-capture.md`](2026-05-30-combat-replay-audio-loopback-capture.md) — Combat Replay 录制音频改用 WASAPI loopback（设备输出）采集 + 跨平台 adapter；记录从 FMOD tap 到 loopback 的排查历程与踩坑（**✅ 已实现并合并**；物理移入 `archive/` 为待办）。
+- [`2026-05-31-combat-replay-audio-macos-process-tap.md`](2026-05-31-combat-replay-audio-macos-process-tap.md) — macOS 音频采集后端：CoreAudio 进程级 tap（`AudioHardwareCreateProcessTap`，14.2+）+ 薄 `BppMacAudio.dylib`，C# 退化成与 WASAPI 相同的 pull 循环（**✅ 已实现并合并**；物理移入 `archive/` 为待办）。
 - [`2026-05-31-collection-panel-design.md`](2026-05-31-collection-panel-design.md) — 全屏卡牌图鉴面板（仅 Item+Skill）：原生 `CardPreviewBase` + 有界实例池 + 回收式固定规格虚拟化网格 + hidden-tag/manual-rule 商人 chips 已落地；完整 spawner/offline 商人来源、热键重绑 UI、键盘导航、滚动惯性、共享抽象提取仍为后续项（**Implemented with follow-ups**）。
 - [`2026-05-31-collection-panel-first-load-performance.md`](2026-05-31-collection-panel-first-load-performance.md) — Collection Panel 首次加载性能优化方案：loading shell、分段测量、无效 art key / negative cache、VM catalog 跨 scene runtime dispose 已落地；默认排序预计算、持久化 snapshot、prewarm 仍按运行日志决定（**Partially implemented**）。
 - [`2026-05-31-sell-hotkey-regression-debug-plan.md`](2026-05-31-sell-hotkey-regression-debug-plan.md) — 安装 BazaarPlusPlus 后官方出售物品快捷键偶发失效的生产调试方案：梳理 native SellItem 输入链路、tooltip/keybind/raycast 失效假设、诊断日志和修复验证矩阵（**Draft，未开工**）。
@@ -27,7 +27,10 @@ Work designed but not yet (fully) landed; lives at this top level until implemen
 - [`2026-06-02-collection-panel-source-catalog-schema.md`](2026-06-02-collection-panel-source-catalog-schema.md) — CollectionPanel 商人 / 训练师来源筛选改为 BPP 自有结构化 source catalog：schema、规则语义、contract tests、旧 game resolver fallback 删除边界。
 - [`2026-06-02-item-board-preview-abstraction.md`](2026-06-02-item-board-preview-abstraction.md) — 抽出单卡 native `CardPreviewBase` primitive 与共享 item-board preview surface；HistoryPanel 与 CardSetPreview 已迁移，live `MonsterBoardTooltip` clone path 已移除（startup/resource runtime validation complete, manual interaction validation pending）。
 - [`2026-06-03-settings-dock-anchor-and-collection-grid-scroll-plan.md`](2026-06-03-settings-dock-anchor-and-collection-grid-scroll-plan.md) — 两处 playtest 微调：设置 dock 面板生成锚点从按钮上边界改到下边界（仍向上弹出）；CollectionPanel 网格滚轮每格跳跃量 300→~120（保留即时跳转，不加滚动条）。（**Draft，未开工**）
-- [`2026-06-03-localization-module-extraction-design.md`](2026-06-03-localization-module-extraction-design.md) — 把本地化引擎（`LocalizedTextSet`/语言码匹配/简繁地区转换/CJK 判定）从 `Game/Settings` 抽离为零依赖独立程序集 `BazaarPlusPlus.Localization`：依赖反转 `ILanguageProvider`/`ILocaleModeProvider`、译文全量集中为嵌套静态类 `Loc` 目录、`BppChineseLocalization`→`ChineseScriptConverter`、删测试 shim（**Draft，未开工**）。
+- [`2026-06-03-localization-module-extraction-design.md`](2026-06-03-localization-module-extraction-design.md) — 把本地化引擎（`LocalizedTextSet`/语言码匹配/简繁地区转换/CJK 判定）从 `Game/Settings` 抽离为零依赖独立程序集 `BazaarPlusPlus.Localization`：依赖反转 `ILanguageProvider`/`ILocaleModeProvider`、译文全量集中为嵌套静态类 `Loc` 目录、`BppChineseLocalization`→`ChineseScriptConverter`、删测试 shim（**P1+P2 已落地：程序集已抽出并 `L.Install` 接线；P0、P3–P5 未做**）。
+- [`2026-06-02-merchant-trainer-portrait-plan.md`](2026-06-02-merchant-trainer-portrait-plan.md) — 商人/训练师头像方案（**活计划；实际经 `CollectionSources/` 子系统落地，与原 `Game/CollectionPanel/Encounters/` 设计不同，「实现进展」段已订正**）。
+- [`2026-06-03-collection-search-removal-sponsor-tweaks-rail-stability.md`](2026-06-03-collection-search-removal-sponsor-tweaks-rail-stability.md) — CollectionPanel 搜索移除 + sponsor 归因 + 操作 rail 稳定性（**✅ 搜索移除已落地（commit f701dce）**）。
+- [`2026-06-03-localization-module-extraction-refactor-prompt.md`](2026-06-03-localization-module-extraction-refactor-prompt.md) — 本地化抽取 executor prompt（**spent；§3 现状描述为抽取前状态，已加注**）。
 
 ## Archived specs
 

@@ -24,8 +24,12 @@ The recorder writes the participant block from the uploader's perspective:
 
 - `PlayerName`, `PlayerAccountId` — the uploader themself (via
   `TryGetPlayerNameSafe` / `TryGetPlayerAccountIdSafe`).
+- `PlayerPrestige`, `PlayerVictories` — the uploader's prestige/victories at
+  time of recording.
 - `OpponentName`, `OpponentAccountId`, `OpponentHero`, etc. — whoever the
   uploader was matched against, captured from the spawn message.
+- `OpponentPrestige`, `OpponentVictories` — the opponent's (i.e. the local
+  player's mirror's) prestige/victories at time of recording.
 
 Combat messages (`spawn`, `combat`, `despawn`) are captured from the uploader's
 session, so physics/board sides are encoded relative to the uploader as
@@ -127,7 +131,9 @@ Files:
 | HistoryBattleRecord slot (UI semantics) | Source column (raw) | Concrete meaning in UI |
 | --- | --- | --- |
 | `PlayerHero / PlayerRank / PlayerRating / PlayerLevel` | `opponent_hero / rank / rating / level` | My mirror (= me) |
+| `PlayerPrestige / PlayerVictories` | `opponent_prestige / opponent_victories` | My mirror's prestige/victories (perspective-flipped from uploader's `opponent_*`) |
 | `OpponentName / OpponentHero / OpponentRank / OpponentRating / OpponentLevel / OpponentAccountId` | `player_name / hero / rank / rating / level / account_id` | The uploader who fought my mirror |
+| `OpponentPrestige / OpponentVictories` | `player_prestige / player_victories` | The uploader's prestige/victories (perspective-flipped from uploader's `player_*`) |
 | `Result` | `ProjectResultToLocal(result)` — `Win`↔`Lost`, `Won`↔`Lost` | My outcome |
 | `WinnerCombatantId` | `ProjectCombatantIdToLocal(...)` — `Player`↔`Opponent` | Who won from my POV |
 | `LoserCombatantId` | `ProjectCombatantIdToLocal(...)` | Who lost from my POV |

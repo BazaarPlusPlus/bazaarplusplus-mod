@@ -1,6 +1,6 @@
 # Collection Panel 设计规格（卡牌图鉴面板）
 
-Status: Implemented with follow-ups (Phase 1–3 + L2/L3 + fixed-grid redesign + hidden-tag/manual-rule merchant chips + first-load P0/P1/P2 shipped 2026-05-31). Full merchant-source filtering from spawner/offline sale data, hotkey rebinding UI, keyboard navigation, true scroll inertia, Plan A wheel forwarding, and shared abstraction extraction remain deferred. See §16 for the as-built record and §17 for the fixed-grid redesign that supersedes the early dynamic-column sizing notes.
+Status: Implemented with follow-ups (Phase 1–3 + L2/L3 + fixed-grid redesign + hidden-tag/manual-rule merchant chips + structured merchant/trainer source filtering + first-load P0/P1/P2 shipped). Merchant/trainer source filtering has since landed as a structured source catalog (the `Sources/` subsystem: `CollectionSourceCatalog` + per-source offer-pool resolution), superseding the original "deferred, needs new data" plan. Hotkey rebinding UI, keyboard navigation, true scroll inertia, Plan A wheel forwarding, and shared abstraction extraction remain deferred. See §16 for the as-built record and §17 for the fixed-grid redesign that supersedes the early dynamic-column sizing notes. The in-doc sketches below are dated; some method names and the §4.1 filter snippet describe an earlier shape — see §16.1 for the current file list.
 
 > 范围：**仅 Item + Skill 两类卡牌**。2026-05-31 实机日志：从 `2888` 个模板接受 `1725` 张目录卡，默认 Item tab 可见 `1105` 张；其余 6 类（EncounterStep / EventEncounter / CombatEncounter / PedestalEncounter / PlayerEffect / SocketEffect）不做。
 > 关联：[2026-05-29-historypanel-fullscreen-responsive-design.md](archive/2026-05-29-historypanel-fullscreen-responsive-design.md)（外壳 + overlay 桥接的前身，含 RenderTexture 方案放弃记录）、[adr/0003-history-panel-preview-overlay.md](../adr/0003-history-panel-preview-overlay.md)。
@@ -101,16 +101,18 @@ internal sealed class CollectionPanel : MonoBehaviour
         _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
     }
 
-    public static void OpenFromDockEntry()
+    // As-built: this entry point is named OpenFromDockButton() (CollectionPanel.cs:106).
+    internal static void OpenFromDockButton()
     {
         if (_instance == null)
         {
             BppLog.Warn("CollectionPanel", "Dock entry requested while CollectionPanel is unavailable.");
             return;
         }
-        // 面板互斥：打开自己前关闭 HistoryPanel
-        if (HistoryPanel.IsVisible)
-            HistoryPanel.Instance?.CloseFromExternalRequest();
+        // 面板互斥：打开自己前关闭 HistoryPanel。As-built 走 HistoryPanelHost.Instance?.ToggleFromHotkey()
+        // （CollectionPanel.cs:18 把 HistoryPanelHost 别名到 HistoryPanel.HistoryPanel；:218 调用）。
+        if (HistoryPanelHost.IsVisible)
+            HistoryPanelHost.Instance?.ToggleFromHotkey();
         _instance._isVisible = true;
         _instance.ApplyVisibility();
         _instance.EnsureCatalogAndRefresh();
@@ -255,9 +257,10 @@ internal sealed class CollectionCardVm
 | 类型 | `Type` | Item / Skill 切换 | 决定用哪套网格（§8） |
 | 英雄 | `Heroes`（`HashSet<EHero>`） | 集合任一命中 | 多英雄零特判；UI 排除占位 `Hero8` |
 | 稀有度 | `StartingTier` | 多选 | 排序显式定义（C8） |
-| 名称 | `DisplayName` | 包含匹配 | 当前语言 |
+| ~~名称~~ | ~~`DisplayName`~~ | ~~包含匹配~~ | **已移除（2026-06-03）**：不再有名称搜索 |
 | 玩法标签（可选） | `Tags` | 集合任一命中 | 无需新数据 |
-| **商人** | `Merchants`（`CollectionMerchantKind[]`） | 集合任一命中 | 已有 hidden-tag / manual-rule chips；完整 sale-source 推导见 §10.3 |
+| **商人/训练师来源** | 结构化来源目录（`Sources/`） | 选中单一来源 → 该来源 offer-pool 集合 | **已落地**：`CollectionSourceCatalog` + `CollectionSourceOfferPoolResolver`，按 `SelectedMerchantSourceKey/SelectedTrainerSourceKey` 过滤（见 §10.3） |
+| 商人（标签层） | `Merchants`（`CollectionMerchantKind[]`） | 集合任一命中 | hidden-tag / manual-rule chips（旧层，仍在） |
 
 ```csharp
 // CollectionFilterEngine.cs —— 纯函数
@@ -273,10 +276,8 @@ internal static class CollectionFilterEngine
         if (f.ActiveType == ECardType.Item && f.Sizes.Count > 0)
             q = q.Where(c => f.Sizes.Contains(c.Size));
         if (f.Merchants.Count > 0) q = q.Where(c => c.Merchants.Any(f.Merchants.Contains));
-        if (!string.IsNullOrWhiteSpace(f.Search))
-            q = q.Where(c =>
-                c.DisplayName.IndexOf(f.Search, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                c.InternalName.IndexOf(f.Search, StringComparison.OrdinalIgnoreCase) >= 0);
+        // 名称搜索分支已于 2026-06-03 移除——`CollectionFilterState` 不再有 `Search` 字段，
+        // `CollectionFilterEngine` 不再做文本匹配（见 CollectionFilterEngine.cs / CollectionFilterState.cs）。
         return q.OrderBy(c => TierRank(c.StartingTier))
                 .ThenBy(c => c.DisplayName, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
@@ -291,7 +292,7 @@ internal static class CollectionFilterEngine
 
 筛选变化 → `generation.Bump()`（**单次**，不是每张卡 Bump）取消在飞渲染 → 用新可见集重置虚拟化器、滚回顶部。
 
-> ⚠️ **搜索输入必须 debounce**（200–300ms），否则逐字符触发 Apply + 重置虚拟化器。英雄/稀有度 chip 点击无需 debounce。
+> **As-built（2026-06-03）：名称搜索整体已移除**——没有 `Search` 字段，也没有 `TextField`/debounce。筛选只靠 chip（英雄/稀有度/类型/尺寸/商人）点击触发，无逐字符路径，故原先关于搜索 debounce 的告警已不适用。
 
 ---
 
@@ -650,19 +651,24 @@ tooltip 渲染栈是 uGUI（独立于 UITK 外壳），UITK 面板能正常显�
 
 ### 10.1 顶部筛选栏
 
-`CollectionPanelView.Tree.cs` + `CollectionPanelView.Filters.cs`：左操作列包含 Item/Skill tab、搜索、Clear、商人 chips、英雄 chips、稀有度 chips、Item 尺寸 chips 和状态文本。名称搜索用 UITK `TextField`，**200ms debounce**——逐字符触发 Apply + 虚拟化器重置开销过大。任一变化 → 更新 `CollectionFilterState` → `CollectionFilterEngine.Apply` → `generation.Bump()`（全局单次）→ 重置虚拟化器。
+`CollectionPanelView.Tree.cs` + `CollectionPanelView.Filters.cs`：左操作列包含 Item/Skill tab、来源（商人/训练师）选择、Clear、商人 chips、英雄 chips、稀有度 chips、Item 尺寸 chips 和状态文本。任一变化 → 更新 `CollectionFilterState` → `CollectionFilterEngine.Apply` → `generation.Bump()`（全局单次）→ 重置虚拟化器。（**As-built（2026-06-03）：名称搜索 `TextField` + 200ms debounce 已移除**，见 §4.1。）
 
 ### 10.2 本地化名
 
 `TCardBase.Localization`（`TCardLocalization`）解析为当前 UI 语言（游戏用 `PlayerPreferences.Data.LanguageCode`，见 `BppHotkeyService.cs:189` 的同款用法）。`LocalizationResolver.Resolve` 的访问器待确认（§14 开放问题）；失败回退 `InternalName`。index.json 的 `name.translations`（含 zh-CN 等 7 语言）作离线兜底。
 
-### 10.3 商人筛选（已做标签型 chips；完整来源后续推导）
+### 10.3 商人 / 训练师来源筛选（已落地：结构化来源目录）
 
-游戏里**没有**静态「商人→卡」表（已核实）：`MerchantSO`/`TMonster` 不含售卖卡；`CardSetPreviewSponsorCatalog` 的 Sponsor 是金主鸣谢，不是售卖来源；商店出货是运行时 spawner 按 `SpawningFilters`（`CardIdFilters/ItemTierFilters`）+ Hero/Day/Hour 动态生成（mod 的 `ShopForecastLogPatch.cs`）。
+**As-built：完整来源筛选已实现**，走的是离线挖出、随 mod 发布的结构化来源目录这条路（即本节早先列为「后续设计」的离线方案，已落地）。源头是 `Data/CollectionSources/collection-sources.json`（schema v3），由 `Sources/` 子系统消费：
 
-当前实现提供标签型商人 chips：`CollectionCardClassifier.ResolveMerchants(...)` 从 `EHiddenTag.*Merchant`、`ECardTag.Merchant` 和预留 manual-rule 表投影到 `CollectionMerchantKind`，`CollectionFilterEngine` 按 `card.Merchants` 任一命中过滤，UI 只展示当前 tab 中真实可用的 merchant chips。
+- `CollectionSourceCatalog`（`Sources/CollectionSourceCatalog.cs`）加载并按 `CollectionSourceKind.Merchant`/`.Trainer` + 选中英雄索引来源条目（`stable source key` / `source template id`）。
+- `CollectionSourceOfferPoolResolver` 把选中来源展开成一组 offer-pool 卡 id；`CollectionSourceOfferPoolCache`（`CollectionSourceOfferPoolCache.cs:16-29`）按 `(source, hero)` 缓存结果。
+- 选中来源经 `CollectionFilterState.SelectedMerchantSourceKey` / `SelectedTrainerSourceKey` 传入 `CollectionFilterContext.OfferedCardIds`，`CollectionFilterEngine` 用该集合过滤可见卡。
+- `CollectionPanel.cs:60` 持有 offer-pool 缓存，`:131` 用 `CollectionSourceCatalog.Entries` 解析打开时的初始选择，`:650`+ 构建当前 tab 可用来源列表。
 
-后续仍需做**完整售卖来源推导**：枚举每个商人的 spawner `SpawningFilters` 展开 `CardIdFilters` + tier/hero 约束得近似售卖集；或离线挖一份「商人→[guid]」目录随 mod 发布（先例：编译进 DLL 的字典字面量，或 `Data/BuildRecommendations/*.json` 嵌入 JSON）。这部分单列后续设计，不阻塞当前面板。
+> 背景（保留历史判断）：游戏里**没有**运行时静态「商人→卡」表——`MerchantSO`/`TMonster` 不含售卖卡，`CardSetPreviewSponsorCatalog` 的 Sponsor 是金主鸣谢而非售卖来源，商店出货是 spawner 按 `SpawningFilters`（`CardIdFilters/ItemTierFilters`）+ Hero/Day/Hour 动态生成（mod 的 `ShopForecastLogPatch.cs`）。正因如此本设计当时把来源筛选列为「需新数据的后续」；落地选择了离线目录（`collection-sources.json`）而非运行时 spawner 推导。
+
+此外仍保留一层**标签型商人 chips**（旧层）：`CollectionCardClassifier.ResolveMerchants(...)` 从 `EHiddenTag.*Merchant`、`ECardTag.Merchant` 和 manual-rule 表投影到 `CollectionCardVm.Merchants`（`CollectionMerchantKind`），`CollectionFilterEngine` 按 `card.Merchants` 任一命中过滤。两层并存：结构化来源目录是主路径，标签 chips 是粗粒度补充。
 
 ---
 
@@ -682,7 +688,8 @@ internal sealed class CollectionPanelSettingsDockEntry : ISettingsDockEntry
             CollectionPanelText.ResolveLabel,       // Func<string,string> resolveLabel
             ResolveStatus,                          // Func<string,string> resolveStatus
             IsActionable,                           // Func<bool> isActive
-            CollectionPanel.OpenFromDockEntry,      // Action activate
+            // As-built：dock 激活经 CollectionPanelDockButtonController → CollectionPanel.OpenFromDockButton()
+            CollectionPanel.OpenFromDockButton,     // Action activate
             collapseAfterActivate: true
         );
 
@@ -736,7 +743,7 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 
 ## 13. 分阶段实施
 
-> **As-built status (2026-05-31)**: Phase 1 ✅ / Phase 2 ✅ / Phase 3 ✅ / fixed-grid redesign ✅ / first-load P0/P1/P2 ✅ / Phase 0 formal measurement ⏸ / Phase 4 merchant-source filtering ⏸ / Phase 5 🟡 (L3, Plan B, art fade, panel fade 已做；热键重绑 UI、键盘导航、真滚动惯性、共享抽象提取未做)。
+> **As-built status**: Phase 1 ✅ / Phase 2 ✅ / Phase 3 ✅ / fixed-grid redesign ✅ / first-load P0/P1/P2 ✅ / Phase 4 merchant/trainer source filtering ✅（结构化来源目录，见 §10.3）/ Phase 0 formal measurement ⏸ / Phase 5 🟡 (L3, Plan B, art fade, panel fade 已做；热键重绑 UI、键盘导航、真滚动惯性、共享抽象提取未做)。名称搜索曾交付，2026-06-03 移除（§4.1）。
 
 ### Phase 0 — 可行性 spike（闸门，先做，1–2 天）  ⏸ Deferred
 在游戏里证明五件事全绿，否则各自落兜底。每项有**定量 pass/fail 标准**：
@@ -757,10 +764,10 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 `CollectionGridVirtualizer`（§5.3，含 pending-return 竞态防护 + 自适应冷加载预算）+ 池按 kind 分键 + L2 美术 LRU（引用计数）+ **L3 Material 共享池**（draw call 结构性问题，不可推迟）+ per-card generation 取消。加 Skill tab。交付：`1725` 张目录卡虚拟化滚动，Item/Skill 切换。
 
 ### Phase 3 — 筛选系统  ✅ Shipped
-左操作列筛选（英雄多选 / 稀有度 / 名称搜索 / Item 尺寸 / hidden-tag merchant chips /（可选）玩法标签），变化触发 Bump + 重算可见集。交付：hero/tier/type/search/size/merchant 可用。
+左操作列筛选（英雄多选 / 稀有度 / Item 尺寸 / merchant chips /（可选）玩法标签），变化触发 Bump + 重算可见集。交付：hero/tier/type/size/merchant 可用。（名称搜索曾交付，已于 2026-06-03 移除——见 §4.1。）
 
-### Phase 4 — 完整商人来源筛选（后续，需新数据）  🟡 Partial
-已落地 hidden-tag/manual-rule merchant chips；完整 spawner 推导或离线目录仍按 §10.3 单列设计。
+### Phase 4 — 完整商人 / 训练师来源筛选  ✅ Shipped
+已落地结构化来源目录（`Sources/` 子系统：`CollectionSourceCatalog` + `CollectionSourceOfferPoolResolver`，源数据 `Data/CollectionSources/collection-sources.json` schema v3），按选中来源的 offer-pool 集合过滤，见 §10.3。旧的 hidden-tag/manual-rule merchant chips 作为粗粒度补充层保留。原计划的 spawner `SpawningFilters` 运行时推导未采用——改走离线目录方案。
 
 ### Phase 5 — 打磨  🟡 Partial
 - ✅ L3 Material 共享池（Phase 2 同期做完）
@@ -787,7 +794,7 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 | R7 | Item 比例需求与原生事实冲突（§5.4） | spike 实测原生比例，localScale 适配，回填并与需求方确认契约 |
 | R8 | 游戏更新重命名/移除反射目标（`_skillReference`、`GetCardById`、`SetUp` 等） | 所有反射 harvest 加 null 检查 + `BppLog.Warn`；启动时 smoke test 验证关键目标存在；缺失时禁用面板并在设置坞显示「当前游戏版本不兼容」 |
 | R9 | 场景切换时面板状态未清理（MonoBehaviour 销毁但 UITK/overlay 清理顺序不确定） | `DetectSceneChange`（仿 `HistoryPanel.cs:384-398`）：场景变化时关闭面板、Return 所有卡、释放 L2 handle、dispose overlay（§2.3） |
-| R10 | CollectionPanel 与 HistoryPanel 同时打开导致 overlay z-fight（共享 sortingOrder 27） | 面板互斥：打开一个时关闭另一个（§2.3 `OpenFromDockEntry`）；HistoryPanel 同理需检查 CollectionPanel.IsVisible |
+| R10 | CollectionPanel 与 HistoryPanel 同时打开导致 overlay z-fight（共享 sortingOrder 27） | 面板互斥：打开一个时关闭另一个（§2.3 `OpenFromDockButton`）；HistoryPanel 同理需检查 CollectionPanel.IsVisible |
 
 **开放问题**
 - 回收换绑到不同卡时是否有旧材质/贴图残留一帧（虽已丢弃缺图卡，仍建议 rebind 时 Destroy Material + 清 `_cardImage.texture`——与 L2 引用计数的 Release 配合）。
@@ -845,7 +852,7 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 
 ### 16.1 文件清单
 
-25 个新文件 + 对 `BppComposition.cs` / `BppConfig.cs` / `IBppConfig.cs` 的小幅扩展。
+**当前（as-built）：`Game/CollectionPanel/` 下共 49 个 `.cs` 文件** + `Patches/CollectionPanel/` 下的补丁 + 对 `BppComposition.cs` / `BppConfig.cs` / `IBppConfig.cs` 的扩展 + 源数据 `Data/CollectionSources/collection-sources.json`。子系统自下方初版清单（约 25 个文件）以来明显扩张，新增整片 **`Sources/` 子树**（来源目录/枚举/DTO/offer-pool 解析：`CollectionSourceCatalog`、`CollectionSourceEntry`、`CollectionSourceEnums`、`CollectionSourceDtos`、`CollectionSourceOfferRule`、`CollectionSourceOfferPoolResolver`、`CollectionSourceOfferPoolResult`、`CollectionSourceRoster`），以及顶层 `CollectionSourceOfferPoolCache`/`CollectionSourceOfferPoolCacheKey`、`CollectionPanelOpenSelectionResolver`、`CollectionPanelDockButtonController`、`CollectionPanelLoadDiagnostics` 等。下方树是**初版快照**（已不完整，仅留作历史；权威清单以 `Game/CollectionPanel/` 实际目录为准）。
 
 ```
 Game/CollectionPanel/
@@ -904,7 +911,7 @@ L2/L3 路径：池在 Instantiate 时挂 `CollectionPanelOwnedMarker`；`CardPre
 | D1 | Plan B 是默认（设计期望 Plan A） | Plan A 实测有隐性问题：游戏 `CardPreviewBase._cardImage` 默认 `raycastTarget=true`，overlay 的 raycaster 命中后 wheel 事件被丢弃，UITK ScrollView 收不到滚动。Plan B 不依赖 raycaster，UITK 始终是最顶层。Plan A 代码保留，由 `UsePolledHover = false` 切换，但要让 Plan A 可用还需补 `IScrollHandler` 转发，目前未做。 |
 | D2 | 删掉了"输入硬拦截层" | 设计 §11.3 标"可选"。中途加了之后吞掉所有非卡区的 click / wheel（详见 §11.3 当前状态）。UITK 全屏 + `pickingMode=Position` 已经够了，删除后回到设计原本的两层结构。 |
 | D3 | `CollectionPanelMount` 自定义 | `ComponentMount<T>` 不支持事件订阅。需要订阅 `ChineseLocaleModeChanged` 失效目录缓存，所以单写一个，`Unmount` 时 `Dispose` 订阅。 |
-| D4 | 面板互斥 (HistoryPanel vs CollectionPanel) | 共享同一组 sortingOrder（26/27），同显会 z-fight 且 Escape 不知道关哪个。`OpenFromDockEntry` 打开时检查 `HistoryPanel.IsVisible`，命中则调 `ToggleFromHotkey()` 关掉它再开自己。 |
+| D4 | 面板互斥 (HistoryPanel vs CollectionPanel) | 共享同一组 sortingOrder（26/27），同显会 z-fight 且 Escape 不知道关哪个。CollectionPanel 的 `OpenFromDockButton` 打开时检查 `HistoryPanel.IsVisible`，命中则调 `ToggleFromHotkey()` 关掉它再开自己。 |
 
 ### 16.4 经验
 
@@ -917,7 +924,7 @@ L2/L3 路径：池在 Instantiate 时挂 `CollectionPanelOwnedMarker`；`CardPre
 | # | 项 | 触发条件 / 说明 |
 |---|---|---|
 | F1 | Phase 0 formal measurement backfill | 固定规格网格已取代早期 `Item 230×300 / Skill 200×200` 占位常量；仍需补正式实测记录：Item 三档 + Skill 预制体真实 `(W, H)`、帧率上限、TooltipParentComponent 主菜单就绪性、cold native bind/art cost。 |
-| F2 | Phase 4 商人筛选 | 设计 §10.3 单列后续，需推导 spawner `SpawningFilters` 或离线挖目录。 |
+| ~~F2~~ | ~~Phase 4 商人筛选~~ | **已完成**：落地结构化来源目录（`Sources/` 子系统 + `Data/CollectionSources/collection-sources.json`），见 §10.3 / §13 Phase 4。 |
 | F3 | 共享抽象提取（Phase 5 剩余） | 设计 §2.1 路线图：`GenerationGuard` → `Core/Runtime/`、UITK 外壳 PanelSettings 配方提取、overlay 类参数化、PendingReturn cell 迁出 `_realized` 到 `_orphanedPending`。纯重构，不影响功能。 |
 | F4 | 热键重绑 UI（Phase 5 剩余） | 当前 `CollectionPanelHotkeyPathConfig` 默认 `<Keyboard>/f9`，可改 cfg 但没有 in-game 重绑入口。用户明确不做。 |
 | F5 | 键盘导航（Phase 5 剩余） | 方向键 / Tab / Enter 在网格内移动焦点 + 触发 hover。用户明确不做。 |
@@ -969,8 +976,8 @@ L2/L3 路径：池在 Instantiate 时挂 `CollectionPanelOwnedMarker`；`CardPre
 | Phase 0 — 可行性 spike | 🟡 Partially covered by shipped behavior | 已通过实机打开验证原生卡/tooltip/滚轮/hover 可用，并已记录 first-load catalog timing；仍缺正式数字表：Item 三种 size 预制体真实 `(W, H)` / Skill 方形尺寸 / 帧率上限 / TooltipParentComponent 主菜单就绪性 / cold native bind-art cost。 |
 | Phase 1 — MVP 单类型静态网格 | ✅ Shipped | 目录 / 外壳 / dock 入口 / 热键 / 一屏 Item 渲染 / hover tooltip 全通。 |
 | Phase 2 — 虚拟化滚动 | ✅ Shipped | recycler virtualizer + (type, size) 分键池 + L2 LRU + L3 Material 共享 + per-card generation 取消 + Item/Skill tab。 |
-| Phase 3 — 筛选系统 | ✅ Shipped | 英雄多选 chips / 稀有度多选 chips / Item 尺寸 chips / 200ms debounce 名称搜索 / Item/Skill tab / Clear 按钮 / hidden-tag/manual-rule merchant chips。 |
-| Phase 4 — 完整商人来源筛选 | 🟡 Partial | 标签型 merchant chips 已落地；spawner 推导或离线目录仍按 §10.3 单列后续。 |
+| Phase 3 — 筛选系统 | ✅ Shipped | 英雄多选 chips / 稀有度多选 chips / Item 尺寸 chips / Item/Skill tab / Clear 按钮 / merchant chips。（名称搜索曾交付，2026-06-03 移除，见 §4.1。） |
+| Phase 4 — 完整商人 / 训练师来源筛选 | ✅ Shipped | 结构化来源目录已落地（`Sources/` 子系统 + `collection-sources.json` schema v3，按来源 offer-pool 过滤，见 §10.3）；标签型 merchant chips 作为补充层保留；spawner 运行时推导未采用，改走离线目录。 |
 | Phase 5 — 打磨 | 🟡 Partial | ✅ L3 Material 共享池<br>✅ Plan B 手动 hit-test<br>✅ Card art 淡入<br>✅ 面板开关过渡（asymmetric fade）<br>✅ first-load loading shell / 分帧 catalog / cache-hit diagnostics<br>✅ ~~输入硬拦截~~（实施后回退，见 P1）<br>⏸ 真正的滚动惯性（尝试过被回退，见 P5；UITK 默认 `mouseWheelScrollSize=300` 兜底）<br>⏸ 热键重绑 UI（用户明确不做）<br>⏸ 键盘导航（用户明确不做）<br>⏸ 共享抽象提取（§2.1 路线图） |
 
 **整体可发布性**：当前实施满足设计 §1 范围（仅 Item + Skill，实机目录 `1725` 张）所声明的核心功能性要求。固定规格网格已取代早期占位尺寸；Phase 0 仍缺正式数字表（native prefab size / 帧率上限 / TooltipParentComponent 主菜单就绪性 / cold native bind-art cost），但不影响当前功能正确。

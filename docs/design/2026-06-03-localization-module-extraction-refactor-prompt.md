@@ -37,6 +37,8 @@
 
 ## 3. 现状清单（动手前用 `rg` 复核行号）
 
+> **⚠️ 本节描述的是抽离前（pre-extraction）的状态，不是当前起点。** P1 + P2 已落地：独立程序集 `BazaarPlusPlus.Localization` 已抽出，引擎 6 类已迁入并改名 `ChineseScriptConverter`，`Resolve(languageCode, mode)` 纯函数核心 + `ILanguageProvider`/`ILocaleModeProvider` + `L` 薄层已就位，`Plugin.cs:108` 已 `L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config))`。**但"语言来源收敛"尚未完成**：`GetLanguageCode()` 仍存在于 `Game/Supporters/Ui/BPPSupporterAttributionRow.cs:193-203`，且多处仍直接 inline 读 `PlayerPreferences.Data.LanguageCode`（如 `Game/Settings/BppSettingsDockController.cs:328`、`Game/Input/BppHotkeyService.cs:189`）——这些是 P2 收敛的遗留尾巴，连同 P0 与 P3–P5 仍待完成。下方清单按原始（pre-extraction）形态保留，动手前一律用 `rg` 复核类型现属哪个命名空间/程序集。
+
 **引擎（将迁入模块）：**
 - `Game/Settings/LocalizedTextSet.cs` — `internal readonly struct`；`Resolve(string languageCode)` 在 :76，对中文转调 `BppChineseLocalization.ResolveChineseText`。
 - `Game/Settings/LanguageCodeMatcher.cs` — `internal static`，`IsChinese/IsSimplifiedChinese/IsGerman/IsPortuguese/IsKorean/IsItalian`，纯字符串匹配。

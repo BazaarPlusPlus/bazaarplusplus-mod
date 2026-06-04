@@ -1,6 +1,6 @@
 # 本地化引擎抽离为独立模块 `BazaarPlusPlus.Localization`
 
-Status: Draft (v2) — 已与维护者确认方案要点，并经 Codex 对抗评审 + 红队评审修订，未开工。落地后移入 `archive/` 并加 `Status:` banner；其中"集中机制、依赖反转、`Resolve(languageCode, mode)` 纯函数核心"等决策应在归档前提升为 ADR。
+Status: In progress (v2) — 已与维护者确认方案要点，并经 Codex 对抗评审 + 红队评审修订。**P1 + P2 已落地**：独立程序集 `BazaarPlusPlus.Localization` 已抽出，`Plugin.cs:108` 已 `L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config))` 接线，引擎纯函数核心 `Resolve(languageCode, mode)` + `ILanguageProvider`/`ILocaleModeProvider` + `L` 薄层已就位。**P0（穷尽清单 + 快照基线）与 P3–P5（`Loc` 目录、字体图集改造、硬编码/inline 清扫、删 shim）仍未做。** 全部落地后移入 `archive/` 并加 `Status:` banner；其中"集中机制、依赖反转、`Resolve(languageCode, mode)` 纯函数核心"等决策应在归档前提升为 ADR。
 
 > **v2 修订摘要（对抗评审并入）：** ① `Resolve` 核心改为显式 `Resolve(languageCode, mode)` 纯函数，删除会丢失简繁/地区语义的无 mode 重载；② 新增"mode 敏感性分类"规则，防止 P4 把仅按语言的串错误接入简繁转换；③ 新增 **P0**（穷尽清单 + 快照基线）作为后续步骤门禁；④ `FontAtlasSample` 反射迁移与图集缓存键 `(languageCode, mode)` 列为高风险载荷项；⑤ P1 补 `Directory.Build.props` 隔离；⑥ 决策 `InternalsVisibleTo` 保持 `internal`；⑦ P4 拆为 P4a/P4b。
 
@@ -153,6 +153,9 @@ static class L
     static void Install(ILanguageProvider language, ILocaleModeProvider mode);
     static string Resolve(LocalizedTextSet set) =>          // = set.Resolve(lang.CurrentLanguageCode, mode.CurrentMode)
         set.Resolve(_language.CurrentLanguageCode, _mode.CurrentMode);
+    // 转发当前语言 / 地区模式，供需要显式入参（如字体图集预热）的调用点用：
+    static string CurrentLanguageCode { get; }             // = _language.CurrentLanguageCode
+    static BppChineseLocaleMode CurrentMode { get; }       // = _mode.CurrentMode
 }
 ```
 

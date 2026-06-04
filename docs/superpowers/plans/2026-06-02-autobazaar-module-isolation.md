@@ -1,5 +1,7 @@
 # AutoBazaar Module Isolation Implementation Plan
 
+> **Status: IMPLEMENTED — 历史归档（spent plan）。** 本计划描述的迁移已全部落地（`AutoBazaar/` 模块 + `Game/AutoBazaarHost/`，`Game/AutoBazaar` 已删，ProjectReference + `#if BPP_AUTOBAZAAR_HOST`）；复选框未回填不代表有未完成项。设计细节见被 ADR-0005 引用的 `specs/2026-06-02-autobazaar-module-isolation-design.md`。保留为历史记录，勿据此重做。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move AutoBazaar into a root-level independently built module while preserving the currently parked runtime behavior.

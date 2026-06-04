@@ -9,7 +9,7 @@
 面板是「边到边全屏、按相对比例自适应」，不再是屏幕居中的固定 1280×1020 盒子（2026-05-29 改造，归档设计见 [docs/design/archive/2026-05-29-historypanel-fullscreen-responsive-design.md](../design/archive/2026-05-29-historypanel-fullscreen-responsive-design.md)）：
 
 - **按高匹配**：`PanelSettings.match = 1f`（`Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs`）——token 随屏幕高度缩放，竖向密度恒定、超宽屏不竖向溢出。
-- **flex 填满 + 百分比**（`Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Tree.cs`）：panel 铺满 root（`flexGrow:1`）、直角、背景不透明；runs 栏 `width: Percent(30)`、battles `flexGrow:1`、preview 容器 `height: Percent(28)`。结构常量改为比例常量 `RunsColumnWidthPercent=30`、`PreviewHeightPercent=28`。
+- **flex 填满 + 百分比**（`Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Tree.cs`）：panel 铺满 root（`flexGrow:1`）、直角、背景不透明；runs 栏 `width: Percent(52)`、battles `flexGrow:1`、preview 容器 `height: Percent(33)`。结构常量改为比例常量 `RunsColumnWidthPercent=52`、`PreviewHeightPercent=33`。
 - **预览口径对齐**：`ApplyPreviewContainerBounds` 是纯 `worldBound→clip` 映射；叠加层走 `scaledPixelsPerPoint`，`match` 一变自动跟随。`ComputePreviewPanelScale` 与 F9 调参器已删除。
 
 > 取舍：`match=1`（纯按高）而非折中的 `0.5`。对竖向列表为主的全屏面板，按高更能保证各分辨率下可见行数比例一致；代价是 32:9 等超宽屏两侧留白，已确认接受。

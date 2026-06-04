@@ -1,5 +1,7 @@
 # Settings Dock Clone Button Implementation Plan
 
+> **Status: IMPLEMENTED — 历史归档（spent plan）。** 本计划描述的工作已全部落地（`BppSettingsDockPlacement.cs` / `BppNativeSettingsButtonClone.cs`）；复选框未回填不代表有未完成项。保留为历史记录，勿据此重做。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > **Revision note (2026-06-03):** This plan was rewritten after a multi-agent design review. Two scope decisions from the user: (1) **drop the BPP sprite swap entirely** — the clone keeps the native gear sprite for now; (2) **two visually identical gear buttons side by side are acceptable** for this version (left = BPP panel, right = native settings). The review's blocker and medium findings are folded in below — most importantly the **controller-clone lifecycle fix** (mirrors the established `BppKeybindSettingsPatch` clone pattern) and **stripping `BazaarButtonController`** off the clone.

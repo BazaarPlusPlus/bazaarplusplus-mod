@@ -45,13 +45,15 @@ For runtime validation that needs launching the game, always launch The Bazaar t
 
 ## Architecture
 
-**Three assemblies** ship as the mod:
+**Four assemblies** ship unconditionally as the mod; a fifth ships only when the `BPP_AUTOBAZAAR_HOST` flag is set:
 
 - `BazaarPlusPlus.dll` — the main BepInEx plugin; references game DLLs, Unity, BepInEx
 - `BazaarPlusPlus.ModApi.dll` — HTTP client + DTOs for the cloud backend; zero game/Unity/BepInEx references
 - `BazaarPlusPlus.Storage.dll` — SQLite persistence layer; zero game/Unity/BepInEx references
+- `BazaarPlusPlus.Localization.dll` — localization engine; zero game/Unity/BepInEx references
+- `BazaarPlusPlus.AutoBazaar.dll` — AutoBazaar host bridge; built only when `EnableAutoBazaarHost=true` (sets `BPP_AUTOBAZAAR_HOST`)
 
-All three csproj files live in the repo root. `ModApi/` and `Storage/` are the source trees for their respective csproj (via `<Compile Include="...">`). `Directory.Build.props` gives them separate `obj/`/`bin/` dirs.
+All five csproj files live in the repo root. `ModApi/`, `Storage/`, `AutoBazaar/`, and `Localization/` are each the source tree for their respective csproj (via `<Compile Include="...">`). `Directory.Build.props` gives them separate `obj/`/`bin/` dirs.
 
 **Plugin lifecycle** — `Plugin.cs` (BepInEx entry) → `BppComposition` (the manual composition root, no DI container). BppComposition wires:
 
@@ -62,10 +64,11 @@ All three csproj files live in the repo root. `ModApi/` and `Storage/` are the s
 **Layer boundaries:**
 
 - `Core/` — pure abstractions (config, event bus, paths, runtime interfaces). Zero game DLL references.
-- `GameInterop/` — game DLL coupling layer (`BppClientCacheBridge`, `GameStateProbe`, `RunContextStore`, `IRunContext`, game-typed events like `CombatSimObserved`/`NetMessageObserved`, shared native adapters like encounter reads, static card data, card preview prefabs, and hero portrait assets).
+- `GameInterop/` — game DLL coupling layer (`BppClientCacheBridge`, `GameStateProbe`, `RunContextStore`, `IRunContext`, game-typed events like `CombatSimObserved`/`NetMessageObserved`, shared native adapters like encounter reads, static card data, card preview prefabs, hero portrait assets, and `EncounterPortraits/` — merchant/trainer encounter portrait sprite provider).
 - `Game/` — feature implementations organized by subdirectory (CombatReplay, HistoryPanel, RunLogging, Screenshots, Tooltips, etc.).
 - `Patches/` — Harmony patches, organized by feature area. `BppPatchHost` provides the static service locator that patches use to reach `IBppServices`.
 - `Infrastructure/` — cross-cutting utilities (logging, fonts, UI design tokens).
+- `Localization/` — zero-dependency localization engine (string lookup, locale switching) extracted from `Game/Settings`.
 
 **Architecture layering rules:**
 

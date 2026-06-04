@@ -28,21 +28,6 @@
 | `Tab` | Cycle `Selected Set` -> `Ten-Win Build` |
 | `W / S` | Browse matched build candidates |
 
-## HistoryPanel Preview Tuning
-
-以下热键仅在 `HistoryPanel` 打开且按住 `Ctrl` 时生效。按住 `Shift` 会使用更大的步进。
-
-| Hotkey | Function |
-| --- | --- |
-| `Ctrl + Left / Right` | Nudge board horizontal offset |
-| `Ctrl + Up / Down` | Nudge camera depth |
-| `Ctrl + PageUp / PageDown` | Nudge camera vertical center |
-| `Ctrl + Q / E` or `Ctrl + Home / End` | Nudge card width scale |
-| `Ctrl + Alt + Q / E` or `Ctrl + Alt + Home / End` | Nudge card height scale |
-| `Ctrl + [ / ]` | Nudge card spacing |
-| `Ctrl + - / =` | Nudge field of view |
-| `Ctrl + Backspace` | Reset preview tuning |
-
 ## Source Files
 
 - `Game/Input/KeyBindings.cs`

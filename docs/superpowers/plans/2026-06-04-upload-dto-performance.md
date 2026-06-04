@@ -1,5 +1,7 @@
 # Upload DTO Performance Implementation Plan
 
+> **Status: IMPLEMENTED — 历史归档（spent plan）。** 本计划描述的工作已全部落地（`RunBundleMultipartContent`、`UploadPayloadSchemaVersion = 5`、3 个上传索引、`BazaarDbSnapshotImagePreparer`）；复选框未回填不代表有未完成项。保留为历史记录，勿据此重做。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Reduce upload DTO memory growth, network payload size, and SQLite hot-path overhead across `bazaarplusplus-mod` and `bazaarplusplus-server`, while preserving query projections and keeping local screenshot quality intact.

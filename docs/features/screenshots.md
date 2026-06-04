@@ -10,7 +10,7 @@ SQLite 列定义（`run_screenshots`、`bazaardb_snapshot_uploads`）统一见 [
 
 ### Trigger
 
-终局界面出现后，`EndOfRunScreenController` 上挂一个全屏透明鼠标 blocker。满足三条件才触发截图：(1) 终局界面已出现满 10 秒；(2) 本局还没成功过一次终局自动截图；(3) 用户触发了一次合法 `Continue`。10 秒窗口内 blocker 吞掉鼠标点击；窗口过后第一次合法点击会先抓图再放行原始 `Continue`，抓图失败则本局仍可再次尝试。
+终局界面出现后，`EndOfRunScreenController` 上挂一个全屏透明鼠标 blocker。满足三条件才触发截图：(1) 终局界面已出现满 8 秒；(2) 本局还没成功过一次终局自动截图；(3) 用户触发了一次合法 `Continue`。8 秒窗口内 blocker 吞掉鼠标点击；窗口过后第一次合法点击会先抓图再放行原始 `Continue`，抓图失败则本局仍可再次尝试。
 
 ### Storage
 
@@ -23,7 +23,7 @@ SQLite 列定义（`run_screenshots`、`bazaardb_snapshot_uploads`）统一见 [
 
 ### UI Suppression
 
-抓图时临时隐藏 Bazaar++ 自己的浮层（设置坞、combat status bar），避免拍进终局图。
+抓图时临时隐藏 Bazaar++ 自己的浮层（设置坞、combat status bar、CollectionPanel 坞按钮），避免拍进终局图。
 
 ### External Reader Contract
 
@@ -37,9 +37,11 @@ SQLite 列定义（`run_screenshots`、`bazaardb_snapshot_uploads`）统一见 [
 
 1. 每个 tick 先 `EnsureBackfilled`（`INSERT OR IGNORE` 补齐 sidecar 行），开关关闭时 tick 顶部短路、零 DB / 零网络。
 2. 取最多 3 条 `status='pending'`（按 `captured_at_utc ASC`）。
-3. 每条：保留本地原始 PNG 不动，准备上传用图片 bytes（原图 `<= 2 MiB` 则直接使用；否则在 `Screenshots/UploadCache/` 生成 PNG derivative，必要时降级 JPEG derivative，最终 bytes 必须 `<= 2 MiB`）→ 取 `player_account_id`（`BppClientCacheBridge.TryGetProfileAccountId`，取不到则**整轮短路跳过**，不发占位符）→ 组装 Snapshot DTO → `POST /bazaardb/snapshots/<snapshot_id>` → 按结果落库。
-4. 结果分类：`Success`→`uploaded`；4xx（除 408/429）→`permanent_failure` 不再重试；5xx / 网络 / 408 / 429 → 留 `pending`、`attempts++` 下轮再试；文件已删 / 行不可读 / 上传 derivative 仍超过限制 → `permanent_failure`。
-5. run 退出或开关 false→true 时 `ArmImmediateAttempt`，下一帧立即上传，无需等 180s。
+3. 取 `player_account_id`（`BppClientCacheBridge.TryGetProfileAccountId`），取不到则**整轮短路跳过**，不发占位符。
+4. 向 `bazaarplusplus-server` 发一次健康探测（每批次懒初始化，仅探测一次）；探测失败则**整批短路**、留 `pending` 下轮再试。
+5. 每条：保留本地原始 PNG 不动，准备上传用图片 bytes（原图 `<= 2 MiB` 则直接使用；否则在 `Screenshots/UploadCache/` 生成 PNG derivative，必要时降级 JPEG derivative，最终 bytes 必须 `<= 2 MiB`）→ 组装 Snapshot DTO → `POST /bazaardb/snapshots/<snapshot_id>` → 按结果落库。
+6. 结果分类：`Success`→`uploaded`；4xx（除 408/429）→`permanent_failure` 不再重试；5xx / 网络 / 408 / 429 → 留 `pending`、`attempts++` 下轮再试；文件已删 / 行不可读 / 上传 derivative 仍超过限制 → `permanent_failure`。
+7. run 退出或开关 false→true 时 `ArmImmediateAttempt`，下一帧立即上传，无需等 180s。
 
 ### Server Flow
 

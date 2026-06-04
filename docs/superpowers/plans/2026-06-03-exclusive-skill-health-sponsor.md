@@ -1,5 +1,7 @@
 # Exclusive Skill Health Sponsor Implementation Plan
 
+> **Status: IMPLEMENTED — 历史归档（spent plan）。** 本计划描述的工作已全部落地（`CollectionHeroScope`、`ModApiHealthClient`、health probe、`BPPSupporterLinks`）；复选框未回填不代表有未完成项。注意：本文多处沿用了旧命名 `BazaarDbScreenshot...`，实际代码为 `BazaarDbSnapshot...`。保留为历史记录，勿据此重做。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix Skill-tab hero filtering so it only shows skills exclusive to the selected hero, add Bazaar++ server health probing to BazaarDB upload startup/retry paths, and route sponsor clicks by language.

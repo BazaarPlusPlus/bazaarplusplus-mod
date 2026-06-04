@@ -1,13 +1,13 @@
 # AutoBazaar Module Isolation Design
 
 Date: 2026-06-02
-Status: Direction approved; implementation plan pending review.
+Status: Implemented and landed.
 
 ## Context
 
-AutoBazaar is currently parked: `BppComposition` keeps the mount registration commented out, so the loopback HTTP endpoint is not started in normal builds. The implementation still lives under `Game/AutoBazaar`, and the unit tests compile selected source files from that folder directly.
+The AutoBazaar module isolation migration is complete. `Game/AutoBazaar` no longer exists; the code now lives in a standalone `AutoBazaar/` root-level module (`BazaarPlusPlus.AutoBazaar.csproj`) containing `Contract/`, `Decisions/`, `Diagnostics/`, `Runtime/`, and `Transport/`. The thin host adapter that owns Unity lifecycle, BepInEx config binding, and game-runtime access lives under `Game/AutoBazaarHost/`. The main plugin consumes the module via `ProjectReference` and gates the host mount registration with `#if BPP_AUTOBAZAAR_HOST` in `BppComposition.cs` (lines 31–32, 126–127). `tests/AutoBazaar.Tests/AutoBazaar.Tests.csproj` references the new assembly via `ProjectReference` (line 27) rather than linking source files directly. Architecture tests in `tests/Architecture.Tests/CoreLayeringTests.cs` (line 253) enforce that the core module does not reference Unity, BepInEx, Harmony, or game DLLs.
 
-That layout makes AutoBazaar look like an ordinary game feature, but it is closer to a separately owned automation bridge. Its stable surface is the versioned HTTP contract; its implementation should be removable and testable without pulling feature UI code, Unity lifecycle code, or unrelated game modules into the same conceptual area.
+AutoBazaar remains parked at runtime: the mount is not registered in normal builds unless the `BPP_AUTOBAZAAR_HOST` compilation symbol is defined. The isolation work described in this document has been carried out in full; the remaining open item is an explicit re-enable task.
 
 ## Goals
 

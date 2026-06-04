@@ -27,7 +27,7 @@ Source of truth:
 - Database file: `<GameRoot>/BazaarPlusPlusV4/bazaarplusplus.db`
 - Local schema version: `15` (`RunLogSchema.LocalDatabaseSchemaVersion`)
 - Row schema version: `11`
-- Upload payload schema version: `1`
+- Upload payload schema version: `5`
 - Runtime pragmas include `foreign_keys = ON`, `user_version = 15`, `busy_timeout = 2000`, and WAL mode.
 
 > Version history: `v11→v12` added the `combat_replay_videos` table; `v13` added the BazaarDB upload sidecar; `v14` added battle-time player/opponent prestige and victories to `battles`; `v15` renamed the sidecar to `bazaardb_snapshot_uploads` with `snapshot_id`. The bootstrap is a single `CREATE TABLE IF NOT EXISTS` pass (`RunLogSchema.BootstrapSql`), so a fresh database is created directly at the current version rather than migrated step by step.
@@ -75,11 +75,11 @@ Key columns:
 
 Main write paths:
 
-- `SqliteRunLogStore.CreateRun`
-- `SqliteRunLogStore.AppendEvent`
-- `SqliteRunLogStore.SaveCheckpoint`
-- `SqliteRunLogStore.CompleteRun`
-- `SqliteRunLogStore.MarkRunAbandoned`
+- `RunLogStore.CreateRun`
+- `RunLogStore.AppendEvent`
+- `RunLogStore.SaveCheckpoint`
+- `RunLogStore.CompleteRun`
+- `RunLogStore.MarkRunAbandoned`
 
 ### `run_events`
 

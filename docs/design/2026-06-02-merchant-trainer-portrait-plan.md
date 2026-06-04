@@ -7,22 +7,27 @@
 
 ---
 
-## 实现进展（2026-06-02）— 模板 ID 目录已落地
+## 实现进展（已落地，2026-06-03 校订）— CollectionSources 子系统 + EncounterPortraitSpriteProvider
 
-第一阶段（"把它维护成一个 template ID 对应的东西"）已实现，采用 **策展 roster × extractor `index.json` → 签入目录** 方案（参考 `CardSetPreview` / `final-builds` 的嵌入资源模式）。**关键改动：放弃按文本/运行时标签分类，改为按 template ID 精确命中**——因为名称不唯一（Aila=8 个 ID、Jay Jay=11 个）且与无关 encounter 同名碰撞（"Advanced Training"、"Bjorn's Gift Exchange"、Bronze/Pygmalien 的 "Nufu" 等）。
+> **⚠️ 与下文 §3/§4/§5 草案的偏差（重要）**：本特性**已实现并通过 Debug 构建**，但**最终架构与本方案 §3.2 提出的 `Game/CollectionPanel/Encounters/` 设计不同**。实现收敛到一个**数据驱动的 `CollectionSources` 子系统**（嵌入 JSON 目录 + Catalog 加载器），而非 §3.2 设想的"扩展 `CollectionCatalog` 保留 `EncounterCards` + 运行时谓词分类"。下文 §3.2/§4/§5 的具体类名/路径多已过时，仅其**头像加载通路（§2/§3.1 的 `ArtKey → EncounterAssetDataSO → IPortraitAssetData`）与英雄关联语义**仍成立。**以下"实际落地"清单为准。**
 
-新增 / 改动：
-- `tools/encounter-portraits/build_catalog.py` —— 生成器：内嵌 bazaardb 70 条 roster（哪些是商人/训练师 + 卖/教标签），交叉 extractor `index.json`（`name.source`→template `id`/`heroes`/`tier`），按 **名称+英雄集+品级** 解析出每个身份的**全部 template ID**，并自动剔除同名碰撞。游戏更新时：重跑 extractor → 按需更新 roster → 重跑本脚本 → 提交 JSON。
-- `Data/Encounters/merchant-trainer-portraits.json` —— 签入目录（嵌入资源）：**70 条身份（47 商人 + 23 训练师）→ 109 个 template ID**，含 kind/tier/heroes/description。
-- `Game/CollectionPanel/Encounters/MerchantTrainerCatalog.cs` —— 加载器（仿 `CardSetBuildDataRepository` 嵌入资源加载）：`TryGet(Guid templateId, out entry)`、`ForHero(EHero)`、`Entries`。
-- `Game/CollectionPanel/Encounters/MerchantTrainerEntry.cs` / `EncounterPortraitKind.cs` —— 运行时模型（含 `AppliesToHero`，空 Heroes = Common = 全英雄）。
-- `BazaarPlusPlus.csproj` —— 新增 `EmbeddedResource`。Debug 构建已通过。
+### 原计划的 5 个文件**均未创建**（草案作废）
+本节早期草案曾声称已新增以下 5 个产物，经核对**全部不存在**，请勿据此理解代码：
+- ~~`tools/encounter-portraits/build_catalog.py`~~ —— 不存在（仓库**无 `tools/` 目录**）。
+- ~~`Data/Encounters/merchant-trainer-portraits.json`~~ —— 不存在（实际数据在 `Data/CollectionSources/collection-sources.json`）。
+- ~~`Game/CollectionPanel/Encounters/MerchantTrainerCatalog.cs`~~ —— 不存在（**无 `Game/CollectionPanel/Encounters/` 目录**）。
+- ~~`Game/CollectionPanel/Encounters/MerchantTrainerEntry.cs`~~ / ~~`EncounterPortraitKind.cs`~~ —— 不存在。
 
-**这取代原 §3.2/§4 的"运行时按 `card.Merchants` 分类"**：现在 `MerchantTrainerCatalog` 是"哪些 template ID 是商人/训练师 + 元数据"的唯一权威来源，英雄关联即 `entry.Heroes`（`ForHero` 已实现 Common-或-空集语义）。
+### 实际落地的架构
+采用 **嵌入 JSON 目录（策展 roster）→ Catalog 加载/校验 → 运行时取 Sprite** 通路：
 
-**仍待做（下一步，不在本次范围）：**
-- `GameInterop/EncounterPortraits/EncounterPortraitSpriteProvider.cs` —— 按 template ID 经 `ArtKey → EncounterAssetDataSO → LoadPortraitSpriteAsync` 取 `Sprite`（见 §3.1）。**动工前先做 Step 0 运行时验证**（取 Aimbot + Bjorn 的某个 template ID，确认出非 null portrait）。
-- CollectionPanel UI（§5/§7）：`MerchantTrainerCatalog.ForHero(selectedHero)` → 每条取一个 `TemplateId` 调 Provider 出图，复用英雄 chip 的 `ApplyHeroChipIcon` 绑定与 tracked-element-map。
+- `Data/CollectionSources/collection-sources.json` —— 签入的策展目录（**嵌入资源**，`BazaarPlusPlus.csproj:31` `<EmbeddedResource Include="Data\CollectionSources\collection-sources.json" />`）。每条 entry 含 `kind`/`name`/`group`/`availableHeroes`/`description`/`portraitTemplateId`/`sourceTemplateIds`/`offerRule`（DTO 见 `Game/CollectionPanel/Sources/CollectionSourceDtos.cs:19-82`）。
+- `Game/CollectionPanel/Sources/CollectionSourceEnums.cs:5-9` —— `CollectionSourceKind { Merchant, Trainer }`（**即原 §3.2 设想的 `EncounterPortraitKind`，但实际命名为 `CollectionSourceKind`**），另含 `CollectionSourceHeroMode`/`CollectionSourceStartingTierMode`/`CollectionSourceOfferPoolStatus`。
+- `Game/CollectionPanel/Sources/CollectionSourceEntry.cs` —— 运行时条目模型：`PortraitTemplateId : Guid`（`:17`/`:48` 喂给 Provider 出图）、`SourceTemplateIds`、`AvailableHeroes`，英雄关联即 `AppliesToHero(EHero)`（`:60-61`，**空集 = 全英雄**，复刻 Common-或-空集语义）。
+- `Game/CollectionPanel/Sources/CollectionSourceCatalog.cs` —— 加载器：从嵌入资源读 `collection-sources.json`（`:17` `ResourceSuffix`），按 `CollectionSourceKind` 解析（`:128`），校验 `portraitTemplateId`/`sourceTemplateIds`（`:142-159`）去重；由 `Game/CollectionPanel/CollectionPanel.cs` 消费。配套 `CollectionSourceRoster.cs` / `CollectionSourceOfferRule.cs` / `CollectionSourceOfferPoolResolver.cs` / `CollectionSourceOfferPoolResult.cs`。
+- `GameInterop/EncounterPortraits/EncounterPortraitSpriteProvider.cs` —— **已实现**：按 `Guid`（`sourceTemplateId`）经 `BppStaticDataAccess.GetCardTemplate → template.ArtKey → AssetLoader.LoadAssetAsyncByAddress<EncounterAssetDataSO> → LoadPortraitSpriteAsync` 取 `Sprite`，含 `CachedSprites`/`InFlightLoads` 去重（`:17-18`）与 null/text-fallback 分支（`:51-63`、`:78-85`）。由 `Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs` 消费。**注意：实际用直调泛型方法，非 §3.1 草案的反射形（见 §3.1 校订）。**
+
+**与草案的关键差异**：实现**没有**扩展 `CollectionCatalog` 增设 `EncounterCards`，也**没有** `EncounterPortraitSource.Matches` 运行时谓词分类——"哪些 template ID 是商人/训练师 + 元数据 + 英雄关联"的唯一权威来源是**签入的 `collection-sources.json`** 经 `CollectionSourceCatalog` 加载，英雄关联即 `CollectionSourceEntry.AppliesToHero`。商人/训练师的 NPC↔英雄关系由策展目录直接给出，不再在运行时从 `card.Merchants` 派生。
 
 ---
 
@@ -165,6 +170,8 @@ internal async Task<T> LoadAssetAsyncByAddress<T>(string address, bool reportSuc
 
 ### 3.1 GameInterop 侧：Sprite 加载适配器（不含任何筛选；商人/训练师共用）
 
+> **【已实现，与草案的偏差】** `GameInterop/EncounterPortraits/EncounterPortraitSpriteProvider.cs` **已落地**，缓存/in-flight/null-fallback 骨架如本节所述。**唯一偏差**：本节草案下方给出"反射调用 `LoadAssetAsyncByAddress`"的骨架，但**实际代码用直调泛型方法**——`await assetLoader.LoadAssetAsyncByAddress<EncounterAssetDataSO>(template.ArtKey)`（`EncounterPortraitSpriteProvider.cs:75`），随后 `await encounterData.LoadPortraitSpriteAsync()`（`:87`），**不经 `MethodInfo`/`MakeGenericMethod`/`Invoke`**。下方反射骨架仅作历史草案保留，**以实际直调形为准**（game DLL 已 publicize，泛型直调可行；MEMORY「反射优于 Publicizer」此处未采用，属团队接受的风格选择）。
+
 新增 `GameInterop/EncounterPortraits/EncounterPortraitSpriteProvider.cs`（命名从 `MerchantPortraits` 泛化为 `EncounterPortraits`，因商人与训练师共用同一加载段），**键为 `Guid`（模板 Id）**：
 
 ```csharp
@@ -185,9 +192,10 @@ internal static class EncounterPortraitSpriteProvider
 }
 ```
 
-加载段反射骨架（签名已确证 `AssetLoader.cs:652`；遵循「反射优于 Publicizer」约定）：
+加载段反射骨架（**历史草案；未采用** —— 实际为 `EncounterPortraitSpriteProvider.cs:75` 的直调 `LoadAssetAsyncByAddress<EncounterAssetDataSO>(template.ArtKey)`，签名已确证 `AssetLoader.cs:652`）：
 
 ```csharp
+// ⚠️ 草案，未实现：实际代码直调泛型 `assetLoader.LoadAssetAsyncByAddress<EncounterAssetDataSO>(artKey)`。
 private static readonly MethodInfo? LoadByAddressOpen = typeof(AssetLoader)
     .GetMethod("LoadAssetAsyncByAddress",
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -223,6 +231,16 @@ private static async Task<Sprite?> LoadAndMaybeCacheAsync(Guid templateId)
 ```
 
 ### 3.2 Game 侧：单一可参数化来源（满足「每类一个独立类」意图，无接口）
+
+> **【已被 CollectionSources 子系统取代 / 未按本节实现】** 本节整套设计——新增 `Game/CollectionPanel/Encounters/` 目录、`EncounterPortraitSource.Matches` 运行时谓词分类、`EncounterPortraitItem` 条目 struct、以及"扩展 `CollectionCatalog` 保留 `EncounterCards`"——**均未实现**：仓库**无 `Game/CollectionPanel/Encounters/` 目录**，亦无 `EncounterPortraitSource`/`EncounterPortraitItem` 类型。
+>
+> 实际落地为**数据驱动的 `Game/CollectionPanel/Sources/` 子系统**（见上文「实现进展」）：
+> - "哪些 template ID 是商人/训练师"不再由运行时谓词从 `card.Merchants` 分类，而由**签入的 `Data/CollectionSources/collection-sources.json`** 直接给出，经 `CollectionSourceCatalog.cs` 加载/校验。
+> - 角色类型枚举实际为 `CollectionSourceKind { Merchant, Trainer }`（`CollectionSourceEnums.cs:5-9`），**非** `EncounterPortraitKind`。
+> - 条目模型实际为 `CollectionSourceEntry`（`CollectionSourceEntry.cs`），其 `PortraitTemplateId`（`:17`）喂给 Provider 出图。
+> - `CollectionCardClassifier` **未**改动以接纳 encounter 卡：其 `Classify` 仍只接受 `Item`/`Skill`（`CollectionCardClassifier.cs:69` `if (type != ECardType.Item && type != ECardType.Skill) return Rejected(...)`），故 encounter 卡的消费**不**走 `CollectionCatalog`，而走独立的 `CollectionSourceCatalog` 读 JSON。
+>
+> 下方原 §3.2 草案（`EncounterPortraitSource` / `EncounterPortraitItem` / `CollectionCatalogBuildSession.EncounterCards`）**仅作历史记录保留**，与现有代码不符。
 
 新增 `Game/CollectionPanel/Encounters/`（紧邻现有 `Data/` 分类逻辑）。**第一期不建接口、不建聚合器**——只建一个**按 `EncounterPortraitKind` 参数化**的来源类，直接消费现有 `CollectionCatalog` 缓存。
 
@@ -349,16 +367,20 @@ pair.Heroes.Contains(EBazaarHero.Common) || pair.Heroes.Contains(battlePlayer.He
 
 当前运行英雄全局可读：`Data.SelectedHero`（`decompiled/TheBazaar/Data.cs:100`），mod 已有先例 `OpponentPortraitController.cs:153`。注意 mod 的 `IRunContext`/`RunContextStore` **不**携带英雄，**直接用 `Data.SelectedHero`**（或 CollectionPanel 已有的 `SelectedHeroes` 过滤态，`CollectionPanel.cs:590`）。
 
-### 实现：单一关联辅助（与既有 `AnyHeroMatch` 的关系已厘清）
+### 实现：单一关联辅助（与既有 hero-scope 谓词的关系已厘清）
 
-新增 `Game/CollectionPanel/Encounters/HeroAssociation.cs`（纯函数，可单测）。同 feature 文件夹已有 `CollectionFilterEngine.AnyHeroMatch`（`CollectionFilterEngine.cs:90-101`），但语义**不同**——`AnyHeroMatch` 只做集合相交，**不** special-case `Common`，也不把空集当 match-all。商人/训练师关联需要 `BazaarCardDealer:4494` 的 **Common-OR-空集回退**语义。故**保留独立 `HeroAssociation`，但在注释交叉引用 `AnyHeroMatch` 说明语义差异，避免两个 matcher 静默分叉**：
+> **【代码校订】** 本节早期草案引用 `CollectionFilterEngine.AnyHeroMatch`（声称在 `CollectionFilterEngine.cs:90-101`），**该类型成员不存在**：`CollectionFilterEngine`（`Game/CollectionPanel/Data/CollectionFilterEngine.cs`）的公开入口是 `Apply(...)`（`:15`），它把 hero 匹配**委托**给 `CollectionHeroScope.MatchesFilter`（`:43`）。真正做集合相交的 `AnyHeroMatch` 是 **`CollectionHeroScope` 的私有方法**（`Game/CollectionPanel/Data/CollectionHeroScope.cs:28-39`），且 `CollectionHeroScope` 还对 `Skill` 卡做单英雄特判（`MatchesSkillHeroScope`，`:23-26`）。下文凡提 `CollectionFilterEngine.AnyHeroMatch(:90-101)` 处，**应读作 `CollectionHeroScope` 内的私有 `AnyHeroMatch(:28-39)`**。
+>
+> 此外，本节草案新增的 `Game/CollectionPanel/Encounters/HeroAssociation.cs` **未实现**（无此目录/类型）。实际的 encounter↔英雄 Common-OR-空集语义由 `CollectionSourceEntry.AppliesToHero(EHero)`（`CollectionSourceEntry.cs:60-61`：`AvailableHeroes.Count == 0 || AvailableHeroes.Contains(hero)`）承担，英雄集合来自签入目录的 `availableHeroes`，**非**运行时从卡 `Heroes` 派生。下方草案仅作历史记录。
+
+新增 `Game/CollectionPanel/Encounters/HeroAssociation.cs`（纯函数，可单测）。同 feature 文件夹已有 hero-scope 谓词 `CollectionHeroScope.AnyHeroMatch`（私有，`CollectionHeroScope.cs:28-39`），但语义**不同**——`AnyHeroMatch` 只做集合相交，**不** special-case `Common`，也不把空集当 match-all。商人/训练师关联需要 `BazaarCardDealer:4494` 的 **Common-OR-空集回退**语义。故**保留独立 `HeroAssociation`，但在注释交叉引用 `AnyHeroMatch` 说明语义差异，避免两个 matcher 静默分叉**：
 
 ```csharp
 #nullable enable
 namespace BazaarPlusPlus.Game.CollectionPanel.Encounters;
 
 // 复现 BazaarCardDealer.cs:4494 的 hero 谓词（客户端 EHero 版）：Common-OR-空集 → match-all。
-// 注意：与 CollectionFilterEngine.AnyHeroMatch(:90-101) 语义【不同】——
+// 注意：与 CollectionHeroScope.AnyHeroMatch(私有, :28-39) 语义【不同】——
 //   AnyHeroMatch 仅做集合相交，不特判 Common、不把空集当 match-all（那是给 Item/Skill 多选筛选用的）。
 //   本谓词专为 encounter↔hero 的 shipped 数据语义而设，故不复用 AnyHeroMatch。
 internal static class HeroAssociation
@@ -525,7 +547,8 @@ private static void ApplyEncounterIcon(VisualElement icon, Sprite? sprite)   // 
 - 模板适配器：`GameInterop/HeroPortraits/HeroPortraitSpriteProvider.cs`
 - UI 绑定原语 + tracked map：`Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs:210,216-231,260-272,285-295`
 - 现有目录缓存（待扩展）：`Game/CollectionPanel/Data/CollectionCatalog.cs:10-140`（`IsCatalogCard` 丢弃 encounter 在 `CollectionCardClassifier.cs:49`）
-- 既有 hero 谓词（语义对照）：`Game/CollectionPanel/Data/CollectionFilterEngine.cs:90-101`
+- 既有 hero 谓词（语义对照）：`Game/CollectionPanel/Data/CollectionHeroScope.cs:28-39`（私有 `AnyHeroMatch`；由 `CollectionFilterEngine.Apply` → `CollectionHeroScope.MatchesFilter` 调用，`CollectionFilterEngine.cs:15,43`）。实际 encounter↔英雄关联落地在 `Game/CollectionPanel/Sources/CollectionSourceEntry.cs:60-61`（`AppliesToHero`）
+- 实际落地（取代 §3.2 草案）：`Game/CollectionPanel/Sources/`（`CollectionSourceEnums.cs:5-9`、`CollectionSourceEntry.cs:17,60-61`、`CollectionSourceCatalog.cs:17`、`CollectionSourceDtos.cs`）+ 嵌入目录 `Data/CollectionSources/collection-sources.json`（`BazaarPlusPlus.csproj:31`）；头像加载 `GameInterop/EncounterPortraits/EncounterPortraitSpriteProvider.cs:75,87`（直调，非反射）
 - 静态数据接缝：`GameInterop/StaticCards/BppStaticDataAccess.cs:25,33`
 - 分类器（复用 `ResolveMerchants`）：`Game/CollectionPanel/Data/CollectionCardClassifier.cs:61-103,105-109`
 - VM 投影：`Game/CollectionPanel/Data/CollectionCardVm.From.cs:11-28`

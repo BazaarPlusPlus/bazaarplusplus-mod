@@ -261,11 +261,11 @@ Snapshot / sim DTO：
 |---|---|---|
 | `POST /run-bundles` | multipart `metadata` (`RunBundleUploadRequest`) + `artifact` (`RunArtifact`) | metadata: `SchemaVersion`、`PlayerAccountId`、`SubmittedAtUtc`、`ArtifactCodec`、`RunProjection`、`BattleProjections`；artifact: gzip-compressed MessagePack bytes |
 | `RunBundleUploadRequest.RunProjection` | `RunProjection` | `RunId`、`Status`、`HeroId`、`HeroName`、`PlayerRank`、`PlayerRating`、`PlayerPosition`、`StartedAtUtc`、`EndedAtUtc`、`FinalDay`、`FinalWins`、`FinalLosses`、`FinalPlayerRank`、`FinalPlayerRating`、`FinalPlayerPosition`、`Battles` |
-| `RunBundleUploadRequest.BattleProjection` | `BattleProjection` | `BattleId`、`RecordedAtUtc`、`RunId`、`Day`、`PlayerName`、`PlayerAccountId`、`PlayerHero`、`PlayerRank`、`PlayerRating`、`PlayerLevel`、`OpponentName`、`OpponentAccountId`、`OpponentHero`、`OpponentRank`、`OpponentRating`、`OpponentLevel`、`Result` |
+| `RunBundleUploadRequest.BattleProjection` | `BattleProjection` | `BattleId`、`RecordedAtUtc`、`RunId`、`Day`、`PlayerName`、`PlayerAccountId`、`PlayerHero`、`PlayerRank`、`PlayerRating`、`PlayerLevel`、`PlayerPrestige`(`int?`)、`PlayerVictories`(`int?`)、`OpponentName`、`OpponentAccountId`、`OpponentHero`、`OpponentRank`、`OpponentRating`、`OpponentLevel`、`OpponentPrestige`(`int?`)、`OpponentVictories`(`int?`)、`Result`、`WinnerCombatantId`(`string?`)、`LoserCombatantId`(`string?`) |
 | `RunArtifact` | run artifact | `RunId`、`Battles` |
 | `RunArtifactBattle` | battle artifact wrapper | `BattleId`、`Manifest`、`Participants`、`Snapshots`、`ReplayPayload` |
 | `BattleManifestArtifact` | manifest | `BattleId`、`RecordedAtUtc`、`Day`、`Hour`、`EncounterId`、`CombatKind`、`Result`、`WinnerCombatantId`、`LoserCombatantId` |
-| `BattleParticipantsArtifact` | participants | player/opponent name、account、hero、rank、rating、level |
+| `BattleParticipantsArtifact` | participants | `PlayerName`、`PlayerAccountId`、`PlayerHero`、`PlayerRank`、`PlayerRating`(`int?`)、`PlayerLevel`(`int?`)、`PlayerPrestige`(`int?`)、`PlayerVictories`(`int?`)、`OpponentName`、`OpponentAccountId`、`OpponentHero`、`OpponentRank`、`OpponentRating`(`int?`)、`OpponentLevel`(`int?`)、`OpponentPrestige`(`int?`)、`OpponentVictories`(`int?`) |
 | `BattleSnapshotsArtifact` | snapshots | `CardSets` |
 | `CardSetCaptureArtifact` | card set | `Label`、`Status`、`Source`、`Items` |
 | `CardSetItemArtifact` | card item | `InstanceId`、`TemplateId`、`Type`、`Size`、`Section`、`Socket`、`Name`、`Tier`、`Enchant`、`Tags`、`Attributes` |

@@ -10,7 +10,7 @@
 ## 当前行为
 
 - 仅在 `IBppServices.RunContext.IsInGameRun` 且功能开启时显示。
-- 展示逻辑战斗时间与当前 frame index。
+- 展示逻辑战斗时间（elapsed time）。
 - 支持暂停和 0.50x / 0.67x / 1.00x 速度档位。
 - 记住功能开关和默认速度档位。
 
@@ -31,7 +31,7 @@
 ## Runtime Flow
 
 1. `Patches/Combat/CombatSimulationPatches.cs` 发布 `CombatSimObserved` 和 `CombatFrameAdvanced`。
-2. `CombatStatusBarModule` 记录总帧数并同步处理进度；HUD frame 文本显示 zero-based 当前帧序号。
+2. `CombatStatusBarModule` 记录总帧数并同步处理进度；`CombatStatusBar.State` 将帧号转换为逻辑耗时（`frameIndex * 50ms`）供 HUD 显示。
 3. `CombatStatusBar` 在 `Update()` 中刷新 HUD。
 
 ## 关键文件
@@ -39,9 +39,13 @@
 - `Plugin.cs`
 - `Core/Config/BppConfig.cs`
 - `Game/CombatStatusBar/CombatStatusBar.cs`
+- `Game/CombatStatusBar/CombatStatusBar.Canvas.cs`
 - `Game/CombatStatusBar/CombatStatusBar.State.cs`
 - `Game/CombatStatusBar/CombatStatusBar.Config.cs`
-- `Game/CombatStatusBar/CombatStatusBarModule.cs`
+- `Game/CombatStatusBar/CombatStatusBar.RoundedSprite.cs`
 - `Game/CombatStatusBar/CombatStatusBar.SettingsMenuBridge.cs`
+- `Game/CombatStatusBar/CombatStatusBar.SettingsMenuLabel.cs`
+- `Game/CombatStatusBar/CombatStatusBarModule.cs`
+- `Game/CombatStatusBar/CombatStatusBarSettingsDockEntry.cs`
 - `Game/Settings/BppSettingsDockCatalog.cs`
 - `Patches/Combat/CombatSimulationPatches.cs`

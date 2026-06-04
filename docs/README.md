@@ -13,6 +13,7 @@
 - [mod-features-overview.md](mod-features-overview.md) — **功能枢纽**：代码派生的功能总览、运行时骨架、配置摘要，链接到下面每篇深入文档。
 - [features/run-logging-and-upload.md](features/run-logging-and-upload.md) — 活跃 run 采集、HistoryPanel 数据、后台上传与信任模型。
 - [features/history-panel.md](features/history-panel.md) — HistoryPanel 布局 / 预览渲染 / ghost 出局行级指示。
+- [features/collection-panel.md](features/collection-panel.md) — 全屏卡牌图鉴（Item+Skill）：入口/生命周期、过滤维度、CollectionSources 来源 catalog（含 v3 schema）、虚拟化网格与首屏性能。
 - [features/combat-replay.md](features/combat-replay.md) — PVP 录制 / 回放 + 可选 MP4 视频录制。
 - [features/screenshots.md](features/screenshots.md) — 终局自动截图 + 可选 BazaarDB 上传。
 - [features/tooltip-preview.md](features/tooltip-preview.md) — 附魔 / 升级预览的 3 态可视性与 pedestal 自动触发。

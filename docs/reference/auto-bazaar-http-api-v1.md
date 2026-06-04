@@ -163,7 +163,7 @@ Submits one action. The call blocks on the HTTP thread until the mod's Unity mai
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `actionKind` | string | yes | One of the 12 action kinds |
+| `actionKind` | string | yes | One of the 11 action kinds |
 | `cardInstanceId` | string | for card-bearing kinds | Instance ID of the card to act on |
 | `targetSection` | string | for `SelectItem`, `MoveItem` | Placement section: `Hand` or `Stash` |
 | `targetSockets` | string[] | for `SelectItem`, `MoveItem` | Ordered socket list; must match an option from `availableActions` exactly |
@@ -205,6 +205,7 @@ Card-bearing kinds are: `SelectItem`, `SelectSkill`, `SelectEncounter`, `CommitT
 | `cooldown` | 429 | `retryAfterSeconds` (float64) |
 | `unavailable` | 503 | — |
 | `not-found` | 404 | — |
+| `internal` | 500 | — |
 
 Future error codes are possible. Clients must tolerate unknown codes: log the response and apply a backoff before retrying.
 
@@ -239,15 +240,15 @@ Rules are applied in order. The first failure terminates validation and the erro
 |---|---|---|---|---|
 | `Wait` | `Wait` | — | always | (no-op) |
 | `StartOrContinueRun` | `Flow` | `hero?`, `playMode?` | hero-select scene with profile loaded and no active `AppState` | `GameInstance.Instance.StartNewRun()` |
-| `AbandonRun` | `Flow` | — | in-run, not in combat / replay / end-run | `Cmd.GetInstance().SendAbandonRun()` |
-| `SelectItem` | `Offer` | `cardInstanceId`, `targetSection`, `targetSockets` | item offered, `SelectItem` allowed | `Cmd.GetInstance().SelectItem(card, sockets, section)` |
-| `SelectSkill` | `Offer` | `cardInstanceId` | skill offered, `SelectSkill` allowed | `Cmd.GetInstance().SendSelectSkill(instanceId)` |
-| `SelectEncounter` | `Route` | `cardInstanceId` | encounter offered, `SelectEncounter` allowed | `Cmd.GetInstance().SelectEncounter(instanceId)` |
-| `CommitToPedestal` | `Pedestal` | `cardInstanceId` | `stateName == Pedestal`, `CommitToPedestal` allowed | `Cmd.GetInstance().SendCommitToPedestal(instanceId)` |
-| `MoveItem` | `Move` | `cardInstanceId`, `targetSection`, `targetSockets` | owned item, `MoveItem` allowed | `Cmd.GetInstance().SendMoveItem(card, sockets, section)` |
-| `SellItem` | `Sell` | `cardInstanceId` | sellable item, `SellItem` allowed | `Cmd.GetInstance().SendSellCard(instanceId)` |
-| `Reroll` | `Reroll` | — | `rerollsRemaining > 0` and `playerGold >= rerollCost` and `Reroll` allowed | `Cmd.GetInstance().SendReRollSelection()` |
-| `ExitState` | `Exit` | — | `canExit == true` and `ExitState` allowed | `Cmd.GetInstance().SendExitCurrentState()` |
+| `AbandonRun` | `Flow` | — | in-run, not in combat / replay / end-run | `AppState.CurrentState.AbandonRunCommand()` via reflection |
+| `SelectItem` | `Offer` | `cardInstanceId`, `targetSection`, `targetSockets` | item offered, `SelectItem` allowed | `AppState.CurrentState.BuyItemCommand(card, sockets, section)` via reflection |
+| `SelectSkill` | `Offer` | `cardInstanceId` | skill offered, `SelectSkill` allowed | `AppState.CurrentState.SelectSkillCommand(skill)` via reflection |
+| `SelectEncounter` | `Offer` | `cardInstanceId` | encounter offered, `SelectEncounter` allowed | `AppState.CurrentState.SelectEncounterCommand(instanceId)` via reflection |
+| `CommitToPedestal` | `Pedestal` | `cardInstanceId` | `stateName == Pedestal`, `CommitToPedestal` allowed | `AppState.CurrentState.CommitToPedestalCommand(instanceId)` via reflection |
+| `MoveItem` | `Move` | `cardInstanceId`, `targetSection`, `targetSockets` | owned item, `MoveItem` allowed | `AppState.CurrentState.MoveCardCommand(card, sockets, section)` via reflection |
+| `SellItem` | `Sell` | `cardInstanceId` | sellable item, `SellItem` allowed | `AppState.CurrentState.SellCardCommand(card)` via reflection |
+| `Reroll` | `Reroll` | — | `rerollsRemaining > 0` and `playerGold >= rerollCost` and `Reroll` allowed | `AppState.CurrentState.RerollCommand()` via reflection |
+| `ExitState` | `Exit` | — | `canExit == true` and `ExitState` allowed | `AppState.CurrentState.ExitStateCommand()` via reflection |
 
 ---
 

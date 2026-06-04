@@ -1,5 +1,7 @@
 # Dock Clone Button Sprites And Hover Implementation Plan
 
+> **Status: IMPLEMENTED — 历史归档（spent plan）。** 本计划描述的工作已全部落地（`BppDockButtonIconKind` / `BppDockButtonSpriteProvider` / `BppDockButtonVisuals`，PNG 已 embed）；复选框未回填不代表有未完成项。保留为历史记录，勿据此重做。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the center icons of the two native-cloned Bazaar++ dock buttons with explicit custom Sprite resources while preserving the native gold-ring button frame, and give both buttons a native-quality hover/pressed visual state.
