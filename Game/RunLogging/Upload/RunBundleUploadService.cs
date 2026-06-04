@@ -28,7 +28,22 @@ internal sealed class RunBundleUploadService : IDisposable
         );
     }
 
-    public async Task UploadPendingRunBundlesAsync(CancellationToken cancellationToken)
+    public Task UploadPendingRunBundlesAsync(CancellationToken cancellationToken) =>
+        UploadPendingRunBundlesAsync(ResolvePlayerAccountId(), cancellationToken);
+
+    public Task UploadPendingRunBundlesInBackgroundAsync(CancellationToken cancellationToken)
+    {
+        var playerAccountId = ResolvePlayerAccountId();
+        return Task.Run(
+            () => UploadPendingRunBundlesAsync(playerAccountId, cancellationToken),
+            cancellationToken
+        );
+    }
+
+    private async Task UploadPendingRunBundlesAsync(
+        string? playerAccountId,
+        CancellationToken cancellationToken
+    )
     {
         var pendingRunIds = _store.GetPendingCompletedRunIds(3);
         if (pendingRunIds.Count == 0)
@@ -40,7 +55,6 @@ internal sealed class RunBundleUploadService : IDisposable
             return;
         }
 
-        var playerAccountId = ResolvePlayerAccountId();
         if (string.IsNullOrWhiteSpace(playerAccountId))
         {
             BppLog.Info(

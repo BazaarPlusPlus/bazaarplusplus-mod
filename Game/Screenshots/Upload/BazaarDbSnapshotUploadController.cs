@@ -2,6 +2,7 @@
 using System;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Upload;
@@ -123,7 +124,7 @@ internal sealed class BazaarDbSnapshotUploadController : MonoBehaviour
             _startupGate,
             Time.unscaledTime,
             _services!.RunContext.IsInGameRun,
-            _uploadService.UploadPendingAsync,
+            UploadPendingSnapshotsOffMainThreadAsync,
             _shutdown.Token
         );
     }
@@ -159,6 +160,16 @@ internal sealed class BazaarDbSnapshotUploadController : MonoBehaviour
     private bool IsEnabled()
     {
         return _services?.Config?.BazaarDbUploadEnabled?.Value ?? false;
+    }
+
+    private Task UploadPendingSnapshotsOffMainThreadAsync(CancellationToken cancellationToken)
+    {
+        var uploadService =
+            _uploadService
+            ?? throw new InvalidOperationException(
+                "BazaarDB screenshot upload service is not initialized."
+            );
+        return uploadService.UploadPendingInBackgroundAsync(cancellationToken);
     }
 
     public static void OnEnabledChanged(bool enabled)

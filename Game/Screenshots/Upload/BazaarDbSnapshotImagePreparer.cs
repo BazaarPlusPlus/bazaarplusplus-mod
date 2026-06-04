@@ -1,7 +1,11 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.IO;
-using UnityEngine;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Processing;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
@@ -75,17 +79,17 @@ internal sealed class BazaarDbSnapshotImagePreparer
         string cachedJpegPath
     )
     {
-        Texture2D? sourceTexture = null;
         try
         {
-            sourceTexture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
-            if (!sourceTexture.LoadImage(sourceBytes, markNonReadable: false))
-                return null;
-
+            using var sourceImage = Image.Load(sourceBytes);
+            var sourceLongestEdge = Math.Max(sourceImage.Width, sourceImage.Height);
             foreach (var target in PngLongestEdgeTargets)
             {
-                using var candidate = ResizedTextureLease.Create(sourceTexture, target);
-                var bytes = candidate.Texture.EncodeToPNG();
+                if (target >= sourceLongestEdge)
+                    continue;
+
+                using var candidate = ResizeToLongestEdge(sourceImage, target);
+                var bytes = EncodePng(candidate);
                 if (
                     bytes is { Length: > 0 }
                     && bytes.Length <= BazaarDbSnapshotUploadLimits.MaxUploadImageBytes
@@ -101,19 +105,12 @@ internal sealed class BazaarDbSnapshotImagePreparer
                 }
             }
 
-            for (
-                var targetIndex = PngLongestEdgeTargets.Length - 1;
-                targetIndex >= 0;
-                targetIndex--
-            )
+            foreach (var target in EnumerateJpegLongestEdgeTargets(sourceLongestEdge))
             {
-                using var candidate = ResizedTextureLease.Create(
-                    sourceTexture,
-                    PngLongestEdgeTargets[targetIndex]
-                );
+                using var candidate = ResizeToLongestEdge(sourceImage, target);
                 foreach (var quality in JpegQualityTargets)
                 {
-                    var bytes = candidate.Texture.EncodeToJPG(quality);
+                    var bytes = EncodeJpeg(candidate, quality);
                     if (
                         bytes is not { Length: > 0 }
                         || bytes.Length > BazaarDbSnapshotUploadLimits.MaxUploadImageBytes
@@ -132,13 +129,64 @@ internal sealed class BazaarDbSnapshotImagePreparer
                 }
             }
         }
-        finally
+        catch (UnknownImageFormatException)
         {
-            if (sourceTexture != null)
-                UnityEngine.Object.Destroy(sourceTexture);
+            return null;
+        }
+        catch (InvalidImageContentException)
+        {
+            return null;
         }
 
         return null;
+    }
+
+    private static Image ResizeToLongestEdge(Image sourceImage, int longestEdge)
+    {
+        return sourceImage.Clone(context =>
+            context.Resize(
+                new ResizeOptions
+                {
+                    Size = new Size(longestEdge, longestEdge),
+                    Mode = ResizeMode.Max,
+                    Sampler = KnownResamplers.Bicubic,
+                }
+            )
+        );
+    }
+
+    private static byte[] EncodePng(Image image)
+    {
+        using var stream = new MemoryStream();
+        image.SaveAsPng(stream, new PngEncoder());
+        return stream.ToArray();
+    }
+
+    private static byte[] EncodeJpeg(Image image, int quality)
+    {
+        using var stream = new MemoryStream();
+        image.SaveAsJpeg(stream, new JpegEncoder { Quality = quality });
+        return stream.ToArray();
+    }
+
+    private static IEnumerable<int> EnumerateJpegLongestEdgeTargets(int sourceLongestEdge)
+    {
+        var emittedSourceSize = false;
+        if (sourceLongestEdge > 0 && sourceLongestEdge <= PngLongestEdgeTargets[0])
+        {
+            emittedSourceSize = true;
+            yield return sourceLongestEdge;
+        }
+
+        foreach (var target in PngLongestEdgeTargets)
+        {
+            if (target > sourceLongestEdge)
+                continue;
+            if (emittedSourceSize && target == sourceLongestEdge)
+                continue;
+
+            yield return target;
+        }
     }
 
     private static void WriteAllBytesAtomically(string path, byte[] bytes)
@@ -159,57 +207,6 @@ internal sealed class BazaarDbSnapshotImagePreparer
         {
             if (File.Exists(tempPath))
                 File.Delete(tempPath);
-        }
-    }
-
-    private sealed class ResizedTextureLease : IDisposable
-    {
-        private ResizedTextureLease(Texture2D texture)
-        {
-            Texture = texture;
-        }
-
-        public Texture2D Texture { get; }
-
-        public static ResizedTextureLease Create(Texture2D source, int longestEdge)
-        {
-            var sourceLongestEdge = Math.Max(source.width, source.height);
-            var scale =
-                sourceLongestEdge > 0 ? Math.Min(1f, longestEdge / (float)sourceLongestEdge) : 1f;
-            var width = Math.Max(1, Mathf.RoundToInt(source.width * scale));
-            var height = Math.Max(1, Mathf.RoundToInt(source.height * scale));
-            if (width == source.width && height == source.height)
-                return new ResizedTextureLease(UnityEngine.Object.Instantiate(source));
-
-            var sourcePixels = source.GetPixels32();
-            var resizedPixels = new Color32[width * height];
-            for (var y = 0; y < height; y++)
-            {
-                var sourceY = Math.Min(
-                    source.height - 1,
-                    Mathf.RoundToInt(y * (source.height - 1) / Math.Max(1f, height - 1f))
-                );
-                for (var x = 0; x < width; x++)
-                {
-                    var sourceX = Math.Min(
-                        source.width - 1,
-                        Mathf.RoundToInt(x * (source.width - 1) / Math.Max(1f, width - 1f))
-                    );
-                    resizedPixels[(y * width) + x] = sourcePixels[
-                        (sourceY * source.width) + sourceX
-                    ];
-                }
-            }
-
-            var resized = new Texture2D(width, height, TextureFormat.RGBA32, mipChain: false);
-            resized.SetPixels32(resizedPixels);
-            resized.Apply(updateMipmaps: false, makeNoLongerReadable: false);
-            return new ResizedTextureLease(resized);
-        }
-
-        public void Dispose()
-        {
-            UnityEngine.Object.Destroy(Texture);
         }
     }
 }

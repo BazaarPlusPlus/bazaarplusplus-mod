@@ -128,6 +128,7 @@
     <PackageReference Include="BepInEx.Core" Version="5.*" />
     <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
     <PackageReference Include="Krafs.Publicizer" Version="2.3.0" PrivateAssets="all" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.11" />
     <PackageReference Include="UnityEngine.Modules" Version="2022.3.40" IncludeAssets="compile" />
     <PackageReference Include="NETStandard.Library" Version="2.0.3" />
     <PackageReference
@@ -221,6 +222,11 @@
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.batteries_v2.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.core.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.provider.e_sqlite3.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SixLabors.ImageSharp.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\System.Buffers.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\System.Memory.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\System.Numerics.Vectors.dll" />
+      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\System.Text.Encoding.CodePages.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\e_sqlite3.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\libe_sqlite3.dylib" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\libBppMacAudio.dylib" />
@@ -234,6 +240,26 @@
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.batteries_v2.dll" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.core.dll" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.provider.e_sqlite3.dll" />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)SixLabors.ImageSharp.dll"
+        Condition="Exists('$(TargetDir)SixLabors.ImageSharp.dll')"
+      />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)System.Buffers.dll"
+        Condition="Exists('$(TargetDir)System.Buffers.dll')"
+      />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)System.Memory.dll"
+        Condition="Exists('$(TargetDir)System.Memory.dll')"
+      />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)System.Numerics.Vectors.dll"
+        Condition="Exists('$(TargetDir)System.Numerics.Vectors.dll')"
+      />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)System.Text.Encoding.CodePages.dll"
+        Condition="Exists('$(TargetDir)System.Text.Encoding.CodePages.dll')"
+      />
       <MacSqliteNativeFile Include="$(FixedMacSqliteNativeFile)" />
       <MacAudioTapNativeFile Include="$(FixedMacAudioTapNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
@@ -312,6 +338,26 @@
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.batteries_v2.dll" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.core.dll" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.provider.e_sqlite3.dll" />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)SixLabors.ImageSharp.dll"
+        Condition="Exists('$(TargetDir)SixLabors.ImageSharp.dll')"
+      />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)System.Buffers.dll"
+        Condition="Exists('$(TargetDir)System.Buffers.dll')"
+      />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)System.Memory.dll"
+        Condition="Exists('$(TargetDir)System.Memory.dll')"
+      />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)System.Numerics.Vectors.dll"
+        Condition="Exists('$(TargetDir)System.Numerics.Vectors.dll')"
+      />
+      <PluginManagedRuntimeFiles
+        Include="$(TargetDir)System.Text.Encoding.CodePages.dll"
+        Condition="Exists('$(TargetDir)System.Text.Encoding.CodePages.dll')"
+      />
       <MacSqliteNativeFile Include="$(FixedMacSqliteNativeFile)" />
       <MacAudioTapNativeFile Include="$(FixedMacAudioTapNativeFile)" />
       <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />

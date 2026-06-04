@@ -11,6 +11,9 @@ var uploadImageType = RequireType(
 var uploadLimitsType = RequireType(
     "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadLimits"
 );
+var imagePreparerType = RequireType(
+    "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotImagePreparer"
+);
 var prepareDelegateType = RequireType(
     "BazaarPlusPlus.Game.Screenshots.Upload.PrepareSnapshotImage"
 );
@@ -117,13 +120,30 @@ try
         BindingFlags.Public | BindingFlags.Instance
     );
     Assert(tryBuildSnapshot != null, "BazaarDbSnapshotUploadStore should expose TryBuildSnapshot.");
+    var maxUploadImageBytes = GetStaticInt(uploadLimitsType, "MaxUploadImageBytes");
     var originalPngRecord = tryBuildSnapshot!.Invoke(store, ["shot-A", "acct-1"]);
     Assert(
         originalPngRecord != null,
         "A small original PNG should build through the production preparer fast path."
     );
 
-    var maxUploadImageBytes = GetStaticInt(uploadLimitsType, "MaxUploadImageBytes");
+    var invalidOversizedPath = Path.Combine(tempRoot, "invalid-oversized.png");
+    File.WriteAllBytes(invalidOversizedPath, new byte[maxUploadImageBytes + 1]);
+    var imagePreparer = Activator.CreateInstance(
+        imagePreparerType,
+        Path.Combine(tempRoot, "upload-cache")
+    );
+    Assert(imagePreparer != null, "BazaarDbSnapshotImagePreparer should be constructible.");
+    var prepareImage = imagePreparerType.GetMethod(
+        "Prepare",
+        BindingFlags.Public | BindingFlags.Instance
+    );
+    Assert(prepareImage != null, "BazaarDbSnapshotImagePreparer should expose Prepare.");
+    Assert(
+        prepareImage!.Invoke(imagePreparer, ["bad-image", invalidOversizedPath]) == null,
+        "An oversized image that cannot be decoded should return null instead of throwing."
+    );
+
     var base64Length = uploadLimitsType.GetMethod(
         "Base64Length",
         BindingFlags.Public | BindingFlags.Static

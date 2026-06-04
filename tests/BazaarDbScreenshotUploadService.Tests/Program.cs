@@ -242,13 +242,15 @@ try
         client.Dispose();
     }
 
-    // Test 5: missing image file → permanent_failure
+    // Test 5: health succeeds, then missing image file -> permanent_failure without POST
     SeedRunSnapshotMissingFile(dbPath, "shot-3");
     ensureBackfilled.Invoke(store, []);
     {
         var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent("{\"status\":\"ok\"}"),
+            Content = new StringContent(
+                "{\"status\":\"ok\",\"server_time_utc\":\"2026-06-03T00:00:00.000Z\"}"
+            ),
         });
         var client = new HttpClient(handler);
         var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => "acct-9")]);
@@ -261,13 +263,15 @@ try
             "Missing image file should be a permanent failure."
         );
         Assert(
-            handler.Requests.Count == 0,
-            "Service should not POST when the image file is missing."
+            handler.Requests.Count == 1
+                && handler.Requests[0].Method == HttpMethod.Get
+                && handler.Requests[0].RequestUri?.AbsolutePath == "/health",
+            "Missing image should happen after the health probe and before upload POST."
         );
         client.Dispose();
     }
 
-    // Test 6: prepared image failure flips to permanent_failure without probing health
+    // Test 6: prepared image failure flips to permanent_failure after health succeeds, without POST
     SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
@@ -284,7 +288,9 @@ try
     {
         var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent("{\"status\":\"ok\"}"),
+            Content = new StringContent(
+                "{\"status\":\"ok\",\"server_time_utc\":\"2026-06-03T00:00:00.000Z\"}"
+            ),
         });
         var client = new HttpClient(handler);
         var service = ctor!.Invoke([fakeStore, routes, client, new Func<string?>(() => "acct-9")]);
@@ -301,8 +307,10 @@ try
             "Prepared image failure should record image_too_large_after_resize."
         );
         Assert(
-            handler.Requests.Count == 0,
-            "Service should not probe health or POST when the upload image cannot be prepared."
+            handler.Requests.Count == 1
+                && handler.Requests[0].Method == HttpMethod.Get
+                && handler.Requests[0].RequestUri?.AbsolutePath == "/health",
+            "Prepared image failure should happen after the health probe and before upload POST."
         );
         client.Dispose();
     }
@@ -322,6 +330,7 @@ try
     );
     ensureBackfilled.Invoke(store, []);
     {
+        FakePreparedImage.PrepareCallCount = 0;
         var handler = new RecordingHandler(req => new HttpResponseMessage(
             HttpStatusCode.ServiceUnavailable
         ));
@@ -340,6 +349,10 @@ try
             "Health failure should not count as a screenshot upload attempt."
         );
         Assert(handler.Requests.Count == 1, "Health failure should not continue into upload POST.");
+        Assert(
+            FakePreparedImage.PrepareCallCount == 0,
+            "Health failure should not invoke the image preparer."
+        );
         client.Dispose();
     }
 
@@ -509,10 +522,8 @@ static Delegate CreatePrepareSnapshotImageDelegate(Type delegateType)
             parametersInfo[index].Name
         );
 
-    var nextImageProperty = typeof(FakePreparedImage).GetProperty(
-        nameof(FakePreparedImage.NextImage)
-    )!;
-    var body = Expression.Convert(Expression.Property(null, nextImageProperty), invoke.ReturnType);
+    var prepareMethod = typeof(FakePreparedImage).GetMethod(nameof(FakePreparedImage.Prepare))!;
+    var body = Expression.Convert(Expression.Call(prepareMethod, parameters), invoke.ReturnType);
     return Expression.Lambda(delegateType, body, parameters).Compile();
 }
 
@@ -568,4 +579,12 @@ internal sealed class RecordingHandler : HttpMessageHandler
 internal static class FakePreparedImage
 {
     public static object? NextImage { get; set; }
+
+    public static int PrepareCallCount { get; set; }
+
+    public static object? Prepare(string snapshotId, string absolutePath)
+    {
+        PrepareCallCount++;
+        return NextImage;
+    }
 }

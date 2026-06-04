@@ -33,7 +33,22 @@ internal sealed class BazaarDbSnapshotUploadService
             ?? throw new ArgumentNullException(nameof(playerAccountIdResolver));
     }
 
-    public async Task UploadPendingAsync(CancellationToken cancellationToken)
+    public Task UploadPendingAsync(CancellationToken cancellationToken) =>
+        UploadPendingAsync(_playerAccountIdResolver()?.Trim(), cancellationToken);
+
+    public Task UploadPendingInBackgroundAsync(CancellationToken cancellationToken)
+    {
+        var playerAccountId = _playerAccountIdResolver()?.Trim();
+        return Task.Run(
+            () => UploadPendingAsync(playerAccountId, cancellationToken),
+            cancellationToken
+        );
+    }
+
+    private async Task UploadPendingAsync(
+        string? playerAccountId,
+        CancellationToken cancellationToken
+    )
     {
         _store.EnsureBackfilled();
 
@@ -47,7 +62,7 @@ internal sealed class BazaarDbSnapshotUploadService
             return;
         }
 
-        if (_playerAccountIdResolver()?.Trim() is not { Length: > 0 } playerAccountId)
+        if (string.IsNullOrWhiteSpace(playerAccountId))
         {
             BppLog.Info(
                 "BazaarDbSnapshotUploadService",
@@ -56,8 +71,25 @@ internal sealed class BazaarDbSnapshotUploadService
             return;
         }
 
+        var healthProbe = await new ModApiHealthClient(_httpClient, _routes)
+            .ProbeAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (!healthProbe.Succeeded)
+        {
+            BppLog.Warn(
+                "BazaarDbSnapshotUploadService",
+                $"Bazaar++ service health probe failed error={healthProbe.Error ?? "unknown"} rtt_ms={healthProbe.RoundTripMilliseconds} probed_at_utc={healthProbe.ProbedAtUtc:O}; retrying later."
+            );
+            return;
+        }
+
+        var serverTimeUtc = healthProbe.ServerTimeUtc?.ToString("O") ?? "unknown";
+        BppLog.Debug(
+            "BazaarDbSnapshotUploadService",
+            $"Bazaar++ service health ok rtt_ms={healthProbe.RoundTripMilliseconds} server_time_utc={serverTimeUtc} probed_at_utc={healthProbe.ProbedAtUtc:O}."
+        );
+
         var client = new BazaarDbSnapshotClient(_httpClient, _routes);
-        ModApiHealthProbeResult? healthProbe = null;
         foreach (var snapshotId in pending)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -73,27 +105,6 @@ internal sealed class BazaarDbSnapshotUploadService
                         _store.LastBuildFailureReason ?? "build_snapshot_failed"
                     );
                     continue;
-                }
-
-                if (!healthProbe.HasValue)
-                {
-                    healthProbe = await new ModApiHealthClient(_httpClient, _routes)
-                        .ProbeAsync(cancellationToken)
-                        .ConfigureAwait(false);
-                    if (!healthProbe.Value.Succeeded)
-                    {
-                        BppLog.Warn(
-                            "BazaarDbSnapshotUploadService",
-                            $"Bazaar++ service health probe failed error={healthProbe.Value.Error ?? "unknown"} rtt_ms={healthProbe.Value.RoundTripMilliseconds} probed_at_utc={healthProbe.Value.ProbedAtUtc:O}; retrying later."
-                        );
-                        return;
-                    }
-
-                    var serverTimeUtc = healthProbe.Value.ServerTimeUtc?.ToString("O") ?? "unknown";
-                    BppLog.Debug(
-                        "BazaarDbSnapshotUploadService",
-                        $"Bazaar++ service health ok rtt_ms={healthProbe.Value.RoundTripMilliseconds} server_time_utc={serverTimeUtc} probed_at_utc={healthProbe.Value.ProbedAtUtc:O}."
-                    );
                 }
 
                 var result = await client.UploadSnapshotAsync(snapshot.Payload, cancellationToken);

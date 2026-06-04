@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Upload;
@@ -102,7 +103,7 @@ internal sealed class RunUploadController : MonoBehaviour
             _startupGate,
             Time.unscaledTime,
             _services!.RunContext.IsInGameRun,
-            _uploadService.UploadPendingRunBundlesAsync,
+            UploadPendingRunBundlesOffMainThreadAsync,
             _shutdown.Token
         );
     }
@@ -139,5 +140,13 @@ internal sealed class RunUploadController : MonoBehaviour
             return;
 
         _startupGate?.ArmImmediateAttempt(Time.unscaledTime);
+    }
+
+    private Task UploadPendingRunBundlesOffMainThreadAsync(CancellationToken cancellationToken)
+    {
+        var uploadService =
+            _uploadService
+            ?? throw new InvalidOperationException("Run bundle upload service is not initialized.");
+        return uploadService.UploadPendingRunBundlesInBackgroundAsync(cancellationToken);
     }
 }
