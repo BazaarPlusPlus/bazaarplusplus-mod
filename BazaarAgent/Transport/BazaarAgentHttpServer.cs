@@ -23,7 +23,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         Converters = { new StringEnumConverter() },
     };
 
-    private readonly string _endpointJsonPath;
     private readonly Func<BazaarAgentContextSnapshot?> _snapshotGetter;
     private readonly BazaarAgentActionQueue _queue;
     private readonly IBazaarAgentLogger _logger;
@@ -36,14 +35,12 @@ public sealed class BazaarAgentHttpServer : IDisposable
 
     public BazaarAgentHttpServer(
         int port,
-        string endpointJsonPath,
         Func<BazaarAgentContextSnapshot?> snapshotGetter,
         BazaarAgentActionQueue queue,
         IBazaarAgentLogger logger
     )
     {
         Port = port;
-        _endpointJsonPath = endpointJsonPath;
         _snapshotGetter = snapshotGetter;
         _queue = queue;
         _logger = logger;
@@ -61,15 +58,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
         _ = Task.Run(() => AcceptLoop(token));
-
-        try
-        {
-            WriteEndpointJson();
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("endpoint.json write failed", ex);
-        }
 
         IsRunning = true;
     }
@@ -95,14 +83,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         }
         catch { }
         _listener = null;
-        try
-        {
-            DeleteEndpointJson();
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("endpoint.json delete failed", ex);
-        }
     }
 
     public void Dispose() => Stop();
@@ -283,38 +263,5 @@ public sealed class BazaarAgentHttpServer : IDisposable
             ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
         }
         catch { }
-    }
-
-    private void WriteEndpointJson()
-    {
-        var dir = Path.GetDirectoryName(_endpointJsonPath);
-        if (!string.IsNullOrEmpty(dir))
-            Directory.CreateDirectory(dir);
-        var payload = new
-        {
-            baseUrl = $"http://127.0.0.1:{Port}",
-            schemaVersion = BazaarAgentSchema.Version,
-            pid = System.Diagnostics.Process.GetCurrentProcess().Id,
-        };
-        var json = JsonConvert.SerializeObject(payload, _json);
-        var tmp = _endpointJsonPath + ".tmp";
-        File.WriteAllText(tmp, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        try
-        {
-            File.Delete(_endpointJsonPath);
-        }
-        catch { }
-        File.Move(tmp, _endpointJsonPath);
-    }
-
-    private void DeleteEndpointJson()
-    {
-        try
-        {
-            File.Delete(_endpointJsonPath);
-        }
-        catch (IOException)
-        { /* ok */
-        }
     }
 }

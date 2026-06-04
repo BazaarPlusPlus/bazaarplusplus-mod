@@ -1,14 +1,14 @@
 # BazaarAgent Decision Surface — Internal Reference
 
-> **Status: optional host.** Default mod builds do not install the BazaarAgent host. Build with `-p:EnableBazaarAgentHost=true` and set `[AutoBazaar] Enabled = true` to serve the HTTP surface this doc derives. The wire contract itself is owned by [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md); this doc owns the game-reader-side derivation.
+> **Status: optional host plugin.** The BazaarAgent host is a separate, optional BepInEx plugin; default mod builds ship without it. Build it on demand with `./run.sh build --with-bazaaragent-host` and set `[BazaarAgent] Enabled = true` in `BazaarPlusPlus.BazaarAgent.cfg` to serve the HTTP surface this doc derives. The wire contract itself is owned by [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md); this doc owns the game-reader-side derivation.
 
 ## Scope
 
-Companion to [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md). Documents how `Game/BazaarAgentHost/BazaarAgentGameContextReader.cs` populates each `BazaarAgentContext` field from live game state. Intended for contributors modifying the host-side game reader.
+Companion to [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md). Documents how `BazaarAgentHost/BazaarAgentGameContextReader.cs` populates each `BazaarAgentContext` field from live game state. Intended for contributors modifying the host-side game reader.
 
 ## Source of Truth
 
-`Game/BazaarAgentHost/BazaarAgentGameContextReader.cs` is authoritative for game-state derivation; `BazaarAgent/` owns the pure wire DTOs, validation, HTTP transport, queueing, and runtime controller. Read alongside `decompiled/` to confirm game-side types and property names.
+`BazaarAgentHost/BazaarAgentGameContextReader.cs` is authoritative for game-state derivation; `BazaarAgent/` owns the pure wire DTOs, validation, HTTP transport, queueing, and runtime controller. Read alongside `decompiled/` to confirm game-side types and property names.
 
 ## Top-Level Scalar Mapping
 
@@ -17,7 +17,7 @@ Companion to [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md). Documen
 | `SchemaVersion` | Const `"1.2.0"` |
 | `TickId` | Assigned by `BazaarAgentContextSnapshotPublisher` (incremented on each publish) |
 | `ServerTimeUtc` | `DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)` (ISO-8601) |
-| `IsEnabled` | `BazaarAgentBepInExOptions.Enabled` (`[AutoBazaar] Enabled`) |
+| `IsEnabled` | `BazaarAgentBepInExOptions.Enabled` (`[BazaarAgent] Enabled`) |
 | `IsInRun` | `Data.Run != null && AppState.CurrentState is RunAppState` |
 | `HasActiveRun` | `Data.HasActiveRun` (computed property on `Data`) |
 | `CanStartOrContinueRun` | `BazaarAgentSceneProbe.IsAtHeroSelectAndReadyForNewRun()` — true iff `SceneManager.GetActiveScene().name == "HeroSelectScene"` AND `AppState.CurrentState == null` AND `ClientCache.Profile.Value != null` |

@@ -1,6 +1,6 @@
 # BazaarAgent HTTP API v1
 
-> **Status: optional host.** Default mod builds do not compile `Game/BazaarAgentHost/`, do not reference `BazaarPlusPlus.BazaarAgent.csproj`, and do not copy `BazaarPlusPlus.BazaarAgent.dll`. Build with `./run.sh build --with-bazaaragent-host` or `-p:EnableBazaarAgentHost=true` to install the host, then set `[AutoBazaar] Enabled = true` in `BepInEx/config/BazaarPlusPlus.cfg` to start the loopback HTTP server. Field names (`stateName`, `availableActions`, `actionKind`, `cardInstanceId`, `targetSection`, `targetSockets`, `reason`) are stable wire contracts; do not rename. Field-by-field derivation lives in the companion [bazaar-agent-decision-surface.md](bazaar-agent-decision-surface.md).
+> **Status: optional host plugin.** The host is a separate, optional BepInEx plugin (`BazaarPlusPlus.BazaarAgentHost.dll`, declaring `[BepInDependency(BazaarPlusPlus)]`). Default mod builds ship only `BazaarPlusPlus.dll` and actively scrub the host dlls; build the host on demand with `./run.sh build --with-bazaaragent-host`. Once installed, set `[BazaarAgent] Enabled = true` in `BepInEx/config/BazaarPlusPlus.BazaarAgent.cfg` to start the loopback HTTP server. Field names (`stateName`, `availableActions`, `actionKind`, `cardInstanceId`, `targetSection`, `targetSockets`, `reason`) are stable wire contracts; do not rename. Field-by-field derivation lives in the companion [bazaar-agent-decision-surface.md](bazaar-agent-decision-surface.md).
 
 The BazaarAgent HTTP API exposes the current game state and accepts one action at a time, acting as pure transport and validation. All strategy, persistence, and training logic belong to external tools; the mod makes no decisions itself. The endpoint runs on loopback and is reachable at `http://127.0.0.1:<port>/v1/`.
 
@@ -12,21 +12,9 @@ BazaarAgent hosts a loopback HTTP server that publishes a versioned snapshot of 
 
 ---
 
-## 2. Discovery and binding
+## 2. Binding and request limits
 
-The listener binds to `127.0.0.1:<port>` only. The default port is `47900`; it is configurable via the `HttpListenerPort` cfg entry under section `BazaarAgent`.
-
-On startup the mod writes a discovery file:
-
-```
-<gameRoot>/BazaarPlusPlus/AutoBazaar/endpoint.json
-```
-
-The file is deleted on shutdown. Its contents:
-
-```json
-{"baseUrl":"http://127.0.0.1:47900","schemaVersion":"1.2.0","pid":12345}
-```
+The listener binds to `127.0.0.1:<port>` only. The default port is `47900`; it is configurable via the `HttpListenerPort` cfg entry under section `BazaarAgent`. The port is config-driven and fixed at startup — there is no discovery file.
 
 All POST requests are subject to a 64 KB body cap. Requests whose declared `Content-Length` header exceeds 65536 bytes are rejected immediately with `413` before the body is read. Requests without a declared length are read up to 65537 bytes and rejected if that limit is reached.
 
@@ -306,13 +294,13 @@ Client recipe: when `interactableTemplateIds` is present, pick the first `Select
 Each dequeued action (executed or rejected) appends one JSONL line. The log path is:
 
 ```
-<gameRoot>/BazaarPlusPlus/AutoBazaar/runs/<sanitized-runId>/decisions.jsonl
+<gameRoot>/BazaarPlusPlus/BazaarAgent/runs/<sanitized-runId>/decisions.jsonl
 ```
 
 When `runId` is null or unavailable, the fallback path is:
 
 ```
-<gameRoot>/BazaarPlusPlus/AutoBazaar/decisions.jsonl
+<gameRoot>/BazaarPlusPlus/BazaarAgent/decisions.jsonl
 ```
 
 `runId` is path-sanitized: all characters returned by `Path.GetInvalidFileNameChars()`, plus `.`, `/`, and `\`, are replaced with `_`. An empty result after sanitization becomes `_`.
@@ -346,7 +334,7 @@ When `runId` is null or unavailable, the fallback path is:
 
 When `Enabled = true` but no external tool posts actions: the server listens and `GET /v1/context` returns the latest snapshot, but no actions advance game state. Replay auto-advance and any automatic UI plumbing still run; those are not decisions.
 
-When `Enabled = false`: the listener stops, `endpoint.json` is deleted, no context snapshots are built, and no decision logs are written.
+When `Enabled = false`: the listener stops, no context snapshots are built, and no decision logs are written.
 
 Toggling `Enabled` back to `true` restarts the listener. `tickId` restarts from 1 on each listener start.
 
@@ -364,7 +352,7 @@ After every non-`Wait` action that the mod dispatched (`executed: true`), a 1.0 
 
 | cfg key | section | default | description |
 |---|---|---|---|
-| `Enabled` | `BazaarAgent` | `false` | Runtime switch. Only has an effect when the mod was built with `EnableBazaarAgentHost=true`; edit cfg file, no in-game UI. |
+| `Enabled` | `BazaarAgent` | `false` | Runtime switch. Only has an effect when the BazaarAgent host plugin is installed; edit the host cfg file, no in-game UI. |
 | `HttpListenerPort` | `BazaarAgent` | `47900` | Loopback port. Changing this value restarts the listener. |
 
 The snapshot tick cadence (`1.5 s`) and the POST blocking timeout (`3 s`) are fixed defaults, no longer configurable.

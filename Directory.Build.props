@@ -23,6 +23,11 @@
     <BaseOutputPath>bin\BazaarAgent\</BaseOutputPath>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.BazaarAgentHost'">
+    <BaseIntermediateOutputPath>obj\BazaarAgentHost\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\BazaarAgentHost\</BaseOutputPath>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.Localization'">
     <BaseIntermediateOutputPath>obj\Localization\</BaseIntermediateOutputPath>
     <BaseOutputPath>bin\Localization\</BaseOutputPath>

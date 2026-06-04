@@ -13,8 +13,6 @@ public interface IBazaarAgentOptions
 
     TimeSpan ActionMinDelay { get; }
 
-    string EndpointFilePath { get; }
-
     string DecisionLogRoot { get; }
 }
 

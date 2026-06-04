@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace BazaarPlusPlus.Core.GameState;
 
-internal readonly struct EncounterTargetingSnapshot
+public readonly struct EncounterTargetingSnapshot
 {
     public IReadOnlyList<string> InteractionFilterTemplateIds { get; init; }
     public HashSet<string> PedestalEligibleInstanceIds { get; init; }

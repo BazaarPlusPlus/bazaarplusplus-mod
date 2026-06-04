@@ -4,7 +4,7 @@ using System.Reflection;
 using BazaarPlusPlus.BazaarAgent;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.BazaarAgentHost;
+namespace BazaarPlusPlus.BazaarAgentHost;
 
 /// <summary>
 /// Handles UI-level plumbing that the BazaarAgent runtime needs each tick:

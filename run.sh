@@ -52,12 +52,15 @@ build() {
     local bazaaragent_host="${1:-false}"
     local args=(-verbosity detailed)
 
-    if [[ "$bazaaragent_host" == "true" ]]; then
-        args+=(-p:EnableBazaarAgentHost=true)
-    fi
-
     print_bazaaragent_host_mode "$bazaaragent_host"
-    dotnet build BazaarPlusPlus.csproj "${args[@]}"
+    # The host is its own plugin project that references the main plugin + the pure core,
+    # so building it builds and deploys all three. A default build builds only the main
+    # plugin, whose build actively scrubs both host dlls from the plugins folder.
+    if [[ "$bazaaragent_host" == "true" ]]; then
+        dotnet build BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
+    else
+        dotnet build BazaarPlusPlus.csproj "${args[@]}"
+    fi
 }
 
 build_all() {
@@ -68,13 +71,14 @@ build_all() {
     if [[ "$prod" == "true" ]]; then
         args+=(-p:BuildProductionPackage=true)
     fi
-    if [[ "$bazaaragent_host" == "true" ]]; then
-        args+=(-p:EnableBazaarAgentHost=true)
-    fi
 
     print_bazaaragent_host_mode "$bazaaragent_host"
     clear_macos_sqlite_quarantine
-    dotnet build BazaarPlusPlus.csproj "${args[@]}"
+    if [[ "$bazaaragent_host" == "true" ]]; then
+        dotnet build BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
+    else
+        dotnet build BazaarPlusPlus.csproj "${args[@]}"
+    fi
     clear_macos_sqlite_quarantine
 }
 

@@ -28,9 +28,6 @@ using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using UnityEngine;
-#if BPP_BAZAARAGENT_HOST
-using BazaarPlusPlus.Game.BazaarAgentHost;
-#endif
 
 namespace BazaarPlusPlus;
 
@@ -123,14 +120,15 @@ internal sealed class BppComposition : IDisposable
             )
         );
 
-#if BPP_BAZAARAGENT_HOST
-        _mountables.Register(
-            new BazaarAgentHostMount(
-                configFile,
-                () => _combatReplayModule.Runtime?.IsReplayStartInProgress == true
-            )
+        // Publish the public game-interop facade for the out-of-process BazaarAgent host
+        // plugin (it declares [BepInDependency(BazaarPlusPlus)] and therefore loads after us).
+        // BazaarPlusPlus does not reference the agent module; the host reads the facade through
+        // BazaarAgentGameBridge. Published unconditionally — it is a passive accessor that nothing
+        // reads unless the host plugin is installed.
+        BazaarAgentGameBridge.Current = new BazaarAgentGameProbe(
+            _encounterStateProbe,
+            () => _combatReplayModule.Runtime?.IsReplayStartInProgress == true
         );
-#endif
     }
 
     public void AttachCombatReplayRuntime(CombatReplayRuntime runtime) =>
@@ -140,5 +138,9 @@ internal sealed class BppComposition : IDisposable
 
     public void Start() => _featureRegistry.Start();
 
-    public void Dispose() => _featureRegistry.Stop();
+    public void Dispose()
+    {
+        BazaarAgentGameBridge.Current = null;
+        _featureRegistry.Stop();
+    }
 }

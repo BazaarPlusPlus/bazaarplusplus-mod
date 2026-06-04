@@ -17,7 +17,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 - 后台上传：run / replay 后台上传，仅在未处于 live run 时执行。
 - BazaarDB 截图上传：可选开关，启用后把终局截图快照 DTO 推到 V4 mod 后端（`bazaarplusplus-server` 仓库，部署 `mod-api-v4.bazaarplusplus.com`），BazaarDB 通过 peek/confirm 队列拉取（默认关闭）。
 - Anonymous Mode：将本地玩家名替换为 `Anonymous`。
-- **BazaarAgent HTTP 接口**（当前 parked）— 本地回环 HTTP 服务（默认端口 47900），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。**该 mount 当前在 `BppComposition.cs:120` 被注释、HTTP 服务不启动。** 详见 [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md)。
+- **BazaarAgent HTTP 接口**（可选 host 插件，默认不安装）— 本地回环 HTTP 服务（默认端口 47900），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。**host 是独立的 BepInEx 插件**，按需用 `./run.sh build --with-bazaaragent-host` 构建；默认构建只产出主插件并主动清除 host dll。详见 [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md)。
 
 ## 安装与配置
 

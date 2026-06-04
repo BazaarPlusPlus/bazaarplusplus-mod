@@ -6,7 +6,7 @@ using HarmonyLib;
 using TheBazaar;
 using UnityEngine.SceneManagement;
 
-namespace BazaarPlusPlus.Game.BazaarAgentHost;
+namespace BazaarPlusPlus.BazaarAgentHost;
 
 /// <summary>Determines whether the game is sitting on the hero-select lobby
 /// with no active session, i.e. it is safe to invoke

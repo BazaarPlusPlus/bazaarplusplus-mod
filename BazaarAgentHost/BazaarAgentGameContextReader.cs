@@ -10,11 +10,10 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarPlusPlus.BazaarAgent;
-using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.GameInterop.Encounter;
+using BazaarPlusPlus.GameInterop;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.BazaarAgentHost;
+namespace BazaarPlusPlus.BazaarAgentHost;
 
 /// <summary>
 /// Reads live game state and produces an <see cref="BazaarAgentContext"/> snapshot.
@@ -22,17 +21,17 @@ namespace BazaarPlusPlus.Game.BazaarAgentHost;
 /// </summary>
 internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 {
-    private readonly IBppServices _services;
+    private readonly IBazaarAgentGameProbe _gameProbe;
     private readonly IBazaarAgentOptions _options;
     private readonly IBazaarAgentLogger _logger;
 
     public BazaarAgentGameContextReader(
-        IBppServices services,
+        IBazaarAgentGameProbe gameProbe,
         IBazaarAgentOptions options,
         IBazaarAgentLogger logger
     )
     {
-        _services = services ?? throw new ArgumentNullException(nameof(services));
+        _gameProbe = gameProbe ?? throw new ArgumentNullException(nameof(gameProbe));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -52,7 +51,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 
         try
         {
-            return BuildCore(_services, _logger, isEnabled, actionCooldownRemainingSeconds);
+            return BuildCore(_gameProbe, _logger, isEnabled, actionCooldownRemainingSeconds);
         }
         catch (Exception ex)
         {
@@ -66,7 +65,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
     // -------------------------------------------------------------------------
 
     private static BazaarAgentContext BuildCore(
-        IBppServices services,
+        IBazaarAgentGameProbe gameProbe,
         IBazaarAgentLogger logger,
         bool isEnabled,
         double actionCooldownRemainingSeconds
@@ -129,11 +128,11 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         bool canReroll =
             canHandleOp(StateOps.Reroll) && rerollsRemaining > 0 && playerGold >= rerollCost;
 
-        var encounterIds = services.EncounterState.GetEncounterIds();
-        var targeting = services.EncounterState.GetTargetingState();
+        var encounterIds = gameProbe.GetEncounterIds();
+        var targeting = gameProbe.GetTargetingState();
 
         string? currentEncounterId = encounterIds.CurrentEncounterId;
-        string? currentEncounterType = EncounterTypeResolver.Resolve(currentEncounterId);
+        string? currentEncounterType = gameProbe.ResolveEncounterType(currentEncounterId);
 
         // --- Card inventories ---
         bool canSell = canHandleOp(StateOps.SellItem);

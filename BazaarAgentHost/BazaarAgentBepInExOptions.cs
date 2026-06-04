@@ -5,7 +5,7 @@ using BazaarPlusPlus.BazaarAgent;
 using BepInEx.Configuration;
 using UnityEngine;
 
-namespace BazaarPlusPlus.Game.BazaarAgentHost;
+namespace BazaarPlusPlus.BazaarAgentHost;
 
 internal sealed class BazaarAgentBepInExOptions : IBazaarAgentOptions
 {
@@ -18,16 +18,16 @@ internal sealed class BazaarAgentBepInExOptions : IBazaarAgentOptions
             throw new ArgumentNullException(nameof(config));
 
         _enabled = config.Bind(
-            "AutoBazaar",
+            "BazaarAgent",
             "Enabled",
             false,
-            "Runtime switch for the AutoBazaar HTTP endpoint. This only has an effect when the mod was built with EnableAutoBazaarHost=true."
+            "Runtime switch for the BazaarAgent HTTP endpoint. Only takes effect when the BazaarAgent host plugin is installed."
         );
         _httpListenerPort = config.Bind(
-            "AutoBazaar",
+            "BazaarAgent",
             "HttpListenerPort",
             47900,
-            "Loopback port for the AutoBazaar HTTP listener. Changing this restarts the listener."
+            "Loopback port for the BazaarAgent HTTP listener. Changing this restarts the listener."
         );
     }
 
@@ -40,7 +40,5 @@ internal sealed class BazaarAgentBepInExOptions : IBazaarAgentOptions
     public TimeSpan ActionMinDelay => TimeSpan.FromSeconds(1);
 
     public string DecisionLogRoot =>
-        Path.GetFullPath(Path.Combine(Application.dataPath, "..", "BazaarPlusPlus", "AutoBazaar"));
-
-    public string EndpointFilePath => Path.Combine(DecisionLogRoot, "endpoint.json");
+        Path.GetFullPath(Path.Combine(Application.dataPath, "..", "BazaarPlusPlus", "BazaarAgent"));
 }

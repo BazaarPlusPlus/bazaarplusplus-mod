@@ -14,19 +14,19 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 大厅与展示类小功能：随机英雄池面板、主菜单版本号、Legendary 段位展示文案、中文术语切换
 - **Anonymous Mode**：可选将显示名改为 `Anonymous`
 - 终局自动截图：终局 `Continue` 前自动保存主截图和元数据
-- **BazaarAgent HTTP 接口**（**默认不安装 Host**）：本地回环 HTTP 服务（默认端口 47900），对外暴露决策上下文（`GET /v1/context`）并接受外部动作（`POST /v1/actions`）；纯传输与校验层，Mod 本身不做策略决策。构建时需显式传 `-p:EnableBazaarAgentHost=true` 才会编译 Host 并复制 `BazaarPlusPlus.BazaarAgent.dll`；安装后还需 `[AutoBazaar] Enabled = true` 才会启动 HTTP 服务。详见 [bazaar-agent-http-api-v1.md](reference/bazaar-agent-http-api-v1.md)。
+- **BazaarAgent HTTP 接口**（**默认不安装 Host**）：本地回环 HTTP 服务（默认端口 47900），对外暴露决策上下文（`GET /v1/context`）并接受外部动作（`POST /v1/actions`）；纯传输与校验层，Mod 本身不做策略决策。Host 是独立的可选 BepInEx 插件；按需用 `./run.sh build --with-bazaaragent-host` 构建（默认构建只产出 `BazaarPlusPlus.dll` 并主动清除两个 host dll），安装后还需 host 自己 cfg 里 `[BazaarAgent] Enabled = true` 才会启动 HTTP 服务。详见 [bazaar-agent-http-api-v1.md](reference/bazaar-agent-http-api-v1.md)。
 
 ## 运行时骨架
 
 | 层次 | 作用 |
 | --- | --- |
-| `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好默认的 `IBppMountable`；`BazaarAgentHostMount` 只在 `EnableBazaarAgentHost=true` 构建中加入 |
+| `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好默认的 `IBppMountable`；BazaarAgent host 已拆为独立插件，不再由本组合根挂载 |
 | `BppComposition.cs` | 创建 `IBppServices`，注册 `RunLifecycleModule`、`CombatReplayModule`、`CombatStatusBarModule`，并把所有 `IBppMountable`（feature runtime）和 `ISettingsDockEntry`（设置坞入口）汇总到两个 registry |
 | `Core/` | 纯抽象：配置、事件总线、路径、run context、运行时服务接口 |
 | `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`Encounter/`、`StaticCards/`、`CardPreview/`、`ItemBoardPreview/`、`HeroPortraits/`、`EncounterPortraits/`、`GameLanguageProvider`，以及带 game type 的事件 + `IRunContext` 接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
-默认挂载的 `IBppMountable`（实际注册见 `BppComposition.cs`；多数是泛型 `ComponentMount<T>`，`HistoryPanelMount`、`CollectionPanelMount` 与 `LiveBuildPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbSnapshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`CollectionPanelMount`（定制类，订阅 `ChineseLocaleModeChanged` 以在切换术语模式时重建目录缓存与 UI 标签）、`LiveBuildPanelMount`（Caps 打开 live run 终局阵容面板）、`ComponentMount<MainMenuVersionCheckController>`（主菜单版本检查 + update-available 探测）、`ComponentMount<TooltipModifierRefreshController>`。`BazaarAgentHostMount` 受 `BPP_BAZAARAGENT_HOST` 编译符号保护，只有 `EnableBazaarAgentHost=true` 构建会编译并注册。BazaarAgent 的纯协议/transport/validation/runtime controller 在根目录 `BazaarAgent/` 和 `BazaarPlusPlus.BazaarAgent.csproj`，Unity 与游戏 DLL 适配层在 `Game/BazaarAgentHost/`。
+默认挂载的 `IBppMountable`（实际注册见 `BppComposition.cs`；多数是泛型 `ComponentMount<T>`，`HistoryPanelMount`、`CollectionPanelMount` 与 `LiveBuildPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbSnapshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`CollectionPanelMount`（定制类，订阅 `ChineseLocaleModeChanged` 以在切换术语模式时重建目录缓存与 UI 标签）、`LiveBuildPanelMount`（Caps 打开 live run 终局阵容面板）、`ComponentMount<MainMenuVersionCheckController>`（主菜单版本检查 + update-available 探测）、`ComponentMount<TooltipModifierRefreshController>`。BazaarAgent host 已拆为独立的 BepInEx 插件（`BazaarPlusPlus.BazaarAgentHost.csproj`，`[BepInDependency(BazaarPlusPlus)]`），不再由本组合根挂载；它通过 BazaarPlusPlus 发布的 public facade（`BazaarAgentGameBridge`）读取游戏状态。BazaarAgent 的纯协议/transport/validation/runtime controller 在根目录 `BazaarAgent/` 和 `BazaarPlusPlus.BazaarAgent.csproj`，Unity 与游戏 DLL 适配层在 `BazaarAgentHost/`（`BazaarPlusPlus.BazaarAgentHost.csproj`）。
 
 ## 游戏内功能模块
 

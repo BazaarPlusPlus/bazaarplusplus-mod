@@ -368,6 +368,10 @@ public class CoreLayeringTests
                     || line.StartsWith("using BazaarGameShared", StringComparison.Ordinal)
                     || line.StartsWith("using BazaarPlusPlus.Game.", StringComparison.Ordinal)
                     || line.StartsWith("using BazaarPlusPlus.GameInterop", StringComparison.Ordinal)
+                    || line.StartsWith(
+                        "using BazaarPlusPlus.BazaarAgentHost",
+                        StringComparison.Ordinal
+                    )
                 )
                 {
                     violations.Add($"{relative}: {line}");
@@ -378,7 +382,7 @@ public class CoreLayeringTests
         Assert.True(
             violations.Count == 0,
             "BazaarAgent core must stay independent from Unity, BepInEx, Harmony, game DLLs, "
-                + "Game features, and GameInterop. Put those dependencies in Game/BazaarAgentHost. "
+                + "Game features, GameInterop, and the host. Put those dependencies in BazaarAgentHost. "
                 + "Offending imports:\n"
                 + string.Join("\n", violations)
         );
@@ -404,7 +408,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Main_project_keeps_BazaarAgent_host_physically_optional()
+    public void Main_project_has_no_host_gating_and_scrubs_both_host_artifacts()
     {
         var repoRoot = RepoRoot();
         var mainProject = Path.Combine(repoRoot, "BazaarPlusPlus.csproj");
@@ -413,85 +417,134 @@ public class CoreLayeringTests
         var project = XDocument.Load(mainProject);
         var elements = project.Descendants().ToList();
 
-        Assert.Contains(
-            elements,
-            e =>
-                e.Name.LocalName == "EnableBazaarAgentHost"
-                && e.Value.Trim() == "false"
-                && IsCondition(e, "'$(EnableBazaarAgentHost)' == ''")
-        );
-        Assert.Contains(
+        // After the inversion the main project carries no host gating at all.
+        Assert.DoesNotContain(elements, e => e.Name.LocalName == "EnableBazaarAgentHost");
+        Assert.DoesNotContain(
             elements,
             e =>
                 e.Name.LocalName == "DefineConstants"
                 && e.Value.Contains("BPP_BAZAARAGENT_HOST", StringComparison.Ordinal)
-                && IsBazaarAgentHostEnabledCondition(e)
         );
-
-        Assert.Contains(
-            elements,
-            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "BazaarAgent/**"
-        );
-        Assert.Contains(
+        Assert.DoesNotContain(
             elements,
             e =>
-                e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "Game/BazaarAgentHost/**"
-        );
-        Assert.Contains(
-            elements,
-            e =>
-                e.Name.LocalName == "Compile"
-                && Attribute(e, "Include") == "Game/BazaarAgentHost/**/*.cs"
-                && IsBazaarAgentHostEnabledCondition(e)
+                e.Name.LocalName == "ProjectReference"
+                && (
+                    Attribute(e, "Include")
+                        ?.Contains("BazaarPlusPlus.BazaarAgent.csproj", StringComparison.Ordinal)
+                    ?? false
+                )
         );
         Assert.DoesNotContain(
             elements,
             e =>
                 e.Name.LocalName == "Compile"
                 && (
-                    Attribute(e, "Include")?.StartsWith("BazaarAgent/", StringComparison.Ordinal)
+                    Attribute(e, "Include")?.Contains("BazaarAgentHost", StringComparison.Ordinal)
                     ?? false
                 )
         );
 
+        // The main project compiles neither the agent core nor the host source tree.
         Assert.Contains(
             elements,
-            e =>
-                e.Name.LocalName == "ProjectReference"
-                && Attribute(e, "Include") == "BazaarPlusPlus.BazaarAgent.csproj"
-                && IsBazaarAgentHostEnabledCondition(e)
+            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "BazaarAgent/**"
+        );
+        Assert.Contains(
+            elements,
+            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "BazaarAgentHost/**"
         );
 
-        var autoBazaarArtifactIncludes = elements
-            .Where(e =>
-                e.Name.LocalName == "PluginManagedRuntimeFiles"
-                && (
-                    Attribute(e, "Include")
-                        ?.Contains("BazaarPlusPlus.BazaarAgent.dll", StringComparison.Ordinal)
-                    ?? false
+        // Default Debug build unconditionally scrubs BOTH host dlls from the live plugins folder.
+        foreach (
+            var dll in new[]
+            {
+                "BazaarPlusPlus.BazaarAgent.dll",
+                "BazaarPlusPlus.BazaarAgentHost.dll",
+            }
+        )
+        {
+            var deletes = elements
+                .Where(e =>
+                    e.Name.LocalName == "FilesToDelete"
+                    && (Attribute(e, "Include")?.Contains(dll, StringComparison.Ordinal) ?? false)
                 )
+                .ToList();
+            Assert.True(deletes.Count > 0, $"Debug FilesToDelete must scrub {dll}.");
+            Assert.All(
+                deletes,
+                e =>
+                    Assert.True(
+                        Attribute(e, "Condition") is null,
+                        $"The scrub of {dll} must be unconditional (no host flag gate)."
+                    )
+            );
+        }
+
+        // Release: both host dlls scrubbed from BOTH installer payload trees.
+        foreach (
+            var dll in new[]
+            {
+                "BazaarPlusPlus.BazaarAgent.dll",
+                "BazaarPlusPlus.BazaarAgentHost.dll",
+            }
+        )
+        {
+            var installerDeletes = elements
+                .Where(e =>
+                    e.Name.LocalName == "InstallerFilesToDelete"
+                    && (Attribute(e, "Include")?.Contains(dll, StringComparison.Ordinal) ?? false)
+                )
+                .Select(e => Attribute(e, "Include")!)
+                .ToList();
+            Assert.Contains(installerDeletes, p => p.Contains("/macos/", StringComparison.Ordinal));
+            Assert.Contains(
+                installerDeletes,
+                p => p.Contains("/windows/", StringComparison.Ordinal)
+            );
+        }
+    }
+
+    [Fact]
+    public void BazaarPlusPlus_assembly_does_not_reference_the_agent_module()
+    {
+        var repoRoot = RepoRoot();
+        var violations = new List<string>();
+
+        foreach (
+            var file in Directory.EnumerateFiles(repoRoot, "*.cs", SearchOption.TopDirectoryOnly)
+        )
+            ScanForAgentImports(file, repoRoot, violations);
+
+        foreach (var dir in new[] { "Core", "Game", "GameInterop", "Patches", "Infrastructure" })
+        {
+            var full = Path.Combine(repoRoot, dir);
+            if (!Directory.Exists(full))
+                continue;
+            foreach (
+                var file in Directory.EnumerateFiles(full, "*.cs", SearchOption.AllDirectories)
             )
-            .ToList();
-        Assert.NotEmpty(autoBazaarArtifactIncludes);
-        Assert.All(
-            autoBazaarArtifactIncludes,
-            e => Assert.True(IsBazaarAgentHostEnabledCondition(e))
+                ScanForAgentImports(file, repoRoot, violations);
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "BazaarPlusPlus must not reference the BazaarAgent module (pure core or host). It "
+                + "publishes the public GameInterop facade instead. Offending imports:\n"
+                + string.Join("\n", violations)
         );
     }
 
-    private static bool IsBazaarAgentHostEnabledCondition(XElement element) =>
-        IsCondition(element, "'$(EnableBazaarAgentHost)' == 'true'");
-
-    private static bool IsCondition(XElement element, string expectedConditionPart) =>
-        (
-            (Attribute(element, "Condition") ?? string.Empty)
-            + " "
-            + (
-                element.Parent is null
-                    ? string.Empty
-                    : Attribute(element.Parent, "Condition") ?? string.Empty
-            )
-        ).Contains(expectedConditionPart, StringComparison.Ordinal);
+    private static void ScanForAgentImports(string file, string repoRoot, List<string> violations)
+    {
+        var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+        foreach (var rawLine in File.ReadLines(file))
+        {
+            var line = rawLine.Trim();
+            if (line.StartsWith("using BazaarPlusPlus.BazaarAgent", StringComparison.Ordinal))
+                violations.Add($"{relative}: {line}");
+        }
+    }
 
     private static string? Attribute(XElement element, string name) =>
         element.Attribute(name)?.Value;

@@ -113,7 +113,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             _queue = new BazaarAgentActionQueue(desiredTimeoutMs);
             _http = new BazaarAgentHttpServer(
                 desiredPort,
-                _options.EndpointFilePath,
                 () => _snapshots.Current,
                 _queue,
                 _logger

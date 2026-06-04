@@ -10,7 +10,7 @@ using BazaarPlusPlus.GameInterop;
 using HarmonyLib;
 using TheBazaar;
 
-namespace BazaarPlusPlus.Game.BazaarAgentHost;
+namespace BazaarPlusPlus.BazaarAgentHost;
 
 internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispatcher
 {

@@ -19,7 +19,6 @@ public class BazaarAgentHttpServerTests
         public int Port { get; }
         public BazaarAgentHttpServer Server { get; }
         public BazaarAgentActionQueue Queue { get; }
-        public string EndpointJsonPath { get; }
         private BazaarAgentContextSnapshot? _snapshot;
         public BazaarAgentContextSnapshot? CurrentSnapshot => _snapshot;
 
@@ -29,13 +28,8 @@ public class BazaarAgentHttpServerTests
         {
             Port = PickFreePort();
             Queue = new BazaarAgentActionQueue(timeoutMs);
-            EndpointJsonPath = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                $"endpoint-{Guid.NewGuid():N}.json"
-            );
             Server = new BazaarAgentHttpServer(
                 Port,
-                EndpointJsonPath,
                 () => CurrentSnapshot,
                 Queue,
                 new TestLogger()
@@ -53,11 +47,6 @@ public class BazaarAgentHttpServerTests
             try
             {
                 Queue.Dispose();
-            }
-            catch { }
-            try
-            {
-                System.IO.File.Delete(EndpointJsonPath);
             }
             catch { }
         }
@@ -294,28 +283,5 @@ public class BazaarAgentHttpServerTests
         var body = await res.Content.ReadAsStringAsync();
         Assert.Contains("\"error\"", body);
         Assert.Contains("\"not-found\"", body);
-    }
-
-    // ---------------------------------------------------------------------------
-    // Case 9 (bonus): endpoint.json written on Start, deleted on Stop
-    // ---------------------------------------------------------------------------
-
-    [Fact]
-    public void EndpointJson_ExistsDuringRun_DeletedAfterDispose()
-    {
-        string? path;
-        using (var f = new ServerFixture())
-        {
-            path = f.EndpointJsonPath;
-            Assert.True(
-                System.IO.File.Exists(path),
-                "endpoint.json should exist while server is running"
-            );
-        }
-        // After Dispose, the server's Stop() removes the file
-        Assert.False(
-            System.IO.File.Exists(path),
-            "endpoint.json should be deleted after server stops"
-        );
     }
 }
