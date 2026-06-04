@@ -1,5 +1,7 @@
 # Isolate AutoBazaar as a transport-only core behind host-owned ports
 
+> **Superseded by [ADR-0006](0006-bazaaragent-as-its-own-plugin.md) (2026-06-05).** The transport-only-core and no-play-policy constraints below still hold, but the host-ownership/packaging model changed: the subsystem was renamed `AutoBazaar → BazaarAgent` and the host adapters moved out of `BazaarPlusPlus.dll` into a new independent BepInEx plugin (`BazaarPlusPlus.BazaarAgentHost.dll`) that depends on BazaarPlusPlus, rather than compiling into it under `#if`. This document is retained as a record in its original `AutoBazaar` naming.
+
 AutoBazaar lives in its own assembly (`AutoBazaar/` → `BazaarPlusPlus.AutoBazaar.csproj`) that contains only the automation bridge's contract, transport, action validation, queue, runtime controller, and decision-log shape. It reaches the game and Unity exclusively through a thin host adapter (`Game/AutoBazaarHost/`) that implements a small set of ports. It runs **no play policy**: the mod publishes a versioned game-state snapshot (`GET /v1/context`) and accepts one validated action per turn (`POST /v1/actions`); all decision-making lives outside the mod, in the separately-owned `bazaarplusplus-agent` repo.
 
 ## Context
