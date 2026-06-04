@@ -320,6 +320,13 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         }
 
+        var keyboard = Keyboard.current;
+        if (keyboard != null && IsPlainTabPressed(keyboard))
+        {
+            ToggleFromHotkey();
+            return;
+        }
+
         var dt = Time.unscaledDeltaTime;
 
         // Drive the panel fade every frame regardless of _isVisible so a Close mid-frame
@@ -341,7 +348,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         }
 
-        var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
         {
             Close();
@@ -379,6 +385,20 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _virtualizer.PollHover(pos, _viewportBoundsPx);
             }
         }
+    }
+
+    private static bool IsPlainTabPressed(Keyboard keyboard) =>
+        keyboard.tabKey.wasPressedThisFrame
+        && keyboard.ctrlKey.isPressed == false
+        && keyboard.altKey.isPressed == false
+        && keyboard.shiftKey.isPressed == false;
+
+    private void ToggleFromHotkey()
+    {
+        if (_isVisible)
+            Close();
+        else
+            Open();
     }
 
     private void DetectSceneChange()

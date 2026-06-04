@@ -1,6 +1,6 @@
 # Collection Panel
 
-游戏内 `CollectionPanel` 是一个全屏卡牌图鉴：把游戏静态卡库里的 **Item** 与 **Skill** 卡渲染成一个虚拟化网格，并按英雄 / 品质 / 尺寸 / 来源（merchant / trainer）过滤。它复用游戏自身的 `CardPreviewBase` 预制体（不自绘卡面），通过一个有界实例池 + 回收式网格把任意大小的卡库压进固定数量的存活卡片实例。只能从大厅的 Bazaar++ 设置坞按钮打开，`Escape` 关闭。
+游戏内 `CollectionPanel` 是一个全屏卡牌图鉴：把游戏静态卡库里的 **Item** 与 **Skill** 卡渲染成一个虚拟化网格，并按英雄 / 品质 / 尺寸 / 来源（merchant / trainer）过滤。它复用游戏自身的 `CardPreviewBase` 预制体（不自绘卡面），通过一个有界实例池 + 回收式网格把任意大小的卡库压进固定数量的存活卡片实例。可以从大厅的 Bazaar++ 设置坞按钮或 `Tab` 打开，`Escape` 关闭。
 
 面板是 `Game` 下最大的子系统（49 个 `.cs`），分四层：`Game/CollectionPanel/`（编排）、`Data/`（卡 VM / 分类 / 过滤）、`Sources/`（merchant/trainer 来源 catalog）、`Grid/` + `Ui/`（虚拟化叠加层 + UITK 操作栏）。本文记录其 **as-shipped** 行为。
 
@@ -12,7 +12,7 @@
 
 - **挂载**：`CollectionPanelMount`（一个 bespoke `IBppMountable`，非通用 `ComponentMount<T>`）在 `BppComposition.cs:101` 注册。它 `AddComponent<CollectionPanel>()` 并订阅 `ChineseLocaleModeChanged` → `CollectionPanel.NotifyLocaleChanged()`（通用 mount 无法订阅事件，这是 bespoke 的唯一理由，见 `CollectionPanelMount.cs:10-27`）。
 - **dock button**：`CollectionPanelDockButtonController.Attach` 由 `Patches/Settings/BppSettingsDockPatch.cs:46` 在设置坞旁克隆出一颗按钮（图标 `BppDockButtonIconKind.CollectionPanel`）；点击触发 `CollectionPanel.OpenFromDockButton()` (`CollectionPanelDockButtonController.cs:105-108` → `CollectionPanel.cs:106`)。它**不是** `ISettingsDockEntry`，而是直接克隆原生按钮。
-- **没有专属热键**。`Escape` 是唯一键，在 `Update` 里关闭面板 (`CollectionPanel.cs:292-297`)。`CollectionPanel.cs:218` 的 `HistoryPanelHost.Instance?.ToggleFromHotkey()` 不是 CollectionPanel 的热键——它是**面板互斥**：collection 与 history 共用 26/27 sorting band，打开本面板前先关掉 HistoryPanel，否则两者 z-fight 且 `Escape` 归属不清 (`CollectionPanel.cs:211-227`)。战斗中打开被抑制 (`CollectionPanel.cs:205-208`)。
+- **快捷键**：无修饰 `Tab` 在 `Update` 里切换面板，`Escape` 关闭面板。战斗中打开被抑制。
 - **打开选择**：`Open` 经 `CollectionPanelOpenSelectionResolver.Resolve` (`CollectionPanelOpenSelectionResolver.cs:12`) 把当前 run 的英雄 + 当前 encounter / 选择项 template id 映射到一个来源条目作为初始过滤；run 外或非具体英雄则回退到默认 (`CollectionPanel.cs:121-146`)。
 - **跨 scene dispose**：`Update` 每帧 `DetectSceneChange` (`CollectionPanel.cs:332-341`)，scene token 一变就 `Close` + `DisposeUnityRuntime`。`DisposeUnityRuntime` (`CollectionPanel.cs:356-375`) 先销毁卡 GameObject（让其 patched `OnDestroy` 在缓存拆除前归还 art-cache 引用计数），再拆 virtualizer / overlay / view / 两个缓存。`OnDestroy` 额外 `InvalidateCatalog` 释放 VM 卡库缓存 (`CollectionPanel.cs:343-354`)。
 

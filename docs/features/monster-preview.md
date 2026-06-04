@@ -4,7 +4,7 @@
 
 本文只描述当前 shipped 的怪物预览实现。旧的 Bazaar++ 自绘 monster showcase 路径、锁定野怪后弹出的 Bazaar++ item-board overlay、对原生 monster tooltip 的 augment 注入全部已被移除，当前运行时保留的是：
 
-- `LiveBuildPanel` 通过 `GameInterop/ItemBoardPreview` 渲染实时阵容 item-board overlay，不再创建或克隆真实 `MonsterBoardTooltip`
+- `LiveBuildPanel` 通过 `GameInterop/ItemBoardPreview` 渲染终局阵容 item-board overlay，不再创建或克隆真实 `MonsterBoardTooltip`
 - `HistoryPanel` 的战斗板预览也走同一个 shared socketed surface（与怪物预览无关）
 
 ## Runtime Entry

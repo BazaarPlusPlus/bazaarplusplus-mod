@@ -105,17 +105,6 @@ internal sealed class LiveBuildPanel : MonoBehaviour
             _previewRenderer.PollHover(mouse.position.ReadValue());
     }
 
-    internal static void OpenFromDockEntry()
-    {
-        if (_instance == null)
-        {
-            BppLog.Warn("LiveBuildPanel", "Dock entry requested before LiveBuildPanel mounted.");
-            return;
-        }
-
-        _instance.Open();
-    }
-
     private void Toggle()
     {
         if (_isVisible)

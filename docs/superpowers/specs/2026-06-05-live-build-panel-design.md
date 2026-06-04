@@ -3,7 +3,7 @@
 Status: REVISED REVIEW DRAFT - HistoryPanel included
 Date: 2026-06-05
 Scope: replace old CardSetPreview, add in-run live build panel, and migrate HistoryPanel onto the same socketed board preview contract
-UI name: 实时阵容
+UI name: 终局阵容
 Code feature name: `LiveBuildPanel`
 
 ## 背景
@@ -12,7 +12,7 @@ Code feature name: `LiveBuildPanel`
 
 旧模式的问题是交互不可见。用户按下 Caps 后，界面没有形成一个明确的操作面板；用户必须知道要继续点卡、按 A/D/Tab 或 W/S，才能理解当前模式。旧 runtime 也把左键添加、右键移除、tooltip lock suppression、推荐切换和 native item-board overlay 都耦在同一个组件里。Evidence: [`CardSetPreviewRuntime.cs:115-154`](../../../Game/CardSetPreview/CardSetPreviewRuntime.cs#L115-L154), [`CardSetPreviewRuntime.cs:299-326`](../../../Game/CardSetPreview/CardSetPreviewRuntime.cs#L299-L326).
 
-`CollectionPanel` 不能直接承担这个职责。它是图鉴/模板目录面板，核心状态是 `CollectionCatalog` 和 `CollectionFilterState`，显示 VM 是 `CollectionCardVm`。实时阵容面板需要读取当前 run 的 live shop/board/stash item，而不是过滤全量模板目录。Evidence: [`CollectionPanel.cs:59-73`](../../../Game/CollectionPanel/CollectionPanel.cs#L59-L73), [`CollectionCardVm.cs:8-27`](../../../Game/CollectionPanel/Data/CollectionCardVm.cs#L8-L27).
+`CollectionPanel` 不能直接承担这个职责。它是图鉴/模板目录面板，核心状态是 `CollectionCatalog` 和 `CollectionFilterState`，显示 VM 是 `CollectionCardVm`。终局阵容面板需要读取当前 run 的 live shop/board/stash item，而不是过滤全量模板目录。Evidence: [`CollectionPanel.cs:59-73`](../../../Game/CollectionPanel/CollectionPanel.cs#L59-L73), [`CollectionCardVm.cs:8-27`](../../../Game/CollectionPanel/Data/CollectionCardVm.cs#L8-L27).
 
 `HistoryPanel` 本次进入第一期范围，不再作为后续清理项。它当前通过 `HistoryPanelPreviewSource` 选择 run/battle/ghost preview 数据，再把 `HistoryItemSpec` 交给 `BattleBoardPreview.Render(...)`。Evidence: [`HistoryPanelPreviewSource.cs:21-49`](../../../Game/HistoryPanel/HistoryPanelPreviewSource.cs#L21-L49), [`HistoryPanel.cs:303-316`](../../../Game/HistoryPanel/HistoryPanel.cs#L303-L316), [`BattleBoardPreview.cs:48-97`](../../../Game/HistoryPanel/Preview/BattleBoardPreview.cs#L48-L97).
 
@@ -35,7 +35,7 @@ Code feature name: `LiveBuildPanel`
 ### 产品行为
 
 1. Caps 打开/关闭新的 `LiveBuildPanel`，旧 `CardSetPreview` Caps 选择模式不再并行挂载。
-2. 面板第一屏就是可操作的“实时阵容”体验，不出现单独说明页或 URL 打开入口。
+2. 面板第一屏就是可操作的“终局阵容”体验，不出现单独说明页或 URL 打开入口。
 3. 面板按四行 10-slot item board 展示：
    - 第一行：十胜推荐 build；
    - 第二行：当前商店 item options；
@@ -114,7 +114,6 @@ Game/LiveBuildPanel/
   LiveBuildPanel.cs
   LiveBuildPanelMount.cs
   LiveBuildPanelText.cs
-  LiveBuildPanelSettingsDockEntry.cs
   Data/
     LiveBuildPanelSnapshot.cs
     LiveItemBoardRowVm.cs
@@ -326,7 +325,7 @@ LiveBuildPanel 是模态 overlay，不是与原生商店同时可操作的 HUD�
 
 - Caps toggle `LiveBuildPanel` open/closed；
 - 旧 `ComponentMount<CardSetPreviewRuntime>` 被替换为新 panel mount；
-- dock entry 可以作为 secondary entry point，但不是唯一入口。
+- 不提供 settings dock entry；Caps 是入口。
 
 打开：
 
@@ -437,7 +436,7 @@ LiveBuildPanel 是模态 overlay，不是与原生商店同时可操作的 HUD�
 4. 迁移 final-build repository 到 `Game/BuildRecommendations/`，更新 `HistoryPanelDataService` 和 `CardSetBuildRecommendationTier.Tests`。
 5. 新增 `BppOverlayPanelMutex`，把 CollectionPanel / HistoryPanel / LiveBuildPanel 的互斥集中到共享 registry。
 6. 新增 `GameInterop/LiveCards/LiveCardSnapshotReader`。
-7. 新增 LiveBuildPanel panel shell、Caps toggle、optional dock entry。
+7. 新增 LiveBuildPanel panel shell 和 Caps toggle；不新增 settings dock entry。
 8. 新增 `ItemBoardRow` UITK view、hit targets、candidate markers、supporter attribution。
 9. 新增 `LiveItemBoardRowPreview` 和 `LiveBuildPreviewRenderer`，连接 final-build recommendation。
 10. 删除旧 `Game/CardSetPreview` runtime/patch/hotkey/mode/chrome/tests，更新 architecture tests。

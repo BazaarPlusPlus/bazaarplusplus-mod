@@ -117,7 +117,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void CollectionPanel_opens_from_native_clone_button_not_hotkey_or_settings_dock()
+    public void CollectionPanel_opens_from_native_clone_button_or_tab_not_settings_dock()
     {
         var repoRoot = RepoRoot();
         var compositionSource = File.ReadAllText(Path.Combine(repoRoot, "BppComposition.cs"));
@@ -135,6 +135,21 @@ public class CoreLayeringTests
         Assert.DoesNotContain("CollectionPanelHotkeyPathConfig", configSource);
         Assert.DoesNotContain("CollectionPanelHotkeyPathConfig", configInterfaceSource);
         Assert.DoesNotContain("WasPressedThisFrame(togglePath", collectionPanelSource);
+        Assert.Contains("keyboard.tabKey.wasPressedThisFrame", collectionPanelSource);
+    }
+
+    [Fact]
+    public void LiveBuildPanel_opens_from_caps_not_settings_dock()
+    {
+        var repoRoot = RepoRoot();
+        var compositionSource = File.ReadAllText(Path.Combine(repoRoot, "BppComposition.cs"));
+        var liveBuildPanelSource = File.ReadAllText(
+            Path.Combine(repoRoot, "Game", "LiveBuildPanel", "LiveBuildPanel.cs")
+        );
+
+        Assert.DoesNotContain("LiveBuildPanelSettingsDockEntry", compositionSource);
+        Assert.DoesNotContain("OpenFromDockEntry", liveBuildPanelSource);
+        Assert.Contains("keyboard?.capsLockKey.wasPressedThisFrame", liveBuildPanelSource);
     }
 
     [Fact]

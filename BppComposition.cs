@@ -92,7 +92,6 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());
         _settingsDockRegistry.Register(new LegendaryPositionSettingsDockEntry());
-        _settingsDockRegistry.Register(new LiveBuildPanelSettingsDockEntry());
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
 
         _mountables.Register(

@@ -8,6 +8,8 @@
 | `Esc` | Close `HistoryPanel` | `HistoryPanel` only | No |
 | `Caps Lock` | Toggle `LiveBuildPanel` | Live run / non-combat UI | No |
 | `Esc` | Close `LiveBuildPanel` | `LiveBuildPanel` only | No |
+| `Tab` | Toggle `CollectionPanel` | Lobby / non-combat UI | No |
+| `Esc` | Close `CollectionPanel` | `CollectionPanel` only | No |
 | `Ctrl` | Force enchant preview (overrides EnchantPreview Mode) | Tooltip hover | Yes |
 | `Shift` | Force upgrade preview (overrides UpgradePreview Mode) | Tooltip hover | Yes |
 
@@ -24,6 +26,7 @@
 - `Game/Input/BppHotkeyService.cs`
 - `Game/LiveBuildPanel/LiveBuildPanel.cs`
 - `Game/HistoryPanel/HistoryPanel.cs`
+- `Game/CollectionPanel/CollectionPanel.cs`
 - `Patches/Settings/BppKeybindSettingsPatch.cs`
 - `Patches/Tooltips/ItemEnchantPreviewPatch.cs`
 - `Patches/Tooltips/UpgradePreviewTooltipPatch.cs`

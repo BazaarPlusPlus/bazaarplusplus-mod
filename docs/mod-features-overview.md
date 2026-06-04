@@ -6,7 +6,7 @@
 
 BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提供：
 
-- 战斗与 UI 增强：状态条、附魔/升级 tooltip、LiveBuildPanel 实时阵容面板
+- 战斗与 UI 增强：状态条、附魔/升级 tooltip、LiveBuildPanel 终局阵容面板
 - **Run logging**：活跃对局写入本地 SQLite，供 HistoryPanel 和上传队列使用
 - **PVP 战斗回放**：本地录制 replay payload，并在 HistoryPanel / ghost replay 路径下条件回放
 - **云同步**：在**非 live run** 时后台上传 run-bundle，并从 **`bazaarplusplus-server`**（部署在 `mod-api-v4.bazaarplusplus.com`）同步 ghost battles / replay 下载链接
@@ -26,7 +26,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`Encounter/`、`StaticCards/`、`CardPreview/`、`ItemBoardPreview/`、`HeroPortraits/`、`EncounterPortraits/`、`GameLanguageProvider`，以及带 game type 的事件 + `IRunContext` 接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
-默认挂载的 `IBppMountable`（实际注册见 `BppComposition.cs`；多数是泛型 `ComponentMount<T>`，`HistoryPanelMount`、`CollectionPanelMount` 与 `LiveBuildPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbSnapshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`CollectionPanelMount`（定制类，订阅 `ChineseLocaleModeChanged` 以在切换术语模式时重建目录缓存与 UI 标签）、`LiveBuildPanelMount`（Caps/设置坞打开 live run 实时阵容面板）、`ComponentMount<MainMenuVersionCheckController>`（主菜单版本检查 + update-available 探测）、`ComponentMount<TooltipModifierRefreshController>`。`AutoBazaarHostMount` 受 `BPP_AUTOBAZAAR_HOST` 编译符号保护，只有 `EnableAutoBazaarHost=true` 构建会编译并注册。AutoBazaar 的纯协议/transport/validation/runtime controller 在根目录 `AutoBazaar/` 和 `BazaarPlusPlus.AutoBazaar.csproj`，Unity 与游戏 DLL 适配层在 `Game/AutoBazaarHost/`。
+默认挂载的 `IBppMountable`（实际注册见 `BppComposition.cs`；多数是泛型 `ComponentMount<T>`，`HistoryPanelMount`、`CollectionPanelMount` 与 `LiveBuildPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbSnapshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`CollectionPanelMount`（定制类，订阅 `ChineseLocaleModeChanged` 以在切换术语模式时重建目录缓存与 UI 标签）、`LiveBuildPanelMount`（Caps 打开 live run 终局阵容面板）、`ComponentMount<MainMenuVersionCheckController>`（主菜单版本检查 + update-available 探测）、`ComponentMount<TooltipModifierRefreshController>`。`AutoBazaarHostMount` 受 `BPP_AUTOBAZAAR_HOST` 编译符号保护，只有 `EnableAutoBazaarHost=true` 构建会编译并注册。AutoBazaar 的纯协议/transport/validation/runtime controller 在根目录 `AutoBazaar/` 和 `BazaarPlusPlus.AutoBazaar.csproj`，Unity 与游戏 DLL 适配层在 `Game/AutoBazaarHost/`。
 
 ## 游戏内功能模块
 
@@ -92,7 +92,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 ### 卡牌图鉴（Collection Panel）
 
-- 全屏只读卡牌图鉴（仅 Item + Skill），复用原生 `CardPreviewBase`；由设置坞旁的原生克隆坞按钮打开，无独立热键，`Esc` 关闭
+- 全屏只读卡牌图鉴（仅 Item + Skill），复用原生 `CardPreviewBase`；由设置坞旁的原生克隆坞按钮或 `Tab` 打开，`Esc` 关闭
 - 过滤维度：类型 / 英雄 / 档位 / 尺寸 / 商人来源（**文本搜索已于 2026-06-03 移除**）
 - `CollectionSources/` 子系统：结构化商人 / 训练师来源 catalog（`Data/CollectionSources/collection-sources.json`，schema v3），offer-rule 映射 Merchant→Item / Trainer→Skill，hero / encounter 头像 chips
 - 回收式固定规格虚拟化网格 + 有界实例池 + 首屏 loading shell

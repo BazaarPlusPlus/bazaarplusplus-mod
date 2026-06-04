@@ -7,10 +7,10 @@ namespace BazaarPlusPlus.Game.LiveBuildPanel;
 internal static class LiveBuildPanelText
 {
     private static readonly LocalizedTextSet TitleText = new(
-        "Live Build",
-        "实时阵容",
-        "實時陣容",
-        "實時陣容"
+        "Final Build",
+        "终局阵容",
+        "終局陣容",
+        "終局陣容"
     );
     private static readonly LocalizedTextSet SubtitleText = new(
         "Choose live item candidates and browse matching ten-win builds.",
