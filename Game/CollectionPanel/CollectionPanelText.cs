@@ -29,6 +29,7 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet CloseText = new("Close", "关闭", "關閉", "關閉");
 
     private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄", "英雄");
+    private static readonly LocalizedTextSet DayHeaderText = new("Day", "天数", "天數", "天數");
     private static readonly LocalizedTextSet TierHeaderText = new(
         "Quality",
         "品质",
@@ -93,6 +94,8 @@ internal static class CollectionPanelText
     internal static string Close() => Resolve(CloseText);
 
     internal static string HeroHeader() => Resolve(HeroHeaderText);
+
+    internal static string DayHeader() => Resolve(DayHeaderText);
 
     internal static string TierHeader() => Resolve(TierHeaderText);
 

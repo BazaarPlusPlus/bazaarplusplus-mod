@@ -84,6 +84,11 @@ internal sealed class CollectionPanel : MonoBehaviour
     private int _loadGeneration;
     private bool _isLoadingCatalog;
 
+    // Captured once per open in ResolveOpenSelection: whether the panel opened during a run and,
+    // if so, that run's current day. Drive the in-run-only Day filter; recomputed on every open.
+    private bool _isInGameRun;
+    private int? _currentRunDay;
+
     public void Initialize(IBppServices services)
     {
         if (_initialized)
@@ -143,6 +148,11 @@ internal sealed class CollectionPanel : MonoBehaviour
                 + $"source={selection.SelectedSourceKey ?? "none"} "
                 + $"matched={IsMatchedOpenSelection(selection)}"
         );
+
+        // The day does not change while the panel is open, so capture run context once here.
+        // Both Open() entry paths call ResolveOpenSelection before applying the selection.
+        _isInGameRun = isInGameRun;
+        _currentRunDay = isInGameRun ? TryReadCurrentDay() : null;
         return selection;
     }
 
@@ -184,6 +194,19 @@ internal sealed class CollectionPanel : MonoBehaviour
         catch (Exception ex)
         {
             BppLog.Warn("CollectionPanel", $"Open selection hero read failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static int? TryReadCurrentDay()
+    {
+        try
+        {
+            return (int?)TheBazaar.Data.Run?.Day;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn("CollectionPanel", $"Open selection day read failed: {ex.Message}");
             return null;
         }
     }
@@ -264,6 +287,9 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void ApplyOpenSelection(CollectionPanelSelectionState selection)
     {
         _filter.ApplySelection(selection);
+        // Default the in-run Day filter to the run's current day (null out of run). _currentRunDay
+        // was just captured in ResolveOpenSelection, which always runs before this.
+        _filter.SelectedRunDay = _currentRunDay;
         PruneInvisibleSourceSelections();
         _scrollY = 0f;
     }
@@ -434,6 +460,14 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 if (!_filter.Tiers.Remove(tier))
                     _filter.Tiers.Add(tier);
+                _scrollY = 0f;
+                ApplyFilters();
+                RefreshView();
+            },
+            toggleDay: day =>
+            {
+                // Re-click the selected day to clear it (back to no day filter — all tiers shown).
+                _filter.SelectedRunDay = _filter.SelectedRunDay == day ? (int?)null : day;
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -708,6 +742,9 @@ internal sealed class CollectionPanel : MonoBehaviour
             HasPackages = HasPackages(),
             SourceSelectorEnabled = !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
+            ShowDayFilter = _isInGameRun,
+            AvailableDays = BuildDayRange(_currentRunDay),
+            SelectedRunDay = _filter.SelectedRunDay,
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
@@ -715,6 +752,16 @@ internal sealed class CollectionPanel : MonoBehaviour
             ContentHeight = _virtualizer.ContentHeight,
         };
         _view.Refresh(model);
+    }
+
+    // 1..max, where max extends past the default picker bound when the current run is deeper.
+    private static IReadOnlyList<int> BuildDayRange(int? currentDay)
+    {
+        var max = Math.Max(DayTierSchedule.DefaultMaxPickerDay, currentDay ?? 0);
+        var days = new int[max];
+        for (var i = 0; i < max; i++)
+            days[i] = i + 1;
+        return days;
     }
 
     private IReadOnlyList<CollectionSourceOptionViewModel> AvailableSourcesFor(ECardType activeType)

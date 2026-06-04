@@ -568,6 +568,71 @@ AssertValues(
     "Merchant hidden tags map to stable collection merchant kinds."
 );
 
+// --- Day filter: DayTierSchedule maps a run day to a StartingTier ceiling. ---
+AssertEqual(ETier.Bronze, DayTierSchedule.CeilingTier(1), "Day 1 ceiling is Bronze.");
+AssertEqual(ETier.Silver, DayTierSchedule.CeilingTier(2), "Day 2 raises the ceiling to Silver.");
+AssertEqual(ETier.Silver, DayTierSchedule.CeilingTier(5), "Day 5 is still Silver-capped.");
+AssertEqual(ETier.Gold, DayTierSchedule.CeilingTier(6), "Day 6 raises the ceiling to Gold.");
+AssertEqual(ETier.Gold, DayTierSchedule.CeilingTier(7), "Day 7 is still Gold-capped.");
+AssertEqual(ETier.Diamond, DayTierSchedule.CeilingTier(8), "Day 8 raises the ceiling to Diamond.");
+AssertEqual(
+    ETier.Diamond,
+    DayTierSchedule.CeilingTier(12),
+    "Days beyond the table stay Diamond-capped."
+);
+
+// --- Day filter: SelectedRunDay keeps StartingTier <= ceiling(day); ANDs with other dimensions. ---
+var dayBronze = Card("Day Bronze", ETier.Bronze);
+var daySilver = Card("Day Silver", ETier.Silver);
+var dayGold = Card("Day Gold", ETier.Gold);
+var dayDiamond = Card("Day Diamond", ETier.Diamond);
+var dayLegendary = Card("Day Legendary", ETier.Legendary);
+var dayPool = new[] { dayBronze, daySilver, dayGold, dayDiamond, dayLegendary };
+
+AssertSequence(
+    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = 1 }),
+    new[] { dayBronze.Id },
+    "Day 1 keeps only Bronze-start cards."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = 2 }),
+    new[] { dayBronze.Id, daySilver.Id },
+    "Day 2 keeps Bronze and Silver, excludes Gold/Diamond."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = 6 }),
+    new[] { dayBronze.Id, daySilver.Id, dayGold.Id },
+    "Day 6 unlocks Gold."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = 8 }),
+    new[] { dayBronze.Id, daySilver.Id, dayGold.Id, dayDiamond.Id, dayLegendary.Id },
+    "Day 8 unlocks Diamond and shows Legendary-start cards alongside Diamond."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = null }),
+    new[] { dayBronze.Id, daySilver.Id, dayGold.Id, dayDiamond.Id, dayLegendary.Id },
+    "Null SelectedRunDay disables day filtering."
+);
+
+var dayAndTierFilter = new CollectionFilterState { SelectedRunDay = 6 };
+dayAndTierFilter.Tiers.Add(ETier.Diamond);
+AssertSequence(
+    CollectionFilterEngine.Apply(dayPool, dayAndTierFilter),
+    Array.Empty<Guid>(),
+    "Manual Tier=Diamond ANDs with Day 6 (ceiling Gold) to nothing — independent dimensions, neither rewrites the other."
+);
+
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        dayPool,
+        new CollectionFilterState { SelectedRunDay = 8 },
+        new CollectionFilterContext { OfferedCardIds = new[] { dayGold.Id, dayLegendary.Id } }
+    ),
+    new[] { dayGold.Id, dayLegendary.Id },
+    "Day predicate ANDs with the resolved offer pool."
+);
+
 Console.WriteLine("CollectionFilterEngine checks passed.");
 
 static CollectionCardVm Card(

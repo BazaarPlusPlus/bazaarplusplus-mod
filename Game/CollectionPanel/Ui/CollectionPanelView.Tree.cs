@@ -122,6 +122,15 @@ internal sealed partial class CollectionPanelView
         _heroChipRow.style.flexWrap = Wrap.NoWrap;
         _heroChipRow.style.justifyContent = Justify.SpaceBetween;
 
+        // Day filter (in-run only — sits above Tier so "the day caps the tier ceiling" reads top
+        // down; Refresh hides this section out of run). Default Wrap lets the numeric chips wrap.
+        _dayFilterSection = CreateFilterSection(
+            rail,
+            CollectionPanelText.DayHeader(),
+            UiSpacing.Lg,
+            out _dayChipRow
+        );
+
         // Tier filter.
         CreateFilterSection(rail, CollectionPanelText.TierHeader(), UiSpacing.Lg, out _tierChipRow);
         _tierChipRow.style.flexWrap = Wrap.NoWrap;

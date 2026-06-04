@@ -31,6 +31,8 @@ internal static class CollectionFilterEngine
         var merchantFilterCount = filter.Merchants.Count;
         // Size only narrows Items; Skills are a single size, so skip it on the Skill tab.
         var sizeFilterCount = filter.ActiveType == ECardType.Item ? filter.Sizes.Count : 0;
+        // In-run only; null disables. Independent of the manual Tier row — both narrow by tier.
+        var dayFilter = filter.SelectedRunDay;
 
         foreach (var card in all)
         {
@@ -43,6 +45,8 @@ internal static class CollectionFilterEngine
             if (heroFilterCount > 0 && !CollectionHeroScope.MatchesFilter(card, filter))
                 continue;
             if (tierFilterCount > 0 && !filter.Tiers.Contains(card.StartingTier))
+                continue;
+            if (dayFilter is int day && !DayTierSchedule.AllowsStartingTier(card.StartingTier, day))
                 continue;
             if (tagFilterCount > 0 && !AnyTagMatch(card.Tags, filter.Tags))
                 continue;

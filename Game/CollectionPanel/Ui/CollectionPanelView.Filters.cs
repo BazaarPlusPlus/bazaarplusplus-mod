@@ -75,6 +75,39 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
+    private void EnsureDayChips(IReadOnlyList<int> days)
+    {
+        if (_dayChipRow == null)
+            return;
+        if (DayChipsMatch(days))
+            return;
+        ClearChipRow(_dayChips, _dayChipRow, keepFirst: false);
+        foreach (var day in days)
+        {
+            var chip = CreateChipButton(
+                day.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                () => _toggleDay(day)
+            );
+            // Numeric day chips are narrow and uniform; override the wide default chip width and
+            // let the section's default Wrap flow them onto multiple lines.
+            UiStyle.FixedWidth(chip.style, Sizes.DayChipWidth);
+            _dayChips[day] = chip;
+            _dayChipRow.Add(chip);
+        }
+    }
+
+    private bool DayChipsMatch(IReadOnlyList<int> days)
+    {
+        if (days.Count != _dayChips.Count)
+            return false;
+        foreach (var day in days)
+        {
+            if (!_dayChips.ContainsKey(day))
+                return false;
+        }
+        return true;
+    }
+
     private void EnsureSizeChips(IReadOnlyList<ECardSize> sizes)
     {
         if (_sizeChipRow == null)

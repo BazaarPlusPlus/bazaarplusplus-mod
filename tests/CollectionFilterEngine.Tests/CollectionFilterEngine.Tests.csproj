@@ -45,6 +45,10 @@
       Link="CollectionFilterState.cs"
     />
     <Compile
+      Include="..\..\Game\CollectionPanel\Data\DayTierSchedule.cs"
+      Link="DayTierSchedule.cs"
+    />
+    <Compile
       Include="..\..\Game\CollectionPanel\Data\CollectionPanelSelectionState.cs"
       Link="CollectionPanelSelectionState.cs"
     />

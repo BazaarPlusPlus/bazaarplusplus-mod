@@ -27,6 +27,11 @@ internal sealed class CollectionFilterState
     public string? SelectedMerchantSourceKey { get; set; }
     public string? SelectedTrainerSourceKey { get; set; }
     public bool IncludePackages { get; set; }
+
+    // User-selected run "Day" filter; null means no day filtering. Only meaningful in-run — the
+    // panel defaults it from Data.Run.Day each time it opens. Deliberately not part of
+    // CollectionPanelSelectionState's cross-session round-trip; recomputed from run state on open.
+    public int? SelectedRunDay { get; set; }
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
     public EHero? SelectedHero
