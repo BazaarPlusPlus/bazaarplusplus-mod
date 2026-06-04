@@ -1,14 +1,34 @@
 #nullable enable
+using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Data.Sqlite;
 
 var schemaType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
 var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadStore");
+var uploadImageType = RequireType(
+    "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadImage"
+);
+var uploadLimitsType = RequireType(
+    "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadLimits"
+);
+var prepareDelegateType = RequireType(
+    "BazaarPlusPlus.Game.Screenshots.Upload.PrepareSnapshotImage"
+);
 
 var ctor = storeType.GetConstructor([typeof(string), typeof(string)]);
 Assert(
     ctor != null,
     "BazaarDbSnapshotUploadStore should expose a constructor taking the database path and screenshots directory."
+);
+var testCtor = storeType.GetConstructor(
+    BindingFlags.NonPublic | BindingFlags.Instance,
+    binder: null,
+    [typeof(string), typeof(string), prepareDelegateType],
+    modifiers: null
+);
+Assert(
+    testCtor != null,
+    "BazaarDbSnapshotUploadStore should expose an internal constructor with an image preparer delegate for tests."
 );
 
 var tempRoot = Path.Combine(
@@ -32,6 +52,8 @@ try
 
     SeedRunSnapshotRow(dbPath, "shot-A", capturedAtUtc: "2026-04-08T20:30:25.000Z");
     SeedRunSnapshotRow(dbPath, "shot-B", capturedAtUtc: "2026-04-08T20:31:25.000Z");
+    WriteScreenshotFile(screenshotsDir, "shot-A", [1]);
+    WriteScreenshotFile(screenshotsDir, "shot-B", [1]);
     SeedRunSnapshotRow(
         dbPath,
         "shot-other-source",
@@ -89,6 +111,84 @@ try
     var pendingLimited = (System.Collections.Generic.IReadOnlyList<string>)
         getPending.Invoke(store, [1])!;
     Assert(pendingLimited.Count == 1, "GetPendingSnapshotIds should respect the limit argument.");
+
+    var tryBuildSnapshot = storeType.GetMethod(
+        "TryBuildSnapshot",
+        BindingFlags.Public | BindingFlags.Instance
+    );
+    Assert(tryBuildSnapshot != null, "BazaarDbSnapshotUploadStore should expose TryBuildSnapshot.");
+    var originalPngRecord = tryBuildSnapshot!.Invoke(store, ["shot-A", "acct-1"]);
+    Assert(
+        originalPngRecord != null,
+        "A small original PNG should build through the production preparer fast path."
+    );
+
+    var maxUploadImageBytes = GetStaticInt(uploadLimitsType, "MaxUploadImageBytes");
+    var base64Length = uploadLimitsType.GetMethod(
+        "Base64Length",
+        BindingFlags.Public | BindingFlags.Static
+    );
+    Assert(base64Length != null, "BazaarDbSnapshotUploadLimits should expose Base64Length.");
+
+    var exactLimitBytes = new byte[maxUploadImageBytes];
+    exactLimitBytes[0] = 1;
+    FakePreparedImage.NextImage = CreateUploadImage(
+        uploadImageType,
+        exactLimitBytes,
+        "image/png",
+        "fake-cache/shot-A.png"
+    );
+    var fakeStore = testCtor!.Invoke([
+        dbPath,
+        screenshotsDir,
+        CreatePrepareSnapshotImageDelegate(prepareDelegateType),
+    ]);
+    var pngRecord = tryBuildSnapshot!.Invoke(fakeStore, ["shot-A", "acct-1"]);
+    Assert(pngRecord != null, "A 2 MiB prepared PNG should build an upload record.");
+    var pngImage = GetProperty(GetProperty(pngRecord!, "Payload")!, "Image")!;
+    var pngBase64 = (string)GetProperty(pngImage, "DataBase64")!;
+    Assert(
+        (string)GetProperty(pngImage, "ContentType")! == "image/png",
+        "Prepared PNG upload should keep image/png content_type."
+    );
+    Assert(
+        pngBase64.Length == (int)base64Length!.Invoke(null, [exactLimitBytes.Length])!,
+        "Prepared image base64 length should match the limit helper."
+    );
+
+    FakePreparedImage.NextImage = CreateUploadImage(
+        uploadImageType,
+        [1, 2, 3, 4],
+        "image/jpeg",
+        "fake-cache/shot-B.jpg"
+    );
+    var jpegStore = testCtor.Invoke([
+        dbPath,
+        screenshotsDir,
+        CreatePrepareSnapshotImageDelegate(prepareDelegateType),
+    ]);
+    var jpegRecord = tryBuildSnapshot.Invoke(jpegStore, ["shot-B", "acct-1"]);
+    Assert(jpegRecord != null, "A prepared JPEG should build an upload record.");
+    var jpegImage = GetProperty(GetProperty(jpegRecord!, "Payload")!, "Image")!;
+    Assert(
+        (string)GetProperty(jpegImage, "ContentType")! == "image/jpeg",
+        "Prepared JPEG upload should set image/jpeg content_type."
+    );
+
+    SeedRunSnapshotRow(dbPath, "shot-too-large", capturedAtUtc: "2026-04-08T20:33:25.000Z");
+    WriteScreenshotFile(screenshotsDir, "shot-too-large", [1]);
+    FakePreparedImage.NextImage = null;
+    var nullStore = testCtor.Invoke([
+        dbPath,
+        screenshotsDir,
+        CreatePrepareSnapshotImageDelegate(prepareDelegateType),
+    ]);
+    var nullRecord = tryBuildSnapshot.Invoke(nullStore, ["shot-too-large", "acct-1"]);
+    Assert(nullRecord == null, "A null prepared image should not build an upload record.");
+    Assert(
+        (string?)GetProperty(nullStore, "LastBuildFailureReason") == "image_too_large_after_resize",
+        "A null prepared image should record image_too_large_after_resize."
+    );
 
     // MarkUploaded
     var markUploaded = storeType.GetMethod(
@@ -215,6 +315,73 @@ static void SeedRunSnapshotRow(
     cmd.ExecuteNonQuery();
 }
 
+static void WriteScreenshotFile(string screenshotsDir, string screenshotId, byte[] bytes)
+{
+    var path = Path.Combine(screenshotsDir, "test", $"{screenshotId}.png");
+    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+    File.WriteAllBytes(path, bytes);
+}
+
+static object CreateUploadImage(
+    Type uploadImageType,
+    byte[] bytes,
+    string contentType,
+    string sourcePath
+)
+{
+    var image =
+        Activator.CreateInstance(uploadImageType)
+        ?? throw new InvalidOperationException("Upload image should be constructible.");
+    SetProperty(image, "Bytes", bytes);
+    SetProperty(image, "ContentType", contentType);
+    SetProperty(image, "SourcePath", sourcePath);
+    return image;
+}
+
+static Delegate CreatePrepareSnapshotImageDelegate(Type delegateType)
+{
+    var invoke =
+        delegateType.GetMethod("Invoke")
+        ?? throw new InvalidOperationException("Delegate Invoke not found.");
+    var parametersInfo = invoke.GetParameters();
+    var parameters = new ParameterExpression[parametersInfo.Length];
+    for (var index = 0; index < parameters.Length; index++)
+        parameters[index] = Expression.Parameter(
+            parametersInfo[index].ParameterType,
+            parametersInfo[index].Name
+        );
+
+    var nextImageProperty = typeof(FakePreparedImage).GetProperty(
+        nameof(FakePreparedImage.NextImage)
+    )!;
+    var body = Expression.Convert(Expression.Property(null, nextImageProperty), invoke.ReturnType);
+    return Expression.Lambda(delegateType, body, parameters).Compile();
+}
+
+static int GetStaticInt(Type type, string name)
+{
+    return (int)(
+        type.GetField(name, BindingFlags.Public | BindingFlags.Static)?.GetValue(null)
+        ?? throw new InvalidOperationException($"Static int not found: {name}")
+    );
+}
+
+static object? GetProperty(object instance, string name)
+{
+    return instance
+        .GetType()
+        .GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+        ?.GetValue(instance);
+}
+
+static void SetProperty(object instance, string name, object? value)
+{
+    instance
+        .GetType()
+        .GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+        ?.SetValue(instance, value);
+}
+
 static long CountRows(SqliteConnection connection, string tableName)
 {
     using var command = connection.CreateCommand();
@@ -249,4 +416,9 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+internal static class FakePreparedImage
+{
+    public static object? NextImage { get; set; }
 }

@@ -8,7 +8,7 @@ Assert(
     "Local database schema version mismatch."
 );
 Assert(
-    GetStaticValue<int>(schemaType, "UploadPayloadSchemaVersion") == 1,
+    GetStaticValue<int>(schemaType, "UploadPayloadSchemaVersion") == 5,
     "Upload payload schema version mismatch."
 );
 Assert(
@@ -123,8 +123,14 @@ Assert(
     "Bootstrap SQL should define screenshot metadata columns."
 );
 Assert(
-    bootstrapSql.Contains("CREATE TABLE IF NOT EXISTS bazaardb_snapshot_uploads", StringComparison.Ordinal)
-        && bootstrapSql.Contains("snapshot_id            TEXT PRIMARY KEY", StringComparison.Ordinal)
+    bootstrapSql.Contains(
+        "CREATE TABLE IF NOT EXISTS bazaardb_snapshot_uploads",
+        StringComparison.Ordinal
+    )
+        && bootstrapSql.Contains(
+            "snapshot_id            TEXT PRIMARY KEY",
+            StringComparison.Ordinal
+        )
         && bootstrapSql.Contains(
             "FOREIGN KEY (snapshot_id) REFERENCES run_screenshots(screenshot_id) ON DELETE CASCADE",
             StringComparison.Ordinal
@@ -152,6 +158,12 @@ Assert(
             StringComparison.Ordinal
         ),
     "Bootstrap SQL should only define the primary screenshot uniqueness index."
+);
+Assert(
+    bootstrapSql.Contains("idx_run_sync_state_dirty_retry", StringComparison.Ordinal)
+        && bootstrapSql.Contains("idx_battles_source_run_recorded", StringComparison.Ordinal)
+        && bootstrapSql.Contains("idx_run_screenshots_source_captured", StringComparison.Ordinal),
+    "Bootstrap SQL should define upload scan covering indexes."
 );
 
 Console.WriteLine("RunLogging SQLite schema checks passed.");

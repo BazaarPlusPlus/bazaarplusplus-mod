@@ -11,7 +11,7 @@ public static class RunLogSchema
 
     public static int RowSchemaVersion => 11;
 
-    public static int UploadPayloadSchemaVersion => 1;
+    public static int UploadPayloadSchemaVersion => 5;
 
     public static int CurrentSchemaVersion => LocalDatabaseSchemaVersion;
 
@@ -240,8 +240,17 @@ public static class RunLogSchema
             CREATE INDEX IF NOT EXISTS idx_{RunSyncStateTableName}_dirty
                 ON {RunSyncStateTableName}(dirty, last_attempt_at_utc);
 
+            CREATE INDEX IF NOT EXISTS idx_run_sync_state_dirty_retry
+                ON {RunSyncStateTableName}(dirty, retry_count, last_attempt_at_utc, run_id);
+
+            CREATE INDEX IF NOT EXISTS idx_battles_source_run_recorded
+                ON {BattlesTableName}(source, run_id, recorded_at_utc ASC, battle_id ASC);
+
             CREATE INDEX IF NOT EXISTS idx_{RunScreenshotsTableName}_run_id_captured_at_utc
                 ON {RunScreenshotsTableName}(run_id, captured_at_utc DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_run_screenshots_source_captured
+                ON {RunScreenshotsTableName}(capture_source, captured_at_utc ASC, screenshot_id ASC);
 
             CREATE UNIQUE INDEX IF NOT EXISTS idx_run_screenshots_primary_run
                 ON {RunScreenshotsTableName}(run_id)

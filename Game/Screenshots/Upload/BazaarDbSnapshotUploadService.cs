@@ -70,7 +70,7 @@ internal sealed class BazaarDbSnapshotUploadService
                     _store.MarkPermanentFailure(
                         snapshotId,
                         attemptedAtUtc,
-                        "build_snapshot_failed"
+                        _store.LastBuildFailureReason ?? "build_snapshot_failed"
                     );
                     continue;
                 }

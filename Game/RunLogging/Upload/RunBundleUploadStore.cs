@@ -39,7 +39,9 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
             WHERE s.dirty = 1
               AND r.completed = 1
               AND r.game_mode = 'Ranked'
-            ORDER BY COALESCE(s.last_attempt_at_utc, r.started_at_utc) ASC
+            ORDER BY s.retry_count ASC,
+                     s.last_attempt_at_utc ASC,
+                     s.run_id ASC
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$limit", limit);

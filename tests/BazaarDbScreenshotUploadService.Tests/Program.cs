@@ -1,4 +1,5 @@
 #nullable enable
+using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -8,7 +9,13 @@ var serviceType = RequireType(
     "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadService"
 );
 var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadStore");
+var uploadImageType = RequireType(
+    "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadImage"
+);
 var routesType = RequireModApiType("BazaarPlusPlus.ModApi.ModApiRoutes");
+var prepareDelegateType = RequireType(
+    "BazaarPlusPlus.Game.Screenshots.Upload.PrepareSnapshotImage"
+);
 
 var ctor = serviceType.GetConstructor(
     BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic,
@@ -44,10 +51,35 @@ try
         "2026-04-08_20-30-25-000_final_run-r1.png"
     );
 
-    var storeCtor = storeType.GetConstructor([typeof(string), typeof(string)])!;
-    var store = storeCtor.Invoke([dbPath, screenshotsDir]);
+    var fakeStoreCtor = storeType.GetConstructor(
+        BindingFlags.NonPublic | BindingFlags.Instance,
+        binder: null,
+        [typeof(string), typeof(string), prepareDelegateType],
+        modifiers: null
+    );
+    Assert(
+        fakeStoreCtor != null,
+        "BazaarDbSnapshotUploadStore should expose an internal constructor with an image preparer delegate for tests."
+    );
+    FakePreparedImage.NextImage = CreateUploadImage(
+        uploadImageType,
+        [0x89, 0x50, 0x4E, 0x47],
+        "image/png",
+        "fake-cache/snapshot.png"
+    );
+    var store = fakeStoreCtor!.Invoke([
+        dbPath,
+        screenshotsDir,
+        CreatePrepareSnapshotImageDelegate(prepareDelegateType),
+    ]);
     var ensureBackfilled = storeType.GetMethod("EnsureBackfilled")!;
     ensureBackfilled.Invoke(store, []);
+    var tryBuildSnapshot = storeType.GetMethod("TryBuildSnapshot")!;
+    var preflightRecord = tryBuildSnapshot.Invoke(store, ["shot-1", "acct-9"]);
+    Assert(
+        preflightRecord != null,
+        $"Preflight snapshot build should succeed; failure={GetStoreBuildFailure(storeType, store)}."
+    );
 
     var routes = routesType
         .GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static)!
@@ -81,7 +113,7 @@ try
 
         Assert(
             handler.Requests.Count == 2,
-            "Service should GET health then POST one upload request."
+            $"Service should GET health then POST one upload request; got {handler.Requests.Count}."
         );
         Assert(
             handler.Requests[0].Method == HttpMethod.Get
@@ -235,7 +267,53 @@ try
         client.Dispose();
     }
 
-    // Test 6: health failure leaves pending rows untouched for the next retry
+    // Test 6: prepared image failure flips to permanent_failure without probing health
+    SeedRunSnapshotWithFile(
+        dbPath,
+        screenshotsDir,
+        "shot-image-too-large",
+        "2026-04-08_20-32-00-000_final_run-r1.png"
+    );
+    FakePreparedImage.NextImage = null;
+    var fakeStore = fakeStoreCtor!.Invoke([
+        dbPath,
+        screenshotsDir,
+        CreatePrepareSnapshotImageDelegate(prepareDelegateType),
+    ]);
+    ensureBackfilled.Invoke(fakeStore, []);
+    {
+        var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"status\":\"ok\"}"),
+        });
+        var client = new HttpClient(handler);
+        var service = ctor!.Invoke([fakeStore, routes, client, new Func<string?>(() => "acct-9")]);
+        var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;
+        var task = (Task)uploadMethod.Invoke(service, [CancellationToken.None])!;
+        task.GetAwaiter().GetResult();
+
+        Assert(
+            GetUploadStatus(dbPath, "shot-image-too-large") == "permanent_failure",
+            "Prepared image failure should be a permanent failure."
+        );
+        Assert(
+            GetUploadLastError(dbPath, "shot-image-too-large") == "image_too_large_after_resize",
+            "Prepared image failure should record image_too_large_after_resize."
+        );
+        Assert(
+            handler.Requests.Count == 0,
+            "Service should not probe health or POST when the upload image cannot be prepared."
+        );
+        client.Dispose();
+    }
+    FakePreparedImage.NextImage = CreateUploadImage(
+        uploadImageType,
+        [0x89, 0x50, 0x4E, 0x47],
+        "image/png",
+        "fake-cache/snapshot.png"
+    );
+
+    // Test 7: health failure leaves pending rows untouched for the next retry
     SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
@@ -265,7 +343,7 @@ try
         client.Dispose();
     }
 
-    // Test 7: missing account id should not probe health or count attempts
+    // Test 8: missing account id should not probe health or count attempts
     SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
@@ -375,6 +453,69 @@ static long GetUploadAttempts(string dbPath, string id)
     return (long)(command.ExecuteScalar() ?? 0L);
 }
 
+static string GetUploadLastError(string dbPath, string id)
+{
+    using var connection = new SqliteConnection($"Data Source={dbPath}");
+    connection.Open();
+    using var command = connection.CreateCommand();
+    command.CommandText =
+        "SELECT last_error FROM bazaardb_snapshot_uploads WHERE snapshot_id = $id;";
+    command.Parameters.AddWithValue("$id", id);
+    return (string?)command.ExecuteScalar() ?? string.Empty;
+}
+
+static string? GetStoreBuildFailure(Type storeType, object store)
+{
+    return (string?)
+        storeType
+            .GetProperty("LastBuildFailureReason", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?.GetValue(store);
+}
+
+static object CreateUploadImage(
+    Type uploadImageType,
+    byte[] bytes,
+    string contentType,
+    string sourcePath
+)
+{
+    var image =
+        Activator.CreateInstance(uploadImageType)
+        ?? throw new InvalidOperationException("Upload image should be constructible.");
+    SetProperty(image, "Bytes", bytes);
+    SetProperty(image, "ContentType", contentType);
+    SetProperty(image, "SourcePath", sourcePath);
+    return image;
+}
+
+static void SetProperty(object instance, string name, object? value)
+{
+    instance
+        .GetType()
+        .GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+        ?.SetValue(instance, value);
+}
+
+static Delegate CreatePrepareSnapshotImageDelegate(Type delegateType)
+{
+    var invoke =
+        delegateType.GetMethod("Invoke")
+        ?? throw new InvalidOperationException("Delegate Invoke not found.");
+    var parametersInfo = invoke.GetParameters();
+    var parameters = new ParameterExpression[parametersInfo.Length];
+    for (var index = 0; index < parameters.Length; index++)
+        parameters[index] = Expression.Parameter(
+            parametersInfo[index].ParameterType,
+            parametersInfo[index].Name
+        );
+
+    var nextImageProperty = typeof(FakePreparedImage).GetProperty(
+        nameof(FakePreparedImage.NextImage)
+    )!;
+    var body = Expression.Convert(Expression.Property(null, nextImageProperty), invoke.ReturnType);
+    return Expression.Lambda(delegateType, body, parameters).Compile();
+}
+
 static Type RequireType(string fullName)
 {
     return Type.GetType($"{fullName}, BazaarPlusPlus.Storage")
@@ -422,4 +563,9 @@ internal sealed class RecordingHandler : HttpMessageHandler
         ContentTypes.Add(request.Content?.Headers.ContentType?.MediaType);
         return Task.FromResult(_responder(request));
     }
+}
+
+internal static class FakePreparedImage
+{
+    public static object? NextImage { get; set; }
 }

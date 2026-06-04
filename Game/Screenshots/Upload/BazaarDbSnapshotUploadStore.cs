@@ -10,13 +10,30 @@ using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
+internal delegate BazaarDbSnapshotUploadImage? PrepareSnapshotImage(
+    string snapshotId,
+    string absolutePath
+);
+
 internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
 {
     private const int UploadPayloadSchemaVersion = 2;
 
     private readonly string _screenshotsDirectoryPath;
+    private readonly PrepareSnapshotImage _imagePreparer;
 
     public BazaarDbSnapshotUploadStore(string databasePath, string screenshotsDirectoryPath)
+        : this(
+            databasePath,
+            screenshotsDirectoryPath,
+            CreateDefaultImagePreparer(screenshotsDirectoryPath)
+        ) { }
+
+    internal BazaarDbSnapshotUploadStore(
+        string databasePath,
+        string screenshotsDirectoryPath,
+        PrepareSnapshotImage imagePreparer
+    )
         : base(databasePath)
     {
         if (string.IsNullOrWhiteSpace(screenshotsDirectoryPath))
@@ -24,7 +41,23 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
                 "Screenshots directory is required.",
                 nameof(screenshotsDirectoryPath)
             );
+        _imagePreparer = imagePreparer ?? throw new ArgumentNullException(nameof(imagePreparer));
         _screenshotsDirectoryPath = screenshotsDirectoryPath;
+    }
+
+    internal string? LastBuildFailureReason { get; private set; }
+
+    private static PrepareSnapshotImage CreateDefaultImagePreparer(string screenshotsDirectoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(screenshotsDirectoryPath))
+            throw new ArgumentException(
+                "Screenshots directory is required.",
+                nameof(screenshotsDirectoryPath)
+            );
+
+        return new BazaarDbSnapshotImagePreparer(
+            Path.Combine(screenshotsDirectoryPath, "UploadCache")
+        ).Prepare;
     }
 
     public void EnsureBackfilled()
@@ -55,14 +88,16 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
-            SELECT u.snapshot_id
-            FROM {RunLogSchema.BazaarDbSnapshotUploadsTableName} AS u
-            INNER JOIN {RunLogSchema.RunScreenshotsTableName} AS s
-                ON s.screenshot_id = u.snapshot_id
-            WHERE u.status = 'pending'
-            ORDER BY s.captured_at_utc ASC
+            SELECT s.screenshot_id
+            FROM {RunLogSchema.RunScreenshotsTableName} AS s
+            INNER JOIN {RunLogSchema.BazaarDbSnapshotUploadsTableName} AS u
+                ON u.snapshot_id = s.screenshot_id
+            WHERE s.capture_source = $captureSource
+              AND u.status = 'pending'
+            ORDER BY s.captured_at_utc ASC, s.screenshot_id ASC
             LIMIT $limit;
             """;
+        command.Parameters.AddWithValue("$captureSource", RunLogSchema.CaptureSourceEndOfRunAuto);
         command.Parameters.AddWithValue("$limit", limit);
 
         using var reader = command.ExecuteReader();
@@ -86,6 +121,7 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
 
     public BazaarDbSnapshotUploadRecord? TryBuildSnapshot(string snapshotId, string playerAccountId)
     {
+        LastBuildFailureReason = null;
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
@@ -107,16 +143,25 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
         command.Parameters.AddWithValue("$id", snapshotId);
         using var reader = command.ExecuteReader();
         if (!reader.Read())
+        {
+            LastBuildFailureReason = "snapshot_not_found";
             return null;
+        }
 
         var imageRelativePath = reader.GetString(reader.GetOrdinal("image_relative_path"));
         var absolutePath = Path.Combine(_screenshotsDirectoryPath, imageRelativePath);
         if (!File.Exists(absolutePath))
+        {
+            LastBuildFailureReason = "image_file_missing";
             return null;
+        }
 
-        var bytes = File.ReadAllBytes(absolutePath);
-        if (bytes.Length == 0)
+        var uploadImage = _imagePreparer(snapshotId, absolutePath);
+        if (uploadImage == null || uploadImage.Bytes.Length == 0)
+        {
+            LastBuildFailureReason = "image_too_large_after_resize";
             return null;
+        }
 
         var playerName = TryResolvePlayerName();
 
@@ -155,9 +200,9 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
                 },
                 Image = new BazaarDbSnapshotImage
                 {
-                    ContentType = "image/png",
+                    ContentType = uploadImage.ContentType,
                     Encoding = "base64",
-                    DataBase64 = Convert.ToBase64String(bytes),
+                    DataBase64 = Convert.ToBase64String(uploadImage.Bytes),
                 },
                 Client = new BazaarDbSnapshotClientInfo
                 {
