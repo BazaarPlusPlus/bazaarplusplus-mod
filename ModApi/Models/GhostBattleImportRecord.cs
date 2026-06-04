@@ -55,7 +55,7 @@ public sealed class GhostBattleImportRecord
 
     public string? LoserCombatantId { get; set; }
 
-    public bool IsBundleFinalBattle { get; set; }
+    public bool IsFinalBattle { get; set; }
 
     public bool ReplayAvailable { get; set; }
 

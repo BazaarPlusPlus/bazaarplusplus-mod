@@ -114,6 +114,7 @@ internal static class BazaarDbSnapshotClientTests
                 RecordedAtUtc = "2026-06-03T12:00:00.000Z",
                 WinnerCombatantId = "Player",
                 LoserCombatantId = "Opponent",
+                IsFinalBattle = true,
             },
             Newtonsoft.Json.JsonSerializer.Create(ModApiSerialization.SerializerSettings)
         );
@@ -124,6 +125,10 @@ internal static class BazaarDbSnapshotClientTests
         Assert(
             (string?)json["loser_combatant_id"] == "Opponent",
             "BattleProjection should serialize loser_combatant_id."
+        );
+        Assert(
+            (bool?)json["is_final_battle"] == true,
+            "BattleProjection should serialize is_final_battle."
         );
     }
 

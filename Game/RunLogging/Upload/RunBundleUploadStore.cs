@@ -160,6 +160,13 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
         var battleProjections = new List<BattleProjection>();
         var artifactBattles = new List<RunArtifactBattle>();
         var battleIds = new List<string>();
+        var runEnded = !string.IsNullOrWhiteSpace(runRow.EndedAtUtc);
+        var finalBattleId = runEnded
+            ? battleManifests
+                .Where(manifest => !string.IsNullOrWhiteSpace(manifest.BattleId))
+                .Select(manifest => manifest.BattleId)
+                .LastOrDefault()
+            : null;
 
         foreach (var manifest in battleManifests)
         {
@@ -171,7 +178,12 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
                 return null;
 
             battleIds.Add(manifest.BattleId);
-            battleProjections.Add(BuildBattleProjection(manifest));
+            battleProjections.Add(
+                BuildBattleProjection(
+                    manifest,
+                    runEnded && string.Equals(manifest.BattleId, finalBattleId, StringComparison.Ordinal)
+                )
+            );
             artifactBattles.Add(BuildArtifactBattle(manifest, payload));
         }
 
@@ -289,7 +301,10 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
         public long LastSeq { get; set; }
     }
 
-    private static BattleProjection BuildBattleProjection(PvpBattleManifest manifest)
+    private static BattleProjection BuildBattleProjection(
+        PvpBattleManifest manifest,
+        bool isFinalBattle
+    )
     {
         return new BattleProjection
         {
@@ -316,6 +331,7 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
             Result = manifest.Outcome.Result,
             WinnerCombatantId = manifest.Outcome.WinnerCombatantId,
             LoserCombatantId = manifest.Outcome.LoserCombatantId,
+            IsFinalBattle = isFinalBattle,
         };
     }
 

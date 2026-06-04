@@ -54,6 +54,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     public void OnPanelShown()
     {
         _session.Begin();
+        _state.ReplayActionInProgress = false;
         _state.IsVisible = true;
         RefreshSectionOnEntry();
     }

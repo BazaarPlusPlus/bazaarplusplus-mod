@@ -411,7 +411,7 @@ try
         )
     );
     var battleProjection =
-        buildBattleProjectionMethod!.Invoke(null, [manifest!])
+        buildBattleProjectionMethod!.Invoke(null, [manifest!, false])
         ?? throw new InvalidOperationException("BuildBattleProjection should return a projection.");
     var battleProjectionType = battleProjection.GetType();
     Assert(
@@ -420,6 +420,10 @@ try
             && Equals(GetProperty(battleProjectionType, battleProjection, "OpponentPrestige"), 12)
             && Equals(GetProperty(battleProjectionType, battleProjection, "OpponentVictories"), 6),
         "Run bundle battle projection should include participant prestige and victories."
+    );
+    Assert(
+        Equals(GetProperty(battleProjectionType, battleProjection, "IsFinalBattle"), false),
+        "Run bundle battle projection should accept the final-battle marker from the caller."
     );
     var artifactBattle =
         buildArtifactBattleMethod!.Invoke(null, [manifest!, payload!])
@@ -690,6 +694,56 @@ try
             )
         ),
         "ListByRunId should surface battles whose run id was backfilled after persistence."
+    );
+    var uploadStore = Activator.CreateInstance(uploadStoreType, dbPath, tempRoot);
+    Assert(uploadStore != null, "RunBundleUploadStore should be constructible.");
+    var activeSnapshot = Invoke(
+        uploadStoreType,
+        uploadStore!,
+        "TryBuildRunBundleSnapshot",
+        new object?[] { "run-001", "player-account-001" }
+    );
+    Assert(
+        activeSnapshot != null,
+        "RunBundleUploadStore should build a snapshot for an active run with local payloads."
+    );
+    var activeProjection = SingleBattleProjection(activeSnapshot!);
+    Assert(
+        Equals(GetProperty(activeProjection.GetType(), activeProjection, "IsFinalBattle"), false),
+        "Run bundle upload should not mark any active-run battle as final."
+    );
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
+        using var finishRun = connection.CreateCommand();
+        finishRun.CommandText = """
+            UPDATE runs
+            SET completed = 1,
+                status = 'completed',
+                ended_at_utc = $endedAtUtc
+            WHERE run_id = $runId;
+            """;
+        finishRun.Parameters.AddWithValue("$runId", "run-001");
+        finishRun.Parameters.AddWithValue(
+            "$endedAtUtc",
+            "2026-03-18T01:30:00.0000000+00:00"
+        );
+        finishRun.ExecuteNonQuery();
+    }
+    var completedSnapshot = Invoke(
+        uploadStoreType,
+        uploadStore!,
+        "TryBuildRunBundleSnapshot",
+        new object?[] { "run-001", "player-account-001" }
+    );
+    Assert(
+        completedSnapshot != null,
+        "RunBundleUploadStore should build a snapshot for a completed run with local payloads."
+    );
+    var finalProjection = SingleBattleProjection(completedSnapshot!);
+    Assert(
+        Equals(GetProperty(finalProjection.GetType(), finalProjection, "IsFinalBattle"), true),
+        "Run bundle upload should mark the sorted last battle of an ended run as final."
     );
 
     var captureService = Activator.CreateInstance(captureServiceType);
@@ -1310,6 +1364,18 @@ static int ReadSnapshotCount(Type recordType, object instance, string propertyNa
             ?.Cast<object>()
             .Count()
         ?? 0;
+}
+
+static object SingleBattleProjection(object uploadSnapshot)
+{
+    var metadata =
+        GetProperty(uploadSnapshot.GetType(), uploadSnapshot, "Metadata")
+        ?? throw new InvalidOperationException("Upload snapshot should expose metadata.");
+    var projections =
+        (System.Collections.IEnumerable?)
+            GetProperty(metadata.GetType(), metadata, "BattleProjections")
+        ?? throw new InvalidOperationException("Upload metadata should expose battle projections.");
+    return projections.Cast<object>().Single();
 }
 
 static long CountRows(SqliteConnection connection, string tableName)

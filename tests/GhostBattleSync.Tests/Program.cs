@@ -97,6 +97,7 @@ Assert(
     coordinatorStateType.GetProperty("GhostSyncInProgress")!.SetValue(state, true);
     coordinatorStateType.GetProperty("ReplayActionInProgress")!.SetValue(state, true);
     coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.SetValue(state, true);
+    coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.SetValue(state, true);
 
     var dependencies =
         Activator.CreateInstance(coordinatorDependenciesType, null, null, null, null)
@@ -125,6 +126,67 @@ Assert(
     Assert(
         coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.GetValue(state) is false,
         "Hiding the history panel should clear final-build refresh in-progress state."
+    );
+    Assert(
+        coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.GetValue(state) is false,
+        "Hiding the history panel should clear server health probe in-progress state."
+    );
+}
+
+{
+    var state =
+        Activator.CreateInstance(coordinatorStateType)
+        ?? throw new InvalidOperationException("HistoryPanelState should be constructible.");
+    coordinatorStateType.GetProperty("GhostSyncInProgress")!.SetValue(state, true);
+    coordinatorStateType.GetProperty("ReplayActionInProgress")!.SetValue(state, true);
+    coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.SetValue(state, true);
+    coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.SetValue(state, true);
+
+    var dependencies =
+        Activator.CreateInstance(coordinatorDependenciesType, null, null, null, null)
+        ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
+    var coordinator =
+        Activator.CreateInstance(
+            coordinatorType,
+            state,
+            dependencies,
+            (Action)(() => { }),
+            (Action)(() => { }),
+            (Action<bool>)(_ => { })
+        )
+        ?? throw new InvalidOperationException("HistoryPanelCoordinator should be constructible.");
+
+    try
+    {
+        InvokeVoid(coordinatorType, coordinator, "OnPanelShown", []);
+    }
+    catch (TargetInvocationException ex)
+        when (ex.InnerException is System.IO.FileNotFoundException fileNotFound
+            && string.Equals(
+                fileNotFound.FileName,
+                "UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null",
+                StringComparison.Ordinal
+            ))
+    {
+        // The exe-style test host does not load UnityEngine.CoreModule, but the reset happens
+        // before OnPanelShown enters the Unity-backed refresh path.
+    }
+
+    Assert(
+        coordinatorStateType.GetProperty("ReplayActionInProgress")!.GetValue(state) is false,
+        "Showing the history panel should clear stale replay in-progress state."
+    );
+    Assert(
+        coordinatorStateType.GetProperty("GhostSyncInProgress")!.GetValue(state) is true,
+        "Showing the history panel should preserve ghost sync in-progress state."
+    );
+    Assert(
+        coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.GetValue(state) is true,
+        "Showing the history panel should preserve final-build refresh in-progress state."
+    );
+    Assert(
+        coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.GetValue(state) is true,
+        "Showing the history panel should preserve server health probe in-progress state."
     );
 }
 
@@ -431,7 +493,8 @@ var rawBattlePayload = JObject.Parse(
       "combat_kind": "PVPCombat",
       "result": "Won",
       "winner_combatant_id": "Player",
-      "loser_combatant_id": "Opponent"
+      "loser_combatant_id": "Opponent",
+      "is_final_battle": true
     }
     """
 );
@@ -466,9 +529,29 @@ Assert(
     "Ghost import should preserve winner_combatant_id without flipping."
 );
 Assert(
-    (bool)(importRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(importRecord) ?? true)
+    (bool)(importRecordType.GetProperty("IsFinalBattle")?.GetValue(importRecord) ?? false) is true,
+    "Ghost import should preserve is_final_battle from the V4 wire."
+);
+var missingFinalBattlePayload = JObject.Parse(
+    $$"""
+    {
+      "battle_id": "ghost-battle-missing-final",
+      "recorded_at_utc": "{{DateTimeOffset.UtcNow.ToString("o")}}"
+    }
+    """
+);
+var missingFinalBattleImportRecord =
+    tryParseBattle!.Invoke(null, [missingFinalBattlePayload])
+    ?? throw new InvalidOperationException(
+        "TryParseBattle should return an import record when is_final_battle is absent."
+    );
+Assert(
+    (bool)(
+        importRecordType.GetProperty("IsFinalBattle")?.GetValue(missingFinalBattleImportRecord)
+        ?? true
+    )
         is false,
-    "Ghost import should default bundle-final battle marker off after the wire field was removed."
+    "Ghost import should default missing is_final_battle to false."
 );
 Assert(
     (int?)importRecordType.GetProperty("PlayerPrestige")?.GetValue(importRecord) == 18
@@ -494,7 +577,8 @@ var localWinBattlePayload = JObject.Parse(
       "combat_kind": "PVPCombat",
       "result": "Lost",
       "winner_combatant_id": "Opponent",
-      "loser_combatant_id": "Player"
+      "loser_combatant_id": "Player",
+      "is_final_battle": true
     }
     """
 );
@@ -557,11 +641,9 @@ try
         "Ghost repository reads should project the result into local-player perspective."
     );
     Assert(
-        (bool)(
-            battleRecordType.GetProperty("IsBundleFinalBattle")?.GetValue(projectedBattle) ?? true
-        )
-            is false,
-        "Ghost repository reads should keep bundle-final marker off after the wire field was removed."
+        (bool)(battleRecordType.GetProperty("IsFinalBattle")?.GetValue(projectedBattle) ?? false)
+            is true,
+        "Ghost repository reads should preserve the final-battle marker."
     );
     Assert(
         (int?)battleRecordType.GetProperty("PlayerPrestige")?.GetValue(projectedBattle) == 12
@@ -574,15 +656,20 @@ try
     );
     Assert(
         (bool)isGhostOpponentEliminated!.Invoke(null, [projectedBattle])! is false,
-        "A ghost battle without bundle-final metadata should not show elimination text when the local player lost."
+        "A final ghost battle should not show elimination text when the local player lost."
     );
     Assert(
         (string?)battleRecordType.GetProperty("Result")?.GetValue(projectedLocalWinBattle) == "Won",
         "Ghost repository reads should project a remote loss into a local-player win."
     );
     Assert(
-        (bool)isGhostOpponentEliminated.Invoke(null, [projectedLocalWinBattle])! is false,
-        "A ghost battle without bundle-final metadata should not show elimination text when the local player won."
+        (bool)(battleRecordType.GetProperty("IsFinalBattle")?.GetValue(projectedLocalWinBattle) ?? false)
+            is true,
+        "Ghost repository reads should preserve the final-battle marker for local wins."
+    );
+    Assert(
+        (bool)isGhostOpponentEliminated.Invoke(null, [projectedLocalWinBattle])! is true,
+        "A final ghost battle should show elimination text when the local player won."
     );
 
     var resolvedOutcome = resolveGhostBattleOutcome!.Invoke(null, [projectedBattle]);

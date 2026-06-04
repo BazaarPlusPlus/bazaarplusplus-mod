@@ -146,6 +146,9 @@ public sealed class BattleProjection
 
     [JsonProperty("loser_combatant_id")]
     public string? LoserCombatantId { get; set; }
+
+    [JsonProperty("is_final_battle")]
+    public bool IsFinalBattle { get; set; }
 }
 
 public sealed class RunArtifact

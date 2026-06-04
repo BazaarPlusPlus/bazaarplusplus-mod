@@ -33,7 +33,7 @@ internal sealed class HistoryBattleRecord
         string? loserCombatantId,
         HistoryBattleSnapshotCounts snapshotCounts,
         PvpBattleSnapshots? snapshots,
-        bool isBundleFinalBattle,
+        bool isFinalBattle,
         HistoryBattleSource source,
         bool replayAvailable,
         bool replayDownloaded
@@ -65,7 +65,7 @@ internal sealed class HistoryBattleRecord
         LoserCombatantId = loserCombatantId;
         SnapshotCounts = snapshotCounts;
         Snapshots = snapshots;
-        IsBundleFinalBattle = isBundleFinalBattle;
+        IsFinalBattle = isFinalBattle;
         Source = source;
         ReplayAvailable = replayAvailable;
         ReplayDownloaded = replayDownloaded;
@@ -133,7 +133,7 @@ internal sealed class HistoryBattleRecord
     // snapshots live in a separate payload file the repository does not read.
     public PvpBattleSnapshots? Snapshots { get; }
 
-    public bool IsBundleFinalBattle { get; }
+    public bool IsFinalBattle { get; }
 
     public HistoryBattleSource Source { get; }
 

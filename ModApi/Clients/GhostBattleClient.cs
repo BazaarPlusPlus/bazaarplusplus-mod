@@ -206,6 +206,7 @@ public sealed class GhostBattleClient
             Result = battle["result"]?.Value<string>()?.Trim(),
             WinnerCombatantId = battle["winner_combatant_id"]?.Value<string>()?.Trim(),
             LoserCombatantId = battle["loser_combatant_id"]?.Value<string>()?.Trim(),
+            IsFinalBattle = battle["is_final_battle"]?.Value<bool?>() ?? false,
             ReplayAvailable = true,
             ReplayDownloaded = false,
             LastSyncedAtUtc = DateTimeOffset.UtcNow,

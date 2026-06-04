@@ -4,7 +4,7 @@ using System.Reflection;
 var schemaType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 15,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 16,
     "Local database schema version mismatch."
 );
 Assert(
@@ -40,7 +40,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 15;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 16;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
@@ -93,7 +93,8 @@ Assert(
         && bootstrapSql.Contains("opponent_account_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("winner_combatant_id", StringComparison.Ordinal)
         && bootstrapSql.Contains("loser_combatant_id", StringComparison.Ordinal)
-        && bootstrapSql.Contains("is_bundle_final_battle", StringComparison.Ordinal)
+        && bootstrapSql.Contains("is_final_battle", StringComparison.Ordinal)
+        && !bootstrapSql.Contains("is_bundle_final_battle", StringComparison.Ordinal)
         && bootstrapSql.Contains("result", StringComparison.Ordinal),
     "Bootstrap SQL should define unified battle identity and outcome columns."
 );

@@ -242,7 +242,7 @@ internal sealed partial class HistoryPanelRepository
                 result,
                 winner_combatant_id,
                 loser_combatant_id,
-                is_bundle_final_battle,
+                is_final_battle,
                 replay_available,
                 replay_downloaded
             FROM {RunLogSchema.BattlesTableName}
@@ -318,7 +318,7 @@ internal sealed partial class HistoryPanelRepository
                     result,
                     winner_combatant_id,
                     loser_combatant_id,
-                    is_bundle_final_battle,
+                    is_final_battle,
                     replay_available,
                     replay_downloaded,
                     last_synced_at_utc
@@ -351,7 +351,7 @@ internal sealed partial class HistoryPanelRepository
                     $result,
                     $winnerCombatantId,
                     $loserCombatantId,
-                    $isBundleFinalBattle,
+                    $isFinalBattle,
                     $replayAvailable,
                     $replayDownloaded,
                     $lastSyncedAtUtc
@@ -384,7 +384,7 @@ internal sealed partial class HistoryPanelRepository
                     result = excluded.result,
                     winner_combatant_id = excluded.winner_combatant_id,
                     loser_combatant_id = excluded.loser_combatant_id,
-                    is_bundle_final_battle = excluded.is_bundle_final_battle,
+                    is_final_battle = excluded.is_final_battle,
                     replay_available = excluded.replay_available,
                     replay_downloaded = MAX(
                         {RunLogSchema.GhostBattlesTableName}.replay_downloaded,
@@ -490,8 +490,8 @@ internal sealed partial class HistoryPanelRepository
                 (object?)battle.LoserCombatantId ?? DBNull.Value
             );
             insertCommand.Parameters.AddWithValue(
-                "$isBundleFinalBattle",
-                battle.IsBundleFinalBattle ? 1 : 0
+                "$isFinalBattle",
+                battle.IsFinalBattle ? 1 : 0
             );
             insertCommand.Parameters.AddWithValue(
                 "$replayAvailable",
@@ -654,7 +654,7 @@ internal sealed partial class HistoryPanelRepository
             EnsureColumnExists(
                 connection,
                 RunLogSchema.BattlesTableName,
-                "is_bundle_final_battle",
+                "is_final_battle",
                 "INTEGER NOT NULL DEFAULT 0"
             );
         }

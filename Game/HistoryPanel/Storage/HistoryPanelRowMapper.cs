@@ -81,7 +81,7 @@ internal static class HistoryPanelRowMapper
                 snapshots.OpponentSkills
             ),
             snapshots,
-            isBundleFinalBattle: false,
+            isFinalBattle: false,
             source: HistoryBattleSource.Local,
             replayAvailable: true,
             replayDownloaded: true
@@ -115,7 +115,7 @@ internal static class HistoryPanelRowMapper
             GetNullableString(reader, "result"),
             GetNullableString(reader, "winner_combatant_id"),
             GetNullableString(reader, "loser_combatant_id"),
-            isBundleFinalBattle: GetNullableInt32(reader, "is_bundle_final_battle") == 1,
+            isFinalBattle: GetNullableInt32(reader, "is_final_battle") == 1,
             replayAvailable: GetNullableInt32(reader, "replay_available") == 1,
             replayDownloaded: GetNullableInt32(reader, "replay_downloaded") == 1
         );

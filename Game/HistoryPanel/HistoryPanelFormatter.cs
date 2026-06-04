@@ -94,7 +94,7 @@ internal static class HistoryPanelFormatter
         if (battle == null || battle.Source != HistoryBattleSource.Ghost)
             return false;
 
-        return battle.IsBundleFinalBattle && IsBattleWinFromLocalPerspective(battle);
+        return battle.IsFinalBattle && IsBattleWinFromLocalPerspective(battle);
     }
 
     private static bool IsBattleWinFromLocalPerspective(HistoryBattleRecord battle)
