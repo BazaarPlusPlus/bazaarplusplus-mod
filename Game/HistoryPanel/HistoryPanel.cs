@@ -9,6 +9,7 @@ using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -22,7 +23,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 {
     private const string ToggleHistoryPanelBindingPath = "<Keyboard>/f8";
     private const string OverlayPanelId = "HistoryPanel";
-    private const int OverlaySortingBand = 27;
+    private const int OverlaySortingBand = BppOverlaySorting.MainOverlayPanelBand;
     private static readonly HashSet<string> UiDiagnosticScenes = new(StringComparer.Ordinal)
     {
         "CollectionUIScene",
@@ -359,7 +360,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             new ItemBoardPreviewOptions
             {
                 Layer = 30,
-                SortingOrder = 27,
+                SortingOrder = BppOverlaySorting.NativeCardPreview,
                 LayoutMode = ItemBoardPreviewLayoutMode.Socketed,
                 ShowHover = true,
                 LogComponent = "HistoryPanelPreview",

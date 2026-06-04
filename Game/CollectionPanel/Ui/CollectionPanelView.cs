@@ -159,7 +159,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _rootObject = new GameObject("CollectionPanelUiToolkitRoot");
         _rootObject.transform.SetParent(_parent, false);
         _panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
-        _panelSettings.sortingOrder = 26;
+        _panelSettings.sortingOrder = BppOverlaySorting.PanelUiToolkit;
         _panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
         _panelSettings.referenceResolution = new Vector2Int(1920, 1080);
         _panelSettings.match = 1f;

@@ -107,7 +107,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _rootObject = new GameObject("HistoryPanelUiToolkitRoot");
         _rootObject.transform.SetParent(_parent, false);
         _panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
-        _panelSettings.sortingOrder = 26;
+        _panelSettings.sortingOrder = BppOverlaySorting.PanelUiToolkit;
         _panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
         _panelSettings.referenceResolution = new Vector2Int(1920, 1080);
         // Match by height (match=1): UI tokens scale with screen height so vertical density

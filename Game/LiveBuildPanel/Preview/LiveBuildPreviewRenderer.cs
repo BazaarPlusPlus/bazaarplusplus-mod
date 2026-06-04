@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.LiveBuildPanel.Preview;
@@ -12,7 +13,7 @@ namespace BazaarPlusPlus.Game.LiveBuildPanel.Preview;
 internal sealed class LiveBuildPreviewRenderer : IDisposable
 {
     private const int PreviewLayer = 30;
-    private const int PreviewSortingOrder = 27;
+    private const int PreviewSortingOrder = BppOverlaySorting.NativeCardPreview;
     private readonly Dictionary<BppItemBoardId, LiveItemBoardRowPreview> _rows = new();
 
     public bool SetBounds(BppItemBoardId id, Rect bounds) => Row(id).SetBounds(bounds);

@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
@@ -43,15 +44,15 @@ internal static class CollectionGridConstants
     // time). Reposition is free; bind triggers Addressables loads on the Item path.
     public const float ColdBindBudgetMs = 3f;
 
-    // Sorting layers: UITK panel at 26, card overlay one above at 27. Anything we put
-    // between them (e.g., a full-screen GraphicRaycaster blocker) intercepts every click
-    // and wheel event before UITK can see it, freezing all panel chrome — so we don't.
-    public const int UiToolkitSortingOrder = 26;
-    public const int OverlaySortingOrder = 27;
+    // Sorting layers: UITK panel below native cards, with optional foreground chrome above.
+    // Anything we put between them (e.g., a full-screen GraphicRaycaster blocker) intercepts
+    // every click and wheel event before UITK can see it, freezing all panel chrome — so we don't.
+    public const int UiToolkitSortingOrder = BppOverlaySorting.PanelUiToolkit;
+    public const int OverlaySortingOrder = BppOverlaySorting.NativeCardPreview;
 
     // true (default): polled hover. No per-card hit Image, no overlay GraphicRaycaster;
     // Mouse.current is polled each Update to dispatch OnHover/OnHoverOut on the cell under
-    // the cursor. UITK at sortingOrder 26 receives every click and wheel event uninterrupted.
+    // the cursor. The lower UITK panel receives every click and wheel event uninterrupted.
     //
     // false: raycaster hover. Per-card transparent Image + overlay GraphicRaycaster fire
     // hover via IPointerEnter/Exit. The card prefab's own RawImage has raycastTarget=true,

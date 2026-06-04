@@ -45,6 +45,10 @@
       Include="../../GameInterop/ItemBoardPreview/BppItemBoardType.cs"
       Link="BppItemBoardType.cs"
     />
+    <Compile
+      Include="../../Infrastructure/UiTokens/BppOverlaySorting.cs"
+      Link="BppOverlaySorting.cs"
+    />
     <Compile Include="Program.cs" />
   </ItemGroup>
 

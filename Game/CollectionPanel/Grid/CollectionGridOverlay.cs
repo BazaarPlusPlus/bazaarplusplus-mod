@@ -5,8 +5,8 @@ using Object = UnityEngine.Object;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
-// Sibling ScreenSpaceOverlay canvas (sortingOrder = 27) where native CardPreviewBase
-// instances are parented and clipped. The UITK panel (sortingOrder = 26) publishes a
+// Sibling ScreenSpaceOverlay canvas where native CardPreviewBase instances are parented
+// and clipped above the UITK panel. The UITK panel publishes a
 // pixel-space rect each time its grid viewport's geometry changes; this overlay reapplies
 // that rect to its clip RectTransform so the grid scrolls underneath the same hole that
 // the UITK viewport opens.
@@ -14,7 +14,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // Mirrors item-board preview overlay scaffolding (sortingOrder, RectMask2D, ApplyTransform
 // math). A GraphicRaycaster is added only when the raycaster-hover dispatch path is
 // selected via CollectionGridConstants.UsePolledHover = false; under the default
-// (polled hover) the overlay is purely visual and UITK at sortingOrder 26 receives every
+// (polled hover) the overlay is purely visual and the lower UITK panel receives every
 // click / wheel uninterrupted.
 internal sealed class CollectionGridOverlay
 {

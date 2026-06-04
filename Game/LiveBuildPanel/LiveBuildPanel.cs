@@ -14,6 +14,7 @@ using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.LiveCards;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -24,7 +25,7 @@ namespace BazaarPlusPlus.Game.LiveBuildPanel;
 internal sealed class LiveBuildPanel : MonoBehaviour
 {
     private const string OverlayPanelId = "LiveBuildPanel";
-    private const int OverlaySortingBand = 27;
+    private const int OverlaySortingBand = BppOverlaySorting.MainOverlayPanelBand;
 
     private static LiveBuildPanel? _instance;
     private readonly LiveCardSnapshotReader _reader = new();

@@ -1,12 +1,30 @@
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 
+TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground();
 TestCandidateToggleUsesTemplateId();
 TestCandidatePruneKeepsSelectableRowsOnly();
 TestRowVmTogglePolicyComesFromBoardType();
 
 Console.WriteLine("LiveBuildPanel checks passed.");
+
+static void TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground()
+{
+    Assert(
+        BppOverlaySorting.PanelUiToolkit < BppOverlaySorting.NativeCardPreview,
+        "Native cards must render above the main UI Toolkit panel."
+    );
+    Assert(
+        BppOverlaySorting.NativeCardPreview < BppOverlaySorting.PanelForeground,
+        "Foreground markers must render above native cards."
+    );
+    Assert(
+        BppOverlaySorting.MainOverlayPanelBand == BppOverlaySorting.NativeCardPreview,
+        "Panel mutex band should remain a separate semantic constant even when it shares the card overlay value."
+    );
+}
 
 static void TestCandidateToggleUsesTemplateId()
 {

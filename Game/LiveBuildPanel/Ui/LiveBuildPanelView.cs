@@ -33,6 +33,10 @@ internal sealed class LiveBuildPanelView : IDisposable
     private GameObject? _rootObject;
     private UIDocument? _document;
     private PanelSettings? _panelSettings;
+    private GameObject? _foregroundRootObject;
+    private UIDocument? _foregroundDocument;
+    private PanelSettings? _foregroundPanelSettings;
+    private VisualElement? _foregroundRoot;
     private VisualElement? _root;
     private Label? _title;
     private VisualElement? _subtitle;
@@ -60,26 +64,22 @@ internal sealed class LiveBuildPanelView : IDisposable
 
         _rootObject = new GameObject("LiveBuildPanelUiToolkitRoot");
         _rootObject.transform.SetParent(_parent, false);
-        _panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
-        _panelSettings.sortingOrder = 28;
-        _panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
-        _panelSettings.referenceResolution = new Vector2Int(1920, 1080);
-        _panelSettings.match = 1f;
-        _panelSettings.clearColor = false;
-        _panelSettings.targetDisplay = 0;
+        _panelSettings = CreatePanelSettings(BppOverlaySorting.PanelUiToolkit);
 
         _document = _rootObject.AddComponent<UIDocument>();
         _document.panelSettings = _panelSettings;
         _root = _document.rootVisualElement;
-        _root.style.flexGrow = 1f;
-        _root.style.position = Position.Absolute;
-        _root.style.left = 0f;
-        _root.style.right = 0f;
-        _root.style.top = 0f;
-        _root.style.bottom = 0f;
-        _root.style.display = DisplayStyle.None;
+        ConfigureDocumentRoot(_root, PickingMode.Position);
         _root.style.unityFont = BppUiFont.Default;
-        _root.pickingMode = PickingMode.Position;
+
+        _foregroundRootObject = new GameObject("LiveBuildPanelForegroundUiToolkitRoot");
+        _foregroundRootObject.transform.SetParent(_parent, false);
+        _foregroundPanelSettings = CreatePanelSettings(BppOverlaySorting.PanelForeground);
+        _foregroundDocument = _foregroundRootObject.AddComponent<UIDocument>();
+        _foregroundDocument.panelSettings = _foregroundPanelSettings;
+        _foregroundRoot = _foregroundDocument.rootVisualElement;
+        ConfigureDocumentRoot(_foregroundRoot, PickingMode.Ignore);
+        _foregroundRoot.style.unityFont = BppUiFont.Default;
 
         BppUiFont.RequestCharactersInTexture(
             LiveBuildPanelText.FontAtlasSample(),
@@ -93,6 +93,8 @@ internal sealed class LiveBuildPanelView : IDisposable
     {
         if (_root != null)
             _root.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+        if (_foregroundRoot != null)
+            _foregroundRoot.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
     }
 
     public void Refresh(LiveBuildPanelSnapshot snapshot)
@@ -127,11 +129,19 @@ internal sealed class LiveBuildPanelView : IDisposable
             UnityEngine.Object.Destroy(_rootObject);
         if (_panelSettings != null)
             UnityEngine.Object.Destroy(_panelSettings);
+        if (_foregroundRootObject != null)
+            UnityEngine.Object.Destroy(_foregroundRootObject);
+        if (_foregroundPanelSettings != null)
+            UnityEngine.Object.Destroy(_foregroundPanelSettings);
 
         _rows.Clear();
         _rootObject = null;
         _document = null;
         _panelSettings = null;
+        _foregroundRootObject = null;
+        _foregroundDocument = null;
+        _foregroundPanelSettings = null;
+        _foregroundRoot = null;
         _root = null;
     }
 
@@ -354,13 +364,30 @@ internal sealed class LiveBuildPanelView : IDisposable
         EContainerSocketId socket
     )
     {
+        if (_foregroundRoot == null)
+            return;
+
+        var hostBounds = elements.SlotHost.worldBound;
+        if (hostBounds.width <= 0f || hostBounds.height <= 0f)
+            return;
+
+        var socketIndex = Mathf.Clamp((int)socket, 0, 9);
+        var span = Mathf.Clamp(card.DisplaySpan, 1, 10);
+        var slotWidth = hostBounds.width / 10f;
+        var left = hostBounds.x + socketIndex * slotWidth;
+        var right = Mathf.Min(hostBounds.xMax, left + span * slotWidth);
+        var top = hostBounds.y + 4f;
+        var height = Mathf.Max(1f, hostBounds.height - 8f);
+        if (right <= left)
+            return;
+
         var marker = new VisualElement();
         marker.pickingMode = PickingMode.Ignore;
         marker.style.position = Position.Absolute;
-        marker.style.left = Length.Percent((int)socket * 10f);
-        marker.style.top = 4f;
-        marker.style.bottom = 4f;
-        marker.style.width = Length.Percent(Mathf.Clamp(card.DisplaySpan, 1, 10) * 10f);
+        marker.style.left = left;
+        marker.style.top = top;
+        marker.style.width = right - left;
+        marker.style.height = height;
         marker.style.backgroundColor = new Color(1f, 0.72f, 0.18f, 0.13f);
         marker.style.borderBottomColor = Colors.HistoryGoldAccent;
         marker.style.borderTopColor = Colors.HistoryGoldAccent;
@@ -383,7 +410,7 @@ internal sealed class LiveBuildPanelView : IDisposable
         badge.style.backgroundColor = Colors.HistoryGoldAccent;
         marker.Add(badge);
 
-        elements.SlotHost.Add(marker);
+        _foregroundRoot.Add(marker);
         elements.Markers.Add(marker);
     }
 
@@ -408,6 +435,30 @@ internal sealed class LiveBuildPanelView : IDisposable
             Mathf.Max(1f, Mathf.Round(worldBound.height * ppp))
         );
         RowBoundsChanged?.Invoke(id, bounds);
+    }
+
+    private static PanelSettings CreatePanelSettings(int sortingOrder)
+    {
+        var settings = ScriptableObject.CreateInstance<PanelSettings>();
+        settings.sortingOrder = sortingOrder;
+        settings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+        settings.referenceResolution = new Vector2Int(1920, 1080);
+        settings.match = 1f;
+        settings.clearColor = false;
+        settings.targetDisplay = 0;
+        return settings;
+    }
+
+    private static void ConfigureDocumentRoot(VisualElement root, PickingMode pickingMode)
+    {
+        root.style.flexGrow = 1f;
+        root.style.position = Position.Absolute;
+        root.style.left = 0f;
+        root.style.right = 0f;
+        root.style.top = 0f;
+        root.style.bottom = 0f;
+        root.style.display = DisplayStyle.None;
+        root.pickingMode = pickingMode;
     }
 
     private static Label CreateLabel(int fontSize, FontStyle fontStyle, Color color)
