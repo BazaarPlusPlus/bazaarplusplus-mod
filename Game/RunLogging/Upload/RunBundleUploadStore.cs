@@ -150,6 +150,70 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
 
     public RunBundleUploadSnapshot? TryBuildRunBundleSnapshot(string runId, string playerAccountId)
     {
+        var runRow = TryGetRunUploadRow(runId);
+        if (runRow == null)
+            return null;
+
+        var battleManifests = _battleCatalog.ListByRunId(runId);
+        var battleProjections = new List<BattleProjection>();
+        var artifactBattles = new List<RunArtifactBattle>();
+        var battleIds = new List<string>();
+
+        foreach (var manifest in battleManifests)
+        {
+            if (string.IsNullOrWhiteSpace(manifest.BattleId))
+                continue;
+
+            var payload = _payloadStore.Load(manifest.BattleId);
+            if (payload == null)
+                return null;
+
+            battleIds.Add(manifest.BattleId);
+            battleProjections.Add(BuildBattleProjection(manifest));
+            artifactBattles.Add(BuildArtifactBattle(manifest, payload));
+        }
+
+        var artifact = new RunArtifact { RunId = runId, Battles = artifactBattles };
+        var artifactBytes = RunBundleArtifactCodec.Serialize(artifact);
+
+        return new RunBundleUploadSnapshot
+        {
+            RunId = runId,
+            LastSeq = runRow.LastSeq,
+            UploadedStatus = runRow.Status,
+            BattleIds = battleIds,
+            ArtifactBytes = artifactBytes,
+            Metadata = new RunBundleUploadRequest
+            {
+                SchemaVersion = RunLogSchema.UploadPayloadSchemaVersion,
+                PlayerAccountId = playerAccountId,
+                SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
+                ArtifactCodec = RunBundleArtifactCodec.ContentType,
+                RunProjection = new RunProjection
+                {
+                    RunId = runId,
+                    Status = runRow.Status ?? string.Empty,
+                    HeroId = null,
+                    HeroName = runRow.Hero,
+                    PlayerRank = runRow.PlayerRank,
+                    PlayerRating = runRow.PlayerRating,
+                    PlayerPosition = null,
+                    StartedAtUtc = runRow.StartedAtUtc,
+                    EndedAtUtc = runRow.EndedAtUtc ?? string.Empty,
+                    FinalDay = runRow.FinalDay,
+                    FinalWins = runRow.Victories,
+                    FinalLosses = runRow.Losses,
+                    FinalPlayerRank = runRow.FinalPlayerRank,
+                    FinalPlayerRating = runRow.FinalPlayerRating,
+                    FinalPlayerPosition = null,
+                },
+                BattleProjections = battleProjections,
+            },
+        };
+    }
+
+    private RunUploadRow? TryGetRunUploadRow(string runId)
+    {
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
@@ -176,64 +240,51 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
         if (!reader.Read())
             return null;
 
-        var lastSeq = GetNullableInt64(reader, "last_seq") ?? 0L;
-        var uploadedStatus = GetNullableString(reader, "status");
-        var battleManifests = _battleCatalog.ListByRunId(runId);
-        var battleProjections = new List<BattleProjection>();
-        var artifactBattles = new List<RunArtifactBattle>();
-        var battleIds = new List<string>();
-
-        foreach (var manifest in battleManifests)
-        {
-            if (string.IsNullOrWhiteSpace(manifest.BattleId))
-                continue;
-
-            var payload = _payloadStore.Load(manifest.BattleId);
-            if (payload == null)
-                return null;
-
-            battleIds.Add(manifest.BattleId);
-            battleProjections.Add(BuildBattleProjection(manifest));
-            artifactBattles.Add(BuildArtifactBattle(manifest, payload));
-        }
-
-        var artifact = new RunArtifact { RunId = runId, Battles = artifactBattles };
-        var artifactBytes = RunBundleArtifactCodec.Serialize(artifact);
-
-        return new RunBundleUploadSnapshot
+        return new RunUploadRow
         {
             RunId = runId,
-            LastSeq = lastSeq,
-            UploadedStatus = uploadedStatus,
-            BattleIds = battleIds,
-            Payload = new RunBundleUploadRequest
-            {
-                SchemaVersion = RunLogSchema.UploadPayloadSchemaVersion,
-                PlayerAccountId = playerAccountId,
-                SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
-                ArtifactCodec = RunBundleArtifactCodec.ContentType,
-                ArtifactBytes = artifactBytes.ToArray(),
-                RunProjection = new RunProjection
-                {
-                    RunId = runId,
-                    Status = uploadedStatus ?? string.Empty,
-                    HeroId = null,
-                    HeroName = GetNullableString(reader, "hero"),
-                    PlayerRank = GetNullableString(reader, "player_rank"),
-                    PlayerRating = GetNullableInt32(reader, "player_rating"),
-                    PlayerPosition = null,
-                    StartedAtUtc = GetNullableString(reader, "started_at_utc"),
-                    EndedAtUtc = GetNullableString(reader, "ended_at_utc") ?? string.Empty,
-                    FinalDay = GetNullableInt32(reader, "final_day"),
-                    FinalWins = GetNullableInt32(reader, "victories"),
-                    FinalLosses = GetNullableInt32(reader, "losses"),
-                    FinalPlayerRank = GetNullableString(reader, "final_player_rank"),
-                    FinalPlayerRating = GetNullableInt32(reader, "final_player_rating"),
-                    FinalPlayerPosition = null,
-                },
-                BattleProjections = battleProjections,
-            },
+            StartedAtUtc = GetNullableString(reader, "started_at_utc"),
+            Status = GetNullableString(reader, "status"),
+            Hero = GetNullableString(reader, "hero"),
+            PlayerRank = GetNullableString(reader, "player_rank"),
+            PlayerRating = GetNullableInt32(reader, "player_rating"),
+            EndedAtUtc = GetNullableString(reader, "ended_at_utc"),
+            FinalDay = GetNullableInt32(reader, "final_day"),
+            Victories = GetNullableInt32(reader, "victories"),
+            Losses = GetNullableInt32(reader, "losses"),
+            FinalPlayerRank = GetNullableString(reader, "final_player_rank"),
+            FinalPlayerRating = GetNullableInt32(reader, "final_player_rating"),
+            LastSeq = GetNullableInt64(reader, "last_seq") ?? 0L,
         };
+    }
+
+    private sealed class RunUploadRow
+    {
+        public string RunId { get; set; } = string.Empty;
+
+        public string? StartedAtUtc { get; set; }
+
+        public string? Status { get; set; }
+
+        public string? Hero { get; set; }
+
+        public string? PlayerRank { get; set; }
+
+        public int? PlayerRating { get; set; }
+
+        public string? EndedAtUtc { get; set; }
+
+        public int? FinalDay { get; set; }
+
+        public int? Victories { get; set; }
+
+        public int? Losses { get; set; }
+
+        public string? FinalPlayerRank { get; set; }
+
+        public int? FinalPlayerRating { get; set; }
+
+        public long LastSeq { get; set; }
     }
 
     private static BattleProjection BuildBattleProjection(PvpBattleManifest manifest)

@@ -64,7 +64,11 @@ internal sealed class RunBundleUploadService : IDisposable
                     continue;
                 }
 
-                var result = await client.UploadRunBundleAsync(snapshot.Payload, cancellationToken);
+                var result = await client.UploadRunBundleAsync(
+                    snapshot.Metadata,
+                    snapshot.ArtifactBytes,
+                    cancellationToken
+                );
                 if (!result.Succeeded)
                 {
                     _store.MarkRunUploadFailed(

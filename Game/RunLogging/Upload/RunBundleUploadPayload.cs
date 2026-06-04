@@ -6,7 +6,9 @@ namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
 internal sealed class RunBundleUploadSnapshot
 {
-    public RunBundleUploadRequest Payload { get; set; } = new();
+    public RunBundleUploadRequest Metadata { get; set; } = new();
+
+    public byte[] ArtifactBytes { get; set; } = [];
 
     public string RunId { get; set; } = string.Empty;
 

@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
@@ -17,20 +16,7 @@ public sealed class RunBundleUploadRequest
     public string SubmittedAtUtc { get; set; } = string.Empty;
 
     [JsonProperty("artifact_codec")]
-    public string ArtifactCodec { get; set; } = "application/json";
-
-    [JsonIgnore]
-    public byte[] ArtifactBytes { get; set; } = Array.Empty<byte>();
-
-    [JsonProperty("artifact_bytes")]
-    public string ArtifactBytesBase64
-    {
-        get => Convert.ToBase64String(ArtifactBytes);
-        set =>
-            ArtifactBytes = string.IsNullOrEmpty(value)
-                ? Array.Empty<byte>()
-                : Convert.FromBase64String(value);
-    }
+    public string ArtifactCodec { get; set; } = "application/x-bpp-runbundle+msgpack+gzip";
 
     [JsonProperty("run_projection")]
     public RunProjection RunProjection { get; set; } = new();

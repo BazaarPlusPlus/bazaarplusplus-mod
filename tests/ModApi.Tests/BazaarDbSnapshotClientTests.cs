@@ -136,7 +136,6 @@ internal static class BazaarDbSnapshotClientTests
                 PlayerAccountId = "acct-1",
                 SubmittedAtUtc = "2026-06-03T12:00:00.000Z",
                 ArtifactCodec = RunBundleArtifactCodec.ContentType,
-                ArtifactBytes = [1, 2, 3],
                 RunProjection = new RunProjection
                 {
                     RunId = "run-1",

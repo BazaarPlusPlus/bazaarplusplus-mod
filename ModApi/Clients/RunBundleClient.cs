@@ -20,21 +20,22 @@ public sealed class RunBundleClient
     }
 
     public async Task<RunBundleUploadResult> UploadRunBundleAsync(
-        RunBundleUploadRequest payload,
+        RunBundleUploadRequest metadata,
+        byte[] artifactBytes,
         CancellationToken cancellationToken
     )
     {
-        var result = await ModApiJsonPost.PostJsonAsync(
-            _httpClient,
-            _routes.UploadRunBundle,
-            payload,
-            cancellationToken
-        );
-        if (result.IsSuccess)
+        using var request = new HttpRequestMessage(HttpMethod.Post, _routes.UploadRunBundle)
+        {
+            Content = RunBundleMultipartContent.Create(metadata, artifactBytes),
+        };
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.IsSuccessStatusCode)
             return RunBundleUploadResult.Success();
 
+        var responseBody = await response.Content.ReadAsStringAsync();
         return RunBundleUploadResult.Failure(
-            ModApiErrorFormatter.FormatHttpFailure(result.StatusCode, result.FailureBody!)
+            ModApiErrorFormatter.FormatHttpFailure((int)response.StatusCode, responseBody)
         );
     }
 }
