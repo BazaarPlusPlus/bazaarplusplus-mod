@@ -552,43 +552,19 @@ internal sealed partial class CollectionPanelView
         }
     }
 
-    // Always visible (unlike the package toggle); active = day participates in filtering.
-    private void RefreshDayToggle(bool active)
+    // Always visible; the face shows the effective day number and highlights when the day
+    // participates in filtering (gold = on, chip background = off).
+    private void RefreshDayToggle(int day, bool active)
     {
         if (_dayToggleButton == null)
             return;
 
+        _dayToggleButton.text = day.ToString(System.Globalization.CultureInfo.InvariantCulture);
         StyleButton(
             _dayToggleButton,
             active ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
             active ? Colors.ButtonSelectedText : Colors.HistoryChipText
         );
-
-        if (_dayToggleLabel != null)
-            _dayToggleLabel.style.color = active
-                ? Colors.ButtonSelectedText
-                : Colors.HistoryChipText;
-
-        if (_daySwitchTrack != null)
-        {
-            _daySwitchTrack.style.backgroundColor = active
-                ? Colors.WithAlpha(Colors.ButtonSelectedText, 0.22f)
-                : Colors.HistoryStatusBackground;
-            UiStyle.BorderColor(
-                _daySwitchTrack.style,
-                active ? Colors.ButtonSelectedText : Colors.HistoryStatusBorder
-            );
-        }
-
-        if (_daySwitchKnob != null)
-        {
-            _daySwitchKnob.style.left = active
-                ? Sizes.PackageSwitchKnobOnLeft
-                : Sizes.PackageSwitchKnobOffLeft;
-            _daySwitchKnob.style.backgroundColor = active
-                ? Colors.ButtonSelectedText
-                : Colors.HistoryStatusText;
-        }
     }
 
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)

@@ -747,6 +747,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             SourceSelectorEnabled = !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
             DayFilterActive = _filter.SelectedRunDay != null,
+            DayFilterValue = _currentRunDay ?? DayTierSchedule.OutOfRunDay,
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,

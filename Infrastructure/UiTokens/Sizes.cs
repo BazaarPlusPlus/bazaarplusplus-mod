@@ -15,6 +15,7 @@ internal static class Sizes
     public const float SectionTitleHeight = 32f;
     public const float ChipMinWidth = 86f;
     public const float ChipHeight = 32f;
+    public const float DayIconWidth = 40f;
     public const float SupporterAttributionHeight = 24f;
     public const float SupporterAttributionReservedHeight = 48f;
     public const int SupporterAttributionNameFont = 14;

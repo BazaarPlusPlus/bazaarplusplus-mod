@@ -33,8 +33,10 @@ internal sealed class CollectionPanelViewModel
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
-    // Day filter toggle state (on = filtering by the current run day, or OutOfRunDay out of run).
+    // Day filter icon: DayFilterValue is the number shown (current run day, or OutOfRunDay);
+    // DayFilterActive highlights it when the day participates in filtering.
     public bool DayFilterActive { get; set; }
+    public int DayFilterValue { get; set; }
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
     public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();
@@ -84,9 +86,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private VisualElement? _packageSwitchTrack;
     private VisualElement? _packageSwitchKnob;
     private Button? _dayToggleButton;
-    private Label? _dayToggleLabel;
-    private VisualElement? _daySwitchTrack;
-    private VisualElement? _daySwitchKnob;
     private Button? _sortQualityButton;
     private Button? _sortSizeButton;
     private VisualElement? _heroChipRow;
@@ -330,7 +329,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_packageToggleButton != null)
             RefreshPackageToggle(model.IncludePackages, model.HasPackages);
         if (_dayToggleButton != null)
-            RefreshDayToggle(model.DayFilterActive);
+            RefreshDayToggle(model.DayFilterValue, model.DayFilterActive);
         if (_sortQualityButton != null)
             RefreshChip(_sortQualityButton, model.SortPriority == CollectionSortPriority.Quality);
         if (_sortSizeButton != null)

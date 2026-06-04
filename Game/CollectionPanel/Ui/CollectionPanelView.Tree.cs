@@ -112,7 +112,7 @@ internal sealed partial class CollectionPanelView
         _sortSizeButton.style.marginLeft = UiSpacing.Xs;
         sortGroup.Add(_sortSizeButton);
 
-        // Day filter toggle: same control shape as the package toggle, just left of it.
+        // Compact day-number icon toggle, just left of the package toggle.
         _dayToggleButton = CreateDayToggleButton();
         _dayToggleButton.style.marginLeft = UiSpacing.Sm;
         _dayToggleButton.style.marginTop = UiSpacing.Xs;
@@ -284,47 +284,19 @@ internal sealed partial class CollectionPanelView
         return button;
     }
 
+    // Compact day-number "icon": shows the effective day (current run day, or OutOfRunDay) and
+    // tapping toggles whether the day participates in filtering. RefreshDayToggle sets the number
+    // and the active highlight; the tooltip names the control since the face is just a number.
     private Button CreateDayToggleButton()
     {
         var button = CreateButton(
             string.Empty,
             _toggleDayFilter,
-            Sizes.PackageToggleWidth,
+            Sizes.DayIconWidth,
             Sizes.ButtonStandardHeight
         );
-        button.style.flexDirection = FlexDirection.Row;
-        button.style.justifyContent = Justify.SpaceBetween;
-        button.style.alignItems = Align.Center;
-        UiStyle.HorizontalPadding(button.style, UiSpacing.Md);
-
-        _dayToggleLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
-        _dayToggleLabel.text = CollectionPanelText.DayHeader();
-        _dayToggleLabel.style.flexShrink = 0f;
-        button.Add(_dayToggleLabel);
-
-        _daySwitchTrack = new VisualElement { pickingMode = PickingMode.Ignore };
-        UiStyle.FixedSize(
-            _daySwitchTrack.style,
-            Sizes.PackageSwitchWidth,
-            Sizes.PackageSwitchHeight
-        );
-        _daySwitchTrack.style.position = Position.Relative;
-        _daySwitchTrack.style.marginLeft = UiSpacing.Sm;
-        UiStyle.Radius(_daySwitchTrack.style, Sizes.PackageSwitchHeight / 2f);
-        UiStyle.Border(_daySwitchTrack.style, Borders.Thin, Colors.HistoryStatusBorder);
-        button.Add(_daySwitchTrack);
-
-        _daySwitchKnob = new VisualElement { pickingMode = PickingMode.Ignore };
-        _daySwitchKnob.style.position = Position.Absolute;
-        _daySwitchKnob.style.left = Sizes.PackageSwitchKnobOffLeft;
-        _daySwitchKnob.style.top = 1f;
-        UiStyle.FixedSize(
-            _daySwitchKnob.style,
-            Sizes.PackageSwitchKnobSize,
-            Sizes.PackageSwitchKnobSize
-        );
-        UiStyle.Radius(_daySwitchKnob.style, Sizes.PackageSwitchKnobSize / 2f);
-        _daySwitchTrack.Add(_daySwitchKnob);
+        button.tooltip = CollectionPanelText.DayHeader();
+        StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
         return button;
     }
 
