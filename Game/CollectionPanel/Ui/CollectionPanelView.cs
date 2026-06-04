@@ -82,9 +82,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _skillTabButton;
     private Button? _closeButton;
     private Button? _packageToggleButton;
-    private Label? _packageToggleLabel;
-    private VisualElement? _packageSwitchTrack;
-    private VisualElement? _packageSwitchKnob;
     private Button? _dayToggleButton;
     private Button? _sortQualityButton;
     private Button? _sortSizeButton;

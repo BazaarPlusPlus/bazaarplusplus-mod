@@ -240,47 +240,16 @@ internal sealed partial class CollectionPanelView
         return section;
     }
 
+    // Plain highlighting toggle (gold = packages shown), matching the day icon — no switch knob.
     private Button CreatePackageToggleButton()
     {
         var button = CreateButton(
-            string.Empty,
+            CollectionPanelText.PackagesToggle(),
             _togglePackages,
             Sizes.PackageToggleWidth,
             Sizes.ButtonStandardHeight
         );
-        button.style.flexDirection = FlexDirection.Row;
-        button.style.justifyContent = Justify.SpaceBetween;
-        button.style.alignItems = Align.Center;
-        UiStyle.HorizontalPadding(button.style, UiSpacing.Md);
-
-        _packageToggleLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
-        _packageToggleLabel.text = CollectionPanelText.PackagesToggle();
-        _packageToggleLabel.style.flexShrink = 0f;
-        button.Add(_packageToggleLabel);
-
-        _packageSwitchTrack = new VisualElement { pickingMode = PickingMode.Ignore };
-        UiStyle.FixedSize(
-            _packageSwitchTrack.style,
-            Sizes.PackageSwitchWidth,
-            Sizes.PackageSwitchHeight
-        );
-        _packageSwitchTrack.style.position = Position.Relative;
-        _packageSwitchTrack.style.marginLeft = UiSpacing.Sm;
-        UiStyle.Radius(_packageSwitchTrack.style, Sizes.PackageSwitchHeight / 2f);
-        UiStyle.Border(_packageSwitchTrack.style, Borders.Thin, Colors.HistoryStatusBorder);
-        button.Add(_packageSwitchTrack);
-
-        _packageSwitchKnob = new VisualElement { pickingMode = PickingMode.Ignore };
-        _packageSwitchKnob.style.position = Position.Absolute;
-        _packageSwitchKnob.style.left = Sizes.PackageSwitchKnobOffLeft;
-        _packageSwitchKnob.style.top = 1f;
-        UiStyle.FixedSize(
-            _packageSwitchKnob.style,
-            Sizes.PackageSwitchKnobSize,
-            Sizes.PackageSwitchKnobSize
-        );
-        UiStyle.Radius(_packageSwitchKnob.style, Sizes.PackageSwitchKnobSize / 2f);
-        _packageSwitchTrack.Add(_packageSwitchKnob);
+        StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
         return button;
     }
 

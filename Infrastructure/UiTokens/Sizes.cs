@@ -24,12 +24,7 @@ internal static class Sizes
     public const float CollectionMatchCountWidth = 96f;
     public const float CollectionSizeFilterSectionMinHeight =
         FontSmall + UiSpacing.Sm + ChipHeight + UiSpacing.Xs;
-    public const float PackageToggleWidth = 104f;
-    public const float PackageSwitchWidth = 30f;
-    public const float PackageSwitchHeight = 16f;
-    public const float PackageSwitchKnobSize = 12f;
-    public const float PackageSwitchKnobOffLeft = 2f;
-    public const float PackageSwitchKnobOnLeft = 16f;
+    public const float PackageToggleWidth = 72f;
     public const float HeroChipIconSize = 48f;
     public const float HeroChipButtonSize = 56f;
     public const float SourceChipIconRatio = 48f / 56f;

@@ -524,32 +524,6 @@ internal sealed partial class CollectionPanelView
             selected ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
             selected ? Colors.ButtonSelectedText : Colors.HistoryChipText
         );
-
-        if (_packageToggleLabel != null)
-            _packageToggleLabel.style.color = selected
-                ? Colors.ButtonSelectedText
-                : Colors.HistoryChipText;
-
-        if (_packageSwitchTrack != null)
-        {
-            _packageSwitchTrack.style.backgroundColor = selected
-                ? Colors.WithAlpha(Colors.ButtonSelectedText, 0.22f)
-                : Colors.HistoryStatusBackground;
-            UiStyle.BorderColor(
-                _packageSwitchTrack.style,
-                selected ? Colors.ButtonSelectedText : Colors.HistoryStatusBorder
-            );
-        }
-
-        if (_packageSwitchKnob != null)
-        {
-            _packageSwitchKnob.style.left = selected
-                ? Sizes.PackageSwitchKnobOnLeft
-                : Sizes.PackageSwitchKnobOffLeft;
-            _packageSwitchKnob.style.backgroundColor = selected
-                ? Colors.ButtonSelectedText
-                : Colors.HistoryStatusText;
-        }
     }
 
     // Always visible; the face shows the effective day number and highlights when the day
