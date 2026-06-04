@@ -38,10 +38,10 @@ internal static class HistoryPanelText
     private static readonly LocalizedTextSet ReplayText = new("Replay", "回放", "重播", "重播");
 
     private static readonly LocalizedTextSet RecordAndReplayText = new(
-        "Record and Replay",
-        "录制并回放",
-        "錄製並重播",
-        "錄製並重播"
+        "Record",
+        "录制",
+        "錄製",
+        "錄製"
     );
 
     private static readonly LocalizedTextSet ReplayUnavailableText = new("Unavailable", "不可用");

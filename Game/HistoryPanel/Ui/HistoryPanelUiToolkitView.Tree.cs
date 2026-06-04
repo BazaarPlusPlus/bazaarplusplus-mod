@@ -435,9 +435,19 @@ internal sealed partial class HistoryPanelUiToolkitView
         StyleButton(_deleteButton, Colors.DeleteBackground, Colors.DeleteText);
         StyleButton(_recordAndReplayButton, Colors.RecordReplayBackground, Colors.RecordReplayText);
         StyleButton(_replayButton, Colors.ReplayBackground, Colors.ReplayText);
-        actions.Add(_replayButton);
-        _recordAndReplayButton.style.marginTop = UiSpacing.Md;
-        actions.Add(_recordAndReplayButton);
+
+        var replayActionRow = new VisualElement();
+        replayActionRow.style.flexDirection = FlexDirection.Row;
+        replayActionRow.style.flexShrink = 0f;
+        replayActionRow.style.width = Length.Percent(100f);
+        actions.Add(replayActionRow);
+
+        UseActionRowRatio(_replayButton, 3f);
+        UseActionRowRatio(_recordAndReplayButton, 1f);
+        replayActionRow.Add(_replayButton);
+        _recordAndReplayButton.style.marginLeft = UiSpacing.Md;
+        replayActionRow.Add(_recordAndReplayButton);
+
         _deleteButton.style.marginTop = UiSpacing.Md;
         actions.Add(_deleteButton);
     }

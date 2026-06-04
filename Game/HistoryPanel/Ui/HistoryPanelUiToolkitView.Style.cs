@@ -147,6 +147,15 @@ internal sealed partial class HistoryPanelUiToolkitView
         return button;
     }
 
+    private static void UseActionRowRatio(Button button, float flexGrow)
+    {
+        button.style.width = StyleKeyword.Auto;
+        button.style.flexBasis = 0f;
+        button.style.flexGrow = flexGrow;
+        button.style.flexShrink = 1f;
+        button.style.minWidth = 0f;
+    }
+
     private static void StyleButton(Button button, Color background, Color textColor)
     {
         button.style.backgroundColor = background;
