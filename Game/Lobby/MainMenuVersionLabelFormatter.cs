@@ -3,7 +3,13 @@ namespace BazaarPlusPlus.Game.Lobby;
 
 internal static class MainMenuVersionLabelFormatter
 {
-    public static string Build(string gameVersion, string pluginVersion)
+    public const string UpdateAvailableText = "update available";
+
+    public static string Build(
+        string gameVersion,
+        string pluginVersion,
+        bool updateAvailable = false
+    )
     {
         var normalizedGameVersion = string.IsNullOrWhiteSpace(gameVersion)
             ? "unknown"
@@ -11,6 +17,7 @@ internal static class MainMenuVersionLabelFormatter
         if (string.IsNullOrWhiteSpace(pluginVersion))
             return $" Version: {normalizedGameVersion} ";
 
-        return $" Version: {normalizedGameVersion} | BPP {pluginVersion.Trim()} ";
+        var updateText = updateAvailable ? $" | {UpdateAvailableText}" : string.Empty;
+        return $" Version: {normalizedGameVersion} | BPP {pluginVersion.Trim()}{updateText} ";
     }
 }

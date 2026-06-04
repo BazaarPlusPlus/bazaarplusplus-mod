@@ -6,7 +6,6 @@ using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 using TMPro;
-using UnityEngine;
 
 namespace BazaarPlusPlus.Patches.Lobby;
 
@@ -25,10 +24,7 @@ internal static class MainMenuVersionLabelBuildPatch
             if (versionLabel == null)
                 return;
 
-            versionLabel.text = MainMenuVersionLabelFormatter.Build(
-                Application.version,
-                BppPluginVersion.Current
-            );
+            MainMenuVersionLabelUpdater.Refresh(versionLabel);
         }
         catch (Exception ex)
         {

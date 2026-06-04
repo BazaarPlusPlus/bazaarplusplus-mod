@@ -12,6 +12,7 @@ using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
+using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
@@ -104,6 +105,9 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(new ComponentMount<CombatStatusBar>((c, s) => c.Initialize(s)));
         _mountables.Register(
             new ComponentMount<EndOfRunScreenshotController>((c, s) => c.Initialize(s))
+        );
+        _mountables.Register(
+            new ComponentMount<MainMenuVersionCheckController>((c, _) => c.Initialize())
         );
         _mountables.Register(
             new HistoryPanelMount(
