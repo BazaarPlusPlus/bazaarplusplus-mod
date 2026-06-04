@@ -41,6 +41,10 @@
 
 - [design/README.md](design/README.md) — spec 生命周期约定 + 按状态索引的 [design/archive/](design/archive/)（已实现 / 已废弃 / 未实现的 dated 设计 spec，每篇带状态横幅）。
 
+## 排障记录（`debugging/`）
+
+- [debugging/README.md](debugging/README.md) — 已修复 / 已验证问题的排障记录：现象、日志与代码证据、根因、修复和验证。
+
 ## 游戏逆向工程（`reverse-engineering/`）
 
 - [reverse-engineering/README.md](reverse-engineering/README.md) — 事实型 RE 参考（网络面、DTO、session 协议、反编译记录；2026-05-21 快照口径）；[reverse-engineering/proposals/](reverse-engineering/proposals/) 下是**尚未实现**的离线模式设计提案。
@@ -50,6 +54,7 @@
 - 已上线功能 → `features/<feature>.md`（先扩展已有文档，再考虑新建）
 - 稳定契约 / schema / 清单 → `reference/`
 - 开工前 / 进行中的提案 → `design/<date>-<slug>.md`（落地或废弃后移入 `design/archive/` 并加状态横幅）
+- 已修复 bug 的排障复盘 / debug session → `debugging/<date>-<slug>.md`
 - 值得记住的设计决策 → `adr/`（在归档对应 spec 前先提升）
 - 新领域术语 → `../CONTEXT.md`
 - 游戏行为逆向 → `reverse-engineering/`（未实现提案放 `proposals/`）
