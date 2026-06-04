@@ -48,6 +48,10 @@
       Include="..\..\Game\CollectionPanel\Grid\CollectionCardMaterialLru.cs"
       Link="CollectionCardMaterialLru.cs"
     />
+    <Compile
+      Include="..\..\Infrastructure\UiTokens\BppOverlaySorting.cs"
+      Link="BppOverlaySorting.cs"
+    />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>

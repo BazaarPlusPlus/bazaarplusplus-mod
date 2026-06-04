@@ -296,10 +296,10 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         CancelPanelLoad();
         _isVisible = false;
-        // SetVisible(false) flips the fade target to 0; Update keeps ticking the fade and
-        // mirroring opacity to the overlay until CurrentOpacity reaches ~0, at which point
-        // the not-visible branch in Update does the actual SetActive(false) + virtualizer
-        // teardown. Doing those immediately here would pop the cards off mid-fade.
+        HideNativeCardLayerImmediately();
+        // Let the UITK chrome fade out, but do not keep the native card overlay alive during
+        // that animation. CardPreviewBase instances live on a sibling ScreenSpaceOverlay canvas,
+        // so delaying its teardown leaves visible card art after the panel has been dismissed.
         _view?.SetVisible(false);
     }
 
@@ -338,8 +338,8 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         if (!_isVisible)
         {
-            // Once the fade-out has settled, release the overlay's GameObject and the
-            // virtualizer's realized cells so the next Open starts clean.
+            // Close() already hides the native card layer synchronously. Keep this as an
+            // idempotent cleanup fallback once the remaining UITK fade-out has settled.
             if (_view != null && !_view.IsFadingOrVisible)
             {
                 _overlay?.SetVisible(false);
@@ -385,6 +385,13 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _virtualizer.PollHover(pos, _viewportBoundsPx);
             }
         }
+    }
+
+    private void HideNativeCardLayerImmediately()
+    {
+        _virtualizer?.Dispose();
+        _overlay?.SetAlpha(0f);
+        _overlay?.SetVisible(false);
     }
 
     private static bool IsPlainTabPressed(Keyboard keyboard) =>

@@ -139,6 +139,83 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void CollectionPanel_close_hides_native_card_layer_synchronously()
+    {
+        var repoRoot = RepoRoot();
+        var collectionPanelSource = File.ReadAllText(
+            Path.Combine(repoRoot, "Game", "CollectionPanel", "CollectionPanel.cs")
+        );
+
+        var closeIndex = collectionPanelSource.IndexOf(
+            "private void Close()",
+            StringComparison.Ordinal
+        );
+        var hideIndex = collectionPanelSource.IndexOf(
+            "HideNativeCardLayerImmediately();",
+            closeIndex,
+            StringComparison.Ordinal
+        );
+        var fadeIndex = collectionPanelSource.IndexOf(
+            "_view?.SetVisible(false);",
+            closeIndex,
+            StringComparison.Ordinal
+        );
+
+        Assert.True(closeIndex >= 0, "CollectionPanel.Close() should exist.");
+        Assert.True(
+            hideIndex > closeIndex,
+            "CollectionPanel.Close() must hide the native card overlay immediately instead of waiting for the UITK fade-out."
+        );
+        Assert.True(
+            fadeIndex > hideIndex,
+            "CollectionPanel.Close() should hide native cards before starting the remaining UITK fade-out."
+        );
+    }
+
+    [Fact]
+    public void CollectionGridVirtualizer_pending_returns_are_completed_after_generation_changes()
+    {
+        var repoRoot = RepoRoot();
+        var virtualizerSource = File.ReadAllText(
+            Path.Combine(
+                repoRoot,
+                "Game",
+                "CollectionPanel",
+                "Grid",
+                "CollectionGridVirtualizer.cs"
+            )
+        );
+
+        var showWhenReadyIndex = virtualizerSource.IndexOf(
+            "private async Task ShowWhenReady",
+            StringComparison.Ordinal
+        );
+        var pendingReturnIndex = virtualizerSource.IndexOf(
+            "if (cell.PendingReturn)",
+            showWhenReadyIndex,
+            StringComparison.Ordinal
+        );
+        var generationMismatchIndex = virtualizerSource.IndexOf(
+            "generationSnapshot != _generation",
+            showWhenReadyIndex,
+            StringComparison.Ordinal
+        );
+
+        Assert.True(
+            showWhenReadyIndex >= 0,
+            "CollectionGridVirtualizer.ShowWhenReady should exist."
+        );
+        Assert.True(
+            pendingReturnIndex > showWhenReadyIndex,
+            "ShowWhenReady should complete pending returns after native SetUp finishes."
+        );
+        Assert.True(
+            generationMismatchIndex > pendingReturnIndex,
+            "Pending-return cells must be returned to the pool even when Dispose changed the generation."
+        );
+    }
+
+    [Fact]
     public void LiveBuildPanel_opens_from_caps_not_settings_dock()
     {
         var repoRoot = RepoRoot();

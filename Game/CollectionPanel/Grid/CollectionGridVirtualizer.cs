@@ -441,13 +441,13 @@ internal sealed class CollectionGridVirtualizer
             );
         }
 
-        if (generationSnapshot != _generation)
-            return;
         if (cell.PendingReturn)
         {
             CompleteRecycle(cell);
             return;
         }
+        if (generationSnapshot != _generation)
+            return;
 
         if (cell.Card == null)
             return;
