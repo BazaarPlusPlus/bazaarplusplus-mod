@@ -90,26 +90,6 @@ internal sealed partial class HistoryPanelUiToolkitView
 
     private void BuildPreview(VisualElement parent)
     {
-        _ghostOpponentEliminatedNotice = CreateLabel(
-            Sizes.FontBody,
-            FontStyle.Bold,
-            Colors.HistoryEliminatedText
-        );
-        UiStyle.FixedHeight(_ghostOpponentEliminatedNotice.style, Sizes.EliminatedNoticeHeight);
-        _ghostOpponentEliminatedNotice.style.marginTop = UiSpacing.Lg;
-        UiStyle.HorizontalPadding(_ghostOpponentEliminatedNotice.style, UiSpacing.Xxl);
-        _ghostOpponentEliminatedNotice.style.unityTextAlign = TextAnchor.MiddleCenter;
-        _ghostOpponentEliminatedNotice.style.whiteSpace = WhiteSpace.NoWrap;
-        _ghostOpponentEliminatedNotice.style.backgroundColor = Colors.HistoryEliminatedBackground;
-        UiStyle.Radius(_ghostOpponentEliminatedNotice.style, Radii.Row);
-        UiStyle.Border(
-            _ghostOpponentEliminatedNotice.style,
-            Borders.Thin,
-            Colors.HistoryEliminatedNoticeBorder
-        );
-        _ghostOpponentEliminatedNotice.style.display = DisplayStyle.None;
-        parent.Add(_ghostOpponentEliminatedNotice);
-
         _previewContainer = new VisualElement();
         _previewContainer.style.flexGrow = 0f;
         _previewContainer.style.flexShrink = 0f;
@@ -171,14 +151,17 @@ internal sealed partial class HistoryPanelUiToolkitView
         rail.style.marginLeft = UiSpacing.ColumnGap;
         parent.Add(rail);
 
+        // ── Fixed header (never scrolls) ─────────────────────────────────────
         var titleRow = new VisualElement();
         titleRow.style.flexDirection = FlexDirection.Row;
         titleRow.style.alignItems = Align.Center;
+        titleRow.style.flexShrink = 0f;
         rail.Add(titleRow);
 
         _title = CreateLabel(Sizes.FontTitle, FontStyle.Bold, Colors.HistoryTitleText);
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
+        _title.style.minHeight = Sizes.ButtonStandardHeight; // VIS-7: lock row height
         titleRow.Add(_title);
 
         _closeButton = CreateButton(
@@ -191,18 +174,152 @@ internal sealed partial class HistoryPanelUiToolkitView
         titleRow.Add(_closeButton);
 
         _subtitle = BPPSupporterAttributionRow.Create();
-        rail.Add(_subtitle);
+        _subtitle.style.flexShrink = 0f;
+        rail.Add(_subtitle); // VIS-2: no extra marginTop; component owns its Sm(6)
 
-        var chipRow = new VisualElement();
-        chipRow.style.flexDirection = FlexDirection.Row;
-        chipRow.style.flexWrap = Wrap.NoWrap;
-        chipRow.style.alignItems = Align.Center;
-        chipRow.style.marginTop = UiSpacing.Lg;
-        rail.Add(chipRow);
+        // ── Flexible body. railBody (plain element, flexGrow=1) reliably fills the
+        //    rail's vertical slack — unlike a ScrollView contentContainer, which
+        //    collapses to content height (see CollectionPanelView.Tree.cs:283-315).
+        var railBody = new VisualElement();
+        railBody.style.flexDirection = FlexDirection.Column;
+        railBody.style.flexGrow = 1f;
+        railBody.style.flexShrink = 1f;
+        railBody.style.minHeight = 0f;
+        railBody.style.marginTop = UiSpacing.Xl;
+        rail.Add(railBody);
+
+        // Selected-battle detail card: the rail's primary flex-growing element.
+        var selectedDetailCard = new VisualElement();
+        selectedDetailCard.style.flexDirection = FlexDirection.Column;
+        selectedDetailCard.style.flexGrow = 1f;
+        selectedDetailCard.style.flexShrink = 1f;
+        selectedDetailCard.style.minHeight = 0f;
+        selectedDetailCard.style.backgroundColor = Colors.HistoryFooterBackground;
+        UiStyle.Radius(selectedDetailCard.style, Radii.Md);
+        UiStyle.Border(selectedDetailCard.style, Borders.Thin, Colors.HistoryListFrameBorder);
+        UiStyle.Padding(selectedDetailCard.style, UiSpacing.Xl);
+        railBody.Add(selectedDetailCard);
+
+        _detailTitle = CreateSectionTitle(HistoryPanelText.SelectedBattle());
+        _detailTitle.style.display = DisplayStyle.None;
+        selectedDetailCard.Add(_detailTitle);
+
+        var resultRow = new VisualElement();
+        resultRow.style.flexDirection = FlexDirection.Row;
+        resultRow.style.flexWrap = Wrap.Wrap;
+        resultRow.style.alignItems = Align.Center;
+        resultRow.style.marginTop = UiSpacing.Sm;
+        selectedDetailCard.Add(resultRow);
+
+        _resultPill = CreateDetailPill(resultRow, Sizes.InlinePillMinWidth);
+        _resultPill.style.display = DisplayStyle.None;
+        _dayPill = CreateDetailPill(resultRow, Sizes.RunProgressPillWidth);
+        _dayPill.style.display = DisplayStyle.None;
+
+        _opponentName = CreateLabel(Sizes.FontFooterPrimary, FontStyle.Bold, Colors.White);
+        _opponentName.style.flexShrink = 1f;
+        _opponentName.style.minWidth = 0f;
+        _opponentName.style.whiteSpace = WhiteSpace.NoWrap;
+        _opponentName.style.overflow = Overflow.Hidden; // RESP-4: truncate, tooltip carries full name
+        _opponentName.style.display = DisplayStyle.None;
+        resultRow.Add(_opponentName);
+
+        _detailMeta = CreateLabel(
+            Sizes.FontSmall,
+            FontStyle.Normal,
+            Colors.HistoryFooterSecondaryText
+        );
+        _detailMeta.style.whiteSpace = WhiteSpace.Normal;
+        _detailMeta.style.marginTop = UiSpacing.Sm;
+        _detailMeta.style.display = DisplayStyle.None;
+        selectedDetailCard.Add(_detailMeta);
+
+        _detailSnapshot = CreateLabel(
+            Sizes.FontSmall,
+            FontStyle.Normal,
+            Colors.HistoryFooterSecondaryText
+        );
+        _detailSnapshot.style.whiteSpace = WhiteSpace.Normal;
+        _detailSnapshot.style.marginTop = UiSpacing.Xxs;
+        _detailSnapshot.style.display = DisplayStyle.None;
+        selectedDetailCard.Add(_detailSnapshot);
+
+        _detailPlaceholder = CreateLabel(
+            Sizes.FontSmall,
+            FontStyle.Normal,
+            Colors.WithAlpha(Colors.HistoryFooterSecondaryText, 0.6f) // single 0.6 layer, no style.opacity
+        );
+        _detailPlaceholder.style.whiteSpace = WhiteSpace.Normal;
+        _detailPlaceholder.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _detailPlaceholder.style.marginTop = UiSpacing.Sm;
+        _detailPlaceholder.style.display = DisplayStyle.None;
+        selectedDetailCard.Add(_detailPlaceholder);
+
+        var detailFlex = new VisualElement();
+        detailFlex.style.flexGrow = 1f; // pushes the notice to the card bottom when content is short
+        selectedDetailCard.Add(detailFlex);
+
+        _ghostOpponentEliminatedNotice = CreateLabel(
+            Sizes.FontBody,
+            FontStyle.Bold,
+            Colors.HistoryEliminatedText
+        );
+        UiStyle.Padding(_ghostOpponentEliminatedNotice.style, UiSpacing.Md, UiSpacing.Sm);
+        _ghostOpponentEliminatedNotice.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _ghostOpponentEliminatedNotice.style.whiteSpace = WhiteSpace.Normal; // was NoWrap
+        _ghostOpponentEliminatedNotice.style.backgroundColor = Colors.HistoryEliminatedBackground;
+        UiStyle.Radius(_ghostOpponentEliminatedNotice.style, Radii.Row);
+        UiStyle.Border(
+            _ghostOpponentEliminatedNotice.style,
+            Borders.Thin,
+            Colors.HistoryEliminatedNoticeBorder
+        );
+        _ghostOpponentEliminatedNotice.style.display = DisplayStyle.None;
+        selectedDetailCard.Add(_ghostOpponentEliminatedNotice);
+
+        // Secondary groups live in a ScrollView so only they scroll on short screens.
+        var railScroll = new ScrollView(ScrollViewMode.Vertical);
+        railScroll.style.flexGrow = 1f;
+        railScroll.style.flexShrink = 1f;
+        railScroll.style.minHeight = 0f;
+        railScroll.style.marginTop = UiSpacing.Xl;
+        railScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+        railScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+        railScroll.mouseWheelScrollSize = 120f; // match CollectionPanel grid scroll feel
+        railScroll.contentContainer.style.flexDirection = FlexDirection.Column;
+        railBody.Add(railScroll);
+
+        // ── Overview: read-only chips + one-shot tools ───────────────────────
+        var overviewGroup = new VisualElement();
+        overviewGroup.style.flexDirection = FlexDirection.Column;
+        overviewGroup.style.flexShrink = 0f;
+        railScroll.Add(overviewGroup);
+
+        var statsChipRow = new VisualElement();
+        statsChipRow.style.flexDirection = FlexDirection.Row;
+        statsChipRow.style.flexWrap = Wrap.Wrap;
+        statsChipRow.style.alignItems = Align.Center;
+        overviewGroup.Add(statsChipRow);
 
         _countChip = CreateChip();
+        _countChip.style.minWidth = Sizes.ChipMinWidth;
         _battleChip = CreateChip();
+        _battleChip.style.minWidth = Sizes.ChipMinWidth;
+        _battleChip.style.marginLeft = UiSpacing.Sm;
         _databaseChip = CreateChip();
+        _databaseChip.style.minWidth = Sizes.ChipMinWidth;
+        _databaseChip.style.marginLeft = UiSpacing.Sm;
+        statsChipRow.Add(_countChip);
+        statsChipRow.Add(_battleChip);
+        statsChipRow.Add(_databaseChip);
+
+        var toolRow = new VisualElement();
+        toolRow.style.flexDirection = FlexDirection.Row;
+        toolRow.style.flexWrap = Wrap.Wrap;
+        toolRow.style.alignItems = Align.Center;
+        toolRow.style.marginTop = UiSpacing.Sm;
+        overviewGroup.Add(toolRow);
+
         _checkServerHealthButton = CreateButton(
             HistoryPanelText.CheckServerHealth(),
             _checkServerHealth,
@@ -210,36 +327,28 @@ internal sealed partial class HistoryPanelUiToolkitView
             Sizes.ButtonStandardHeight
         );
         StyleButton(_checkServerHealthButton, Colors.ReplayBackground, Colors.ReplayText);
-        chipRow.Add(_countChip);
-        _battleChip.style.marginLeft = UiSpacing.Sm;
-        chipRow.Add(_battleChip);
-        _databaseChip.style.marginLeft = UiSpacing.Sm;
-        chipRow.Add(_databaseChip);
-        _checkServerHealthButton.style.marginLeft = UiSpacing.Sm;
-        chipRow.Add(_checkServerHealthButton);
+        _finalBuildRefreshButton = CreateButton(
+            HistoryPanelText.RefreshFinalBuilds(),
+            _refreshFinalBuilds,
+            Sizes.FinalBuildRefreshButtonWidth,
+            Sizes.ButtonStandardHeight
+        );
+        _finalBuildRefreshButton.style.marginLeft = UiSpacing.Sm;
+        toolRow.Add(_checkServerHealthButton);
+        toolRow.Add(_finalBuildRefreshButton);
 
-        _statusLabel = CreateLabel(Sizes.FontCorner, FontStyle.Normal, Colors.HistoryStatusText);
-        _statusLabel.style.display = DisplayStyle.None;
-        _statusLabel.style.flexGrow = 0f;
-        _statusLabel.style.flexShrink = 1f;
-        _statusLabel.style.whiteSpace = WhiteSpace.Normal;
-        _statusLabel.style.minHeight = Sizes.StatusHeight;
-        _statusLabel.style.width = Length.Percent(100f);
-        _statusLabel.style.marginTop = UiSpacing.Sm;
-        _statusLabel.style.alignSelf = Align.Stretch;
-        UiStyle.HorizontalPadding(_statusLabel.style, UiSpacing.Lg);
-        _statusLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
-        _statusLabel.style.backgroundColor = Colors.HistoryStatusBackground;
-        UiStyle.Radius(_statusLabel.style, Radii.Status);
-        UiStyle.Border(_statusLabel.style, Borders.Thin, Colors.HistoryStatusBorder);
-        rail.Add(_statusLabel);
+        // ── Navigation: mode tabs + ghost filter ─────────────────────────────
+        var navGroup = new VisualElement();
+        navGroup.style.flexDirection = FlexDirection.Column;
+        navGroup.style.flexShrink = 0f;
+        navGroup.style.marginTop = UiSpacing.Xl;
+        railScroll.Add(navGroup);
 
         var tabsRow = new VisualElement();
         tabsRow.style.flexDirection = FlexDirection.Row;
         tabsRow.style.flexWrap = Wrap.NoWrap;
         tabsRow.style.alignItems = Align.Center;
-        tabsRow.style.marginTop = UiSpacing.Lg;
-        rail.Add(tabsRow);
+        navGroup.Add(tabsRow);
 
         _runsTabButton = CreateButton(
             HistoryPanelText.RunsTab(),
@@ -255,17 +364,9 @@ internal sealed partial class HistoryPanelUiToolkitView
             Sizes.ButtonStandardHeight,
             fixedWidth: false
         );
-        _finalBuildRefreshButton = CreateButton(
-            HistoryPanelText.RefreshFinalBuilds(),
-            _refreshFinalBuilds,
-            Sizes.FinalBuildRefreshButtonWidth,
-            Sizes.ButtonStandardHeight
-        );
         tabsRow.Add(_runsTabButton);
         _ghostTabButton.style.marginLeft = UiSpacing.Sm;
         tabsRow.Add(_ghostTabButton);
-        _finalBuildRefreshButton.style.marginLeft = UiSpacing.Md;
-        tabsRow.Add(_finalBuildRefreshButton);
 
         _ghostFilterRow = new VisualElement();
         _ghostFilterRow.style.flexDirection = FlexDirection.Row;
@@ -273,7 +374,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         _ghostFilterRow.style.alignItems = Align.Center;
         _ghostFilterRow.style.display = DisplayStyle.None;
         _ghostFilterRow.style.marginTop = UiSpacing.Sm;
-        rail.Add(_ghostFilterRow);
+        navGroup.Add(_ghostFilterRow);
 
         _ghostAllButton = CreateButton(
             HistoryPanelText.FilterAll(),
@@ -302,31 +403,22 @@ internal sealed partial class HistoryPanelUiToolkitView
         _ghostLostButton.style.marginLeft = UiSpacing.Sm;
         _ghostFilterRow.Add(_ghostLostButton);
 
-        rail.Add(CreateSpacer());
-
-        var footerBlock = new VisualElement();
-        footerBlock.style.flexDirection = FlexDirection.Column;
-        footerBlock.style.flexShrink = 0f;
-        footerBlock.style.backgroundColor = Colors.HistoryFooterBackground;
-        UiStyle.Radius(footerBlock.style, Radii.Md);
-        UiStyle.Border(footerBlock.style, Borders.Thin, Colors.HistoryListFrameBorder);
-        UiStyle.Padding(footerBlock.style, UiSpacing.Xl);
-        rail.Add(footerBlock);
-
-        _footerPrimary = CreateLabel(Sizes.FontFooterPrimary, FontStyle.Bold, Colors.White);
-        _footerSecondary = CreateLabel(
-            Sizes.FontSmall,
-            FontStyle.Normal,
-            Colors.HistoryFooterSecondaryText
-        );
-        _footerPrimary.style.display = DisplayStyle.None;
-        _footerPrimary.style.whiteSpace = WhiteSpace.Normal;
-        footerBlock.Add(_footerPrimary);
-
-        _footerSecondary.style.display = DisplayStyle.None;
-        _footerSecondary.style.whiteSpace = WhiteSpace.Normal;
-        _footerSecondary.style.marginTop = UiSpacing.Sm;
-        footerBlock.Add(_footerSecondary);
+        // ── Fixed footer: status banner directly above its actions ───────────
+        _statusLabel = CreateLabel(Sizes.FontCorner, FontStyle.Normal, Colors.HistoryStatusText);
+        _statusLabel.style.display = DisplayStyle.None;
+        _statusLabel.style.flexGrow = 0f;
+        _statusLabel.style.flexShrink = 0f;
+        _statusLabel.style.whiteSpace = WhiteSpace.Normal;
+        _statusLabel.style.minHeight = Sizes.StatusHeight;
+        _statusLabel.style.width = Length.Percent(100f);
+        _statusLabel.style.marginTop = UiSpacing.Md;
+        _statusLabel.style.alignSelf = Align.Stretch;
+        UiStyle.Padding(_statusLabel.style, UiSpacing.Xl, UiSpacing.Sm); // VIS-4
+        _statusLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
+        _statusLabel.style.backgroundColor = Colors.HistoryStatusBackground;
+        UiStyle.Radius(_statusLabel.style, Radii.Md); // VIS-3: was Radii.Status
+        UiStyle.Border(_statusLabel.style, Borders.Thin, Colors.HistoryStatusBorder);
+        rail.Add(_statusLabel);
 
         var actions = new VisualElement();
         actions.style.flexDirection = FlexDirection.Column;

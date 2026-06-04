@@ -83,33 +83,40 @@ internal sealed partial class HistoryPanel
                 ? FilteredGhostBattles.ToList()
                 : _battles.ToList();
 
-        var footerPrimaryText =
-            ActiveSelectedBattle == null
-                ? HistoryPanelText.NoBattleSelected()
-                : $"{HistoryPanelFormatter.FormatBattleResult(ActiveSelectedBattle)} | {HistoryPanelFormatter.FormatDayOnly(ActiveSelectedBattle.Day)} | {ActiveSelectedBattle.OpponentName ?? HistoryPanelText.UnknownOpponent()}";
+        var selectedBattle = ActiveSelectedBattle;
+        var hasSelectedBattle = selectedBattle != null;
 
-        var selectedBattleTimestamp =
-            ActiveSelectedBattle == null
-                ? null
-                : HistoryPanelFormatter.FormatTimestamp(ActiveSelectedBattle.RecordedAtUtc);
-        var selectedBattleTimestampText = selectedBattleTimestamp ?? string.Empty;
-        var snapshotSummary =
-            ActiveSelectedBattle == null
-                ? string.Empty
-                : HistoryPanelFormatter.FormatSnapshotSummary(ActiveSelectedBattle.SnapshotCounts);
-        var battleSummary =
-            ActiveSelectedBattle == null ? HistoryPanelText.SelectBattleForFooter()
-            : string.IsNullOrWhiteSpace(snapshotSummary) ? selectedBattleTimestampText
-            : $"{selectedBattleTimestampText} | {snapshotSummary}";
-        var footerSecondaryText = battleSummary;
+        var detailResultText = hasSelectedBattle
+            ? HistoryPanelFormatter.FormatBattleResult(selectedBattle!)
+            : string.Empty;
+        var detailResultSeverity = ResolveBattleResultSeverity(selectedBattle);
+        var detailDayText = hasSelectedBattle
+            ? HistoryPanelFormatter.FormatDayOnly(selectedBattle!.Day)
+            : string.Empty;
+        var detailOpponentName = hasSelectedBattle
+            ? (selectedBattle!.OpponentName ?? HistoryPanelText.UnknownOpponent())
+            : string.Empty;
+        var detailMetaText = hasSelectedBattle
+            ? HistoryPanelFormatter.FormatTimestamp(selectedBattle!.RecordedAtUtc)
+            : string.Empty;
+        var detailSnapshotText = hasSelectedBattle
+            ? HistoryPanelFormatter.FormatSnapshotSummary(selectedBattle!.SnapshotCounts)
+            : string.Empty;
+        var detailPlaceholderText = hasSelectedBattle
+            ? string.Empty
+            : HistoryPanelText.SelectBattleForFooter();
+
         var ghostOpponentEliminatedNoticeText = HistoryPanelFormatter.IsGhostOpponentEliminated(
-            ActiveSelectedBattle
+            selectedBattle
         )
             ? HistoryPanelText.GhostOpponentEliminatedNotice()
             : string.Empty;
         var serverHealthDisplay = _state.ServerHealthProbeInProgress
             ? HistoryPanelServerHealthFormatter.Checking()
             : HistoryPanelServerHealthFormatter.Idle();
+
+        var statusSeverity = ResolveStatusSeverity();
+        var databaseChipSeverity = ResolveDatabaseChipSeverity();
 
         return new HistoryPanelUiToolkitModel
         {
@@ -125,11 +132,13 @@ internal sealed partial class HistoryPanel
                     ? HistoryPanelText.CountBattles(FilteredGhostBattles.Count)
                     : HistoryPanelText.CountBattles(_battles.Count),
             DatabaseChipText = HistoryPanelText.DatabaseChip(GetDatabaseChipText()),
+            DatabaseChipSeverity = databaseChipSeverity,
             ServerHealthButtonText = serverHealthDisplay.ButtonText,
             ServerHealthButtonEnabled = serverHealthDisplay.ButtonEnabled,
             SectionMode = _sectionMode,
             GhostBattleFilter = _ghostBattleFilter,
             StatusMessage = _statusMessage,
+            StatusSeverity = statusSeverity,
             Runs = _runs,
             VisibleBattles = visibleBattles,
             SelectedRunIndex = _selectedRunIndex,
@@ -161,8 +170,14 @@ internal sealed partial class HistoryPanel
                 ? HistoryPanelText.Working()
                 : HistoryPanelText.RefreshFinalBuilds(),
             FinalBuildRefreshButtonEnabled = !_state.FinalBuildRefreshInProgress,
-            FooterPrimaryText = footerPrimaryText,
-            FooterSecondaryText = footerSecondaryText,
+            HasSelectedBattle = hasSelectedBattle,
+            DetailResultText = detailResultText,
+            DetailResultSeverity = detailResultSeverity,
+            DetailDayText = detailDayText,
+            DetailOpponentName = detailOpponentName,
+            DetailMetaText = detailMetaText,
+            DetailSnapshotText = detailSnapshotText,
+            DetailPlaceholderText = detailPlaceholderText,
             GhostOpponentEliminatedNoticeText = ghostOpponentEliminatedNoticeText,
         };
     }
@@ -187,6 +202,48 @@ internal sealed partial class HistoryPanel
         return string.IsNullOrWhiteSpace(replayUnavailableReason)
             ? _replayService.GetReplayActionLabel(battle)
             : HistoryPanelText.ReplayUnavailable();
+    }
+
+    private StatusSeverity ResolveStatusSeverity()
+    {
+        if (_state.DeleteRunConfirmationStatusActive)
+            return StatusSeverity.Confirm;
+
+        if (
+            _state.GhostSyncInProgress
+            || _state.ServerHealthProbeInProgress
+            || _state.FinalBuildRefreshInProgress
+        )
+            return StatusSeverity.Pending;
+
+        return StatusSeverity.Neutral;
+    }
+
+    // Connected -> Success(green); Missing (fresh install, File.Exists=false) -> Neutral, NOT an
+    // error; Unavailable (repository uninitialized) -> Failure. Reads each flag once.
+    private StatusSeverity ResolveDatabaseChipSeverity()
+    {
+        if (!_dataService.IsAvailable)
+            return StatusSeverity.Failure;
+        return _dataService.DatabaseExists ? StatusSeverity.Success : StatusSeverity.Neutral;
+    }
+
+    private static StatusSeverity ResolveBattleResultSeverity(HistoryBattleRecord? battle)
+    {
+        if (battle == null)
+            return StatusSeverity.Neutral;
+
+        // eliminated first (it also counts as a win)
+        if (HistoryPanelFormatter.IsGhostOpponentEliminated(battle))
+            return StatusSeverity.Confirm; // -> Eliminated accent pill
+
+        if (HistoryPanelFormatter.IsBattleWin(battle))
+            return StatusSeverity.Success;
+
+        if (HistoryPanelFormatter.IsBattleLoss(battle))
+            return StatusSeverity.Failure;
+
+        return StatusSeverity.Neutral;
     }
 }
 
@@ -215,6 +272,10 @@ internal sealed class HistoryPanelUiToolkitModel
 
     public string? StatusMessage { get; set; }
 
+    public StatusSeverity StatusSeverity { get; set; }
+
+    public StatusSeverity DatabaseChipSeverity { get; set; }
+
     public List<HistoryRunRecord> Runs { get; set; } = new();
 
     public List<HistoryBattleRecord> VisibleBattles { get; set; } = new();
@@ -241,9 +302,21 @@ internal sealed class HistoryPanelUiToolkitModel
 
     public bool FinalBuildRefreshButtonEnabled { get; set; }
 
-    public string FooterPrimaryText { get; set; } = string.Empty;
+    public bool HasSelectedBattle { get; set; }
 
-    public string FooterSecondaryText { get; set; } = string.Empty;
+    public string DetailResultText { get; set; } = string.Empty;
+
+    public StatusSeverity DetailResultSeverity { get; set; }
+
+    public string DetailDayText { get; set; } = string.Empty;
+
+    public string DetailOpponentName { get; set; } = string.Empty;
+
+    public string DetailMetaText { get; set; } = string.Empty;
+
+    public string DetailSnapshotText { get; set; } = string.Empty;
+
+    public string DetailPlaceholderText { get; set; } = string.Empty;
 
     public string GhostOpponentEliminatedNoticeText { get; set; } = string.Empty;
 }

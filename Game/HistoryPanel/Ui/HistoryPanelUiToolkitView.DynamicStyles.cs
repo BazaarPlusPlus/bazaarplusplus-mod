@@ -183,4 +183,98 @@ internal sealed partial class HistoryPanelUiToolkitView
         refs.DayBubble.style.backgroundColor = GetBattleDayBackground(isEliminated, isWin, isLoss);
         UiStyle.BorderColor(refs.DayBubble.style, borderColor);
     }
+
+    // Categorized status banner: writes all four border sides each call (UiStyle.Border sets four
+    // sides; touching only borderLeft would leave stale Neutral edges across refreshes), then adds
+    // a 2px left emphasis bar for non-neutral severities.
+    private static void ApplyStatusSeverity(Label banner, StatusSeverity severity)
+    {
+        Color bg,
+            text,
+            edge;
+        bool accent;
+        switch (severity)
+        {
+            case StatusSeverity.Confirm:
+                bg = Colors.DeleteConfirmBackground;
+                text = Colors.DeleteConfirmText;
+                edge = Colors.BattleRowLossAccent;
+                accent = true;
+                break;
+            case StatusSeverity.Failure:
+                bg = Colors.StatusAbandonedBackground;
+                text = Colors.StatusAbandonedText;
+                edge = Colors.BattleRowLossAccent;
+                accent = true;
+                break;
+            case StatusSeverity.Success:
+                bg = Colors.StatusCompletedBackground;
+                text = Colors.StatusCompletedText;
+                edge = Colors.BattleRowWinAccent;
+                accent = true;
+                break;
+            case StatusSeverity.Pending:
+                bg = Colors.StatusDefaultBackground;
+                text = Colors.StatusDefaultText;
+                edge = Colors.BattleRowNeutralAccent;
+                accent = true;
+                break;
+            default:
+                bg = Colors.HistoryStatusBackground;
+                text = Colors.HistoryStatusText;
+                edge = Colors.HistoryStatusBorder;
+                accent = false;
+                break;
+        }
+        banner.style.backgroundColor = bg;
+        banner.style.color = text;
+        UiStyle.Border(banner.style, Borders.Thin, accent ? edge : Colors.HistoryStatusBorder);
+        if (accent)
+        {
+            banner.style.borderLeftWidth = Borders.Accent;
+            banner.style.borderLeftColor = edge;
+        }
+    }
+
+    // Selected-battle result pill: same Win/Loss/Eliminated/Neutral accent language as the battle
+    // list rows (ApplyBattleRowState). Caller uses CreateDetailPill so font size is FontSmall, not
+    // the FontTiny CreateInlinePill default.
+    private static void ConfigureResultPill(Label pill, string text, StatusSeverity severity)
+    {
+        var (background, textColor) = severity switch
+        {
+            StatusSeverity.Success => (
+                Colors.BattleRowWinSelectedBackground,
+                Colors.BattleRowWinAccent
+            ),
+            StatusSeverity.Failure => (
+                Colors.BattleRowLossSelectedBackground,
+                Colors.BattleRowLossAccent
+            ),
+            StatusSeverity.Confirm => (
+                Colors.BattleRowEliminatedSelectedBackground,
+                Colors.BattleRowEliminatedAccent
+            ),
+            _ => (Colors.BattleRowNeutralSelectedBackground, Colors.White),
+        };
+        ConfigurePill(pill, text, background, textColor, !string.IsNullOrWhiteSpace(text));
+    }
+
+    // DB connection chip: Connected -> health-green; Unavailable -> warm loss accent; Missing ->
+    // neutral grey (fresh install is not an error). Uses the InfoChip seam (left bar) so the chip
+    // reads as a status chip distinct from the plain count chips.
+    private static void ApplyDatabaseChipSeverity(Label chip, string text, StatusSeverity severity)
+    {
+        var accent = severity switch
+        {
+            StatusSeverity.Success => Colors.HistoryHealthAccent,
+            StatusSeverity.Failure => Colors.BattleRowLossAccent,
+            _ => Colors.BattleRowNeutralAccent, // Missing / neutral
+        };
+        chip.text = text;
+        chip.style.backgroundColor = Colors.InfoChipBackground(accent);
+        chip.style.color = accent;
+        chip.style.borderLeftWidth = Borders.Accent;
+        chip.style.borderLeftColor = Colors.InfoChipBorder(accent);
+    }
 }

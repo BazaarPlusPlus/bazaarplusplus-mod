@@ -53,8 +53,13 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Label? _previewStatusLabel;
     private Label? _previewDebugLabel;
     private VisualElement? _previewContainer;
-    private Label? _footerPrimary;
-    private Label? _footerSecondary;
+    private Label? _detailTitle;
+    private Label? _resultPill;
+    private Label? _dayPill;
+    private Label? _opponentName;
+    private Label? _detailMeta;
+    private Label? _detailSnapshot;
+    private Label? _detailPlaceholder;
     private Button? _deleteButton;
     private Button? _replayButton;
     private Button? _recordAndReplayButton;
@@ -183,13 +188,18 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle);
         _countChip!.text = model.CountChipText;
         _battleChip!.text = model.BattleChipText;
-        _databaseChip!.text = model.DatabaseChipText;
+        ApplyDatabaseChipSeverity(
+            _databaseChip!,
+            model.DatabaseChipText,
+            model.DatabaseChipSeverity
+        );
         _checkServerHealthButton!.text = model.ServerHealthButtonText;
         _checkServerHealthButton.SetEnabled(model.ServerHealthButtonEnabled);
         _statusLabel!.text = model.StatusMessage ?? string.Empty;
         _statusLabel.style.display = string.IsNullOrWhiteSpace(model.StatusMessage)
             ? DisplayStyle.None
             : DisplayStyle.Flex;
+        ApplyStatusSeverity(_statusLabel, model.StatusSeverity);
         _runsSection!.style.display =
             model.SectionMode == HistorySectionMode.Ghost ? DisplayStyle.None : DisplayStyle.Flex;
         _battlesSection!.style.marginLeft =
@@ -198,14 +208,31 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
             model.SectionMode == HistorySectionMode.Ghost ? DisplayStyle.None : DisplayStyle.Flex;
         _runsBattleSubtitle!.text = model.RunsBattleSubtitle;
         _runsBattleSubtitle.style.display = DisplayStyle.None;
-        _footerPrimary!.text = model.FooterPrimaryText;
-        _footerPrimary.style.display = string.IsNullOrWhiteSpace(model.FooterPrimaryText)
-            ? DisplayStyle.None
-            : DisplayStyle.Flex;
-        _footerSecondary!.text = model.FooterSecondaryText;
-        _footerSecondary.style.display = string.IsNullOrWhiteSpace(model.FooterSecondaryText)
-            ? DisplayStyle.None
-            : DisplayStyle.Flex;
+        var hasSelection = model.HasSelectedBattle;
+        _detailTitle!.style.display = hasSelection ? DisplayStyle.Flex : DisplayStyle.None;
+        ConfigureResultPill(_resultPill!, model.DetailResultText, model.DetailResultSeverity);
+        ConfigurePill(
+            _dayPill!,
+            model.DetailDayText,
+            Colors.HistoryDayBubbleBackground,
+            Colors.White,
+            hasSelection && !string.IsNullOrWhiteSpace(model.DetailDayText)
+        );
+        _opponentName!.text = model.DetailOpponentName;
+        _opponentName.tooltip = model.DetailOpponentName;
+        _opponentName.style.display = hasSelection ? DisplayStyle.Flex : DisplayStyle.None;
+        _detailMeta!.text = model.DetailMetaText;
+        _detailMeta.style.display =
+            hasSelection && !string.IsNullOrWhiteSpace(model.DetailMetaText)
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+        _detailSnapshot!.text = model.DetailSnapshotText;
+        _detailSnapshot.style.display =
+            hasSelection && !string.IsNullOrWhiteSpace(model.DetailSnapshotText)
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+        _detailPlaceholder!.text = model.DetailPlaceholderText;
+        _detailPlaceholder.style.display = hasSelection ? DisplayStyle.None : DisplayStyle.Flex;
         _ghostOpponentEliminatedNotice!.text = model.GhostOpponentEliminatedNoticeText;
         _ghostOpponentEliminatedNotice.style.display = string.IsNullOrWhiteSpace(
             model.GhostOpponentEliminatedNoticeText

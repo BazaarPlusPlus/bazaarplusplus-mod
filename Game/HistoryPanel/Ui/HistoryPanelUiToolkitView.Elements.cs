@@ -50,6 +50,17 @@ internal sealed partial class HistoryPanelUiToolkitView
         return pill;
     }
 
+    // CreateInlinePill defaults to FontTiny(10) for compact in-row pills. The selected-battle
+    // detail card needs result/day pills to read at FontSmall so the win/loss outcome is glanceable
+    // next to the FontFooterPrimary(15) opponent name.
+    private static Label CreateDetailPill(VisualElement row, float minWidth)
+    {
+        var pill = CreateInlinePill(row, minWidth);
+        pill.style.fontSize = Sizes.FontSmall;
+        pill.style.height = Sizes.ChipHeight;
+        return pill;
+    }
+
     private static void SetFixedPillWidth(Label pill, float width) =>
         UiStyle.FixedWidth(pill.style, width);
 

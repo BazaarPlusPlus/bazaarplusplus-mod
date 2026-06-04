@@ -134,6 +134,13 @@ internal static class HistoryPanelText
         "選擇一場戰鬥進行檢視，想重新進入時再使用重播。"
     );
 
+    private static readonly LocalizedTextSet SelectedBattleText = new(
+        "Selected",
+        "当前战斗",
+        "當前戰鬥",
+        "當前戰鬥"
+    );
+
     private static readonly LocalizedTextSet PreviewUnavailablePrefixText = new(
         "Replay unavailable:",
         "回放不可用："
@@ -286,6 +293,8 @@ internal static class HistoryPanelText
     internal static string UnknownOpponent() => Resolve(UnknownOpponentText);
 
     internal static string SelectBattleForFooter() => Resolve(SelectBattleForFooterText);
+
+    internal static string SelectedBattle() => Resolve(SelectedBattleText);
 
     internal static string PreviewUnavailablePrefix() => Resolve(PreviewUnavailablePrefixText);
 
