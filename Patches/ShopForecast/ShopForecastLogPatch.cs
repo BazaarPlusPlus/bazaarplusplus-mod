@@ -5,9 +5,12 @@ using System.Linq;
 using BazaarBattleService.Models;
 using BazaarGameClient.Domain.Models;
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Runs;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
+using BazaarPlusPlus.Core.GameState;
+using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
@@ -33,8 +36,12 @@ internal static class ShopForecastLogPatch
 
             LogActiveSnapshot(snapshot);
 
-            if (snapshot.StateName == ERunState.Choice)
-                LogChoiceOptions(snapshot);
+            if (
+                snapshot.StateName == ERunState.Choice
+                || snapshot.StateName == ERunState.Encounter
+                || snapshot.StateName == ERunState.LevelUp
+            )
+                LogSelectionOptions(snapshot);
         }
         catch (Exception ex)
         {
@@ -57,7 +64,7 @@ internal static class ShopForecastLogPatch
         );
     }
 
-    private static void LogChoiceOptions(SimUpdateRunState snapshot)
+    private static void LogSelectionOptions(SimUpdateRunState snapshot)
     {
         if (snapshot.SelectionSet == null || snapshot.SelectionSet.Count == 0)
             return;
@@ -66,7 +73,10 @@ internal static class ShopForecastLogPatch
         {
             var optionId = snapshot.SelectionSet[i];
             var enrich = SafeBuildEnrichment(optionId);
-            BppLog.Info(Component, $"  option[{i}] id={optionId}{enrich}");
+            BppLog.Info(
+                Component,
+                $"  selection[{i}] state={snapshot.StateName} id={optionId}{enrich}"
+            );
         }
     }
 
@@ -87,15 +97,75 @@ internal static class ShopForecastLogPatch
         if (string.IsNullOrEmpty(rawId))
             return "";
 
+        var runtime = BuildRuntimeEnrichment(rawId);
+        var dealerEnrichment = BuildDealerEnrichment(rawId);
+        if (string.IsNullOrEmpty(runtime))
+            return dealerEnrichment;
+        if (string.IsNullOrEmpty(dealerEnrichment))
+            return runtime;
+        return runtime + dealerEnrichment;
+    }
+
+    private static string BuildRuntimeEnrichment(string rawId)
+    {
+        if (Guid.TryParse(rawId, out var directGuid))
+        {
+            var staticTemplate = TryGetStaticTemplate(directGuid);
+            return staticTemplate == null
+                ? " runtime=static-guid-not-found"
+                : $" runtime=static({FormatTemplate(staticTemplate)}){FormatPedestalCatalog(directGuid)}";
+        }
+
+        if (
+            Data.Entities == null
+            || !Data.Entities.TryGetValue(new InstanceId(rawId), out var clientCard)
+            || clientCard == null
+        )
+            return " runtime=instance-not-in-entities";
+
+        var template = clientCard.Template ?? TryGetStaticTemplate(clientCard.TemplateId);
+        var templateInfo = template == null ? "template=null" : FormatTemplate(template);
+
+        return $" runtime=entity(template={clientCard.TemplateId},type={clientCard.Type},tier={clientCard.Tier},section={clientCard.Section},{templateInfo})"
+            + FormatPedestalCatalog(clientCard.TemplateId);
+    }
+
+    private static ITCard? TryGetStaticTemplate(Guid templateId)
+    {
+        try
+        {
+            return Data.GetStatic()?.GetCardById(templateId);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string FormatTemplate(ITCard template)
+    {
+        return $"staticId={template.Id},staticType={template.Type},internal='{template.InternalName}'";
+    }
+
+    private static string FormatPedestalCatalog(Guid templateId)
+    {
+        var kind = PedestalEnchantCatalog.Classify(templateId, out var enchant);
+        return kind == ChoiceScreenPedestalKind.None
+            ? ""
+            : $" pedestalCatalog={kind}(enchant={(enchant.HasValue ? enchant.Value.ToString() : "none")})";
+    }
+
+    private static string BuildDealerEnrichment(string rawId)
+    {
         var dealer = Singleton<GameServiceManager>.Instance?.CardDealer;
         if (dealer == null)
-            return " enrich=no-dealer";
+            return " dealer=no-dealer";
         if (dealer.cardRepo == null)
-            return " enrich=cardrepo-null";
+            return " dealer=cardrepo-null";
 
-        var (template, lookupNote) = ResolveTemplate(rawId!, dealer);
+        var (template, lookupNote) = ResolveTemplate(rawId, dealer);
         if (template == null)
-            return $" enrich={lookupNote}";
+            return $" dealer={lookupNote}";
 
         var f = template.SpawningFilters;
         if (f == null)

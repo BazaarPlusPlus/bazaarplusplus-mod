@@ -38,9 +38,16 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
             return _choicePedestalSnapshot;
 
         var ids = GetEncounterIds();
-        if (!ids.IsChoiceState)
+        if (!ids.IsSelectionState)
         {
-            _choicePedestalSnapshot = ChoicePedestalSnapshot.Empty;
+            _choicePedestalSnapshot =
+                AppState.CurrentState is PedestalState && ids.CurrentEncounterTemplateId.HasValue
+                    ? CreateChoicePedestalSnapshot(
+                        ChoiceScreenPedestalResolver.ResolveDetailedFromTemplateIds(
+                            new[] { ids.CurrentEncounterTemplateId.Value }
+                        )
+                    )
+                    : ChoicePedestalSnapshot.Empty;
             _choicePedestalFrame = frame;
             return _choicePedestalSnapshot;
         }
@@ -48,11 +55,7 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
         var choice = ChoiceScreenPedestalResolver.ResolveDetailedFromTemplateIds(
             ids.ChoiceSelectionTemplateIds
         );
-        _choicePedestalSnapshot = new ChoicePedestalSnapshot
-        {
-            Kind = choice.Kind,
-            EnchantmentTypeNames = choice.EnchantmentTypeNames,
-        };
+        _choicePedestalSnapshot = CreateChoicePedestalSnapshot(choice);
         _choicePedestalFrame = frame;
         return _choicePedestalSnapshot;
     }
@@ -78,9 +81,11 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
             var currentEncounterId = runState?.CurrentEncounterId;
             var currentEncounterTemplateId = TryParseTemplateId(currentEncounterId);
             var isChoiceState = appState is ChoiceState;
+            var isSelectionState =
+                isChoiceState || appState is EncounterState || appState is LevelUpState;
 
             if (
-                !isChoiceState
+                !isSelectionState
                 || runState?.SelectionSet == null
                 || runState.SelectionSet.Count == 0
             )
@@ -90,6 +95,7 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
                     CurrentEncounterId = currentEncounterId,
                     CurrentEncounterTemplateId = currentEncounterTemplateId,
                     IsChoiceState = isChoiceState,
+                    IsSelectionState = isSelectionState,
                     ChoiceSelectionEntryIds = Array.Empty<string>(),
                     ChoiceSelectionTemplateIds = Array.Empty<Guid>(),
                 };
@@ -112,7 +118,8 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
             {
                 CurrentEncounterId = currentEncounterId,
                 CurrentEncounterTemplateId = currentEncounterTemplateId,
-                IsChoiceState = true,
+                IsChoiceState = isChoiceState,
+                IsSelectionState = true,
                 ChoiceSelectionEntryIds =
                     entryIds.Count == 0 ? Array.Empty<string>() : entryIds.ToArray(),
                 ChoiceSelectionTemplateIds =
@@ -178,5 +185,16 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
         if (string.IsNullOrWhiteSpace(id))
             return null;
         return Guid.TryParse(id, out var guid) ? guid : null;
+    }
+
+    private static ChoicePedestalSnapshot CreateChoicePedestalSnapshot(
+        ChoiceScreenPedestalResult choice
+    )
+    {
+        return new ChoicePedestalSnapshot
+        {
+            Kind = choice.Kind,
+            EnchantmentTypeNames = choice.EnchantmentTypeNames,
+        };
     }
 }
