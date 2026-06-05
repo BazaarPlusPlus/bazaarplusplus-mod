@@ -22,7 +22,7 @@ This repository only keeps documentation that still matches the current implemen
 ## Installation And Configuration
 
 - Runtime prerequisites: *The Bazaar* and BepInEx 5 must already be installed.
-- For manual installation, copy `BazaarPlusPlus.dll` and the SQLite runtime dependencies from the build output into the game's `BepInEx/plugins/` directory.
+- For manual installation, copy `BazaarPlusPlus.dll`, `BazaarPlusPlus.ModApi.dll`, `BazaarPlusPlus.Storage.dll`, `BazaarPlusPlus.Localization.dll`, and the native SQLite runtime dependency from the build output into the game's `BepInEx/plugins/` directory.
 - After the first launch, configuration is written to `BepInEx/config/BazaarPlusPlus.cfg`.
 - Detailed notes for feature-specific settings, hotkeys, and debug surfaces live under [docs/reference/](docs/reference/); see [docs/README.md](docs/README.md) for the full documentation index.
 

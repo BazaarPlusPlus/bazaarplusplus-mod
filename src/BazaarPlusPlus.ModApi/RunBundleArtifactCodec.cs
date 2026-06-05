@@ -10,6 +10,9 @@ public static class RunBundleArtifactCodec
     public static byte[] Serialize(RunArtifact artifact) =>
         MessagePackGzipCodec.Serialize(artifact);
 
-    public static RunArtifact? Deserialize(byte[] artifactBytes) =>
-        MessagePackGzipCodec.Deserialize<RunArtifact>(artifactBytes);
+    public static bool TryDeserialize(
+        byte[]? artifactBytes,
+        out RunArtifact? artifact,
+        out string? error
+    ) => MessagePackGzipCodec.TryDeserialize(artifactBytes, out artifact, out error);
 }

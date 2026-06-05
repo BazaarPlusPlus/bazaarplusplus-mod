@@ -2,7 +2,7 @@
 
 ## Gameplay Settings
 
-`Game/Settings/BppSettingsDockController.cs` 负责把 Bazaar++ 设置按钮挂到原生 settings UI 上，具体定义来自 `Game/Settings/BppSettingsDockCatalog.cs`。
+`Game/Settings/BppSettingsDockController.cs` 负责把 Bazaar++ 设置按钮挂到原生 settings UI 上。条目在 `BppComposition.cs` 注册为 `ISettingsDockEntry`；`Game/Settings/BppSettingsDockCatalog.cs` 负责收集、排序与物化。
 
 当前内容：
 
@@ -41,7 +41,6 @@
 当前仓库没有单独的 `DebugPanel` runtime。可用的调试/开发入口主要是：
 
 - `F8` 或 `Bazaar++ panel -> Game History`: 打开 `HistoryPanel`
-- `HistoryPanel` 打开且按住 `Ctrl` 时的 preview tuning 热键
 - 运行日志中的 `BppLog` 分类输出
 
 ## Key Files
@@ -51,6 +50,7 @@
 - `Game/Input/BppHotkeyService.cs`
 - `Game/Settings/BppSettingsDockController.cs`
 - `Game/Settings/BppSettingsDockCatalog.cs`
+- `BppComposition.cs`
 - `Patches/Settings/BppSettingsDockPatch.cs`
 - `Patches/Settings/SettingsMenuToggleInstaller.cs`
 - `Patches/Settings/BppKeybindSettingsPatch.cs`

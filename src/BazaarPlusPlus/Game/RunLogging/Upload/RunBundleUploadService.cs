@@ -123,8 +123,12 @@ internal sealed class RunBundleUploadService : IDisposable
         {
             return BppClientCacheBridge.TryGetProfileAccountId()?.Trim();
         }
-        catch
+        catch (Exception ex)
         {
+            BppLog.Debug(
+                "RunBundleUpload",
+                $"ResolvePlayerAccountId failed: {ex.GetType().Name}: {ex.Message}"
+            );
             return null;
         }
     }

@@ -71,17 +71,26 @@ public sealed class BazaarAgentHttpServer : IDisposable
         {
             _cts?.Cancel();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Listener cancellation failed: {FormatException(ex)}");
+        }
         try
         {
             _listener?.Stop();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Listener stop failed: {FormatException(ex)}");
+        }
         try
         {
             _listener?.Close();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Listener close failed: {FormatException(ex)}");
+        }
         _listener = null;
     }
 
@@ -99,8 +108,14 @@ public sealed class BazaarAgentHttpServer : IDisposable
             {
                 ctx = await listener.GetContextAsync().ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
+                if (!token.IsCancellationRequested)
+                {
+                    IsRunning = false;
+                    Interlocked.Exchange(ref _started, 0);
+                    _logger.Warning($"Listener accept loop stopped: {FormatException(ex)}");
+                }
                 return;
             }
             _ = HandleContextAsync(ctx);
@@ -139,7 +154,10 @@ public sealed class BazaarAgentHttpServer : IDisposable
             {
                 WriteErrorEnvelope(ctx, 500, "internal", ex.GetType().Name);
             }
-            catch { }
+            catch (Exception writeEx)
+            {
+                _logger.Warning($"Failed to write HTTP error envelope: {FormatException(writeEx)}");
+            }
         }
         finally
         {
@@ -147,7 +165,10 @@ public sealed class BazaarAgentHttpServer : IDisposable
             {
                 ctx.Response.Close();
             }
-            catch { }
+            catch (Exception closeEx)
+            {
+                _logger.Warning($"Failed to close HTTP response: {FormatException(closeEx)}");
+            }
         }
     }
 
@@ -262,6 +283,11 @@ public sealed class BazaarAgentHttpServer : IDisposable
             ctx.Response.ContentLength64 = bytes.Length;
             ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Failed to write HTTP error envelope: {FormatException(ex)}");
+        }
     }
+
+    private static string FormatException(Exception ex) => $"{ex.GetType().Name}: {ex.Message}";
 }

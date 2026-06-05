@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Models;
@@ -112,8 +113,12 @@ internal sealed class GhostBattleSyncService
         {
             return BppClientCacheBridge.TryGetProfileAccountId()?.Trim();
         }
-        catch
+        catch (Exception ex)
         {
+            BppLog.Debug(
+                "GhostBattleSync",
+                $"ResolvePlayerAccountId failed: {ex.GetType().Name}: {ex.Message}"
+            );
             return null;
         }
     }
@@ -144,9 +149,20 @@ internal sealed class GhostBattleSyncService
 
         try
         {
-            var artifact = RunBundleArtifactCodec.Deserialize(responseBytes);
-            if (artifact == null)
+            if (
+                !RunBundleArtifactCodec.TryDeserialize(
+                    responseBytes,
+                    out var artifact,
+                    out var artifactError
+                )
+            )
+            {
+                BppLog.Warn(
+                    "GhostBattleSync",
+                    $"Failed to deserialize replay artifact for battle '{battleId}': {artifactError ?? "unknown_error"}"
+                );
                 return null;
+            }
 
             var battle = artifact?.Battles?.FirstOrDefault(candidate =>
                 string.Equals(candidate.BattleId, battleId, StringComparison.Ordinal)
@@ -184,8 +200,12 @@ internal sealed class GhostBattleSyncService
                 ReplayPayload = replayPayload,
             };
         }
-        catch
+        catch (Exception ex)
         {
+            BppLog.Warn(
+                "GhostBattleSync",
+                $"Failed to extract replay artifact for battle '{battleId}': {ex.Message}"
+            );
             return null;
         }
     }

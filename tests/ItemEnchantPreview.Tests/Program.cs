@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Text;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
@@ -153,6 +155,19 @@ Assert(
     "Formatted segments should contain both the enchantment label and rendered body text."
 );
 
+var passivePatchType = RequireType("BazaarPlusPlus.Patches.Tooltips.CardTooltipDataPassivePatch");
+var appendTooltipText = passivePatchType.GetMethod(
+    "AppendTooltipText",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
+Assert(appendTooltipText != null, "AppendTooltipText should stay testable.");
+var tooltipBuilder = new StringBuilder();
+appendTooltipText!.Invoke(null, [tooltipBuilder, "first\r\n\r\n second \rthird\n   \n"]);
+Assert(
+    tooltipBuilder.ToString() == "first\n second \nthird\n",
+    "AppendTooltipText should normalize CR/LF without keeping blank or whitespace-only lines."
+);
+
 var key1 = ItemEnchantPreviewCache.CreateKey(snapshot);
 
 var changedSnapshot = new ItemEnchantPreviewSnapshot
@@ -170,6 +185,17 @@ var key2 = ItemEnchantPreviewCache.CreateKey(changedSnapshot);
 Assert(key1 != key2, "Cache keys must change when preview-relevant attributes change.");
 
 Console.WriteLine("ItemEnchantPreview checks passed.");
+
+static Type RequireType(string fullName)
+{
+    var assembly =
+        AppDomain
+            .CurrentDomain.GetAssemblies()
+            .FirstOrDefault(assembly => assembly.GetName().Name == "BazaarPlusPlus")
+        ?? System.Reflection.Assembly.Load("BazaarPlusPlus");
+    return assembly.GetType(fullName)
+        ?? throw new InvalidOperationException($"{fullName} should exist.");
+}
 
 static void Assert(bool condition, string message)
 {

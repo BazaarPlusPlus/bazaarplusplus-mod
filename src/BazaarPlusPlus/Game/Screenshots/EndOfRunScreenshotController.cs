@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections;
+using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel;
@@ -19,11 +20,12 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 {
     private const float CaptureRetryCooldownSeconds = 1f;
     private const float FirstCaptureDelaySeconds = 8f;
-    private static readonly System.Reflection.MethodInfo ContinueClickMethod = AccessTools.Method(
+    private static readonly System.Reflection.MethodInfo? ContinueClickMethod = AccessTools.Method(
         typeof(EndOfRunScreenController),
         "OnContinueClick"
-    )!;
+    );
     private static EndOfRunScreenshotController? _current;
+    private static bool _reportedMissingContinueClick;
     private readonly EndOfRunScreenshotGate _gate = new();
     private readonly EndOfRunMouseBlocker _mouseBlocker = new();
     private ScreenshotService? _screenshotService;
@@ -227,9 +229,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             _captureSuppressionScope = BeginUiSuppression();
             yield return new WaitForEndOfFrame();
 
+            Exception? captureFailure = null;
+            Task<ScreenshotCaptureResult?>? captureTask = null;
             try
             {
-                capture = _screenshotService?.CaptureCurrentFrame(
+                captureTask = _screenshotService?.CaptureCurrentFrameAsync(
                     new ScreenshotCaptureRequest
                     {
                         RunId = ResolveRunId(),
@@ -237,29 +241,68 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                         CaptureSource = RunScreenshotCaptureSource.EndOfRunAuto,
                     }
                 );
-                if (capture != null)
-                {
-                    PersistCapture(capture, isPrimary: true);
-                    _gate.MarkAttemptCompleted();
-                    shouldPassthrough = true;
-                    BppLog.Info(
-                        "EndOfRunScreenshot",
-                        $"CaptureCoroutine action=captured frame={Time.frameCount} time={Time.unscaledTime:F3}"
-                    );
-                }
-                else
-                {
-                    _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
-                    BppLog.Warn(
-                        "EndOfRunScreenshot",
-                        "Screenshot attempt aborted before it could be queued."
-                    );
-                }
             }
             catch (Exception ex)
             {
+                captureFailure = ex;
+            }
+
+            if (captureTask != null)
+            {
+                while (!captureTask.IsCompleted)
+                    yield return null;
+
+                try
+                {
+                    capture = captureTask.GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    captureFailure = ex;
+                }
+            }
+
+            if (capture != null && captureFailure == null)
+            {
+                var persistTask = PersistCaptureAsync(capture, isPrimary: true);
+                while (!persistTask.IsCompleted)
+                    yield return null;
+
+                try
+                {
+                    persistTask.GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    captureFailure = ex;
+                }
+            }
+
+            if (captureFailure != null)
+            {
                 _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
-                BppLog.Error("EndOfRunScreenshot", "End-of-run screenshot capture failed.", ex);
+                BppLog.Error(
+                    "EndOfRunScreenshot",
+                    "End-of-run screenshot capture failed.",
+                    captureFailure
+                );
+            }
+            else if (capture != null)
+            {
+                _gate.MarkAttemptCompleted();
+                shouldPassthrough = true;
+                BppLog.Info(
+                    "EndOfRunScreenshot",
+                    $"CaptureCoroutine action=captured frame={Time.frameCount} time={Time.unscaledTime:F3}"
+                );
+            }
+            else
+            {
+                _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
+                BppLog.Warn(
+                    "EndOfRunScreenshot",
+                    "Screenshot attempt aborted before it could be queued."
+                );
             }
 
             if (shouldPassthrough)
@@ -270,7 +313,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                     "EndOfRunScreenshot",
                     $"CaptureCoroutine action=invoke-continue frame={Time.frameCount} time={Time.unscaledTime:F3}"
                 );
-                ContinueClickMethod.Invoke(controller, []);
+                TryInvokeContinueClick(controller);
             }
         }
         finally
@@ -283,19 +326,44 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         }
     }
 
-    private void PersistCapture(ScreenshotCaptureResult? capture, bool isPrimary = false)
+    private static void TryInvokeContinueClick(EndOfRunScreenController controller)
+    {
+        if (ContinueClickMethod == null)
+        {
+            if (!_reportedMissingContinueClick)
+            {
+                _reportedMissingContinueClick = true;
+                BppLog.Warn(
+                    "EndOfRunScreenshot",
+                    "EndOfRunScreenController.OnContinueClick was not found; skipping automatic continue after screenshot capture."
+                );
+            }
+
+            return;
+        }
+
+        ContinueClickMethod.Invoke(controller, []);
+    }
+
+    private Task PersistCaptureAsync(ScreenshotCaptureResult? capture, bool isPrimary = false)
     {
         if (capture == null || _screenshotStore == null)
-            return;
+            return Task.CompletedTask;
 
-        try
+        var record = RunScreenshotMetadataReader.CreateRecord(capture, isPrimary);
+        var screenshotStore = _screenshotStore;
+
+        return Task.Run(() =>
         {
-            _screenshotStore.Save(RunScreenshotMetadataReader.CreateRecord(capture, isPrimary));
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("ScreenshotService", "Failed to persist screenshot metadata.", ex);
-        }
+            try
+            {
+                screenshotStore.Save(record);
+            }
+            catch (Exception ex)
+            {
+                BppLog.Error("ScreenshotService", "Failed to persist screenshot metadata.", ex);
+            }
+        });
     }
 
     private string? ResolveRunId()

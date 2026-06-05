@@ -96,14 +96,19 @@ internal sealed class BazaarDbSnapshotUploadService
             var attemptedAtUtc = DateTime.UtcNow;
             try
             {
-                var snapshot = _store.TryBuildSnapshot(snapshotId, playerAccountId);
+                var snapshot = _store.TryBuildSnapshot(
+                    snapshotId,
+                    playerAccountId,
+                    cancellationToken
+                );
                 if (snapshot == null)
                 {
-                    _store.MarkPermanentFailure(
-                        snapshotId,
-                        attemptedAtUtc,
-                        _store.LastBuildFailureReason ?? "build_snapshot_failed"
-                    );
+                    var buildFailureReason =
+                        _store.LastBuildFailureReason ?? "build_snapshot_failed";
+                    if (IsTransientBuildFailure(buildFailureReason))
+                        _store.MarkTransientFailure(snapshotId, attemptedAtUtc, buildFailureReason);
+                    else
+                        _store.MarkPermanentFailure(snapshotId, attemptedAtUtc, buildFailureReason);
                     continue;
                 }
 
@@ -129,5 +134,10 @@ internal sealed class BazaarDbSnapshotUploadService
                 _store.MarkTransientFailure(snapshotId, attemptedAtUtc, ex.Message);
             }
         }
+    }
+
+    private static bool IsTransientBuildFailure(string reason)
+    {
+        return string.Equals(reason, "image_prepare_timeout", StringComparison.Ordinal);
     }
 }

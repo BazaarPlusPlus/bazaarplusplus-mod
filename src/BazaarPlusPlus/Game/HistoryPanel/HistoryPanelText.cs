@@ -800,11 +800,6 @@ internal static class HistoryPanelText
         );
     }
 
-    internal static string PreviewTuneStatus(string summary)
-    {
-        return FormatSimple("Preview tune: " + summary, "预览调参：" + summary);
-    }
-
     internal static string PreviewSelectRunOrBattle()
     {
         return FormatSimple(
@@ -839,7 +834,9 @@ internal static class HistoryPanelText
     internal static string FontAtlasSample()
     {
         var languageCode = L.CurrentLanguageCode;
-        if (FontAtlasSampleCache.TryGetValue(languageCode, out var cachedSample))
+        var mode = L.CurrentMode;
+        var cacheKey = CreateFontAtlasSampleCacheKey(languageCode, mode);
+        if (FontAtlasSampleCache.TryGetValue(cacheKey, out var cachedSample))
             return cachedSample;
 
         var parts = new List<string>();
@@ -855,7 +852,7 @@ internal static class HistoryPanelText
             if (field.GetValue(null) is not LocalizedTextSet set)
                 continue;
 
-            var resolved = set.Resolve(languageCode, L.CurrentMode);
+            var resolved = set.Resolve(languageCode, mode);
             if (!string.IsNullOrWhiteSpace(resolved))
                 parts.Add(resolved);
         }
@@ -875,7 +872,7 @@ internal static class HistoryPanelText
         }
 
         var sample = deduped.Count > 0 ? new string(deduped.ToArray()) : FontProbeSample();
-        FontAtlasSampleCache[languageCode] = sample;
+        FontAtlasSampleCache[cacheKey] = sample;
         return sample;
     }
 
@@ -887,12 +884,12 @@ internal static class HistoryPanelText
         );
     }
 
-    internal static string PreviewTuneHelp()
+    private static string CreateFontAtlasSampleCacheKey(
+        string languageCode,
+        BppChineseLocaleMode mode
+    )
     {
-        return FormatSimple(
-            "Ctrl+Left/Right board spacing, Ctrl+[ / ] card spacing, Ctrl+Up/Down zoom, Ctrl+PgUp/PgDn vertical, Ctrl+Q/E or Home/End card width, Ctrl+Alt+Q/E or Home/End card height, Ctrl+-/= FOV, Ctrl+Backspace reset.",
-            "Ctrl+左右 调整棋盘间距，Ctrl+[ / ] 调整卡牌间距，Ctrl+上下 调整缩放，Ctrl+PgUp/PgDn 调整垂直位置，Ctrl+Q/E 或 Home/End 调整卡牌宽度，Ctrl+Alt+Q/E 或 Home/End 调整卡牌高度，Ctrl+-/= 调整视野，Ctrl+Backspace 重置。"
-        );
+        return $"{languageCode}\u001F{(int)mode}";
     }
 
     private static string Resolve(LocalizedTextSet set) => L.Resolve(set);

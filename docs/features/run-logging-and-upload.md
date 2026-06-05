@@ -20,7 +20,7 @@ SQLite 列定义统一见 [sqlite-schema-reference.md](../reference/sqlite-schem
 
 `runs`、`run_events`、`battles`、`battle_snapshots`、`sync_cursors`、`run_sync_state`，外加 `<GameRoot>/BazaarPlusPlusV4/CombatReplays/` 下的 replay payload 文件（见 [combat-replay.md](combat-replay.md)）。各表列定义见 schema 参考，本文不重复。
 
-`battles.is_bundle_final_battle` 是**本地列名**。当前 V4 API 不再上传或返回 final-battle wire 字段；HistoryPanel 的 ghost「这场后对手出局」提示仍复用本地字段，但远端 ghost 导入默认不会触发。
+`battles.is_final_battle` 是本地列名，并与当前 V4 `is_final_battle` wire 字段同名。HistoryPanel 的 ghost「这场后对手出局」提示会把该标记与本地视角胜负一起判断。
 
 ## Background Upload & Ghost Battles
 
@@ -31,7 +31,7 @@ SQLite 列定义统一见 [sqlite-schema-reference.md](../reference/sqlite-schem
 3. `RunUploadController` 在启动延迟后、或 run 退出 / replay 落盘完成后扫描待上传的 completed runs。
 4. `RunBundleUploadStore` 组装 metadata（run projection、top-level battle projections）与 gzip MessagePack replay artifact。SQLite run row 会先复制到内存，随后才读取 replay payload 文件，避免在打开 reader 时做文件 IO / 压缩。
 5. `RunBundleUploadService` 编排上传，经 `RunBundleClient` 执行 multipart `POST /run-bundles`（不附鉴权头）：`metadata` part 是 JSON，`artifact` part 是 raw `application/x-bpp-runbundle+msgpack+gzip` bytes。
-6. 服务端写入有效的 top-level `battle_projections[]`；当前 wire 不携带 final-battle 标记。
+6. 服务端写入有效的 top-level `battle_projections[]`，包含 `is_final_battle` 标记。
 7. 上传成功后清除 run 与关联 replay 的 dirty 标记。
 
 ghost 同步与 replay 下载（V4 wire，服务端在独立仓库 `bazaarplusplus-server`，部署 `mod-api-v4.bazaarplusplus.com`）：

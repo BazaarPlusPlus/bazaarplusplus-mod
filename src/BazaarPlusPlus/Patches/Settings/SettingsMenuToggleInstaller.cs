@@ -1,7 +1,6 @@
 #pragma warning disable CS0436
 #nullable enable
 using System;
-using System.Linq;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.UI;
@@ -48,15 +47,7 @@ internal static class SettingsMenuLayoutUtility
             return;
         }
 
-        var additionalIndex = parentRect
-            .Cast<Transform>()
-            .Where(child => child != null && child != anchorRow && child.name.StartsWith("BPP_"))
-            .OrderBy(child => child.GetSiblingIndex())
-            .ToList()
-            .FindIndex(child => child == cloneRow);
-
-        if (additionalIndex < 0)
-            additionalIndex = 0;
+        var additionalIndex = GetAdditionalRowIndex(parentRect, anchorRow, cloneRow);
 
         var step = GetVerticalStep(anchorRect, cloneRect);
         cloneRect.anchorMin = anchorRect.anchorMin;
@@ -80,6 +71,28 @@ internal static class SettingsMenuLayoutUtility
         return rectTransform.GetComponent<VerticalLayoutGroup>() != null
             || rectTransform.GetComponent<HorizontalOrVerticalLayoutGroup>() != null
             || rectTransform.GetComponent<GridLayoutGroup>() != null;
+    }
+
+    private static int GetAdditionalRowIndex(
+        RectTransform parentRect,
+        Transform anchorRow,
+        Transform cloneRow
+    )
+    {
+        var index = 0;
+        for (var childIndex = 0; childIndex < parentRect.childCount; childIndex++)
+        {
+            var child = parentRect.GetChild(childIndex);
+            if (child == null || child == anchorRow || !child.name.StartsWith("BPP_"))
+                continue;
+
+            if (child == cloneRow)
+                return index;
+
+            index++;
+        }
+
+        return 0;
     }
 
     private static float GetVerticalStep(RectTransform anchorRect, RectTransform cloneRect)

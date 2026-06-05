@@ -14,3 +14,14 @@ An encounter that upgrades or enchants one of the player's existing items, rathe
 **Encounter status probe**:
 The on-demand, pull-based read of the player's *current* run/encounter state (`IEncounterStateProbe.GetEncounterIds()`, `GetChoicePedestal()`, `GetTargetingState()`). The project's chosen way to expose "where is the player in the run right now" — as status queries, not a recorded timeline.
 _Avoid_: encounter tracker, run timeline (deliberately not built — see [ADR-0001](docs/adr/0001-encounter-status-probe-not-timeline-tracker.md))
+
+## Collection sources
+
+**Collection Source Catalog**:
+The versioned in-mod catalog that defines merchant and trainer source filters for the Collection Panel. It is built from `collection-sources.json`, validated by `CollectionSourceCatalog.ExpectedSchemaVersion`, and keyed by stable source keys plus source template ids.
+
+**Offer Pool**:
+The set of card templates a source can offer, expressed through structured rules rather than runtime encounter fallback heuristics. Collection source filtering resolves cards against these rules and template ids.
+
+**Merchant Kind**:
+The project-owned bucket for grouping Bazaar merchants and trainers in CollectionPanel source filters (`CollectionMerchantKind`). It is a UI/filtering classification over source definitions, not a game enum.

@@ -136,8 +136,12 @@ internal static class ShopForecastLogPatch
         {
             return Data.GetStatic()?.GetCardById(templateId);
         }
-        catch
+        catch (Exception ex)
         {
+            BppLog.Debug(
+                Component,
+                $"Static template lookup failed for {templateId}: {ex.GetType().Name}: {ex.Message}"
+            );
             return null;
         }
     }

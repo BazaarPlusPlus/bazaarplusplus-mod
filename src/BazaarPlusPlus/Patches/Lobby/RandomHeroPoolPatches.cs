@@ -2,7 +2,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Lobby.RandomHeroPool;
 using BazaarPlusPlus.Infrastructure;
@@ -119,15 +118,23 @@ internal static class RandomHeroPoolSelectRandomHeroImmediatePatch
             return false;
         }
 
-        var unlockedHeroViews = reflectedUnlockedHeroes.Where(view => view != null).ToArray();
-        if (unlockedHeroViews.Length == 0)
+        var unlockedHeroViews = new List<HeroItemView>();
+        var unlockedHeroIds = new List<string>();
+        foreach (var view in reflectedUnlockedHeroes)
+        {
+            if (view == null)
+                continue;
+
+            unlockedHeroViews.Add(view);
+            unlockedHeroIds.Add(view.Hero.ToString());
+        }
+
+        if (unlockedHeroViews.Count == 0)
         {
             return false;
         }
 
-        var candidateHeroIds = RandomHeroPoolPlayerPrefs.ResolveEffectivePool(
-            unlockedHeroViews.Select(view => view.Hero.ToString())
-        );
+        var candidateHeroIds = RandomHeroPoolPlayerPrefs.ResolveEffectivePool(unlockedHeroIds);
         if (candidateHeroIds.Count == 0)
         {
             return false;
@@ -135,9 +142,16 @@ internal static class RandomHeroPoolSelectRandomHeroImmediatePatch
 
         var randomIndex = UnityEngine.Random.Range(0, candidateHeroIds.Count);
         var selectedHeroId = Selector.SelectHero(candidateHeroIds, randomIndex);
-        var selectedHeroView = unlockedHeroViews.FirstOrDefault(view =>
-            string.Equals(view.Hero.ToString(), selectedHeroId, StringComparison.Ordinal)
-        );
+        HeroItemView? selectedHeroView = null;
+        foreach (var view in unlockedHeroViews)
+        {
+            if (!string.Equals(view.Hero.ToString(), selectedHeroId, StringComparison.Ordinal))
+                continue;
+
+            selectedHeroView = view;
+            break;
+        }
+
         if (selectedHeroView == null || IsProgrammaticSelectionField == null)
         {
             return false;

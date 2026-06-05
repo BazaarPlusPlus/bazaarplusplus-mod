@@ -1,8 +1,12 @@
 #nullable enable
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using BazaarPlusPlus.Infrastructure;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace BazaarPlusPlus.Game.Screenshots;
 
@@ -17,10 +21,10 @@ internal sealed class ScreenshotService
         _nowProvider = nowProvider ?? (() => DateTimeOffset.Now);
     }
 
-    public ScreenshotCaptureResult? CaptureCurrentFrame(ScreenshotCaptureRequest request)
+    public Task<ScreenshotCaptureResult?> CaptureCurrentFrameAsync(ScreenshotCaptureRequest request)
     {
         if (string.IsNullOrWhiteSpace(_directoryPath))
-            return null;
+            return Task.FromResult<ScreenshotCaptureResult?>(null);
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
@@ -38,9 +42,7 @@ internal sealed class ScreenshotService
             if (!string.IsNullOrWhiteSpace(directoryPath))
                 Directory.CreateDirectory(directoryPath);
 
-            WriteCurrentFrameToFile(filePath);
-            BppLog.Info("ScreenshotService", $"Saved screenshot: {filePath}");
-            return new ScreenshotCaptureResult
+            var result = new ScreenshotCaptureResult
             {
                 ScreenshotId = screenshotId,
                 RunId = request.RunId,
@@ -52,15 +54,37 @@ internal sealed class ScreenshotService
                 CapturedAtLocal = capturedAtLocal,
                 CapturedAtUtc = capturedAtUtc,
             };
+            return CaptureAndWriteCurrentFrameAsync(filePath)
+                .ContinueWith(
+                    task =>
+                    {
+                        if (task.IsFaulted)
+                        {
+                            BppLog.Error(
+                                "ScreenshotService",
+                                "Failed to capture screenshot.",
+                                task.Exception!.GetBaseException()
+                            );
+                            return null;
+                        }
+
+                        if (task.IsCanceled || !task.Result)
+                            return null;
+
+                        BppLog.Info("ScreenshotService", $"Saved screenshot: {filePath}");
+                        return result;
+                    },
+                    TaskScheduler.Default
+                );
         }
         catch (Exception ex)
         {
             BppLog.Error("ScreenshotService", "Failed to capture screenshot.", ex);
-            return null;
+            return Task.FromResult<ScreenshotCaptureResult?>(null);
         }
     }
 
-    private static void WriteCurrentFrameToFile(string filePath)
+    private static Task<bool> CaptureAndWriteCurrentFrameAsync(string filePath)
     {
         var width = Screen.width;
         var height = Screen.height;
@@ -69,24 +93,164 @@ internal sealed class ScreenshotService
                 $"Cannot capture screenshot with invalid size {width}x{height}."
             );
 
-        Texture2D? texture = null;
-        var previousActive = RenderTexture.active;
+        var completion = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        RenderTexture? renderTexture = null;
         try
         {
-            texture = new Texture2D(width, height, TextureFormat.RGB24, mipChain: false);
-            texture.ReadPixels(new Rect(0f, 0f, width, height), 0, 0, recalculateMipMaps: false);
-            texture.Apply(updateMipmaps: false, makeNoLongerReadable: false);
-            var pngBytes = texture.EncodeToPNG();
-            if (pngBytes == null || pngBytes.Length == 0)
-                throw new InvalidOperationException("Screenshot PNG encoding returned no data.");
+            renderTexture = new RenderTexture(
+                width,
+                height,
+                depth: 0,
+                format: RenderTextureFormat.ARGB32
+            )
+            {
+                name = "BPP_EndOfRunScreenshot",
+                useMipMap = false,
+                autoGenerateMips = false,
+            };
+            if (!renderTexture.Create())
+                throw new InvalidOperationException(
+                    $"Failed to create RenderTexture {width}x{height} for screenshot capture."
+                );
 
-            File.WriteAllBytes(filePath, pngBytes);
+            ScreenCapture.CaptureScreenshotIntoRenderTexture(renderTexture);
+            var capturedTexture = renderTexture;
+            AsyncGPUReadback.Request(
+                capturedTexture,
+                0,
+                TextureFormat.RGBA32,
+                request =>
+                    OnReadbackComplete(
+                        request,
+                        capturedTexture,
+                        width,
+                        height,
+                        filePath,
+                        completion
+                    )
+            );
+        }
+        catch
+        {
+            ReleaseRenderTexture(renderTexture);
+            throw;
+        }
+
+        return completion.Task;
+    }
+
+    private static void OnReadbackComplete(
+        AsyncGPUReadbackRequest request,
+        RenderTexture renderTexture,
+        int width,
+        int height,
+        string filePath,
+        TaskCompletionSource<bool> completion
+    )
+    {
+        try
+        {
+            if (request.hasError)
+            {
+                completion.TrySetException(
+                    new InvalidOperationException("AsyncGPUReadback returned an error.")
+                );
+                return;
+            }
+
+            var pixels = new byte[width * height * 4];
+            request.GetData<byte>().CopyTo(pixels);
+            if (!SystemInfo.graphicsUVStartsAtTop)
+                FlipVerticalRgba32(pixels, width, height);
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    WriteRgba32PngAtomically(filePath, pixels, width, height);
+                    completion.TrySetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    completion.TrySetException(ex);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            completion.TrySetException(ex);
         }
         finally
         {
-            RenderTexture.active = previousActive;
-            if (texture != null)
-                UnityEngine.Object.Destroy(texture);
+            ReleaseRenderTexture(renderTexture);
+        }
+    }
+
+    private static void WriteRgba32PngAtomically(
+        string filePath,
+        byte[] pixels,
+        int width,
+        int height
+    )
+    {
+        var directory = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+            Directory.CreateDirectory(directory);
+
+        var tempPath = $"{filePath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            using (var image = Image.LoadPixelData<Rgba32>(pixels, width, height))
+            {
+                image.SaveAsPng(tempPath);
+            }
+
+            if (File.Exists(filePath))
+                File.Replace(tempPath, filePath, null, ignoreMetadataErrors: true);
+            else
+                File.Move(tempPath, filePath);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
+    }
+
+    private static void FlipVerticalRgba32(byte[] buffer, int width, int height)
+    {
+        var stride = width * 4;
+        var rowBuffer = new byte[stride];
+        for (var row = 0; row < height / 2; row++)
+        {
+            var topOffset = row * stride;
+            var bottomOffset = (height - 1 - row) * stride;
+
+            Buffer.BlockCopy(buffer, topOffset, rowBuffer, 0, stride);
+            Buffer.BlockCopy(buffer, bottomOffset, buffer, topOffset, stride);
+            Buffer.BlockCopy(rowBuffer, 0, buffer, bottomOffset, stride);
+        }
+    }
+
+    private static void ReleaseRenderTexture(RenderTexture? renderTexture)
+    {
+        if (renderTexture == null)
+            return;
+
+        try
+        {
+            if (renderTexture.IsCreated())
+                renderTexture.Release();
+            UnityEngine.Object.Destroy(renderTexture);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Debug(
+                "ScreenshotService",
+                $"Failed to release screenshot RenderTexture: {ex.Message}"
+            );
         }
     }
 }

@@ -22,18 +22,35 @@ public static class CardTooltipDataPassivePatch
         if (builder == null || string.IsNullOrWhiteSpace(text))
             return;
 
-        var normalized = text.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n');
-        if (normalized.Length == 0)
-            return;
-
-        var lines = normalized.Split('\n');
-        foreach (var line in lines)
+        var lineStart = 0;
+        for (var index = 0; index < text.Length; index++)
         {
-            if (string.IsNullOrWhiteSpace(line))
+            var character = text[index];
+            if (character != '\r' && character != '\n')
                 continue;
 
-            builder.Append(line);
+            AppendLine(builder, text, lineStart, index - lineStart);
+            if (character == '\r' && index + 1 < text.Length && text[index + 1] == '\n')
+                index++;
+            lineStart = index + 1;
+        }
+
+        AppendLine(builder, text, lineStart, text.Length - lineStart);
+    }
+
+    private static void AppendLine(StringBuilder builder, string text, int startIndex, int length)
+    {
+        if (length <= 0)
+            return;
+
+        for (var index = startIndex; index < startIndex + length; index++)
+        {
+            if (char.IsWhiteSpace(text[index]))
+                continue;
+
+            builder.Append(text, startIndex, length);
             builder.Append('\n');
+            return;
         }
     }
 

@@ -122,13 +122,19 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         {
             _http?.Stop();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Listener stop failed: {ex.GetType().Name}: {ex.Message}");
+        }
 
         try
         {
             _queue?.Dispose();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Listener queue disposal failed: {ex.GetType().Name}: {ex.Message}");
+        }
 
         _http = null;
         _queue = null;

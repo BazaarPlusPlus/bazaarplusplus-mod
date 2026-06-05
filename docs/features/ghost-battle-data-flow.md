@@ -112,7 +112,7 @@ Ghost rows are written to the local SQLite `battles` table with
 `opponent_*` columns continue to carry uploader-perspective values — storage
 matches what the server returned.
 
-The local SQLite still uses the column name `is_bundle_final_battle` (mod-side schema, decoupled from the current V4 wire).
+The local SQLite uses the column name `is_final_battle`, matching the current V4 wire field.
 
 This is a deliberate choice: the repository stores facts, and perspective
 translation happens at read time.
@@ -137,7 +137,7 @@ Files:
 | `Result` | `ProjectResultToLocal(result)` — `Win`↔`Lost`, `Won`↔`Lost` | My outcome |
 | `WinnerCombatantId` | `ProjectCombatantIdToLocal(...)` — `Player`↔`Opponent` | Who won from my POV |
 | `LoserCombatantId` | `ProjectCombatantIdToLocal(...)` | Who lost from my POV |
-| `IsBundleFinalBattle` | `is_bundle_final_battle` (local SQLite column; not populated by current V4 ghost wire) | Local-only bundle-final marker; current remote imports default false |
+| `IsFinalBattle` | `is_final_battle` | Final-battle marker from the current V4 wire, persisted locally and projected into the UI model |
 | `Source` | — | `HistoryBattleSource.Ghost` |
 | `ReplayAvailable / ReplayDownloaded` | `replay_available / replay_downloaded` | Whether replay payload can/has been fetched |
 
@@ -235,9 +235,8 @@ is a product-level choice, not a bug.
 - All ghost-specific UI / filtering / summary code consumes projected
   `HistoryBattleRecord` values, not raw columns. If a new ghost feature reads
   raw columns directly, extend the projector instead.
-- `is_bundle_final_battle` is a local marker; current V4 remote imports leave it
-  false, and UI code combines it with projected local outcome only at decision
-  points.
+- `is_final_battle` comes from the current V4 wire and is persisted locally; UI
+  code combines it with projected local outcome only at decision points.
 - Replay payload + manifest are forwarded untouched; do not try to "fix"
   player/opponent labels there without also remapping the combat message
   stream.

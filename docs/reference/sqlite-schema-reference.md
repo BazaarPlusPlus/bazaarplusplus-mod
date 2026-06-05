@@ -25,12 +25,12 @@ Source of truth:
 ## Local Client SQLite
 
 - Database file: `<GameRoot>/BazaarPlusPlusV4/bazaarplusplus.db`
-- Local schema version: `15` (`RunLogSchema.LocalDatabaseSchemaVersion`)
+- Local schema version: `16` (`RunLogSchema.LocalDatabaseSchemaVersion`)
 - Row schema version: `11`
 - Upload payload schema version: `5`
-- Runtime pragmas include `foreign_keys = ON`, `user_version = 15`, `busy_timeout = 2000`, and WAL mode.
+- Runtime pragmas include `foreign_keys = ON`, `user_version = 16`, `busy_timeout = 2000`, and WAL mode.
 
-> Version history: `v11→v12` added the `combat_replay_videos` table; `v13` added the BazaarDB upload sidecar; `v14` added battle-time player/opponent prestige and victories to `battles`; `v15` renamed the sidecar to `bazaardb_snapshot_uploads` with `snapshot_id`. The bootstrap is a single `CREATE TABLE IF NOT EXISTS` pass (`RunLogSchema.BootstrapSql`), so a fresh database is created directly at the current version rather than migrated step by step.
+> Version history: `v11→v12` added the `combat_replay_videos` table; `v13` added the BazaarDB upload sidecar; `v14` added battle-time player/opponent prestige and victories to `battles`; `v15` renamed the sidecar to `bazaardb_snapshot_uploads` with `snapshot_id`; `v16` added final-battle metadata to `battles` as `is_final_battle`. The bootstrap is a single `CREATE TABLE IF NOT EXISTS` pass (`RunLogSchema.BootstrapSql`), so a fresh database is created directly at the current version rather than migrated step by step.
 
 Current tables:
 
@@ -107,7 +107,7 @@ Columns:
 - player side: `player_name`, `player_account_id`, `player_hero`, `player_rank`, `player_rating`, `player_level`, `player_prestige`, `player_victories`
 - opponent side: `opponent_name`, `opponent_account_id`, `opponent_hero`, `opponent_rank`, `opponent_rating`, `opponent_level`, `opponent_prestige`, `opponent_victories`
 - outcome: `result`, `winner_combatant_id`, `loser_combatant_id`
-- bundle marker: `is_bundle_final_battle` — this is a **local column**. Current V4 API does not upload or return a final-battle wire field.
+- final-battle marker: `is_final_battle` — this mirrors the current V4 `is_final_battle` wire field and is also used for local final-battle metadata.
 - replay state: `replay_available`, `replay_downloaded`, `has_local_payload`, `replay_dirty`, `replay_last_attempt_at_utc`, `replay_last_uploaded_at_utc`, `replay_retry_count`, `replay_last_error`
 - sync/lifecycle: `last_synced_at_utc`, `deleted_at_utc`
 
@@ -318,5 +318,5 @@ Authoritative references:
 - Run-bundle upload packages local run + battle state into one MessagePack artifact (to R2) plus lightweight SQL projections written via `db.batch()` (`runs` insert + per-battle ON CONFLICT upsert).
 - Server SQL is for lookup; the uploaded artifact body lives in R2 and is served via short-lived presigned URLs from `POST /ghost-battles/:battle_id/replay-link`.
 - The server is fully unauthenticated for mod-side endpoints; identity comes from `player_account_id` in `POST /run-bundles` bodies and `GET /ghost-battles` query strings. The server fully ingests valid battle projections, and ghost sync filters by `opponent_account_id`.
-- Current V4 ghost sync does not carry a final-battle marker, so remote imports leave the local `is_bundle_final_battle` marker false.
+- Current V4 ghost sync carries the `is_final_battle` marker; remote imports persist it into the local `is_final_battle` column.
 - BazaarDB pull endpoints (`POST /bazaardb/peek` and `POST /bazaardb/confirm`) require a Bearer token (`BAZAARDB_PULL_TOKEN`). Snapshot DTOs live in private R2 and are exposed to BazaarDB only through short-lived presigned URLs returned by `peek`; `confirm` marks delivered rows done and deletes the corresponding R2 object best-effort.

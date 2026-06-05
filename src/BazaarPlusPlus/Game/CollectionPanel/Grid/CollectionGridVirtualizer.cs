@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
@@ -57,6 +59,7 @@ internal sealed class CollectionGridVirtualizer
     private float _lastScrollY = float.NaN;
     private int _hoverPollIndex = -1;
     private bool _hoverDispatched;
+    private FirstWindowBindDiagnostics? _firstWindowDiagnostics;
 
     public CollectionGridVirtualizer(CollectionGridOverlay overlay, CollectionCardFactory factory)
     {
@@ -86,6 +89,8 @@ internal sealed class CollectionGridVirtualizer
         RecycleAll();
         _slots?.Clear();
         _lastScrollY = float.NaN;
+        _firstWindowDiagnostics =
+            _visible.Count == 0 ? null : new FirstWindowBindDiagnostics(_generation);
     }
 
     public void SetViewport(float width, float height)
@@ -137,6 +142,12 @@ internal sealed class CollectionGridVirtualizer
         );
         var firstIdx = _layout.ShelfAt(firstShelf).FirstIndex;
         var lastIdx = _layout.ShelfAt(lastShelf).LastIndex;
+        _firstWindowDiagnostics?.EnsureWindow(
+            firstIdx,
+            lastIdx,
+            _visible.Count,
+            _layout.ShelfCount
+        );
 
         // 1) Recycle cells that scrolled out of window.
         _recycleScratch.Clear();
@@ -163,6 +174,7 @@ internal sealed class CollectionGridVirtualizer
                 break;
             TryRealize(idx);
         }
+        _firstWindowDiagnostics?.TryLogBindingPhase(_generation);
 
         // 3) Reposition realized cells whenever the scroll offset moved (or the base unit
         // changed on a viewport resize, _scaleDirty). Skipping when nothing changed avoids
@@ -191,6 +203,7 @@ internal sealed class CollectionGridVirtualizer
         _visible = Array.Empty<CollectionCardVm>();
         _hoverPollIndex = -1;
         _hoverDispatched = false;
+        _firstWindowDiagnostics = null;
     }
 
     // Polled hover (CollectionGridConstants.UsePolledHover = true, the default). Called
@@ -310,7 +323,9 @@ internal sealed class CollectionGridVirtualizer
     private void TryRealize(int index)
     {
         var vm = _visible[index];
+        var bindStartedAt = _firstWindowDiagnostics?.StartBind(index) ?? 0L;
         var binding = _factory.TryBind(vm);
+        _firstWindowDiagnostics?.RecordBind(index, bindStartedAt, binding);
         if (binding == null)
             return;
         var card = binding.Value.Card;
@@ -582,5 +597,155 @@ internal sealed class CollectionGridVirtualizer
         // (the CanvasGroup alpha was zeroed on Take).
         public bool FadeActive { get; set; }
         public float FadeAlpha { get; set; }
+    }
+
+    private sealed class FirstWindowBindDiagnostics
+    {
+        private readonly int _generation;
+        private readonly HashSet<int> _completedIndices = new();
+        private readonly List<Task> _setUpTasks = new();
+
+        private long _startedAt;
+        private int _firstIndex = -1;
+        private int _lastIndex = -1;
+        private int _visibleCount;
+        private int _shelfCount;
+        private int _attempts;
+        private int _bound;
+        private int _failed;
+        private double _bindMs;
+        private bool _bindingLogged;
+        private bool _setUpLogStarted;
+
+        public FirstWindowBindDiagnostics(int generation)
+        {
+            _generation = generation;
+        }
+
+        public void EnsureWindow(int firstIndex, int lastIndex, int visibleCount, int shelfCount)
+        {
+            if (_startedAt != 0L || firstIndex < 0 || lastIndex < firstIndex)
+                return;
+
+            _startedAt = Stopwatch.GetTimestamp();
+            _firstIndex = firstIndex;
+            _lastIndex = lastIndex;
+            _visibleCount = visibleCount;
+            _shelfCount = shelfCount;
+        }
+
+        public long StartBind(int index)
+        {
+            return Covers(index) ? Stopwatch.GetTimestamp() : 0L;
+        }
+
+        public void RecordBind(int index, long startedAt, CollectionCardBinding? binding)
+        {
+            if (startedAt == 0L || !Covers(index) || !_completedIndices.Add(index))
+                return;
+
+            _attempts++;
+            _bindMs += ElapsedMs(startedAt, Stopwatch.GetTimestamp());
+            if (binding.HasValue)
+            {
+                _bound++;
+                _setUpTasks.Add(binding.Value.SetUpTask);
+            }
+            else
+            {
+                _failed++;
+            }
+        }
+
+        public void TryLogBindingPhase(int currentGeneration)
+        {
+            if (
+                _bindingLogged
+                || currentGeneration != _generation
+                || _startedAt == 0L
+                || _completedIndices.Count < WindowSize
+            )
+            {
+                return;
+            }
+
+            _bindingLogged = true;
+            var elapsedMs = ElapsedMs(_startedAt, Stopwatch.GetTimestamp());
+            BppLog.Debug(
+                "CollectionGridVirtualizer",
+                "firstWindowBind "
+                    + $"range={_firstIndex}-{_lastIndex} "
+                    + $"window={WindowSize} "
+                    + $"visible={_visibleCount} "
+                    + $"shelves={_shelfCount} "
+                    + $"attempts={_attempts} "
+                    + $"bound={_bound} "
+                    + $"failed={_failed} "
+                    + $"bindMs={FormatMs(_bindMs)} "
+                    + $"elapsedMs={FormatMs(elapsedMs)}"
+            );
+
+            if (_setUpTasks.Count > 0 && !_setUpLogStarted)
+            {
+                _setUpLogStarted = true;
+                _ = LogSetUpCompletionAsync(
+                    _setUpTasks.ToArray(),
+                    _startedAt,
+                    WindowSize,
+                    _bound,
+                    _failed
+                );
+            }
+        }
+
+        private bool Covers(int index) =>
+            !_bindingLogged && _startedAt != 0L && index >= _firstIndex && index <= _lastIndex;
+
+        private int WindowSize => _lastIndex >= _firstIndex ? _lastIndex - _firstIndex + 1 : 0;
+
+        private static async Task LogSetUpCompletionAsync(
+            Task[] tasks,
+            long startedAt,
+            int windowSize,
+            int bound,
+            int failedBinds
+        )
+        {
+            try
+            {
+                await Task.WhenAll(tasks).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Faulted tasks are counted below; ShowWhenReady owns the per-card debug log.
+            }
+
+            var faulted = 0;
+            var canceled = 0;
+            foreach (var task in tasks)
+            {
+                if (task.IsFaulted)
+                    faulted++;
+                else if (task.IsCanceled)
+                    canceled++;
+            }
+
+            BppLog.Debug(
+                "CollectionGridVirtualizer",
+                "firstWindowSetUp "
+                    + $"window={windowSize} "
+                    + $"bound={bound} "
+                    + $"failedBinds={failedBinds} "
+                    + $"faulted={faulted} "
+                    + $"canceled={canceled} "
+                    + $"artAndSetupElapsedMs={FormatMs(ElapsedMs(startedAt, Stopwatch.GetTimestamp()))}"
+            );
+        }
+
+        private static double ElapsedMs(long start, long end) =>
+            (end - start) * 1000.0 / Stopwatch.Frequency;
+
+        private static string FormatMs(double value) =>
+            value.ToString("0.0", CultureInfo.InvariantCulture);
     }
 }

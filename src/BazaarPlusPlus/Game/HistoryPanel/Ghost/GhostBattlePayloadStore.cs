@@ -56,7 +56,16 @@ internal sealed class GhostBattlePayloadStore
         try
         {
             var payloadBytes = File.ReadAllBytes(filePath);
-            return GhostBattlePayloadCodec.Deserialize(payloadBytes);
+            if (
+                GhostBattlePayloadCodec.TryDeserialize(payloadBytes, out var payload, out var error)
+            )
+                return payload;
+
+            BppLog.Warn(
+                "GhostBattlePayloadStore",
+                $"Skipping invalid ghost payload '{filePath}': {error ?? "unknown_error"}"
+            );
+            return null;
         }
         catch (Exception ex)
         {

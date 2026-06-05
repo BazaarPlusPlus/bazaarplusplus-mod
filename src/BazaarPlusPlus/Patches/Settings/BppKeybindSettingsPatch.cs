@@ -2,7 +2,6 @@
 #nullable enable
 using System;
 using System.Collections;
-using System.Linq;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -16,19 +15,26 @@ internal static class BppKeybindSettingsAwakePatch
 {
     private const string EnchantPreviewEnglishLabel = "Show Enchant Preview";
     private const string UpgradePreviewEnglishLabel = "Show Upgrade Preview";
+    internal const string EnchantPreviewObjectName = "BPP_Keybind_EnchantPreview";
+    internal const string UpgradePreviewObjectName = "BPP_Keybind_UpgradePreview";
 
     private static readonly BppKeybindDefinition[] Definitions =
     [
         new(
-            "BPP_Keybind_EnchantPreview",
+            EnchantPreviewObjectName,
             BppHotkeyActionId.HoldEnchantPreview,
             EnchantPreviewEnglishLabel
         ),
         new(
-            "BPP_Keybind_UpgradePreview",
+            UpgradePreviewObjectName,
             BppHotkeyActionId.HoldUpgradePreview,
             UpgradePreviewEnglishLabel
         ),
+    ];
+    private static readonly string[] DefinitionObjectNames =
+    [
+        EnchantPreviewObjectName,
+        UpgradePreviewObjectName,
     ];
 
     [HarmonyPostfix]
@@ -54,7 +60,7 @@ internal static class BppKeybindSettingsAwakePatch
         foreach (var definition in Definitions)
             anchorRow = EnsureKeybindRow(definition, templateRow, anchorRow) ?? anchorRow;
 
-        ArrangeRows(templateRow, Definitions.Select(definition => definition.ObjectName).ToArray());
+        ArrangeRows(templateRow, DefinitionObjectNames);
     }
 
     internal static void RefreshLanguage(OptionsDialogController instance)
@@ -108,11 +114,14 @@ internal static class BppKeybindSettingsAwakePatch
         if (keybindRows == null)
             return null;
 
-        return keybindRows
-            .Where(candidate =>
-                candidate != null && candidate.GetComponent<KeyBindController>() != null
-            )
-            .LastOrDefault();
+        Transform? templateRow = null;
+        foreach (var candidate in keybindRows)
+        {
+            if (candidate != null && candidate.GetComponent<KeyBindController>() != null)
+                templateRow = candidate;
+        }
+
+        return templateRow;
     }
 
     private static void ArrangeRows(Transform templateRow, params string[] rowObjectNames)
@@ -214,6 +223,7 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
 
     private OptionsDialogController? _controller;
     private Coroutine? _refreshCoroutine;
+    private bool _nativeLabelsUpdated;
 
     internal static BppKeybindSettingsRefreshDriver Attach(OptionsDialogController controller)
     {
@@ -229,6 +239,7 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
         if (_refreshCoroutine != null)
             StopCoroutine(_refreshCoroutine);
 
+        _nativeLabelsUpdated = false;
         _refreshCoroutine = StartCoroutine(RefreshRoutine());
     }
 
@@ -252,7 +263,10 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
             {
                 BppKeybindSettingsAwakePatch.EnsureKeybindRows(_controller);
                 BppKeybindSettingsAwakePatch.RefreshLanguage(_controller);
-                NativeKeybindLabelAwakePatch.TryUpdateLabels(_controller);
+                if (!_nativeLabelsUpdated)
+                    _nativeLabelsUpdated = NativeKeybindLabelAwakePatch.TryUpdateLabels(
+                        _controller
+                    );
 
                 if (HasInstalledRows(_controller))
                 {
@@ -277,15 +291,22 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
 
     private static bool HasInstalledRows(OptionsDialogController controller)
     {
-        return controller
-                .GetComponentsInChildren<Transform>(true)
-                .Any(candidate =>
-                    candidate != null && candidate.name == "BPP_Keybind_EnchantPreview"
-                )
-            && controller
-                .GetComponentsInChildren<Transform>(true)
-                .Any(candidate =>
-                    candidate != null && candidate.name == "BPP_Keybind_UpgradePreview"
-                );
+        var foundEnchant = false;
+        var foundUpgrade = false;
+        foreach (var candidate in controller.GetComponentsInChildren<Transform>(true))
+        {
+            if (candidate == null)
+                continue;
+
+            if (candidate.name == BppKeybindSettingsAwakePatch.EnchantPreviewObjectName)
+                foundEnchant = true;
+            else if (candidate.name == BppKeybindSettingsAwakePatch.UpgradePreviewObjectName)
+                foundUpgrade = true;
+
+            if (foundEnchant && foundUpgrade)
+                return true;
+        }
+
+        return false;
     }
 }

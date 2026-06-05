@@ -35,13 +35,23 @@ public static class MessagePackGzipCodec
         return output.ToArray();
     }
 
-    public static T? Deserialize<T>(byte[]? payloadBytes)
+    public static bool TryDeserialize<T>(byte[]? payloadBytes, out T? value, out string? error)
         where T : class
     {
+        value = null;
+        error = null;
+
         if (payloadBytes == null || payloadBytes.Length == 0)
-            return null;
+        {
+            error = "payload_empty";
+            return false;
+        }
+
         if (!LooksLikeGzip(payloadBytes))
-            return null;
+        {
+            error = "payload_not_gzip";
+            return false;
+        }
 
         try
         {
@@ -49,11 +59,19 @@ public static class MessagePackGzipCodec
             using var gzip = new GZipStream(input, CompressionMode.Decompress);
             using var decompressed = new MemoryStream();
             gzip.CopyTo(decompressed);
-            return MessagePackSerializer.Deserialize<T>(decompressed.ToArray(), Options);
+            value = MessagePackSerializer.Deserialize<T>(decompressed.ToArray(), Options);
+            if (value == null)
+            {
+                error = "payload_deserialized_null";
+                return false;
+            }
+
+            return true;
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            error = $"{ex.GetType().Name}: {ex.Message}";
+            return false;
         }
     }
 

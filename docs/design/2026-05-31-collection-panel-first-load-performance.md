@@ -97,11 +97,11 @@ The pre-fix runtime log from 2026-05-31 showed `CollectionCatalog` building `173
 
 Status: Partially landed.
 
-The shipped instrumentation records catalog, filter, refresh, cache-hit/source counts, accepted/rejected counts, catalog card count, and visible card count under `[BPP][CollectionPanelLoad]`. It does not yet separately time `EnsureView()` or the first-window native card bind/art path, so those remain optional future instrumentation if logs show native realization is still the user-visible delay.
+The shipped instrumentation records `EnsureView()`, catalog, filter, refresh, cache-hit/source counts, accepted/rejected counts, catalog card count, and visible card count under `[BPP][CollectionPanelLoad]`. It does not yet separately time the first-window native card bind/art path, so that remains optional future instrumentation if logs show native realization is still the user-visible delay.
 
 Add a small, removable or debug-level timing helper around the first-open path before changing behavior.
 
-The remaining instrumentation gap is `EnsureView()` and the first several `CollectionCardFactory.TryBind(...)` calls; shipped logs already cover the catalog build session, filter pass, refresh pass, cache-hit state, source counts, and visible count: `Game/CollectionPanel/CollectionPanel.cs:445-517` and `Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs:155-165`.
+The remaining instrumentation gap is the first several `CollectionCardFactory.TryBind(...)` calls and any art loads they trigger; shipped logs already cover `EnsureView()`, the catalog build session, filter pass, refresh pass, cache-hit state, source counts, and visible count: `Game/CollectionPanel/CollectionPanel.cs:445-517` and `Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs:155-165`.
 
 Log catalog source counts, accepted counts, rejected placeholder/template counts, filter result count, and first-window bind count because those values decide whether the fix should focus on data projection or native card binding: `Game/CollectionPanel/Data/CollectionCatalog.cs:64-79` and `Game/CollectionPanel/Data/CollectionFilterEngine.cs:20-65`.
 
@@ -148,6 +148,8 @@ Acceptance for P2 is that opening the panel after a non-locale scene transition 
 Status: Deferred.
 
 The fresh runtime log showed `filter=2.7ms` cold and `filter=2.2ms` on cache-hit reopen, so this is not currently the first-load bottleneck.
+
+Revalidate this deferred decision if the catalog exceeds roughly 3000 accepted cards, a profiling run shows filter/sort above 10ms on target hardware, or the next CollectionPanel performance session records filter time as a visible share of first-open latency.
 
 If P0 shows `CollectionFilterEngine.Apply(...)` is a meaningful share of first-open cost, add precomputed default Item and Skill ordered lists at catalog build time: `Game/CollectionPanel/Data/CollectionFilterEngine.cs:52-65`.
 

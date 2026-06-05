@@ -2,6 +2,7 @@
 
 RoutesTests.Run();
 CodecTests.Run();
+ErrorFormatterTests.Run();
 HealthClientTests.Run();
 BazaarDbSnapshotClientTests.Run();
 RunBundleClientTests.Run();

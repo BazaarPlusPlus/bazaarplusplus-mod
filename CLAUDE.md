@@ -45,12 +45,15 @@ For runtime validation that needs launching the game, always launch The Bazaar t
 
 ## Architecture
 
-**Four assemblies** ship unconditionally as the mod; two BazaarAgent assemblies ship only when `./run.sh build --with-bazaaragent` or `./run.sh all --with-bazaaragent` is used:
+**Four assemblies** ship unconditionally as the mod:
 
 - `BazaarPlusPlus.dll` — the main BepInEx plugin; references game DLLs, Unity, BepInEx
 - `BazaarPlusPlus.ModApi.dll` — HTTP client + DTOs for the cloud backend; zero game/Unity/BepInEx references
 - `BazaarPlusPlus.Storage.dll` — SQLite persistence layer; zero game/Unity/BepInEx references
 - `BazaarPlusPlus.Localization.dll` — localization engine; zero game/Unity/BepInEx references
+
+Two BazaarAgent assemblies ship only when `./run.sh build --with-bazaaragent` or `./run.sh all --with-bazaaragent` is used:
+
 - `BazaarPlusPlus.BazaarAgent.dll` — pure HTTP transport, DTO, validation, queue, and runtime controller; zero game/Unity/BepInEx references
 - `BazaarPlusPlus.BazaarAgentHost.dll` — optional BepInEx host bridge; installing the dll starts the fixed `127.0.0.1:47900` listener automatically
 
@@ -69,7 +72,7 @@ All six projects live under `src/<AssemblyName>/`, each in its own directory so 
 - `Game/` — feature implementations organized by subdirectory (CombatReplay, HistoryPanel, RunLogging, Screenshots, Tooltips, etc.).
 - `Patches/` — Harmony patches, organized by feature area. `BppPatchHost` provides the static service locator that patches use to reach `IBppServices`.
 - `Infrastructure/` — cross-cutting utilities (logging, fonts, UI design tokens).
-- `Localization/` — zero-dependency localization engine (string lookup, locale switching) extracted from `Game/Settings`.
+- `Localization/` — zero-dependency localization engine extracted from `Game/Settings`. The `L` facade is installed at plugin startup with `L.Install(ILanguageProvider, ILocaleModeProvider)`, then owns string lookup, locale switching, and language-code / Chinese-mode resolution. Runtime providers live at the game/plugin edge (`GameLanguageProvider`, `ChineseLocaleModeProvider`); the localization assembly itself stays free of game, Unity, and BepInEx references.
 
 **Architecture layering rules:**
 

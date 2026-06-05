@@ -121,7 +121,10 @@ try
     );
     Assert(tryBuildSnapshot != null, "BazaarDbSnapshotUploadStore should expose TryBuildSnapshot.");
     var maxUploadImageBytes = GetStaticInt(uploadLimitsType, "MaxUploadImageBytes");
-    var originalPngRecord = tryBuildSnapshot!.Invoke(store, ["shot-A", "acct-1"]);
+    var originalPngRecord = tryBuildSnapshot!.Invoke(
+        store,
+        ["shot-A", "acct-1", CancellationToken.None]
+    );
     Assert(
         originalPngRecord != null,
         "A small original PNG should build through the production preparer fast path."
@@ -140,7 +143,10 @@ try
     );
     Assert(prepareImage != null, "BazaarDbSnapshotImagePreparer should expose Prepare.");
     Assert(
-        prepareImage!.Invoke(imagePreparer, ["bad-image", invalidOversizedPath]) == null,
+        prepareImage!.Invoke(
+            imagePreparer,
+            ["bad-image", invalidOversizedPath, CancellationToken.None]
+        ) == null,
         "An oversized image that cannot be decoded should return null instead of throwing."
     );
 
@@ -163,7 +169,10 @@ try
         screenshotsDir,
         CreatePrepareSnapshotImageDelegate(prepareDelegateType),
     ]);
-    var pngRecord = tryBuildSnapshot!.Invoke(fakeStore, ["shot-A", "acct-1"]);
+    var pngRecord = tryBuildSnapshot!.Invoke(
+        fakeStore,
+        ["shot-A", "acct-1", CancellationToken.None]
+    );
     Assert(pngRecord != null, "A 2 MiB prepared PNG should build an upload record.");
     var pngImage = GetProperty(GetProperty(pngRecord!, "Payload")!, "Image")!;
     var pngBase64 = (string)GetProperty(pngImage, "DataBase64")!;
@@ -187,7 +196,10 @@ try
         screenshotsDir,
         CreatePrepareSnapshotImageDelegate(prepareDelegateType),
     ]);
-    var jpegRecord = tryBuildSnapshot.Invoke(jpegStore, ["shot-B", "acct-1"]);
+    var jpegRecord = tryBuildSnapshot.Invoke(
+        jpegStore,
+        ["shot-B", "acct-1", CancellationToken.None]
+    );
     Assert(jpegRecord != null, "A prepared JPEG should build an upload record.");
     var jpegImage = GetProperty(GetProperty(jpegRecord!, "Payload")!, "Image")!;
     Assert(
@@ -203,7 +215,10 @@ try
         screenshotsDir,
         CreatePrepareSnapshotImageDelegate(prepareDelegateType),
     ]);
-    var nullRecord = tryBuildSnapshot.Invoke(nullStore, ["shot-too-large", "acct-1"]);
+    var nullRecord = tryBuildSnapshot.Invoke(
+        nullStore,
+        ["shot-too-large", "acct-1", CancellationToken.None]
+    );
     Assert(nullRecord == null, "A null prepared image should not build an upload record.");
     Assert(
         (string?)GetProperty(nullStore, "LastBuildFailureReason") == "image_too_large_after_resize",

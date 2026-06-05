@@ -45,7 +45,14 @@ internal sealed class CombatReplayPayloadStore
         try
         {
             var payloadBytes = File.ReadAllBytes(filePath);
-            return PvpReplayPayloadCodec.Deserialize(payloadBytes);
+            if (PvpReplayPayloadCodec.TryDeserialize(payloadBytes, out var payload, out var error))
+                return payload;
+
+            BppLog.Warn(
+                "CombatReplayPayloadStore",
+                $"Skipping invalid replay payload '{filePath}': {error ?? "unknown_error"}"
+            );
+            return null;
         }
         catch (Exception ex)
         {

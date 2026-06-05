@@ -1,5 +1,6 @@
 #nullable enable
 using System.Reflection;
+using BazaarPlusPlus.Localization;
 
 var formatterType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelServerHealthFormatter"
@@ -48,6 +49,26 @@ Assert(GetBool(failureDisplay, "ButtonEnabled"), "Failure should re-enable the b
 Assert(
     GetString(failureDisplay, "StatusMessage") == "Game-server check failed after 87 ms: http_503",
     "Failure status should include RTT and stable error."
+);
+
+var textType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelText");
+var languageProvider = new MutableLanguageProvider("zh-CN");
+var modeProvider = new MutableLocaleModeProvider(BppChineseLocaleMode.Mainland);
+L.Install(languageProvider, modeProvider);
+var mainlandSample = InvokeStatic(textType, "FontAtlasSample") as string;
+modeProvider.CurrentMode = BppChineseLocaleMode.Taiwan;
+var taiwanSample = InvokeStatic(textType, "FontAtlasSample") as string;
+Assert(
+    !string.IsNullOrWhiteSpace(mainlandSample) && mainlandSample.Contains('对'),
+    "Mainland font atlas sample should include simplified Chinese glyphs."
+);
+Assert(
+    !string.IsNullOrWhiteSpace(taiwanSample) && taiwanSample.Contains('對'),
+    "Taiwan font atlas sample should include traditional Chinese glyphs after a mode switch."
+);
+Assert(
+    !string.Equals(mainlandSample, taiwanSample, StringComparison.Ordinal),
+    "FontAtlasSample cache should vary by Chinese locale mode, not only language code."
 );
 
 Console.WriteLine("HistoryPanelServerHealth checks passed.");
@@ -116,4 +137,14 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+internal sealed class MutableLanguageProvider(string languageCode) : ILanguageProvider
+{
+    public string CurrentLanguageCode { get; set; } = languageCode;
+}
+
+internal sealed class MutableLocaleModeProvider(BppChineseLocaleMode mode) : ILocaleModeProvider
+{
+    public BppChineseLocaleMode CurrentMode { get; set; } = mode;
 }

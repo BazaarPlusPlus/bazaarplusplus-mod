@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Storage.RunLog;
@@ -12,7 +13,8 @@ namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
 internal delegate BazaarDbSnapshotUploadImage? PrepareSnapshotImage(
     string snapshotId,
-    string absolutePath
+    string absolutePath,
+    CancellationToken cancellationToken
 );
 
 internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
@@ -119,9 +121,14 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
         return command.ExecuteScalar() != null;
     }
 
-    public BazaarDbSnapshotUploadRecord? TryBuildSnapshot(string snapshotId, string playerAccountId)
+    public BazaarDbSnapshotUploadRecord? TryBuildSnapshot(
+        string snapshotId,
+        string playerAccountId,
+        CancellationToken cancellationToken
+    )
     {
         LastBuildFailureReason = null;
+        cancellationToken.ThrowIfCancellationRequested();
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
         command.CommandText = $"""
@@ -156,7 +163,17 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
             return null;
         }
 
-        var uploadImage = _imagePreparer(snapshotId, absolutePath);
+        BazaarDbSnapshotUploadImage? uploadImage;
+        try
+        {
+            uploadImage = _imagePreparer(snapshotId, absolutePath, cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            LastBuildFailureReason = "image_prepare_timeout";
+            return null;
+        }
+
         if (uploadImage == null || uploadImage.Bytes.Length == 0)
         {
             LastBuildFailureReason = "image_too_large_after_resize";

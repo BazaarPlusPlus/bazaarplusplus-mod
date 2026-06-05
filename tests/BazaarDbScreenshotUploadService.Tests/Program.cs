@@ -75,7 +75,10 @@ try
     var ensureBackfilled = storeType.GetMethod("EnsureBackfilled")!;
     ensureBackfilled.Invoke(store, []);
     var tryBuildSnapshot = storeType.GetMethod("TryBuildSnapshot")!;
-    var preflightRecord = tryBuildSnapshot.Invoke(store, ["shot-1", "acct-9"]);
+    var preflightRecord = tryBuildSnapshot.Invoke(
+        store,
+        ["shot-1", "acct-9", CancellationToken.None]
+    );
     Assert(
         preflightRecord != null,
         $"Preflight snapshot build should succeed; failure={GetStoreBuildFailure(storeType, store)}."
@@ -314,6 +317,7 @@ try
         );
         client.Dispose();
     }
+    FakePreparedImage.NextException = null;
     FakePreparedImage.NextImage = CreateUploadImage(
         uploadImageType,
         [0x89, 0x50, 0x4E, 0x47],
@@ -321,7 +325,68 @@ try
         "fake-cache/snapshot.png"
     );
 
-    // Test 7: health failure leaves pending rows untouched for the next retry
+    // Test 7: prepared image timeout is transient after health succeeds, without POST
+    SeedRunSnapshotWithFile(
+        dbPath,
+        screenshotsDir,
+        "shot-image-timeout",
+        "2026-04-08_20-32-10-000_final_run-r1.png"
+    );
+    FakePreparedImage.NextImage = null;
+    FakePreparedImage.NextException = new TimeoutException("resize timed out");
+    var timeoutStore = fakeStoreCtor.Invoke([
+        dbPath,
+        screenshotsDir,
+        CreatePrepareSnapshotImageDelegate(prepareDelegateType),
+    ]);
+    ensureBackfilled.Invoke(timeoutStore, []);
+    {
+        var handler = new RecordingHandler(req => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                "{\"status\":\"ok\",\"server_time_utc\":\"2026-06-03T00:00:00.000Z\"}"
+            ),
+        });
+        var client = new HttpClient(handler);
+        var service = ctor!.Invoke([
+            timeoutStore,
+            routes,
+            client,
+            new Func<string?>(() => "acct-9"),
+        ]);
+        var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;
+        var task = (Task)uploadMethod.Invoke(service, [CancellationToken.None])!;
+        task.GetAwaiter().GetResult();
+
+        Assert(
+            GetUploadStatus(dbPath, "shot-image-timeout") == "pending",
+            "Prepared image timeout should be a transient failure."
+        );
+        Assert(
+            GetUploadAttempts(dbPath, "shot-image-timeout") == 1,
+            "Prepared image timeout should increment attempts."
+        );
+        Assert(
+            GetUploadLastError(dbPath, "shot-image-timeout") == "image_prepare_timeout",
+            "Prepared image timeout should record image_prepare_timeout."
+        );
+        Assert(
+            handler.Requests.Count == 1
+                && handler.Requests[0].Method == HttpMethod.Get
+                && handler.Requests[0].RequestUri?.AbsolutePath == "/health",
+            "Prepared image timeout should happen after the health probe and before upload POST."
+        );
+        client.Dispose();
+    }
+    FakePreparedImage.NextException = null;
+    FakePreparedImage.NextImage = CreateUploadImage(
+        uploadImageType,
+        [0x89, 0x50, 0x4E, 0x47],
+        "image/png",
+        "fake-cache/snapshot.png"
+    );
+
+    // Test 8: health failure leaves pending rows untouched for the next retry
     SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
@@ -356,7 +421,7 @@ try
         client.Dispose();
     }
 
-    // Test 8: missing account id should not probe health or count attempts
+    // Test 9: missing account id should not probe health or count attempts
     SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
@@ -580,11 +645,21 @@ internal static class FakePreparedImage
 {
     public static object? NextImage { get; set; }
 
+    public static Exception? NextException { get; set; }
+
     public static int PrepareCallCount { get; set; }
 
-    public static object? Prepare(string snapshotId, string absolutePath)
+    public static object? Prepare(
+        string snapshotId,
+        string absolutePath,
+        CancellationToken cancellationToken
+    )
     {
+        cancellationToken.ThrowIfCancellationRequested();
         PrepareCallCount++;
+        if (NextException != null)
+            throw NextException;
+
         return NextImage;
     }
 }

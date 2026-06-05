@@ -51,7 +51,10 @@ public sealed class PendingAction
         {
             _timer?.Dispose();
         }
-        catch { }
+        catch
+        {
+            // Best-effort cleanup; completion is already published and the timer is collectible.
+        }
         _timer = null;
         _tcs.TrySetResult(response);
     }

@@ -20,7 +20,7 @@
 - [features/combat-status-bar.md](features/combat-status-bar.md) — 战斗底部 HUD。
 - [features/monster-preview.md](features/monster-preview.md) — 原生怪物预览 + CardSet overlay。
 - [features/ghost-battle-data-flow.md](features/ghost-battle-data-flow.md) — ghost battle 录制→上传→同步→渲染的视角翻转数据流。
-- [features/bazaar-agent.md](features/bazaar-agent.md) — BazaarAgent 概览（**当前 parked**）。
+- [features/bazaar-agent.md](features/bazaar-agent.md) — BazaarAgent 概览（可选独立 host 插件，默认不随包分发，按需 `--with-bazaaragent` 构建）。
 
 ## 稳定契约 / 清单（`reference/`）
 
@@ -29,13 +29,13 @@
 - [reference/sqlite-schema-reference.md](reference/sqlite-schema-reference.md) — 本地表 / 列 / 版本的唯一真相源。
 - [reference/hotkeys-reference.md](reference/hotkeys-reference.md) — 快捷键默认值与可绑按键的唯一真相源。
 - [reference/settings-and-debug-surfaces.md](reference/settings-and-debug-surfaces.md) — 设置坞条目清单。
-- [reference/bazaar-agent-http-api-v1.md](reference/bazaar-agent-http-api-v1.md) — BazaarAgent wire 契约（parked）。
-- [reference/bazaar-agent-decision-surface.md](reference/bazaar-agent-decision-surface.md) — BazaarAgent 字段推导（parked）。
+- [reference/bazaar-agent-http-api-v1.md](reference/bazaar-agent-http-api-v1.md) — BazaarAgent wire 契约（可选独立 host 插件）。
+- [reference/bazaar-agent-decision-surface.md](reference/bazaar-agent-decision-surface.md) — BazaarAgent 字段推导（可选独立 host 插件）。
 
 ## 领域决策与术语
 
 - [../CONTEXT.md](../CONTEXT.md) — 领域术语表（Encounter / Pedestal / Encounter status probe …）。
-- [adr/](adr/) — 架构决策记录：[0001](adr/0001-encounter-status-probe-not-timeline-tracker.md) 状态探针、[0002](adr/0002-mountable-feature-registry.md) mountable 注册表、[0003](adr/0003-history-panel-preview-overlay.md) 预览 overlay、[0004](adr/0004-preview-visibility-three-state-mode.md) 3 态预览模式、[0005](adr/0005-autobazaar-isolated-transport-core.md) BazaarAgent 隔离核心。
+- [adr/](adr/) — 架构决策记录：[0001](adr/0001-encounter-status-probe-not-timeline-tracker.md) 状态探针、[0002](adr/0002-mountable-feature-registry.md) mountable 注册表、[0003](adr/0003-history-panel-preview-overlay.md) 预览 overlay、[0004](adr/0004-preview-visibility-three-state-mode.md) 3 态预览模式、[0005](adr/0005-autobazaar-isolated-transport-core.md) BazaarAgent 隔离核心（被 0006 取代）、[0006](adr/0006-bazaaragent-as-its-own-plugin.md) BazaarAgent 独立插件化。
 
 ## 设计历史（`design/`）
 

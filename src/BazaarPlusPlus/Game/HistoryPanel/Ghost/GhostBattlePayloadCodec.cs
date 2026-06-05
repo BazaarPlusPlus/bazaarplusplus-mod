@@ -8,6 +8,9 @@ internal static class GhostBattlePayloadCodec
     public static byte[] Serialize(GhostBattlePayload payload) =>
         MessagePackGzipCodec.Serialize(payload);
 
-    public static GhostBattlePayload? Deserialize(byte[] payloadBytes) =>
-        MessagePackGzipCodec.Deserialize<GhostBattlePayload>(payloadBytes);
+    public static bool TryDeserialize(
+        byte[]? payloadBytes,
+        out GhostBattlePayload? payload,
+        out string? error
+    ) => MessagePackGzipCodec.TryDeserialize(payloadBytes, out payload, out error);
 }

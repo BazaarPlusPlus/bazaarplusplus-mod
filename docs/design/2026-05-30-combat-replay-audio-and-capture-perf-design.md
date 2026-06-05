@@ -1,7 +1,7 @@
 # Combat Replay 录制：消除卡顿 + 加入游戏音频
 
 - 日期：2026-05-30
-- 状态：设计待定稿（brainstorm 产出，已二次自审，待评审）
+- 状态：SUPERSEDED（audio）/ IMPLEMENTED（video）。音频侧的 FMOD tap 决策已被 WASAPI/CoreAudio 输出层采集取代；视频侧的帧缓冲池、墙钟 CFR 与异步 mux 仍是现行实现历史。
 - 影响仓库：`bazaarplusplus-mod`
 
 > **更新（2026-05-30）**：本文的**音频抓取决策**（决策 2：从 FMOD 主 channel group 挂直通 tap DSP）**已被取代**——FMOD tap 抓不到 Resonance Audio 空间化的 3D 战斗音效，已改为 **WASAPI loopback 录设备输出**。详见 [2026-05-30-combat-replay-audio-loopback-capture.md](2026-05-30-combat-replay-audio-loopback-capture.md)。本文的视频侧决策（帧缓冲池消卡顿、墙钟 CFR、异步 mux）不受影响，仍是现行实现。

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
@@ -12,6 +13,9 @@ namespace BazaarPlusPlus.GameInterop;
 internal static class BppClientCacheBridge
 {
     private const string LogComponent = "BppClientCacheBridge";
+    private static readonly ConcurrentDictionary<string, MemberAccessor> MemberAccessors = new();
+    private static Type? _clientCacheType;
+    private static bool _clientCacheTypeResolved;
 
     public static string? TryGetProfileUsername()
     {
@@ -132,7 +136,7 @@ internal static class BppClientCacheBridge
 
         try
         {
-            var clientCacheType = AccessTools.TypeByName("TheBazaar.ClientCache");
+            var clientCacheType = TryGetClientCacheType();
             if (clientCacheType == null)
                 return false;
 
@@ -158,8 +162,7 @@ internal static class BppClientCacheBridge
     {
         const BindingFlags flags =
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
-        return type.GetProperty(memberName, flags)?.GetValue(null, null)
-            ?? type.GetField(memberName, flags)?.GetValue(null);
+        return GetMemberAccessor(type, memberName, flags).GetValue(null);
     }
 
     private static object? ReadMember(object? instance, string memberName)
@@ -173,8 +176,35 @@ internal static class BppClientCacheBridge
             | BindingFlags.NonPublic
             | BindingFlags.Instance
             | BindingFlags.Static;
-        return type.GetProperty(memberName, flags)?.GetValue(instance, null)
-            ?? type.GetField(memberName, flags)?.GetValue(instance);
+        return GetMemberAccessor(type, memberName, flags).GetValue(instance);
+    }
+
+    private static Type? TryGetClientCacheType()
+    {
+        if (_clientCacheTypeResolved)
+            return _clientCacheType;
+
+        _clientCacheType = AccessTools.TypeByName("TheBazaar.ClientCache");
+        if (_clientCacheType != null)
+            _clientCacheTypeResolved = true;
+
+        return _clientCacheType;
+    }
+
+    private static MemberAccessor GetMemberAccessor(
+        Type type,
+        string memberName,
+        BindingFlags flags
+    )
+    {
+        var key = $"{type.AssemblyQualifiedName}\u001F{(int)flags}\u001F{memberName}";
+        return MemberAccessors.GetOrAdd(
+            key,
+            _ => new MemberAccessor(
+                type.GetProperty(memberName, flags),
+                type.GetField(memberName, flags)
+            )
+        );
     }
 
     private static string? ReadStringMember(object? instance, string memberName)
@@ -202,5 +232,25 @@ internal static class BppClientCacheBridge
         return value == null ? null
             : int.TryParse(value.ToString(), out var parsed) ? parsed
             : null;
+    }
+
+    private sealed class MemberAccessor
+    {
+        private readonly PropertyInfo? _property;
+        private readonly FieldInfo? _field;
+
+        internal MemberAccessor(PropertyInfo? property, FieldInfo? field)
+        {
+            _property = property;
+            _field = field;
+        }
+
+        internal object? GetValue(object? instance)
+        {
+            if (_property != null)
+                return _property.GetValue(instance, null);
+
+            return _field?.GetValue(instance);
+        }
     }
 }

@@ -1,4 +1,5 @@
 #nullable enable
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace BazaarPlusPlus.ModApi;
@@ -15,9 +16,14 @@ public static class ModApiErrorFormatter
 
     public static string FormatHttpFailure(int statusCode, string responseBody)
     {
-        var parsed = TryParseHttpErrorPayload(responseBody);
+        var parsed = TryParseHttpErrorPayload(responseBody, out var parseError);
         if (parsed == null)
-            return $"http_{statusCode}:{Truncate(responseBody)}";
+        {
+            var truncatedBody = Truncate(responseBody);
+            return string.IsNullOrWhiteSpace(parseError)
+                ? $"http_{statusCode}:{truncatedBody}"
+                : $"http_{statusCode}:unparseable_error_payload({Truncate(parseError)}):{truncatedBody}";
+        }
 
         var error = parsed.Value.Error;
         var detail = parsed.Value.Detail;
@@ -27,8 +33,12 @@ public static class ModApiErrorFormatter
         return $"http_{statusCode}:{error}({detail})";
     }
 
-    private static (string Error, string? Detail)? TryParseHttpErrorPayload(string responseBody)
+    private static (string Error, string? Detail)? TryParseHttpErrorPayload(
+        string responseBody,
+        out string? parseError
+    )
     {
+        parseError = null;
         if (string.IsNullOrWhiteSpace(responseBody))
             return null;
 
@@ -45,8 +55,9 @@ public static class ModApiErrorFormatter
                 ?? payload["message"]?.Value<string>()?.Trim();
             return (error, string.IsNullOrWhiteSpace(detail) ? null : Truncate(detail));
         }
-        catch
+        catch (JsonException ex)
         {
+            parseError = $"{ex.GetType().Name}: {ex.Message}";
             return null;
         }
     }

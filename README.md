@@ -22,7 +22,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 ## 安装与配置
 
 - 运行前提：已安装《The Bazaar》与 BepInEx 5。
-- 手动安装时，将构建输出中的 `BazaarPlusPlus.dll` 以及同目录下的 SQLite 运行时依赖复制到游戏的 `BepInEx/plugins/`。
+- 手动安装时，将构建输出中的 `BazaarPlusPlus.dll`、`BazaarPlusPlus.ModApi.dll`、`BazaarPlusPlus.Storage.dll`、`BazaarPlusPlus.Localization.dll` 以及同目录下的 SQLite 原生运行时依赖复制到游戏的 `BepInEx/plugins/`。
 - 首次运行后，配置文件会写入 `BepInEx/config/BazaarPlusPlus.cfg`。
 - 与详细功能相关的配置项、热键和 debug 面板说明见 [docs/reference/](docs/reference/)；完整文档索引见 [docs/README.md](docs/README.md)。
 

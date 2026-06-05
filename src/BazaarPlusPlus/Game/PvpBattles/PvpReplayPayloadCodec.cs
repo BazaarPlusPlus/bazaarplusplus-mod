@@ -8,6 +8,9 @@ internal static class PvpReplayPayloadCodec
     public static byte[] Serialize(PvpReplayPayload payload) =>
         MessagePackGzipCodec.Serialize(payload);
 
-    public static PvpReplayPayload? Deserialize(byte[] payloadBytes) =>
-        MessagePackGzipCodec.Deserialize<PvpReplayPayload>(payloadBytes);
+    public static bool TryDeserialize(
+        byte[]? payloadBytes,
+        out PvpReplayPayload? payload,
+        out string? error
+    ) => MessagePackGzipCodec.TryDeserialize(payloadBytes, out payload, out error);
 }
