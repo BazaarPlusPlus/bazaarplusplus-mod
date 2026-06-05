@@ -27,6 +27,7 @@ internal static class BppItemBoardPreviewMapper
                     Tier = card.Tier,
                     SocketId =
                         card.DisplaySocketId ?? card.SourceSocketId ?? EContainerSocketId.Socket_0,
+                    DisplaySpan = card.DisplaySpan,
                     EnchantmentType = card.EnchantmentType,
                     Attributes = card.Attributes,
                     InstanceIdPrefix = $"bpp-{board.Id.ToString().ToLowerInvariant()}",

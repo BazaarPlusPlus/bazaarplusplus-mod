@@ -19,7 +19,7 @@ internal sealed class LiveItemBoardRowPreview
             {
                 Layer = layer,
                 SortingOrder = sortingOrder,
-                LayoutMode = ItemBoardPreviewLayoutMode.Socketed,
+                LayoutMode = ItemBoardPreviewLayoutMode.SlotGrid,
                 ShowHover = true,
                 LogComponent = $"LiveBuildPanel:{id}",
             }
@@ -47,7 +47,8 @@ internal sealed class LiveItemBoardRowPreview
             bounds.width / ItemBoardSocketLayout.NativeBoardWidth,
             bounds.height / ItemBoardSocketLayout.NativeBoardHeight
         );
-        return _preview.SetCardScale(scale);
+        _preview.SetCardScale(scale);
+        return true;
     }
 
     public IEnumerator Render(BppItemBoard board)

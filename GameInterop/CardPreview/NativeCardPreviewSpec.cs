@@ -14,6 +14,8 @@ internal sealed class NativeCardPreviewSpec
 
     public EContainerSocketId? SocketId { get; init; }
 
+    public int DisplaySpan { get; init; } = 1;
+
     public EEnchantmentType? EnchantmentType { get; init; }
 
     public IReadOnlyDictionary<ECardAttributeType, int>? Attributes { get; init; }

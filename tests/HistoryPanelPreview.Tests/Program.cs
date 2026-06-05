@@ -22,6 +22,12 @@ TestSlotPlanner_SelectableContainerSkipsInvalidSourceSockets();
 TestSlotPlanner_SelectableShopCentersByTotalSpan();
 TestSlotPlanner_SelectableShopSkipsOverflowRemainder();
 TestPreviewMapper_UsesDisplaySocketAndBoardPrefix();
+TestPreviewMapper_CarriesDisplaySpan();
+TestOptionsForwarder_PreservesSlotGridLayoutMode();
+TestSlotGridGeometry_ResolvesSingleSlot();
+TestSlotGridGeometry_ResolvesMediumSpan();
+TestSlotGridGeometry_ResolvesLargeSpan();
+TestSlotGridGeometry_ClampsOverflowSpan();
 
 Console.WriteLine("HistoryPanelPreview checks passed.");
 
@@ -290,6 +296,93 @@ static void TestPreviewMapper_UsesDisplaySocketAndBoardPrefix()
         spec.InstanceIdPrefix == "bpp-livestash",
         "Mapper should use the board id as a stable preview instance prefix."
     );
+}
+
+static void TestPreviewMapper_CarriesDisplaySpan()
+{
+    var board = Board(
+        BppItemBoardId.LiveBoard,
+        BppItemBoardType.SelectableContainer,
+        Card(
+            0,
+            ECardSize.Large,
+            source: EContainerSocketId.Socket_1,
+            display: EContainerSocketId.Socket_4
+        )
+    );
+
+    var spec = BppItemBoardPreviewMapper.Map(board).Single();
+
+    Assert(spec.SocketId == EContainerSocketId.Socket_4, "Mapper should preserve display socket.");
+    Assert(spec.DisplaySpan == 3, "Mapper should pass the planned display span to the renderer.");
+}
+
+static void TestOptionsForwarder_PreservesSlotGridLayoutMode()
+{
+    var options = new ItemBoardPreviewOptions
+    {
+        Layer = 7,
+        SortingOrder = 8,
+        LayoutMode = ItemBoardPreviewLayoutMode.SlotGrid,
+        ShowHover = false,
+        UseCanvasGroup = true,
+        LogComponent = "test",
+        SlotGridHorizontalInsetPixels = 11f,
+        SlotGridVerticalInsetPixels = 12f,
+        SlotGridMaxHeightRatio = 0.75f,
+        SlotGridMaxScale = 0.9f,
+    };
+
+    var forwarded = ItemBoardPreviewOptionsForwarder.ForSurface(options);
+
+    Assert(
+        forwarded.LayoutMode == ItemBoardPreviewLayoutMode.SlotGrid,
+        "Layout mode must forward."
+    );
+    Assert(forwarded.Layer == 7, "Layer must forward.");
+    Assert(forwarded.SortingOrder == 8, "Sorting order must forward.");
+    Assert(!forwarded.ShowHover, "Hover option must forward.");
+    Assert(forwarded.UseCanvasGroup, "CanvasGroup option must forward.");
+    Assert(forwarded.LogComponent == "test", "Log component must forward.");
+    Assert(
+        forwarded.SlotGridHorizontalInsetPixels == 11f,
+        "SlotGrid horizontal inset must forward."
+    );
+    Assert(forwarded.SlotGridVerticalInsetPixels == 12f, "SlotGrid vertical inset must forward.");
+    Assert(forwarded.SlotGridMaxHeightRatio == 0.75f, "SlotGrid max height must forward.");
+    Assert(forwarded.SlotGridMaxScale == 0.9f, "SlotGrid max scale must forward.");
+}
+
+static void TestSlotGridGeometry_ResolvesSingleSlot()
+{
+    var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 200f, 2, 1, 0f, 0f);
+
+    Assert(rect.X == 200f, "Socket 2 should start at x=200 for a 1000px row.");
+    Assert(rect.Width == 100f, "A small item should occupy one 100px slot.");
+}
+
+static void TestSlotGridGeometry_ResolvesMediumSpan()
+{
+    var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 200f, 3, 2, 0f, 0f);
+
+    Assert(rect.X == 300f, "Socket 3 should start at x=300 for a 1000px row.");
+    Assert(rect.Width == 200f, "A medium item should occupy two 100px slots.");
+}
+
+static void TestSlotGridGeometry_ResolvesLargeSpan()
+{
+    var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 200f, 5, 3, 0f, 0f);
+
+    Assert(rect.X == 500f, "Socket 5 should start at x=500 for a 1000px row.");
+    Assert(rect.Width == 300f, "A large item should occupy three 100px slots.");
+}
+
+static void TestSlotGridGeometry_ClampsOverflowSpan()
+{
+    var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 200f, 8, 3, 0f, 0f);
+
+    Assert(rect.X == 800f, "Socket 8 should start at x=800 for a 1000px row.");
+    Assert(rect.Width == 200f, "Overflowing span should clamp at the end of the row.");
 }
 
 static BppItemBoard Board(

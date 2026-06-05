@@ -13,6 +13,7 @@ internal sealed partial class HistoryPanel
     private HistoryPanelUiToolkitView? _uiView;
     private Rect _previewContainerBounds;
     private bool _hasPreviewContainerBounds;
+    private bool _previewContainerBoundsChanged;
 
     private void EnsureUi()
     {
@@ -42,6 +43,8 @@ internal sealed partial class HistoryPanel
 
     private void OnPreviewContainerBoundsChanged(Rect bounds)
     {
+        _previewContainerBoundsChanged =
+            !_hasPreviewContainerBounds || !RectApproximately(_previewContainerBounds, bounds);
         _previewContainerBounds = bounds;
         _hasPreviewContainerBounds = true;
 
@@ -72,6 +75,12 @@ internal sealed partial class HistoryPanel
     {
         _uiView?.SetPreviewStatus(message, visible);
     }
+
+    private static bool RectApproximately(Rect left, Rect right) =>
+        Mathf.Approximately(left.x, right.x)
+        && Mathf.Approximately(left.y, right.y)
+        && Mathf.Approximately(left.width, right.width)
+        && Mathf.Approximately(left.height, right.height);
 
     private HistoryPanelUiToolkitModel BuildUiModel()
     {

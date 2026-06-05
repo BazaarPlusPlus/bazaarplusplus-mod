@@ -16,6 +16,8 @@ namespace BazaarPlusPlus.Game.LiveBuildPanel.Ui;
 
 internal sealed class LiveBuildPanelView : IDisposable
 {
+    private const bool ShowSlotBackdrop = true;
+
     private sealed class RowElements
     {
         public Label Title = null!;
@@ -225,19 +227,30 @@ internal sealed class LiveBuildPanelView : IDisposable
         slotHost.style.overflow = Overflow.Hidden;
         row.Add(slotHost);
 
-        for (var i = 0; i < 10; i++)
+        if (ShowSlotBackdrop)
         {
-            var slot = new VisualElement();
-            slot.pickingMode = PickingMode.Ignore;
-            slot.style.position = Position.Absolute;
-            slot.style.left = Length.Percent(i * 10f);
-            slot.style.top = 6f;
-            slot.style.bottom = 6f;
-            slot.style.width = Length.Percent(10f);
-            slot.style.backgroundColor = Colors.CollectionSlotBackground;
-            slot.style.borderLeftColor = Colors.HistoryListFrameBorder;
-            slot.style.borderLeftWidth = i == 0 ? 0f : 1f;
-            slotHost.Add(slot);
+            for (var i = 0; i < ItemBoardSlotGridGeometry.SocketCount; i++)
+            {
+                var slotRect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(
+                    100f,
+                    100f,
+                    i,
+                    1,
+                    0f,
+                    0f
+                );
+                var slot = new VisualElement();
+                slot.pickingMode = PickingMode.Ignore;
+                slot.style.position = Position.Absolute;
+                slot.style.left = Length.Percent(slotRect.X);
+                slot.style.top = 6f;
+                slot.style.bottom = 6f;
+                slot.style.width = Length.Percent(slotRect.Width);
+                slot.style.backgroundColor = Colors.CollectionSlotBackground;
+                slot.style.borderLeftColor = Colors.HistoryListFrameBorder;
+                slot.style.borderLeftWidth = i == 0 ? 0f : 1f;
+                slotHost.Add(slot);
+            }
         }
 
         slotHost.RegisterCallback<GeometryChangedEvent>(_ => PublishRowBounds(id, slotHost));
@@ -340,11 +353,19 @@ internal sealed class LiveBuildPanelView : IDisposable
     )
     {
         var hit = new VisualElement();
+        var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(
+            100f,
+            100f,
+            (int)socket,
+            card.DisplaySpan,
+            0f,
+            0f
+        );
         hit.style.position = Position.Absolute;
-        hit.style.left = Length.Percent((int)socket * 10f);
+        hit.style.left = Length.Percent(rect.X);
         hit.style.top = 0f;
         hit.style.bottom = 0f;
-        hit.style.width = Length.Percent(Mathf.Clamp(card.DisplaySpan, 1, 10) * 10f);
+        hit.style.width = Length.Percent(rect.Width);
         hit.style.backgroundColor = Color.clear;
         hit.RegisterCallback<MouseDownEvent>(evt =>
         {
@@ -371,23 +392,24 @@ internal sealed class LiveBuildPanelView : IDisposable
         if (hostBounds.width <= 0f || hostBounds.height <= 0f)
             return;
 
-        var socketIndex = Mathf.Clamp((int)socket, 0, 9);
-        var span = Mathf.Clamp(card.DisplaySpan, 1, 10);
-        var slotWidth = hostBounds.width / 10f;
-        var left = hostBounds.x + socketIndex * slotWidth;
-        var right = Mathf.Min(hostBounds.xMax, left + span * slotWidth);
-        var top = hostBounds.y + 4f;
-        var height = Mathf.Max(1f, hostBounds.height - 8f);
-        if (right <= left)
+        var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(
+            hostBounds.width,
+            hostBounds.height,
+            (int)socket,
+            card.DisplaySpan,
+            0f,
+            4f
+        );
+        if (rect.Width <= 0f)
             return;
 
         var marker = new VisualElement();
         marker.pickingMode = PickingMode.Ignore;
         marker.style.position = Position.Absolute;
-        marker.style.left = left;
-        marker.style.top = top;
-        marker.style.width = right - left;
-        marker.style.height = height;
+        marker.style.left = hostBounds.x + rect.X;
+        marker.style.top = hostBounds.y + rect.Y;
+        marker.style.width = rect.Width;
+        marker.style.height = rect.Height;
         marker.style.backgroundColor = new Color(1f, 0.72f, 0.18f, 0.13f);
         marker.style.borderBottomColor = Colors.HistoryGoldAccent;
         marker.style.borderTopColor = Colors.HistoryGoldAccent;

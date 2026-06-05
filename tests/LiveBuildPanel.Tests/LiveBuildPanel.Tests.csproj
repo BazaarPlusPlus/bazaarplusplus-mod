@@ -46,6 +46,10 @@
       Link="BppItemBoardType.cs"
     />
     <Compile
+      Include="../../GameInterop/ItemBoardPreview/ItemBoardSlotGridGeometry.cs"
+      Link="ItemBoardSlotGridGeometry.cs"
+    />
+    <Compile
       Include="../../Infrastructure/UiTokens/BppOverlaySorting.cs"
       Link="BppOverlaySorting.cs"
     />

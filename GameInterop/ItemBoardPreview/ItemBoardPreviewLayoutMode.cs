@@ -5,4 +5,5 @@ internal enum ItemBoardPreviewLayoutMode
 {
     Socketed,
     Packed,
+    SlotGrid,
 }

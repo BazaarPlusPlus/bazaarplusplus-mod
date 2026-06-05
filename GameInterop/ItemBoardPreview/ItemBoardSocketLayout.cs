@@ -6,7 +6,7 @@ namespace BazaarPlusPlus.GameInterop.ItemBoardPreview;
 
 internal static class ItemBoardSocketLayout
 {
-    public const int SocketCount = 10;
+    public const int SocketCount = ItemBoardSlotGridGeometry.SocketCount;
     public const int NativeBoardWidth = 2600;
     public const int NativeBoardHeight = 600;
 

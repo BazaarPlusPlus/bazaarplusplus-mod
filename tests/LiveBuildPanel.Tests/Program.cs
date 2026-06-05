@@ -7,6 +7,7 @@ TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground();
 TestCandidateToggleUsesTemplateId();
 TestCandidatePruneKeepsSelectableRowsOnly();
 TestRowVmTogglePolicyComesFromBoardType();
+TestSlotChromeGeometryMatchesTenSlotContract();
 
 Console.WriteLine("LiveBuildPanel checks passed.");
 
@@ -72,6 +73,19 @@ static void TestRowVmTogglePolicyComesFromBoardType()
         ).CanToggleCandidates,
         "Shop row should expose candidate hit targets."
     );
+}
+
+static void TestSlotChromeGeometryMatchesTenSlotContract()
+{
+    var hitPercent = ItemBoardSlotGridGeometry.ResolveOccupiedRect(100f, 100f, 3, 2, 0f, 0f);
+    var markerPixels = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 180f, 3, 2, 0f, 4f);
+
+    Assert(hitPercent.X == 30f, "Hit target should start at the socket's 10-slot percent.");
+    Assert(hitPercent.Width == 20f, "Hit target should span the card's display slots.");
+    Assert(markerPixels.X == 300f, "Marker should use the same left socket in pixels.");
+    Assert(markerPixels.Width == 200f, "Marker should use the same occupied span in pixels.");
+    Assert(markerPixels.Y == 4f, "Marker should apply only its vertical chrome inset.");
+    Assert(markerPixels.Height == 172f, "Marker height should preserve the vertical chrome inset.");
 }
 
 static BppItemBoard Board(BppItemBoardId id, BppItemBoardType type, Guid templateId) =>

@@ -73,6 +73,7 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
         _clipSize = rounded;
         ApplyTransform();
+        _renderedSignature = null;
     }
 
     public bool SetCardScale(float scale)
@@ -157,7 +158,9 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
             yield break;
 
         Canvas.ForceUpdateCanvases();
-        if (_options.LayoutMode == ItemBoardPreviewLayoutMode.Packed)
+        if (_options.LayoutMode == ItemBoardPreviewLayoutMode.SlotGrid)
+            LayoutCardsSlotGrid();
+        else if (_options.LayoutMode == ItemBoardPreviewLayoutMode.Packed)
             LayoutCardsPacked();
 
         if (ItemBoardPreviewSignatureGate.ShouldCache(aggregate))
@@ -356,6 +359,17 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
         _clipRect.sizeDelta = _clipSize;
         _clipRect.localScale = Vector3.one;
 
+        if (_options.LayoutMode == ItemBoardPreviewLayoutMode.SlotGrid)
+        {
+            _boardRect.anchorMin = Vector2.zero;
+            _boardRect.anchorMax = Vector2.one;
+            _boardRect.pivot = new Vector2(0.5f, 0.5f);
+            _boardRect.anchoredPosition = Vector2.zero;
+            _boardRect.sizeDelta = Vector2.zero;
+            _boardRect.localScale = Vector3.one;
+            return;
+        }
+
         _boardRect.anchorMin = new Vector2(0.5f, 0.5f);
         _boardRect.anchorMax = new Vector2(0.5f, 0.5f);
         _boardRect.pivot = new Vector2(0.5f, 0.5f);
@@ -441,6 +455,71 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
         {
             entry.card.position += new Vector3(cursor - entry.frameLeft, 0f, 0f);
             cursor += entry.frameWidth;
+        }
+    }
+
+    private void LayoutCardsSlotGrid()
+    {
+        if (_active.Count == 0)
+            return;
+
+        var corners = new Vector3[4];
+        foreach (var handle in _active)
+        {
+            if (!handle.SetUpTask.IsCompletedSuccessfully || handle.Card == null)
+                continue;
+            if (!handle.Card.gameObject.activeInHierarchy)
+                continue;
+
+            var frame = FindDescendant(handle.Rect, "FrameContainer") ?? handle.Rect;
+            frame.GetWorldCorners(corners);
+            var frameWidth = corners[2].x - corners[0].x;
+            var frameHeight = corners[2].y - corners[0].y;
+            if (frameWidth <= 0f || frameHeight <= 0f)
+                continue;
+
+            var socketIndex = handle.Spec.SocketId.HasValue ? (int)handle.Spec.SocketId.Value : 0;
+            var occupied = ItemBoardSlotGridGeometry.ResolveOccupiedRect(
+                _clipSize.x,
+                _clipSize.y,
+                socketIndex,
+                handle.Spec.DisplaySpan,
+                _options.SlotGridHorizontalInsetPixels,
+                _options.SlotGridVerticalInsetPixels
+            );
+            var targetWidth = Mathf.Max(1f, occupied.Width);
+            var targetHeight = Mathf.Max(
+                1f,
+                Mathf.Min(
+                    occupied.Height,
+                    _clipSize.y * Mathf.Clamp01(_options.SlotGridMaxHeightRatio)
+                )
+            );
+            var scale = Mathf.Min(targetWidth / frameWidth, targetHeight / frameHeight);
+            var maxScale = Mathf.Max(0.05f, _options.SlotGridMaxScale);
+            scale = Mathf.Clamp(scale, 0.05f, maxScale);
+
+            var cardTransform = handle.Card.transform;
+            cardTransform.localScale = new Vector3(
+                cardTransform.localScale.x * scale,
+                cardTransform.localScale.y * scale,
+                cardTransform.localScale.z
+            );
+
+            frame.GetWorldCorners(corners);
+            var frameCenter = new Vector2(
+                (corners[0].x + corners[2].x) * 0.5f,
+                (corners[0].y + corners[2].y) * 0.5f
+            );
+            var targetCenter = new Vector2(
+                _position.x + occupied.CenterX,
+                _position.y + occupied.CenterY
+            );
+            cardTransform.position += new Vector3(
+                targetCenter.x - frameCenter.x,
+                targetCenter.y - frameCenter.y,
+                0f
+            );
         }
     }
 

@@ -361,7 +361,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             {
                 Layer = 30,
                 SortingOrder = BppOverlaySorting.NativeCardPreview,
-                LayoutMode = ItemBoardPreviewLayoutMode.Socketed,
+                LayoutMode = ItemBoardPreviewLayoutMode.SlotGrid,
                 ShowHover = true,
                 LogComponent = "HistoryPanelPreview",
             }
@@ -370,12 +370,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             ApplyPreviewContainerBounds(_previewContainerBounds);
     }
 
-    // Translates a screen-space UI Toolkit container Rect into the three item-board preview
-    // knobs: position (bottom-left of the overlay clip), clip size, and an auto-fit card scale
-    // that fits the native board into the available area. The container Rect already
-    // arrives in physical pixels (the view scales worldBound by scaledPixelsPerPoint), so this
-    // is a direct mapping with no resolution-dependent fudge factor. Returns true if the card
-    // scale changed so the caller knows to re-render.
+    // Translates a screen-space UI Toolkit container Rect into the preview surface knobs.
+    // SlotGrid consumes position and clip size directly; SetCardScale still provides the
+    // existing cache invalidation signal for legacy-sized preview updates. The container Rect
+    // already arrives in physical pixels (the view scales worldBound by scaledPixelsPerPoint),
+    // so this is a direct mapping with no resolution-dependent fudge factor. Returns true if
+    // the card scale or bounds changed so the caller knows to re-render.
     private bool ApplyPreviewContainerBounds(Rect bounds)
     {
         if (_battleBoardPreview == null)
@@ -388,7 +388,9 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
         _battleBoardPreview.SetPosition(new Vector2(bounds.x, bounds.y));
         _battleBoardPreview.SetClipSize(new Vector2(bounds.width, bounds.height));
-        return _battleBoardPreview.SetCardScale(autoFitScale);
+        var boundsChanged = _previewContainerBoundsChanged;
+        _previewContainerBoundsChanged = false;
+        return _battleBoardPreview.SetCardScale(autoFitScale) || boundsChanged;
     }
 
     private void DisposePreviewRenderer()

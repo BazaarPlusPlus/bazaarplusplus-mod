@@ -47,6 +47,18 @@
       Link="BppItemBoardType.cs"
     />
     <Compile
+      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewLayoutMode.cs"
+      Link="ItemBoardPreviewLayoutMode.cs"
+    />
+    <Compile
+      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewOptions.cs"
+      Link="ItemBoardPreviewOptions.cs"
+    />
+    <Compile
+      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewOptionsForwarder.cs"
+      Link="ItemBoardPreviewOptionsForwarder.cs"
+    />
+    <Compile
       Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewSignatureGate.cs"
       Link="ItemBoardPreviewSignatureGate.cs"
     />
@@ -57,6 +69,14 @@
     <Compile
       Include="../../GameInterop/ItemBoardPreview/ItemBoardSocketResolver.cs"
       Link="ItemBoardSocketResolver.cs"
+    />
+    <Compile
+      Include="../../GameInterop/ItemBoardPreview/ItemBoardSlotGridGeometry.cs"
+      Link="ItemBoardSlotGridGeometry.cs"
+    />
+    <Compile
+      Include="../../Infrastructure/UiTokens/BppOverlaySorting.cs"
+      Link="BppOverlaySorting.cs"
     />
     <Compile Include="Program.cs" />
   </ItemGroup>
