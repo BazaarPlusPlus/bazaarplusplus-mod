@@ -36,7 +36,7 @@ internal sealed class LiveBuildPanelSnapshot
             new LiveItemBoardRowVm(
                 FinalBuild,
                 LiveBuildPanelText.FinalBuildRow(),
-                LiveBuildPanelText.NoRecommendation()
+                string.Empty
             ),
             new LiveItemBoardRowVm(
                 Shop,
