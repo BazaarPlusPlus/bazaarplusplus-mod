@@ -13,13 +13,13 @@ namespace BazaarPlusPlus.BazaarAgentHost;
 /// <see cref="Awake"/> builds the pure-core controller, <see cref="Update"/> pumps its tick, and
 /// <see cref="OnDestroy"/> disposes it. BazaarPlusPlus does not know this plugin exists.
 /// </summary>
-[BepInPlugin(PluginGuid, PluginName, PluginVersion)]
+[BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
 [BepInDependency(BppPluginMetadata.Guid)]
 public sealed class BazaarAgentHostPlugin : BaseUnityPlugin
 {
-    public const string PluginGuid = "BazaarPlusPlus.BazaarAgent";
-    public const string PluginName = "BazaarPlusPlus BazaarAgent Host";
-    public const string PluginVersion = "6.0.0";
+    public const string PluginGuid = MyPluginInfo.PLUGIN_GUID;
+    public const string PluginName = MyPluginInfo.PLUGIN_NAME;
+    public const string PluginVersion = MyPluginInfo.PLUGIN_VERSION;
 
     private BazaarAgentRuntimeController? _controller;
 
