@@ -1,0 +1,66 @@
+src/BazaarPlusPlus/Game/Screenshots/EndOfRunScreenshotController.cs
+  s_20556f20fd32f9::t_97f2c167440ab7 267-290 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a22cd692a91ed054c87c92a","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Range":[267,290]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0daf7a4e1c4f7931f9919aa4c72425b4295d9934",
+  "prompts": {},
+  "sessions": {
+    "s_20556f20fd32f9": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a213ed88be6afae6e853b02",
+        "model": "gpt-5.5__dev"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {
+    "src/BazaarPlusPlus/Game/Screenshots/EndOfRunScreenshotController.cs": [
+      {
+        "hash": "s_20556f20fd32f9::t_97f2c167440ab7",
+        "line_ranges": [
+          {
+            "Range": [
+              267,
+              290
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a22cd692a91ed054c87c92a",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Range": [
+                  267,
+                  290
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "s_20556f20fd32f9": {
+      "tool": "trae",
+      "conversation_id": "6a213ed88be6afae6e853b02",
+      "session_id": "6a213ed88be6afae6e853b02",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_20556f20fd32f9::t_97f2c167440ab7": {
+      "tool": "trae",
+      "conversation_id": "6a213ed88be6afae6e853b02",
+      "session_id": "6a213ed88be6afae6e853b02",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
