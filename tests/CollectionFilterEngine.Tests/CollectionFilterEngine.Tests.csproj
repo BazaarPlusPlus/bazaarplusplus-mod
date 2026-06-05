@@ -21,51 +21,51 @@
 
   <ItemGroup>
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionCardVm.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardVm.cs"
       Link="CollectionCardVm.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionFilterEngine.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionFilterEngine.cs"
       Link="CollectionFilterEngine.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionFilterContext.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionFilterContext.cs"
       Link="CollectionFilterContext.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionHeroScope.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionHeroScope.cs"
       Link="CollectionHeroScope.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionCardFacetRanks.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardFacetRanks.cs"
       Link="CollectionCardFacetRanks.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionFilterState.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionFilterState.cs"
       Link="CollectionFilterState.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\DayTierSchedule.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\DayTierSchedule.cs"
       Link="DayTierSchedule.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionPanelSelectionState.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionPanelSelectionState.cs"
       Link="CollectionPanelSelectionState.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Sources\CollectionSourceEnums.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceEnums.cs"
       Link="CollectionSourceEnums.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionCardClassifier.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardClassifier.cs"
       Link="CollectionCardClassifier.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionCardClassification.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardClassification.cs"
       Link="CollectionCardClassification.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionMerchantKind.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMerchantKind.cs"
       Link="CollectionMerchantKind.cs"
     />
     <Reference Include="BazaarGameShared">

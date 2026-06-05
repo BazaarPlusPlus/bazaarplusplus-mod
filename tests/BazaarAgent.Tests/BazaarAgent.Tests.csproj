@@ -24,6 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\BazaarPlusPlus.BazaarAgent.csproj" />
+    <ProjectReference Include="..\..\src\BazaarPlusPlus.BazaarAgent\BazaarPlusPlus.BazaarAgent.csproj" />
   </ItemGroup>
 </Project>

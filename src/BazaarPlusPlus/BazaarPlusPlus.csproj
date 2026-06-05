@@ -29,42 +29,10 @@
     <EmbeddedResource Include="Resources\Fonts\SourceHanSansCN-LICENSE.txt" />
   </ItemGroup>
 
-  <!-- Exclude decompiled and installer files -->
-  <ItemGroup>
-    <Compile Remove="tests/**" />
-    <EmbeddedResource Remove="tests/**" />
-    <None Remove="tests/**" />
-    <Compile Remove="tools/**" />
-    <EmbeddedResource Remove="tools/**" />
-    <None Remove="tools/**" />
-    <Compile Remove="decompiled/**" />
-    <EmbeddedResource Remove="decompiled/**" />
-    <None Remove="decompiled/**" />
-    <Compile Remove="ModApi/**" />
-    <EmbeddedResource Remove="ModApi/**" />
-    <None Remove="ModApi/**" />
-    <Compile Remove="Storage/**" />
-    <EmbeddedResource Remove="Storage/**" />
-    <None Remove="Storage/**" />
-    <Compile Remove="BazaarAgent/**" />
-    <EmbeddedResource Remove="BazaarAgent/**" />
-    <None Remove="BazaarAgent/**" />
-    <Compile Remove="Localization/**" />
-    <EmbeddedResource Remove="Localization/**" />
-    <None Remove="Localization/**" />
-    <Compile Remove="BazaarAgentHost/**" />
-    <EmbeddedResource Remove="BazaarAgentHost/**" />
-    <None Remove="BazaarAgentHost/**" />
-    <Compile Remove="**/bin/**;**/obj/**" />
-    <EmbeddedResource Remove="**/bin/**;**/obj/**" />
-    <None Remove="**/bin/**;**/obj/**" />
-    <Content Remove="**/bin/**;**/obj/**" />
-  </ItemGroup>
-
   <!-- Project paths -->
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
-    <BPPInstallerSourcePath>$(ProjectRoot)/../bazaarplusplus-installer/src-tauri/resources</BPPInstallerSourcePath>
+    <BPPInstallerSourcePath>$(ProjectRoot)/../../../bazaarplusplus-installer/src-tauri/resources</BPPInstallerSourcePath>
     <HostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant())</HostArchitecture>
     <MacSqliteRuntimeRid>osx-x64</MacSqliteRuntimeRid>
     <FixedMacSqliteNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/libe_sqlite3.dylib</FixedMacSqliteNativeFile>
@@ -133,9 +101,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="BazaarPlusPlus.ModApi.csproj" />
-    <ProjectReference Include="BazaarPlusPlus.Storage.csproj" />
-    <ProjectReference Include="BazaarPlusPlus.Localization.csproj" />
+    <ProjectReference Include="../BazaarPlusPlus.ModApi/BazaarPlusPlus.ModApi.csproj" />
+    <ProjectReference Include="../BazaarPlusPlus.Storage/BazaarPlusPlus.Storage.csproj" />
+    <ProjectReference Include="../BazaarPlusPlus.Localization/BazaarPlusPlus.Localization.csproj" />
   </ItemGroup>
 
   <!-- Game assembly references -->

@@ -21,15 +21,15 @@
 
   <ItemGroup>
     <Compile
-      Include="..\..\Core\GameState\ChoiceScreenPedestalKind.cs"
+      Include="..\..\src\BazaarPlusPlus\Core\GameState\ChoiceScreenPedestalKind.cs"
       Link="ChoiceScreenPedestalKind.cs"
     />
     <Compile
-      Include="..\..\GameInterop\Encounter\ChoiceScreenPedestalResolver.cs"
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Encounter\ChoiceScreenPedestalResolver.cs"
       Link="ChoiceScreenPedestalResolver.cs"
     />
     <Compile
-      Include="..\..\GameInterop\Encounter\PedestalEnchantCatalog.cs"
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Encounter\PedestalEnchantCatalog.cs"
       Link="PedestalEnchantCatalog.cs"
     />
     <Reference Include="BazaarGameShared">

@@ -4,7 +4,7 @@
 
 BazaarPlusPlus is a BepInEx mod for *The Bazaar*. It adds combat UI enhancements, monster and tooltip previews, run logging, an in-game history panel, local combat replay playback, end-of-run automatic screenshots, and background upload features.
 
-This repository only keeps documentation that still matches the current implementation. If any document conflicts with the code, treat `Plugin.cs`, `Core/`, `Game/`, and `Patches/` as the source of truth.
+This repository only keeps documentation that still matches the current implementation. If any document conflicts with the code, treat the actual implementation under `src/BazaarPlusPlus/` (`Plugin.cs`, `Core/`, `Game/`, `Patches/`, …) as the source of truth.
 
 ## Feature Overview
 
@@ -33,8 +33,8 @@ This repository only keeps documentation that still matches the current implemen
 - Common commands:
 
 ```bash
-dotnet build
-dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
+dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj
+dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 ./run.sh build
 ./run.sh all
 ```
@@ -47,16 +47,15 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 - Run logging, combat replay, and end-of-run screenshots store local SQLite data, replay payloads, and screenshot files. Cloud sync itself carries no authentication credentials.
 - Background upload only scans for uploads while the client is outside a live run.
-- The cloud backend (uploads, ghost battles, replay links, BazaarDB snapshot delivery) now lives in a separate repository `bazaarplusplus-server`, deployed at `mod-api-v4.bazaarplusplus.com`. The mod-side HTTP client lives in `BazaarPlusPlus.ModApi.csproj`.
+- The cloud backend (uploads, ghost battles, replay links, BazaarDB snapshot delivery) now lives in a separate repository `bazaarplusplus-server`, deployed at `mod-api-v4.bazaarplusplus.com`. The mod-side HTTP client lives in `src/BazaarPlusPlus.ModApi/`.
 
 ## Repository Layout
 
 > The Chinese [README.md](README.md) is authoritative for the repository layout; this section is a summary.
 
-- `Plugin.cs`: BepInEx runtime entry point.
-- `Core/`, `Game/`, `Patches/`: main feature implementation.
-- `Data/`: embedded resources (e.g. build recommendation JSON).
-- `ModApi/`, `Storage/`: the HTTP-client and local-persistence csprojs (zero game/Unity/BepInEx dependencies), wired into the mod via `BppComposition.cs`.
+- `src/BazaarPlusPlus/`: the main plugin project — `Plugin.cs` (BepInEx runtime entry point), `BppComposition.cs`, and the `Core/`, `GameInterop/`, `Game/`, `Patches/`, `Infrastructure/` layers plus `Data/` embedded resources (e.g. build recommendation JSON).
+- `src/BazaarPlusPlus.ModApi/`, `src/BazaarPlusPlus.Storage/`, `src/BazaarPlusPlus.Localization/`: the HTTP-client, local-persistence, and localization assemblies (zero game/Unity/BepInEx dependencies), wired into the mod via `BppComposition.cs`.
+- `src/BazaarPlusPlus.BazaarAgent/`, `src/BazaarPlusPlus.BazaarAgentHost/`: the optional BazaarAgent pure core and host plugin (not installed by default; build on demand with `./run.sh build --with-bazaaragent`).
 - `tests/`: feature-focused test projects.
 - `run.sh`: local build, test, format, and decompile entry point.
 

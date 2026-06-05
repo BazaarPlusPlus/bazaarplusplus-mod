@@ -21,35 +21,35 @@
 
   <ItemGroup>
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionCardVm.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardVm.cs"
       Link="CollectionCardVm.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Data\CollectionMerchantKind.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMerchantKind.cs"
       Link="CollectionMerchantKind.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Grid\CollectionGridConstants.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionGridConstants.cs"
       Link="CollectionGridConstants.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Grid\CollectionGridCell.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionGridCell.cs"
       Link="CollectionGridCell.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Grid\CollectionGridLayout.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionGridLayout.cs"
       Link="CollectionGridLayout.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Grid\CollectionGridPixelization.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionGridPixelization.cs"
       Link="CollectionGridPixelization.cs"
     />
     <Compile
-      Include="..\..\Game\CollectionPanel\Grid\CollectionCardMaterialLru.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionCardMaterialLru.cs"
       Link="CollectionCardMaterialLru.cs"
     />
     <Compile
-      Include="..\..\Infrastructure\UiTokens\BppOverlaySorting.cs"
+      Include="..\..\src\BazaarPlusPlus\Infrastructure\UiTokens\BppOverlaySorting.cs"
       Link="BppOverlaySorting.cs"
     />
     <Reference Include="BazaarGameShared">

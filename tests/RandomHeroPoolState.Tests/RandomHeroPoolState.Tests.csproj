@@ -11,21 +11,21 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="../../Game/Lobby/SelectionPoolState.cs" Link="Lobby/SelectionPoolState.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/Game/Lobby/SelectionPoolState.cs" Link="Lobby/SelectionPoolState.cs" />
     <Compile
-      Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolPreferences.cs"
+      Include="../../src/BazaarPlusPlus/Game/Lobby/RandomHeroPool/RandomHeroPoolPreferences.cs"
       Link="RandomHeroPool/RandomHeroPoolPreferences.cs"
     />
     <Compile
-      Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolSelector.cs"
+      Include="../../src/BazaarPlusPlus/Game/Lobby/RandomHeroPool/RandomHeroPoolSelector.cs"
       Link="RandomHeroPool/RandomHeroPoolSelector.cs"
     />
     <Compile
-      Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolState.cs"
+      Include="../../src/BazaarPlusPlus/Game/Lobby/RandomHeroPool/RandomHeroPoolState.cs"
       Link="RandomHeroPool/RandomHeroPoolState.cs"
     />
     <Compile
-      Include="../../Game/Lobby/RandomHeroPool/RandomHeroPoolStateFactory.cs"
+      Include="../../src/BazaarPlusPlus/Game/Lobby/RandomHeroPool/RandomHeroPoolStateFactory.cs"
       Link="RandomHeroPool/RandomHeroPoolStateFactory.cs"
     />
   </ItemGroup>

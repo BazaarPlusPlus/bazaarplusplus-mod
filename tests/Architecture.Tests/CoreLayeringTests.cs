@@ -30,13 +30,14 @@ public class CoreLayeringTests
     public void Core_does_not_depend_on_Game_GameInterop_or_game_assemblies()
     {
         var repoRoot = RepoRoot();
-        var coreDir = Path.Combine(repoRoot, "Core");
+        var mainSource = MainSourceRoot(repoRoot);
+        var coreDir = Path.Combine(mainSource, "Core");
         Assert.True(Directory.Exists(coreDir), $"Could not locate Core directory at '{coreDir}'.");
 
         var violations = new List<string>();
         foreach (var file in Directory.EnumerateFiles(coreDir, "*.cs", SearchOption.AllDirectories))
         {
-            var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+            var relative = Path.GetRelativePath(mainSource, file).Replace('\\', '/');
             foreach (var rawLine in File.ReadLines(file))
             {
                 var line = rawLine.Trim();
@@ -77,7 +78,8 @@ public class CoreLayeringTests
     public void CollectionPanel_does_not_depend_on_HistoryPanel_preview_internals()
     {
         var repoRoot = RepoRoot();
-        var collectionPanelDir = Path.Combine(repoRoot, "Game", "CollectionPanel");
+        var mainSource = MainSourceRoot(repoRoot);
+        var collectionPanelDir = Path.Combine(mainSource, "Game", "CollectionPanel");
         Assert.True(
             Directory.Exists(collectionPanelDir),
             $"Could not locate CollectionPanel directory at '{collectionPanelDir}'."
@@ -92,7 +94,7 @@ public class CoreLayeringTests
             )
         )
         {
-            var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+            var relative = Path.GetRelativePath(mainSource, file).Replace('\\', '/');
             foreach (var rawLine in File.ReadLines(file))
             {
                 var line = rawLine.Trim();
@@ -120,15 +122,16 @@ public class CoreLayeringTests
     public void CollectionPanel_opens_from_native_clone_button_or_tab_not_settings_dock()
     {
         var repoRoot = RepoRoot();
-        var compositionSource = File.ReadAllText(Path.Combine(repoRoot, "BppComposition.cs"));
+        var mainSource = MainSourceRoot(repoRoot);
+        var compositionSource = File.ReadAllText(Path.Combine(mainSource, "BppComposition.cs"));
         var configSource = File.ReadAllText(
-            Path.Combine(repoRoot, "Core", "Config", "BppConfig.cs")
+            Path.Combine(mainSource, "Core", "Config", "BppConfig.cs")
         );
         var configInterfaceSource = File.ReadAllText(
-            Path.Combine(repoRoot, "Core", "Config", "IBppConfig.cs")
+            Path.Combine(mainSource, "Core", "Config", "IBppConfig.cs")
         );
         var collectionPanelSource = File.ReadAllText(
-            Path.Combine(repoRoot, "Game", "CollectionPanel", "CollectionPanel.cs")
+            Path.Combine(mainSource, "Game", "CollectionPanel", "CollectionPanel.cs")
         );
 
         Assert.DoesNotContain("CollectionPanelSettingsDockEntry", compositionSource);
@@ -142,8 +145,9 @@ public class CoreLayeringTests
     public void CollectionPanel_close_hides_native_card_layer_synchronously()
     {
         var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
         var collectionPanelSource = File.ReadAllText(
-            Path.Combine(repoRoot, "Game", "CollectionPanel", "CollectionPanel.cs")
+            Path.Combine(mainSource, "Game", "CollectionPanel", "CollectionPanel.cs")
         );
 
         var closeIndex = collectionPanelSource.IndexOf(
@@ -176,9 +180,10 @@ public class CoreLayeringTests
     public void CollectionGridVirtualizer_pending_returns_are_completed_after_generation_changes()
     {
         var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
         var virtualizerSource = File.ReadAllText(
             Path.Combine(
-                repoRoot,
+                mainSource,
                 "Game",
                 "CollectionPanel",
                 "Grid",
@@ -219,9 +224,10 @@ public class CoreLayeringTests
     public void LiveBuildPanel_opens_from_caps_not_settings_dock()
     {
         var repoRoot = RepoRoot();
-        var compositionSource = File.ReadAllText(Path.Combine(repoRoot, "BppComposition.cs"));
+        var mainSource = MainSourceRoot(repoRoot);
+        var compositionSource = File.ReadAllText(Path.Combine(mainSource, "BppComposition.cs"));
         var liveBuildPanelSource = File.ReadAllText(
-            Path.Combine(repoRoot, "Game", "LiveBuildPanel", "LiveBuildPanel.cs")
+            Path.Combine(mainSource, "Game", "LiveBuildPanel", "LiveBuildPanel.cs")
         );
 
         Assert.DoesNotContain("LiveBuildPanelSettingsDockEntry", compositionSource);
@@ -233,20 +239,21 @@ public class CoreLayeringTests
     public void HistoryPanel_and_LiveBuildPanel_do_not_depend_on_each_others_internals()
     {
         var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
         Assert.False(
-            Directory.Exists(Path.Combine(repoRoot, "Game", "CardSetPreview")),
+            Directory.Exists(Path.Combine(mainSource, "Game", "CardSetPreview")),
             "Game/CardSetPreview was replaced by LiveBuildPanel plus BuildRecommendations and must not be restored."
         );
 
         var rules = new[]
         {
             new PreviewBoundaryRule(
-                Path.Combine(repoRoot, "Game", "HistoryPanel"),
+                Path.Combine(mainSource, "Game", "HistoryPanel"),
                 "BazaarPlusPlus.Game.LiveBuildPanel",
                 "HistoryPanel"
             ),
             new PreviewBoundaryRule(
-                Path.Combine(repoRoot, "Game", "LiveBuildPanel"),
+                Path.Combine(mainSource, "Game", "LiveBuildPanel"),
                 "BazaarPlusPlus.Game.HistoryPanel",
                 "LiveBuildPanel"
             ),
@@ -268,7 +275,7 @@ public class CoreLayeringTests
                 )
             )
             {
-                var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+                var relative = Path.GetRelativePath(mainSource, file).Replace('\\', '/');
                 foreach (var rawLine in File.ReadLines(file))
                 {
                     var line = rawLine.Trim();
@@ -297,7 +304,8 @@ public class CoreLayeringTests
     public void GameInterop_does_not_depend_on_Game_feature_namespaces()
     {
         var repoRoot = RepoRoot();
-        var gameInteropDir = Path.Combine(repoRoot, "GameInterop");
+        var mainSource = MainSourceRoot(repoRoot);
+        var gameInteropDir = Path.Combine(mainSource, "GameInterop");
         Assert.True(
             Directory.Exists(gameInteropDir),
             $"Could not locate GameInterop directory at '{gameInteropDir}'."
@@ -312,7 +320,7 @@ public class CoreLayeringTests
             )
         )
         {
-            var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+            var relative = Path.GetRelativePath(mainSource, file).Replace('\\', '/');
             foreach (var rawLine in File.ReadLines(file))
             {
                 var line = rawLine.Trim();
@@ -341,7 +349,7 @@ public class CoreLayeringTests
     public void BazaarAgent_core_does_not_depend_on_host_or_game_runtime_namespaces()
     {
         var repoRoot = RepoRoot();
-        var autoBazaarDir = Path.Combine(repoRoot, "BazaarAgent");
+        var autoBazaarDir = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgent");
         Assert.True(
             Directory.Exists(autoBazaarDir),
             $"Could not locate BazaarAgent directory at '{autoBazaarDir}'."
@@ -352,7 +360,7 @@ public class CoreLayeringTests
             var file in Directory.EnumerateFiles(autoBazaarDir, "*.cs", SearchOption.AllDirectories)
         )
         {
-            var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+            var relative = Path.GetRelativePath(autoBazaarDir, file).Replace('\\', '/');
             foreach (var rawLine in File.ReadLines(file))
             {
                 var line = rawLine.Trim();
@@ -411,7 +419,7 @@ public class CoreLayeringTests
     public void Main_project_has_no_host_gating_and_scrubs_both_host_artifacts()
     {
         var repoRoot = RepoRoot();
-        var mainProject = Path.Combine(repoRoot, "BazaarPlusPlus.csproj");
+        var mainProject = Path.Combine(MainSourceRoot(repoRoot), "BazaarPlusPlus.csproj");
         Assert.True(File.Exists(mainProject), $"Could not locate main project at '{mainProject}'.");
 
         var project = XDocument.Load(mainProject);
@@ -445,14 +453,23 @@ public class CoreLayeringTests
                 )
         );
 
-        // The main project compiles neither the agent core nor the host source tree.
-        Assert.Contains(
+        // The agent core and host are their own projects under src/; the main project must not
+        // reference either (it publishes the public GameInterop facade instead). The agent-core
+        // ProjectReference absence is asserted above; here we also forbid a host ProjectReference.
+        // No Compile Remove="BazaarAgent*/**" assertion is needed now that those source trees live
+        // outside the main project's directory cone under src/.
+        Assert.DoesNotContain(
             elements,
-            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "BazaarAgent/**"
-        );
-        Assert.Contains(
-            elements,
-            e => e.Name.LocalName == "Compile" && Attribute(e, "Remove") == "BazaarAgentHost/**"
+            e =>
+                e.Name.LocalName == "ProjectReference"
+                && (
+                    Attribute(e, "Include")
+                        ?.Contains(
+                            "BazaarPlusPlus.BazaarAgentHost.csproj",
+                            StringComparison.Ordinal
+                        )
+                    ?? false
+                )
         );
 
         // Default Debug build unconditionally scrubs BOTH host dlls from the live plugins folder.
@@ -509,8 +526,15 @@ public class CoreLayeringTests
     public void BazaarAgent_host_has_no_runtime_config_switches()
     {
         var repoRoot = RepoRoot();
-        var optionsFile = Path.Combine(repoRoot, "BazaarAgentHost", "BazaarAgentBepInExOptions.cs");
-        var portsFile = Path.Combine(repoRoot, "BazaarAgent", "Contract", "BazaarAgentPorts.cs");
+        var optionsFile = Path.Combine(
+            ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost"),
+            "BazaarAgentBepInExOptions.cs"
+        );
+        var portsFile = Path.Combine(
+            ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgent"),
+            "Contract",
+            "BazaarAgentPorts.cs"
+        );
         Assert.True(File.Exists(optionsFile), $"Could not locate options file at '{optionsFile}'.");
         Assert.True(File.Exists(portsFile), $"Could not locate ports file at '{portsFile}'.");
 
@@ -548,7 +572,10 @@ public class CoreLayeringTests
     public void BazaarAgent_host_repackages_production_zip_after_copying_optional_artifacts()
     {
         var repoRoot = RepoRoot();
-        var hostProject = Path.Combine(repoRoot, "BazaarPlusPlus.BazaarAgentHost.csproj");
+        var hostProject = Path.Combine(
+            ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost"),
+            "BazaarPlusPlus.BazaarAgentHost.csproj"
+        );
         Assert.True(File.Exists(hostProject), $"Could not locate host project at '{hostProject}'.");
 
         var project = XDocument.Load(hostProject);
@@ -591,22 +618,23 @@ public class CoreLayeringTests
     public void BazaarPlusPlus_assembly_does_not_reference_the_agent_module()
     {
         var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
         var violations = new List<string>();
 
         foreach (
-            var file in Directory.EnumerateFiles(repoRoot, "*.cs", SearchOption.TopDirectoryOnly)
+            var file in Directory.EnumerateFiles(mainSource, "*.cs", SearchOption.TopDirectoryOnly)
         )
-            ScanForAgentImports(file, repoRoot, violations);
+            ScanForAgentImports(file, mainSource, violations);
 
         foreach (var dir in new[] { "Core", "Game", "GameInterop", "Patches", "Infrastructure" })
         {
-            var full = Path.Combine(repoRoot, dir);
+            var full = Path.Combine(mainSource, dir);
             if (!Directory.Exists(full))
                 continue;
             foreach (
                 var file in Directory.EnumerateFiles(full, "*.cs", SearchOption.AllDirectories)
             )
-                ScanForAgentImports(file, repoRoot, violations);
+                ScanForAgentImports(file, mainSource, violations);
         }
 
         Assert.True(
@@ -617,9 +645,47 @@ public class CoreLayeringTests
         );
     }
 
-    private static void ScanForAgentImports(string file, string repoRoot, List<string> violations)
+    [Fact]
+    public void Production_assemblies_live_under_src_not_repo_root()
     {
-        var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+        var repoRoot = RepoRoot();
+
+        // Guard against regressing to the old flat layout: no production csproj may sit at the
+        // repo root. Every assembly lives in its own src/<AssemblyName>/ directory.
+        var strayRootCsprojs = Directory
+            .EnumerateFiles(repoRoot, "BazaarPlusPlus*.csproj", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(
+            strayRootCsprojs.Count == 0,
+            "No BazaarPlusPlus*.csproj may live at the repo root; keep each assembly under "
+                + "src/<AssemblyName>/. Offending root csprojs:\n"
+                + string.Join("\n", strayRootCsprojs)
+        );
+
+        foreach (
+            var assembly in new[]
+            {
+                "BazaarPlusPlus",
+                "BazaarPlusPlus.ModApi",
+                "BazaarPlusPlus.Storage",
+                "BazaarPlusPlus.Localization",
+                "BazaarPlusPlus.BazaarAgent",
+                "BazaarPlusPlus.BazaarAgentHost",
+            }
+        )
+        {
+            var csproj = Path.Combine(ProjectRoot(repoRoot, assembly), assembly + ".csproj");
+            Assert.True(
+                File.Exists(csproj),
+                $"Expected production project at '{csproj}'. Keep every assembly under src/<AssemblyName>/."
+            );
+        }
+    }
+
+    private static void ScanForAgentImports(string file, string baseDir, List<string> violations)
+    {
+        var relative = Path.GetRelativePath(baseDir, file).Replace('\\', '/');
         foreach (var rawLine in File.ReadLines(file))
         {
             var line = rawLine.Trim();
@@ -630,6 +696,14 @@ public class CoreLayeringTests
 
     private static string? Attribute(XElement element, string name) =>
         element.Attribute(name)?.Value;
+
+    // Production assemblies now live under <repo>/src/<AssemblyName>/. These helpers keep the
+    // layering assertions anchored to the moved source trees while RepoRoot() stays the repo root.
+    private static string MainSourceRoot(string repoRoot) =>
+        Path.Combine(repoRoot, "src", "BazaarPlusPlus");
+
+    private static string ProjectRoot(string repoRoot, string projectName) =>
+        Path.Combine(repoRoot, "src", projectName);
 
     // The compile-time path of this source file anchors the repo root without loading any
     // game-coupled assembly at runtime: <repo>/tests/Architecture.Tests/CoreLayeringTests.cs.

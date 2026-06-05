@@ -4,11 +4,11 @@
 
 ## Scope
 
-Companion to [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md). Documents how `BazaarAgentHost/BazaarAgentGameContextReader.cs` populates each `BazaarAgentContext` field from live game state. Intended for contributors modifying the host-side game reader.
+Companion to [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md). Documents how `src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameContextReader.cs` populates each `BazaarAgentContext` field from live game state. Intended for contributors modifying the host-side game reader.
 
 ## Source of Truth
 
-`BazaarAgentHost/BazaarAgentGameContextReader.cs` is authoritative for game-state derivation; `BazaarAgent/` owns the pure wire DTOs, validation, HTTP transport, queueing, and runtime controller. Read alongside `decompiled/` to confirm game-side types and property names.
+`src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameContextReader.cs` is authoritative for game-state derivation; `src/BazaarPlusPlus.BazaarAgent/` owns the pure wire DTOs, validation, HTTP transport, queueing, and runtime controller. Read alongside `decompiled/` to confirm game-side types and property names.
 
 ## Top-Level Scalar Mapping
 

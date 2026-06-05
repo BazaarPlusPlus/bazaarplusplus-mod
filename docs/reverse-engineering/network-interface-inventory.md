@@ -10,8 +10,8 @@
 | Addressables | `AddressablesManager.cs`、`AddressablesLoader.cs` | Unity Addressables download | 本地 `StreamingAssets/aa`，可有 catalog update | 场景、资源包、音频。 |
 | 旧版 TempoNet facade | `BazaarGameShared.TempoNet.Requests/RequestFacade.cs` | JSON over `HttpClient` | 构造时传入 | 旧客户端/共享库 REST 封装，覆盖账号、市场、排行榜等。 |
 | 旧版 battle service manager | `BazaarBattleService/BazaarRequestManager.cs` | JSON over `HttpClient` | 默认 `https://dev-temponet.azurewebsites.net` | 旧 run/ghost/savegame/marketplace/chest/profile 接口。当前主流程不以它为主。 |
-| BazaarPlusPlus mod API | `ModApi/*`、`Game/*Upload*` | JSON/bytes over `HttpClient` | `https://mod-api-v4.bazaarplusplus.com` 等 | run bundle 上传、幽灵战斗同步、截图上传、推荐/赞助数据。 |
-| BazaarAgent 本地接口 | `BazaarAgent/*` + `BazaarAgentHost/*` | JSON over loopback `HttpListener` | 固定 `http://127.0.0.1:47900` | 暴露当前决策上下文，接受外部自动化 action；Host 默认不安装，需 `./run.sh build --with-bazaaragent` 构建，host dll 安装后自动启动。 |
+| BazaarPlusPlus mod API | `src/BazaarPlusPlus.ModApi/*`、`src/BazaarPlusPlus/Game/*Upload*` | JSON/bytes over `HttpClient` | `https://mod-api-v4.bazaarplusplus.com` 等 | run bundle 上传、幽灵战斗同步、截图上传、推荐/赞助数据。 |
+| BazaarAgent 本地接口 | `src/BazaarPlusPlus.BazaarAgent/*` + `src/BazaarPlusPlus.BazaarAgentHost/*` | JSON over loopback `HttpListener` | 固定 `http://127.0.0.1:47900` | 暴露当前决策上下文，接受外部自动化 action；Host 默认不安装，需 `./run.sh build --with-bazaaragent` 构建，host dll 安装后自动启动。 |
 | 潜在 telemetry stub | `AnalyticsManager.cs` | `HttpClient` | `Config.NetURL` 或 `https://localhost:7291/` | 定义了 `api/telemetry` 和统计模型，但当前反编译文件未发现实际发送调用。 |
 | 旧/测试主菜单数据 | `MainMenuUIDataHandler.cs` | JSON / image URL over `UnityWebRequest` 或后续图片加载 | 相对路径、`example.com` 常量、`picsum.photos` 测试图 | 旧市场/收藏 UI 测试数据下载。当前主流程不依赖，但属于潜在联网面。 |
 | 外链 | UI settings / terms | `Application.OpenURL` | playthebazaar.com | 隐私、条款、EULA、公告链接。 |

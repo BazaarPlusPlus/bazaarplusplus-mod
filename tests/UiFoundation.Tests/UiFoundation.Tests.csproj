@@ -8,13 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="../../Infrastructure/Fonts/EmbeddedFontFile.cs" Link="EmbeddedFontFile.cs" />
-    <Compile Include="../../Infrastructure/Fonts/BppTmpFontPolicy.cs" Link="BppTmpFontPolicy.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/Infrastructure/Fonts/EmbeddedFontFile.cs" Link="EmbeddedFontFile.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/Infrastructure/Fonts/BppTmpFontPolicy.cs" Link="BppTmpFontPolicy.cs" />
     <Compile Include="Program.cs" />
     <EmbeddedResource Include="Resources/embedded-font-test.txt" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../BazaarPlusPlus.Localization.csproj" />
+    <ProjectReference Include="../../src/BazaarPlusPlus.Localization/BazaarPlusPlus.Localization.csproj" />
   </ItemGroup>
 </Project>

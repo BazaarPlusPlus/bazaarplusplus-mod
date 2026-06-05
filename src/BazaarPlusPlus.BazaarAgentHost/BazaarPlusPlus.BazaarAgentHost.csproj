@@ -19,17 +19,11 @@
     <NoWarn>CS0436</NoWarn>
   </PropertyGroup>
 
-  <!-- Only this project's own source tree compiles into the host assembly. -->
-  <ItemGroup>
-    <Compile Remove="**/*.cs" />
-    <Compile Include="BazaarAgentHost/**/*.cs" />
-  </ItemGroup>
-
   <!-- Project paths (duplicated from BazaarPlusPlus.csproj so the host resolves the game
        assemblies and copy destinations on its own, without coupling to the main project). -->
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
-    <BPPInstallerSourcePath>$(ProjectRoot)/../bazaarplusplus-installer/src-tauri/resources</BPPInstallerSourcePath>
+    <BPPInstallerSourcePath>$(ProjectRoot)/../../../bazaarplusplus-installer/src-tauri/resources</BPPInstallerSourcePath>
   </PropertyGroup>
   <!-- Candidate install paths for common Steam locations -->
   <PropertyGroup>
@@ -77,8 +71,8 @@
   <!-- The pure core ships with the host (host owns its copy); the main plugin is a
        runtime-provided dependency, referenced for the public facade but not copied. -->
   <ItemGroup>
-    <ProjectReference Include="BazaarPlusPlus.BazaarAgent.csproj" />
-    <ProjectReference Include="BazaarPlusPlus.csproj" Private="false" />
+    <ProjectReference Include="../BazaarPlusPlus.BazaarAgent/BazaarPlusPlus.BazaarAgent.csproj" />
+    <ProjectReference Include="../BazaarPlusPlus/BazaarPlusPlus.csproj" Private="false" />
   </ItemGroup>
 
   <!-- Game assembly references (resolved via ManagedPath, like the main project) -->

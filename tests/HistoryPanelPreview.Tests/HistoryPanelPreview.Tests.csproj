@@ -18,64 +18,64 @@
 
   <ItemGroup>
     <Compile
-      Include="../../GameInterop/CardPreview/NativeCardPreviewSpec.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewSpec.cs"
       Link="NativeCardPreviewSpec.cs"
     />
-    <Compile Include="../../GameInterop/ItemBoardPreview/BppItemBoard.cs" Link="BppItemBoard.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoard.cs" Link="BppItemBoard.cs" />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardCard.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardCard.cs"
       Link="BppItemBoardCard.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardId.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardId.cs"
       Link="BppItemBoardId.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardPreviewMapper.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardPreviewMapper.cs"
       Link="BppItemBoardPreviewMapper.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs"
       Link="BppItemBoardSlotPlanner.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardSpan.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSpan.cs"
       Link="BppItemBoardSpan.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardType.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardType.cs"
       Link="BppItemBoardType.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewLayoutMode.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewLayoutMode.cs"
       Link="ItemBoardPreviewLayoutMode.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewOptions.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewOptions.cs"
       Link="ItemBoardPreviewOptions.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewOptionsForwarder.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewOptionsForwarder.cs"
       Link="ItemBoardPreviewOptionsForwarder.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewSignatureGate.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSignatureGate.cs"
       Link="ItemBoardPreviewSignatureGate.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardPreviewGenerationGuard.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewGenerationGuard.cs"
       Link="ItemBoardPreviewGenerationGuard.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardSocketResolver.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardSocketResolver.cs"
       Link="ItemBoardSocketResolver.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardSlotGridGeometry.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardSlotGridGeometry.cs"
       Link="ItemBoardSlotGridGeometry.cs"
     />
     <Compile
-      Include="../../Infrastructure/UiTokens/BppOverlaySorting.cs"
+      Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/BppOverlaySorting.cs"
       Link="BppOverlaySorting.cs"
     />
     <Compile Include="Program.cs" />

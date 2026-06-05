@@ -8,13 +8,13 @@ The mod targets `netstandard2.1` (C# 12). Game assemblies are resolved via `Mana
 
 ```powershell
 # Build the mod (Debug, auto-copies to BepInEx/plugins/ if game found)
-dotnet build BazaarPlusPlus.csproj
+dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj
 
 # Build with explicit game assembly path
-dotnet build BazaarPlusPlus.csproj -p:ManagedPath="D:\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed"
+dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath="D:\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed"
 
 # Build both Debug + Release (Release copies to installer repo if present)
-dotnet build BazaarPlusPlus.csproj -t:BuildAll
+dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -t:BuildAll
 
 # Run a single test project
 dotnet test tests\RunLifecycleState.Tests\RunLifecycleState.Tests.csproj
@@ -54,7 +54,7 @@ For runtime validation that needs launching the game, always launch The Bazaar t
 - `BazaarPlusPlus.BazaarAgent.dll` — pure HTTP transport, DTO, validation, queue, and runtime controller; zero game/Unity/BepInEx references
 - `BazaarPlusPlus.BazaarAgentHost.dll` — optional BepInEx host bridge; installing the dll starts the fixed `127.0.0.1:47900` listener automatically
 
-All six csproj files live in the repo root. `ModApi/`, `Storage/`, `Localization/`, `BazaarAgent/`, and `BazaarAgentHost/` are each the source tree for their respective csproj (via `<Compile Include="...">`). `Directory.Build.props` gives them separate `obj/`/`bin/` dirs.
+All six projects live under `src/<AssemblyName>/`, each in its own directory so its default compile cone is its own source (no shared root-level globbing). The main plugin is `src/BazaarPlusPlus/` (`Plugin.cs`, `BppComposition.cs`, and the `Core/`, `Game/`, `GameInterop/`, `Infrastructure/`, `Patches/` layers); the five child assemblies are `src/BazaarPlusPlus.ModApi/`, `src/BazaarPlusPlus.Storage/`, `src/BazaarPlusPlus.Localization/`, `src/BazaarPlusPlus.BazaarAgent/`, and `src/BazaarPlusPlus.BazaarAgentHost/`. The root `Directory.Build.props` only carries the shared `BppVersion` and code-style flag; each project gets its own `obj/`/`bin/` under its own directory.
 
 **Plugin lifecycle** — `Plugin.cs` (BepInEx entry) → `BppComposition` (the manual composition root, no DI container). BppComposition wires:
 

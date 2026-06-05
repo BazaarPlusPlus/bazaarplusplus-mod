@@ -24,52 +24,52 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\BazaarPlusPlus.Localization.csproj" />
+    <ProjectReference Include="..\..\src\BazaarPlusPlus.Localization\BazaarPlusPlus.Localization.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Infrastructure\UiSuppressionScope.cs" Link="UiSuppressionScope.cs" />
+    <Compile Include="..\..\src\BazaarPlusPlus\Infrastructure\UiSuppressionScope.cs" Link="UiSuppressionScope.cs" />
     <Compile
-      Include="..\..\Game\Settings\SettingsMenuToggleBridge.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\Settings\SettingsMenuToggleBridge.cs"
       Link="SettingsMenuToggleBridge.cs"
     />
     <Compile
-      Include="..\..\Game\Settings\BppSettingsDockDefinition.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\Settings\BppSettingsDockDefinition.cs"
       Link="BppSettingsDockDefinition.cs"
     />
     <Compile
-      Include="..\..\Game\CombatStatusBar\CombatStatusBar.SettingsMenuBridge.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CombatStatusBar\CombatStatusBar.SettingsMenuBridge.cs"
       Link="CombatStatusBar.SettingsMenuBridge.cs"
     />
     <Compile
-      Include="..\..\Game\CombatStatusBar\CombatStatusBar.SettingsMenuLabel.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CombatStatusBar\CombatStatusBar.SettingsMenuLabel.cs"
       Link="CombatStatusBar.SettingsMenuLabel.cs"
     />
     <Compile
-      Include="..\..\Game\CombatStatusBar\CombatStatusBar.State.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CombatStatusBar\CombatStatusBar.State.cs"
       Link="CombatStatusBar.State.cs"
     />
     <Compile
-      Include="..\..\Game\CombatStatusBar\CombatStatusBar.RoundedSprite.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CombatStatusBar\CombatStatusBar.RoundedSprite.cs"
       Link="CombatStatusBar.RoundedSprite.cs"
     />
     <Compile
-      Include="..\..\Game\ItemEnchantPreview\EnchantPreview.SettingsMenuLabel.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\ItemEnchantPreview\EnchantPreview.SettingsMenuLabel.cs"
       Link="EnchantPreview.SettingsMenuLabel.cs"
     />
     <Compile
-      Include="..\..\Game\NameOverride\NameOverride.SettingsMenuBridge.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\NameOverride\NameOverride.SettingsMenuBridge.cs"
       Link="NameOverride.SettingsMenuBridge.cs"
     />
     <Compile
-      Include="..\..\Game\NameOverride\NameOverride.SettingsMenuLabel.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\NameOverride\NameOverride.SettingsMenuLabel.cs"
       Link="NameOverride.SettingsMenuLabel.cs"
     />
     <Compile
-      Include="..\..\Game\HistoryPanel\HistoryPanelAccessPolicy.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\HistoryPanel\HistoryPanelAccessPolicy.cs"
       Link="HistoryPanelAccessPolicy.cs"
     />
-    <Compile Include="..\..\Core\Events\IBppEventBus.cs" Link="IBppEventBus.cs" />
-    <Compile Include="..\..\Core\Events\InMemoryBppEventBus.cs" Link="InMemoryBppEventBus.cs" />
+    <Compile Include="..\..\src\BazaarPlusPlus\Core\Events\IBppEventBus.cs" Link="IBppEventBus.cs" />
+    <Compile Include="..\..\src\BazaarPlusPlus\Core\Events\InMemoryBppEventBus.cs" Link="InMemoryBppEventBus.cs" />
   </ItemGroup>
 </Project>

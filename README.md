@@ -4,7 +4,7 @@
 
 BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 UI 增强、怪物与 tooltip 预览、run logging、历史面板、本地战斗回放、终局自动截图，以及后台上传能力。
 
-当前仓库只保留与现有实现仍然一致的说明文档；如果文档与代码冲突，以 `Plugin.cs`、`Core/`、`Game/`、`Patches/` 中的实际实现为准。
+当前仓库只保留与现有实现仍然一致的说明文档；如果文档与代码冲突，以 `src/BazaarPlusPlus/` 下的 `Plugin.cs`、`Core/`、`Game/`、`Patches/` 等实际实现为准。
 
 ## 功能概览
 
@@ -33,8 +33,8 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 - 常用命令：
 
 ```bash
-dotnet build
-dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
+dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj
+dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 ./run.sh build
 ./run.sh all
 ```
@@ -47,16 +47,13 @@ dotnet build -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 
 - run logging、战斗回放和终局截图会在本地保存 SQLite 数据、replay payload 与截图文件；云同步本身不携带任何鉴权凭证。
 - 后台上传会在非 live run 状态下执行上传扫描。
-- 云端后端（上传、ghost battles、replay 链接、BazaarDB 快照投递）现在在独立仓库 `bazaarplusplus-server`，部署于 `mod-api-v4.bazaarplusplus.com`。mod 侧的 HTTP 客户端在 `BazaarPlusPlus.ModApi.csproj` 里。
+- 云端后端（上传、ghost battles、replay 链接、BazaarDB 快照投递）现在在独立仓库 `bazaarplusplus-server`，部署于 `mod-api-v4.bazaarplusplus.com`。mod 侧的 HTTP 客户端在 `src/BazaarPlusPlus.ModApi/` 里。
 
 ## 仓库结构
 
-- `Plugin.cs`：BepInEx 运行时入口（精简，feature wiring 走 `BppComposition` 的 `IBppMountable`/`ISettingsDockEntry` 注册表）。
-- `Core/`：纯抽象（配置、事件总线、路径、运行时服务接口，零 game DLL 引用）。
-- `GameInterop/`：游戏 DLL 耦合层（`BppClientCacheBridge`、`BppStaticDataAccess`、`GameStateProbe`、`RunContextStore`、`IRunContext` 接口、带 game type 的事件 `CombatSimObserved`/`NetMessageObserved`）。
-- `Game/`、`Patches/`：主要功能实现 + Harmony 补丁。
-- `Data/`：内嵌资源（如 build 推荐 JSON）。
-- `ModApi/`、`Storage/`：分别是 HTTP 客户端 csproj 与本地持久化 csproj（零 game/Unity/BepInEx 依赖），由 `BppComposition.cs` 装配进 mod。
+- `src/BazaarPlusPlus/`：主插件工程。`Plugin.cs` 为 BepInEx 运行时入口（精简，feature wiring 走 `BppComposition` 的 `IBppMountable`/`ISettingsDockEntry` 注册表）；其下 `Core/` 纯抽象（配置、事件总线、路径、运行时服务接口，零 game DLL 引用），`GameInterop/` 游戏 DLL 耦合层（`BppClientCacheBridge`、`BppStaticDataAccess`、`GameStateProbe`、`RunContextStore`、`IRunContext` 接口、带 game type 的事件 `CombatSimObserved`/`NetMessageObserved`），`Game/`、`Patches/` 主要功能实现 + Harmony 补丁，`Data/` 内嵌资源（如 build 推荐 JSON）。
+- `src/BazaarPlusPlus.ModApi/`、`src/BazaarPlusPlus.Storage/`、`src/BazaarPlusPlus.Localization/`：HTTP 客户端、本地持久化、本地化引擎三个独立程序集（零 game/Unity/BepInEx 依赖），由 `BppComposition.cs` 装配进 mod。
+- `src/BazaarPlusPlus.BazaarAgent/`、`src/BazaarPlusPlus.BazaarAgentHost/`：可选 BazaarAgent 纯核心与 host 插件（默认不安装，按需 `./run.sh build --with-bazaaragent` 构建）。
 - `tests/`：按特性拆分的测试项目。
 - `run.sh`：本地构建、测试、格式化和反编译入口。
 

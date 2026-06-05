@@ -14,26 +14,26 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <Compile
-      Include="../../Game/Supporters/BPPSupporterAttributionText.cs"
+      Include="../../src/BazaarPlusPlus/Game/Supporters/BPPSupporterAttributionText.cs"
       Link="BPPSupporterAttributionText.cs"
     />
-    <Compile Include="../../Game/Supporters/BPPSupporterLinks.cs" Link="BPPSupporterLinks.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/Game/Supporters/BPPSupporterLinks.cs" Link="BPPSupporterLinks.cs" />
     <Compile
-      Include="../../Game/Supporters/BPPSupporterEntry.cs"
+      Include="../../src/BazaarPlusPlus/Game/Supporters/BPPSupporterEntry.cs"
       Link="BPPSupporterEntry.cs"
     />
     <Compile
-      Include="../../Game/Supporters/BPPSupporterSample.cs"
+      Include="../../src/BazaarPlusPlus/Game/Supporters/BPPSupporterSample.cs"
       Link="BPPSupporterSample.cs"
     />
     <Compile
-      Include="../../Game/Supporters/BPPSupporterSampler.cs"
+      Include="../../src/BazaarPlusPlus/Game/Supporters/BPPSupporterSampler.cs"
       Link="BPPSupporterSampler.cs"
     />
     <Compile Include="Program.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../BazaarPlusPlus.Localization.csproj" />
+    <ProjectReference Include="../../src/BazaarPlusPlus.Localization/BazaarPlusPlus.Localization.csproj" />
   </ItemGroup>
 </Project>

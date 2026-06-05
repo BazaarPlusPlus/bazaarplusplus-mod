@@ -57,9 +57,9 @@ build() {
     # so building it builds and deploys all three. A default build builds only the main
     # plugin, whose build actively scrubs both host dlls from the plugins folder.
     if [[ "$bazaaragent" == "true" ]]; then
-        dotnet build BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
+        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
     else
-        dotnet build BazaarPlusPlus.csproj "${args[@]}"
+        dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj "${args[@]}"
     fi
 }
 
@@ -75,9 +75,9 @@ build_all() {
     print_bazaaragent_mode "$bazaaragent"
     clear_macos_sqlite_quarantine
     if [[ "$bazaaragent" == "true" ]]; then
-        dotnet build BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
+        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
     else
-        dotnet build BazaarPlusPlus.csproj "${args[@]}"
+        dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj "${args[@]}"
     fi
     clear_macos_sqlite_quarantine
 }

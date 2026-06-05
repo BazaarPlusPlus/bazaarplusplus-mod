@@ -3,34 +3,4 @@
     <BppVersion>4.1.0</BppVersion>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
-
-  <!--
-    Give each csproj in the repo root its own intermediate/output dirs so that
-    they do not clobber each other's project.assets.json and NuGet lock files.
-    Must be set here (before Microsoft.Common.props is imported) to take effect.
-  -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.ModApi'">
-    <BaseIntermediateOutputPath>obj\ModApi\</BaseIntermediateOutputPath>
-    <BaseOutputPath>bin\ModApi\</BaseOutputPath>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.Storage'">
-    <BaseIntermediateOutputPath>obj\Storage\</BaseIntermediateOutputPath>
-    <BaseOutputPath>bin\Storage\</BaseOutputPath>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.BazaarAgent'">
-    <BaseIntermediateOutputPath>obj\BazaarAgent\</BaseIntermediateOutputPath>
-    <BaseOutputPath>bin\BazaarAgent\</BaseOutputPath>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.BazaarAgentHost'">
-    <BaseIntermediateOutputPath>obj\BazaarAgentHost\</BaseIntermediateOutputPath>
-    <BaseOutputPath>bin\BazaarAgentHost\</BaseOutputPath>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BazaarPlusPlus.Localization'">
-    <BaseIntermediateOutputPath>obj\Localization\</BaseIntermediateOutputPath>
-    <BaseOutputPath>bin\Localization\</BaseOutputPath>
-  </PropertyGroup>
 </Project>

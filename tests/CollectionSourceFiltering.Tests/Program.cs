@@ -286,7 +286,13 @@ AssertThrows<InvalidOperationException>(
     "A source template id should belong to exactly one collection source entry."
 );
 
-var currentCatalogPath = Path.Combine("Data", "CollectionSources", "collection-sources.json");
+var currentCatalogPath = Path.Combine(
+    "src",
+    "BazaarPlusPlus",
+    "Data",
+    "CollectionSources",
+    "collection-sources.json"
+);
 var currentCatalogJson = File.ReadAllText(currentCatalogPath);
 var currentCatalog = CollectionSourceCatalog.Build(currentCatalogJson);
 AssertEqual(

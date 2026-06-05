@@ -21,36 +21,36 @@
 
   <ItemGroup>
     <Compile
-      Include="../../Game/LiveBuildPanel/Data/LiveBuildCandidateState.cs"
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildCandidateState.cs"
       Link="LiveBuildCandidateState.cs"
     />
     <Compile
-      Include="../../Game/LiveBuildPanel/Data/LiveItemBoardRowVm.cs"
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveItemBoardRowVm.cs"
       Link="LiveItemBoardRowVm.cs"
     />
-    <Compile Include="../../GameInterop/ItemBoardPreview/BppItemBoard.cs" Link="BppItemBoard.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoard.cs" Link="BppItemBoard.cs" />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardCard.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardCard.cs"
       Link="BppItemBoardCard.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardId.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardId.cs"
       Link="BppItemBoardId.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardSpan.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSpan.cs"
       Link="BppItemBoardSpan.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/BppItemBoardType.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardType.cs"
       Link="BppItemBoardType.cs"
     />
     <Compile
-      Include="../../GameInterop/ItemBoardPreview/ItemBoardSlotGridGeometry.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardSlotGridGeometry.cs"
       Link="ItemBoardSlotGridGeometry.cs"
     />
     <Compile
-      Include="../../Infrastructure/UiTokens/BppOverlaySorting.cs"
+      Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/BppOverlaySorting.cs"
       Link="BppOverlaySorting.cs"
     />
     <Compile Include="Program.cs" />
