@@ -1,6 +1,6 @@
 # BazaarAgent Decision Surface — Internal Reference
 
-> **Status: optional host plugin.** The BazaarAgent host is a separate, optional BepInEx plugin; default mod builds ship without it. Build it on demand with `./run.sh build --with-bazaaragent-host` and set `[BazaarAgent] Enabled = true` in `BazaarPlusPlus.BazaarAgent.cfg` to serve the HTTP surface this doc derives. The wire contract itself is owned by [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md); this doc owns the game-reader-side derivation.
+> **Status: optional host plugin.** The BazaarAgent host is a separate, optional BepInEx plugin; default mod builds ship without it. Build it on demand with `./run.sh build --with-bazaaragent`. Installing the host dll starts the fixed `127.0.0.1:47900` HTTP surface automatically. The wire contract itself is owned by [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md); this doc owns the game-reader-side derivation.
 
 ## Scope
 
@@ -14,10 +14,9 @@ Companion to [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md). Documen
 
 | Context field | Derivation |
 |---|---|
-| `SchemaVersion` | Const `"1.2.0"` |
+| `SchemaVersion` | Const `"2.0.0"` |
 | `TickId` | Assigned by `BazaarAgentContextSnapshotPublisher` (incremented on each publish) |
 | `ServerTimeUtc` | `DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)` (ISO-8601) |
-| `IsEnabled` | `BazaarAgentBepInExOptions.Enabled` (`[BazaarAgent] Enabled`) |
 | `IsInRun` | `Data.Run != null && AppState.CurrentState is RunAppState` |
 | `HasActiveRun` | `Data.HasActiveRun` (computed property on `Data`) |
 | `CanStartOrContinueRun` | `BazaarAgentSceneProbe.IsAtHeroSelectAndReadyForNewRun()` — true iff `SceneManager.GetActiveScene().name == "HeroSelectScene"` AND `AppState.CurrentState == null` AND `ClientCache.Profile.Value != null` |
@@ -42,7 +41,7 @@ Companion to [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md). Documen
 | `RerollsRemaining` | `(int)(Data.CurrentState?.RerollsRemaining ?? 0u)` |
 | `CurrentEncounterId` | `Data.CurrentState?.CurrentEncounterId` (already `string?`) |
 | `CurrentEncounterType` | Looks for a live `Data.Entities` card whose `TemplateId` matches `CurrentEncounterId`; uses `card.Template.GetType().Name` when available, otherwise `card.Type.ToString()` |
-| `ActionCooldownRemainingSeconds` | Passed in by `BazaarAgentRuntimeController`, computed from the last non-wait action time and `IBazaarAgentOptions.ActionMinDelay` |
+| `ActionCooldownRemainingSeconds` | Passed in by `BazaarAgentRuntimeController`, computed from the last non-wait action time and the fixed 1.0 second runtime default |
 | `InteractableTemplateIds` | `BazaarAgentInteractionFilterProbe.ReadCurrentFilter()` — reflection on `AppState._iteractionFilter`. Null/omitted when the list is empty or reflection fails. |
 
 ## State Mapping
@@ -98,7 +97,6 @@ Each action's inclusion criterion in terms of game-state paths:
 
 `BazaarAgentGameContextReader.Build` wraps its body in try/catch. On any exception it logs through `IBazaarAgentLogger` and returns a degenerate context:
 
-- `IsEnabled` — from config (same as normal path)
 - `StateName` — `Unknown`
 - `AvailableActions` — `[Wait]`
 

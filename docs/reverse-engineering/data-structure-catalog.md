@@ -282,21 +282,21 @@ Snapshot / sim DTO：
 - 当前 mod client 不附加鉴权 header；`RunBundleUploadRequest.PlayerAccountId`、`GhostBattleClient.QueryAgainstMeAsync(playerAccountId)`、`BazaarDbSnapshotUploadRequest.Player.AccountId` 是主要身份输入。
 - BazaarDB 拉取不在游戏进程内执行；服务端通过 `POST /bazaardb/peek` 返回私有 R2 的短期预签 URL，外部 BazaarDB puller 落地后调用 `POST /bazaardb/confirm`。
 
-## AutoBazaar 本地 HTTP DTO
+## BazaarAgent 本地 HTTP DTO
 
 | DTO | 字段 |
 |---|---|
-| `AutoBazaarCardSnapshot` | `InstanceId`、`Kind`、`Type`、`TemplateId`、`DisplayName`、`Tier`、`Size`、`Enchantment`、`SocketId`、`Location`、`Order`、`Tags`、`HiddenTags`、`Attributes`、`ActiveAbilities`、`BuyPrice`、`SellPrice`、`CanAfford`、`CanFit`、`CanSelect`、`IsFree`、`TargetSection`、`TargetSockets`、`UnavailableReason`、`CanSell` |
-| `AutoBazaarCardAbilitySnapshot` | `Id`、`InternalName`、`InternalDescription`、`Trigger`、`Action`、`ActiveIn`、`WorksIn`、`Priority` |
-| `AutoBazaarDecisionOption` | `ActionKind`、`Group`、`DisplayKey`、`CardInstanceId`、`TargetSection`、`TargetSockets`、`Card` |
-| `AutoBazaarContext` | `SchemaVersion`、`TickId`、`ServerTimeUtc`、`IsEnabled`、`IsInRun`、`HasActiveRun`、`CanStartOrContinueRun`、`IsClientBusy`、`RunId`、`StateName`、`PlayerHero`、`Day`、`Hour`、`Wins`、`Losses`、`PlayerGold`、`PlayerIncome`、`PlayerHealth`、`PlayerMaxHealth`、`PlayerPrestige`、`PlayerLevel`、`SelectionIsFree`、`CanExit`、`CanReroll`、`RerollCost`、`RerollsRemaining`、`CurrentEncounterId`、`CurrentEncounterType`、`ActionCooldownRemainingSeconds`、`InteractableTemplateIds`、`BoardItems`、`ChestItems`、`PlayerSkills`、`SellableItems`、`SelectionOptions`、`AvailableActions` |
-| `AutoBazaarAction` | `SchemaVersion?`、`ActionKind`、`CardInstanceId?`、`TargetSection?`、`TargetSockets?`、`Hero?`、`PlayMode?`、`Reason?`、`ForTickId?` |
+| `BazaarAgentCardSnapshot` | `InstanceId`、`Kind`、`Type`、`TemplateId`、`DisplayName`、`Tier`、`Size`、`Enchantment`、`SocketId`、`Location`、`Order`、`Tags`、`HiddenTags`、`Attributes`、`ActiveAbilities`、`BuyPrice`、`SellPrice`、`CanAfford`、`CanFit`、`CanSelect`、`IsFree`、`TargetSection`、`TargetSockets`、`UnavailableReason`、`CanSell` |
+| `BazaarAgentCardAbilitySnapshot` | `Id`、`InternalName`、`InternalDescription`、`Trigger`、`Action`、`ActiveIn`、`WorksIn`、`Priority` |
+| `BazaarAgentDecisionOption` | `ActionKind`、`Group`、`DisplayKey`、`CardInstanceId`、`TargetSection`、`TargetSockets`、`Card` |
+| `BazaarAgentContext` | `SchemaVersion`、`TickId`、`ServerTimeUtc`、`IsInRun`、`HasActiveRun`、`CanStartOrContinueRun`、`IsClientBusy`、`RunId`、`StateName`、`PlayerHero`、`Day`、`Hour`、`Wins`、`Losses`、`PlayerGold`、`PlayerIncome`、`PlayerHealth`、`PlayerMaxHealth`、`PlayerPrestige`、`PlayerLevel`、`SelectionIsFree`、`CanExit`、`CanReroll`、`RerollCost`、`RerollsRemaining`、`CurrentEncounterId`、`CurrentEncounterType`、`ActionCooldownRemainingSeconds`、`InteractableTemplateIds`、`BoardItems`、`ChestItems`、`PlayerSkills`、`SellableItems`、`SelectionOptions`、`AvailableActions` |
+| `BazaarAgentAction` | `SchemaVersion?`、`ActionKind`、`CardInstanceId?`、`TargetSection?`、`TargetSockets?`、`Hero?`、`PlayMode?`、`Reason?`、`ForTickId?` |
 
 业务点：
 
 - `GET /v1/context` 可使用 ETag/304；无 snapshot 时返回 503。
 - `POST /v1/actions` 只接受当前 `AvailableActions` 中存在的动作，并在 Unity 主线程调用原 `AppState`/`Cmd` 路径。
-- AutoBazaar 是控制层，不是权威 run 引擎；离线玩法仍要由本地 session server 产出 `INetMessage`。
+- BazaarAgent 是控制层，不是权威 run 引擎；离线玩法仍要由本地 session server 产出 `INetMessage`。
 
 ## 本地离线新增 DTO 建议
 

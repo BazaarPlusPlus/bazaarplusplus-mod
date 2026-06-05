@@ -14,7 +14,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - 大厅与展示类小功能：随机英雄池面板、主菜单版本号、Legendary 段位展示文案、中文术语切换
 - **Anonymous Mode**：可选将显示名改为 `Anonymous`
 - 终局自动截图：终局 `Continue` 前自动保存主截图和元数据
-- **BazaarAgent HTTP 接口**（**默认不安装 Host**）：本地回环 HTTP 服务（默认端口 47900），对外暴露决策上下文（`GET /v1/context`）并接受外部动作（`POST /v1/actions`）；纯传输与校验层，Mod 本身不做策略决策。Host 是独立的可选 BepInEx 插件；按需用 `./run.sh build --with-bazaaragent-host` 构建（默认构建只产出 `BazaarPlusPlus.dll` 并主动清除两个 host dll），安装后还需 host 自己 cfg 里 `[BazaarAgent] Enabled = true` 才会启动 HTTP 服务。详见 [bazaar-agent-http-api-v1.md](reference/bazaar-agent-http-api-v1.md)。
+- **BazaarAgent HTTP 接口**（**默认不安装 Host**）：固定 `127.0.0.1:47900` 本地回环 HTTP 服务，对外暴露决策上下文（`GET /v1/context`）并接受外部动作（`POST /v1/actions`）；纯传输与校验层，Mod 本身不做策略决策。Host 是独立的可选 BepInEx 插件；按需用 `./run.sh build --with-bazaaragent` 构建（默认构建只产出 `BazaarPlusPlus.dll` 并主动清除两个 host dll），host dll 安装后自动启动，没有额外启用开关或端口配置。详见 [bazaar-agent-http-api-v1.md](reference/bazaar-agent-http-api-v1.md)。
 
 ## 运行时骨架
 

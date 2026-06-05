@@ -17,7 +17,7 @@ This repository only keeps documentation that still matches the current implemen
 - Background upload: run and replay upload, performed only while the client is outside a live run.
 - BazaarDB screenshot upload: optional toggle that pushes end-of-run snapshot DTOs to the V4 mod backend (`bazaarplusplus-server` repo, deployed at `mod-api-v4.bazaarplusplus.com`) for BazaarDB to pull through the peek/confirm delivery queue (off by default).
 - Anonymous Mode: replaces the local player name with `Anonymous`.
-- **BazaarAgent HTTP endpoint** (optional host plugin, not installed by default) — local loopback HTTP server (default port 47900) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. **The host is a separate BepInEx plugin**, built on demand with `./run.sh build --with-bazaaragent-host`; default builds ship only the main plugin and actively scrub the host dlls. See [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md).
+- **BazaarAgent HTTP endpoint** (optional host plugin, not installed by default) — local loopback HTTP server (fixed at `127.0.0.1:47900`) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. **The host is a separate BepInEx plugin**, built on demand with `./run.sh build --with-bazaaragent`; installing the host dll starts it automatically, while default builds ship only the main plugin and actively scrub the host dlls. See [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md).
 
 ## Installation And Configuration
 

@@ -84,20 +84,8 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             return;
         _lastListenerReconcileTime = _clock.NowSeconds;
 
-        var enabled = _options.Enabled;
-        var desiredPort = _options.HttpListenerPort;
-        var desiredTimeoutMs = _options.ActionTimeoutMilliseconds;
-
-        if (!enabled)
-        {
-            if (_http is not null)
-            {
-                _logger.Info("Stopping listener (Enabled=false)");
-                StopListener();
-                _snapshots.Reset();
-            }
-            return;
-        }
+        var desiredPort = BazaarAgentRuntimeDefaults.HttpListenerPort;
+        var desiredTimeoutMs = BazaarAgentRuntimeDefaults.ActionTimeoutMilliseconds;
 
         if (_http is not null && desiredPort == _currentPort)
             return;
@@ -246,7 +234,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     private double ComputeCooldownLeft()
     {
         var elapsed = _clock.NowSeconds - _lastActionTime;
-        var remaining = _options.ActionMinDelay.TotalSeconds - elapsed;
+        var remaining = BazaarAgentRuntimeDefaults.ActionMinDelay.TotalSeconds - elapsed;
         return remaining > 0 ? remaining : 0;
     }
 

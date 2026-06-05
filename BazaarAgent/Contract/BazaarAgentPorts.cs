@@ -3,16 +3,15 @@ using System;
 
 namespace BazaarPlusPlus.BazaarAgent;
 
+public static class BazaarAgentRuntimeDefaults
+{
+    public const int HttpListenerPort = 47900;
+    public const int ActionTimeoutMilliseconds = 3000;
+    public static readonly TimeSpan ActionMinDelay = TimeSpan.FromSeconds(1);
+}
+
 public interface IBazaarAgentOptions
 {
-    bool Enabled { get; }
-
-    int HttpListenerPort { get; }
-
-    int ActionTimeoutMilliseconds { get; }
-
-    TimeSpan ActionMinDelay { get; }
-
     string DecisionLogRoot { get; }
 }
 

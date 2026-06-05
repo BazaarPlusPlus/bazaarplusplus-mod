@@ -11,7 +11,7 @@
 | 旧版 TempoNet facade | `BazaarGameShared.TempoNet.Requests/RequestFacade.cs` | JSON over `HttpClient` | 构造时传入 | 旧客户端/共享库 REST 封装，覆盖账号、市场、排行榜等。 |
 | 旧版 battle service manager | `BazaarBattleService/BazaarRequestManager.cs` | JSON over `HttpClient` | 默认 `https://dev-temponet.azurewebsites.net` | 旧 run/ghost/savegame/marketplace/chest/profile 接口。当前主流程不以它为主。 |
 | BazaarPlusPlus mod API | `ModApi/*`、`Game/*Upload*` | JSON/bytes over `HttpClient` | `https://mod-api-v4.bazaarplusplus.com` 等 | run bundle 上传、幽灵战斗同步、截图上传、推荐/赞助数据。 |
-| AutoBazaar 本地接口 | `AutoBazaar/*` + `Game/AutoBazaarHost/*` | JSON over loopback `HttpListener` | `http://127.0.0.1:47900` 默认 | 暴露当前决策上下文，接受外部自动化 action；Host 默认不编译，需 `EnableAutoBazaarHost=true` + `[AutoBazaar] Enabled=true`。 |
+| BazaarAgent 本地接口 | `BazaarAgent/*` + `BazaarAgentHost/*` | JSON over loopback `HttpListener` | 固定 `http://127.0.0.1:47900` | 暴露当前决策上下文，接受外部自动化 action；Host 默认不安装，需 `./run.sh build --with-bazaaragent` 构建，host dll 安装后自动启动。 |
 | 潜在 telemetry stub | `AnalyticsManager.cs` | `HttpClient` | `Config.NetURL` 或 `https://localhost:7291/` | 定义了 `api/telemetry` 和统计模型，但当前反编译文件未发现实际发送调用。 |
 | 旧/测试主菜单数据 | `MainMenuUIDataHandler.cs` | JSON / image URL over `UnityWebRequest` 或后续图片加载 | 相对路径、`example.com` 常量、`picsum.photos` 测试图 | 旧市场/收藏 UI 测试数据下载。当前主流程不依赖，但属于潜在联网面。 |
 | 外链 | UI settings / terms | `Application.OpenURL` | playthebazaar.com | 隐私、条款、EULA、公告链接。 |
@@ -296,16 +296,16 @@ run session header：
 
 离线模式应默认关闭上传类功能；推荐/赞助数据使用本地 cache 或内置 fallback。
 
-## AutoBazaar 本地 HTTP 接口
+## BazaarAgent 本地 HTTP 接口
 
 这是 mod 已有的 loopback 自动化接口，不依赖互联网。
 
 | 方法 | 路径 | 请求结构 | 响应结构 | 业务 |
 |---|---|---|---|---|
-| GET | `/v1/context` | header 可带 `If-None-Match: "<tickId>"` | `AutoBazaarContext`，304 支持，503 无 snapshot | 暴露当前 run/选择/卡牌/可执行动作。 |
-| POST | `/v1/actions` | `AutoBazaarAction`，body 最大 64KB | success envelope 或 error envelope | 校验 action 是否在 `availableActions` 中、tick 是否 stale、冷却是否结束，然后在 Unity 主线程调用 `AppState.CurrentState.*Command()`。 |
+| GET | `/v1/context` | header 可带 `If-None-Match: "<tickId>"` | `BazaarAgentContext`，304 支持，503 无 snapshot | 暴露当前 run/选择/卡牌/可执行动作。 |
+| POST | `/v1/actions` | `BazaarAgentAction`，body 最大 64KB | success envelope 或 error envelope | 校验 action 是否在 `availableActions` 中、tick 是否 stale、冷却是否结束，然后在 Unity 主线程调用 `AppState.CurrentState.*Command()`。 |
 
-`AutoBazaarAction` 字段：`schemaVersion?`、`actionKind`、`cardInstanceId?`、`targetSection?`、`targetSockets?`、`hero?`、`playMode?`、`reason?`、`forTickId?`。  
+`BazaarAgentAction` 字段：`schemaVersion?`、`actionKind`、`cardInstanceId?`、`targetSection?`、`targetSockets?`、`hero?`、`playMode?`、`reason?`、`forTickId?`。
 `actionKind`：`Wait`、`StartOrContinueRun`、`AbandonRun`、`SelectItem`、`SelectSkill`、`SelectEncounter`、`CommitToPedestal`、`MoveItem`、`SellItem`、`Reroll`、`ExitState`。
 
 这个接口适合离线预定义对局的外部控制层，但它不是 run 引擎：真实状态变化仍来自官方 `/sessions`/`/commands` 或未来本地替代。

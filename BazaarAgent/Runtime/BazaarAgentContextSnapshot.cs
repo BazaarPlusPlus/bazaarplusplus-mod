@@ -53,7 +53,6 @@ public sealed class BazaarAgentContextSnapshotPublisher
             SchemaVersion = src.SchemaVersion,
             TickId = tickId,
             ServerTimeUtc = src.ServerTimeUtc,
-            IsEnabled = src.IsEnabled,
             IsInRun = src.IsInRun,
             HasActiveRun = src.HasActiveRun,
             CanStartOrContinueRun = src.CanStartOrContinueRun,
@@ -91,8 +90,7 @@ public sealed class BazaarAgentContextSnapshotPublisher
     private static bool EqualsIgnoreTimeAndTick(BazaarAgentContext a, BazaarAgentContext b)
     {
         // Explicitly ignore: ServerTimeUtc, TickId, SchemaVersion (publisher-controlled)
-        return a.IsEnabled == b.IsEnabled
-            && a.IsInRun == b.IsInRun
+        return a.IsInRun == b.IsInRun
             && a.HasActiveRun == b.HasActiveRun
             && a.CanStartOrContinueRun == b.CanStartOrContinueRun
             && a.IsClientBusy == b.IsClientBusy

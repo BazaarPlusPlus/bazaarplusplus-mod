@@ -35,8 +35,8 @@ public sealed class BazaarAgentHostPlugin : BaseUnityPlugin
         }
 
         var logger = new BazaarAgentBepInExLogger(Logger);
-        var options = new BazaarAgentBepInExOptions(Config);
-        var contextReader = new BazaarAgentGameContextReader(gameProbe, options, logger);
+        var options = new BazaarAgentBepInExOptions();
+        var contextReader = new BazaarAgentGameContextReader(gameProbe, logger);
         var dispatcher = new BazaarAgentGameActionDispatcher(logger);
         var uiPlumbing = new BazaarAgentUiPlumbing(logger, gameProbe.IsReplayStartInProgress);
 

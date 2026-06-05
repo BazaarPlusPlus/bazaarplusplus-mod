@@ -28,8 +28,8 @@ csharpier format .
 
 `run.sh` works on macOS and Windows (Git Bash). Subcommands:
 
-- `./run.sh build [--with-autobazaar-host]` — Debug build
-- `./run.sh all [--prod] [--with-autobazaar-host]` — Debug + Release (BuildAll)
+- `./run.sh build [--with-bazaaragent]` — Debug build
+- `./run.sh all [--prod] [--with-bazaaragent]` — Debug + Release (BuildAll)
 - `./run.sh test` — run all test projects under `tests/`
 - `./run.sh format` — csharpier format
 - `./run.sh decompile [DllName]` — decompile a single game DLL (default: Assembly-CSharp)
@@ -45,15 +45,16 @@ For runtime validation that needs launching the game, always launch The Bazaar t
 
 ## Architecture
 
-**Four assemblies** ship unconditionally as the mod; a fifth ships only when the `BPP_AUTOBAZAAR_HOST` flag is set:
+**Four assemblies** ship unconditionally as the mod; two BazaarAgent assemblies ship only when `./run.sh build --with-bazaaragent` or `./run.sh all --with-bazaaragent` is used:
 
 - `BazaarPlusPlus.dll` — the main BepInEx plugin; references game DLLs, Unity, BepInEx
 - `BazaarPlusPlus.ModApi.dll` — HTTP client + DTOs for the cloud backend; zero game/Unity/BepInEx references
 - `BazaarPlusPlus.Storage.dll` — SQLite persistence layer; zero game/Unity/BepInEx references
 - `BazaarPlusPlus.Localization.dll` — localization engine; zero game/Unity/BepInEx references
-- `BazaarPlusPlus.AutoBazaar.dll` — AutoBazaar host bridge; built only when `EnableAutoBazaarHost=true` (sets `BPP_AUTOBAZAAR_HOST`)
+- `BazaarPlusPlus.BazaarAgent.dll` — pure HTTP transport, DTO, validation, queue, and runtime controller; zero game/Unity/BepInEx references
+- `BazaarPlusPlus.BazaarAgentHost.dll` — optional BepInEx host bridge; installing the dll starts the fixed `127.0.0.1:47900` listener automatically
 
-All five csproj files live in the repo root. `ModApi/`, `Storage/`, `AutoBazaar/`, and `Localization/` are each the source tree for their respective csproj (via `<Compile Include="...">`). `Directory.Build.props` gives them separate `obj/`/`bin/` dirs.
+All six csproj files live in the repo root. `ModApi/`, `Storage/`, `Localization/`, `BazaarAgent/`, and `BazaarAgentHost/` are each the source tree for their respective csproj (via `<Compile Include="...">`). `Directory.Build.props` gives them separate `obj/`/`bin/` dirs.
 
 **Plugin lifecycle** — `Plugin.cs` (BepInEx entry) → `BppComposition` (the manual composition root, no DI container). BppComposition wires:
 

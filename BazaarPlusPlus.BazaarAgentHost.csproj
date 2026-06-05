@@ -153,6 +153,31 @@
     />
   </Target>
 
+  <!-- Production packaging: the main project creates BepInEx.zip before this host
+       project has copied the optional dlls into SourceForBuild. Re-zip after the
+       host artifacts are present so BazaarAgent production builds include them. -->
+  <Target
+    Name="PackageHostInstallerSource"
+    AfterTargets="CopyHostToInstallerSource"
+    Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)') and '$(BuildProductionPackage)' == 'true'"
+  >
+    <Message Text="[BazaarAgentHost] Rebuilding production installer package with BazaarAgent" Importance="high" />
+    <ZipDirectory
+      SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos"
+      DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/macos/BepInEx.zip"
+      Overwrite="true"
+    />
+    <ZipDirectory
+      SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/windows"
+      DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/windows/BepInEx.zip"
+      Overwrite="true"
+    />
+    <Message
+      Text="[BazaarAgentHost] Successfully rebuilt mod zip with BazaarAgent host artifacts."
+      Importance="high"
+    />
+  </Target>
+
   <!-- Build both Debug and Release of the host (and its main/core deps) in one pass. -->
   <Target Name="BuildAll">
     <MSBuild Projects="$(MSBuildProjectFile)" Targets="Build" Properties="Configuration=Debug" />

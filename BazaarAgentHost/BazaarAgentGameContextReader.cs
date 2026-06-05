@@ -22,17 +22,11 @@ namespace BazaarPlusPlus.BazaarAgentHost;
 internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 {
     private readonly IBazaarAgentGameProbe _gameProbe;
-    private readonly IBazaarAgentOptions _options;
     private readonly IBazaarAgentLogger _logger;
 
-    public BazaarAgentGameContextReader(
-        IBazaarAgentGameProbe gameProbe,
-        IBazaarAgentOptions options,
-        IBazaarAgentLogger logger
-    )
+    public BazaarAgentGameContextReader(IBazaarAgentGameProbe gameProbe, IBazaarAgentLogger logger)
     {
         _gameProbe = gameProbe ?? throw new ArgumentNullException(nameof(gameProbe));
-        _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -42,21 +36,14 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
     /// </summary>
     public BazaarAgentContext Build(double actionCooldownRemainingSeconds)
     {
-        bool isEnabled = _options.Enabled;
-
-        if (!isEnabled)
-        {
-            return MakeDegenerate(isEnabled: false, actionCooldownRemainingSeconds);
-        }
-
         try
         {
-            return BuildCore(_gameProbe, _logger, isEnabled, actionCooldownRemainingSeconds);
+            return BuildCore(_gameProbe, _logger, actionCooldownRemainingSeconds);
         }
         catch (Exception ex)
         {
             _logger.Error("context build failed", ex);
-            return MakeDegenerate(isEnabled: true, actionCooldownRemainingSeconds);
+            return MakeDegenerate(actionCooldownRemainingSeconds);
         }
     }
 
@@ -67,7 +54,6 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
     private static BazaarAgentContext BuildCore(
         IBazaarAgentGameProbe gameProbe,
         IBazaarAgentLogger logger,
-        bool isEnabled,
         double actionCooldownRemainingSeconds
     )
     {
@@ -90,7 +76,6 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             {
                 SchemaVersion = BazaarAgentSchema.Version,
                 ServerTimeUtc = UtcNow(),
-                IsEnabled = isEnabled,
                 StateName = BazaarAgentRunStateName.Unknown,
                 CanStartOrContinueRun = canStartEarly,
                 ActionCooldownRemainingSeconds = actionCooldownRemainingSeconds,
@@ -195,7 +180,6 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             SchemaVersion = BazaarAgentSchema.Version,
             TickId = 0,
             ServerTimeUtc = UtcNow(),
-            IsEnabled = isEnabled,
             IsInRun = isInRun,
             HasActiveRun = hasActiveRun,
             CanStartOrContinueRun = canStartOrContinueRun,
@@ -976,12 +960,11 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             DisplayKey = "StartOrContinueRun",
         };
 
-    private static BazaarAgentContext MakeDegenerate(bool isEnabled, double cooldown) =>
+    private static BazaarAgentContext MakeDegenerate(double cooldown) =>
         new()
         {
             SchemaVersion = BazaarAgentSchema.Version,
             ServerTimeUtc = UtcNow(),
-            IsEnabled = isEnabled,
             StateName = BazaarAgentRunStateName.Unknown,
             ActionCooldownRemainingSeconds = cooldown,
             AvailableActions = new[] { WaitOption() },

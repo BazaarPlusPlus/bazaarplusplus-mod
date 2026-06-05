@@ -10,7 +10,6 @@ public class BazaarAgentContextSnapshotTests
             ServerTimeUtc = serverTime,
             StateName = BazaarAgentRunStateName.Choice,
             PlayerGold = gold,
-            IsEnabled = true,
         };
 
     [Fact]
@@ -50,7 +49,6 @@ public class BazaarAgentContextSnapshotTests
         var s1 = pub.Publish(
             new BazaarAgentContext
             {
-                IsEnabled = true,
                 StateName = BazaarAgentRunStateName.Choice,
                 PlayerHero = "Vanessa",
                 Day = 1,
@@ -68,7 +66,6 @@ public class BazaarAgentContextSnapshotTests
         var s2 = pub.Publish(
             new BazaarAgentContext
             {
-                IsEnabled = true,
                 StateName = BazaarAgentRunStateName.Choice,
                 PlayerHero = "Vanessa",
                 Day = 1,
@@ -97,7 +94,6 @@ public class BazaarAgentContextSnapshotTests
         var choice2 = new BazaarAgentContext
         {
             StateName = BazaarAgentRunStateName.Choice,
-            IsEnabled = true,
             PlayerGold = 10,
         };
         var s2 = pub.Publish(choice2);
@@ -107,7 +103,6 @@ public class BazaarAgentContextSnapshotTests
         var combat = new BazaarAgentContext
         {
             StateName = BazaarAgentRunStateName.Combat,
-            IsEnabled = true,
             PlayerGold = 10,
         };
         var s3 = pub.Publish(combat);
@@ -121,7 +116,6 @@ public class BazaarAgentContextSnapshotTests
         var pub = new BazaarAgentContextSnapshotPublisher();
         var withOne = new BazaarAgentContext
         {
-            IsEnabled = true,
             StateName = BazaarAgentRunStateName.Choice,
             BoardItems = new[]
             {
@@ -130,7 +124,6 @@ public class BazaarAgentContextSnapshotTests
         };
         var withTwo = new BazaarAgentContext
         {
-            IsEnabled = true,
             StateName = BazaarAgentRunStateName.Choice,
             BoardItems = new[]
             {
@@ -149,7 +142,6 @@ public class BazaarAgentContextSnapshotTests
         var pub = new BazaarAgentContextSnapshotPublisher();
         var basic = new BazaarAgentContext
         {
-            IsEnabled = true,
             BoardItems = new[]
             {
                 new BazaarAgentCardSnapshot
@@ -174,7 +166,6 @@ public class BazaarAgentContextSnapshotTests
         };
         var changed = new BazaarAgentContext
         {
-            IsEnabled = true,
             BoardItems = new[]
             {
                 new BazaarAgentCardSnapshot
@@ -210,7 +201,6 @@ public class BazaarAgentContextSnapshotTests
         var pub = new BazaarAgentContextSnapshotPublisher();
         var a = new BazaarAgentContext
         {
-            IsEnabled = true,
             AvailableActions = new[]
             {
                 new BazaarAgentDecisionOption
@@ -226,7 +216,6 @@ public class BazaarAgentContextSnapshotTests
         };
         var b = new BazaarAgentContext
         {
-            IsEnabled = true,
             AvailableActions = new[]
             {
                 new BazaarAgentDecisionOption

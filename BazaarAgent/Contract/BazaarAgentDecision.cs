@@ -5,7 +5,7 @@ namespace BazaarPlusPlus.BazaarAgent;
 
 public static class BazaarAgentSchema
 {
-    public const string Version = "1.2.0";
+    public const string Version = "2.0.0";
 }
 
 public enum BazaarAgentActionKind
@@ -145,7 +145,6 @@ public sealed class BazaarAgentContext
     public ulong TickId { get; init; }
     public string ServerTimeUtc { get; init; } = "";
 
-    public bool IsEnabled { get; init; }
     public bool IsInRun { get; init; }
     public bool HasActiveRun { get; init; }
     public bool CanStartOrContinueRun { get; init; }

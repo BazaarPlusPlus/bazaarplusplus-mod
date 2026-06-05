@@ -39,24 +39,24 @@ clear_macos_sqlite_quarantine() {
     done
 }
 
-print_bazaaragent_host_mode() {
-    local bazaaragent_host="${1:-false}"
-    if [[ "$bazaaragent_host" == "true" ]]; then
-        echo -e "${CYAN}== BazaarAgent Host: ${GREEN}enabled${CYAN} ==${RESET}"
+print_bazaaragent_mode() {
+    local bazaaragent="${1:-false}"
+    if [[ "$bazaaragent" == "true" ]]; then
+        echo -e "${CYAN}== BazaarAgent: ${GREEN}included${CYAN} ==${RESET}"
     else
-        echo -e "${CYAN}== BazaarAgent Host: disabled ==${RESET}"
+        echo -e "${CYAN}== BazaarAgent: excluded ==${RESET}"
     fi
 }
 
 build() {
-    local bazaaragent_host="${1:-false}"
+    local bazaaragent="${1:-false}"
     local args=(-verbosity detailed)
 
-    print_bazaaragent_host_mode "$bazaaragent_host"
+    print_bazaaragent_mode "$bazaaragent"
     # The host is its own plugin project that references the main plugin + the pure core,
     # so building it builds and deploys all three. A default build builds only the main
     # plugin, whose build actively scrubs both host dlls from the plugins folder.
-    if [[ "$bazaaragent_host" == "true" ]]; then
+    if [[ "$bazaaragent" == "true" ]]; then
         dotnet build BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
     else
         dotnet build BazaarPlusPlus.csproj "${args[@]}"
@@ -65,16 +65,16 @@ build() {
 
 build_all() {
     local prod="${1:-false}"
-    local bazaaragent_host="${2:-false}"
+    local bazaaragent="${2:-false}"
     local args=(-t:BuildAll -verbosity detailed)
 
     if [[ "$prod" == "true" ]]; then
         args+=(-p:BuildProductionPackage=true)
     fi
 
-    print_bazaaragent_host_mode "$bazaaragent_host"
+    print_bazaaragent_mode "$bazaaragent"
     clear_macos_sqlite_quarantine
-    if [[ "$bazaaragent_host" == "true" ]]; then
+    if [[ "$bazaaragent" == "true" ]]; then
         dotnet build BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
     else
         dotnet build BazaarPlusPlus.csproj "${args[@]}"
@@ -83,11 +83,11 @@ build_all() {
 }
 
 parse_build_options() {
-    local bazaaragent_host=false
+    local bazaaragent=false
 
     while (($# > 0)); do
         case "$1" in
-            --with-bazaaragent-host|--bazaaragent) bazaaragent_host=true ;;
+            --with-bazaaragent) bazaaragent=true ;;
             *)
                 usage
                 exit 1
@@ -96,7 +96,7 @@ parse_build_options() {
         shift
     done
 
-    build "$bazaaragent_host"
+    build "$bazaaragent"
 }
 
 test_all() {
@@ -155,17 +155,16 @@ decompile_all() {
 usage() {
     cat <<EOF
 Usage:
-  $0 build [--with-bazaaragent-host]
-  $0 all [--prod] [--with-bazaaragent-host]
+  $0 build [--with-bazaaragent]
+  $0 all [--prod] [--with-bazaaragent]
   $0 test
   $0 format
   $0 decompile [DllName]
   $0 decompile-all
 
 Options:
-  --with-bazaaragent-host  Build and copy the optional BazaarAgent host assembly.
-  --bazaaragent            Alias for --with-bazaaragent-host.
-  --prod                  With all: also build the production installer package.
+  --with-bazaaragent  Build and copy the optional BazaarAgent assemblies.
+  --prod              With all: also build the production installer package.
 EOF
 }
 
@@ -173,11 +172,11 @@ case "${1:-}" in
     all)
         shift
         prod=false
-        bazaaragent_host=false
+        bazaaragent=false
         while (($# > 0)); do
             case "$1" in
                 --prod) prod=true ;;
-                --with-bazaaragent-host|--bazaaragent) bazaaragent_host=true ;;
+                --with-bazaaragent) bazaaragent=true ;;
                 *)
                     usage
                     exit 1
@@ -185,7 +184,7 @@ case "${1:-}" in
             esac
             shift
         done
-        build_all "$prod" "$bazaaragent_host"
+        build_all "$prod" "$bazaaragent"
         ;;
     build)
         shift

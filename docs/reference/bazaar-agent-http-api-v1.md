@@ -1,8 +1,8 @@
 # BazaarAgent HTTP API v1
 
-> **Status: optional host plugin.** The host is a separate, optional BepInEx plugin (`BazaarPlusPlus.BazaarAgentHost.dll`, declaring `[BepInDependency(BazaarPlusPlus)]`). Default mod builds ship only `BazaarPlusPlus.dll` and actively scrub the host dlls; build the host on demand with `./run.sh build --with-bazaaragent-host`. Once installed, set `[BazaarAgent] Enabled = true` in `BepInEx/config/BazaarPlusPlus.BazaarAgent.cfg` to start the loopback HTTP server. Field names (`stateName`, `availableActions`, `actionKind`, `cardInstanceId`, `targetSection`, `targetSockets`, `reason`) are stable wire contracts; do not rename. Field-by-field derivation lives in the companion [bazaar-agent-decision-surface.md](bazaar-agent-decision-surface.md).
+> **Status: optional host plugin.** The host is a separate, optional BepInEx plugin (`BazaarPlusPlus.BazaarAgentHost.dll`, declaring `[BepInDependency(BazaarPlusPlus)]`). Default mod builds ship only `BazaarPlusPlus.dll` and actively scrub the host dlls; build the host on demand with `./run.sh build --with-bazaaragent`. Installing the host dll starts the loopback HTTP server automatically at fixed `127.0.0.1:47900`. Field names (`stateName`, `availableActions`, `actionKind`, `cardInstanceId`, `targetSection`, `targetSockets`, `reason`) are stable wire contracts; do not rename. Field-by-field derivation lives in the companion [bazaar-agent-decision-surface.md](bazaar-agent-decision-surface.md).
 
-The BazaarAgent HTTP API exposes the current game state and accepts one action at a time, acting as pure transport and validation. All strategy, persistence, and training logic belong to external tools; the mod makes no decisions itself. The endpoint runs on loopback and is reachable at `http://127.0.0.1:<port>/v1/`.
+The BazaarAgent HTTP API exposes the current game state and accepts one action at a time, acting as pure transport and validation. All strategy, persistence, and training logic belong to external tools; the mod makes no decisions itself. The endpoint runs on loopback and is reachable at `http://127.0.0.1:47900/v1/`.
 
 ---
 
@@ -14,7 +14,7 @@ BazaarAgent hosts a loopback HTTP server that publishes a versioned snapshot of 
 
 ## 2. Binding and request limits
 
-The listener binds to `127.0.0.1:<port>` only. The default port is `47900`; it is configurable via the `HttpListenerPort` cfg entry under section `BazaarAgent`. The port is config-driven and fixed at startup — there is no discovery file.
+The listener binds to `127.0.0.1:47900` only. The port is fixed at build time; there is no cfg entry and no discovery file.
 
 All POST requests are subject to a 64 KB body cap. Requests whose declared `Content-Length` header exceeds 65536 bytes are rejected immediately with `413` before the body is read. Requests without a declared length are read up to 65537 bytes and rejected if that limit is reached.
 
@@ -22,7 +22,7 @@ All POST requests are subject to a 64 KB body cap. Requests whose declared `Cont
 
 ## 3. Versioning
 
-The major API version is encoded in the URL path (`/v1`). A bump to `/v2` signals breaking changes to the request/response envelope. The body field `schemaVersion` follows semver; minor bumps (e.g. `1.2.0`) signal contract changes — added fields, added or removed enum values, or added or removed `actionKind` values — that clients SHOULD inspect when targeting a specific minor version.
+The URL path (`/v1`) identifies the HTTP route family. The body field `schemaVersion` follows semver; major bumps (for example, `2.0.0`) signal breaking response-body contract changes, while minor bumps signal additive fields, enum values, or `actionKind` values that clients SHOULD inspect when targeting a specific version.
 
 **Client guarantees (required):**
 
@@ -56,10 +56,9 @@ Top-level scalar fields:
 
 | Field | Type | Description |
 |---|---|---|
-| `schemaVersion` | string | Semver string, e.g. `"1.2.0"` |
+| `schemaVersion` | string | Semver string, e.g. `"2.0.0"` |
 | `tickId` | uint64 | Monotonically increasing counter; resets to 1 when the listener restarts |
 | `serverTimeUtc` | string | ISO-8601 UTC timestamp of snapshot build; excluded from ETag fingerprint |
-| `isEnabled` | bool | Whether BazaarAgent is active |
 | `isInRun` | bool | Whether the game is inside an active run |
 | `hasActiveRun` | bool | Whether a run exists (may be ended) |
 | `canStartOrContinueRun` | bool | True when the game is on the hero-select scene with the player profile loaded and no active `AppState`. Covers both fresh-run and resume-run cases — the server distinguishes via the player profile. |
@@ -166,7 +165,7 @@ Card-bearing kinds are: `SelectItem`, `SelectSkill`, `SelectEncounter`, `CommitT
 
 ```jsonc
 {
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "2.0.0",
   "decisionId": "01HXYZ...",
   "executed": true,
   "tickId": 12346,
@@ -332,11 +331,9 @@ When `runId` is null or unavailable, the fallback path is:
 
 ## 10. No-external-connection semantics
 
-When `Enabled = true` but no external tool posts actions: the server listens and `GET /v1/context` returns the latest snapshot, but no actions advance game state. Replay auto-advance and any automatic UI plumbing still run; those are not decisions.
+When the host dll is installed but no external tool posts actions: the server listens and `GET /v1/context` returns the latest snapshot, but no actions advance game state. Replay auto-advance and any automatic UI plumbing still run; those are not decisions.
 
-When `Enabled = false`: the listener stops, no context snapshots are built, and no decision logs are written.
-
-Toggling `Enabled` back to `true` restarts the listener. `tickId` restarts from 1 on each listener start.
+Removing the host dll disables the listener entirely. `tickId` restarts from 1 on each listener start.
 
 ---
 
@@ -348,11 +345,6 @@ After every non-`Wait` action that the mod dispatched (`executed: true`), a 1.0 
 
 ---
 
-## 12. Configuration
+## 12. Runtime defaults
 
-| cfg key | section | default | description |
-|---|---|---|---|
-| `Enabled` | `BazaarAgent` | `false` | Runtime switch. Only has an effect when the BazaarAgent host plugin is installed; edit the host cfg file, no in-game UI. |
-| `HttpListenerPort` | `BazaarAgent` | `47900` | Loopback port. Changing this value restarts the listener. |
-
-The snapshot tick cadence (`1.5 s`) and the POST blocking timeout (`3 s`) are fixed defaults, no longer configurable.
+There is no BazaarAgent runtime cfg. Installing `BazaarPlusPlus.BazaarAgentHost.dll` enables the listener, and removing it disables the listener. The listener port (`47900`), snapshot tick cadence (`1.5 s`), minimum action delay (`1.0 s`), and POST blocking timeout (`3 s`) are fixed defaults.

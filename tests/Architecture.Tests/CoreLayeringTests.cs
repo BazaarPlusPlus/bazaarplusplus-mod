@@ -506,6 +506,88 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void BazaarAgent_host_has_no_runtime_config_switches()
+    {
+        var repoRoot = RepoRoot();
+        var optionsFile = Path.Combine(repoRoot, "BazaarAgentHost", "BazaarAgentBepInExOptions.cs");
+        var portsFile = Path.Combine(repoRoot, "BazaarAgent", "Contract", "BazaarAgentPorts.cs");
+        Assert.True(File.Exists(optionsFile), $"Could not locate options file at '{optionsFile}'.");
+        Assert.True(File.Exists(portsFile), $"Could not locate ports file at '{portsFile}'.");
+
+        var optionsText = File.ReadAllText(optionsFile);
+        Assert.DoesNotContain("ConfigEntry<", optionsText);
+        Assert.DoesNotContain(".Bind(", optionsText);
+        Assert.DoesNotContain("BepInEx.Configuration", optionsText);
+        Assert.DoesNotContain("Enabled", optionsText);
+        Assert.DoesNotContain("HttpListenerPort", optionsText);
+
+        var portsText = File.ReadAllText(portsFile);
+        Assert.DoesNotContain("bool Enabled", portsText);
+        Assert.DoesNotContain("int HttpListenerPort {", portsText);
+        Assert.Contains("HttpListenerPort = 47900", portsText);
+    }
+
+    [Fact]
+    public void Run_script_exposes_only_the_canonical_bazaaragent_flag()
+    {
+        var repoRoot = RepoRoot();
+        var runScript = Path.Combine(repoRoot, "run.sh");
+        Assert.True(File.Exists(runScript), $"Could not locate run script at '{runScript}'.");
+
+        var text = File.ReadAllText(runScript);
+        Assert.Contains("--with-bazaaragent", text);
+        Assert.DoesNotContain("--with-bazaaragent-host", text);
+        Assert.DoesNotContain(
+            "--bazaaragent",
+            text.Replace("--with-bazaaragent", "", StringComparison.Ordinal)
+        );
+        Assert.DoesNotContain("--with-autobazaar-host", text);
+    }
+
+    [Fact]
+    public void BazaarAgent_host_repackages_production_zip_after_copying_optional_artifacts()
+    {
+        var repoRoot = RepoRoot();
+        var hostProject = Path.Combine(repoRoot, "BazaarPlusPlus.BazaarAgentHost.csproj");
+        Assert.True(File.Exists(hostProject), $"Could not locate host project at '{hostProject}'.");
+
+        var project = XDocument.Load(hostProject);
+        var elements = project.Descendants().ToList();
+        var target = Assert.Single(
+            elements,
+            e =>
+                e.Name.LocalName == "Target" && Attribute(e, "Name") == "PackageHostInstallerSource"
+        );
+        var condition = Attribute(target, "Condition") ?? string.Empty;
+        Assert.Equal("CopyHostToInstallerSource", Attribute(target, "AfterTargets"));
+        Assert.Contains("$(BuildProductionPackage)", condition);
+        Assert.Contains("true", condition);
+
+        foreach (var platform in new[] { "macos", "windows" })
+        {
+            Assert.Contains(
+                elements,
+                e =>
+                    e.Name.LocalName == "ZipDirectory"
+                    && (
+                        Attribute(e, "SourceDirectory")
+                            ?.Contains($"/SourceForBuild/{platform}", StringComparison.Ordinal)
+                        ?? false
+                    )
+                    && (
+                        Attribute(e, "DestinationFile")
+                            ?.Contains(
+                                $"/BepInExSource/{platform}/BepInEx.zip",
+                                StringComparison.Ordinal
+                            )
+                        ?? false
+                    )
+                    && Attribute(e, "Overwrite") == "true"
+            );
+        }
+    }
+
+    [Fact]
     public void BazaarPlusPlus_assembly_does_not_reference_the_agent_module()
     {
         var repoRoot = RepoRoot();

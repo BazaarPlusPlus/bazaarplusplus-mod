@@ -80,7 +80,6 @@ public class BazaarAgentHttpServerTests
         new()
         {
             TickId = tickId,
-            IsEnabled = true,
             StateName = BazaarAgentRunStateName.Choice,
             PlayerGold = 10,
             AvailableActions = new[]
@@ -125,7 +124,6 @@ public class BazaarAgentHttpServerTests
             TickId = 42,
             StateName = BazaarAgentRunStateName.Choice,
             PlayerGold = 10,
-            IsEnabled = true,
         };
         f.SetSnapshot(new BazaarAgentContextSnapshot(ctx));
 
@@ -135,8 +133,10 @@ public class BazaarAgentHttpServerTests
         Assert.Equal("\"42\"", res.Headers.ETag?.ToString());
         Assert.Equal("application/json", res.Content.Headers.ContentType?.MediaType);
         var body = await res.Content.ReadAsStringAsync();
+        Assert.Contains("\"schemaVersion\":\"2.0.0\"", body);
         Assert.Contains("\"tickId\":42", body);
         Assert.Contains("\"stateName\":\"Choice\"", body);
+        Assert.DoesNotContain("\"isEnabled\"", body);
     }
 
     // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ public class BazaarAgentHttpServerTests
     public async Task GetContext_Returns304_WhenIfNoneMatchMatchesETag()
     {
         using var f = new ServerFixture();
-        var ctx = new BazaarAgentContext { TickId = 7, IsEnabled = true };
+        var ctx = new BazaarAgentContext { TickId = 7 };
         f.SetSnapshot(new BazaarAgentContextSnapshot(ctx));
 
         using var http = Http();
