@@ -292,7 +292,7 @@ The V5 run-bundle upload is multipart and has three logical layers:
 - `artifact` part: raw gzip-compressed MessagePack blob, content type `application/x-bpp-runbundle+msgpack+gzip`
 - local upload queues: `run_sync_state` and `bazaardb_snapshot_uploads` drive background retries
 
-R2 stores the raw artifact bytes. D1 stores only metadata and query projections. Current V5 run-bundle uploads use top-level `battle_projections[]` for battle metadata and do not carry a final-battle marker; the old JSON `artifact_bytes` field is no longer emitted by the mod.
+R2 stores the raw artifact bytes. D1 stores only metadata and query projections. Current V5 run-bundle uploads use top-level `battle_projections[]` for battle metadata, including the `is_final_battle` marker; the old JSON `artifact_bytes` field is no longer emitted by the mod.
 
 ## V4 Server D1 Schema
 
@@ -302,7 +302,7 @@ The V4 server schema lives in a separate repo (`bazaarplusplus-server`) and is t
 - `battles` — projection for `GET /ghost-battles`
 - `bazaardb_delivery` — BazaarDB Snapshot DTO delivery queue
 
-V4 explicitly removed (vs V3): `run_bundles` table, `replay_tokens` table, all `installation_id` columns, `battles.player_account_id_in_payload`, `battles.replay_available`, and the former `seen_player_accounts` opponent filter. The current wire contract also omits the battle bundle-final flag; any retained D1 column is schema residue, not API contract.
+V4 explicitly removed (vs V3): `run_bundles` table, `replay_tokens` table, all `installation_id` columns, `battles.player_account_id_in_payload`, `battles.replay_available`, and the former `seen_player_accounts` opponent filter. The current wire contract carries the final-battle marker as `is_final_battle`; the old V3 `is_bundle_final_battle` name is not emitted or consumed.
 
 Authoritative references:
 
