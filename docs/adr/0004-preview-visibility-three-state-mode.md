@@ -4,6 +4,8 @@
 
 > **Update 2026-06-04:** Fresh installs now default `EnchantPreview / Mode` to `Always`; the original `AutoOnPedestalChoice` mode remains available from the settings dock.
 
+> **Update 2026-06-05:** The legacy `[EnchantPreview] AlwaysShow` migration bridge was removed. Current builds bind `[EnchantPreview] Mode` directly and do not rewrite orphaned `AlwaysShow` entries.
+
 The original decision introduced an independent three-state visibility mode — `Off` / `AutoOnPedestalChoice` / `Always` — to replace the old boolean `EnchantPreviewAlwaysShow`. The hold-key (`HoldEnchantPreview` / `HoldUpgradePreview`) remains the manual override in every mode.
 
 ## Context
@@ -16,7 +18,7 @@ The game already exposes that signal: while the player is on the map choosing (`
 
 - `AutoOnPedestalChoice` auto-shows the matching preview when hovering an inventory item while the corresponding pedestal is on the choice screen; not inside `PedestalState`, not for `TPedestalBehaviorTransform`.
 - Resolution is centralized in `Game/Tooltips/TooltipPreviewModePolicy` (priority `hotkey > Always > AutoOnPedestalChoice > Normal`; upgrade wins ties), shared by the three call sites so behaviour can't drift. See [tooltip-preview.md](../features/tooltip-preview.md).
-- **Backward-compatible migration** runs on first launch: `EnchantPreviewAlwaysShow = true` → `Mode = Always`; `false` → `Mode = AutoOnPedestalChoice`; the old key is removed from the config file.
+- The initial implementation included a first-launch migration from `EnchantPreviewAlwaysShow` to `Mode`; current builds no longer run that migration.
 - Per-item filtering inside the preview (only items the pedestal would accept) was explicitly left out of scope — that is a larger change against `ItemEnchantPreviewService` / `UpgradePreviewTooltipPatch`.
 
 Full design history: [docs/design/archive/2026-05-24-pedestal-aware-preview-display-design.md](../design/archive/2026-05-24-pedestal-aware-preview-display-design.md).

@@ -44,7 +44,6 @@ internal sealed class BppConfig : IBppConfig
             DefaultEnchantPreviewMode,
             "When to show enchant preview text in item tooltips. Off = hold Ctrl only. AutoOnPedestalChoice = auto-show while an enchant pedestal is offered on the choice screen, hold Ctrl otherwise. Always = append to every eligible tooltip."
         );
-        MigrateLegacyEnchantPreviewAlwaysShow(config);
         EnableCombatStatusBarConfig = config.Bind(
             "CombatStatusBar",
             "Enabled",
@@ -87,32 +86,6 @@ internal sealed class BppConfig : IBppConfig
             "UploadScreenshots",
             false,
             "When enabled, end-of-run screenshot snapshots are uploaded to our server for BazaarDB delivery. Includes screenshots from past runs. You can turn this off at any time; we will stop uploading and never delete what was already sent."
-        );
-    }
-
-    private void MigrateLegacyEnchantPreviewAlwaysShow(ConfigFile config)
-    {
-        if (EnchantPreviewModeConfig == null)
-            return;
-
-        var legacyKey = new ConfigDefinition("EnchantPreview", "AlwaysShow");
-        if (!config.OrphanedEntries.TryGetValue(legacyKey, out var legacyValue))
-            return;
-
-        var migratedTo = EnchantPreviewModeConfig.Value;
-        if (bool.TryParse(legacyValue, out var legacyAlwaysShow))
-        {
-            migratedTo = legacyAlwaysShow
-                ? PreviewVisibilityMode.Always
-                : PreviewVisibilityMode.AutoOnPedestalChoice;
-            EnchantPreviewModeConfig.Value = migratedTo;
-        }
-
-        config.OrphanedEntries.Remove(legacyKey);
-        config.Save();
-        global::BazaarPlusPlus.Infrastructure.BppLog.Info(
-            "Config",
-            $"Migrated legacy [EnchantPreview] AlwaysShow={legacyValue} to Mode={migratedTo}."
         );
     }
 }

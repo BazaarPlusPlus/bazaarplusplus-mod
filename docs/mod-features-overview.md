@@ -53,7 +53,6 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **自动触发**：附魔 `AutoOnPedestalChoice` 模式下，在 `ChoiceState` 选择屏遇到附魔 pedestal 时，hover 物品自动展示附魔预览；非 pedestal 选项或非 ChoiceState 不会自动触发
 - **手动覆盖**：按住 `HoldEnchantPreview`（默认 Ctrl）总是显示附魔预览；升级预览没有可视性模式，只在按住 `HoldUpgradePreview`（默认 Shift）时显示
 - **共享决策**：`TooltipModifierRefreshController`、`ItemEnchantPreviewPatch`、`UpgradePreviewTooltipPatch` 共同调用 `Game/Tooltips/TooltipPreviewModePolicy.Resolve`，保证三处行为一致；模式由 `GameInterop/Encounter/ChoiceScreenPedestalResolver` 从 `RunState.SelectionSet` 推导
-- **迁移**：首次启动会把旧的 `[EnchantPreview] AlwaysShow = true/false` 自动迁移到 `[EnchantPreview] Mode = Always / AutoOnPedestalChoice`，并从配置文件移除旧键
 
 详见 [features/tooltip-preview.md](features/tooltip-preview.md) 与 [ADR-0004](adr/0004-preview-visibility-three-state-mode.md)。
 

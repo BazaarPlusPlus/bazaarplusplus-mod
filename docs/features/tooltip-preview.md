@@ -10,7 +10,6 @@ hover 物品时，在原生 primary tooltip 之外按需展示**附魔预览**�
 
 - **自动触发（pedestal-aware）**：在 `ChoiceState` 选择屏遇到附魔 pedestal 时，hover 物品自动展开附魔预览；非 pedestal 选项或非 ChoiceState 不会自动触发。pedestal 种类由 `GameInterop/Encounter/ChoiceScreenPedestalResolver.cs` 从 `RunState.SelectionSet` 推导，配合 `GameInterop/Encounter/EncounterStateProbe.cs`（缓存 + ChoiceState 检测）。「pedestal」术语见 [CONTEXT.md](../../CONTEXT.md)。
 - **按 pedestal 类型过滤**：选择屏提供的附魔 pedestal 带一个具体附魔类型（`TPedestalBehaviorEnchant.Enchantment`）或一个随机池（`TPedestalBehaviorEnchantRandom`）。自动触发时，预览只展示这些被提供的类型；同屏可同时提供多个附魔 pedestal，类型取**并集**。手动 hotkey、`Always`、或不在 pedestal 选择屏时不带过滤，展示物品全部可附魔类型。
-- **首启迁移**：旧的 `[EnchantPreview] AlwaysShow = true/false` 在首次启动时自动迁移为 `[EnchantPreview] Mode = Always / AutoOnPedestalChoice`，并从配置文件移除旧键。
 
 ## 升级预览：仅 Shift 热键
 
