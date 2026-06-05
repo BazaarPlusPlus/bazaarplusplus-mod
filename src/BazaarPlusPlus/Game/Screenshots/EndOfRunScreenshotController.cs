@@ -264,9 +264,30 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
             if (capture != null && captureFailure == null)
             {
-                var persistTask = PersistCaptureAsync(capture, isPrimary: true);
-                while (!persistTask.IsCompleted)
-                    yield return null;
+                Task? persistTask = null;
+                try
+                {
+                    persistTask = PersistCaptureAsync(capture, isPrimary: true);
+                }
+                catch (Exception ex)
+                {
+                    captureFailure = ex;
+                }
+
+                if (persistTask != null)
+                {
+                    while (!persistTask.IsCompleted)
+                        yield return null;
+
+                    try
+                    {
+                        persistTask.GetAwaiter().GetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        captureFailure = ex;
+                    }
+                }
             }
 
             if (captureFailure != null)
