@@ -28,6 +28,11 @@ TestSlotGridGeometry_ResolvesSingleSlot();
 TestSlotGridGeometry_ResolvesMediumSpan();
 TestSlotGridGeometry_ResolvesLargeSpan();
 TestSlotGridGeometry_ClampsOverflowSpan();
+TestSlotGridScale_AllowsHeightFirstUpscale();
+TestSlotGridScale_UsesSharedHeightForProportionalSpans();
+TestSlotGridScale_DerivesWidthFromHeightAndNativeAspect();
+TestSlotGridTargetHeight_UsesBoardFitScaleInTallContainer();
+TestSlotGridTargetHeight_ClampsToSlotHeightInShortContainer();
 
 Console.WriteLine("HistoryPanelPreview checks passed.");
 
@@ -385,6 +390,76 @@ static void TestSlotGridGeometry_ClampsOverflowSpan()
     Assert(rect.Width == 200f, "Overflowing span should clamp at the end of the row.");
 }
 
+static void TestSlotGridScale_AllowsHeightFirstUpscale()
+{
+    var scale = ItemBoardSlotGridGeometry.ResolveHeightScale(200f, 300f, 2f);
+
+    Assert(Approx(scale, 1.5f), "SlotGrid should be able to grow cards above native scale.");
+}
+
+static void TestSlotGridScale_UsesSharedHeightForProportionalSpans()
+{
+    const float nativeHeight = 200f;
+    const float targetHeight = 300f;
+    var smallScale = ItemBoardSlotGridGeometry.ResolveHeightScale(nativeHeight, targetHeight, 2f);
+    var mediumScale = ItemBoardSlotGridGeometry.ResolveHeightScale(nativeHeight, targetHeight, 2f);
+    var largeScale = ItemBoardSlotGridGeometry.ResolveHeightScale(nativeHeight, targetHeight, 2f);
+
+    Assert(
+        Approx(nativeHeight * smallScale, targetHeight),
+        "Small card should reach target height."
+    );
+    Assert(
+        Approx(nativeHeight * mediumScale, targetHeight),
+        "Medium card should reach target height."
+    );
+    Assert(
+        Approx(nativeHeight * largeScale, targetHeight),
+        "Large card should reach target height."
+    );
+}
+
+static void TestSlotGridScale_DerivesWidthFromHeightAndNativeAspect()
+{
+    const float nativeWidth = 400f;
+    const float nativeHeight = 100f;
+    const float targetHeight = 250f;
+    var scale = ItemBoardSlotGridGeometry.ResolveHeightScale(nativeHeight, targetHeight, 5f);
+
+    Assert(Approx(scale, 2.5f), "SlotGrid scale should be determined by target height.");
+    Assert(
+        Approx(nativeWidth * scale, 1000f),
+        "Rendered width should follow the native frame aspect after height scaling."
+    );
+}
+
+static void TestSlotGridTargetHeight_UsesBoardFitScaleInTallContainer()
+{
+    var targetHeight = ItemBoardSlotGridGeometry.ResolveScaledTargetHeight(
+        slotHeight: 500f,
+        boardNativeHeight: 600f,
+        boardScale: 0.4f,
+        maxHeightRatio: 0.96f
+    );
+
+    Assert(
+        Approx(targetHeight, 230.4f),
+        "A tall HistoryPanel container should cap card height by board-fit scale."
+    );
+}
+
+static void TestSlotGridTargetHeight_ClampsToSlotHeightInShortContainer()
+{
+    var targetHeight = ItemBoardSlotGridGeometry.ResolveScaledTargetHeight(
+        slotHeight: 180f,
+        boardNativeHeight: 600f,
+        boardScale: 0.5f,
+        maxHeightRatio: 0.96f
+    );
+
+    Assert(Approx(targetHeight, 180f), "A short LiveBuildPanel row should use its slot height.");
+}
+
 static BppItemBoard Board(
     BppItemBoardId id,
     BppItemBoardType type,
@@ -418,3 +493,6 @@ static void Assert(bool condition, string message)
     if (!condition)
         throw new InvalidOperationException(message);
 }
+
+static bool Approx(float actual, float expected, float tolerance = 0.0001f) =>
+    Math.Abs(actual - expected) <= tolerance;

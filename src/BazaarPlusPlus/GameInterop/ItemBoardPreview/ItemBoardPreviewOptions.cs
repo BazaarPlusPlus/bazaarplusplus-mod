@@ -25,5 +25,5 @@ internal sealed class ItemBoardPreviewOptions
 
     public float SlotGridMaxHeightRatio { get; init; } = 0.96f;
 
-    public float SlotGridMaxScale { get; init; } = 1f;
+    public float SlotGridMaxScale { get; init; } = 10f;
 }

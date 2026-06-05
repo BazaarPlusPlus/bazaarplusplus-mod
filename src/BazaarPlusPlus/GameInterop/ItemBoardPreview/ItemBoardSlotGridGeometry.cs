@@ -52,4 +52,31 @@ internal static class ItemBoardSlotGridGeometry
             Math.Max(1f, safeHeight - insetY * 2f)
         );
     }
+
+    public static float ResolveHeightScale(float frameHeight, float targetHeight, float maxScale)
+    {
+        var safeFrameHeight = Math.Max(1f, frameHeight);
+        var safeTargetHeight = Math.Max(1f, targetHeight);
+
+        var scale = safeTargetHeight / safeFrameHeight;
+        var safeMaxScale = Math.Max(0.05f, maxScale);
+        scale = Math.Clamp(scale, 0.05f, safeMaxScale);
+        if (float.IsNaN(scale) || float.IsInfinity(scale))
+            return 1f;
+
+        return scale;
+    }
+
+    public static float ResolveScaledTargetHeight(
+        float slotHeight,
+        float boardNativeHeight,
+        float boardScale,
+        float maxHeightRatio
+    )
+    {
+        var safeSlotHeight = Math.Max(1f, slotHeight);
+        var scaledBoardHeight = Math.Max(1f, boardNativeHeight * Math.Max(0.05f, boardScale));
+        var ratio = Math.Clamp(maxHeightRatio, 0f, 1f);
+        return Math.Max(1f, Math.Min(safeSlotHeight, scaledBoardHeight * ratio));
+    }
 }

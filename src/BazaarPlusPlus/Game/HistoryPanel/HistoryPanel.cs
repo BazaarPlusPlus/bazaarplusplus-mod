@@ -371,11 +371,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     }
 
     // Translates a screen-space UI Toolkit container Rect into the preview surface knobs.
-    // SlotGrid consumes position and clip size directly; SetCardScale still provides the
-    // existing cache invalidation signal for legacy-sized preview updates. The container Rect
-    // already arrives in physical pixels (the view scales worldBound by scaledPixelsPerPoint),
-    // so this is a direct mapping with no resolution-dependent fudge factor. Returns true if
-    // the card scale or bounds changed so the caller knows to re-render.
+    // SlotGrid uses position/clip for placement and autoFitScale for the same board-fit height
+    // cap as LiveBuildPanel. The container Rect already arrives in physical pixels (the view
+    // scales worldBound by scaledPixelsPerPoint), so this is a direct mapping with no
+    // resolution-dependent fudge factor. Returns true if the card scale or bounds changed so
+    // the caller knows to re-render.
     private bool ApplyPreviewContainerBounds(Rect bounds)
     {
         if (_battleBoardPreview == null)

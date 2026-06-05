@@ -487,17 +487,17 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
                 _options.SlotGridHorizontalInsetPixels,
                 _options.SlotGridVerticalInsetPixels
             );
-            var targetWidth = Mathf.Max(1f, occupied.Width);
-            var targetHeight = Mathf.Max(
-                1f,
-                Mathf.Min(
-                    occupied.Height,
-                    _clipSize.y * Mathf.Clamp01(_options.SlotGridMaxHeightRatio)
-                )
+            var targetHeight = ItemBoardSlotGridGeometry.ResolveScaledTargetHeight(
+                occupied.Height,
+                ItemBoardSocketLayout.NativeBoardHeight,
+                _cardScale,
+                _options.SlotGridMaxHeightRatio
             );
-            var scale = Mathf.Min(targetWidth / frameWidth, targetHeight / frameHeight);
-            var maxScale = Mathf.Max(0.05f, _options.SlotGridMaxScale);
-            scale = Mathf.Clamp(scale, 0.05f, maxScale);
+            var scale = ItemBoardSlotGridGeometry.ResolveHeightScale(
+                frameHeight,
+                targetHeight,
+                _options.SlotGridMaxScale
+            );
 
             var cardTransform = handle.Card.transform;
             cardTransform.localScale = new Vector3(
