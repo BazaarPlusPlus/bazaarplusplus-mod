@@ -155,6 +155,7 @@ internal sealed class GhostBattleSyncService
                     out var artifact,
                     out var artifactError
                 )
+                || artifact == null
             )
             {
                 BppLog.Warn(
@@ -164,7 +165,7 @@ internal sealed class GhostBattleSyncService
                 return null;
             }
 
-            var battle = artifact?.Battles?.FirstOrDefault(candidate =>
+            var battle = artifact.Battles?.FirstOrDefault(candidate =>
                 string.Equals(candidate.BattleId, battleId, StringComparison.Ordinal)
             );
             if (battle == null)
@@ -211,7 +212,7 @@ internal sealed class GhostBattleSyncService
     }
 
     private static PvpBattleManifest? BuildBattleManifest(
-        RunArtifact? artifact,
+        RunArtifact artifact,
         string battleId,
         RunArtifactBattle battle
     )
@@ -222,7 +223,7 @@ internal sealed class GhostBattleSyncService
         return new PvpBattleManifest
         {
             BattleId = battleId,
-            RunId = artifact?.RunId,
+            RunId = artifact.RunId,
             RecordedAtUtc = DateTimeOffset.Parse(battle.Manifest.RecordedAtUtc),
             CombatKind = battle.Manifest.CombatKind,
             Day = battle.Manifest.Day,

@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
@@ -90,7 +91,9 @@ internal sealed class CollectionGridVirtualizer
         _slots?.Clear();
         _lastScrollY = float.NaN;
         _firstWindowDiagnostics =
-            _visible.Count == 0 ? null : new FirstWindowBindDiagnostics(_generation);
+            BppBuild.IsDebug && _visible.Count > 0
+                ? new FirstWindowBindDiagnostics(_generation)
+                : null;
     }
 
     public void SetViewport(float width, float height)
