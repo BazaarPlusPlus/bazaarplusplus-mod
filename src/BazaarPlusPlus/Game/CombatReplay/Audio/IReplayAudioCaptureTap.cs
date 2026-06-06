@@ -5,8 +5,9 @@ namespace BazaarPlusPlus.Game.CombatReplay.Audio;
 
 /// <summary>
 /// A replay-audio capture source that writes a streaming WAV the recorder later muxes into the MP4.
-/// Implemented by both the FMOD passthrough-DSP tap and the WASAPI loopback tap so the recorder can
-/// swap capture strategies without changing its lifecycle/teardown code.
+/// Implemented by WasapiLoopbackCaptureTap (Windows), CoreAudioProcessTapCaptureTap (macOS ≥ 15), and
+/// UnsupportedPlatformAudioCapture (no-op fallback) so the recorder can swap capture strategies without
+/// changing its lifecycle/teardown code.
 /// </summary>
 internal interface IReplayAudioCaptureTap : IDisposable
 {

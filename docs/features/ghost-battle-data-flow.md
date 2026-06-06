@@ -18,7 +18,7 @@ the uploader's point of view, the same row is just a normal PvP win/loss.
 
 ## 1. Recording (Uploader's Client)
 
-File: [`Game/PvpBattles/PvpBattleSnapshotCollector.cs`](../../Game/PvpBattles/PvpBattleSnapshotCollector.cs)
+File: [`Game/PvpBattles/PvpBattleSnapshotCollector.cs`](../../src/BazaarPlusPlus/Game/PvpBattles/PvpBattleSnapshotCollector.cs)
 
 The recorder writes the participant block from the uploader's perspective:
 
@@ -46,9 +46,11 @@ INSERT INTO battles (
   ...
   player_account_id,             -- uploader (from request body, NOT NULL in V4)
   player_name, player_hero, player_rank, player_rating, player_level,
+  player_prestige, player_victories,
   opponent_account_id,           -- whoever the uploader fought
   opponent_name, opponent_hero, opponent_rank, opponent_rating, opponent_level,
-  result,                        -- from uploader's POV ("Win" = uploader won)
+  opponent_prestige, opponent_victories,
+  result,                        -- from uploader's POV ("win" = uploader won)
   ...
 )
 ```
@@ -57,7 +59,7 @@ V4 dropped the V3 `player_account_id_in_payload` reconciliation column (server n
 
 **Invariant after this step**: every row on the server holds the uploader's
 view. `player_*` is the uploader, `opponent_*` is whoever they fought.
-The current V4 wire contract does not include a final-battle marker.
+The V4 wire contract includes `is_final_battle` in `battle_projections` (see `upload.ts:87`).
 
 ## 3. Ghost Query (Server → Local Player's Client)
 
@@ -80,12 +82,12 @@ The response is **raw uploader-perspective data** — no flip yet:
 
 - `player_*` = uploader (some other player who fought my ghost)
 - `opponent_*` = me
-- `result = "Win"` means the uploader won (i.e., *I lost* my mirror match)
-- No final-battle marker is returned by the current V4 API.
+- `result = "win"` means the uploader won (i.e., *I lost* my mirror match)
+- `is_final_battle` is returned by the ghost query and mapped to `GhostBattleImportRecord.IsFinalBattle`.
 
 ## 4. Import (Client Parses Response)
 
-File: [`ModApi/Clients/GhostBattleClient.cs`](../../ModApi/Clients/GhostBattleClient.cs)
+File: [`ModApi/Clients/GhostBattleClient.cs`](../../src/BazaarPlusPlus.ModApi/Clients/GhostBattleClient.cs)
 (`TryParseBattle`)
 
 Fields are deserialized into `GhostBattleImportRecord` **1:1** — the client
@@ -97,14 +99,14 @@ null/default unless a later API version adds them.
 - `OpponentName / OpponentAccountId / OpponentHero / ...` = me
 - `Result` = uploader-perspective win/loss string
 - `WinnerCombatantId` ∈ { `Player`, `Opponent` } — `Player` means uploader won.
-- `IsBundleFinalBattle` = defaults false; current V4 wire does not carry this field.
+- `IsFinalBattle` = parsed from `is_final_battle` in the server response.
 - `ReplayAvailable` = constant `true` (V4 server no longer ships a per-row
   flag; the V4 invariant is "battle row exists ⇒ R2 artifact exists", since
   R2.put precedes the D1 batch and orphan cleanup runs on D1 failure).
 
 ## 5. Local Persistence
 
-File: [`Game/HistoryPanel/Storage/HistoryPanelRepository.cs`](../../Game/HistoryPanel/Storage/HistoryPanelRepository.cs)
+File: [`Game/HistoryPanel/Storage/HistoryPanelRepository.cs`](../../src/BazaarPlusPlus/Game/HistoryPanel/Storage/HistoryPanelRepository.cs)
 (`UpsertGhostBattles`, `ReplaceGhostBattles`)
 
 Ghost rows are written to the local SQLite `battles` table with
@@ -120,9 +122,9 @@ translation happens at read time.
 ## 6. Read + Projection (Storage → UI Model)
 
 Files:
-- [`Game/HistoryPanel/Storage/HistoryPanelRepository.cs`](../../Game/HistoryPanel/Storage/HistoryPanelRepository.cs)
+- [`Game/HistoryPanel/Storage/HistoryPanelRepository.cs`](../../src/BazaarPlusPlus/Game/HistoryPanel/Storage/HistoryPanelRepository.cs)
   (`ListRecentGhostBattles`)
-- [`Game/HistoryPanel/Ghost/GhostBattleLocalProjector.cs`](../../Game/HistoryPanel/Ghost/GhostBattleLocalProjector.cs)
+- [`Game/HistoryPanel/Ghost/GhostBattleLocalProjector.cs`](../../src/BazaarPlusPlus/Game/HistoryPanel/Ghost/GhostBattleLocalProjector.cs)
 
 `ListRecentGhostBattles` pulls raw columns and hands them to
 `GhostBattleLocalProjector.CreateHistoryBattleRecord`, which flips into
@@ -148,7 +150,7 @@ downstream rendering and filtering code does not special-case ghost rows.
 
 ## 7. Rendering (UI Model → Screen)
 
-File: [`Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs`](../../Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs)
+File: [`Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs`](../../src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs)
 
 The history panel binds the projected record directly:
 
@@ -156,8 +158,7 @@ The history panel binds the projected record directly:
 - `refs.OpponentName.text` ← `battle.OpponentName` — shows the uploader's name.
 - Player-side pills bind to `battle.PlayerHero` / related — show my mirror.
 - The selected-battle notice shows "opponent eliminated" only when
-  `IsBundleFinalBattle` is true and the projected local-player outcome is a win.
-  Current V4 ghost imports do not set that marker.
+  `IsFinalBattle` is true and the projected local-player outcome is a win.
 
 Because projection already reframed the row into local-player perspective, the
 view has no ghost-specific branching for participant display.
@@ -165,11 +166,11 @@ view has no ghost-specific branching for participant display.
 ## 8. Replay Path (Deliberately Unflipped)
 
 Files:
-- [`Game/HistoryPanel/HistoryPanelReplayService.cs`](../../Game/HistoryPanel/HistoryPanelReplayService.cs)
+- [`Game/HistoryPanel/HistoryPanelReplayService.cs`](../../src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelReplayService.cs)
   (`ReplayGhostBattleAsync`)
-- [`Game/HistoryPanel/Ghost/GhostBattlePayloadStore.cs`](../../Game/HistoryPanel/Ghost/GhostBattlePayloadStore.cs)
-- [`Game/HistoryPanel/Ghost/GhostBattleSyncService.cs`](../../Game/HistoryPanel/Ghost/GhostBattleSyncService.cs)
-  (`DownloadReplayPayloadAsync` / `BuildBattleManifest`)
+- [`Game/HistoryPanel/Ghost/GhostBattlePayloadStore.cs`](../../src/BazaarPlusPlus/Game/HistoryPanel/Ghost/GhostBattlePayloadStore.cs)
+- [`Game/HistoryPanel/Ghost/GhostBattleSyncService.cs`](../../src/BazaarPlusPlus/Game/HistoryPanel/Ghost/GhostBattleSyncService.cs)
+  (`DownloadReplayAsync` / `BuildBattleManifest`)
 
 When the user presses Replay:
 
@@ -201,7 +202,7 @@ is a product-level choice, not a bug.
   player_*   = uploader
   opponent_* = me
   result     = uploader POV
-  final-battle marker is not part of current V4 wire
+  is_final_battle returned by ghost query
         │
         ▼ GET /ghost-battles
         │  (WHERE opponent_account_id = me)
@@ -219,7 +220,7 @@ is a product-level choice, not a bug.
    Player* = me (mirror)
    Opponent* = uploader
    Result / WinnerCombatantId from my POV
-   IsBundleFinalBattle = local marker, false for current V4 remote imports
+   IsFinalBattle = from the is_final_battle wire field; set by ghost import
         │
         ├─▶ History Panel list / filters (local-POV)
         │

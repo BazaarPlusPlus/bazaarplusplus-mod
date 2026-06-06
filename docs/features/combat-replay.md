@@ -29,7 +29,7 @@ PVP combat 的本地录制与回放，外加可选的 MP4 视频录制。录制 
 
 - **HistoryPanel 本地 battle**：payload 存在且当前允许 bootstrap 时，`runtime.ReplaySaved(battleId)`。
 - **ghost battle**：服务端声明 replay 可用时，先下载 payload，再 `runtime.ReplayImportedBattle(manifest, payload)`。
-- bootstrap：`CombatReplayRuntime.Bootstrap.TryInjectSavedReplayAsync` 重建场景 / 卡牌 / 技能 → `AppState.TryPushState<ReplayState>()` → `replayState.Replay()`。
+- bootstrap：`ReplayBootstrap.InjectSavedReplayAsync`（`Game/CombatReplay/Bootstrap/ReplayBootstrap.cs`）重建场景 / 卡牌 / 技能 → `AppState.TryPushState<ReplayState>()` → `replayState.Replay()`。
 - 退出：`CombatReplayRuntime.OnStateChanged` 检测离开 `ReplayState`。
 
 ## Playback Events
@@ -67,13 +67,13 @@ replay 播放期间把 Unity Game View 抓帧编码为 MP4，落到 `<GameRoot>/
 
 ### 当前状态
 
-录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / overlay 抑制）、SQLite `combat_replay_videos` 元数据均已落地；录制由 HistoryPanel「录制并回放」按钮单次触发。FFmpeg 已随 mod 分发（见上文「二进制分发」），无需 installer 单独部署。**音频**已落地（按平台分采集后端，统一下混立体声 48 kHz AAC 合入 MP4）：卡牌打击 / 棋盘等 3D 音效由 Resonance Audio 空间化、不在任何 FMOD 通道组上，故 FMOD tap 抓不到，必须在系统/进程输出层截取——**Windows** 走 **WASAPI loopback**（录设备输出；见 [loopback 采集决策](../design/2026-05-30-combat-replay-audio-loopback-capture.md)），**macOS ≥15** 走 **CoreAudio 进程级 tap**（`AudioHardwareCreateProcessTap`，经薄 `BppMacAudio.dylib`，C# 退化成同款 pull 循环；见 [macOS process-tap 设计](../design/2026-05-31-combat-replay-audio-macos-process-tap.md)、构建/打包见 [`native/mac-audio-tap/README.md`](../../native/mac-audio-tap/README.md)），低于该门静音降级。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项。SFX 修复历史归档在 [docs/design/archive/2026-05-23-combat-replay-sfx-impl.md](../design/archive/2026-05-23-combat-replay-sfx-impl.md)。
+录制链路、稳定性（fallback / 检测缓存 / bounded queue / 资源闭环 / overlay 抑制）、SQLite `combat_replay_videos` 元数据均已落地；录制由 HistoryPanel「录制并回放」按钮单次触发。FFmpeg 已随 mod 分发（见上文「二进制分发」），无需 installer 单独部署。**音频**已落地（按平台分采集后端，统一下混立体声 48 kHz AAC 合入 MP4）：卡牌打击 / 棋盘等 3D 音效由 Resonance Audio 空间化、不在任何 FMOD 通道组上，故 FMOD tap 抓不到，必须在系统/进程输出层截取——**Windows** 走 **WASAPI loopback**（录设备输出；见 [loopback 采集决策](../design/archive/2026-05-30-combat-replay-audio-loopback-capture.md)），**macOS ≥15** 走 **CoreAudio 进程级 tap**（`AudioHardwareCreateProcessTap`，经薄 `BppMacAudio.dylib`，C# 退化成同款 pull 循环；见 [macOS process-tap 设计](../design/archive/2026-05-31-combat-replay-audio-macos-process-tap.md)、构建/打包见 [`native/mac-audio-tap/README.md`](../../native/mac-audio-tap/README.md)），低于该门静音降级。**未落地**：HistoryPanel 内的视频状态 / “Open Folder” 行动项。SFX 修复历史归档在 [docs/design/archive/2026-05-23-combat-replay-sfx-impl.md](../design/archive/2026-05-23-combat-replay-sfx-impl.md)。
 
 ## 关键文件
 
 - `Patches/Combat/CombatReplayCapturePatch.cs`
 - `Game/CombatReplay/CombatReplayModule.cs`
-- `Game/CombatReplay/CombatReplayRuntime.cs`、`CombatReplayRuntime.Bootstrap.cs`
+- `Game/CombatReplay/CombatReplayRuntime.cs`、`Game/CombatReplay/Bootstrap/ReplayBootstrap.cs`
 - `Game/CombatReplay/CombatReplayCaptureService.cs`
 - `Game/CombatReplay/CombatReplayPersistenceQueue.cs`、`CombatReplayPayloadStore.cs`、`CombatReplayLoader.cs`
 - `Game/CombatReplay/CombatReplayPlaybackStarting.cs`、`CombatReplayPlaybackEnded.cs`

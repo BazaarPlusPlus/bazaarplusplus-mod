@@ -29,16 +29,16 @@
 
 过滤管线是 *state → 纯函数 → VM → chips* 的线性结构，新增一个维度是同构扩展：
 
-- **过滤状态**：`CollectionFilterState`（[Game/CollectionPanel/Data/CollectionFilterState.cs:16](../../Game/CollectionPanel/Data/CollectionFilterState.cs#L16)）持有各筛选集合（`Heroes`/`Tiers`/`Sizes`/…）。
-- **纯过滤**：`CollectionFilterEngine.Apply`（[CollectionFilterEngine.cs:15](../../Game/CollectionPanel/Data/CollectionFilterEngine.cs#L15)），循环内每个维度一条 `continue` 谓词，第 35–53 行；**现有 Tier 谓词在第 45 行** `if (tierFilterCount > 0 && !filter.Tiers.Contains(card.StartingTier)) continue;`。
-- **卡牌已暴露 `StartingTier`**：`CollectionCardVm.StartingTier`（[CollectionCardVm.cs:17](../../Game/CollectionPanel/Data/CollectionCardVm.cs#L17)），由 `From()` 从 `template.StartingTier` 填充（[CollectionCardVm.From.cs:25](../../Game/CollectionPanel/Data/CollectionCardVm.From.cs#L25)）。⇒ **天数维度无需任何 catalog / 卡牌数据改动。**
+- **过滤状态**：`CollectionFilterState`（[Game/CollectionPanel/Data/CollectionFilterState.cs:16](../../src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionFilterState.cs#L16)）持有各筛选集合（`Heroes`/`Tiers`/`Sizes`/…）。
+- **纯过滤**：`CollectionFilterEngine.Apply`（[CollectionFilterEngine.cs:15](../../src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionFilterEngine.cs#L15)），循环内每个维度一条 `continue` 谓词，第 35–53 行；**现有 Tier 谓词在第 45 行** `if (tierFilterCount > 0 && !filter.Tiers.Contains(card.StartingTier)) continue;`。
+- **卡牌已暴露 `StartingTier`**：`CollectionCardVm.StartingTier`（[CollectionCardVm.cs:17](../../src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionCardVm.cs#L17)），由 `From()` 从 `template.StartingTier` 填充（[CollectionCardVm.From.cs:25](../../src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionCardVm.From.cs#L25)）。⇒ **天数维度无需任何 catalog / 卡牌数据改动。**
 - **等级 enum**：`ETier { Bronze, Silver, Gold, Diamond, Legendary }`（`decompiled/BazaarGameShared/…/ETier.cs`，值 0–4）。`TierRank` 抽象出排序序，过滤/排序都不依赖 enum 整数值（`CollectionCardFacetRanks`）。
-- **运行态读取**已在面板打开路径里：`ResolveOpenSelection()`（[CollectionPanel.cs:122](../../Game/CollectionPanel/CollectionPanel.cs#L122)）→ `IsInGameRunForOpen()`（[CollectionPanel.cs:157](../../Game/CollectionPanel/CollectionPanel.cs#L157)）判是否对局内；英雄读 `TheBazaar.Data.Run?.Player?.Hero`（`TryReadCurrentHero()`，[CollectionPanel.cs:175](../../Game/CollectionPanel/CollectionPanel.cs#L175)）。**天数是同根兄弟字段** `TheBazaar.Data.Run?.Day`（`Run.Day : uint`，默认 1，`decompiled/BazaarGameClient/…/Run.cs:18`）。
-- **toggle 装配**：`EnsureView()`（[CollectionPanel.cs:407](../../Game/CollectionPanel/CollectionPanel.cs#L407)）把各 toggle 回调注入 `CollectionPanelView` 构造器；`toggleTier` 在第 433–440 行：改 `_filter` → `_scrollY=0` → `ApplyFilters()` → `RefreshView()`。
-- **VM 装配**：`RefreshView()`（[CollectionPanel.cs:689](../../Game/CollectionPanel/CollectionPanel.cs#L689)）构造 `CollectionPanelViewModel`（[Ui/CollectionPanelView.cs:17](../../Game/CollectionPanel/Ui/CollectionPanelView.cs#L17)）。
-- **条件显隐先例**：`Refresh()` 里 Size 行仅在 Item tab 可见、Source 行按数量显隐（[Ui/CollectionPanelView.cs:326](../../Game/CollectionPanel/Ui/CollectionPanelView.cs#L326)–337）。**Day 行的「仅对局内显示」复用此 `style.display` 模式。**
-- **chips 模式**：`CreateFilterSection`（默认 `chipRow.flexWrap = Wrap`，[Ui/CollectionPanelView.Tree.cs:229](../../Game/CollectionPanel/Ui/CollectionPanelView.Tree.cs#L229)）；Tier section 在 [Tree.cs:126](../../Game/CollectionPanel/Ui/CollectionPanelView.Tree.cs#L126)；`EnsureTierChips`/`TierChipsMatch`（[Ui/CollectionPanelView.Filters.cs:32](../../Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs#L32)）；`CreateChipButton`（[Filters.cs:216](../../Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs#L216)）；`RefreshChip`（[Filters.cs:494](../../Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs#L494)）。
-- **本地化**：`CollectionPanelText`（[CollectionPanelText.cs:11](../../Game/CollectionPanel/CollectionPanelText.cs#L11)）；header 用 `LocalizedTextSet`（如 `TierHeader`，第 32–37 行）；数字无需逐项本地化。
+- **运行态读取**已在面板打开路径里：`ResolveOpenSelection()`（[CollectionPanel.cs:138](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L138)）→ `IsInGameRunForOpen()`（[CollectionPanel.cs:177](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L177)）判是否对局内；英雄读 `TheBazaar.Data.Run?.Player?.Hero`（`TryReadCurrentHero()`，[CollectionPanel.cs:191](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L191)）。**天数是同根兄弟字段** `TheBazaar.Data.Run?.Day`（`Run.Day : uint`，默认 1，`decompiled/BazaarGameClient/…/Run.cs:18`）。
+- **toggle 装配**：`EnsureView()`（[CollectionPanel.cs:457](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L457)）把各 toggle 回调注入 `CollectionPanelView` 构造器；`toggleTier` 在第 483–492 行：改 `_filter` → `_scrollY=0` → `ApplyFilters()` → `RefreshView()`。
+- **VM 装配**：`RefreshView()`（[CollectionPanel.cs:750](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L750)）构造 `CollectionPanelViewModel`（[Ui/CollectionPanelView.cs:17](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.cs#L17)）。
+- **条件显隐先例**：`Refresh()` 里 Size 行仅在 Item tab 可见、Source 行按数量显隐（[Ui/CollectionPanelView.cs:326](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.cs#L326)–337）。**Day 行的「仅对局内显示」复用此 `style.display` 模式。**
+- **chips 模式**：`CreateFilterSection`（默认 `chipRow.flexWrap = Wrap`，[Ui/CollectionPanelView.Tree.cs:229](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.Tree.cs#L229)）；Tier section 在 [Tree.cs:126](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.Tree.cs#L126)；`EnsureTierChips`/`TierChipsMatch`（[Ui/CollectionPanelView.Filters.cs:32](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs#L32)）；`CreateChipButton`（[Filters.cs:216](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs#L216)）；`RefreshChip`（[Filters.cs:494](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs#L494)）。
+- **本地化**：`CollectionPanelText`（[CollectionPanelText.cs:11](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanelText.cs#L11)）；header 用 `LocalizedTextSet`（如 `TierHeader`，第 32–37 行）；数字无需逐项本地化。
 - **单测**：`tests/CollectionFilterEngine.Tests` 是 **exe-runner**（`OutputType=Exe`，`dotnet run` 执行），用 `Card(name, tier, …)` helper 直接造 `CollectionCardVm`（[Program.cs:573](../../tests/CollectionFilterEngine.Tests/Program.cs#L573)）。它**逐文件 `<Compile Include>`** 引擎依赖（[csproj:22](../../tests/CollectionFilterEngine.Tests/CollectionFilterEngine.Tests.csproj#L22)–66）。
 
 ---
@@ -133,7 +133,7 @@ if (dayFilter is int day
 面板打开时（天数在面板开着时不会变，捕获一次即可）：
 
 - `CollectionPanel` 新增字段：`private bool _isInGameRun;`、`private int? _currentRunDay;`
-- 新增私有方法，镜像 `TryReadCurrentHero()`（[CollectionPanel.cs:171](../../Game/CollectionPanel/CollectionPanel.cs#L171)）：
+- 新增私有方法，镜像 `TryReadCurrentHero()`（[CollectionPanel.cs:191](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L191)）：
 
 ```csharp
 private static int? TryReadCurrentDay()
@@ -147,14 +147,14 @@ private static int? TryReadCurrentDay()
 }
 ```
 
-- 在 `ResolveOpenSelection()`（已读 `isInGameRun`，[L122](../../Game/CollectionPanel/CollectionPanel.cs#L122)）末尾记录：
+- 在 `ResolveOpenSelection()`（已读 `isInGameRun`，[L138](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L138)）末尾记录：
   ```csharp
   _isInGameRun = isInGameRun;
   _currentRunDay = isInGameRun ? TryReadCurrentDay() : null;
   ```
-- **默认 = 当前天**：在 `Open(selection)`（应用 selection 到 `_filter` 处，[L204](../../Game/CollectionPanel/CollectionPanel.cs#L204)）设 `_filter.SelectedRunDay = _currentRunDay;`（非对局即 `null`）。
+- **默认 = 当前天**：在 `Open(selection)`（应用 selection 到 `_filter` 处，[L204](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L204)）设 `_filter.SelectedRunDay = _currentRunDay;`（非对局即 `null`）。
 
-> 不入 `CollectionPanelSelectionState`（该 DTO 仅 round-trip 英雄+来源用于重开，[CollectionPanel.cs:117](../../Game/CollectionPanel/CollectionPanel.cs#L117)）；天数每次开面板按运行态重算、不持久化。
+> 不入 `CollectionPanelSelectionState`（该 DTO 仅 round-trip 英雄+来源用于重开，[CollectionPanel.cs:117](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L117)）；天数每次开面板按运行态重算、不持久化。
 
 ### 5. ViewModel — `CollectionPanelViewModel`
 
@@ -183,10 +183,10 @@ SelectedRunDay = _filter.SelectedRunDay,
   _dayFilterSection = CreateFilterSection(rail, CollectionPanelText.DayHeader(), UiSpacing.Lg, out _dayChipRow);
   // 不覆写 flexWrap ⇒ 默认 Wrap，数字芯片自动换行（Tier/Size 行才覆写为 NoWrap）。
   ```
-- **`CollectionPanelView.Filters.cs`**：加 `EnsureDayChips(IReadOnlyList<int>)` + `_dayChips : Dictionary<int,Button>` + `DayChipsMatch`/清理，镜像 `EnsureTierChips`/`TierChipsMatch`（[Filters.cs:32](../../Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs#L32)）。芯片文本即天数数字，单选，窄固定宽（新增 `Sizes.DayChipWidth ≈ 40f`，或复用既有小宽 token）。
+- **`CollectionPanelView.Filters.cs`**：加 `EnsureDayChips(IReadOnlyList<int>)` + `_dayChips : Dictionary<int,Button>` + `DayChipsMatch`/清理，镜像 `EnsureTierChips`/`TierChipsMatch`（[Filters.cs:32](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.Filters.cs#L32)）。芯片文本即天数数字，单选，窄固定宽（新增 `Sizes.DayChipWidth ≈ 40f`，或复用既有小宽 token）。
 - **`CollectionPanelView.cs`**：
   - 字段：`_dayChipRow`、`_dayFilterSection`、`_dayChips`。
-  - 构造器加 `Action<int> toggleDay`（→ `_toggleDay`），与现有 toggle 同位置注入（[ctor L123](../../Game/CollectionPanel/Ui/CollectionPanelView.cs#L123)）。
+  - 构造器加 `Action<int> toggleDay`（→ `_toggleDay`），与现有 toggle 同位置注入（[ctor L123](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.cs#L123)）。
   - `Refresh()` 末尾：
     ```csharp
     EnsureDayChips(model.AvailableDays);
@@ -195,12 +195,12 @@ SelectedRunDay = _filter.SelectedRunDay,
     if (_dayFilterSection != null)
         _dayFilterSection.style.display = model.ShowDayFilter ? DisplayStyle.Flex : DisplayStyle.None;
     ```
-  - `EnsureCreated()` 字体预载串（[L172](../../Game/CollectionPanel/Ui/CollectionPanelView.cs#L172)）追加 `+ CollectionPanelText.DayHeader()`（数字 0–9 已在既有预载串内）。
+  - `EnsureCreated()` 字体预载串（[L172](../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.cs#L172)）追加 `+ CollectionPanelText.DayHeader()`（数字 0–9 已在既有预载串内）。
 - **`CollectionPanelText.cs`**：加 `DayHeaderText = new("Day", "天数", "天數", "天數")` + `internal static string DayHeader() => Resolve(DayHeaderText);`。
 
 ### 7. 装配 + 交互 — `EnsureView()`
 
-加 `toggleDay` 回调，与 `toggleTier`（[L433](../../Game/CollectionPanel/CollectionPanel.cs#L433)）同构；再次点击已选天 ⇒ 取消（回到「不过滤天数」、显示全部等级）：
+加 `toggleDay` 回调，与 `toggleTier`（[L483](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs#L483)）同构；再次点击已选天 ⇒ 取消（回到「不过滤天数」、显示全部等级）：
 
 ```csharp
 toggleDay: day =>

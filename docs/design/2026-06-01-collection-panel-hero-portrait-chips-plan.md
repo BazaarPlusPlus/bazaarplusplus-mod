@@ -1,5 +1,7 @@
 # Collection Panel Hero Portrait Chips Implementation Plan
 
+> **Status: IMPLEMENTED — 历史归档(spent plan)。** HeroPortraitSpriteProvider(GameInterop/HeroPortraits/)与 CollectionPanel hero chips(CollectionPanelView.Filters.cs)已全部落地;§2 的 token 草案值与 as-built 不同(实际 HeroChipIconSize=48f、HeroChipButtonSize=56f,无 HeroChipMinWidth)。复选框为历史状态,勿据此重做。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace CollectionPanel hero filter text chips with readable hero chips that show the game's native hero portrait sprite when available, while keeping text fallback and preparing the same sprite provider for a later HistoryPanel badge pass.

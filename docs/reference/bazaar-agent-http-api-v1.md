@@ -245,7 +245,7 @@ Rules are applied in order. The first failure terminates validation and the erro
 `Wait`, `StartOrContinueRun`, `AbandonRun`, `SelectItem`, `SelectSkill`, `SelectEncounter`, `CommitToPedestal`, `MoveItem`, `SellItem`, `Reroll`, `ExitState`
 
 **`EHero` values:**
-`Common`, `Pygmalien`, `Vanessa`, `Stelle`, `Jules`, `Dooley`, `Mak`, `Karnok`
+`Common`, `Pygmalien`, `Vanessa`, `Stelle`, `Jules`, `Dooley`, `Mak`, `Karnok`, `Hero8` (Hero8 为游戏内占位枚举值，无配套英雄资源，外部工具应视为 opaque)
 
 **`EPlayMode` values:**
 `Unranked`, `Ranked`

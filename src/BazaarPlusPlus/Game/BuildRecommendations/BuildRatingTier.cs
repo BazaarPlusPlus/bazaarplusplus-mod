@@ -2,9 +2,8 @@
 namespace BazaarPlusPlus.Game.BuildRecommendations;
 
 /// <summary>
-/// Maps a live player rating to the final-build rating tier bucket key.
-/// Mirrors the analyzer's rating_tier_bucket boundaries (spec §6.1):
-/// &lt;=500 low, &lt;=899 mid, else high. A null rating falls back to the cross-tier "all".
+/// Maps a live player rating to the final-build rating tier bucket key,
+/// matching the analyzer pipeline's rating_tier_bucket boundaries (<=500 low, <=899 mid, else high; null → "all").
 /// </summary>
 internal static class BuildRatingTier
 {

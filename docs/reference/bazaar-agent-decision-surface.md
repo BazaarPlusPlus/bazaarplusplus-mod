@@ -19,7 +19,7 @@ Companion to [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md). Documen
 | `ServerTimeUtc` | `DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)` (ISO-8601) |
 | `IsInRun` | `Data.Run != null && AppState.CurrentState is RunAppState` |
 | `HasActiveRun` | `Data.HasActiveRun` (computed property on `Data`) |
-| `CanStartOrContinueRun` | `BazaarAgentSceneProbe.IsAtHeroSelectAndReadyForNewRun()` — true iff `SceneManager.GetActiveScene().name == "HeroSelectScene"` AND `AppState.CurrentState == null` AND `ClientCache.Profile.Value != null` |
+| `CanStartOrContinueRun` | `BazaarAgentSceneProbe.IsAtHeroSelectAndReadyForNewRun(logger)` — true iff `SceneManager.GetActiveScene().name == "HeroSelectScene"` AND `AppState.CurrentState == null` AND `ClientCache.Profile.Value != null` |
 | `IsClientBusy` | Hardcoded `false` in v1 — `HttpGameClient` busy-tracking deferred |
 | `RunId` | `Data.Run?.GameModeId.ToString("D")`, or `null` if Guid is default |
 | `StateName` | See "State Mapping" section below |
@@ -40,9 +40,9 @@ Companion to [bazaar-agent-http-api-v1.md](bazaar-agent-http-api-v1.md). Documen
 | `RerollCost` | `(int)(Data.CurrentState?.RerollCost ?? 0u)` |
 | `RerollsRemaining` | `(int)(Data.CurrentState?.RerollsRemaining ?? 0u)` |
 | `CurrentEncounterId` | `Data.CurrentState?.CurrentEncounterId` (already `string?`) |
-| `CurrentEncounterType` | Looks for a live `Data.Entities` card whose `TemplateId` matches `CurrentEncounterId`; uses `card.Template.GetType().Name` when available, otherwise `card.Type.ToString()` |
+| `CurrentEncounterType` | 先查静态数据（`BppStaticDataAccess.GetCardTemplate`），命中则返回 `template.GetType().Name`；未命中才扫描 `Data.Entities`，找到匹配 `TemplateId` 的 card 后使用 `card.Template.GetType().Name` 或 `card.Type.ToString()`（`EncounterTypeResolver.cs:20-50`） |
 | `ActionCooldownRemainingSeconds` | Passed in by `BazaarAgentRuntimeController`, computed from the last non-wait action time and the fixed 1.0 second runtime default |
-| `InteractableTemplateIds` | `BazaarAgentInteractionFilterProbe.ReadCurrentFilter()` — reflection on `AppState._iteractionFilter`. Null/omitted when the list is empty or reflection fails. |
+| `InteractableTemplateIds` | 经 `IBazaarAgentGameProbe.GetTargetingState().InteractionFilterTemplateIds` → `EncounterStateProbe.GetTargetingState()` → `InteractionFilterProbe.ReadCurrentFilter()`（`src/BazaarPlusPlus/GameInterop/Encounter/InteractionFilterProbe.cs`）— reflection on `AppState._iteractionFilter`（游戏侧拼写如此）。Null/omitted when the list is empty or reflection fails. |
 
 ## State Mapping
 
@@ -87,7 +87,7 @@ Each action's inclusion criterion in terms of game-state paths:
 | `Reroll` | `AppState.CanHandleOperation(Reroll) && RerollsRemaining > 0 && PlayerGold >= RerollCost` |
 | `ExitState` | `AppState.CanHandleOperation(ExitState) && SelectionContextRules.CanExit != false` |
 | `SellItem` (per card) | `AppState.CanHandleOperation(SellItem)` — one entry per sellable card |
-| `MoveItem` (per placement) | Legal placements computed by `BazaarAgentMoveTargetPlanner.Enumerate(itemSize, capacity=10, occupiedAndLockedSockets, excludeStart, excludeCount)`. A socket counts as unusable if `SocketedContainer.IsSocketLocked` returns true for it, or if it is occupied. One entry per legal `(card, targetSection, targetSocket)` triplet. |
+| `MoveItem` (per placement) | Legal placements computed by `BazaarAgentMoveTargetPlanner.Enumerate(itemSize, capacity=10, occupiedSockets, excludeStart, excludeCount)`. 调用方通过 `GetOccupiedAndLockedSockets()` 把 locked+occupied 合并后传入。A socket counts as unusable if `SocketedContainer.IsSocketLocked` returns true for it, or if it is occupied. One entry per legal `(card, targetSection, targetSocket)` triplet. |
 | `SelectItem` (per card) | `AppState.CanHandleOperation(SelectItem) && card.CanSelect != false && card.CanAfford != false && card.CanFit != false` — one entry per offered item in `SelectionOptions` |
 | `SelectSkill` (per skill) | `AppState.CanHandleOperation(SelectSkill) && card.CanSelect != false && card.CanAfford != false` — one entry per offered skill in `SelectionOptions` |
 

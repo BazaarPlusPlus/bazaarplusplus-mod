@@ -1,4 +1,4 @@
-> **Status: IMPLEMENTED (historical).** Shipped 2026-05-31. Current state: [CollectionPanelView.Tree.cs](../../../Game/CollectionPanel/Ui/CollectionPanelView.Tree.cs), [HistoryPanelUiToolkitView.Tree.cs](../../../Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Tree.cs), and [Sizes.cs](../../../Infrastructure/UiTokens/Sizes.cs).
+> **Status: IMPLEMENTED (historical).** Shipped 2026-05-31. Current state: [CollectionPanelView.Tree.cs](../../../src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.Tree.cs), [HistoryPanelUiToolkitView.Tree.cs](../../../src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Tree.cs), and [Sizes.cs](../../../src/BazaarPlusPlus/Infrastructure/UiTokens/Sizes.cs). Note: HistoryPanel operation rail was subsequently redesigned in commit c5e138f (2026-06-04); §5.2 reflects the original shipped state.
 
 # History / Collection Panel 右侧操作区布局设计规格
 

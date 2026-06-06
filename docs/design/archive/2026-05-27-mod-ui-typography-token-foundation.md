@@ -1,4 +1,4 @@
-> **Status: IMPLEMENTED (historical).** Both halves shipped: fonts (Infrastructure/Fonts/, SourceHanSansCN-Regular.otf) and design tokens (Infrastructure/UiTokens/).
+> **Status: PARTIALLY IMPLEMENTED (historical).** Fonts(Infrastructure/Fonts/,SourceHanSansCN-Regular.otf)与 design tokens(Infrastructure/UiTokens/)已落地；例外：CombatStatusBar.Canvas.cs:707 仍用 LegacyRuntime.ttf（G1 准则 1/4 未达成）。
 
 # Mod UI Typography & Design Token Foundation
 

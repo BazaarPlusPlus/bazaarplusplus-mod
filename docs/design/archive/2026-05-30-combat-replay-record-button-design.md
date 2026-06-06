@@ -1,7 +1,7 @@
 # Combat Replay 视频录制改为 HistoryPanel 按钮触发
 
 - 日期：2026-05-30
-- 状态：已实现并验证（build 通过 + 评审通过），待提交；合并后移入 `archive/` 并加 `Status:` banner
+- 状态：**IMPLEMENTED(已合并,历史归档)**。活真相见 [combat-replay.md](../../features/combat-replay.md) 与代码。
 - 影响仓库：`bazaarplusplus-mod`
 
 ## 背景与动机

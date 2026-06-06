@@ -10,8 +10,8 @@ It failed on a hard platform constraint: **under URP, an offscreen `Camera → R
 
 ## Consequences
 
-- `BattleBoardPreview.cs` owns a `ScreenSpaceOverlay` Canvas; the overlay tracks the UI Toolkit container via `scaledPixelsPerPoint`, so it follows `PanelSettings.match` automatically (see [history-panel.md](../features/history-panel.md) §布局, §预览渲染).
-- RT-era code was deleted: `HistoryPanelPreviewTextureGeometry` keeps only `NativeBoardWidth/Height`; `ResolveTextureSize` / `ResolveBoardPlacement` and their tests are gone, as are `Game/PreviewSurface/` and `Game/MonsterPreview/Architecture/`.
+- `GameInterop/ItemBoardPreview/BppItemBoardPreview.cs` + `ItemBoardPreviewSurface.cs` own a `ScreenSpaceOverlay` Canvas; the overlay tracks the UI Toolkit container via `scaledPixelsPerPoint`, so it follows `PanelSettings.match` automatically (see [history-panel.md](../features/history-panel.md) §布局, §预览渲染).
+- RT-era code was deleted: `NativeBoardWidth`/`NativeBoardHeight` constants survive in `GameInterop/ItemBoardPreview/ItemBoardSocketLayout.cs`; `HistoryPanelPreviewTextureGeometry` itself is gone, along with `ResolveTextureSize` / `ResolveBoardPlacement` and their tests, `Game/PreviewSurface/`, and `Game/MonsterPreview/Architecture/`.
 - **Do not re-propose the offscreen-RT path** unless the project leaves URP or Unity gains offscreen uGUI rendering. The HistoryPanel preview stack is intentionally decoupled from the monster/CardSet preview path (see [monster-preview.md](../features/monster-preview.md)).
 
 Related layout history: [docs/design/archive/2026-05-29-historypanel-fullscreen-responsive-design.md](../design/archive/2026-05-29-historypanel-fullscreen-responsive-design.md). (The detailed offscreen-RT migration spec was pruned; this ADR is the record of that decision.)

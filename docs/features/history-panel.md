@@ -26,7 +26,7 @@ Ghost tab 的 battle row 在「这一场把对手打出局」时叠加两个**�
 
 ```
 HistoryPanelFormatter.IsGhostOpponentEliminated(battle)
-  ⇔ battle.Source == Ghost ∧ battle.IsBundleFinalBattle ∧ Player 视角胜利
+  ⇔ battle.Source == Ghost ∧ battle.IsFinalBattle ∧ Player 视角胜利
 ```
 
 - **信号 1 — accent 升金**：`BattleRow` 左侧 accent strip 在原 win/loss/未知三态外新增「Eliminated win = 金 `(0.94,0.70,0.28)`」第四态；行底色 / 边框同步深金。金色复用详情面板 `_ghostOpponentEliminatedNotice` 的边框色，语义全局一致。

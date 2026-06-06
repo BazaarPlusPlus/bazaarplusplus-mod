@@ -291,8 +291,8 @@ run session header：
 | URL | 数据结构 | 实现 | 业务 |
 |---|---|---|---|
 | `https://bppinstaller.bazaarplusplus.com/latest.json` | `{ version: string }` | 5s timeout，`MainMenuVersionCheckController`，失败只记 `Warn` | 每次进入主菜单时检查是否有 mod 更新可用；比较当前版本与 `version` 字段，更新可用时在主菜单显示提示。 |
-| `https://bpp-static.bazaarplusplus.com/supporter-list.json` | `{ name, tier }[]` | 10s timeout，1h temp cache，失败用 fallback | Monster preview 赞助文本随机展示。 |
-| `https://bpp-metrics.bazaarplusplus.com/final_builds_for_mod.json` | `heroes -> builds/cardIndex/subsetIndex` | 10s timeout，20h 本地 cache，失败用内置 JSON | Monster preview/card set 推荐最终阵容。 |
+| `https://bpp-static.bazaarplusplus.com/supporter-list.json` | `{ name, tier }[]` | 10s timeout，1h temp cache，失败用 fallback | LiveBuildPanel / CollectionPanel / HistoryPanel 赞助文本随机展示。 |
+| `https://bpp-metrics.bazaarplusplus.com/final_builds_for_mod.json` | `heroes -> builds/cardIndex/subsetIndex` | 10s timeout，20h 本地 cache，失败用内置 JSON | LiveBuildPanel 终局阵容推荐(HistoryPanel 数据服务后台刷新缓存)。 |
 
 离线模式应默认关闭上传类功能；推荐/赞助数据使用本地 cache 或内置 fallback。
 

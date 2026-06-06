@@ -102,6 +102,8 @@ Two new entries on `IBppConfig`, both as `ConfigEntry<PreviewVisibilityMode>?` (
 | `EnchantPreviewModeConfig` | `EnchantPreview` / `Mode` | `AutoOnPedestalChoice` | Replaces `EnchantPreviewAlwaysShowConfig`. |
 | `UpgradePreviewModeConfig` | `UpgradePreview` / `Mode` | `AutoOnPedestalChoice` | No prior config; brand new. |
 
+注：UpgradePreviewModeConfig 未实现——实现时决定升级预览仅保留 hold-Shift 手动触发（TooltipPreviewModePolicy.cs:29），自动模式专属 EnchantPreview；见 ADR-0004。
+
 The old `EnchantPreviewAlwaysShowConfig` is **removed from `IBppConfig`**. Hotkey path entries (`EnchantPreviewHotkeyPathConfig`, `UpgradePreviewHotkeyPathConfig`) are untouched.
 
 **Migration** runs once on `BppConfig.Initialize(ConfigFile)`, after binding the new entries:

@@ -2,7 +2,7 @@
 
 Status: Draft
 
-> Supersession note: CollectionPanel is taking the first implementation pass through `GameInterop/HeroPortraits/HeroPortraitSpriteProvider`. When HistoryPanel work starts, reuse that provider and only add HistoryPanel-specific `Label` badge rendering and ListView stale-bind protection here.
+> Supersession note: CollectionPanel has completed its implementation pass through `GameInterop/HeroPortraits/HeroPortraitSpriteProvider.cs` (already exists, consumed by `CollectionPanelView.Filters.cs`). HistoryPanel side has not been implemented — `Rows.cs` still uses text pills. When HistoryPanel work starts, reuse `HeroPortraitSpriteProvider` directly (it already includes the cache and inFlight dedup); no separate `HistoryHeroPortraitProvider` is needed — the §4.1 standalone provider proposal is superseded.
 
 > 范围：把 HistoryPanel run 行 / battle 行里那个三字母英雄 **文本徽章**（如 `VAN`/`PYG`，由 `GetHeroBadgeStyle` 生成）换成英雄**真实头像 Sprite**，文本徽章降级为加载失败/无图时的 fallback。**仅 UI 渲染层改动**，不动数据层、不动 SQLite、不动上传。
 > 关联：[../features/history-panel.md](../features/history-panel.md)（HistoryPanel 布局 / 行结构）、[archive/2026-05-29-historypanel-fullscreen-responsive-design.md](archive/2026-05-29-historypanel-fullscreen-responsive-design.md)（全屏外壳前身）、[2026-05-31-collection-panel-design.md](2026-05-31-collection-panel-design.md)（同样用「GUID/枚举 → 游戏原生资源」的取图思路）。
@@ -145,6 +145,8 @@ private static void BindHeroPill(Label pill, string? rawHero)
 ## 4. 改造方案（step-by-step，带代码）
 
 ### 4.1 新增：英雄名 → Sprite 解析器 + 进程级缓存
+
+> **注（落地更新）：** 无需新建 `HistoryHeroPortraitProvider`，直接复用 `HeroPortraitSpriteProvider`（`GameInterop/HeroPortraits/HeroPortraitSpriteProvider.cs`，含缓存与 inFlight 防重）。原独立 provider 提案作废。下方代码为历史存档，实现时改用 `HeroPortraitSpriteProvider`。
 
 英雄数量极少（`EHero` 枚举），用永久 `Dictionary` 缓存即可，不做淘汰。null 也缓存（代表「确定无图」），避免重复失败加载。
 

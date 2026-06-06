@@ -9,6 +9,8 @@ The AutoBazaar module isolation migration is complete. `Game/AutoBazaar` no long
 
 AutoBazaar remains parked at runtime: the mount is not registered in normal builds unless the `BPP_AUTOBAZAAR_HOST` compilation symbol is defined. The isolation work described in this document has been carried out in full; the remaining open item is an explicit re-enable task.
 
+> **2026-06-05 update(ADR-0006):** 上述路径与结构在依赖反转后已变更:`BazaarPlusPlus.AutoBazaar.csproj` → `src/BazaarPlusPlus.BazaarAgent/`;`Game/AutoBazaarHost/` → `src/BazaarPlusPlus.BazaarAgentHost/`(独立 BepInEx 插件);`tests/AutoBazaar.Tests/` → `tests/BazaarAgent.Tests/`;`#if BPP_AUTOBAZAAR_HOST` 已删除。架构测试现为 CoreLayeringTests.BazaarAgent_core_does_not_depend_on_host_or_game_runtime_namespaces。详见 [ADR-0006](../../adr/0006-bazaaragent-as-its-own-plugin.md)。
+
 ## Goals
 
 - Move AutoBazaar ownership to a root-level module instead of `Game/AutoBazaar`.

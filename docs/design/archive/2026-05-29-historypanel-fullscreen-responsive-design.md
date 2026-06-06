@@ -4,7 +4,7 @@
 
 > ✅ **已实现（2026-05-29）。** 落地与本文有两处偏差：(1) `match` 采用 `1f`（纯按高），(2) 应用户决定，
 > F9 调参器与预览调试色块**已删除**（本文「非目标」原写保留）。当前状态见
-> [history-panel-known-issues.md](../../features/history-panel.md) §1。
+> [history-panel.md](../../features/history-panel.md)（Known Issues 节）。
 
 > 设计文档。把 HistoryPanel 从「屏幕居中的固定 1280×1020 小方块」改成「边到边全屏、按相对比例
 > 自适应」的面板，使其在 16:9 / 21:9 超宽 / 4K（以及窗口拖动改尺寸）下行为一致：永不溢出、
@@ -28,7 +28,7 @@
   （[BattleBoardPreview.cs](../../../Game/HistoryPanel/Preview/BattleBoardPreview.cs)）。
   注：曾有一版「预览改回 RenderTexture 贴进 UI Toolkit」的设计，因 URP 下离屏 Camera→RT 无法渲染
   uGUI 而废弃、已回退到 overlay 方案（决策记录见
-  [history-panel-known-issues.md](../../features/history-panel.md) §2）。本次在 overlay 方案之上做布局适配。
+  [history-panel.md](../../features/history-panel.md)（预览渲染节））。本次在 overlay 方案之上做布局适配。
 - **不删除临时 F9 调参器 / 调试色块**（[HistoryPanel.PreviewTunerDebug.cs](../../../Game/HistoryPanel/HistoryPanel.PreviewTunerDebug.cs)），
   仅同步它依赖的缩放口径。
 

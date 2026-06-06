@@ -1,7 +1,7 @@
 # Collection 搜索移除、赞助者抽样调整与操作栏布局稳定性
 
 日期：2026-06-03
-状态：已批准（待 spec 复审）
+状态：已实现（Part A 搜索移除 / B 布局 / C 赞助 / D / E 全部落地）
 本稿经两轮独立评审修订（外部 Codex 对抗式评审 + 内部 red-team subagent），见文末「评审修订记录」。
 
 ## 概述
@@ -71,7 +71,7 @@
 > C2、C3 都改动**共享**组件（`BPPSupporterSampler`/`BPPSupporterCatalog` 与 `BPPSupporterAttributionRow`），因此 **Collection 与 History 两个面板都会生效**。这是有意为之（两处署名行都受益），并在 Part D 中对两处都做验证。
 
 ### C1. tier4 权重 6 → 9
-`Game/Supporters/BPPSupporterSampler.cs` 的 `ResolveTierWeight`：`4 => 6` 改为 `4 => 9`。`ResolveTierWeight` 仅被 `Sample()`（加权路径）调用，`Sample()` 仅被 `BPPSupporters.Sample()` → `CardSetPreviewRuntime.cs:285` 调用；`SampleMany` 不经过它。故只影响单条「Supported by」面板。tier4 占比 6/12（50%）→ 9/15（50% 基底 1+2+3+9=15，tier4=9/15=60%）。
+`Game/Supporters/BPPSupporterSampler.cs` 的 `ResolveTierWeight`：`4 => 6` 改为 `4 => 9`。`ResolveTierWeight` 仅被 `Sample()`（加权路径）调用，`Sample()` 仅被 `BPPSupporters.Sample()` → `CardSetPreviewRuntime.cs:285` 调用；`SampleMany` 不经过它。(注:CardSetPreviewRuntime 已于 commit 50e64b1 随 CardSetPreview 删除,LiveBuildPanel 改用 `SampleMany()`；`Sample()` 现无调用方)故只影响单条「Supported by」面板。tier4 占比 6/12（50%）→ 9/15（50% 基底 1+2+3+9=15，tier4=9/15=60%）。
 
 ### C2. 4 名署名行中最多一个 >7 字的名字（用「打乱袋内分散长名」实现，不改游标契约）
 

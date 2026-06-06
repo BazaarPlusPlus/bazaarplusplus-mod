@@ -7,8 +7,10 @@ namespace BazaarPlusPlus.Game.CombatReplay.Audio;
 
 /// <summary>
 /// Lock-free single-producer/single-consumer ring buffer of 32-bit float PCM
-/// samples. The producer is the FMOD mixer thread (the DSP read callback) and the
-/// consumer is the background WAV writer thread.
+/// samples. NOTE: No production audio path currently uses this class — the active
+/// capture backends (WASAPI loopback on Windows, CoreAudio process tap on macOS)
+/// write directly to WavStreamWriter. Retained for unit-test coverage of the
+/// lock-free SPSC algorithm.
 ///
 /// The producer side is wait-free and allocation-free and NEVER touches the read
 /// cursor: it only advances <see cref="_writePos"/>, overwriting the oldest slots in
@@ -31,7 +33,7 @@ internal sealed class AudioRingBuffer
     private readonly int _capacity;
     private readonly int _mask;
 
-    // Producer-owned cursor (FMOD mixer thread). Read plainly by the producer,
+    // Producer-owned cursor. Read plainly by the producer,
     // published via Volatile.Write, observed by the consumer via Volatile.Read.
     private long _writePos;
 

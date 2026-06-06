@@ -256,9 +256,9 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         }
     }
 
-    // Exception-safe, idempotent. Stops all audio taps (removeDSP + release + joins
-    // the WAV writer threads + closes the files) so the WAVs are complete and unlocked
-    // before the muxer reads them. Returns only WAV paths whose tap captured at least
+    // Exception-safe, idempotent. Stops all audio taps (signals stop, joins the WAV
+    // writer threads, closes the files) so the WAVs are complete and unlocked before
+    // the muxer reads them. Returns only WAV paths whose tap captured at least
     // one PCM sample, so header-only WAVs cannot truncate the video during -shortest.
     private List<string> StopAudioTaps()
     {
@@ -268,7 +268,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         var capturedWavPaths = new List<string>(taps.Count);
         foreach (var tap in taps)
         {
-            // Read before Stop(): the ring counter is written by the mixer thread and
+            // Read before Stop(): CapturedAnySamples is updated by the capture thread and
             // remains available after teardown, but this keeps the decision explicit.
             var capturedAnySamples = tap.CapturedAnySamples;
             var sampleFloats = tap.CapturedSampleFloats;
@@ -684,8 +684,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         _activeSession = null;
 
         StopCaptureCoroutine();
-        // Tear the tap down synchronously: removeDSP + release before any new
-        // recording's addDSP (covers superseded, OnDisable, OnDestroy, and the
+        // Tear the tap down synchronously: stop + join before any new recording's
+        // capture thread starts (covers superseded, OnDisable, OnDestroy, and the
         // scene-change-driven OnDisable). Abort never muxes — it deletes temps.
         var wavPaths = _activeAudioWavPaths;
         StopAudioTaps();

@@ -10,7 +10,7 @@ This document targets the slow first visible load of the Collection Panel built 
 
 Before this plan landed, the first-open path ran `EnsureView()`, catalog rebuild, filter, and view refresh synchronously from `CollectionPanel.Open()` before the normal frame loop could paint a loading state.
 
-Current code shows the shell first and then starts `LoadPanelAsync(...)`: `Game/CollectionPanel/CollectionPanel.cs:160-167` and `Game/CollectionPanel/CollectionPanel.cs:427-517`.
+Current code shows the shell first and then starts `LoadPanelAsync(...)`: `Game/CollectionPanel/CollectionPanel.cs:555-560` and `Game/CollectionPanel/CollectionPanel.cs:573-686`.
 
 Card realization after the panel is open is already virtualized and budgeted per frame, so this plan separates catalog/filter work from native card binding work instead of treating the panel as one monolithic load step: `Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs:106-165`.
 
@@ -26,9 +26,9 @@ The revised plan below therefore treats the advisor review as unavailable eviden
 
 ## Current Load Shape
 
-As implemented, `Open()` creates/activates the UITK shell and overlay, then calls `StartPanelLoad()` instead of synchronously rebuilding the catalog: `Game/CollectionPanel/CollectionPanel.cs:160-167`.
+As implemented, `Open()` creates/activates the UITK shell and overlay, then calls `StartPanelLoad()` instead of synchronously rebuilding the catalog: `Game/CollectionPanel/CollectionPanel.cs:555-560`.
 
-`LoadPanelAsync(...)` immediately publishes `CatalogLoading()`, clears the visible set, refreshes the view, yields one frame, then loads catalog metadata, applies filters, refreshes, and logs `CollectionPanelLoad` timing: `Game/CollectionPanel/CollectionPanel.cs:445-517`.
+`LoadPanelAsync(...)` immediately publishes `CatalogLoading()`, clears the visible set, refreshes the view, yields one frame, then loads catalog metadata, applies filters, refreshes, and logs `CollectionPanelLoad` timing: `Game/CollectionPanel/CollectionPanel.cs:573-686`.
 
 Catalog loading now first checks `CollectionCatalog.TryGetCached(...)`, then falls back to `CollectionCatalogBuildSession.Step(...)` with a per-frame budget. Cache identity is guarded by the static data manager object, and cache invalidation logs a reason: `Game/CollectionPanel/Data/CollectionCatalog.cs:17-43`, `Game/CollectionPanel/Data/CollectionCatalog.cs:45-119`, and `Game/CollectionPanel/Data/CollectionCatalogBuildSession.cs`.
 
@@ -83,7 +83,7 @@ Locale changes still must invalidate the catalog, because `DisplayName` is resol
 
 The Item art path is more expensive and riskier than the Skill art path because `CardPreviewItem.LoadArt(...)` directly calls `Addressables.LoadAssetAsync<CardAssetDataSO>(_cardData.ArtKey)`, while `CardPreviewSkill.LoadArt(...)` goes through `AssetLoader.LoadAssetAsyncByAddress<Texture>(...)`: `decompiled/TheBazaarRuntime/TheBazaar.UI/CardPreviewItem.cs:80-95` and `decompiled/TheBazaarRuntime/TheBazaar.UI/CardPreviewSkill.cs:14-22`.
 
-The Collection Panel patch already replaces Item art loading for panel-owned cards, but `CollectionCardArtCache.Get(...)` only caches successful handles and does not remember failed art keys: `Patches/CollectionPanel/CollectionItemLoadArtPatch.cs:21-34` and `Game/CollectionPanel/Grid/CollectionCardArtCache.cs:39-102`.
+The Collection Panel patch already replaces Item art loading for panel-owned cards, but `CollectionCardArtCache.Get(...)` only caches successful handles and does not remember failed art keys: `src/BazaarPlusPlus/Patches/CollectionPanel/CollectionItemLoadArtPatch.cs:21-34` and `Game/CollectionPanel/Grid/CollectionCardArtCache.cs:39-102`.
 
 Before P1, the catalog classifier only rejected non Item/Skill cards, empty art keys, `"Invalid"` art keys, and internal names containing `[DEBUG]` or `[TEMPLATE]`.
 
@@ -121,7 +121,7 @@ Generalize template-name rejection so names like `[SMALL ITEM TEMPLATE]`, `[MEDI
 
 Add a failed-key set inside `CollectionCardArtCache` so a failed `Addressables.LoadAssetAsync<CardAssetDataSO>(artKey)` does not retry on every later bind for the same art key during the same panel cache lifetime: `Game/CollectionPanel/Grid/CollectionCardArtCache.cs:39-80`.
 
-Only negative-cache definite Addressables failures and exceptions from the cache-owned load path, because the patch is scoped to panel-owned cards through `CollectionPanelOwnedMarker`: `Patches/CollectionPanel/CollectionItemLoadArtPatch.cs:24-34` and `Game/CollectionPanel/Grid/CollectionPanelOwnedMarker.cs:6-16`.
+Only negative-cache definite Addressables failures and exceptions from the cache-owned load path, because the patch is scoped to panel-owned cards through `CollectionPanelOwnedMarker`: `src/BazaarPlusPlus/Patches/CollectionPanel/CollectionItemLoadArtPatch.cs:24-34` and `Game/CollectionPanel/Grid/CollectionPanelOwnedMarker.cs:6-16`.
 
 Do not persist failed art keys across process runs because Addressables catalog content can change with a game update while the BPP cache file would not own that invalidation contract: `decompiled/TheBazaarRuntime/TheBazaar.DataManagement/DataManifestType.cs:18-26`.
 

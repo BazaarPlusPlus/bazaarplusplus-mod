@@ -1,5 +1,7 @@
 # 重构执行 Prompt v2：把 6 个程序集收进 `src/`（每项目一目录）
 
+> **Status: IMPLEMENTED — 历史归档(spent executor prompt)。** src/ 物理重构已全部落地(commits 1f623f0、4021187),6 个程序集均在 src/<AssemblyName>/ 下。保留为历史记录,勿据此重做。
+
 > 读者是一个**对此前分析一无所知的全新 agent**。本文件自包含，不依赖任何对话上下文。
 > 工作目录：`bazaarplusplus-mod/`（一个独立 git 仓库；不要在父目录 `bpp/` 跑仓库级命令）。
 

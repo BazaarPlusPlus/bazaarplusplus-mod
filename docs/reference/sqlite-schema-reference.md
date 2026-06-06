@@ -11,14 +11,14 @@ It covers:
 
 Source of truth:
 
-- `Storage/RunLog/RunLogSchema.cs`
-- `Storage/RunLog/RunLogStore.cs`
-- `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
-- `Storage/RunScreenshot/RunScreenshotSqliteStore.cs`
-- `Game/CombatReplay/Video/CombatReplayVideoMetadataStore.cs`
-- `Game/Screenshots/Upload/BazaarDbSnapshotUploadStore.cs`
-- `Game/HistoryPanel/Storage/HistoryPanelRepository.cs`
-- `Game/RunLogging/Upload/RunBundleUploadStore.cs`
+- `src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs`
+- `src/BazaarPlusPlus.Storage/RunLog/RunLogStore.cs`
+- `src/BazaarPlusPlus/Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
+- `src/BazaarPlusPlus.Storage/RunScreenshot/RunScreenshotSqliteStore.cs`
+- `src/BazaarPlusPlus/Game/CombatReplay/Video/CombatReplayVideoMetadataStore.cs`
+- `src/BazaarPlusPlus/Game/Screenshots/Upload/BazaarDbSnapshotUploadStore.cs`
+- `src/BazaarPlusPlus/Game/HistoryPanel/Storage/HistoryPanelRepository.cs`
+- `src/BazaarPlusPlus/Game/RunLogging/Upload/RunBundleUploadStore.cs`
 - `bazaarplusplus-server/migrations/0001_v4_initial.sql`
 - `bazaarplusplus-server/src/features/runBundles/upload.ts`
 
@@ -232,7 +232,7 @@ Columns:
 - `last_error TEXT NULL`
 - `uploaded_at_utc TEXT NULL`
 
-Write path: `Game/Screenshots/Upload/BazaarDbSnapshotUploadStore.cs` (`MarkUploaded` → `uploaded`; 4xx except 408/429 → `permanent_failure`; 5xx / network errors stay `pending` for retry).
+Write path: `src/BazaarPlusPlus/Game/Screenshots/Upload/BazaarDbSnapshotUploadStore.cs` (`MarkUploaded` → `uploaded`; 4xx except 408/429 → `permanent_failure`; 5xx / network errors stay `pending` for retry).
 
 ### Local Indexes
 

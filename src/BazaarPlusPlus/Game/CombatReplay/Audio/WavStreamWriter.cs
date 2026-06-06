@@ -56,11 +56,9 @@ internal sealed class WavStreamWriter : IDisposable
     }
 
     /// <summary>
-    /// Overrides the channel count written into the final header on <see cref="Dispose"/>.
-    /// FMOD only reports the true interleave width once the first mixer callback fires;
-    /// the tap latches it and calls this before closing so the header matches the PCM
-    /// actually written. The on-disk samples are channel-agnostic interleaved floats, so
-    /// only the header's channel / byteRate / blockAlign fields need the corrected count.
+    /// Overrides the channel count written into the final WAV header on <see cref="Dispose"/>.
+    /// The on-disk samples are channel-agnostic interleaved floats, so only the header fields
+    /// need the corrected count.
     /// No-op for non-positive values. Owner only, before <see cref="Dispose"/>.
     /// </summary>
     public void SetChannelCount(int channels)

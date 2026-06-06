@@ -39,6 +39,8 @@
 
 > **⚠️ 本节描述的是抽离前（pre-extraction）的状态，不是当前起点。** P1 + P2 已落地：独立程序集 `BazaarPlusPlus.Localization` 已抽出，引擎 6 类已迁入并改名 `ChineseScriptConverter`，`Resolve(languageCode, mode)` 纯函数核心 + `ILanguageProvider`/`ILocaleModeProvider` + `L` 薄层已就位，`Plugin.cs:108` 已 `L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config))`。**但"语言来源收敛"尚未完成**：`GetLanguageCode()` 仍存在于 `Game/Supporters/Ui/BPPSupporterAttributionRow.cs:193-203`，且多处仍直接 inline 读 `PlayerPreferences.Data.LanguageCode`（如 `Game/Settings/BppSettingsDockController.cs:328`、`Game/Input/BppHotkeyService.cs:189`）——这些是 P2 收敛的遗留尾巴，连同 P0 与 P3–P5 仍待完成。下方清单按原始（pre-extraction）形态保留，动手前一律用 `rg` 复核类型现属哪个命名空间/程序集。
 
+> **当前起点（P1+P2 已落地）：** 引擎类已在 `src/BazaarPlusPlus.Localization/`；`L.Install` 已接线（`Plugin.cs:108`）；`FontAtlasSampleCache` 键已改为 `(languageCode, mode)`（`HistoryPanelText.cs:887-892`）。`GetLanguageCode()` 遗留直读点（动手前用 `rg` 逐个验证行号）：`Game/Supporters/Ui/BPPSupporterAttributionRow.cs:193`、`Game/Settings/BppSettingsDockController.cs:328/340/341`、`Game/Input/BppHotkeyService.cs:189`。CardSetPreviewModeStatusText.cs 已随 CardSetPreview 整体删除，§3/§4a 中对其的引用不再适用。
+
 **引擎（将迁入模块）：**
 - `Game/Settings/LocalizedTextSet.cs` — `internal readonly struct`；`Resolve(string languageCode)` 在 :76，对中文转调 `BppChineseLocalization.ResolveChineseText`。
 - `Game/Settings/LanguageCodeMatcher.cs` — `internal static`，`IsChinese/IsSimplifiedChinese/IsGerman/IsPortuguese/IsKorean/IsItalian`，纯字符串匹配。
@@ -55,9 +57,9 @@
 **内容（留功能侧，仅抽字符串进 `Loc`）：**
 - `Game/HistoryPanel/HistoryPanelText.cs`（955 行）：静态 `LocalizedTextSet` 字段 + 动态 builder（`RankLabel` :418 引用 mod 枚举 `RunOutcomeTier`（定义于 `Game/HistoryPanel/HistoryPanelFormatter.cs:8`）、`RunRecord` :405、`BoardSummary` :392、大量 `FormatSimple(...)` inline 字面量 :347+）。**`FontAtlasSample()` :831 用反射枚举自身 `LocalizedTextSet` 字段预热字体图集；`FontAtlasSampleCache` :13 仅以 `languageCode` 为键。**
 - `Game/CollectionPanel/CollectionPanelText.cs` — `using BazaarGameShared.Domain.Core.Types`（游戏类型），不可整体搬。
-- `Game/CardSetPreview/CardSetPreviewRuntime.cs` — `UnityEngine`/`BazaarGameClient`，不可搬。
+- `Game/CardSetPreview/CardSetPreviewRuntime.cs` — `UnityEngine`/`BazaarGameClient`，不可搬（已随 CardSetPreview 删除，此条目历史存档）。
 - `Game/Supporters/BPPSupporterAttributionText.cs:8-31` — **仅按 `IsChinese` 输出简体、从不过简繁转换**（mode 不敏感）。
-- `Game/CardSetPreview/CardSetPreviewModeStatusText.cs:13-15` — 同上，mode 不敏感。
+- ~~`Game/CardSetPreview/CardSetPreviewModeStatusText.cs:13-15`~~ — 已随 CardSetPreview 删除，此子项取消。
 - `Game/CollectionPanel/Data/CollectionLocalizationResolver.cs:14` — `ResolveTitle(TCardBase template)`，按游戏模板解析卡名（游戏类型，留原处）。
 - 各 `*.SettingsMenuLabel.cs` / `*SettingsDockEntry.cs`（`rg -l "LocalizedTextSet" Game`）。
 - `CombatStatusBar.Canvas.cs` — 纯硬编码英文标签。
@@ -70,7 +72,7 @@
 **构建先例（照搬）：**
 - `BazaarPlusPlus.ModApi.csproj`：`Compile Remove="**/*.cs"` + `Compile Include="ModApi/**/*.cs"`。
 - `BazaarPlusPlus.csproj`：`Compile Remove="ModApi/**"`/`Storage/**`（~:49-54）、`ProjectReference`（~:141-142）、copy 到 `BepInEx/plugins`（~:223-238）。
-- `Directory.Build.props:11-24` 仅 ModApi/Storage/AutoBazaar 有独立 `obj/bin`。
+- `Directory.Build.props` 当前仅含 `BppVersion` 与 `EnforceCodeStyleInBuild`，无路径隔离条目（原说法"仅 ModApi/Storage/AutoBazaar 有（:11-24）"已过时）。
 - 测试 shim：`tests/CombatStatusBarState.Tests/TestChineseLocalizationShim.cs`。
 
 ## 4. 目标接口契约
@@ -111,7 +113,7 @@ static partial class Loc   // 集中文本目录，按功能分区（仅命名�
 
 **mode 敏感性分类（强制）：** 迁移每条串前归类——
 - **mode 敏感（默认）**：只给简体 mainland 值，转换器派生 TW/HK。
-- **mode 不敏感**（如 `BPPSupporterAttributionText`、`CardSetPreviewModeStatusText`，当前对所有中文输出同一份文本）：**必须**显式给与原输出一致的 TW/HK 值（通常 = 简体原文），或保留为功能侧格式化器，**不得**默认走转换器。
+- **mode 不敏感**（如 `BPPSupporterAttributionText`，当前对所有中文输出同一份文本；CardSetPreviewModeStatusText 已随 CardSetPreview 删除）：**必须**显式给与原输出一致的 TW/HK 值（通常 = 简体原文），或保留为功能侧格式化器，**不得**默认走转换器。
 
 ## 5. 工作包（按序执行，每包后停下 review）
 

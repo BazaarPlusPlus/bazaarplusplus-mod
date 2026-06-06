@@ -18,7 +18,7 @@
 - [features/screenshots.md](features/screenshots.md) — 终局自动截图 + 可选 BazaarDB 上传。
 - [features/tooltip-preview.md](features/tooltip-preview.md) — 附魔 / 升级预览的 3 态可视性与 pedestal 自动触发。
 - [features/combat-status-bar.md](features/combat-status-bar.md) — 战斗底部 HUD。
-- [features/monster-preview.md](features/monster-preview.md) — 原生怪物预览 + CardSet overlay。
+- [features/monster-preview.md](features/monster-preview.md) — 原生怪物预览 + LiveBuildPanel item-board overlay（旧 CardSet overlay 路径已删除）。
 - [features/ghost-battle-data-flow.md](features/ghost-battle-data-flow.md) — ghost battle 录制→上传→同步→渲染的视角翻转数据流。
 - [features/bazaar-agent.md](features/bazaar-agent.md) — BazaarAgent 概览（可选独立 host 插件，默认不随包分发，按需 `--with-bazaaragent` 构建）。
 
@@ -40,6 +40,12 @@
 ## 设计历史（`design/`）
 
 - [design/README.md](design/README.md) — spec 生命周期约定 + 按状态索引的 [design/archive/](design/archive/)（已实现 / 已废弃 / 未实现的 dated 设计 spec，每篇带状态横幅）。
+
+## 审计（`audits/`）
+
+- [audits/2026-06-04-doc-code-drift-audit.md](audits/2026-06-04-doc-code-drift-audit.md) — 文档/注释/代码漂移综合审计（91 条；P0/P1 多数已由 60c2bb0、854e4e1 落地）。
+- [audits/2026-06-05-autobazaar-dependency-inversion-feasibility.md](audits/2026-06-05-autobazaar-dependency-inversion-feasibility.md) — BazaarAgent 依赖反转可行性审计（已落地，见 ADR-0006）。
+- [audits/2026-06-05-codebase-health-audit.md](audits/2026-06-05-codebase-health-audit.md) — 代码体检（文档类发现已修，代码类待独立任务）。
 
 ## 排障记录（`debugging/`）
 

@@ -9,7 +9,7 @@
 
 ## 当前行为
 
-- 仅在 `IBppServices.RunContext.IsInGameRun` 且功能开启时显示。
+- 仅在功能开启时显示；live run（`RunContext.IsInGameRun` 缓存为 true）与录制回放（缓存为 false 时回退 `GameStateProbe.ComputeIsInGameRun()`，把 `ReplayState` 也报告为 in-game-run）均会显示，lobby / 主菜单不显示（`CombatStatusBar.State.cs:111-133`）。
 - 展示逻辑战斗时间（elapsed time）。
 - 支持暂停和 0.50x / 0.67x / 1.00x 速度档位。
 - 记住功能开关和默认速度档位。
@@ -37,6 +37,7 @@
 ## 关键文件
 
 - `Plugin.cs`
+- `BppComposition.cs`
 - `Core/Config/BppConfig.cs`
 - `Game/CombatStatusBar/CombatStatusBar.cs`
 - `Game/CombatStatusBar/CombatStatusBar.Canvas.cs`

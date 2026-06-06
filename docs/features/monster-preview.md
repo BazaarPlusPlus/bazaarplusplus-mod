@@ -31,6 +31,8 @@ LiveBuildPanel
   -> GameInterop/CardPreview/NativeCardPreviewFactory
 ```
 
+实际中间层：`LiveBuildPanel`（`LiveBuildPanel.cs:35`）持有 `LiveBuildPreviewRenderer`，`LiveBuildPreviewRenderer` 通过 `LiveItemBoardRowPreview`（`LiveItemBoardRowPreview.cs:11`）持有 `BppItemBoardPreview`。
+
 这条路径用于 live run 内容推荐展示，不是旧的 monster self-render showcase。候选状态、面板文案和 supporter attribution chrome 位于 `Game/LiveBuildPanel/`。
 
 ### History Panel
@@ -39,9 +41,7 @@ LiveBuildPanel
 预览容器的 `worldBound` 同步位置。曾短暂改用离屏 Camera→RenderTexture，
 因 URP 下无法渲染 uGUI 已回退到 overlay；详见 [history-panel.md](history-panel.md) §预览渲染 与 [ADR-0003](../adr/0003-history-panel-preview-overlay.md)。
 
-History preview 过滤 card template 时使用游戏静态数据
-`Data.GetStatic().GetCardById(Guid)`。Bazaar++ 不再定位、解析、缓存或预热本地卡牌模板
-JSON；过期或未知的 template id 会在渲染前被过滤掉。
+History preview 过滤 card template 时经 `GameInterop/StaticCards/BppStaticDataAccess` 间接访问游戏静态数据（内部调 `manager.GetCardById(templateId)`，并处理 `Data.GetStatic()` 返回 Task 的版本差异；`HistoryBattlePreviewProjection.cs` 在 `TryGetStaticGameData()` 中调用 `BppStaticDataAccess.TryGet()`）。Bazaar++ 不再定位、解析、缓存或预热本地卡牌模板 JSON；过期或未知的 template id 会在渲染前被过滤掉。
 
 ## 关键文件
 

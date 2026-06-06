@@ -56,9 +56,7 @@ The shared item-board surface now lives in `GameInterop/ItemBoardPreview/`:
 `RectMask2D` clipping, 10 sockets, generation cancellation, optional signature
 cache, packed/socketed layout, and setup-gated polled hover.
 
-`Game/HistoryPanel/Preview/BattleBoardPreview.cs` is now a thin wrapper that
-maps `HistoryItemSpec` to `NativeCardPreviewSpec` and delegates rendering to
-`ItemBoardPreviewSurface`. The feature-local `BattleBoardCardFactory`,
+`Game/HistoryPanel/Preview/BattleBoardPreview.cs` — thin wrapper file deleted (50e64b1); HistoryPanel now directly holds `BppItemBoardPreview` (`HistoryPanel.cs:42/359`), mapping `HistoryItemSpec` to `NativeCardPreviewSpec` inline. The feature-local `BattleBoardCardFactory`,
 `HistoryPanelPreviewCardPool`, socket resolver, layout, generation guard, and
 signature gate files were removed.
 
@@ -246,6 +244,8 @@ wrappers with no independent lifecycle logic.
 
 ### Consumer: CardSetPreview
 
+> **注（历史存档）：** CardSetPreview 已由 LiveBuildPanel 全量替代（commit 50e64b1）；`LiveItemBoardRowPreview.cs` 已用 `BppItemBoardPreview` + SlotGrid。本节为历史存档。
+
 CardSetPreview should then switch from live tooltip cloning to the shared
 surface.
 
@@ -338,7 +338,7 @@ Automated tests:
 - Keep `Core` and `GameInterop` layering tests passing; `GameInterop` must not
   import `Game/HistoryPanel` or `Game/CardSetPreview`.
 - Keep `tests/MonsterPreviewResilience.Tests` for CardSetPreview hotkeys/status
-  behavior.
+  behavior (当前为空 test shell，无源文件).
 
 Target command set:
 

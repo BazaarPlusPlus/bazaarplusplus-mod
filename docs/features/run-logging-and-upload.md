@@ -67,4 +67,4 @@ ghost 同步与 replay 下载（V4 wire，服务端在独立仓库 `bazaarpluspl
 - `Storage/Upload/RunSyncStateStore.cs`、`BattleReplaySyncStateStore.cs`
 - `ModApi/Clients/ModOnlineClient.cs`、`RunBundleClient.cs`、`GhostBattleClient.cs`
 - `Game/PvpBattles/Persistence/PvpBattleSqliteStore.cs`
-- `Game/HistoryPanel/HistoryPanel.cs`、`Storage/HistoryPanelRepository.cs`、`Ghost/GhostBattleSyncService.cs`、`Ghost/GhostBattleLocalProjector.cs`、`HistoryPanelReplayService.cs`、`HistoryPanelFormatter.cs`
+- `Game/HistoryPanel/HistoryPanel.cs`、`Game/HistoryPanel/Storage/HistoryPanelRepository.cs`、`Game/HistoryPanel/Ghost/GhostBattleSyncService.cs`、`Game/HistoryPanel/Ghost/GhostBattleLocalProjector.cs`、`Game/HistoryPanel/HistoryPanelReplayService.cs`、`Game/HistoryPanel/HistoryPanelFormatter.cs`

@@ -7,9 +7,9 @@
 ## 文档目录
 
 - [network-interface-inventory.md](network-interface-inventory.md)  
-  官方客户端、旧版服务、静态 CDN、Addressables、mod 上传/同步、AutoBazaar 本地 HTTP 的接口清单、数据结构和业务逻辑。
+  官方客户端、旧版服务、静态 CDN、Addressables、mod 上传/同步、BazaarAgent 本地 HTTP 的接口清单、数据结构和业务逻辑。
 - [data-structure-catalog.md](data-structure-catalog.md)  
-  所有主要接口 DTO、MessagePack DTO、mod DTO、AutoBazaar DTO 和本地 fixture DTO 建议。
+  所有主要接口 DTO、MessagePack DTO、mod DTO、BazaarAgent DTO 和本地 fixture DTO 建议。
 - [session-command-protocol.md](session-command-protocol.md)  
   `/sessions`、`/commands`、`DELETE /sessions` 的 MessagePack 协议、命令/消息 DTO、客户端状态流和失败恢复逻辑。
 - [offline-local-run-design.md](proposals/offline-local-run-design.md)  

@@ -9,15 +9,17 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 ## 功能概览
 
 - 战斗状态条：在底部 HUD 显示逻辑战斗时间、已处理帧数、暂停状态以及离散速度档（0.50x / 0.67x / 1.00x）。
-- 怪物预览：完全走游戏原生怪物预览，Bazaar++ 不做修改；CardSet preview 复用原生 `MonsterBoardTooltip` 作为宿主展示自定义 board 内容。
+- 怪物预览：完全走游戏原生怪物预览，Bazaar++ 不做修改。
 - 附魔 / 升级预览：附魔预览有可视性模式（Off / AutoOnPedestalChoice / Always，默认 Always）；Auto 模式会在选择屏遇到对应 pedestal 时自动显示预览；按住 Ctrl / Shift 仍可手动覆盖。
 - Run Logging 与 HistoryPanel：活跃 run 写入 SQLite；游戏内可浏览 runs、PVP battles、ghost battles，并预览保存的战斗快照。
 - 战斗回放：本地保存 PVP replay payload；`HistoryPanel` 在条件满足时可回放已保存战斗。
 - 终局自动截图：终局 `Continue` 前保存主截图和 SQLite 元数据。
 - 后台上传：run / replay 后台上传，仅在未处于 live run 时执行。
 - BazaarDB 截图上传：可选开关，启用后把终局截图快照 DTO 推到 V4 mod 后端（`bazaarplusplus-server` 仓库，部署 `mod-api-v4.bazaarplusplus.com`），BazaarDB 通过 peek/confirm 队列拉取（默认关闭）。
+- 卡牌图鉴（Collection Panel）：全屏 Item/Skill 图鉴，Tab 键或大厅 dock 按钮打开；支持英雄 / 品质 / 体型 / 商人与训练师来源 / 运行天数筛选。
+- 终局阵容面板（Live Build Panel）：局内 CapsLock 开关；展示实时 shop / board / stash，并按当前评级分段给出终局 build 推荐（数据来自云端 final_builds_for_mod.json，内嵌 final-builds-top50.json 兜底）。
 - Anonymous Mode：将本地玩家名替换为 `Anonymous`。
-- **BazaarAgent HTTP 接口**（可选 host 插件，默认不安装）— 本地回环 HTTP 服务（固定 `127.0.0.1:47900`），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。**host 是独立的 BepInEx 插件**，按需用 `./run.sh build --with-bazaaragent` 构建；host dll 安装后会自动启动，默认构建只产出主插件并主动清除 host dll。详见 [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md)。
+- **BazaarAgent HTTP 接口**（可选 host 插件，默认不安装）— 本地回环 HTTP 服务（固定 `127.0.0.1:47900`），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。**host 是独立的 BepInEx 插件**，按需用 `./run.sh build --with-bazaaragent` 构建；host dll 安装后会自动启动，默认构建只产出主插件并主动清除两个 host dll。详见 [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md)。
 
 ## 安装与配置
 
@@ -29,7 +31,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 ## 从源码构建
 
 - 项目目标框架为 `netstandard2.1`，使用可构建 C# 12 项目的 .NET SDK。
-- 主项目和大多数测试项目通过 `ManagedPath` 解析游戏程序集；如果自动识别不到本地安装目录，请在构建时显式传入它。
+- 主项目和依赖游戏程序集的测试项目通过 `ManagedPath` 解析游戏程序集；如果自动识别不到本地安装目录，请在构建时显式传入它。
 - 常用命令：
 
 ```bash
@@ -51,7 +53,7 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/Th
 
 ## 仓库结构
 
-- `src/BazaarPlusPlus/`：主插件工程。`Plugin.cs` 为 BepInEx 运行时入口（精简，feature wiring 走 `BppComposition` 的 `IBppMountable`/`ISettingsDockEntry` 注册表）；其下 `Core/` 纯抽象（配置、事件总线、路径、运行时服务接口，零 game DLL 引用），`GameInterop/` 游戏 DLL 耦合层（`BppClientCacheBridge`、`BppStaticDataAccess`、`GameStateProbe`、`RunContextStore`、`IRunContext` 接口、带 game type 的事件 `CombatSimObserved`/`NetMessageObserved`），`Game/`、`Patches/` 主要功能实现 + Harmony 补丁，`Data/` 内嵌资源（如 build 推荐 JSON）。
+- `src/BazaarPlusPlus/`：主插件工程。`Plugin.cs` 为 BepInEx 运行时入口（精简，feature wiring 走 `BppComposition` 的 `IBppMountable`/`ISettingsDockEntry` 注册表）；其下 `Core/` 纯抽象（配置、事件总线、路径、运行时服务接口，零 game DLL 引用），`GameInterop/` 游戏 DLL 耦合层（`BppClientCacheBridge`、`BppStaticDataAccess`、`GameStateProbe`、`RunContextStore`、`IRunContext` 接口、带 game type 的事件 `CombatSimObserved`/`NetMessageObserved`），`Game/`、`Patches/` 主要功能实现 + Harmony 补丁，`Infrastructure/` 跨切面工具（日志、字体、UI design token），`Data/` 内嵌资源（如 build 推荐 JSON）。
 - `src/BazaarPlusPlus.ModApi/`、`src/BazaarPlusPlus.Storage/`、`src/BazaarPlusPlus.Localization/`：HTTP 客户端、本地持久化、本地化引擎三个独立程序集（零 game/Unity/BepInEx 依赖），由 `BppComposition.cs` 装配进 mod。
 - `src/BazaarPlusPlus.BazaarAgent/`、`src/BazaarPlusPlus.BazaarAgentHost/`：可选 BazaarAgent 纯核心与 host 插件（默认不安装，按需 `./run.sh build --with-bazaaragent` 构建）。
 - `tests/`：按特性拆分的测试项目。

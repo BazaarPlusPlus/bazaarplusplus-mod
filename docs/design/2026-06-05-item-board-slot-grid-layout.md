@@ -9,10 +9,10 @@ Scope: `LiveBuildPanel` 四行 item board、共享 `BppItemBoardPreview`、以�
 
 当前共享 item-board 数据模型已经是 10-slot。`ItemBoardSocketLayout` 定义
 `SocketCount = 10`，并保留一个 native board 常量 `2600x600`。Evidence:
-[`ItemBoardSocketLayout.cs:7-11`](../../GameInterop/ItemBoardPreview/ItemBoardSocketLayout.cs#L7-L11).
+[`ItemBoardSocketLayout.cs:7-11`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardSocketLayout.cs#L7-L11).
 
 卡牌 span 语义也已经显式化：small = 1、medium = 2、large = 3。Evidence:
-[`BppItemBoardSpan.cs:9-21`](../../GameInterop/ItemBoardPreview/BppItemBoardSpan.cs#L9-L21).
+[`BppItemBoardSpan.cs:9-21`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSpan.cs#L9-L21).
 
 这和游戏自己的容器语义一致。decompiled `SocketedContainer` 会把同一张 item 写入它占用的每一个 socket，
 但 `GetCardsAndSockets()` 只返回每张 item 的左 socket，并按 `socketable.Size - 1`
@@ -34,22 +34,22 @@ Evidence: [`CardContainer.cs:17-27`](../../decompiled/BazaarGameClient/BazaarGam
 
 `LiveBuildPanel` 的 UITK 层已经按整行 10 等分绘制 slot 背板、点击层和候选 marker：
 
-- slot 背板使用 `left = i * 10%`、`width = 10%`。Evidence:
-  [`LiveBuildPanelView.cs:228-240`](../../Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs#L228-L240).
+- 已修复：slot 背板使用 `left = i * 10%`、`width = 10%`（`LiveBuildPanelView` 已用 `ItemBoardSlotGridGeometry.ResolveOccupiedRect`）。Evidence:
+  [`LiveBuildPanelView.cs:228-240`](../../src/BazaarPlusPlus/Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs#L228-L240).
 - hit target 使用 `left = socket * 10%`、`width = span * 10%`。Evidence:
-  [`LiveBuildPanelView.cs:321-358`](../../Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs#L321-L358).
+  [`LiveBuildPanelView.cs:321-358`](../../src/BazaarPlusPlus/Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs#L321-L358).
 - candidate marker 使用 `hostBounds.width / 10f` 计算 slot 宽。Evidence:
-  [`LiveBuildPanelView.cs:370-390`](../../Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs#L370-L390).
+  [`LiveBuildPanelView.cs:370-390`](../../src/BazaarPlusPlus/Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs#L370-L390).
 
 但 native card overlay 没有使用这套全宽 10 等分坐标。它先把一个固定 `2600x600` 的 board 等比 fit
 到 row bounds 里：
 
 - `LiveItemBoardRowPreview.SetBounds()` 计算 `scale = min(bounds.width / 2600, bounds.height / 600)`。
   Evidence:
-  [`LiveItemBoardRowPreview.cs:44-50`](../../Game/LiveBuildPanel/Preview/LiveItemBoardRowPreview.cs#L44-L50).
+  [`LiveItemBoardRowPreview.cs:44-50`](../../src/BazaarPlusPlus/Game/LiveBuildPanel/Preview/LiveItemBoardRowPreview.cs#L44-L50).
 - `ItemBoardPreviewSurface.ApplyTransform()` 把 `2600x600` 的 `_boardRect` 居中放进 clip，再应用 `_cardScale`。
   Evidence:
-  [`ItemBoardPreviewSurface.cs:359-367`](../../GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L359-L367).
+  [`ItemBoardPreviewSurface.cs:359-367`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L359-L367).
 
 这就产生了两套坐标系：
 
@@ -60,15 +60,13 @@ Evidence: [`CardContainer.cs:17-27`](../../decompiled/BazaarGameClient/BazaarGam
 
 还有一个数据到渲染的缺口：`BppItemBoardCard.DisplaySpan` 已经存在，slot planner 也会写
 `DisplaySocketId`，但 mapper 目前只把 socket 传给 `NativeCardPreviewSpec`。Evidence:
-[`BppItemBoardCard.cs:31-33`](../../GameInterop/ItemBoardPreview/BppItemBoardCard.cs#L31-L33),
-[`BppItemBoardPreviewMapper.cs:23-33`](../../GameInterop/ItemBoardPreview/BppItemBoardPreviewMapper.cs#L23-L33).
+[`BppItemBoardCard.cs:31-33`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardCard.cs#L31-L33),
+[`BppItemBoardPreviewMapper.cs:23-33`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardPreviewMapper.cs#L23-L33).
 `NativeCardPreviewSpec` 当前没有 display span 字段。Evidence:
-[`NativeCardPreviewSpec.cs:9-22`](../../GameInterop/CardPreview/NativeCardPreviewSpec.cs#L9-L22).
+[`NativeCardPreviewSpec.cs:9-22`](../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewSpec.cs#L9-L22).
 
-另一个必须顺手修的漂移是：`BppItemBoardPreview.Render()` 忽略构造时传入的 layout mode，并硬编码
-`Socketed`。Evidence:
-[`BppItemBoardPreview.cs:33-44`](../../GameInterop/ItemBoardPreview/BppItemBoardPreview.cs#L33-L44).
-如果不修，新增 layout mode 即使在 consumer 里配置了，也不会真正传到 surface。
+已修复：`BppItemBoardPreview.Render()` 原忽略构造时传入的 layout mode 并硬编码 `Socketed`；`OptionsForwarder` 透传 `LayoutMode` 已落地。Evidence:
+[`BppItemBoardPreview.cs:33-44`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardPreview.cs#L33-L44).
 
 ## 目标行为
 
@@ -80,7 +78,7 @@ candidate marker、可选 slot 背板都必须使用同一套 slot geometry。
 renderer 不能在 planner 已经分配 `DisplaySocketId` 之后再根据 card frame 宽度做二次 packed。
 当前 packed path 会测量 `FrameContainer` world width，然后把所有 active card 按 frame 宽度连续排在 board
 中心。Evidence:
-[`ItemBoardPreviewSurface.cs:412-443`](../../GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L412-L443).
+[`ItemBoardPreviewSurface.cs:412-443`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L412-L443).
 这个行为不是 LivePanel / HistoryPanel 的 slot-fidelity 目标。
 
 ### Shop 行
@@ -89,25 +87,25 @@ shop 行仍然是 10-slot board，只是 shop selection 中的 item 通常没有
 它的居中 display socket 由 `BppItemBoardSlotPlanner` 计算，不由 renderer 现场 packed：
 
 - `SelectableShop` 会进入 `PlanSelectableShop`。Evidence:
-  [`BppItemBoardSlotPlanner.cs:19-24`](../../GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs#L19-L24).
+  [`BppItemBoardSlotPlanner.cs:19-24`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs#L19-L24).
 - `PlanSelectableShop()` 会按来源顺序计算 `totalSpan`，能放下时从 `floor((10 - totalSpan) / 2)`
   开始，然后按每张卡的 span 递增分配 `DisplaySocketId`。Evidence:
-  [`BppItemBoardSlotPlanner.cs:107-133`](../../GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs#L107-L133).
+  [`BppItemBoardSlotPlanner.cs:107-133`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs#L107-L133).
 
 renderer 只消费这些 planned `DisplaySocketId`。它不能再按 frame width 对 shop 卡做一次居中。
 
 ### Board / Stash / History / Final Build
 
 `SelectableContainer` 行保留合法 source socket，缺 socket 或越界的卡跳过。Evidence:
-[`BppItemBoardSlotPlanner.cs:75-104`](../../GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs#L75-L104).
+[`BppItemBoardSlotPlanner.cs:75-104`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs#L75-L104).
 
 `Reference` 行优先保留 source/recommendation/snapshot 提供的 socket；缺 source socket 时才用
 span-aware fallback。Evidence:
-[`BppItemBoardSlotPlanner.cs:27-73`](../../GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs#L27-L73).
+[`BppItemBoardSlotPlanner.cs:27-73`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs#L27-L73).
 
 HistoryPanel 当前已经把 battle snapshot 投影成 `BppItemBoard(Id=Historical, Type=Reference)`。
 Evidence:
-[`HistoryBattlePreviewProjection.cs:55-67`](../../Game/HistoryPanel/Data/HistoryBattlePreviewProjection.cs#L55-L67).
+[`HistoryBattlePreviewProjection.cs:55-67`](../../src/BazaarPlusPlus/Game/HistoryPanel/Data/HistoryBattlePreviewProjection.cs#L55-L67).
 它也应该复用同一个 slot-grid renderer，但默认不显示可见 slot 背板，避免改动 HistoryPanel 的视觉重心。
 
 ### 卡牌尺寸
@@ -127,7 +125,7 @@ native card art 应在占用 slot 矩形内居中，并做等比缩放。不要�
 
 ### 1. 新增 SlotGrid layout mode
 
-扩展 [`ItemBoardPreviewLayoutMode.cs`](../../GameInterop/ItemBoardPreview/ItemBoardPreviewLayoutMode.cs#L4):
+扩展 [`ItemBoardPreviewLayoutMode.cs`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewLayoutMode.cs#L4):
 
 ```csharp
 internal enum ItemBoardPreviewLayoutMode
@@ -147,13 +145,13 @@ internal enum ItemBoardPreviewLayoutMode
 
 ### 2. 把 DisplaySpan 传到 preview spec
 
-在 [`NativeCardPreviewSpec.cs`](../../GameInterop/CardPreview/NativeCardPreviewSpec.cs#L9) 增加：
+在 [`NativeCardPreviewSpec.cs`](../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewSpec.cs#L9) 增加：
 
 ```csharp
 public int DisplaySpan { get; init; } = 1;
 ```
 
-然后更新 [`BppItemBoardPreviewMapper.cs`](../../GameInterop/ItemBoardPreview/BppItemBoardPreviewMapper.cs#L23):
+然后更新 [`BppItemBoardPreviewMapper.cs`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardPreviewMapper.cs#L23):
 
 ```csharp
 DisplaySpan = card.DisplaySpan,
@@ -163,7 +161,7 @@ span 的来源仍然是 `BppItemBoardCard.DisplaySpan`。mapper 只负责把已�
 
 ### 3. 修正 BppItemBoardPreview 的 LayoutMode 转发
 
-更新 [`BppItemBoardPreview.Render()`](../../GameInterop/ItemBoardPreview/BppItemBoardPreview.cs#L33)，让转发给
+更新 [`BppItemBoardPreview.Render()`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardPreview.cs#L33)，让转发给
 surface 的 options 使用 `_options.LayoutMode`，而不是硬编码 `Socketed`。
 
 这是 `SlotGrid` 能被 LivePanel / HistoryPanel opt-in 的前置修复。
@@ -201,7 +199,7 @@ ResolveOccupiedRect(
 
 ### 5. 在 ItemBoardPreviewSurface 实现 LayoutCardsSlotGrid()
 
-在 [`ItemBoardPreviewSurface.cs`](../../GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L159) 的 layout
+在 [`ItemBoardPreviewSurface.cs`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L159) 的 layout
 分支中加入：
 
 ```csharp
@@ -217,14 +215,14 @@ else if (_options.LayoutMode == ItemBoardPreviewLayoutMode.Packed)
 2. 从 `handle.Spec.DisplaySpan` 取 `span`。
 3. 用完整 `_clipSize.width / 10` 解析该卡的占用 rect。
 4. 测量 card visual bounds，优先沿用 packed path 里查找的 `FrameContainer`。Evidence:
-   [`ItemBoardPreviewSurface.cs:424-427`](../../GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L424-L427).
+   [`ItemBoardPreviewSurface.cs:424-427`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L424-L427).
 5. 根据 occupied rect、inset、max-height ratio 计算等比 scale。
 6. 应用 transform，使 measured frame center 对齐 occupied rect center。
 
 这个 layout 必须在 setup/show 后运行，因为 native frame/art 尺寸只有在 setup 完成后才可靠。当前 render flow
 已经等待 `Task.WhenAll(_activeSetUpTasks)`，show setup cards，`ForceUpdateCanvases()`，然后才做 layout。
 Evidence:
-[`ItemBoardPreviewSurface.cs:145-162`](../../GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L145-L162).
+[`ItemBoardPreviewSurface.cs:145-162`](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L145-L162).
 
 ### 6. 给 SlotGrid 加可调参数
 
@@ -241,14 +239,14 @@ public float SlotGridMaxScale { get; init; } = 1f;
 
 ### 7. LiveBuildPanel 切到 SlotGrid
 
-修改 [`LiveItemBoardRowPreview`](../../Game/LiveBuildPanel/Preview/LiveItemBoardRowPreview.cs#L17)，把 layout mode
+修改 [`LiveItemBoardRowPreview`](../../src/BazaarPlusPlus/Game/LiveBuildPanel/Preview/LiveItemBoardRowPreview.cs#L17)，把 layout mode
 从 `Socketed` 改为 `SlotGrid`。
 
 `LiveBuildPanel` 已经构造四个 `BppItemBoard` row：final build、live shop、live board、live stash。
 Evidence:
-[`LiveBuildPanel.cs:227-266`](../../Game/LiveBuildPanel/LiveBuildPanel.cs#L227-L266).
+[`LiveBuildPanel.cs:227-266`](../../src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs#L227-L266).
 live row 当前也已经通过 `BppItemBoardSlotPlanner.Plan(...)` 规划 display socket。Evidence:
-[`LiveBuildPanel.cs:288-297`](../../Game/LiveBuildPanel/LiveBuildPanel.cs#L288-L297).
+[`LiveBuildPanel.cs:288-297`](../../src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs#L288-L297).
 
 不要给 renderer 增加 shop 特判。shop 居中留在 `BppItemBoardSlotPlanner.PlanSelectableShop()`。
 
@@ -270,11 +268,10 @@ native preview runtime/layout，候选样式、背板样式、面板 chrome 属�
 
 ### 9. HistoryPanel 切到 SlotGrid，但默认无背板
 
-HistoryPanel 当前创建 shared preview 时显式配置 `LayoutMode = Socketed`。Evidence:
-[`HistoryPanel.cs:357-368`](../../Game/HistoryPanel/HistoryPanel.cs#L357-L368).
+已完成：`HistoryPanel.cs:364` 已配置 `LayoutMode = SlotGrid`。Evidence:
+[`HistoryPanel.cs:357-368`](../../src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanel.cs#L357-L368).
 
-`SlotGrid` 在 LivePanel 验证对齐后，HistoryPanel 也应切到 `SlotGrid`，保证历史 preview 也使用同一个
-"left socket + span" 视觉 contract。HistoryPanel 默认不添加可见 10-slot 背板。
+HistoryPanel 现在与 LivePanel 使用同一个 "left socket + span" 视觉 contract，默认不添加可见 10-slot 背板。待游戏内手测验证。
 
 ## 测试
 

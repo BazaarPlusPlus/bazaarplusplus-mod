@@ -23,7 +23,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 | `Plugin.cs` | BepInEx 入口：初始化配置、composition、Harmony patches、`CombatReplayRuntime`（bootstrap-special，需在 `composition.Start()` 前构造），随后 `Mountables.MountAll(...)` 一行装好默认的 `IBppMountable`；BazaarAgent host 已拆为独立插件，不再由本组合根挂载 |
 | `BppComposition.cs` | 创建 `IBppServices`，注册 `RunLifecycleModule`、`CombatReplayModule`、`CombatStatusBarModule`，并把所有 `IBppMountable`（feature runtime）和 `ISettingsDockEntry`（设置坞入口）汇总到两个 registry |
 | `Core/` | 纯抽象：配置、事件总线、路径、run context、运行时服务接口 |
-| `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`Encounter/`、`StaticCards/`、`CardPreview/`、`ItemBoardPreview/`、`HeroPortraits/`、`EncounterPortraits/`、`GameLanguageProvider`，以及带 game type 的事件 + `IRunContext` 接口 |
+| `GameInterop/` | 游戏 DLL 耦合层：`GameStateProbe`、`RunContextStore`、`BppClientCacheBridge`、`Encounter/`、`StaticCards/`、`CardPreview/`、`ItemBoardPreview/`、`HeroPortraits/`、`EncounterPortraits/`、`GameLanguageProvider`、`BazaarAgent/`（跨插件 facade：`BazaarAgentGameBridge` / `IBazaarAgentGameProbe`）、`LiveCards/`（live run 卡牌快照读取，供 LiveBuildPanel），以及带 game type 的事件 + `IRunContext` 接口 |
 | `Patches/` | Harmony 补丁：战斗模拟、回放采集、设置坞、大厅、tooltip、名称覆盖等 |
 
 默认挂载的 `IBppMountable`（实际注册见 `BppComposition.cs`；多数是泛型 `ComponentMount<T>`，`HistoryPanelMount`、`CollectionPanelMount` 与 `LiveBuildPanelMount` 为定制类）：`ComponentMount<RunLoggingController>`、`ComponentMount<RunUploadController>`、`ComponentMount<CombatStatusBar>`、`ComponentMount<EndOfRunScreenshotController>`、`ComponentMount<BazaarDbSnapshotUploadController>`、`ComponentMount<CombatReplayVideoRecorder>`、`HistoryPanelMount`（用 `Func<>` 延迟解析 online client + combat replay runtime）、`CollectionPanelMount`（定制类，订阅 `ChineseLocaleModeChanged` 以在切换术语模式时重建目录缓存与 UI 标签）、`LiveBuildPanelMount`（Caps 打开 live run 终局阵容面板）、`ComponentMount<MainMenuVersionCheckController>`（主菜单版本检查 + update-available 探测）、`ComponentMount<TooltipModifierRefreshController>`。BazaarAgent host 已拆为独立的 BepInEx 插件（`BazaarPlusPlus.BazaarAgentHost.csproj`，`[BepInDependency(BazaarPlusPlus)]`），不再由本组合根挂载；它通过 BazaarPlusPlus 发布的 public facade（`BazaarAgentGameBridge`）读取游戏状态。BazaarAgent 的纯协议/transport/validation/runtime controller 在 `src/BazaarPlusPlus.BazaarAgent/`（`BazaarPlusPlus.BazaarAgent.csproj`），Unity 与游戏 DLL 适配层在 `src/BazaarPlusPlus.BazaarAgentHost/`（`BazaarPlusPlus.BazaarAgentHost.csproj`）。
@@ -47,12 +47,18 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 
 详见 [features/monster-preview.md](features/monster-preview.md)。
 
+### 终局阵容面板（LiveBuildPanel）
+
+- 局内 CapsLock 开关（`LiveBuildPanel.cs:85`）；由 `LiveBuildPanelMount` 挂载（`BppComposition.cs:114`），代码在 `Game/LiveBuildPanel/`。
+- 展示当前 run 的实时 shop / board / stash 行，并按当前评级分段筛选 ten-win 终局 build 推荐（`Game/BuildRecommendations/`：远端 `https://bpp-metrics.bazaarplusplus.com/final_builds_for_mod.json` + 内嵌 `final-builds-top50.json` 兜底，本地缓存后台刷新）。
+- item-board 渲染复用 `GameInterop/ItemBoardPreview`；赞助者署名行来自 `Game/Supporters/`。
+
 ### 附魔预览与升级预览（Tooltips）
 
 - **可视性模式**：附魔预览有独立的 3 态配置（`Off` / `AutoOnPedestalChoice` / `Always`），默认 `Always`
 - **自动触发**：附魔 `AutoOnPedestalChoice` 模式下，在 `ChoiceState` 选择屏遇到附魔 pedestal 时，hover 物品自动展示附魔预览；非 pedestal 选项或非 ChoiceState 不会自动触发
 - **手动覆盖**：按住 `HoldEnchantPreview`（默认 Ctrl）总是显示附魔预览；升级预览没有可视性模式，只在按住 `HoldUpgradePreview`（默认 Shift）时显示
-- **共享决策**：`TooltipModifierRefreshController`、`ItemEnchantPreviewPatch`、`UpgradePreviewTooltipPatch` 共同调用 `Game/Tooltips/TooltipPreviewModePolicy.Resolve`，保证三处行为一致；模式由 `GameInterop/Encounter/ChoiceScreenPedestalResolver` 从 `RunState.SelectionSet` 推导
+- **共享决策**：`TooltipModifierRefreshController`、`ItemEnchantPreviewPatch` 直接调用 `Game/Tooltips/TooltipPreviewModePolicy.Resolve`；`UpgradePreviewTooltipPatch` **间接**调用（`UpgradePreviewTooltipPatch.cs:17` 只调 `UpgradeTooltipScheduler.TryScheduleUpgradeTooltip`；`UpgradeTooltipScheduler.cs:23` 内部调 `Resolve`），三处行为保持一致；模式由 `GameInterop/Encounter/ChoiceScreenPedestalResolver` 从 `RunState.SelectionSet` 推导
 
 详见 [features/tooltip-preview.md](features/tooltip-preview.md) 与 [ADR-0004](adr/0004-preview-visibility-three-state-mode.md)。
 
@@ -122,7 +128,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 - **主菜单版本号**：在游戏版本字符串旁展示模组版本；检测到新版本时追加 ` | update available`（启动时 GET `https://bppinstaller.bazaarplusplus.com/latest.json`）
 - **Legendary 位置展示**：可按配置保留原值、隐藏、固定 `999999` 或显示 `#position | rating`
 - **中文术语模式**：可在 Mainland / Taiwan / HongKong 术语间切换
-- **赞助者署名（Supporters）**：在 CardSet 预览 / 卡牌图鉴 / HistoryPanel 展示赞助者署名行与按语言路由的赞助链接（`Game/Supporters/`）
+- **赞助者署名（Supporters）**：在 LiveBuildPanel（终局阵容面板）/ 卡牌图鉴 / HistoryPanel 展示赞助者署名行与按语言路由的赞助链接（`Game/Supporters/`）
 - **Bazaar++ 设置坞**：注入 Game History、Anonymous、Legendary Position、Enchant Preview、Combat Status Bar、Chinese Locale、BazaarDB 截图上传 共 7 个 `ISettingsDockEntry` 入口（另有 CollectionPanel 原生克隆坞按钮，不属 `ISettingsDockEntry`）
 
 ## 云同步与 bazaarplusplus-server

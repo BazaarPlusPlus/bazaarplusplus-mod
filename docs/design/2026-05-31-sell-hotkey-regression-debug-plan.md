@@ -82,7 +82,7 @@ When enabled, instrument the official sell flow with Harmony patches and log one
 - item instance id, owner, section, and hidden unsellable status when an item is found
 - `HasAnyLockedTooltipControllers()` and primary / secondary lock status
 - BazaarPlusPlus tooltip preview mode and configured hotkeys
-- visibility of HistoryPanel, CollectionPanel, CardSetPreview mode, CombatStatusBar, and end-of-run blocker
+- visibility of HistoryPanel, CollectionPanel, LiveBuildPanel (CapsLock toggle), CombatStatusBar, and end-of-run blocker
 
 Do not log every frame. Only log on `SellItem` perform, and optionally on BazaarPlusPlus tooltip refresh while the sell key is pressed.
 
@@ -107,7 +107,7 @@ Do not log every frame. Only log on `SellItem` perform, and optionally on Bazaar
 4. Audit preview objects for physics colliders.
    - For all BazaarPlusPlus-created preview roots and cloned native preview cards, ensure visual-only objects are on an ignore-raycast layer or have colliders disabled.
    - Do not change colliders on real board cards.
-   - Validate CardSetPreview, HistoryPanel preview, and CollectionPanel separately because they create preview card objects in different hosts.
+   - Validate LiveBuildPanel, HistoryPanel preview, and CollectionPanel separately because they create preview card objects in different hosts.
 
 5. Align BazaarPlusPlus hotkeys with native input context where needed.
    - Global toggles such as HistoryPanel and CollectionPanel can keep standalone polling if intentional.
@@ -126,7 +126,7 @@ Verify with diagnostics on first, then off:
 - BazaarPlusPlus enchant / upgrade preview held while selling
 - after opening and closing HistoryPanel
 - after opening and closing CollectionPanel
-- after enabling and disabling CardSetPreview selection mode
+- after toggling LiveBuildPanel (CapsLock)
 - after combat ends and the next non-combat state becomes interactive
 - while a modal or settings screen is open, confirming native no-op is expected
 

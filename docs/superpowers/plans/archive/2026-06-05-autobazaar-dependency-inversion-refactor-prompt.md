@@ -1,5 +1,7 @@
 # Refactor execution prompt — Rename AutoBazaar → BazaarAgent **and** invert the AutoBazaar ↔ BazaarPlusPlus dependency
 
+> **Status: IMPLEMENTED — 历史归档(spent executor prompt)。** WP-R(代码改名 AutoBazaar→BazaarAgent)与依赖反转(两插件模型)已全部落地(commits 5c268a3、eb8ad5a、3e0988b);WP-M 的 cfg 条目(Enabled / HttpListenerPort)按 ADR-0006 decision 5 **整体删除**(非改名)——BazaarAgentHost.dll 装载即自动启用固定 127.0.0.1:47900 监听,移除即禁用,无用户可见 cfg 段。正文所有 AutoBazaar 路径与 file:line 锚点均为 WP-R 之前状态。被 ADR-0006 引用,保留为历史记录,勿据此重做。
+
 > **You are a fresh agent.** You have no memory of the analysis that produced this plan. This document is self-contained. Companion audit (read it first for full evidence): [docs/audits/2026-06-05-autobazaar-dependency-inversion-feasibility.md](../../audits/2026-06-05-autobazaar-dependency-inversion-feasibility.md). Repo rules: [CLAUDE.md](../../../CLAUDE.md). ADR being superseded: [docs/adr/0005-autobazaar-isolated-transport-core.md](../../adr/0005-autobazaar-isolated-transport-core.md).
 >
 > **Two intertwined goals:** (1) **rename** the subsystem `AutoBazaar` → `BazaarAgent` everywhere in this repo, and (2) **invert** the assembly dependency so the agent module owns its automation logic and consumes BazaarPlusPlus as a game-interop substrate. Do the **code-only** rename first (WP-R) so the inversion works on clean names; the **user-visible** rename (cfg section + on-disk path) is a *separate, behavior-affecting* change that rides with the major-version migration (WP-M), **not** WP-R.

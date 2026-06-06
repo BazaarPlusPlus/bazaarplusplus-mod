@@ -31,12 +31,12 @@ text.
 The tooltip path only appends enchant preview text after the mode policy resolves
 to `TooltipPreviewMode.Enchant`. The mode policy returns enchant in auto mode
 only when the current pedestal snapshot is classified as `Enchant`
-([`Game/Tooltips/TooltipPreviewModePolicy.cs:35`](../../Game/Tooltips/TooltipPreviewModePolicy.cs#L35),
-[`Game/Tooltips/TooltipPreviewModePolicy.cs:41`](../../Game/Tooltips/TooltipPreviewModePolicy.cs#L41)).
+([`Game/Tooltips/TooltipPreviewModePolicy.cs:35`](../../src/BazaarPlusPlus/Game/Tooltips/TooltipPreviewModePolicy.cs#L35),
+[`Game/Tooltips/TooltipPreviewModePolicy.cs:41`](../../src/BazaarPlusPlus/Game/Tooltips/TooltipPreviewModePolicy.cs#L41)).
 The tooltip patch then builds restricted preview segments from that snapshot
-([`Patches/Tooltips/ItemEnchantPreviewPatch.cs:55`](../../Patches/Tooltips/ItemEnchantPreviewPatch.cs#L55),
-[`Patches/Tooltips/ItemEnchantPreviewPatch.cs:66`](../../Patches/Tooltips/ItemEnchantPreviewPatch.cs#L66),
-[`Patches/Tooltips/ItemEnchantPreviewPatch.cs:71`](../../Patches/Tooltips/ItemEnchantPreviewPatch.cs#L71)).
+([`Patches/Tooltips/ItemEnchantPreviewPatch.cs:76`](../../src/BazaarPlusPlus/Patches/Tooltips/ItemEnchantPreviewPatch.cs#L76),
+[`Patches/Tooltips/ItemEnchantPreviewPatch.cs:83`](../../src/BazaarPlusPlus/Patches/Tooltips/ItemEnchantPreviewPatch.cs#L83),
+[`Patches/Tooltips/ItemEnchantPreviewPatch.cs:88`](../../src/BazaarPlusPlus/Patches/Tooltips/ItemEnchantPreviewPatch.cs#L88)).
 
 So every miss reduced to the same question: did
 `IEncounterStateProbe.GetChoicePedestal()` return an enchant pedestal snapshot
@@ -63,14 +63,14 @@ discarded before classification.
 
 `EncounterIdsSnapshot` now distinguishes "is literally ChoiceState" from "has a
 selection surface":
-[`Core/GameState/EncounterIdsSnapshot.cs:12`](../../Core/GameState/EncounterIdsSnapshot.cs#L12),
-[`Core/GameState/EncounterIdsSnapshot.cs:13`](../../Core/GameState/EncounterIdsSnapshot.cs#L13).
+[`Core/GameState/EncounterIdsSnapshot.cs:12`](../../src/BazaarPlusPlus/Core/GameState/EncounterIdsSnapshot.cs#L12),
+[`Core/GameState/EncounterIdsSnapshot.cs:13`](../../src/BazaarPlusPlus/Core/GameState/EncounterIdsSnapshot.cs#L13).
 
 `EncounterStateProbe.ReadEncounterIds()` now treats `EncounterState` as a
 selection state and resolves each `SelectionSet` entry to stable template ids
-([`GameInterop/Encounter/EncounterStateProbe.cs:83`](../../GameInterop/Encounter/EncounterStateProbe.cs#L83),
-[`GameInterop/Encounter/EncounterStateProbe.cs:84`](../../GameInterop/Encounter/EncounterStateProbe.cs#L84),
-[`GameInterop/Encounter/EncounterStateProbe.cs:104`](../../GameInterop/Encounter/EncounterStateProbe.cs#L104)).
+([`GameInterop/Encounter/EncounterStateProbe.cs:83`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L83),
+[`GameInterop/Encounter/EncounterStateProbe.cs:84`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L84),
+[`GameInterop/Encounter/EncounterStateProbe.cs:104`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L104)).
 
 ## Problem 2: Active `PedestalState` Has No `SelectionSet`
 
@@ -98,13 +98,13 @@ When `GetChoicePedestal()` is not on a selection surface, it now checks whether
 the app is in `PedestalState` and whether the current encounter template id is
 available. If so, it classifies that single template id through the same
 pedestal resolver used for selection entries
-([`GameInterop/Encounter/EncounterStateProbe.cs:40`](../../GameInterop/Encounter/EncounterStateProbe.cs#L40),
-[`GameInterop/Encounter/EncounterStateProbe.cs:43`](../../GameInterop/Encounter/EncounterStateProbe.cs#L43),
-[`GameInterop/Encounter/EncounterStateProbe.cs:46`](../../GameInterop/Encounter/EncounterStateProbe.cs#L46)).
+([`GameInterop/Encounter/EncounterStateProbe.cs:40`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L40),
+[`GameInterop/Encounter/EncounterStateProbe.cs:43`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L43),
+[`GameInterop/Encounter/EncounterStateProbe.cs:46`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L46)).
 
 Upgrade pedestals stay safe under this path: the resolver returns `Upgrade`, and
 the enchant mode policy still only auto-shows when the kind is `Enchant`
-([`Game/Tooltips/TooltipPreviewModePolicy.cs:41`](../../Game/Tooltips/TooltipPreviewModePolicy.cs#L41)).
+([`Game/Tooltips/TooltipPreviewModePolicy.cs:41`](../../src/BazaarPlusPlus/Game/Tooltips/TooltipPreviewModePolicy.cs#L41)).
 
 ## Problem 3: Level-Up Pedestal Choices Use `LevelUpState`
 
@@ -124,7 +124,7 @@ The current `LogOutput.log` has the same evidence at
 
 The decompiled state also confirms that `LevelUpState` is a real app state with
 `StateName => ERunState.LevelUp`, and it allows `SelectEncounter`
-([`decompiled/TheBazaarRuntime/TheBazaar/LevelUpState.cs:6`](../../decompiled/TheBazaarRuntime/TheBazaar/LevelUpState.cs#L6),
+([`decompiled/TheBazaarRuntime/TheBazaar/LevelUpState.cs:8`](../../decompiled/TheBazaarRuntime/TheBazaar/LevelUpState.cs#L8),
 [`decompiled/TheBazaarRuntime/TheBazaar/LevelUpState.cs:10`](../../decompiled/TheBazaarRuntime/TheBazaar/LevelUpState.cs#L10)).
 `DataExtensions.Update(RunState, SimUpdateRunState)` copies
 `snapshot.SelectionSet` directly into the client run state
@@ -135,8 +135,8 @@ The decompiled state also confirms that `LevelUpState` is a real app state with
 
 `EncounterStateProbe.ReadEncounterIds()` now includes `LevelUpState` in
 `isSelectionState`:
-[`GameInterop/Encounter/EncounterStateProbe.cs:83`](../../GameInterop/Encounter/EncounterStateProbe.cs#L83),
-[`GameInterop/Encounter/EncounterStateProbe.cs:84`](../../GameInterop/Encounter/EncounterStateProbe.cs#L84).
+[`GameInterop/Encounter/EncounterStateProbe.cs:83`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L83),
+[`GameInterop/Encounter/EncounterStateProbe.cs:84`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L84).
 
 This lets the same selection-entry resolver classify level-up enchant pedestal
 offers without adding a separate level-up code path.
@@ -160,19 +160,19 @@ preview was caused by:
 
 `ShopForecastLogPatch` now expands selection entries for `Choice`, `Encounter`,
 and `LevelUp`
-([`Patches/ShopForecast/ShopForecastLogPatch.cs:37`](../../Patches/ShopForecast/ShopForecastLogPatch.cs#L37),
-[`Patches/ShopForecast/ShopForecastLogPatch.cs:39`](../../Patches/ShopForecast/ShopForecastLogPatch.cs#L39)).
+([`Patches/ShopForecast/ShopForecastLogPatch.cs:37`](../../src/BazaarPlusPlus/Patches/ShopForecast/ShopForecastLogPatch.cs#L37),
+[`Patches/ShopForecast/ShopForecastLogPatch.cs:39`](../../src/BazaarPlusPlus/Patches/ShopForecast/ShopForecastLogPatch.cs#L39)).
 
 Each entry is enriched from the live runtime entity or static template:
-[`Patches/ShopForecast/ShopForecastLogPatch.cs:67`](../../Patches/ShopForecast/ShopForecastLogPatch.cs#L67),
-[`Patches/ShopForecast/ShopForecastLogPatch.cs:109`](../../Patches/ShopForecast/ShopForecastLogPatch.cs#L109),
-[`Patches/ShopForecast/ShopForecastLogPatch.cs:126`](../../Patches/ShopForecast/ShopForecastLogPatch.cs#L126).
+[`Patches/ShopForecast/ShopForecastLogPatch.cs:67`](../../src/BazaarPlusPlus/Patches/ShopForecast/ShopForecastLogPatch.cs#L67),
+[`Patches/ShopForecast/ShopForecastLogPatch.cs:109`](../../src/BazaarPlusPlus/Patches/ShopForecast/ShopForecastLogPatch.cs#L109),
+[`Patches/ShopForecast/ShopForecastLogPatch.cs:126`](../../src/BazaarPlusPlus/Patches/ShopForecast/ShopForecastLogPatch.cs#L126).
 
 Pedestal templates are classified through `PedestalEnchantCatalog`, so logs now
 show `pedestalCatalog=Enchant(enchant=...)`, `Upgrade(enchant=none)`, or no
 pedestal catalog marker:
-[`Patches/ShopForecast/ShopForecastLogPatch.cs:150`](../../Patches/ShopForecast/ShopForecastLogPatch.cs#L150),
-[`Patches/ShopForecast/ShopForecastLogPatch.cs:152`](../../Patches/ShopForecast/ShopForecastLogPatch.cs#L152).
+[`Patches/ShopForecast/ShopForecastLogPatch.cs:154`](../../src/BazaarPlusPlus/Patches/ShopForecast/ShopForecastLogPatch.cs#L154),
+[`Patches/ShopForecast/ShopForecastLogPatch.cs:157`](../../src/BazaarPlusPlus/Patches/ShopForecast/ShopForecastLogPatch.cs#L157).
 
 This logging is what exposed the final `LevelUpState` miss.
 
@@ -182,15 +182,15 @@ This logging is what exposed the final `LevelUpState` miss.
 
 1. Selection surface: classify all resolved template ids from
    `ChoiceState` / `EncounterState` / `LevelUpState` `SelectionSet`
-   ([`GameInterop/Encounter/EncounterStateProbe.cs:55`](../../GameInterop/Encounter/EncounterStateProbe.cs#L55)).
+   ([`GameInterop/Encounter/EncounterStateProbe.cs:55`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L55)).
 2. Active pedestal surface: if already in `PedestalState`, classify
    `CurrentEncounterTemplateId`
-   ([`GameInterop/Encounter/EncounterStateProbe.cs:43`](../../GameInterop/Encounter/EncounterStateProbe.cs#L43)).
+   ([`GameInterop/Encounter/EncounterStateProbe.cs:43`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L43)).
 
 Both shapes produce the same `ChoicePedestalSnapshot` via
 `CreateChoicePedestalSnapshot`
-([`GameInterop/Encounter/EncounterStateProbe.cs:58`](../../GameInterop/Encounter/EncounterStateProbe.cs#L58),
-[`GameInterop/Encounter/EncounterStateProbe.cs:189`](../../GameInterop/Encounter/EncounterStateProbe.cs#L189)).
+([`GameInterop/Encounter/EncounterStateProbe.cs:58`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L58),
+[`GameInterop/Encounter/EncounterStateProbe.cs:190`](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L190)).
 
 The user confirmed the runtime behavior after rebuilding and restarting the
 game.
@@ -202,13 +202,13 @@ Commands run before committing `5d1560e`:
 ```bash
 git diff --check
 dotnet run --project tests/ChoiceScreenPedestalResolver.Tests/ChoiceScreenPedestalResolver.Tests.csproj
-dotnet build BazaarPlusPlus.csproj
+dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj
 ```
 
 Results:
 
 - `ChoiceScreenPedestalResolver checks passed.`
-- `dotnet build BazaarPlusPlus.csproj` completed with `0 Warning(s)` and
+- `dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj` completed with `0 Warning(s)` and
   `0 Error(s)`.
 - Debug build copied `BazaarPlusPlus.dll` into the BepInEx plugins folder.
 

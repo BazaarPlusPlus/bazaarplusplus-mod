@@ -1,6 +1,6 @@
 # 本地化引擎抽离为独立模块 `BazaarPlusPlus.Localization`
 
-Status: In progress (v2) — 已与维护者确认方案要点，并经 Codex 对抗评审 + 红队评审修订。**P1 + P2 已落地**：独立程序集 `BazaarPlusPlus.Localization` 已抽出，`Plugin.cs:108` 已 `L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config))` 接线，引擎纯函数核心 `Resolve(languageCode, mode)` + `ILanguageProvider`/`ILocaleModeProvider` + `L` 薄层已就位。**P0（穷尽清单 + 快照基线）与 P3–P5（`Loc` 目录、字体图集改造、硬编码/inline 清扫、删 shim）仍未做。** 全部落地后移入 `archive/` 并加 `Status:` banner；其中"集中机制、依赖反转、`Resolve(languageCode, mode)` 纯函数核心"等决策应在归档前提升为 ADR。
+Status: In progress (v2) — 已与维护者确认方案要点，并经 Codex 对抗评审 + 红队评审修订。**P1+P2+P3 缓存键修复已落地**：独立程序集已抽出、L.Install 已接线、FontAtlasSampleCache 键已改为 (languageCode, mode)(HistoryPanelText.cs:887-892)。**P0（快照基线）、P3 其余（Loc 目录 + FontAtlasSample 反射改造）、P4a、P4b、P5 未做。** 全部落地后移入 `archive/` 并加 `Status:` banner；其中"集中机制、依赖反转、`Resolve(languageCode, mode)` 纯函数核心"等决策应在归档前提升为 ADR。
 
 > **v2 修订摘要（对抗评审并入）：** ① `Resolve` 核心改为显式 `Resolve(languageCode, mode)` 纯函数，删除会丢失简繁/地区语义的无 mode 重载；② 新增"mode 敏感性分类"规则，防止 P4 把仅按语言的串错误接入简繁转换；③ 新增 **P0**（穷尽清单 + 快照基线）作为后续步骤门禁；④ `FontAtlasSample` 反射迁移与图集缓存键 `(languageCode, mode)` 列为高风险载荷项；⑤ P1 补 `Directory.Build.props` 隔离；⑥ 决策 `InternalsVisibleTo` 保持 `internal`；⑦ P4 拆为 P4a/P4b。
 
@@ -47,7 +47,7 @@ Status: In progress (v2) — 已与维护者确认方案要点，并经 Codex �
 | `Game/Supporters/BPPSupporterAttributionText.cs` | 仅 `Game.Settings` | ✅ 可搬 |
 | `Game/HistoryPanel/HistoryPanelText.cs` | `using TheBazaar`（仅 `GetLanguageCode`）+ mod 枚举 `RunOutcomeTier`（`HistoryPanelFormatter.cs:8`）+ 反射自身字段 | ⚠️ 反转 provider 后无游戏依赖，但引用功能领域枚举 |
 | `Game/CollectionPanel/CollectionPanelText.cs` | `using BazaarGameShared.Domain.Core.Types`（**游戏类型**）| ❌ 不可整体搬 |
-| `Game/CardSetPreview/CardSetPreviewRuntime.cs` | `BazaarGameClient`/`Shared` + `UnityEngine` | ❌ Unity 运行时，文案是附带 |
+| `Game/CardSetPreview/CardSetPreviewRuntime.cs` | `BazaarGameClient`/`Shared` + `UnityEngine` | ❌ Unity 运行时，文案是附带（已被 LiveBuildPanel 替换，commit 50e64b1）|
 
 **结论：分离"可翻译的字符串数据"（进模块目录）与"带游戏/领域逻辑的格式化器"（留功能侧）。**
 
@@ -98,7 +98,7 @@ label.text = L.Resolve(Loc.History.Title);   // “引用变量 + Resolve”
 
 ### mode 敏感性分类（v2 新增，强制规则）
 
-部分中文串当前**只过 `LanguageCodeMatcher.IsChinese` 判定、从不过简繁/地区转换**，TW/HK 用户看到的就是简体——这是刻意的。证据：[BPPSupporterAttributionText.cs:8-31](../../Game/Supporters/BPPSupporterAttributionText.cs)、[CardSetPreviewModeStatusText.cs:13-15](../../Game/CardSetPreview/CardSetPreviewModeStatusText.cs)。
+部分中文串当前**只过 `LanguageCodeMatcher.IsChinese` 判定、从不过简繁/地区转换**，TW/HK 用户看到的就是简体——这是刻意的。证据：[BPPSupporterAttributionText.cs:8-31](../../src/BazaarPlusPlus/Game/Supporters/BPPSupporterAttributionText.cs)（CardSetPreviewModeStatusText.cs 已随 CardSetPreview 删除，此子项取消）。
 
 把这类串升格为普通 `LocalizedTextSet` 条目会让它们被 `ChineseScriptConverter` 自动转繁——**这是行为变化，不是重构**。因此每条迁移串必须先归类：
 
@@ -109,8 +109,8 @@ label.text = L.Resolve(Loc.History.Title);   // “引用变量 + Resolve”
 
 ### 字体图集：两处必须随迁改造的高风险载荷项（v2 新增）
 
-1. **`FontAtlasSample()` 反射会静默塌缩。** [HistoryPanelText.cs:831-872](../../Game/HistoryPanel/HistoryPanelText.cs) 用 `typeof(HistoryPanelText).GetFields(...)` 反射**自身** `LocalizedTextSet` 字段预热 CJK 图集。字段迁入 `Loc.History` 后，此反射将找不到任何字段 → 样本塌缩成只剩 ASCII + `FontProbeSample`，**所有中文字形预热丢失**（首次渲染掉字/卡顿）。改造为显式枚举 `Loc` 对应分区，并加测试覆盖"样本含预期 CJK 字形"。
-2. **图集缓存按单键 `languageCode` 会陈旧。** [HistoryPanelText.cs:13/834/870](../../Game/HistoryPanel/HistoryPanelText.cs) 的 `FontAtlasSampleCache` 仅以 `languageCode` 为键；CN→TW 切换时 languageCode 不变，繁体专有字形不进图集。P4 升格后流入图集的串暴增，问题被放大。缓存键改为 `(languageCode, mode)`，并在 `ChineseLocaleModeChanged`（[Core/Events/ChineseLocaleModeChanged.cs](../../Core/Events/ChineseLocaleModeChanged.cs)）时失效。
+1. **`FontAtlasSample()` 反射会静默塌缩。** [HistoryPanelText.cs:831-872](../../src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelText.cs) 用 `typeof(HistoryPanelText).GetFields(...)` 反射**自身** `LocalizedTextSet` 字段预热 CJK 图集。字段迁入 `Loc.History` 后，此反射将找不到任何字段 → 样本塌缩成只剩 ASCII + `FontProbeSample`，**所有中文字形预热丢失**（首次渲染掉字/卡顿）。改造为显式枚举 `Loc` 对应分区，并加测试覆盖"样本含预期 CJK 字形"。
+2. **图集缓存键已修复（`(languageCode, mode)` 复合键）。** [HistoryPanelText.cs:887-892](../../src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelText.cs) 的 `CreateFontAtlasSampleCacheKey` 已改为 `(languageCode, mode)` 复合键（`$"{languageCode}{(int)mode}"`）。P3 字段迁入 `Loc.History` 后还需改造 `FontAtlasSample()` 反射为显式枚举，`ChineseLocaleModeChanged`（[Core/Events/ChineseLocaleModeChanged.cs](../../src/BazaarPlusPlus/Core/Events/ChineseLocaleModeChanged.cs)）时失效缓存的改造也仍待做。
 
 ## 模块边界与归属
 
@@ -121,7 +121,7 @@ label.text = L.Resolve(Loc.History.Title);   // “引用变量 + Resolve”
 | **主程序集 / Core** | `ChineseLocaleModeProvider : ILocaleModeProvider`（读 `IBppConfig.ChineseLocaleModeConfig`） |
 | **`Infrastructure/Fonts`（不动）** | `BppTmpFont`/`BppUiFont`/`EmbeddedFontFile`（Unity TMP 字体**应用**） |
 | **`Patches/`（不动行为）** | `OptionsDialogLanguageRefreshPatch`（切语言刷新） |
-| **各功能目录** | 带领域逻辑的格式化器，消费 `Loc` 目录；含游戏类型的解析器如 [CollectionLocalizationResolver](../../Game/CollectionPanel/Data/CollectionLocalizationResolver.cs)（`ResolveTitle(TCardBase)`，按游戏模板解析卡名）留原处，仅其文案常量进目录 |
+| **各功能目录** | 带领域逻辑的格式化器，消费 `Loc` 目录；含游戏类型的解析器如 [CollectionLocalizationResolver](../../src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionLocalizationResolver.cs)（`ResolveTitle(TCardBase)`，按游戏模板解析卡名）留原处，仅其文案常量进目录 |
 
 > **可见性决策（v2）：** 引擎类型当前为 `internal`。拆成独立 DLL 后，**优先用 `InternalsVisibleTo`**（主程序集 + 测试工程）保持 `internal`，而非全部 `public`——避免把本地化内部结构变成 mod 对外契约。仅 provider 接口与 `Resolve`/`L` 等真正的消费入口按需公开。
 
@@ -169,7 +169,7 @@ static class L
 ## csproj / 构建改造（照搬 `ModApi` 模式）
 
 1. 新建 `BazaarPlusPlus.Localization.csproj`：`netstandard2.1` + `Compile Remove="**/*.cs"` / `Compile Include="Localization/**/*.cs"`。
-2. **（v2 必补，Codex#3）** [Directory.Build.props](../../Directory.Build.props) 增加 `BazaarPlusPlus.Localization` 的 `BaseIntermediateOutputPath`/`BaseOutputPath` 隔离条目——当前只有 ModApi/Storage/AutoBazaar 有（:11-24）。少了它，第 4 个根 csproj 用默认 `obj/bin` 会与主工程相互覆盖 `project.assets.json` / NuGet lock，导致构建顺序相关失败。
+2. **（v2 必补，Codex#3）** [Directory.Build.props](../../Directory.Build.props) 增加 `BazaarPlusPlus.Localization` 的 `BaseIntermediateOutputPath`/`BaseOutputPath` 隔离条目——Directory.Build.props 当前仅含 BppVersion 与 EnforceCodeStyleInBuild，无路径隔离条目（原说法"只有 ModApi/Storage/AutoBazaar 有（:11-24）"已过时，该隔离尚未添加）。少了它，第 4 个根 csproj 用默认 `obj/bin` 会与主工程相互覆盖 `project.assets.json` / NuGet lock，导致构建顺序相关失败。
 3. `BazaarPlusPlus.csproj` 增 `Compile Remove="Localization/**"`、`ProjectReference`、`BepInEx/plugins` 复制项（仿现有 ModApi/Storage 第 49–54、141–142、223–238 行附近写法）。
 4. 用 `InternalsVisibleTo` 暴露 `internal` 类型给主程序集与测试工程（见可见性决策）。
 5. 测试工程改为直接 `ProjectReference` 新模块，**删除 `TestChineseLocalizationShim.cs`**（仅在 P0 快照基线就绪后）。
@@ -182,7 +182,7 @@ static class L
 | **P1** | 建模块骨架 + 迁移引擎 6 类 + 改名 `ChineseScriptConverter` + 迁入 `BppChineseLocaleMode` + 修 `using`。新 csproj + **`Directory.Build.props` 隔离** + `InternalsVisibleTo` + 构建复制 plumbing。 | `./run.sh build` 通过；localization 项目、主项目、`BuildAll` **背靠背构建**均通过；产出并复制 `BazaarPlusPlus.Localization.dll` | P0 |
 | **P2** | 引擎核心改 `Resolve(languageCode, mode)` 纯函数；引入 `ILanguageProvider`/`ILocaleModeProvider` + `L` 薄层；`GameLanguageProvider` 落 GameInterop；收敛所有 `GetLanguageCode()` / inline `LanguageCode` 读取。 | 全量快照不变 | P1 |
 | **P3** | 建 `Loc` 目录；各功能**静态** `LocalizedTextSet` 字段迁入目录，功能改引用 `Loc.X.Y`；**改造 `FontAtlasSample` 枚举 `Loc` 分区** + 图集缓存键改 `(languageCode, mode)` 并在 `ChineseLocaleModeChanged` 失效。 | 全量快照不变；新增"图集样本含预期 CJK 字形"测试 | P2 |
-| **P4a** | 真硬编码块升格：`CombatStatusBar.Canvas`、`CardSetPreviewModeStatusText` → 目录条目；逐条做 **mode 敏感性分类**。 | 全量快照不变（含 3 mode） | P3 |
+| **P4a** | 真硬编码块升格：`CombatStatusBar.Canvas` → 目录条目（CardSetPreviewModeStatusText 已随 CardSetPreview 删除，实际目标仅余 CombatStatusBar.Canvas.cs）；逐条做 **mode 敏感性分类**。 | 全量快照不变（含 3 mode） | P3 |
 | **P4b** | inline 双语字面量 / 插值串清扫（churn 最大、风险最高）→ 目录条目 / 模式串；每条标注 mode 敏感性。 | 全量快照不变（含 3 mode），**门禁于 P0 基线** | P4a |
 | **P5** | 测试直引模块、删 shim、跑全部测试。 | `./run.sh test` 全绿 | P2（删 shim 须在 P0 基线之后） |
 

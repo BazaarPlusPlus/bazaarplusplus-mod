@@ -18,15 +18,15 @@
 - `HoldEnchantPreview`
 - `HoldUpgradePreview`
 
-当前由 `Game/Input/BppHotkeyService.cs` 管理，默认值分别是 `Ctrl` 和 `Shift`，支持鼠标按键绑定，并在保存前拒绝 Bazaar++ 动作内部冲突。
+当前由 `src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs` 管理，默认值分别是 `Ctrl` 和 `Shift`，支持鼠标按键绑定，并在保存前拒绝 Bazaar++ 动作内部冲突。
 
 ## Source Files
 
-- `Game/Input/KeyBindings.cs`
-- `Game/Input/BppHotkeyService.cs`
-- `Game/LiveBuildPanel/LiveBuildPanel.cs`
-- `Game/HistoryPanel/HistoryPanel.cs`
-- `Game/CollectionPanel/CollectionPanel.cs`
-- `Patches/Settings/BppKeybindSettingsPatch.cs`
-- `Patches/Tooltips/ItemEnchantPreviewPatch.cs`
-- `Patches/Tooltips/UpgradePreviewTooltipPatch.cs`
+- `src/BazaarPlusPlus/Game/Input/KeyBindings.cs`
+- `src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs`
+- `src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs`
+- `src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanel.cs`
+- `src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs`
+- `src/BazaarPlusPlus/Patches/Settings/BppKeybindSettingsPatch.cs`
+- `src/BazaarPlusPlus/Patches/Tooltips/ItemEnchantPreviewPatch.cs`
+- `src/BazaarPlusPlus/Patches/Tooltips/UpgradePreviewTooltipPatch.cs`

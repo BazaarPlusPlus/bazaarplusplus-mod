@@ -4,7 +4,7 @@ using BazaarPlusPlus.Core.GameState;
 namespace BazaarPlusPlus.GameInterop;
 
 /// <summary>
-/// The narrow, public game-interop surface that the out-of-process BazaarAgent host
+/// The narrow, public game-interop surface that the separate-assembly BazaarAgent host
 /// plugin consumes from BazaarPlusPlus. It exposes only the encounter reads and the
 /// replay-activity signal the agent context reader needs — everything else in
 /// BazaarPlusPlus stays <c>internal</c>. BazaarPlusPlus does not reference the agent

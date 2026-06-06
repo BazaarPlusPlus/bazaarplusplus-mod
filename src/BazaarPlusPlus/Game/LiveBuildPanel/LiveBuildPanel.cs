@@ -220,7 +220,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     }
 
     // Live rating selects the final-build tier bucket; fallback "all" when unavailable.
-    // No account-specific filtering — the rating is the only selector (spec §10.6).
+    // No account-specific filtering — the rating is the only selector.
     private static string ResolveLiveRatingTier()
     {
         return BppClientCacheBridge.TryGetPlayerRankSnapshot(out _, out var rating)

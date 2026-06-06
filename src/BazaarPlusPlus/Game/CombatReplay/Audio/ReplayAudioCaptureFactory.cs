@@ -53,7 +53,7 @@ internal static class ReplayAudioCaptureFactory
 }
 
 /// <summary>
-/// No-op capture for platforms that do not yet have a loopback backend (e.g. macOS). Its
+/// No-op capture for platforms without a supported loopback backend (pre-15 macOS / other non-Windows platforms). Its
 /// <see cref="TryStart"/> returns false, so the recorder proceeds with a silent video and nothing is
 /// captured. Replace by returning a real backend from <see cref="ReplayAudioCaptureFactory"/>.
 /// </summary>

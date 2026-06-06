@@ -1,6 +1,6 @@
 # AutoBazaar Module Isolation Implementation Plan
 
-> **Status: IMPLEMENTED — 历史归档（spent plan）。** 本计划描述的迁移已全部落地（`AutoBazaar/` 模块 + `Game/AutoBazaarHost/`，`Game/AutoBazaar` 已删，ProjectReference + `#if BPP_AUTOBAZAAR_HOST`）；复选框未回填不代表有未完成项。设计细节见被 ADR-0005 引用的 `specs/2026-06-02-autobazaar-module-isolation-design.md`。保留为历史记录，勿据此重做。
+> **Status: IMPLEMENTED — 历史归档（spent plan）。** 本计划描述的迁移已全部落地（`AutoBazaar/` 模块 + `Game/AutoBazaarHost/`，`Game/AutoBazaar` 已删，ProjectReference + `#if BPP_AUTOBAZAAR_HOST`）；复选框未回填不代表有未完成项。设计细节见被 ADR-0005 引用的 `specs/2026-06-02-autobazaar-module-isolation-design.md`。保留为历史记录，勿据此重做。*注:此后 commit eb8ad5a(2026-06-05)完成依赖反转与全量改名——`AutoBazaar/` → `src/BazaarPlusPlus.BazaarAgent/`,`Game/AutoBazaarHost/` → 独立程序集 `src/BazaarPlusPlus.BazaarAgentHost/`,`#if BPP_AUTOBAZAAR_HOST` 已删除,详见 ADR-0006。*
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

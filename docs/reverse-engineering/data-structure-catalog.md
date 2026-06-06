@@ -261,7 +261,7 @@ Snapshot / sim DTO：
 |---|---|---|
 | `POST /run-bundles` | multipart `metadata` (`RunBundleUploadRequest`) + `artifact` (`RunArtifact`) | metadata: `SchemaVersion`、`PlayerAccountId`、`SubmittedAtUtc`、`ArtifactCodec`、`RunProjection`、`BattleProjections`；artifact: gzip-compressed MessagePack bytes |
 | `RunBundleUploadRequest.RunProjection` | `RunProjection` | `RunId`、`Status`、`HeroId`、`HeroName`、`PlayerRank`、`PlayerRating`、`PlayerPosition`、`StartedAtUtc`、`EndedAtUtc`、`FinalDay`、`FinalWins`、`FinalLosses`、`FinalPlayerRank`、`FinalPlayerRating`、`FinalPlayerPosition`、`Battles` |
-| `RunBundleUploadRequest.BattleProjection` | `BattleProjection` | `BattleId`、`RecordedAtUtc`、`RunId`、`Day`、`PlayerName`、`PlayerAccountId`、`PlayerHero`、`PlayerRank`、`PlayerRating`、`PlayerLevel`、`PlayerPrestige`(`int?`)、`PlayerVictories`(`int?`)、`OpponentName`、`OpponentAccountId`、`OpponentHero`、`OpponentRank`、`OpponentRating`、`OpponentLevel`、`OpponentPrestige`(`int?`)、`OpponentVictories`(`int?`)、`Result`、`WinnerCombatantId`(`string?`)、`LoserCombatantId`(`string?`) |
+| `RunBundleUploadRequest.BattleProjection` | `BattleProjection` | `BattleId`、`RecordedAtUtc`、`RunId`、`Day`、`PlayerName`、`PlayerAccountId`、`PlayerHero`、`PlayerRank`、`PlayerRating`、`PlayerLevel`、`PlayerPrestige`(`int?`)、`PlayerVictories`(`int?`)、`OpponentName`、`OpponentAccountId`、`OpponentHero`、`OpponentRank`、`OpponentRating`、`OpponentLevel`、`OpponentPrestige`(`int?`)、`OpponentVictories`(`int?`)、`Result`、`WinnerCombatantId`(`string?`)、`LoserCombatantId`(`string?`)、`IsFinalBattle`(`bool`,wire 名 `is_final_battle`) |
 | `RunArtifact` | run artifact | `RunId`、`Battles` |
 | `RunArtifactBattle` | battle artifact wrapper | `BattleId`、`Manifest`、`Participants`、`Snapshots`、`ReplayPayload` |
 | `BattleManifestArtifact` | manifest | `BattleId`、`RecordedAtUtc`、`Day`、`Hour`、`EncounterId`、`CombatKind`、`Result`、`WinnerCombatantId`、`LoserCombatantId` |
@@ -270,7 +270,7 @@ Snapshot / sim DTO：
 | `CardSetCaptureArtifact` | card set | `Label`、`Status`、`Source`、`Items` |
 | `CardSetItemArtifact` | card item | `InstanceId`、`TemplateId`、`Type`、`Size`、`Section`、`Socket`、`Name`、`Tier`、`Enchant`、`Tags`、`Attributes` |
 | `ReplayPayloadArtifact` | replay bytes | `BattleId`、`Version`、`SpawnMessageBytes`、`CombatMessageBytes`、`DespawnMessageBytes` |
-| `GET /ghost-battles` | `GhostBattleImportRecord` | `BattleId`、`RecordedAtUtc`、`Day`、player/opponent fields、`Result`、`WinnerCombatantId`、`LoserCombatantId`、`ReplayAvailable`、`ReplayDownloaded`、`LastSyncedAtUtc`；current V4 wire does not include `IsBundleFinalBattle` |
+| `GET /ghost-battles` | `GhostBattleImportRecord` | `BattleId`、`RecordedAtUtc`、`Day`、player/opponent fields、`Result`、`WinnerCombatantId`、`LoserCombatantId`、`IsFinalBattle`(`bool`)、`ReplayAvailable`、`ReplayDownloaded`、`LastSyncedAtUtc`；V4 wire 已包含 `is_final_battle`；客户端解析为 `IsFinalBattle`(默认 false，GhostBattleClient.cs:209) |
 | `POST /ghost-battles/{battleId}/replay-link` | response JSON | `download_url` |
 | `GET download_url` | bytes | replay payload bytes |
 | `POST /bazaardb/snapshots/<snapshot_id>` | `BazaarDbSnapshotUploadRequest` | `SchemaVersion`、`Snapshot`、`Player`、`Run`、`Image`、`Client` |

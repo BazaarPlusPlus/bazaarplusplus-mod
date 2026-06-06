@@ -326,12 +326,12 @@ public interface ICombatResolver
 
 这些接口不要伪装成官方 `/api/*`，避免和客户端原协议混淆。
 
-## 与 AutoBazaar 的组合
+## 与 BazaarAgent 的组合
 
-AutoBazaar 已经能暴露当前 `availableActions` 并接收 `SelectItem`、`Reroll`、`ExitState` 等动作。预定义对局可以这样使用：
+BazaarAgent 已经能暴露当前 `availableActions` 并接收 `SelectItem`、`Reroll`、`ExitState` 等动作。预定义对局可以这样使用：
 
 1. 本地 fixture server 提供确定性 run。
-2. AutoBazaar 外部 bot 读取 `/v1/context`。
+2. BazaarAgent 外部 bot 读取 `/v1/context`。
 3. bot 根据 fixture 目标选择动作。
 4. 客户端通过原 `AppState` 发送 `INetCommand` 给本地 session server。
 5. 本地 session server 产生确定性消息。
@@ -395,6 +395,6 @@ fixture 必须绑定：
 1. 客户端能启动到主菜单。
 2. 选择 hero 后能创建 `/sessions`。
 3. 收到 `RunInitialized + GameStateSync + GameSim` 并进入 board。
-4. AutoBazaar 或玩家点击能发送 `/commands`。
+4. BazaarAgent 或玩家点击能发送 `/commands`。
 5. 同一命令序列两次运行的 `stateHash` 完全相同。
 6. 不发生任何官方外网请求；mod 上传默认关闭。

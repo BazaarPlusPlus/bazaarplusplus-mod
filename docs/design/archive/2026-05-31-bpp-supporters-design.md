@@ -1,4 +1,4 @@
-> **Status: IMPLEMENTED (historical).** Shipped 2026-05-31. Current state: [Game/Supporters](../../../Game/Supporters/) and [CardSetPreviewRuntime.cs](../../../Game/CardSetPreview/CardSetPreviewRuntime.cs).
+> **Status: IMPLEMENTED (historical).** Shipped 2026-05-31. Current state: src/BazaarPlusPlus/Game/Supporters/。注：CardSetPreview 子系统其后被删除（commit 50e64b1），BPPSupporters 现由 CollectionPanel / HistoryPanel / LiveBuildPanel 消费（主调 API 为后增的 SampleMany(int)）。
 
 # BPPSupporters Design
 
@@ -40,6 +40,7 @@ internal readonly struct BPPSupporterSample
 internal static class BPPSupporters
 {
     public static BPPSupporterSample Sample();
+    // SampleMany(int) 为后续新增的主调 API
 }
 ```
 
@@ -80,7 +81,7 @@ private static int ResolveTierWeight(int tier)
 {
     return tier switch
     {
-        4 => 6,
+        4 => 9,
         3 => 3,
         2 => 2,
         _ => 1,

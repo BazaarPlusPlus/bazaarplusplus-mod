@@ -16,10 +16,10 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath="D:\Steam\s
 # Build both Debug + Release (Release copies to installer repo if present)
 dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -t:BuildAll
 
-# Run a single test project
-dotnet test tests\RunLifecycleState.Tests\RunLifecycleState.Tests.csproj
+# Run a single xUnit test project (has Microsoft.NET.Test.Sdk)
+dotnet test tests\Architecture.Tests\Architecture.Tests.csproj
 
-# Run a non-SDK test project (ones without Microsoft.NET.Test.Sdk)
+# Run an exe-runner test project (no Microsoft.NET.Test.Sdk)
 dotnet run --project tests\ChoiceScreenPedestalResolver.Tests\ChoiceScreenPedestalResolver.Tests.csproj
 
 # Format
@@ -68,7 +68,7 @@ All six projects live under `src/<AssemblyName>/`, each in its own directory so 
 **Layer boundaries:**
 
 - `Core/` — pure abstractions (config, event bus, paths, runtime interfaces). Zero game DLL references.
-- `GameInterop/` — game DLL coupling layer (`BppClientCacheBridge`, `GameStateProbe`, `RunContextStore`, `IRunContext`, game-typed events like `CombatSimObserved`/`NetMessageObserved`, shared native adapters like encounter reads, static card data, card preview prefabs, hero portrait assets, and `EncounterPortraits/` — merchant/trainer encounter portrait sprite provider).
+- `GameInterop/` — game DLL coupling layer (`BppClientCacheBridge`, `GameStateProbe`, `RunContextStore`, `IRunContext`, game-typed events like `CombatSimObserved`/`NetMessageObserved`, shared native adapters like encounter reads, static card data, card preview prefabs, hero portrait assets, and `EncounterPortraits/` — merchant/trainer encounter portrait sprite provider, `LiveCards/` — live-run card snapshot reads (used by LiveBuildPanel), and `BazaarAgent/` — the public cross-plugin facade (BazaarAgentGameBridge / IBazaarAgentGameProbe) consumed by the separate BazaarAgentHost plugin).
 - `Game/` — feature implementations organized by subdirectory (CombatReplay, HistoryPanel, RunLogging, Screenshots, Tooltips, etc.).
 - `Patches/` — Harmony patches, organized by feature area. `BppPatchHost` provides the static service locator that patches use to reach `IBppServices`.
 - `Infrastructure/` — cross-cutting utilities (logging, fonts, UI design tokens).

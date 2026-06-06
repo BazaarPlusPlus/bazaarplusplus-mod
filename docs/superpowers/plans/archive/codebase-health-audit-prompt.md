@@ -1,5 +1,7 @@
 # 审计执行 Prompt：fallback 残留 / 分层 / 性能 / 文档漂移 + 完整优化方案
 
+> **Status: DONE — 历史归档(spent executor prompt)。** 产出审计已写入 [docs/audits/2026-06-05-codebase-health-audit.md](../../../audits/2026-06-05-codebase-health-audit.md)。保留为历史记录,勿据此重新执行。
+
 > 读者是一个**对此前分析一无所知的全新 agent**。本文件自包含，不依赖任何对话上下文。
 > 工作目录：`bazaarplusplus-mod/`（一个独立 git 仓库；不要在父目录 `bpp/` 跑仓库级命令）。
 > 这是一次**只读审计 + 方案**任务：你输出一篇审计文档和一份可确认的优化方案，**不写任何代码补丁**。
@@ -84,7 +86,7 @@
 - **V3 → V4 服务端**：CLAUDE.md 称 V3 后端源码已从 mod 移除。核：mod 里有没有残留的 V3 endpoint / DTO / 客户端 / `v3` 命名。
 - **附魔预览迁移移除**：`git log` 有 `Remove legacy enchant preview migration`（commit `19dabcc`），但 `src/BazaarPlusPlus/Game/ItemEnchantPreview/` 与 `tests/ItemEnchantPreview.Tests/` 仍在。核：有没有迁移 shim / 旧 schema 兼容分支残留。
 - **本地化抽取**：`docs/design/2026-06-03-localization-module-extraction-*`。核：主插件里有没有和 `BazaarPlusPlus.Localization` 重复的、留作 fallback 的内联本地化路径。
-- **`src/` 物理重构**：`docs/refactor-src-layout-prompt.md` + `git log` 的 `Move all six assemblies under src/`。核：有没有残留的根布局构建胶水（`Compile Remove/Include`、根级 `obj`/`bin` 输出块、指向旧根路径的引用）。
+- **`src/` 物理重构**：`docs/superpowers/plans/archive/refactor-src-layout-prompt.md` + `git log` 的 `Move all six assemblies under src/`。核：有没有残留的根布局构建胶水（`Compile Remove/Include`、根级 `obj`/`bin` 输出块、指向旧根路径的引用）。
 - **死线格式 / 字段**：候选——`RunLogEvent` 的 `Options` / `Selected*` 字段、`RunLogOptionSnapshot` 可能既无 producer 也无 consumer（疑似 EncounterTracking 重设计前的脚手架）。**这是一条待验证线索**：用 `rg` 确认是否真的无人写入、无人读取，再决定记不记。
 
 **通用搜索（命中后必须核对，不要直接抄进结论）：**

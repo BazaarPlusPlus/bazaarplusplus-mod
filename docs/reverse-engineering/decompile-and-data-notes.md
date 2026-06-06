@@ -1,11 +1,5 @@
 # 反编译与数据包记录
 
-## 约束
-
-- 本次只新增文档，没有编译。
-- `decompiled/` 下已有反编译源码被当作只读参考；本次只按用户要求新增 `decompiled/reverse-docs/*` 文档。
-- 已确认本地 PowerShell 为 `7.6.2`。
-
 ## 已覆盖的反编译程序集
 
 仓库 `run.sh` 的 `decompile_all()` 覆盖这些游戏程序集：

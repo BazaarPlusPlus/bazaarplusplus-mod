@@ -9,13 +9,15 @@ This repository only keeps documentation that still matches the current implemen
 ## Feature Overview
 
 - Combat status bar: shows logical combat time, processed frames, pause state, and discrete speed multipliers in a bottom HUD.
-- Monster preview: fully delegates to the game's native monster preview without modification; the CardSet preview reuses `MonsterBoardTooltip` as a host to display custom board content.
+- Monster preview: fully delegates to the game's native monster preview without modification.
 - Enchant / upgrade preview: enchant preview has a visibility mode (Off / AutoOnPedestalChoice / Always, default Always); Auto mode shows the matching preview while an enchant pedestal is offered on the choice screen; Ctrl / Shift still work as manual overrides.
 - Run Logging and HistoryPanel: active runs are written to SQLite; the in-game panel can browse runs, PvP battles, ghost battles, and saved board snapshots.
 - Combat replay: saves local PvP replay payloads; `HistoryPanel` can replay saved battles when the required conditions are met.
 - End-of-run automatic screenshots: saves the primary final-run screenshot and SQLite metadata before `Continue`.
 - Background upload: run and replay upload, performed only while the client is outside a live run.
 - BazaarDB screenshot upload: optional toggle that pushes end-of-run snapshot DTOs to the V4 mod backend (`bazaarplusplus-server` repo, deployed at `mod-api-v4.bazaarplusplus.com`) for BazaarDB to pull through the peek/confirm delivery queue (off by default).
+- Collection Panel: a full-screen Item/Skill card browser, opened with Tab or the lobby dock button; supports filtering by hero, quality, size, merchant and trainer source, and run day.
+- Live Build Panel: toggled in-run with CapsLock; displays live shop / board / stash and shows final-build recommendations grouped by the current rating tier (data sourced from the cloud final_builds_for_mod.json, with a bundled final-builds-top50.json fallback).
 - Anonymous Mode: replaces the local player name with `Anonymous`.
 - **BazaarAgent HTTP endpoint** (optional host plugin, not installed by default) — local loopback HTTP server (fixed at `127.0.0.1:47900`) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. **The host is a separate BepInEx plugin**, built on demand with `./run.sh build --with-bazaaragent`; installing the host dll starts it automatically, while default builds ship only the main plugin and actively scrub the host dlls. See [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md).
 
@@ -29,7 +31,7 @@ This repository only keeps documentation that still matches the current implemen
 ## Building From Source
 
 - The project targets `netstandard2.1` and expects a .NET SDK that can build C# 12 projects.
-- The main mod project and most test projects resolve game assemblies through `ManagedPath`. If auto-detection does not find your local install, pass it explicitly during the build.
+- The main mod project and the test projects that reference game assemblies resolve game assemblies through `ManagedPath`. If auto-detection does not find your local install, pass it explicitly during the build.
 - Common commands:
 
 ```bash

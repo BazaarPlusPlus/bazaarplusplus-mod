@@ -1,6 +1,6 @@
 # Collection Panel Structured Source Catalog
 
-> Status: Draft (revised 2026-06-02 after red-team review)
+> Status: Implemented(schema 现为 v3,含 groups 字段;本文 JSON 示例仍为 v2 草案形态)
 > Date: 2026-06-02
 > Supersedes: `docs/design/archive/2026-06-02-collection-panel-offer-source-filtering.md`
 > Scope: Replace the merchant/trainer source filtering plan with a BPP-owned structured source catalog and rule resolver. This design covers schema, DTOs, runtime flow, validation, and related cleanup for Collection Panel source filtering.
@@ -68,10 +68,12 @@ Root:
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "entries": []
 }
 ```
+
+> 注:实际 v3 增加了顶层 `groups` 字段(CollectionSourceCatalog.cs:109-115 强制校验;Data/CollectionSources/collection-sources.json:3-11)。
 
 Entry:
 
@@ -262,7 +264,7 @@ Validation has two tiers with different migration-step dependencies.
 
 **Schema / shape validation** — authorable as soon as the v2 JSON and DTOs exist (Migration steps 2-3):
 
-- `schemaVersion` is the expected version (2).
+- `schemaVersion` is the expected version (3).
 - Every entry has a non-empty `sourceKey`, `kind`, `name`, `portraitTemplateId`, `sourceTemplateIds`, and `offerRule`.
 - Every `sourceKey` is unique; a forced name+hero collision test exercises the fingerprint suffix.
 - `portraitTemplateId` is a valid GUID and appears in `sourceTemplateIds`, unless a per-entry documented-exception flag is set.

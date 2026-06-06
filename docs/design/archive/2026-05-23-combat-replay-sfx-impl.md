@@ -193,7 +193,7 @@ commit `1ce7c38` 已落地，文件清单：
 
 - 修改：[Game/CombatReplay/CombatReplayRuntime.Warmup.cs](../../../Game/CombatReplay/CombatReplayRuntime.Warmup.cs) — 加 `LogReplayAudioState` (L970)、`EnsureReplayAudioReadyForPlayback` (L923)、`StopAllTrackedSfxEventInstances` (L1179)、`ReassertSfxVolumeFromPreferences` (L1239)
 - 修改：[Game/CombatReplay/CombatReplayRuntime.Bootstrap.cs:139](../../../Game/CombatReplay/CombatReplayRuntime.Bootstrap.cs#L139) — 调用点更名
-- 新增：[Patches/Combat/ReplayStateAudioDiagnosticPatch.cs](../../../Patches/Combat/ReplayStateAudioDiagnosticPatch.cs) — Harmony prefix on `ReplayState.Replay`
+- 注：ReplayStateAudioDiagnosticPatch(§4.3)最终未交付；诊断日志能力未保留，仅保留 EnsureAudioReadyForPlayback 的分层防御逻辑（AudioBankWarmer.cs）。
 - 修改：[BazaarPlusPlus.csproj](../../../BazaarPlusPlus.csproj) — `FMODUnity` 加进 `<Reference>`
 - 修改：[run.sh](../../../run.sh) — `FMODUnity` 加进 `decompile_all`
 

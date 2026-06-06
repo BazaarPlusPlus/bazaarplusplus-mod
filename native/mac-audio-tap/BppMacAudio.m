@@ -1,6 +1,6 @@
 // BppMacAudio.m — CoreAudio process-tap capture wrapper for The Bazaar mod.
 //
-// Architecture (see docs/design/2026-05-31-combat-replay-audio-macos-process-tap.md
+// Architecture (see docs/design/archive/2026-05-31-combat-replay-audio-macos-process-tap.md
 // sections 4 & 5): the realtime IOProc, the lock-free SPSC FIFO and the
 // planar->interleave fixup all live here in native code. The IOProc is a
 // CoreAudio realtime thread; it must never malloc, lock, send an ObjC message,

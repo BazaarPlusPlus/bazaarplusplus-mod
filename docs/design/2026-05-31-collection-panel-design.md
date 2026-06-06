@@ -61,7 +61,7 @@ Status: Implemented with follow-ups (Phase 1–3 + L2/L3 + fixed-grid redesign +
 ```
 Game/CollectionPanel/
   CollectionPanel.cs                    # MonoBehaviour 宿主：static 单例、Initialize、Update 热键/Escape、IsInCombat 关闭
-  CollectionPanelSettingsDockEntry.cs   # ISettingsDockEntry
+  CollectionPanelDockButtonController.cs  # dock 按钮开合
   CollectionPanelText.cs                # 本地化标签/状态文案（仿 HistoryPanelText）
   Data/
     CollectionCatalog.cs                # 枚举 GetCardMap() → 过滤 Item|Skill + HasValidArt → VM 列表（缓存）
@@ -852,7 +852,7 @@ if (BppHotkeyService.WasPressedThisFrame(_config.CollectionPanelHotkeyPathConfig
 
 ### 16.1 文件清单
 
-**当前（as-built）：`Game/CollectionPanel/` 下共 49 个 `.cs` 文件** + `Patches/CollectionPanel/` 下的补丁 + 对 `BppComposition.cs` / `BppConfig.cs` / `IBppConfig.cs` 的扩展 + 源数据 `Data/CollectionSources/collection-sources.json`。子系统自下方初版清单（约 25 个文件）以来明显扩张，新增整片 **`Sources/` 子树**（来源目录/枚举/DTO/offer-pool 解析：`CollectionSourceCatalog`、`CollectionSourceEntry`、`CollectionSourceEnums`、`CollectionSourceDtos`、`CollectionSourceOfferRule`、`CollectionSourceOfferPoolResolver`、`CollectionSourceOfferPoolResult`、`CollectionSourceRoster`），以及顶层 `CollectionSourceOfferPoolCache`/`CollectionSourceOfferPoolCacheKey`、`CollectionPanelOpenSelectionResolver`、`CollectionPanelDockButtonController`、`CollectionPanelLoadDiagnostics` 等。下方树是**初版快照**（已不完整，仅留作历史；权威清单以 `Game/CollectionPanel/` 实际目录为准）。
+**当前（as-built）：`Game/CollectionPanel/` 下共 50 个 `.cs` 文件（后增 Data/DayTierSchedule.cs）** + `Patches/CollectionPanel/` 下的补丁 + 对 `BppComposition.cs` / `BppConfig.cs` / `IBppConfig.cs` 的扩展 + 源数据 `Data/CollectionSources/collection-sources.json`。子系统自下方初版清单（约 25 个文件）以来明显扩张，新增整片 **`Sources/` 子树**（来源目录/枚举/DTO/offer-pool 解析：`CollectionSourceCatalog`、`CollectionSourceEntry`、`CollectionSourceEnums`、`CollectionSourceDtos`、`CollectionSourceOfferRule`、`CollectionSourceOfferPoolResolver`、`CollectionSourceOfferPoolResult`、`CollectionSourceRoster`），以及顶层 `CollectionSourceOfferPoolCache`/`CollectionSourceOfferPoolCacheKey`、`CollectionPanelOpenSelectionResolver`、`CollectionPanelDockButtonController`、`CollectionPanelLoadDiagnostics` 等。下方树是**初版快照**（已不完整，仅留作历史；权威清单以 `Game/CollectionPanel/` 实际目录为准）。
 
 ```
 Game/CollectionPanel/

@@ -2,7 +2,7 @@
 
 hover 物品时，在原生 primary tooltip 之外按需展示**附魔预览**或**升级预览**。
 
-> 怪物 / CardSet 预览是另一条独立路径，见 [monster-preview.md](monster-preview.md)，不属于本 feature。
+> 怪物预览与 item-board overlay 是另一条独立路径，见 [monster-preview.md](monster-preview.md)，不属于本 feature。
 
 ## 附魔预览：3 态可视性 + pedestal 感知
 
@@ -17,7 +17,7 @@ hover 物品时，在原生 primary tooltip 之外按需展示**附魔预览**�
 
 ## 优先级与刷新
 
-完整优先级：**hotkey（`Shift` 升级 / `Ctrl` 附魔）> 附魔 `Always` > 附魔 `AutoOnPedestalChoice` 匹配 > Normal**。一次只解析出一种预览模式。hover 期间按下 / 松开 modifier、或 SelectionSet 改变，都会即时刷新 tooltip（不等下一次 hover）。三处调用方（`TooltipModifierRefreshController`、`ItemEnchantPreviewPatch`、`UpgradePreviewTooltipPatch`）共享 `Game/Tooltips/TooltipPreviewModePolicy.cs` 的判定，保证行为一致。
+完整优先级：**hotkey（`Shift` 升级 / `Ctrl` 附魔）> 附魔 `Always` > 附魔 `AutoOnPedestalChoice` 匹配 > Normal**。一次只解析出一种预览模式。hover 期间按下 / 松开 modifier、或 SelectionSet 改变，都会即时刷新 tooltip（不等下一次 hover）。三处调用方共享 `Game/Tooltips/TooltipPreviewModePolicy.cs` 的判定，保证行为一致：`TooltipModifierRefreshController` 与 `ItemEnchantPreviewPatch` 直接调用，`UpgradePreviewTooltipPatch` 经 `UpgradeTooltipScheduler` 间接调用。
 
 热键默认 `Ctrl`（附魔）/ `Shift`（升级），均可改绑、支持鼠标按键——**默认值与改绑规则的唯一权威是 [hotkeys-reference.md](../reference/hotkeys-reference.md)**，本文不重复。
 

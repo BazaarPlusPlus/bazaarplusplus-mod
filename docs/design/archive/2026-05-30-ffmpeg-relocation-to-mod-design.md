@@ -1,7 +1,7 @@
 # FFmpeg 从 installer 子系统迁移为随 mod 分发的兄弟二进制
 
 - 日期：2026-05-30
-- 状态：已实现并验证（2026-05-30，见文末「实现记录」）
+- 状态：**IMPLEMENTED(已实现并合并,历史归档)**
 - 影响仓库：`bazaarplusplus-mod`（主要）、`bazaarplusplus-installer`（删除 FFmpeg 子系统）
 
 ## 背景与动机

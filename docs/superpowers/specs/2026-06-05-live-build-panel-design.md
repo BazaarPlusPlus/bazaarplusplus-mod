@@ -1,10 +1,12 @@
 # Live Build Panel Target Document
 
-Status: REVISED REVIEW DRAFT - HistoryPanel included
+Status: IMPLEMENTED(已落地;细节见下方实现状态注)
 Date: 2026-06-05
 Scope: replace old CardSetPreview, add in-run live build panel, and migrate HistoryPanel onto the same socketed board preview contract
 UI name: 终局阵容
 Code feature name: `LiveBuildPanel`
+
+> **实现状态(2026-06-05 起):** 核心架构已落地——Game/LiveBuildPanel/、GameInterop/ItemBoardPreview/BppItemBoard*、Game/BuildRecommendations/、Game/OverlayPanels/BppOverlayPanelMutex;HistoryPanel 已迁移至 BppItemBoardPreview;Game/CardSetPreview/ 已删除。Ui/ 目标文件(LiveBuildPanelView.Tree.cs/.Rows.cs)实际合并为单文件 LiveBuildPanelView.cs。『数据来源』章节引用的 AutoBazaarGameContextReader.cs 等为 WP-R 改名前旧路径(现 src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameContextReader.cs)。
 
 ## 背景
 
@@ -287,7 +289,7 @@ selection 中的 skill 和 encounter 分支不进入本面板。AutoBazaar contr
 
 从 `run.Player.Hand` 和 `run.Player.Stash` 读取容器，再通过 `CardContainer.Container.GetCardsAndSockets()` 枚举 item 和 socket。AutoBazaar reader 已经用这条路径读取 board/chest snapshots。Evidence: [`AutoBazaarGameContextReader.cs:267-321`](../../../Game/AutoBazaarHost/AutoBazaarGameContextReader.cs#L267-L321).
 
-LiveBuildPanel 不能直接依赖 `Game/AutoBazaarHost`，因为 AutoBazaar host 是 flag-gated feature；底层 live container/selection read helper 放在 `GameInterop/LiveCards/`，LiveBuildPanel 消费这个 adapter。AutoBazaar 是否迁到同一 adapter 可以作为同 PR 的 opportunistic cleanup，不能让 LiveBuildPanel import AutoBazaar。
+LiveBuildPanel 不能直接依赖 `Game/AutoBazaarHost`，因为 BazaarAgent host 已是独立 BepInEx 插件(按需安装)；底层 live container/selection read helper 放在 `GameInterop/LiveCards/`，LiveBuildPanel 消费这个 adapter。AutoBazaar 是否迁到同一 adapter 可以作为同 PR 的 opportunistic cleanup，不能让 LiveBuildPanel import AutoBazaar。
 
 ### HistoryPanel
 
