@@ -11,7 +11,6 @@ using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.Rendering;
-using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
@@ -751,10 +750,13 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     {
         try
         {
+            // The combat status bar is intentionally NOT suppressed here: during a recorded replay
+            // it stays visible just like in a normal replay, so it is captured into the MP4 (the
+            // recorder uses full-screen ScreenCapture). The remaining BPP overlays stay suppressed
+            // to keep them out of the recording.
             return UiSuppressionScope.Begin(
                 CollectionPanelDockButtonController.BeginScreenshotSuppression,
-                BppSettingsDockController.BeginScreenshotSuppression,
-                CombatStatusBarFeature.BeginScreenshotSuppression
+                BppSettingsDockController.BeginScreenshotSuppression
             );
         }
         catch (Exception ex)
