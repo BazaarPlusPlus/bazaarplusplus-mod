@@ -11,6 +11,7 @@ using BazaarPlusPlus.Game.LiveBuildPanel.Preview;
 using BazaarPlusPlus.Game.LiveBuildPanel.Ui;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.LiveCards;
 using BazaarPlusPlus.Infrastructure;
@@ -202,15 +203,29 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private void RefreshRecommendations()
     {
         var hero = _liveSnapshot.Hero?.ToString();
+        var ratingTier = ResolveLiveRatingTier();
         _matches =
             string.IsNullOrWhiteSpace(hero) || !_candidateState.HasCandidates
                 ? Array.Empty<BuildRecommendation>()
-                : _recommendations.FindFinalRecommendations(hero, _candidateState.TemplateIds);
+                : _recommendations.FindFinalRecommendations(
+                    hero,
+                    _candidateState.TemplateIds,
+                    ratingTier
+                );
         _recommendationIndex = Mathf.Clamp(
             _recommendationIndex,
             0,
             Math.Max(0, _matches.Count - 1)
         );
+    }
+
+    // Live rating selects the final-build tier bucket; fallback "all" when unavailable.
+    // No account-specific filtering — the rating is the only selector (spec §10.6).
+    private static string ResolveLiveRatingTier()
+    {
+        return BppClientCacheBridge.TryGetPlayerRankSnapshot(out _, out var rating)
+            ? BuildRatingTier.FromRating(rating)
+            : BuildRatingTier.All;
     }
 
     private void RefreshViewAndPreview()
