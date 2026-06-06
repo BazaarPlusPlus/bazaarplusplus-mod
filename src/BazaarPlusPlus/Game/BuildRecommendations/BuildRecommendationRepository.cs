@@ -51,26 +51,40 @@ internal sealed class BuildRecommendationRepository
     public bool TryFindFinalRecommendation(
         string? hero,
         IReadOnlyCollection<Guid> templateIds,
+        string ratingTier,
         out BuildRecommendation recommendation
     )
     {
-        var recommendations = FindFinalRecommendations(hero, templateIds);
+        var recommendations = FindFinalRecommendations(hero, templateIds, ratingTier);
         recommendation = recommendations.FirstOrDefault()!;
         return recommendation != null;
     }
 
     public IReadOnlyList<BuildRecommendation> FindFinalRecommendations(
         string? hero,
-        IReadOnlyCollection<Guid> templateIds
+        IReadOnlyCollection<Guid> templateIds,
+        string ratingTier
     )
     {
         var finalRoot = EnsureFinalRoot();
         if (finalRoot?.Heroes == null || string.IsNullOrWhiteSpace(hero))
             return Array.Empty<BuildRecommendation>();
 
-        return finalRoot.Heroes.TryGetValue(hero, out var heroBucket)
-            ? FindRecommendations(heroBucket, templateIds, ResolveFinalBuildLabel())
-            : Array.Empty<BuildRecommendation>();
+        if (!finalRoot.Heroes.TryGetValue(hero, out var heroTiers) || heroTiers?.Tiers == null)
+            return Array.Empty<BuildRecommendation>();
+
+        var bucket = ResolveTierBucket(heroTiers.Tiers, ratingTier);
+        return FindRecommendations(bucket, templateIds, ResolveFinalBuildLabel());
+    }
+
+    private static BuildQueryBucket? ResolveTierBucket(
+        Dictionary<string, BuildQueryBucket> tiers,
+        string ratingTier
+    )
+    {
+        if (tiers.TryGetValue(ratingTier, out var bucket) && bucket != null)
+            return bucket;
+        return tiers.TryGetValue(BuildRatingTier.All, out var fallback) ? fallback : null;
     }
 
     private static FinalBuildRoot? EnsureFinalRoot()
@@ -642,7 +656,15 @@ internal sealed class BuildRecommendationRepository
     private sealed class FinalBuildRoot
     {
         [JsonProperty("heroes")]
-        public Dictionary<string, BuildQueryBucket>? Heroes { get; set; }
+        public Dictionary<string, HeroTierSet>? Heroes { get; set; }
+    }
+
+    private sealed class HeroTierSet
+    {
+        // tier key (all/low/mid/high) -> bucket. The positional cardIndex/subsetIndex
+        // invariant is preserved INSIDE each bucket.
+        [JsonProperty("tiers")]
+        public Dictionary<string, BuildQueryBucket>? Tiers { get; set; }
     }
 
     private sealed class BuildQueryBucket

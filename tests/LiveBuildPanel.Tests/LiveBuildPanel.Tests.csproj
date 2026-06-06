@@ -21,6 +21,10 @@
 
   <ItemGroup>
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/BuildRecommendations/BuildRatingTier.cs"
+      Link="BuildRatingTier.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildCandidateState.cs"
       Link="LiveBuildCandidateState.cs"
     />

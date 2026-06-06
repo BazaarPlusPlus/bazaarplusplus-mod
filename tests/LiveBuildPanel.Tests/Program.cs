@@ -1,4 +1,5 @@
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.BuildRecommendations;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure.UiTokens;
@@ -8,8 +9,18 @@ TestCandidateToggleUsesTemplateId();
 TestCandidatePruneKeepsSelectableRowsOnly();
 TestRowVmTogglePolicyComesFromBoardType();
 TestSlotChromeGeometryMatchesTenSlotContract();
+TestBuildRatingTierMapping();
 
 Console.WriteLine("LiveBuildPanel checks passed.");
+
+static void TestBuildRatingTierMapping()
+{
+    Assert(BuildRatingTier.FromRating(null) == "all", "null rating -> all");
+    Assert(BuildRatingTier.FromRating(500) == "low", "<=500 -> low");
+    Assert(BuildRatingTier.FromRating(501) == "mid", "501 -> mid");
+    Assert(BuildRatingTier.FromRating(899) == "mid", "899 -> mid");
+    Assert(BuildRatingTier.FromRating(900) == "high", "900 -> high");
+}
 
 static void TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground()
 {

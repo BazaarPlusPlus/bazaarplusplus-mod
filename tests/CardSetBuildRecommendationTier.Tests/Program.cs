@@ -7,6 +7,7 @@ TestFreshFinalBuildCacheIsUsedWithoutRemoteDownload();
 TestExpiredFinalBuildCacheUsesStaleCacheAndQueuesRemoteRefresh();
 TestManualFinalBuildRefreshBypassesFreshCache();
 TestFinalBuildRecommendationReturnsBoardContract();
+TestFinalBuildTierSelectionPrefersLiveTierWithAllFallback();
 
 Console.WriteLine("BuildRecommendation checks passed.");
 
@@ -130,7 +131,7 @@ static void TestFinalBuildRecommendationReturnsBoardContract()
         var repository = Activator.CreateInstance(repositoryType)!;
         var method = repositoryType.GetMethod("FindFinalRecommendations")!;
         var recommendations = (System.Collections.IEnumerable)
-            method.Invoke(repository, ["BoardHero", new[] { selectedCardId }])!;
+            method.Invoke(repository, ["BoardHero", new[] { selectedCardId }, "all"])!;
         var recommendation = recommendations.Cast<object>().Single();
         var board = recommendation.GetType().GetProperty("Board")!.GetValue(recommendation)!;
 
@@ -284,6 +285,65 @@ static void TestManualFinalBuildRefreshBypassesFreshCache()
     }
 }
 
+static void TestFinalBuildTierSelectionPrefersLiveTierWithAllFallback()
+{
+    var repositoryType = GetRepositoryType();
+    var now = new DateTime(2026, 04, 25, 12, 0, 0, DateTimeKind.Utc);
+    var cachePath = Path.Combine(
+        Path.GetTempPath(),
+        $"bpp-final-build-cache-{Guid.NewGuid():N}.json"
+    );
+    var selectedCardId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+    File.WriteAllText(
+        cachePath,
+        CreateTwoTierPayload("TierHero", selectedCardId, "all-build", "high-build")
+    );
+    File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
+
+    ConfigureFinalBuildRemoteForTests(
+        repositoryType,
+        cachePath,
+        now,
+        _ => throw new InvalidOperationException("Fresh cache should not download remote data.")
+    );
+
+    try
+    {
+        var repository = Activator.CreateInstance(repositoryType)!;
+        var method = repositoryType.GetMethod("FindFinalRecommendations")!;
+
+        Assert(
+            FirstRecommendationSource(method, repository, "TierHero", selectedCardId, "high")
+                == "high-build",
+            "Live high tier should select the high-tier bucket."
+        );
+        Assert(
+            FirstRecommendationSource(method, repository, "TierHero", selectedCardId, "mid")
+                == "all-build",
+            "A tier missing from the hero should fall back to the all bucket."
+        );
+    }
+    finally
+    {
+        ResetFinalBuildRemoteForTests(repositoryType);
+        TryDelete(cachePath);
+    }
+}
+
+static string FirstRecommendationSource(
+    MethodInfo method,
+    object repository,
+    string hero,
+    Guid cardId,
+    string tier
+)
+{
+    var recommendations = (System.Collections.IEnumerable)
+        method.Invoke(repository, [hero, new[] { cardId }, tier])!;
+    var recommendation = recommendations.Cast<object>().First();
+    return (string)recommendation.GetType().GetProperty("Source")!.GetValue(recommendation)!;
+}
+
 static void AssertMappedTier(
     MethodInfo projectMethod,
     Type playerCardEntryType,
@@ -370,14 +430,19 @@ static bool RefreshFinalBuildsFromRemote(Type repositoryType, out string? error)
     return refreshed;
 }
 
-static List<string> LoadFinalBuildSources(Type repositoryType, string hero)
+static List<string> LoadFinalBuildSources(Type repositoryType, string hero, string tier = "all")
 {
     var root = InvokeStaticValue(repositoryType, "EnsureFinalRoot")!;
     var heroes = (System.Collections.IDictionary)
         root.GetType().GetProperty("Heroes")!.GetValue(root)!;
     Assert(heroes.Contains(hero), $"Expected final build data to contain hero {hero}.");
 
-    var bucket = heroes[hero]!;
+    var heroTiers = heroes[hero]!;
+    var tiers = (System.Collections.IDictionary)
+        heroTiers.GetType().GetProperty("Tiers")!.GetValue(heroTiers)!;
+    Assert(tiers.Contains(tier), $"Expected hero {hero} to contain tier {tier}.");
+
+    var bucket = tiers[tier]!;
     var builds = (System.Collections.IEnumerable)
         bucket.GetType().GetProperty("Builds")!.GetValue(bucket)!;
     return builds
@@ -388,38 +453,68 @@ static List<string> LoadFinalBuildSources(Type repositoryType, string hero)
         .ToList();
 }
 
-static string CreateFinalBuildPayload(string hero, Guid selectedCardId, string source)
+static string CreateFinalBuildPayload(
+    string hero,
+    Guid selectedCardId,
+    string source,
+    string tier = "all"
+)
 {
+    var bucket = CreateBucketJson(selectedCardId, source);
     return $$"""
         {
           "generatedAt": "2026-04-25T12:00:00Z",
           "heroes": {
             "{{hero}}": {
-              "builds": [
-                {
-                  "source": "{{source}}",
-                  "setSignature": "{{selectedCardId}}",
-                  "goldScore": 10.0,
-                  "playerCards": [
-                    {
-                      "cardId": "{{selectedCardId}}",
-                      "slot": 0,
-                      "tier": 1,
-                      "enchant": "None"
-                    }
-                  ]
-                }
-              ],
-              "cardIndex": {
-                "{{selectedCardId}}": [0]
-              },
-              "subsetIndex": {
-                "{{selectedCardId}}": {
-                  "matchedBuildIds": [0]
-                }
+              "tiers": {
+                "{{tier}}": {{bucket}}
               }
             }
           }
+        }
+        """;
+}
+
+static string CreateTwoTierPayload(
+    string hero,
+    Guid selectedCardId,
+    string allSource,
+    string highSource
+)
+{
+    var allBucket = CreateBucketJson(selectedCardId, allSource);
+    var highBucket = CreateBucketJson(selectedCardId, highSource);
+    return $$"""
+        {
+          "generatedAt": "2026-04-25T12:00:00Z",
+          "heroes": {
+            "{{hero}}": {
+              "tiers": {
+                "all": {{allBucket}},
+                "high": {{highBucket}}
+              }
+            }
+          }
+        }
+        """;
+}
+
+static string CreateBucketJson(Guid selectedCardId, string source)
+{
+    return $$"""
+        {
+          "builds": [
+            {
+              "source": "{{source}}",
+              "setSignature": "{{selectedCardId}}",
+              "goldScore": 10.0,
+              "playerCards": [
+                { "cardId": "{{selectedCardId}}", "slot": 0, "tier": 1, "enchant": "None" }
+              ]
+            }
+          ],
+          "cardIndex": { "{{selectedCardId}}": [0] },
+          "subsetIndex": { "{{selectedCardId}}": { "matchedBuildIds": [0] } }
         }
         """;
 }
