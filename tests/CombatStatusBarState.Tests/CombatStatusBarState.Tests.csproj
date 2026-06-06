@@ -69,6 +69,7 @@
       Include="..\..\src\BazaarPlusPlus\Game\HistoryPanel\HistoryPanelAccessPolicy.cs"
       Link="HistoryPanelAccessPolicy.cs"
     />
+    <Compile Include="..\..\src\BazaarPlusPlus\Core\GameState\IGameStateProbe.cs" Link="IGameStateProbe.cs" />
     <Compile Include="..\..\src\BazaarPlusPlus\Core\Events\IBppEventBus.cs" Link="IBppEventBus.cs" />
     <Compile Include="..\..\src\BazaarPlusPlus\Core\Events\InMemoryBppEventBus.cs" Link="InMemoryBppEventBus.cs" />
   </ItemGroup>

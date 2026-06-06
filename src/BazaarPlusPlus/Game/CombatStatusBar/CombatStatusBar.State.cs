@@ -110,7 +110,26 @@ internal sealed partial class CombatStatusBar
 
     internal static bool ShouldRenderForState(bool enabled)
     {
-        return enabled && (_services?.RunContext.IsInGameRun ?? false);
+        if (!enabled || _services == null)
+            return false;
+
+        // Fast path: during a live run the cached flag is already true, so the per-frame probe
+        // never runs. The cache is only false in lobby/menu and during replay playback — replay
+        // enters ReplayState via AppState.TryPushState without firing RunStarted, so nothing ever
+        // flips the cache true. Consult the live probe in that case; ComputeIsInGameRun() reports
+        // ReplayState as in-game-run, which keeps the bar (and its playback controls) visible.
+        if (_services.RunContext.IsInGameRun)
+            return true;
+
+        try
+        {
+            return _services.GameStateProbe.ComputeIsInGameRun();
+        }
+        catch
+        {
+            // Probe touches game statics; never log here (per-frame call would spam). Hide if unsure.
+            return false;
+        }
     }
 
     internal static bool CanStepCombatSpeed(int direction)

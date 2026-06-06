@@ -1,3 +1,4 @@
+using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.Runtime;
 
 namespace BazaarPlusPlus.Core.Runtime
@@ -10,6 +11,7 @@ namespace BazaarPlusPlus.Core.Runtime
     internal interface IBppServices
     {
         IRunContext RunContext { get; }
+        IGameStateProbe GameStateProbe { get; }
     }
 
     internal sealed class TestRunContext : IRunContext
@@ -17,11 +19,22 @@ namespace BazaarPlusPlus.Core.Runtime
         public bool IsInGameRun { get; set; }
     }
 
+    internal sealed class TestGameStateProbe : IGameStateProbe
+    {
+        public bool Result { get; set; }
+
+        public bool ComputeIsInGameRun() => Result;
+    }
+
     internal sealed class TestServices : IBppServices
     {
         public static TestServices Instance { get; } = new TestServices();
 
         public IRunContext RunContext { get; } = new TestRunContext();
+
+        public TestGameStateProbe GameStateProbe { get; } = new TestGameStateProbe();
+
+        IGameStateProbe IBppServices.GameStateProbe => GameStateProbe;
     }
 }
 

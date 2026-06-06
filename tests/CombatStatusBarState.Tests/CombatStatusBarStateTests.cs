@@ -19,6 +19,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
     {
         CombatStatusBar.ResetStateForTests();
         BazaarPlusPlus.Core.Runtime.TestServices.Instance.RunContext.IsInGameRun = false;
+        BazaarPlusPlus.Core.Runtime.TestServices.Instance.GameStateProbe.Result = false;
     }
 
     [Fact]
@@ -200,6 +201,23 @@ public sealed class CombatStatusBarStateTests : IDisposable
 
         BazaarPlusPlus.Core.Runtime.TestServices.Instance.RunContext.IsInGameRun = true;
         Assert.True(CombatStatusBar.ShouldRenderForState(enabled: true));
+        Assert.False(CombatStatusBar.ShouldRenderForState(enabled: false));
+    }
+
+    [Fact]
+    public void ShouldRenderForState_ShowsDuringReplay_WhenProbeReportsInGameRun()
+    {
+        var services = BazaarPlusPlus.Core.Runtime.TestServices.Instance;
+
+        // Replay's start guard forces the cached flag to false, and entering ReplayState never
+        // fires RunStarted, so the cache stays false throughout playback...
+        services.RunContext.IsInGameRun = false;
+        // ...but the live probe reports ReplayState as in-game-run.
+        services.GameStateProbe.Result = true;
+
+        Assert.True(CombatStatusBar.ShouldRenderForState(enabled: true));
+
+        // The user's enable toggle is still the master switch.
         Assert.False(CombatStatusBar.ShouldRenderForState(enabled: false));
     }
 
