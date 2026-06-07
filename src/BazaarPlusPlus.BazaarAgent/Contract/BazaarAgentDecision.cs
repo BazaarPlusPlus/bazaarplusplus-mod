@@ -1,5 +1,8 @@
 #nullable enable
 using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
 
 namespace BazaarPlusPlus.BazaarAgent;
 
@@ -75,6 +78,19 @@ public enum BazaarAgentTargetSection
     Stash,
     Skill,
     Fuse,
+}
+
+/// <summary>Combat-replay playback phase, exposed so external scripts can tell when the replay
+/// "continue" button is clickable (<see cref="FinishedAwaitingContinue"/>). Serialized camelCase
+/// (<c>none</c>/<c>starting</c>/<c>playing</c>/<c>finishedAwaitingContinue</c>) per the wire
+/// contract; the type-level converter overrides the PascalCase settings-level one.</summary>
+[JsonConverter(typeof(StringEnumConverter), typeof(CamelCaseNamingStrategy))]
+public enum BazaarAgentReplayPhase
+{
+    None,
+    Starting,
+    Playing,
+    FinishedAwaitingContinue,
 }
 
 public sealed class BazaarAgentCardSnapshot
@@ -171,6 +187,13 @@ public sealed class BazaarAgentContext
     public string? CurrentEncounterId { get; init; }
     public string? CurrentEncounterType { get; init; }
     public double ActionCooldownRemainingSeconds { get; init; }
+
+    /// <summary>Where combat-replay playback currently is; <c>finishedAwaitingContinue</c> means
+    /// <c>POST /v1/replay/continue</c> will finalize the replay (and any recording).</summary>
+    public BazaarAgentReplayPhase ReplayPhase { get; init; }
+
+    /// <summary>Battle id of the active replay session, when one is active.</summary>
+    public string? ReplayBattleId { get; init; }
 
     /// <summary>Template IDs the game currently restricts player clicks to (target-selection mode: upgrade, enchant). Null/empty means no filter is active. When non-empty, only owned board/chest item cards whose templateId is in this set accept a SelectItem POST; offer-based SelectItem actions are suppressed from <see cref="AvailableActions"/>.</summary>
     public IReadOnlyList<string>? InteractableTemplateIds { get; init; }

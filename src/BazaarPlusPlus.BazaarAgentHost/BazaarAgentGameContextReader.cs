@@ -64,6 +64,11 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         // Determine state name
         var stateName = ResolveStateName(appState, runState);
 
+        // Replay phase/battleId come from the replay recorder facade. Read in every path —
+        // including the lobby/unknown one — so external recording scripts never see the phase
+        // flicker to "none" while a replay bootstrap is loading scenes.
+        var (replayPhase, replayBattleId) = ReadReplayPhase();
+
         // If game isn't ready (no active AppState), the only meaningful action the
         // mod can offer is StartOrContinueRun — but only when actually at hero-select.
         if (appState == null || stateName == BazaarAgentRunStateName.Unknown)
@@ -79,6 +84,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
                 StateName = BazaarAgentRunStateName.Unknown,
                 CanStartOrContinueRun = canStartEarly,
                 ActionCooldownRemainingSeconds = actionCooldownRemainingSeconds,
+                ReplayPhase = replayPhase,
+                ReplayBattleId = replayBattleId,
                 AvailableActions = lobbyActions,
             };
         }
@@ -205,6 +212,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             CurrentEncounterId = currentEncounterId,
             CurrentEncounterType = currentEncounterType,
             ActionCooldownRemainingSeconds = actionCooldownRemainingSeconds,
+            ReplayPhase = replayPhase,
+            ReplayBattleId = replayBattleId,
             InteractableTemplateIds = interactionFilter is not null ? interactionFilterList : null,
             BoardItems = boardItems,
             ChestItems = chestItems,
@@ -213,6 +222,28 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             SelectionOptions = selectionOptions,
             AvailableActions = actions,
         };
+    }
+
+    // -------------------------------------------------------------------------
+    // Replay phase
+    // -------------------------------------------------------------------------
+
+    private static (BazaarAgentReplayPhase Phase, string? BattleId) ReadReplayPhase()
+    {
+        var recorder = BazaarAgentGameBridge.CurrentRecorder;
+        if (recorder is null)
+            return (BazaarAgentReplayPhase.None, null);
+
+        var snapshot = recorder.GetReplayPhase();
+        var phase = snapshot.Phase switch
+        {
+            BppReplayPhase.Starting => BazaarAgentReplayPhase.Starting,
+            BppReplayPhase.Playing => BazaarAgentReplayPhase.Playing,
+            BppReplayPhase.FinishedAwaitingContinue =>
+                BazaarAgentReplayPhase.FinishedAwaitingContinue,
+            _ => BazaarAgentReplayPhase.None,
+        };
+        return (phase, snapshot.BattleId);
     }
 
     // -------------------------------------------------------------------------

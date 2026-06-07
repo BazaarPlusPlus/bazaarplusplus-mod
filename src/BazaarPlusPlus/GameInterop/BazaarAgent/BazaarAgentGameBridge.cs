@@ -12,4 +12,9 @@ public static class BazaarAgentGameBridge
     /// <summary>The live game-interop facade, or <c>null</c> before BazaarPlusPlus has
     /// initialized or after it has been disposed.</summary>
     public static IBazaarAgentGameProbe? Current { get; internal set; }
+
+    /// <summary>The replay video recording facade, or <c>null</c> before BazaarPlusPlus has
+    /// initialized or after it has been disposed. Read lazily per call by the host — the
+    /// combat-replay runtime behind it is attached after this is published.</summary>
+    public static IBazaarAgentReplayRecorder? CurrentRecorder { get; internal set; }
 }

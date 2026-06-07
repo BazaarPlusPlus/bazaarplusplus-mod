@@ -19,19 +19,22 @@ public class BazaarAgentHttpServerTests
         public int Port { get; }
         public BazaarAgentHttpServer Server { get; }
         public BazaarAgentActionQueue Queue { get; }
+        public BazaarAgentReplayControlQueue ReplayQueue { get; }
         private BazaarAgentContextSnapshot? _snapshot;
         public BazaarAgentContextSnapshot? CurrentSnapshot => _snapshot;
 
         public void SetSnapshot(BazaarAgentContextSnapshot? s) => _snapshot = s;
 
-        public ServerFixture(int timeoutMs = 5000)
+        public ServerFixture(int timeoutMs = 5000, int replayTimeoutMs = 5000)
         {
             Port = PickFreePort();
             Queue = new BazaarAgentActionQueue(timeoutMs);
+            ReplayQueue = new BazaarAgentReplayControlQueue(replayTimeoutMs);
             Server = new BazaarAgentHttpServer(
                 Port,
                 () => CurrentSnapshot,
                 Queue,
+                ReplayQueue,
                 new TestLogger()
             );
             Server.Start();
@@ -47,6 +50,11 @@ public class BazaarAgentHttpServerTests
             try
             {
                 Queue.Dispose();
+            }
+            catch { }
+            try
+            {
+                ReplayQueue.Dispose();
             }
             catch { }
         }
@@ -263,6 +271,30 @@ public class BazaarAgentHttpServerTests
             new StringContent("{\"actionKind\":\"Wait\"}", Encoding.UTF8, "application/json")
         );
         Assert.Equal(HttpStatusCode.ServiceUnavailable, res.StatusCode);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Case 7b: GET serializes replayPhase as camelCase wire values
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetContext_SerializesReplayPhaseCamelCase()
+    {
+        using var f = new ServerFixture();
+        var ctx = new BazaarAgentContext
+        {
+            TickId = 5,
+            ReplayPhase = BazaarAgentReplayPhase.FinishedAwaitingContinue,
+            ReplayBattleId = "battle-123",
+        };
+        f.SetSnapshot(new BazaarAgentContextSnapshot(ctx));
+
+        using var http = Http();
+        var res = await http.GetAsync($"http://127.0.0.1:{f.Port}/v1/context");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var body = await res.Content.ReadAsStringAsync();
+        Assert.Contains("\"replayPhase\":\"finishedAwaitingContinue\"", body);
+        Assert.Contains("\"replayBattleId\":\"battle-123\"", body);
     }
 
     // ---------------------------------------------------------------------------

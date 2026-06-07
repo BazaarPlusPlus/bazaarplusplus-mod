@@ -444,6 +444,62 @@ public class CoreLayeringTests
         );
     }
 
+    // External battle video recording depends on replays staying in the
+    // finishedAwaitingContinue phase until an explicit POST /v1/replay/continue: the recording
+    // only finalizes (moov atom) when ReplayState.Exit() runs, and the exit timing belongs to the
+    // external orchestrator. The host must therefore never exit ReplayState from its tick — the
+    // single allowed programmatic exit lives in CombatReplayRuntime.TryContinueReplay.
+    [Fact]
+    public void BazaarAgentHost_never_exits_replay_state_and_main_mod_exits_only_via_continue()
+    {
+        var repoRoot = RepoRoot();
+
+        // Host side: no replay auto-advance, no ReplayState.Exit calls at all.
+        var hostDir = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost");
+        var hostViolations = new List<string>();
+        foreach (var file in EnumerateSourceFiles(hostDir))
+        {
+            var relative = Path.GetRelativePath(hostDir, file).Replace('\\', '/');
+            var text = File.ReadAllText(file);
+            if (text.Contains("TryAdvanceReplay", StringComparison.Ordinal))
+                hostViolations.Add($"{relative}: TryAdvanceReplay");
+            if (text.Contains(".Exit()", StringComparison.Ordinal))
+                hostViolations.Add($"{relative}: .Exit() call");
+        }
+        Assert.True(
+            hostViolations.Count == 0,
+            "BazaarAgentHost must never exit ReplayState (snapshot ticks would race the external "
+                + "POST /v1/replay/continue and orphan in-flight recordings). Offending code:\n"
+                + string.Join("\n", hostViolations)
+        );
+
+        // Main mod side: replay.Exit() appears exactly once, inside CombatReplayRuntime
+        // (TryContinueReplay). The Harmony exit patch intercepts Exit; it must not invoke it.
+        var mainSource = MainSourceRoot(repoRoot);
+        var exitCallers = new List<string>();
+        foreach (var file in EnumerateSourceFiles(mainSource))
+        {
+            var relative = Path.GetRelativePath(mainSource, file).Replace('\\', '/');
+            foreach (var rawLine in File.ReadLines(file))
+            {
+                if (rawLine.Contains("replay.Exit()", StringComparison.Ordinal))
+                    exitCallers.Add(relative);
+            }
+        }
+        Assert.Equal(
+            new[] { "Game/CombatReplay/CombatReplayRuntime.cs" },
+            exitCallers.Distinct().OrderBy(x => x, StringComparer.Ordinal).ToArray()
+        );
+    }
+
+    private static IEnumerable<string> EnumerateSourceFiles(string root) =>
+        Directory
+            .EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+            .Where(f =>
+                !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
+            );
+
     [Fact]
     public void BazaarAgent_tests_reference_project_instead_of_source_linking_game_files()
     {

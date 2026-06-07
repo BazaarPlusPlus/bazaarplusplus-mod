@@ -78,6 +78,8 @@ public sealed class BazaarAgentContextSnapshotPublisher
             CurrentEncounterId = src.CurrentEncounterId,
             CurrentEncounterType = src.CurrentEncounterType,
             ActionCooldownRemainingSeconds = src.ActionCooldownRemainingSeconds,
+            ReplayPhase = src.ReplayPhase,
+            ReplayBattleId = src.ReplayBattleId,
             InteractableTemplateIds = src.InteractableTemplateIds,
             BoardItems = src.BoardItems,
             ChestItems = src.ChestItems,
@@ -115,6 +117,8 @@ public sealed class BazaarAgentContextSnapshotPublisher
             && a.CurrentEncounterId == b.CurrentEncounterId
             && a.CurrentEncounterType == b.CurrentEncounterType
             && a.ActionCooldownRemainingSeconds == b.ActionCooldownRemainingSeconds
+            && a.ReplayPhase == b.ReplayPhase
+            && a.ReplayBattleId == b.ReplayBattleId
             && SocketsEqual(a.InteractableTemplateIds, b.InteractableTemplateIds)
             && CardsEqual(a.BoardItems, b.BoardItems)
             && CardsEqual(a.ChestItems, b.ChestItems)

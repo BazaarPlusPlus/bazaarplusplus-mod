@@ -33,7 +33,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public static CombatReplayRuntime? Instance { get; private set; }
 
-    public string? ActiveBattleId => _controller?.ActiveBattleId;
+    // Sourced from the playback session (BeginSession sets it for both the local-saved and the
+    // imported-ghost path); the controller only learns battle ids on the local-saved path.
+    public string? ActiveBattleId => _playbackPublisher?.ActiveSessionBattleId;
 
     public bool IsReplayPlaybackActive =>
         _savedReplayPlaybackActive || AppState.CurrentState is ReplayState;
@@ -240,6 +242,45 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             CombatReplayPlaybackSource.ImportedGhost,
             recordVideo
         );
+        return true;
+    }
+
+    /// <summary>
+    /// Drives the replay "continue" button programmatically: validates that playback has finished
+    /// and is waiting on the button, then runs the same chain a real click does
+    /// (BoardManager.OnBoardRecapReplayButtonsContinueClicked: LevelUp recap cleanup, then
+    /// <c>ReplayState.Exit()</c>). This is the only programmatic path allowed to exit ReplayState —
+    /// finalizing any in-flight video recording depends on it.
+    /// </summary>
+    public bool TryContinueReplay(out string reason)
+    {
+        if (AppState.CurrentState is not ReplayState replay)
+        {
+            reason = "No replay is active.";
+            return false;
+        }
+
+        if (_isReplayStartInProgress)
+        {
+            reason = "Replay playback is still starting.";
+            return false;
+        }
+
+        if (replay.IsReplaying)
+        {
+            reason = "Replay playback has not finished yet.";
+            return false;
+        }
+
+        // Mirror the native continue click: clear the LevelUp recap overlay first
+        // (BoardManager.OnBoardRecapReplayButtonsContinueClicked guards on ERunState.LevelUp),
+        // then Exit(). For bootstrapped saved replays the Exit() prefix patch reroutes into
+        // TryExitBootstrappedSavedReplayToMenu, which publishes the recorder's "ended" signal.
+        if (Data.CurrentState?.StateName == BazaarGameShared.Domain.Runs.ERunState.LevelUp)
+            Singleton<BoardManager>.Instance?.ExitRecapReplayState();
+
+        replay.Exit();
+        reason = string.Empty;
         return true;
     }
 

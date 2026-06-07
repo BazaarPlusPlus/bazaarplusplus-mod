@@ -25,8 +25,6 @@ internal sealed class CombatReplayController
         _loader = loader ?? throw new ArgumentNullException(nameof(loader));
     }
 
-    public string? ActiveBattleId { get; private set; }
-
     public IReadOnlyList<PvpBattleManifest> ListRecentBattles()
     {
         return _battleCatalog
@@ -57,7 +55,6 @@ internal sealed class CombatReplayController
         if (manifest == null || !_payloadStore.Exists(manifest.BattleId))
             return null;
 
-        ActiveBattleId = manifest.BattleId;
         return manifest;
     }
 

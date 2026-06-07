@@ -45,7 +45,7 @@ PVP combat 的本地录制与回放，外加可选的 MP4 视频录制。录制 
 
 replay 播放期间把 Unity Game View 抓帧编码为 MP4，落到 `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<yyyy-MM-dd>/<battle_id>.<yyyyMMdd-HHmmss>.mp4`，供离线复盘 / 社区分享。Local 与 ghost replay 一视同仁。
 
-- **触发：单次、显式，由 HistoryPanel 页脚的「录制并回放」按钮发起**，作用于当前选中对局，与现有纯 Replay 按钮并存。点按钮 →（ghost 对局先下载 payload）→ 回放该对局 → 回放期间录制 → 离开 `ReplayState` 自动收尾。没有全局开关、也不会自动录每场回放：录制意图作为参数绑定到本次 session（`CombatReplayPlaybackStarting.RecordVideo`），随 session 走、无残留状态；纯 Replay 按钮与 `ReplayLatest` 不录制。
+- **触发：单次、显式，由 HistoryPanel 页脚的「录制并回放」按钮发起**，作用于当前选中对局，与现有纯 Replay 按钮并存。点按钮 →（ghost 对局先下载 payload）→ 回放该对局 → 回放期间录制 → 离开 `ReplayState` 自动收尾。没有全局开关、也不会自动录每场回放：录制意图作为参数绑定到本次 session（`CombatReplayPlaybackStarting.RecordVideo`），随 session 走、无残留状态；纯 Replay 按钮与 `ReplayLatest` 不录制。装有可选 BazaarAgent host 插件时还有第二个程序化入口：`POST /v1/replay/record`（外部送入 `GhostBattlePayload`，收尾由外部 `POST /v1/replay/continue` 显式驱动；见 [ADR-0007](../adr/0007-bazaaragent-external-replay-video-recording.md) 与 [HTTP API 参考](../reference/bazaar-agent-http-api-v1.md)）。
 - **录制可用性 = FFmpeg 存在 + 支持 `AsyncGPUReadback`，没有功能开关。** 二者任一不满足时「录制并回放」按钮置灰并给出状态提示（如「未检测到 FFmpeg，无法录制」），且不会误启一个无视频的回放。
 - **FFmpeg 两级检测，只检测不下载（随 mod 分发）**：`<GameRoot>/BepInEx/plugins/ffmpeg(.exe)`（与 mod 同目录的 bundled 二进制）→ 系统 `PATH`。FFmpeg 随 mod 一起分发，无需单独下载或安装。检测方式是起 `ffmpeg -version`（2s 超时，`ExitCode==0`），结果缓存到 session；为避免阻塞 UI 线程，首次探活异步预热，按钮可用态读缓存结果。
 - **抓帧 / 编码**：`ScreenCapture.CaptureScreenshotIntoRenderTexture` + `AsyncGPUReadback`（main thread 只 enqueue 到 bounded queue）→ FFmpeg subprocess（rawvideo stdin → libx264 / openh264 → MP4）。`SystemInfo.supportsAsyncGPUReadback` 为 false 时录制不可用。

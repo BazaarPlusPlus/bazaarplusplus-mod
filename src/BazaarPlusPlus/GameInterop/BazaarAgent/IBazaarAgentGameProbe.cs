@@ -21,7 +21,4 @@ public interface IBazaarAgentGameProbe
     /// <summary>Resolves the encounter type (merchant/trainer/event/...) for an encounter id,
     /// or <c>null</c> when it cannot be classified.</summary>
     string? ResolveEncounterType(string? encounterId);
-
-    /// <summary>True while a combat-replay start is in progress (used to defer replay auto-advance).</summary>
-    bool IsReplayStartInProgress();
 }

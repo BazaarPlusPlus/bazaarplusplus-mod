@@ -25,6 +25,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
 
     private readonly Func<BazaarAgentContextSnapshot?> _snapshotGetter;
     private readonly BazaarAgentActionQueue _queue;
+    private readonly BazaarAgentReplayControlQueue _replayQueue;
     private readonly IBazaarAgentLogger _logger;
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
@@ -37,12 +38,14 @@ public sealed class BazaarAgentHttpServer : IDisposable
         int port,
         Func<BazaarAgentContextSnapshot?> snapshotGetter,
         BazaarAgentActionQueue queue,
+        BazaarAgentReplayControlQueue replayQueue,
         IBazaarAgentLogger logger
     )
     {
         Port = port;
         _snapshotGetter = snapshotGetter;
         _queue = queue;
+        _replayQueue = replayQueue;
         _logger = logger;
     }
 
@@ -142,6 +145,20 @@ public sealed class BazaarAgentHttpServer : IDisposable
             {
                 await HandlePostActions(ctx).ConfigureAwait(false);
             }
+            else if (
+                string.Equals(path, "/v1/replay/record", StringComparison.OrdinalIgnoreCase)
+                && method == "POST"
+            )
+            {
+                await HandlePostReplayRecord(ctx).ConfigureAwait(false);
+            }
+            else if (
+                string.Equals(path, "/v1/replay/continue", StringComparison.OrdinalIgnoreCase)
+                && method == "POST"
+            )
+            {
+                await HandlePostReplayContinue(ctx).ConfigureAwait(false);
+            }
             else
             {
                 WriteErrorEnvelope(ctx, 404, "not-found", "unknown route");
@@ -199,44 +216,9 @@ public sealed class BazaarAgentHttpServer : IDisposable
 
     private async Task HandlePostActions(HttpListenerContext ctx)
     {
-        // Pre-check Content-Length header
-        var declaredHeader = ctx.Request.Headers["Content-Length"];
-        if (long.TryParse(declaredHeader, out var declared) && declared > MaxBodyBytes)
-        {
-            WriteErrorEnvelope(ctx, 413, "invalid", "body too large");
+        var body = await ReadBodyWithCap(ctx, MaxBodyBytes).ConfigureAwait(false);
+        if (body is null)
             return;
-        }
-
-        // Stream-read with size cap
-        byte[] body;
-        try
-        {
-            using var ms = new MemoryStream();
-            var buf = new byte[8192];
-            var total = 0;
-            while (true)
-            {
-                var read = await ctx
-                    .Request.InputStream.ReadAsync(buf, 0, buf.Length)
-                    .ConfigureAwait(false);
-                if (read <= 0)
-                    break;
-                total += read;
-                if (total > MaxBodyBytes)
-                {
-                    WriteErrorEnvelope(ctx, 413, "invalid", "body too large");
-                    return;
-                }
-                ms.Write(buf, 0, read);
-            }
-            body = ms.ToArray();
-        }
-        catch (IOException ex)
-        {
-            _logger.Error("POST body read failed", ex);
-            WriteErrorEnvelope(ctx, 400, "invalid", "read failed");
-            return;
-        }
 
         BazaarAgentAction? action;
         try
@@ -257,6 +239,90 @@ public sealed class BazaarAgentHttpServer : IDisposable
         }
 
         var res = await _queue.EnqueueAndAwaitAsync(action).ConfigureAwait(false);
+        await WriteQueueResponse(ctx, res).ConfigureAwait(false);
+    }
+
+    private async Task HandlePostReplayRecord(HttpListenerContext ctx)
+    {
+        // Raw binary route: the body is a GhostBattlePayload msgpack+gzip blob, never JSON.
+        // It gets its own (much larger) cap and bypasses the action parser entirely.
+        var body = await ReadBodyWithCap(ctx, BazaarAgentRuntimeDefaults.MaxRecordBodyBytes)
+            .ConfigureAwait(false);
+        if (body is null)
+            return;
+
+        if (body.Length == 0)
+        {
+            WriteErrorEnvelope(ctx, 400, "invalid", "empty body");
+            return;
+        }
+
+        var battleId = ctx.Request.Headers["X-Bpp-Battle-Id"];
+        if (string.IsNullOrWhiteSpace(battleId))
+            battleId = ctx.Request.QueryString["battleId"];
+
+        var res = await _replayQueue
+            .EnqueueAndAwaitAsync(BazaarAgentReplayControlKind.Start, body, battleId)
+            .ConfigureAwait(false);
+        await WriteQueueResponse(ctx, res).ConfigureAwait(false);
+    }
+
+    private async Task HandlePostReplayContinue(HttpListenerContext ctx)
+    {
+        var res = await _replayQueue
+            .EnqueueAndAwaitAsync(BazaarAgentReplayControlKind.Continue, null, null)
+            .ConfigureAwait(false);
+        await WriteQueueResponse(ctx, res).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads the request body up to <paramref name="maxBytes"/>. Returns <c>null</c>
+    /// after writing a 413/400 error envelope when the cap is exceeded or the read fails.</summary>
+    private async Task<byte[]?> ReadBodyWithCap(HttpListenerContext ctx, int maxBytes)
+    {
+        // Pre-check Content-Length header
+        var declaredHeader = ctx.Request.Headers["Content-Length"];
+        if (long.TryParse(declaredHeader, out var declared) && declared > maxBytes)
+        {
+            WriteErrorEnvelope(ctx, 413, "invalid", "body too large");
+            return null;
+        }
+
+        // Stream-read with size cap
+        try
+        {
+            using var ms = new MemoryStream();
+            var buf = new byte[8192];
+            var total = 0;
+            while (true)
+            {
+                var read = await ctx
+                    .Request.InputStream.ReadAsync(buf, 0, buf.Length)
+                    .ConfigureAwait(false);
+                if (read <= 0)
+                    break;
+                total += read;
+                if (total > maxBytes)
+                {
+                    WriteErrorEnvelope(ctx, 413, "invalid", "body too large");
+                    return null;
+                }
+                ms.Write(buf, 0, read);
+            }
+            return ms.ToArray();
+        }
+        catch (IOException ex)
+        {
+            _logger.Error("POST body read failed", ex);
+            WriteErrorEnvelope(ctx, 400, "invalid", "read failed");
+            return null;
+        }
+    }
+
+    private static async Task WriteQueueResponse(
+        HttpListenerContext ctx,
+        BazaarAgentServerResponse res
+    )
+    {
         ctx.Response.StatusCode = res.HttpStatus;
         ctx.Response.ContentType = "application/json; charset=utf-8";
         var bytes = Encoding.UTF8.GetBytes(res.JsonBody);
