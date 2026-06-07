@@ -32,8 +32,8 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     private double _lastListenerReconcileTime = double.NegativeInfinity;
     private BazaarAgentDecisionLog? _decisionLog;
     private BazaarAgentHttpServer? _http;
-    private BazaarAgentActionQueue? _queue;
-    private BazaarAgentReplayControlQueue? _replayQueue;
+    private BazaarAgentCommandQueue<BazaarAgentAction>? _queue;
+    private BazaarAgentCommandQueue<BazaarAgentReplayCommand>? _replayQueue;
     private int _currentPort = -1;
 
     public BazaarAgentRuntimeController(
@@ -83,7 +83,21 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
         var pending = _queue.TryDequeue();
         if (pending is not null)
-            ProcessPending(pending, snapshot);
+        {
+            // A dequeued command is claimed (its timeout is disarmed), so it MUST be answered
+            // here — an unhandled exception would leave the HTTP client waiting forever.
+            // Answer BEFORE logging: the logger itself can throw (e.g. disk-full inside the
+            // BepInEx log listener chain), and that must not swallow the response.
+            try
+            {
+                ProcessPending(pending, snapshot);
+            }
+            catch (Exception ex)
+            {
+                pending.SetResponse(new BazaarAgentServerResponse(500, "{\"error\":\"internal\"}"));
+                _logger.Error("action processing threw", ex);
+            }
+        }
 
         return true;
     }
@@ -108,8 +122,8 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
         try
         {
-            _queue = new BazaarAgentActionQueue(desiredTimeoutMs);
-            _replayQueue = new BazaarAgentReplayControlQueue(
+            _queue = new BazaarAgentCommandQueue<BazaarAgentAction>(desiredTimeoutMs);
+            _replayQueue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(
                 BazaarAgentRuntimeDefaults.ReplayControlTimeoutMilliseconds
             );
             _http = new BazaarAgentHttpServer(
@@ -173,15 +187,32 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         if (queue is null)
             return;
 
-        while (queue.TryDequeue() is { } pending)
+        // At most ONE command per tick: a Start pays a multi-MB gzip+msgpack decode on the main
+        // thread, and replay control is strictly serial anyway — a burst of queued commands
+        // (retry storm, requests accumulated during a scene-load stall) must not stack several
+        // decodes into a single frame. The next command runs on the next Update, ~one frame later.
+        if (queue.TryDequeue() is { } pending)
         {
-            BazaarAgentReplayControlProcessor.Process(pending, _replaySink, _logger);
+            // Claimed commands have their timeout disarmed and must always be answered.
+            // Answer BEFORE logging — the logger itself can throw.
+            try
+            {
+                BazaarAgentReplayControlProcessor.Process(pending, _replaySink, _logger);
+            }
+            catch (Exception ex)
+            {
+                pending.SetResponse(new BazaarAgentServerResponse(500, "{\"error\":\"internal\"}"));
+                _logger.Error("replay control processing threw", ex);
+            }
         }
     }
 
-    private void ProcessPending(PendingAction pending, BazaarAgentContextSnapshot snapshot)
+    private void ProcessPending(
+        BazaarAgentPendingCommand<BazaarAgentAction> pending,
+        BazaarAgentContextSnapshot snapshot
+    )
     {
-        var action = pending.Action;
+        var action = pending.Command;
         var decisionId = BazaarAgentUlid.New();
         var cooldownLeft = ComputeCooldownLeft();
 

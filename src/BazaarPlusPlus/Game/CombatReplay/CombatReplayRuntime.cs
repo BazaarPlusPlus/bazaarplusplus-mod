@@ -31,6 +31,33 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private bool _isReplayStartInProgress;
     private bool _savedReplayPlaybackActive;
 
+    // Latched while a replay exit is in flight but ReplayState has not actually been left yet
+    // (the bootstrapped exit path keeps CurrentState == ReplayState for the whole async
+    // menu-return). Guards against a second Exit(): after the first exit cleared the
+    // bootstrapped flags, a duplicate Exit() would run the original ReplayState.Exit() body
+    // (whose own _exitRequested was never set on the rerouted path) and dispatch the dead
+    // replay's despawn GameSim into the live state machine mid transition.
+    //
+    // The suppression is TIME-BOUNDED: ReturnToMainMenu awaits a network call internally and
+    // can silently fail, leaving the game parked in ReplayState forever. Past the window, a
+    // fresh Exit() (native click or continue endpoint) is allowed through again as the escape
+    // hatch — running the original Exit body is the lesser evil versus a permanently dead
+    // continue button.
+    private const float ReplayExitSuppressionWindowSeconds = 15f;
+    private bool _replayExitInProgress;
+    private float _replayExitRequestedAtRealtime;
+
+    private bool IsReplayExitSuppressionActive =>
+        _replayExitInProgress
+        && Time.realtimeSinceStartup - _replayExitRequestedAtRealtime
+            < ReplayExitSuppressionWindowSeconds;
+
+    private void LatchReplayExitInProgress()
+    {
+        _replayExitInProgress = true;
+        _replayExitRequestedAtRealtime = Time.realtimeSinceStartup;
+    }
+
     public static CombatReplayRuntime? Instance { get; private set; }
 
     // Sourced from the playback session (BeginSession sets it for both the local-saved and the
@@ -73,6 +100,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private void Update()
     {
         _persistence?.DrainPendingResults();
+
+        // The exit-in-progress latch clears itself once ReplayState is actually gone; this is
+        // the only reliable signal on the bootstrapped exit path, where the state transition
+        // happens via RunManager.ReturnToMainMenu without a normal ReplayState exit event.
+        if (_replayExitInProgress && AppState.CurrentState is not ReplayState)
+            _replayExitInProgress = false;
     }
 
     private void OnDestroy()
@@ -272,6 +305,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
+        if (IsReplayExitSuppressionActive)
+        {
+            reason = "Replay exit is already in progress.";
+            return false;
+        }
+
         // Mirror the native continue click: clear the LevelUp recap overlay first
         // (BoardManager.OnBoardRecapReplayButtonsContinueClicked guards on ERunState.LevelUp),
         // then Exit(). For bootstrapped saved replays the Exit() prefix patch reroutes into
@@ -280,6 +319,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             Singleton<BoardManager>.Instance?.ExitRecapReplayState();
 
         replay.Exit();
+        LatchReplayExitInProgress();
         reason = string.Empty;
         return true;
     }
@@ -327,10 +367,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _portraitController!.Cleanup();
             _portraitController.RestoreSelectedHeroOverride();
             BppLog.Error("CombatReplayRuntime", $"Failed to start replay {battleId}: {ex}");
-            if (_playbackPublisher!.StartingPublished)
-            {
-                _playbackPublisher.PublishEnded("start-failed", failed: true);
-            }
+            // Unconditional: PublishEnded only publishes the event when "starting" was
+            // published, but it must always clear the session (battle id) for a failed start.
+            _playbackPublisher!.PublishEnded("start-failed", failed: true);
             if (attemptedBootstrapFromLobby)
                 await ReplayBootstrap.RollbackBootstrapAsync();
         }
@@ -380,14 +419,19 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     internal static bool TryExitBootstrappedSavedReplayToMenu()
     {
         var instance = Instance;
-        if (
-            instance == null
-            || !instance._savedReplayPlaybackActive
-            || !instance._bootstrappedReplayActive
-        )
-        {
+        if (instance == null)
             return false;
-        }
+
+        // A replay exit is already in flight (the bootstrapped flags were cleared, but the
+        // async menu-return has not left ReplayState yet). Report "handled" so the Exit()
+        // prefix patch suppresses the original body — running it now would dispatch the dead
+        // replay's despawn GameSim into the live state machine mid transition. Time-bounded:
+        // see ReplayExitSuppressionWindowSeconds.
+        if (instance.IsReplayExitSuppressionActive && AppState.CurrentState is ReplayState)
+            return true;
+
+        if (!instance._savedReplayPlaybackActive || !instance._bootstrappedReplayActive)
+            return false;
 
         instance.ExitBootstrappedSavedReplayToMenu();
         return true;
@@ -399,6 +443,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _bootstrappedReplayActive = false;
         _savedReplayPlaybackActive = false;
         _isReplayStartInProgress = false;
+        // Covers the native continue-click path too (it never goes through TryContinueReplay);
+        // Update() clears the latch once ReplayState is actually gone.
+        LatchReplayExitInProgress();
         _portraitController?.RestoreSelectedHeroOverride();
         // Bootstrapped saved replays exit through this manual path (the state-exit patch
         // intercepts the normal transition), so OnStateChanged's PublishEnded never fires for

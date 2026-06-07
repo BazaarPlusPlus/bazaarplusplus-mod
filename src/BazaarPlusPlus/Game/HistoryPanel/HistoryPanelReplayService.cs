@@ -9,7 +9,6 @@ using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Infrastructure;
-using UnityEngine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -18,12 +17,14 @@ internal sealed class HistoryPanelReplayService
     private readonly Func<CombatReplayRuntime?> _runtimeAccessor;
     private readonly Func<string?> _replayDirectoryPathAccessor;
     private readonly Func<string?> _pluginsDirectoryPathAccessor;
+    private readonly Func<string?> _videoDirectoryPathAccessor;
     private readonly GhostBattleSyncService? _ghostSyncService;
 
     public HistoryPanelReplayService(
         Func<CombatReplayRuntime?> runtimeAccessor,
         Func<string?> replayDirectoryPathAccessor,
         Func<string?> pluginsDirectoryPathAccessor,
+        Func<string?> videoDirectoryPathAccessor,
         GhostBattleSyncService? ghostSyncService = null
     )
     {
@@ -35,6 +36,9 @@ internal sealed class HistoryPanelReplayService
         _pluginsDirectoryPathAccessor =
             pluginsDirectoryPathAccessor
             ?? throw new ArgumentNullException(nameof(pluginsDirectoryPathAccessor));
+        _videoDirectoryPathAccessor =
+            videoDirectoryPathAccessor
+            ?? throw new ArgumentNullException(nameof(videoDirectoryPathAccessor));
         _ghostSyncService = ghostSyncService;
     }
 
@@ -48,23 +52,20 @@ internal sealed class HistoryPanelReplayService
         _ = Task.Run(() => FfmpegLocator.Resolve(pluginsDirectoryPath));
     }
 
-    // Recording is feasible only when the replay itself can run AND a working ffmpeg is
-    // available AND the device supports async GPU readback (the frame-grab path). Mirrors the
-    // three guards in CombatReplayVideoRecorder. supportsAsyncGPUReadback is a cheap static
-    // getter; FfmpegLocator.Resolve hits the prewarmed cache here (no probe on the UI thread).
+    // Recording is feasible only when the replay itself can run AND the shared recording gate
+    // passes (async GPU readback + ffmpeg + video directory — the same gate the recorder
+    // enforces at capture time). FfmpegLocator.Resolve hits the prewarmed cache here (no probe
+    // on the UI thread).
     public bool CanRecordReplay(HistoryBattleRecord? battle, out string reason)
     {
         if (!CanReplayBattle(battle, out reason))
             return false;
 
-        if (!SystemInfo.supportsAsyncGPUReadback)
-        {
-            reason = HistoryPanelText.RecordingUnavailable();
-            return false;
-        }
-
-        var pluginsDirectoryPath = _pluginsDirectoryPathAccessor();
-        if (string.IsNullOrEmpty(FfmpegLocator.Resolve(pluginsDirectoryPath)))
+        var gate = CombatReplayRecordingGate.Evaluate(
+            _pluginsDirectoryPathAccessor(),
+            _videoDirectoryPathAccessor()
+        );
+        if (!gate.CanRecord)
         {
             reason = HistoryPanelText.RecordingUnavailable();
             return false;

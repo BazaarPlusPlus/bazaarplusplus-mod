@@ -14,29 +14,32 @@ namespace BazaarPlusPlus.BazaarAgent;
 public static class BazaarAgentReplayControlProcessor
 {
     public static void Process(
-        PendingReplayControl pending,
+        BazaarAgentPendingCommand<BazaarAgentReplayCommand> pending,
         IBazaarAgentReplayControlSink sink,
         IBazaarAgentLogger logger
     )
     {
+        var command = pending.Command;
         BazaarAgentReplayControlOutcome outcome;
         try
         {
             outcome =
-                pending.Kind == BazaarAgentReplayControlKind.Start
-                    ? sink.Start(pending.Payload ?? Array.Empty<byte>(), pending.BattleId)
+                command.Kind == BazaarAgentReplayControlKind.Start
+                    ? sink.Start(command.Payload ?? Array.Empty<byte>(), command.BattleId)
                     : sink.Continue();
         }
         catch (Exception ex)
         {
-            logger.Error($"replay control {pending.Kind} threw", ex);
+            // Answer BEFORE logging — the claimed command's timeout is disarmed, and the
+            // logger itself can throw; the response must never be lost to a logging failure.
             pending.SetResponse(
                 new BazaarAgentServerResponse(500, BuildErrorBody("internal", ex.GetType().Name))
             );
+            logger.Error($"replay control {command.Kind} threw", ex);
             return;
         }
 
-        pending.SetResponse(MapOutcome(pending.Kind, outcome));
+        pending.SetResponse(MapOutcome(command.Kind, outcome));
     }
 
     public static BazaarAgentServerResponse MapOutcome(

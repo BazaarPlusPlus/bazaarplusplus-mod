@@ -48,6 +48,13 @@ public enum BazaarAgentReplayControlKind
     Continue,
 }
 
+/// <summary>One replay control command as carried through the HTTP→main-thread queue.</summary>
+public readonly record struct BazaarAgentReplayCommand(
+    BazaarAgentReplayControlKind Kind,
+    byte[]? Payload,
+    string? BattleId
+);
+
 public enum BazaarAgentReplayControlStatus
 {
     /// <summary>Command reached the game: recording started / continue triggered.</summary>

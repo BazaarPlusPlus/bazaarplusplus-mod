@@ -13,14 +13,14 @@ public class BazaarAgentReplayHttpRoutesTests
     {
         public int Port { get; }
         public BazaarAgentHttpServer Server { get; }
-        public BazaarAgentActionQueue Queue { get; }
-        public BazaarAgentReplayControlQueue ReplayQueue { get; }
+        public BazaarAgentCommandQueue<BazaarAgentAction> Queue { get; }
+        public BazaarAgentCommandQueue<BazaarAgentReplayCommand> ReplayQueue { get; }
 
         public ServerFixture(int replayTimeoutMs = 5000)
         {
             Port = PickFreePort();
-            Queue = new BazaarAgentActionQueue(5000);
-            ReplayQueue = new BazaarAgentReplayControlQueue(replayTimeoutMs);
+            Queue = new BazaarAgentCommandQueue<BazaarAgentAction>(5000);
+            ReplayQueue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(replayTimeoutMs);
             Server = new BazaarAgentHttpServer(
                 Port,
                 () => null,
@@ -75,7 +75,7 @@ public class BazaarAgentReplayHttpRoutesTests
     /// completing the first dequeued command with <paramref name="respond"/>.</summary>
     private static void PumpReplayQueueOnce(
         ServerFixture f,
-        Func<PendingReplayControl, BazaarAgentServerResponse> respond
+        Func<BazaarAgentPendingCommand<BazaarAgentReplayCommand>, BazaarAgentServerResponse> respond
     )
     {
         _ = Task.Run(async () =>
@@ -99,18 +99,18 @@ public class BazaarAgentReplayHttpRoutesTests
         using var f = new ServerFixture();
         var payload = new byte[] { 0x1F, 0x8B, 0x01, 0x02, 0x03 };
 
-        PendingReplayControl? seen = null;
+        BazaarAgentPendingCommand<BazaarAgentReplayCommand>? seen = null;
         PumpReplayQueueOnce(
             f,
             pending =>
             {
                 seen = pending;
                 return BazaarAgentReplayControlProcessor.MapOutcome(
-                    pending.Kind,
+                    pending.Command.Kind,
                     new BazaarAgentReplayControlOutcome(
                         BazaarAgentReplayControlStatus.Accepted,
                         null,
-                        pending.BattleId
+                        pending.Command.BattleId
                     )
                 );
             }
@@ -138,9 +138,9 @@ public class BazaarAgentReplayHttpRoutesTests
         Assert.Contains("\"status\":\"recording-started\"", body);
 
         Assert.NotNull(seen);
-        Assert.Equal(BazaarAgentReplayControlKind.Start, seen!.Kind);
-        Assert.Equal(payload, seen.Payload);
-        Assert.Equal("battle-42", seen.BattleId);
+        Assert.Equal(BazaarAgentReplayControlKind.Start, seen!.Command.Kind);
+        Assert.Equal(payload, seen.Command.Payload);
+        Assert.Equal("battle-42", seen.Command.BattleId);
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public class BazaarAgentReplayHttpRoutesTests
     {
         using var f = new ServerFixture();
 
-        PendingReplayControl? seen = null;
+        BazaarAgentPendingCommand<BazaarAgentReplayCommand>? seen = null;
         PumpReplayQueueOnce(
             f,
             pending =>
@@ -164,7 +164,7 @@ public class BazaarAgentReplayHttpRoutesTests
             new ByteArrayContent(new byte[] { 0x01 })
         );
         Assert.Equal(HttpStatusCode.Accepted, res.StatusCode);
-        Assert.Equal("battle-q", seen!.BattleId);
+        Assert.Equal("battle-q", seen!.Command.BattleId);
     }
 
     [Fact]
@@ -231,14 +231,14 @@ public class BazaarAgentReplayHttpRoutesTests
     {
         using var f = new ServerFixture();
 
-        PendingReplayControl? seen = null;
+        BazaarAgentPendingCommand<BazaarAgentReplayCommand>? seen = null;
         PumpReplayQueueOnce(
             f,
             pending =>
             {
                 seen = pending;
                 return BazaarAgentReplayControlProcessor.MapOutcome(
-                    pending.Kind,
+                    pending.Command.Kind,
                     new BazaarAgentReplayControlOutcome(
                         BazaarAgentReplayControlStatus.Accepted,
                         null,
@@ -259,8 +259,8 @@ public class BazaarAgentReplayHttpRoutesTests
         Assert.Contains("\"status\":\"continue-triggered\"", body);
 
         Assert.NotNull(seen);
-        Assert.Equal(BazaarAgentReplayControlKind.Continue, seen!.Kind);
-        Assert.Null(seen.Payload);
+        Assert.Equal(BazaarAgentReplayControlKind.Continue, seen!.Command.Kind);
+        Assert.Null(seen.Command.Payload);
     }
 
     [Fact]

@@ -38,6 +38,7 @@ internal sealed class HistoryPanelMount : IBppMountable
             services.RunContext,
             services.Paths.RunLogDatabasePath,
             services.Paths.CombatReplayDirectoryPath,
+            services.Paths.CombatReplayVideoDirectoryPath,
             services.Paths.PluginsDirectoryPath,
             () => combatReplayRuntime
         );

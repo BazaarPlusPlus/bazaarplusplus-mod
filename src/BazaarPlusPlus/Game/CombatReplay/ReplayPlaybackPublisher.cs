@@ -20,8 +20,6 @@ internal sealed class ReplayPlaybackPublisher
         _services = services ?? throw new ArgumentNullException(nameof(services));
     }
 
-    public bool StartingPublished => _startingPublished;
-
     /// <summary>Battle id of the session currently between BeginSession and PublishEnded.</summary>
     public string? ActiveSessionBattleId => _activeBattleId;
 
@@ -77,13 +75,18 @@ internal sealed class ReplayPlaybackPublisher
 
     public void PublishEnded(string reason, bool failed)
     {
-        if (!_startingPublished)
-            return;
-
+        // Always clear the session, even when no "starting" event was ever published (a start
+        // that failed before playback began). Leaving _activeBattleId set would leak the failed
+        // battle id into ActiveSessionBattleId — and from there into the BazaarAgent
+        // replayBattleId context field during unrelated, later replays.
         var battleId = _activeBattleId ?? string.Empty;
+        var startingPublished = _startingPublished;
         _startingPublished = false;
         _activeBattleId = null;
         _activeManifest = null;
+
+        if (!startingPublished)
+            return;
 
         try
         {

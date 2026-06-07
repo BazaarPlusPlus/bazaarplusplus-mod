@@ -9,7 +9,6 @@ using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
-using UnityEngine;
 
 namespace BazaarPlusPlus;
 
@@ -24,6 +23,7 @@ namespace BazaarPlusPlus;
 internal static class BazaarAgentReplayRecorderWiring
 {
     private static int _ffmpegPrewarmKicked;
+    private static volatile bool _ffmpegPrewarmCompleted;
 
     public static IBazaarAgentReplayRecorder Create(
         Func<CombatReplayRuntime?> runtimeAccessor,
@@ -49,6 +49,13 @@ internal static class BazaarAgentReplayRecorderWiring
 
         if (runtime == null)
             return BppReplayControlResult.Unavailable("Combat replay runtime is unavailable.");
+
+        // Guards before decode: this runs on the Unity main thread inside one controller tick,
+        // and the gzip+msgpack decode of a multi-MB payload is the expensive part. A request
+        // that is going to be rejected anyway (in-run, replay already active, recording
+        // unavailable) must not pay it — especially for command bursts queued during a stall.
+        if (!CanRecordNow(runtime, services, out var reason))
+            return BppReplayControlResult.Rejected(reason);
 
         if (!GhostBattlePayloadCodec.TryDeserialize(payloadBytes, out var ghost, out var error))
             return BppReplayControlResult.Invalid($"Payload decode failed: {error}");
@@ -81,9 +88,6 @@ internal static class BazaarAgentReplayRecorderWiring
             );
         }
 
-        if (!CanRecordNow(runtime, services, out var reason))
-            return BppReplayControlResult.Rejected(reason);
-
         if (!runtime.ReplayImportedBattle(manifest, payload, recordVideo: true))
             return BppReplayControlResult.Rejected("Replay runtime rejected the imported battle.");
 
@@ -94,9 +98,9 @@ internal static class BazaarAgentReplayRecorderWiring
         return BppReplayControlResult.Accepted(battleId);
     }
 
-    // The recorder's OnPlaybackStarting bails out silently when any of these fail (the replay
-    // still plays, nothing is recorded) — so a record request must be rejected up front instead
-    // of returning "accepted" for a session that will never produce an mp4.
+    // The recorder's OnPlaybackStarting bails out silently when the recording gate fails (the
+    // replay still plays, nothing is recorded) — so a record request must be rejected up front
+    // instead of returning "accepted" for a session that will never produce an mp4.
     private static bool CanRecordNow(
         CombatReplayRuntime runtime,
         IBppServices services,
@@ -106,21 +110,29 @@ internal static class BazaarAgentReplayRecorderWiring
         if (!runtime.CanReplaySavedCombats(out reason))
             return false;
 
-        if (!SystemInfo.supportsAsyncGPUReadback)
+        // FfmpegLocator.Resolve probes (~2s, with WaitForExit calls) on its first process-wide
+        // call. Never pay that on the Unity main thread: until the off-thread prewarm has
+        // finished, answer with a retryable rejection instead of freezing the game.
+        if (!_ffmpegPrewarmCompleted)
         {
-            reason = "Video recording is unavailable on this device (no async GPU readback).";
+            reason = "Recording availability probe is still warming up; retry shortly.";
             return false;
         }
 
-        if (string.IsNullOrEmpty(FfmpegLocator.Resolve(services.Paths.PluginsDirectoryPath)))
+        var gate = CombatReplayRecordingGate.Evaluate(
+            services.Paths.PluginsDirectoryPath,
+            services.Paths.CombatReplayVideoDirectoryPath
+        );
+        if (!gate.CanRecord)
         {
-            reason = "Video recording is unavailable (FFmpeg could not be resolved).";
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(services.Paths.CombatReplayVideoDirectoryPath))
-        {
-            reason = "Video recording is unavailable (video directory is not configured).";
+            reason = gate.Blocker switch
+            {
+                CombatReplayRecordingBlocker.NoAsyncGpuReadback =>
+                    "Video recording is unavailable on this device (no async GPU readback).",
+                CombatReplayRecordingBlocker.FfmpegUnavailable =>
+                    "Video recording is unavailable (FFmpeg could not be resolved).",
+                _ => "Video recording is unavailable (video directory is not configured).",
+            };
             return false;
         }
 
@@ -173,6 +185,16 @@ internal static class BazaarAgentReplayRecorderWiring
             return;
 
         var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
-        _ = Task.Run(() => FfmpegLocator.Resolve(pluginsDirectoryPath));
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                FfmpegLocator.Resolve(pluginsDirectoryPath);
+            }
+            finally
+            {
+                _ffmpegPrewarmCompleted = true;
+            }
+        });
     }
 }

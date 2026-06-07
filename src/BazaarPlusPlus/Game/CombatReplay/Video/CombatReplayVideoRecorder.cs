@@ -142,37 +142,38 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         if (services == null)
             return;
 
-        if (!SystemInfo.supportsAsyncGPUReadback)
-        {
-            BppLog.Info(
-                "CombatReplayVideo",
-                "SystemInfo.supportsAsyncGPUReadback is false on this device; video recording is disabled."
-            );
-            return;
-        }
-
         var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
-        var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
-        if (string.IsNullOrEmpty(ffmpegExecutable))
+        var gate = CombatReplayRecordingGate.Evaluate(
+            pluginsDirectoryPath,
+            services.Paths.CombatReplayVideoDirectoryPath
+        );
+        if (!gate.CanRecord)
         {
-            BppLog.Warn(
-                "CombatReplayVideo",
-                $"Recording requested for {evt.BattleId} but FFmpeg could not be resolved (plugins='{pluginsDirectoryPath}'); skipping capture."
-            );
+            switch (gate.Blocker)
+            {
+                case CombatReplayRecordingBlocker.NoAsyncGpuReadback:
+                    BppLog.Info(
+                        "CombatReplayVideo",
+                        "SystemInfo.supportsAsyncGPUReadback is false on this device; video recording is disabled."
+                    );
+                    break;
+                case CombatReplayRecordingBlocker.FfmpegUnavailable:
+                    BppLog.Warn(
+                        "CombatReplayVideo",
+                        $"Recording requested for {evt.BattleId} but FFmpeg could not be resolved (plugins='{pluginsDirectoryPath}'); skipping capture."
+                    );
+                    break;
+                default:
+                    BppLog.Warn(
+                        "CombatReplayVideo",
+                        "CombatReplayVideoDirectoryPath is not configured; cannot record replay video."
+                    );
+                    break;
+            }
             return;
         }
 
-        var videoDirectoryPath = services.Paths.CombatReplayVideoDirectoryPath;
-        if (string.IsNullOrWhiteSpace(videoDirectoryPath))
-        {
-            BppLog.Warn(
-                "CombatReplayVideo",
-                "CombatReplayVideoDirectoryPath is not configured; cannot record replay video."
-            );
-            return;
-        }
-
-        var request = BuildCaptureRequest(evt, ffmpegExecutable!, videoDirectoryPath);
+        var request = BuildCaptureRequest(evt, gate.FfmpegExecutable!, gate.VideoDirectoryPath!);
         if (request == null)
             return;
 

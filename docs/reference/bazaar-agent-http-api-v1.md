@@ -219,7 +219,7 @@ The battle id from the header/query, when present, is cross-checked against the 
 |---|---|
 | 202 | Accepted and playback+recording started. **Not** "mp4 ready" — completion is observed by polling `replayPhase` and then the output file (see flow below). Body: `{"accepted":true,"battleId":"...","status":"recording-started"}` |
 | 400 | Empty body, gzip/msgpack decode failure, missing manifest, or battleId mismatch (`invalid`) |
-| 409 | Replay/recording guards refused (`stale-or-unavailable`): in an active run, already in ReplayState, a replay start already in flight, or recording unavailable (no async GPU readback / FFmpeg unresolved / video directory unset). Requires the game to sit at the menu/lobby |
+| 409 | Replay/recording guards refused (`stale-or-unavailable`): in an active run, already in ReplayState, a replay start already in flight, recording unavailable (no async GPU readback / FFmpeg unresolved / video directory unset), or the one-time FFmpeg availability probe is still warming up right after game start (retry shortly). Requires the game to sit at the menu/lobby |
 | 413 | Body over the record cap (`invalid`) |
 | 503 | Recorder facade or combat-replay runtime unavailable, queue disposed, or the 10 s main-thread accept window timed out (`unavailable`) |
 | 500 | Unexpected exception (`internal`) |
@@ -394,4 +394,4 @@ After every non-`Wait` action that the mod dispatched (`executed: true`), a 1.0 
 
 ## 12. Runtime defaults
 
-There is no BazaarAgent runtime cfg. Installing `BazaarPlusPlus.BazaarAgentHost.dll` enables the listener, and removing it disables the listener. The listener port (`47900`), snapshot tick cadence (`1.5 s`), minimum action delay (`1.0 s`), action POST blocking timeout (`3 s`), replay-control POST blocking timeout (`10 s`), and record body cap (`32 MB`) are fixed defaults. Replay control commands drain every frame (not at the snapshot cadence), so record/continue accepts are not throttled to 1.5 s.
+There is no BazaarAgent runtime cfg. Installing `BazaarPlusPlus.BazaarAgentHost.dll` enables the listener, and removing it disables the listener. The listener port (`47900`), snapshot tick cadence (`1.5 s`), minimum action delay (`1.0 s`), action POST blocking timeout (`3 s`), replay-control POST blocking timeout (`10 s`), and record body cap (`32 MB`) are fixed defaults. Replay control commands drain one per frame (not at the snapshot cadence), so record/continue accepts are not throttled to 1.5 s; a burst of queued commands processes across consecutive frames.

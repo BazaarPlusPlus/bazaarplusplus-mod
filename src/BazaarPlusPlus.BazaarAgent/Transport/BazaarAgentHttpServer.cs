@@ -24,8 +24,8 @@ public sealed class BazaarAgentHttpServer : IDisposable
     };
 
     private readonly Func<BazaarAgentContextSnapshot?> _snapshotGetter;
-    private readonly BazaarAgentActionQueue _queue;
-    private readonly BazaarAgentReplayControlQueue _replayQueue;
+    private readonly BazaarAgentCommandQueue<BazaarAgentAction> _queue;
+    private readonly BazaarAgentCommandQueue<BazaarAgentReplayCommand> _replayQueue;
     private readonly IBazaarAgentLogger _logger;
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
@@ -37,8 +37,8 @@ public sealed class BazaarAgentHttpServer : IDisposable
     public BazaarAgentHttpServer(
         int port,
         Func<BazaarAgentContextSnapshot?> snapshotGetter,
-        BazaarAgentActionQueue queue,
-        BazaarAgentReplayControlQueue replayQueue,
+        BazaarAgentCommandQueue<BazaarAgentAction> queue,
+        BazaarAgentCommandQueue<BazaarAgentReplayCommand> replayQueue,
         IBazaarAgentLogger logger
     )
     {
@@ -262,7 +262,9 @@ public sealed class BazaarAgentHttpServer : IDisposable
             battleId = ctx.Request.QueryString["battleId"];
 
         var res = await _replayQueue
-            .EnqueueAndAwaitAsync(BazaarAgentReplayControlKind.Start, body, battleId)
+            .EnqueueAndAwaitAsync(
+                new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, body, battleId)
+            )
             .ConfigureAwait(false);
         await WriteQueueResponse(ctx, res).ConfigureAwait(false);
     }
@@ -270,10 +272,20 @@ public sealed class BazaarAgentHttpServer : IDisposable
     private async Task HandlePostReplayContinue(HttpListenerContext ctx)
     {
         var res = await _replayQueue
-            .EnqueueAndAwaitAsync(BazaarAgentReplayControlKind.Continue, null, null)
+            .EnqueueAndAwaitAsync(
+                new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Continue, null, null)
+            )
             .ConfigureAwait(false);
         await WriteQueueResponse(ctx, res).ConfigureAwait(false);
     }
+
+    // How much of an over-cap request body gets drained after a 413 so the client can read the
+    // response instead of hitting a TCP reset, and for how long. Beyond either bound, closing
+    // with unread data (and the reset that follows) is the lesser evil — the time bound keeps a
+    // stalled client (declared length, never sends) from parking the handler task forever.
+    private const long MaxRejectedBodyDrainBytes =
+        2L * BazaarAgentRuntimeDefaults.MaxRecordBodyBytes;
+    private const int MaxRejectedBodyDrainMilliseconds = 5000;
 
     /// <summary>Reads the request body up to <paramref name="maxBytes"/>. Returns <c>null</c>
     /// after writing a 413/400 error envelope when the cap is exceeded or the read fails.</summary>
@@ -283,7 +295,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
         var declaredHeader = ctx.Request.Headers["Content-Length"];
         if (long.TryParse(declaredHeader, out var declared) && declared > maxBytes)
         {
-            WriteErrorEnvelope(ctx, 413, "invalid", "body too large");
+            await RejectTooLarge(ctx).ConfigureAwait(false);
             return null;
         }
 
@@ -303,7 +315,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
                 total += read;
                 if (total > maxBytes)
                 {
-                    WriteErrorEnvelope(ctx, 413, "invalid", "body too large");
+                    await RejectTooLarge(ctx).ConfigureAwait(false);
                     return null;
                 }
                 ms.Write(buf, 0, read);
@@ -315,6 +327,55 @@ public sealed class BazaarAgentHttpServer : IDisposable
             _logger.Error("POST body read failed", ex);
             WriteErrorEnvelope(ctx, 400, "invalid", "read failed");
             return null;
+        }
+    }
+
+    /// <summary>Writes the 413 envelope, then drains the unread request body (bounded in bytes
+    /// AND time). Closing with unread data makes HttpListener reset the connection, so a client
+    /// still streaming the body would see a broken pipe instead of the 413. Responding first
+    /// keeps clients that never send a body (header-only probes) from waiting on the drain.</summary>
+    private async Task RejectTooLarge(HttpListenerContext ctx)
+    {
+        WriteErrorEnvelope(ctx, 413, "invalid", "body too large");
+        try
+        {
+            var buf = new byte[8192];
+            long drained = 0;
+            var drainClock = System.Diagnostics.Stopwatch.StartNew();
+            while (drained < MaxRejectedBodyDrainBytes)
+            {
+                var remainingMs = MaxRejectedBodyDrainMilliseconds - drainClock.ElapsedMilliseconds;
+                if (remainingMs <= 0)
+                    return;
+
+                // HttpListener request streams do not reliably honor cancellation tokens, so
+                // race the read against a delay; a stalled client loses the race and gets the
+                // connection reset from the caller's Close() instead of holding this task.
+                var readTask = ctx.Request.InputStream.ReadAsync(buf, 0, buf.Length);
+                var completed = await Task.WhenAny(readTask, Task.Delay((int)remainingMs))
+                    .ConfigureAwait(false);
+                if (completed != readTask)
+                {
+                    // Observe the orphaned read's eventual fault (triggered by the close) so it
+                    // doesn't surface as an unobserved task exception.
+                    _ = readTask.ContinueWith(
+                        t => _ = t.Exception,
+                        TaskContinuationOptions.OnlyOnFaulted
+                            | TaskContinuationOptions.ExecuteSynchronously
+                    );
+                    return;
+                }
+
+                var read = await readTask.ConfigureAwait(false);
+                if (read <= 0)
+                    return;
+                drained += read;
+            }
+        }
+        catch (Exception ex)
+        {
+            // The client may abort once it sees the 413 — nothing left to salvage.
+            _logger.Warning($"Rejected-body drain stopped: {FormatException(ex)}");
         }
     }
 

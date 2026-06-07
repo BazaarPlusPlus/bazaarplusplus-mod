@@ -28,6 +28,7 @@ internal static class HistoryPanelFactory
             runtime.CombatReplayRuntimeAccessor,
             () => runtime.CombatReplayDirectoryPath,
             () => runtime.PluginsDirectoryPath,
+            () => runtime.CombatReplayVideoDirectoryPath,
             ghostSyncService
         );
         var serverHealthProbe = new HistoryPanelServerHealthProbe(onlineClient);

@@ -18,8 +18,8 @@ public class BazaarAgentHttpServerTests
     {
         public int Port { get; }
         public BazaarAgentHttpServer Server { get; }
-        public BazaarAgentActionQueue Queue { get; }
-        public BazaarAgentReplayControlQueue ReplayQueue { get; }
+        public BazaarAgentCommandQueue<BazaarAgentAction> Queue { get; }
+        public BazaarAgentCommandQueue<BazaarAgentReplayCommand> ReplayQueue { get; }
         private BazaarAgentContextSnapshot? _snapshot;
         public BazaarAgentContextSnapshot? CurrentSnapshot => _snapshot;
 
@@ -28,8 +28,8 @@ public class BazaarAgentHttpServerTests
         public ServerFixture(int timeoutMs = 5000, int replayTimeoutMs = 5000)
         {
             Port = PickFreePort();
-            Queue = new BazaarAgentActionQueue(timeoutMs);
-            ReplayQueue = new BazaarAgentReplayControlQueue(replayTimeoutMs);
+            Queue = new BazaarAgentCommandQueue<BazaarAgentAction>(timeoutMs);
+            ReplayQueue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(replayTimeoutMs);
             Server = new BazaarAgentHttpServer(
                 Port,
                 () => CurrentSnapshot,
