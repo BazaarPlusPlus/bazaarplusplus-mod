@@ -1,7 +1,14 @@
 # LiveBuildPanel 阵容拉取与 HistoryPanel 连通性操作归位方案
 
-Status: Draft, pending confirmation
+Status: Implemented (2026-06-07)
 Date: 2026-06-07
+
+实现期间确认的增量：拉取成功的反馈不止 `十胜阵容已更新。`，还追加当前 corpus 的
+`generatedAt`（本地时间）与规模统计（阵容数 / 英雄数），数据来自
+`TenWinBuildCorpus.GeneratedAtUtc` / `BuildCount` / `HeroCount`，经
+`BuildRecommendationRepository.GetCorpusSummary()` 提供。建议补充测试中的
+"HistoryPanel 不再包含 FinalBuildRefresh" 源码断言未采纳（与 no-coverage-theater
+约定冲突；跨面板 import 边界已有 `CoreLayeringTests` 覆盖），其余建议测试已落地。
 
 ## 背景
 

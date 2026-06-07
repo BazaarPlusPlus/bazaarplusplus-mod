@@ -25,7 +25,6 @@ internal sealed partial class HistoryPanel
                 () => TryReplaySelectedBattle(false),
                 () => TryReplaySelectedBattle(true),
                 TryDeleteSelectedRun,
-                TryRefreshFinalBuilds,
                 TryCheckServerHealth,
                 SelectRun,
                 SelectBattle,
@@ -175,10 +174,6 @@ internal sealed partial class HistoryPanel
                     && IsDeleteRunConfirmationActive(SelectedRun.RunId)
             ),
             DeleteButtonEnabled = canDeleteSelectedRun,
-            FinalBuildRefreshButtonText = _state.FinalBuildRefreshInProgress
-                ? HistoryPanelText.Working()
-                : HistoryPanelText.RefreshFinalBuilds(),
-            FinalBuildRefreshButtonEnabled = !_state.FinalBuildRefreshInProgress,
             HasSelectedBattle = hasSelectedBattle,
             DetailResultText = detailResultText,
             DetailResultSeverity = detailResultSeverity,
@@ -291,10 +286,6 @@ internal sealed class HistoryPanelUiToolkitModel
     public string DeleteButtonText { get; set; } = string.Empty;
 
     public bool DeleteButtonEnabled { get; set; }
-
-    public string FinalBuildRefreshButtonText { get; set; } = string.Empty;
-
-    public bool FinalBuildRefreshButtonEnabled { get; set; }
 
     public bool HasSelectedBattle { get; set; }
 

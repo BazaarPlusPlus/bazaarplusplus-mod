@@ -96,7 +96,6 @@ Assert(
         ?? throw new InvalidOperationException("HistoryPanelState should be constructible.");
     coordinatorStateType.GetProperty("GhostSyncInProgress")!.SetValue(state, true);
     coordinatorStateType.GetProperty("ReplayActionInProgress")!.SetValue(state, true);
-    coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.SetValue(state, true);
     coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.SetValue(state, true);
 
     var dependencies =
@@ -124,10 +123,6 @@ Assert(
         "Hiding the history panel should clear replay in-progress state."
     );
     Assert(
-        coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.GetValue(state) is false,
-        "Hiding the history panel should clear final-build refresh in-progress state."
-    );
-    Assert(
         coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.GetValue(state) is false,
         "Hiding the history panel should clear server health probe in-progress state."
     );
@@ -139,7 +134,6 @@ Assert(
         ?? throw new InvalidOperationException("HistoryPanelState should be constructible.");
     coordinatorStateType.GetProperty("GhostSyncInProgress")!.SetValue(state, true);
     coordinatorStateType.GetProperty("ReplayActionInProgress")!.SetValue(state, true);
-    coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.SetValue(state, true);
     coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.SetValue(state, true);
 
     var dependencies =
@@ -166,7 +160,8 @@ Assert(
                 fileNotFound.FileName,
                 "UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null",
                 StringComparison.Ordinal
-            ))
+            )
+        )
     {
         // The exe-style test host does not load UnityEngine.CoreModule, but the reset happens
         // before OnPanelShown enters the Unity-backed refresh path.
@@ -179,10 +174,6 @@ Assert(
     Assert(
         coordinatorStateType.GetProperty("GhostSyncInProgress")!.GetValue(state) is true,
         "Showing the history panel should preserve ghost sync in-progress state."
-    );
-    Assert(
-        coordinatorStateType.GetProperty("FinalBuildRefreshInProgress")!.GetValue(state) is true,
-        "Showing the history panel should preserve final-build refresh in-progress state."
     );
     Assert(
         coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.GetValue(state) is true,
@@ -663,7 +654,10 @@ try
         "Ghost repository reads should project a remote loss into a local-player win."
     );
     Assert(
-        (bool)(battleRecordType.GetProperty("IsFinalBattle")?.GetValue(projectedLocalWinBattle) ?? false)
+        (bool)(
+            battleRecordType.GetProperty("IsFinalBattle")?.GetValue(projectedLocalWinBattle)
+            ?? false
+        )
             is true,
         "Ghost repository reads should preserve the final-battle marker for local wins."
     );

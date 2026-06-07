@@ -61,13 +61,6 @@ internal static class HistoryPanelText
 
     private static readonly LocalizedTextSet WorkingText = new("Working...", "处理中...");
 
-    private static readonly LocalizedTextSet RefreshFinalBuildsText = new(
-        "Pull Builds",
-        "拉取阵容",
-        "拉取陣容",
-        "拉取陣容"
-    );
-
     private static readonly LocalizedTextSet CheckServerHealthText = new(
         "Check Server",
         "检测连通",
@@ -271,8 +264,6 @@ internal static class HistoryPanelText
     internal static string DeleteConfirm() => Resolve(DeleteConfirmText);
 
     internal static string Working() => Resolve(WorkingText);
-
-    internal static string RefreshFinalBuilds() => Resolve(RefreshFinalBuildsText);
 
     internal static string CheckServerHealth() => Resolve(CheckServerHealthText);
 
@@ -665,32 +656,9 @@ internal static class HistoryPanelText
         return FormatSimple("Ghost sync is already in progress.", "幽灵同步进行中。");
     }
 
-    internal static string FinalBuildRefreshAlreadyRunning()
-    {
-        return FormatSimple("Build pull is already in progress.", "阵容拉取进行中。");
-    }
-
     internal static string SyncingGhostBattles()
     {
         return FormatSimple("Syncing ghost battles...", "正在同步幽灵对战...");
-    }
-
-    internal static string RefreshingFinalBuilds()
-    {
-        return FormatSimple("Pulling ten-win builds...", "正在拉取十胜阵容...");
-    }
-
-    internal static string FinalBuildRefreshSucceeded()
-    {
-        return FormatSimple("Ten-win builds updated.", "十胜阵容已更新。");
-    }
-
-    internal static string FinalBuildRefreshFailed(string details)
-    {
-        return FormatSimple(
-            $"Couldn't pull ten-win builds: {details}",
-            $"拉取十胜阵容失败：{details}"
-        );
     }
 
     internal static string BattleLoadFailed(string details)

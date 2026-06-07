@@ -28,16 +28,20 @@ internal sealed class LiveBuildPanelSnapshot
 
     public int RecommendationCount { get; init; }
 
+    public string FinalBuildRefreshButtonText { get; init; } = string.Empty;
+
+    public bool FinalBuildRefreshButtonEnabled { get; init; } = true;
+
+    public string BuildRefreshStatusText { get; init; } = string.Empty;
+
+    public LiveBuildRefreshSeverity BuildRefreshStatusSeverity { get; init; }
+
     public IReadOnlyList<BPPSupporterSample> Supporters { get; init; } =
         Array.Empty<BPPSupporterSample>();
 
     public LiveItemBoardRowVm[] Rows =>
         [
-            new LiveItemBoardRowVm(
-                FinalBuild,
-                LiveBuildPanelText.FinalBuildRow(),
-                string.Empty
-            ),
+            new LiveItemBoardRowVm(FinalBuild, LiveBuildPanelText.FinalBuildRow(), string.Empty),
             new LiveItemBoardRowVm(
                 Shop,
                 LiveBuildPanelText.ShopRow(),

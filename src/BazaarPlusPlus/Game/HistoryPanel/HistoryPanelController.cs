@@ -88,12 +88,6 @@ internal sealed partial class HistoryPanel
         _coordinator?.TryDeleteSelectedRun(SelectedRun);
     }
 
-    private void TryRefreshFinalBuilds()
-    {
-        if (_coordinator != null)
-            _ = _coordinator.TryRefreshFinalBuildsAsync();
-    }
-
     private void TryCheckServerHealth()
     {
         if (_coordinator != null)

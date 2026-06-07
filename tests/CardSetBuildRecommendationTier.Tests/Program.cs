@@ -34,6 +34,7 @@ internal static class TenWinBuildTests
         TestFreshCacheIsUsedWithoutRemoteDownload();
         TestStaleCacheUsesStaleAndQueuesBackgroundRefresh();
         TestManualRefreshBypassesFreshCache();
+        TestRefreshServiceWrapsManualRefreshOutcome();
         TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh();
         TestColdStartFallsBackToEmbeddedThenRemote();
         TestEmbeddedSeedResourceIsBundledAndParses();
@@ -472,6 +473,77 @@ internal static class TenWinBuildTests
         }
     }
 
+    // The LiveBuildPanel manual pull consumes the shared refresh service; its result wrapper must
+    // surface the repository's failure detail instead of swallowing it.
+    private static void TestRefreshServiceWrapsManualRefreshOutcome()
+    {
+        var repositoryType = GetRepositoryType();
+        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
+        var cachePath = TempCachePath(); // no cache on disk; downloads drive the outcome.
+
+        Configure(
+            repositoryType,
+            cachePath,
+            now,
+            _ => throw new InvalidOperationException("refresh-boom")
+        );
+
+        try
+        {
+            var failure = RunRefreshService(repositoryType);
+            Assert(!GetResultSucceeded(failure), "A throwing download should fail the refresh.");
+            Assert(
+                GetResultError(failure)?.Contains("refresh-boom") == true,
+                "The refresh failure should carry the underlying error detail."
+            );
+
+            Configure(repositoryType, cachePath, now, _ => ScorePayload("CacheHero", 333));
+            var success = RunRefreshService(repositoryType);
+            Assert(GetResultSucceeded(success), "A valid download should succeed the refresh.");
+            Assert(
+                GetResultError(success) == null,
+                "A successful refresh should not carry an error."
+            );
+
+            var after = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(
+                after.SequenceEqual([333L]),
+                "A successful service refresh should update the shared corpus."
+            );
+        }
+        finally
+        {
+            Reset(repositoryType);
+            TryDelete(cachePath);
+        }
+    }
+
+    private static object RunRefreshService(Type repositoryType)
+    {
+        var serviceType = repositoryType.Assembly.GetType(
+            "BazaarPlusPlus.Game.BuildRecommendations.BuildRecommendationRefreshService"
+        );
+        Assert(serviceType != null, "BuildRecommendationRefreshService should exist.");
+        var service =
+            Activator.CreateInstance(serviceType!)
+            ?? throw new InvalidOperationException("Refresh service should be constructible.");
+        var refreshAsync = serviceType!.GetMethod("RefreshAsync");
+        Assert(refreshAsync != null, "Refresh service should expose RefreshAsync.");
+
+        var task = (System.Threading.Tasks.Task)
+            refreshAsync!.Invoke(service, [System.Threading.CancellationToken.None])!;
+        task.GetAwaiter().GetResult();
+        return task.GetType().GetProperty("Result")!.GetValue(task)!;
+    }
+
+    private static bool GetResultSucceeded(object result) =>
+        (bool)result.GetType().GetProperty("Succeeded")!.GetValue(result)!;
+
+    private static string? GetResultError(object result) =>
+        (string?)result.GetType().GetProperty("Error")!.GetValue(result);
+
     private static void TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh()
     {
         var repositoryType = GetRepositoryType();
@@ -587,6 +659,12 @@ internal static class TenWinBuildTests
         Assert(corpus != null, "The bundled seed should parse with the production corpus parser.");
         var heroCount = (int)corpusType.GetProperty("HeroCount")!.GetValue(corpus)!;
         Assert(heroCount > 0, "The bundled seed should contain at least one hero.");
+        Assert(
+            corpusType.GetProperty("GeneratedAtUtc")!.GetValue(corpus) != null,
+            "The bundled seed should carry a parseable generatedAt timestamp."
+        );
+        var buildCount = (int)corpusType.GetProperty("BuildCount")!.GetValue(corpus)!;
+        Assert(buildCount > 0, "The bundled seed should count at least one build.");
     }
 
     // ---- Payload builders -------------------------------------------------

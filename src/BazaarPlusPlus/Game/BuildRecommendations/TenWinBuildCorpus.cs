@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 
@@ -59,15 +60,23 @@ internal sealed class TenWinBuildCorpus
     private TenWinBuildCorpus(
         IReadOnlyList<Guid?> cards,
         IReadOnlyDictionary<Guid, int> refByTemplateId,
-        IReadOnlyDictionary<string, TenWinHero> heroes
+        IReadOnlyDictionary<string, TenWinHero> heroes,
+        DateTimeOffset? generatedAtUtc
     )
     {
         _cards = cards;
         _refByTemplateId = refByTemplateId;
         _heroes = heroes;
+        GeneratedAtUtc = generatedAtUtc;
+        BuildCount = heroes.Values.Sum(hero => hero.Builds.Count);
     }
 
     public int HeroCount => _heroes.Count;
+
+    /// <summary>Analyzer emission time (top-level <c>generatedAt</c>); null when absent/invalid.</summary>
+    public DateTimeOffset? GeneratedAtUtc { get; }
+
+    public int BuildCount { get; }
 
     /// <summary>
     /// Parses the compact payload. Returns <c>null</c> on any structural problem (unparseable JSON,
@@ -135,7 +144,33 @@ internal sealed class TenWinBuildCorpus
             heroes[heroProperty.Name] = new TenWinHero(builds, cardIndex);
         }
 
-        return new TenWinBuildCorpus(cards, refByTemplateId, heroes);
+        return new TenWinBuildCorpus(cards, refByTemplateId, heroes, ParseGeneratedAt(root));
+    }
+
+    // Json.NET eagerly converts ISO-8601 strings to Date tokens during JObject.Parse, so both
+    // token shapes must be accepted; anything else degrades to null rather than failing the parse.
+    private static DateTimeOffset? ParseGeneratedAt(JObject root)
+    {
+        var token = root["generatedAt"];
+        switch (token?.Type)
+        {
+            case JTokenType.Date:
+                var dateTime = token.Value<DateTime>();
+                return dateTime.Kind == DateTimeKind.Unspecified
+                    ? new DateTimeOffset(dateTime, TimeSpan.Zero)
+                    : new DateTimeOffset(dateTime.ToUniversalTime());
+            case JTokenType.String:
+                return DateTimeOffset.TryParse(
+                    token.Value<string>(),
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                    out var generatedAt
+                )
+                    ? generatedAt
+                    : (DateTimeOffset?)null;
+            default:
+                return null;
+        }
     }
 
     /// <summary>
@@ -462,6 +497,23 @@ internal sealed class TenWinBuildCorpus
 
         public bool IsComplete => Score >= 0;
     }
+}
+
+/// <summary>Provenance summary of a loaded corpus for status/feedback surfaces.</summary>
+internal readonly struct TenWinCorpusSummary
+{
+    public TenWinCorpusSummary(DateTimeOffset? generatedAtUtc, int buildCount, int heroCount)
+    {
+        GeneratedAtUtc = generatedAtUtc;
+        BuildCount = buildCount;
+        HeroCount = heroCount;
+    }
+
+    public DateTimeOffset? GeneratedAtUtc { get; }
+
+    public int BuildCount { get; }
+
+    public int HeroCount { get; }
 }
 
 internal sealed class TenWinHero

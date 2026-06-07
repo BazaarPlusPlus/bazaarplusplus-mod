@@ -29,6 +29,35 @@
       Link="LiveItemBoardRowVm.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanelText.cs"
+      Link="LiveBuildPanelText.cs"
+    />
+    <Compile Include="../../src/BazaarPlusPlus.Localization/L.cs" Link="L.cs" />
+    <Compile
+      Include="../../src/BazaarPlusPlus.Localization/LocalizedTextSet.cs"
+      Link="LocalizedTextSet.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus.Localization/LanguageCodeMatcher.cs"
+      Link="LanguageCodeMatcher.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus.Localization/ChineseScriptConverter.cs"
+      Link="ChineseScriptConverter.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus.Localization/BppChineseLocaleMode.cs"
+      Link="BppChineseLocaleMode.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus.Localization/ILanguageProvider.cs"
+      Link="ILanguageProvider.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus.Localization/ILocaleModeProvider.cs"
+      Link="ILocaleModeProvider.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoard.cs"
       Link="BppItemBoard.cs"
     />
