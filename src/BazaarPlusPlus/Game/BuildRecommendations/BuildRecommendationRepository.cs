@@ -355,17 +355,19 @@ internal sealed class BuildRecommendationRepository
                 "BuildRecommendationRepository",
                 $"Background ten-win builds refresh failed reason={reason} error={error ?? "unknown"}."
             );
-
-            // Cold start with no usable corpus: allow a later query to retry the fetch.
-            lock (SyncRoot)
-            {
-                if (_corpus == null)
-                    _attemptedLoad = false;
-            }
         }
         finally
         {
-            EndBackgroundRefresh();
+            // Atomically clear the in-progress flag and, on a cold start with no usable corpus,
+            // re-arm the one-shot load so a later query retries (and can re-queue) the fetch.
+            // Doing both under one lock avoids a window where a racing query re-arms the load
+            // while the refresh is still marked in-progress and so suppresses its own re-queue.
+            lock (SyncRoot)
+            {
+                _backgroundRefreshInProgress = false;
+                if (_corpus == null)
+                    _attemptedLoad = false;
+            }
         }
     }
 
