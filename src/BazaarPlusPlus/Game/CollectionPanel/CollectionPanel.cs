@@ -748,6 +748,10 @@ internal sealed class CollectionPanel : MonoBehaviour
                 {
                     OfferedCardIds = offeredCardIds,
                     ApplyHeroFilter = !hasSelectedSource || _filter.ActiveType == ECardType.Skill,
+                    // A source whose offer rule pins a starting tier deals that tier on any
+                    // day; only exempt once its pool is actually narrowing the result.
+                    SuppressDayGate =
+                        offeredCardIds != null && sourceEntry!.OfferRule.StartingTier != null,
                 }
             );
             _virtualizer.SetVisible(ordered, _filter.ActiveType);

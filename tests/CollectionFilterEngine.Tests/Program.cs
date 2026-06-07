@@ -685,6 +685,36 @@ AssertSequence(
     "Day predicate ANDs with the resolved offer pool."
 );
 
+// --- Day filter: fixed-tier sources (offer rule pins a starting tier) ignore the day gate. ---
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        dayPool,
+        new CollectionFilterState { SelectedRunDay = 1 },
+        new CollectionFilterContext
+        {
+            OfferedCardIds = new[] { dayGold.Id, dayDiamond.Id },
+            SuppressDayGate = true,
+        }
+    ),
+    new[] { dayGold.Id, dayDiamond.Id },
+    "A fixed-tier source's pool is exempt from the day ceiling (Luxe on Day 1 still deals Diamond)."
+);
+var suppressedDayManualTier = new CollectionFilterState { SelectedRunDay = 1 };
+suppressedDayManualTier.Tiers.Add(ETier.Gold);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        dayPool,
+        suppressedDayManualTier,
+        new CollectionFilterContext
+        {
+            OfferedCardIds = new[] { dayGold.Id, dayDiamond.Id },
+            SuppressDayGate = true,
+        }
+    ),
+    new[] { dayGold.Id },
+    "Suppressing the day gate leaves the manual Tier row in force."
+);
+
 Console.WriteLine("CollectionFilterEngine checks passed.");
 
 static CollectionCardVm Card(

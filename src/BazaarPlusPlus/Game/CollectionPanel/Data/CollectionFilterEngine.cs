@@ -32,7 +32,8 @@ internal static class CollectionFilterEngine
         // Size only narrows Items; Skills are a single size, so skip it on the Skill tab.
         var sizeFilterCount = filter.ActiveType == ECardType.Item ? filter.Sizes.Count : 0;
         // In-run only; null disables. Independent of the manual Tier row — both narrow by tier.
-        var dayFilter = filter.SelectedRunDay;
+        // Fixed-tier sources are exempt: their pool ignores the day's tier ceiling.
+        var dayFilter = context.SuppressDayGate ? null : filter.SelectedRunDay;
 
         foreach (var card in all)
         {
