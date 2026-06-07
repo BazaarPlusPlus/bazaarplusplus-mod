@@ -22,6 +22,9 @@ internal sealed class ReplayPlaybackPublisher
 
     public bool StartingPublished => _startingPublished;
 
+    /// <summary>Battle id of the session currently between BeginSession and PublishEnded.</summary>
+    public string? ActiveSessionBattleId => _activeBattleId;
+
     public void BeginSession(
         string battleId,
         PvpBattleManifest? manifest,

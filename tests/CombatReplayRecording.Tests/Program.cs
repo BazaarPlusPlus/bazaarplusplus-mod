@@ -724,10 +724,7 @@ try
             WHERE run_id = $runId;
             """;
         finishRun.Parameters.AddWithValue("$runId", "run-001");
-        finishRun.Parameters.AddWithValue(
-            "$endedAtUtc",
-            "2026-03-18T01:30:00.0000000+00:00"
-        );
+        finishRun.Parameters.AddWithValue("$endedAtUtc", "2026-03-18T01:30:00.0000000+00:00");
         finishRun.ExecuteNonQuery();
     }
     var completedSnapshot = Invoke(
@@ -1124,13 +1121,12 @@ try
         new[] { loadedPayloadFromController }
     );
     Assert(loadedFromController != null, "Controller should deserialize a loaded replay payload.");
+    // Active battle id tracking moved off the controller onto the playback session
+    // (ReplayPlaybackPublisher.ActiveSessionBattleId): the controller only ever saw the
+    // local-saved path, so its id was stale/null for imported ghost battles.
     Assert(
-        string.Equals(
-            (string?)GetProperty(controllerType, controller!, "ActiveBattleId"),
-            battleId,
-            StringComparison.Ordinal
-        ),
-        "Controller should track the active battle id."
+        controllerType.GetProperty("ActiveBattleId") == null,
+        "Controller must not re-grow ActiveBattleId; the playback session owns the active id."
     );
 
     Console.WriteLine("CombatReplayRecording store checks passed.");
@@ -1372,8 +1368,11 @@ static object SingleBattleProjection(object uploadSnapshot)
         GetProperty(uploadSnapshot.GetType(), uploadSnapshot, "Metadata")
         ?? throw new InvalidOperationException("Upload snapshot should expose metadata.");
     var projections =
-        (System.Collections.IEnumerable?)
-            GetProperty(metadata.GetType(), metadata, "BattleProjections")
+        (System.Collections.IEnumerable?)GetProperty(
+            metadata.GetType(),
+            metadata,
+            "BattleProjections"
+        )
         ?? throw new InvalidOperationException("Upload metadata should expose battle projections.");
     return projections.Cast<object>().Single();
 }

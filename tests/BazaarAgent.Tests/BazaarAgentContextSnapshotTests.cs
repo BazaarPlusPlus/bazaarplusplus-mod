@@ -43,6 +43,77 @@ public class BazaarAgentContextSnapshotTests
     }
 
     [Fact]
+    public void Publish_ReplayPhaseChange_BumpsTickIdAndClonesFields()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var s1 = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.Replay,
+                ReplayPhase = BazaarAgentReplayPhase.Playing,
+                ReplayBattleId = "battle-7",
+            }
+        );
+        var s2 = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.Replay,
+                ReplayPhase = BazaarAgentReplayPhase.FinishedAwaitingContinue,
+                ReplayBattleId = "battle-7",
+            }
+        );
+        Assert.Equal(2UL, s2.TickId);
+        Assert.NotSame(s1, s2);
+        Assert.NotEqual(s1.ETag, s2.ETag);
+        // CloneWithTickId must carry the replay fields into the published snapshot.
+        Assert.Equal(BazaarAgentReplayPhase.FinishedAwaitingContinue, s2.Context.ReplayPhase);
+        Assert.Equal("battle-7", s2.Context.ReplayBattleId);
+    }
+
+    [Fact]
+    public void Publish_SameReplayPhaseAndBattleId_KeepsTickId()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var s1 = pub.Publish(
+            new BazaarAgentContext
+            {
+                ReplayPhase = BazaarAgentReplayPhase.FinishedAwaitingContinue,
+                ReplayBattleId = "battle-7",
+            }
+        );
+        var s2 = pub.Publish(
+            new BazaarAgentContext
+            {
+                ReplayPhase = BazaarAgentReplayPhase.FinishedAwaitingContinue,
+                ReplayBattleId = "battle-7",
+            }
+        );
+        Assert.Same(s1, s2);
+    }
+
+    [Fact]
+    public void Publish_ReplayBattleIdChange_BumpsTickId()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var s1 = pub.Publish(
+            new BazaarAgentContext
+            {
+                ReplayPhase = BazaarAgentReplayPhase.Starting,
+                ReplayBattleId = "a",
+            }
+        );
+        var s2 = pub.Publish(
+            new BazaarAgentContext
+            {
+                ReplayPhase = BazaarAgentReplayPhase.Starting,
+                ReplayBattleId = "b",
+            }
+        );
+        Assert.Equal(1UL, s1.TickId);
+        Assert.Equal(2UL, s2.TickId);
+    }
+
+    [Fact]
     public void Publish_DifferentRunProgressFields_BumpsTickId()
     {
         var pub = new BazaarAgentContextSnapshotPublisher();

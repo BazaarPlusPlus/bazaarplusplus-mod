@@ -38,15 +38,17 @@ public sealed class BazaarAgentHostPlugin : BaseUnityPlugin
         var options = new BazaarAgentBepInExOptions();
         var contextReader = new BazaarAgentGameContextReader(gameProbe, logger);
         var dispatcher = new BazaarAgentGameActionDispatcher(logger);
-        var uiPlumbing = new BazaarAgentUiPlumbing(logger, gameProbe.IsReplayStartInProgress);
+        // Replay control (record/continue) is the only path that may exit ReplayState, and only
+        // on an explicit POST /v1/replay/continue. No tick-driven replay auto-advance exists.
+        var replaySink = new BazaarAgentGameReplayControlSink();
 
         _controller = new BazaarAgentRuntimeController(
             options,
             contextReader,
             dispatcher,
+            replaySink,
             logger,
-            new SystemBazaarAgentClock(),
-            uiPlumbing.Tick
+            new SystemBazaarAgentClock()
         );
 
         logger.Info("BazaarAgent host plugin initialized");

@@ -120,14 +120,16 @@ internal sealed class BppComposition : IDisposable
             )
         );
 
-        // Publish the public game-interop facade for the out-of-process BazaarAgent host
+        // Publish the public game-interop facades for the out-of-process BazaarAgent host
         // plugin (it declares [BepInDependency(BazaarPlusPlus)] and therefore loads after us).
-        // BazaarPlusPlus does not reference the agent module; the host reads the facade through
-        // BazaarAgentGameBridge. Published unconditionally — it is a passive accessor that nothing
-        // reads unless the host plugin is installed.
-        BazaarAgentGameBridge.Current = new BazaarAgentGameProbe(
-            _encounterStateProbe,
-            () => _combatReplayModule.Runtime?.IsReplayStartInProgress == true
+        // BazaarPlusPlus does not reference the agent module; the host reads the facades through
+        // BazaarAgentGameBridge. Published unconditionally — they are passive accessors that
+        // nothing reads unless the host plugin is installed. The recorder's runtime accessor is
+        // lazy on purpose: CombatReplayRuntime is attached after this constructor runs.
+        BazaarAgentGameBridge.Current = new BazaarAgentGameProbe(_encounterStateProbe);
+        BazaarAgentGameBridge.CurrentRecorder = BazaarAgentReplayRecorderWiring.Create(
+            () => _combatReplayModule.Runtime,
+            _services
         );
     }
 
@@ -141,6 +143,7 @@ internal sealed class BppComposition : IDisposable
     public void Dispose()
     {
         BazaarAgentGameBridge.Current = null;
+        BazaarAgentGameBridge.CurrentRecorder = null;
         _featureRegistry.Stop();
     }
 }

@@ -49,5 +49,6 @@ Archived specs are historical; each file carries its own `Status:` banner.
 - `2026-05-30-combat-replay-audio-loopback-capture.md` → [combat-replay.md](../features/combat-replay.md)
 - `2026-05-31-combat-replay-audio-macos-process-tap.md` → [combat-replay.md](../features/combat-replay.md), `native/mac-audio-tap/`
 - `2026-05-30-combat-replay-audio-and-capture-perf-design.md` → superseded(audio)/implemented(video),见 [combat-replay.md](../features/combat-replay.md)
+- `2026-06-07-bazaaragent-external-battle-video-recording-design.md` → [ADR-0007](../adr/0007-bazaaragent-external-replay-video-recording.md), [bazaar-agent-http-api-v1.md](../reference/bazaar-agent-http-api-v1.md)
 
 > Earlier aspirational / superseded specs (AutoBazaar agent, HTTP rate-limit bypass, arm-then-record, skill showcase, V3 BazaarDB upload, SFX silent-analysis, the offscreen-RT migration) were pruned once their decisions landed in ADRs or they were confirmed never-built; recover them from git history if needed.

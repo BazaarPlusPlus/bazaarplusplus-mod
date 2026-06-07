@@ -16,7 +16,9 @@ BazaarAgent hosts a loopback HTTP server that publishes a versioned snapshot of 
 
 The listener binds to `127.0.0.1:47900` only. The port is fixed at build time; there is no cfg entry and no discovery file.
 
-All POST requests are subject to a 64 KB body cap. Requests whose declared `Content-Length` header exceeds 65536 bytes are rejected immediately with `413` before the body is read. Requests without a declared length are read up to 65537 bytes and rejected if that limit is reached.
+`POST /v1/actions` requests are subject to a 64 KB body cap. Requests whose declared `Content-Length` header exceeds 65536 bytes are rejected immediately with `413` before the body is read. Requests without a declared length are read up to 65537 bytes and rejected if that limit is reached.
+
+`POST /v1/replay/record` carries a raw binary blob and has its own, much larger cap (32 MB, provisional pending production p99 measurement). The same pre-check/stream-read rejection rules apply.
 
 ---
 
@@ -84,6 +86,8 @@ Top-level scalar fields:
 | `currentEncounterId` | string\|null | Template ID of the active encounter card, if any |
 | `currentEncounterType` | string\|null | Runtime template type for the active encounter when it can be resolved from live entities |
 | `actionCooldownRemainingSeconds` | float64 | Seconds until the cooldown gate clears; 0 when no gate is active |
+| `replayPhase` | string | Combat-replay playback phase: `none`, `starting`, `playing`, or `finishedAwaitingContinue` (the continue button is clickable — `POST /v1/replay/continue` will finalize the replay and any recording). Note the camelCase values, unlike other enums. |
+| `replayBattleId` | string\|null | Battle id of the active replay session, when one is active |
 | `interactableTemplateIds` | string[] \| omitted | When present and non-empty, the game is in target-selection mode (upgrade/enchant). Clients pick from `availableActions` `SelectItem` options targeting owned board/chest item cards whose templateId is in this set. See "Target-selection mode" section. |
 
 Card list fields (each element is an `BazaarAgentCardSnapshot`):
@@ -198,6 +202,49 @@ Future error codes are possible. Clients must tolerate unknown codes: log the re
 
 ---
 
+### POST /v1/replay/record
+
+Boots playback of an externally supplied battle replay with video recording enabled. The body is **raw binary** — a `GhostBattlePayload` (BattleId + PvpBattleManifest + PvpReplayPayload) serialized with the mod's MessagePack+gzip codec — not JSON. A bare `PvpReplayPayload` is rejected: the manifest is required to rebuild the opponent identity.
+
+```
+POST /v1/replay/record
+X-Bpp-Battle-Id: <battleId>          # optional; ?battleId= also accepted
+Content-Type: application/x-bpp-ghostbattle+msgpack+gzip
+<raw GhostBattlePayload bytes>
+```
+
+The battle id from the header/query, when present, is cross-checked against the ids inside the payload; a mismatch is a `400`.
+
+| Status | When |
+|---|---|
+| 202 | Accepted and playback+recording started. **Not** "mp4 ready" — completion is observed by polling `replayPhase` and then the output file (see flow below). Body: `{"accepted":true,"battleId":"...","status":"recording-started"}` |
+| 400 | Empty body, gzip/msgpack decode failure, missing manifest, or battleId mismatch (`invalid`) |
+| 409 | Replay/recording guards refused (`stale-or-unavailable`): in an active run, already in ReplayState, a replay start already in flight, or recording unavailable (no async GPU readback / FFmpeg unresolved / video directory unset). Requires the game to sit at the menu/lobby |
+| 413 | Body over the record cap (`invalid`) |
+| 503 | Recorder facade or combat-replay runtime unavailable, queue disposed, or the 10 s main-thread accept window timed out (`unavailable`) |
+| 500 | Unexpected exception (`internal`) |
+
+**Recording flow (one battle per mp4, strictly serial):**
+
+1. `POST /v1/replay/record` with the payload → expect `202`.
+2. Poll `GET /v1/context` until `replayPhase == "finishedAwaitingContinue"` and `replayBattleId` matches. Phase changes surface at the 1.5 s snapshot cadence.
+3. `POST /v1/replay/continue` → the replay exits and the recorder finalizes the mp4 (moov atom is written on exit — skipping this step leaves an unplayable file).
+4. Poll for the output file: `<GameRoot>/BazaarPlusPlusV4/CombatReplayVideos/<date>/<battleId>.<stamp>.mp4` (muxing is asynchronous).
+
+The replay **never exits on its own** — the game waits on the continue button indefinitely, and the mod adds no auto-advance. Exit timing belongs to the caller; sleep before step 3 to record a longer tail.
+
+### POST /v1/replay/continue
+
+Drives the replay "continue" button (`ReplayState.Exit()`). Empty body. Works for any replay sitting at `finishedAwaitingContinue`, whether or not it is being recorded.
+
+| Status | When |
+|---|---|
+| 200 | Exit triggered. Body: `{"accepted":true,"status":"continue-triggered"}` |
+| 409 | Not currently in a continuable phase (no replay, still starting, or still playing) (`stale-or-unavailable`) |
+| 503 | Recorder facade/runtime unavailable or queue timeout (`unavailable`) |
+
+---
+
 ## 5. Validation rules
 
 Rules are applied in order. The first failure terminates validation and the error is returned. Rules 1–6, including 5a/5b, and rule 8 run before dispatch; rule 7 (`forTickId`) runs between rule 6 and rule 8.
@@ -265,10 +312,10 @@ All enum values are serialized as strings. Parsing is case-insensitive on the se
 
 ## 8. UI plumbing (informative)
 
-The mod auto-handles two zero-decision UI gates so external tools do not need to POST actions for them:
+The mod performs **no automatic UI advancement**:
 
-- **Replay auto-advance** — when the game enters `ReplayState` and playback completes, the mod advances to the next state automatically.
-- **Known overlay dismissal** — no overlays are dismissed automatically in v1. PvP first-victory tutorial dialog detection was not reliably implemented in the decompiled types.
+- **Replays never auto-advance.** When the game sits in `ReplayState` with playback finished (`replayPhase == "finishedAwaitingContinue"`), it stays there until something drives the continue button — either the player or `POST /v1/replay/continue`. The former tick-driven replay auto-advance was removed: it raced external recording orchestration and took the exit timing (and therefore the recording finalize point) away from the caller.
+- **Known overlay dismissal** — no overlays are dismissed automatically. PvP first-victory tutorial dialog detection was not reliably implemented in the decompiled types.
 
 **End-run screens are not driven by BazaarAgent.** When `stateName` is `EndRunVictory` or `EndRunDefeat`, `availableActions` contains only `Wait` — the player (or whatever drives the game UI directly) advances past the end-of-run screen, after which the next `StartOrContinueRun` becomes available at hero-select.
 
@@ -331,7 +378,7 @@ When `runId` is null or unavailable, the fallback path is:
 
 ## 10. No-external-connection semantics
 
-When the host dll is installed but no external tool posts actions: the server listens and `GET /v1/context` returns the latest snapshot, but no actions advance game state. Replay auto-advance and any automatic UI plumbing still run; those are not decisions.
+When the host dll is installed but no external tool posts actions: the server listens and `GET /v1/context` returns the latest snapshot, but no actions advance game state. Nothing advances automatically — in particular, a finished replay waits at the continue button until the player (or a `POST /v1/replay/continue`) drives it.
 
 Removing the host dll disables the listener entirely. `tickId` restarts from 1 on each listener start.
 
@@ -347,4 +394,4 @@ After every non-`Wait` action that the mod dispatched (`executed: true`), a 1.0 
 
 ## 12. Runtime defaults
 
-There is no BazaarAgent runtime cfg. Installing `BazaarPlusPlus.BazaarAgentHost.dll` enables the listener, and removing it disables the listener. The listener port (`47900`), snapshot tick cadence (`1.5 s`), minimum action delay (`1.0 s`), and POST blocking timeout (`3 s`) are fixed defaults.
+There is no BazaarAgent runtime cfg. Installing `BazaarPlusPlus.BazaarAgentHost.dll` enables the listener, and removing it disables the listener. The listener port (`47900`), snapshot tick cadence (`1.5 s`), minimum action delay (`1.0 s`), action POST blocking timeout (`3 s`), replay-control POST blocking timeout (`10 s`), and record body cap (`32 MB`) are fixed defaults. Replay control commands drain every frame (not at the snapshot cadence), so record/continue accepts are not throttled to 1.5 s.
