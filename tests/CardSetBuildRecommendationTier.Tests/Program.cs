@@ -1,553 +1,827 @@
+using System.Collections;
 using System.Reflection;
 
-RegisterAssemblyResolution();
-TestRecommendationTierMapping();
-TestDefaultFinalBuildCachePathUsesGameRootDirectory();
-TestFreshFinalBuildCacheIsUsedWithoutRemoteDownload();
-TestExpiredFinalBuildCacheUsesStaleCacheAndQueuesRemoteRefresh();
-TestManualFinalBuildRefreshBypassesFreshCache();
-TestFinalBuildRecommendationReturnsBoardContract();
-TestFinalBuildTierSelectionPrefersLiveTierWithAllFallback();
+// Behavior tests for the analyzer-v4 ten-win build corpus consumed by the mod.
+// The payload is the compact string-table + schema-driven array-row format emitted by
+// bazaarplusplus-analyzers/src/bpp/stages/analyze/mod_builds.py at
+// analyzer-v4/mod/tenwin_builds.json. Every assertion drives the public
+// BuildRecommendationRepository.FindRecommendations surface (parse + recall + scoring +
+// board projection) or the static cache/remote hooks, via reflection over the internal type.
 
-Console.WriteLine("BuildRecommendation checks passed.");
+TenWinBuildTests.Run();
 
-static void RegisterAssemblyResolution()
+internal static class TenWinBuildTests
 {
-    AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
+    private const string GuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    private const string GuidB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    private const string GuidC = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    private const string GuidD = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+
+    public static void Run()
     {
-        var assemblyName = new AssemblyName(args.Name);
-        if (!string.Equals(assemblyName.Name, "UnityEngine.CoreModule", StringComparison.Ordinal))
-            return null;
+        RegisterAssemblyResolution();
 
-        var assemblyPath = Path.Combine(AppContext.BaseDirectory, "UnityEngine.CoreModule.dll");
-        return File.Exists(assemblyPath) ? Assembly.LoadFrom(assemblyPath) : null;
-    };
-}
+        TestFindRecommendationsHasNoRatingTierParam();
+        TestDefaultCachePathUsesTenwinBuildsFileName();
+        TestSingleCardSelectionResolvesViaCardIndex();
+        TestMultiCardSelectionPrefersIntersection();
+        TestUnionFallbackWhenIntersectionEmptyButAllCovered();
+        TestUnionFallbackKeepsResultsWhenOneSelectedCardUncovered();
+        TestSelectingOnlyUncoveredCardsReturnsEmpty();
+        TestLiveStateRankingOutranksScore();
+        TestBoardContractMapsTierEnchantSize();
+        TestNullSlotAndTierDoNotCrash();
+        TestFreshCacheIsUsedWithoutRemoteDownload();
+        TestStaleCacheUsesStaleAndQueuesBackgroundRefresh();
+        TestManualRefreshBypassesFreshCache();
+        TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh();
+        TestColdStartFallsBackToEmbeddedThenRemote();
+        TestEmbeddedSeedResourceIsBundledAndParses();
 
-static void TestRecommendationTierMapping()
-{
-    var assembly = Assembly.Load("BazaarPlusPlus");
-    var repositoryType = assembly.GetType(
-        "BazaarPlusPlus.Game.BuildRecommendations.BuildRecommendationRepository"
-    )!;
-    var playerCardEntryType = repositoryType.GetNestedType(
-        "PlayerCardEntry",
-        BindingFlags.NonPublic
-    )!;
-    var projectMethod = repositoryType.GetMethod(
-        "ProjectPlayerCards",
-        BindingFlags.NonPublic | BindingFlags.Static
-    )!;
+        Console.WriteLine("TenWin build recommendation checks passed.");
+    }
 
-    AssertMappedTier(projectMethod, playerCardEntryType, 1, "Bronze");
-    AssertMappedTier(projectMethod, playerCardEntryType, 4, "Diamond");
-    AssertMappedTier(projectMethod, playerCardEntryType, 5, "Legendary");
-}
+    // ---- Tests ------------------------------------------------------------
 
-static void TestDefaultFinalBuildCachePathUsesGameRootDirectory()
-{
-    var repositoryType = GetRepositoryType();
-    var buildPathMethod = repositoryType.GetMethod(
-        "BuildDefaultFinalBuildsCacheFilePath",
-        BindingFlags.NonPublic | BindingFlags.Static
-    );
-    Assert(
-        buildPathMethod != null,
-        "Expected BuildRecommendationRepository to expose default cache path construction."
-    );
-
-    var gameRootPath = Path.Combine(Path.GetTempPath(), $"bpp-game-root-{Guid.NewGuid():N}");
-    var cachePath = (string)buildPathMethod!.Invoke(null, [gameRootPath])!;
-
-    Assert(
-        cachePath == Path.Combine(gameRootPath, "BazaarPlusPlusV4", "final_builds_for_mod.json"),
-        "Final build cache should live under GameRoot/BazaarPlusPlusV4/final_builds_for_mod.json."
-    );
-}
-
-static void TestFreshFinalBuildCacheIsUsedWithoutRemoteDownload()
-{
-    var repositoryType = GetRepositoryType();
-    var now = new DateTime(2026, 04, 25, 12, 0, 0, DateTimeKind.Utc);
-    var cachePath = Path.Combine(
-        Path.GetTempPath(),
-        $"bpp-final-build-cache-{Guid.NewGuid():N}.json"
-    );
-    var selectedCardId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    File.WriteAllText(
-        cachePath,
-        CreateFinalBuildPayload("RemoteHero", selectedCardId, "fresh-cache")
-    );
-    File.SetLastWriteTimeUtc(cachePath, now.AddHours(-19));
-
-    ConfigureFinalBuildRemoteForTests(
-        repositoryType,
-        cachePath,
-        now,
-        _ => throw new InvalidOperationException("Fresh cache should not download remote data.")
-    );
-
-    try
+    private static void TestFindRecommendationsHasNoRatingTierParam()
     {
-        var sources = LoadFinalBuildSources(repositoryType, "RemoteHero");
+        var repositoryType = GetRepositoryType();
 
-        Assert(sources.Count == 1, "Fresh cached final builds should be loadable.");
+        var find = repositoryType.GetMethod("FindRecommendations");
+        Assert(find != null, "Repository should expose FindRecommendations.");
+        var parameters = find!.GetParameters();
         Assert(
-            sources[0] == "fresh-cache",
-            "Fresh cached final builds should override the embedded resource."
+            parameters.Length == 3,
+            "FindRecommendations should take (hero, selectedTemplateIds, liveState)."
+        );
+        Assert(
+            parameters[0].ParameterType == typeof(string),
+            "First parameter should be the hero string."
+        );
+        Assert(
+            !parameters.Skip(1).Any(p => p.ParameterType == typeof(string)),
+            "FindRecommendations must not take a string rating-tier parameter."
+        );
+
+        Assert(
+            repositoryType.GetMethod("FindFinalRecommendations") == null,
+            "Legacy tier-based FindFinalRecommendations must be removed."
+        );
+        Assert(
+            repositoryType.GetMethod("TryFindFinalRecommendation") == null,
+            "Legacy TryFindFinalRecommendation must be removed."
+        );
+
+        var ratingTierType = repositoryType.Assembly.GetType(
+            "BazaarPlusPlus.Game.BuildRecommendations.BuildRatingTier"
+        );
+        Assert(
+            ratingTierType == null,
+            "BuildRatingTier must be deleted from the production assembly."
         );
     }
-    finally
+
+    private static void TestDefaultCachePathUsesTenwinBuildsFileName()
     {
-        ResetFinalBuildRemoteForTests(repositoryType);
-        TryDelete(cachePath);
-    }
-}
-
-static void TestFinalBuildRecommendationReturnsBoardContract()
-{
-    var repositoryType = GetRepositoryType();
-    var now = new DateTime(2026, 04, 25, 12, 0, 0, DateTimeKind.Utc);
-    var cachePath = Path.Combine(
-        Path.GetTempPath(),
-        $"bpp-final-build-cache-{Guid.NewGuid():N}.json"
-    );
-    var selectedCardId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
-    File.WriteAllText(
-        cachePath,
-        CreateFinalBuildPayload("BoardHero", selectedCardId, "board-contract")
-    );
-    File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
-
-    ConfigureFinalBuildRemoteForTests(
-        repositoryType,
-        cachePath,
-        now,
-        _ => throw new InvalidOperationException("Fresh cache should not download remote data.")
-    );
-
-    try
-    {
-        var repository = Activator.CreateInstance(repositoryType)!;
-        var method = repositoryType.GetMethod("FindFinalRecommendations")!;
-        var recommendations = (System.Collections.IEnumerable)
-            method.Invoke(repository, ["BoardHero", new[] { selectedCardId }, "all"])!;
-        var recommendation = recommendations.Cast<object>().Single();
-        var board = recommendation.GetType().GetProperty("Board")!.GetValue(recommendation)!;
-
-        Assert(
-            board.GetType().GetProperty("Id")!.GetValue(board)!.ToString() == "FinalBuild",
-            "Matched recommendation should expose BppItemBoard.Id=FinalBuild."
+        var repositoryType = GetRepositoryType();
+        var buildPathMethod = repositoryType.GetMethod(
+            "BuildDefaultTenWinCacheFilePath",
+            BindingFlags.NonPublic | BindingFlags.Static
         );
         Assert(
-            board.GetType().GetProperty("Type")!.GetValue(board)!.ToString() == "Reference",
-            "Matched recommendation should expose BppItemBoard.Type=Reference."
+            buildPathMethod != null,
+            "Repository should expose default ten-win cache path construction."
         );
 
-        var cards = (System.Collections.ICollection)
-            board.GetType().GetProperty("Cards")!.GetValue(board)!;
-        Assert(cards.Count == 1, "Matched recommendation board should expose renderable cards.");
-    }
-    finally
-    {
-        ResetFinalBuildRemoteForTests(repositoryType);
-        TryDelete(cachePath);
-    }
-}
+        var gameRootPath = Path.Combine(Path.GetTempPath(), $"bpp-game-root-{Guid.NewGuid():N}");
+        var cachePath = (string)buildPathMethod!.Invoke(null, [gameRootPath])!;
 
-static void TestExpiredFinalBuildCacheUsesStaleCacheAndQueuesRemoteRefresh()
-{
-    var repositoryType = GetRepositoryType();
-    var now = new DateTime(2026, 04, 25, 12, 0, 0, DateTimeKind.Utc);
-    var cachePath = Path.Combine(
-        Path.GetTempPath(),
-        $"bpp-final-build-cache-{Guid.NewGuid():N}.json"
-    );
-    var selectedCardId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
-    File.WriteAllText(
-        cachePath,
-        CreateFinalBuildPayload("StaleHero", selectedCardId, "stale-cache")
-    );
-    File.SetLastWriteTimeUtc(cachePath, now.AddHours(-21));
-
-    var downloaded = false;
-    Action? queuedRefresh = null;
-    var queuedRefreshCount = 0;
-    var remotePayload = CreateFinalBuildPayload("RemoteHero", selectedCardId, "remote-download");
-    ConfigureFinalBuildRemoteWithBackgroundRefreshForTests(
-        repositoryType,
-        cachePath,
-        now,
-        _ =>
-        {
-            downloaded = true;
-            return remotePayload;
-        },
-        refresh =>
-        {
-            queuedRefreshCount++;
-            queuedRefresh = refresh;
-        }
-    );
-
-    try
-    {
-        var sources = LoadFinalBuildSources(repositoryType, "StaleHero");
-
-        Assert(!downloaded, "Expired final build cache should not block on a remote download.");
         Assert(
-            queuedRefreshCount == 1,
-            "Expired final build cache should queue a background refresh."
-        );
-        Assert(
-            queuedRefresh != null,
-            "Queued background refresh should be executable by the scheduler."
-        );
-        Assert(sources.Count == 1, "Stale cached final builds should remain loadable.");
-        Assert(
-            sources[0] == "stale-cache",
-            "Stale cached final builds should be used instead of synchronously downloading remote data."
-        );
-        Assert(
-            File.ReadAllText(cachePath) != remotePayload,
-            "Normal final build loading should not rewrite the disk cache from remote data."
-        );
-
-        queuedRefresh!();
-        var refreshedSources = LoadFinalBuildSources(repositoryType, "RemoteHero");
-        Assert(downloaded, "Queued background refresh should download remote final build data.");
-        Assert(
-            refreshedSources[0] == "remote-download",
-            "Queued background refresh should replace the in-memory final build data."
-        );
-        Assert(
-            File.ReadAllText(cachePath) == remotePayload,
-            "Queued background refresh should replace the disk cache."
+            cachePath == Path.Combine(gameRootPath, "BazaarPlusPlusV4", "tenwin_builds.json"),
+            "Ten-win build cache should live under GameRoot/BazaarPlusPlusV4/tenwin_builds.json."
         );
     }
-    finally
+
+    private static void TestSingleCardSelectionResolvesViaCardIndex()
     {
-        ResetFinalBuildRemoteForTests(repositoryType);
-        TryDelete(cachePath);
-    }
-}
-
-static void TestManualFinalBuildRefreshBypassesFreshCache()
-{
-    var repositoryType = GetRepositoryType();
-    var now = new DateTime(2026, 04, 25, 12, 0, 0, DateTimeKind.Utc);
-    var cachePath = Path.Combine(
-        Path.GetTempPath(),
-        $"bpp-final-build-cache-{Guid.NewGuid():N}.json"
-    );
-    var selectedCardId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
-    var cachedPayload = CreateFinalBuildPayload("ManualHero", selectedCardId, "fresh-cache");
-    File.WriteAllText(cachePath, cachedPayload);
-    File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
-
-    var downloaded = false;
-    var remotePayload = CreateFinalBuildPayload("ManualHero", selectedCardId, "manual-remote");
-    ConfigureFinalBuildRemoteForTests(
-        repositoryType,
-        cachePath,
-        now,
-        _ =>
-        {
-            downloaded = true;
-            return remotePayload;
-        }
-    );
-
-    try
-    {
-        var cachedSources = LoadFinalBuildSources(repositoryType, "ManualHero");
-        Assert(cachedSources[0] == "fresh-cache", "Fresh cache should load before manual refresh.");
-        Assert(!downloaded, "Initial load from a fresh cache should not download remote data.");
-
-        var refreshed = RefreshFinalBuildsFromRemote(repositoryType, out var error);
-        var refreshedSources = LoadFinalBuildSources(repositoryType, "ManualHero");
-
-        Assert(refreshed, $"Manual final build refresh should succeed: {error}");
-        Assert(downloaded, "Manual final build refresh should download remote data.");
-        Assert(
-            refreshedSources[0] == "manual-remote",
-            "Manual final build refresh should replace the in-memory final build data."
-        );
-        Assert(
-            File.ReadAllText(cachePath) == remotePayload,
-            "Manual final build refresh should replace the disk cache."
-        );
-    }
-    finally
-    {
-        ResetFinalBuildRemoteForTests(repositoryType);
-        TryDelete(cachePath);
-    }
-}
-
-static void TestFinalBuildTierSelectionPrefersLiveTierWithAllFallback()
-{
-    var repositoryType = GetRepositoryType();
-    var now = new DateTime(2026, 04, 25, 12, 0, 0, DateTimeKind.Utc);
-    var cachePath = Path.Combine(
-        Path.GetTempPath(),
-        $"bpp-final-build-cache-{Guid.NewGuid():N}.json"
-    );
-    var selectedCardId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
-    File.WriteAllText(
-        cachePath,
-        CreateTwoTierPayload("TierHero", selectedCardId, "all-build", "high-build")
-    );
-    File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
-
-    ConfigureFinalBuildRemoteForTests(
-        repositoryType,
-        cachePath,
-        now,
-        _ => throw new InvalidOperationException("Fresh cache should not download remote data.")
-    );
-
-    try
-    {
-        var repository = Activator.CreateInstance(repositoryType)!;
-        var method = repositoryType.GetMethod("FindFinalRecommendations")!;
-
-        Assert(
-            FirstRecommendationSource(method, repository, "TierHero", selectedCardId, "high")
-                == "high-build",
-            "Live high tier should select the high-tier bucket."
-        );
-        Assert(
-            FirstRecommendationSource(method, repository, "TierHero", selectedCardId, "mid")
-                == "all-build",
-            "A tier missing from the hero should fall back to the all bucket."
-        );
-    }
-    finally
-    {
-        ResetFinalBuildRemoteForTests(repositoryType);
-        TryDelete(cachePath);
-    }
-}
-
-static string FirstRecommendationSource(
-    MethodInfo method,
-    object repository,
-    string hero,
-    Guid cardId,
-    string tier
-)
-{
-    var recommendations = (System.Collections.IEnumerable)
-        method.Invoke(repository, [hero, new[] { cardId }, tier])!;
-    var recommendation = recommendations.Cast<object>().First();
-    return (string)recommendation.GetType().GetProperty("Source")!.GetValue(recommendation)!;
-}
-
-static void AssertMappedTier(
-    MethodInfo projectMethod,
-    Type playerCardEntryType,
-    int rawTier,
-    string expected
-)
-{
-    var entries = Array.CreateInstance(playerCardEntryType, 1);
-    var entry = Activator.CreateInstance(playerCardEntryType)!;
-    playerCardEntryType
-        .GetProperty("CardId")!
-        .SetValue(entry, "11111111-1111-1111-1111-111111111111");
-    playerCardEntryType.GetProperty("Slot")!.SetValue(entry, 0);
-    playerCardEntryType.GetProperty("Tier")!.SetValue(entry, rawTier);
-    entries.SetValue(entry, 0);
-
-    var result = (System.Collections.IEnumerable)projectMethod.Invoke(null, [entries])!;
-    var projected = result.Cast<object>().Single();
-    var actual = projected.GetType().GetProperty("Tier")!.GetValue(projected)!.ToString();
-
-    Assert(
-        actual == expected,
-        $"Expected recommendation tier {rawTier} to map to {expected}, but was {actual}."
-    );
-}
-
-static Type GetRepositoryType()
-{
-    var assembly = Assembly.Load("BazaarPlusPlus");
-    return assembly.GetType(
-        "BazaarPlusPlus.Game.BuildRecommendations.BuildRecommendationRepository"
-    )!;
-}
-
-static void ConfigureFinalBuildRemoteForTests(
-    Type repositoryType,
-    string cachePath,
-    DateTime utcNow,
-    Func<string, string> downloadJson
-)
-{
-    InvokeStatic(
-        repositoryType,
-        "ConfigureFinalBuildRemoteForTests",
-        cachePath,
-        (Func<DateTime>)(() => utcNow),
-        downloadJson
-    );
-}
-
-static void ConfigureFinalBuildRemoteWithBackgroundRefreshForTests(
-    Type repositoryType,
-    string cachePath,
-    DateTime utcNow,
-    Func<string, string> downloadJson,
-    Action<Action> queueBackgroundRefresh
-)
-{
-    InvokeStatic(
-        repositoryType,
-        "ConfigureFinalBuildRemoteForTests",
-        cachePath,
-        (Func<DateTime>)(() => utcNow),
-        downloadJson,
-        queueBackgroundRefresh
-    );
-}
-
-static void ResetFinalBuildRemoteForTests(Type repositoryType)
-{
-    InvokeStatic(repositoryType, "ResetFinalBuildRemoteForTests");
-}
-
-static bool RefreshFinalBuildsFromRemote(Type repositoryType, out string? error)
-{
-    var method = repositoryType.GetMethod(
-        "TryRefreshFinalBuildsFromRemote",
-        BindingFlags.NonPublic | BindingFlags.Static
-    );
-    Assert(method != null, "Expected BuildRecommendationRepository to expose manual refresh.");
-    object?[] parameters = [null];
-    var refreshed = (bool)method!.Invoke(null, parameters)!;
-    error = (string?)parameters[0];
-    return refreshed;
-}
-
-static List<string> LoadFinalBuildSources(Type repositoryType, string hero, string tier = "all")
-{
-    var root = InvokeStaticValue(repositoryType, "EnsureFinalRoot")!;
-    var heroes = (System.Collections.IDictionary)
-        root.GetType().GetProperty("Heroes")!.GetValue(root)!;
-    Assert(heroes.Contains(hero), $"Expected final build data to contain hero {hero}.");
-
-    var heroTiers = heroes[hero]!;
-    var tiers = (System.Collections.IDictionary)
-        heroTiers.GetType().GetProperty("Tiers")!.GetValue(heroTiers)!;
-    Assert(tiers.Contains(tier), $"Expected hero {hero} to contain tier {tier}.");
-
-    var bucket = tiers[tier]!;
-    var builds = (System.Collections.IEnumerable)
-        bucket.GetType().GetProperty("Builds")!.GetValue(bucket)!;
-    return builds
-        .Cast<object>()
-        .Select(build =>
-            (string?)build.GetType().GetProperty("Source")!.GetValue(build) ?? string.Empty
-        )
-        .ToList();
-}
-
-static string CreateFinalBuildPayload(
-    string hero,
-    Guid selectedCardId,
-    string source,
-    string tier = "all"
-)
-{
-    var bucket = CreateBucketJson(selectedCardId, source);
-    return $$"""
-        {
-          "generatedAt": "2026-04-25T12:00:00Z",
-          "heroes": {
-            "{{hero}}": {
-              "tiers": {
-                "{{tier}}": {{bucket}}
-              }
-            }
-          }
-        }
-        """;
-}
-
-static string CreateTwoTierPayload(
-    string hero,
-    Guid selectedCardId,
-    string allSource,
-    string highSource
-)
-{
-    var allBucket = CreateBucketJson(selectedCardId, allSource);
-    var highBucket = CreateBucketJson(selectedCardId, highSource);
-    return $$"""
-        {
-          "generatedAt": "2026-04-25T12:00:00Z",
-          "heroes": {
-            "{{hero}}": {
-              "tiers": {
-                "all": {{allBucket}},
-                "high": {{highBucket}}
-              }
-            }
-          }
-        }
-        """;
-}
-
-static string CreateBucketJson(Guid selectedCardId, string source)
-{
-    return $$"""
-        {
-          "builds": [
+        WithCorpus(
+            MainRecallPayload("RecallHero"),
+            (repositoryType, repository) =>
             {
-              "source": "{{source}}",
-              "setSignature": "{{selectedCardId}}",
-              "goldScore": 10.0,
-              "playerCards": [
-                { "cardId": "{{selectedCardId}}", "slot": 0, "tier": 1, "enchant": "None" }
-              ]
+                var scores = ScoresOf(Find(repositoryType, repository, "RecallHero", [GuidA]));
+                // cardIndex[A] = [build0(score100), build1(score200)] -> ranked by score desc.
+                Assert(
+                    scores.SequenceEqual([200L, 100L]),
+                    $"Single-card recall should return A's builds by score; got [{string.Join(",", scores)}]."
+                );
             }
-          ],
-          "cardIndex": { "{{selectedCardId}}": [0] },
-          "subsetIndex": { "{{selectedCardId}}": { "matchedBuildIds": [0] } }
-        }
-        """;
-}
-
-static void InvokeStatic(Type type, string methodName, params object[] parameters)
-{
-    var method = type.GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
-        .FirstOrDefault(method =>
-            method.Name == methodName && method.GetParameters().Length == parameters.Length
         );
-    Assert(method != null, $"Expected {type.FullName}.{methodName} to exist.");
-    method!.Invoke(null, parameters);
-}
-
-static object? InvokeStaticValue(Type type, string methodName, params object[] parameters)
-{
-    var method = type.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
-    Assert(method != null, $"Expected {type.FullName}.{methodName} to exist.");
-    return method!.Invoke(null, parameters);
-}
-
-static void TryDelete(string path)
-{
-    try
-    {
-        if (File.Exists(path))
-            File.Delete(path);
     }
-    catch { }
-}
 
-static void Assert(bool condition, string message)
-{
-    if (!condition)
-        throw new InvalidOperationException(message);
+    private static void TestMultiCardSelectionPrefersIntersection()
+    {
+        WithCorpus(
+            MainRecallPayload("RecallHero"),
+            (repositoryType, repository) =>
+            {
+                var scores = ScoresOf(
+                    Find(repositoryType, repository, "RecallHero", [GuidA, GuidB])
+                );
+                // cardIndex[A]=[0,1], cardIndex[B]=[0,2] -> intersection {0} (score100).
+                Assert(
+                    scores.SequenceEqual([100L]),
+                    $"Intersection of A and B should return only build0; got [{string.Join(",", scores)}]."
+                );
+            }
+        );
+    }
+
+    private static void TestUnionFallbackWhenIntersectionEmptyButAllCovered()
+    {
+        // cards A,B both covered but with disjoint build sets -> intersection empty -> union.
+        var payload = Payload(
+            cards: $"[\"{GuidA}\",\"{GuidB}\"]",
+            enchantments: "[null]",
+            hero: "DisjointHero",
+            builds: $"[{Build("[0]", "[[0,0,1,0,1]]", 10)},{Build("[1]", "[[1,0,1,0,1]]", 20)}]",
+            cardIndex: "[[0,[0]],[1,[1]]]"
+        );
+        WithCorpus(
+            payload,
+            (repositoryType, repository) =>
+            {
+                var scores = ScoresOf(
+                    Find(repositoryType, repository, "DisjointHero", [GuidA, GuidB])
+                );
+                Assert(
+                    scores.Count == 2,
+                    $"Disjoint intersection should fall back to the union of both builds; got {scores.Count}."
+                );
+            }
+        );
+    }
+
+    private static void TestUnionFallbackKeepsResultsWhenOneSelectedCardUncovered()
+    {
+        WithCorpus(
+            MainRecallPayload("RecallHero"),
+            (repositoryType, repository) =>
+            {
+                // C is present in cards[] but absent from this hero's cardIndex -> uncovered.
+                // The literal intersection is empty, so union over the covered card (A) must still return results.
+                var scores = ScoresOf(
+                    Find(repositoryType, repository, "RecallHero", [GuidA, GuidC])
+                );
+                Assert(
+                    scores.Count == 2,
+                    $"An uncovered selected card must not empty the result while A has coverage; got {scores.Count}."
+                );
+            }
+        );
+    }
+
+    private static void TestSelectingOnlyUncoveredCardsReturnsEmpty()
+    {
+        WithCorpus(
+            MainRecallPayload("RecallHero"),
+            (repositoryType, repository) =>
+            {
+                // D is absent from cards[] entirely; C is in cards[] but not in cardIndex. Neither has coverage.
+                Assert(
+                    ScoresOf(Find(repositoryType, repository, "RecallHero", [GuidD])).Count == 0,
+                    "An unknown selected card should return no recommendation."
+                );
+                Assert(
+                    ScoresOf(Find(repositoryType, repository, "RecallHero", [GuidC])).Count == 0,
+                    "A selected card with no historical coverage should return no recommendation."
+                );
+            }
+        );
+    }
+
+    private static void TestLiveStateRankingOutranksScore()
+    {
+        WithCorpus(
+            MainRecallPayload("RecallHero"),
+            (repositoryType, repository) =>
+            {
+                // Selecting A returns build0(score100, contains B) and build1(score200, A only).
+                // With no live state, build1 wins on score.
+                Assert(
+                    ScoresOf(Find(repositoryType, repository, "RecallHero", [GuidA])).First()
+                        == 200L,
+                    "Without live state the higher-score build ranks first."
+                );
+
+                // Put B on the board: build0 gains live-state weight and must outrank the higher-score build1.
+                var liveState = LiveState(repositoryType, board: [GuidB], stash: [], shop: []);
+                var ranked = ScoresOf(
+                    Find(repositoryType, repository, "RecallHero", [GuidA], liveState)
+                );
+                Assert(
+                    ranked.First() == 100L,
+                    $"A board match should outrank a higher analyzer score; got first={ranked.First()}."
+                );
+            }
+        );
+    }
+
+    private static void TestBoardContractMapsTierEnchantSize()
+    {
+        var payload = Payload(
+            cards: $"[\"{GuidA}\"]",
+            enchantments: "[null,\"Fiery\"]",
+            hero: "BoardHero",
+            // layout: cardRef0, slot3, tier5(Legendary), enchantRef1(Fiery), size2(Medium)
+            builds: $"[{Build("[0]", "[[0,3,5,1,2]]", 1)}]",
+            cardIndex: "[[0,[0]]]"
+        );
+        WithCorpus(
+            payload,
+            (repositoryType, repository) =>
+            {
+                var recommendation = Find(repositoryType, repository, "BoardHero", [GuidA])
+                    .Cast<object>()
+                    .Single();
+                var board = Prop(recommendation, "Board")!;
+                Assert(
+                    Prop(board, "Id")!.ToString() == "FinalBuild",
+                    "Recommendation board Id should be FinalBuild."
+                );
+                Assert(
+                    Prop(board, "Type")!.ToString() == "Reference",
+                    "Recommendation board Type should be Reference."
+                );
+
+                var cards = ((IEnumerable)Prop(board, "Cards")!).Cast<object>().ToList();
+                Assert(cards.Count == 1, "Board should expose the single layout card.");
+                var card = cards[0];
+                Assert(
+                    Prop(card, "Tier")!.ToString() == "Legendary",
+                    "Tier value 5 should map to ETier.Legendary."
+                );
+                Assert(
+                    Prop(card, "Size")!.ToString() == "Medium",
+                    "Size 2 should map to ECardSize.Medium."
+                );
+                Assert(
+                    Prop(card, "EnchantmentType")?.ToString() == "Fiery",
+                    "enchantRef 1 should resolve to EEnchantmentType.Fiery."
+                );
+                Assert(
+                    Prop(card, "SourceSocketId")?.ToString() == "Socket_3",
+                    "Slot 3 should map to EContainerSocketId.Socket_3."
+                );
+
+                // tenWinRunCount / score survive into the recommendation DTO for UI evidence.
+                Assert(
+                    (int)Prop(recommendation, "TenWinRunCount")! == 80,
+                    "TenWinRunCount should be carried from stats."
+                );
+                Assert(
+                    (long)Prop(recommendation, "Score")! == 1L,
+                    "Score should be carried from stats."
+                );
+            }
+        );
+    }
+
+    private static void TestNullSlotAndTierDoNotCrash()
+    {
+        var payload = Payload(
+            cards: $"[\"{GuidA}\"]",
+            enchantments: "[null]",
+            hero: "NullHero",
+            // layout: cardRef0, slot null, tier null, enchantRef0, size1
+            builds: $"[{Build("[0]", "[[0,null,null,0,1]]", 5)}]",
+            cardIndex: "[[0,[0]]]"
+        );
+        WithCorpus(
+            payload,
+            (repositoryType, repository) =>
+            {
+                var recommendation = Find(repositoryType, repository, "NullHero", [GuidA])
+                    .Cast<object>()
+                    .Single();
+                var board = Prop(recommendation, "Board")!;
+                var card = ((IEnumerable)Prop(board, "Cards")!).Cast<object>().Single();
+                Assert(
+                    Prop(card, "Tier")!.ToString() == "Bronze",
+                    "A null tier should clamp to ETier.Bronze."
+                );
+                Assert(
+                    Prop(card, "EnchantmentType") == null,
+                    "enchantRef 0 should resolve to no enchantment."
+                );
+            }
+        );
+    }
+
+    private static void TestFreshCacheIsUsedWithoutRemoteDownload()
+    {
+        var repositoryType = GetRepositoryType();
+        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
+        var cachePath = TempCachePath();
+        File.WriteAllText(cachePath, ScorePayload("CacheHero", 111));
+        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-19));
+
+        Configure(
+            repositoryType,
+            cachePath,
+            now,
+            _ => throw new InvalidOperationException("Fresh cache should not download.")
+        );
+        try
+        {
+            var scores = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(
+                scores.SequenceEqual([111L]),
+                "Fresh cache should answer recommendations without a download."
+            );
+        }
+        finally
+        {
+            Reset(repositoryType);
+            TryDelete(cachePath);
+        }
+    }
+
+    private static void TestStaleCacheUsesStaleAndQueuesBackgroundRefresh()
+    {
+        var repositoryType = GetRepositoryType();
+        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
+        var cachePath = TempCachePath();
+        File.WriteAllText(cachePath, ScorePayload("CacheHero", 111));
+        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-21));
+
+        var downloaded = false;
+        Action? queuedRefresh = null;
+        var queuedRefreshCount = 0;
+        var remotePayload = ScorePayload("CacheHero", 222);
+        ConfigureWithBackgroundRefresh(
+            repositoryType,
+            cachePath,
+            now,
+            _ =>
+            {
+                downloaded = true;
+                return remotePayload;
+            },
+            refresh =>
+            {
+                queuedRefreshCount++;
+                queuedRefresh = refresh;
+            }
+        );
+
+        try
+        {
+            var stale = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(!downloaded, "Stale cache should not block on a synchronous download.");
+            Assert(
+                queuedRefreshCount == 1,
+                "Stale cache should queue exactly one background refresh."
+            );
+            Assert(queuedRefresh != null, "The queued refresh should be executable.");
+            Assert(
+                stale.SequenceEqual([111L]),
+                "Stale cache data should answer until the refresh completes."
+            );
+            Assert(
+                File.ReadAllText(cachePath) != remotePayload,
+                "Normal loading should not rewrite the disk cache."
+            );
+
+            queuedRefresh!();
+            var refreshed = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(downloaded, "The queued refresh should download remote data.");
+            Assert(
+                refreshed.SequenceEqual([222L]),
+                "The background refresh should replace the in-memory corpus."
+            );
+            Assert(
+                File.ReadAllText(cachePath) == remotePayload,
+                "The background refresh should replace the disk cache."
+            );
+        }
+        finally
+        {
+            Reset(repositoryType);
+            TryDelete(cachePath);
+        }
+    }
+
+    private static void TestManualRefreshBypassesFreshCache()
+    {
+        var repositoryType = GetRepositoryType();
+        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
+        var cachePath = TempCachePath();
+        File.WriteAllText(cachePath, ScorePayload("CacheHero", 111));
+        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
+
+        var downloaded = false;
+        var remotePayload = ScorePayload("CacheHero", 222);
+        Configure(
+            repositoryType,
+            cachePath,
+            now,
+            _ =>
+            {
+                downloaded = true;
+                return remotePayload;
+            }
+        );
+
+        try
+        {
+            var cached = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(
+                cached.SequenceEqual([111L]),
+                "Fresh cache should load before a manual refresh."
+            );
+            Assert(!downloaded, "Loading a fresh cache should not download.");
+
+            var refreshed = ManualRefresh(repositoryType, out var error);
+            Assert(refreshed, $"Manual refresh should succeed: {error}");
+            Assert(downloaded, "Manual refresh should download remote data.");
+
+            var after = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(
+                after.SequenceEqual([222L]),
+                "Manual refresh should replace the in-memory corpus."
+            );
+            Assert(
+                File.ReadAllText(cachePath) == remotePayload,
+                "Manual refresh should replace the disk cache."
+            );
+        }
+        finally
+        {
+            Reset(repositoryType);
+            TryDelete(cachePath);
+        }
+    }
+
+    private static void TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh()
+    {
+        var repositoryType = GetRepositoryType();
+        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
+        var cachePath = TempCachePath(); // never created on disk -> cold start.
+
+        Action? queuedRefresh = null;
+        var queuedRefreshCount = 0;
+        var remotePayload = ScorePayload("CacheHero", 222);
+        ConfigureWithBackgroundRefresh(
+            repositoryType,
+            cachePath,
+            now,
+            _ => remotePayload,
+            refresh =>
+            {
+                queuedRefreshCount++;
+                queuedRefresh = refresh;
+            }
+        );
+        SetEmbedded(repositoryType, () => null); // no embedded seed available either.
+
+        try
+        {
+            var cold = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(
+                cold.Count == 0,
+                "A cold start with no cache and no embedded seed should return no recommendation."
+            );
+            Assert(queuedRefreshCount == 1, "A cold start should queue a background refresh.");
+
+            queuedRefresh!();
+            var afterRefresh = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(
+                afterRefresh.SequenceEqual([222L]),
+                "After the cold-start refresh the corpus should populate."
+            );
+        }
+        finally
+        {
+            Reset(repositoryType);
+            TryDelete(cachePath);
+        }
+    }
+
+    private static void TestColdStartFallsBackToEmbeddedThenRemote()
+    {
+        var repositoryType = GetRepositoryType();
+        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
+        var cachePath = TempCachePath(); // never created on disk -> cold start.
+
+        Action? queuedRefresh = null;
+        var remotePayload = ScorePayload("CacheHero", 222);
+        ConfigureWithBackgroundRefresh(
+            repositoryType,
+            cachePath,
+            now,
+            _ => remotePayload,
+            refresh => queuedRefresh = refresh
+        );
+        SetEmbedded(repositoryType, () => ScorePayload("CacheHero", 555));
+
+        try
+        {
+            // No cache on disk: the bundled seed answers immediately while a refresh is queued.
+            var cold = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(
+                cold.SequenceEqual([555L]),
+                "A cold start with no cache should fall back to the embedded seed."
+            );
+
+            queuedRefresh!();
+            var afterRefresh = ScoresOf(
+                Find(repositoryType, NewRepository(repositoryType), "CacheHero", [GuidA])
+            );
+            Assert(
+                afterRefresh.SequenceEqual([222L]),
+                "The background refresh should replace the embedded seed with remote data."
+            );
+        }
+        finally
+        {
+            Reset(repositoryType);
+            TryDelete(cachePath);
+        }
+    }
+
+    private static void TestEmbeddedSeedResourceIsBundledAndParses()
+    {
+        var repositoryType = GetRepositoryType();
+        var readSeed = repositoryType.GetMethod(
+            "ReadEmbeddedSeedForTests",
+            BindingFlags.NonPublic | BindingFlags.Static
+        );
+        Assert(readSeed != null, "Repository should expose the embedded seed reader.");
+        var json = (string?)readSeed!.Invoke(null, null);
+        Assert(
+            !string.IsNullOrWhiteSpace(json),
+            "The bundled tenwin_builds.json seed should be embedded in the assembly."
+        );
+
+        var corpusType = repositoryType.Assembly.GetType(
+            "BazaarPlusPlus.Game.BuildRecommendations.TenWinBuildCorpus"
+        )!;
+        var parse = corpusType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static)!;
+        var corpus = parse.Invoke(null, [json]);
+        Assert(corpus != null, "The bundled seed should parse with the production corpus parser.");
+        var heroCount = (int)corpusType.GetProperty("HeroCount")!.GetValue(corpus)!;
+        Assert(heroCount > 0, "The bundled seed should contain at least one hero.");
+    }
+
+    // ---- Payload builders -------------------------------------------------
+
+    private static string MainRecallPayload(string hero) =>
+        Payload(
+            cards: $"[\"{GuidA}\",\"{GuidB}\",\"{GuidC}\"]",
+            enchantments: "[null,\"Fiery\"]",
+            hero: hero,
+            builds: $"[{Build("[0,1]", "[[0,0,1,0,1],[1,1,1,0,1]]", 100)},"
+                + $"{Build("[0]", "[[0,0,1,0,1]]", 200)},"
+                + $"{Build("[1]", "[[1,0,1,0,1]]", 150)}]",
+            // A(ref0) -> builds 0,1 ; B(ref1) -> builds 0,2 ; C(ref2) absent (uncovered for this hero).
+            cardIndex: "[[0,[0,1]],[1,[0,2]]]"
+        );
+
+    private static string ScorePayload(string hero, long score) =>
+        Payload(
+            cards: $"[\"{GuidA}\"]",
+            enchantments: "[null]",
+            hero: hero,
+            builds: $"[{Build("[0]", "[[0,0,1,0,1]]", score)}]",
+            cardIndex: "[[0,[0]]]"
+        );
+
+    private static string Build(
+        string cardRefs,
+        string layout,
+        long score,
+        string selection = "[0,null]"
+    ) => $"[{cardRefs},{layout},[300,80,2667,118,13,21,45,12,2667,112,{score}],{selection}]";
+
+    private static string Payload(
+        string cards,
+        string enchantments,
+        string hero,
+        string builds,
+        string cardIndex
+    ) =>
+        $$"""
+            {
+              "schemaVersion": 1,
+              "kind": "mod_tenwin_builds",
+              "cards": {{cards}},
+              "enchantments": {{enchantments}},
+              "schemas": {
+                "build": ["cardRefs", "layout", "stats", "selection"],
+                "layout": ["cardRef", "slot", "tier", "enchantRef", "size"],
+                "stats": ["completedRunCount", "tenWinRunCount", "tenWinRateBps", "avgTenWinFinalDayTenth", "p75TenWinFinalDay", "avgTenWinFinalLossesTenth", "eliteCompletedRunCount", "eliteTenWinRunCount", "eliteTenWinRateBps", "eliteAvgTenWinFinalDayTenth", "score"],
+                "selection": ["reason", "coveredCardRef"]
+              },
+              "selectionReasons": ["core", "coverage"],
+              "heroes": {
+                "{{hero}}": {
+                  "builds": {{builds}},
+                  "cardIndex": {{cardIndex}}
+                }
+              }
+            }
+            """;
+
+    // ---- Reflection plumbing ----------------------------------------------
+
+    private static void RegisterAssemblyResolution()
+    {
+        AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
+        {
+            var assemblyName = new AssemblyName(args.Name);
+            if (
+                !string.Equals(
+                    assemblyName.Name,
+                    "UnityEngine.CoreModule",
+                    StringComparison.Ordinal
+                )
+            )
+                return null;
+
+            var assemblyPath = Path.Combine(AppContext.BaseDirectory, "UnityEngine.CoreModule.dll");
+            return File.Exists(assemblyPath) ? Assembly.LoadFrom(assemblyPath) : null;
+        };
+    }
+
+    private static Type GetRepositoryType()
+    {
+        var assembly = Assembly.Load("BazaarPlusPlus");
+        return assembly.GetType(
+            "BazaarPlusPlus.Game.BuildRecommendations.BuildRecommendationRepository"
+        )!;
+    }
+
+    private static object NewRepository(Type repositoryType) =>
+        Activator.CreateInstance(repositoryType)!;
+
+    private static void WithCorpus(string payload, Action<Type, object> body)
+    {
+        var repositoryType = GetRepositoryType();
+        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
+        var cachePath = TempCachePath();
+        File.WriteAllText(cachePath, payload);
+        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
+        Configure(
+            repositoryType,
+            cachePath,
+            now,
+            _ => throw new InvalidOperationException("Fresh cache should not download.")
+        );
+        try
+        {
+            body(repositoryType, NewRepository(repositoryType));
+        }
+        finally
+        {
+            Reset(repositoryType);
+            TryDelete(cachePath);
+        }
+    }
+
+    private static IEnumerable Find(
+        Type repositoryType,
+        object repository,
+        string hero,
+        string[] templateIds,
+        object? liveState = null
+    )
+    {
+        var method = repositoryType.GetMethod("FindRecommendations")!;
+        var ids = templateIds.Select(Guid.Parse).ToArray();
+        return (IEnumerable)method.Invoke(repository, [hero, ids, liveState])!;
+    }
+
+    private static object LiveState(
+        Type repositoryType,
+        string[] board,
+        string[] stash,
+        string[] shop
+    )
+    {
+        var liveStateType = repositoryType.Assembly.GetType(
+            "BazaarPlusPlus.Game.BuildRecommendations.BuildLiveState"
+        )!;
+        var from = liveStateType.GetMethod("From")!;
+        return from.Invoke(
+            null,
+            [
+                board.Select(Guid.Parse).ToArray(),
+                stash.Select(Guid.Parse).ToArray(),
+                shop.Select(Guid.Parse).ToArray(),
+            ]
+        )!;
+    }
+
+    private static List<long> ScoresOf(IEnumerable recommendations) =>
+        recommendations.Cast<object>().Select(r => (long)Prop(r, "Score")!).ToList();
+
+    private static object? Prop(object target, string name) =>
+        target.GetType().GetProperty(name)!.GetValue(target);
+
+    private static string TempCachePath() =>
+        Path.Combine(Path.GetTempPath(), $"bpp-tenwin-{Guid.NewGuid():N}.json");
+
+    private static void Configure(
+        Type repositoryType,
+        string cachePath,
+        DateTime utcNow,
+        Func<string, string> downloadJson
+    ) =>
+        InvokeStatic(
+            repositoryType,
+            "ConfigureTenWinRemoteForTests",
+            cachePath,
+            (Func<DateTime>)(() => utcNow),
+            downloadJson
+        );
+
+    private static void ConfigureWithBackgroundRefresh(
+        Type repositoryType,
+        string cachePath,
+        DateTime utcNow,
+        Func<string, string> downloadJson,
+        Action<Action> queueBackgroundRefresh
+    ) =>
+        InvokeStatic(
+            repositoryType,
+            "ConfigureTenWinRemoteForTests",
+            cachePath,
+            (Func<DateTime>)(() => utcNow),
+            downloadJson,
+            queueBackgroundRefresh
+        );
+
+    private static void Reset(Type repositoryType) =>
+        InvokeStatic(repositoryType, "ResetTenWinRemoteForTests");
+
+    private static void SetEmbedded(Type repositoryType, Func<string?> loader) =>
+        InvokeStatic(repositoryType, "SetEmbeddedJsonForTests", loader);
+
+    private static bool ManualRefresh(Type repositoryType, out string? error)
+    {
+        var method = repositoryType.GetMethod(
+            "TryRefreshFinalBuildsFromRemote",
+            BindingFlags.NonPublic | BindingFlags.Static
+        );
+        Assert(method != null, "Repository should expose a manual remote refresh.");
+        object?[] parameters = [null];
+        var refreshed = (bool)method!.Invoke(null, parameters)!;
+        error = (string?)parameters[0];
+        return refreshed;
+    }
+
+    private static void InvokeStatic(Type type, string methodName, params object[] parameters)
+    {
+        var method = type.GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .FirstOrDefault(m =>
+                m.Name == methodName && m.GetParameters().Length == parameters.Length
+            );
+        Assert(
+            method != null,
+            $"Expected {type.FullName}.{methodName} ({parameters.Length} args) to exist."
+        );
+        method!.Invoke(null, parameters);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch { }
+    }
+
+    private static void Assert(bool condition, string message)
+    {
+        if (!condition)
+            throw new InvalidOperationException(message);
+    }
 }

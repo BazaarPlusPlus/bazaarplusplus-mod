@@ -8,616 +8,145 @@ using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 using BazaarPlusPlus.ModApi.Http;
-using Newtonsoft.Json;
-using TheBazaar;
-using UnityEngine;
 
 namespace BazaarPlusPlus.Game.BuildRecommendations;
 
+/// <summary>
+/// Loads the analyzer-v4 ten-win build corpus (cached locally with a background remote refresh),
+/// answers recommendation queries against the live state, and projects matched builds onto
+/// renderable item boards. The corpus is a static package — recommendation queries are answered
+/// from the local copy and never hit the server.
+/// </summary>
 internal sealed class BuildRecommendationRepository
 {
-    private const string FinalBuildsResourceSuffix = "final-builds-top50.json";
-    private const string FinalBuildsRemoteUrl =
-        "https://bpp-metrics.bazaarplusplus.com/final_builds_for_mod.json";
-    private const string FinalBuildsCacheFileName = "final_builds_for_mod.json";
+    private const string TenWinBuildsRemoteUrl =
+        "https://bpp-metrics.bazaarplusplus.com/analyzer-v4/mod/tenwin_builds.json";
+    private const string TenWinBuildsCacheFileName = "tenwin_builds.json";
     private static readonly LocalizedTextSet FinalBuildLabel = new(
         "Ten-Win Build",
         "十胜阵容",
         "十勝陣容",
         "十勝陣容"
     );
-    private static readonly TimeSpan FinalBuildsCacheDuration = TimeSpan.FromHours(20);
-    private static readonly HttpClient FinalBuildsHttpClient = BppHttpClientFactory.Create(
+    private static readonly TimeSpan TenWinBuildsCacheDuration = TimeSpan.FromHours(20);
+    private static readonly HttpClient TenWinHttpClient = BppHttpClientFactory.Create(
         productVersion: BppPluginVersion.Current,
-        userAgentSuffix: "BuildDataRepository",
+        userAgentSuffix: "TenWinBuildRepository",
         timeout: TimeSpan.FromSeconds(10)
     );
     private static readonly object SyncRoot = new();
-    private static FinalBuildRoot? _finalRoot;
+    private static TenWinBuildCorpus? _corpus;
     private static bool _attemptedLoad;
-    private static string? _finalBuildsCacheFilePath;
+    private static string? _cacheFilePath;
     private static Func<DateTime> _utcNow = () => DateTime.UtcNow;
-    private static Func<string, string> _downloadFinalBuildJson = DownloadFinalBuildJson;
-    private static Action<Action> _queueBackgroundFinalBuildRefresh =
-        QueueBackgroundFinalBuildRefresh;
-    private static bool _backgroundFinalBuildRefreshInProgress;
+    private static Func<string, string> _downloadJson = DownloadJson;
+    private static Func<string?> _loadEmbeddedJson = LoadEmbeddedTenWinJson;
+    private static Action<Action> _queueBackgroundRefresh = QueueBackgroundRefresh;
+    private static bool _backgroundRefreshInProgress;
 
-    public bool TryFindFinalRecommendation(
+    public IReadOnlyList<BuildRecommendation> FindRecommendations(
         string? hero,
-        IReadOnlyCollection<Guid> templateIds,
-        string ratingTier,
-        out BuildRecommendation recommendation
+        IReadOnlyCollection<Guid> selectedTemplateIds,
+        BuildLiveState? liveState = null
     )
     {
-        var recommendations = FindFinalRecommendations(hero, templateIds, ratingTier);
-        recommendation = recommendations.FirstOrDefault()!;
-        return recommendation != null;
-    }
-
-    public IReadOnlyList<BuildRecommendation> FindFinalRecommendations(
-        string? hero,
-        IReadOnlyCollection<Guid> templateIds,
-        string ratingTier
-    )
-    {
-        var finalRoot = EnsureFinalRoot();
-        if (finalRoot?.Heroes == null || string.IsNullOrWhiteSpace(hero))
+        var corpus = EnsureCorpus();
+        if (corpus == null)
             return Array.Empty<BuildRecommendation>();
 
-        if (!finalRoot.Heroes.TryGetValue(hero, out var heroTiers) || heroTiers?.Tiers == null)
+        var matches = corpus.FindBuilds(
+            hero,
+            selectedTemplateIds ?? Array.Empty<Guid>(),
+            liveState ?? BuildLiveState.Empty
+        );
+        if (matches.Count == 0)
             return Array.Empty<BuildRecommendation>();
 
-        var bucket = ResolveTierBucket(heroTiers.Tiers, ratingTier);
-        return FindRecommendations(bucket, templateIds, ResolveFinalBuildLabel());
-    }
-
-    private static BuildQueryBucket? ResolveTierBucket(
-        Dictionary<string, BuildQueryBucket> tiers,
-        string ratingTier
-    )
-    {
-        if (tiers.TryGetValue(ratingTier, out var bucket) && bucket != null)
-            return bucket;
-        return tiers.TryGetValue(BuildRatingTier.All, out var fallback) ? fallback : null;
-    }
-
-    private static FinalBuildRoot? EnsureFinalRoot()
-    {
-        EnsureLoaded();
-        return _finalRoot;
-    }
-
-    private static void EnsureLoaded()
-    {
-        var shouldRefreshInBackground = false;
-        lock (SyncRoot)
+        var label = ResolveFinalBuildLabel();
+        var results = new List<BuildRecommendation>(matches.Count);
+        foreach (var match in matches)
         {
-            if (_attemptedLoad)
-                return;
+            var board = ProjectBoard(match.Build);
+            if (board.Cards.Count == 0)
+                continue;
 
-            _attemptedLoad = true;
-            _finalRoot = LoadFinalBuildRoot(out shouldRefreshInBackground);
-        }
-
-        if (shouldRefreshInBackground)
-            TryQueueFinalBuildRefreshFromRemote("cache_stale_or_missing");
-    }
-
-    private static FinalBuildRoot? LoadFinalBuildRoot(out bool shouldRefreshInBackground)
-    {
-        shouldRefreshInBackground = false;
-
-        if (TryLoadFinalBuildCache(allowExpired: false, out var freshRoot))
-            return freshRoot;
-
-        if (TryLoadFinalBuildCache(allowExpired: true, out var staleRoot))
-        {
-            shouldRefreshInBackground = true;
-            BppLog.Info(
-                "BuildRecommendationRepository",
-                "Using expired final builds cache; remote refresh was queued in the background."
-            );
-            return staleRoot;
-        }
-
-        shouldRefreshInBackground = true;
-        return LoadEmbeddedJson<FinalBuildRoot>(FinalBuildsResourceSuffix);
-    }
-
-    internal static bool TryRefreshFinalBuildsFromRemote(out string? error)
-    {
-        if (!TryLoadRemoteFinalBuilds(out var remoteRoot, out error) || remoteRoot == null)
-            return false;
-
-        lock (SyncRoot)
-        {
-            _finalRoot = remoteRoot;
-            _attemptedLoad = true;
-        }
-
-        return true;
-    }
-
-    private static void TryQueueFinalBuildRefreshFromRemote(string reason)
-    {
-        if (!TryBeginBackgroundFinalBuildRefresh())
-            return;
-
-        try
-        {
-            _queueBackgroundFinalBuildRefresh(() =>
-                RefreshFinalBuildsFromRemoteInBackground(reason)
-            );
-            BppLog.Info(
-                "BuildRecommendationRepository",
-                $"Queued background final builds refresh reason={reason}."
-            );
-        }
-        catch (Exception ex)
-        {
-            EndBackgroundFinalBuildRefresh();
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to queue background final builds refresh reason={reason}: {ex.Message}"
-            );
-        }
-    }
-
-    private static bool TryBeginBackgroundFinalBuildRefresh()
-    {
-        lock (SyncRoot)
-        {
-            if (_backgroundFinalBuildRefreshInProgress)
-                return false;
-
-            _backgroundFinalBuildRefreshInProgress = true;
-            return true;
-        }
-    }
-
-    private static void EndBackgroundFinalBuildRefresh()
-    {
-        lock (SyncRoot)
-        {
-            _backgroundFinalBuildRefreshInProgress = false;
-        }
-    }
-
-    private static void RefreshFinalBuildsFromRemoteInBackground(string reason)
-    {
-        try
-        {
-            if (TryLoadRemoteFinalBuilds(out var remoteRoot, out var error) && remoteRoot != null)
-            {
-                lock (SyncRoot)
+            results.Add(
+                new BuildRecommendation
                 {
-                    _finalRoot = remoteRoot;
-                    _attemptedLoad = true;
+                    ModeLabel = label,
+                    MatchedCardCount = match.MatchedSelectedCount,
+                    TenWinRunCount = match.Build.Stats.TenWinRunCount,
+                    TenWinRateBps = match.Build.Stats.TenWinRateBps,
+                    P75TenWinFinalDay = match.Build.Stats.P75TenWinFinalDay,
+                    Score = match.Build.Stats.Score,
+                    Board = board,
                 }
-
-                BppLog.Info(
-                    "BuildRecommendationRepository",
-                    $"Background final builds refresh succeeded reason={reason}."
-                );
-                return;
-            }
-
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Background final builds refresh failed reason={reason} error={error ?? "unknown"}."
             );
         }
-        finally
+
+        for (var i = 0; i < results.Count; i++)
         {
-            EndBackgroundFinalBuildRefresh();
+            results[i].ResultIndex = i;
+            results[i].ResultCount = results.Count;
         }
+
+        return results;
     }
 
-    private static bool TryLoadFinalBuildCache(
-        bool allowExpired,
-        out FinalBuildRoot? finalBuildRoot
-    )
+    private static BppItemBoard ProjectBoard(TenWinBuild build)
     {
-        finalBuildRoot = null;
-
-        try
-        {
-            var cacheFilePath = ResolveFinalBuildsCacheFilePath();
-            if (!File.Exists(cacheFilePath))
-                return false;
-
-            var lastWriteUtc = File.GetLastWriteTimeUtc(cacheFilePath);
-            var expiresAtUtc = lastWriteUtc.Add(FinalBuildsCacheDuration);
-            if (!allowExpired && _utcNow() >= expiresAtUtc)
-                return false;
-
-            var json = File.ReadAllText(cacheFilePath);
-            finalBuildRoot = DeserializeFinalBuildJson(json, "cache");
-            if (finalBuildRoot == null)
-                return false;
-
-            BppLog.Info(
-                "BuildRecommendationRepository",
-                $"Loaded final builds from cache path={cacheFilePath} "
-                    + $"expired={_utcNow() >= expiresAtUtc} expiresAtUtc={expiresAtUtc:O}"
-            );
-            return true;
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to read final builds cache {ResolveFinalBuildsCacheFilePath()}: {ex.Message}"
-            );
-            return false;
-        }
-    }
-
-    private static bool TryLoadRemoteFinalBuilds(out FinalBuildRoot? finalBuildRoot)
-    {
-        return TryLoadRemoteFinalBuilds(out finalBuildRoot, out _);
-    }
-
-    private static bool TryLoadRemoteFinalBuilds(
-        out FinalBuildRoot? finalBuildRoot,
-        out string? error
-    )
-    {
-        finalBuildRoot = null;
-        error = null;
-
-        try
-        {
-            var json = _downloadFinalBuildJson(FinalBuildsRemoteUrl);
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                error = "empty_response";
-                return false;
-            }
-
-            finalBuildRoot = DeserializeFinalBuildJson(json, "remote");
-            if (finalBuildRoot == null)
-            {
-                error = "invalid_response";
-                return false;
-            }
-
-            TryWriteFinalBuildCache(json);
-            BppLog.Info(
-                "BuildRecommendationRepository",
-                $"Loaded final builds from remote url={FinalBuildsRemoteUrl}"
-            );
-            return true;
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to refresh final builds from {FinalBuildsRemoteUrl}: {ex.Message}"
-            );
-            return false;
-        }
-    }
-
-    private static FinalBuildRoot? DeserializeFinalBuildJson(string json, string source)
-    {
-        try
-        {
-            var parsed = JsonConvert.DeserializeObject<FinalBuildRoot>(json);
-            if (parsed?.Heroes == null)
-            {
-                BppLog.Warn(
-                    "BuildRecommendationRepository",
-                    $"Final builds JSON from {source} did not contain heroes."
-                );
-                return null;
-            }
-
-            return parsed;
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to parse final builds JSON from {source}: {ex.Message}"
-            );
-            return null;
-        }
-    }
-
-    private static void TryWriteFinalBuildCache(string json)
-    {
-        try
-        {
-            var cacheFilePath = ResolveFinalBuildsCacheFilePath();
-            var cacheDirectory = Path.GetDirectoryName(cacheFilePath);
-            if (!string.IsNullOrWhiteSpace(cacheDirectory))
-                Directory.CreateDirectory(cacheDirectory);
-
-            File.WriteAllText(cacheFilePath, json);
-            File.SetLastWriteTimeUtc(cacheFilePath, _utcNow());
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to write final builds cache {ResolveFinalBuildsCacheFilePath()}: {ex.Message}"
-            );
-        }
-    }
-
-    private static string ResolveFinalBuildsCacheFilePath()
-    {
-        return _finalBuildsCacheFilePath
-            ?? BuildDefaultFinalBuildsCacheFilePath(BepInEx.Paths.GameRootPath);
-    }
-
-    private static string BuildDefaultFinalBuildsCacheFilePath(string gameRootPath)
-    {
-        return Path.Combine(gameRootPath, "BazaarPlusPlusV4", FinalBuildsCacheFileName);
-    }
-
-    private static string DownloadFinalBuildJson(string url)
-    {
-        return FinalBuildsHttpClient.GetStringAsync(url).GetAwaiter().GetResult();
-    }
-
-    private static void QueueBackgroundFinalBuildRefresh(Action refresh)
-    {
-        _ = Task.Run(refresh);
-    }
-
-    private static void ConfigureFinalBuildRemoteForTests(
-        string cacheFilePath,
-        Func<DateTime> utcNow,
-        Func<string, string> downloadJson
-    )
-    {
-        lock (SyncRoot)
-        {
-            _finalRoot = null;
-            _attemptedLoad = false;
-            _backgroundFinalBuildRefreshInProgress = false;
-            _finalBuildsCacheFilePath = cacheFilePath;
-            _utcNow = utcNow;
-            _downloadFinalBuildJson = downloadJson;
-            _queueBackgroundFinalBuildRefresh = QueueBackgroundFinalBuildRefresh;
-        }
-    }
-
-    private static void ConfigureFinalBuildRemoteForTests(
-        string cacheFilePath,
-        Func<DateTime> utcNow,
-        Func<string, string> downloadJson,
-        Action<Action> queueBackgroundRefresh
-    )
-    {
-        lock (SyncRoot)
-        {
-            _finalRoot = null;
-            _attemptedLoad = false;
-            _backgroundFinalBuildRefreshInProgress = false;
-            _finalBuildsCacheFilePath = cacheFilePath;
-            _utcNow = utcNow;
-            _downloadFinalBuildJson = downloadJson;
-            _queueBackgroundFinalBuildRefresh =
-                queueBackgroundRefresh ?? QueueBackgroundFinalBuildRefresh;
-        }
-    }
-
-    private static void ResetFinalBuildRemoteForTests()
-    {
-        lock (SyncRoot)
-        {
-            _finalRoot = null;
-            _attemptedLoad = false;
-            _backgroundFinalBuildRefreshInProgress = false;
-            _finalBuildsCacheFilePath = null;
-            _utcNow = () => DateTime.UtcNow;
-            _downloadFinalBuildJson = DownloadFinalBuildJson;
-            _queueBackgroundFinalBuildRefresh = QueueBackgroundFinalBuildRefresh;
-        }
-    }
-
-    private static T? LoadEmbeddedJson<T>(string resourceSuffix)
-        where T : class
-    {
-        try
-        {
-            var assembly = Assembly.GetExecutingAssembly();
-            var resourceName = assembly
-                .GetManifestResourceNames()
-                .FirstOrDefault(name =>
-                    name.EndsWith(resourceSuffix, StringComparison.OrdinalIgnoreCase)
-                );
-            if (resourceName == null)
-            {
-                BppLog.Warn(
-                    "BuildRecommendationRepository",
-                    $"Embedded resource not found suffix={resourceSuffix}"
-                );
-                return null;
-            }
-
-            using var stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream == null)
-                return null;
-
-            using var reader = new StreamReader(stream);
-            var json = reader.ReadToEnd();
-            var parsed = JsonConvert.DeserializeObject<T>(json);
-            BppLog.Info(
-                "BuildRecommendationRepository",
-                $"Loaded embedded build data resource={resourceName} parsed={(parsed != null)}"
-            );
-            return parsed;
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error(
-                "BuildRecommendationRepository",
-                $"Failed to load embedded build data suffix={resourceSuffix}",
-                ex
-            );
-            return null;
-        }
-    }
-
-    private static IReadOnlyList<BuildRecommendation> FindRecommendations(
-        BuildQueryBucket? bucket,
-        IReadOnlyCollection<Guid> templateIds,
-        string modeLabel
-    )
-    {
-        if (bucket?.Builds == null || templateIds == null || templateIds.Count == 0)
-            return Array.Empty<BuildRecommendation>();
-
-        var selectedCardIds = templateIds
-            .Where(id => id != Guid.Empty)
-            .Select(id => id.ToString())
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(id => id, StringComparer.Ordinal)
+        var cards = build
+            .Layout.Where(item => item.TemplateId != Guid.Empty)
+            .OrderBy(item => item.Slot ?? int.MaxValue)
+            .Select(ProjectCard)
             .ToArray();
-        if (selectedCardIds.Length == 0)
-            return Array.Empty<BuildRecommendation>();
 
-        IReadOnlyList<int>? matchedBuildIds = null;
-        var preserveIncomingOrder = false;
-        if (
-            selectedCardIds.Length <= 3
-            && bucket.SubsetIndex != null
-            && bucket.SubsetIndex.TryGetValue(
-                string.Join("|", selectedCardIds),
-                out var subsetEntry
+        return BppItemBoardSlotPlanner.Plan(
+            new BppItemBoard(
+                BppItemBoardId.FinalBuild,
+                BppItemBoardType.Reference,
+                cards,
+                $"tenwin-build:{build.BuildId}"
             )
-            && subsetEntry?.MatchedBuildIds?.Count > 0
-        )
-        {
-            matchedBuildIds = subsetEntry.MatchedBuildIds;
-            preserveIncomingOrder = true;
-        }
-        else if (bucket.CardIndex != null)
-        {
-            HashSet<int>? intersection = null;
-            foreach (var cardId in selectedCardIds)
-            {
-                if (!bucket.CardIndex.TryGetValue(cardId, out var buildIds) || buildIds.Count == 0)
-                    return Array.Empty<BuildRecommendation>();
-
-                if (intersection == null)
-                {
-                    intersection = new HashSet<int>(buildIds);
-                    continue;
-                }
-
-                intersection.IntersectWith(buildIds);
-                if (intersection.Count == 0)
-                    return Array.Empty<BuildRecommendation>();
-            }
-
-            matchedBuildIds = intersection?.OrderBy(id => id).ToArray();
-        }
-
-        if (matchedBuildIds == null || matchedBuildIds.Count == 0)
-            return Array.Empty<BuildRecommendation>();
-
-        var candidates = matchedBuildIds
-            .Select(
-                (buildId, index) =>
-                    new
-                    {
-                        Build = buildId >= 0 && buildId < bucket.Builds.Count
-                            ? bucket.Builds[buildId]
-                            : null,
-                        BuildId = buildId,
-                        OriginalIndex = index,
-                    }
-            )
-            .Where(candidate => candidate.Build?.PlayerCards?.Count > 0)
-            .ToList();
-        if (candidates.Count == 0)
-            return Array.Empty<BuildRecommendation>();
-
-        var orderedCandidates = preserveIncomingOrder
-            ? candidates
-            : candidates
-                .OrderByDescending(candidate => candidate.Build!.GoldScore)
-                .ThenBy(candidate => candidate.BuildId)
-                .ToList();
-
-        var recommendations = orderedCandidates
-            .Select(
-                (candidate, index) =>
-                    new BuildRecommendation
-                    {
-                        ModeLabel = modeLabel,
-                        Source = candidate.Build!.Source ?? string.Empty,
-                        SetSignature = candidate.Build!.SetSignature ?? string.Empty,
-                        GoldScore = candidate.Build.GoldScore,
-                        ResultIndex = index,
-                        ResultCount = orderedCandidates.Count,
-                        Board = BppItemBoardSlotPlanner.Plan(
-                            new BppItemBoard(
-                                BppItemBoardId.FinalBuild,
-                                BppItemBoardType.Reference,
-                                ProjectPlayerCards(candidate.Build.PlayerCards),
-                                candidate.Build.SetSignature
-                            )
-                        ),
-                    }
-            )
-            .Where(recommendation => recommendation.Board.Cards.Count > 0)
-            .ToArray();
-        return recommendations;
+        );
     }
 
-    private static IReadOnlyList<BppItemBoardCard> ProjectPlayerCards(
-        IReadOnlyList<PlayerCardEntry>? playerCards
-    )
+    private static BppItemBoardCard ProjectCard(TenWinLayoutItem item)
     {
-        if (playerCards == null || playerCards.Count == 0)
-            return Array.Empty<BppItemBoardCard>();
-
-        return playerCards
-            .Where(entry => entry != null && Guid.TryParse(entry.CardId, out _))
-            .OrderBy(entry => entry!.Slot)
-            .Select(entry =>
-            {
-                Enum.TryParse<EEnchantmentType>(
-                    entry!.Enchant ?? string.Empty,
-                    true,
-                    out var enchantType
-                );
-                var hasEnchant =
-                    !string.IsNullOrWhiteSpace(entry.Enchant)
-                    && !string.Equals(entry.Enchant, "None", StringComparison.OrdinalIgnoreCase);
-                var templateId = Guid.Parse(entry.CardId!);
-                var size = ResolveCardSize(templateId);
-                return new BppItemBoardCard
-                {
-                    TemplateId = templateId,
-                    InstanceId = $"final-build-{entry.Slot?.ToString() ?? "unsocketed"}",
-                    Order = entry.Slot ?? 0,
-                    Tier = MapRecommendationTier(entry.Tier),
-                    Size = size,
-                    Span = BppItemBoardSpan.Resolve(size),
-                    SourceSocketId = entry.Slot.HasValue
-                        ? (EContainerSocketId?)Mathf.Clamp(entry.Slot.Value, 0, 9)
-                        : null,
-                    EnchantmentType = hasEnchant ? enchantType : null,
-                };
-            })
-            .ToArray();
+        var size = ResolveCardSize(item.TemplateId, item.Size);
+        return new BppItemBoardCard
+        {
+            TemplateId = item.TemplateId,
+            InstanceId = $"tenwin-{(item.Slot?.ToString() ?? "unsocketed")}-{item.TemplateId:N}",
+            Order = item.Slot ?? 0,
+            Tier = MapTier(item.Tier),
+            Size = size,
+            Span = BppItemBoardSpan.Resolve(size),
+            SourceSocketId = item.Slot.HasValue
+                ? (EContainerSocketId?)Math.Clamp(item.Slot.Value, 0, 9)
+                : null,
+            EnchantmentType = MapEnchant(item.EnchantName),
+        };
     }
 
-    private static ECardSize ResolveCardSize(Guid templateId)
+    private static ECardSize ResolveCardSize(Guid templateId, int? size)
+    {
+        return size switch
+        {
+            1 => ECardSize.Small,
+            2 => ECardSize.Medium,
+            3 => ECardSize.Large,
+            // Out-of-range/absent payload size: fall back to the game's authoritative card size.
+            _ => ResolveCardSizeFromStaticData(templateId),
+        };
+    }
+
+    private static ECardSize ResolveCardSizeFromStaticData(Guid templateId)
     {
         try
         {
@@ -637,81 +166,405 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    private static ETier MapRecommendationTier(int? rawTier)
+    private static ETier MapTier(int? tier)
     {
-        // Build recommendation JSON stores Bronze..Legendary as 1..5, while ETier is 0..4.
-        var normalizedTier = rawTier.GetValueOrDefault();
-        if (normalizedTier > 0)
-            normalizedTier--;
+        // Layout tier is the analyzer's mod value 1..5 (Bronze..Legendary); ETier is 0..4.
+        var normalized = tier.GetValueOrDefault();
+        if (normalized > 0)
+            normalized--;
 
-        normalizedTier = Math.Clamp(normalizedTier, (int)ETier.Bronze, (int)ETier.Legendary);
-        return (ETier)normalizedTier;
+        normalized = Math.Clamp(normalized, (int)ETier.Bronze, (int)ETier.Legendary);
+        return (ETier)normalized;
     }
 
-    private static string ResolveFinalBuildLabel()
+    private static EEnchantmentType? MapEnchant(string? enchantName)
     {
-        return L.Resolve(FinalBuildLabel);
+        if (string.IsNullOrWhiteSpace(enchantName))
+            return null;
+
+        return Enum.TryParse<EEnchantmentType>(enchantName, true, out var type)
+            ? type
+            : (EEnchantmentType?)null;
     }
 
-    private sealed class FinalBuildRoot
+    private static string ResolveFinalBuildLabel() => L.Resolve(FinalBuildLabel);
+
+    // ---- Corpus loading / cache / remote refresh --------------------------
+
+    internal static TenWinBuildCorpus? EnsureCorpus()
     {
-        [JsonProperty("heroes")]
-        public Dictionary<string, HeroTierSet>? Heroes { get; set; }
+        EnsureLoaded();
+        return _corpus;
     }
 
-    private sealed class HeroTierSet
+    private static void EnsureLoaded()
     {
-        // tier key (all/low/mid/high) -> bucket. The positional cardIndex/subsetIndex
-        // invariant is preserved INSIDE each bucket.
-        [JsonProperty("tiers")]
-        public Dictionary<string, BuildQueryBucket>? Tiers { get; set; }
+        var shouldRefreshInBackground = false;
+        lock (SyncRoot)
+        {
+            if (_attemptedLoad)
+                return;
+
+            _attemptedLoad = true;
+            _corpus = LoadCorpus(out shouldRefreshInBackground);
+        }
+
+        if (shouldRefreshInBackground)
+            TryQueueRefreshFromRemote("cache_stale_or_missing");
     }
 
-    private sealed class BuildQueryBucket
+    private static TenWinBuildCorpus? LoadCorpus(out bool shouldRefreshInBackground)
     {
-        [JsonProperty("builds")]
-        public List<BuildRecord> Builds { get; set; } = new();
+        shouldRefreshInBackground = false;
 
-        [JsonProperty("cardIndex")]
-        public Dictionary<string, List<int>>? CardIndex { get; set; }
+        if (TryLoadCache(allowExpired: false, out var freshCorpus))
+            return freshCorpus;
 
-        [JsonProperty("subsetIndex")]
-        public Dictionary<string, SubsetRecord>? SubsetIndex { get; set; }
+        if (TryLoadCache(allowExpired: true, out var staleCorpus))
+        {
+            shouldRefreshInBackground = true;
+            BppLog.Info(
+                "BuildRecommendationRepository",
+                "Using expired ten-win builds cache; remote refresh was queued in the background."
+            );
+            return staleCorpus;
+        }
+
+        // Cold start with no cache: seed from the bundled corpus (same compact format, same parser)
+        // so the panel is never empty offline, and still queue a remote refresh.
+        shouldRefreshInBackground = true;
+        var embeddedJson = _loadEmbeddedJson();
+        return string.IsNullOrWhiteSpace(embeddedJson)
+            ? null
+            : DeserializeCorpus(embeddedJson!, "embedded");
     }
 
-    private sealed class BuildRecord
+    private static string? LoadEmbeddedTenWinJson()
     {
-        [JsonProperty("source")]
-        public string? Source { get; set; }
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var resourceName = assembly
+                .GetManifestResourceNames()
+                .FirstOrDefault(name =>
+                    name.EndsWith(TenWinBuildsCacheFileName, StringComparison.OrdinalIgnoreCase)
+                );
+            if (resourceName == null)
+            {
+                BppLog.Warn(
+                    "BuildRecommendationRepository",
+                    "Embedded ten-win builds seed resource was not found."
+                );
+                return null;
+            }
 
-        [JsonProperty("setSignature")]
-        public string? SetSignature { get; set; }
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream == null)
+                return null;
 
-        [JsonProperty("goldScore")]
-        public double GoldScore { get; set; }
-
-        [JsonProperty("playerCards")]
-        public List<PlayerCardEntry> PlayerCards { get; set; } = new();
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "BuildRecommendationRepository",
+                $"Failed to load embedded ten-win builds seed: {ex.Message}"
+            );
+            return null;
+        }
     }
 
-    private sealed class SubsetRecord
+    internal static bool TryRefreshFinalBuildsFromRemote(out string? error)
     {
-        [JsonProperty("matchedBuildIds")]
-        public List<int> MatchedBuildIds { get; set; } = new();
+        if (!TryLoadRemote(out var remoteCorpus, out error) || remoteCorpus == null)
+            return false;
+
+        lock (SyncRoot)
+        {
+            _corpus = remoteCorpus;
+            _attemptedLoad = true;
+        }
+
+        return true;
     }
 
-    private sealed class PlayerCardEntry
+    private static void TryQueueRefreshFromRemote(string reason)
     {
-        [JsonProperty("cardId")]
-        public string? CardId { get; set; }
+        if (!TryBeginBackgroundRefresh())
+            return;
 
-        [JsonProperty("slot")]
-        public int? Slot { get; set; }
+        try
+        {
+            _queueBackgroundRefresh(() => RefreshFromRemoteInBackground(reason));
+            BppLog.Info(
+                "BuildRecommendationRepository",
+                $"Queued background ten-win builds refresh reason={reason}."
+            );
+        }
+        catch (Exception ex)
+        {
+            EndBackgroundRefresh();
+            BppLog.Warn(
+                "BuildRecommendationRepository",
+                $"Failed to queue background ten-win builds refresh reason={reason}: {ex.Message}"
+            );
+        }
+    }
 
-        [JsonProperty("tier")]
-        public int? Tier { get; set; }
+    private static bool TryBeginBackgroundRefresh()
+    {
+        lock (SyncRoot)
+        {
+            if (_backgroundRefreshInProgress)
+                return false;
 
-        [JsonProperty("enchant")]
-        public string? Enchant { get; set; }
+            _backgroundRefreshInProgress = true;
+            return true;
+        }
+    }
+
+    private static void EndBackgroundRefresh()
+    {
+        lock (SyncRoot)
+        {
+            _backgroundRefreshInProgress = false;
+        }
+    }
+
+    private static void RefreshFromRemoteInBackground(string reason)
+    {
+        try
+        {
+            if (TryLoadRemote(out var remoteCorpus, out var error) && remoteCorpus != null)
+            {
+                lock (SyncRoot)
+                {
+                    _corpus = remoteCorpus;
+                    _attemptedLoad = true;
+                }
+
+                BppLog.Info(
+                    "BuildRecommendationRepository",
+                    $"Background ten-win builds refresh succeeded reason={reason}."
+                );
+                return;
+            }
+
+            BppLog.Warn(
+                "BuildRecommendationRepository",
+                $"Background ten-win builds refresh failed reason={reason} error={error ?? "unknown"}."
+            );
+
+            // Cold start with no usable corpus: allow a later query to retry the fetch.
+            lock (SyncRoot)
+            {
+                if (_corpus == null)
+                    _attemptedLoad = false;
+            }
+        }
+        finally
+        {
+            EndBackgroundRefresh();
+        }
+    }
+
+    private static bool TryLoadCache(bool allowExpired, out TenWinBuildCorpus? corpus)
+    {
+        corpus = null;
+
+        try
+        {
+            var cacheFilePath = ResolveCacheFilePath();
+            if (!File.Exists(cacheFilePath))
+                return false;
+
+            var lastWriteUtc = File.GetLastWriteTimeUtc(cacheFilePath);
+            var expiresAtUtc = lastWriteUtc.Add(TenWinBuildsCacheDuration);
+            if (!allowExpired && _utcNow() >= expiresAtUtc)
+                return false;
+
+            var json = File.ReadAllText(cacheFilePath);
+            corpus = DeserializeCorpus(json, "cache");
+            if (corpus == null)
+                return false;
+
+            BppLog.Info(
+                "BuildRecommendationRepository",
+                $"Loaded ten-win builds from cache path={cacheFilePath} "
+                    + $"expired={_utcNow() >= expiresAtUtc} expiresAtUtc={expiresAtUtc:O}"
+            );
+            return true;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "BuildRecommendationRepository",
+                $"Failed to read ten-win builds cache {ResolveCacheFilePath()}: {ex.Message}"
+            );
+            return false;
+        }
+    }
+
+    private static bool TryLoadRemote(out TenWinBuildCorpus? corpus, out string? error)
+    {
+        corpus = null;
+        error = null;
+
+        try
+        {
+            var json = _downloadJson(TenWinBuildsRemoteUrl);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                error = "empty_response";
+                return false;
+            }
+
+            corpus = DeserializeCorpus(json, "remote");
+            if (corpus == null)
+            {
+                error = "invalid_response";
+                return false;
+            }
+
+            TryWriteCache(json);
+            BppLog.Info(
+                "BuildRecommendationRepository",
+                $"Loaded ten-win builds from remote url={TenWinBuildsRemoteUrl}"
+            );
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            BppLog.Warn(
+                "BuildRecommendationRepository",
+                $"Failed to refresh ten-win builds from {TenWinBuildsRemoteUrl}: {ex.Message}"
+            );
+            return false;
+        }
+    }
+
+    private static TenWinBuildCorpus? DeserializeCorpus(string json, string source)
+    {
+        var corpus = TenWinBuildCorpus.Parse(json);
+        if (corpus == null)
+        {
+            BppLog.Warn(
+                "BuildRecommendationRepository",
+                $"Ten-win builds JSON from {source} was missing or malformed."
+            );
+        }
+
+        return corpus;
+    }
+
+    private static void TryWriteCache(string json)
+    {
+        try
+        {
+            var cacheFilePath = ResolveCacheFilePath();
+            var cacheDirectory = Path.GetDirectoryName(cacheFilePath);
+            if (!string.IsNullOrWhiteSpace(cacheDirectory))
+                Directory.CreateDirectory(cacheDirectory);
+
+            File.WriteAllText(cacheFilePath, json);
+            File.SetLastWriteTimeUtc(cacheFilePath, _utcNow());
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "BuildRecommendationRepository",
+                $"Failed to write ten-win builds cache {ResolveCacheFilePath()}: {ex.Message}"
+            );
+        }
+    }
+
+    private static string ResolveCacheFilePath()
+    {
+        return _cacheFilePath ?? BuildDefaultTenWinCacheFilePath(BepInEx.Paths.GameRootPath);
+    }
+
+    private static string BuildDefaultTenWinCacheFilePath(string gameRootPath)
+    {
+        return Path.Combine(gameRootPath, "BazaarPlusPlusV4", TenWinBuildsCacheFileName);
+    }
+
+    private static string DownloadJson(string url)
+    {
+        return TenWinHttpClient.GetStringAsync(url).GetAwaiter().GetResult();
+    }
+
+    private static void QueueBackgroundRefresh(Action refresh)
+    {
+        _ = Task.Run(refresh);
+    }
+
+    // ---- Test hooks -------------------------------------------------------
+
+    private static void ConfigureTenWinRemoteForTests(
+        string cacheFilePath,
+        Func<DateTime> utcNow,
+        Func<string, string> downloadJson
+    )
+    {
+        lock (SyncRoot)
+        {
+            _corpus = null;
+            _attemptedLoad = false;
+            _backgroundRefreshInProgress = false;
+            _cacheFilePath = cacheFilePath;
+            _utcNow = utcNow;
+            _downloadJson = downloadJson;
+            _loadEmbeddedJson = () => null;
+            _queueBackgroundRefresh = QueueBackgroundRefresh;
+        }
+    }
+
+    private static void ConfigureTenWinRemoteForTests(
+        string cacheFilePath,
+        Func<DateTime> utcNow,
+        Func<string, string> downloadJson,
+        Action<Action> queueBackgroundRefresh
+    )
+    {
+        lock (SyncRoot)
+        {
+            _corpus = null;
+            _attemptedLoad = false;
+            _backgroundRefreshInProgress = false;
+            _cacheFilePath = cacheFilePath;
+            _utcNow = utcNow;
+            _downloadJson = downloadJson;
+            _loadEmbeddedJson = () => null;
+            _queueBackgroundRefresh = queueBackgroundRefresh ?? QueueBackgroundRefresh;
+        }
+    }
+
+    private static string? ReadEmbeddedSeedForTests() => LoadEmbeddedTenWinJson();
+
+    private static void SetEmbeddedJsonForTests(Func<string?> loadEmbeddedJson)
+    {
+        lock (SyncRoot)
+        {
+            _corpus = null;
+            _attemptedLoad = false;
+            _loadEmbeddedJson = loadEmbeddedJson ?? (() => null);
+        }
+    }
+
+    private static void ResetTenWinRemoteForTests()
+    {
+        lock (SyncRoot)
+        {
+            _corpus = null;
+            _attemptedLoad = false;
+            _backgroundRefreshInProgress = false;
+            _cacheFilePath = null;
+            _utcNow = () => DateTime.UtcNow;
+            _downloadJson = DownloadJson;
+            _loadEmbeddedJson = LoadEmbeddedTenWinJson;
+            _queueBackgroundRefresh = QueueBackgroundRefresh;
+        }
     }
 }

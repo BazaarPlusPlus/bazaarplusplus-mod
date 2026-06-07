@@ -21,10 +21,6 @@
 
   <ItemGroup>
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/BuildRecommendations/BuildRatingTier.cs"
-      Link="BuildRatingTier.cs"
-    />
-    <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildCandidateState.cs"
       Link="LiveBuildCandidateState.cs"
     />
@@ -32,7 +28,10 @@
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveItemBoardRowVm.cs"
       Link="LiveItemBoardRowVm.cs"
     />
-    <Compile Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoard.cs" Link="BppItemBoard.cs" />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoard.cs"
+      Link="BppItemBoard.cs"
+    />
     <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardCard.cs"
       Link="BppItemBoardCard.cs"

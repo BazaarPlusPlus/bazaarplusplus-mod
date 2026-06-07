@@ -11,7 +11,6 @@ using BazaarPlusPlus.Game.LiveBuildPanel.Preview;
 using BazaarPlusPlus.Game.LiveBuildPanel.Ui;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
-using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.LiveCards;
 using BazaarPlusPlus.Infrastructure;
@@ -203,14 +202,13 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private void RefreshRecommendations()
     {
         var hero = _liveSnapshot.Hero?.ToString();
-        var ratingTier = ResolveLiveRatingTier();
         _matches =
             string.IsNullOrWhiteSpace(hero) || !_candidateState.HasCandidates
                 ? Array.Empty<BuildRecommendation>()
-                : _recommendations.FindFinalRecommendations(
+                : _recommendations.FindRecommendations(
                     hero,
                     _candidateState.TemplateIds,
-                    ratingTier
+                    ResolveLiveState()
                 );
         _recommendationIndex = Mathf.Clamp(
             _recommendationIndex,
@@ -219,14 +217,18 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         );
     }
 
-    // Live rating selects the final-build tier bucket; fallback "all" when unavailable.
-    // No account-specific filtering — the rating is the only selector.
-    private static string ResolveLiveRatingTier()
+    // Live board/stash/shop only rank matched builds (board weighs most); they never drive recall.
+    private BuildLiveState ResolveLiveState()
     {
-        return BppClientCacheBridge.TryGetPlayerRankSnapshot(out _, out var rating)
-            ? BuildRatingTier.FromRating(rating)
-            : BuildRatingTier.All;
+        return BuildLiveState.From(
+            TemplateIdsOf(_liveSnapshot.BoardItems),
+            TemplateIdsOf(_liveSnapshot.StashItems),
+            TemplateIdsOf(_liveSnapshot.ShopItems)
+        );
     }
+
+    private static IReadOnlyCollection<Guid> TemplateIdsOf(IReadOnlyList<LiveCardSnapshot> cards) =>
+        cards.Select(card => card.TemplateId).Where(id => id != Guid.Empty).Distinct().ToArray();
 
     private void RefreshViewAndPreview()
     {
@@ -337,9 +339,12 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         if (recommendation == null)
             return LiveBuildPanelText.NoRecommendation();
 
-        return string.IsNullOrWhiteSpace(recommendation.Source)
-            ? LiveBuildPanelText.RecommendationCount(_recommendationIndex, _matches.Count)
-            : $"{LiveBuildPanelText.RecommendationCount(_recommendationIndex, _matches.Count)} | {recommendation.Source}";
+        return $"{LiveBuildPanelText.RecommendationCount(_recommendationIndex, _matches.Count)} · "
+            + LiveBuildPanelText.RecommendationEvidence(
+                recommendation.TenWinRunCount,
+                recommendation.TenWinRateBps,
+                recommendation.P75TenWinFinalDay
+            );
     }
 
     private void StopRender()

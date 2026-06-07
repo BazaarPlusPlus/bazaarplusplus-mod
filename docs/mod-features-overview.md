@@ -50,7 +50,7 @@ BazaarPlusPlus 是面向《The Bazaar》的 **BepInEx** 插件，在游戏中提
 ### 终局阵容面板（LiveBuildPanel）
 
 - 局内 CapsLock 开关（`LiveBuildPanel.cs:85`）；由 `LiveBuildPanelMount` 挂载（`BppComposition.cs:114`），代码在 `Game/LiveBuildPanel/`。
-- 展示当前 run 的实时 shop / board / stash 行，并按当前评级分段筛选 ten-win 终局 build 推荐（`Game/BuildRecommendations/`：远端 `https://bpp-metrics.bazaarplusplus.com/final_builds_for_mod.json` + 内嵌 `final-builds-top50.json` 兜底，本地缓存后台刷新）。
+- 展示当前 run 的实时 shop / board / stash 行，选择候选物品后筛选匹配的 ten-win 终局 build 推荐（`Game/BuildRecommendations/`：远端 analyzer-v4 `https://bpp-metrics.bazaarplusplus.com/analyzer-v4/mod/tenwin_builds.json`，本地缓存后台刷新，内嵌 `Data/BuildRecommendations/tenwin_builds.json` 种子数据用于冷启动兜底）。
 - item-board 渲染复用 `GameInterop/ItemBoardPreview`；赞助者署名行来自 `Game/Supporters/`。
 
 ### 附魔预览与升级预览（Tooltips）
