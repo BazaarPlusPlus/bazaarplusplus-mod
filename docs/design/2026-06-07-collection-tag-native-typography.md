@@ -127,8 +127,8 @@ CardTooltipTypeHandler.RenderCardUI                          // decompiled/TheBa
 **退化语义 ≠ fallback**：解析链（§5）的每个失败点都退化为**原生 API 自身的行为**（`LocalizableText` 查不到返回原文；typography 未注册返回枚举名），不存在第二份 mod 词典。退化结果不缓存、按次解析，typography 注册后下一次 `Refresh` 即自愈。
 
 **接受的代价**（评审请重点确认）：
-1. 简繁台/港模式失去预授变体——原生 zh-CN 文案经 `ChineseScriptConverter.Convert(text, null, null, mode)` 逐字转换 + 台/港用词表（`ChineseScriptConverter.cs:483-490`），未映射字符原样通过（`:509`）。相对今天手写的台/港文案是**质量回退**，换取零维护。
-2. 启动极早窗口（异步注册完成前）打开面板会短暂看到英文枚举名 chips，任意一次交互/Refresh 后自愈。
+1. ~~简繁台/港模式失去预授变体——原生 zh-CN 文案经 `ChineseScriptConverter.Convert` 逐字转换 + 台/港用词表，质量回退换零维护~~ **实施修订（2026-06-07，用户决策）**：标签 chips 在台/港模式下**不做**简繁转换，直接显示游戏原生 zh-CN 文案——逐字转换对游戏词汇的质量噪音比简繁混排更糟。行内呈现为「chip 简体 + mod chrome 繁体」的已接受混排；`mode` 同步退出适配器缓存键。
+2. 启动极早窗口（异步注册完成前）打开面板会短暂看到英文枚举名 chips。~~任意一次交互/Refresh 后自愈~~ **评审修订**：实现时加入 readiness 轮询自愈（§5 失败点表），无需用户交互。
 3. 游戏字符串表没有的语言/词条显示英文原文——与游戏自身 `LocalizableText` 行为一致。
 
 ### 4.3 私有成员访问
@@ -153,10 +153,10 @@ private static readonly MethodInfo? GetConfigurationMethod = AccessTools.Method(
 
 | 轴 | 触发 | 本设计行为 |
 |---|---|---|
-| BPP 简繁模式 | `ChineseLocaleModeChanged`（`ChineseLocaleModeSettingsDockEntry.cs:56`）→ 既有订阅链（`CollectionPanelMount.cs:25-27`） | 解析链末端套 `ChineseScriptConverter`；缓存键含 mode，事件即失效 |
+| BPP 简繁模式 | `ChineseLocaleModeChanged`（`ChineseLocaleModeSettingsDockEntry.cs:56`）→ 既有订阅链（`CollectionPanelMount.cs:25-27`） | ~~解析链末端套 `ChineseScriptConverter`；缓存键含 mode~~ **实施修订**：chips 不参与简繁转换（原生 zh-CN 直出），mode 不入缓存键；事件链照旧刷新 chrome 文案 |
 | 游戏语言 | CJK 等字体回退语言**重启进程**（mod 状态全清，无滞留）；非重启语言 `SetLocaleAsync` 进程内切换 | 标签按次解析 + 缓存键含 languageCode → 下一次 `Refresh`（任意交互/开面板）自愈。**不**新增对 `OptionsDialogController.OnLanguageOptionChanged` 的 patch 扩展：该方法 `async void`（`OptionsDialogController.cs:564`），Harmony postfix 在首个 await 处即触发、可能早于 `SetLocaleAsync` 完成——既有 `OptionsDialogLanguageRefreshPatch` 已踩在这一时序上，不再加注此陷阱面 |
 
-两套文案源（chip = 原生 locale，More/Less/标题 = mod `L`）都锚定 `PlayerPreferences.Data.LanguageCode`，叠加同一简繁转换后行内一致。
+两套文案源（chip = 原生 locale，More/Less/标题 = mod `L`）都锚定 `PlayerPreferences.Data.LanguageCode`。**实施修订**：chips 不再叠加简繁转换，台/港模式下行内为「chip 简体 + chrome 繁体」混排（接受）。
 
 ### 4.6 字体与光栅（核查更正早期假设）
 
@@ -167,9 +167,11 @@ private static readonly MethodInfo? GetConfigurationMethod = AccessTools.Method(
 
 ```
 ResolveTag(ECardTag tag) -> NativeTagDisplay { string Label; Color? AccentColor }
-  // 主线程；每次 Refresh 经缓存调用；缓存键 = (typography 实例引用, L.CurrentLanguageCode, L.CurrentMode)
+  // 主线程；每次 Refresh 经缓存调用；缓存键 = (typography 实例引用, L.CurrentLanguageCode)
   // —— 实例引用即天然失效键（locale 变化 = 新实例，§3.1）；键变则整表清空。
   // typography == null 时的结果【不入缓存】⇒ 注册完成后自动自愈。
+  // 实施修订：原 step 5（台/港模式 ChineseScriptConverter 逐字转换）已删除——chips 原生 zh-CN 直出，
+  // mode 不入缓存键（§4.2 代价 1、§4.5）。
 
   1. name = tag.ToString()                       // "Weapon"，枚举名即查询键
   2. typo = Data.TooltipTypography               // 现读，可空（启动窗口 / TooltipParentComponent.OnDestroy 后）
@@ -181,16 +183,14 @@ ResolveTag(ECardTag tag) -> NativeTagDisplay { string Label; Color? AccentColor 
      cfg 为空:
        label = new LocalizableText(name).GetLocalizedText()   // 游戏字符串表；查不到返回 name 原文
        color = null                               // try/catch：任何异常 → label = name
-  5. if LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode) && L.CurrentMode != Mainland:
-       label = ChineseScriptConverter.Convert(label, null, null, L.CurrentMode)
-  6. return (label, color)
+  5. return (label, color)
 ```
 
 失败点全景：
 
 | 失败点 | 触发 | 输出 | 自愈 |
 |---|---|---|---|
-| typo == null | 启动异步注册未完成（`TooltipParentComponent.cs:601-602` await 前）；tooltip 宿主销毁 | `LocalizableText` 路径（LocalizationService 有启动硬保证，typo 注册任务依赖它——`AppLoader.cs:172`） | 不入缓存，下次 Refresh 重试 |
+| typo == null | 启动异步注册未完成（`TooltipParentComponent.cs:601-602` await 前）；tooltip 宿主销毁 | `LocalizableText` 路径（LocalizationService 有启动硬保证，typo 注册任务依赖它——`AppLoader.cs:172`） | 不入缓存，下次 Refresh 重试；**评审修订**：不再依赖用户交互——`RefreshView` 记录本次渲染是否错过原生 typography，`CollectionPanel.Update` 在面板可见期间轮询 `NativeTagTypography.IsNativeTypographyAvailable`（每帧一次静态 null 探针），注册完成后自动触发一次 `RefreshView` 自愈（2026-06-07 Codex 对抗评审 finding） |
 | 反射解析失败 | 游戏更新改私有签名 | 文案走 `LocalizableText`，无色 | 一次性 Warn，本会话内不再试 |
 | cfg miss | 该标签无 keyword 配置（原生 tooltip 对这类标签直接隐藏，筛选行**不能**隐藏——选项仍参与过滤） | `LocalizableText` 文案，无色 | 入缓存（合法状态） |
 | 字符串表 miss | 冷门语言/词条 | 英文原文（`LocalizableText.cs:28-29` 自身行为） | 入缓存 |
@@ -214,7 +214,7 @@ tests/Architecture.Tests/CoreLayeringTests.cs    # 新增 feature-scoped ratchet
 
 ### Phase 1 — 原生 typography 接入 + 删除手工词典（本提案核心，单 PR）
 
-1. **适配器**：`GameInterop/TagTypography/NativeTagTypography.cs` 按 §5 实现 `Resolve(ECardTag)`（内部以 string key 实现，公开 `ECardTag` 便利入口）；缓存表 + 三元缓存键 + null 结果不入缓存；反射 `MethodInfo` 静态缓存；fail-closed 一次性告警。
+1. **适配器**：`GameInterop/TagTypography/NativeTagTypography.cs` 按 §5 实现 `Resolve(ECardTag)`（内部以 string key 实现，公开 `ECardTag` 便利入口）；缓存表 + 二元缓存键（实施修订：mode 已移除）+ null 结果不入缓存；反射 `MethodInfo` 静态缓存；fail-closed 一次性告警。
 2. **视图接入**：`EnsureTagChips`（`Filters.cs:112-137`）创建 chip 时取 `NativeTagTypography.Resolve(tag).Label`；`Refresh`（`Ui/CollectionPanelView.cs:300-382`）的 tag chip 循环（`:336-337`）改为「重设 `.text` + 传 `AccentColor` 给 `RefreshChip` 变体」——文案随缓存键失效自动跟新，**结构性消除 P4 的标签部分**；`TagChipsMatch` 维持纯序列比较不变。
 3. **同类 bug 一并修净（显式扩展范围，评审可裁剪）**：同一 Refresh 循环对 tier/size chips（`:332-335`）无条件重设 `.text`（`CollectionPanelText.Tier/Size`），节标题、Items/Skills 页签、排序按钮、包裹开关文案改为每次 Refresh 重解析——与 Title/Subtitle/Count 的既有逐次解析模式（`:305-307`）对齐。hero chip tooltip 同步重设。这是 P4 的非标签残留，机制相同、同文件、增量小。
 4. **删除** `CollectionPanelText.Tag(ECardTag)`。
@@ -245,7 +245,7 @@ tests/Architecture.Tests/CoreLayeringTests.cs    # 新增 feature-scoped ratchet
 | 1 | 主菜单冷启动立即开面板 | 标签 chips 可渲染（枚举名或译文），后续交互自愈为译文 |
 | 2 | 局内开面板，悬停卡牌 | 筛选 chip 译名/颜色与原生 tooltip 标签行一致 |
 | 3 | 游戏语言 en ↔ 非重启语言切换 | 下一次面板交互后标签即新语言 |
-| 4 | BPP 简繁三模式循环（面板开着 + 关着各一轮） | chips、tier/size、节标题全部跟随；无 P4 滞留 |
+| 4 | BPP 简繁三模式循环（面板开着 + 关着各一轮） | tier/size、节标题跟随；tag chips 保持原生 zh-CN（实施修订：不转换）；无 P4 滞留 |
 | 5 | 中文下检查全部 24 个标签 | 记录哪些命中 keyword config（§9.1 数据采集） |
 | 6 | 选中态对比度 | 原生色未选中文字在灰底可读，选中金色覆盖正常 |
 
@@ -254,7 +254,7 @@ tests/Architecture.Tests/CoreLayeringTests.cs    # 新增 feature-scoped ratchet
 1. **24 个白名单标签中哪些有 `KeywordIconColorConfiguration`**（含 zh 译文、颜色、`MakeAllUppercase`）——ScriptableObject 资产，静态不可知。采证：临时主路径探针逐个 log `GetConfiguration(name)` 命中情况（repo 规则：不建独立诊断脚手架）。
 2. 游戏 zh 字符串表对 `ECardTag` 枚举名（`LocalizableText` 路径）的命中率——青龙以此为主路径，预期良好，需实证。
 3. 启动窗口退化渲染与自愈的实际观感（§8.2 场景 1）。
-4. `ChineseScriptConverter` 对游戏 zh-CN 标签词汇的逐字转换质量（台/港用词表面向 mod 文案语料，对游戏词汇可能欠拟合）。
+4. ~~`ChineseScriptConverter` 对游戏 zh-CN 标签词汇的逐字转换质量~~ 已撤销——实施修订后 chips 不做简繁转换（§4.2 代价 1）。
 5. 原生色与选中态的视觉对比度。
 6. ko 语言谚文 tofu 与否（§4.6；若 tofu → 字体路由跟进项，独立 PR）。
 7. `TooltipParentComponent` 是否存在 mid-session 销毁路径（影响极小——null 守卫已覆盖；低优先）。
