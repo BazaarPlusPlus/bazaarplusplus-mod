@@ -31,6 +31,7 @@ internal sealed class LiveBuildPanelView : IDisposable
     private readonly Action _close;
     private readonly Action _previous;
     private readonly Action _next;
+    private readonly Action _refreshFinalBuilds;
     private readonly Dictionary<BppItemBoardId, RowElements> _rows = new();
     private GameObject? _rootObject;
     private UIDocument? _document;
@@ -43,17 +44,27 @@ internal sealed class LiveBuildPanelView : IDisposable
     private Label? _title;
     private VisualElement? _subtitle;
     private Label? _candidateCount;
+    private Button? _finalBuildRefreshButton;
+    private Label? _buildRefreshStatus;
     private Label? _recommendationStatus;
     private Button? _previousButton;
     private Button? _nextButton;
     private Button? _closeButton;
 
-    public LiveBuildPanelView(Transform parent, Action close, Action previous, Action next)
+    public LiveBuildPanelView(
+        Transform parent,
+        Action close,
+        Action previous,
+        Action next,
+        Action refreshFinalBuilds
+    )
     {
         _parent = parent ?? throw new ArgumentNullException(nameof(parent));
         _close = close ?? throw new ArgumentNullException(nameof(close));
         _previous = previous ?? throw new ArgumentNullException(nameof(previous));
         _next = next ?? throw new ArgumentNullException(nameof(next));
+        _refreshFinalBuilds =
+            refreshFinalBuilds ?? throw new ArgumentNullException(nameof(refreshFinalBuilds));
     }
 
     public event Action<BppItemBoardId, Rect>? RowBoundsChanged;
@@ -113,6 +124,17 @@ internal sealed class LiveBuildPanelView : IDisposable
         );
         _candidateCount!.text = LiveBuildPanelText.CandidateCount(
             snapshot.CandidateTemplateIds.Count
+        );
+        _finalBuildRefreshButton!.text = snapshot.FinalBuildRefreshButtonText;
+        _finalBuildRefreshButton.SetEnabled(snapshot.FinalBuildRefreshButtonEnabled);
+        _buildRefreshStatus!.text = snapshot.BuildRefreshStatusText;
+        _buildRefreshStatus.style.display = string.IsNullOrWhiteSpace(
+            snapshot.BuildRefreshStatusText
+        )
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
+        _buildRefreshStatus.style.color = ResolveRefreshStatusColor(
+            snapshot.BuildRefreshStatusSeverity
         );
         _recommendationStatus!.text = snapshot.RecommendationStatus;
         _previousButton!.text = LiveBuildPanelText.Previous();
@@ -296,6 +318,22 @@ internal sealed class LiveBuildPanelView : IDisposable
         _candidateCount.style.backgroundColor = Colors.HistoryChipBackground;
         _candidateCount.style.unityTextAlign = TextAnchor.MiddleCenter;
         rail.Add(_candidateCount);
+
+        _finalBuildRefreshButton = CreateButton(
+            LiveBuildPanelText.RefreshFinalBuilds(),
+            _refreshFinalBuilds
+        );
+        _finalBuildRefreshButton.style.marginTop = 12f;
+        _finalBuildRefreshButton.style.height = Sizes.ButtonStandardHeight;
+        rail.Add(_finalBuildRefreshButton);
+
+        // Refresh feedback gets its own rail label (never a board-row empty text): row copy feeds
+        // the row geometry callbacks and would re-trigger preview redraws on every status change.
+        _buildRefreshStatus = CreateLabel(14, FontStyle.Normal, Colors.HistoryStatusText);
+        _buildRefreshStatus.style.marginTop = 8f;
+        _buildRefreshStatus.style.whiteSpace = WhiteSpace.Normal;
+        _buildRefreshStatus.style.display = DisplayStyle.None;
+        rail.Add(_buildRefreshStatus);
 
         _recommendationStatus = CreateLabel(16, FontStyle.Normal, Colors.HistoryStatusText);
         _recommendationStatus.style.marginTop = 12f;
@@ -481,6 +519,17 @@ internal sealed class LiveBuildPanelView : IDisposable
         root.style.bottom = 0f;
         root.style.display = DisplayStyle.None;
         root.pickingMode = pickingMode;
+    }
+
+    private static Color ResolveRefreshStatusColor(LiveBuildRefreshSeverity severity)
+    {
+        return severity switch
+        {
+            LiveBuildRefreshSeverity.Success => Colors.StatusCompletedText,
+            LiveBuildRefreshSeverity.Failure => Colors.StatusAbandonedText,
+            LiveBuildRefreshSeverity.Pending => Colors.StatusDefaultText,
+            _ => Colors.HistoryStatusText,
+        };
     }
 
     private static Label CreateLabel(int fontSize, FontStyle fontStyle, Color color)

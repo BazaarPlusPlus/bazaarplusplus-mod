@@ -4,6 +4,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.BuildRecommendations;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
@@ -30,6 +32,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private static LiveBuildPanel? _instance;
     private readonly LiveCardSnapshotReader _reader = new();
     private readonly BuildRecommendationRepository _recommendations = new();
+    private readonly BuildRecommendationRefreshService _refreshService = new();
     private readonly LiveBuildCandidateState _candidateState = new();
     private readonly LiveBuildPreviewRenderer _previewRenderer = new();
     private LiveBuildPanelView? _view;
@@ -40,6 +43,10 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private string _lastSceneToken = string.Empty;
     private bool _isVisible;
     private int _recommendationIndex;
+    private bool _buildRefreshInProgress;
+    private string _buildRefreshStatusText = string.Empty;
+    private LiveBuildRefreshSeverity _buildRefreshStatusSeverity;
+    private int _buildRefreshOperationVersion;
 
     public static bool IsVisible => _instance?._isVisible == true;
 
@@ -62,6 +69,9 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         if (ReferenceEquals(_instance, this))
             _instance = null;
 
+        // Invalidate any in-flight manual refresh so its continuation never touches the
+        // destroyed view (the shared corpus update itself is allowed to finish in the background).
+        _buildRefreshOperationVersion++;
         BppOverlayPanelMutex.Unregister(OverlayPanelId);
         StopRender();
         _previewRenderer.Dispose();
@@ -127,6 +137,10 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         _supporters = BPPSupporters.SampleMany(2);
         _candidateState.Clear();
         _recommendationIndex = 0;
+        // A refresh still in flight keeps its pending status visible; otherwise drop the previous
+        // session's one-shot success/failure feedback.
+        if (!_buildRefreshInProgress)
+            SetBuildRefreshStatus(string.Empty, LiveBuildRefreshSeverity.Neutral);
         _liveSnapshot = _reader.Read();
         RefreshRecommendations();
         RefreshViewAndPreview();
@@ -156,7 +170,8 @@ internal sealed class LiveBuildPanel : MonoBehaviour
             transform,
             Close,
             PreviousRecommendation,
-            NextRecommendation
+            NextRecommendation,
+            TryRefreshFinalBuilds
         );
         _view.RowBoundsChanged += OnRowBoundsChanged;
         _view.CandidateToggleRequested += OnCandidateToggleRequested;
@@ -197,6 +212,108 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 
         _recommendationIndex = WrapIndex(_recommendationIndex + 1, _matches.Count);
         RefreshViewAndPreview();
+    }
+
+    private void TryRefreshFinalBuilds()
+    {
+        if (!_isVisible)
+            return;
+
+        if (_buildRefreshInProgress)
+        {
+            SetBuildRefreshStatus(
+                LiveBuildPanelText.FinalBuildRefreshAlreadyRunning(),
+                LiveBuildRefreshSeverity.Pending
+            );
+            RefreshRailView();
+            return;
+        }
+
+        _buildRefreshInProgress = true;
+        SetBuildRefreshStatus(
+            LiveBuildPanelText.RefreshingFinalBuilds(),
+            LiveBuildRefreshSeverity.Pending
+        );
+        RefreshRailView();
+        _ = RefreshFinalBuildsAsync(_buildRefreshOperationVersion);
+    }
+
+    private async Task RefreshFinalBuildsAsync(int operationVersion)
+    {
+        BuildRecommendationRefreshResult result;
+        try
+        {
+            result = await _refreshService.RefreshAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            result = BuildRecommendationRefreshResult.Failure(ex.Message);
+        }
+
+        // Stale continuation guard: a destroyed panel bumped the version; the corpus update (if
+        // any) already landed in the shared repository and must not touch this UI.
+        if (operationVersion != _buildRefreshOperationVersion)
+            return;
+
+        _buildRefreshInProgress = false;
+        if (result.Succeeded)
+        {
+            var summary = _recommendations.GetCorpusSummary();
+            SetBuildRefreshStatus(
+                summary.HasValue
+                    ? LiveBuildPanelText.FinalBuildRefreshSucceeded(
+                        summary.Value.GeneratedAtUtc,
+                        summary.Value.BuildCount,
+                        summary.Value.HeroCount
+                    )
+                    : LiveBuildPanelText.FinalBuildRefreshSucceeded(),
+                LiveBuildRefreshSeverity.Success
+            );
+            BppLog.Info("LiveBuildPanel", "Manual ten-win builds refresh succeeded.");
+        }
+        else
+        {
+            var error = string.IsNullOrWhiteSpace(result.Error)
+                ? LiveBuildPanelText.Unknown()
+                : result.Error!;
+            SetBuildRefreshStatus(
+                LiveBuildPanelText.FinalBuildRefreshFailed(error),
+                LiveBuildRefreshSeverity.Failure
+            );
+            BppLog.Warn("LiveBuildPanel", $"Manual ten-win builds refresh failed error={error}.");
+        }
+
+        if (!_isVisible || _view == null)
+            return;
+
+        if (result.Succeeded)
+        {
+            // Recompute against the refreshed corpus; failures keep the previous matches intact.
+            RefreshRecommendations();
+            RefreshViewAndPreview();
+        }
+        else
+        {
+            RefreshRailView();
+        }
+    }
+
+    private void SetBuildRefreshStatus(string statusText, LiveBuildRefreshSeverity severity)
+    {
+        _buildRefreshStatusText = statusText;
+        _buildRefreshStatusSeverity = string.IsNullOrWhiteSpace(statusText)
+            ? LiveBuildRefreshSeverity.Neutral
+            : severity;
+    }
+
+    // Status-only updates redraw the UITK tree without restarting the native preview coroutine:
+    // the boards did not change, so re-rendering card previews would be wasted work.
+    private void RefreshRailView()
+    {
+        if (!_isVisible)
+            return;
+
+        _view?.Refresh(BuildPanelSnapshot());
     }
 
     private void RefreshRecommendations()
@@ -279,6 +396,12 @@ internal sealed class LiveBuildPanel : MonoBehaviour
             RecommendationStatus = ResolveRecommendationStatus(recommendation),
             RecommendationIndex = _recommendationIndex,
             RecommendationCount = _matches.Count,
+            FinalBuildRefreshButtonText = _buildRefreshInProgress
+                ? LiveBuildPanelText.Working()
+                : LiveBuildPanelText.RefreshFinalBuilds(),
+            FinalBuildRefreshButtonEnabled = !_buildRefreshInProgress,
+            BuildRefreshStatusText = _buildRefreshStatusText,
+            BuildRefreshStatusSeverity = _buildRefreshStatusSeverity,
             Supporters = _supporters,
         };
     }

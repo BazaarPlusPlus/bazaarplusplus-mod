@@ -313,13 +313,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         statsChipRow.Add(_battleChip);
         statsChipRow.Add(_databaseChip);
 
-        var toolRow = new VisualElement();
-        toolRow.style.flexDirection = FlexDirection.Row;
-        toolRow.style.flexWrap = Wrap.Wrap;
-        toolRow.style.alignItems = Align.Center;
-        toolRow.style.marginTop = UiSpacing.Sm;
-        overviewGroup.Add(toolRow);
-
+        // The server health probe lives on the same overview row as the DB chip: both answer "is
+        // my data path healthy", but they stay separate signals — the chip reads the local run-log
+        // DB, the button probes the remote /health endpoint and reports into the status banner.
         _checkServerHealthButton = CreateButton(
             HistoryPanelText.CheckServerHealth(),
             _checkServerHealth,
@@ -327,15 +323,8 @@ internal sealed partial class HistoryPanelUiToolkitView
             Sizes.ButtonStandardHeight
         );
         StyleButton(_checkServerHealthButton, Colors.ReplayBackground, Colors.ReplayText);
-        _finalBuildRefreshButton = CreateButton(
-            HistoryPanelText.RefreshFinalBuilds(),
-            _refreshFinalBuilds,
-            Sizes.FinalBuildRefreshButtonWidth,
-            Sizes.ButtonStandardHeight
-        );
-        _finalBuildRefreshButton.style.marginLeft = UiSpacing.Sm;
-        toolRow.Add(_checkServerHealthButton);
-        toolRow.Add(_finalBuildRefreshButton);
+        _checkServerHealthButton.style.marginLeft = UiSpacing.Sm;
+        statsChipRow.Add(_checkServerHealthButton);
 
         // ── Navigation: mode tabs + ghost filter ─────────────────────────────
         var navGroup = new VisualElement();

@@ -17,7 +17,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private readonly Action _replay;
     private readonly Action _recordAndReplay;
     private readonly Action _delete;
-    private readonly Action _refreshFinalBuilds;
     private readonly Action _checkServerHealth;
     private readonly Action<int> _selectRun;
     private readonly Action<int> _selectBattle;
@@ -36,7 +35,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Button? _checkServerHealthButton;
     private Button? _runsTabButton;
     private Button? _ghostTabButton;
-    private Button? _finalBuildRefreshButton;
     private Label? _statusLabel;
     private VisualElement? _runsSection;
     private VisualElement? _battlesSection;
@@ -75,7 +73,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         Action replay,
         Action recordAndReplay,
         Action delete,
-        Action refreshFinalBuilds,
         Action checkServerHealth,
         Action<int> selectRun,
         Action<int> selectBattle,
@@ -89,8 +86,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _recordAndReplay =
             recordAndReplay ?? throw new ArgumentNullException(nameof(recordAndReplay));
         _delete = delete ?? throw new ArgumentNullException(nameof(delete));
-        _refreshFinalBuilds =
-            refreshFinalBuilds ?? throw new ArgumentNullException(nameof(refreshFinalBuilds));
         _checkServerHealth =
             checkServerHealth ?? throw new ArgumentNullException(nameof(checkServerHealth));
         _selectRun = selectRun ?? throw new ArgumentNullException(nameof(selectRun));
@@ -242,8 +237,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 
         RefreshTabButton(_runsTabButton!, model.SectionMode == HistorySectionMode.Runs);
         RefreshTabButton(_ghostTabButton!, model.SectionMode == HistorySectionMode.Ghost);
-        _finalBuildRefreshButton!.text = model.FinalBuildRefreshButtonText;
-        _finalBuildRefreshButton.SetEnabled(model.FinalBuildRefreshButtonEnabled);
         _ghostFilterRow!.style.display =
             model.SectionMode == HistorySectionMode.Ghost ? DisplayStyle.Flex : DisplayStyle.None;
         RefreshGhostFilterButton(

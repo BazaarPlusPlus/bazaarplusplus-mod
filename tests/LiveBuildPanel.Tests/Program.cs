@@ -1,13 +1,16 @@
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.LiveBuildPanel;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure.UiTokens;
+using BazaarPlusPlus.Localization;
 
 TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground();
 TestCandidateToggleUsesTemplateId();
 TestCandidatePruneKeepsSelectableRowsOnly();
 TestRowVmTogglePolicyComesFromBoardType();
 TestSlotChromeGeometryMatchesTenSlotContract();
+TestRefreshFinalBuildsTextsAreAtlasWarmed();
 
 Console.WriteLine("LiveBuildPanel checks passed.");
 
@@ -88,6 +91,45 @@ static void TestSlotChromeGeometryMatchesTenSlotContract()
     Assert(markerPixels.Height == 172f, "Marker height should preserve the vertical chrome inset.");
 }
 
+// CJK glyphs only render if they were in the font-atlas warm-up sample on first open; every
+// refresh-flow string the rail can show must therefore be part of FontAtlasSample().
+static void TestRefreshFinalBuildsTextsAreAtlasWarmed()
+{
+    L.Install(
+        new FixedLanguageProvider("zh-CN"),
+        new FixedLocaleModeProvider(BppChineseLocaleMode.Mainland)
+    );
+
+    Assert(
+        LiveBuildPanelText.RefreshFinalBuilds() == "拉取阵容",
+        "zh-CN pull-builds button copy should be 拉取阵容."
+    );
+
+    var sample = LiveBuildPanelText.FontAtlasSample();
+    foreach (
+        var text in new[]
+        {
+            LiveBuildPanelText.RefreshFinalBuilds(),
+            LiveBuildPanelText.Working(),
+            LiveBuildPanelText.RefreshingFinalBuilds(),
+            LiveBuildPanelText.FinalBuildRefreshAlreadyRunning(),
+            LiveBuildPanelText.FinalBuildRefreshSucceeded(),
+            LiveBuildPanelText.FinalBuildRefreshSucceeded(
+                new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
+                1234567890,
+                1234567890
+            ),
+            LiveBuildPanelText.FinalBuildRefreshFailed(LiveBuildPanelText.Unknown()),
+        }
+    )
+    {
+        Assert(
+            sample.Contains(text, StringComparison.Ordinal),
+            $"FontAtlasSample must include refresh copy '{text}' for CJK glyph warm-up."
+        );
+    }
+}
+
 static BppItemBoard Board(BppItemBoardId id, BppItemBoardType type, Guid templateId) =>
     new(id, type, [new BppItemBoardCard { TemplateId = templateId, Size = ECardSize.Small }]);
 
@@ -95,4 +137,14 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+internal sealed class FixedLanguageProvider(string languageCode) : ILanguageProvider
+{
+    public string CurrentLanguageCode => languageCode;
+}
+
+internal sealed class FixedLocaleModeProvider(BppChineseLocaleMode mode) : ILocaleModeProvider
+{
+    public BppChineseLocaleMode CurrentMode => mode;
 }

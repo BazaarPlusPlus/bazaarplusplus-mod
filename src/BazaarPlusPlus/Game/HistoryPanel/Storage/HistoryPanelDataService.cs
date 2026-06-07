@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.BuildRecommendations;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 
@@ -169,47 +168,6 @@ internal sealed class HistoryPanelDataService
         {
             return HistoryPanelAttemptResult.Failure(
                 HistoryPanelText.GhostSyncFailed(ex.Message),
-                ex
-            );
-        }
-    }
-
-    public async Task<HistoryPanelAttemptResult> RefreshFinalBuildsAsync(
-        CancellationToken cancellationToken
-    )
-    {
-        try
-        {
-            var result = await Task.Run(
-                    () =>
-                    {
-                        var succeeded =
-                            BuildRecommendationRepository.TryRefreshFinalBuildsFromRemote(
-                                out var error
-                            );
-                        return (Succeeded: succeeded, Error: error);
-                    },
-                    cancellationToken
-                )
-                .ConfigureAwait(false);
-
-            if (!result.Succeeded)
-                return HistoryPanelAttemptResult.Failure(
-                    HistoryPanelText.FinalBuildRefreshFailed(
-                        result.Error ?? HistoryPanelText.Unknown()
-                    )
-                );
-
-            return HistoryPanelAttemptResult.Success(HistoryPanelText.FinalBuildRefreshSucceeded());
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return HistoryPanelAttemptResult.Failure(
-                HistoryPanelText.FinalBuildRefreshFailed(ex.Message),
                 ex
             );
         }

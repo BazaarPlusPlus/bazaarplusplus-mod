@@ -189,6 +189,18 @@ internal sealed class BuildRecommendationRepository
 
     private static string ResolveFinalBuildLabel() => L.Resolve(FinalBuildLabel);
 
+    /// <summary>
+    /// Snapshot of the currently loaded corpus's provenance (analyzer emission time, build/hero
+    /// counts) for status surfaces; null while no corpus is loaded.
+    /// </summary>
+    public TenWinCorpusSummary? GetCorpusSummary()
+    {
+        var corpus = EnsureCorpus();
+        return corpus == null
+            ? (TenWinCorpusSummary?)null
+            : new TenWinCorpusSummary(corpus.GeneratedAtUtc, corpus.BuildCount, corpus.HeroCount);
+    }
+
     // ---- Corpus loading / cache / remote refresh --------------------------
 
     internal static TenWinBuildCorpus? EnsureCorpus()
