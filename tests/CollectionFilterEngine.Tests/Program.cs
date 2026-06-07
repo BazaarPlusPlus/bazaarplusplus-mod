@@ -361,6 +361,48 @@ AssertSequence(
     "Tag filters are available for future skill filtering rules."
 );
 
+var weaponItem = Card("Weapon Item", ETier.Bronze, tags: new[] { ECardTag.Weapon });
+var potionItem = Card("Potion Item", ETier.Bronze, tags: new[] { ECardTag.Potion });
+var toolItem = Card("Tool Item", ETier.Bronze, tags: new[] { ECardTag.Tool });
+var itemTagFilter = new CollectionFilterState();
+itemTagFilter.Tags.Add(ECardTag.Weapon);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { potionItem, toolItem, weaponItem }, itemTagFilter),
+    new[] { weaponItem.Id },
+    "A single selected tag narrows items to cards carrying that tag."
+);
+itemTagFilter.Tags.Add(ECardTag.Potion);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { potionItem, toolItem, weaponItem }, itemTagFilter),
+    new[] { potionItem.Id, weaponItem.Id },
+    "Multiple selected tags OR together, matching the other facet rows."
+);
+
+AssertEqual(
+    CollectionTagWhitelist.Ordered.Count,
+    CollectionTagWhitelist.Ordered.Distinct().Count(),
+    "Tag whitelist entries must be distinct."
+);
+AssertTrue(
+    CollectionTagWhitelist.PrimaryCount <= CollectionTagWhitelist.Ordered.Count,
+    "Tag whitelist primary slice must fit inside the option list."
+);
+foreach (
+    var mechanismTag in new[]
+    {
+        ECardTag.Unsellable,
+        ECardTag.Unstashable,
+        ECardTag.Merchant,
+        ECardTag.Event,
+        ECardTag.Combat,
+        ECardTag.Loot,
+    }
+)
+    AssertFalse(
+        CollectionTagWhitelist.Ordered.Contains(mechanismTag),
+        $"Tag whitelist must exclude mechanism tag {mechanismTag}."
+    );
+
 var vanessaExclusiveSkill = Card(
     "Vanessa Exclusive Skill",
     ETier.Bronze,

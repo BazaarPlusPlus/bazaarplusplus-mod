@@ -144,6 +144,12 @@ internal sealed partial class CollectionPanelView
         _sizeChipRow.style.flexWrap = Wrap.NoWrap;
         _sizeChipRow.style.justifyContent = Justify.SpaceBetween;
 
+        // Tag filter (player-facing card categories). Compact auto-width chips that wrap like
+        // the source row; collapsed to the whitelist's primary slice until expanded.
+        CreateFilterSection(rail, CollectionPanelText.TagHeader(), UiSpacing.Lg, out _tagChipRow);
+        _tagChipRow.style.flexWrap = Wrap.Wrap;
+        _tagChipRow.style.justifyContent = Justify.FlexStart;
+
         // Source filter (merchant portraits on Items, trainer portraits on Skills).
         _sourceFilterSection = CreateFilterSection(
             rail,

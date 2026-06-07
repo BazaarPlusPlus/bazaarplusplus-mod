@@ -68,6 +68,10 @@
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMerchantKind.cs"
       Link="CollectionMerchantKind.cs"
     />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTagWhitelist.cs"
+      Link="CollectionTagWhitelist.cs"
+    />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>

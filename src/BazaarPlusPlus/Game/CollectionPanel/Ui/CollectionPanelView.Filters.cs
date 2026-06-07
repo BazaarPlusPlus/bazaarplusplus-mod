@@ -109,6 +109,98 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
+    private void EnsureTagChips(IReadOnlyList<ECardTag> tags, HashSet<ECardTag> selectedTags)
+    {
+        if (_tagChipRow == null)
+            return;
+        var visible = VisibleTagOptions(tags, selectedTags);
+        if (!TagChipsMatch(visible))
+        {
+            ClearTagChipRow();
+            foreach (var tag in visible)
+            {
+                var captured = tag;
+                var chip = CreateCompactChipButton(
+                    CollectionPanelText.Tag(captured),
+                    () => _toggleTag(captured)
+                );
+                _tagChips[captured] = chip;
+                _tagChipOrder.Add(captured);
+                _tagChipRow.Add(chip);
+            }
+
+            _tagMoreButton = CreateCompactChipButton(string.Empty, ToggleTagRowExpanded);
+            _tagChipRow.Add(_tagMoreButton);
+        }
+
+        RefreshTagMoreButton(tags.Count);
+    }
+
+    // Collapsed: the whitelist's primary slice plus any selected tag that would otherwise be
+    // hidden (a selection must never be invisible). Expanded: every option.
+    private List<ECardTag> VisibleTagOptions(
+        IReadOnlyList<ECardTag> tags,
+        HashSet<ECardTag> selectedTags
+    )
+    {
+        var visible = new List<ECardTag>(tags.Count);
+        for (var i = 0; i < tags.Count; i++)
+        {
+            var tag = tags[i];
+            if (
+                _tagRowExpanded
+                || i < CollectionTagWhitelist.PrimaryCount
+                || selectedTags.Contains(tag)
+            )
+                visible.Add(tag);
+        }
+        return visible;
+    }
+
+    private bool TagChipsMatch(List<ECardTag> visible)
+    {
+        if (visible.Count != _tagChipOrder.Count)
+            return false;
+        for (var i = 0; i < visible.Count; i++)
+            if (visible[i] != _tagChipOrder[i])
+                return false;
+        return true;
+    }
+
+    private void ToggleTagRowExpanded()
+    {
+        _tagRowExpanded = !_tagRowExpanded;
+        EnsureTagChips(_lastTagOptions, _lastSelectedTags);
+        foreach (var pair in _tagChips)
+            RefreshChip(pair.Value, _lastSelectedTags.Contains(pair.Key));
+    }
+
+    private void RefreshTagMoreButton(int totalOptionCount)
+    {
+        if (_tagMoreButton == null)
+            return;
+        var hiddenCount = totalOptionCount - _tagChipOrder.Count;
+        _tagMoreButton.style.display =
+            _tagRowExpanded || hiddenCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+        _tagMoreButton.text = _tagRowExpanded
+            ? CollectionPanelText.TagLess()
+            : CollectionPanelText.TagMore(hiddenCount);
+        StyleButton(_tagMoreButton, Colors.HistoryButtonBackground, Colors.HistorySubtitleText);
+    }
+
+    private void ClearTagChipRow()
+    {
+        foreach (var button in _tagChips.Values)
+        {
+            if (button.parent != null)
+                button.parent.Remove(button);
+        }
+        _tagChips.Clear();
+        _tagChipOrder.Clear();
+        _tagMoreButton = null;
+        _tagChipRow?.Clear();
+    }
+
     private void EnsureSourceChips(IReadOnlyList<CollectionSourceOptionViewModel> sources)
     {
         if (_sourceChipRow == null)
@@ -230,6 +322,20 @@ internal sealed partial class CollectionPanelView
             chip.style.minWidth = 0f;
         }
         chip.style.marginRight = fillRow ? 0f : UiSpacing.Sm;
+        chip.style.marginBottom = UiSpacing.Xs;
+        StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        return chip;
+    }
+
+    // Compact auto-width chip for many-valued wrap rows (tags): text-sized instead of the
+    // fixed-width tier/size chip so two dozen options fit in a couple of wrapped lines.
+    private static Button CreateCompactChipButton(string text, Action onClick)
+    {
+        var chip = CreateButton(text, onClick, 0f, Sizes.InfoChipHeight, fixedWidth: false);
+        chip.style.minWidth = Sizes.InfoChipMinWidth;
+        chip.style.fontSize = Sizes.FontSmall;
+        UiStyle.HorizontalPadding(chip.style, UiSpacing.Md);
+        chip.style.marginRight = UiSpacing.Sm;
         chip.style.marginBottom = UiSpacing.Xs;
         StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
         return chip;
