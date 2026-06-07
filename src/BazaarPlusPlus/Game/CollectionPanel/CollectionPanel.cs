@@ -13,6 +13,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -86,6 +87,12 @@ internal sealed class CollectionPanel : MonoBehaviour
     private Coroutine? _loadCoroutine;
     private int _loadGeneration;
     private bool _isLoadingCatalog;
+
+    // True when the last RefreshView ran before the game's async tooltip typography
+    // registration completed: tag chips rendered degraded (string-table labels, no accent
+    // color) and nothing else would re-render them without user interaction. Update polls for
+    // the typography instance and re-refreshes once, so the startup window self-heals.
+    private bool _viewMissedNativeTypography;
 
     // The run's current day, captured once per open in ResolveOpenSelection (null out of run, or
     // when Data.Run is unreadable). The Day toggle filters by this value, falling back to
@@ -353,6 +360,13 @@ internal sealed class CollectionPanel : MonoBehaviour
             Close();
             return;
         }
+
+        // Startup self-heal for tag typography: a refresh that ran inside the game's async
+        // typography registration window rendered degraded chips, and no further Refresh
+        // arrives without user interaction. Re-render once the instance appears (the check is
+        // a static null probe per frame; RefreshView clears the flag).
+        if (_viewMissedNativeTypography && NativeTagTypography.IsNativeTypographyAvailable)
+            RefreshView();
 
         if (_viewportBoundsDirty && _virtualizer != null && _overlay != null)
         {
@@ -791,6 +805,13 @@ internal sealed class CollectionPanel : MonoBehaviour
             AvailableSources = AvailableSourcesFor(_filter.ActiveType),
             ContentHeight = _virtualizer.ContentHeight,
         };
+        // Record whether this render has native typography; while it does not, Update polls for
+        // the late async registration and re-refreshes so the degraded chips self-heal. Written
+        // BEFORE the render: typography registration is a main-thread continuation that cannot
+        // interleave with the synchronous Refresh below, so the value is identical either way,
+        // and writing first keeps a throwing Refresh from leaving the flag armed (which would
+        // turn a one-shot failure into a per-frame retry).
+        _viewMissedNativeTypography = !NativeTagTypography.IsNativeTypographyAvailable;
         _view.Refresh(model);
     }
 

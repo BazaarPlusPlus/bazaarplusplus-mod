@@ -35,19 +35,26 @@ internal static class NativeTagTypography
     );
 
     // Cache key: the typography instance reference (a new instance per locale change makes the
-    // reference a natural invalidation key) plus the mod-side language code and Chinese script
-    // mode. Results resolved while typography is null are NOT cached, so the table self-heals
-    // once the game's async typography registration completes.
+    // reference a natural invalidation key) plus the mod-side language code. Results resolved
+    // while typography is null are NOT cached, so the table self-heals once the game's async
+    // typography registration completes. The BPP Chinese script mode is deliberately NOT part
+    // of the key: tag labels show the game's native zh-CN text as-is in Taiwan/HongKong modes
+    // (per-character conversion of game vocabulary was judged worse than the script mismatch).
     private static readonly Dictionary<string, NativeTagDisplay> Cache = new(
         StringComparer.Ordinal
     );
     private static TooltipTypography? _cachedTypography;
     private static string _cachedLanguageCode = string.Empty;
-    private static BppChineseLocaleMode _cachedMode;
 
     // One-time fail-closed switch for the reflection path (game update renamed the member or
     // changed its shape): labels keep flowing through the game string table, colors are lost.
     private static bool _configurationPathBroken;
+
+    /// <summary>True once the game's async typography registration has completed (or after a
+    /// locale change rebuilt the instance). While false, <see cref="Resolve(string)"/> degrades
+    /// to the string-table path; consumers that rendered in that window can poll this to know
+    /// when a re-render will pick up native labels and colors.</summary>
+    public static bool IsNativeTypographyAvailable => Data.TooltipTypography != null;
 
     public static NativeTagDisplay Resolve(ECardTag tag) => Resolve(tag.ToString());
 
@@ -55,39 +62,31 @@ internal static class NativeTagTypography
     {
         var typography = Data.TooltipTypography;
         var languageCode = L.CurrentLanguageCode;
-        var mode = L.CurrentMode;
 
         // Startup window (async registration pending) or tooltip host destroyed: resolve
         // through the string table only and skip the cache so the next call retries.
         if (typography == null)
-            return ResolveUncached(null, key, languageCode, mode);
+            return ResolveUncached(null, key);
 
         if (
             !ReferenceEquals(typography, _cachedTypography)
             || !string.Equals(languageCode, _cachedLanguageCode, StringComparison.Ordinal)
-            || mode != _cachedMode
         )
         {
             Cache.Clear();
             _cachedTypography = typography;
             _cachedLanguageCode = languageCode;
-            _cachedMode = mode;
         }
 
         if (Cache.TryGetValue(key, out var cached))
             return cached;
 
-        var display = ResolveUncached(typography, key, languageCode, mode);
+        var display = ResolveUncached(typography, key);
         Cache[key] = display;
         return display;
     }
 
-    private static NativeTagDisplay ResolveUncached(
-        TooltipTypography? typography,
-        string key,
-        string languageCode,
-        BppChineseLocaleMode mode
-    )
+    private static NativeTagDisplay ResolveUncached(TooltipTypography? typography, string key)
     {
         string label;
         Color? accentColor = null;
@@ -106,9 +105,6 @@ internal static class NativeTagTypography
             // filter option must stay visible) — fall back to the game string table.
             label = LocalizeThroughStringTable(key);
         }
-
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-            label = ChineseScriptConverter.Convert(label, null, null, mode);
 
         return new NativeTagDisplay(label, accentColor);
     }
