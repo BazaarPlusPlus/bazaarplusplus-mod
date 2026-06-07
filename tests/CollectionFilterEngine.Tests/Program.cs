@@ -448,8 +448,8 @@ var exclusiveSkillResult = CollectionFilterEngine.Apply(
 );
 AssertSequence(
     exclusiveSkillResult,
-    new[] { vanessaExclusiveSkill.Id },
-    "Skill hero filtering should return only skills exclusive to the selected hero."
+    new[] { sharedHeroSkill.Id, vanessaExclusiveSkill.Id },
+    "Skill hero filtering shows hero-exclusive plus general-shared (multi-hero, non-Common) skills; Common-scoped multi-hero skills stay hidden."
 );
 
 var exclusiveSkillSourceResult = CollectionFilterEngine.Apply(
@@ -477,8 +477,8 @@ var exclusiveSkillSourceResult = CollectionFilterEngine.Apply(
 );
 AssertSequence(
     exclusiveSkillSourceResult,
-    new[] { vanessaExclusiveSkill.Id },
-    "Trainer/source pools should still be ANDed with exclusive skill hero filtering."
+    new[] { sharedHeroSkill.Id, vanessaExclusiveSkill.Id },
+    "Trainer/source pools AND with the widened skill hero scope, so shared skills surface in trainer pools too."
 );
 
 var commonSkillFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
@@ -497,7 +497,20 @@ var commonSkillResult = CollectionFilterEngine.Apply(
 AssertSequence(
     commonSkillResult,
     new[] { commonSkill.Id },
-    "Common skill filtering should only show skills explicitly scoped to Common/global."
+    "Common skill filtering should only show skills explicitly scoped to Common/global — the general-shared bucket is empty by definition for Common."
+);
+
+AssertTrue(
+    CollectionHeroScope.MatchesSkillHeroScope(new[] { EHero.Vanessa, EHero.Mak }, EHero.Vanessa),
+    "A {Vanessa, Mak} shared skill matches the Vanessa scope."
+);
+AssertFalse(
+    CollectionHeroScope.MatchesSkillHeroScope(new[] { EHero.Vanessa, EHero.Mak }, EHero.Dooley),
+    "A {Vanessa, Mak} shared skill does not match an uninvolved hero."
+);
+AssertFalse(
+    CollectionHeroScope.MatchesSkillHeroScope(new[] { EHero.Common, EHero.Vanessa }, EHero.Vanessa),
+    "Common-scoped multi-hero skills are not general-shared."
 );
 
 AssertFalse(
