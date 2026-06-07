@@ -154,35 +154,8 @@ internal static class CollectionPanelText
             _ => size.ToString(),
         };
 
-    internal static string Tag(ECardTag tag) =>
-        tag switch
-        {
-            ECardTag.Weapon => FormatSimple("Weapon", "武器", "武器", "武器"),
-            ECardTag.Property => FormatSimple("Property", "房产", "房產", "房產"),
-            ECardTag.Food => FormatSimple("Food", "食物", "食物", "食物"),
-            ECardTag.Potion => FormatSimple("Potion", "药水", "藥水", "藥水"),
-            ECardTag.Tool => FormatSimple("Tool", "工具", "工具", "工具"),
-            ECardTag.Vehicle => FormatSimple("Vehicle", "载具", "載具", "載具"),
-            ECardTag.Aquatic => FormatSimple("Aquatic", "水生", "水生", "水生"),
-            ECardTag.Friend => FormatSimple("Friend", "伙伴", "夥伴", "夥伴"),
-            ECardTag.Core => FormatSimple("Core", "核心", "核心", "核心"),
-            ECardTag.Ray => FormatSimple("Ray", "射线", "射線", "射線"),
-            ECardTag.Dinosaur => FormatSimple("Dinosaur", "恐龙", "恐龍", "恐龍"),
-            ECardTag.Apparel => FormatSimple("Apparel", "服装", "服裝", "服裝"),
-            ECardTag.Toy => FormatSimple("Toy", "玩具", "玩具", "玩具"),
-            ECardTag.Tech => FormatSimple("Tech", "科技", "科技", "科技"),
-            ECardTag.Dragon => FormatSimple("Dragon", "龙", "龍", "龍"),
-            ECardTag.Ingredient => FormatSimple("Ingredient", "原料", "原料", "原料"),
-            ECardTag.Relic => FormatSimple("Relic", "遗物", "遺物", "遺物"),
-            ECardTag.Reagent => FormatSimple("Reagent", "试剂", "試劑", "試劑"),
-            ECardTag.Map => FormatSimple("Map", "地图", "地圖", "地圖"),
-            ECardTag.Key => FormatSimple("Key", "钥匙", "鑰匙", "鑰匙"),
-            ECardTag.Drone => FormatSimple("Drone", "无人机", "無人機", "無人機"),
-            ECardTag.Sigil => FormatSimple("Sigil", "印记", "印記", "印記"),
-            ECardTag.Trap => FormatSimple("Trap", "陷阱", "陷阱", "陷阱"),
-            ECardTag.Instrument => FormatSimple("Instrument", "乐器", "樂器", "樂器"),
-            _ => tag.ToString(),
-        };
+    // Tag labels intentionally have no entry here: chips resolve through the game's native
+    // typography (GameInterop.TagTypography.NativeTagTypography), never a mod-side dictionary.
 
     internal static string Merchant(CollectionMerchantKind merchant) =>
         merchant switch

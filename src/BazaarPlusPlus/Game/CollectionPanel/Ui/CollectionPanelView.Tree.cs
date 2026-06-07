@@ -95,10 +95,10 @@ internal sealed partial class CollectionPanelView
         sortGroup.style.marginTop = UiSpacing.Xs;
         primaryControlsRow.Add(sortGroup);
 
-        var sortLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
-        sortLabel.text = CollectionPanelText.SortHeader();
-        sortLabel.style.marginRight = UiSpacing.Xs;
-        sortGroup.Add(sortLabel);
+        _sortLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        _sortLabel.text = CollectionPanelText.SortHeader();
+        _sortLabel.style.marginRight = UiSpacing.Xs;
+        sortGroup.Add(_sortLabel);
 
         _sortQualityButton = CreateInlineSortButton(
             CollectionPanelText.SortQuality(),
@@ -124,12 +124,24 @@ internal sealed partial class CollectionPanelView
         primaryControlsRow.Add(_packageToggleButton);
 
         // Hero filter.
-        CreateFilterSection(rail, CollectionPanelText.HeroHeader(), UiSpacing.Xl, out _heroChipRow);
+        CreateFilterSection(
+            rail,
+            CollectionPanelText.HeroHeader(),
+            UiSpacing.Xl,
+            out _heroChipRow,
+            out _heroFilterLabel
+        );
         _heroChipRow.style.flexWrap = Wrap.NoWrap;
         _heroChipRow.style.justifyContent = Justify.SpaceBetween;
 
         // Tier filter.
-        CreateFilterSection(rail, CollectionPanelText.TierHeader(), UiSpacing.Lg, out _tierChipRow);
+        CreateFilterSection(
+            rail,
+            CollectionPanelText.TierHeader(),
+            UiSpacing.Lg,
+            out _tierChipRow,
+            out _tierFilterLabel
+        );
         _tierChipRow.style.flexWrap = Wrap.NoWrap;
         _tierChipRow.style.justifyContent = Justify.SpaceBetween;
 
@@ -138,7 +150,8 @@ internal sealed partial class CollectionPanelView
             rail,
             CollectionPanelText.SizeHeader(),
             UiSpacing.Lg,
-            out _sizeChipRow
+            out _sizeChipRow,
+            out _sizeFilterLabel
         );
         _sizeFilterSection.style.minHeight = Sizes.CollectionSizeFilterSectionMinHeight;
         _sizeChipRow.style.flexWrap = Wrap.NoWrap;
@@ -146,7 +159,13 @@ internal sealed partial class CollectionPanelView
 
         // Tag filter (player-facing card categories). Compact auto-width chips that wrap like
         // the source row; collapsed to the whitelist's primary slice until expanded.
-        CreateFilterSection(rail, CollectionPanelText.TagHeader(), UiSpacing.Lg, out _tagChipRow);
+        CreateFilterSection(
+            rail,
+            CollectionPanelText.TagHeader(),
+            UiSpacing.Lg,
+            out _tagChipRow,
+            out _tagFilterLabel
+        );
         _tagChipRow.style.flexWrap = Wrap.Wrap;
         _tagChipRow.style.justifyContent = Justify.FlexStart;
 

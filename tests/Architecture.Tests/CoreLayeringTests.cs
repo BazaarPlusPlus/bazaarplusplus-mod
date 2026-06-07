@@ -118,6 +118,54 @@ public class CoreLayeringTests
         );
     }
 
+    // Feature-scoped ratchet, not a repo-wide layering rule: Game/ may legitimately reference
+    // TheBazaar.* elsewhere (Game/Tooltips does). This locks in the decision that CollectionPanel
+    // consumes native tooltip typography through the GameInterop.TagTypography seam instead of
+    // importing the game's tooltip namespaces directly. Known blind spots of the StartsWith scan:
+    // fully-qualified inline references and alias usings are not detected.
+    [Fact]
+    public void CollectionPanel_does_not_import_native_tooltip_namespaces()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var collectionPanelDir = Path.Combine(mainSource, "Game", "CollectionPanel");
+        Assert.True(
+            Directory.Exists(collectionPanelDir),
+            $"Could not locate CollectionPanel directory at '{collectionPanelDir}'."
+        );
+
+        var violations = new List<string>();
+        foreach (
+            var file in Directory.EnumerateFiles(
+                collectionPanelDir,
+                "*.cs",
+                SearchOption.AllDirectories
+            )
+        )
+        {
+            var relative = Path.GetRelativePath(mainSource, file).Replace('\\', '/');
+            foreach (var rawLine in File.ReadLines(file))
+            {
+                var line = rawLine.Trim();
+                if (
+                    line.StartsWith("using TheBazaar.UI.Tooltips", StringComparison.Ordinal)
+                    || line.StartsWith("using TheBazaar.Tooltips", StringComparison.Ordinal)
+                )
+                {
+                    violations.Add($"{relative}: {line}");
+                }
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "CollectionPanel must consume native tooltip typography through "
+                + "GameInterop.TagTypography instead of importing the game's tooltip namespaces. "
+                + "Offending imports:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
     [Fact]
     public void CollectionPanel_opens_from_native_clone_button_or_tab_not_settings_dock()
     {

@@ -7,6 +7,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -86,8 +87,13 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _closeButton;
     private Button? _packageToggleButton;
     private Button? _dayToggleButton;
+    private Label? _sortLabel;
     private Button? _sortQualityButton;
     private Button? _sortSizeButton;
+    private Label? _heroFilterLabel;
+    private Label? _tierFilterLabel;
+    private Label? _sizeFilterLabel;
+    private Label? _tagFilterLabel;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
     private VisualElement? _sizeChipRow;
@@ -319,6 +325,7 @@ internal sealed partial class CollectionPanelView : IDisposable
 
         RefreshTabButton(_itemTabButton!, model.ActiveType == ECardType.Item);
         RefreshTabButton(_skillTabButton!, model.ActiveType == ECardType.Skill);
+        RefreshChromeTexts();
 
         EnsureHeroChips(model.AvailableHeroes);
         EnsureTierChips(model.AvailableTiers);
@@ -327,14 +334,30 @@ internal sealed partial class CollectionPanelView : IDisposable
         _lastSelectedTags = model.SelectedTags;
         EnsureTagChips(model.AvailableTags, model.SelectedTags);
         EnsureSourceChips(model.AvailableSources);
+        // Chip text is reset unconditionally on every Refresh: the Ensure*Chips early-exit
+        // compares only keys, so a locale change while the chips survive would otherwise leave
+        // their labels in the previous language (same P4 mechanism as RefreshChromeTexts).
         foreach (var pair in _heroChips)
+        {
+            pair.Value.tooltip = CollectionPanelText.Hero(pair.Key);
             RefreshHeroChip(pair.Key, pair.Value, model.SelectedHeroes.Contains(pair.Key));
+        }
         foreach (var pair in _tierChips)
+        {
+            pair.Value.text = CollectionPanelText.Tier(pair.Key);
             RefreshChip(pair.Value, model.SelectedTiers.Contains(pair.Key));
+        }
         foreach (var pair in _sizeChips)
+        {
+            pair.Value.text = CollectionPanelText.Size(pair.Key);
             RefreshChip(pair.Value, model.SelectedSizes.Contains(pair.Key));
+        }
         foreach (var pair in _tagChips)
-            RefreshChip(pair.Value, model.SelectedTags.Contains(pair.Key));
+        {
+            var display = NativeTagTypography.Resolve(pair.Key);
+            pair.Value.text = display.Label;
+            RefreshChip(pair.Value, model.SelectedTags.Contains(pair.Key), display.AccentColor);
+        }
         foreach (var pair in _sourceChips)
         {
             RefreshChip(
@@ -379,6 +402,40 @@ internal sealed partial class CollectionPanelView : IDisposable
                 && !model.IsLoading;
             _emptyLabel.style.display = showEmpty ? DisplayStyle.Flex : DisplayStyle.None;
         }
+    }
+
+    // P4 fix: these chrome strings used to be set only at construction, so a locale change
+    // while the view was alive (BPP Chinese script mode, or a non-restart game-language switch)
+    // left them in the previous language. Re-resolving on every Refresh matches the existing
+    // Title/Subtitle/Count per-refresh pattern.
+    private void RefreshChromeTexts()
+    {
+        if (_closeButton != null)
+            _closeButton.text = CollectionPanelText.Close();
+        if (_itemTabButton != null)
+            _itemTabButton.text = CollectionPanelText.ItemsTab();
+        if (_skillTabButton != null)
+            _skillTabButton.text = CollectionPanelText.SkillsTab();
+        if (_sortLabel != null)
+            _sortLabel.text = CollectionPanelText.SortHeader();
+        if (_sortQualityButton != null)
+            _sortQualityButton.text = CollectionPanelText.SortQuality();
+        if (_sortSizeButton != null)
+            _sortSizeButton.text = CollectionPanelText.SortSize();
+        if (_dayToggleButton != null)
+            _dayToggleButton.tooltip = CollectionPanelText.DayHeader();
+        if (_packageToggleButton != null)
+            _packageToggleButton.text = CollectionPanelText.PackagesToggle();
+        if (_heroFilterLabel != null)
+            _heroFilterLabel.text = CollectionPanelText.HeroHeader();
+        if (_tierFilterLabel != null)
+            _tierFilterLabel.text = CollectionPanelText.TierHeader();
+        if (_sizeFilterLabel != null)
+            _sizeFilterLabel.text = CollectionPanelText.SizeHeader();
+        if (_tagFilterLabel != null)
+            _tagFilterLabel.text = CollectionPanelText.TagHeader();
+        if (_emptyLabel != null)
+            _emptyLabel.text = CollectionPanelText.NoMatches();
     }
 
     public void UpdateContentSpacerHeight(float contentHeightPixels)
