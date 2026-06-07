@@ -507,6 +507,14 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ApplyFilters();
                 RefreshView();
             },
+            toggleTag: tag =>
+            {
+                if (!_filter.Tags.Remove(tag))
+                    _filter.Tags.Add(tag);
+                _scrollY = 0f;
+                ApplyFilters();
+                RefreshView();
+            },
             toggleSource: sourceKey =>
             {
                 _filter.ToggleSource(_filter.ActiveType, sourceKey);
@@ -764,6 +772,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedHeroes = new HashSet<EHero>(_filter.Heroes),
             SelectedTiers = new HashSet<ETier>(_filter.Tiers),
             SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
+            SelectedTags = new HashSet<ECardTag>(_filter.Tags),
             SelectedSourceKey = _filter.GetSelectedSourceKey(_filter.ActiveType),
             IncludePackages = _filter.IncludePackages,
             ShowPackageToggle = true,
@@ -774,6 +783,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
+            AvailableTags = CollectionTagWhitelist.Ordered,
             AvailableSources = AvailableSourcesFor(_filter.ActiveType),
             ContentHeight = _virtualizer.ContentHeight,
         };

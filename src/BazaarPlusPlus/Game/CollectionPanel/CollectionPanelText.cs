@@ -37,6 +37,8 @@ internal static class CollectionPanelText
         "品質"
     );
     private static readonly LocalizedTextSet SizeHeaderText = new("Size", "尺寸", "尺寸", "尺寸");
+    private static readonly LocalizedTextSet TagHeaderText = new("Tags", "标签", "標籤", "標籤");
+    private static readonly LocalizedTextSet TagLessText = new("Less", "收起", "收起", "收起");
     private static readonly LocalizedTextSet SortHeaderText = new("Sort", "排序", "排序", "排序");
     private static readonly LocalizedTextSet SortQualityText = new(
         "Quality",
@@ -101,6 +103,18 @@ internal static class CollectionPanelText
 
     internal static string SizeHeader() => Resolve(SizeHeaderText);
 
+    internal static string TagHeader() => Resolve(TagHeaderText);
+
+    internal static string TagMore(int hiddenCount) =>
+        FormatSimple(
+            $"More ({hiddenCount})",
+            $"更多（{hiddenCount}）",
+            $"更多（{hiddenCount}）",
+            $"更多（{hiddenCount}）"
+        );
+
+    internal static string TagLess() => Resolve(TagLessText);
+
     internal static string SortHeader() => Resolve(SortHeaderText);
 
     internal static string SortQuality() => Resolve(SortQualityText);
@@ -138,6 +152,36 @@ internal static class CollectionPanelText
             ECardSize.Medium => FormatSimple("Medium", "中型", "中型", "中型"),
             ECardSize.Large => FormatSimple("Large", "大型", "大型", "大型"),
             _ => size.ToString(),
+        };
+
+    internal static string Tag(ECardTag tag) =>
+        tag switch
+        {
+            ECardTag.Weapon => FormatSimple("Weapon", "武器", "武器", "武器"),
+            ECardTag.Property => FormatSimple("Property", "房产", "房產", "房產"),
+            ECardTag.Food => FormatSimple("Food", "食物", "食物", "食物"),
+            ECardTag.Potion => FormatSimple("Potion", "药水", "藥水", "藥水"),
+            ECardTag.Tool => FormatSimple("Tool", "工具", "工具", "工具"),
+            ECardTag.Vehicle => FormatSimple("Vehicle", "载具", "載具", "載具"),
+            ECardTag.Aquatic => FormatSimple("Aquatic", "水生", "水生", "水生"),
+            ECardTag.Friend => FormatSimple("Friend", "伙伴", "夥伴", "夥伴"),
+            ECardTag.Core => FormatSimple("Core", "核心", "核心", "核心"),
+            ECardTag.Ray => FormatSimple("Ray", "射线", "射線", "射線"),
+            ECardTag.Dinosaur => FormatSimple("Dinosaur", "恐龙", "恐龍", "恐龍"),
+            ECardTag.Apparel => FormatSimple("Apparel", "服装", "服裝", "服裝"),
+            ECardTag.Toy => FormatSimple("Toy", "玩具", "玩具", "玩具"),
+            ECardTag.Tech => FormatSimple("Tech", "科技", "科技", "科技"),
+            ECardTag.Dragon => FormatSimple("Dragon", "龙", "龍", "龍"),
+            ECardTag.Ingredient => FormatSimple("Ingredient", "原料", "原料", "原料"),
+            ECardTag.Relic => FormatSimple("Relic", "遗物", "遺物", "遺物"),
+            ECardTag.Reagent => FormatSimple("Reagent", "试剂", "試劑", "試劑"),
+            ECardTag.Map => FormatSimple("Map", "地图", "地圖", "地圖"),
+            ECardTag.Key => FormatSimple("Key", "钥匙", "鑰匙", "鑰匙"),
+            ECardTag.Drone => FormatSimple("Drone", "无人机", "無人機", "無人機"),
+            ECardTag.Sigil => FormatSimple("Sigil", "印记", "印記", "印記"),
+            ECardTag.Trap => FormatSimple("Trap", "陷阱", "陷阱", "陷阱"),
+            ECardTag.Instrument => FormatSimple("Instrument", "乐器", "樂器", "樂器"),
+            _ => tag.ToString(),
         };
 
     internal static string Merchant(CollectionMerchantKind merchant) =>

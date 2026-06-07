@@ -27,6 +27,7 @@ internal sealed class CollectionPanelViewModel
     public HashSet<EHero> SelectedHeroes { get; set; } = new();
     public HashSet<ETier> SelectedTiers { get; set; } = new();
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
+    public HashSet<ECardTag> SelectedTags { get; set; } = new();
     public string? SelectedSourceKey { get; set; }
     public bool IncludePackages { get; set; }
     public bool ShowPackageToggle { get; set; } = true;
@@ -40,6 +41,7 @@ internal sealed class CollectionPanelViewModel
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
     public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();
+    public IReadOnlyList<ECardTag> AvailableTags { get; set; } = Array.Empty<ECardTag>();
     public IReadOnlyList<CollectionSourceOptionViewModel> AvailableSources { get; set; } =
         Array.Empty<CollectionSourceOptionViewModel>();
     public float ContentHeight { get; set; }
@@ -66,6 +68,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action<ETier> _toggleTier;
     private readonly Action _toggleDayFilter;
     private readonly Action<ECardSize> _toggleSize;
+    private readonly Action<ECardTag> _toggleTag;
     private readonly Action<string> _toggleSource;
     private readonly Action _togglePackages;
     private readonly Action<CollectionSortPriority> _setSortPriority;
@@ -88,6 +91,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
     private VisualElement? _sizeChipRow;
+    private VisualElement? _tagChipRow;
+    private Button? _tagMoreButton;
     private Label? _sourceFilterLabel;
     private VisualElement? _sourceChipRow;
     private VisualElement? _sizeFilterSection;
@@ -106,6 +111,15 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Dictionary<EHero, VisualElement> _heroChipIcons = new();
     private readonly Dictionary<ETier, Button> _tierChips = new();
     private readonly Dictionary<ECardSize, Button> _sizeChips = new();
+    private readonly Dictionary<ECardTag, Button> _tagChips = new();
+    private readonly List<ECardTag> _tagChipOrder = new();
+
+    // Tag-row collapse state. The row shows the whitelist's primary slice (plus any selected
+    // tag that would otherwise be hidden) until expanded; the last refreshed options/selection
+    // are kept so the expand toggle can rebuild the row without waiting for the next Refresh.
+    private bool _tagRowExpanded;
+    private IReadOnlyList<ECardTag> _lastTagOptions = Array.Empty<ECardTag>();
+    private HashSet<ECardTag> _lastSelectedTags = new();
     private readonly Dictionary<string, Button> _sourceChips = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VisualElement> _sourceChipIcons = new(
         StringComparer.Ordinal
@@ -132,6 +146,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action<ETier> toggleTier,
         Action toggleDayFilter,
         Action<ECardSize> toggleSize,
+        Action<ECardTag> toggleTag,
         Action<string> toggleSource,
         Action togglePackages,
         Action<CollectionSortPriority> setSortPriority
@@ -145,6 +160,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _toggleDayFilter =
             toggleDayFilter ?? throw new ArgumentNullException(nameof(toggleDayFilter));
         _toggleSize = toggleSize ?? throw new ArgumentNullException(nameof(toggleSize));
+        _toggleTag = toggleTag ?? throw new ArgumentNullException(nameof(toggleTag));
         _toggleSource = toggleSource ?? throw new ArgumentNullException(nameof(toggleSource));
         _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
         _setSortPriority =
@@ -307,6 +323,9 @@ internal sealed partial class CollectionPanelView : IDisposable
         EnsureHeroChips(model.AvailableHeroes);
         EnsureTierChips(model.AvailableTiers);
         EnsureSizeChips(model.AvailableSizes);
+        _lastTagOptions = model.AvailableTags;
+        _lastSelectedTags = model.SelectedTags;
+        EnsureTagChips(model.AvailableTags, model.SelectedTags);
         EnsureSourceChips(model.AvailableSources);
         foreach (var pair in _heroChips)
             RefreshHeroChip(pair.Key, pair.Value, model.SelectedHeroes.Contains(pair.Key));
@@ -314,6 +333,8 @@ internal sealed partial class CollectionPanelView : IDisposable
             RefreshChip(pair.Value, model.SelectedTiers.Contains(pair.Key));
         foreach (var pair in _sizeChips)
             RefreshChip(pair.Value, model.SelectedSizes.Contains(pair.Key));
+        foreach (var pair in _tagChips)
+            RefreshChip(pair.Value, model.SelectedTags.Contains(pair.Key));
         foreach (var pair in _sourceChips)
         {
             RefreshChip(
