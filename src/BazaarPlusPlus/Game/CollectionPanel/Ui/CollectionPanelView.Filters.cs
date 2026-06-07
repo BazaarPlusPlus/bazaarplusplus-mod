@@ -5,6 +5,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.GameInterop.EncounterPortraits;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
+using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -121,7 +122,7 @@ internal sealed partial class CollectionPanelView
             {
                 var captured = tag;
                 var chip = CreateCompactChipButton(
-                    CollectionPanelText.Tag(captured),
+                    NativeTagTypography.Resolve(captured).Label,
                     () => _toggleTag(captured)
                 );
                 _tagChips[captured] = chip;
@@ -172,7 +173,11 @@ internal sealed partial class CollectionPanelView
         _tagRowExpanded = !_tagRowExpanded;
         EnsureTagChips(_lastTagOptions, _lastSelectedTags);
         foreach (var pair in _tagChips)
-            RefreshChip(pair.Value, _lastSelectedTags.Contains(pair.Key));
+            RefreshChip(
+                pair.Value,
+                _lastSelectedTags.Contains(pair.Key),
+                NativeTagTypography.Resolve(pair.Key).AccentColor
+            );
     }
 
     private void RefreshTagMoreButton(int totalOptionCount)
@@ -597,7 +602,9 @@ internal sealed partial class CollectionPanelView
         return new string(initials.ToArray());
     }
 
-    private static void RefreshChip(Button chip, bool selected)
+    // unselectedTextColor carries the game's official keyword color for tag chips; the selected
+    // state keeps the gold highlight regardless so selection always reads the same way.
+    private static void RefreshChip(Button chip, bool selected, Color? unselectedTextColor = null)
     {
         if (selected)
         {
@@ -611,7 +618,7 @@ internal sealed partial class CollectionPanelView
         else
         {
             chip.style.backgroundColor = Colors.HistoryChipBackground;
-            chip.style.color = Colors.HistoryChipText;
+            chip.style.color = unselectedTextColor ?? Colors.HistoryChipText;
             UiStyle.BorderColor(chip.style, Colors.ButtonBorderFor(Colors.HistoryChipBackground));
         }
     }
