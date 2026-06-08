@@ -387,6 +387,44 @@ public class CoreLayeringTests
         );
     }
 
+    [Fact]
+    public void CardArtReplacement_gameinterop_does_not_depend_on_Game_feature_namespaces()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var cardArtInteropDir = Path.Combine(mainSource, "GameInterop", "CardArtReplacement");
+        Assert.True(
+            Directory.Exists(cardArtInteropDir),
+            $"Could not locate CardArtReplacement interop directory at '{cardArtInteropDir}'."
+        );
+
+        var violations = new List<string>();
+        foreach (
+            var file in Directory.EnumerateFiles(
+                cardArtInteropDir,
+                "*.cs",
+                SearchOption.AllDirectories
+            )
+        )
+        {
+            var relative = Path.GetRelativePath(mainSource, file).Replace('\\', '/');
+            foreach (var rawLine in File.ReadLines(file))
+            {
+                var line = rawLine.Trim();
+                if (line.StartsWith("using BazaarPlusPlus.Game.", StringComparison.Ordinal))
+                    violations.Add($"{relative}: {line}");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "GameInterop.CardArtReplacement must not import Game feature namespaces. "
+                + "Keep catalog/cache policy in Game/CardArtReplacement and pass primitive data "
+                + "into the interop injector. Offending imports:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
     private readonly record struct PreviewBoundaryRule(
         string Directory,
         string DisallowedNamespace,

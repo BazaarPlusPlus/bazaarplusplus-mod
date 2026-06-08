@@ -25,6 +25,9 @@
     <EmbeddedResource Include="Data\CollectionSources\collection-sources.json" />
     <EmbeddedResource Include="Resources\DockButtons\bpp-settings-icon.png" />
     <EmbeddedResource Include="Resources\DockButtons\collection-panel-icon.png" />
+    <EmbeddedResource Include="Resources\CustomCardArt\*.png">
+      <LogicalName>BazaarPlusPlus.Resources.CustomCardArt.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="Resources\Fonts\SourceHanSansCN-Regular.otf" />
     <EmbeddedResource Include="Resources\Fonts\SourceHanSansCN-LICENSE.txt" />
   </ItemGroup>

@@ -1,6 +1,6 @@
 # 包裹卡商人头像 — 直接替换卡图方案（Card-Art Replacement）设计 + Goal
 
-> **Status:** Draft — 待人工确认后实施。本轮**只分析、未改代码**。
+> **Status:** IMPLEMENTED — 文字版管线已验证（in-run 卡 + CollectionPanel 预览）；真实/头像美术后续按同名 `<templateId>.png` 覆盖。
 >
 > 与姊妹方案 [`2026-06-08-package-merchant-portrait-plan.md`](2026-06-08-package-merchant-portrait-plan.md)（世界空间 overlay 叠头像）**目标相同**——让玩家一眼看出「这张包裹卖给哪个商人」——但**手段不同**：本方案**直接替换包裹卡的卡面插画贴图**（类似 mod 现有 collection panel 的「换 icon / 换材质」做法），用**我们自己创作的图片**替换原始卡图。两方案二选一，对比见 §10。
 >

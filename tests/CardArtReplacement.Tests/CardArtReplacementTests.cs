@@ -1,0 +1,140 @@
+using System.Runtime.CompilerServices;
+using BazaarPlusPlus.Game.CardArtReplacement;
+using UnityEngine;
+using Xunit;
+
+namespace BazaarPlusPlus.Tests.CardArtReplacement;
+
+public sealed class CardArtReplacementTests : IDisposable
+{
+    private readonly string _tempDir = Path.Combine(
+        Path.GetTempPath(),
+        $"bpp-card-art-{Guid.NewGuid():N}"
+    );
+
+    public CardArtReplacementTests()
+    {
+        Directory.CreateDirectory(_tempDir);
+    }
+
+    [Fact]
+    public void Catalog_maps_guid_png_filenames_to_template_ids()
+    {
+        var templateId = Guid.NewGuid();
+        var expectedPath = Path.Combine(_tempDir, $"{templateId}.png");
+        File.WriteAllBytes(expectedPath, Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(_tempDir, "not-a-guid.png"), Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(_tempDir, $"{Guid.NewGuid()}.jpg"), Array.Empty<byte>());
+
+        var catalog = new CustomCardArtCatalog(_tempDir);
+
+        Assert.Equal(1, catalog.Count);
+        Assert.True(catalog.TryGetArtPath(templateId, out var actualPath));
+        Assert.Equal(expectedPath, actualPath);
+    }
+
+    [Fact]
+    public void Catalog_refresh_picks_up_new_placeholder_files()
+    {
+        var catalog = new CustomCardArtCatalog(_tempDir);
+        var templateId = Guid.NewGuid();
+        File.WriteAllBytes(Path.Combine(_tempDir, $"{templateId}.png"), Array.Empty<byte>());
+
+        catalog.Refresh();
+
+        Assert.True(catalog.TryGetArtPath(templateId, out _));
+    }
+
+    [Fact]
+    public void Texture_cache_loads_png_once_per_template_id()
+    {
+        var templateId = Guid.NewGuid();
+        File.WriteAllBytes(Path.Combine(_tempDir, $"{templateId}.png"), OnePixelPng);
+        var catalog = new CustomCardArtCatalog(_tempDir);
+        var fakeTexture = (Texture2D)RuntimeHelpers.GetUninitializedObject(typeof(Texture2D));
+        var loadCount = 0;
+        var cache = new CustomCardArtTextureCache(
+            catalog,
+            (string _, Guid __, out Texture2D? texture) =>
+            {
+                loadCount++;
+                texture = fakeTexture;
+                return true;
+            }
+        );
+
+        Assert.True(cache.TryGetTexture(templateId, out var first, out var firstPath));
+        Assert.Same(fakeTexture, first);
+        Assert.True(cache.TryGetTexture(templateId, out var second, out var secondPath));
+        Assert.Same(first, second);
+        Assert.Equal(1, loadCount);
+        Assert.Equal(firstPath, secondPath);
+        Assert.NotNull(firstPath);
+    }
+
+    [Fact]
+    public void Main_assembly_embeds_default_placeholder_package_art()
+    {
+        var resources = typeof(CardArtReplacementFeature)
+            .Assembly.GetManifestResourceNames()
+            .Where(name =>
+                name.StartsWith("BazaarPlusPlus.Resources.CustomCardArt.", StringComparison.Ordinal)
+                && name.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+            )
+            .ToArray();
+
+        Assert.Equal(117, resources.Length);
+        foreach (var resource in resources)
+        {
+            var fileName = resource.Substring("BazaarPlusPlus.Resources.CustomCardArt.".Length);
+            Assert.True(Guid.TryParse(Path.GetFileNameWithoutExtension(fileName), out _));
+        }
+    }
+
+    [Fact]
+    public void Bundled_installer_writes_missing_defaults_without_overwriting_custom_files()
+    {
+        var existingTemplateId = Guid.NewGuid();
+        var missingTemplateId = Guid.NewGuid();
+        var existingPath = Path.Combine(_tempDir, $"{existingTemplateId}.png");
+        File.WriteAllBytes(existingPath, [0x01, 0x02, 0x03]);
+
+        var resources = new[]
+        {
+            $"BazaarPlusPlus.Resources.CustomCardArt.{existingTemplateId}.png",
+            $"BazaarPlusPlus.Resources.CustomCardArt.{missingTemplateId}.png",
+        };
+        var installer = new BundledCustomCardArtInstaller(
+            () => resources,
+            _ => new MemoryStream([0x09, 0x08, 0x07])
+        );
+
+        var result = installer.InstallMissing(_tempDir);
+
+        Assert.Equal(2, result.ResourceCount);
+        Assert.Equal(1, result.ExistingCount);
+        Assert.Equal(1, result.WrittenCount);
+        Assert.Equal(0, result.FailedCount);
+        Assert.Equal([0x01, 0x02, 0x03], File.ReadAllBytes(existingPath));
+        Assert.Equal(
+            [0x09, 0x08, 0x07],
+            File.ReadAllBytes(Path.Combine(_tempDir, $"{missingTemplateId}.png"))
+        );
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            Directory.Delete(_tempDir, recursive: true);
+        }
+        catch
+        {
+            // Best-effort test cleanup.
+        }
+    }
+
+    private static readonly byte[] OnePixelPng = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+    );
+}
