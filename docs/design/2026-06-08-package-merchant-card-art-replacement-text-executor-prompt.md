@@ -44,8 +44,10 @@
 用已存在的生成器产出**文字版**占位图并放到 runtime 读取目录：
 
 ```bash
-# 输出到运行期数据目录（与 CombatReplays/Screenshots 同级的 BazaarPlusPlusV4/）
-uv run --with pillow tools/generate_placeholder_package_art.py \
+# 生成器在 extractor 仓库（其 venv 已含 Pillow）；输出到运行期数据目录
+# （与 CombatReplays/Screenshots 同级的 BazaarPlusPlusV4/）
+cd bazaarplusplus-extractor
+uv run python scripts/generate_placeholder_package_art.py \
     --mode text \
     --out "<GameRoot>/BazaarPlusPlusV4/CustomCardArt"
 ```
@@ -65,4 +67,4 @@ uv run --with pillow tools/generate_placeholder_package_art.py \
 ### 收尾
 
 - 自检 diff → commit（含 `Co-Authored-By`）→ 合并工作分支到 `master` → push → 删已合并分支（未经要求不提前 commit）。
-- 文字版验证通过后：把设计文档对应 Status 标注「文字版管线已验证」；真实/头像美术 ready 后按同名 `<templateId>.png` 覆盖 `CustomCardArt/`（零代码改动，可用 `tools/build_package_merchant_artpack.py` 产出的数据包 + 生图模型生成）。
+- 文字版验证通过后：把设计文档对应 Status 标注「文字版管线已验证」；真实/头像美术 ready 后按同名 `<templateId>.png` 覆盖 `CustomCardArt/`（零代码改动，可用 `bazaarplusplus-extractor/scripts/build_package_merchant_artpack.py` 产出的数据包 + 生图模型生成）。

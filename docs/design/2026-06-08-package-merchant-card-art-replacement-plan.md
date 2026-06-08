@@ -136,7 +136,7 @@ in-run 卡（`ItemController`）的插画由其子组件 **`ItemVisualsControlle
 
 ### 9.1 Phase 0：占位图先行（验证管线，与真实美术解耦）
 
-为了**先验证替换管线的可行性**（不等成品图），用 `tools/generate_placeholder_package_art.py`（Pillow，`uv run --with pillow …`）按 §16 全表自动生成 117 张占位图（39 商人 × 3 size，排除 The Tester），文件名 `<templateId>.png`：
+为了**先验证替换管线的可行性**（不等成品图），用 `bazaarplusplus-extractor/scripts/generate_placeholder_package_art.py`（`cd bazaarplusplus-extractor && uv run python scripts/…`）按 §16 全表自动生成 117 张占位图（39 商人 × 3 size，排除 The Tester），文件名 `<templateId>.png`：
 - **`--mode text`**：纯占位——`"<Merchant>'s <Size> Package"` 文字 + 按 size 着色背景。零外部素材，纯验证「templateId 命中 → SetTexture 生效」。
 - **`--mode portrait`（推荐起步）**：直接用**真实商人头像**（抽取产物 `exports/card-assets/prod/cards/<merchantEncounterId>/icon.png`，contain-fit 到 1024² + 底部 size 标签）。实测 **117/117 商人头像都能命中**——所以这套占位图**本身就是可用的过渡美术**，先上它即可看到「卖给哪个商人」，真实精修图 ready 后按同名 `<templateId>.png` 覆盖即可。
 - 输出落 `<GameRoot>/BazaarPlusPlusV4/CustomCardArt/`（runtime 读取处）。商人头像源自每张包裹卡能力图里嵌入的 merchant encounter GUID（脚本内联 §2 解析逻辑，自动跟版）。
@@ -207,7 +207,7 @@ in-run 卡（`ItemController`）的插画由其子组件 **`ItemVisualsControlle
 >
 > **做什么**：对 `HiddenTags` 含 `EHiddenTag.Package` 的卡（名为 `"<Merchant>'s Package"`），把其卡面插画贴图替换为磁盘上对应的自制 PNG（按 `TemplateId` 命中）。
 >
-> **Phase 0（先做，验证管线）**：先跑 `tools/generate_placeholder_package_art.py --mode portrait`（已存在）生成 117 张 `<templateId>.png` 占位图（真实商人头像，可作过渡美术），落 `<GameRoot>/BazaarPlusPlusV4/CustomCardArt/`，用它把 runtime 替换跑通；真实精修图 ready 后按同名覆盖、零代码改动。
+> **Phase 0（先做，验证管线）**：先跑 `bazaarplusplus-extractor/scripts/generate_placeholder_package_art.py --mode portrait`（已存在）生成 117 张 `<templateId>.png` 占位图（真实商人头像，可作过渡美术），落 `<GameRoot>/BazaarPlusPlusV4/CustomCardArt/`，用它把 runtime 替换跑通；真实精修图 ready 后按同名覆盖、零代码改动。
 >
 > **替换原点**：`[HarmonyPostfix] ItemVisualsController.SetCardFrameMaterial`（`ItemVisualsController.cs:189`）——原方法后，对 `__instance.cardIllustrationRenderer.sharedMaterial` 做 `SetTexture(CardArtShaderVariables.EncounterBaseMap, tex)` + `mat.mainTexture = tex`（只改插画，保留品质/附魔 keyword）。身份用 `ConditionalWeakTable<ItemVisualsController,Card>`（由 `Setup(Card,…)` postfix 填）+ `GetComponentInParent<ItemController>` 兜底；判 `CardData.Template` 是包裹卡且清单命中。
 >
