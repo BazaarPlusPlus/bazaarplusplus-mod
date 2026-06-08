@@ -706,21 +706,21 @@ internal static class TenWinBuildTests
     ) =>
         $$"""
             {
-              "schemaVersion": 1,
+              "schema_version": 2,
               "kind": "mod_tenwin_builds",
               "cards": {{cards}},
               "enchantments": {{enchantments}},
               "schemas": {
-                "build": ["cardRefs", "layout", "stats", "selection"],
-                "layout": ["cardRef", "slot", "tier", "enchantRef", "size"],
-                "stats": ["completedRunCount", "tenWinRunCount", "tenWinRateBps", "avgTenWinFinalDayTenth", "p75TenWinFinalDay", "avgTenWinFinalLossesTenth", "eliteCompletedRunCount", "eliteTenWinRunCount", "eliteTenWinRateBps", "eliteAvgTenWinFinalDayTenth", "score"],
-                "selection": ["reason", "coveredCardRef"]
+                "build": ["card_refs", "layout", "stats", "selection"],
+                "layout": ["card_ref", "slot", "tier", "enchant_ref", "size"],
+                "stats": ["completed_run_count", "ten_win_run_count", "ten_win_rate_bps", "avg_ten_win_final_day_tenth", "p75_ten_win_final_day", "avg_ten_win_final_losses_tenth", "elite_completed_run_count", "elite_ten_win_run_count", "elite_ten_win_rate_bps", "elite_avg_ten_win_final_day_tenth", "score"],
+                "selection": ["reason", "covered_card_ref"]
               },
-              "selectionReasons": ["core", "coverage"],
+              "selection_reasons": ["core", "coverage"],
               "heroes": {
                 "{{hero}}": {
                   "builds": {{builds}},
-                  "cardIndex": {{cardIndex}}
+                  "card_index": {{cardIndex}}
                 }
               }
             }

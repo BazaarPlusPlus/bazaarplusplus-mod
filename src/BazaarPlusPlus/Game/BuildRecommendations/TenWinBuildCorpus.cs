@@ -15,7 +15,8 @@ namespace BazaarPlusPlus.Game.BuildRecommendations;
 /// The payload is a compact, schema-driven format: top-level string tables (<c>cards</c>,
 /// <c>enchantments</c>) plus per-hero builds encoded as positional array rows whose column order
 /// comes from <c>schemas</c>. Build IDs are implicit zero-based indices into a hero's
-/// <c>builds</c> array; <c>cardIndex</c> maps a card ref to the build IDs that contain it.
+/// <c>builds</c> array; <c>card_index</c> maps a card ref to the build IDs that contain it.
+/// The wire format is whole-tree snake_case at <c>schema_version</c> 2.
 ///
 /// This type is pure (System + Newtonsoft only, zero game/Unity references): it owns parsing,
 /// recall, and scoring. Projection of a matched build onto a renderable board lives in
@@ -23,33 +24,35 @@ namespace BazaarPlusPlus.Game.BuildRecommendations;
 /// </summary>
 internal sealed class TenWinBuildCorpus
 {
+    private const int ExpectedSchemaVersion = 2;
+
     private static readonly string[] DefaultBuildSchema =
     {
-        "cardRefs",
+        "card_refs",
         "layout",
         "stats",
         "selection",
     };
     private static readonly string[] DefaultLayoutSchema =
     {
-        "cardRef",
+        "card_ref",
         "slot",
         "tier",
-        "enchantRef",
+        "enchant_ref",
         "size",
     };
     private static readonly string[] DefaultStatsSchema =
     {
-        "completedRunCount",
-        "tenWinRunCount",
-        "tenWinRateBps",
-        "avgTenWinFinalDayTenth",
-        "p75TenWinFinalDay",
-        "avgTenWinFinalLossesTenth",
-        "eliteCompletedRunCount",
-        "eliteTenWinRunCount",
-        "eliteTenWinRateBps",
-        "eliteAvgTenWinFinalDayTenth",
+        "completed_run_count",
+        "ten_win_run_count",
+        "ten_win_rate_bps",
+        "avg_ten_win_final_day_tenth",
+        "p75_ten_win_final_day",
+        "avg_ten_win_final_losses_tenth",
+        "elite_completed_run_count",
+        "elite_ten_win_run_count",
+        "elite_ten_win_rate_bps",
+        "elite_avg_ten_win_final_day_tenth",
         "score",
     };
 
@@ -98,6 +101,11 @@ internal sealed class TenWinBuildCorpus
             return null;
         }
 
+        // Gate on the wire schema version so a future format change fails loudly
+        // instead of silently mis-decoding. Greenfield: only v2 is accepted.
+        if (root["schema_version"]?.Value<int?>() != ExpectedSchemaVersion)
+            return null;
+
         if (root["heroes"] is not JObject heroesObj)
             return null;
 
@@ -140,7 +148,7 @@ internal sealed class TenWinBuildCorpus
                 layout,
                 stats
             );
-            var cardIndex = ParseCardIndex(heroObj["cardIndex"] as JArray);
+            var cardIndex = ParseCardIndex(heroObj["card_index"] as JArray);
             heroes[heroProperty.Name] = new TenWinHero(builds, cardIndex);
         }
 
@@ -151,7 +159,7 @@ internal sealed class TenWinBuildCorpus
     // token shapes must be accepted; anything else degrades to null rather than failing the parse.
     private static DateTimeOffset? ParseGeneratedAt(JObject root)
     {
-        var token = root["generatedAt"];
+        var token = root["generated_at"];
         switch (token?.Type)
         {
             case JTokenType.Date:
@@ -446,7 +454,7 @@ internal sealed class TenWinBuildCorpus
     {
         public BuildColumns(List<string> schema)
         {
-            CardRefs = schema.IndexOf("cardRefs");
+            CardRefs = schema.IndexOf("card_refs");
             Layout = schema.IndexOf("layout");
             Stats = schema.IndexOf("stats");
         }
@@ -462,10 +470,10 @@ internal sealed class TenWinBuildCorpus
     {
         public LayoutColumns(List<string> schema)
         {
-            CardRef = schema.IndexOf("cardRef");
+            CardRef = schema.IndexOf("card_ref");
             Slot = schema.IndexOf("slot");
             Tier = schema.IndexOf("tier");
-            EnchantRef = schema.IndexOf("enchantRef");
+            EnchantRef = schema.IndexOf("enchant_ref");
             Size = schema.IndexOf("size");
         }
 
@@ -482,10 +490,10 @@ internal sealed class TenWinBuildCorpus
     {
         public StatsColumns(List<string> schema)
         {
-            CompletedRunCount = schema.IndexOf("completedRunCount");
-            TenWinRunCount = schema.IndexOf("tenWinRunCount");
-            TenWinRateBps = schema.IndexOf("tenWinRateBps");
-            P75TenWinFinalDay = schema.IndexOf("p75TenWinFinalDay");
+            CompletedRunCount = schema.IndexOf("completed_run_count");
+            TenWinRunCount = schema.IndexOf("ten_win_run_count");
+            TenWinRateBps = schema.IndexOf("ten_win_rate_bps");
+            P75TenWinFinalDay = schema.IndexOf("p75_ten_win_final_day");
             Score = schema.IndexOf("score");
         }
 
