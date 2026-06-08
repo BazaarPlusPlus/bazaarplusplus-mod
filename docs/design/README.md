@@ -31,6 +31,8 @@ Work designed but not yet (fully) landed; lives at this top level until implemen
 - [`2026-06-05-item-board-slot-grid-layout.md`](2026-06-05-item-board-slot-grid-layout.md) — LiveBuildPanel / HistoryPanel 共享 item-board preview 改为显式全宽 10-slot grid：shop 行先由 planner 计算居中的 display slots，renderer 只按 `DisplaySocketId + DisplaySpan` 居中等比放置 native cards，slot 背板可控显隐（**✅ 已实现（代码 + 单测 + Debug 构建通过），待游戏内手测验证**）。
 - [`2026-06-07-live-build-refresh-and-history-health-layout.md`](2026-06-07-live-build-refresh-and-history-health-layout.md) — 把十胜阵容手动拉取入口从 HistoryPanel 归位到 LiveBuildPanel，并把 HistoryPanel 的远端连通性检测按钮移到本地 DB chip 同一 overview 行；保持 DB 本地状态与 server health 远端状态分离（**Draft，待确认**）。
 - [`2026-06-07-collection-tag-native-typography.md`](2026-06-07-collection-tag-native-typography.md) — CollectionPanel 标签筛选行的文案/配色切到游戏原生 tooltip typography（keyword 配置 + `LocalizableText`），**无 fallback**：删除手工词典 `CollectionPanelText.Tag(ECardTag)`；顺带结构性修复 locale 切换后 chip 文案滞留 bug；渲染保持 UITK，新增 `GameInterop/TagTypography/` 适配器（**Draft，待红队评审**）。
+- [`2026-06-08-package-merchant-portrait-plan.md`](2026-06-08-package-merchant-portrait-plan.md) — 给背包/Stash/手牌里的「包裹卡」（`EHiddenTag.Package`，名为 `<Merchant>'s Package`）叠加其对应商人的头像：映射走卡能力图里嵌入的商人 encounter GUID（`TPrerequisiteRun→TRunConditionalCurrentEncounter→TCardConditionalId`，严格 1:1，120/120 实测），出图复用 `EncounterPortraitSpriteProvider`，UI 走 qinglong `TierBadgeRenderer` 同款**世界空间** `SpriteRenderer`（非 UITK）挂 `ItemController.ShowCard`+`Cleanup` postfix；含数据漂移说明（活数据在运行期缓存而非 StreamingAssets）（**Draft v2，已过 Codex 对抗评审并修订池化重挂 / 层边界两项，待人工确认实施**）。
+  - 配套 executor 指令：[`2026-06-08-package-merchant-portrait-executor-prompt.md`](2026-06-08-package-merchant-portrait-executor-prompt.md)。
 
 ## Archived specs
 
