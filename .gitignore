@@ -26,6 +26,11 @@ __pycache__/
 **/plugins/BazaarPlusPlus.version
 **/BepInEx.zip
 
+# Local generated package card art
+/artifacts/
+/results/
+/results_atlas/
+
 # OS
 .DS_Store
 Thumbs.db
