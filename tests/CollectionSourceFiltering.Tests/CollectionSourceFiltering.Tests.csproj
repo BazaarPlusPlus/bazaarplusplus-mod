@@ -33,6 +33,10 @@
       Link="CollectionSourceDtos.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionHiddenTagGroups.cs"
+      Link="CollectionHiddenTagGroups.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceEntry.cs"
       Link="CollectionSourceEntry.cs"
     />

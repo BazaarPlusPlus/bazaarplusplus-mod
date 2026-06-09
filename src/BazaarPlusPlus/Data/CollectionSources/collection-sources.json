@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "groups": [
     "generalist",
     "tier-specialist",
@@ -23,13 +23,19 @@
       "sourceTemplateIds": [
         "847b1294-649d-4f02-ab04-0ee9f838c462"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Vehicle",
-          "Drone"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Vehicle",
+              "Drone"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -49,12 +55,18 @@
         "abf614d4-4700-41f3-a05a-68c7e843cb1a",
         "dc12f4bd-6c33-41f0-b7ad-d62a0be09a47"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Weapon"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Weapon"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -66,6 +78,7 @@
         "Jules",
         "Karnok",
         "Mak",
+        "Stelle",
         "Vanessa"
       ],
       "description": "Sells Crit items from any Hero",
@@ -73,13 +86,18 @@
       "sourceTemplateIds": [
         "f22fd14f-7e00-40cb-9e44-a46f34d64764"
       ],
-      "offerRule": {
-        "heroMode": "AllHeroes",
-        "hiddenTagsAny": [
-          "Crit",
-          "CritReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "AllHeroes",
+            "hiddenTagGroupsAny": [
+              "Crit"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -96,12 +114,18 @@
         "b649cc9a-9ea4-46d3-9ee5-8d57626260cf",
         "e3bbe96b-7108-4343-9584-3bade7f004a5"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "sizesAny": [
-          "Small"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "sizesAny": [
+              "Small"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -114,13 +138,19 @@
       "sourceTemplateIds": [
         "8f0aea10-9894-4ded-a726-72b23142589c"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "sizesAny": [
-          "Medium",
-          "Large"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "sizesAny": [
+              "Medium",
+              "Large"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -134,13 +164,29 @@
         "3346b0d5-20a0-4aa4-a7d4-b86ad0109e59",
         "b1288f12-2cf9-4473-a43e-4dd521703990"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Haste",
-          "HasteReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Haste"
+            ]
+          }
+        },
+        {
+          "key": "rare-turbo",
+          "kind": "Enchanted",
+          "rarityLabel": "Rare",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "enchantmentTypesAny": [
+              "Turbo"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -154,13 +200,29 @@
         "b10f79af-da26-4b27-88da-3e7fea49a3b9",
         "ef25f92c-484a-48de-b6de-8fc6429823ca"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Slow",
-          "SlowReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Slow"
+            ]
+          }
+        },
+        {
+          "key": "rare-heavy",
+          "kind": "Enchanted",
+          "rarityLabel": "Rare",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "enchantmentTypesAny": [
+              "Heavy"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -175,13 +237,18 @@
       "sourceTemplateIds": [
         "816e6ba0-8f5f-412e-9756-8e1901dd9d49"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Ammo",
-          "AmmoReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Ammo"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -194,13 +261,19 @@
       "sourceTemplateIds": [
         "c6cffe25-8e94-4a7b-a821-3e3c7093333b"
       ],
-      "offerRule": {
-        "heroMode": "NeutralOnly",
-        "startingTier": {
-          "mode": "AtMost",
-          "tier": "Bronze"
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "NeutralOnly",
+            "startingTier": {
+              "mode": "AtMost",
+              "tier": "Bronze"
+            }
+          }
         }
-      }
+      ]
     },
     {
       "kind": "Merchant",
@@ -220,10 +293,16 @@
       "sourceTemplateIds": [
         "4580fb31-b2ea-4f9b-9ab9-2979602f83d8"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Dooley"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Dooley"
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -238,12 +317,18 @@
       "sourceTemplateIds": [
         "0ff275f7-60ef-4428-acb6-1a138d03152d"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Potion"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Potion"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -259,13 +344,18 @@
       "sourceTemplateIds": [
         "7bd967dd-4631-4252-bdff-ee0bd5e3ddb7"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Health",
-          "HealthReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Health"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -278,13 +368,29 @@
       "sourceTemplateIds": [
         "c246ee53-51ea-40c1-ac2f-71435e179531"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Freeze",
-          "FreezeReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Freeze"
+            ]
+          }
+        },
+        {
+          "key": "rare-icy",
+          "kind": "Enchanted",
+          "rarityLabel": "Rare",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "enchantmentTypesAny": [
+              "Icy"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -297,12 +403,18 @@
       "sourceTemplateIds": [
         "9fc8b5a3-f522-4999-b310-26a0fadc7708"
       ],
-      "offerRule": {
-        "heroMode": "AllHeroes",
-        "tagsAny": [
-          "Apparel"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "AllHeroes",
+            "tagsAny": [
+              "Apparel"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -317,12 +429,18 @@
       "sourceTemplateIds": [
         "c3d9c329-0db6-478e-ad0f-ef2ae78834ce"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Food"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Food"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -336,13 +454,19 @@
         "1f72700a-fe11-4792-8a47-9e52b9387f29",
         "50292930-5e68-47a2-8cc5-fde69aadc5aa"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "startingTier": {
-          "mode": "AtMost",
-          "tier": "Gold"
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "startingTier": {
+              "mode": "AtMost",
+              "tier": "Gold"
+            }
+          }
         }
-      }
+      ]
     },
     {
       "kind": "Merchant",
@@ -356,13 +480,29 @@
         "43dbd6ed-6989-4ae4-acdc-f8bfcb8a008f",
         "55e0f929-071a-4e51-b60e-51fcc792f0b9"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Burn",
-          "BurnReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Burn"
+            ]
+          }
+        },
+        {
+          "key": "rare-fiery",
+          "kind": "Enchanted",
+          "rarityLabel": "Rare",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "enchantmentTypesAny": [
+              "Fiery"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -380,18 +520,23 @@
       "sourceTemplateIds": [
         "2708055d-a8be-4c2f-a8d6-574e884a254e"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Health",
-          "HealthReference",
-          "Heal",
-          "HealReference",
-          "Regen",
-          "RegenReference",
-          "HealthRegen"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Health",
+              "Heal",
+              "Regen"
+            ],
+            "hiddenTagsAny": [
+              "HealthRegen"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -414,9 +559,15 @@
         "eb1453e4-2307-4b6f-9a15-f8f30c849eb4",
         "fa533c05-c89a-4849-8562-b560532f1431"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero"
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -436,10 +587,16 @@
       "sourceTemplateIds": [
         "7fdc233f-b81f-4216-a646-4c807c2240da"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Jules"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Jules"
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -459,10 +616,16 @@
       "sourceTemplateIds": [
         "379d881b-4524-4db9-a606-47bd35749f44"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Karnok"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Karnok"
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -482,15 +645,19 @@
       "sourceTemplateIds": [
         "a4fa13f8-6beb-4b6c-839b-60af167628d9"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Health",
-          "HealthReference",
-          "Shield",
-          "ShieldReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Health",
+              "Shield"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -506,12 +673,18 @@
         "79fe1693-1e6d-4ed6-b376-794baca19262",
         "7b598c89-fdf2-4e83-bc4c-6f16d86fbe04"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsNone": [
-          "Weapon"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsNone": [
+              "Weapon"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -525,13 +698,29 @@
         "2745a661-095c-44a5-bb6e-8dc76e07bda2",
         "d86e22d9-b54d-4be9-8b5b-f3fe93d4c133"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Poison",
-          "PoisonReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Poison"
+            ]
+          }
+        },
+        {
+          "key": "rare-toxic",
+          "kind": "Enchanted",
+          "rarityLabel": "Rare",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "enchantmentTypesAny": [
+              "Toxic"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -544,13 +733,19 @@
       "sourceTemplateIds": [
         "892de564-d894-4e07-ab21-959e16e8cdf8"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "startingTier": {
-          "mode": "AtMost",
-          "tier": "Diamond"
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "startingTier": {
+              "mode": "AtMost",
+              "tier": "Diamond"
+            }
+          }
         }
-      }
+      ]
     },
     {
       "kind": "Merchant",
@@ -570,10 +765,16 @@
       "sourceTemplateIds": [
         "4475cff5-6105-4f4a-978c-b282e36173eb"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Mak"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Mak"
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -587,13 +788,19 @@
         "214fe1d5-c583-4766-99c5-c621598c83ce",
         "b8f55bb0-536e-4d5f-a328-d38f88c6d479"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "sizesAny": [
-          "Small",
-          "Large"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "sizesAny": [
+              "Small",
+              "Large"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -609,12 +816,18 @@
         "cca9281a-d259-4771-9747-ea7af6de8dcf",
         "e1e3e229-9806-4d2d-99e7-d25592fe14b6"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "sizesAny": [
-          "Medium"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "sizesAny": [
+              "Medium"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -629,12 +842,18 @@
       "sourceTemplateIds": [
         "e30d8bef-5bea-4e95-b4c2-e29e17325a82"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Property"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Property"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -649,12 +868,18 @@
       "sourceTemplateIds": [
         "1a21931f-6183-4251-914b-c8f83dc58a30"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Aquatic"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Aquatic"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -668,12 +893,18 @@
         "d3727a3a-3dd2-4ea7-a396-515e2c41c1b0",
         "d61f942a-6da4-48bd-a4db-1bde45174aba"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Tool"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Tool"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -693,13 +924,18 @@
       "sourceTemplateIds": [
         "7066e72e-40b7-4104-b521-159de457f2d0"
       ],
-      "offerRule": {
-        "heroMode": "AllHeroes",
-        "hiddenTagsAny": [
-          "Flying",
-          "FlyingReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "AllHeroes",
+            "hiddenTagGroupsAny": [
+              "Flying"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -712,12 +948,18 @@
       "sourceTemplateIds": [
         "065f6793-8607-4f02-abfe-db6afb221ab2"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "sizesAny": [
-          "Large"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "sizesAny": [
+              "Large"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -732,17 +974,23 @@
       "sourceTemplateIds": [
         "bcdaa6d4-9057-4ea1-8110-a2dae217c55f"
       ],
-      "offerRule": {
-        "heroMode": "AllHeroes",
-        "hiddenTagsAny": [
-          "EconomyReference",
-          "Gold",
-          "Income",
-          "Value",
-          "BuyPrice",
-          "SellPrice"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "AllHeroes",
+            "hiddenTagsAny": [
+              "EconomyReference",
+              "Gold",
+              "Income",
+              "Value",
+              "BuyPrice",
+              "SellPrice"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -762,10 +1010,16 @@
       "sourceTemplateIds": [
         "f9074804-1812-445a-8688-b8c86f9c7711"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Pygmalien"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Pygmalien"
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -779,13 +1033,19 @@
         "323e2c05-f077-4774-84a5-9e89d8d1c9b9",
         "e7cac33d-864c-45c9-8a3e-c3218aa0febe"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "sizesAny": [
-          "Small",
-          "Medium"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "sizesAny": [
+              "Small",
+              "Medium"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -798,10 +1058,16 @@
       "sourceTemplateIds": [
         "b690812d-108b-49ce-82f3-e1a41379022c"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "enchantableOnly": true
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "enchantableOnly": true
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -817,12 +1083,18 @@
       "sourceTemplateIds": [
         "9459a01b-edf5-432b-81cd-1fd2cacfadad"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Friend"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Friend"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -836,13 +1108,19 @@
         "5fcd3081-0daa-4e50-b749-c884b405ef9c",
         "ec81a27c-590c-43a1-a353-804a23b5e5d9"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "startingTier": {
-          "mode": "AtMost",
-          "tier": "Silver"
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "startingTier": {
+              "mode": "AtMost",
+              "tier": "Silver"
+            }
+          }
         }
-      }
+      ]
     },
     {
       "kind": "Merchant",
@@ -862,10 +1140,16 @@
       "sourceTemplateIds": [
         "e48b3243-1e7e-4a97-bf4f-0699fd0b4616"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Stelle"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Stelle"
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -878,12 +1162,18 @@
       "sourceTemplateIds": [
         "22bb0004-5131-4588-a567-03ee3c96003b"
       ],
-      "offerRule": {
-        "heroMode": "AllHeroes",
-        "tagsAny": [
-          "Toy"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "AllHeroes",
+            "tagsAny": [
+              "Toy"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -896,12 +1186,18 @@
       "sourceTemplateIds": [
         "e840f7a3-0a04-455d-852c-286dc5011efc"
       ],
-      "offerRule": {
-        "heroMode": "AllHeroes",
-        "tagsAny": [
-          "Relic"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "AllHeroes",
+            "tagsAny": [
+              "Relic"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -918,12 +1214,18 @@
       "sourceTemplateIds": [
         "41cdf4ee-7790-4da1-96f8-a46d3391a0d9"
       ],
-      "offerRule": {
-        "heroMode": "AllHeroes",
-        "tagsAny": [
-          "Tech"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "AllHeroes",
+            "tagsAny": [
+              "Tech"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -938,12 +1240,18 @@
       "sourceTemplateIds": [
         "b1b1f445-e625-4397-b4e2-ee4feeb729fa"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Friend"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Friend"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -963,17 +1271,20 @@
       "sourceTemplateIds": [
         "3e871bbb-fb25-417f-8643-cb43456c3fc7"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Haste",
-          "HasteReference",
-          "Slow",
-          "SlowReference",
-          "Cooldown",
-          "CooldownReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagGroupsAny": [
+              "Haste",
+              "Slow",
+              "Cooldown"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -986,9 +1297,15 @@
       "sourceTemplateIds": [
         "e3b894b0-a078-4b1d-8793-ac6459a8361a"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero"
+          }
+        }
+      ]
     },
     {
       "kind": "Merchant",
@@ -1008,10 +1325,16 @@
       "sourceTemplateIds": [
         "580ba494-a852-4d80-a82d-5cd66fcfd2f3"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Vanessa"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Vanessa"
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1024,13 +1347,19 @@
       "sourceTemplateIds": [
         "a7b60dc3-36a1-46e8-ba7e-c34f255513c8"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "startingTier": {
-          "mode": "AtMost",
-          "tier": "Diamond"
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "startingTier": {
+              "mode": "AtMost",
+              "tier": "Diamond"
+            }
+          }
         }
-      }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1044,13 +1373,19 @@
         "4c3d4b9d-e5b7-469c-be91-67b213c5a975",
         "8d5c8a08-45cf-43d2-b1ec-a37d3bd5542b"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "startingTier": {
-          "mode": "AtMost",
-          "tier": "Silver"
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "startingTier": {
+              "mode": "AtMost",
+              "tier": "Silver"
+            }
+          }
         }
-      }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1068,13 +1403,19 @@
       "sourceTemplateIds": [
         "0417372b-77dc-4040-9f29-33d709c591a5"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Freeze",
-          "FreezeReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "Freeze",
+              "FreezeReference"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1089,13 +1430,19 @@
       "sourceTemplateIds": [
         "54e27892-1eb3-4b1d-9824-51f9fa0bf51a"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Ammo",
-          "AmmoReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "Ammo",
+              "AmmoReference"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1110,10 +1457,16 @@
       "sourceTemplateIds": [
         "77cd5ccd-be81-49fb-a697-58da76571c0a"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Dooley"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Dooley"
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1132,13 +1485,19 @@
       "sourceTemplateIds": [
         "d3a78867-fd60-4a67-b03a-4200ba58674c"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Shield",
-          "ShieldReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "Shield",
+              "ShieldReference"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1153,10 +1512,16 @@
       "sourceTemplateIds": [
         "de175e34-df34-4581-a13a-46767e1c7c6b"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Karnok"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Karnok"
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1177,13 +1542,19 @@
       "sourceTemplateIds": [
         "294f81dd-eb9f-47a9-9b9c-fa9766291485"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Burn",
-          "BurnReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "Burn",
+              "BurnReference"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1198,10 +1569,16 @@
       "sourceTemplateIds": [
         "35e74c18-1bd6-4c91-ab21-2fd64adf6cc6"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Pygmalien"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Pygmalien"
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1216,10 +1593,16 @@
       "sourceTemplateIds": [
         "c4e01347-bcbc-e164-c848-544774f80599"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Jules"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Jules"
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1232,9 +1615,15 @@
       "sourceTemplateIds": [
         "210003fa-a20d-4ad1-9ada-d5fad5bf9f89"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero"
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1249,10 +1638,16 @@
       "sourceTemplateIds": [
         "845d2051-cca0-4533-947a-aa290f364e0a"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Vanessa"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Vanessa"
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1265,13 +1660,19 @@
       "sourceTemplateIds": [
         "a07fbe69-c1d0-41a3-af72-d517e7706718"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "startingTier": {
-          "mode": "AtMost",
-          "tier": "Gold"
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "startingTier": {
+              "mode": "AtMost",
+              "tier": "Gold"
+            }
+          }
         }
-      }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1286,13 +1687,19 @@
         "bc75676c-032f-441a-a6a2-35b1ccc2eb80",
         "e2fc8bd4-b97d-485b-8bb6-5c966d336c4a"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "startingTier": {
-          "mode": "AtMost",
-          "tier": "Bronze"
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "startingTier": {
+              "mode": "AtMost",
+              "tier": "Bronze"
+            }
+          }
         }
-      }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1310,13 +1717,19 @@
       "sourceTemplateIds": [
         "f1892cf4-3dcb-4d41-b137-d670f44a65f8"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Poison",
-          "PoisonReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "Poison",
+              "PoisonReference"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1334,18 +1747,24 @@
       "sourceTemplateIds": [
         "b46b862e-ba64-4e05-ad5e-b8dbc90517c9"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Health",
-          "HealthReference",
-          "Heal",
-          "HealReference",
-          "Regen",
-          "RegenReference",
-          "HealthRegen"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "Health",
+              "HealthReference",
+              "Heal",
+              "HealReference",
+              "Regen",
+              "RegenReference",
+              "HealthRegen"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1358,12 +1777,18 @@
       "sourceTemplateIds": [
         "bfe9db96-a189-4bdf-84e5-fc1743ff8569"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "tagsAny": [
-          "Weapon"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Weapon"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1383,13 +1808,19 @@
       "sourceTemplateIds": [
         "18f8471a-3914-419a-9296-14e624e86ac6"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Slow",
-          "SlowReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "Slow",
+              "SlowReference"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1404,10 +1835,16 @@
       "sourceTemplateIds": [
         "3e0f0266-e92b-4a9a-b0b8-dba816e51647"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Stelle"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Stelle"
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1426,13 +1863,19 @@
       "sourceTemplateIds": [
         "922b9031-c859-479c-95c4-18234a366c63"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Crit",
-          "CritReference"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "Crit",
+              "CritReference"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1452,14 +1895,20 @@
       "sourceTemplateIds": [
         "86907ad1-f67a-48db-ac30-e5afe2de237a"
       ],
-      "offerRule": {
-        "heroMode": "SelectedHero",
-        "hiddenTagsAny": [
-          "Haste",
-          "HasteReference",
-          "Charge"
-        ]
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "Haste",
+              "HasteReference",
+              "Charge"
+            ]
+          }
+        }
+      ]
     },
     {
       "kind": "Trainer",
@@ -1474,10 +1923,16 @@
       "sourceTemplateIds": [
         "054e937d-553e-41a5-951b-62550f870f93"
       ],
-      "offerRule": {
-        "heroMode": "FixedHero",
-        "hero": "Mak"
-      }
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Mak"
+          }
+        }
+      ]
     }
   ]
 }

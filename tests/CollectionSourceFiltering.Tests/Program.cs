@@ -12,7 +12,7 @@ var collisionId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 var entries = CollectionSourceCatalog.Build(
     $$"""
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "groups": [
         "generalist",
         "all-hero",
@@ -29,7 +29,7 @@ var entries = CollectionSourceCatalog.Build(
           "description": "Sells Crit items",
           "portraitTemplateId": "{{ailaId1}}",
           "sourceTemplateIds": ["{{ailaId1}}", "{{ailaId2}}"],
-          "offerRule": { "heroMode": "SelectedHero", "hiddenTagsAny": ["Crit", "CritReference"] }
+          "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero", "hiddenTagsAny": ["Crit", "CritReference"] } }]
         },
         {
           "name": "Aila",
@@ -40,7 +40,7 @@ var entries = CollectionSourceCatalog.Build(
           "description": "Sells Crit items",
           "portraitTemplateId": "{{collisionId}}",
           "sourceTemplateIds": ["{{collisionId}}"],
-          "offerRule": { "heroMode": "SelectedHero", "hiddenTagsAny": ["Crit", "CritReference"] }
+          "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero", "hiddenTagsAny": ["Crit", "CritReference"] } }]
         },
         {
           "name": "Nufu",
@@ -51,7 +51,7 @@ var entries = CollectionSourceCatalog.Build(
           "description": "Sells common items",
           "portraitTemplateId": "{{globalMerchantId}}",
           "sourceTemplateIds": ["{{globalMerchantId}}"],
-          "offerRule": { "heroMode": "SelectedHero" }
+          "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
         },
         {
           "name": "Professor Riggs",
@@ -62,7 +62,7 @@ var entries = CollectionSourceCatalog.Build(
           "description": "Teaches skills",
           "portraitTemplateId": "{{pygTrainerId}}",
           "sourceTemplateIds": ["{{pygTrainerId}}"],
-          "offerRule": { "heroMode": "SelectedHero" }
+          "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
         },
         {
           "name": "Nufu",
@@ -73,14 +73,14 @@ var entries = CollectionSourceCatalog.Build(
           "description": "Second collision entry",
           "portraitTemplateId": "66666666-6666-6666-6666-666666666666",
           "sourceTemplateIds": ["66666666-6666-6666-6666-666666666666"],
-          "offerRule": { "heroMode": "AllHeroes" }
+          "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "AllHeroes" } }]
         }
       ]
     }
     """
 );
 
-AssertEqual(5, entries.Count, "Catalog build should keep valid v3 entries.");
+AssertEqual(5, entries.Count, "Catalog build should keep valid v4 entries.");
 AssertTrue(
     entries.All(entry => !string.IsNullOrWhiteSpace(entry.SourceKey)),
     "Every source entry should receive a stable source key."
@@ -131,7 +131,7 @@ AssertThrows<InvalidOperationException>(
         CollectionSourceCatalog.Build(
             $$"""
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "groups": ["generalist"],
               "entries": [
                 {
@@ -143,7 +143,7 @@ AssertThrows<InvalidOperationException>(
                   "description": "Broken",
                   "portraitTemplateId": "{{globalMerchantId}}",
                   "sourceTemplateIds": ["{{globalMerchantId}}"],
-                  "offerRule": { "heroMode": "Bogus" }
+                  "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "Bogus" } }]
                 }
               ]
             }
@@ -156,7 +156,7 @@ AssertThrows<InvalidOperationException>(
         CollectionSourceCatalog.Build(
             $$"""
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "entries": [
                 {
                   "name": "Broken",
@@ -167,20 +167,20 @@ AssertThrows<InvalidOperationException>(
                   "description": "Broken",
                   "portraitTemplateId": "{{globalMerchantId}}",
                   "sourceTemplateIds": ["{{globalMerchantId}}"],
-                  "offerRule": { "heroMode": "SelectedHero" }
+                  "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
                 }
               ]
             }
             """
         ),
-    "Schema v3 source catalogs should require a top-level groups list."
+    "Schema v4 source catalogs should require a top-level groups list."
 );
 AssertThrows<InvalidOperationException>(
     () =>
         CollectionSourceCatalog.Build(
             $$"""
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "groups": ["generalist", "generalist"],
               "entries": [
                 {
@@ -192,7 +192,7 @@ AssertThrows<InvalidOperationException>(
                   "description": "Broken",
                   "portraitTemplateId": "{{globalMerchantId}}",
                   "sourceTemplateIds": ["{{globalMerchantId}}"],
-                  "offerRule": { "heroMode": "SelectedHero" }
+                  "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
                 }
               ]
             }
@@ -205,7 +205,7 @@ AssertThrows<InvalidOperationException>(
         CollectionSourceCatalog.Build(
             $$"""
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "groups": ["generalist"],
               "entries": [
                 {
@@ -217,7 +217,7 @@ AssertThrows<InvalidOperationException>(
                   "description": "Broken",
                   "portraitTemplateId": "{{globalMerchantId}}",
                   "sourceTemplateIds": ["{{globalMerchantId}}"],
-                  "offerRule": { "heroMode": "SelectedHero" }
+                  "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
                 }
               ]
             }
@@ -230,7 +230,7 @@ AssertThrows<InvalidOperationException>(
         CollectionSourceCatalog.Build(
             $$"""
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "groups": ["generalist"],
               "entries": [
                 {
@@ -241,7 +241,7 @@ AssertThrows<InvalidOperationException>(
                   "description": "Broken",
                   "portraitTemplateId": "{{globalMerchantId}}",
                   "sourceTemplateIds": ["{{globalMerchantId}}"],
-                  "offerRule": { "heroMode": "SelectedHero" }
+                  "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
                 }
               ]
             }
@@ -254,7 +254,7 @@ AssertThrows<InvalidOperationException>(
         CollectionSourceCatalog.Build(
             $$"""
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "groups": ["generalist"],
               "entries": [
                 {
@@ -266,7 +266,7 @@ AssertThrows<InvalidOperationException>(
                   "description": "One",
                   "portraitTemplateId": "{{globalMerchantId}}",
                   "sourceTemplateIds": ["{{globalMerchantId}}"],
-                  "offerRule": { "heroMode": "SelectedHero" }
+                  "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
                 },
                 {
                   "name": "Two",
@@ -277,7 +277,7 @@ AssertThrows<InvalidOperationException>(
                   "description": "Two",
                   "portraitTemplateId": "{{globalMerchantId}}",
                   "sourceTemplateIds": ["{{globalMerchantId}}"],
-                  "offerRule": { "heroMode": "SelectedHero" }
+                  "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
                 }
               ]
             }
@@ -320,6 +320,14 @@ AssertTrue(
     ),
     "Default selected merchant source key should exist in the current source catalog."
 );
+AssertTrue(
+    currentCatalog.Any(entry =>
+        entry.Kind == CollectionSourceKind.Merchant
+        && string.Equals(entry.Name, "Aimbot", StringComparison.Ordinal)
+        && entry.AppliesToHero(EHero.Stelle)
+    ),
+    "Aimbot should be visible for Stelle after the v4 source-catalog migration."
+);
 AssertEqual(
     currentCatalog.Count,
     currentCatalog.Select(entry => entry.SourceKey).Distinct(StringComparer.Ordinal).Count(),
@@ -338,11 +346,12 @@ foreach (var source in currentCatalog)
         $"{source.SourceKey} should include portraitTemplateId in sourceTemplateIds."
     );
     AssertTrue(source.SourceTemplateIds.Count > 0, $"{source.SourceKey} needs source ids.");
-    if (source.OfferRule.HeroMode == CollectionSourceHeroMode.FixedHero)
-        AssertTrue(source.OfferRule.Hero.HasValue, $"{source.SourceKey} needs a fixed hero.");
-    if (source.OfferRule.HeroMode == CollectionSourceHeroMode.NeutralOnly)
+    var primaryRule = PrimaryRule(source);
+    if (primaryRule.HeroMode == CollectionSourceHeroMode.FixedHero)
+        AssertTrue(primaryRule.Hero.HasValue, $"{source.SourceKey} needs a fixed hero.");
+    if (primaryRule.HeroMode == CollectionSourceHeroMode.NeutralOnly)
         AssertFalse(
-            source.OfferRule.Hero.HasValue,
+            primaryRule.Hero.HasValue,
             $"{source.SourceKey} neutral-only rules should not carry hero."
         );
 }
@@ -494,7 +503,7 @@ AssertEqual(
 var globalNufu = entries.First(entry =>
     entry.Kind == CollectionSourceKind.Merchant
     && string.Equals(entry.Name, "Nufu", StringComparison.Ordinal)
-    && entry.OfferRule.HeroMode == CollectionSourceHeroMode.SelectedHero
+    && PrimaryRule(entry).HeroMode == CollectionSourceHeroMode.SelectedHero
 );
 var openOnChoiceMerchant = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: true,
@@ -566,6 +575,10 @@ AssertTrue(
     noHeroCacheKey.Contains(ailaId1.ToString("N")[..12], StringComparison.Ordinal)
         && noHeroCacheKey.Contains(ailaId2.ToString("N")[..12], StringComparison.Ordinal),
     "Source offer cache key should include a fingerprint of all source template ids."
+);
+AssertTrue(
+    noHeroCacheKey.Contains(vanessaAila.OfferRuleFingerprint, StringComparison.Ordinal),
+    "Source offer cache key should include the v4 source rule fingerprint."
 );
 AssertTrue(
     noHeroCacheKey.EndsWith("|no-selected-hero", StringComparison.Ordinal),
@@ -938,6 +951,197 @@ AssertSet(
     "Structured rules should AND size, tag include/exclude, hidden tag, and enchantable predicates."
 );
 
+var segmentedEntry = BuildEntryWithSegments(
+    "Segmented",
+    CollectionSourceKind.Merchant,
+    """
+    [
+      {
+        "key": "normal-tool",
+        "kind": "Normal",
+        "rule": { "heroMode": "SelectedHero", "tagsAny": ["Tool"] }
+      },
+      {
+        "key": "rare-turbo",
+        "kind": "Enchanted",
+        "rarityLabel": "Rare",
+        "rule": { "heroMode": "SelectedHero", "enchantmentTypesAny": ["Turbo"] }
+      }
+    ]
+    """
+);
+var segmentedNormal = CatalogCard(
+    Guid.Parse("11111111-aaaa-0000-0000-000000000001"),
+    ECardType.Item,
+    [EHero.Vanessa],
+    tags: [ECardTag.Tool]
+);
+var segmentedEnchanted = CatalogCard(
+    Guid.Parse("11111111-aaaa-0000-0000-000000000002"),
+    ECardType.Item,
+    [EHero.Vanessa],
+    enchantments: Enchantments(EEnchantmentType.Turbo)
+);
+var segmentedBoth = CatalogCard(
+    Guid.Parse("11111111-aaaa-0000-0000-000000000003"),
+    ECardType.Item,
+    [EHero.Vanessa],
+    tags: [ECardTag.Tool],
+    enchantments: Enchantments(EEnchantmentType.Turbo)
+);
+var segmentedExcluded = CatalogCard(
+    Guid.Parse("11111111-aaaa-0000-0000-000000000004"),
+    ECardType.Item,
+    [EHero.Dooley],
+    tags: [ECardTag.Tool],
+    enchantments: Enchantments(EEnchantmentType.Turbo)
+);
+var segmentedResult = CollectionSourceOfferPoolResolver.Resolve(
+    segmentedEntry,
+    EHero.Vanessa,
+    new[] { segmentedNormal, segmentedEnchanted, segmentedBoth, segmentedExcluded }
+);
+AssertSet(
+    segmentedResult.OfferedCardIds,
+    new[] { segmentedNormal.Id, segmentedEnchanted.Id, segmentedBoth.Id },
+    "Segments should OR together while each segment keeps its own AND predicates."
+);
+AssertEqual(
+    CollectionSourceOfferSegmentKind.Normal,
+    segmentedResult.OfferMatchesByCardId[segmentedNormal.Id][0].SegmentKind,
+    "Normal-only matches should retain the normal segment attribution."
+);
+AssertEqual(
+    EEnchantmentType.Turbo,
+    segmentedResult.OfferMatchesByCardId[segmentedEnchanted.Id][0].EnchantmentType,
+    "Enchanted matches should retain the matched enchantment type."
+);
+AssertEqual(
+    2,
+    segmentedResult.OfferMatchesByCardId[segmentedBoth.Id].Count,
+    "A card that matches both normal and enchanted segments should keep both match reasons."
+);
+
+var hiddenGroupEntry = BuildSingleEntry(
+    "Hidden Group",
+    CollectionSourceKind.Merchant,
+    """{ "heroMode": "AllHeroes", "hiddenTagGroupsAny": ["Crit"] }"""
+);
+var hiddenGroupCard = CatalogCard(
+    Guid.Parse("11111111-bbbb-0000-0000-000000000001"),
+    ECardType.Item,
+    [EHero.Dooley],
+    hiddenTags: [EHiddenTag.CritReference]
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(hiddenGroupEntry, EHero.Vanessa, new[] { hiddenGroupCard })
+        .OfferedCardIds,
+    new[] { hiddenGroupCard.Id },
+    "hiddenTagGroupsAny should expand base/reference hidden tags during catalog parsing."
+);
+
+var enchantmentFacetEntry = BuildEntryWithSegments(
+    "Enchantment Facets",
+    CollectionSourceKind.Merchant,
+    """
+    [
+      {
+        "key": "rare-tagged",
+        "kind": "Enchanted",
+        "rarityLabel": "Rare",
+        "rule": {
+          "heroMode": "SelectedHero",
+          "enchantmentTagsAny": ["Weapon"],
+          "enchantmentHiddenTagsAny": ["Haste"]
+        }
+      }
+    ]
+    """
+);
+var enchantmentFacetMatch = CatalogCard(
+    Guid.Parse("11111111-cccc-0000-0000-000000000001"),
+    ECardType.Item,
+    [EHero.Vanessa],
+    enchantments: EnchantmentWithFacets(
+        EEnchantmentType.Turbo,
+        new[] { ECardTag.Weapon },
+        new[] { EHiddenTag.Haste }
+    )
+);
+var enchantmentFacetMiss = CatalogCard(
+    Guid.Parse("11111111-cccc-0000-0000-000000000002"),
+    ECardType.Item,
+    [EHero.Vanessa],
+    enchantments: EnchantmentWithFacets(
+        EEnchantmentType.Turbo,
+        new[] { ECardTag.Weapon },
+        new[] { EHiddenTag.Slow }
+    )
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(
+            enchantmentFacetEntry,
+            EHero.Vanessa,
+            new[] { enchantmentFacetMatch, enchantmentFacetMiss }
+        )
+        .OfferedCardIds,
+    new[] { enchantmentFacetMatch.Id },
+    "enchantmentTagsAny and enchantmentHiddenTagsAny should match the same TEnchantment facets."
+);
+
+var specialistEnchantments = new Dictionary<string, EEnchantmentType>
+{
+    ["Knightshade"] = EEnchantmentType.Toxic,
+    ["Hef"] = EEnchantmentType.Fiery,
+    ["Chronos"] = EEnchantmentType.Turbo,
+    ["Freiya"] = EEnchantmentType.Icy,
+    ["Cobweb"] = EEnchantmentType.Heavy,
+};
+foreach (var pair in specialistEnchantments)
+{
+    var specialist = currentCatalog.Single(entry =>
+        entry.Kind == CollectionSourceKind.Merchant
+        && string.Equals(entry.Name, pair.Key, StringComparison.Ordinal)
+    );
+    AssertEqual(
+        2,
+        specialist.OfferSegments.Count,
+        $"{pair.Key} should expose normal and rare enchanted source segments."
+    );
+    var enchantedSegment = specialist.OfferSegments.Single(segment =>
+        segment.Kind == CollectionSourceOfferSegmentKind.Enchanted
+    );
+    AssertValues(
+        enchantedSegment.Rule.EnchantmentTypesAny.ToArray(),
+        new[] { pair.Value },
+        $"{pair.Key} rare segment should use the expected enchantment type."
+    );
+
+    var candidate = CatalogCard(
+        GuidFromIndex(pair.Key, 99),
+        ECardType.Item,
+        [EHero.Vanessa],
+        enchantments: Enchantments(pair.Value)
+    );
+    var specialistResult = CollectionSourceOfferPoolResolver.Resolve(
+        specialist,
+        EHero.Vanessa,
+        new[] { candidate }
+    );
+    AssertSet(
+        specialistResult.OfferedCardIds,
+        new[] { candidate.Id },
+        $"{pair.Key} rare segment should match by TCardItem.Enchantments keys without base hidden tags."
+    );
+    AssertEqual(
+        pair.Value,
+        specialistResult.OfferMatchesByCardId[candidate.Id][0].EnchantmentType,
+        $"{pair.Key} rare match should carry the matched enchantment type."
+    );
+}
+
 foreach (var sourceEntry in currentCatalog)
 {
     var selectedHero = RepresentativeSelectedHero(sourceEntry);
@@ -976,12 +1180,25 @@ static CollectionSourceEntry BuildSingleEntry(
     string offerRuleJson
 )
 {
+    return BuildEntryWithSegments(
+        name,
+        kind,
+        $$"""[{ "key": "normal", "kind": "Normal", "rule": {{offerRuleJson}} }]"""
+    );
+}
+
+static CollectionSourceEntry BuildEntryWithSegments(
+    string name,
+    CollectionSourceKind kind,
+    string offerSegmentsJson
+)
+{
     var id = GuidFromIndex(name, 7);
     return CollectionSourceCatalog
         .Build(
             $$"""
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "groups": ["fixture"],
               "entries": [
                 {
@@ -993,7 +1210,7 @@ static CollectionSourceEntry BuildSingleEntry(
                   "description": "{{name}} fixture",
                   "portraitTemplateId": "{{id}}",
                   "sourceTemplateIds": ["{{id}}"],
-                  "offerRule": {{offerRuleJson}}
+                  "offerSegments": {{offerSegmentsJson}}
                 }
               ]
             }
@@ -1004,7 +1221,7 @@ static CollectionSourceEntry BuildSingleEntry(
 
 static EHero? RepresentativeSelectedHero(CollectionSourceEntry entry)
 {
-    if (entry.OfferRule.HeroMode != CollectionSourceHeroMode.SelectedHero)
+    if (PrimaryRule(entry).HeroMode != CollectionSourceHeroMode.SelectedHero)
         return EHero.Vanessa;
     if (entry.AvailableHeroes.Count > 0)
         return entry.AvailableHeroes[0];
@@ -1018,7 +1235,7 @@ static CollectionCardVm MatchingCard(
     ECardType? cardType = null
 )
 {
-    var rule = entry.OfferRule;
+    var rule = PrimaryRule(entry);
     var tags = rule.TagsAny.Count > 0 ? new[] { rule.TagsAny[0] } : Array.Empty<ECardTag>();
     if (rule.TagsNone.Contains(ECardTag.Tool) && tags.Length == 0)
         tags = new[] { ECardTag.Food };
@@ -1051,8 +1268,14 @@ static CollectionCardVm MatchingCard(
         InternalName = id.ToString("N"),
         ArtKey = id.ToString("N"),
         IsEnchantable = rule.EnchantableOnly,
+        Enchantments = rule.EnchantableOnly
+            ? Enchantments(EEnchantmentType.Toxic)
+            : new Dictionary<EEnchantmentType, CollectionCardEnchantmentFacets>(),
     };
 }
+
+static CollectionSourceOfferRule PrimaryRule(CollectionSourceEntry entry) =>
+    entry.OfferSegments[0].Rule;
 
 static CollectionCardVm CatalogCard(
     Guid id,
@@ -1062,7 +1285,8 @@ static CollectionCardVm CatalogCard(
     IEnumerable<EHiddenTag>? hiddenTags = null,
     ECardSize size = ECardSize.Medium,
     ETier tier = ETier.Bronze,
-    bool isEnchantable = false
+    bool isEnchantable = false,
+    IReadOnlyDictionary<EEnchantmentType, CollectionCardEnchantmentFacets>? enchantments = null
 ) =>
     new()
     {
@@ -1076,7 +1300,38 @@ static CollectionCardVm CatalogCard(
         DisplayName = id.ToString("N"),
         InternalName = id.ToString("N"),
         ArtKey = id.ToString("N"),
-        IsEnchantable = isEnchantable,
+        IsEnchantable = isEnchantable || (enchantments != null && enchantments.Count > 0),
+        Enchantments =
+            enchantments
+            ?? (
+                isEnchantable
+                    ? Enchantments(EEnchantmentType.Toxic)
+                    : new Dictionary<EEnchantmentType, CollectionCardEnchantmentFacets>()
+            ),
+    };
+
+static IReadOnlyDictionary<EEnchantmentType, CollectionCardEnchantmentFacets> Enchantments(
+    params EEnchantmentType[] types
+)
+{
+    var result = new Dictionary<EEnchantmentType, CollectionCardEnchantmentFacets>();
+    foreach (var type in types)
+        result[type] = new CollectionCardEnchantmentFacets(
+            type,
+            Array.Empty<ECardTag>(),
+            Array.Empty<EHiddenTag>()
+        );
+    return result;
+}
+
+static IReadOnlyDictionary<EEnchantmentType, CollectionCardEnchantmentFacets> EnchantmentWithFacets(
+    EEnchantmentType type,
+    IReadOnlyCollection<ECardTag> tags,
+    IReadOnlyCollection<EHiddenTag> hiddenTags
+) =>
+    new Dictionary<EEnchantmentType, CollectionCardEnchantmentFacets>
+    {
+        [type] = new(type, tags, hiddenTags),
     };
 
 static Guid GuidFromIndex(string seed, int index)

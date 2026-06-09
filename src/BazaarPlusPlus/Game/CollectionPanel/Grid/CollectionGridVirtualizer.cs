@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
@@ -41,6 +42,10 @@ internal sealed class CollectionGridVirtualizer
     private readonly CollectionGridSlotLayer? _slots;
 
     private IReadOnlyList<CollectionCardVm> _visible = Array.Empty<CollectionCardVm>();
+    private IReadOnlyDictionary<
+        Guid,
+        IReadOnlyList<CollectionSourceOfferMatch>
+    > _sourceMatchesByCardId = new Dictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>();
     private CollectionGridLayout _layout = CollectionGridLayout.Empty;
     private float _viewportWidth;
     private float _viewportHeight;
@@ -80,10 +85,20 @@ internal sealed class CollectionGridVirtualizer
 
     // SetVisible swaps in a new ordered visible set (typically after filter change) and
     // recycles everything currently realized. Caller is expected to also reset scrollY to 0.
-    public void SetVisible(IReadOnlyList<CollectionCardVm> visible, ECardType activeType)
+    public void SetVisible(
+        IReadOnlyList<CollectionCardVm> visible,
+        ECardType activeType,
+        IReadOnlyDictionary<
+            Guid,
+            IReadOnlyList<CollectionSourceOfferMatch>
+        >? sourceMatchesByCardId = null
+    )
     {
         BumpGeneration();
         _visible = visible ?? Array.Empty<CollectionCardVm>();
+        _sourceMatchesByCardId =
+            sourceMatchesByCardId
+            ?? new Dictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>();
         _gap = CollectionGridConstants.GridGap;
         _layout = CollectionGridLayout.Build(_visible, activeType);
         RecomputePixelization();
@@ -343,6 +358,8 @@ internal sealed class CollectionGridVirtualizer
         if (hover == null)
             hover = card.gameObject.AddComponent<CollectionCardHoverRelay>();
         hover.Bind(card);
+        _sourceMatchesByCardId.TryGetValue(vm.Id, out var sourceMatches);
+        CollectionSourceAttributionBadge.Bind(card.gameObject, sourceMatches);
 
         if (!CollectionGridConstants.UsePolledHover)
             EnsureHitTarget(card.gameObject);

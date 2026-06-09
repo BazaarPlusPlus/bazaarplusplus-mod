@@ -12,7 +12,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 internal static class CollectionSourceCatalog
 {
-    private const int ExpectedSchemaVersion = 3;
+    private const int ExpectedSchemaVersion = 4;
     private const string LogComponent = "CollectionSourceCatalog";
     private const string ResourceSuffix = "collection-sources.json";
 
@@ -158,7 +158,10 @@ internal static class CollectionSourceCatalog
                     );
                 usedSourceTemplateIds[sourceTemplateId] = $"entries[{i}]";
             }
-            var offerRule = BuildOfferRule(entry.OfferRule, $"entries[{i}].offerRule");
+            var offerSegments = BuildOfferSegments(
+                entry.OfferSegments,
+                $"entries[{i}].offerSegments"
+            );
 
             candidates.Add(
                 new EntryBuildCandidate(
@@ -169,7 +172,7 @@ internal static class CollectionSourceCatalog
                     description,
                     portraitTemplateId,
                     sourceTemplateIds,
-                    offerRule,
+                    offerSegments,
                     group,
                     order,
                     groupDisplayIndex
@@ -206,7 +209,7 @@ internal static class CollectionSourceCatalog
                     candidate.Description,
                     candidate.PortraitTemplateId,
                     candidate.SourceTemplateIds,
-                    candidate.OfferRule,
+                    candidate.OfferSegments,
                     candidate.Group,
                     candidate.Order,
                     candidate.GroupDisplayIndex
@@ -231,6 +234,47 @@ internal static class CollectionSourceCatalog
                 continue;
             yield return entry;
         }
+    }
+
+    private static IReadOnlyList<CollectionSourceOfferSegment> BuildOfferSegments(
+        IReadOnlyList<CollectionSourceOfferSegmentDto>? dtos,
+        string path
+    )
+    {
+        if (dtos == null || dtos.Count == 0)
+            throw new InvalidOperationException($"{path} must contain at least one segment.");
+
+        var segments = new List<CollectionSourceOfferSegment>(dtos.Count);
+        var usedKeys = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < dtos.Count; i++)
+        {
+            var dto = dtos[i];
+            if (dto == null)
+                throw new InvalidOperationException($"{path}[{i}] is null.");
+            var segmentPath = $"{path}[{i}]";
+            var key = RequiredText(dto.Key, $"{segmentPath}.key");
+            if (!usedKeys.Add(key))
+                throw new InvalidOperationException($"{segmentPath}.key '{key}' is duplicated.");
+            var kind = ParseEnum<CollectionSourceOfferSegmentKind>(dto.Kind, $"{segmentPath}.kind");
+            var rule = BuildOfferRule(dto.Rule, $"{segmentPath}.rule");
+            segments.Add(
+                new CollectionSourceOfferSegment(
+                    key,
+                    kind,
+                    dto.RarityLabel?.Trim() ?? string.Empty,
+                    rule
+                )
+            );
+        }
+
+        var hasPinnedTier = segments.Any(segment => segment.Rule.StartingTier != null);
+        var hasUnpinnedTier = segments.Any(segment => segment.Rule.StartingTier == null);
+        if (hasPinnedTier && hasUnpinnedTier)
+            throw new InvalidOperationException(
+                $"{path} cannot mix startingTier and non-startingTier segments in schema v4."
+            );
+
+        return segments;
     }
 
     private static CollectionSourceOfferRule BuildOfferRule(
@@ -263,6 +307,11 @@ internal static class CollectionSourceCatalog
             );
         }
 
+        var hiddenTags = MergeHiddenTags(
+            ParseEnumList<EHiddenTag>(dto.HiddenTagsAny, $"{path}.hiddenTagsAny"),
+            CollectionHiddenTagGroups.Expand(dto.HiddenTagGroupsAny, $"{path}.hiddenTagGroupsAny")
+        );
+
         return new CollectionSourceOfferRule(
             heroMode,
             hero,
@@ -270,9 +319,40 @@ internal static class CollectionSourceCatalog
             ParseEnumList<ECardSize>(dto.SizesAny, $"{path}.sizesAny"),
             ParseEnumList<ECardTag>(dto.TagsAny, $"{path}.tagsAny"),
             ParseEnumList<ECardTag>(dto.TagsNone, $"{path}.tagsNone"),
-            ParseEnumList<EHiddenTag>(dto.HiddenTagsAny, $"{path}.hiddenTagsAny"),
-            dto.EnchantableOnly
+            hiddenTags,
+            dto.EnchantableOnly,
+            ParseEnumList<EEnchantmentType>(dto.EnchantmentTypesAny, $"{path}.enchantmentTypesAny"),
+            ParseEnumList<ECardTag>(dto.EnchantmentTagsAny, $"{path}.enchantmentTagsAny"),
+            ParseEnumList<EHiddenTag>(
+                dto.EnchantmentHiddenTagsAny,
+                $"{path}.enchantmentHiddenTagsAny"
+            )
         );
+    }
+
+    private static IReadOnlyList<EHiddenTag> MergeHiddenTags(
+        IReadOnlyList<EHiddenTag> explicitTags,
+        IReadOnlyList<EHiddenTag> groupTags
+    )
+    {
+        if (explicitTags.Count == 0)
+            return groupTags;
+        if (groupTags.Count == 0)
+            return explicitTags;
+
+        var result = new List<EHiddenTag>(explicitTags.Count + groupTags.Count);
+        var used = new HashSet<EHiddenTag>();
+        foreach (var tag in explicitTags)
+        {
+            if (used.Add(tag))
+                result.Add(tag);
+        }
+        foreach (var tag in groupTags)
+        {
+            if (used.Add(tag))
+                result.Add(tag);
+        }
+        return result;
     }
 
     private static IReadOnlyDictionary<Guid, CollectionSourceEntry> BuildSourceTemplateIndex(
@@ -425,7 +505,7 @@ internal static class CollectionSourceCatalog
             string description,
             Guid portraitTemplateId,
             IReadOnlyList<Guid> sourceTemplateIds,
-            CollectionSourceOfferRule offerRule,
+            IReadOnlyList<CollectionSourceOfferSegment> offerSegments,
             string group,
             int order,
             int groupDisplayIndex
@@ -438,7 +518,7 @@ internal static class CollectionSourceCatalog
             Description = description;
             PortraitTemplateId = portraitTemplateId;
             SourceTemplateIds = sourceTemplateIds;
-            OfferRule = offerRule;
+            OfferSegments = offerSegments;
             Group = group;
             Order = order;
             GroupDisplayIndex = groupDisplayIndex;
@@ -458,7 +538,7 @@ internal static class CollectionSourceCatalog
 
         public IReadOnlyList<Guid> SourceTemplateIds { get; }
 
-        public CollectionSourceOfferRule OfferRule { get; }
+        public IReadOnlyList<CollectionSourceOfferSegment> OfferSegments { get; }
 
         public string Group { get; }
 

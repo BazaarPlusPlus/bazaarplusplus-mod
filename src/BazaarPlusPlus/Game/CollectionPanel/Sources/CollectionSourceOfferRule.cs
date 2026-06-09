@@ -28,7 +28,10 @@ internal sealed class CollectionSourceOfferRule
         IReadOnlyList<ECardTag> tagsAny,
         IReadOnlyList<ECardTag> tagsNone,
         IReadOnlyList<EHiddenTag> hiddenTagsAny,
-        bool enchantableOnly
+        bool enchantableOnly,
+        IReadOnlyList<EEnchantmentType> enchantmentTypesAny,
+        IReadOnlyList<ECardTag> enchantmentTagsAny,
+        IReadOnlyList<EHiddenTag> enchantmentHiddenTagsAny
     )
     {
         HeroMode = heroMode;
@@ -39,6 +42,9 @@ internal sealed class CollectionSourceOfferRule
         TagsNone = tagsNone ?? Array.Empty<ECardTag>();
         HiddenTagsAny = hiddenTagsAny ?? Array.Empty<EHiddenTag>();
         EnchantableOnly = enchantableOnly;
+        EnchantmentTypesAny = enchantmentTypesAny ?? Array.Empty<EEnchantmentType>();
+        EnchantmentTagsAny = enchantmentTagsAny ?? Array.Empty<ECardTag>();
+        EnchantmentHiddenTagsAny = enchantmentHiddenTagsAny ?? Array.Empty<EHiddenTag>();
     }
 
     public CollectionSourceHeroMode HeroMode { get; }
@@ -56,4 +62,58 @@ internal sealed class CollectionSourceOfferRule
     public IReadOnlyList<EHiddenTag> HiddenTagsAny { get; }
 
     public bool EnchantableOnly { get; }
+
+    public IReadOnlyList<EEnchantmentType> EnchantmentTypesAny { get; }
+
+    public IReadOnlyList<ECardTag> EnchantmentTagsAny { get; }
+
+    public IReadOnlyList<EHiddenTag> EnchantmentHiddenTagsAny { get; }
+}
+
+internal sealed class CollectionSourceOfferSegment
+{
+    public CollectionSourceOfferSegment(
+        string key,
+        CollectionSourceOfferSegmentKind kind,
+        string rarityLabel,
+        CollectionSourceOfferRule rule
+    )
+    {
+        Key = key ?? throw new ArgumentNullException(nameof(key));
+        Kind = kind;
+        RarityLabel = rarityLabel ?? string.Empty;
+        Rule = rule ?? throw new ArgumentNullException(nameof(rule));
+    }
+
+    public string Key { get; }
+
+    public CollectionSourceOfferSegmentKind Kind { get; }
+
+    public string RarityLabel { get; }
+
+    public CollectionSourceOfferRule Rule { get; }
+}
+
+internal sealed class CollectionSourceOfferMatch
+{
+    public CollectionSourceOfferMatch(
+        string segmentKey,
+        CollectionSourceOfferSegmentKind segmentKind,
+        string rarityLabel,
+        EEnchantmentType? enchantmentType
+    )
+    {
+        SegmentKey = segmentKey ?? throw new ArgumentNullException(nameof(segmentKey));
+        SegmentKind = segmentKind;
+        RarityLabel = rarityLabel ?? string.Empty;
+        EnchantmentType = enchantmentType;
+    }
+
+    public string SegmentKey { get; }
+
+    public CollectionSourceOfferSegmentKind SegmentKind { get; }
+
+    public string RarityLabel { get; }
+
+    public EEnchantmentType? EnchantmentType { get; }
 }

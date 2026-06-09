@@ -19,24 +19,80 @@ internal static class CollectionSourceOfferPoolResolver
         if (source == null)
             return CollectionSourceOfferPoolResult.NoneSelected();
 
-        var result = new HashSet<Guid>();
+        var offeredCardIds = new HashSet<Guid>();
+        var matchesByCardId = new Dictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>();
         foreach (var card in catalogCards)
         {
-            if (Matches(source, selectedHero, card))
-                result.Add(card.Id);
+            var matches = ResolveMatches(source, selectedHero, card);
+            if (matches.Count == 0)
+                continue;
+
+            offeredCardIds.Add(card.Id);
+            matchesByCardId[card.Id] = matches;
         }
-        return CollectionSourceOfferPoolResult.Ready(result);
+        return CollectionSourceOfferPoolResult.Ready(offeredCardIds, matchesByCardId);
     }
 
-    private static bool Matches(
+    private static IReadOnlyList<CollectionSourceOfferMatch> ResolveMatches(
         CollectionSourceEntry source,
         EHero? selectedHero,
         CollectionCardVm card
     )
     {
         if (card.Type != CardTypeFor(source.Kind))
-            return false;
-        var rule = source.OfferRule;
+            return Array.Empty<CollectionSourceOfferMatch>();
+
+        var matches = new List<CollectionSourceOfferMatch>();
+        foreach (var segment in source.OfferSegments)
+        {
+            AddSegmentMatches(matches, segment, selectedHero, card);
+        }
+        return matches;
+    }
+
+    private static void AddSegmentMatches(
+        List<CollectionSourceOfferMatch> matches,
+        CollectionSourceOfferSegment segment,
+        EHero? selectedHero,
+        CollectionCardVm card
+    )
+    {
+        var rule = segment.Rule;
+        if (!MatchesBaseRule(rule, selectedHero, card))
+            return;
+
+        if (segment.Kind == CollectionSourceOfferSegmentKind.Enchanted)
+        {
+            foreach (var enchantment in card.Enchantments.Values)
+            {
+                if (!MatchesEnchantment(rule, enchantment))
+                    continue;
+                matches.Add(
+                    new CollectionSourceOfferMatch(
+                        segment.Key,
+                        segment.Kind,
+                        segment.RarityLabel,
+                        enchantment.Type
+                    )
+                );
+            }
+            return;
+        }
+
+        if (HasEnchantmentConstraints(rule) && !MatchesAnyEnchantment(rule, card))
+            return;
+
+        matches.Add(
+            new CollectionSourceOfferMatch(segment.Key, segment.Kind, segment.RarityLabel, null)
+        );
+    }
+
+    private static bool MatchesBaseRule(
+        CollectionSourceOfferRule rule,
+        EHero? selectedHero,
+        CollectionCardVm card
+    )
+    {
         if (!MatchesHero(rule, selectedHero, card.Heroes))
             return false;
         if (rule.StartingTier != null && !MatchesStartingTier(rule.StartingTier, card.StartingTier))
@@ -53,6 +109,44 @@ internal static class CollectionSourceOfferPoolResolver
             return false;
         return true;
     }
+
+    private static bool MatchesAnyEnchantment(CollectionSourceOfferRule rule, CollectionCardVm card)
+    {
+        foreach (var enchantment in card.Enchantments.Values)
+        {
+            if (MatchesEnchantment(rule, enchantment))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool MatchesEnchantment(
+        CollectionSourceOfferRule rule,
+        CollectionCardEnchantmentFacets enchantment
+    )
+    {
+        if (
+            rule.EnchantmentTypesAny.Count > 0
+            && !Contains(rule.EnchantmentTypesAny, enchantment.Type)
+        )
+            return false;
+        if (
+            rule.EnchantmentTagsAny.Count > 0
+            && !Overlaps(enchantment.Tags, rule.EnchantmentTagsAny)
+        )
+            return false;
+        if (
+            rule.EnchantmentHiddenTagsAny.Count > 0
+            && !Overlaps(enchantment.HiddenTags, rule.EnchantmentHiddenTagsAny)
+        )
+            return false;
+        return HasEnchantmentConstraints(rule) || rule.EnchantableOnly;
+    }
+
+    private static bool HasEnchantmentConstraints(CollectionSourceOfferRule rule) =>
+        rule.EnchantmentTypesAny.Count > 0
+        || rule.EnchantmentTagsAny.Count > 0
+        || rule.EnchantmentHiddenTagsAny.Count > 0;
 
     private static ECardType CardTypeFor(CollectionSourceKind kind) =>
         kind == CollectionSourceKind.Trainer ? ECardType.Skill : ECardType.Item;

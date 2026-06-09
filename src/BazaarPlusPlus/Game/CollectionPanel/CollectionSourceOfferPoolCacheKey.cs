@@ -14,6 +14,7 @@ internal static class CollectionSourceOfferPoolCacheKey
             "|",
             source.SourceKey,
             BuildTemplateIdsFingerprint(source.SourceTemplateIds),
+            source.OfferRuleFingerprint,
             BuildHeroKey(selectedHero)
         );
 

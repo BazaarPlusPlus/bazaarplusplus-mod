@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using BazaarGameShared.Domain.Core.Types;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Sources;
@@ -16,7 +17,7 @@ internal sealed class CollectionSourceEntry
         string description,
         Guid portraitTemplateId,
         IReadOnlyList<Guid> sourceTemplateIds,
-        CollectionSourceOfferRule offerRule,
+        IReadOnlyList<CollectionSourceOfferSegment> offerSegments,
         string group,
         int order,
         int groupDisplayIndex
@@ -29,10 +30,12 @@ internal sealed class CollectionSourceEntry
         Description = description;
         PortraitTemplateId = portraitTemplateId;
         SourceTemplateIds = sourceTemplateIds;
-        OfferRule = offerRule;
+        OfferSegments = offerSegments;
         Group = group;
         Order = order;
         GroupDisplayIndex = groupDisplayIndex;
+        OfferRuleFingerprint = BuildOfferRuleFingerprint(offerSegments);
+        SuppressDayGate = offerSegments.Count > 0 && offerSegments[0].Rule.StartingTier != null;
     }
 
     public string SourceKey { get; }
@@ -49,7 +52,11 @@ internal sealed class CollectionSourceEntry
 
     public IReadOnlyList<Guid> SourceTemplateIds { get; }
 
-    public CollectionSourceOfferRule OfferRule { get; }
+    public IReadOnlyList<CollectionSourceOfferSegment> OfferSegments { get; }
+
+    public string OfferRuleFingerprint { get; }
+
+    public bool SuppressDayGate { get; }
 
     public string Group { get; }
 
@@ -59,4 +66,53 @@ internal sealed class CollectionSourceEntry
 
     public bool AppliesToHero(EHero hero) =>
         AvailableHeroes.Count == 0 || AvailableHeroes.Contains(hero);
+
+    private static string BuildOfferRuleFingerprint(
+        IReadOnlyList<CollectionSourceOfferSegment> segments
+    )
+    {
+        var builder = new StringBuilder();
+        foreach (var segment in segments)
+        {
+            if (builder.Length > 0)
+                builder.Append(';');
+            builder
+                .Append(segment.Key)
+                .Append(':')
+                .Append(segment.Kind)
+                .Append(':')
+                .Append(segment.RarityLabel)
+                .Append(':');
+            AppendRule(builder, segment.Rule);
+        }
+        return builder.ToString();
+    }
+
+    private static void AppendRule(StringBuilder builder, CollectionSourceOfferRule rule)
+    {
+        builder
+            .Append(rule.HeroMode)
+            .Append('|')
+            .Append(rule.Hero?.ToString() ?? string.Empty)
+            .Append('|')
+            .Append(rule.StartingTier?.Mode.ToString() ?? string.Empty)
+            .Append(':')
+            .Append(rule.StartingTier?.Tier.ToString() ?? string.Empty)
+            .Append('|')
+            .AppendJoin(",", rule.SizesAny)
+            .Append('|')
+            .AppendJoin(",", rule.TagsAny)
+            .Append('|')
+            .AppendJoin(",", rule.TagsNone)
+            .Append('|')
+            .AppendJoin(",", rule.HiddenTagsAny)
+            .Append('|')
+            .Append(rule.EnchantableOnly ? "enchantable" : string.Empty)
+            .Append('|')
+            .AppendJoin(",", rule.EnchantmentTypesAny)
+            .Append('|')
+            .AppendJoin(",", rule.EnchantmentTagsAny)
+            .Append('|')
+            .AppendJoin(",", rule.EnchantmentHiddenTagsAny);
+    }
 }

@@ -42,8 +42,23 @@ internal sealed class CollectionSourceEntryDto
     [JsonProperty("sourceTemplateIds")]
     public List<string>? SourceTemplateIds { get; set; }
 
-    [JsonProperty("offerRule")]
-    public CollectionSourceOfferRuleDto? OfferRule { get; set; }
+    [JsonProperty("offerSegments")]
+    public List<CollectionSourceOfferSegmentDto>? OfferSegments { get; set; }
+}
+
+internal sealed class CollectionSourceOfferSegmentDto
+{
+    [JsonProperty("key")]
+    public string? Key { get; set; }
+
+    [JsonProperty("kind")]
+    public string? Kind { get; set; }
+
+    [JsonProperty("rarityLabel")]
+    public string? RarityLabel { get; set; }
+
+    [JsonProperty("rule")]
+    public CollectionSourceOfferRuleDto? Rule { get; set; }
 }
 
 internal sealed class CollectionSourceOfferRuleDto
@@ -69,8 +84,20 @@ internal sealed class CollectionSourceOfferRuleDto
     [JsonProperty("hiddenTagsAny")]
     public List<string>? HiddenTagsAny { get; set; }
 
+    [JsonProperty("hiddenTagGroupsAny")]
+    public List<string>? HiddenTagGroupsAny { get; set; }
+
     [JsonProperty("enchantableOnly")]
     public bool EnchantableOnly { get; set; }
+
+    [JsonProperty("enchantmentTypesAny")]
+    public List<string>? EnchantmentTypesAny { get; set; }
+
+    [JsonProperty("enchantmentTagsAny")]
+    public List<string>? EnchantmentTagsAny { get; set; }
+
+    [JsonProperty("enchantmentHiddenTagsAny")]
+    public List<string>? EnchantmentHiddenTagsAny { get; set; }
 }
 
 internal sealed class CollectionSourceStartingTierRuleDto

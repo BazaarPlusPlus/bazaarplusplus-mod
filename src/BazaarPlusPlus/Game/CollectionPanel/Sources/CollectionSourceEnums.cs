@@ -22,6 +22,12 @@ internal enum CollectionSourceStartingTierMode
     Exact,
 }
 
+internal enum CollectionSourceOfferSegmentKind
+{
+    Normal,
+    Enchanted,
+}
+
 internal enum CollectionSourceOfferPoolStatus
 {
     Ready,

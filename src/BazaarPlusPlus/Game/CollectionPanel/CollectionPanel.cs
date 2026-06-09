@@ -759,6 +759,10 @@ internal sealed class CollectionPanel : MonoBehaviour
             var sourceEntry = _filter.PackagesOnly ? null : ResolveSelectedSourceEntry();
             var hasSelectedSource = sourceEntry != null;
             IReadOnlyCollection<Guid>? offeredCardIds = null;
+            IReadOnlyDictionary<
+                Guid,
+                IReadOnlyList<CollectionSourceOfferMatch>
+            >? offerMatchesByCardId = null;
             if (sourceEntry != null)
             {
                 var offerPoolResult = _offerPoolCache.GetOrResolve(
@@ -767,7 +771,10 @@ internal sealed class CollectionPanel : MonoBehaviour
                     _catalogCards
                 );
                 if (offerPoolResult.Status == CollectionSourceOfferPoolStatus.Ready)
+                {
                     offeredCardIds = offerPoolResult.OfferedCardIds;
+                    offerMatchesByCardId = offerPoolResult.OfferMatchesByCardId;
+                }
             }
 
             if (!_isLoadingCatalog)
@@ -786,10 +793,10 @@ internal sealed class CollectionPanel : MonoBehaviour
                     SuppressDayGate =
                         !_filter.PackagesOnly
                         && offeredCardIds != null
-                        && sourceEntry!.OfferRule.StartingTier != null,
+                        && sourceEntry!.SuppressDayGate,
                 }
             );
-            _virtualizer.SetVisible(ordered, _filter.ActiveType);
+            _virtualizer.SetVisible(ordered, _filter.ActiveType, offerMatchesByCardId);
         }
         ResetVisibleScroll();
     }
