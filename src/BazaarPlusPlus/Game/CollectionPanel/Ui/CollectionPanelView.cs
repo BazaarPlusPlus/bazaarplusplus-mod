@@ -57,7 +57,6 @@ internal sealed class CollectionSourceOptionViewModel
     public string Description { get; init; } = string.Empty;
     public CollectionSourceKind Kind { get; init; }
     public Guid RepresentativeTemplateId { get; init; }
-    public bool BreakAfter { get; init; }
 }
 
 internal sealed partial class CollectionPanelView : IDisposable
@@ -97,17 +96,19 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _sortSizeButton;
     private Label? _heroFilterLabel;
     private Label? _tierFilterLabel;
-    private Label? _sizeFilterLabel;
     private Label? _tagFilterLabel;
+    private Label? _keywordFilterLabel;
+    private Label? _keywordReferenceSectionLabel;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
     private VisualElement? _sizeChipRow;
+    private VisualElement? _tierSizeDivider;
     private VisualElement? _tagChipRow;
-    private Button? _tagMoreButton;
+    private VisualElement? _keywordChipRow;
     private Label? _sourceFilterLabel;
     private VisualElement? _sourceChipRow;
-    private VisualElement? _sizeFilterSection;
     private VisualElement? _tagFilterSection;
+    private VisualElement? _keywordFilterSection;
     private VisualElement? _sourceFilterSection;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
@@ -127,22 +128,14 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly List<ECardTag> _tagChipOrder = new();
     private readonly Dictionary<EHiddenTag, Button> _keywordChips = new();
     private readonly List<EHiddenTag> _keywordChipOrder = new();
-    private CollectionTagFacetKind _tagFacetKind;
 
-    // Tag-row collapse state. The row shows the whitelist's primary slice (plus any selected
-    // tag that would otherwise be hidden) until expanded; the last refreshed options/selection
-    // are kept so the expand toggle can rebuild the row without waiting for the next Refresh.
-    private bool _tagRowExpanded;
-    private IReadOnlyList<ECardTag> _lastTagOptions = Array.Empty<ECardTag>();
-    private HashSet<ECardTag> _lastSelectedTags = new();
-    private IReadOnlyList<EHiddenTag> _lastKeywordOptions = Array.Empty<EHiddenTag>();
-    private HashSet<EHiddenTag> _lastSelectedKeywords = new();
     private readonly Dictionary<string, Button> _sourceChips = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VisualElement> _sourceChipIcons = new(
         StringComparer.Ordinal
     );
     private readonly List<string> _sourceChipOrder = new();
     private Rect _lastGridBounds;
+    private float _appliedHeroChipBox = -1f;
     private float _appliedSourceChipBox = -1f;
 
     // Panel-open/-close fade state. _opacity is the displayed alpha, _targetOpacity is what
@@ -152,13 +145,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private float _targetOpacity;
 
     private static readonly string[] LoadingFrames = { "|", "/", "-", "\\" };
-
-    private enum CollectionTagFacetKind
-    {
-        None,
-        Tags,
-        Keywords,
-    }
 
     public event Action<Rect>? GridViewportBoundsChanged;
 
@@ -351,7 +337,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         EnsureHeroChips(model.AvailableHeroes);
         EnsureTierChips(model.AvailableTiers);
         EnsureSizeChips(model.AvailableSizes);
-        RefreshTagFacetChips(model);
+        RefreshFacetChips(model);
         EnsureSourceChips(model.AvailableSources);
         // Chip text is reset unconditionally on every Refresh: the Ensure*Chips early-exit
         // compares only keys, so a locale change while the chips survive would otherwise leave
@@ -364,7 +350,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         foreach (var pair in _tierChips)
         {
             pair.Value.text = CollectionPanelText.Tier(pair.Key);
-            RefreshChip(pair.Value, model.SelectedTiers.Contains(pair.Key));
+            RefreshTierChip(pair.Key, pair.Value, model.SelectedTiers.Contains(pair.Key));
         }
         foreach (var pair in _sizeChips)
         {
@@ -401,30 +387,39 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_sortSizeButton != null)
             RefreshChip(_sortSizeButton, model.SortPriority == CollectionSortPriority.Size);
 
-        // Size only narrows Items; keep the section's reserved layout slot on Skills.
-        if (_sizeFilterSection != null)
-            _sizeFilterSection.style.display = DisplayStyle.Flex;
+        // Size only narrows Items; on Skills only the size segment disappears while Quality stays.
+        var showSizeChips = model.TabProfile.ShowSizeFilter;
         if (_sizeChipRow != null)
         {
-            var showSizeChips = model.TabProfile.ShowSizeFilter;
-            _sizeChipRow.style.visibility = showSizeChips ? Visibility.Visible : Visibility.Hidden;
+            _sizeChipRow.style.display = showSizeChips ? DisplayStyle.Flex : DisplayStyle.None;
             _sizeChipRow.SetEnabled(showSizeChips);
             _sizeChipRow.pickingMode = showSizeChips ? PickingMode.Position : PickingMode.Ignore;
         }
+        if (_tierSizeDivider != null)
+            _tierSizeDivider.style.display = showSizeChips ? DisplayStyle.Flex : DisplayStyle.None;
+        if (_tierChipRow != null)
+            _tierChipRow.style.marginLeft = 0f;
         if (_tagFilterSection != null)
-            _tagFilterSection.style.display =
-                model.TabProfile.ShowTagFilter || model.TabProfile.ShowKeywordFilter
-                    ? DisplayStyle.Flex
-                    : DisplayStyle.None;
+            _tagFilterSection.style.display = model.TabProfile.ShowTagFilter
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+        if (_keywordFilterSection != null)
+            _keywordFilterSection.style.display = model.TabProfile.ShowKeywordFilter
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
         if (_sourceFilterSection != null)
             _sourceFilterSection.style.display =
                 model.AvailableSources.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
         if (_sourceFilterLabel != null)
             _sourceFilterLabel.text = CollectionPanelText.SourceHeader(model.ActiveType);
+        if (_tierFilterLabel != null)
+            _tierFilterLabel.text = CollectionPanelText.TierSizeHeader();
         if (_tagFilterLabel != null)
-            _tagFilterLabel.text = model.TabProfile.ShowKeywordFilter
-                ? CollectionPanelText.KeywordHeader()
-                : CollectionPanelText.TagHeader();
+            _tagFilterLabel.text = CollectionPanelText.TagHeader();
+        if (_keywordFilterLabel != null)
+            _keywordFilterLabel.text = CollectionPanelText.KeywordHeader();
+        if (_keywordReferenceSectionLabel != null)
+            _keywordReferenceSectionLabel.text = CollectionPanelText.KeywordReferenceSection();
 
         UpdateContentSpacerHeight(model.ContentHeight);
 
@@ -466,11 +461,13 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_heroFilterLabel != null)
             _heroFilterLabel.text = CollectionPanelText.HeroHeader();
         if (_tierFilterLabel != null)
-            _tierFilterLabel.text = CollectionPanelText.TierHeader();
-        if (_sizeFilterLabel != null)
-            _sizeFilterLabel.text = CollectionPanelText.SizeHeader();
+            _tierFilterLabel.text = CollectionPanelText.TierSizeHeader();
         if (_tagFilterLabel != null)
             _tagFilterLabel.text = CollectionPanelText.TagHeader();
+        if (_keywordFilterLabel != null)
+            _keywordFilterLabel.text = CollectionPanelText.KeywordHeader();
+        if (_keywordReferenceSectionLabel != null)
+            _keywordReferenceSectionLabel.text = CollectionPanelText.KeywordReferenceSection();
         if (_emptyLabel != null)
             _emptyLabel.text = CollectionPanelText.NoMatches();
     }

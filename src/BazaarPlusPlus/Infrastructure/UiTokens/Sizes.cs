@@ -22,12 +22,12 @@ internal static class Sizes
     public const float SupporterAttributionNameMaxWidth = 118f;
     public const float SupporterActionMinWidth = 74f;
     public const float CollectionMatchCountWidth = 96f;
-    public const float CollectionSizeFilterSectionMinHeight =
-        FontSmall + UiSpacing.Sm + ChipHeight + UiSpacing.Xs;
     public const float PackageToggleWidth = 72f;
     public const float HeroChipIconSize = 48f;
     public const float HeroChipButtonSize = 56f;
+    public const int HeroChipsPerRow = 8;
     public const float TagChipIconSize = 14f;
+    public const int SourceChipsPerRow = 8;
     public const float SourceChipIconRatio = 48f / 56f;
     public const float SourceChipMinSize = 40f;
     public const float ButtonStandardHeight = 32f;

@@ -80,7 +80,10 @@ internal sealed class CollectionFilterState
     public void ToggleHero(EHero hero)
     {
         if (Heroes.Count == 1 && Heroes.Contains(hero))
+        {
+            Heroes.Clear();
             return;
+        }
 
         Heroes.Clear();
         Heroes.Add(hero);

@@ -755,6 +755,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         }
         else
         {
+            TrimUnavailableFacetSelections();
             var sourceEntry = _filter.PackagesOnly ? null : ResolveSelectedSourceEntry();
             var hasSelectedSource = sourceEntry != null;
             IReadOnlyCollection<Guid>? offeredCardIds = null;
@@ -799,6 +800,11 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
 
         var profile = CollectionTabProfile.For(_filter.ActiveType);
+        var availableTags = CollectionFacetAvailability.TagsFor(_catalogCards, _filter.ActiveType);
+        var availableKeywords = CollectionFacetAvailability.KeywordsFor(
+            _catalogCards,
+            _filter.ActiveType
+        );
         var model = new CollectionPanelViewModel
         {
             Title = CollectionPanelText.Title(),
@@ -823,8 +829,8 @@ internal sealed class CollectionPanel : MonoBehaviour
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
-            AvailableTags = CollectionTagWhitelist.Ordered,
-            AvailableKeywords = CollectionKeywordWhitelist.Ordered,
+            AvailableTags = availableTags,
+            AvailableKeywords = availableKeywords,
             AvailableSources = AvailableSourcesFor(_filter.ActiveType),
             ContentHeight = _virtualizer.ContentHeight,
         };
@@ -836,6 +842,29 @@ internal sealed class CollectionPanel : MonoBehaviour
         // turn a one-shot failure into a per-frame retry).
         _viewMissedNativeTypography = !NativeTagTypography.IsNativeTypographyAvailable;
         _view.Refresh(model);
+    }
+
+    private void TrimUnavailableFacetSelections()
+    {
+        var profile = CollectionTabProfile.For(_filter.ActiveType);
+        if (profile.ShowTagFilter)
+            TrimSet(
+                _filter.Tags,
+                CollectionFacetAvailability.TagsFor(_catalogCards, _filter.ActiveType)
+            );
+        if (profile.ShowKeywordFilter)
+            TrimSet(
+                _filter.Keywords,
+                CollectionFacetAvailability.KeywordsFor(_catalogCards, _filter.ActiveType)
+            );
+    }
+
+    private static void TrimSet<T>(HashSet<T> selected, IReadOnlyList<T> available)
+    {
+        if (selected.Count == 0)
+            return;
+        var allowed = available as HashSet<T> ?? new HashSet<T>(available);
+        selected.RemoveWhere(value => !allowed.Contains(value));
     }
 
     private IReadOnlyList<CollectionSourceOptionViewModel> AvailableSourcesFor(ECardType activeType)
@@ -856,7 +885,6 @@ internal sealed class CollectionPanel : MonoBehaviour
                     Description = entry.Description,
                     Kind = entry.Kind,
                     RepresentativeTemplateId = entry.PortraitTemplateId,
-                    BreakAfter = item.BreakAfter,
                 }
             );
         }

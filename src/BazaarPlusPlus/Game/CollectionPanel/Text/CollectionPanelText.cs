@@ -29,21 +29,25 @@ internal static class CollectionPanelText
 
     private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄", "英雄");
     private static readonly LocalizedTextSet DayHeaderText = new("Day", "天数", "天數", "天數");
-    private static readonly LocalizedTextSet TierHeaderText = new(
-        "Quality",
-        "品质",
-        "品質",
-        "品質"
+    private static readonly LocalizedTextSet TierSizeHeaderText = new(
+        "Size / Quality",
+        "尺寸 / 品质",
+        "尺寸 / 品質",
+        "尺寸 / 品質"
     );
-    private static readonly LocalizedTextSet SizeHeaderText = new("Size", "尺寸", "尺寸", "尺寸");
     private static readonly LocalizedTextSet TagHeaderText = new("Tags", "标签", "標籤", "標籤");
     private static readonly LocalizedTextSet KeywordHeaderText = new(
-        "Keywords",
-        "关键词",
-        "關鍵詞",
-        "關鍵詞"
+        "Types",
+        "类型",
+        "類型",
+        "類型"
     );
-    private static readonly LocalizedTextSet TagLessText = new("Less", "收起", "收起", "收起");
+    private static readonly LocalizedTextSet KeywordReferenceSectionText = new(
+        "Related",
+        "相关",
+        "相關",
+        "相關"
+    );
     private static readonly LocalizedTextSet SortHeaderText = new("Sort", "排序", "排序", "排序");
     private static readonly LocalizedTextSet SortQualityText = new(
         "Quality",
@@ -110,23 +114,13 @@ internal static class CollectionPanelText
 
     internal static string DayHeader() => Resolve(DayHeaderText);
 
-    internal static string TierHeader() => Resolve(TierHeaderText);
-
-    internal static string SizeHeader() => Resolve(SizeHeaderText);
+    internal static string TierSizeHeader() => Resolve(TierSizeHeaderText);
 
     internal static string TagHeader() => Resolve(TagHeaderText);
 
     internal static string KeywordHeader() => Resolve(KeywordHeaderText);
 
-    internal static string TagMore(int hiddenCount) =>
-        FormatSimple(
-            $"More ({hiddenCount})",
-            $"更多（{hiddenCount}）",
-            $"更多（{hiddenCount}）",
-            $"更多（{hiddenCount}）"
-        );
-
-    internal static string TagLess() => Resolve(TagLessText);
+    internal static string KeywordReferenceSection() => Resolve(KeywordReferenceSectionText);
 
     internal static string SortHeader() => Resolve(SortHeaderText);
 

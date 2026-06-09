@@ -81,6 +81,10 @@
       Link="CollectionKeywordWhitelist.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionFacetAvailability.cs"
+      Link="CollectionFacetAvailability.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\PackageIdentity.cs"
       Link="PackageIdentity.cs"
     />

@@ -30,8 +30,13 @@ AssertEqual(
 heroState.ToggleHero(EHero.Common);
 AssertValues(
     heroState.Heroes.ToArray(),
-    new[] { EHero.Common },
-    "Toggling the only selected hero should keep that hero selected."
+    Array.Empty<EHero>(),
+    "Toggling the only selected hero should clear the hero selection."
+);
+AssertEqual(
+    null,
+    heroState.ToSelectionState().SelectedHero,
+    "An empty hero selection should round-trip as no selected hero."
 );
 heroState.ToggleHero(EHero.Dooley);
 AssertValues(
@@ -430,29 +435,137 @@ AssertSequence(
     "Multiple selected tags OR together, matching the other facet rows."
 );
 
+var damageItem = Card(
+    "Damage Item",
+    ETier.Bronze,
+    tags: new[] { ECardTag.Weapon },
+    hiddenTags: new[] { EHiddenTag.Damage }
+);
+var shieldItem = Card(
+    "Shield Item",
+    ETier.Bronze,
+    tags: new[] { ECardTag.Weapon },
+    hiddenTags: new[] { EHiddenTag.Shield }
+);
+var damageToolItem = Card(
+    "Damage Tool Item",
+    ETier.Bronze,
+    tags: new[] { ECardTag.Tool },
+    hiddenTags: new[] { EHiddenTag.Damage }
+);
+var damageReferenceItem = Card(
+    "Damage Reference Item",
+    ETier.Bronze,
+    hiddenTags: new[] { EHiddenTag.DamageReference }
+);
+var itemKeywordFilter = new CollectionFilterState();
+itemKeywordFilter.Keywords.Add(EHiddenTag.Damage);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { shieldItem, damageToolItem, damageItem },
+        itemKeywordFilter
+    ),
+    new[] { damageItem.Id, damageToolItem.Id },
+    "Item keyword filters narrow items by EHiddenTag."
+);
+itemKeywordFilter.Keywords.Add(EHiddenTag.Shield);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { shieldItem, damageToolItem, damageItem },
+        itemKeywordFilter
+    ),
+    new[] { damageItem.Id, damageToolItem.Id, shieldItem.Id },
+    "Multiple selected item keywords OR together."
+);
+var itemKeywordAndReferenceFilter = new CollectionFilterState();
+itemKeywordAndReferenceFilter.Keywords.Add(EHiddenTag.Damage);
+itemKeywordAndReferenceFilter.Keywords.Add(EHiddenTag.DamageReference);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { damageReferenceItem, shieldItem, damageItem },
+        itemKeywordAndReferenceFilter
+    ),
+    new[] { damageItem.Id, damageReferenceItem.Id },
+    "Keyword and reference selections share the same OR keyword facet."
+);
+var itemTagAndKeywordFilter = new CollectionFilterState();
+itemTagAndKeywordFilter.Tags.Add(ECardTag.Weapon);
+itemTagAndKeywordFilter.Keywords.Add(EHiddenTag.Damage);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { shieldItem, damageToolItem, damageItem },
+        itemTagAndKeywordFilter
+    ),
+    new[] { damageItem.Id },
+    "Item tags and item keywords combine as separate AND facets."
+);
+
 AssertEqual(
     CollectionTagWhitelist.Ordered.Count,
     CollectionTagWhitelist.Ordered.Distinct().Count(),
     "Tag whitelist entries must be distinct."
 );
-AssertTrue(
-    CollectionTagWhitelist.PrimaryCount <= CollectionTagWhitelist.Ordered.Count,
-    "Tag whitelist primary slice must fit inside the option list."
+AssertValues(
+    CollectionTagWhitelist.Ordered.Select(tag => tag.ToString()).ToArray(),
+    new[]
+    {
+        nameof(ECardTag.Weapon),
+        nameof(ECardTag.Friend),
+        nameof(ECardTag.Aquatic),
+        nameof(ECardTag.Tool),
+        nameof(ECardTag.Drone),
+        nameof(ECardTag.Vehicle),
+        nameof(ECardTag.Food),
+        nameof(ECardTag.Trap),
+        nameof(ECardTag.Toy),
+        nameof(ECardTag.Potion),
+        nameof(ECardTag.Reagent),
+        nameof(ECardTag.Relic),
+        nameof(ECardTag.Dragon),
+        nameof(ECardTag.Core),
+        nameof(ECardTag.Tech),
+        nameof(ECardTag.Dinosaur),
+        nameof(ECardTag.Ray),
+        nameof(ECardTag.Apparel),
+        nameof(ECardTag.Merchant),
+        nameof(ECardTag.Property),
+        nameof(ECardTag.Loot),
+    },
+    "Tag whitelist should match the curated CollectionPanel tag order."
 );
 foreach (
     var mechanismTag in new[]
     {
         ECardTag.Unsellable,
         ECardTag.Unstashable,
-        ECardTag.Merchant,
         ECardTag.Event,
         ECardTag.Combat,
-        ECardTag.Loot,
     }
 )
     AssertFalse(
         CollectionTagWhitelist.Ordered.Contains(mechanismTag),
         $"Tag whitelist must exclude mechanism tag {mechanismTag}."
+    );
+foreach (
+    var bazaarDbTag in new[] { ECardTag.Apparel, ECardTag.Merchant, ECardTag.Loot, ECardTag.Weapon }
+)
+    AssertTrue(
+        CollectionTagWhitelist.Ordered.Contains(bazaarDbTag),
+        $"Tag whitelist should include BazaarDB type/tag {bazaarDbTag}."
+    );
+foreach (
+    var unusedTypeTag in new[]
+    {
+        ECardTag.Ingredient,
+        ECardTag.Instrument,
+        ECardTag.Key,
+        ECardTag.Map,
+        ECardTag.Sigil,
+    }
+)
+    AssertFalse(
+        CollectionTagWhitelist.Ordered.Contains(unusedTypeTag),
+        $"Tag whitelist should exclude non-BazaarDB type/tag {unusedTypeTag}."
     );
 
 AssertEqual(
@@ -460,15 +573,165 @@ AssertEqual(
     CollectionKeywordWhitelist.Ordered.Distinct().Count(),
     "Keyword whitelist entries must be distinct."
 );
-AssertTrue(
-    CollectionKeywordWhitelist.PrimaryCount <= CollectionKeywordWhitelist.Ordered.Count,
-    "Keyword whitelist primary slice must fit inside the option list."
+AssertValues(
+    CollectionKeywordWhitelist.Ordered.Select(tag => tag.ToString()).ToArray(),
+    new[]
+    {
+        nameof(EHiddenTag.Quest),
+        nameof(EHiddenTag.Flying),
+        nameof(EHiddenTag.Haste),
+        nameof(EHiddenTag.Charge),
+        nameof(EHiddenTag.Cooldown),
+        nameof(EHiddenTag.Slow),
+        nameof(EHiddenTag.Freeze),
+        nameof(EHiddenTag.Damage),
+        nameof(EHiddenTag.Shield),
+        nameof(EHiddenTag.Heal),
+        nameof(EHiddenTag.Health),
+        nameof(EHiddenTag.Burn),
+        nameof(EHiddenTag.Poison),
+        nameof(EHiddenTag.Regen),
+        nameof(EHiddenTag.Crit),
+        nameof(EHiddenTag.Ammo),
+        nameof(EHiddenTag.Lifesteal),
+        nameof(EHiddenTag.Rage),
+        nameof(EHiddenTag.Gold),
+        nameof(EHiddenTag.Income),
+        nameof(EHiddenTag.Value),
+        nameof(EHiddenTag.QuestReference),
+        nameof(EHiddenTag.FlyingReference),
+        nameof(EHiddenTag.HasteReference),
+        nameof(EHiddenTag.CooldownReference),
+        nameof(EHiddenTag.SlowReference),
+        nameof(EHiddenTag.FreezeReference),
+        nameof(EHiddenTag.DamageReference),
+        nameof(EHiddenTag.ShieldReference),
+        nameof(EHiddenTag.HealReference),
+        nameof(EHiddenTag.HealthReference),
+        nameof(EHiddenTag.BurnReference),
+        nameof(EHiddenTag.PoisonReference),
+        nameof(EHiddenTag.RegenReference),
+        nameof(EHiddenTag.CritReference),
+        nameof(EHiddenTag.AmmoReference),
+        nameof(EHiddenTag.RageReference),
+        nameof(EHiddenTag.EconomyReference),
+    },
+    "Keyword whitelist should match the curated CollectionPanel keyword list."
 );
 foreach (var nonKeyword in new[] { EHiddenTag.Merchant, EHiddenTag.Package, EHiddenTag.Unsellable })
     AssertFalse(
         CollectionKeywordWhitelist.Ordered.Contains(nonKeyword),
         $"Keyword whitelist must exclude non-keyword tag {nonKeyword}."
     );
+foreach (
+    var referenceKeyword in new[]
+    {
+        EHiddenTag.ChilledReference,
+        EHiddenTag.HeatedReference,
+        EHiddenTag.JoyReference,
+        EHiddenTag.PotionReference,
+        EHiddenTag.TechReference,
+        EHiddenTag.TempoReference,
+    }
+)
+    AssertFalse(
+        CollectionKeywordWhitelist.Ordered.Contains(referenceKeyword),
+        $"Keyword whitelist should exclude non-curated reference tag {referenceKeyword}."
+    );
+foreach (
+    var referenceKeyword in new[]
+    {
+        EHiddenTag.DamageReference,
+        EHiddenTag.HealReference,
+        EHiddenTag.AmmoReference,
+        EHiddenTag.RageReference,
+        EHiddenTag.EconomyReference,
+    }
+)
+    AssertTrue(
+        CollectionKeywordWhitelist.Ordered.Contains(referenceKeyword),
+        $"Keyword whitelist should include curated reference tag {referenceKeyword}."
+    );
+foreach (
+    var bazaarDbKeyword in new[]
+    {
+        EHiddenTag.Ammo,
+        EHiddenTag.Crit,
+        EHiddenTag.Health,
+        EHiddenTag.Quest,
+        EHiddenTag.Value,
+    }
+)
+    AssertTrue(
+        CollectionKeywordWhitelist.Ordered.Contains(bazaarDbKeyword),
+        $"Keyword whitelist should include BazaarDB keyword {bazaarDbKeyword}."
+    );
+foreach (
+    var nonBazaarDbKeyword in new[]
+    {
+        EHiddenTag.AbsorbDestroy,
+        EHiddenTag.AbsorbFreeze,
+        EHiddenTag.AbsorbSlow,
+        EHiddenTag.CanCrit,
+        EHiddenTag.Experience,
+        EHiddenTag.Level,
+        EHiddenTag.Multicast,
+        EHiddenTag.Reload,
+        EHiddenTag.Tempo,
+        EHiddenTag.Ticket,
+    }
+)
+    AssertFalse(
+        CollectionKeywordWhitelist.Ordered.Contains(nonBazaarDbKeyword),
+        $"Keyword whitelist should exclude non-BazaarDB keyword {nonBazaarDbKeyword}."
+    );
+
+var availableFacetCards = new[]
+{
+    Card(
+        "Damage Weapon",
+        ETier.Bronze,
+        tags: new[] { ECardTag.Weapon, ECardTag.Ingredient },
+        hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.DamageReference }
+    ),
+    Card(
+        "Package Shield",
+        ETier.Bronze,
+        isPackage: true,
+        tags: new[] { ECardTag.Tool },
+        hiddenTags: new[] { EHiddenTag.Package, EHiddenTag.Shield }
+    ),
+    Card(
+        "Skill Quest",
+        ETier.Bronze,
+        type: ECardType.Skill,
+        hiddenTags: new[] { EHiddenTag.Quest }
+    ),
+};
+AssertValues(
+    CollectionFacetAvailability
+        .TagsFor(availableFacetCards, ECardType.Item)
+        .Select(tag => tag.ToString())
+        .ToArray(),
+    new[] { nameof(ECardTag.Weapon) },
+    "Available item tags should include only non-package catalog tags that are in the BazaarDB-facing whitelist."
+);
+AssertValues(
+    CollectionFacetAvailability
+        .KeywordsFor(availableFacetCards, ECardType.Item)
+        .Select(tag => tag.ToString())
+        .ToArray(),
+    new[] { nameof(EHiddenTag.Damage), nameof(EHiddenTag.DamageReference) },
+    "Available item keywords should include non-package catalog keywords and curated references from the same facet."
+);
+AssertValues(
+    CollectionFacetAvailability
+        .KeywordsFor(availableFacetCards, ECardType.Skill)
+        .Select(tag => tag.ToString())
+        .ToArray(),
+    new[] { nameof(EHiddenTag.Quest) },
+    "Available skill keywords should be computed independently from item keywords."
+);
 
 var vanessaExclusiveSkill = Card(
     "Vanessa Exclusive Skill",
@@ -499,6 +762,30 @@ var missingHeroSkill = Card(
     ETier.Bronze,
     type: ECardType.Skill,
     heroes: Array.Empty<EHero>()
+);
+var emptyHeroSkillFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
+var emptyHeroSkillResult = CollectionFilterEngine.Apply(
+    new[]
+    {
+        sharedHeroSkill,
+        commonSkill,
+        commonSharedSkill,
+        missingHeroSkill,
+        vanessaExclusiveSkill,
+    },
+    emptyHeroSkillFilter
+);
+AssertSequence(
+    emptyHeroSkillResult,
+    new[]
+    {
+        commonSharedSkill.Id,
+        commonSkill.Id,
+        missingHeroSkill.Id,
+        sharedHeroSkill.Id,
+        vanessaExclusiveSkill.Id,
+    },
+    "Empty hero selection should show every skill card without applying hero scope."
 );
 var exclusiveSkillFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
 exclusiveSkillFilter.Heroes.Add(EHero.Vanessa);

@@ -132,33 +132,30 @@ internal sealed partial class CollectionPanelView
             out _heroFilterLabel
         );
         _heroChipRow.style.flexWrap = Wrap.NoWrap;
-        _heroChipRow.style.justifyContent = Justify.SpaceBetween;
+        _heroChipRow.style.justifyContent = Justify.FlexStart;
+        _heroChipRow.RegisterCallback<GeometryChangedEvent>(OnHeroChipRowGeometryChanged);
 
-        // Tier filter.
+        // Size + tier filter. Size is hidden on Skills, leaving Quality to fill the row.
         CreateFilterSection(
             rail,
-            CollectionPanelText.TierHeader(),
+            CollectionPanelText.TierSizeHeader(),
             UiSpacing.Lg,
-            out _tierChipRow,
+            out var tierSizeChipRow,
             out _tierFilterLabel
         );
+        tierSizeChipRow.style.flexWrap = Wrap.NoWrap;
+        tierSizeChipRow.style.justifyContent = Justify.FlexStart;
+        _sizeChipRow = CreateCombinedFilterChipSegment(3f);
+        _tierChipRow = CreateCombinedFilterChipSegment(5f);
+        _tierSizeDivider = CreateCombinedFilterDivider();
+        tierSizeChipRow.Add(_sizeChipRow);
+        tierSizeChipRow.Add(_tierSizeDivider);
+        tierSizeChipRow.Add(_tierChipRow);
         _tierChipRow.style.flexWrap = Wrap.NoWrap;
-        _tierChipRow.style.justifyContent = Justify.SpaceBetween;
-
-        // Size filter (Items only — Refresh hides the chips but keeps this row's layout slot).
-        _sizeFilterSection = CreateFilterSection(
-            rail,
-            CollectionPanelText.SizeHeader(),
-            UiSpacing.Lg,
-            out _sizeChipRow,
-            out _sizeFilterLabel
-        );
-        _sizeFilterSection.style.minHeight = Sizes.CollectionSizeFilterSectionMinHeight;
-        _sizeChipRow.style.flexWrap = Wrap.NoWrap;
-        _sizeChipRow.style.justifyContent = Justify.SpaceBetween;
+        _tierChipRow.style.justifyContent = Justify.FlexStart;
 
         // Tag filter (player-facing card categories). Compact auto-width chips that wrap like
-        // the source row; collapsed to the whitelist's primary slice until expanded.
+        // the source row and show the full whitelist by default.
         _tagFilterSection = CreateFilterSection(
             rail,
             CollectionPanelText.TagHeader(),
@@ -169,6 +166,18 @@ internal sealed partial class CollectionPanelView
         _tagChipRow.style.flexWrap = Wrap.Wrap;
         _tagChipRow.style.justifyContent = Justify.FlexStart;
 
+        // Keyword filter (EHiddenTag gameplay keywords). Keep this above merchant/trainer sources;
+        // Refresh decides per tab whether the row is visible.
+        _keywordFilterSection = CreateFilterSection(
+            rail,
+            CollectionPanelText.KeywordHeader(),
+            UiSpacing.Lg,
+            out _keywordChipRow,
+            out _keywordFilterLabel
+        );
+        _keywordChipRow.style.flexWrap = Wrap.Wrap;
+        _keywordChipRow.style.justifyContent = Justify.FlexStart;
+
         // Source filter (merchant portraits on Items, trainer portraits on Skills).
         _sourceFilterSection = CreateFilterSection(
             rail,
@@ -177,7 +186,8 @@ internal sealed partial class CollectionPanelView
             out _sourceChipRow,
             out _sourceFilterLabel
         );
-        _sourceChipRow.style.flexWrap = Wrap.Wrap;
+        _sourceChipRow.style.flexDirection = FlexDirection.Column;
+        _sourceChipRow.style.flexWrap = Wrap.NoWrap;
         _sourceChipRow.style.justifyContent = Justify.FlexStart;
         _sourceChipRow.RegisterCallback<GeometryChangedEvent>(OnSourceChipRowGeometryChanged);
 
@@ -263,6 +273,31 @@ internal sealed partial class CollectionPanelView
         section.Add(chipRow);
 
         return section;
+    }
+
+    private static VisualElement CreateCombinedFilterChipSegment(float flexGrow)
+    {
+        var segment = new VisualElement();
+        segment.style.flexDirection = FlexDirection.Row;
+        segment.style.flexWrap = Wrap.NoWrap;
+        segment.style.alignItems = Align.Center;
+        segment.style.flexGrow = flexGrow;
+        segment.style.flexShrink = 1f;
+        segment.style.minWidth = 0f;
+        return segment;
+    }
+
+    private static VisualElement CreateCombinedFilterDivider()
+    {
+        var divider = new VisualElement { pickingMode = PickingMode.Ignore };
+        divider.style.width = Borders.Thin;
+        divider.style.height = Sizes.InfoChipHeight;
+        divider.style.marginLeft = UiSpacing.Sm;
+        divider.style.marginRight = UiSpacing.Sm;
+        divider.style.flexShrink = 0f;
+        divider.style.backgroundColor = Colors.HistoryButtonBorder;
+        divider.style.opacity = 0.72f;
+        return divider;
     }
 
     // Plain highlighting toggle (gold = packages only), matching the day icon — no switch knob.

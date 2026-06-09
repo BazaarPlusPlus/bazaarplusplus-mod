@@ -22,9 +22,12 @@ internal sealed partial class CollectionPanelView
         if (HeroChipsMatch(heroes))
             return;
         ClearHeroChipRow();
-        foreach (var hero in heroes)
+        for (var i = 0; i < heroes.Count; i++)
         {
+            var hero = heroes[i];
             var chip = CreateHeroChipButton(hero, () => _toggleHero(hero));
+            chip.style.marginRight =
+                i % Sizes.HeroChipsPerRow == Sizes.HeroChipsPerRow - 1 ? 0f : UiSpacing.Sm;
             _heroChips[hero] = chip;
             _heroChipRow.Add(chip);
         }
@@ -110,55 +113,35 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
-    private void RefreshTagFacetChips(CollectionPanelViewModel model)
+    private void RefreshFacetChips(CollectionPanelViewModel model)
     {
-        var kind =
-            model.TabProfile.ShowKeywordFilter ? CollectionTagFacetKind.Keywords
-            : model.TabProfile.ShowTagFilter ? CollectionTagFacetKind.Tags
-            : CollectionTagFacetKind.None;
-
-        if (_tagFacetKind != kind)
+        if (model.TabProfile.ShowTagFilter)
         {
-            ClearTagFacetRow();
-            _tagFacetKind = kind;
-            _tagRowExpanded = false;
-        }
-
-        if (kind == CollectionTagFacetKind.Tags)
-        {
-            _lastTagOptions = model.AvailableTags;
-            _lastSelectedTags = model.SelectedTags;
-            _lastKeywordOptions = Array.Empty<EHiddenTag>();
-            _lastSelectedKeywords = new HashSet<EHiddenTag>();
-            EnsureTagChips(model.AvailableTags, model.SelectedTags);
-        }
-        else if (kind == CollectionTagFacetKind.Keywords)
-        {
-            _lastTagOptions = Array.Empty<ECardTag>();
-            _lastSelectedTags = new HashSet<ECardTag>();
-            _lastKeywordOptions = model.AvailableKeywords;
-            _lastSelectedKeywords = model.SelectedKeywords;
-            EnsureKeywordChips(model.AvailableKeywords, model.SelectedKeywords);
+            EnsureTagChips(model.AvailableTags);
         }
         else
         {
-            _lastTagOptions = Array.Empty<ECardTag>();
-            _lastSelectedTags = new HashSet<ECardTag>();
-            _lastKeywordOptions = Array.Empty<EHiddenTag>();
-            _lastSelectedKeywords = new HashSet<EHiddenTag>();
+            ClearTagFacetRow();
+        }
+
+        if (model.TabProfile.ShowKeywordFilter)
+        {
+            EnsureKeywordChips(model.AvailableKeywords);
+        }
+        else
+        {
+            ClearKeywordFacetRow();
         }
     }
 
-    private void EnsureTagChips(IReadOnlyList<ECardTag> tags, HashSet<ECardTag> selectedTags)
+    private void EnsureTagChips(IReadOnlyList<ECardTag> tags)
     {
         if (_tagChipRow == null)
             return;
-        var visible = VisibleTagOptions(tags, selectedTags);
-        if (!TagChipsMatch(visible))
+        if (!TagChipsMatch(tags))
         {
             ClearTagFacetRow();
-            _tagFacetKind = CollectionTagFacetKind.Tags;
-            foreach (var tag in visible)
+            foreach (var tag in tags)
             {
                 var captured = tag;
                 var chip = CreateTagFacetChipButton(() => _toggleTag(captured));
@@ -167,87 +150,41 @@ internal sealed partial class CollectionPanelView
                 _tagChipOrder.Add(captured);
                 _tagChipRow.Add(chip);
             }
-
-            _tagMoreButton = CreateCompactChipButton(string.Empty, ToggleTagRowExpanded);
-            _tagChipRow.Add(_tagMoreButton);
         }
-
-        RefreshTagMoreButton(tags.Count);
     }
 
-    private void EnsureKeywordChips(
-        IReadOnlyList<EHiddenTag> keywords,
-        HashSet<EHiddenTag> selectedKeywords
-    )
+    private void EnsureKeywordChips(IReadOnlyList<EHiddenTag> keywords)
     {
-        if (_tagChipRow == null)
+        if (_keywordChipRow == null)
             return;
-        var visible = VisibleKeywordOptions(keywords, selectedKeywords);
-        if (!KeywordChipsMatch(visible))
+        if (!KeywordChipsMatch(keywords))
         {
-            ClearTagFacetRow();
-            _tagFacetKind = CollectionTagFacetKind.Keywords;
-            foreach (var keyword in visible)
+            ClearKeywordFacetRow();
+            var hasReferenceSection = false;
+            foreach (var keyword in keywords)
             {
+                if (
+                    !hasReferenceSection
+                    && CollectionKeywordWhitelist.IsReferenceKeyword(keyword)
+                )
+                {
+                    _keywordReferenceSectionLabel = CreateKeywordReferenceSectionLabel();
+                    _keywordChipRow.Add(_keywordReferenceSectionLabel);
+                    hasReferenceSection = true;
+                }
+
                 var captured = keyword;
                 var chip = CreateTagFacetChipButton(() => _toggleKeyword(captured));
                 ApplyTagChipContent(chip, NativeTagTypography.Resolve(captured));
                 _keywordChips[captured] = chip;
                 _keywordChipOrder.Add(captured);
-                _tagChipRow.Add(chip);
+                _keywordChipRow.Add(chip);
             }
-
-            _tagMoreButton = CreateCompactChipButton(string.Empty, ToggleTagRowExpanded);
-            _tagChipRow.Add(_tagMoreButton);
         }
-
-        RefreshTagMoreButton(keywords.Count);
     }
 
-    // Collapsed: the whitelist's primary slice plus any selected tag that would otherwise be
-    // hidden (a selection must never be invisible). Expanded: every option.
-    private List<ECardTag> VisibleTagOptions(
-        IReadOnlyList<ECardTag> tags,
-        HashSet<ECardTag> selectedTags
-    )
+    private bool TagChipsMatch(IReadOnlyList<ECardTag> visible)
     {
-        var visible = new List<ECardTag>(tags.Count);
-        for (var i = 0; i < tags.Count; i++)
-        {
-            var tag = tags[i];
-            if (
-                _tagRowExpanded
-                || i < CollectionTagWhitelist.PrimaryCount
-                || selectedTags.Contains(tag)
-            )
-                visible.Add(tag);
-        }
-        return visible;
-    }
-
-    private List<EHiddenTag> VisibleKeywordOptions(
-        IReadOnlyList<EHiddenTag> keywords,
-        HashSet<EHiddenTag> selectedKeywords
-    )
-    {
-        var visible = new List<EHiddenTag>(keywords.Count);
-        for (var i = 0; i < keywords.Count; i++)
-        {
-            var keyword = keywords[i];
-            if (
-                _tagRowExpanded
-                || i < CollectionKeywordWhitelist.PrimaryCount
-                || selectedKeywords.Contains(keyword)
-            )
-                visible.Add(keyword);
-        }
-        return visible;
-    }
-
-    private bool TagChipsMatch(List<ECardTag> visible)
-    {
-        if (_tagFacetKind != CollectionTagFacetKind.Tags)
-            return false;
         if (visible.Count != _tagChipOrder.Count)
             return false;
         for (var i = 0; i < visible.Count; i++)
@@ -256,54 +193,14 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
-    private bool KeywordChipsMatch(List<EHiddenTag> visible)
+    private bool KeywordChipsMatch(IReadOnlyList<EHiddenTag> visible)
     {
-        if (_tagFacetKind != CollectionTagFacetKind.Keywords)
-            return false;
         if (visible.Count != _keywordChipOrder.Count)
             return false;
         for (var i = 0; i < visible.Count; i++)
             if (visible[i] != _keywordChipOrder[i])
                 return false;
         return true;
-    }
-
-    private void ToggleTagRowExpanded()
-    {
-        _tagRowExpanded = !_tagRowExpanded;
-        if (_tagFacetKind == CollectionTagFacetKind.Keywords)
-            EnsureKeywordChips(_lastKeywordOptions, _lastSelectedKeywords);
-        else
-            EnsureTagChips(_lastTagOptions, _lastSelectedTags);
-        foreach (var pair in _tagChips)
-            RefreshChip(
-                pair.Value,
-                _lastSelectedTags.Contains(pair.Key),
-                NativeTagTypography.Resolve(pair.Key).AccentColor
-            );
-        foreach (var pair in _keywordChips)
-            RefreshChip(
-                pair.Value,
-                _lastSelectedKeywords.Contains(pair.Key),
-                NativeTagTypography.Resolve(pair.Key).AccentColor
-            );
-    }
-
-    private void RefreshTagMoreButton(int totalOptionCount)
-    {
-        if (_tagMoreButton == null)
-            return;
-        var visibleCount =
-            _tagFacetKind == CollectionTagFacetKind.Keywords
-                ? _keywordChipOrder.Count
-                : _tagChipOrder.Count;
-        var hiddenCount = totalOptionCount - visibleCount;
-        _tagMoreButton.style.display =
-            _tagRowExpanded || hiddenCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
-        _tagMoreButton.text = _tagRowExpanded
-            ? CollectionPanelText.TagLess()
-            : CollectionPanelText.TagMore(hiddenCount);
-        StyleButton(_tagMoreButton, Colors.HistoryButtonBackground, Colors.HistorySubtitleText);
     }
 
     private void ClearTagFacetRow()
@@ -315,10 +212,32 @@ internal sealed partial class CollectionPanelView
         }
         _tagChips.Clear();
         _tagChipOrder.Clear();
+        _tagChipRow?.Clear();
+    }
+
+    private void ClearKeywordFacetRow()
+    {
+        foreach (var button in _keywordChips.Values)
+        {
+            if (button.parent != null)
+                button.parent.Remove(button);
+        }
         _keywordChips.Clear();
         _keywordChipOrder.Clear();
-        _tagMoreButton = null;
-        _tagChipRow?.Clear();
+        _keywordReferenceSectionLabel = null;
+        _keywordChipRow?.Clear();
+    }
+
+    private static Label CreateKeywordReferenceSectionLabel()
+    {
+        var label = CreateLabel(Sizes.FontTiny, FontStyle.Bold, Colors.HistoryStatusText);
+        label.text = CollectionPanelText.KeywordReferenceSection();
+        label.style.width = Length.Percent(100f);
+        label.style.flexBasis = Length.Percent(100f);
+        label.style.marginTop = UiSpacing.Xs;
+        label.style.marginBottom = UiSpacing.Xs;
+        label.style.opacity = 0.72f;
+        return label;
     }
 
     private void EnsureSourceChips(IReadOnlyList<CollectionSourceOptionViewModel> sources)
@@ -328,14 +247,22 @@ internal sealed partial class CollectionPanelView
         if (SourceChipsMatch(sources))
             return;
         ClearSourceChipRow();
-        foreach (var source in sources)
+        VisualElement? sourceLine = null;
+        for (var i = 0; i < sources.Count; i++)
         {
+            if (i % Sizes.SourceChipsPerRow == 0)
+            {
+                sourceLine = CreateSourceChipLine();
+                _sourceChipRow.Add(sourceLine);
+            }
+
+            var source = sources[i];
             var chip = CreateSourceChipButton(source, () => _toggleSource(source.SourceKey));
+            chip.style.marginRight =
+                i % Sizes.SourceChipsPerRow == Sizes.SourceChipsPerRow - 1 ? 0f : UiSpacing.Sm;
             _sourceChips[source.SourceKey] = chip;
             _sourceChipOrder.Add(source.SourceKey);
-            _sourceChipRow.Add(chip);
-            if (source.BreakAfter)
-                _sourceChipRow.Add(CreateSourceChipBreak());
+            sourceLine!.Add(chip);
         }
     }
 
@@ -377,14 +304,34 @@ internal sealed partial class CollectionPanelView
         _sourceChipRow?.Clear();
     }
 
-    private static VisualElement CreateSourceChipBreak()
+    private static VisualElement CreateSourceChipLine()
     {
-        var spacer = new VisualElement { pickingMode = PickingMode.Ignore };
-        spacer.style.flexBasis = Length.Percent(100);
-        spacer.style.flexGrow = 0f;
-        spacer.style.flexShrink = 0f;
-        spacer.style.height = 1f;
-        return spacer;
+        var row = new VisualElement { pickingMode = PickingMode.Ignore };
+        row.style.flexDirection = FlexDirection.Row;
+        row.style.flexWrap = Wrap.NoWrap;
+        row.style.alignItems = Align.Center;
+        row.style.alignSelf = Align.Stretch;
+        return row;
+    }
+
+    private void OnHeroChipRowGeometryChanged(GeometryChangedEvent evt) =>
+        ApplyHeroChipSizing(evt.newRect.width);
+
+    private void ApplyHeroChipSizing(float rowWidth)
+    {
+        var box = CalculatePortraitChipBox(rowWidth, Sizes.HeroChipsPerRow);
+        if (box <= 0f)
+            return;
+        if (Mathf.Abs(box - _appliedHeroChipBox) < 0.5f)
+            return;
+
+        _appliedHeroChipBox = box;
+        var icon = Mathf.Round(box * Sizes.SourceChipIconRatio);
+        foreach (var pair in _heroChips)
+        {
+            if (_heroChipIcons.TryGetValue(pair.Key, out var iconElement))
+                ResizeHeroChip(pair.Value, iconElement, pair.Key, box, icon);
+        }
     }
 
     private void OnSourceChipRowGeometryChanged(GeometryChangedEvent evt) =>
@@ -392,11 +339,9 @@ internal sealed partial class CollectionPanelView
 
     private void ApplySourceChipSizing(float rowWidth)
     {
-        if (float.IsNaN(rowWidth) || rowWidth <= 0f)
+        var box = CalculatePortraitChipBox(rowWidth, Sizes.SourceChipsPerRow);
+        if (box <= 0f)
             return;
-
-        var gap = UiSpacing.Sm;
-        var box = Mathf.Max(Sizes.SourceChipMinSize, Mathf.Floor(rowWidth / 6f - gap));
         if (Mathf.Abs(box - _appliedSourceChipBox) < 0.5f)
             return;
 
@@ -407,6 +352,13 @@ internal sealed partial class CollectionPanelView
             if (_sourceChipIcons.TryGetValue(pair.Key, out var iconElement))
                 ResizeSourceChip(pair.Value, iconElement, box, icon);
         }
+    }
+
+    private static float CalculatePortraitChipBox(float rowWidth, int chipsPerRow)
+    {
+        if (float.IsNaN(rowWidth) || rowWidth <= 0f || chipsPerRow <= 0)
+            return 0f;
+        return Mathf.Floor((rowWidth - UiSpacing.Sm * (chipsPerRow - 1)) / chipsPerRow);
     }
 
     private static void ClearChipRow<T>(
@@ -447,20 +399,6 @@ internal sealed partial class CollectionPanelView
         return chip;
     }
 
-    // Compact auto-width chip for many-valued wrap rows (tags): text-sized instead of the
-    // fixed-width tier/size chip so two dozen options fit in a couple of wrapped lines.
-    private static Button CreateCompactChipButton(string text, Action onClick)
-    {
-        var chip = CreateButton(text, onClick, 0f, Sizes.InfoChipHeight, fixedWidth: false);
-        chip.style.minWidth = Sizes.InfoChipMinWidth;
-        chip.style.fontSize = Sizes.FontSmall;
-        UiStyle.HorizontalPadding(chip.style, UiSpacing.Md);
-        chip.style.marginRight = UiSpacing.Sm;
-        chip.style.marginBottom = UiSpacing.Xs;
-        StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
-        return chip;
-    }
-
     private static Button CreateTagFacetChipButton(Action onClick)
     {
         var chip = CreateButton(string.Empty, onClick, 0f, Sizes.InfoChipHeight, fixedWidth: false);
@@ -471,13 +409,6 @@ internal sealed partial class CollectionPanelView
         UiStyle.HorizontalPadding(chip.style, UiSpacing.Md);
         chip.style.marginRight = UiSpacing.Sm;
         chip.style.marginBottom = UiSpacing.Xs;
-
-        var implicitText = chip.Q<TextElement>();
-        if (implicitText != null)
-        {
-            implicitText.style.flexGrow = 0f;
-            implicitText.style.display = DisplayStyle.None;
-        }
 
         var icon = new VisualElement { name = TagChipIconName, pickingMode = PickingMode.Ignore };
         UiStyle.FixedSize(icon.style, Sizes.TagChipIconSize, Sizes.TagChipIconSize);
@@ -529,8 +460,9 @@ internal sealed partial class CollectionPanelView
         var chip = CreateButton(
             string.Empty,
             onClick,
-            Sizes.HeroChipButtonSize,
-            Sizes.HeroChipButtonSize
+            CurrentHeroChipBox(),
+            CurrentHeroChipBox(),
+            fixedWidth: false
         );
         chip.tooltip = labelText;
         chip.style.flexDirection = FlexDirection.Row;
@@ -541,6 +473,13 @@ internal sealed partial class CollectionPanelView
 
         var icon = CreateHeroChipIcon(hero);
         chip.Add(icon);
+        ResizeHeroChip(
+            chip,
+            icon,
+            hero,
+            CurrentHeroChipBox(),
+            Mathf.Round(CurrentHeroChipBox() * Sizes.SourceChipIconRatio)
+        );
 
         _heroChipIcons[hero] = icon;
         if (HeroPortraitSpriteProvider.IsRenderableHero(hero))
@@ -580,16 +519,15 @@ internal sealed partial class CollectionPanelView
     private static VisualElement CreateHeroChipIcon(EHero hero)
     {
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        UiStyle.FixedSize(icon.style, Sizes.HeroChipIconSize, Sizes.HeroChipIconSize);
         icon.style.position = Position.Relative;
         icon.style.backgroundColor = Colors.HistoryStatusBackground;
         icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
         icon.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
         UiStyle.Border(icon.style, Borders.Thin, Colors.HistoryButtonBorder);
-        UiStyle.Radius(icon.style, Sizes.HeroChipIconSize / 2f);
+        ResizeHeroIcon(icon, Sizes.HeroChipIconSize);
 
         if (!HeroPortraitSpriteProvider.IsRenderableHero(hero))
-            AddCommonHeroGlyph(icon);
+            AddCommonHeroGlyph(icon, Sizes.HeroChipIconSize);
 
         return icon;
     }
@@ -621,6 +559,28 @@ internal sealed partial class CollectionPanelView
     private float CurrentSourceChipBox() =>
         _appliedSourceChipBox > 0f ? _appliedSourceChipBox : Sizes.SourceChipMinSize;
 
+    private float CurrentHeroChipBox() =>
+        _appliedHeroChipBox > 0f ? _appliedHeroChipBox : Sizes.HeroChipButtonSize;
+
+    private static void ResizeHeroChip(
+        Button chip,
+        VisualElement icon,
+        EHero hero,
+        float box,
+        float iconSize
+    )
+    {
+        chip.style.width = box;
+        chip.style.minWidth = box;
+        chip.style.maxWidth = box;
+        chip.style.height = box;
+        chip.style.minHeight = box;
+        chip.style.maxHeight = box;
+        ResizeHeroIcon(icon, iconSize);
+        if (!HeroPortraitSpriteProvider.IsRenderableHero(hero))
+            AddCommonHeroGlyph(icon, iconSize);
+    }
+
     private static void ResizeSourceChip(Button chip, VisualElement icon, float box, float iconSize)
     {
         chip.style.width = box;
@@ -630,6 +590,17 @@ internal sealed partial class CollectionPanelView
         chip.style.minHeight = box;
         chip.style.maxHeight = box;
         ResizeSourceIcon(icon, iconSize);
+    }
+
+    private static void ResizeHeroIcon(VisualElement icon, float iconSize)
+    {
+        icon.style.width = iconSize;
+        icon.style.minWidth = iconSize;
+        icon.style.maxWidth = iconSize;
+        icon.style.height = iconSize;
+        icon.style.minHeight = iconSize;
+        icon.style.maxHeight = iconSize;
+        UiStyle.Radius(icon.style, iconSize / 2f);
     }
 
     private static void ResizeSourceIcon(VisualElement icon, float iconSize)
@@ -643,27 +614,30 @@ internal sealed partial class CollectionPanelView
         UiStyle.Radius(icon.style, iconSize / 2f);
     }
 
-    private static void AddCommonHeroGlyph(VisualElement icon)
+    private static void AddCommonHeroGlyph(VisualElement icon, float iconSize)
     {
-        AddCommonHeroDot(icon, 21f, 21f, 6f, Colors.HistoryChipText);
-        AddCommonHeroDot(icon, 9f, 9f, 5f, Colors.HistorySubtitleText);
-        AddCommonHeroDot(icon, 34f, 9f, 5f, Colors.HistorySubtitleText);
-        AddCommonHeroDot(icon, 9f, 34f, 5f, Colors.HistorySubtitleText);
-        AddCommonHeroDot(icon, 34f, 34f, 5f, Colors.HistorySubtitleText);
+        icon.Clear();
+        AddCommonHeroDot(icon, 0.5f, 0.5f, 0.125f, iconSize, Colors.HistoryChipText);
+        AddCommonHeroDot(icon, 0.24f, 0.24f, 0.104f, iconSize, Colors.HistorySubtitleText);
+        AddCommonHeroDot(icon, 0.76f, 0.24f, 0.104f, iconSize, Colors.HistorySubtitleText);
+        AddCommonHeroDot(icon, 0.24f, 0.76f, 0.104f, iconSize, Colors.HistorySubtitleText);
+        AddCommonHeroDot(icon, 0.76f, 0.76f, 0.104f, iconSize, Colors.HistorySubtitleText);
     }
 
     private static void AddCommonHeroDot(
         VisualElement parent,
-        float left,
-        float top,
-        float size,
+        float centerX,
+        float centerY,
+        float sizeRatio,
+        float iconSize,
         Color color
     )
     {
+        var size = Mathf.Max(3f, Mathf.Round(iconSize * sizeRatio));
         var dot = new VisualElement { pickingMode = PickingMode.Ignore };
         dot.style.position = Position.Absolute;
-        dot.style.left = left;
-        dot.style.top = top;
+        dot.style.left = Mathf.Round(iconSize * centerX - size / 2f);
+        dot.style.top = Mathf.Round(iconSize * centerY - size / 2f);
         UiStyle.FixedSize(dot.style, size, size);
         dot.style.backgroundColor = color;
         UiStyle.Radius(dot.style, size / 2f);
@@ -800,6 +774,24 @@ internal sealed partial class CollectionPanelView
         }
     }
 
+    private static void RefreshTierChip(ETier tier, Button chip, bool selected)
+    {
+        var textColor = TierTextColor(tier);
+        RefreshChip(chip, selected, textColor);
+        chip.style.color = textColor;
+    }
+
+    private static Color TierTextColor(ETier tier) =>
+        tier switch
+        {
+            ETier.Bronze => Colors.FromRgb(180, 98, 65, 1f),
+            ETier.Silver => Colors.FromRgb(192, 192, 192, 1f),
+            ETier.Gold => Colors.FromRgb(255, 215, 0, 1f),
+            ETier.Diamond => Colors.FromRgb(0, 255, 255, 1f),
+            ETier.Legendary => Colors.FromRgb(255, 69, 0, 1f),
+            _ => Colors.HistoryChipText,
+        };
+
     private void RefreshPackageToggle(bool selected, bool visible)
     {
         if (_packageToggleButton == null)
@@ -880,7 +872,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Radius(button.style, Radii.Md);
 
         var textElement = button.Q<TextElement>();
-        if (textElement != null)
+        if (textElement != null && !ReferenceEquals(textElement, button))
         {
             textElement.style.unityTextAlign = TextAnchor.MiddleCenter;
             textElement.style.flexGrow = 1f;

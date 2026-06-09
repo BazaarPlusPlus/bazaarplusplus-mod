@@ -56,7 +56,7 @@ internal readonly struct CollectionTabProfile
                 CollectionSourceKind.Merchant,
                 showSizeFilter: true,
                 showTagFilter: true,
-                showKeywordFilter: false,
+                showKeywordFilter: true,
                 showPackageToggle: true
             );
 }

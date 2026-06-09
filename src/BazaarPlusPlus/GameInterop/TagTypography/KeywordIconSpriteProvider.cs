@@ -16,10 +16,10 @@ namespace BazaarPlusPlus.GameInterop.TagTypography;
 internal static class KeywordIconSpriteProvider
 {
     private static readonly Dictionary<string, Sprite> Cache = new(StringComparer.Ordinal);
+    private static readonly HashSet<string> MissesThisPass = new(StringComparer.Ordinal);
     private static TMP_SpriteAsset? _spriteAsset;
-    private static bool _scannedThisPass;
 
-    public static void BeginResolvePass() => _scannedThisPass = false;
+    public static void BeginResolvePass() => MissesThisPass.Clear();
 
     public static Sprite? Resolve(string iconName)
     {
@@ -27,16 +27,23 @@ internal static class KeywordIconSpriteProvider
             return null;
         if (Cache.TryGetValue(iconName, out var cached))
             return cached;
+        if (MissesThisPass.Contains(iconName))
+            return null;
 
         try
         {
             var asset = ResolveSpriteAsset(iconName);
             if (asset == null)
+            {
+                MissesThisPass.Add(iconName);
                 return null;
+            }
 
             var sprite = ExtractSprite(asset, iconName);
             if (sprite != null)
                 Cache[iconName] = sprite;
+            else
+                MissesThisPass.Add(iconName);
             return sprite;
         }
         catch (Exception ex)
@@ -53,10 +60,6 @@ internal static class KeywordIconSpriteProvider
     {
         if (_spriteAsset != null && _spriteAsset.GetSpriteIndexFromName(iconName) >= 0)
             return _spriteAsset;
-
-        if (_scannedThisPass)
-            return null;
-        _scannedThisPass = true;
 
         foreach (var text in Resources.FindObjectsOfTypeAll<TMP_Text>())
         {

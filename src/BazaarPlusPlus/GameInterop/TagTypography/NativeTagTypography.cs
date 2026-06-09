@@ -24,6 +24,20 @@ namespace BazaarPlusPlus.GameInterop.TagTypography;
 /// </summary>
 internal static class NativeTagTypography
 {
+    private static readonly LocalizedTextSet ReferenceSuffixText = new(
+        " Related",
+        "相关",
+        "相關",
+        "相關"
+    );
+
+    private static readonly LocalizedTextSet EconomyReferenceBaseText = new(
+        "Economy",
+        "经济",
+        "經濟",
+        "經濟"
+    );
+
     // GetConfiguration is private and overloaded (string / ECardAttributeType); resolve the
     // string overload explicitly. The MethodInfo is cached, but the TooltipTypography instance
     // is never cached: locale changes rebuild it as a fresh instance, so a stored reference
@@ -58,9 +72,27 @@ internal static class NativeTagTypography
 
     public static NativeTagDisplay Resolve(ECardTag tag) => Resolve(tag.ToString());
 
-    public static NativeTagDisplay Resolve(EHiddenTag tag) => Resolve(tag.ToString());
+    public static NativeTagDisplay Resolve(EHiddenTag tag)
+    {
+        if (TryResolveReferenceTag(tag, out var referenceDisplay))
+            return referenceDisplay;
 
-    public static NativeTagDisplay Resolve(string key)
+        var display = Resolve(
+            tag.ToString(),
+            GetConfigurationAliasKey(tag),
+            ShouldOverrideConfigurationStyle(tag)
+        );
+        return TryOverrideHiddenTagLabel(tag, display, out var overridden) ? overridden : display;
+    }
+
+    public static NativeTagDisplay Resolve(string key) =>
+        Resolve(key, aliasKey: null, overrideConfigurationStyle: false);
+
+    private static NativeTagDisplay Resolve(
+        string key,
+        string? aliasKey,
+        bool overrideConfigurationStyle
+    )
     {
         var typography = Data.TooltipTypography;
         var languageCode = L.CurrentLanguageCode;
@@ -68,7 +100,7 @@ internal static class NativeTagTypography
         // Startup window (async registration pending) or tooltip host destroyed: resolve
         // through the string table only and skip the cache so the next call retries.
         if (typography == null)
-            return ResolveUncached(null, key);
+            return ResolveUncached(null, key, aliasKey, overrideConfigurationStyle);
 
         if (
             !ReferenceEquals(typography, _cachedTypography)
@@ -83,25 +115,42 @@ internal static class NativeTagTypography
         if (Cache.TryGetValue(key, out var cached))
             return cached;
 
-        var display = ResolveUncached(typography, key);
+        var display = ResolveUncached(typography, key, aliasKey, overrideConfigurationStyle);
         Cache[key] = display;
         return display;
     }
 
-    private static NativeTagDisplay ResolveUncached(TooltipTypography? typography, string key)
+    private static NativeTagDisplay ResolveUncached(
+        TooltipTypography? typography,
+        string key,
+        string? aliasKey,
+        bool overrideConfigurationStyle
+    )
     {
         string label;
         Color? accentColor = null;
         var iconName = string.Empty;
 
         var configuration = GetConfigurationOrNull(typography, key);
-        if (configuration != null)
+        var styleConfiguration = configuration;
+        if (
+            (configuration == null || overrideConfigurationStyle)
+            && !string.IsNullOrWhiteSpace(aliasKey)
+        )
         {
-            label = LocalizeConfiguredText(configuration, key);
-            if (configuration.MakeAllUppercase)
+            styleConfiguration = GetConfigurationOrNull(typography, aliasKey) ?? configuration;
+        }
+
+        if (styleConfiguration != null)
+        {
+            label =
+                configuration != null
+                    ? LocalizeConfiguredText(configuration, key)
+                    : LocalizeThroughStringTable(key);
+            if ((configuration ?? styleConfiguration).MakeAllUppercase)
                 label = label.ToUpperInvariant();
-            accentColor = configuration.Color;
-            iconName = configuration.IconName ?? string.Empty;
+            accentColor = styleConfiguration.Color;
+            iconName = styleConfiguration.IconName ?? string.Empty;
         }
         else
         {
@@ -111,6 +160,87 @@ internal static class NativeTagTypography
         }
 
         return new NativeTagDisplay(label, accentColor, iconName);
+    }
+
+    private static string? GetConfigurationAliasKey(EHiddenTag tag) =>
+        tag switch
+        {
+            EHiddenTag.Crit => ECardAttributeType.CritChance.ToString(),
+            EHiddenTag.Gold => EHiddenTag.Income.ToString(),
+            EHiddenTag.EconomyReference => EHiddenTag.Income.ToString(),
+            _ => null,
+        };
+
+    private static bool ShouldOverrideConfigurationStyle(EHiddenTag tag) => tag == EHiddenTag.Gold;
+
+    private static bool TryResolveReferenceTag(
+        EHiddenTag tag,
+        out NativeTagDisplay referenceDisplay
+    )
+    {
+        referenceDisplay = default;
+        if (!TryGetReferenceBaseTag(tag, out var baseTag))
+            return false;
+
+        var baseDisplay = Resolve(baseTag);
+        var label = ReferenceLabel(tag, baseDisplay.Label);
+        referenceDisplay = new NativeTagDisplay(label, baseDisplay.AccentColor, baseDisplay.IconName);
+        return true;
+    }
+
+    private static bool TryGetReferenceBaseTag(EHiddenTag tag, out EHiddenTag baseTag)
+    {
+        baseTag = tag switch
+        {
+            EHiddenTag.DamageReference => EHiddenTag.Damage,
+            EHiddenTag.HealReference => EHiddenTag.Heal,
+            EHiddenTag.BurnReference => EHiddenTag.Burn,
+            EHiddenTag.PoisonReference => EHiddenTag.Poison,
+            EHiddenTag.JoyReference => EHiddenTag.Joy,
+            EHiddenTag.ShieldReference => EHiddenTag.Shield,
+            EHiddenTag.RegenReference => EHiddenTag.Regen,
+            EHiddenTag.HealthReference => EHiddenTag.Health,
+            EHiddenTag.FreezeReference => EHiddenTag.Freeze,
+            EHiddenTag.HasteReference => EHiddenTag.Haste,
+            EHiddenTag.SlowReference => EHiddenTag.Slow,
+            EHiddenTag.EconomyReference => EHiddenTag.Income,
+            EHiddenTag.CooldownReference => EHiddenTag.Cooldown,
+            EHiddenTag.AmmoReference => EHiddenTag.Ammo,
+            EHiddenTag.CritReference => EHiddenTag.Crit,
+            EHiddenTag.QuestReference => EHiddenTag.Quest,
+            EHiddenTag.FlyingReference => EHiddenTag.Flying,
+            EHiddenTag.RageReference => EHiddenTag.Rage,
+            EHiddenTag.HeatedReference => EHiddenTag.Heated,
+            EHiddenTag.ChilledReference => EHiddenTag.Chilled,
+            EHiddenTag.TempoReference => EHiddenTag.Tempo,
+            _ => tag,
+        };
+        return baseTag != tag;
+    }
+
+    private static string ReferenceLabel(EHiddenTag tag, string baseLabel)
+    {
+        if (tag == EHiddenTag.EconomyReference)
+            baseLabel = L.Resolve(EconomyReferenceBaseText);
+        return baseLabel + L.Resolve(ReferenceSuffixText);
+    }
+
+    private static bool TryOverrideHiddenTagLabel(
+        EHiddenTag tag,
+        NativeTagDisplay display,
+        out NativeTagDisplay overridden
+    )
+    {
+        overridden = display;
+        if (tag != EHiddenTag.Quest)
+            return false;
+
+        overridden = new NativeTagDisplay(
+            LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode) ? "任务" : display.Label,
+            display.AccentColor,
+            display.IconName
+        );
+        return true;
     }
 
     private static KeywordIconColorConfiguration? GetConfigurationOrNull(
