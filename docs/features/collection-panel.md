@@ -13,7 +13,7 @@
 - **挂载**：`CollectionPanelMount`（一个 bespoke `IBppMountable`，非通用 `ComponentMount<T>`）在 `BppComposition.cs:97` 注册。它 `AddComponent<CollectionPanel>()` 并订阅 `ChineseLocaleModeChanged` → `CollectionPanel.NotifyLocaleChanged()`（通用 mount 无法订阅事件，这是 bespoke 的唯一理由，见 `CollectionPanelMount.cs:10-27`）。
 - **dock button**：`CollectionPanelDockButtonController.Attach` 由 `Patches/Settings/BppSettingsDockPatch.cs:46` 在设置坞旁克隆出一颗按钮（图标 `BppDockButtonIconKind.CollectionPanel`）；点击触发 `CollectionPanel.OpenFromDockButton()` (`CollectionPanelDockButtonController.cs:105-108` → `CollectionPanel.cs:123`)。它**不是** `ISettingsDockEntry`，而是直接克隆原生按钮。
 - **快捷键**：无修饰 `Tab` 在 `Update` 里切换面板，`Escape` 关闭面板。战斗中打开被抑制。
-- **打开选择**：`Open` 经 `CollectionPanelOpenSelectionResolver.Resolve` (`CollectionPanelOpenSelectionResolver.cs:12`) 把当前 run 的英雄 + 当前 encounter / 选择项 template id 映射到一个来源条目作为初始过滤；run 外或非具体英雄则回退到默认 (`CollectionPanel.cs:138`)。
+- **打开选择**：`Open` 经 `CollectionPanelOpenSelectionResolver.Resolve` (`CollectionPanelOpenSelectionResolver.cs:12`) 把当前 run 的英雄 + 当前 encounter / 选择项 template id 映射到一个来源条目作为初始过滤；run 内当前英雄优先。run 外则使用用户上次在 CollectionPanel 明确点击的英雄 chip（`PlayerPrefs`，账号 scope，`CollectionPanelHeroPreferenceStore.cs:22-48`），无记录或记录无效时回退到默认 Vanessa + Jay Jay (`CollectionPanel.cs:147-160`)。
 - **跨 scene dispose**：`Update` 每帧 `DetectSceneChange` (`CollectionPanel.cs:411`)，scene token 一变就 `Close` + `DisposeUnityRuntime`。`DisposeUnityRuntime` (`CollectionPanel.cs:436`) 先销毁卡 GameObject（让其 patched `OnDestroy` 在缓存拆除前归还 art-cache 引用计数），再拆 virtualizer / overlay / view / 两个缓存。`OnDestroy` 额外 `InvalidateCatalog` 释放 VM 卡库缓存 (`CollectionPanel.cs:422`)。
 
 ## 过滤维度
@@ -21,7 +21,7 @@
 可变选择态在 `CollectionFilterState` (`Data/CollectionFilterState.cs:16`)，纯函数 `CollectionFilterEngine.Apply` (`Data/CollectionFilterEngine.cs:15`) 据此产出有序可见集：
 
 - **ActiveType**：`Item` / `Skill` tab（互斥），决定网格列数与 cell 尺寸。
-- **Heroes**：单选英雄（`ToggleHero` 始终归一到一个英雄，`CollectionFilterState.cs:82-89`）。`SelectedHero` 仅当恰好选 1 个英雄时有值。
+- **Heroes**：单选英雄（`ToggleHero` 始终归一到一个英雄，`CollectionFilterState.cs:80-87`）。`SelectedHero` 仅当恰好选 1 个英雄时有值。用户明确点击英雄 chip 后，当前英雄写入 `PlayerPrefs`，用于下一次局外打开面板；run 内打开仍由当前 run 英雄和 encounter source 决定 (`CollectionPanel.cs:496-504`)。
 - **Tiers**：Bronze/Silver/Gold/Diamond/Legendary 多选。
 - **Sizes**：Small/Medium/Large 多选，**仅 Item tab 生效**（Skill 单一尺寸，引擎在 Skill tab 忽略此集，`CollectionFilterEngine.cs:33`；UI 在 Skill tab 隐藏该行但保留布局槽，`CollectionPanelView.cs:336-342`）。
 - **来源**（merchant / trainer，见下节）：单选；选中后用 offer-pool 把可见集收窄到该来源会卖 / 会教的卡。
