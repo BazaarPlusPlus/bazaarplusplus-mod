@@ -694,6 +694,99 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void RandomHeroSkinPool_has_no_legacy_playerprefs_migration()
+    {
+        var repoRoot = RepoRoot();
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(repoRoot),
+                "Game",
+                "Lobby",
+                "RandomHeroSkinPool",
+                "RandomHeroSkinPoolPlayerPrefs.cs"
+            )
+        );
+
+        Assert.DoesNotContain(
+            string.Concat("Legacy", "HeroSkinPool", "PrefsKeyPrefix"),
+            source
+        );
+        Assert.DoesNotContain(
+            string.Concat("BPP.Random", "HeroSkinPool", ".Selected"),
+            source
+        );
+        Assert.DoesNotContain(string.Concat("BuildLegacy", "HeroSkin", "PrefsKey"), source);
+    }
+
+    [Fact]
+    public void Capture_modules_use_ui_chrome_suppression_seam()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var screenshotSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "Screenshots", "EndOfRunScreenshotController.cs")
+        );
+        var recorderSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CombatReplay", "Video", "CombatReplayVideoRecorder.cs")
+        );
+        var chromeSuppressionSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "OverlayPanels", "BppUiChromeSuppression.cs")
+        );
+
+        Assert.Contains("BppUiChromeSuppression.Begin", screenshotSource);
+        Assert.Contains("BppUiChromeSuppressionMode.Screenshot", screenshotSource);
+        Assert.Contains("BppUiChromeSuppression.Begin", recorderSource);
+        Assert.Contains("BppUiChromeSuppressionMode.ReplayRecording", recorderSource);
+
+        foreach (var source in new[] { screenshotSource, recorderSource })
+        {
+            Assert.DoesNotContain(
+                "CollectionPanelDockButtonController.BeginScreenshotSuppression",
+                source
+            );
+            Assert.DoesNotContain("BppSettingsDockController.BeginScreenshotSuppression", source);
+            Assert.DoesNotContain("CombatStatusBarFeature.BeginScreenshotSuppression", source);
+        }
+
+        Assert.Contains(
+            "CollectionPanelDockButtonController.BeginScreenshotSuppression",
+            chromeSuppressionSource
+        );
+        Assert.Contains(
+            "BppSettingsDockController.BeginScreenshotSuppression",
+            chromeSuppressionSource
+        );
+        Assert.Contains("CombatStatusBarFeature.BeginScreenshotSuppression", chromeSuppressionSource);
+    }
+
+    [Fact]
+    public void PvpBattles_remains_a_shared_game_module()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var pvpBattlesDir = Path.Combine(mainSource, "Game", "PvpBattles");
+
+        Assert.True(Directory.Exists(pvpBattlesDir), $"Could not locate '{pvpBattlesDir}'.");
+        Assert.False(Directory.Exists(Path.Combine(mainSource, "Game", "CombatReplay", "PvpBattles")));
+        Assert.False(Directory.Exists(Path.Combine(mainSource, "Game", "HistoryPanel", "PvpBattles")));
+        Assert.False(Directory.Exists(Path.Combine(mainSource, "Game", "RunLogging", "PvpBattles")));
+
+        var combatReplaySource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CombatReplay", "CombatReplayCaptureService.cs")
+        );
+        var historyProjectionSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "HistoryPanel", "Data", "HistoryBattlePreviewProjection.cs")
+        );
+        var runLoggingSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "RunLogging", "RunLoggingModule.cs")
+        );
+
+        Assert.Contains("using BazaarPlusPlus.Game.PvpBattles;", combatReplaySource);
+        Assert.Contains("using BazaarPlusPlus.Game.PvpBattles;", historyProjectionSource);
+        Assert.Contains("using BazaarPlusPlus.Game.PvpBattles;", runLoggingSource);
+    }
+
+    [Fact]
     public void Run_script_exposes_only_the_canonical_bazaaragent_flag()
     {
         var repoRoot = RepoRoot();

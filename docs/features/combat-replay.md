@@ -20,6 +20,8 @@ PVP combat 的本地录制与回放，外加可选的 MP4 视频录制。录制 
 4. `Game/CombatReplay/CombatReplayRuntime.cs` 经 `CombatReplayPersistenceQueue` 异步持久化 payload 与 manifest。
 5. 完成后发布 `PvpBattleRecorded`，供 run logging 等模块消费。
 
+PvP battle capture and replay artifact models live in the shared [`PvP Battles`](pvp-battles.md) module rather than under `CombatReplay`.
+
 ## Storage
 
 - payload 文件：`<GameRoot>/BazaarPlusPlusV4/CombatReplays/<battle_id>.payload.mpack.gz`（由 `CombatReplayPayloadStore` 管理）

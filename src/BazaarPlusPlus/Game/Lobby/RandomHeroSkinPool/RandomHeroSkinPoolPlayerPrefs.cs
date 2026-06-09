@@ -10,7 +10,6 @@ namespace BazaarPlusPlus.Game.Lobby.RandomHeroSkinPool;
 internal static class RandomHeroSkinPoolPlayerPrefs
 {
     private const string SelectedPoolPrefsKeyPrefix = "BPP.RandomCollectiblePool.Selected";
-    private const string LegacyHeroSkinPoolPrefsKeyPrefix = "BPP.RandomHeroSkinPool.Selected";
     private const string LogScope = "RandomHeroSkinPool";
 
     public static IReadOnlyCollection<string>? LoadSelectedIds(
@@ -18,23 +17,10 @@ internal static class RandomHeroSkinPoolPlayerPrefs
         BazaarInventoryTypes.ECollectionType collectionType
     )
     {
-        var key = BuildScopedPrefsKey(hero, collectionType);
-        var selectedIds = RandomPoolPrefsHelpers.LoadIdCollection(key, LogScope);
-        if (selectedIds != null)
-            return selectedIds;
-
-        if (collectionType != BazaarInventoryTypes.ECollectionType.HeroSkins)
-            return null;
-
-        var legacy = RandomPoolPrefsHelpers.LoadIdCollection(
-            BuildLegacyHeroSkinPrefsKey(hero),
+        return RandomPoolPrefsHelpers.LoadIdCollection(
+            BuildScopedPrefsKey(hero, collectionType),
             LogScope
         );
-        if (legacy == null)
-            return null;
-
-        SaveSelectedIds(hero, collectionType, legacy);
-        return legacy;
     }
 
     public static void SaveSelectedIds(
@@ -53,11 +39,5 @@ internal static class RandomHeroSkinPoolPlayerPrefs
     {
         var scope = RandomPoolPrefsHelpers.ResolveAccountScopeForPrefs(LogScope);
         return $"{SelectedPoolPrefsKeyPrefix}.{Uri.EscapeDataString(collectionType.ToString())}.{Uri.EscapeDataString(hero.ToString())}.{scope}";
-    }
-
-    private static string BuildLegacyHeroSkinPrefsKey(EHero hero)
-    {
-        var scope = RandomPoolPrefsHelpers.ResolveAccountScopeForPrefs(LogScope);
-        return $"{LegacyHeroSkinPoolPrefsKeyPrefix}.{Uri.EscapeDataString(hero.ToString())}.{scope}";
     }
 }

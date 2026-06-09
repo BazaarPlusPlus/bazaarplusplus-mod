@@ -29,8 +29,24 @@
       Link="LiveItemBoardRowVm.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanelText.cs"
-      Link="LiveBuildPanelText.cs"
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Text/LiveBuildPanelText.Chrome.cs"
+      Link="Text/LiveBuildPanelText.Chrome.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Text/LiveBuildPanelText.Evidence.cs"
+      Link="Text/LiveBuildPanelText.Evidence.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Text/LiveBuildPanelText.FontSample.cs"
+      Link="Text/LiveBuildPanelText.FontSample.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Text/LiveBuildPanelText.Refresh.cs"
+      Link="Text/LiveBuildPanelText.Refresh.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Text/LiveBuildPanelText.Status.cs"
+      Link="Text/LiveBuildPanelText.Status.cs"
     />
     <Compile Include="../../src/BazaarPlusPlus.Localization/L.cs" Link="L.cs" />
     <Compile

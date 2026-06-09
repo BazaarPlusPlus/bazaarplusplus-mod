@@ -59,6 +59,8 @@ ghost 同步与 replay 下载（V4 wire，服务端在独立仓库 `bazaarpluspl
 
 ## 关键文件
 
+PvP battle manifests, snapshots, and persistence live in the shared [`PvP Battles`](pvp-battles.md) module; RunLogging attaches those battle ids to run logs but does not own the battle evidence model.
+
 - `Game/RunLifecycle/RunLifecycleModule.cs`
 - `Patches/RunLogging/RunInitializedPatch.cs`
 - `Game/RunLogging/RunLoggingController.cs`、`RunLoggingModule.cs`、`RunLogSessionManager.cs`、`RunLoggingGameDataReader.cs`

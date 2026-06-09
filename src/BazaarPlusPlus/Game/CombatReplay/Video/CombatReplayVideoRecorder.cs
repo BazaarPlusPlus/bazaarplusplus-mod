@@ -5,9 +5,8 @@ using System.Collections.Generic;
 using System.IO;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CombatReplay.Audio;
-using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -755,10 +754,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             // it stays visible just like in a normal replay, so it is captured into the MP4 (the
             // recorder uses full-screen ScreenCapture). The remaining BPP overlays stay suppressed
             // to keep them out of the recording.
-            return UiSuppressionScope.Begin(
-                CollectionPanelDockButtonController.BeginScreenshotSuppression,
-                BppSettingsDockController.BeginScreenshotSuppression
-            );
+            return BppUiChromeSuppression.Begin(BppUiChromeSuppressionMode.ReplayRecording);
         }
         catch (Exception ex)
         {

@@ -24,14 +24,14 @@
 - **Heroes**：单选英雄（`ToggleHero` 始终归一到一个英雄，`CollectionFilterState.cs:80-87`）。`SelectedHero` 仅当恰好选 1 个英雄时有值。用户明确点击英雄 chip 后，当前英雄写入 `PlayerPrefs`，用于下一次局外打开面板；run 内打开仍由当前 run 英雄和 encounter source 决定 (`CollectionPanel.cs:496-504`)。
 - **Tiers**：Bronze/Silver/Gold/Diamond/Legendary 多选。
 - **Sizes**：Small/Medium/Large 多选，**仅 Item tab 生效**（Skill 单一尺寸，引擎在 Skill tab 忽略此集，`CollectionFilterEngine.cs:33`；UI 在 Skill tab 隐藏该行但保留布局槽，`CollectionPanelView.cs:336-342`）。
-- **来源**（merchant / trainer，见下节）：单选；选中后用 offer-pool 把可见集收窄到该来源会卖 / 会教的卡。
+- **来源**（merchant / trainer）：单选，保存在 `CollectionFilterState.SelectedSourceKey`。当前 tab 的 `CollectionTabProfile.SourceKind` 决定它表示 merchant 还是 trainer；Item tab 显示 merchant 来源，Skill tab 显示 trainer 来源。
 - **Day**：运行日过滤，默认开启；面板打开时绑定到当前 run 天数（`CollectionPanel.cs:287-288`，`_filter.SelectedRunDay = _currentRunDay ?? DayTierSchedule.OutOfRunDay`），局外为 `DayTierSchedule.OutOfRunDay = 20`（Diamond 上限，不收窄）。引擎用 `DayTierSchedule.AllowsStartingTier(card.StartingTier, day)` 过滤（`CollectionFilterEngine.cs:49`）；UI 为顶部天数数字按钮（`CollectionPanelView.Tree.cs` CreateDayToggleButton，`CollectionPanelView.cs:329` RefreshDayToggle），点击切换是否参与过滤。
-- **IncludePackages**：开关，默认排除 package 卡（`CollectionFilterEngine.cs:43`）；开关当前恒可见（`CollectionPanel.cs:769` ShowPackageToggle = true 硬编码；`RefreshPackageToggle` 的 visible 参数路径上从不为 false，`CollectionPanelView.Filters.cs:513`）。
+- **PackagesOnly**：Item tab 的互斥模式。开启后只显示 package cards，并临时禁用来源选择；关闭后默认排除 package cards。Skill tab 不显示该开关。
 - **SortPriority**：`Quality`（先 tier 后 size）/ `Size`（先 size 后 tier），末级按 DisplayName (`CollectionFilterEngine.cs:56-89`)。
 
-> **文本搜索已于 2026-06-03 移除。** 当前 live 代码不再有搜索框、`Search` 过滤态或去抖逻辑——`CollectionPanelText.cs` 与 `Ui/` 视图里已无任何 `Search` 引用。不要再为本面板记录 / 重建搜索框；历史细节见 `docs/design/2026-06-03-collection-search-removal-sponsor-tweaks-rail-stability.md`。
+> **文本搜索已于 2026-06-03 移除。** 当前 live 代码不再有搜索框、`Search` 过滤态或去抖逻辑——`Text/CollectionPanelText.cs` 与 `Ui/` 视图里已无任何 `Search` 引用。不要再为本面板记录 / 重建搜索框；历史细节见 `docs/design/2026-06-03-collection-search-removal-sponsor-tweaks-rail-stability.md`。
 
-`CollectionMerchantKind`（`Data/CollectionMerchantKind.cs:6`，Burn/Poison/Freeze/… 等 hidden-tag 派生的 merchant 桶）由 `CollectionCardClassifier.ResolveMerchants` (`CollectionCardClassifier.cs:106`) 填进 VM；`CollectionFilterState.Merchants` 是引擎支持的过滤位 (`CollectionFilterEngine.cs:51`)，但当前操作栏 UI 不暴露它——来源收窄走的是下节的 offer-pool 路径，不是这个 merchant-kind 集。
+历史 note：旧的 merchant-kind 过滤态已不再是当前面板入口。当前来源收窄走 `CollectionSourceCatalog` + offer-pool 路径；文档和实现都应以 `CollectionSourceKind`、`SelectedSourceKey`、`CollectionTabProfile` 为准。
 
 ## CollectionSources 子系统
 
@@ -70,7 +70,7 @@
     - `heroMode`：`SelectedHero` / `AllHeroes` / `FixedHero` / `NeutralOnly`。`FixedHero` 必须带 `hero`；`NeutralOnly` 不许带 `hero` (`CollectionSourceCatalog.cs:249-252`)。
     - `startingTier`（可选 `{mode, tier}`，mode = `AtMost`/`Exact`）。
     - `sizesAny` / `tagsAny` / `tagsNone` / `hiddenTagsAny`（枚举字符串数组）、`enchantableOnly` (bool)。
-- **sourceKey 派生**（非 JSON 字段）：`Build` 由 `(kind, name, availableHeroes)` slug 出 base key；同 base key 多条时追加 `sourceTemplateIds` 指纹去重 (`CollectionSourceCatalog.cs:180-215`)。这是过滤态 (`SelectedMerchantSourceKey` / `SelectedTrainerSourceKey`) 持有的稳定键。
+- **sourceKey 派生**（非 JSON 字段）：`Build` 由 `(kind, name, availableHeroes)` slug 出 base key；同 base key 多条时追加 `sourceTemplateIds` 指纹去重 (`CollectionSourceCatalog.cs:180-215`)。这是过滤态 `SelectedSourceKey` 持有的稳定键；当前 tab 的 `CollectionTabProfile.SourceKind` 决定该 key 对应 merchant 还是 trainer。
 
 当前文件：69 条 entry（47 Merchant + 22 Trainer）。代表性 entry（按实际 JSON）——固定英雄 merchant `{heroMode:"FixedHero", hero:"Dooley"}`；中立分层 merchant `Curio` `{heroMode:"NeutralOnly", startingTier:{mode:"AtMost", tier:"Bronze"}}`；分层 trainer `Adira` `{heroMode:"SelectedHero", startingTier:{mode:"AtMost", tier:"Diamond"}}`；附魔 merchant `Serafina` `{enchantableOnly:true}`。
 
@@ -78,10 +78,10 @@
 
 编排 / 生命周期：
 - `Game/CollectionPanel/CollectionPanel.cs`、`CollectionPanelMount.cs`、`CollectionPanelDockButtonController.cs`、`CollectionPanelOpenSelectionResolver.cs`
-- `Game/CollectionPanel/CollectionPanelSelectionState.cs`（在 `Data/`）、`CollectionPanelText.cs`、`CollectionPanelLoadDiagnostics.cs`
+- `Game/CollectionPanel/CollectionPanelSelectionState.cs`（在 `Data/`）、`Text/CollectionPanelText.cs`、`CollectionPanelLoadDiagnostics.cs`
 
 数据 / 过滤：
-- `Game/CollectionPanel/Data/CollectionCatalog.cs`、`CollectionCatalogBuildSession.cs`、`CollectionCardVm.cs`(+`.From.cs`)、`CollectionCardClassifier.cs`、`CollectionFilterState.cs`、`CollectionFilterEngine.cs`、`CollectionMerchantKind.cs`、`CollectionHeroScope.cs`、`DayTierSchedule.cs`
+- `Game/CollectionPanel/Data/CollectionCatalog.cs`、`CollectionCatalogBuildSession.cs`、`CollectionCardVm.cs`(+`.From.cs`)、`CollectionCardClassifier.cs`、`CollectionFilterState.cs`、`CollectionFilterEngine.cs`、`CollectionTabProfile.cs`、`CollectionHeroScope.cs`、`DayTierSchedule.cs`
 
 来源 catalog：
 - `Game/CollectionPanel/Sources/CollectionSourceCatalog.cs`、`CollectionSourceDtos.cs`、`CollectionSourceEntry.cs`、`CollectionSourceEnums.cs`、`CollectionSourceOfferRule.cs`、`CollectionSourceOfferPoolResolver.cs`、`CollectionSourceRoster.cs`

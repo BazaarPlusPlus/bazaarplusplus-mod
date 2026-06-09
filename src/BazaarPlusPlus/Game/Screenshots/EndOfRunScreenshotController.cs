@@ -4,15 +4,13 @@ using System.Collections;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Game.CollectionPanel;
-using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Storage.RunScreenshot;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
 using UnityEngine;
-using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 
 namespace BazaarPlusPlus.Game.Screenshots;
 
@@ -412,11 +410,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private static IDisposable? BeginUiSuppression()
     {
-        return UiSuppressionScope.Begin(
-            CollectionPanelDockButtonController.BeginScreenshotSuppression,
-            BppSettingsDockController.BeginScreenshotSuppression,
-            CombatStatusBarFeature.BeginScreenshotSuppression
-        );
+        return BppUiChromeSuppression.Begin(BppUiChromeSuppressionMode.Screenshot);
     }
 
     private void DisposeCaptureSuppressionScope()

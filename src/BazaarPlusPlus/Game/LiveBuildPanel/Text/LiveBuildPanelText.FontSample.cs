@@ -1,0 +1,39 @@
+#nullable enable
+
+using System;
+using BazaarPlusPlus.Localization;
+
+namespace BazaarPlusPlus.Game.LiveBuildPanel;
+
+internal static partial class LiveBuildPanelText
+{
+    public static string FontAtlasSample() =>
+        Title()
+        + Subtitle()
+        + FinalBuildRow()
+        + ShopRow()
+        + BoardRow()
+        + StashRow()
+        + Close()
+        + Previous()
+        + Next()
+        + NoRun()
+        + NoCandidates()
+        + NoRecommendation()
+        + EmptyShop()
+        + EmptyBoard()
+        + EmptyStash()
+        + L.Resolve(TenWinLabelText)
+        + RefreshFinalBuilds()
+        + Working()
+        + RefreshingFinalBuilds()
+        + FinalBuildRefreshAlreadyRunning()
+        + FinalBuildRefreshSucceeded()
+        // Fixed sample covering the corpus-summary labels/units plus every digit glyph.
+        + FinalBuildRefreshSucceeded(
+            new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
+            1234567890,
+            1234567890
+        )
+        + FinalBuildRefreshFailed(Unknown());
+}

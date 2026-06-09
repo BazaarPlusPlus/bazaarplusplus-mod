@@ -34,7 +34,7 @@ HistoryPanelFormatter.IsGhostOpponentEliminated(battle)
 
 双信号互为校验：扫描场景靠颜色、色弱玩家靠文字。row 指示与详情面板横幅都从 `IsGhostOpponentEliminated()` 单一来源派生，不会漂移。
 
-涉及文件：`Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Rows.cs`（chip 构造 / 绑定 / 着色分支）、`Game/HistoryPanel/HistoryPanelText.cs`（`GhostOpponentEliminatedShortText`）。`HistoryBattleRecord` 与 `HistoryPanelFormatter.IsGhostOpponentEliminated()` 不改。
+涉及文件：`Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Rows.cs`（chip 构造 / 绑定 / 着色分支）、`Game/HistoryPanel/Text/HistoryPanelText.Battles.cs`（`GhostOpponentEliminatedShortText`）。`HistoryBattleRecord` 与 `HistoryPanelFormatter.IsGhostOpponentEliminated()` 不改。
 
 ## Known Issues / 待现场确认
 
@@ -47,4 +47,4 @@ HistoryPanelFormatter.IsGhostOpponentEliminated(battle)
 - `GameInterop/ItemBoardPreview/BppItemBoardPreview.cs`
 - `GameInterop/ItemBoardPreview/BppItemBoard.cs`
 - `Game/HistoryPanel/Storage/HistoryPanelRepository.cs`
-- `Game/HistoryPanel/HistoryPanelReplayService.cs`、`HistoryPanelFormatter.cs`、`HistoryPanelText.cs`
+- `Game/HistoryPanel/HistoryPanelReplayService.cs`、`HistoryPanelFormatter.cs`、`Text/HistoryPanelText.*.cs`

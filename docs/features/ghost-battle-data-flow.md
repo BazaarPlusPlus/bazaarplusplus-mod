@@ -6,6 +6,8 @@ finally rendered in the History Panel. Source-of-truth files are linked at each
 hop so the semantics of `player_*` vs `opponent_*` can be verified layer by
 layer.
 
+The client-side battle models referenced below live in the shared [`PvP Battles`](pvp-battles.md) module.
+
 ## Participant Terminology
 
 - **Uploader** — the player who actually sat down and played a PvP match. Their
