@@ -6,7 +6,7 @@ Scope: replace old CardSetPreview, add in-run live build panel, and migrate Hist
 UI name: 终局阵容
 Code feature name: `LiveBuildPanel`
 
-> **实现状态(2026-06-05 起):** 核心架构已落地——Game/LiveBuildPanel/、GameInterop/ItemBoardPreview/BppItemBoard*、Game/BuildRecommendations/、Game/OverlayPanels/BppOverlayPanelMutex;HistoryPanel 已迁移至 BppItemBoardPreview;Game/CardSetPreview/ 已删除。Ui/ 目标文件(LiveBuildPanelView.Tree.cs/.Rows.cs)实际合并为单文件 LiveBuildPanelView.cs。『数据来源』章节引用的 AutoBazaarGameContextReader.cs 等为 WP-R 改名前旧路径(现 src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameContextReader.cs)。
+> **实现状态(2026-06-05 起):** 核心架构已落地——Game/LiveBuildPanel/（含 Recommendations/）、GameInterop/ItemBoardPreview/BppItemBoard*、Game/OverlayPanels/BppOverlayPanelMutex;HistoryPanel 已迁移至 BppItemBoardPreview;Game/CardSetPreview/ 已删除。Ui/ 目标文件(LiveBuildPanelView.Tree.cs/.Rows.cs)实际合并为单文件 LiveBuildPanelView.cs。『数据来源』章节引用的 AutoBazaarGameContextReader.cs 等为 WP-R 改名前旧路径(现 src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameContextReader.cs)。
 
 ## 背景
 
@@ -65,9 +65,9 @@ Code feature name: `LiveBuildPanel`
 ### 技术验收
 
 1. 新 feature 目录为 `Game/LiveBuildPanel/`，runtime live card 读取适配放在 `GameInterop/LiveCards/`。
-2. 通用 board contract 是 `BppItemBoard`，放在 `GameInterop/ItemBoardPreview/`，由 LiveBuildPanel、HistoryPanel 和 final-build recommendation 共同消费。
+2. 通用 board contract 是 `BppItemBoard`，放在 `GameInterop/ItemBoardPreview/`，由 LiveBuildPanel 和 HistoryPanel 共同消费；final-build recommendation rendering 通过 LiveBuildPanel 内部 recommendation backend 使用。
 3. `BattleBoardPreview` / `HistoryItemSpec` 被共享 `BppItemBoardPreview` / `BppItemBoard` 替换；HistoryPanel 不再使用 `ItemBoardPreviewLayoutMode.Packed`。
-4. final-build 数据逻辑迁到中性模块，例如 `Game/BuildRecommendations/`；`Game/CardSetPreview/` 不作为 fallback 保留。
+4. final-build 数据逻辑迁到 `Game/LiveBuildPanel/Recommendations/`；`Game/CardSetPreview/` 不作为 fallback 保留，且不再保留顶层旧 recommendation 目录。
 5. `LiveBuildPanel` 和 `HistoryPanel` 不直接依赖彼此内部类型；共享 preview/model 只能通过 `GameInterop.ItemBoardPreview`。
 6. 删除旧 `CardSetPreviewRuntime` 时同步删除 composition mount、tooltip patches、hotkey/mode/status classes、旧 board service/chrome 和旧 tests。
 7. 面板互斥不再继续扩散 feature-to-feature static import。新增共享 overlay panel mutex/registry，CollectionPanel、HistoryPanel、LiveBuildPanel 打开前都关闭同 sorting band 的其他面板。当前 CollectionPanel 已经用 direct import 关闭 HistoryPanel，因为两者共享 26/27 sorting band。Evidence: [`CollectionPanel.cs:234-237`](../../../Game/CollectionPanel/CollectionPanel.cs#L234-L237), [`CollectionGridConstants.cs:46-50`](../../../Game/CollectionPanel/Grid/CollectionGridConstants.cs#L46-L50), [`HistoryPanelUiToolkitView.cs:107-110`](../../../Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs#L107-L110).
@@ -127,11 +127,12 @@ Game/LiveBuildPanel/
   Preview/
     LiveBuildPreviewRenderer.cs
     LiveItemBoardRowPreview.cs
-
-Game/BuildRecommendations/
-  BuildRecommendationRepository.cs
-  BuildRecommendation.cs
-  BuildRecommendationSource.cs
+  Recommendations/
+    BuildRecommendationRepository.cs
+    BuildRecommendation.cs
+    BuildRecommendationRefreshService.cs
+    BuildLiveState.cs
+    TenWinBuildCorpus.cs
 
 Game/OverlayPanels/
   BppOverlayPanelMutex.cs
@@ -158,13 +159,13 @@ GameInterop/ItemBoardPreview/
 
 `BppItemBoardPreview` 是 shared renderer wrapper，持有 `ItemBoardPreviewSurface`，把 `BppItemBoardCard` 映射为 `NativeCardPreviewSpec`，并转发 `Render` / `PollHover` / `Hide` / `Dispose`。HistoryPanel 和 LiveBuildPanel 可以各自包一层 feature adapter，但不得再复制 `BattleBoardPreview.MapSpecs(...)` 这种 feature-owned preview mapping。
 
-`BuildRecommendationRepository` 只负责 final-build 数据、cache/remote refresh 和候选匹配。它可以返回 `BuildRecommendation`，其中包含一个 `BppItemBoard(Id=FinalBuild, Type=Reference)`，从而删除旧 `ItemBoardItemSpec`。
+`LiveBuildPanel/Recommendations/BuildRecommendationRepository` 只负责 final-build 数据、cache/remote refresh 和候选匹配。它可以返回 `BuildRecommendation`，其中包含一个 `BppItemBoard(Id=FinalBuild, Type=Reference)`，从而删除旧 `ItemBoardItemSpec`。该模块是 LiveBuildPanel 的私有 recommendation backend，不是跨 feature shared module。
 
 `BppOverlayPanelMutex` 是三块 overlay panel 的互斥点，替换当前 CollectionPanel -> HistoryPanel 的 direct static dependency。它只知道 panel id、visibility 和 close callback，不知道 feature 内部状态。
 
 ## BppItemBoard
 
-`BppItemBoard` 放在 `GameInterop/ItemBoardPreview/`，因为它是 native item-board preview surface 的输入 contract，且现在有三个消费者：LiveBuildPanel、HistoryPanel、final-build recommendation rendering。
+`BppItemBoard` 放在 `GameInterop/ItemBoardPreview/`，因为它是 native item-board preview surface 的输入 contract，且现在有两个 feature consumers：LiveBuildPanel 和 HistoryPanel。final-build recommendation rendering is an internal LiveBuildPanel consumer through `LiveBuildPanel/Recommendations/`.
 
 ```text
 BppItemBoard
@@ -299,9 +300,9 @@ LiveBuildPanel 不能直接依赖 `Game/AutoBazaarHost`，因为 BazaarAgent hos
 
 ### Final Build
 
-final-build recommendation 数据和匹配逻辑迁到 `Game/BuildRecommendations/`。当前 repository 会把 final-build player cards 投影为 `ItemBoardItemSpec`，其中包含 `TemplateId`、`Tier`、`SocketId`、`EnchantmentType` 等渲染所需字段。Evidence: [`CardSetBuildDataRepository.cs:539-558`](../../../Game/CardSetPreview/CardSetBuildDataRepository.cs#L539-L558), [`CardSetBuildDataRepository.cs:558-589`](../../../Game/CardSetPreview/CardSetBuildDataRepository.cs#L558-L589), [`ItemBoardItemSpec.cs:9-35`](../../../Game/CardSetPreview/ItemBoardItemSpec.cs#L9-L35).
+final-build recommendation 数据和匹配逻辑迁到 `Game/LiveBuildPanel/Recommendations/`。当前 repository 会把 final-build player cards 投影为 `ItemBoardItemSpec`，其中包含 `TemplateId`、`Tier`、`SocketId`、`EnchantmentType` 等渲染所需字段。Evidence: [`CardSetBuildDataRepository.cs:539-558`](../../../Game/CardSetPreview/CardSetBuildDataRepository.cs#L539-L558), [`CardSetBuildDataRepository.cs:558-589`](../../../Game/CardSetPreview/CardSetBuildDataRepository.cs#L558-L589), [`ItemBoardItemSpec.cs:9-35`](../../../Game/CardSetPreview/ItemBoardItemSpec.cs#L9-L35).
 
-迁移后的 repository 返回 `BuildRecommendation`，其 board 字段是 `BppItemBoard(Id=FinalBuild, Type=Reference)`。`HistoryPanelDataService` 的 remote refresh 入口同步改引用，不保留 `BazaarPlusPlus.Game.CardSetPreview` namespace shim。
+迁移后的 repository 返回 `BuildRecommendation`，其 board 字段是 `BppItemBoard(Id=FinalBuild, Type=Reference)`。LiveBuildPanel 直接持有 refresh/query backend；`HistoryPanelDataService` 不再消费它，也不保留 `BazaarPlusPlus.Game.CardSetPreview` namespace shim。
 
 ## 候选状态
 
@@ -366,7 +367,7 @@ LiveBuildPanel 是模态 overlay，不是与原生商店同时可操作的 HUD�
 
 ### 迁移目标
 
-- `CardSetBuildDataRepository.cs`, `CardSetBuildRecommendation.cs`, `ItemBoardItemSpec.cs` 迁到 `Game/BuildRecommendations/` 并重命名为 final-build/build-recommendation 语义；`ItemBoardItemSpec` 被 `BppItemBoardCard` 取代。
+- `CardSetBuildDataRepository.cs`, `CardSetBuildRecommendation.cs`, `ItemBoardItemSpec.cs` 迁到 `Game/LiveBuildPanel/Recommendations/` 并重命名为 final-build/build-recommendation 语义；`ItemBoardItemSpec` 被 `BppItemBoardCard` 取代。
 - `HistoryPanelDataService.cs` 改引用新 repository；`AllowedFeaturePreviewBoundaryFiles` 里的旧 HistoryPanel -> CardSetPreview exception 删除。
 - `HistoryPanelPreviewSource` / `HistoryBattlePreviewProjection` 改返回 `HistoryBattlePreviewData(Board: BppItemBoard, Signature)` 或直接由 data 承载 board signature。
 - `CollectionPanel` 和 `HistoryPanel` 当前 direct mutex 替换为 `BppOverlayPanelMutex`。
@@ -375,7 +376,7 @@ LiveBuildPanel 是模态 overlay，不是与原生商店同时可操作的 HUD�
 
 `MonsterPreviewResilience.Tests` 当前仍直接编译并断言旧 mode enum、mode flow、hotkey helper 和 mode status text。Evidence: [`MonsterPreviewResilience.Tests.csproj:10-26`](../../../tests/MonsterPreviewResilience.Tests/MonsterPreviewResilience.Tests.csproj#L10-L26), [`MonsterPreviewResilience.Tests/Program.cs:14-68`](../../../tests/MonsterPreviewResilience.Tests/Program.cs#L14-L68). 这些旧断言应删除。该文件里的 supporter attribution helper 断言不需要搬家，因为 `Supporters.Tests` 已经覆盖相同 helper。Evidence: [`Supporters.Tests/Program.cs:18-40`](../../../tests/Supporters.Tests/Program.cs#L18-L40), [`Supporters.Tests.csproj:14-33`](../../../tests/Supporters.Tests/Supporters.Tests.csproj#L14-L33).
 
-`CardSetBuildRecommendationTier.Tests` 不能漏。它通过 reflection 找旧 `BazaarPlusPlus.Game.CardSetPreview.CardSetBuildDataRepository`，并覆盖 tier mapping、cache path 和 remote-refresh 行为。Evidence: [`CardSetBuildRecommendationTier.Tests/Program.cs:25-43`](../../../tests/CardSetBuildRecommendationTier.Tests/Program.cs#L25-L43), [`CardSetBuildRecommendationTier.Tests/Program.cs:45-103`](../../../tests/CardSetBuildRecommendationTier.Tests/Program.cs#L45-L103). 迁移 repository 时必须同步更新类型名和测试断言。
+`LiveBuildRecommendations.Tests` 不能漏。它通过 reflection 找 internal recommendation repository types，并覆盖 tier mapping、cache path 和 remote-refresh 行为。Evidence: [`LiveBuildRecommendations.Tests/Program.cs:25-43`](../../../tests/LiveBuildRecommendations.Tests/Program.cs#L25-L43), [`LiveBuildRecommendations.Tests/Program.cs:45-103`](../../../tests/LiveBuildRecommendations.Tests/Program.cs#L45-L103). 迁移 repository 时必须同步更新类型名和测试断言。
 
 `CoreLayeringTests.HistoryPanel_and_CardSetPreview_do_not_depend_on_each_others_preview_internals` 不能只改 allowlist。它现在 assert `Game/CardSetPreview` directory exists；旧目录删除后这条规则本身会失败。Evidence: [`CoreLayeringTests.cs:149-205`](../../../tests/Architecture.Tests/CoreLayeringTests.cs#L149-L205). 新规则应改成：`Game/HistoryPanel` 与 `Game/LiveBuildPanel` 不互相 import，二者通过 `GameInterop.ItemBoardPreview` 共享；`Game/CardSetPreview` 不存在。
 
@@ -416,7 +417,7 @@ LiveBuildPanel 是模态 overlay，不是与原生商店同时可操作的 HUD�
    - skill/encounter selection 被忽略；
    - board/stash snapshot 保留 socket id。
 
-6. `BuildRecommendations.Tests`
+6. `LiveBuildRecommendations.Tests`
    - final-build repository namespace/type migration；
    - tier mapping；
    - cache path；
@@ -435,7 +436,7 @@ LiveBuildPanel 是模态 overlay，不是与原生商店同时可操作的 HUD�
 1. 新增 pure data tests：`BppItemBoardSlotPlanner`、HistoryPanel projection、candidate state。
 2. 新增 `BppItemBoard`、`BppItemBoardCard`、`BppItemBoardId`、`BppItemBoardType`、`BppItemBoardSlotPlanner`、`BppItemBoardPreview`。
 3. 迁移 HistoryPanel preview：`HistoryBattlePreviewProjection` 产出 `BppItemBoard`，HistoryPanel 使用 shared preview，删除 `BattleBoardPreview` / `HistoryItemSpec` / duplicate geometry。
-4. 迁移 final-build repository 到 `Game/BuildRecommendations/`，更新 `HistoryPanelDataService` 和 `CardSetBuildRecommendationTier.Tests`。
+4. 迁移 final-build repository 到 `Game/LiveBuildPanel/Recommendations/`，确认 `HistoryPanelDataService` 不再消费它，并更新 `LiveBuildRecommendations.Tests`。
 5. 新增 `BppOverlayPanelMutex`，把 CollectionPanel / HistoryPanel / LiveBuildPanel 的互斥集中到共享 registry。
 6. 新增 `GameInterop/LiveCards/LiveCardSnapshotReader`。
 7. 新增 LiveBuildPanel panel shell 和 Caps toggle；不新增 settings dock entry。

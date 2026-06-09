@@ -20,8 +20,8 @@ Date: 2026-06-07
 
 - `LiveBuildPanel` 已经持有 `BuildRecommendationRepository`，并在候选物品变化时调用 `FindRecommendations(...)` 生成十胜推荐：`src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs:31`、`src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs:202`。
 - `LiveBuildPanel` 的右侧 rail 已经有候选数量、推荐状态、上一条/下一条导航，是承载“拉取阵容”按钮的自然位置：`src/BazaarPlusPlus/Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs:265`、`src/BazaarPlusPlus/Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs:293`。
-- `BuildRecommendationRepository` 明确负责加载 analyzer-v4 十胜阵容 corpus、缓存、远端刷新，并说明推荐查询只读本地 corpus、不打远端：`src/BazaarPlusPlus/Game/BuildRecommendations/BuildRecommendationRepository.cs:19`。
-- 手动远端刷新实际入口在共享仓库层：`BuildRecommendationRepository.TryRefreshFinalBuildsFromRemote(...)`，位置是 `src/BazaarPlusPlus/Game/BuildRecommendations/BuildRecommendationRepository.cs:278`。
+- `BuildRecommendationRepository` 明确负责加载 analyzer-v4 十胜阵容 corpus、缓存、远端刷新，并说明推荐查询只读本地 corpus、不打远端：`src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/BuildRecommendationRepository.cs:19`。
+- 手动远端刷新实际入口在 LiveBuildPanel recommendation backend：`BuildRecommendationRepository.TryRefreshFinalBuildsFromRemote(...)`，位置是 `src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/BuildRecommendationRepository.cs:290`。
 - HistoryPanel 目前只是把共享仓库刷新包进 `HistoryPanelDataService.RefreshFinalBuildsAsync(...)`：`src/BazaarPlusPlus/Game/HistoryPanel/Storage/HistoryPanelDataService.cs:177`。
 - HistoryPanel UI 当前把 `Pull Builds / 拉取阵容` 按钮放在 operation rail 的 tool row：`src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Tree.cs:316`、`src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Tree.cs:330`。
 - HistoryPanel 本地 DB chip 来自 `_dataService.IsAvailable` 与 `_dataService.DatabaseExists`，语义是本地 SQLite/repository 可用性：`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelCoordinator.cs:460`、`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanel.UiToolkit.cs:216`。
@@ -33,7 +33,7 @@ Date: 2026-06-07
 ## 目标
 
 1. 把“拉取阵容”入口从 HistoryPanel 移到 LiveBuildPanel。
-2. 保持十胜阵容刷新逻辑在 `Game/BuildRecommendations` 共享层，避免 LiveBuildPanel 依赖 HistoryPanel。
+2. 保持十胜阵容刷新逻辑在 `Game/LiveBuildPanel/Recommendations`，避免 LiveBuildPanel 依赖 HistoryPanel，也避免误把 recommendation backend 表达成跨 feature shared module。
 3. 删除 HistoryPanel 里的阵容刷新状态、按钮、文案和测试假设。
 4. 把 HistoryPanel 的“检测连通”按钮移动到 DB chip 同一行。
 5. 保持本地 DB 状态与远端 server health 状态分离：同一行展示，不合并语义。
@@ -98,9 +98,9 @@ Server health 语义保持：
 
 ## 实施设计
 
-### 1. 在 BuildRecommendations 增加共享刷新服务
+### 1. 在 LiveBuildPanel/Recommendations 保留刷新服务
 
-新增 `src/BazaarPlusPlus/Game/BuildRecommendations/BuildRecommendationRefreshService.cs`：
+保留 `src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/BuildRecommendationRefreshService.cs`：
 
 ```csharp
 internal sealed class BuildRecommendationRefreshService
@@ -117,7 +117,7 @@ internal readonly struct BuildRecommendationRefreshResult
 
 内部使用 `Task.Run(...)` 包装 `BuildRecommendationRepository.TryRefreshFinalBuildsFromRemote(out error)`。这样 async/session guard 不再挂在 HistoryPanel，LiveBuildPanel 可以直接消费共享服务。注意：现有 repository 刷新是同步 HTTP 读取，`CancellationToken` 只能阻止任务启动或阻止 stale continuation 更新 UI，不保证中断已经发出的网络请求；本次不改 repository 的 HTTP 实现。
 
-保留 `TryRefreshFinalBuildsFromRemote(...)` 的现有签名，因为测试已经通过反射验证这个手动刷新入口：`tests/CardSetBuildRecommendationTier.Tests/Program.cs:786`。
+保留 `TryRefreshFinalBuildsFromRemote(...)` 的现有签名，因为测试已经通过反射验证这个手动刷新入口：`tests/LiveBuildRecommendations.Tests/Program.cs:867`。
 
 ### 2. 给 LiveBuildPanel 增加刷新状态与动作
 
@@ -212,7 +212,7 @@ internal readonly struct BuildRecommendationRefreshResult
 ### 必跑
 
 ```bash
-dotnet run --project tests/CardSetBuildRecommendationTier.Tests/CardSetBuildRecommendationTier.Tests.csproj
+dotnet run --project tests/LiveBuildRecommendations.Tests/LiveBuildRecommendations.Tests.csproj
 dotnet run --project tests/LiveBuildPanel.Tests/LiveBuildPanel.Tests.csproj
 dotnet run --project tests/HistoryPanelServerHealth.Tests/HistoryPanelServerHealth.Tests.csproj
 dotnet run --project tests/GhostBattleSync.Tests/GhostBattleSync.Tests.csproj
@@ -278,7 +278,7 @@ open "steam://run/1617400"
 
 预计修改：
 
-- `src/BazaarPlusPlus/Game/BuildRecommendations/BuildRecommendationRefreshService.cs`（新增）
+- `src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/BuildRecommendationRefreshService.cs`
 - `src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs`
 - `src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanelText.cs`
 - `src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildPanelSnapshot.cs`
