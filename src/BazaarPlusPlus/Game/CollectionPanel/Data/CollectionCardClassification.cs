@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
 internal enum CollectionCardEligibilityReason
@@ -23,7 +20,4 @@ internal sealed class CollectionCardClassification
     public CollectionCardEligibilityReason EligibilityReason { get; init; }
 
     public bool IsPackage { get; init; }
-
-    public IReadOnlyCollection<CollectionMerchantKind> Merchants { get; init; } =
-        Array.Empty<CollectionMerchantKind>();
 }

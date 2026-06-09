@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards;
-using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.Game.CardFrames;
 using TheBazaar.Utilities.Shaders;
@@ -56,11 +56,10 @@ internal static class CardArtInjector
         return false;
     }
 
-    public static bool IsPackageCard(Card? card) =>
-        card?.HiddenTags != null && card.HiddenTags.Contains(EHiddenTag.Package);
+    public static bool IsPackageCard(Card? card) => PackageIdentity.IsPackage(card?.HiddenTags);
 
     public static bool IsPackageTemplate(TCardBase? card) =>
-        card?.HiddenTags != null && card.HiddenTags.Contains(EHiddenTag.Package);
+        PackageIdentity.IsPackage(card?.HiddenTags);
 
     public static bool Apply(ItemVisualsController visuals, Texture2D texture)
     {

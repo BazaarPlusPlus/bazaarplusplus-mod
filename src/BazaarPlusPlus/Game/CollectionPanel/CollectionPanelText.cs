@@ -1,6 +1,5 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
@@ -38,6 +37,12 @@ internal static class CollectionPanelText
     );
     private static readonly LocalizedTextSet SizeHeaderText = new("Size", "尺寸", "尺寸", "尺寸");
     private static readonly LocalizedTextSet TagHeaderText = new("Tags", "标签", "標籤", "標籤");
+    private static readonly LocalizedTextSet KeywordHeaderText = new(
+        "Keywords",
+        "关键词",
+        "關鍵詞",
+        "關鍵詞"
+    );
     private static readonly LocalizedTextSet TagLessText = new("Less", "收起", "收起", "收起");
     private static readonly LocalizedTextSet SortHeaderText = new("Sort", "排序", "排序", "排序");
     private static readonly LocalizedTextSet SortQualityText = new(
@@ -60,10 +65,16 @@ internal static class CollectionPanelText
         "訓練師"
     );
     private static readonly LocalizedTextSet PackagesToggleText = new(
-        "Packages",
-        "包裹",
-        "包裹",
-        "包裹"
+        "Packages only",
+        "仅包裹",
+        "僅包裹",
+        "僅包裹"
+    );
+    private static readonly LocalizedTextSet PackagesToggleTooltipText = new(
+        "Show only package cards.",
+        "只显示包裹卡。",
+        "只顯示包裹卡。",
+        "只顯示包裹卡。"
     );
 
     private static readonly LocalizedTextSet CatalogLoadingText = new(
@@ -105,6 +116,8 @@ internal static class CollectionPanelText
 
     internal static string TagHeader() => Resolve(TagHeaderText);
 
+    internal static string KeywordHeader() => Resolve(KeywordHeaderText);
+
     internal static string TagMore(int hiddenCount) =>
         FormatSimple(
             $"More ({hiddenCount})",
@@ -121,12 +134,12 @@ internal static class CollectionPanelText
 
     internal static string SortSize() => Resolve(SortSizeText);
 
-    internal static string MerchantHeader() => Resolve(MerchantHeaderText);
-
     internal static string SourceHeader(ECardType activeType) =>
         activeType == ECardType.Skill ? Resolve(TrainerHeaderText) : Resolve(MerchantHeaderText);
 
     internal static string PackagesToggle() => Resolve(PackagesToggleText);
+
+    internal static string PackagesToggleTooltip() => Resolve(PackagesToggleTooltipText);
 
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 
@@ -156,27 +169,6 @@ internal static class CollectionPanelText
 
     // Tag labels intentionally have no entry here: chips resolve through the game's native
     // typography (GameInterop.TagTypography.NativeTagTypography), never a mod-side dictionary.
-
-    internal static string Merchant(CollectionMerchantKind merchant) =>
-        merchant switch
-        {
-            CollectionMerchantKind.General => FormatSimple("General", "通用", "通用", "通用"),
-            CollectionMerchantKind.Burn => FormatSimple("Burn", "燃烧", "燃燒", "燃燒"),
-            CollectionMerchantKind.Poison => FormatSimple("Poison", "中毒", "中毒", "中毒"),
-            CollectionMerchantKind.Freeze => FormatSimple("Freeze", "冻结", "凍結", "凍結"),
-            CollectionMerchantKind.Slow => FormatSimple("Slow", "减速", "減速", "減速"),
-            CollectionMerchantKind.Haste => FormatSimple("Haste", "加速", "加速", "加速"),
-            CollectionMerchantKind.Speed => FormatSimple("Speed", "速度", "速度", "速度"),
-            CollectionMerchantKind.Toughness => FormatSimple("Toughness", "韧性", "韌性", "韌性"),
-            CollectionMerchantKind.Strength => FormatSimple("Strength", "力量", "力量", "力量"),
-            CollectionMerchantKind.Heal => FormatSimple("Heal", "治疗", "治療", "治療"),
-            CollectionMerchantKind.Economy => FormatSimple("Economy", "经济", "經濟", "經濟"),
-            CollectionMerchantKind.Shield => FormatSimple("Shield", "护盾", "護盾", "護盾"),
-            CollectionMerchantKind.Health => FormatSimple("Health", "生命", "生命", "生命"),
-            CollectionMerchantKind.Joy => FormatSimple("Joy", "欢乐", "歡樂", "歡樂"),
-            CollectionMerchantKind.Flying => FormatSimple("Flying", "飞行", "飛行", "飛行"),
-            _ => merchant.ToString(),
-        };
 
     internal static string Hero(EHero hero) =>
         hero switch

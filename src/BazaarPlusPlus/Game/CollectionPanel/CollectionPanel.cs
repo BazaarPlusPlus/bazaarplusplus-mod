@@ -481,6 +481,8 @@ internal sealed class CollectionPanel : MonoBehaviour
                 if (_filter.ActiveType == type)
                     return;
                 _filter.ActiveType = type;
+                if (type == ECardType.Skill)
+                    _filter.PackagesOnly = false;
                 PruneInvisibleSourceSelections();
                 _scrollY = 0f;
                 ApplyFilters();
@@ -529,6 +531,14 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ApplyFilters();
                 RefreshView();
             },
+            toggleKeyword: keyword =>
+            {
+                if (!_filter.Keywords.Remove(keyword))
+                    _filter.Keywords.Add(keyword);
+                _scrollY = 0f;
+                ApplyFilters();
+                RefreshView();
+            },
             toggleSource: sourceKey =>
             {
                 _filter.ToggleSource(_filter.ActiveType, sourceKey);
@@ -538,7 +548,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             },
             togglePackages: () =>
             {
-                _filter.IncludePackages = !_filter.IncludePackages;
+                _filter.PackagesOnly = !_filter.PackagesOnly;
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
@@ -739,7 +749,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         }
         else
         {
-            var sourceEntry = ResolveSelectedSourceEntry();
+            var sourceEntry = _filter.PackagesOnly ? null : ResolveSelectedSourceEntry();
             var hasSelectedSource = sourceEntry != null;
             IReadOnlyCollection<Guid>? offeredCardIds = null;
             if (sourceEntry != null)
@@ -761,11 +771,15 @@ internal sealed class CollectionPanel : MonoBehaviour
                 new CollectionFilterContext
                 {
                     OfferedCardIds = offeredCardIds,
-                    ApplyHeroFilter = !hasSelectedSource || _filter.ActiveType == ECardType.Skill,
+                    ApplyHeroFilter =
+                        !_filter.PackagesOnly
+                        && (!hasSelectedSource || _filter.ActiveType == ECardType.Skill),
                     // A source whose offer rule pins a starting tier deals that tier on any
                     // day; only exempt once its pool is actually narrowing the result.
                     SuppressDayGate =
-                        offeredCardIds != null && sourceEntry!.OfferRule.StartingTier != null,
+                        !_filter.PackagesOnly
+                        && offeredCardIds != null
+                        && sourceEntry!.OfferRule.StartingTier != null,
                 }
             );
             _virtualizer.SetVisible(ordered, _filter.ActiveType);
@@ -778,6 +792,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (_view == null || _virtualizer == null)
             return;
 
+        var profile = CollectionTabProfile.For(_filter.ActiveType);
         var model = new CollectionPanelViewModel
         {
             Title = CollectionPanelText.Title(),
@@ -787,14 +802,15 @@ internal sealed class CollectionPanel : MonoBehaviour
             StatusMessage = _statusVisible ? _statusMessage : null,
             IsLoading = _isLoadingCatalog,
             ActiveType = _filter.ActiveType,
+            TabProfile = profile,
             SelectedHeroes = new HashSet<EHero>(_filter.Heroes),
             SelectedTiers = new HashSet<ETier>(_filter.Tiers),
             SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
             SelectedTags = new HashSet<ECardTag>(_filter.Tags),
-            SelectedSourceKey = _filter.GetSelectedSourceKey(_filter.ActiveType),
-            IncludePackages = _filter.IncludePackages,
-            ShowPackageToggle = true,
-            SourceSelectorEnabled = !_isLoadingCatalog,
+            SelectedKeywords = new HashSet<EHiddenTag>(_filter.Keywords),
+            SelectedSourceKey = _filter.PackagesOnly ? null : _filter.SelectedSourceKey,
+            PackagesOnly = _filter.PackagesOnly,
+            SourceSelectorEnabled = !_isLoadingCatalog && !_filter.PackagesOnly,
             SortPriority = _filter.SortPriority,
             DayFilterActive = _filter.SelectedRunDay != null,
             DayFilterValue = _currentRunDay ?? DayTierSchedule.OutOfRunDay,
@@ -802,6 +818,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
             AvailableTags = CollectionTagWhitelist.Ordered,
+            AvailableKeywords = CollectionKeywordWhitelist.Ordered,
             AvailableSources = AvailableSourcesFor(_filter.ActiveType),
             ContentHeight = _virtualizer.ContentHeight,
         };
@@ -817,10 +834,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private IReadOnlyList<CollectionSourceOptionViewModel> AvailableSourcesFor(ECardType activeType)
     {
-        var kind =
-            activeType == ECardType.Skill
-                ? CollectionSourceKind.Trainer
-                : CollectionSourceKind.Merchant;
+        var kind = CollectionTabProfile.For(activeType).SourceKind;
         var roster = CollectionSourceRoster.Build(
             CollectionSourceCatalog.For(kind, _filter.SelectedHero)
         );
@@ -846,9 +860,11 @@ internal sealed class CollectionPanel : MonoBehaviour
     private bool PruneInvisibleSourceSelections()
     {
         var selectedHero = _filter.SelectedHero;
-        var visibleMerchants = SourceKeysFor(CollectionSourceKind.Merchant, selectedHero);
-        var visibleTrainers = SourceKeysFor(CollectionSourceKind.Trainer, selectedHero);
-        return _filter.PruneSelectedSources(visibleMerchants, visibleTrainers);
+        var visibleSources = SourceKeysFor(
+            CollectionTabProfile.For(_filter.ActiveType).SourceKind,
+            selectedHero
+        );
+        return _filter.PruneSelectedSource(visibleSources);
     }
 
     private static IReadOnlyList<string> SourceKeysFor(
@@ -864,30 +880,27 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private CollectionSourceEntry? ResolveSelectedSourceEntry()
     {
-        var sourceKey = _filter.GetSelectedSourceKey(_filter.ActiveType);
+        var sourceKey = _filter.SelectedSourceKey;
         if (string.IsNullOrWhiteSpace(sourceKey))
             return null;
 
         if (!CollectionSourceCatalog.TryGetBySourceKey(sourceKey!, out var entry) || entry == null)
         {
-            _filter.ClearSelectedSource(_filter.ActiveType);
+            _filter.ClearSelectedSource();
             return null;
         }
 
-        var expectedKind =
-            _filter.ActiveType == ECardType.Skill
-                ? CollectionSourceKind.Trainer
-                : CollectionSourceKind.Merchant;
+        var expectedKind = CollectionTabProfile.For(_filter.ActiveType).SourceKind;
         if (entry.Kind != expectedKind)
         {
-            _filter.ClearSelectedSource(_filter.ActiveType);
+            _filter.ClearSelectedSource();
             return null;
         }
 
         var selectedHero = _filter.SelectedHero;
         if (selectedHero.HasValue && !entry.AppliesToHero(selectedHero.Value))
         {
-            _filter.ClearSelectedSource(_filter.ActiveType);
+            _filter.ClearSelectedSource();
             return null;
         }
 

@@ -23,6 +23,4 @@ internal sealed partial class CollectionCardVm
     public string ArtKey { get; init; } = string.Empty;
     public bool IsEnchantable { get; init; }
     public bool IsPackage { get; init; }
-    public IReadOnlyCollection<CollectionMerchantKind> Merchants { get; init; } =
-        Array.Empty<CollectionMerchantKind>();
 }

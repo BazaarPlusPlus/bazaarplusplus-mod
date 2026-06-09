@@ -110,6 +110,45 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
+    private void RefreshTagFacetChips(CollectionPanelViewModel model)
+    {
+        var kind =
+            model.TabProfile.ShowKeywordFilter ? CollectionTagFacetKind.Keywords
+            : model.TabProfile.ShowTagFilter ? CollectionTagFacetKind.Tags
+            : CollectionTagFacetKind.None;
+
+        if (_tagFacetKind != kind)
+        {
+            ClearTagFacetRow();
+            _tagFacetKind = kind;
+            _tagRowExpanded = false;
+        }
+
+        if (kind == CollectionTagFacetKind.Tags)
+        {
+            _lastTagOptions = model.AvailableTags;
+            _lastSelectedTags = model.SelectedTags;
+            _lastKeywordOptions = Array.Empty<EHiddenTag>();
+            _lastSelectedKeywords = new HashSet<EHiddenTag>();
+            EnsureTagChips(model.AvailableTags, model.SelectedTags);
+        }
+        else if (kind == CollectionTagFacetKind.Keywords)
+        {
+            _lastTagOptions = Array.Empty<ECardTag>();
+            _lastSelectedTags = new HashSet<ECardTag>();
+            _lastKeywordOptions = model.AvailableKeywords;
+            _lastSelectedKeywords = model.SelectedKeywords;
+            EnsureKeywordChips(model.AvailableKeywords, model.SelectedKeywords);
+        }
+        else
+        {
+            _lastTagOptions = Array.Empty<ECardTag>();
+            _lastSelectedTags = new HashSet<ECardTag>();
+            _lastKeywordOptions = Array.Empty<EHiddenTag>();
+            _lastSelectedKeywords = new HashSet<EHiddenTag>();
+        }
+    }
+
     private void EnsureTagChips(IReadOnlyList<ECardTag> tags, HashSet<ECardTag> selectedTags)
     {
         if (_tagChipRow == null)
@@ -117,7 +156,8 @@ internal sealed partial class CollectionPanelView
         var visible = VisibleTagOptions(tags, selectedTags);
         if (!TagChipsMatch(visible))
         {
-            ClearTagChipRow();
+            ClearTagFacetRow();
+            _tagFacetKind = CollectionTagFacetKind.Tags;
             foreach (var tag in visible)
             {
                 var captured = tag;
@@ -135,6 +175,37 @@ internal sealed partial class CollectionPanelView
         }
 
         RefreshTagMoreButton(tags.Count);
+    }
+
+    private void EnsureKeywordChips(
+        IReadOnlyList<EHiddenTag> keywords,
+        HashSet<EHiddenTag> selectedKeywords
+    )
+    {
+        if (_tagChipRow == null)
+            return;
+        var visible = VisibleKeywordOptions(keywords, selectedKeywords);
+        if (!KeywordChipsMatch(visible))
+        {
+            ClearTagFacetRow();
+            _tagFacetKind = CollectionTagFacetKind.Keywords;
+            foreach (var keyword in visible)
+            {
+                var captured = keyword;
+                var chip = CreateCompactChipButton(
+                    NativeTagTypography.Resolve(captured).Label,
+                    () => _toggleKeyword(captured)
+                );
+                _keywordChips[captured] = chip;
+                _keywordChipOrder.Add(captured);
+                _tagChipRow.Add(chip);
+            }
+
+            _tagMoreButton = CreateCompactChipButton(string.Empty, ToggleTagRowExpanded);
+            _tagChipRow.Add(_tagMoreButton);
+        }
+
+        RefreshTagMoreButton(keywords.Count);
     }
 
     // Collapsed: the whitelist's primary slice plus any selected tag that would otherwise be
@@ -158,8 +229,29 @@ internal sealed partial class CollectionPanelView
         return visible;
     }
 
+    private List<EHiddenTag> VisibleKeywordOptions(
+        IReadOnlyList<EHiddenTag> keywords,
+        HashSet<EHiddenTag> selectedKeywords
+    )
+    {
+        var visible = new List<EHiddenTag>(keywords.Count);
+        for (var i = 0; i < keywords.Count; i++)
+        {
+            var keyword = keywords[i];
+            if (
+                _tagRowExpanded
+                || i < CollectionKeywordWhitelist.PrimaryCount
+                || selectedKeywords.Contains(keyword)
+            )
+                visible.Add(keyword);
+        }
+        return visible;
+    }
+
     private bool TagChipsMatch(List<ECardTag> visible)
     {
+        if (_tagFacetKind != CollectionTagFacetKind.Tags)
+            return false;
         if (visible.Count != _tagChipOrder.Count)
             return false;
         for (var i = 0; i < visible.Count; i++)
@@ -168,14 +260,35 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
+    private bool KeywordChipsMatch(List<EHiddenTag> visible)
+    {
+        if (_tagFacetKind != CollectionTagFacetKind.Keywords)
+            return false;
+        if (visible.Count != _keywordChipOrder.Count)
+            return false;
+        for (var i = 0; i < visible.Count; i++)
+            if (visible[i] != _keywordChipOrder[i])
+                return false;
+        return true;
+    }
+
     private void ToggleTagRowExpanded()
     {
         _tagRowExpanded = !_tagRowExpanded;
-        EnsureTagChips(_lastTagOptions, _lastSelectedTags);
+        if (_tagFacetKind == CollectionTagFacetKind.Keywords)
+            EnsureKeywordChips(_lastKeywordOptions, _lastSelectedKeywords);
+        else
+            EnsureTagChips(_lastTagOptions, _lastSelectedTags);
         foreach (var pair in _tagChips)
             RefreshChip(
                 pair.Value,
                 _lastSelectedTags.Contains(pair.Key),
+                NativeTagTypography.Resolve(pair.Key).AccentColor
+            );
+        foreach (var pair in _keywordChips)
+            RefreshChip(
+                pair.Value,
+                _lastSelectedKeywords.Contains(pair.Key),
                 NativeTagTypography.Resolve(pair.Key).AccentColor
             );
     }
@@ -184,7 +297,11 @@ internal sealed partial class CollectionPanelView
     {
         if (_tagMoreButton == null)
             return;
-        var hiddenCount = totalOptionCount - _tagChipOrder.Count;
+        var visibleCount =
+            _tagFacetKind == CollectionTagFacetKind.Keywords
+                ? _keywordChipOrder.Count
+                : _tagChipOrder.Count;
+        var hiddenCount = totalOptionCount - visibleCount;
         _tagMoreButton.style.display =
             _tagRowExpanded || hiddenCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
         _tagMoreButton.text = _tagRowExpanded
@@ -193,7 +310,7 @@ internal sealed partial class CollectionPanelView
         StyleButton(_tagMoreButton, Colors.HistoryButtonBackground, Colors.HistorySubtitleText);
     }
 
-    private void ClearTagChipRow()
+    private void ClearTagFacetRow()
     {
         foreach (var button in _tagChips.Values)
         {
@@ -202,6 +319,8 @@ internal sealed partial class CollectionPanelView
         }
         _tagChips.Clear();
         _tagChipOrder.Clear();
+        _keywordChips.Clear();
+        _keywordChipOrder.Clear();
         _tagMoreButton = null;
         _tagChipRow?.Clear();
     }

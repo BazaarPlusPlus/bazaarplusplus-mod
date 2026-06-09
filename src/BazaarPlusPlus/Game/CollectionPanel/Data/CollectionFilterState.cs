@@ -19,14 +19,13 @@ internal sealed class CollectionFilterState
     public HashSet<EHero> Heroes { get; } = new();
     public HashSet<ETier> Tiers { get; } = new();
     public HashSet<ECardTag> Tags { get; } = new();
+    public HashSet<EHiddenTag> Keywords { get; } = new();
 
-    // Item card size (Small/Medium/Large). Only meaningful on the Item tab — Skills are a single
-    // size, so the engine ignores this set when ActiveType is Skill and the UI hides the row.
+    // Item card size (Small/Medium/Large). The active tab profile decides whether this set is
+    // shown and applied.
     public HashSet<ECardSize> Sizes { get; } = new();
-    public HashSet<CollectionMerchantKind> Merchants { get; } = new();
-    public string? SelectedMerchantSourceKey { get; set; }
-    public string? SelectedTrainerSourceKey { get; set; }
-    public bool IncludePackages { get; set; }
+    public string? SelectedSourceKey { get; set; }
+    public bool PackagesOnly { get; set; }
 
     // User-selected run "Day" filter; null means no day filtering. Starts enabled so the panel
     // binds it to Data.Run.Day on open; outside a run, OutOfRunDay keeps the toggle visibly active
@@ -47,7 +46,7 @@ internal sealed class CollectionFilterState
     }
 
     public string? GetSelectedSourceKey(ECardType activeType) =>
-        activeType == ECardType.Skill ? SelectedTrainerSourceKey : SelectedMerchantSourceKey;
+        activeType == ActiveType ? SelectedSourceKey : null;
 
     public void ApplySelection(CollectionPanelSelectionState selection)
     {
@@ -57,30 +56,24 @@ internal sealed class CollectionFilterState
         Heroes.Clear();
         Heroes.Add(selection.SelectedHero ?? CollectionPanelSelectionState.DefaultHero);
 
-        Merchants.Clear();
         if (selection.SelectedSourceKind == CollectionSourceKind.Trainer)
         {
             ActiveType = ECardType.Skill;
-            SelectedMerchantSourceKey = null;
-            SelectedTrainerSourceKey = selection.SelectedSourceKey;
+            PackagesOnly = false;
+            SelectedSourceKey = selection.SelectedSourceKey;
             return;
         }
 
         ActiveType = ECardType.Item;
-        SelectedMerchantSourceKey = selection.SelectedSourceKey;
-        SelectedTrainerSourceKey = null;
+        SelectedSourceKey = selection.SelectedSourceKey;
     }
 
     public CollectionPanelSelectionState ToSelectionState()
     {
-        var kind =
-            ActiveType == ECardType.Skill
-                ? CollectionSourceKind.Trainer
-                : CollectionSourceKind.Merchant;
         return new CollectionPanelSelectionState(
             SelectedHero,
-            GetSelectedSourceKey(ActiveType),
-            kind
+            SelectedSourceKey,
+            CollectionTabProfile.For(ActiveType).SourceKind
         );
     }
 
@@ -98,20 +91,12 @@ internal sealed class CollectionFilterState
         if (string.IsNullOrWhiteSpace(sourceKey))
             return;
 
-        if (activeType == ECardType.Skill)
-        {
-            SelectedTrainerSourceKey = string.Equals(
-                SelectedTrainerSourceKey,
-                sourceKey,
-                System.StringComparison.Ordinal
-            )
-                ? null
-                : sourceKey;
-            return;
-        }
+        ActiveType = activeType;
+        if (ActiveType == ECardType.Skill)
+            PackagesOnly = false;
 
-        SelectedMerchantSourceKey = string.Equals(
-            SelectedMerchantSourceKey,
+        SelectedSourceKey = string.Equals(
+            SelectedSourceKey,
             sourceKey,
             System.StringComparison.Ordinal
         )
@@ -119,47 +104,26 @@ internal sealed class CollectionFilterState
             : sourceKey;
     }
 
-    public bool ClearSelectedSource(ECardType activeType)
+    public bool ClearSelectedSource()
     {
-        if (activeType == ECardType.Skill)
-        {
-            if (string.IsNullOrWhiteSpace(SelectedTrainerSourceKey))
-                return false;
-            SelectedTrainerSourceKey = null;
-            return true;
-        }
-
-        if (string.IsNullOrWhiteSpace(SelectedMerchantSourceKey))
+        if (string.IsNullOrWhiteSpace(SelectedSourceKey))
             return false;
-        SelectedMerchantSourceKey = null;
+        SelectedSourceKey = null;
         return true;
     }
 
-    public bool PruneSelectedSources(
-        IReadOnlyCollection<string> visibleMerchantSourceKeys,
-        IReadOnlyCollection<string> visibleTrainerSourceKeys
-    )
+    public bool PruneSelectedSource(IReadOnlyCollection<string> visibleSourceKeys)
     {
-        var changed = false;
         if (
-            !string.IsNullOrWhiteSpace(SelectedMerchantSourceKey)
-            && !ContainsOrdinal(visibleMerchantSourceKeys, SelectedMerchantSourceKey!)
+            !string.IsNullOrWhiteSpace(SelectedSourceKey)
+            && !ContainsOrdinal(visibleSourceKeys, SelectedSourceKey!)
         )
         {
-            SelectedMerchantSourceKey = null;
-            changed = true;
+            SelectedSourceKey = null;
+            return true;
         }
 
-        if (
-            !string.IsNullOrWhiteSpace(SelectedTrainerSourceKey)
-            && !ContainsOrdinal(visibleTrainerSourceKeys, SelectedTrainerSourceKey!)
-        )
-        {
-            SelectedTrainerSourceKey = null;
-            changed = true;
-        }
-
-        return changed;
+        return false;
     }
 
     private static bool ContainsOrdinal(IReadOnlyCollection<string> values, string value)

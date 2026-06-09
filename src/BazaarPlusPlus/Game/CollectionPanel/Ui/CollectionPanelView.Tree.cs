@@ -159,7 +159,7 @@ internal sealed partial class CollectionPanelView
 
         // Tag filter (player-facing card categories). Compact auto-width chips that wrap like
         // the source row; collapsed to the whitelist's primary slice until expanded.
-        CreateFilterSection(
+        _tagFilterSection = CreateFilterSection(
             rail,
             CollectionPanelText.TagHeader(),
             UiSpacing.Lg,
@@ -265,7 +265,7 @@ internal sealed partial class CollectionPanelView
         return section;
     }
 
-    // Plain highlighting toggle (gold = packages shown), matching the day icon — no switch knob.
+    // Plain highlighting toggle (gold = packages only), matching the day icon — no switch knob.
     private Button CreatePackageToggleButton()
     {
         var button = CreateButton(

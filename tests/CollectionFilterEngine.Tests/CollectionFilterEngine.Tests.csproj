@@ -37,6 +37,10 @@
       Link="CollectionHeroScope.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTabProfile.cs"
+      Link="CollectionTabProfile.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardFacetRanks.cs"
       Link="CollectionCardFacetRanks.cs"
     />
@@ -65,12 +69,16 @@
       Link="CollectionCardClassification.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMerchantKind.cs"
-      Link="CollectionMerchantKind.cs"
-    />
-    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTagWhitelist.cs"
       Link="CollectionTagWhitelist.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionKeywordWhitelist.cs"
+      Link="CollectionKeywordWhitelist.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\PackageIdentity.cs"
+      Link="PackageIdentity.cs"
     />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>

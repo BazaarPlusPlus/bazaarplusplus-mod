@@ -35,7 +35,6 @@ internal sealed partial class CollectionCardVm
                 && item.Enchantments != null
                 && item.Enchantments.Count > 0,
             IsPackage = classification.IsPackage,
-            Merchants = classification.Merchants,
         };
     }
 }

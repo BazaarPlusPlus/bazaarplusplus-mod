@@ -1,3 +1,4 @@
+using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
@@ -69,8 +70,7 @@ AssertEqual(
     "New filter state should start with the day filter selected."
 );
 var selectionState = new CollectionFilterState();
-selectionState.Merchants.Add(CollectionMerchantKind.Burn);
-selectionState.SelectedTrainerSourceKey = "trainer:old";
+selectionState.SelectedSourceKey = "trainer:old";
 selectionState.ApplySelection(defaultSelection);
 AssertValues(
     selectionState.Heroes.ToArray(),
@@ -79,17 +79,8 @@ AssertValues(
 );
 AssertEqual(
     "merchant:jay-jay:global",
-    selectionState.SelectedMerchantSourceKey,
+    selectionState.SelectedSourceKey,
     "Applying the default selection should select Jay Jay in the filter state."
-);
-AssertFalse(
-    selectionState.Merchants.Contains(CollectionMerchantKind.Burn),
-    "Applying a panel selection should clear stale merchant-kind filters."
-);
-AssertEqual(
-    null,
-    selectionState.SelectedTrainerSourceKey,
-    "Applying a merchant selection should clear stale trainer source selection."
 );
 AssertEqual(
     defaultSelection,
@@ -109,7 +100,7 @@ AssertValues(
 );
 AssertEqual(
     "merchant:jules:diamond:dooley+karnok+mak+pygmalien+stelle+vanessa",
-    selectionState.SelectedMerchantSourceKey,
+    selectionState.SelectedSourceKey,
     "Runtime selection should replace the previous selected merchant."
 );
 AssertEqual(
@@ -122,7 +113,7 @@ var trainerSelection = new CollectionPanelSelectionState(
     "trainer:mr-tuskari:pygmalien",
     CollectionSourceKind.Trainer
 );
-selectionState.SelectedMerchantSourceKey = "merchant:stale";
+selectionState.SelectedSourceKey = "merchant:stale";
 selectionState.ApplySelection(trainerSelection);
 AssertEqual(
     ECardType.Skill,
@@ -131,13 +122,8 @@ AssertEqual(
 );
 AssertEqual(
     "trainer:mr-tuskari:pygmalien",
-    selectionState.SelectedTrainerSourceKey,
+    selectionState.SelectedSourceKey,
     "Applying a trainer runtime selection should store the trainer source key."
-);
-AssertEqual(
-    null,
-    selectionState.SelectedMerchantSourceKey,
-    "Applying a trainer runtime selection should clear stale merchant source selection."
 );
 AssertEqual(
     trainerSelection,
@@ -152,54 +138,79 @@ AssertEqual(
 );
 AssertEqual(
     null,
-    selectionState.SelectedTrainerSourceKey,
-    "Applying a merchant runtime selection should clear stale trainer source selection."
+    selectionState.GetSelectedSourceKey(ECardType.Skill),
+    "A single selected source key should not read back as a stale source for the inactive tab."
 );
 
 var sourceState = new CollectionFilterState();
 sourceState.ToggleSource(ECardType.Item, "merchant:aila");
 AssertEqual(
     "merchant:aila",
-    sourceState.SelectedMerchantSourceKey,
+    sourceState.SelectedSourceKey,
     "Item source selection should store the merchant source key."
 );
 sourceState.ToggleSource(ECardType.Item, "merchant:helt");
 AssertEqual(
     "merchant:helt",
-    sourceState.SelectedMerchantSourceKey,
+    sourceState.SelectedSourceKey,
     "Selecting another item source should replace the prior merchant source."
 );
 sourceState.ToggleSource(ECardType.Item, "merchant:helt");
 AssertEqual(
     null,
-    sourceState.SelectedMerchantSourceKey,
+    sourceState.SelectedSourceKey,
     "Selecting the active item source again should clear it."
 );
 sourceState.ToggleSource(ECardType.Skill, "trainer:juliette");
 AssertEqual(
     "trainer:juliette",
-    sourceState.SelectedTrainerSourceKey,
+    sourceState.SelectedSourceKey,
     "Skill source selection should store the trainer source key."
 );
-sourceState.SelectedMerchantSourceKey = "merchant:hidden";
-sourceState.SelectedTrainerSourceKey = "trainer:visible";
+AssertEqual(
+    ECardType.Skill,
+    sourceState.ActiveType,
+    "Toggling a Skill source should set Skill active."
+);
+sourceState.PackagesOnly = true;
+sourceState.ToggleSource(ECardType.Skill, "trainer:scout");
+AssertFalse(
+    sourceState.PackagesOnly,
+    "Skill source selection should clear stale package-only mode."
+);
+sourceState.ActiveType = ECardType.Item;
+sourceState.SelectedSourceKey = "merchant:hidden";
 AssertTrue(
-    sourceState.PruneSelectedSources(new[] { "merchant:visible" }, new[] { "trainer:visible" }),
+    sourceState.PruneSelectedSource(new[] { "merchant:visible" }),
     "Pruning should report a change when a selected source is no longer visible."
 );
 AssertEqual(
     null,
-    sourceState.SelectedMerchantSourceKey,
+    sourceState.SelectedSourceKey,
     "Pruning should clear invisible merchant source selection."
+);
+sourceState.ActiveType = ECardType.Skill;
+sourceState.SelectedSourceKey = "trainer:visible";
+AssertFalse(
+    sourceState.PruneSelectedSource(new[] { "trainer:visible" }),
+    "Pruning should report no change when the selected source is still visible."
 );
 AssertEqual(
     "trainer:visible",
-    sourceState.SelectedTrainerSourceKey,
+    sourceState.SelectedSourceKey,
     "Pruning should preserve visible trainer source selection."
 );
 
 var normal = Card("Normal", ETier.Bronze);
 var package = Card("Starter Package", ETier.Silver, isPackage: true);
+var bronzePackage = Card(
+    "Bronze Package",
+    ETier.Bronze,
+    isPackage: true,
+    heroes: new[] { EHero.Dooley },
+    tags: new[] { ECardTag.Tool },
+    hiddenTags: new[] { EHiddenTag.Package, EHiddenTag.Shield }
+);
 
 var defaultPackageResult = CollectionFilterEngine.Apply(
     new[] { package, normal },
@@ -207,15 +218,41 @@ var defaultPackageResult = CollectionFilterEngine.Apply(
 );
 AssertSequence(defaultPackageResult, new[] { normal.Id }, "Packages are excluded by default.");
 
-var includePackageFilter = new CollectionFilterState { IncludePackages = true };
-var includePackageResult = CollectionFilterEngine.Apply(
+var packagesOnlyFilter = new CollectionFilterState { PackagesOnly = true };
+var packagesOnlyResult = CollectionFilterEngine.Apply(
     new[] { package, normal },
-    includePackageFilter
+    packagesOnlyFilter
 );
 AssertSequence(
-    includePackageResult,
-    new[] { normal.Id, package.Id },
-    "IncludePackages restores package cards to the visible set."
+    packagesOnlyResult,
+    new[] { package.Id },
+    "PackagesOnly shows package cards as an exclusive package view."
+);
+var packagesOnlyWithSourceResult = CollectionFilterEngine.Apply(
+    new[] { package, bronzePackage, normal },
+    new CollectionFilterState { PackagesOnly = true },
+    new CollectionFilterContext
+    {
+        OfferedCardIds = new[] { normal.Id },
+        ApplyHeroFilter = true,
+        SuppressDayGate = true,
+    }
+);
+AssertSequence(
+    packagesOnlyWithSourceResult,
+    new[] { bronzePackage.Id, package.Id },
+    "PackagesOnly ignores source offer pools and context gates."
+);
+var packagesOnlyWithFacets = new CollectionFilterState { PackagesOnly = true, SelectedRunDay = 1 };
+packagesOnlyWithFacets.Heroes.Add(EHero.Vanessa);
+packagesOnlyWithFacets.Tiers.Add(ETier.Bronze);
+packagesOnlyWithFacets.Sizes.Add(ECardSize.Small);
+packagesOnlyWithFacets.Tags.Add(ECardTag.Weapon);
+packagesOnlyWithFacets.Keywords.Add(EHiddenTag.Damage);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { package, bronzePackage, normal }, packagesOnlyWithFacets),
+    new[] { bronzePackage.Id, package.Id },
+    "PackagesOnly ignores hero, tier, size, tag, keyword, and day facets."
 );
 
 var bronzeLarge = Card("A Bronze Large", ETier.Bronze, size: ECardSize.Large);
@@ -243,36 +280,17 @@ AssertSequence(
     "Size sort priority sorts by size first, then by tier within each size."
 );
 
-var burnMerchant = Card(
-    "Burn Merchant Item",
-    ETier.Bronze,
-    merchants: new[] { CollectionMerchantKind.Burn }
-);
-var healMerchant = Card(
-    "Heal Merchant Item",
-    ETier.Bronze,
-    merchants: new[] { CollectionMerchantKind.Heal }
-);
-var merchantFilter = new CollectionFilterState();
-merchantFilter.Merchants.Add(CollectionMerchantKind.Burn);
-var merchantResult = CollectionFilterEngine.Apply(
-    new[] { healMerchant, burnMerchant, normal },
-    merchantFilter
-);
-AssertSequence(
-    merchantResult,
-    new[] { burnMerchant.Id },
-    "Merchant filters match cards classified for at least one selected merchant."
-);
+var offerPoolItem = Card("Offer Pool Item", ETier.Bronze);
+var offerPoolExcluded = Card("Offer Pool Excluded", ETier.Bronze);
 
 var offerPoolResult = CollectionFilterEngine.Apply(
-    new[] { healMerchant, burnMerchant, normal },
+    new[] { offerPoolExcluded, offerPoolItem, normal },
     new CollectionFilterState(),
-    new CollectionFilterContext { OfferedCardIds = new[] { burnMerchant.Id, Guid.NewGuid() } }
+    new CollectionFilterContext { OfferedCardIds = new[] { offerPoolItem.Id, Guid.NewGuid() } }
 );
 AssertSequence(
     offerPoolResult,
-    new[] { burnMerchant.Id },
+    new[] { offerPoolItem.Id },
     "Resolved offer pool should AND with the normal visible card filters."
 );
 
@@ -313,30 +331,6 @@ AssertSequence(
     "Selected source pools should not be cropped by the run-hero selector a second time."
 );
 
-var burnMerchantSkill = Card(
-    "Burn Merchant Skill",
-    ETier.Bronze,
-    type: ECardType.Skill,
-    merchants: new[] { CollectionMerchantKind.Burn }
-);
-var healMerchantSkill = Card(
-    "Heal Merchant Skill",
-    ETier.Bronze,
-    type: ECardType.Skill,
-    merchants: new[] { CollectionMerchantKind.Heal }
-);
-var skillMerchantFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
-skillMerchantFilter.Merchants.Add(CollectionMerchantKind.Burn);
-var skillMerchantResult = CollectionFilterEngine.Apply(
-    new[] { healMerchantSkill, burnMerchantSkill, normal },
-    skillMerchantFilter
-);
-AssertSequence(
-    skillMerchantResult,
-    new[] { burnMerchantSkill.Id },
-    "Merchant filters also narrow the Skill tab."
-);
-
 var weaponSkill = Card(
     "Weapon Skill",
     ETier.Bronze,
@@ -357,8 +351,33 @@ var skillTagResult = CollectionFilterEngine.Apply(
 );
 AssertSequence(
     skillTagResult,
-    new[] { weaponSkill.Id },
-    "Tag filters are available for future skill filtering rules."
+    new[] { potionSkill.Id, weaponSkill.Id },
+    "Item tag filters do not narrow the Skill tab."
+);
+var damageSkill = Card(
+    "Damage Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    hiddenTags: new[] { EHiddenTag.Damage }
+);
+var shieldSkill = Card(
+    "Shield Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    hiddenTags: new[] { EHiddenTag.Shield }
+);
+var skillKeywordFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
+skillKeywordFilter.Keywords.Add(EHiddenTag.Damage);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { shieldSkill, damageSkill, normal }, skillKeywordFilter),
+    new[] { damageSkill.Id },
+    "Skill keyword filters narrow skills by EHiddenTag."
+);
+skillKeywordFilter.Keywords.Add(EHiddenTag.Shield);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { shieldSkill, damageSkill, normal }, skillKeywordFilter),
+    new[] { damageSkill.Id, shieldSkill.Id },
+    "Multiple selected skill keywords OR together."
 );
 
 var weaponItem = Card("Weapon Item", ETier.Bronze, tags: new[] { ECardTag.Weapon });
@@ -401,6 +420,21 @@ foreach (
     AssertFalse(
         CollectionTagWhitelist.Ordered.Contains(mechanismTag),
         $"Tag whitelist must exclude mechanism tag {mechanismTag}."
+    );
+
+AssertEqual(
+    CollectionKeywordWhitelist.Ordered.Count,
+    CollectionKeywordWhitelist.Ordered.Distinct().Count(),
+    "Keyword whitelist entries must be distinct."
+);
+AssertTrue(
+    CollectionKeywordWhitelist.PrimaryCount <= CollectionKeywordWhitelist.Ordered.Count,
+    "Keyword whitelist primary slice must fit inside the option list."
+);
+foreach (var nonKeyword in new[] { EHiddenTag.Merchant, EHiddenTag.Package, EHiddenTag.Unsellable })
+    AssertFalse(
+        CollectionKeywordWhitelist.Ordered.Contains(nonKeyword),
+        $"Keyword whitelist must exclude non-keyword tag {nonKeyword}."
     );
 
 var vanessaExclusiveSkill = Card(
@@ -607,25 +641,26 @@ AssertEqual(
         .EligibilityReason,
     "Unsupported card types should report a reasoned rejection."
 );
+var hiddenTagPackageTemplate = new TCardItem
+{
+    Type = ECardType.Item,
+    ArtKey = "Assets/Cards/Bundle.png",
+    InternalName = "Vanessa Starter Bundle",
+    HiddenTags = new HashSet<EHiddenTag> { EHiddenTag.Package },
+};
 AssertTrue(
-    CollectionCardClassifier
-        .Classify(ECardType.Item, "Assets/Cards/Package.png", "Vanessa Starter Package")
-        .IsPackage,
-    "Packages should stay in the catalog classification result and be hidden by filters."
+    CollectionCardClassifier.Classify(hiddenTagPackageTemplate).IsPackage,
+    "HiddenTag.Package marks package templates for the exclusive package view."
 );
-AssertTrue(
-    CollectionCardClassifier.IsPackageName("Vanessa Starter Package"),
-    "Package detection is centralized for future rule hardening."
-);
-AssertValues(
-    CollectionCardClassifier
-        .ResolveMerchants(
-            Array.Empty<ECardTag>(),
-            new[] { EHiddenTag.BurnMerchant, EHiddenTag.Merchant }
-        )
-        .ToArray(),
-    new[] { CollectionMerchantKind.Burn, CollectionMerchantKind.General },
-    "Merchant hidden tags map to stable collection merchant kinds."
+var packageNameWithoutTagTemplate = new TCardItem
+{
+    Type = ECardType.Item,
+    ArtKey = "Assets/Cards/Package.png",
+    InternalName = "Vanessa Starter Package",
+};
+AssertFalse(
+    CollectionCardClassifier.Classify(packageNameWithoutTagTemplate).IsPackage,
+    "Package-like names no longer mark packages without HiddenTag.Package."
 );
 
 // --- Day filter: DayTierSchedule maps a run day to a StartingTier ceiling. ---
@@ -737,7 +772,7 @@ static CollectionCardVm Card(
     ECardSize size = ECardSize.Medium,
     bool isPackage = false,
     IReadOnlyCollection<ECardTag>? tags = null,
-    IReadOnlyCollection<CollectionMerchantKind>? merchants = null,
+    IReadOnlyCollection<EHiddenTag>? hiddenTags = null,
     IReadOnlyCollection<EHero>? heroes = null
 ) =>
     new()
@@ -747,10 +782,10 @@ static CollectionCardVm Card(
         Size = size,
         StartingTier = tier,
         Tags = tags ?? Array.Empty<ECardTag>(),
+        HiddenTags = hiddenTags ?? Array.Empty<EHiddenTag>(),
         DisplayName = name,
         InternalName = name,
         IsPackage = isPackage,
-        Merchants = merchants ?? Array.Empty<CollectionMerchantKind>(),
         Heroes = heroes ?? Array.Empty<EHero>(),
     };
 

@@ -58,6 +58,8 @@ internal static class NativeTagTypography
 
     public static NativeTagDisplay Resolve(ECardTag tag) => Resolve(tag.ToString());
 
+    public static NativeTagDisplay Resolve(EHiddenTag tag) => Resolve(tag.ToString());
+
     public static NativeTagDisplay Resolve(string key)
     {
         var typography = Data.TooltipTypography;

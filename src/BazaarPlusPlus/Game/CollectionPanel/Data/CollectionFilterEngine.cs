@@ -25,12 +25,12 @@ internal static class CollectionFilterEngine
                 ? null
                 : context.OfferedCardIds as HashSet<Guid>
                     ?? new HashSet<Guid>(context.OfferedCardIds);
+        var profile = CollectionTabProfile.For(filter.ActiveType);
         var heroFilterCount = context.ApplyHeroFilter ? filter.Heroes.Count : 0;
         var tierFilterCount = filter.Tiers.Count;
-        var tagFilterCount = filter.Tags.Count;
-        var merchantFilterCount = filter.Merchants.Count;
-        // Size only narrows Items; Skills are a single size, so skip it on the Skill tab.
-        var sizeFilterCount = filter.ActiveType == ECardType.Item ? filter.Sizes.Count : 0;
+        var tagFilterCount = profile.ShowTagFilter ? filter.Tags.Count : 0;
+        var keywordFilterCount = profile.ShowKeywordFilter ? filter.Keywords.Count : 0;
+        var sizeFilterCount = profile.ShowSizeFilter ? filter.Sizes.Count : 0;
         // In-run only; null disables. Independent of the manual Tier row — both narrow by tier.
         // Fixed-tier sources are exempt: their pool ignores the day's tier ceiling.
         var dayFilter = context.SuppressDayGate ? null : filter.SelectedRunDay;
@@ -39,9 +39,15 @@ internal static class CollectionFilterEngine
         {
             if (card.Type != filter.ActiveType)
                 continue;
-            if (offerPoolSet != null && !offerPoolSet.Contains(card.Id))
+            if (filter.PackagesOnly)
+            {
+                if (card.IsPackage)
+                    result.Add(card);
                 continue;
-            if (!filter.IncludePackages && card.IsPackage)
+            }
+            if (card.IsPackage)
+                continue;
+            if (offerPoolSet != null && !offerPoolSet.Contains(card.Id))
                 continue;
             if (heroFilterCount > 0 && !CollectionHeroScope.MatchesFilter(card, filter))
                 continue;
@@ -51,9 +57,9 @@ internal static class CollectionFilterEngine
                 continue;
             if (tagFilterCount > 0 && !AnyTagMatch(card.Tags, filter.Tags))
                 continue;
-            if (sizeFilterCount > 0 && !filter.Sizes.Contains(card.Size))
+            if (keywordFilterCount > 0 && !AnyKeywordMatch(card.HiddenTags, filter.Keywords))
                 continue;
-            if (merchantFilterCount > 0 && !AnyMerchantMatch(card.Merchants, filter.Merchants))
+            if (sizeFilterCount > 0 && !filter.Sizes.Contains(card.Size))
                 continue;
             result.Add(card);
         }
@@ -106,14 +112,14 @@ internal static class CollectionFilterEngine
         return false;
     }
 
-    private static bool AnyMerchantMatch(
-        IReadOnlyCollection<CollectionMerchantKind> cardMerchants,
-        HashSet<CollectionMerchantKind> filterMerchants
+    private static bool AnyKeywordMatch(
+        IReadOnlyCollection<EHiddenTag> cardKeywords,
+        HashSet<EHiddenTag> filterKeywords
     )
     {
-        foreach (var merchant in cardMerchants)
+        foreach (var keyword in cardKeywords)
         {
-            if (filterMerchants.Contains(merchant))
+            if (filterKeywords.Contains(keyword))
                 return true;
         }
         return false;

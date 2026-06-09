@@ -25,13 +25,14 @@ internal sealed class CollectionPanelViewModel
     public string? StatusMessage { get; set; }
     public bool IsLoading { get; set; }
     public ECardType ActiveType { get; set; } = ECardType.Item;
+    public CollectionTabProfile TabProfile { get; set; } = CollectionTabProfile.For(ECardType.Item);
     public HashSet<EHero> SelectedHeroes { get; set; } = new();
     public HashSet<ETier> SelectedTiers { get; set; } = new();
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
     public HashSet<ECardTag> SelectedTags { get; set; } = new();
+    public HashSet<EHiddenTag> SelectedKeywords { get; set; } = new();
     public string? SelectedSourceKey { get; set; }
-    public bool IncludePackages { get; set; }
-    public bool ShowPackageToggle { get; set; } = true;
+    public bool PackagesOnly { get; set; }
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
@@ -43,6 +44,7 @@ internal sealed class CollectionPanelViewModel
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
     public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();
     public IReadOnlyList<ECardTag> AvailableTags { get; set; } = Array.Empty<ECardTag>();
+    public IReadOnlyList<EHiddenTag> AvailableKeywords { get; set; } = Array.Empty<EHiddenTag>();
     public IReadOnlyList<CollectionSourceOptionViewModel> AvailableSources { get; set; } =
         Array.Empty<CollectionSourceOptionViewModel>();
     public float ContentHeight { get; set; }
@@ -70,6 +72,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action _toggleDayFilter;
     private readonly Action<ECardSize> _toggleSize;
     private readonly Action<ECardTag> _toggleTag;
+    private readonly Action<EHiddenTag> _toggleKeyword;
     private readonly Action<string> _toggleSource;
     private readonly Action _togglePackages;
     private readonly Action<CollectionSortPriority> _setSortPriority;
@@ -102,6 +105,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _sourceFilterLabel;
     private VisualElement? _sourceChipRow;
     private VisualElement? _sizeFilterSection;
+    private VisualElement? _tagFilterSection;
     private VisualElement? _sourceFilterSection;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
@@ -119,6 +123,9 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Dictionary<ECardSize, Button> _sizeChips = new();
     private readonly Dictionary<ECardTag, Button> _tagChips = new();
     private readonly List<ECardTag> _tagChipOrder = new();
+    private readonly Dictionary<EHiddenTag, Button> _keywordChips = new();
+    private readonly List<EHiddenTag> _keywordChipOrder = new();
+    private CollectionTagFacetKind _tagFacetKind;
 
     // Tag-row collapse state. The row shows the whitelist's primary slice (plus any selected
     // tag that would otherwise be hidden) until expanded; the last refreshed options/selection
@@ -126,6 +133,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private bool _tagRowExpanded;
     private IReadOnlyList<ECardTag> _lastTagOptions = Array.Empty<ECardTag>();
     private HashSet<ECardTag> _lastSelectedTags = new();
+    private IReadOnlyList<EHiddenTag> _lastKeywordOptions = Array.Empty<EHiddenTag>();
+    private HashSet<EHiddenTag> _lastSelectedKeywords = new();
     private readonly Dictionary<string, Button> _sourceChips = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VisualElement> _sourceChipIcons = new(
         StringComparer.Ordinal
@@ -142,6 +151,13 @@ internal sealed partial class CollectionPanelView : IDisposable
 
     private static readonly string[] LoadingFrames = { "|", "/", "-", "\\" };
 
+    private enum CollectionTagFacetKind
+    {
+        None,
+        Tags,
+        Keywords,
+    }
+
     public event Action<Rect>? GridViewportBoundsChanged;
 
     public CollectionPanelView(
@@ -153,6 +169,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action toggleDayFilter,
         Action<ECardSize> toggleSize,
         Action<ECardTag> toggleTag,
+        Action<EHiddenTag> toggleKeyword,
         Action<string> toggleSource,
         Action togglePackages,
         Action<CollectionSortPriority> setSortPriority
@@ -167,6 +184,7 @@ internal sealed partial class CollectionPanelView : IDisposable
             toggleDayFilter ?? throw new ArgumentNullException(nameof(toggleDayFilter));
         _toggleSize = toggleSize ?? throw new ArgumentNullException(nameof(toggleSize));
         _toggleTag = toggleTag ?? throw new ArgumentNullException(nameof(toggleTag));
+        _toggleKeyword = toggleKeyword ?? throw new ArgumentNullException(nameof(toggleKeyword));
         _toggleSource = toggleSource ?? throw new ArgumentNullException(nameof(toggleSource));
         _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
         _setSortPriority =
@@ -330,9 +348,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         EnsureHeroChips(model.AvailableHeroes);
         EnsureTierChips(model.AvailableTiers);
         EnsureSizeChips(model.AvailableSizes);
-        _lastTagOptions = model.AvailableTags;
-        _lastSelectedTags = model.SelectedTags;
-        EnsureTagChips(model.AvailableTags, model.SelectedTags);
+        RefreshTagFacetChips(model);
         EnsureSourceChips(model.AvailableSources);
         // Chip text is reset unconditionally on every Refresh: the Ensure*Chips early-exit
         // compares only keys, so a locale change while the chips survive would otherwise leave
@@ -358,6 +374,12 @@ internal sealed partial class CollectionPanelView : IDisposable
             pair.Value.text = display.Label;
             RefreshChip(pair.Value, model.SelectedTags.Contains(pair.Key), display.AccentColor);
         }
+        foreach (var pair in _keywordChips)
+        {
+            var display = NativeTagTypography.Resolve(pair.Key);
+            pair.Value.text = display.Label;
+            RefreshChip(pair.Value, model.SelectedKeywords.Contains(pair.Key), display.AccentColor);
+        }
         foreach (var pair in _sourceChips)
         {
             RefreshChip(
@@ -368,7 +390,7 @@ internal sealed partial class CollectionPanelView : IDisposable
             pair.Value.style.opacity = model.SourceSelectorEnabled ? 1f : 0.58f;
         }
         if (_packageToggleButton != null)
-            RefreshPackageToggle(model.IncludePackages, model.ShowPackageToggle);
+            RefreshPackageToggle(model.PackagesOnly, model.TabProfile.ShowPackageToggle);
         if (_dayToggleButton != null)
             RefreshDayToggle(model.DayFilterValue, model.DayFilterActive);
         if (_sortQualityButton != null)
@@ -381,16 +403,25 @@ internal sealed partial class CollectionPanelView : IDisposable
             _sizeFilterSection.style.display = DisplayStyle.Flex;
         if (_sizeChipRow != null)
         {
-            var showSizeChips = model.ActiveType == ECardType.Item;
+            var showSizeChips = model.TabProfile.ShowSizeFilter;
             _sizeChipRow.style.visibility = showSizeChips ? Visibility.Visible : Visibility.Hidden;
             _sizeChipRow.SetEnabled(showSizeChips);
             _sizeChipRow.pickingMode = showSizeChips ? PickingMode.Position : PickingMode.Ignore;
         }
+        if (_tagFilterSection != null)
+            _tagFilterSection.style.display =
+                model.TabProfile.ShowTagFilter || model.TabProfile.ShowKeywordFilter
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
         if (_sourceFilterSection != null)
             _sourceFilterSection.style.display =
                 model.AvailableSources.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
         if (_sourceFilterLabel != null)
             _sourceFilterLabel.text = CollectionPanelText.SourceHeader(model.ActiveType);
+        if (_tagFilterLabel != null)
+            _tagFilterLabel.text = model.TabProfile.ShowKeywordFilter
+                ? CollectionPanelText.KeywordHeader()
+                : CollectionPanelText.TagHeader();
 
         UpdateContentSpacerHeight(model.ContentHeight);
 
@@ -425,7 +456,10 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_dayToggleButton != null)
             _dayToggleButton.tooltip = CollectionPanelText.DayHeader();
         if (_packageToggleButton != null)
+        {
             _packageToggleButton.text = CollectionPanelText.PackagesToggle();
+            _packageToggleButton.tooltip = CollectionPanelText.PackagesToggleTooltip();
+        }
         if (_heroFilterLabel != null)
             _heroFilterLabel.text = CollectionPanelText.HeroHeader();
         if (_tierFilterLabel != null)
