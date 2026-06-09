@@ -73,6 +73,10 @@
       Link="CollectionPanelSelectionState.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionPanelHeroPreference.cs"
+      Link="CollectionPanelHeroPreference.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\CollectionPanelOpenSelectionResolver.cs"
       Link="CollectionPanelOpenSelectionResolver.cs"
     />

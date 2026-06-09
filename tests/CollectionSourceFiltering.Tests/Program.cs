@@ -398,6 +398,41 @@ AssertEqual(
     openOutsideRun,
     "Opening outside an in-game run should fall back to VAN + Jay Jay."
 );
+var openOutsideRunWithRememberedHero = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: false,
+    currentHero: EHero.Dooley,
+    currentEncounterTemplateId: vanessaAila.SourceTemplateIds[0],
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries,
+    rememberedHero: EHero.Mak
+);
+AssertEqual(
+    new CollectionPanelSelectionState(
+        EHero.Mak,
+        CollectionPanelSelectionState.DefaultMerchantSourceKey,
+        CollectionSourceKind.Merchant
+    ),
+    openOutsideRunWithRememberedHero,
+    "Opening outside a run should use the remembered explicit CollectionPanel hero."
+);
+
+var openOutsideRunWithRememberedCommon = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: false,
+    currentHero: EHero.Dooley,
+    currentEncounterTemplateId: vanessaAila.SourceTemplateIds[0],
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries,
+    rememberedHero: EHero.Common
+);
+AssertEqual(
+    new CollectionPanelSelectionState(
+        EHero.Common,
+        CollectionPanelSelectionState.DefaultMerchantSourceKey,
+        CollectionSourceKind.Merchant
+    ),
+    openOutsideRunWithRememberedCommon,
+    "Opening outside a run should preserve Common as a remembered hero."
+);
 var dooleyAila = entries.Single(entry =>
     entry.Kind == CollectionSourceKind.Merchant
     && string.Equals(entry.Name, "Aila", StringComparison.Ordinal)
@@ -418,6 +453,23 @@ AssertEqual(
     ),
     openOnCurrentMerchant,
     "Opening during a run should select the current concrete hero and merchant source."
+);
+var openInRunIgnoresRememberedHero = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: true,
+    currentHero: EHero.Dooley,
+    currentEncounterTemplateId: dooleyAila.SourceTemplateIds[0],
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries,
+    rememberedHero: EHero.Mak
+);
+AssertEqual(
+    new CollectionPanelSelectionState(
+        EHero.Dooley,
+        dooleyAila.SourceKey,
+        CollectionSourceKind.Merchant
+    ),
+    openInRunIgnoresRememberedHero,
+    "Opening during a run should keep the current run hero and source over a remembered hero."
 );
 var pygTrainer = entries.Single(entry =>
     entry.Kind == CollectionSourceKind.Trainer

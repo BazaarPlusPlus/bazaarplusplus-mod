@@ -14,10 +14,14 @@ internal static class CollectionPanelOpenSelectionResolver
         EHero? currentHero,
         Guid? currentEncounterTemplateId,
         IReadOnlyCollection<Guid>? choiceSelectionTemplateIds,
-        IEnumerable<CollectionSourceEntry> entries
+        IEnumerable<CollectionSourceEntry> entries,
+        EHero? rememberedHero = null
     )
     {
-        if (!isInGameRun || !IsConcreteHero(currentHero))
+        if (!isInGameRun)
+            return ResolveOutOfRunSelection(rememberedHero);
+
+        if (!IsConcreteHero(currentHero))
             return CollectionPanelSelectionState.Default;
 
         var hero = currentHero!.Value;
@@ -38,6 +42,20 @@ internal static class CollectionPanelOpenSelectionResolver
     }
 
     internal static bool IsConcreteHero(EHero? hero) => hero.HasValue && hero.Value != EHero.Common;
+
+    private static CollectionPanelSelectionState ResolveOutOfRunSelection(EHero? rememberedHero)
+    {
+        var hero =
+            rememberedHero.HasValue && CollectionPanelHeroPreference.IsSupportedHero(rememberedHero.Value)
+                ? rememberedHero.Value
+                : CollectionPanelSelectionState.DefaultHero;
+
+        return new CollectionPanelSelectionState(
+            hero,
+            CollectionPanelSelectionState.DefaultMerchantSourceKey,
+            CollectionSourceKind.Merchant
+        );
+    }
 
     private static CollectionSourceEntry? ResolveSource(
         EHero hero,
