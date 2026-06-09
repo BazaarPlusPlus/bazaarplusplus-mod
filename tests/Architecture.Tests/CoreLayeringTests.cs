@@ -353,7 +353,9 @@ public class CoreLayeringTests
     {
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
-        var oldRecommendationsDir = Path.Combine(mainSource, "Game", "BuildRecommendations");
+        var oldRecommendationsName = "Build" + "Recommendations";
+        var oldRecommendationsNamespace = "BazaarPlusPlus.Game." + oldRecommendationsName;
+        var oldRecommendationsDir = Path.Combine(mainSource, "Game", oldRecommendationsName);
         var liveRecommendationsDir = Path.Combine(
             mainSource,
             "Game",
@@ -363,7 +365,7 @@ public class CoreLayeringTests
 
         Assert.False(
             Directory.Exists(oldRecommendationsDir),
-            "BuildRecommendations is LiveBuildPanel-owned; do not restore top-level Game/BuildRecommendations."
+            "BuildRecommendations is LiveBuildPanel-owned; do not restore the top-level Game recommendation directory."
         );
         Assert.True(
             Directory.Exists(liveRecommendationsDir),
@@ -375,8 +377,7 @@ public class CoreLayeringTests
             .ToList();
         var oldNamespaceHits = sourceFiles
             .Where(file =>
-                File.ReadAllText(file)
-                    .Contains("BazaarPlusPlus.Game.BuildRecommendations", StringComparison.Ordinal)
+                File.ReadAllText(file).Contains(oldRecommendationsNamespace, StringComparison.Ordinal)
             )
             .Select(file => Path.GetRelativePath(mainSource, file).Replace('\\', '/'))
             .ToList();

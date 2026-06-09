@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 
-namespace BazaarPlusPlus.Game.BuildRecommendations;
+namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 
 /// <summary>
 /// Parsed, in-memory view of the analyzer-v4 ten-win build corpus

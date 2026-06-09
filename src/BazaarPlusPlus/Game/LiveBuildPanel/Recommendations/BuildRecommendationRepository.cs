@@ -14,7 +14,7 @@ using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 using BazaarPlusPlus.ModApi.Http;
 
-namespace BazaarPlusPlus.Game.BuildRecommendations;
+namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 
 /// <summary>
 /// Loads the analyzer-v4 ten-win build corpus (cached locally with a background remote refresh),

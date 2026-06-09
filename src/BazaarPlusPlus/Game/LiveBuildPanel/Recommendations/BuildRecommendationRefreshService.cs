@@ -3,7 +3,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace BazaarPlusPlus.Game.BuildRecommendations;
+namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 
 /// <summary>
 /// Shared manual-refresh entry over the ten-win build corpus. Wraps the repository's synchronous

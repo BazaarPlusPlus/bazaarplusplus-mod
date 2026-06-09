@@ -1,7 +1,7 @@
 #nullable enable
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 
-namespace BazaarPlusPlus.Game.BuildRecommendations;
+namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 
 internal sealed class BuildRecommendation
 {

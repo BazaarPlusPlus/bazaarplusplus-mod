@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace BazaarPlusPlus.Game.BuildRecommendations;
+namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 
 /// <summary>
 /// The player's current item context, used purely to rank ten-win build matches against what
