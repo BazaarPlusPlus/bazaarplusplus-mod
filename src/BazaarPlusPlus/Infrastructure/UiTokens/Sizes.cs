@@ -27,6 +27,7 @@ internal static class Sizes
     public const float PackageToggleWidth = 72f;
     public const float HeroChipIconSize = 48f;
     public const float HeroChipButtonSize = 56f;
+    public const float TagChipIconSize = 14f;
     public const float SourceChipIconRatio = 48f / 56f;
     public const float SourceChipMinSize = 40f;
     public const float ButtonStandardHeight = 32f;

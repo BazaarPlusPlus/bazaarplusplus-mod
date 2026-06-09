@@ -63,6 +63,8 @@ internal sealed class CollectionSourceOptionViewModel
 internal sealed partial class CollectionPanelView : IDisposable
 {
     private const string SourceChipInitialsName = "bpp-source-chip-initials";
+    private const string TagChipIconName = "bpp-tag-chip-icon";
+    private const string TagChipLabelName = "bpp-tag-chip-label";
 
     private readonly Transform _parent;
     private readonly Action _close;
@@ -345,6 +347,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         RefreshTabButton(_skillTabButton!, model.ActiveType == ECardType.Skill);
         RefreshChromeTexts();
 
+        KeywordIconSpriteProvider.BeginResolvePass();
         EnsureHeroChips(model.AvailableHeroes);
         EnsureTierChips(model.AvailableTiers);
         EnsureSizeChips(model.AvailableSizes);
@@ -371,13 +374,13 @@ internal sealed partial class CollectionPanelView : IDisposable
         foreach (var pair in _tagChips)
         {
             var display = NativeTagTypography.Resolve(pair.Key);
-            pair.Value.text = display.Label;
+            ApplyTagChipContent(pair.Value, display);
             RefreshChip(pair.Value, model.SelectedTags.Contains(pair.Key), display.AccentColor);
         }
         foreach (var pair in _keywordChips)
         {
             var display = NativeTagTypography.Resolve(pair.Key);
-            pair.Value.text = display.Label;
+            ApplyTagChipContent(pair.Value, display);
             RefreshChip(pair.Value, model.SelectedKeywords.Contains(pair.Key), display.AccentColor);
         }
         foreach (var pair in _sourceChips)

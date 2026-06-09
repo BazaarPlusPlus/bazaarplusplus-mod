@@ -92,6 +92,7 @@ internal static class NativeTagTypography
     {
         string label;
         Color? accentColor = null;
+        var iconName = string.Empty;
 
         var configuration = GetConfigurationOrNull(typography, key);
         if (configuration != null)
@@ -100,6 +101,7 @@ internal static class NativeTagTypography
             if (configuration.MakeAllUppercase)
                 label = label.ToUpperInvariant();
             accentColor = configuration.Color;
+            iconName = configuration.IconName ?? string.Empty;
         }
         else
         {
@@ -108,7 +110,7 @@ internal static class NativeTagTypography
             label = LocalizeThroughStringTable(key);
         }
 
-        return new NativeTagDisplay(label, accentColor);
+        return new NativeTagDisplay(label, accentColor, iconName);
     }
 
     private static KeywordIconColorConfiguration? GetConfigurationOrNull(

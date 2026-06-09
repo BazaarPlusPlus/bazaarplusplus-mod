@@ -161,10 +161,8 @@ internal sealed partial class CollectionPanelView
             foreach (var tag in visible)
             {
                 var captured = tag;
-                var chip = CreateCompactChipButton(
-                    NativeTagTypography.Resolve(captured).Label,
-                    () => _toggleTag(captured)
-                );
+                var chip = CreateTagFacetChipButton(() => _toggleTag(captured));
+                ApplyTagChipContent(chip, NativeTagTypography.Resolve(captured));
                 _tagChips[captured] = chip;
                 _tagChipOrder.Add(captured);
                 _tagChipRow.Add(chip);
@@ -192,10 +190,8 @@ internal sealed partial class CollectionPanelView
             foreach (var keyword in visible)
             {
                 var captured = keyword;
-                var chip = CreateCompactChipButton(
-                    NativeTagTypography.Resolve(captured).Label,
-                    () => _toggleKeyword(captured)
-                );
+                var chip = CreateTagFacetChipButton(() => _toggleKeyword(captured));
+                ApplyTagChipContent(chip, NativeTagTypography.Resolve(captured));
                 _keywordChips[captured] = chip;
                 _keywordChipOrder.Add(captured);
                 _tagChipRow.Add(chip);
@@ -463,6 +459,68 @@ internal sealed partial class CollectionPanelView
         chip.style.marginBottom = UiSpacing.Xs;
         StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
         return chip;
+    }
+
+    private static Button CreateTagFacetChipButton(Action onClick)
+    {
+        var chip = CreateButton(string.Empty, onClick, 0f, Sizes.InfoChipHeight, fixedWidth: false);
+        chip.style.minWidth = Sizes.InfoChipMinWidth;
+        chip.style.flexDirection = FlexDirection.Row;
+        chip.style.alignItems = Align.Center;
+        chip.style.justifyContent = Justify.Center;
+        UiStyle.HorizontalPadding(chip.style, UiSpacing.Md);
+        chip.style.marginRight = UiSpacing.Sm;
+        chip.style.marginBottom = UiSpacing.Xs;
+
+        var implicitText = chip.Q<TextElement>();
+        if (implicitText != null)
+        {
+            implicitText.style.flexGrow = 0f;
+            implicitText.style.display = DisplayStyle.None;
+        }
+
+        var icon = new VisualElement { name = TagChipIconName, pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(icon.style, Sizes.TagChipIconSize, Sizes.TagChipIconSize);
+        icon.style.flexShrink = 0f;
+        icon.style.marginRight = UiSpacing.Xs;
+        icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
+        icon.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
+        icon.style.display = DisplayStyle.None;
+        chip.Add(icon);
+
+        var label = new Label { name = TagChipLabelName, pickingMode = PickingMode.Ignore };
+        label.style.fontSize = Sizes.FontSmall;
+        label.style.unityFont = BppUiFont.Default;
+        label.style.unityFontStyleAndWeight = FontStyle.Normal;
+        label.style.unityTextAlign = TextAnchor.MiddleCenter;
+        label.style.flexShrink = 0f;
+        chip.Add(label);
+
+        StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        return chip;
+    }
+
+    private static void ApplyTagChipContent(Button chip, NativeTagDisplay display)
+    {
+        var label = chip.Q<Label>(TagChipLabelName);
+        if (label != null)
+            label.text = display.Label;
+
+        var icon = chip.Q<VisualElement>(TagChipIconName);
+        if (icon == null)
+            return;
+
+        var sprite = KeywordIconSpriteProvider.Resolve(display.IconName);
+        if (sprite != null)
+        {
+            icon.style.backgroundImage = new StyleBackground(sprite);
+            icon.style.display = DisplayStyle.Flex;
+            icon.MarkDirtyRepaint();
+            return;
+        }
+
+        icon.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
+        icon.style.display = DisplayStyle.None;
     }
 
     private Button CreateHeroChipButton(EHero hero, Action onClick)
