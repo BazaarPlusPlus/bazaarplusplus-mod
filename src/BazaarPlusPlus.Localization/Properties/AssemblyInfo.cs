@@ -6,4 +6,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("UiFoundation.Tests")]
 [assembly: InternalsVisibleTo("GhostBattleSync.Tests")]
 [assembly: InternalsVisibleTo("HistoryPanelServerHealth.Tests")]
-[assembly: InternalsVisibleTo("CardSetBuildRecommendationTier.Tests")]
+[assembly: InternalsVisibleTo("LiveBuildRecommendations.Tests")]

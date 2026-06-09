@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Reflection;
 
-// Behavior tests for the analyzer-v4 ten-win build corpus consumed by the mod.
+// Behavior tests for the analyzer-v4 ten-win build corpus consumed by LiveBuildPanel.
 // The payload is the compact string-table + schema-driven array-row format emitted by
 // bazaarplusplus-analyzers/src/bpp/stages/analyze/mod_builds.py at
 // analyzer-v4/mod/tenwin_builds.json. Every assertion drives the public
@@ -39,7 +39,7 @@ internal static class TenWinBuildTests
         TestColdStartFallsBackToEmbeddedThenRemote();
         TestEmbeddedSeedResourceIsBundledAndParses();
 
-        Console.WriteLine("TenWin build recommendation checks passed.");
+        Console.WriteLine("LiveBuild recommendation checks passed.");
     }
 
     // ---- Tests ------------------------------------------------------------
@@ -74,7 +74,7 @@ internal static class TenWinBuildTests
         );
 
         var ratingTierType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.BuildRecommendations.BuildRatingTier"
+            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildRatingTier"
         );
         Assert(
             ratingTierType == null,
@@ -523,7 +523,7 @@ internal static class TenWinBuildTests
     private static object RunRefreshService(Type repositoryType)
     {
         var serviceType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.BuildRecommendations.BuildRecommendationRefreshService"
+            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildRecommendationRefreshService"
         );
         Assert(serviceType != null, "BuildRecommendationRefreshService should exist.");
         var service =
@@ -652,7 +652,7 @@ internal static class TenWinBuildTests
         );
 
         var corpusType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.BuildRecommendations.TenWinBuildCorpus"
+            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.TenWinBuildCorpus"
         )!;
         var parse = corpusType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static)!;
         var corpus = parse.Invoke(null, [json]);
@@ -751,7 +751,7 @@ internal static class TenWinBuildTests
     {
         var assembly = Assembly.Load("BazaarPlusPlus");
         return assembly.GetType(
-            "BazaarPlusPlus.Game.BuildRecommendations.BuildRecommendationRepository"
+            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildRecommendationRepository"
         )!;
     }
 
@@ -803,7 +803,7 @@ internal static class TenWinBuildTests
     )
     {
         var liveStateType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.BuildRecommendations.BuildLiveState"
+            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildLiveState"
         )!;
         var from = liveStateType.GetMethod("From")!;
         return from.Invoke(
