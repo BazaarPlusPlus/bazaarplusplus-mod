@@ -290,7 +290,7 @@ public class CoreLayeringTests
         var mainSource = MainSourceRoot(repoRoot);
         Assert.False(
             Directory.Exists(Path.Combine(mainSource, "Game", "CardSetPreview")),
-            "Game/CardSetPreview was replaced by LiveBuildPanel plus BuildRecommendations and must not be restored."
+            "Game/CardSetPreview was replaced by LiveBuildPanel and must not be restored."
         );
 
         var rules = new[]
@@ -345,6 +345,84 @@ public class CoreLayeringTests
             "HistoryPanel and LiveBuildPanel must share runtime preview behavior through "
                 + "GameInterop.ItemBoardPreview instead of importing each other's feature internals. Offending imports:\n"
                 + string.Join("\n", violations)
+        );
+    }
+
+    [Fact]
+    public void LiveBuildPanel_owns_build_recommendations()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var oldRecommendationsDir = Path.Combine(mainSource, "Game", "BuildRecommendations");
+        var liveRecommendationsDir = Path.Combine(
+            mainSource,
+            "Game",
+            "LiveBuildPanel",
+            "Recommendations"
+        );
+
+        Assert.False(
+            Directory.Exists(oldRecommendationsDir),
+            "BuildRecommendations is LiveBuildPanel-owned; do not restore top-level Game/BuildRecommendations."
+        );
+        Assert.True(
+            Directory.Exists(liveRecommendationsDir),
+            $"Could not locate LiveBuildPanel recommendations directory at '{liveRecommendationsDir}'."
+        );
+
+        var sourceFiles = Directory
+            .EnumerateFiles(mainSource, "*.cs", SearchOption.AllDirectories)
+            .ToList();
+        var oldNamespaceHits = sourceFiles
+            .Where(file =>
+                File.ReadAllText(file)
+                    .Contains("BazaarPlusPlus.Game.BuildRecommendations", StringComparison.Ordinal)
+            )
+            .Select(file => Path.GetRelativePath(mainSource, file).Replace('\\', '/'))
+            .ToList();
+        Assert.True(
+            oldNamespaceHits.Count == 0,
+            "Production code must not reference the old BuildRecommendations namespace:\n"
+                + string.Join("\n", oldNamespaceHits)
+        );
+
+        var recommendationsRoot =
+            Path.GetFullPath(liveRecommendationsDir) + Path.DirectorySeparatorChar;
+        var liveBuildPanelFile = Path.GetFullPath(
+            Path.Combine(mainSource, "Game", "LiveBuildPanel", "LiveBuildPanel.cs")
+        );
+
+        bool IsAllowedRecommendationConsumer(string file)
+        {
+            var fullPath = Path.GetFullPath(file);
+            return fullPath.StartsWith(recommendationsRoot, StringComparison.Ordinal)
+                || string.Equals(fullPath, liveBuildPanelFile, StringComparison.Ordinal);
+        }
+
+        var disallowedImports = sourceFiles
+            .Where(file => !IsAllowedRecommendationConsumer(file))
+            .SelectMany(file =>
+                File.ReadLines(file)
+                    .Select((line, index) => new
+                    {
+                        File = Path.GetRelativePath(mainSource, file).Replace('\\', '/'),
+                        Line = index + 1,
+                        Text = line.Trim(),
+                    })
+            )
+            .Where(hit =>
+                hit.Text.StartsWith(
+                    "using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations",
+                    StringComparison.Ordinal
+                )
+            )
+            .Select(hit => $"{hit.File}:{hit.Line}: {hit.Text}")
+            .ToList();
+
+        Assert.True(
+            disallowedImports.Count == 0,
+            "Only LiveBuildPanel may import its recommendation internals. Offending imports:\n"
+                + string.Join("\n", disallowedImports)
         );
     }
 
