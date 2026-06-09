@@ -83,7 +83,7 @@ public sealed class CardArtReplacementTests : IDisposable
             )
             .ToArray();
 
-        Assert.Equal(117, resources.Length);
+        Assert.Equal(120, resources.Length);
         foreach (var resource in resources)
         {
             var fileName = resource.Substring("BazaarPlusPlus.Resources.CustomCardArt.".Length);

@@ -72,7 +72,7 @@ in-run 卡（`ItemController`）的插画由其子组件 **`ItemVisualsControlle
 **分辨率**：item 卡插画源贴图普遍 **1024×1024 正方形**（实测 1061/1073 为 1024²；少数离群 1×2048²、几张 512²）。Small/Medium/Large **不**按 socket 数改插画分辨率；可见宽度差异来自 per-size 卡框 mesh 裁切（卡框独立 per-size prefab，`AssetLoader.cs:424-430`）。抽取无缩放（`art.py:188`；`convert_image_to_rgb` 丢 alpha，`art.py:51-54`）。
 
 **创作单位（已定）：为每个商人的每个 size 各画一张** = `(商人 × size)`，与 native「每 size 一张箱子」一致、像素级贴合每个 size 的卡框裁切。
-- 规模：**40 商人 × 3 size = 120 张**；**The Tester（§16 第 37 行）是测试商人，不做** → 实际 **39 商人 / 117 张**。
+- 规模：**40 商人 × 3 size = 120 张**；**The Tester（§16 第 37 行）是真实商人，也包含在作图范围内**。
 - 文件名 `<templateId>.png`（运行期按 `TemplateId` 命中，§4）；全表见 §16。
 - **不采用** 的「每商人一张复用到 3 size」精简法：native 本就按 size 分图，单图在三种 size 卡框下裁切不一、观感妥协。
 - 每张 1024² 正方形；各 size 的安全区/裁切需 authoring 时对照游戏内实际显示校准。
@@ -130,15 +130,15 @@ in-run 卡（`ItemController`）的插画由其子组件 **`ItemVisualsControlle
 
 - **基底**：抽取产物 `bazaarplusplus-extractor/exports/card-assets/prod/cards/<templateId>/RGB_Preview.png`（1024² 原生卡图）+ 同卡 `manifest.json`（带 size/material）。
 - **商人头像素材**：商人 encounter 的 `icon.png`/portrait（抽取产物或 `EncounterPortraitSpriteProvider` 同源 ArtKey）。
-- **离线合成**（一次性，非运行期）：包裹卡 → 商人映射**已离线算好**（见 §16 全表，源自活数据 `prod/cache/GameData.db` 包裹卡能力图 `TPrerequisiteRun→TRunConditionalCurrentEncounter→TCardConditionalId.Id`，与 overlay 方案同源）。把对应商人头像合成到 **该 size 的** native 箱子图上，按 (商人×size) 导出 **117 张**（39 商人 × 3 size，排除 The Tester）1024² PNG 到 `CustomCardArt/`，文件名 `<templateId>.png`（直接对应 §16）。
+- **离线合成**（一次性，非运行期）：包裹卡 → 商人映射**已离线算好**（见 §16 全表，源自活数据 `prod/cache/GameData.db` 包裹卡能力图 `TPrerequisiteRun→TRunConditionalCurrentEncounter→TCardConditionalId.Id`，与 overlay 方案同源）。把对应商人头像合成到 **该 size 的** native 箱子图上，按 (商人×size) 导出 **120 张**（40 商人 × 3 size，包含 The Tester）1024² PNG 到 `CustomCardArt/`，文件名 `<templateId>.png`（直接对应 §16）。
   - 可写 `uv`+Pillow 脚本批量合成（repo Python 用 `uv`、不 `from __future__`），输入 = §16 表 + 抽取的 per-size native 箱子图（3 个 ArtKey）+ 商人头像。
 - **运行期不依赖** 该映射——只读清单/文件名 `TemplateId→file`。映射只服务**离线作图**。
 
 ### 9.1 Phase 0：占位图先行（验证管线，与真实美术解耦）
 
-为了**先验证替换管线的可行性**（不等成品图），用 `bazaarplusplus-extractor/scripts/generate_placeholder_package_art.py`（`cd bazaarplusplus-extractor && uv run python scripts/…`）按 §16 全表自动生成 117 张占位图（39 商人 × 3 size，排除 The Tester），文件名 `<templateId>.png`：
+为了**先验证替换管线的可行性**（不等成品图），用 `bazaarplusplus-extractor/scripts/generate_placeholder_package_art.py`（`cd bazaarplusplus-extractor && uv run python scripts/…`）按 §16 全表自动生成 120 张占位图（40 商人 × 3 size，包含 The Tester），文件名 `<templateId>.png`：
 - **`--mode text`**：纯占位——`"<Merchant>'s <Size> Package"` 文字 + 按 size 着色背景。零外部素材，纯验证「templateId 命中 → SetTexture 生效」。
-- **`--mode portrait`（推荐起步）**：直接用**真实商人头像**（抽取产物 `exports/card-assets/prod/cards/<merchantEncounterId>/icon.png`，contain-fit 到 1024² + 底部 size 标签）。实测 **117/117 商人头像都能命中**——所以这套占位图**本身就是可用的过渡美术**，先上它即可看到「卖给哪个商人」，真实精修图 ready 后按同名 `<templateId>.png` 覆盖即可。
+- **`--mode portrait`（推荐起步）**：直接用**真实商人头像**（抽取产物 `exports/card-assets/prod/cards/<merchantEncounterId>/icon.png`，contain-fit 到 1024² + 底部 size 标签）。实测 **120/120 商人头像都能命中**——所以这套占位图**本身就是可用的过渡美术**，先上它即可看到「卖给哪个商人」，真实精修图 ready 后按同名 `<templateId>.png` 覆盖即可。
 - 输出落 `<GameRoot>/BazaarPlusPlusV4/CustomCardArt/`（runtime 读取处）。商人头像源自每张包裹卡能力图里嵌入的 merchant encounter GUID（脚本内联 §2 解析逻辑，自动跟版）。
 
 **流程**：实现 runtime 替换（§11）→ 跑脚本生成占位图 → 进游戏验证替换/池化（§12）→ 真实图 ready 后覆盖同名文件。占位与成品**键完全一致**（`<templateId>.png`），切换零代码改动。
@@ -207,11 +207,11 @@ in-run 卡（`ItemController`）的插画由其子组件 **`ItemVisualsControlle
 >
 > **做什么**：对 `HiddenTags` 含 `EHiddenTag.Package` 的卡（名为 `"<Merchant>'s Package"`），把其卡面插画贴图替换为磁盘上对应的自制 PNG（按 `TemplateId` 命中）。
 >
-> **Phase 0（先做，验证管线）**：先跑 `bazaarplusplus-extractor/scripts/generate_placeholder_package_art.py --mode portrait`（已存在）生成 117 张 `<templateId>.png` 占位图（真实商人头像，可作过渡美术），落 `<GameRoot>/BazaarPlusPlusV4/CustomCardArt/`，用它把 runtime 替换跑通；真实精修图 ready 后按同名覆盖、零代码改动。
+> **Phase 0（先做，验证管线）**：先跑 `bazaarplusplus-extractor/scripts/generate_placeholder_package_art.py --mode portrait`（已存在）生成 120 张 `<templateId>.png` 占位图（真实商人头像，可作过渡美术），落 `<GameRoot>/BazaarPlusPlusV4/CustomCardArt/`，用它把 runtime 替换跑通；真实精修图 ready 后按同名覆盖、零代码改动。
 >
 > **替换原点**：`[HarmonyPostfix] ItemVisualsController.SetCardFrameMaterial`（`ItemVisualsController.cs:189`）——原方法后，对 `__instance.cardIllustrationRenderer.sharedMaterial` 做 `SetTexture(CardArtShaderVariables.EncounterBaseMap, tex)` + `mat.mainTexture = tex`（只改插画，保留品质/附魔 keyword）。身份用 `ConditionalWeakTable<ItemVisualsController,Card>`（由 `Setup(Card,…)` postfix 填）+ `GetComponentInParent<ItemController>` 兜底；判 `CardData.Template` 是包裹卡且清单命中。
 >
-> **图片**：磁盘 `<GameRoot>/BazaarPlusPlusV4/CustomCardArt/`（`BepInExPathProvider` 加属性），`File.ReadAllBytes → Texture2D.LoadImage → Apply`（照 `BppDockButtonSpriteProvider.cs:57-71`），按 key 缓存。**键 = `TemplateId`**（文件名 `<templateId>.png`）。范围 = **每个商人的每个 size 各一张**，共 40 商人 × 3 size = 120（排除测试商人 The Tester → **39 商人 / 117 张**），全表见 §16。**分辨率 1024×1024 正方形**（可 512²）。**不要用 ArtKey 当键**（只有 3 个，会塌掉所有商人）。
+> **图片**：磁盘 `<GameRoot>/BazaarPlusPlusV4/CustomCardArt/`（`BepInExPathProvider` 加属性），`File.ReadAllBytes → Texture2D.LoadImage → Apply`（照 `BppDockButtonSpriteProvider.cs:57-71`），按 key 缓存。**键 = `TemplateId`**（文件名 `<templateId>.png`）。范围 = **每个商人的每个 size 各一张**，共 40 商人 × 3 size = 120（包含真实商人 The Tester），全表见 §16。**分辨率 1024×1024 正方形**（可 512²）。**不要用 ArtKey 当键**（只有 3 个，会塌掉所有商人）。
 >
 > **不可破约束**：① 只改 per-card `materialInstance` 的贴图（它是 `Instantiate` 副本，§1），**不要**新增 child 物体、不要 patch `Cleanup`、不要持有需释放的材质——靠 `SetCardFrameMaterial` 每次重绑重触发实现池化安全；② `GameInterop.CardArtReplacement` 零 `Game.*` 依赖 + 架构测试守住；③ 只新增本特性文件，不动无关改动；④ 实现前在 postfix 加临时 Debug 探针 dump 命中情况，进游戏验证后移除。
 >
@@ -237,7 +237,7 @@ in-run 卡（`ItemController`）的插画由其子组件 **`ItemVisualsControlle
 
 ## 16 附录：120 张包裹卡 TemplateId 全表（作图工作清单）
 
-> **决定**：为**每个商人的每个 size 各画一张**（见 §3）。共 **40 商人 × 3 size = 120 张**；其中 **The Tester（#37）是测试商人，通常不做** → 实际 **39 商人 / 117 张**。文件名建议 `<templateId>.png`（运行期按 `TemplateId` 命中）。
+> **决定**：为**每个商人的每个 size 各画一张**（见 §3）。共 **40 商人 × 3 size = 120 张**；**The Tester（#37）是真实商人，包含在作图范围内**。文件名建议 `<templateId>.png`（运行期按 `TemplateId` 命中）。
 >
 > native 通用箱子 ArtKey（跨商人共享、按 size）：Small `b44a99faac3eae3468d3f12dcc284c63` / Medium `b8c002a5eee6a2541925014180a54b63` / Large `47aa57dfa612fa544a087cddf0ebce89`——证明原生不画商人，须按 (商人×size) 替换。
 
@@ -279,7 +279,7 @@ in-run 卡（`ItemController`）的插画由其子组件 **`ItemVisualsControlle
 | 34 | Silvia | 21b570fc-b5c9-494c-8f9f-52aed6bcd11a | 43dd428f-ee17-492a-aff1-0b2d6492cf27 | 2a3cc868-07fb-4d64-b5ae-3d14755b0855 |
 | 35 | Tatiana | 8ffb584b-7d91-402b-aeeb-4dbe38d92c78 | 5049bcca-cf8f-4cc5-9e0d-faea06d6fcc6 | 81c9a871-6010-4cc9-994e-ac554e08c2ad |
 | 36 | The Antiquarian | f44bdeec-6c20-49fd-ac42-2d54879053ec | 5a45e8c9-b948-490c-a042-31809704a561 | 3d9f6f13-ffef-4b5e-8215-c067298d7f44 |
-| 37 | The Tester（测试，通常不做） | aff387d9-a2b8-4210-b1fd-3ff19bc05d10 | 8bde0419-323a-4c43-a634-2feac448c3c3 | 700dd052-eb06-405b-99a5-3dea1a9417a1 |
+| 37 | The Tester | aff387d9-a2b8-4210-b1fd-3ff19bc05d10 | 8bde0419-323a-4c43-a634-2feac448c3c3 | 700dd052-eb06-405b-99a5-3dea1a9417a1 |
 | 38 | Tinker | 00c67a4d-eea4-4297-b797-3071893c2a1c | 0c2ffb12-9202-4f0e-95db-d5dc7fc93706 | b999d37f-b2a0-4cf9-a6e0-fe02419bee58 |
 | 39 | Tok's Clocks | dc22510b-5577-422d-bcde-b23572c16f5a | 5db2e1cc-2d4b-40d7-9d05-bb3ec99ab67a | 14f3b0a2-cfc1-449b-8d29-0d936b3f7b3f |
 | 40 | Valpak | 6ac5f8e2-1c03-4dda-becf-4836e56b31ec | 9fd5de2a-7546-4788-a4ba-4b08a0149243 | 53f0819a-82e8-406e-8d04-e1463d5ea380 |

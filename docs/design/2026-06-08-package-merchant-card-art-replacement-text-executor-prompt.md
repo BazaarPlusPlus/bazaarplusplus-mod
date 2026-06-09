@@ -12,7 +12,7 @@
 
 ### 背景（已验证，勿重新论证；证据见设计文档）
 
-- 「包裹卡」= `ITCard.HiddenTags` 含 `EHiddenTag.Package` 的 Item，名为 `"<Merchant>'s Package"`。共 **120 个 templateId = 40 商人 × 3 size（Small/Medium/Large）**；每个 (商人,size) 一个唯一 templateId（全表见设计文档 §16）。测试商人 **The Tester 不做** → 实际 117。
+- 「包裹卡」= `ITCard.HiddenTags` 含 `EHiddenTag.Package` 的 Item，名为 `"<Merchant>'s Package"`。共 **120 个 templateId = 40 商人 × 3 size（Small/Medium/Large）**；每个 (商人,size) 一个唯一 templateId（全表见设计文档 §16）。**The Tester 是真实商人，也包含在范围内**。
 - 原生卡图是**通用箱子**（只有 3 个 ArtKey，按 size 共享、跨商人相同）→ 原生不显示商人；所以 **不能按 ArtKey 替换，必须按 `TemplateId`**。
 - 替换原点：**`[HarmonyPostfix] ItemVisualsController.SetCardFrameMaterial`**（`ItemVisualsController.cs:189-217`）。原方法新建 per-card `materialInstance`（`Object.Instantiate`，`:197`）挂到 `cardIllustrationRenderer.sharedMaterial`（`:198`）。我们在其后对该材质做 `SetTexture(CardArtShaderVariables.EncounterBaseMap /*"_BaseMap"*/, tex)` + `mat.mainTexture = tex`（只改插画，保留 premium/enchant keyword）。
 - in-run 卡是**世界空间 `MonoBehaviour`**（`CardController.cs:32`），不是 UGUI/UITK。
@@ -52,7 +52,7 @@ uv run python scripts/generate_placeholder_package_art.py \
     --out "<GameRoot>/BazaarPlusPlusV4/CustomCardArt"
 ```
 
-产出 117 张 `<templateId>.png`，每张为按 size 着色背景 + 居中文字 `"<Merchant>'s <Size> Package"`（如 `Tinker's Small Package`）。runtime 按 `TemplateId` 命中即把卡面替换为该文字图。
+产出 120 张 `<templateId>.png`，每张为按 size 着色背景 + 居中文字 `"<Merchant>'s <Size> Package"`（如 `Tinker's Small Package`）。runtime 按 `TemplateId` 命中即把卡面替换为该文字图。
 
 ### 验证（完成判据）
 
