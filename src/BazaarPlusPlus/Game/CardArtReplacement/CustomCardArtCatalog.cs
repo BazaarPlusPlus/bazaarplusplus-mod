@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace BazaarPlusPlus.Game.CardArtReplacement;
 
@@ -25,16 +26,16 @@ internal sealed class CustomCardArtCatalog
         if (string.IsNullOrWhiteSpace(DirectoryPath) || !Directory.Exists(DirectoryPath))
             return;
 
-        foreach (var path in Directory.EnumerateFiles(DirectoryPath))
+        // Ordinal-sorted + first-wins so resolution is deterministic when both
+        // <id>.jpg and <id>.png exist: ".jpg" sorts before ".png", so the shipped
+        // .jpg wins over a stale .png left over from an earlier build. To override
+        // art, replace the file in place rather than adding a second extension.
+        foreach (var path in Directory.EnumerateFiles(DirectoryPath).OrderBy(p => p, StringComparer.Ordinal))
         {
-            if (!string.Equals(Path.GetExtension(path), ".png", StringComparison.OrdinalIgnoreCase))
+            if (!CustomCardArtImageFormats.TryGetTemplateId(path, out var templateId))
                 continue;
 
-            var fileName = Path.GetFileNameWithoutExtension(path);
-            if (!Guid.TryParse(fileName, out var templateId) || templateId == Guid.Empty)
-                continue;
-
-            _pathsByTemplateId[templateId] = path;
+            _pathsByTemplateId.TryAdd(templateId, path);
         }
     }
 

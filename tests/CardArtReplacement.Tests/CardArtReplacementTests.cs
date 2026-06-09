@@ -18,19 +18,38 @@ public sealed class CardArtReplacementTests : IDisposable
     }
 
     [Fact]
-    public void Catalog_maps_guid_png_filenames_to_template_ids()
+    public void Catalog_maps_guid_png_and_jpg_filenames_to_template_ids()
+    {
+        var pngTemplateId = Guid.NewGuid();
+        var jpgTemplateId = Guid.NewGuid();
+        var pngPath = Path.Combine(_tempDir, $"{pngTemplateId}.png");
+        var jpgPath = Path.Combine(_tempDir, $"{jpgTemplateId}.jpg");
+        File.WriteAllBytes(pngPath, Array.Empty<byte>());
+        File.WriteAllBytes(jpgPath, Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(_tempDir, "not-a-guid.png"), Array.Empty<byte>());
+
+        var catalog = new CustomCardArtCatalog(_tempDir);
+
+        Assert.Equal(2, catalog.Count);
+        Assert.True(catalog.TryGetArtPath(pngTemplateId, out var actualPng));
+        Assert.Equal(pngPath, actualPng);
+        Assert.True(catalog.TryGetArtPath(jpgTemplateId, out var actualJpg));
+        Assert.Equal(jpgPath, actualJpg);
+    }
+
+    [Fact]
+    public void Catalog_prefers_shipped_jpg_over_stale_png_for_same_template_id()
     {
         var templateId = Guid.NewGuid();
-        var expectedPath = Path.Combine(_tempDir, $"{templateId}.png");
-        File.WriteAllBytes(expectedPath, Array.Empty<byte>());
-        File.WriteAllBytes(Path.Combine(_tempDir, "not-a-guid.png"), Array.Empty<byte>());
-        File.WriteAllBytes(Path.Combine(_tempDir, $"{Guid.NewGuid()}.jpg"), Array.Empty<byte>());
+        var jpgPath = Path.Combine(_tempDir, $"{templateId}.jpg");
+        File.WriteAllBytes(Path.Combine(_tempDir, $"{templateId}.png"), Array.Empty<byte>());
+        File.WriteAllBytes(jpgPath, Array.Empty<byte>());
 
         var catalog = new CustomCardArtCatalog(_tempDir);
 
         Assert.Equal(1, catalog.Count);
         Assert.True(catalog.TryGetArtPath(templateId, out var actualPath));
-        Assert.Equal(expectedPath, actualPath);
+        Assert.Equal(jpgPath, actualPath);
     }
 
     [Fact]
@@ -79,7 +98,7 @@ public sealed class CardArtReplacementTests : IDisposable
             .Assembly.GetManifestResourceNames()
             .Where(name =>
                 name.StartsWith("BazaarPlusPlus.Resources.CustomCardArt.", StringComparison.Ordinal)
-                && name.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                && CustomCardArtImageFormats.IsSupportedExtension(Path.GetExtension(name))
             )
             .ToArray();
 
@@ -87,7 +106,7 @@ public sealed class CardArtReplacementTests : IDisposable
         foreach (var resource in resources)
         {
             var fileName = resource.Substring("BazaarPlusPlus.Resources.CustomCardArt.".Length);
-            Assert.True(Guid.TryParse(Path.GetFileNameWithoutExtension(fileName), out _));
+            Assert.True(CustomCardArtImageFormats.TryGetTemplateId(fileName, out _));
         }
     }
 
@@ -96,13 +115,13 @@ public sealed class CardArtReplacementTests : IDisposable
     {
         var existingTemplateId = Guid.NewGuid();
         var missingTemplateId = Guid.NewGuid();
-        var existingPath = Path.Combine(_tempDir, $"{existingTemplateId}.png");
+        var existingPath = Path.Combine(_tempDir, $"{existingTemplateId}.jpg");
         File.WriteAllBytes(existingPath, [0x01, 0x02, 0x03]);
 
         var resources = new[]
         {
-            $"BazaarPlusPlus.Resources.CustomCardArt.{existingTemplateId}.png",
-            $"BazaarPlusPlus.Resources.CustomCardArt.{missingTemplateId}.png",
+            $"BazaarPlusPlus.Resources.CustomCardArt.{existingTemplateId}.jpg",
+            $"BazaarPlusPlus.Resources.CustomCardArt.{missingTemplateId}.jpg",
         };
         var installer = new BundledCustomCardArtInstaller(
             () => resources,
@@ -118,7 +137,7 @@ public sealed class CardArtReplacementTests : IDisposable
         Assert.Equal([0x01, 0x02, 0x03], File.ReadAllBytes(existingPath));
         Assert.Equal(
             [0x09, 0x08, 0x07],
-            File.ReadAllBytes(Path.Combine(_tempDir, $"{missingTemplateId}.png"))
+            File.ReadAllBytes(Path.Combine(_tempDir, $"{missingTemplateId}.jpg"))
         );
     }
 

@@ -10,7 +10,6 @@ namespace BazaarPlusPlus.Game.CardArtReplacement;
 internal sealed class BundledCustomCardArtInstaller
 {
     private const string ResourcePrefix = "BazaarPlusPlus.Resources.CustomCardArt.";
-    private const string PngExtension = ".png";
 
     private readonly Func<IReadOnlyList<string>> _resourceNames;
     private readonly Func<string, Stream?> _openResource;
@@ -42,7 +41,7 @@ internal sealed class BundledCustomCardArtInstaller
         {
             result.ResourceCount++;
             var fileName = ResourceNameToFileName(resourceName);
-            if (!IsTemplateIdPngFileName(fileName))
+            if (!CustomCardArtImageFormats.TryGetTemplateId(fileName, out _))
             {
                 result.FailedCount++;
                 continue;
@@ -68,27 +67,12 @@ internal sealed class BundledCustomCardArtInstaller
         _resourceNames()
             .Where(name =>
                 name.StartsWith(ResourcePrefix, StringComparison.Ordinal)
-                && name.EndsWith(PngExtension, StringComparison.OrdinalIgnoreCase)
+                && CustomCardArtImageFormats.IsSupportedExtension(Path.GetExtension(name))
             )
             .OrderBy(name => name, StringComparer.Ordinal);
 
     private static string ResourceNameToFileName(string resourceName) =>
         resourceName.Substring(ResourcePrefix.Length);
-
-    private static bool IsTemplateIdPngFileName(string fileName)
-    {
-        if (
-            !string.Equals(
-                Path.GetExtension(fileName),
-                PngExtension,
-                StringComparison.OrdinalIgnoreCase
-            )
-        )
-            return false;
-
-        return Guid.TryParse(Path.GetFileNameWithoutExtension(fileName), out var templateId)
-            && templateId != Guid.Empty;
-    }
 
     private bool TryWriteResource(string resourceName, string targetPath)
     {
