@@ -65,6 +65,39 @@ AssertEqual(
     "Default panel selection should target the Item merchant source rail."
 );
 AssertEqual(
+    "BPP.CollectionPanel.SelectedHero.anonymous",
+    CollectionPanelHeroPreference.BuildPrefsKey(null),
+    "CollectionPanel hero preference should use an anonymous scope when no account scope is available."
+);
+AssertEqual(
+    "BPP.CollectionPanel.SelectedHero.account%2Fone",
+    CollectionPanelHeroPreference.BuildPrefsKey("account/one"),
+    "CollectionPanel hero preference key should URI-escape account scopes."
+);
+AssertEqual(
+    "Dooley",
+    CollectionPanelHeroPreference.Serialize(EHero.Dooley),
+    "CollectionPanel hero preference should serialize enum names."
+);
+AssertTrue(
+    CollectionPanelHeroPreference.TryParse("Dooley", out var parsedDooley)
+        && parsedDooley == EHero.Dooley,
+    "CollectionPanel hero preference should parse a supported concrete hero."
+);
+AssertTrue(
+    CollectionPanelHeroPreference.TryParse("Common", out var parsedCommon)
+        && parsedCommon == EHero.Common,
+    "CollectionPanel hero preference should preserve Common as a real panel hero."
+);
+AssertFalse(
+    CollectionPanelHeroPreference.TryParse("NotARealHero", out _),
+    "CollectionPanel hero preference should reject unknown hero strings."
+);
+AssertFalse(
+    CollectionPanelHeroPreference.TryParse("", out _),
+    "CollectionPanel hero preference should reject empty values."
+);
+AssertEqual(
     DayTierSchedule.OutOfRunDay,
     new CollectionFilterState().SelectedRunDay,
     "New filter state should start with the day filter selected."

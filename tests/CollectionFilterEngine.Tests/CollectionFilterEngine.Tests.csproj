@@ -57,6 +57,10 @@
       Link="CollectionPanelSelectionState.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionPanelHeroPreference.cs"
+      Link="CollectionPanelHeroPreference.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceEnums.cs"
       Link="CollectionSourceEnums.cs"
     />
