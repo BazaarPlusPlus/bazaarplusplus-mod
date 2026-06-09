@@ -63,6 +63,8 @@ internal sealed class CollectionPanel : MonoBehaviour
     private readonly CollectionCatalog _catalog = new();
     private readonly CollectionFilterState _filter = new();
     private readonly CollectionSourceOfferPoolCache _offerPoolCache = new();
+    private readonly ICollectionPanelHeroPreferenceStore _heroPreferenceStore =
+        new CollectionPanelHeroPreferenceStore();
 
     private IBppConfig _config = null!;
     private CollectionPanelView? _view;
@@ -145,6 +147,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     private CollectionPanelSelectionState ResolveOpenSelection()
     {
         var isInGameRun = IsInGameRunForOpen();
+        var rememberedHero = isInGameRun ? null : _heroPreferenceStore.Load();
         var hero = isInGameRun ? TryReadCurrentHero() : null;
         var encounterIds = isInGameRun ? TryReadEncounterIds() : EncounterIdsSnapshot.Empty;
         var selection = CollectionPanelOpenSelectionResolver.Resolve(
@@ -152,7 +155,8 @@ internal sealed class CollectionPanel : MonoBehaviour
             hero,
             encounterIds.CurrentEncounterTemplateId,
             encounterIds.ChoiceSelectionTemplateIds,
-            CollectionSourceCatalog.Entries
+            CollectionSourceCatalog.Entries,
+            rememberedHero
         );
 
         BppLog.Debug(
@@ -160,6 +164,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             "Open selection resolved "
                 + $"inRun={isInGameRun} "
                 + $"hero={selection.SelectedHero?.ToString() ?? "none"} "
+                + $"rememberedHero={rememberedHero?.ToString() ?? "none"} "
                 + $"currentEncounterId={encounterIds.CurrentEncounterId ?? "none"} "
                 + $"currentEncounterTemplateId={encounterIds.CurrentEncounterTemplateId?.ToString() ?? "none"} "
                 + $"sourceKind={selection.SelectedSourceKind} "
@@ -491,6 +496,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             toggleHero: hero =>
             {
                 _filter.ToggleHero(hero);
+                _heroPreferenceStore.Save(hero);
                 PruneInvisibleSourceSelections();
                 _scrollY = 0f;
                 ApplyFilters();
