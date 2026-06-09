@@ -18,32 +18,13 @@ public sealed class CardArtReplacementTests : IDisposable
     }
 
     [Fact]
-    public void Catalog_maps_guid_png_and_jpg_filenames_to_template_ids()
-    {
-        var pngTemplateId = Guid.NewGuid();
-        var jpgTemplateId = Guid.NewGuid();
-        var pngPath = Path.Combine(_tempDir, $"{pngTemplateId}.png");
-        var jpgPath = Path.Combine(_tempDir, $"{jpgTemplateId}.jpg");
-        File.WriteAllBytes(pngPath, Array.Empty<byte>());
-        File.WriteAllBytes(jpgPath, Array.Empty<byte>());
-        File.WriteAllBytes(Path.Combine(_tempDir, "not-a-guid.png"), Array.Empty<byte>());
-
-        var catalog = new CustomCardArtCatalog(_tempDir);
-
-        Assert.Equal(2, catalog.Count);
-        Assert.True(catalog.TryGetArtPath(pngTemplateId, out var actualPng));
-        Assert.Equal(pngPath, actualPng);
-        Assert.True(catalog.TryGetArtPath(jpgTemplateId, out var actualJpg));
-        Assert.Equal(jpgPath, actualJpg);
-    }
-
-    [Fact]
-    public void Catalog_prefers_shipped_jpg_over_stale_png_for_same_template_id()
+    public void Catalog_maps_guid_jpg_filenames_and_ignores_png_and_non_guid_files()
     {
         var templateId = Guid.NewGuid();
         var jpgPath = Path.Combine(_tempDir, $"{templateId}.jpg");
-        File.WriteAllBytes(Path.Combine(_tempDir, $"{templateId}.png"), Array.Empty<byte>());
         File.WriteAllBytes(jpgPath, Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(_tempDir, $"{Guid.NewGuid()}.png"), Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(_tempDir, "not-a-guid.jpg"), Array.Empty<byte>());
 
         var catalog = new CustomCardArtCatalog(_tempDir);
 
@@ -57,7 +38,7 @@ public sealed class CardArtReplacementTests : IDisposable
     {
         var catalog = new CustomCardArtCatalog(_tempDir);
         var templateId = Guid.NewGuid();
-        File.WriteAllBytes(Path.Combine(_tempDir, $"{templateId}.png"), Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(_tempDir, $"{templateId}.jpg"), Array.Empty<byte>());
 
         catalog.Refresh();
 
@@ -65,10 +46,10 @@ public sealed class CardArtReplacementTests : IDisposable
     }
 
     [Fact]
-    public void Texture_cache_loads_png_once_per_template_id()
+    public void Texture_cache_loads_jpg_once_per_template_id()
     {
         var templateId = Guid.NewGuid();
-        File.WriteAllBytes(Path.Combine(_tempDir, $"{templateId}.png"), OnePixelPng);
+        File.WriteAllBytes(Path.Combine(_tempDir, $"{templateId}.jpg"), OnePixelImageBytes);
         var catalog = new CustomCardArtCatalog(_tempDir);
         var fakeTexture = (Texture2D)RuntimeHelpers.GetUninitializedObject(typeof(Texture2D));
         var loadCount = 0;
@@ -98,7 +79,7 @@ public sealed class CardArtReplacementTests : IDisposable
             .Assembly.GetManifestResourceNames()
             .Where(name =>
                 name.StartsWith("BazaarPlusPlus.Resources.CustomCardArt.", StringComparison.Ordinal)
-                && CustomCardArtImageFormats.IsSupportedExtension(Path.GetExtension(name))
+                && name.EndsWith(CustomCardArtImageFormats.Extension, StringComparison.OrdinalIgnoreCase)
             )
             .ToArray();
 
@@ -153,7 +134,7 @@ public sealed class CardArtReplacementTests : IDisposable
         }
     }
 
-    private static readonly byte[] OnePixelPng = Convert.FromBase64String(
+    private static readonly byte[] OnePixelImageBytes = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
     );
 }

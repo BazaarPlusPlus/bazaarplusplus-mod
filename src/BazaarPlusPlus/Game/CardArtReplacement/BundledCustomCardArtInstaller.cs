@@ -67,7 +67,7 @@ internal sealed class BundledCustomCardArtInstaller
         _resourceNames()
             .Where(name =>
                 name.StartsWith(ResourcePrefix, StringComparison.Ordinal)
-                && CustomCardArtImageFormats.IsSupportedExtension(Path.GetExtension(name))
+                && name.EndsWith(CustomCardArtImageFormats.Extension, StringComparison.OrdinalIgnoreCase)
             )
             .OrderBy(name => name, StringComparer.Ordinal);
 

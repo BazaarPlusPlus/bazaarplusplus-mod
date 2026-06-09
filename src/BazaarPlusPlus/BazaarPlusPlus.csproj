@@ -28,9 +28,6 @@
     <EmbeddedResource Include="Resources\CustomCardArt\*.jpg">
       <LogicalName>BazaarPlusPlus.Resources.CustomCardArt.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Resources\CustomCardArt\*.png">
-      <LogicalName>BazaarPlusPlus.Resources.CustomCardArt.%(Filename)%(Extension)</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="Resources\Fonts\SourceHanSansCN-Regular.otf" />
     <EmbeddedResource Include="Resources\Fonts\SourceHanSansCN-LICENSE.txt" />
   </ItemGroup>
