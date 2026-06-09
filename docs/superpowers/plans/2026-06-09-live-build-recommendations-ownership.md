@@ -58,7 +58,7 @@ No implementation should begin until this plan is confirmed. This is a mechanica
 - Read: all files listed in "Target File Structure"
 - Modify only after confirmation: this plan file if review finds a concrete flaw
 
-- [ ] **Step 1: Re-check production consumers**
+- [x] **Step 1: Re-check production consumers**
 
 Run:
 
@@ -70,7 +70,7 @@ Expected:
 - Production matches outside `src/BazaarPlusPlus/Game/BuildRecommendations/` appear only in `src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs`.
 - Test matches appear in the recommendation exe-runner project only.
 
-- [ ] **Step 2: Re-check HistoryPanel**
+- [x] **Step 2: Re-check HistoryPanel**
 
 Run:
 
@@ -80,7 +80,7 @@ rg -n "BuildRecommendations|BuildRecommendation|TryRefreshFinalBuilds|RefreshFin
 
 Expected: no matches.
 
-- [ ] **Step 3: Write red-team findings**
+- [x] **Step 3: Write red-team findings**
 
 Add a short `## Red-team review` section near the end of this plan. Use one of these exact outcomes:
 
@@ -98,7 +98,7 @@ or, for concrete issues:
 - `path/to/file`: specific failure mode and exact mitigation.
 ```
 
-- [ ] **Step 4: Confirm before implementation**
+- [x] **Step 4: Confirm before implementation**
 
 If the review finds a blocker, revise the relevant tasks before implementing. If there are no blocking findings, leave implementation tasks unchanged and proceed only after confirmation.
 
@@ -107,7 +107,7 @@ If the review finds a blocker, revise the relevant tasks before implementing. If
 **Files:**
 - Modify: `tests/Architecture.Tests/CoreLayeringTests.cs`
 
-- [ ] **Step 1: Update the stale CardSetPreview replacement message**
+- [x] **Step 1: Update the stale CardSetPreview replacement message**
 
 In `HistoryPanel_and_LiveBuildPanel_do_not_depend_on_each_others_internals()`, replace:
 
@@ -121,7 +121,7 @@ with:
 "Game/CardSetPreview was replaced by LiveBuildPanel and must not be restored."
 ```
 
-- [ ] **Step 2: Add the ownership ratchet**
+- [x] **Step 2: Add the ownership ratchet**
 
 Add this test near `HistoryPanel_and_LiveBuildPanel_do_not_depend_on_each_others_internals()`:
 
@@ -205,7 +205,7 @@ public void LiveBuildPanel_owns_build_recommendations()
 }
 ```
 
-- [ ] **Step 3: Run the ratchet and verify it fails before the move**
+- [x] **Step 3: Run the ratchet and verify it fails before the move**
 
 Run:
 
@@ -215,7 +215,7 @@ dotnet test tests/Architecture.Tests/Architecture.Tests.csproj --filter LiveBuil
 
 Expected: FAIL because `src/BazaarPlusPlus/Game/BuildRecommendations` still exists and `src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations` does not exist yet.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/Architecture.Tests/CoreLayeringTests.cs
@@ -228,7 +228,7 @@ git commit -m "test: ratchet live build recommendations ownership"
 - Move: `src/BazaarPlusPlus/Game/BuildRecommendations/*`
 - Modify: `src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs`
 
-- [ ] **Step 1: Move files**
+- [x] **Step 1: Move files**
 
 Run:
 
@@ -244,7 +244,7 @@ rmdir src/BazaarPlusPlus/Game/BuildRecommendations
 
 Expected: the old directory is gone and the five files exist under `Game/LiveBuildPanel/Recommendations/`.
 
-- [ ] **Step 2: Rename production namespace**
+- [x] **Step 2: Rename production namespace**
 
 In each moved file, change:
 
@@ -258,7 +258,7 @@ to:
 namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 ```
 
-- [ ] **Step 3: Update LiveBuildPanel import**
+- [x] **Step 3: Update LiveBuildPanel import**
 
 In `src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs`, replace:
 
@@ -272,7 +272,7 @@ with:
 using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 ```
 
-- [ ] **Step 4: Run focused source scans**
+- [x] **Step 4: Run focused source scans**
 
 Run:
 
@@ -293,7 +293,7 @@ Expected:
 - One import in `src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs`.
 - No matches under `src/BazaarPlusPlus/Game/HistoryPanel/`.
 
-- [ ] **Step 5: Run production verification**
+- [x] **Step 5: Run production verification**
 
 Run:
 
@@ -304,7 +304,7 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations tests/Architecture.Tests/CoreLayeringTests.cs
@@ -318,8 +318,9 @@ git commit -m "refactor: move build recommendations under live build panel"
 - Rename: `tests/CardSetBuildRecommendationTier.Tests/` to `tests/LiveBuildRecommendations.Tests/`
 - Rename: `tests/LiveBuildRecommendations.Tests/CardSetBuildRecommendationTier.Tests.csproj` to `tests/LiveBuildRecommendations.Tests/LiveBuildRecommendations.Tests.csproj`
 - Modify: `tests/LiveBuildRecommendations.Tests/Program.cs`
+- Modify: `src/BazaarPlusPlus.Localization/Properties/AssemblyInfo.cs`
 
-- [ ] **Step 1: Rename test directory and project**
+- [x] **Step 1: Rename test directory and project**
 
 Run:
 
@@ -333,7 +334,7 @@ Expected:
 - `tests/LiveBuildRecommendations.Tests/LiveBuildRecommendations.Tests.csproj` exists.
 - `tests/CardSetBuildRecommendationTier.Tests` has no tracked files left.
 
-- [ ] **Step 2: Update test comments and output name**
+- [x] **Step 2: Update test comments and output name**
 
 In `tests/LiveBuildRecommendations.Tests/Program.cs`, replace the file header comment:
 
@@ -359,7 +360,7 @@ with:
 Console.WriteLine("LiveBuild recommendation checks passed.");
 ```
 
-- [ ] **Step 3: Update reflection type strings**
+- [x] **Step 3: Update reflection type strings**
 
 Replace every old namespace string in `tests/LiveBuildRecommendations.Tests/Program.cs`:
 
@@ -393,7 +394,7 @@ to:
 "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildLiveState"
 ```
 
-- [ ] **Step 4: Run focused test**
+- [x] **Step 4: Run focused test**
 
 Run:
 
@@ -407,7 +408,7 @@ Expected:
 LiveBuild recommendation checks passed.
 ```
 
-- [ ] **Step 5: Run discovery sanity check**
+- [x] **Step 5: Run discovery sanity check**
 
 Run:
 
@@ -417,7 +418,7 @@ find tests -mindepth 2 -maxdepth 2 -name '*.csproj' | sort | rg "CardSetBuildRec
 
 Expected: only `tests/LiveBuildRecommendations.Tests/LiveBuildRecommendations.Tests.csproj` is listed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/LiveBuildRecommendations.Tests
@@ -431,7 +432,7 @@ git commit -m "test: rename live build recommendation tests"
 - Modify: `docs/superpowers/specs/2026-06-05-live-build-panel-design.md`
 - Modify: `docs/design/2026-06-07-live-build-refresh-and-history-health-layout.md`
 
-- [ ] **Step 1: Update the LiveBuildPanel target document implementation status**
+- [x] **Step 1: Update the LiveBuildPanel target document implementation status**
 
 In `docs/superpowers/specs/2026-06-05-live-build-panel-design.md`, replace:
 
@@ -445,7 +446,7 @@ with:
 Game/LiveBuildPanel/（含 Recommendations/）、GameInterop/ItemBoardPreview/BppItemBoard*、Game/OverlayPanels/BppOverlayPanelMutex
 ```
 
-- [ ] **Step 2: Update technical acceptance wording**
+- [x] **Step 2: Update technical acceptance wording**
 
 Replace:
 
@@ -456,10 +457,10 @@ final-build 数据逻辑迁到中性模块，例如 `Game/BuildRecommendations/`
 with:
 
 ```markdown
-final-build 数据逻辑迁到 `Game/LiveBuildPanel/Recommendations/`；`Game/CardSetPreview/` 不作为 fallback 保留，且不再保留顶层 `Game/BuildRecommendations/`。
+final-build 数据逻辑迁到 `Game/LiveBuildPanel/Recommendations/`；`Game/CardSetPreview/` 不作为 fallback 保留，且不再保留顶层旧 recommendation 目录。
 ```
 
-- [ ] **Step 3: Update file structure block**
+- [x] **Step 3: Update file structure block**
 
 Replace the sibling block:
 
@@ -481,7 +482,7 @@ with this child block under `Game/LiveBuildPanel/`:
     TenWinBuildCorpus.cs
 ```
 
-- [ ] **Step 4: Update ownership paragraphs**
+- [x] **Step 4: Update ownership paragraphs**
 
 Replace:
 
@@ -507,7 +508,7 @@ with:
 `BppItemBoard` 放在 `GameInterop/ItemBoardPreview/`，因为它是 native item-board preview surface 的输入 contract，且现在有两个 feature consumers：LiveBuildPanel 和 HistoryPanel。final-build recommendation rendering is an internal LiveBuildPanel consumer through `LiveBuildPanel/Recommendations/`.
 ```
 
-- [ ] **Step 5: Update stale migration/test references**
+- [x] **Step 5: Update stale migration/test references**
 
 In `docs/superpowers/specs/2026-06-05-live-build-panel-design.md`:
 
@@ -571,7 +572,7 @@ with:
 迁移 final-build repository 到 `Game/LiveBuildPanel/Recommendations/`，确认 `HistoryPanelDataService` 不再消费它，并更新 `LiveBuildRecommendations.Tests`。
 ```
 
-- [ ] **Step 6: Update the 2026-06-07 refresh-layout design**
+- [x] **Step 6: Update the 2026-06-07 refresh-layout design**
 
 In `docs/design/2026-06-07-live-build-refresh-and-history-health-layout.md`, update the code-fact paths:
 
@@ -633,19 +634,19 @@ with:
 - `src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/BuildRecommendationRefreshService.cs`
 ```
 
-- [ ] **Step 7: Run docs scan**
+- [x] **Step 7: Run docs scan**
 
 Run:
 
 ```bash
-rg -n "Game/BuildRecommendations|BazaarPlusPlus\\.Game\\.BuildRecommendations|CardSetBuildRecommendationTier|BuildRecommendations\\.Tests" docs/superpowers/specs docs/design -g '*.md' -g '!docs/design/archive/**' -g '!docs/superpowers/plans/archive/**'
+rg -n "Game/BuildRecommendations|BazaarPlusPlus\\.Game\\.BuildRecommendations|CardSetBuildRecommendationTier|(^|[^A-Za-z])BuildRecommendations\\.Tests" docs/superpowers/specs docs/design -g '*.md' -g '!docs/design/archive/**' -g '!docs/superpowers/plans/archive/**'
 ```
 
 Expected:
 - No matches in current `docs/superpowers/specs` or current `docs/design` files.
 - Archived docs may still mention historical names; do not rewrite archive files for this ownership cleanup.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-06-05-live-build-panel-design.md docs/design/2026-06-07-live-build-refresh-and-history-health-layout.md
@@ -657,7 +658,7 @@ git commit -m "docs: mark live build recommendations as panel-owned"
 **Files:**
 - Read/verify only unless a previous task left a failure
 
-- [ ] **Step 1: Run source and test stale-name scans**
+- [x] **Step 1: Run source and test stale-name scans**
 
 Run:
 
@@ -675,17 +676,17 @@ rg -n "BazaarPlusPlus\\.Game\\.LiveBuildPanel\\.Recommendations" src/BazaarPlusP
 
 Expected: no matches.
 
-- [ ] **Step 2: Run docs stale-name scan**
+- [x] **Step 2: Run docs stale-name scan**
 
 Run:
 
 ```bash
-rg -n "Game/BuildRecommendations|BazaarPlusPlus\\.Game\\.BuildRecommendations|CardSetBuildRecommendationTier|BuildRecommendations\\.Tests" docs/superpowers/specs docs/design -g '*.md' -g '!docs/design/archive/**' -g '!docs/superpowers/plans/archive/**'
+rg -n "Game/BuildRecommendations|BazaarPlusPlus\\.Game\\.BuildRecommendations|CardSetBuildRecommendationTier|(^|[^A-Za-z])BuildRecommendations\\.Tests" docs/superpowers/specs docs/design -g '*.md' -g '!docs/design/archive/**' -g '!docs/superpowers/plans/archive/**'
 ```
 
 Expected: no matches.
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -697,7 +698,7 @@ dotnet run --project tests/LiveBuildPanel.Tests/LiveBuildPanel.Tests.csproj
 
 Expected: all PASS.
 
-- [ ] **Step 4: Run broad safety checks**
+- [x] **Step 4: Run broad safety checks**
 
 Run:
 
@@ -708,7 +709,7 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj
 
 Expected: PASS.
 
-- [ ] **Step 5: Review diff**
+- [x] **Step 5: Review diff**
 
 Run:
 
@@ -734,6 +735,10 @@ Expected:
 - Do not reintroduce any `HistoryPanel` dependency on recommendation refresh. `HistoryPanel` should remain free of `BuildRecommendation*` and `LiveBuildPanel.Recommendations` imports.
 - Do not preserve namespace compatibility shims. This module is internal and unpublished as an API surface.
 - Keep archived docs unchanged unless a verification command explicitly includes them.
+
+## Red-team review
+
+- No blocking findings.
 
 ## Self-Review
 
