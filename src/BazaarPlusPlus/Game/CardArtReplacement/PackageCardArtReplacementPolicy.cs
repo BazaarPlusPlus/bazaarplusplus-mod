@@ -5,7 +5,7 @@ namespace BazaarPlusPlus.Game.CardArtReplacement;
 
 internal static class PackageCardArtReplacementPolicy
 {
-    internal const bool DefaultEnabled = true;
+    internal const bool DefaultEnabled = false;
 
     internal static bool IsEnabled(IBppConfig? config) =>
         config?.EnablePackageCardArtReplacementConfig?.Value ?? DefaultEnabled;

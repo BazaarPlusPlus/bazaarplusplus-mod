@@ -125,9 +125,9 @@ public sealed class CardArtReplacementTests : IDisposable
     }
 
     [Fact]
-    public void Package_art_replacement_policy_defaults_enabled_when_config_is_missing()
+    public void Package_art_replacement_policy_defaults_disabled_when_config_is_missing()
     {
-        Assert.True(PackageCardArtReplacementPolicy.IsEnabled(null));
+        Assert.False(PackageCardArtReplacementPolicy.IsEnabled(null));
     }
 
     [Fact]
@@ -138,11 +138,11 @@ public sealed class CardArtReplacementTests : IDisposable
         var config = new BppConfig();
         config.Initialize(configFile);
 
-        Assert.True(PackageCardArtReplacementPolicy.IsEnabled(config));
-
-        PackageCardArtReplacementPolicy.SetEnabled(config, false);
-
         Assert.False(PackageCardArtReplacementPolicy.IsEnabled(config));
+
+        PackageCardArtReplacementPolicy.SetEnabled(config, true);
+
+        Assert.True(PackageCardArtReplacementPolicy.IsEnabled(config));
     }
 
     public void Dispose()

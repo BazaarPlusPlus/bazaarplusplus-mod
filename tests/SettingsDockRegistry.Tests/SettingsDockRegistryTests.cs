@@ -108,14 +108,14 @@ public class SettingsDockRegistryTests
             Assert.Equal("PackageCardArtReplacement", definition.Key);
             Assert.Equal("Package Swap", definition.ResolveLabel("en"));
             Assert.Equal("掉包快递", definition.ResolveLabel("zh-CN"));
-            Assert.True(definition.IsActive());
-            Assert.Equal("ON", definition.ResolveStatus("en"));
+            Assert.False(definition.IsActive());
+            Assert.Equal("OFF", definition.ResolveStatus("en"));
 
             definition.Activate();
 
-            Assert.False(config.EnablePackageCardArtReplacementConfig!.Value);
-            Assert.False(definition.IsActive());
-            Assert.Equal("OFF", definition.ResolveStatus("en"));
+            Assert.True(config.EnablePackageCardArtReplacementConfig!.Value);
+            Assert.True(definition.IsActive());
+            Assert.Equal("ON", definition.ResolveStatus("en"));
             Assert.False(definition.CollapseAfterActivate);
 
             configFile.Save();
@@ -124,7 +124,7 @@ public class SettingsDockRegistryTests
             var reloadedConfig = new BppConfig();
             reloadedConfig.Initialize(reloadedConfigFile);
 
-            Assert.False(PackageCardArtReplacementPolicy.IsEnabled(reloadedConfig));
+            Assert.True(PackageCardArtReplacementPolicy.IsEnabled(reloadedConfig));
         }
         finally
         {

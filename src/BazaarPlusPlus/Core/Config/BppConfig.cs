@@ -92,7 +92,7 @@ internal sealed class BppConfig : IBppConfig
         EnablePackageCardArtReplacementConfig = config.Bind(
             "CardArtReplacement",
             "EnablePackageArtReplacement",
-            true,
+            false,
             "Whether BazaarPlusPlus should replace package card art with bundled custom package art."
         );
     }
