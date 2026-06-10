@@ -19,4 +19,4 @@ Two facts shaped the decision. First, AutoBazaar is parked by default, so its ru
 - Reusable adapters over The Bazaar runtime stay in `GameInterop/`, not in AutoBazaar core; AutoBazaar-specific schema, validation, decision-log format, and available-action derivation stay in the core.
 - Reopen if AutoBazaar ever needs to become its own BepInEx plugin, or if play policy is ever pulled into the mod (it should not be — policy belongs to `bazaarplusplus-agent`).
 
-Full design detail: [docs/superpowers/specs/2026-06-02-autobazaar-module-isolation-design.md](../superpowers/specs/2026-06-02-autobazaar-module-isolation-design.md). Feature overview and build flags: [docs/features/bazaar-agent.md](../features/bazaar-agent.md).
+Full design detail: [docs/superpowers/specs/2026-06-02-autobazaar-module-isolation-design.md](../archive/superpowers/specs/2026-06-02-autobazaar-module-isolation-design.md). Feature overview and build flags: [docs/features/bazaar-agent.md](../archive/features/bazaar-agent.md).

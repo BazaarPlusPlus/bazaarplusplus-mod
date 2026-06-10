@@ -6,7 +6,7 @@ BazaarAgent loopback server (`127.0.0.1:47900`): `POST /v1/replay/record` (raw
 (`replayPhase`/`replayBattleId` poll), and `POST /v1/replay/continue` (drives the replay
 "continue" button). The mod holds no batch state machine; an external script orchestrates the
 serial loop. Design history with the decompiled-source evidence:
-[archive/2026-06-07-bazaaragent-external-battle-video-recording-design.md](../design/archive/2026-06-07-bazaaragent-external-battle-video-recording-design.md).
+[archive/2026-06-07-bazaaragent-external-battle-video-recording-design.md](../archive/design/archive/2026-06-07-bazaaragent-external-battle-video-recording-design.md).
 
 ## Context
 
@@ -65,5 +65,5 @@ observable `finishedAwaitingContinue` window.
 - `BazaarAgentContext` grows `replayPhase`/`replayBattleId` (additive, schema-minor); the phase
   enum serializes camelCase on the wire, unlike the other PascalCase enums — pinned by test.
 - The wire contract reference is
-  [reference/bazaar-agent-http-api-v1.md](../reference/bazaar-agent-http-api-v1.md); the
+  [reference/bazaar-agent-http-api-v1.md](../archive/reference/bazaar-agent-http-api-v1.md); the
   recording flow contract (poll → continue → poll file) lives there.

@@ -4,7 +4,7 @@
 
 BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 UI 增强、怪物与 tooltip 预览、run logging、历史面板、本地战斗回放、终局自动截图，以及后台上传能力。
 
-当前仓库只保留与现有实现仍然一致的说明文档；如果文档与代码冲突，以 `src/BazaarPlusPlus/` 下的 `Plugin.cs`、`Core/`、`Game/`、`Patches/` 等实际实现为准。
+当前入口文档按现有实现校准；`docs/archive/` 只保留历史上下文。如果文档与代码冲突，以 `src/BazaarPlusPlus/` 下的 `Plugin.cs`、`Core/`、`Game/`、`Patches/` 等实际实现为准。
 
 ## 功能概览
 
@@ -19,14 +19,14 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 模组，提供战斗 
 - 卡牌图鉴（Collection Panel）：全屏 Item/Skill 图鉴，Tab 键或大厅 dock 按钮打开；支持英雄 / 品质 / 体型 / 商人与训练师来源 / 运行天数筛选。
 - 终局阵容面板（Live Build Panel）：局内 CapsLock 开关；展示实时 shop / board / stash，选择候选物品后给出匹配的十胜终局 build 推荐（数据来自云端 analyzer-v4 `tenwin_builds.json`，本地缓存后台刷新，并内嵌一份种子数据用于冷启动兜底）。
 - Anonymous Mode：将本地玩家名替换为 `Anonymous`。
-- **BazaarAgent HTTP 接口**（可选 host 插件，默认不安装）— 本地回环 HTTP 服务（固定 `127.0.0.1:47900`），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。**host 是独立的 BepInEx 插件**，按需用 `./run.sh build --with-bazaaragent` 构建；host dll 安装后会自动启动，默认构建只产出主插件并主动清除两个 host dll。详见 [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md)。
+- **BazaarAgent HTTP 接口**（可选 host 插件，默认不安装）— 本地回环 HTTP 服务（固定 `127.0.0.1:47900`），允许外部工具读取当前决策上下文（`GET /v1/context`）并发起动作（`POST /v1/actions`）。Mod 本身不做策略决策。**host 是独立的 BepInEx 插件**，按需用 `./run.sh build --with-bazaaragent` 构建；host dll 安装后会自动启动，默认构建只产出主插件并主动清除两个 host dll。详见 [docs/ARCHITECTURE.md#bazaaragent-optional-host](docs/ARCHITECTURE.md#bazaaragent-optional-host)。
 
 ## 安装与配置
 
 - 运行前提：已安装《The Bazaar》与 BepInEx 5。
 - 手动安装时，将构建输出中的 `BazaarPlusPlus.dll`、`BazaarPlusPlus.ModApi.dll`、`BazaarPlusPlus.Storage.dll`、`BazaarPlusPlus.Localization.dll` 以及同目录下的 SQLite 原生运行时依赖复制到游戏的 `BepInEx/plugins/`。
 - 首次运行后，配置文件会写入 `BepInEx/config/BazaarPlusPlus.cfg`。
-- 与详细功能相关的配置项、热键和 debug 面板说明见 [docs/reference/](docs/reference/)；完整文档索引见 [docs/README.md](docs/README.md)。
+- 当前架构和主要运行时说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；完整文档索引见 [docs/README.md](docs/README.md)。
 
 ## 从源码构建
 
@@ -61,11 +61,11 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/Th
 
 ## 文档入口
 
-- [docs/README.md](docs/README.md)：**文档总索引**（按受众与生命周期组织所有文档）。
-- [docs/mod-features-overview.md](docs/mod-features-overview.md)：当前功能总览（按功能的深入目录）。
-- [docs/features/](docs/features/)：各功能的现行文档（run logging 与上传、combat replay、history panel、screenshots、tooltip preview 等）。
-- [docs/reference/](docs/reference/)：稳定契约 / 清单（热键、设置表面、SQLite schema、BazaarAgent HTTP API）。
-- [docs/adr/](docs/adr/)：设计决策记录（ADR）。
+- [docs/README.md](docs/README.md)：文档索引与生命周期说明。
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：当前实现的 living architecture（按主题组织，带代码证据）。
+- [docs/adr/](docs/adr/)：设计决策记录（本仓库沿用 ADR 目录作为 decision records）。
+- [docs/plans/](docs/plans/)：仍未落地或仍需人工确认的后续工作。
+- [docs/archive/](docs/archive/)：已实现、已废弃或历史参考文档；归档内容只保留历史上下文，不再作为当前实现说明。
 
 ## License
 

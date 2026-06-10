@@ -17,8 +17,8 @@ The game already exposes that signal: while the player is on the map choosing (`
 ## Consequences
 
 - `AutoOnPedestalChoice` auto-shows the matching preview when hovering an inventory item while the corresponding pedestal is on the choice screen; not inside `PedestalState`, not for `TPedestalBehaviorTransform`.
-- Resolution is centralized in `Game/Tooltips/TooltipPreviewModePolicy` (priority `hold-upgrade-hotkey > hold-enchant-hotkey > Always > AutoOnPedestalChoice > Normal`; upgrade preview is hold-Shift only and has no visibility mode), shared by the three call sites so behaviour can't drift. See [tooltip-preview.md](../features/tooltip-preview.md).
+- Resolution is centralized in `Game/Tooltips/TooltipPreviewModePolicy` (priority `hold-upgrade-hotkey > hold-enchant-hotkey > Always > AutoOnPedestalChoice > Normal`; upgrade preview is hold-Shift only and has no visibility mode), shared by the three call sites so behaviour can't drift. See [tooltip-preview.md](../archive/features/tooltip-preview.md).
 - The initial implementation included a first-launch migration from `EnchantPreviewAlwaysShow` to `Mode`; current builds no longer run that migration.
 - Per-item filtering inside the preview (only items the pedestal would accept) was explicitly left out of scope — that is a larger change against `ItemEnchantPreviewService` / `UpgradePreviewTooltipPatch`.
 
-Full design history: [docs/design/archive/2026-05-24-pedestal-aware-preview-display-design.md](../design/archive/2026-05-24-pedestal-aware-preview-display-design.md).
+Full design history: [docs/design/archive/2026-05-24-pedestal-aware-preview-display-design.md](../archive/design/archive/2026-05-24-pedestal-aware-preview-display-design.md).

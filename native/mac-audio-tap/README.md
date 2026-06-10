@@ -3,8 +3,8 @@
 The native half of Combat Replay's macOS audio capture. All CoreAudio interaction lives
 here so the C# side stays a plain pull loop identical to the Windows WASAPI path.
 
-- **Why this exists + how the tap works:** [`docs/design/archive/2026-05-31-combat-replay-audio-macos-process-tap.md`](../../docs/design/archive/2026-05-31-combat-replay-audio-macos-process-tap.md)
-- **Feature-level truth:** [`docs/features/combat-replay.md`](../../docs/features/combat-replay.md)
+- **Why this exists + how the tap works:** [`docs/design/archive/2026-05-31-combat-replay-audio-macos-process-tap.md`](../../docs/archive/design/archive/2026-05-31-combat-replay-audio-macos-process-tap.md)
+- **Archived feature note:** [`docs/features/combat-replay.md`](../../docs/archive/features/combat-replay.md)
 - **C# consumer:** [`src/BazaarPlusPlus/Game/CombatReplay/Audio/CoreAudioProcessTapCaptureTap.cs`](../../src/BazaarPlusPlus/Game/CombatReplay/Audio/CoreAudioProcessTapCaptureTap.cs)
 
 ## Files

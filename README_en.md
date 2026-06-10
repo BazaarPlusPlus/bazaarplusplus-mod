@@ -4,7 +4,7 @@
 
 BazaarPlusPlus is a BepInEx mod for *The Bazaar*. It adds combat UI enhancements, monster and tooltip previews, run logging, an in-game history panel, local combat replay playback, end-of-run automatic screenshots, and background upload features.
 
-This repository only keeps documentation that still matches the current implementation. If any document conflicts with the code, treat the actual implementation under `src/BazaarPlusPlus/` (`Plugin.cs`, `Core/`, `Game/`, `Patches/`, …) as the source of truth.
+Current entry-point docs are calibrated against the current implementation; `docs/archive/` is preserved only for historical context. If any document conflicts with the code, treat the actual implementation under `src/BazaarPlusPlus/` (`Plugin.cs`, `Core/`, `Game/`, `Patches/`, ...) as the source of truth.
 
 ## Feature Overview
 
@@ -19,14 +19,14 @@ This repository only keeps documentation that still matches the current implemen
 - Collection Panel: a full-screen Item/Skill card browser, opened with Tab or the lobby dock button; supports filtering by hero, quality, size, merchant and trainer source, and run day.
 - Live Build Panel: toggled in-run with CapsLock; displays live shop / board / stash and, once you pick candidate items, shows matching ten-win final-build recommendations (data sourced from the cloud analyzer-v4 `tenwin_builds.json`, cached locally with a background refresh, with a bundled seed copy for cold-start fallback).
 - Anonymous Mode: replaces the local player name with `Anonymous`.
-- **BazaarAgent HTTP endpoint** (optional host plugin, not installed by default) — local loopback HTTP server (fixed at `127.0.0.1:47900`) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. **The host is a separate BepInEx plugin**, built on demand with `./run.sh build --with-bazaaragent`; installing the host dll starts it automatically, while default builds ship only the main plugin and actively scrub the host dlls. See [docs/features/bazaar-agent.md](docs/features/bazaar-agent.md).
+- **BazaarAgent HTTP endpoint** (optional host plugin, not installed by default) — local loopback HTTP server (fixed at `127.0.0.1:47900`) exposing the current decision context (`GET /v1/context`) and accepting external-tool actions (`POST /v1/actions`). The mod itself takes no autonomous decisions. **The host is a separate BepInEx plugin**, built on demand with `./run.sh build --with-bazaaragent`; installing the host dll starts it automatically, while default builds ship only the main plugin and actively scrub the host dlls. See [docs/ARCHITECTURE.md#bazaaragent-optional-host](docs/ARCHITECTURE.md#bazaaragent-optional-host).
 
 ## Installation And Configuration
 
 - Runtime prerequisites: *The Bazaar* and BepInEx 5 must already be installed.
 - For manual installation, copy `BazaarPlusPlus.dll`, `BazaarPlusPlus.ModApi.dll`, `BazaarPlusPlus.Storage.dll`, `BazaarPlusPlus.Localization.dll`, and the native SQLite runtime dependency from the build output into the game's `BepInEx/plugins/` directory.
 - After the first launch, configuration is written to `BepInEx/config/BazaarPlusPlus.cfg`.
-- Detailed notes for feature-specific settings, hotkeys, and debug surfaces live under [docs/reference/](docs/reference/); see [docs/README.md](docs/README.md) for the full documentation index.
+- Current architecture and major runtime notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); see [docs/README.md](docs/README.md) for the documentation index.
 
 ## Building From Source
 
@@ -63,11 +63,11 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/Th
 
 ## Documentation Entry Points
 
-- [docs/README.md](docs/README.md): **the documentation index** (all docs organized by audience and lifecycle).
-- [docs/mod-features-overview.md](docs/mod-features-overview.md): overview of the currently implemented feature set.
-- [docs/features/](docs/features/): living per-feature docs (run logging & upload, combat replay, history panel, screenshots, tooltip preview, …).
-- [docs/reference/](docs/reference/): stable contracts / inventories (hotkeys, settings surfaces, SQLite schema, BazaarAgent HTTP API).
-- [docs/adr/](docs/adr/): architecture decision records.
+- [docs/README.md](docs/README.md): documentation index and lifecycle rules.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): living architecture for the current implementation, organized by topic and grounded in code paths.
+- [docs/adr/](docs/adr/): architecture decision records. This repository keeps the existing ADR convention instead of a separate `docs/decisions/` tree.
+- [docs/plans/](docs/plans/): active or needs-human-decision future work only.
+- [docs/archive/](docs/archive/): implemented, superseded, or historical documents. Archived content is not current implementation guidance.
 
 ## License
 
