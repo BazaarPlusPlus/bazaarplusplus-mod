@@ -99,6 +99,12 @@ internal static class CollectionPanelText
         "沒有符合目前篩選條件的卡。",
         "沒有符合目前篩選條件的卡。"
     );
+    private static readonly LocalizedTextSet SourceDisclaimerText = new(
+        "Source filters are inferred outside the game; in-game offers remain authoritative.",
+        "来源筛选基于外部推导，具体以游戏内实际为准。",
+        "來源篩選基於外部推導，具體以遊戲內實際為準。",
+        "來源篩選基於外部推導，具體以遊戲內實際為準。"
+    );
 
     internal static string Title() => Resolve(TitleText);
 
@@ -140,6 +146,8 @@ internal static class CollectionPanelText
     internal static string CatalogUnavailable() => Resolve(CatalogUnavailableText);
 
     internal static string NoMatches() => Resolve(NoMatchesText);
+
+    internal static string SourceDisclaimer() => Resolve(SourceDisclaimerText);
 
     internal static string Tier(ETier tier) =>
         tier switch

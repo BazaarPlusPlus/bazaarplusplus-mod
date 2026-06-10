@@ -207,6 +207,21 @@ internal sealed partial class CollectionPanelView
         _sourceChipRow.style.justifyContent = Justify.FlexStart;
         _sourceChipRow.RegisterCallback<GeometryChangedEvent>(OnSourceChipRowGeometryChanged);
 
+        _disclaimerLabel = CreateLabel(
+            Sizes.FontCorner,
+            FontStyle.Normal,
+            Colors.HistoryFooterSecondaryText
+        );
+        _disclaimerLabel.text = CollectionPanelText.SourceDisclaimer();
+        _disclaimerLabel.tooltip = _disclaimerLabel.text;
+        _disclaimerLabel.style.marginTop = UiSpacing.Md;
+        _disclaimerLabel.style.flexShrink = 0f;
+        _disclaimerLabel.style.width = Length.Percent(100f);
+        _disclaimerLabel.style.whiteSpace = WhiteSpace.Normal;
+        _disclaimerLabel.style.maxHeight = Sizes.DetailTextMaxHeight;
+        _disclaimerLabel.style.overflow = Overflow.Hidden;
+        rail.Add(_disclaimerLabel);
+
         _statusLabel = CreateLabel(Sizes.FontSmall, FontStyle.Normal, Colors.HistoryStatusText);
         _statusLabel.style.marginTop = UiSpacing.Md;
         _statusLabel.style.flexShrink = 0f;

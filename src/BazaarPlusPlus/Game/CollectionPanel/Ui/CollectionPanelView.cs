@@ -87,6 +87,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private VisualElement? _subtitle;
     private Label? _countLabel;
     private Label? _statusLabel;
+    private Label? _disclaimerLabel;
     private Button? _itemTabButton;
     private Button? _skillTabButton;
     private Button? _closeButton;
@@ -216,6 +217,7 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.SortQuality()
                 + CollectionPanelText.SortSize()
                 + CollectionPanelText.NoMatches()
+                + CollectionPanelText.SourceDisclaimer()
                 + CollectionPanelText.DayHeader()
                 + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#\\",
             Sizes.FontButton,
@@ -472,6 +474,11 @@ internal sealed partial class CollectionPanelView : IDisposable
             _keywordFilterLabel.text = CollectionPanelText.KeywordHeader();
         if (_keywordReferenceSectionLabel != null)
             _keywordReferenceSectionLabel.text = CollectionPanelText.KeywordReferenceSection();
+        if (_disclaimerLabel != null)
+        {
+            _disclaimerLabel.text = CollectionPanelText.SourceDisclaimer();
+            _disclaimerLabel.tooltip = _disclaimerLabel.text;
+        }
         if (_emptyLabel != null)
             _emptyLabel.text = CollectionPanelText.NoMatches();
     }
