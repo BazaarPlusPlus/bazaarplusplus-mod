@@ -35,6 +35,10 @@ internal static class CardPreviewItemArtReplacePatch
             if (instance == null || instance.gameObject == null)
                 return;
 
+            var services = BppPatchHost.Services;
+            if (!PackageCardArtReplacementPolicy.IsEnabled(services.Config))
+                return;
+
             var card = instance._cardData;
             if (!CardArtInjector.IsPackageTemplate(card))
                 return;

@@ -30,6 +30,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? BazaarDbUploadEnabled { get; private set; }
 
+    public ConfigEntry<bool>? EnablePackageCardArtReplacementConfig { get; private set; }
+
     public void Initialize(ConfigFile config)
     {
         EnableNameOverrideConfig = config.Bind(
@@ -86,6 +88,12 @@ internal sealed class BppConfig : IBppConfig
             "UploadScreenshots",
             false,
             "When enabled, end-of-run screenshot snapshots are uploaded to our server for BazaarDB delivery. Includes screenshots from past runs. You can turn this off at any time; we will stop uploading and never delete what was already sent."
+        );
+        EnablePackageCardArtReplacementConfig = config.Bind(
+            "CardArtReplacement",
+            "EnablePackageArtReplacement",
+            true,
+            "Whether BazaarPlusPlus should replace package card art with bundled custom package art."
         );
     }
 }

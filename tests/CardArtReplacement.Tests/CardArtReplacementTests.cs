@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
+using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.CardArtReplacement;
+using BepInEx.Configuration;
 using UnityEngine;
 using Xunit;
 
@@ -120,6 +122,27 @@ public sealed class CardArtReplacementTests : IDisposable
             [0x09, 0x08, 0x07],
             File.ReadAllBytes(Path.Combine(_tempDir, $"{missingTemplateId}.jpg"))
         );
+    }
+
+    [Fact]
+    public void Package_art_replacement_policy_defaults_enabled_when_config_is_missing()
+    {
+        Assert.True(PackageCardArtReplacementPolicy.IsEnabled(null));
+    }
+
+    [Fact]
+    public void Package_art_replacement_policy_reads_and_writes_config()
+    {
+        var configPath = Path.Combine(_tempDir, "BazaarPlusPlus.cfg");
+        var configFile = new ConfigFile(configPath, saveOnInit: false);
+        var config = new BppConfig();
+        config.Initialize(configFile);
+
+        Assert.True(PackageCardArtReplacementPolicy.IsEnabled(config));
+
+        PackageCardArtReplacementPolicy.SetEnabled(config, false);
+
+        Assert.False(PackageCardArtReplacementPolicy.IsEnabled(config));
     }
 
     public void Dispose()

@@ -1,5 +1,8 @@
 using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Game.CardArtReplacement;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Localization;
+using BepInEx.Configuration;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests.SettingsDockRegistry;
@@ -29,6 +32,16 @@ public class SettingsDockRegistryTests
                 collapseAfterActivate: false
             );
         }
+    }
+
+    private sealed class TestLanguageProvider : ILanguageProvider
+    {
+        public string CurrentLanguageCode => "en";
+    }
+
+    private sealed class TestLocaleModeProvider : ILocaleModeProvider
+    {
+        public BppChineseLocaleMode CurrentMode => BppChineseLocaleMode.Mainland;
     }
 
     [Fact]
@@ -72,6 +85,52 @@ public class SettingsDockRegistryTests
         Assert.Equal("A", pairs[0].Definition.Key);
         Assert.Equal(1, pairs[1].Order);
         Assert.Equal("B", pairs[1].Definition.Key);
+    }
+
+    [Fact]
+    public void PackageCardArtReplacementDockEntry_uses_order_four_and_toggles_config()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-package-art-settings-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var entry = new PackageCardArtReplacementSettingsDockEntry();
+
+            var definition = entry.Build(config);
+
+            Assert.Equal(4, entry.Order);
+            Assert.Equal("PackageCardArtReplacement", definition.Key);
+            Assert.Equal("Package Swap", definition.ResolveLabel("en"));
+            Assert.Equal("掉包快递", definition.ResolveLabel("zh-CN"));
+            Assert.True(definition.IsActive());
+            Assert.Equal("ON", definition.ResolveStatus("en"));
+
+            definition.Activate();
+
+            Assert.False(config.EnablePackageCardArtReplacementConfig!.Value);
+            Assert.False(definition.IsActive());
+            Assert.Equal("OFF", definition.ResolveStatus("en"));
+            Assert.False(definition.CollapseAfterActivate);
+
+            configFile.Save();
+
+            var reloadedConfigFile = new ConfigFile(configPath, saveOnInit: false);
+            var reloadedConfig = new BppConfig();
+            reloadedConfig.Initialize(reloadedConfigFile);
+
+            Assert.False(PackageCardArtReplacementPolicy.IsEnabled(reloadedConfig));
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
     }
 
     [Theory]

@@ -35,7 +35,9 @@ internal static class ItemVisualsArtReplacePatch
     {
         try
         {
-            _ = BppPatchHost.Services;
+            var services = BppPatchHost.Services;
+            if (!PackageCardArtReplacementPolicy.IsEnabled(services.Config))
+                return;
 
             if (__instance == null || __instance.gameObject == null)
                 return;

@@ -92,6 +92,7 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());
         _settingsDockRegistry.Register(new LegendaryPositionSettingsDockEntry());
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
+        _settingsDockRegistry.Register(new PackageCardArtReplacementSettingsDockEntry());
 
         _mountables.Register(
             new ComponentMount<BazaarDbSnapshotUploadController>((c, s) => c.Initialize(s))

@@ -23,4 +23,6 @@ internal interface IBppConfig
     ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig { get; }
 
     ConfigEntry<bool>? BazaarDbUploadEnabled { get; }
+
+    ConfigEntry<bool>? EnablePackageCardArtReplacementConfig { get; }
 }
