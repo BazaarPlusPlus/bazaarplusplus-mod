@@ -527,7 +527,6 @@
           "rule": {
             "heroMode": "SelectedHero",
             "hiddenTagGroupsAny": [
-              "Health",
               "Heal",
               "Regen"
             ],
