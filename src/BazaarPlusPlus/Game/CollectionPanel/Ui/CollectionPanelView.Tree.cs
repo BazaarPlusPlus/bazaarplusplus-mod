@@ -177,8 +177,11 @@ internal sealed partial class CollectionPanelView
             CollectionPanelText.TagHeader(),
             UiSpacing.Lg,
             out _tagChipRow,
-            out _tagFilterLabel
+            out _tagFilterLabel,
+            out var tagHeaderRow
         );
+        _tagMatchModeButton = CreateFacetMatchModeButton(_toggleTagMatchMode);
+        tagHeaderRow.Add(_tagMatchModeButton);
         _tagChipRow.style.flexWrap = Wrap.Wrap;
         _tagChipRow.style.justifyContent = Justify.FlexStart;
 
@@ -189,8 +192,11 @@ internal sealed partial class CollectionPanelView
             CollectionPanelText.KeywordHeader(),
             UiSpacing.Lg,
             out _keywordChipRow,
-            out _keywordFilterLabel
+            out _keywordFilterLabel,
+            out var keywordHeaderRow
         );
+        _keywordMatchModeButton = CreateFacetMatchModeButton(_toggleKeywordMatchMode);
+        keywordHeaderRow.Add(_keywordMatchModeButton);
         _keywordChipRow.style.flexWrap = Wrap.Wrap;
         _keywordChipRow.style.justifyContent = Justify.FlexStart;
 
@@ -291,6 +297,15 @@ internal sealed partial class CollectionPanelView
         float marginTop,
         out VisualElement chipRow,
         out Label label
+    ) => CreateFilterSection(parent, title, marginTop, out chipRow, out label, out _);
+
+    private static VisualElement CreateFilterSection(
+        VisualElement parent,
+        string title,
+        float marginTop,
+        out VisualElement chipRow,
+        out Label label,
+        out VisualElement headerRow
     )
     {
         var section = new VisualElement();
@@ -299,12 +314,21 @@ internal sealed partial class CollectionPanelView
         section.style.marginTop = marginTop;
         parent.Add(section);
 
+        headerRow = new VisualElement();
+        headerRow.style.flexDirection = FlexDirection.Row;
+        headerRow.style.alignItems = Align.Center;
+        headerRow.style.alignSelf = Align.Stretch;
+        headerRow.style.marginBottom = UiSpacing.Sm;
+        section.Add(headerRow);
+
         label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
         label.text = title;
-        label.style.marginBottom = UiSpacing.Sm;
+        label.style.flexGrow = 1f;
+        label.style.flexShrink = 1f;
+        label.style.minWidth = 0f;
         label.style.whiteSpace = WhiteSpace.NoWrap;
         label.style.overflow = Overflow.Hidden;
-        section.Add(label);
+        headerRow.Add(label);
 
         chipRow = new VisualElement();
         chipRow.style.flexDirection = FlexDirection.Row;
@@ -314,6 +338,20 @@ internal sealed partial class CollectionPanelView
         section.Add(chipRow);
 
         return section;
+    }
+
+    private static Button CreateFacetMatchModeButton(Action onClick)
+    {
+        var button = CreateButton(
+            string.Empty,
+            onClick,
+            Sizes.FacetModeToggleWidth,
+            Sizes.InfoChipHeight
+        );
+        button.style.marginLeft = UiSpacing.Sm;
+        button.style.fontSize = Sizes.FontSmall;
+        StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        return button;
     }
 
     private static VisualElement CreateCombinedFilterChipSegment(float flexGrow)

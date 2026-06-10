@@ -55,9 +55,12 @@ internal static class CollectionFilterEngine
                 continue;
             if (dayFilter is int day && !DayTierSchedule.AllowsStartingTier(card.StartingTier, day))
                 continue;
-            if (tagFilterCount > 0 && !AnyTagMatch(card.Tags, filter.Tags))
+            if (tagFilterCount > 0 && !MatchesFacet(card.Tags, filter.Tags, filter.TagMatchMode))
                 continue;
-            if (keywordFilterCount > 0 && !AnyKeywordMatch(card.HiddenTags, filter.Keywords))
+            if (
+                keywordFilterCount > 0
+                && !MatchesFacet(card.HiddenTags, filter.Keywords, filter.KeywordMatchMode)
+            )
                 continue;
             if (sizeFilterCount > 0 && !filter.Sizes.Contains(card.Size))
                 continue;
@@ -99,30 +102,43 @@ internal static class CollectionFilterEngine
         return TierRank(a.StartingTier).CompareTo(TierRank(b.StartingTier));
     }
 
-    private static bool AnyTagMatch(
-        IReadOnlyCollection<ECardTag> cardTags,
-        HashSet<ECardTag> filterTags
+    private static bool MatchesFacet<T>(
+        IReadOnlyCollection<T> cardValues,
+        HashSet<T> filterValues,
+        CollectionFacetMatchMode mode
+    ) =>
+        mode == CollectionFacetMatchMode.All
+            ? AllSelectedValuesMatch(cardValues, filterValues)
+            : AnySelectedValueMatches(cardValues, filterValues);
+
+    private static bool AnySelectedValueMatches<T>(
+        IReadOnlyCollection<T> cardValues,
+        HashSet<T> filterValues
     )
     {
-        foreach (var tag in cardTags)
+        foreach (var value in cardValues)
         {
-            if (filterTags.Contains(tag))
+            if (filterValues.Contains(value))
                 return true;
         }
         return false;
     }
 
-    private static bool AnyKeywordMatch(
-        IReadOnlyCollection<EHiddenTag> cardKeywords,
-        HashSet<EHiddenTag> filterKeywords
+    private static bool AllSelectedValuesMatch<T>(
+        IReadOnlyCollection<T> cardValues,
+        HashSet<T> filterValues
     )
     {
-        foreach (var keyword in cardKeywords)
+        if (cardValues.Count < filterValues.Count)
+            return false;
+
+        var cardValueSet = cardValues as HashSet<T> ?? new HashSet<T>(cardValues);
+        foreach (var selected in filterValues)
         {
-            if (filterKeywords.Contains(keyword))
-                return true;
+            if (!cardValueSet.Contains(selected))
+                return false;
         }
-        return false;
+        return true;
     }
 
     private static int TierRank(ETier tier) => CollectionCardFacetRanks.TierRank(tier);

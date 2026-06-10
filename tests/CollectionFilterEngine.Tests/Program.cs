@@ -287,10 +287,12 @@ packagesOnlyWithFacets.Tiers.Add(ETier.Bronze);
 packagesOnlyWithFacets.Sizes.Add(ECardSize.Small);
 packagesOnlyWithFacets.Tags.Add(ECardTag.Weapon);
 packagesOnlyWithFacets.Keywords.Add(EHiddenTag.Damage);
+packagesOnlyWithFacets.TagMatchMode = CollectionFacetMatchMode.All;
+packagesOnlyWithFacets.KeywordMatchMode = CollectionFacetMatchMode.All;
 AssertSequence(
     CollectionFilterEngine.Apply(new[] { package, bronzePackage, normal }, packagesOnlyWithFacets),
     new[] { bronzePackage.Id, package.Id },
-    "PackagesOnly ignores hero, tier, size, tag, keyword, and day facets."
+    "PackagesOnly ignores hero, tier, size, tag, keyword, match mode, and day facets."
 );
 
 var bronzeLarge = Card("A Bronze Large", ETier.Bronze, size: ECardSize.Large);
@@ -404,6 +406,12 @@ var shieldSkill = Card(
     type: ECardType.Skill,
     hiddenTags: new[] { EHiddenTag.Shield }
 );
+var damageShieldSkill = Card(
+    "Damage Shield Skill",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.Shield }
+);
 var skillKeywordFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
 skillKeywordFilter.Keywords.Add(EHiddenTag.Damage);
 AssertSequence(
@@ -417,10 +425,30 @@ AssertSequence(
     new[] { damageSkill.Id, shieldSkill.Id },
     "Multiple selected skill keywords OR together."
 );
+var allSkillKeywordFilter = new CollectionFilterState
+{
+    ActiveType = ECardType.Skill,
+    KeywordMatchMode = CollectionFacetMatchMode.All,
+};
+allSkillKeywordFilter.Keywords.Add(EHiddenTag.Damage);
+allSkillKeywordFilter.Keywords.Add(EHiddenTag.Shield);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { shieldSkill, damageSkill, damageShieldSkill, normal },
+        allSkillKeywordFilter
+    ),
+    new[] { damageShieldSkill.Id },
+    "All keyword mode requires every selected skill keyword on the same card."
+);
 
 var weaponItem = Card("Weapon Item", ETier.Bronze, tags: new[] { ECardTag.Weapon });
 var potionItem = Card("Potion Item", ETier.Bronze, tags: new[] { ECardTag.Potion });
 var toolItem = Card("Tool Item", ETier.Bronze, tags: new[] { ECardTag.Tool });
+var weaponPotionItem = Card(
+    "Weapon Potion Item",
+    ETier.Bronze,
+    tags: new[] { ECardTag.Weapon, ECardTag.Potion }
+);
 var itemTagFilter = new CollectionFilterState();
 itemTagFilter.Tags.Add(ECardTag.Weapon);
 AssertSequence(
@@ -434,6 +462,17 @@ AssertSequence(
     new[] { potionItem.Id, weaponItem.Id },
     "Multiple selected tags OR together, matching the other facet rows."
 );
+var allItemTagFilter = new CollectionFilterState { TagMatchMode = CollectionFacetMatchMode.All };
+allItemTagFilter.Tags.Add(ECardTag.Weapon);
+allItemTagFilter.Tags.Add(ECardTag.Potion);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { potionItem, toolItem, weaponItem, weaponPotionItem },
+        allItemTagFilter
+    ),
+    new[] { weaponPotionItem.Id },
+    "All tag mode requires every selected item tag on the same card."
+);
 
 var damageItem = Card(
     "Damage Item",
@@ -446,6 +485,12 @@ var shieldItem = Card(
     ETier.Bronze,
     tags: new[] { ECardTag.Weapon },
     hiddenTags: new[] { EHiddenTag.Shield }
+);
+var damageShieldItem = Card(
+    "Damage Shield Item",
+    ETier.Bronze,
+    tags: new[] { ECardTag.Weapon },
+    hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.Shield }
 );
 var damageToolItem = Card(
     "Damage Tool Item",
@@ -477,6 +522,20 @@ AssertSequence(
     new[] { damageItem.Id, damageToolItem.Id, shieldItem.Id },
     "Multiple selected item keywords OR together."
 );
+var allItemKeywordFilter = new CollectionFilterState
+{
+    KeywordMatchMode = CollectionFacetMatchMode.All,
+};
+allItemKeywordFilter.Keywords.Add(EHiddenTag.Damage);
+allItemKeywordFilter.Keywords.Add(EHiddenTag.Shield);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { shieldItem, damageToolItem, damageItem, damageShieldItem },
+        allItemKeywordFilter
+    ),
+    new[] { damageShieldItem.Id },
+    "All keyword mode requires every selected item keyword on the same card."
+);
 var itemKeywordAndReferenceFilter = new CollectionFilterState();
 itemKeywordAndReferenceFilter.Keywords.Add(EHiddenTag.Damage);
 itemKeywordAndReferenceFilter.Keywords.Add(EHiddenTag.DamageReference);
@@ -487,6 +546,25 @@ AssertSequence(
     ),
     new[] { damageItem.Id, damageReferenceItem.Id },
     "Keyword and reference selections share the same OR keyword facet."
+);
+var damageAndReferenceItem = Card(
+    "Damage Reference Combo Item",
+    ETier.Bronze,
+    hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.DamageReference }
+);
+var allItemKeywordAndReferenceFilter = new CollectionFilterState
+{
+    KeywordMatchMode = CollectionFacetMatchMode.All,
+};
+allItemKeywordAndReferenceFilter.Keywords.Add(EHiddenTag.Damage);
+allItemKeywordAndReferenceFilter.Keywords.Add(EHiddenTag.DamageReference);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { damageReferenceItem, damageItem, damageAndReferenceItem },
+        allItemKeywordAndReferenceFilter
+    ),
+    new[] { damageAndReferenceItem.Id },
+    "All keyword mode also requires curated reference keywords on the same card."
 );
 var itemTagAndKeywordFilter = new CollectionFilterState();
 itemTagAndKeywordFilter.Tags.Add(ECardTag.Weapon);

@@ -32,6 +32,8 @@ internal sealed class CollectionPanelViewModel
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
     public HashSet<ECardTag> SelectedTags { get; set; } = new();
     public HashSet<EHiddenTag> SelectedKeywords { get; set; } = new();
+    public CollectionFacetMatchMode TagMatchMode { get; set; } = CollectionFacetMatchMode.Any;
+    public CollectionFacetMatchMode KeywordMatchMode { get; set; } = CollectionFacetMatchMode.Any;
     public string? SelectedSourceKey { get; set; }
     public bool PackagesOnly { get; set; }
     public bool SourceSelectorEnabled { get; set; } = true;
@@ -75,6 +77,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Action<ECardSize> _toggleSize;
     private readonly Action<ECardTag> _toggleTag;
     private readonly Action<EHiddenTag> _toggleKeyword;
+    private readonly Action _toggleTagMatchMode;
+    private readonly Action _toggleKeywordMatchMode;
     private readonly Action<string> _toggleSource;
     private readonly Action _togglePackages;
     private readonly Action<CollectionSortPriority> _setSortPriority;
@@ -101,6 +105,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _tagFilterLabel;
     private Label? _keywordFilterLabel;
     private Label? _keywordReferenceSectionLabel;
+    private Button? _tagMatchModeButton;
+    private Button? _keywordMatchModeButton;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
     private VisualElement? _sizeChipRow;
@@ -160,6 +166,8 @@ internal sealed partial class CollectionPanelView : IDisposable
         Action<ECardSize> toggleSize,
         Action<ECardTag> toggleTag,
         Action<EHiddenTag> toggleKeyword,
+        Action toggleTagMatchMode,
+        Action toggleKeywordMatchMode,
         Action<string> toggleSource,
         Action togglePackages,
         Action<CollectionSortPriority> setSortPriority
@@ -175,6 +183,11 @@ internal sealed partial class CollectionPanelView : IDisposable
         _toggleSize = toggleSize ?? throw new ArgumentNullException(nameof(toggleSize));
         _toggleTag = toggleTag ?? throw new ArgumentNullException(nameof(toggleTag));
         _toggleKeyword = toggleKeyword ?? throw new ArgumentNullException(nameof(toggleKeyword));
+        _toggleTagMatchMode =
+            toggleTagMatchMode ?? throw new ArgumentNullException(nameof(toggleTagMatchMode));
+        _toggleKeywordMatchMode =
+            toggleKeywordMatchMode
+            ?? throw new ArgumentNullException(nameof(toggleKeywordMatchMode));
         _toggleSource = toggleSource ?? throw new ArgumentNullException(nameof(toggleSource));
         _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
         _setSortPriority =
@@ -213,6 +226,12 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.SkillsTab()
                 + CollectionPanelText.Close()
                 + CollectionPanelText.PackagesToggle()
+                + CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any)
+                + CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.All)
+                + CollectionPanelText.TagMatchModeTooltip(CollectionFacetMatchMode.Any)
+                + CollectionPanelText.TagMatchModeTooltip(CollectionFacetMatchMode.All)
+                + CollectionPanelText.KeywordMatchModeTooltip(CollectionFacetMatchMode.Any)
+                + CollectionPanelText.KeywordMatchModeTooltip(CollectionFacetMatchMode.All)
                 + CollectionPanelText.SortHeader()
                 + CollectionPanelText.SortQuality()
                 + CollectionPanelText.SortSize()
@@ -345,6 +364,16 @@ internal sealed partial class CollectionPanelView : IDisposable
         EnsureSizeChips(model.AvailableSizes);
         RefreshFacetChips(model);
         EnsureSourceChips(model.AvailableSources);
+        RefreshMatchModeButton(
+            _tagMatchModeButton,
+            model.TagMatchMode,
+            CollectionPanelText.TagMatchModeTooltip(model.TagMatchMode)
+        );
+        RefreshMatchModeButton(
+            _keywordMatchModeButton,
+            model.KeywordMatchMode,
+            CollectionPanelText.KeywordMatchModeTooltip(model.KeywordMatchMode)
+        );
         // Chip text is reset unconditionally on every Refresh: the Ensure*Chips early-exit
         // compares only keys, so a locale change while the chips survive would otherwise leave
         // their labels in the previous language (same P4 mechanism as RefreshChromeTexts).

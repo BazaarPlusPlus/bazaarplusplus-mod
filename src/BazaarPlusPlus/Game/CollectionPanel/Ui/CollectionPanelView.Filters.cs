@@ -813,6 +813,20 @@ internal sealed partial class CollectionPanelView
         );
     }
 
+    private static void RefreshMatchModeButton(
+        Button? button,
+        CollectionFacetMatchMode mode,
+        string tooltip
+    )
+    {
+        if (button == null)
+            return;
+
+        button.text = CollectionPanelText.FacetMatchMode(mode);
+        button.tooltip = tooltip;
+        RefreshChip(button, mode == CollectionFacetMatchMode.All);
+    }
+
     // Always visible; the face shows the effective day number and highlights when the day
     // participates in filtering (gold = on, chip background = off).
     private void RefreshDayToggle(int day, bool active)

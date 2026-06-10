@@ -11,6 +11,12 @@ internal enum CollectionSortPriority
     Size,
 }
 
+internal enum CollectionFacetMatchMode
+{
+    Any,
+    All,
+}
+
 // Mutable selection state held by CollectionPanel; pure data. The filter engine reads
 // this and produces an ordered visible set.
 internal sealed class CollectionFilterState
@@ -20,6 +26,8 @@ internal sealed class CollectionFilterState
     public HashSet<ETier> Tiers { get; } = new();
     public HashSet<ECardTag> Tags { get; } = new();
     public HashSet<EHiddenTag> Keywords { get; } = new();
+    public CollectionFacetMatchMode TagMatchMode { get; set; } = CollectionFacetMatchMode.Any;
+    public CollectionFacetMatchMode KeywordMatchMode { get; set; } = CollectionFacetMatchMode.Any;
 
     // Item card size (Small/Medium/Large). The active tab profile decides whether this set is
     // shown and applied.

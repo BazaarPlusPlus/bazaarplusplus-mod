@@ -51,6 +51,7 @@ internal static class Sizes
     public const float LiveBuildRecommendationStatusMaxHeight = 90f;
     public const float LiveBuildRowEmptyMaxHeight = 58f;
     public const float TagFacetChipMaxWidth = 156f;
+    public const float FacetModeToggleWidth = 58f;
     public const float RowAccentWidth = 6f;
     public const float RowSideHostWidth = 62f;
     public const float RunRowHeight = 98f;

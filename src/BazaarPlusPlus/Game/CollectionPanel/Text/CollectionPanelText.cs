@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
@@ -47,6 +48,32 @@ internal static class CollectionPanelText
         "相关",
         "相關",
         "相關"
+    );
+    private static readonly LocalizedTextSet FacetMatchAnyText = new("Any", "任一", "任一", "任一");
+    private static readonly LocalizedTextSet FacetMatchAllText = new("All", "全部", "全部", "全部");
+    private static readonly LocalizedTextSet TagMatchAnyTooltipText = new(
+        "Tags: match cards with any selected tag. Click to require all.",
+        "标签：匹配任一已选标签的卡。点击切换为必须全部匹配。",
+        "標籤：匹配任一已選標籤的卡。點擊切換為必須全部匹配。",
+        "標籤：匹配任一已選標籤的卡。點擊切換為必須全部匹配。"
+    );
+    private static readonly LocalizedTextSet TagMatchAllTooltipText = new(
+        "Tags: require every selected tag. Click to match any.",
+        "标签：必须匹配所有已选标签。点击切换为任一匹配。",
+        "標籤：必須匹配所有已選標籤。點擊切換為任一匹配。",
+        "標籤：必須匹配所有已選標籤。點擊切換為任一匹配。"
+    );
+    private static readonly LocalizedTextSet KeywordMatchAnyTooltipText = new(
+        "Types: match cards with any selected type. Click to require all.",
+        "类型：匹配任一已选类型的卡。点击切换为必须全部匹配。",
+        "類型：匹配任一已選類型的卡。點擊切換為必須全部匹配。",
+        "類型：匹配任一已選類型的卡。點擊切換為必須全部匹配。"
+    );
+    private static readonly LocalizedTextSet KeywordMatchAllTooltipText = new(
+        "Types: require every selected type. Click to match any.",
+        "类型：必须匹配所有已选类型。点击切换为任一匹配。",
+        "類型：必須匹配所有已選類型。點擊切換為任一匹配。",
+        "類型：必須匹配所有已選類型。點擊切換為任一匹配。"
     );
     private static readonly LocalizedTextSet SortHeaderText = new("Sort", "排序", "排序", "排序");
     private static readonly LocalizedTextSet SortQualityText = new(
@@ -127,6 +154,21 @@ internal static class CollectionPanelText
     internal static string KeywordHeader() => Resolve(KeywordHeaderText);
 
     internal static string KeywordReferenceSection() => Resolve(KeywordReferenceSectionText);
+
+    internal static string FacetMatchMode(CollectionFacetMatchMode mode) =>
+        mode == CollectionFacetMatchMode.All
+            ? Resolve(FacetMatchAllText)
+            : Resolve(FacetMatchAnyText);
+
+    internal static string TagMatchModeTooltip(CollectionFacetMatchMode mode) =>
+        mode == CollectionFacetMatchMode.All
+            ? Resolve(TagMatchAllTooltipText)
+            : Resolve(TagMatchAnyTooltipText);
+
+    internal static string KeywordMatchModeTooltip(CollectionFacetMatchMode mode) =>
+        mode == CollectionFacetMatchMode.All
+            ? Resolve(KeywordMatchAllTooltipText)
+            : Resolve(KeywordMatchAnyTooltipText);
 
     internal static string SortHeader() => Resolve(SortHeaderText);
 

@@ -545,6 +545,20 @@ internal sealed class CollectionPanel : MonoBehaviour
                 ApplyFilters();
                 RefreshView();
             },
+            toggleTagMatchMode: () =>
+            {
+                _filter.TagMatchMode = ToggleMatchMode(_filter.TagMatchMode);
+                _scrollY = 0f;
+                ApplyFilters();
+                RefreshView();
+            },
+            toggleKeywordMatchMode: () =>
+            {
+                _filter.KeywordMatchMode = ToggleMatchMode(_filter.KeywordMatchMode);
+                _scrollY = 0f;
+                ApplyFilters();
+                RefreshView();
+            },
             toggleSource: sourceKey =>
             {
                 _filter.ToggleSource(_filter.ActiveType, sourceKey);
@@ -589,6 +603,11 @@ internal sealed class CollectionPanel : MonoBehaviour
         _factory = new CollectionCardFactory(_pool, _overlay.BoardRoot!);
         _virtualizer = new CollectionGridVirtualizer(_overlay, _factory);
     }
+
+    private static CollectionFacetMatchMode ToggleMatchMode(CollectionFacetMatchMode mode) =>
+        mode == CollectionFacetMatchMode.All
+            ? CollectionFacetMatchMode.Any
+            : CollectionFacetMatchMode.All;
 
     private void StartPanelLoad()
     {
@@ -827,6 +846,8 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
             SelectedTags = new HashSet<ECardTag>(_filter.Tags),
             SelectedKeywords = new HashSet<EHiddenTag>(_filter.Keywords),
+            TagMatchMode = _filter.TagMatchMode,
+            KeywordMatchMode = _filter.KeywordMatchMode,
             SelectedSourceKey = _filter.PackagesOnly ? null : _filter.SelectedSourceKey,
             PackagesOnly = _filter.PackagesOnly,
             SourceSelectorEnabled = !_isLoadingCatalog && !_filter.PackagesOnly,
