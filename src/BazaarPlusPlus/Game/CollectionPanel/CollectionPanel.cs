@@ -483,11 +483,8 @@ internal sealed class CollectionPanel : MonoBehaviour
             close: Close,
             setActiveType: type =>
             {
-                if (_filter.ActiveType == type)
+                if (!_filter.SelectActiveType(type))
                     return;
-                _filter.ActiveType = type;
-                if (type == ECardType.Skill)
-                    _filter.PackagesOnly = false;
                 PruneInvisibleSourceSelections();
                 _scrollY = 0f;
                 ApplyFilters();
@@ -568,7 +565,10 @@ internal sealed class CollectionPanel : MonoBehaviour
             },
             togglePackages: () =>
             {
-                _filter.PackagesOnly = !_filter.PackagesOnly;
+                if (!_filter.SelectPackagesOnly())
+                    return;
+
+                PruneInvisibleSourceSelections();
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();

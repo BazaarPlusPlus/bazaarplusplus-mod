@@ -11,8 +11,7 @@ internal readonly struct CollectionTabProfile
         CollectionSourceKind sourceKind,
         bool showSizeFilter,
         bool showTagFilter,
-        bool showKeywordFilter,
-        bool showPackageToggle
+        bool showKeywordFilter
     )
     {
         CardType = cardType;
@@ -20,7 +19,6 @@ internal readonly struct CollectionTabProfile
         ShowSizeFilter = showSizeFilter;
         ShowTagFilter = showTagFilter;
         ShowKeywordFilter = showKeywordFilter;
-        ShowPackageToggle = showPackageToggle;
     }
 
     public ECardType CardType { get; }
@@ -39,8 +37,6 @@ internal readonly struct CollectionTabProfile
 
     public bool ShowDayFilter => true;
 
-    public bool ShowPackageToggle { get; }
-
     public static CollectionTabProfile For(ECardType cardType) =>
         cardType == ECardType.Skill
             ? new CollectionTabProfile(
@@ -48,15 +44,13 @@ internal readonly struct CollectionTabProfile
                 CollectionSourceKind.Trainer,
                 showSizeFilter: false,
                 showTagFilter: false,
-                showKeywordFilter: true,
-                showPackageToggle: false
+                showKeywordFilter: true
             )
             : new CollectionTabProfile(
                 ECardType.Item,
                 CollectionSourceKind.Merchant,
                 showSizeFilter: true,
                 showTagFilter: true,
-                showKeywordFilter: true,
-                showPackageToggle: true
+                showKeywordFilter: true
             );
 }

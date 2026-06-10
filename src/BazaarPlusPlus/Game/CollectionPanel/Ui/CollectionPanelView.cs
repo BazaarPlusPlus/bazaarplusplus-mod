@@ -354,7 +354,10 @@ internal sealed partial class CollectionPanelView : IDisposable
             UpdateLoadingLabelText();
         }
 
-        RefreshTabButton(_itemTabButton!, model.ActiveType == ECardType.Item);
+        RefreshTabButton(
+            _itemTabButton!,
+            model.ActiveType == ECardType.Item && !model.PackagesOnly
+        );
         RefreshTabButton(_skillTabButton!, model.ActiveType == ECardType.Skill);
         RefreshChromeTexts();
 
@@ -414,7 +417,7 @@ internal sealed partial class CollectionPanelView : IDisposable
             pair.Value.style.opacity = model.SourceSelectorEnabled ? 1f : 0.58f;
         }
         if (_packageToggleButton != null)
-            RefreshPackageToggle(model.PackagesOnly, model.TabProfile.ShowPackageToggle);
+            RefreshPackageToggle(model.PackagesOnly);
         if (_dayToggleButton != null)
             RefreshDayToggle(model.DayFilterValue, model.DayFilterActive);
         if (_sortQualityButton != null)

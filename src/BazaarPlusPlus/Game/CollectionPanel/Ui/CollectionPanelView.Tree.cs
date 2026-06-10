@@ -101,6 +101,9 @@ internal sealed partial class CollectionPanelView
         primaryControlsRow.Add(_itemTabButton);
         _skillTabButton.style.marginLeft = UiSpacing.Md;
         primaryControlsRow.Add(_skillTabButton);
+        _packageToggleButton = CreatePackageTabButton();
+        _packageToggleButton.style.marginLeft = UiSpacing.Md;
+        primaryControlsRow.Add(_packageToggleButton);
 
         primaryControlsRow.Add(CreateOperationSpacer());
 
@@ -128,16 +131,11 @@ internal sealed partial class CollectionPanelView
         _sortSizeButton.style.marginLeft = UiSpacing.Xs;
         sortGroup.Add(_sortSizeButton);
 
-        // Compact day-number icon toggle, just left of the package toggle.
+        // Compact day-number icon toggle.
         _dayToggleButton = CreateDayToggleButton();
         _dayToggleButton.style.marginLeft = UiSpacing.Sm;
         _dayToggleButton.style.marginTop = UiSpacing.Xs;
         primaryControlsRow.Add(_dayToggleButton);
-
-        _packageToggleButton = CreatePackageToggleButton();
-        _packageToggleButton.style.marginLeft = UiSpacing.Sm;
-        _packageToggleButton.style.marginTop = UiSpacing.Xs;
-        primaryControlsRow.Add(_packageToggleButton);
 
         // Hero filter.
         CreateFilterSection(
@@ -379,16 +377,15 @@ internal sealed partial class CollectionPanelView
         return divider;
     }
 
-    // Plain highlighting toggle (gold = packages only), matching the day icon — no switch knob.
-    private Button CreatePackageToggleButton()
+    private Button CreatePackageTabButton()
     {
         var button = CreateButton(
             CollectionPanelText.PackagesToggle(),
             _togglePackages,
-            Sizes.PackageToggleWidth,
+            Sizes.RunsTabWidth,
             Sizes.ButtonStandardHeight
         );
-        StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        StyleButton(button, Colors.RunsTabBackground, Colors.White);
         return button;
     }
 

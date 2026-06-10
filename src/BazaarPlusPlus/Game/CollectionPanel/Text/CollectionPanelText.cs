@@ -96,10 +96,10 @@ internal static class CollectionPanelText
         "訓練師"
     );
     private static readonly LocalizedTextSet PackagesToggleText = new(
-        "Packages only",
-        "仅包裹",
-        "僅包裹",
-        "僅包裹"
+        "Packages",
+        "包裹",
+        "包裹",
+        "包裹"
     );
     private static readonly LocalizedTextSet PackagesToggleTooltipText = new(
         "Show only package cards.",

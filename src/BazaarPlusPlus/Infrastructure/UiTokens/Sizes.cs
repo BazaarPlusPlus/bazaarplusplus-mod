@@ -22,7 +22,6 @@ internal static class Sizes
     public const float SupporterAttributionNameMaxWidth = 118f;
     public const float SupporterActionMinWidth = 74f;
     public const float CollectionMatchCountWidth = 96f;
-    public const float PackageToggleWidth = 112f;
     public const float HeroChipIconSize = 48f;
     public const float HeroChipButtonSize = 56f;
     public const int HeroChipsPerRow = 8;

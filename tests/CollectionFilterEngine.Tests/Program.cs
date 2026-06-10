@@ -217,6 +217,55 @@ AssertFalse(
     sourceState.PackagesOnly,
     "Skill source selection should clear stale package-only mode."
 );
+
+var topLevelModeState = new CollectionFilterState { ActiveType = ECardType.Skill };
+AssertTrue(
+    topLevelModeState.SelectPackagesOnly(),
+    "Selecting the Package tab from Skills should report a mode change."
+);
+AssertEqual(
+    ECardType.Item,
+    topLevelModeState.ActiveType,
+    "Selecting the Package tab should route through the Item card type."
+);
+AssertTrue(
+    topLevelModeState.PackagesOnly,
+    "Selecting the Package tab should enable package-only mode."
+);
+AssertFalse(
+    topLevelModeState.SelectPackagesOnly(),
+    "Selecting the already active Package tab should be a no-op."
+);
+AssertTrue(
+    topLevelModeState.SelectActiveType(ECardType.Item),
+    "Selecting Items from package mode should report a mode change."
+);
+AssertFalse(
+    topLevelModeState.PackagesOnly,
+    "Selecting Items from package mode should clear package-only mode."
+);
+AssertFalse(
+    topLevelModeState.SelectActiveType(ECardType.Item),
+    "Selecting the already active normal Items tab should be a no-op."
+);
+AssertTrue(
+    topLevelModeState.SelectPackagesOnly(),
+    "Selecting Packages from Items should report a mode change."
+);
+AssertTrue(
+    topLevelModeState.SelectActiveType(ECardType.Skill),
+    "Selecting Skills from package mode should report a mode change."
+);
+AssertEqual(
+    ECardType.Skill,
+    topLevelModeState.ActiveType,
+    "Selecting Skills from package mode should activate Skills."
+);
+AssertFalse(
+    topLevelModeState.PackagesOnly,
+    "Selecting Skills from package mode should clear package-only mode."
+);
+
 sourceState.ActiveType = ECardType.Item;
 sourceState.SelectedSourceKey = "merchant:hidden";
 AssertTrue(

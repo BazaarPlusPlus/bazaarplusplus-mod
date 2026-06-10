@@ -56,6 +56,26 @@ internal sealed class CollectionFilterState
     public string? GetSelectedSourceKey(ECardType activeType) =>
         activeType == ActiveType ? SelectedSourceKey : null;
 
+    public bool SelectActiveType(ECardType activeType)
+    {
+        if (ActiveType == activeType && !PackagesOnly)
+            return false;
+
+        ActiveType = activeType;
+        PackagesOnly = false;
+        return true;
+    }
+
+    public bool SelectPackagesOnly()
+    {
+        if (ActiveType == ECardType.Item && PackagesOnly)
+            return false;
+
+        ActiveType = ECardType.Item;
+        PackagesOnly = true;
+        return true;
+    }
+
     public void ApplySelection(CollectionPanelSelectionState selection)
     {
         if (selection == null)
