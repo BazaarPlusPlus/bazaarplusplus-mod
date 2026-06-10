@@ -36,7 +36,9 @@ The switch should not delete files, skip bundled-resource installation, or mutat
 
 Default must be `true` so existing users keep the current package-card replacement unless they explicitly opt out.
 
-The first implementation should not force-refresh every currently visible card when the switch is turned off. The current logic mutates or swaps materials after native art loading (`ItemVisualsArtReplacePatch.cs:59`, `CardPreviewItemArtReplacePatch.cs:59-61`), so immediate rollback would require broader native refresh/reflection work. The acceptance target is: disabling the setting prevents replacement on new card material setup / preview load; reopening CollectionPanel or causing native card redraw shows original art.
+The visible SettingsDock row name should be `快递掉包` in Chinese. Use a concise English fallback such as `Package Swap`, but do not keep the old Chinese copy `包裹卡面`.
+
+The first implementation should not force-refresh every currently visible card when the switch is turned off. The current logic mutates or swaps materials after native art loading (`ItemVisualsArtReplacePatch.cs:59`, `CardPreviewItemArtReplacePatch.cs:59-61`), so immediate rollback would require broader native refresh/reflection work. The acceptance target is: disabling the setting prevents replacement on new card material setup / preview load; reopening CollectionPanel or causing native card redraw shows original art. The SettingsDock may still refresh its own row state after a click; that is not a card/material refresh.
 
 ## File Structure
 
@@ -52,6 +54,8 @@ The first implementation should not force-refresh every currently visible card w
   Feature-owned SettingsDock contribution using `SettingsMenuToggleBridge`.
 - Modify `src/BazaarPlusPlus/BppComposition.cs`
   Register the new SettingsDock entry.
+- Modify `src/BazaarPlusPlus.Localization/Properties/AssemblyInfo.cs`
+  Allow `SettingsDockRegistry.Tests` to install localization test providers for label assertions.
 - Modify `src/BazaarPlusPlus/Patches/CardArtReplacement/ItemVisualsArtReplacePatch.cs`
   Gate live item art replacement before package/texture work.
 - Modify `src/BazaarPlusPlus/Patches/CardArtReplacement/CardPreviewItemArtReplacePatch.cs`
@@ -59,7 +63,7 @@ The first implementation should not force-refresh every currently visible card w
 - Modify `tests/CardArtReplacement.Tests/CardArtReplacementTests.cs`
   Add policy tests for default-enabled and config read/write behavior.
 - Modify `tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs`
-  Add a SettingsDock entry test for order, key, ON/OFF status, and activation.
+  Add a SettingsDock entry test for order, key, localized label, ON/OFF status, activation, and config reload persistence.
 
 ## Implementation Tasks
 
@@ -201,7 +205,7 @@ namespace BazaarPlusPlus.Game.CardArtReplacement;
 
 internal static class PackageCardArtReplacementSettingsMenuLabel
 {
-    private static readonly LocalizedTextSet Labels = new("Package Card Art", "包裹卡面");
+    private static readonly LocalizedTextSet Labels = new("Package Swap", "快递掉包");
 
     internal static string Resolve(string languageCode)
     {
@@ -260,6 +264,7 @@ Expected: build succeeds and the new entry compiles through the main project ref
 ### Task 4: Add Automated Tests
 
 **Files:**
+- Modify: `src/BazaarPlusPlus.Localization/Properties/AssemblyInfo.cs`
 - Modify: `tests/CardArtReplacement.Tests/CardArtReplacementTests.cs`
 - Modify: `tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs`
 
@@ -299,11 +304,32 @@ public void Package_art_replacement_policy_reads_and_writes_config()
 
 - [ ] **Step 2: Add SettingsDock entry test**
 
+In `src/BazaarPlusPlus.Localization/Properties/AssemblyInfo.cs`, add:
+
+```csharp
+[assembly: InternalsVisibleTo("SettingsDockRegistry.Tests")]
+```
+
 In `SettingsDockRegistryTests.cs`, add these `using` directives:
 
 ```csharp
 using BazaarPlusPlus.Game.CardArtReplacement;
+using BazaarPlusPlus.Localization;
 using BepInEx.Configuration;
+```
+
+Add these test providers inside `SettingsDockRegistryTests`:
+
+```csharp
+private sealed class TestLanguageProvider : ILanguageProvider
+{
+    public string CurrentLanguageCode => "en";
+}
+
+private sealed class TestLocaleModeProvider : ILocaleModeProvider
+{
+    public BppChineseLocaleMode CurrentMode => BppChineseLocaleMode.Mainland;
+}
 ```
 
 Add this test after `MaterializeWithOrder_returns_entries_paired_with_their_Order`:
@@ -318,6 +344,7 @@ public void PackageCardArtReplacementDockEntry_uses_order_four_and_toggles_confi
     );
     try
     {
+        L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
         var configFile = new ConfigFile(configPath, saveOnInit: false);
         var config = new BppConfig();
         config.Initialize(configFile);
@@ -327,6 +354,8 @@ public void PackageCardArtReplacementDockEntry_uses_order_four_and_toggles_confi
 
         Assert.Equal(4, entry.Order);
         Assert.Equal("PackageCardArtReplacement", definition.Key);
+        Assert.Equal("Package Swap", definition.ResolveLabel("en"));
+        Assert.Equal("快递掉包", definition.ResolveLabel("zh-CN"));
         Assert.True(definition.IsActive());
         Assert.Equal("ON", definition.ResolveStatus("en"));
 
@@ -336,6 +365,14 @@ public void PackageCardArtReplacementDockEntry_uses_order_four_and_toggles_confi
         Assert.False(definition.IsActive());
         Assert.Equal("OFF", definition.ResolveStatus("en"));
         Assert.False(definition.CollapseAfterActivate);
+
+        configFile.Save();
+
+        var reloadedConfigFile = new ConfigFile(configPath, saveOnInit: false);
+        var reloadedConfig = new BppConfig();
+        reloadedConfig.Initialize(reloadedConfigFile);
+
+        Assert.False(PackageCardArtReplacementPolicy.IsEnabled(reloadedConfig));
     }
     finally
     {
@@ -402,23 +439,27 @@ open "steam://run/1617400"
 Expected:
 
 1. Open the in-game SettingsDock.
-2. Confirm a `Package Card Art` / `包裹卡面` row appears between enchant preview and combat status bar.
+2. Confirm a `Package Swap` / `快递掉包` row appears between enchant preview and combat status bar.
 3. With the row ON, open CollectionPanel package tab and confirm package cards use the bundled custom art.
-4. Toggle the row OFF, close/reopen CollectionPanel, and confirm package cards use native/original art.
-5. Toggle the row ON again, close/reopen CollectionPanel, and confirm package cards use bundled custom art again.
-6. Read `<GameDir>/BepInEx/LogOutput.log` and confirm no `[BPP][CardArtReplacement] Postfix failed` or `Preview postfix failed` warnings appeared during the toggle checks.
+4. Toggle the row OFF and confirm the SettingsDock row status changes immediately. Do not require currently visible card art to change before a native reload/redraw.
+5. Close/reopen CollectionPanel and confirm package cards use native/original art.
+6. Toggle the row ON again, close/reopen CollectionPanel, and confirm package cards use bundled custom art again.
+7. Restart the game and confirm the last selected toggle state persists.
+8. Read `<GameDir>/BepInEx/LogOutput.log` and confirm no `[BPP][CardArtReplacement] Postfix failed` or `Preview postfix failed` warnings appeared during the toggle checks.
 
 ## Non-Goals
 
 - Do not remove, rename, or stop embedding `Resources/CustomCardArt/*.jpg`.
 - Do not change `BundledCustomCardArtInstaller.InstallMissing`; installing missing bundled art remains harmless even when runtime replacement is disabled.
-- Do not add a broad immediate-refresh system for currently visible card materials in this pass. If that becomes a requirement, implement it as a follow-up with explicit native card refresh evidence.
+- Do not add a broad immediate-refresh system for currently visible card materials in this pass. If that becomes a requirement, implement it as a follow-up with explicit native card refresh evidence. The existing SettingsDock row refresh after activation is allowed because it only updates dock UI state.
 - Do not change package detection. Keep `EHiddenTag.Package` as the identity source.
 
 ## Acceptance Criteria
 
 - Fresh installs default to package-card art replacement ON.
-- SettingsDock has a persistent toggle row with stable key `PackageCardArtReplacement` and `Order => 4`.
+- SettingsDock has a persistent toggle row labeled `Package Swap` / `快递掉包`, with stable key `PackageCardArtReplacement` and `Order => 4`.
 - Turning the setting OFF prevents both live item-card and CollectionPanel preview replacement paths from applying custom package art on subsequent native load/setup.
+- Toggling OFF immediately updates only the SettingsDock row status; it does not force-refresh already visible card materials.
 - Turning the setting ON restores the existing behavior on subsequent native load/setup.
+- The selected setting survives config reload / game restart.
 - Focused tests, architecture tests, `./run.sh test`, and `./run.sh build` pass.
