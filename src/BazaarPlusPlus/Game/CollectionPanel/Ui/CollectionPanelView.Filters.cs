@@ -6,6 +6,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.GameInterop.EncounterPortraits;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
 using BazaarPlusPlus.GameInterop.TagTypography;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -163,10 +164,7 @@ internal sealed partial class CollectionPanelView
             var hasReferenceSection = false;
             foreach (var keyword in keywords)
             {
-                if (
-                    !hasReferenceSection
-                    && CollectionKeywordWhitelist.IsReferenceKeyword(keyword)
-                )
+                if (!hasReferenceSection && CollectionKeywordWhitelist.IsReferenceKeyword(keyword))
                 {
                     _keywordReferenceSectionLabel = CreateKeywordReferenceSectionLabel();
                     _keywordChipRow.Add(_keywordReferenceSectionLabel);
@@ -236,6 +234,8 @@ internal sealed partial class CollectionPanelView
         label.style.flexBasis = Length.Percent(100f);
         label.style.marginTop = UiSpacing.Xs;
         label.style.marginBottom = UiSpacing.Xs;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.overflow = Overflow.Hidden;
         label.style.opacity = 0.72f;
         return label;
     }
@@ -424,7 +424,11 @@ internal sealed partial class CollectionPanelView
         label.style.unityFont = BppUiFont.Default;
         label.style.unityFontStyleAndWeight = FontStyle.Normal;
         label.style.unityTextAlign = TextAnchor.MiddleCenter;
-        label.style.flexShrink = 0f;
+        label.style.flexShrink = 1f;
+        label.style.minWidth = 0f;
+        label.style.maxWidth = Sizes.TagFacetChipMaxWidth;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.overflow = Overflow.Hidden;
         chip.Add(label);
 
         StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
@@ -435,7 +439,8 @@ internal sealed partial class CollectionPanelView
     {
         var label = chip.Q<Label>(TagChipLabelName);
         if (label != null)
-            label.text = display.Label;
+            label.text = StablePanelText.Compact(display.Label, 24);
+        chip.tooltip = display.Label;
 
         var icon = chip.Q<VisualElement>(TagChipIconName);
         if (icon == null)
@@ -865,6 +870,7 @@ internal sealed partial class CollectionPanelView
         button.style.unityTextAlign = TextAnchor.MiddleCenter;
         button.style.justifyContent = Justify.Center;
         button.style.alignItems = Align.Center;
+        button.style.overflow = Overflow.Hidden;
         UiStyle.Padding(button.style, UiSpacing.None);
         button.style.backgroundColor = Colors.HistoryButtonBackground;
         button.style.color = Colors.White;
@@ -876,8 +882,13 @@ internal sealed partial class CollectionPanelView
         {
             textElement.style.unityTextAlign = TextAnchor.MiddleCenter;
             textElement.style.flexGrow = 1f;
+            textElement.style.flexShrink = 1f;
+            textElement.style.minWidth = 0f;
+            textElement.style.whiteSpace = WhiteSpace.NoWrap;
+            textElement.style.overflow = Overflow.Hidden;
             textElement.style.unityFont = BppUiFont.Default;
         }
+        button.tooltip = text;
         return button;
     }
 

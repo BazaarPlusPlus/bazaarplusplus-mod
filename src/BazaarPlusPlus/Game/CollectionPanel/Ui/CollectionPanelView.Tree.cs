@@ -37,6 +37,8 @@ internal sealed partial class CollectionPanelView
         rail.style.flexBasis = Length.Percent(Sizes.OperationRailWidthPercent);
         rail.style.minWidth = Sizes.OperationRailMinWidth;
         rail.style.maxWidth = Sizes.OperationRailMaxWidth;
+        rail.style.minHeight = 0f;
+        rail.style.overflow = Overflow.Hidden;
         rail.style.marginLeft = UiSpacing.ColumnGap;
         parent.Add(rail);
 
@@ -49,6 +51,9 @@ internal sealed partial class CollectionPanelView
         _title = CreateLabel(Sizes.FontTitle, FontStyle.Bold, Colors.HistoryTitleText);
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
+        _title.style.minWidth = 0f;
+        _title.style.whiteSpace = WhiteSpace.NoWrap;
+        _title.style.overflow = Overflow.Hidden;
         titleRow.Add(_title);
 
         _countLabel = CreateCountLabel();
@@ -67,8 +72,19 @@ internal sealed partial class CollectionPanelView
         _subtitle = BPPSupporterAttributionRow.Create();
         rail.Add(_subtitle);
 
+        var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
+        controlsScroll.style.flexGrow = 1f;
+        controlsScroll.style.flexShrink = 1f;
+        controlsScroll.style.minHeight = 0f;
+        controlsScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+        controlsScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+        controlsScroll.mouseWheelScrollSize = CollectionGridConstants.MouseWheelScrollPoints;
+        controlsScroll.contentContainer.style.flexDirection = FlexDirection.Column;
+        controlsScroll.contentContainer.style.minHeight = 0f;
+        rail.Add(controlsScroll);
+
         var primaryControlsRow = CreateOperationRow(UiSpacing.Xl);
-        rail.Add(primaryControlsRow);
+        controlsScroll.Add(primaryControlsRow);
 
         _itemTabButton = CreateButton(
             CollectionPanelText.ItemsTab(),
@@ -125,7 +141,7 @@ internal sealed partial class CollectionPanelView
 
         // Hero filter.
         CreateFilterSection(
-            rail,
+            controlsScroll,
             CollectionPanelText.HeroHeader(),
             UiSpacing.Xl,
             out _heroChipRow,
@@ -137,7 +153,7 @@ internal sealed partial class CollectionPanelView
 
         // Size + tier filter. Size is hidden on Skills, leaving Quality to fill the row.
         CreateFilterSection(
-            rail,
+            controlsScroll,
             CollectionPanelText.TierSizeHeader(),
             UiSpacing.Lg,
             out var tierSizeChipRow,
@@ -157,7 +173,7 @@ internal sealed partial class CollectionPanelView
         // Tag filter (player-facing card categories). Compact auto-width chips that wrap like
         // the source row and show the full whitelist by default.
         _tagFilterSection = CreateFilterSection(
-            rail,
+            controlsScroll,
             CollectionPanelText.TagHeader(),
             UiSpacing.Lg,
             out _tagChipRow,
@@ -169,7 +185,7 @@ internal sealed partial class CollectionPanelView
         // Keyword filter (EHiddenTag gameplay keywords). Keep this above merchant/trainer sources;
         // Refresh decides per tab whether the row is visible.
         _keywordFilterSection = CreateFilterSection(
-            rail,
+            controlsScroll,
             CollectionPanelText.KeywordHeader(),
             UiSpacing.Lg,
             out _keywordChipRow,
@@ -180,7 +196,7 @@ internal sealed partial class CollectionPanelView
 
         // Source filter (merchant portraits on Items, trainer portraits on Skills).
         _sourceFilterSection = CreateFilterSection(
-            rail,
+            controlsScroll,
             CollectionPanelText.SourceHeader(ECardType.Item),
             UiSpacing.Lg,
             out _sourceChipRow,
@@ -192,8 +208,13 @@ internal sealed partial class CollectionPanelView
         _sourceChipRow.RegisterCallback<GeometryChangedEvent>(OnSourceChipRowGeometryChanged);
 
         _statusLabel = CreateLabel(Sizes.FontSmall, FontStyle.Normal, Colors.HistoryStatusText);
-        _statusLabel.style.marginTop = UiSpacing.Lg;
+        _statusLabel.style.marginTop = UiSpacing.Md;
+        _statusLabel.style.flexShrink = 0f;
+        _statusLabel.style.minHeight = Sizes.StatusHeight;
+        _statusLabel.style.maxHeight = Sizes.CollectionStatusMaxHeight;
+        _statusLabel.style.width = Length.Percent(100f);
         _statusLabel.style.whiteSpace = WhiteSpace.Normal;
+        _statusLabel.style.overflow = Overflow.Hidden;
         _statusLabel.style.display = DisplayStyle.None;
         rail.Add(_statusLabel);
     }
@@ -224,6 +245,8 @@ internal sealed partial class CollectionPanelView
         label.style.height = Sizes.ButtonCompactHeight;
         UiStyle.FixedWidth(label.style, Sizes.CollectionMatchCountWidth);
         label.style.flexShrink = 0f;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.overflow = Overflow.Hidden;
         label.style.unityTextAlign = TextAnchor.MiddleCenter;
         label.style.alignSelf = Align.Center;
         UiStyle.HorizontalPadding(label.style, UiSpacing.Md);
@@ -257,12 +280,15 @@ internal sealed partial class CollectionPanelView
     {
         var section = new VisualElement();
         section.style.flexDirection = FlexDirection.Column;
+        section.style.flexShrink = 0f;
         section.style.marginTop = marginTop;
         parent.Add(section);
 
         label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
         label.text = title;
         label.style.marginBottom = UiSpacing.Sm;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.overflow = Overflow.Hidden;
         section.Add(label);
 
         chipRow = new VisualElement();
@@ -373,6 +399,8 @@ internal sealed partial class CollectionPanelView
         _emptyLabel.text = CollectionPanelText.NoMatches();
         _emptyLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
         _emptyLabel.style.height = 80f;
+        _emptyLabel.style.whiteSpace = WhiteSpace.Normal;
+        _emptyLabel.style.overflow = Overflow.Hidden;
         _emptyLabel.style.display = DisplayStyle.None;
         _gridViewport.Add(_emptyLabel);
 
@@ -388,6 +416,8 @@ internal sealed partial class CollectionPanelView
         _loadingLabel.style.top = 0f;
         _loadingLabel.style.bottom = 0f;
         _loadingLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _loadingLabel.style.whiteSpace = WhiteSpace.Normal;
+        _loadingLabel.style.overflow = Overflow.Hidden;
         _loadingLabel.style.display = DisplayStyle.None;
         _gridViewport.Add(_loadingLabel);
     }

@@ -124,6 +124,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         _previewStatusLabel.style.bottom = UiSpacing.ColumnGap;
         _previewStatusLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
         _previewStatusLabel.style.whiteSpace = WhiteSpace.Normal;
+        _previewStatusLabel.style.maxHeight = Sizes.PanelStatusMaxHeight;
+        _previewStatusLabel.style.overflow = Overflow.Hidden;
         _previewContainer.Add(_previewStatusLabel);
 
         _previewDebugLabel = CreateLabel(
@@ -134,6 +136,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         _previewDebugLabel.style.position = Position.Absolute;
         _previewDebugLabel.style.right = UiSpacing.Xxl;
         _previewDebugLabel.style.top = UiSpacing.Xl;
+        _previewDebugLabel.style.maxWidth = Sizes.StatusMaxWidth;
+        _previewDebugLabel.style.whiteSpace = WhiteSpace.NoWrap;
+        _previewDebugLabel.style.overflow = Overflow.Hidden;
         _previewDebugLabel.style.display = DisplayStyle.None;
         _previewContainer.Add(_previewDebugLabel);
     }
@@ -161,7 +166,10 @@ internal sealed partial class HistoryPanelUiToolkitView
         _title = CreateLabel(Sizes.FontTitle, FontStyle.Bold, Colors.HistoryTitleText);
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
+        _title.style.minWidth = 0f;
         _title.style.minHeight = Sizes.ButtonStandardHeight; // VIS-7: lock row height
+        _title.style.whiteSpace = WhiteSpace.NoWrap;
+        _title.style.overflow = Overflow.Hidden;
         titleRow.Add(_title);
 
         _closeButton = CreateButton(
@@ -194,6 +202,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         selectedDetailCard.style.flexGrow = 1f;
         selectedDetailCard.style.flexShrink = 1f;
         selectedDetailCard.style.minHeight = 0f;
+        selectedDetailCard.style.overflow = Overflow.Hidden;
         selectedDetailCard.style.backgroundColor = Colors.HistoryFooterBackground;
         UiStyle.Radius(selectedDetailCard.style, Radii.Md);
         UiStyle.Border(selectedDetailCard.style, Borders.Thin, Colors.HistoryListFrameBorder);
@@ -230,6 +239,8 @@ internal sealed partial class HistoryPanelUiToolkitView
             Colors.HistoryFooterSecondaryText
         );
         _detailMeta.style.whiteSpace = WhiteSpace.Normal;
+        _detailMeta.style.maxHeight = Sizes.DetailTextMaxHeight;
+        _detailMeta.style.overflow = Overflow.Hidden;
         _detailMeta.style.marginTop = UiSpacing.Sm;
         _detailMeta.style.display = DisplayStyle.None;
         selectedDetailCard.Add(_detailMeta);
@@ -240,6 +251,8 @@ internal sealed partial class HistoryPanelUiToolkitView
             Colors.HistoryFooterSecondaryText
         );
         _detailSnapshot.style.whiteSpace = WhiteSpace.Normal;
+        _detailSnapshot.style.maxHeight = Sizes.DetailTextMaxHeight;
+        _detailSnapshot.style.overflow = Overflow.Hidden;
         _detailSnapshot.style.marginTop = UiSpacing.Xxs;
         _detailSnapshot.style.display = DisplayStyle.None;
         selectedDetailCard.Add(_detailSnapshot);
@@ -250,6 +263,8 @@ internal sealed partial class HistoryPanelUiToolkitView
             Colors.WithAlpha(Colors.HistoryFooterSecondaryText, 0.6f) // single 0.6 layer, no style.opacity
         );
         _detailPlaceholder.style.whiteSpace = WhiteSpace.Normal;
+        _detailPlaceholder.style.maxHeight = Sizes.DetailTextMaxHeight;
+        _detailPlaceholder.style.overflow = Overflow.Hidden;
         _detailPlaceholder.style.unityTextAlign = TextAnchor.MiddleCenter;
         _detailPlaceholder.style.marginTop = UiSpacing.Sm;
         _detailPlaceholder.style.display = DisplayStyle.None;
@@ -267,6 +282,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         UiStyle.Padding(_ghostOpponentEliminatedNotice.style, UiSpacing.Md, UiSpacing.Sm);
         _ghostOpponentEliminatedNotice.style.unityTextAlign = TextAnchor.MiddleCenter;
         _ghostOpponentEliminatedNotice.style.whiteSpace = WhiteSpace.Normal; // was NoWrap
+        _ghostOpponentEliminatedNotice.style.maxHeight = Sizes.DetailNoticeMaxHeight;
+        _ghostOpponentEliminatedNotice.style.overflow = Overflow.Hidden;
         _ghostOpponentEliminatedNotice.style.backgroundColor = Colors.HistoryEliminatedBackground;
         UiStyle.Radius(_ghostOpponentEliminatedNotice.style, Radii.Row);
         UiStyle.Border(
@@ -399,6 +416,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         _statusLabel.style.flexShrink = 0f;
         _statusLabel.style.whiteSpace = WhiteSpace.Normal;
         _statusLabel.style.minHeight = Sizes.StatusHeight;
+        _statusLabel.style.maxHeight = Sizes.PanelStatusMaxHeight;
+        _statusLabel.style.overflow = Overflow.Hidden;
         _statusLabel.style.width = Length.Percent(100f);
         _statusLabel.style.marginTop = UiSpacing.Md;
         _statusLabel.style.alignSelf = Align.Stretch;

@@ -3,6 +3,7 @@ using System;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -190,7 +191,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         );
         _checkServerHealthButton!.text = model.ServerHealthButtonText;
         _checkServerHealthButton.SetEnabled(model.ServerHealthButtonEnabled);
-        _statusLabel!.text = model.StatusMessage ?? string.Empty;
+        _statusLabel!.text = StablePanelText.Compact(model.StatusMessage, 180);
+        _statusLabel.tooltip = model.StatusMessage ?? string.Empty;
         _statusLabel.style.display = string.IsNullOrWhiteSpace(model.StatusMessage)
             ? DisplayStyle.None
             : DisplayStyle.Flex;
@@ -216,19 +218,26 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _opponentName!.text = model.DetailOpponentName;
         _opponentName.tooltip = model.DetailOpponentName;
         _opponentName.style.display = hasSelection ? DisplayStyle.Flex : DisplayStyle.None;
-        _detailMeta!.text = model.DetailMetaText;
+        _detailMeta!.text = StablePanelText.Compact(model.DetailMetaText, 96);
+        _detailMeta.tooltip = model.DetailMetaText;
         _detailMeta.style.display =
             hasSelection && !string.IsNullOrWhiteSpace(model.DetailMetaText)
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
-        _detailSnapshot!.text = model.DetailSnapshotText;
+        _detailSnapshot!.text = StablePanelText.Compact(model.DetailSnapshotText, 112);
+        _detailSnapshot.tooltip = model.DetailSnapshotText;
         _detailSnapshot.style.display =
             hasSelection && !string.IsNullOrWhiteSpace(model.DetailSnapshotText)
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
-        _detailPlaceholder!.text = model.DetailPlaceholderText;
+        _detailPlaceholder!.text = StablePanelText.Compact(model.DetailPlaceholderText, 112);
+        _detailPlaceholder.tooltip = model.DetailPlaceholderText;
         _detailPlaceholder.style.display = hasSelection ? DisplayStyle.None : DisplayStyle.Flex;
-        _ghostOpponentEliminatedNotice!.text = model.GhostOpponentEliminatedNoticeText;
+        _ghostOpponentEliminatedNotice!.text = StablePanelText.Compact(
+            model.GhostOpponentEliminatedNoticeText,
+            96
+        );
+        _ghostOpponentEliminatedNotice.tooltip = model.GhostOpponentEliminatedNoticeText;
         _ghostOpponentEliminatedNotice.style.display = string.IsNullOrWhiteSpace(
             model.GhostOpponentEliminatedNoticeText
         )
@@ -253,10 +262,13 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         );
 
         _replayButton!.text = model.ReplayButtonText;
+        _replayButton.tooltip = model.ReplayButtonText;
         _replayButton.SetEnabled(model.ReplayButtonEnabled);
         _recordAndReplayButton!.text = model.RecordAndReplayButtonText;
+        _recordAndReplayButton.tooltip = model.RecordAndReplayButtonText;
         _recordAndReplayButton.SetEnabled(model.RecordAndReplayButtonEnabled);
         _deleteButton!.text = model.DeleteButtonText;
+        _deleteButton.tooltip = model.DeleteButtonText;
         _deleteButton.SetEnabled(model.DeleteButtonEnabled);
         RefreshDeleteButton(_deleteButton, model.DeleteButtonText, model.DeleteButtonEnabled);
 

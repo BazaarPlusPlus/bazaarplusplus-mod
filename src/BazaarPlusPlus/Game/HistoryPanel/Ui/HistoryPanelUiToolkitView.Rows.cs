@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -334,7 +335,9 @@ internal sealed partial class HistoryPanelUiToolkitView
             HistoryPanelText.BoardSummary(battle.OpponentHandItemCount, battle.OpponentSkillCount),
             Colors.HistoryOpponentAccent
         );
-        refs.OpponentName.text = battle.OpponentName ?? string.Empty;
+        var opponentName = battle.OpponentName ?? string.Empty;
+        refs.OpponentName.text = StablePanelText.Compact(opponentName, 48);
+        refs.OpponentName.tooltip = opponentName;
         refs.OpponentName.style.display = string.IsNullOrWhiteSpace(refs.OpponentName.text)
             ? DisplayStyle.None
             : DisplayStyle.Flex;

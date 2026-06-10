@@ -7,6 +7,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -125,9 +126,12 @@ internal sealed class LiveBuildPanelView : IDisposable
         _candidateCount!.text = LiveBuildPanelText.CandidateCount(
             snapshot.CandidateTemplateIds.Count
         );
+        _candidateCount.tooltip = _candidateCount.text;
         _finalBuildRefreshButton!.text = snapshot.FinalBuildRefreshButtonText;
+        _finalBuildRefreshButton.tooltip = snapshot.FinalBuildRefreshButtonText;
         _finalBuildRefreshButton.SetEnabled(snapshot.FinalBuildRefreshButtonEnabled);
-        _buildRefreshStatus!.text = snapshot.BuildRefreshStatusText;
+        _buildRefreshStatus!.text = StablePanelText.Compact(snapshot.BuildRefreshStatusText, 150);
+        _buildRefreshStatus.tooltip = snapshot.BuildRefreshStatusText;
         _buildRefreshStatus.style.display = string.IsNullOrWhiteSpace(
             snapshot.BuildRefreshStatusText
         )
@@ -136,9 +140,12 @@ internal sealed class LiveBuildPanelView : IDisposable
         _buildRefreshStatus.style.color = ResolveRefreshStatusColor(
             snapshot.BuildRefreshStatusSeverity
         );
-        _recommendationStatus!.text = snapshot.RecommendationStatus;
+        _recommendationStatus!.text = StablePanelText.Compact(snapshot.RecommendationStatus, 96);
+        _recommendationStatus.tooltip = snapshot.RecommendationStatus;
         _previousButton!.text = LiveBuildPanelText.Previous();
+        _previousButton.tooltip = LiveBuildPanelText.Previous();
         _nextButton!.text = LiveBuildPanelText.Next();
+        _nextButton.tooltip = LiveBuildPanelText.Next();
         _previousButton.SetEnabled(snapshot.RecommendationCount > 1);
         _nextButton.SetEnabled(snapshot.RecommendationCount > 1);
 
@@ -173,6 +180,7 @@ internal sealed class LiveBuildPanelView : IDisposable
     {
         var panel = new VisualElement();
         panel.style.flexGrow = 1f;
+        panel.style.minHeight = 0f;
         panel.style.flexDirection = FlexDirection.Row;
         panel.style.backgroundColor = Colors.HistoryPanelBackground;
         panel.style.paddingLeft = 34f;
@@ -185,6 +193,7 @@ internal sealed class LiveBuildPanelView : IDisposable
         boardArea.style.flexGrow = 1f;
         boardArea.style.flexShrink = 1f;
         boardArea.style.minWidth = 0f;
+        boardArea.style.minHeight = 0f;
         boardArea.style.flexDirection = FlexDirection.Column;
         panel.Add(boardArea);
 
@@ -230,15 +239,19 @@ internal sealed class LiveBuildPanelView : IDisposable
         labelColumn.style.paddingLeft = 14f;
         labelColumn.style.paddingRight = 12f;
         labelColumn.style.justifyContent = Justify.Center;
+        labelColumn.style.overflow = Overflow.Hidden;
         row.Add(labelColumn);
 
         var title = CreateLabel(18, FontStyle.Bold, Colors.HistorySectionTitleText);
-        title.style.whiteSpace = WhiteSpace.Normal;
+        title.style.whiteSpace = WhiteSpace.NoWrap;
+        title.style.overflow = Overflow.Hidden;
         labelColumn.Add(title);
 
         var empty = CreateLabel(13, FontStyle.Normal, Colors.HistoryFooterSecondaryText);
         empty.style.marginTop = 4f;
         empty.style.whiteSpace = WhiteSpace.Normal;
+        empty.style.maxHeight = Sizes.LiveBuildRowEmptyMaxHeight;
+        empty.style.overflow = Overflow.Hidden;
         labelColumn.Add(empty);
 
         var slotHost = new VisualElement();
@@ -290,6 +303,8 @@ internal sealed class LiveBuildPanelView : IDisposable
         rail.style.width = 330f;
         rail.style.flexShrink = 0f;
         rail.style.marginLeft = 24f;
+        rail.style.minHeight = 0f;
+        rail.style.overflow = Overflow.Hidden;
         rail.style.flexDirection = FlexDirection.Column;
         parent.Add(rail);
 
@@ -300,6 +315,10 @@ internal sealed class LiveBuildPanelView : IDisposable
 
         _title = CreateLabel(28, FontStyle.Bold, Colors.HistoryTitleText);
         _title.style.flexGrow = 1f;
+        _title.style.flexShrink = 1f;
+        _title.style.minWidth = 0f;
+        _title.style.whiteSpace = WhiteSpace.NoWrap;
+        _title.style.overflow = Overflow.Hidden;
         titleRow.Add(_title);
 
         _closeButton = CreateButton(LiveBuildPanelText.Close(), _close);
@@ -315,6 +334,8 @@ internal sealed class LiveBuildPanelView : IDisposable
         _candidateCount = CreateLabel(16, FontStyle.Bold, Colors.HistoryChipText);
         _candidateCount.style.marginTop = 22f;
         _candidateCount.style.height = 34f;
+        _candidateCount.style.whiteSpace = WhiteSpace.NoWrap;
+        _candidateCount.style.overflow = Overflow.Hidden;
         _candidateCount.style.backgroundColor = Colors.HistoryChipBackground;
         _candidateCount.style.unityTextAlign = TextAnchor.MiddleCenter;
         rail.Add(_candidateCount);
@@ -332,12 +353,16 @@ internal sealed class LiveBuildPanelView : IDisposable
         _buildRefreshStatus = CreateLabel(14, FontStyle.Normal, Colors.HistoryStatusText);
         _buildRefreshStatus.style.marginTop = 8f;
         _buildRefreshStatus.style.whiteSpace = WhiteSpace.Normal;
+        _buildRefreshStatus.style.maxHeight = Sizes.LiveBuildRefreshStatusMaxHeight;
+        _buildRefreshStatus.style.overflow = Overflow.Hidden;
         _buildRefreshStatus.style.display = DisplayStyle.None;
         rail.Add(_buildRefreshStatus);
 
         _recommendationStatus = CreateLabel(16, FontStyle.Normal, Colors.HistoryStatusText);
         _recommendationStatus.style.marginTop = 12f;
         _recommendationStatus.style.whiteSpace = WhiteSpace.Normal;
+        _recommendationStatus.style.maxHeight = Sizes.LiveBuildRecommendationStatusMaxHeight;
+        _recommendationStatus.style.overflow = Overflow.Hidden;
         _recommendationStatus.style.backgroundColor = Colors.HistoryStatusBackground;
         _recommendationStatus.style.paddingLeft = 12f;
         _recommendationStatus.style.paddingRight = 12f;
@@ -366,7 +391,17 @@ internal sealed class LiveBuildPanelView : IDisposable
             return;
 
         elements.Title.text = row.Title;
-        elements.Empty.text = row.Board.Cards.Count == 0 ? row.EmptyText : string.Empty;
+        elements.Title.tooltip = row.Title;
+        if (row.Board.Cards.Count == 0)
+        {
+            elements.Empty.text = StablePanelText.Compact(row.EmptyText, 72);
+            elements.Empty.tooltip = row.EmptyText;
+        }
+        else
+        {
+            elements.Empty.text = string.Empty;
+            elements.Empty.tooltip = string.Empty;
+        }
         ClearDynamic(elements);
 
         foreach (var card in row.Board.Cards)
@@ -547,10 +582,13 @@ internal sealed class LiveBuildPanelView : IDisposable
     {
         var button = new Button(() => onClick()) { text = text };
         button.style.height = 40f;
+        button.style.minWidth = 0f;
+        button.style.flexShrink = 1f;
         button.style.unityFont = BppUiFont.Default;
         button.style.unityTextAlign = TextAnchor.MiddleCenter;
         button.style.justifyContent = Justify.Center;
         button.style.alignItems = Align.Center;
+        button.style.overflow = Overflow.Hidden;
         button.style.backgroundColor = Colors.HistoryButtonBackground;
         button.style.color = Colors.White;
         button.style.borderBottomColor = Colors.HistoryButtonBorder;
@@ -561,6 +599,18 @@ internal sealed class LiveBuildPanelView : IDisposable
         button.style.borderTopWidth = 1f;
         button.style.borderLeftWidth = 1f;
         button.style.borderRightWidth = 1f;
+        var textElement = button.Q<TextElement>();
+        if (textElement != null)
+        {
+            textElement.style.unityTextAlign = TextAnchor.MiddleCenter;
+            textElement.style.flexGrow = 1f;
+            textElement.style.flexShrink = 1f;
+            textElement.style.minWidth = 0f;
+            textElement.style.whiteSpace = WhiteSpace.NoWrap;
+            textElement.style.overflow = Overflow.Hidden;
+            textElement.style.unityFont = BppUiFont.Default;
+        }
+        button.tooltip = text;
         return button;
     }
 }

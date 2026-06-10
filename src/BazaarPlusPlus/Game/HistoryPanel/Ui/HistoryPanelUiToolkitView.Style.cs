@@ -50,6 +50,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         label.text = text.ToUpperInvariant();
         UiStyle.FixedHeight(label.style, Sizes.SectionTitleHeight);
         label.style.unityTextAlign = TextAnchor.MiddleLeft;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.overflow = Overflow.Hidden;
         return label;
     }
 
@@ -115,8 +117,14 @@ internal sealed partial class HistoryPanelUiToolkitView
         {
             textElement.style.unityTextAlign = TextAnchor.MiddleCenter;
             textElement.style.flexGrow = 1f;
+            textElement.style.flexShrink = 1f;
+            textElement.style.minWidth = 0f;
+            textElement.style.whiteSpace = WhiteSpace.NoWrap;
+            textElement.style.overflow = Overflow.Hidden;
             textElement.style.unityFont = GetUiFont();
         }
+        button.tooltip = text;
+        button.style.overflow = Overflow.Hidden;
         return button;
     }
 
@@ -142,8 +150,14 @@ internal sealed partial class HistoryPanelUiToolkitView
         {
             textElement.style.unityTextAlign = TextAnchor.MiddleCenter;
             textElement.style.flexGrow = 1f;
+            textElement.style.flexShrink = 1f;
+            textElement.style.minWidth = 0f;
+            textElement.style.whiteSpace = WhiteSpace.NoWrap;
+            textElement.style.overflow = Overflow.Hidden;
             textElement.style.unityFont = GetUiFont();
         }
+        button.tooltip = text;
+        button.style.overflow = Overflow.Hidden;
         return button;
     }
 
@@ -196,6 +210,8 @@ internal sealed partial class HistoryPanelUiToolkitView
     {
         var content = new VisualElement();
         content.style.flexGrow = 1f;
+        content.style.flexShrink = 1f;
+        content.style.minWidth = 0f;
         UiStyle.Padding(content.style, UiSpacing.Xl, UiSpacing.RowVerticalPadding);
         content.style.flexDirection = FlexDirection.Column;
         return content;
@@ -223,6 +239,9 @@ internal sealed partial class HistoryPanelUiToolkitView
     {
         var label = CreateLabel(fontSize, FontStyle.Normal, color);
         label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.flexShrink = 1f;
+        label.style.minWidth = 0f;
+        label.style.overflow = Overflow.Hidden;
         row.Add(label);
         return label;
     }

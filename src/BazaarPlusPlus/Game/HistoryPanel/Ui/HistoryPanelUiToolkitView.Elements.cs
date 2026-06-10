@@ -30,6 +30,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         chip.style.minWidth = minWidth;
         chip.style.height = Sizes.InfoChipHeight;
         chip.style.marginRight = UiSpacing.Sm;
+        chip.style.whiteSpace = WhiteSpace.NoWrap;
+        chip.style.overflow = Overflow.Hidden;
         UiStyle.HorizontalPadding(chip.style, UiSpacing.Md);
         chip.style.unityTextAlign = TextAnchor.MiddleCenter;
         UiStyle.Radius(chip.style, Radii.InfoChip);
@@ -42,6 +44,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         var pill = CreateLabel(Sizes.FontTiny, FontStyle.Bold, Colors.White);
         pill.style.minWidth = minWidth;
         pill.style.height = Sizes.InlinePillHeight;
+        pill.style.whiteSpace = WhiteSpace.NoWrap;
+        pill.style.overflow = Overflow.Hidden;
         UiStyle.HorizontalPadding(pill.style, UiSpacing.Md);
         pill.style.marginRight = UiSpacing.Sm;
         pill.style.unityTextAlign = TextAnchor.MiddleCenter;

@@ -22,7 +22,7 @@ internal static class Sizes
     public const float SupporterAttributionNameMaxWidth = 118f;
     public const float SupporterActionMinWidth = 74f;
     public const float CollectionMatchCountWidth = 96f;
-    public const float PackageToggleWidth = 72f;
+    public const float PackageToggleWidth = 112f;
     public const float HeroChipIconSize = 48f;
     public const float HeroChipButtonSize = 56f;
     public const int HeroChipsPerRow = 8;
@@ -43,6 +43,14 @@ internal static class Sizes
     public const float CloseButtonWidth = 96f;
     public const float StatusHeight = 24f;
     public const float StatusMaxWidth = 220f;
+    public const float PanelStatusMaxHeight = 64f;
+    public const float DetailTextMaxHeight = 42f;
+    public const float DetailNoticeMaxHeight = 48f;
+    public const float CollectionStatusMaxHeight = 54f;
+    public const float LiveBuildRefreshStatusMaxHeight = 56f;
+    public const float LiveBuildRecommendationStatusMaxHeight = 90f;
+    public const float LiveBuildRowEmptyMaxHeight = 58f;
+    public const float TagFacetChipMaxWidth = 156f;
     public const float RowAccentWidth = 6f;
     public const float RowSideHostWidth = 62f;
     public const float RunRowHeight = 98f;

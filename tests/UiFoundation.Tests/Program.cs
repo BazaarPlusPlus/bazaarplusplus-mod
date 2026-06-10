@@ -1,8 +1,10 @@
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
 
 TestEmbeddedFontExtractionWritesResourceBytes();
 TestEmbeddedFontExtractionFailsForMissingResource();
 TestTmpFontPolicyDetectsCjkText();
+TestStablePanelTextCompactionKeepsStableSlots();
 
 Console.WriteLine("UiFoundation checks passed.");
 
@@ -79,6 +81,44 @@ static void TestTmpFontPolicyDetectsCjkText()
     Assert(
         !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont("Supported by Alice"),
         "TMP font policy should leave pure Latin text on the existing TMP font."
+    );
+}
+
+static void TestStablePanelTextCompactionKeepsStableSlots()
+{
+    Assert(
+        StablePanelText.Compact("Short status", 32) == "Short status",
+        "Short text should not be changed."
+    );
+    Assert(
+        StablePanelText.Compact("Hidden status", 0) == string.Empty,
+        "Non-positive budgets should hide the text instead of expanding the slot."
+    );
+    Assert(
+        StablePanelText.Compact("Line one\n\tline two   line three", 64)
+            == "Line one line two line three",
+        "Medium text should collapse whitespace without truncating."
+    );
+
+    var longMessage =
+        "Network refresh failed because the upstream endpoint returned a long diagnostic payload "
+        + "with repeated retry metadata and a platform-specific file path that would otherwise "
+        + "grow the panel footer.";
+    var compact = StablePanelText.Compact(longMessage, 80);
+    Assert(compact.Length <= 80, "Long text should stay within the caller's character budget.");
+    Assert(
+        compact.EndsWith("...", StringComparison.Ordinal),
+        "Long text should advertise truncation."
+    );
+    Assert(
+        compact.StartsWith("Network refresh failed", StringComparison.Ordinal),
+        "Long text should keep the actionable prefix visible."
+    );
+
+    var unbroken = new string('x', 300);
+    Assert(
+        StablePanelText.Compact(unbroken, 48).Length == 48,
+        "Unbroken text should also be clamped."
     );
 }
 

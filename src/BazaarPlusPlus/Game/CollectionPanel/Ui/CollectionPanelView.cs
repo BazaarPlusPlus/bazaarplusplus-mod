@@ -8,6 +8,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.GameInterop.TagTypography;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -297,7 +298,9 @@ internal sealed partial class CollectionPanelView : IDisposable
         var message = string.IsNullOrWhiteSpace(_loadingMessage)
             ? CollectionPanelText.CatalogLoading()
             : _loadingMessage;
-        _loadingLabel.text = $"{LoadingFrames[_loadingFrameIndex]} {message}";
+        _loadingLabel.text =
+            $"{LoadingFrames[_loadingFrameIndex]} {StablePanelText.Compact(message, 180)}";
+        _loadingLabel.tooltip = message;
     }
 
     // Snap the ScrollView to the top. Called on filter / tab changes so the user is not
@@ -317,7 +320,8 @@ internal sealed partial class CollectionPanelView : IDisposable
         _title!.text = model.Title;
         BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle);
         _countLabel!.text = model.CountText;
-        _statusLabel!.text = model.StatusMessage ?? string.Empty;
+        _statusLabel!.text = StablePanelText.Compact(model.StatusMessage, 150);
+        _statusLabel.tooltip = model.StatusMessage ?? string.Empty;
         _statusLabel.style.display = string.IsNullOrWhiteSpace(model.StatusMessage)
             ? DisplayStyle.None
             : DisplayStyle.Flex;
