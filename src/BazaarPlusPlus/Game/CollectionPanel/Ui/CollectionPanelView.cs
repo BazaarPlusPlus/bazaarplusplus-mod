@@ -118,6 +118,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private VisualElement? _tagFilterSection;
     private VisualElement? _keywordFilterSection;
     private VisualElement? _sourceFilterSection;
+    private ScrollView? _controlsScrollView;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
     private VisualElement? _gridContentSpacer;
@@ -333,6 +334,12 @@ internal sealed partial class CollectionPanelView : IDisposable
             _gridScrollView.scrollOffset = new Vector2(_gridScrollView.scrollOffset.x, 0f);
     }
 
+    public void ResetControlsScroll()
+    {
+        if (_controlsScrollView != null)
+            _controlsScrollView.scrollOffset = new Vector2(_controlsScrollView.scrollOffset.x, 0f);
+    }
+
     public void Refresh(CollectionPanelViewModel model)
     {
         if (_root == null)
@@ -425,7 +432,8 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_sortSizeButton != null)
             RefreshChip(_sortSizeButton, model.SortPriority == CollectionSortPriority.Size);
 
-        // Size only narrows Items; on Skills only the size segment disappears while Quality stays.
+        // Size/tags only narrow Items. On Skills, let Quality fill the row and let source filters
+        // move up naturally instead of reserving dead space.
         var showSizeChips = model.TabProfile.ShowSizeFilter;
         if (_sizeChipRow != null)
         {
@@ -451,7 +459,9 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_sourceFilterLabel != null)
             _sourceFilterLabel.text = CollectionPanelText.SourceHeader(model.ActiveType);
         if (_tierFilterLabel != null)
-            _tierFilterLabel.text = CollectionPanelText.TierSizeHeader();
+            _tierFilterLabel.text = showSizeChips
+                ? CollectionPanelText.TierSizeHeader()
+                : CollectionPanelText.SortQuality();
         if (_tagFilterLabel != null)
             _tagFilterLabel.text = CollectionPanelText.TagHeader();
         if (_keywordFilterLabel != null)
@@ -550,6 +560,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _document = null;
         _panelSettings = null;
         _root = null;
+        _controlsScrollView = null;
     }
 
     private void OnGridViewportGeometryChanged(GeometryChangedEvent evt)

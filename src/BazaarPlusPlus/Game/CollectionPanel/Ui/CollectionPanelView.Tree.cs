@@ -72,19 +72,8 @@ internal sealed partial class CollectionPanelView
         _subtitle = BPPSupporterAttributionRow.Create();
         rail.Add(_subtitle);
 
-        var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
-        controlsScroll.style.flexGrow = 1f;
-        controlsScroll.style.flexShrink = 1f;
-        controlsScroll.style.minHeight = 0f;
-        controlsScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
-        controlsScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
-        controlsScroll.mouseWheelScrollSize = CollectionGridConstants.MouseWheelScrollPoints;
-        controlsScroll.contentContainer.style.flexDirection = FlexDirection.Column;
-        controlsScroll.contentContainer.style.minHeight = 0f;
-        rail.Add(controlsScroll);
-
-        var primaryControlsRow = CreateOperationRow(UiSpacing.Xl);
-        controlsScroll.Add(primaryControlsRow);
+        var primaryControlsRow = CreateOperationRow(UiSpacing.Sm);
+        rail.Add(primaryControlsRow);
 
         _itemTabButton = CreateButton(
             CollectionPanelText.ItemsTab(),
@@ -99,11 +88,11 @@ internal sealed partial class CollectionPanelView
             Sizes.ButtonStandardHeight
         );
         primaryControlsRow.Add(_itemTabButton);
-        _skillTabButton.style.marginLeft = UiSpacing.Md;
-        primaryControlsRow.Add(_skillTabButton);
         _packageToggleButton = CreatePackageTabButton();
         _packageToggleButton.style.marginLeft = UiSpacing.Md;
         primaryControlsRow.Add(_packageToggleButton);
+        _skillTabButton.style.marginLeft = UiSpacing.Md;
+        primaryControlsRow.Add(_skillTabButton);
 
         primaryControlsRow.Add(CreateOperationSpacer());
 
@@ -137,6 +126,18 @@ internal sealed partial class CollectionPanelView
         _dayToggleButton.style.marginTop = UiSpacing.Xs;
         primaryControlsRow.Add(_dayToggleButton);
 
+        var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
+        controlsScroll.style.flexGrow = 1f;
+        controlsScroll.style.flexShrink = 1f;
+        controlsScroll.style.minHeight = 0f;
+        controlsScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+        controlsScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+        controlsScroll.mouseWheelScrollSize = CollectionGridConstants.MouseWheelScrollPoints;
+        controlsScroll.contentContainer.style.flexDirection = FlexDirection.Column;
+        controlsScroll.contentContainer.style.minHeight = 0f;
+        _controlsScrollView = controlsScroll;
+        rail.Add(controlsScroll);
+
         // Hero filter.
         CreateFilterSection(
             controlsScroll,
@@ -149,7 +150,7 @@ internal sealed partial class CollectionPanelView
         _heroChipRow.style.justifyContent = Justify.FlexStart;
         _heroChipRow.RegisterCallback<GeometryChangedEvent>(OnHeroChipRowGeometryChanged);
 
-        // Size + tier filter. Size is hidden on Skills, leaving Quality to fill the row.
+        // Size + tier filter. On Skills, Refresh hides Size and lets Quality fill the row.
         CreateFilterSection(
             controlsScroll,
             CollectionPanelText.TierSizeHeader(),
@@ -168,23 +169,8 @@ internal sealed partial class CollectionPanelView
         _tierChipRow.style.flexWrap = Wrap.NoWrap;
         _tierChipRow.style.justifyContent = Justify.FlexStart;
 
-        // Tag filter (player-facing card categories). Compact auto-width chips that wrap like
-        // the source row and show the full whitelist by default.
-        _tagFilterSection = CreateFilterSection(
-            controlsScroll,
-            CollectionPanelText.TagHeader(),
-            UiSpacing.Lg,
-            out _tagChipRow,
-            out _tagFilterLabel,
-            out var tagHeaderRow
-        );
-        _tagMatchModeButton = CreateFacetMatchModeButton(_toggleTagMatchMode);
-        tagHeaderRow.Add(_tagMatchModeButton);
-        _tagChipRow.style.flexWrap = Wrap.Wrap;
-        _tagChipRow.style.justifyContent = Justify.FlexStart;
-
-        // Keyword filter (EHiddenTag gameplay keywords). Keep this above merchant/trainer sources;
-        // Refresh decides per tab whether the row is visible.
+        // Keyword filter (EHiddenTag gameplay keywords). This is the common secondary filter for
+        // Items, Packages, and Skills, so keep it directly below Quality.
         _keywordFilterSection = CreateFilterSection(
             controlsScroll,
             CollectionPanelText.KeywordHeader(),
@@ -197,6 +183,21 @@ internal sealed partial class CollectionPanelView
         keywordHeaderRow.Add(_keywordMatchModeButton);
         _keywordChipRow.style.flexWrap = Wrap.Wrap;
         _keywordChipRow.style.justifyContent = Justify.FlexStart;
+
+        // Tag filter (player-facing item categories). Items/Packages show this below gameplay
+        // keywords; Skills hide it and source filters move up naturally.
+        _tagFilterSection = CreateFilterSection(
+            controlsScroll,
+            CollectionPanelText.TagHeader(),
+            UiSpacing.Lg,
+            out _tagChipRow,
+            out _tagFilterLabel,
+            out var tagHeaderRow
+        );
+        _tagMatchModeButton = CreateFacetMatchModeButton(_toggleTagMatchMode);
+        tagHeaderRow.Add(_tagMatchModeButton);
+        _tagChipRow.style.flexWrap = Wrap.Wrap;
+        _tagChipRow.style.justifyContent = Justify.FlexStart;
 
         // Source filter (merchant portraits on Items, trainer portraits on Skills).
         _sourceFilterSection = CreateFilterSection(
@@ -244,6 +245,7 @@ internal sealed partial class CollectionPanelView
         row.style.flexDirection = FlexDirection.Row;
         row.style.alignItems = Align.Center;
         row.style.flexWrap = Wrap.Wrap;
+        row.style.flexShrink = 0f;
         row.style.marginTop = marginTop;
         return row;
     }

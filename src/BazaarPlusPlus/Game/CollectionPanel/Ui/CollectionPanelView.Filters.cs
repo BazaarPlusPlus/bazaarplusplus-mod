@@ -116,14 +116,7 @@ internal sealed partial class CollectionPanelView
 
     private void RefreshFacetChips(CollectionPanelViewModel model)
     {
-        if (model.TabProfile.ShowTagFilter)
-        {
-            EnsureTagChips(model.AvailableTags);
-        }
-        else
-        {
-            ClearTagFacetRow();
-        }
+        EnsureTagChips(model.AvailableTags);
 
         if (model.TabProfile.ShowKeywordFilter)
         {

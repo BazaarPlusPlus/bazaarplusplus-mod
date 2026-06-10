@@ -285,6 +285,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         // SetVisible starts the fade-in ramp; overlay activates so its CanvasGroup starts
         // mirroring the view's opacity (Update pushes the live value each frame).
         _view!.SetVisible(true);
+        _view.ResetControlsScroll();
         _overlay?.SetVisible(true);
         _overlay?.SetAlpha(_view!.CurrentOpacity);
         StartPanelLoad();
@@ -489,6 +490,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
+                _view?.ResetControlsScroll();
             },
             toggleHero: hero =>
             {
@@ -498,6 +500,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
+                _view?.ResetControlsScroll();
             },
             toggleTier: tier =>
             {
@@ -506,6 +509,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _scrollY = 0f;
                 ApplyFilters();
                 RefreshView();
+                _view?.ResetControlsScroll();
             },
             toggleDayFilter: () =>
             {
@@ -826,7 +830,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
 
         var profile = CollectionTabProfile.For(_filter.ActiveType);
-        var availableTags = CollectionFacetAvailability.TagsFor(_catalogCards, _filter.ActiveType);
+        var availableTags = CollectionFacetAvailability.TagsFor(_catalogCards, ECardType.Item);
         var availableKeywords = CollectionFacetAvailability.KeywordsFor(
             _catalogCards,
             _filter.ActiveType
