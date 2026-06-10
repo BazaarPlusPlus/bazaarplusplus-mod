@@ -754,6 +754,39 @@ AssertSet(
     new[] { fixedHeroCards[0].Id },
     "FixedHero rules should use the source hero, not the selected UI hero."
 );
+var fixedHeroTrainerEntry = BuildSingleEntry(
+    "Fixed Vanessa Trainer",
+    CollectionSourceKind.Trainer,
+    """{ "heroMode": "FixedHero", "hero": "Vanessa" }"""
+);
+var fixedHeroTrainerCards = new[]
+{
+    CatalogCard(
+        Guid.Parse("bbbbbbbb-1000-0000-0000-000000000001"),
+        ECardType.Skill,
+        [EHero.Vanessa]
+    ),
+    CatalogCard(
+        Guid.Parse("bbbbbbbb-1000-0000-0000-000000000002"),
+        ECardType.Skill,
+        [EHero.Vanessa, EHero.Dooley]
+    ),
+    CatalogCard(
+        Guid.Parse("bbbbbbbb-1000-0000-0000-000000000003"),
+        ECardType.Skill,
+        [EHero.Dooley]
+    ),
+};
+var fixedHeroTrainerResult = CollectionSourceOfferPoolResolver.Resolve(
+    fixedHeroTrainerEntry,
+    EHero.Dooley,
+    fixedHeroTrainerCards
+);
+AssertSet(
+    fixedHeroTrainerResult.OfferedCardIds,
+    new[] { fixedHeroTrainerCards[0].Id },
+    "FixedHero trainer rules should teach only skills exclusive to the fixed hero."
+);
 
 var allHeroEntry = BuildSingleEntry(
     "All Crit",

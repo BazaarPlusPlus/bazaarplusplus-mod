@@ -45,20 +45,21 @@ internal static class CollectionSourceOfferPoolResolver
         var matches = new List<CollectionSourceOfferMatch>();
         foreach (var segment in source.OfferSegments)
         {
-            AddSegmentMatches(matches, segment, selectedHero, card);
+            AddSegmentMatches(matches, source.Kind, segment, selectedHero, card);
         }
         return matches;
     }
 
     private static void AddSegmentMatches(
         List<CollectionSourceOfferMatch> matches,
+        CollectionSourceKind sourceKind,
         CollectionSourceOfferSegment segment,
         EHero? selectedHero,
         CollectionCardVm card
     )
     {
         var rule = segment.Rule;
-        if (!MatchesBaseRule(rule, selectedHero, card))
+        if (!MatchesBaseRule(sourceKind, rule, selectedHero, card))
             return;
 
         if (segment.Kind == CollectionSourceOfferSegmentKind.Enchanted)
@@ -88,12 +89,13 @@ internal static class CollectionSourceOfferPoolResolver
     }
 
     private static bool MatchesBaseRule(
+        CollectionSourceKind sourceKind,
         CollectionSourceOfferRule rule,
         EHero? selectedHero,
         CollectionCardVm card
     )
     {
-        if (!MatchesHero(rule, selectedHero, card.Heroes))
+        if (!MatchesHero(sourceKind, rule, selectedHero, card.Heroes))
             return false;
         if (rule.StartingTier != null && !MatchesStartingTier(rule.StartingTier, card.StartingTier))
             return false;
@@ -152,6 +154,7 @@ internal static class CollectionSourceOfferPoolResolver
         kind == CollectionSourceKind.Trainer ? ECardType.Skill : ECardType.Item;
 
     private static bool MatchesHero(
+        CollectionSourceKind sourceKind,
         CollectionSourceOfferRule rule,
         EHero? selectedHero,
         IReadOnlyCollection<EHero> cardHeroes
@@ -163,7 +166,11 @@ internal static class CollectionSourceOfferPoolResolver
                 return true;
 
             case CollectionSourceHeroMode.FixedHero:
-                return rule.Hero.HasValue && Contains(cardHeroes, rule.Hero.Value);
+                if (!rule.Hero.HasValue)
+                    return false;
+                return sourceKind == CollectionSourceKind.Trainer
+                    ? MatchesExclusiveHero(cardHeroes, rule.Hero.Value)
+                    : Contains(cardHeroes, rule.Hero.Value);
 
             case CollectionSourceHeroMode.NeutralOnly:
                 return Contains(cardHeroes, EHero.Common);
@@ -177,6 +184,9 @@ internal static class CollectionSourceOfferPoolResolver
                 return false;
         }
     }
+
+    private static bool MatchesExclusiveHero(IReadOnlyCollection<EHero> cardHeroes, EHero hero) =>
+        cardHeroes.Count == 1 && Contains(cardHeroes, hero);
 
     private static bool MatchesStartingTier(
         CollectionSourceStartingTierRule rule,
