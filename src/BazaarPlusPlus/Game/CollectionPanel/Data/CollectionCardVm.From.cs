@@ -34,7 +34,7 @@ internal sealed partial class CollectionCardVm
             StartingTier = template.StartingTier,
             Heroes = template.Heroes,
             Tags = template.Tags,
-            HiddenTags = template.HiddenTags,
+            HiddenTags = CollectionDerivedKeywordFacts.ProjectHiddenTags(template),
             DisplayName =
                 CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName,
             InternalName = template.InternalName,

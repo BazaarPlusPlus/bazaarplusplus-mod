@@ -25,6 +25,18 @@
       Link="CollectionCardVm.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardVm.From.cs"
+      Link="CollectionCardVm.From.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionDerivedKeywordFacts.cs"
+      Link="CollectionDerivedKeywordFacts.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionLocalizationResolver.cs"
+      Link="CollectionLocalizationResolver.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionFilterEngine.cs"
       Link="CollectionFilterEngine.cs"
     />

@@ -1,3 +1,4 @@
+using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
@@ -576,6 +577,84 @@ AssertSequence(
     ),
     new[] { damageItem.Id },
     "Item tags and item keywords combine as separate AND facets."
+);
+
+var derivedLifestealTemplate = new TCardItem
+{
+    Id = Guid.NewGuid(),
+    Type = ECardType.Item,
+    StartingTier = ETier.Bronze,
+    Size = ECardSize.Medium,
+    InternalName = "Derived Lifesteal Weapon",
+    ArtKey = "Assets/Cards/DerivedLifestealWeapon.png",
+    Tags = new HashSet<ECardTag> { ECardTag.Weapon },
+    HiddenTags = new HashSet<EHiddenTag>(),
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = new TCardTier
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Lifesteal] = 100,
+            },
+        },
+    },
+};
+var derivedLifestealVm = CollectionCardVm.From(derivedLifestealTemplate);
+AssertTrue(
+    derivedLifestealVm.HiddenTags.Contains(EHiddenTag.Lifesteal),
+    "CollectionCardVm.From should derive Lifesteal from positive item attributes."
+);
+AssertFalse(
+    derivedLifestealTemplate.HiddenTags.Contains(EHiddenTag.Lifesteal),
+    "Derived Lifesteal projection should not mutate the source game template HiddenTags."
+);
+AssertValues(
+    CollectionFacetAvailability
+        .KeywordsFor(new[] { derivedLifestealVm }, ECardType.Item)
+        .Select(tag => tag.ToString())
+        .ToArray(),
+    new[] { nameof(EHiddenTag.Lifesteal) },
+    "Available item keywords should include Lifesteal derived from item attributes."
+);
+var noLifestealTemplate = new TCardItem
+{
+    Id = Guid.NewGuid(),
+    Type = ECardType.Item,
+    StartingTier = ETier.Bronze,
+    Size = ECardSize.Medium,
+    InternalName = "No Lifesteal Weapon",
+    ArtKey = "Assets/Cards/NoLifestealWeapon.png",
+    Tags = new HashSet<ECardTag> { ECardTag.Weapon },
+    HiddenTags = new HashSet<EHiddenTag>(),
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = new TCardTier
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Lifesteal] = 0,
+            },
+        },
+    },
+};
+var noLifestealVm = CollectionCardVm.From(noLifestealTemplate);
+var lifestealFilter = new CollectionFilterState();
+lifestealFilter.Keywords.Add(EHiddenTag.Lifesteal);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { noLifestealVm, derivedLifestealVm }, lifestealFilter),
+    new[] { derivedLifestealVm.Id },
+    "Lifesteal keyword filtering should include derived Lifesteal VMs and exclude non-positive attributes."
+);
+var allLifestealFilter = new CollectionFilterState
+{
+    KeywordMatchMode = CollectionFacetMatchMode.All,
+};
+allLifestealFilter.Keywords.Add(EHiddenTag.Lifesteal);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { noLifestealVm, derivedLifestealVm }, allLifestealFilter),
+    new[] { derivedLifestealVm.Id },
+    "All keyword mode should still match a VM with derived Lifesteal when Lifesteal is the only selected keyword."
 );
 
 AssertEqual(
