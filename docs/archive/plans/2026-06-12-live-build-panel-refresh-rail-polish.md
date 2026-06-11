@@ -1,7 +1,10 @@
 ---
-status: active
-calibrated: 2026-06-12
+status: implemented
+archived: 2026-06-12
+superseded-by: code
 ---
+
+> Status: IMPLEMENTED. `SupporterAttributionCount=4`, per-hero `HeroBuildCounts` corpus summary, and the fixed refresh strip all shipped (HEAD merge "live build pull strip and corpus detail", verified `LiveBuildPanel.cs:31,138`, `TenWinCorpusSummary.cs:30`). Retained as the design record.
 
 # Live Build Panel Refresh Rail Polish Implementation Plan
 
