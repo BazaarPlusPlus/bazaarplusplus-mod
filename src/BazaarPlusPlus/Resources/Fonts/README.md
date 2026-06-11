@@ -3,8 +3,8 @@
 `LXGWWenKai-Regular.ttf` is a subset of LXGW WenKai Regular from the
 Homebrew `font-lxgw-wenkai` cask. It keeps Latin, common UI symbols, CJK
 punctuation, fullwidth forms, and the main CJK Unified Ideographs block so
-runtime Chinese card tooltip text still has broad coverage without embedding
-the full upstream font.
+BPP-owned Chinese UI text still has broad coverage without embedding the full
+upstream font.
 
 Regenerate with fontTools from a locally installed cask font:
 
