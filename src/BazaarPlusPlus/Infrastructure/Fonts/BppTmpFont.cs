@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Runtime.CompilerServices;
 using TMPro;
 using UnityEngine;
 using UnityEngine.TextCore;
@@ -16,16 +17,24 @@ internal static class BppTmpFont
 
     private static TMP_FontAsset? _default;
     private static bool _loadFailureLogged;
+    private static readonly ConditionalWeakTable<TMP_Text, FontSnapshot> OriginalFonts = new();
 
-    public static bool TryApply(TextMeshProUGUI? text, string? sampleText)
+    public static bool TryApply(TMP_Text? text, string? sampleText)
     {
-        if (text == null || !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(sampleText))
+        if (text == null)
             return false;
+
+        if (!BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(sampleText))
+        {
+            RestoreOriginal(text);
+            return false;
+        }
 
         var fontAsset = ResolveDefault();
         if (fontAsset == null)
             return false;
 
+        CaptureOriginal(text);
         text.font = fontAsset;
         if (fontAsset.material != null)
             text.fontSharedMaterial = fontAsset.material;
@@ -57,7 +66,7 @@ internal static class BppTmpFont
                 return null;
             }
 
-            fontAsset.name = "BPP SourceHanSansCN TMP";
+            fontAsset.name = "BPP LXGWWenKai TMP";
             _default = fontAsset;
             BppLog.Info(Component, $"Loaded TMP UI font '{fontAsset.name}'.");
             return _default;
@@ -84,6 +93,28 @@ internal static class BppTmpFont
         }
     }
 
+    private static void CaptureOriginal(TMP_Text text)
+    {
+        if (OriginalFonts.TryGetValue(text, out _))
+            return;
+
+        OriginalFonts.Add(
+            text,
+            new FontSnapshot { Font = text.font, SharedMaterial = text.fontSharedMaterial }
+        );
+    }
+
+    private static void RestoreOriginal(TMP_Text text)
+    {
+        if (!OriginalFonts.TryGetValue(text, out var snapshot))
+            return;
+
+        if (snapshot.Font != null)
+            text.font = snapshot.Font;
+        if (snapshot.SharedMaterial != null)
+            text.fontSharedMaterial = snapshot.SharedMaterial;
+    }
+
     private static void LogLoadFailure(string reason)
     {
         if (_loadFailureLogged)
@@ -91,5 +122,11 @@ internal static class BppTmpFont
 
         _loadFailureLogged = true;
         BppLog.Warn(Component, $"Failed to load embedded TMP UI font. {reason}");
+    }
+
+    private sealed class FontSnapshot
+    {
+        public TMP_FontAsset? Font { get; init; }
+        public Material? SharedMaterial { get; init; }
     }
 }

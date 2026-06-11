@@ -82,6 +82,10 @@ static void TestTmpFontPolicyDetectsCjkText()
         !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont("Supported by Alice"),
         "TMP font policy should leave pure Latin text on the existing TMP font."
     );
+    Assert(
+        !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont("㐀"),
+        "TMP font policy should leave Extension A characters on the existing TMP fallback chain."
+    );
 }
 
 static void TestStablePanelTextCompactionKeepsStableSlots()

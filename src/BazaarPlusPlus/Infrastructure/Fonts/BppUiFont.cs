@@ -11,9 +11,8 @@ namespace BazaarPlusPlus.Infrastructure.Fonts;
 internal static class BppUiFont
 {
     private const string Component = "UiFont";
-    private const string FontFileName = "SourceHanSansCN-Regular.otf";
-    private const string ResourceName =
-        "BazaarPlusPlus.Resources.Fonts.SourceHanSansCN-Regular.otf";
+    private const string FontFileName = "LXGWWenKai-Regular.ttf";
+    private const string ResourceName = "BazaarPlusPlus.Resources.Fonts.LXGWWenKai-Regular.ttf";
 
     private static Font? _default;
 

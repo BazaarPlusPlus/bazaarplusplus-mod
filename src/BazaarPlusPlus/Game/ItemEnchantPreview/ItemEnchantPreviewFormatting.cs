@@ -3,6 +3,7 @@ using System;
 using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Fonts;
 using TheBazaar.Tooltips;
 using TheBazaar.Utilities;
 
@@ -16,9 +17,14 @@ public static class ItemEnchantPreviewFormatting
     private const int PrefixSizePercent = 60;
     private const int EffectSizePercent = 55;
     private const string EnchantmentPrefix = "\u00A0\u00A0· ";
+    private const string CjkLineHeight = "<line-height=1.15em>";
 
     private static readonly Regex SizeTagRegex = new Regex(
         "<size=(\\d+)%>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant
+    );
+    private static readonly Regex NativeLineHeightRegex = new Regex(
+        "<line-height=1\\.6em>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant
     );
 
@@ -29,7 +35,10 @@ public static class ItemEnchantPreviewFormatting
     {
         var enchantmentLabel = GetEnchantmentLabel(enchantmentType);
         var colorHex = GetEnchantmentColorHex(enchantmentType);
-        var scaledText = ScaleInlineSizes(renderedText, EffectSizePercent / 100f);
+        var scaledText = ScaleInlineSizes(
+            NormalizeNativeLineHeight(renderedText),
+            EffectSizePercent / 100f
+        );
 
         return new TooltipSegment(
             $"<size={PrefixSizePercent}%>{EnchantmentPrefix}<color=#{colorHex}>{enchantmentLabel}</color>: </size><size={EffectSizePercent}%>{scaledText}</size>",
@@ -37,6 +46,14 @@ public static class ItemEnchantPreviewFormatting
             null,
             -1
         );
+    }
+
+    internal static string NormalizeNativeLineHeight(string text)
+    {
+        if (!BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(text))
+            return text;
+
+        return NativeLineHeightRegex.Replace(text, CjkLineHeight);
     }
 
     private static string ScaleInlineSizes(string text, float scale)

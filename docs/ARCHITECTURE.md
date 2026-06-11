@@ -94,7 +94,7 @@ The current BPP hotkey conflict check compares BPP actions against other BPP act
 
 `BazaarPlusPlus.Localization` is the localization resolution engine. The `L` facade is installed at plugin startup with language and locale-mode providers, then resolves `LocalizedTextSet` values against current language and Chinese locale mode (`src/BazaarPlusPlus.Localization/L.cs:11-30`, `src/BazaarPlusPlus/Plugin.cs:107-109`).
 
-CJK text is handled with an embedded Source Han Sans font. `BppUiFont` extracts `SourceHanSansCN-Regular.otf` from embedded resources to a BepInEx cache path and loads it as a Unity `Font` (`src/BazaarPlusPlus/Infrastructure/Fonts/BppUiFont.cs:14-40`). The font and license are embedded by the main project (`src/BazaarPlusPlus/BazaarPlusPlus.csproj:31-32`).
+CJK text is handled with an embedded LXGW WenKai font. `BppUiFont` extracts `LXGWWenKai-Regular.ttf` from embedded resources to a BepInEx cache path and loads it as a Unity `Font` (`src/BazaarPlusPlus/Infrastructure/Fonts/BppUiFont.cs:14-40`). The font and license are embedded by the main project (`src/BazaarPlusPlus/BazaarPlusPlus.csproj:31-32`). The font file is subset by Unicode range rather than by the current source strings so runtime Chinese card tooltip text keeps broad glyph coverage (`src/BazaarPlusPlus/Resources/Fonts/README.md:1-15`).
 
 ## Supporter Attribution
 

@@ -155,6 +155,27 @@ Assert(
     "Formatted segments should contain both the enchantment label and rendered body text."
 );
 
+var cjkSegment = ItemEnchantPreviewFormatting.CreateSegment(
+    EEnchantmentType.Icy,
+    "<line-height=1.6em>冰冷时获得护盾</line-height>"
+);
+
+Assert(
+    cjkSegment.Text.Contains("<line-height=1.15em>")
+        && !cjkSegment.Text.Contains("<line-height=1.6em>"),
+    "CJK enchant preview text should compact the game's native tooltip line height."
+);
+
+var englishLineHeightSegment = ItemEnchantPreviewFormatting.CreateSegment(
+    EEnchantmentType.Icy,
+    "<line-height=1.6em>Freeze for 2 seconds</line-height>"
+);
+
+Assert(
+    englishLineHeightSegment.Text.Contains("<line-height=1.6em>"),
+    "Non-CJK enchant preview text should preserve the game's native tooltip line height."
+);
+
 var passivePatchType = RequireType("BazaarPlusPlus.Patches.Tooltips.CardTooltipDataPassivePatch");
 var appendTooltipText = passivePatchType.GetMethod(
     "AppendTooltipText",
