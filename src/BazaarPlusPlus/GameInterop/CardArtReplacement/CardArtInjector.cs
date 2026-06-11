@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards;
 using BazaarPlusPlus.GameInterop.Cards;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.Game.CardFrames;
 using TheBazaar.Utilities.Shaders;
@@ -56,9 +57,35 @@ internal static class CardArtInjector
         return false;
     }
 
-    public static bool IsPackageCard(Card? card) => PackageIdentity.IsPackage(card?.HiddenTags);
+    public static bool IsPackageCard(Card? card)
+    {
+        if (card == null)
+            return false;
+
+        if (PackageIdentity.IsPackage(card.HiddenTags))
+            return true;
+
+        if (IsPackageTemplate(card.Template))
+            return true;
+
+        try
+        {
+            var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
+            return IsPackageTemplate(
+                BppStaticDataAccess.GetCardTemplate(staticData, card.TemplateId)
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Debug(LogCategory, $"Static package identity lookup failed: {ex.Message}");
+            return false;
+        }
+    }
 
     public static bool IsPackageTemplate(TCardBase? card) =>
+        PackageIdentity.IsPackage(card?.HiddenTags);
+
+    private static bool IsPackageTemplate(ITCard? card) =>
         PackageIdentity.IsPackage(card?.HiddenTags);
 
     public static bool Apply(ItemVisualsController visuals, Texture2D texture)

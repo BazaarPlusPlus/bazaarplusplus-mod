@@ -1,6 +1,9 @@
 using System.Runtime.CompilerServices;
+using BazaarGameShared.Domain.Cards.Item;
+using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.CardArtReplacement;
+using BazaarPlusPlus.GameInterop.CardArtReplacement;
 using BepInEx.Configuration;
 using UnityEngine;
 using Xunit;
@@ -81,7 +84,10 @@ public sealed class CardArtReplacementTests : IDisposable
             .Assembly.GetManifestResourceNames()
             .Where(name =>
                 name.StartsWith("BazaarPlusPlus.Resources.CustomCardArt.", StringComparison.Ordinal)
-                && name.EndsWith(CustomCardArtImageFormats.Extension, StringComparison.OrdinalIgnoreCase)
+                && name.EndsWith(
+                    CustomCardArtImageFormats.Extension,
+                    StringComparison.OrdinalIgnoreCase
+                )
             )
             .ToArray();
 
@@ -122,6 +128,60 @@ public sealed class CardArtReplacementTests : IDisposable
             [0x09, 0x08, 0x07],
             File.ReadAllBytes(Path.Combine(_tempDir, $"{missingTemplateId}.jpg"))
         );
+    }
+
+    [Fact]
+    public void Package_identity_accepts_runtime_hidden_tag()
+    {
+        var card = new BazaarGameClient.Domain.Models.Cards.Card
+        {
+            TemplateId = Guid.NewGuid(),
+            HiddenTags = new HashSet<EHiddenTag> { EHiddenTag.Package },
+        };
+
+        Assert.True(CardArtInjector.IsPackageCard(card));
+    }
+
+    [Fact]
+    public void Package_identity_accepts_template_hidden_tag_when_runtime_tags_are_empty()
+    {
+        var templateId = Guid.NewGuid();
+        var card = new BazaarGameClient.Domain.Models.Cards.Card
+        {
+            TemplateId = templateId,
+            HiddenTags = new HashSet<EHiddenTag>(),
+            Template = new TCardItem
+            {
+                Id = templateId,
+                Type = ECardType.Item,
+                ArtKey = "Assets/Cards/Package.png",
+                InternalName = "Package Template",
+                HiddenTags = new HashSet<EHiddenTag> { EHiddenTag.Package },
+            },
+        };
+
+        Assert.True(CardArtInjector.IsPackageCard(card));
+    }
+
+    [Fact]
+    public void Package_identity_rejects_template_without_package_hidden_tag()
+    {
+        var templateId = Guid.NewGuid();
+        var card = new BazaarGameClient.Domain.Models.Cards.Card
+        {
+            TemplateId = templateId,
+            HiddenTags = new HashSet<EHiddenTag>(),
+            Template = new TCardItem
+            {
+                Id = templateId,
+                Type = ECardType.Item,
+                ArtKey = "Assets/Cards/Package.png",
+                InternalName = "Package Name Without Hidden Tag",
+                HiddenTags = new HashSet<EHiddenTag>(),
+            },
+        };
+
+        Assert.False(CardArtInjector.IsPackageCard(card));
     }
 
     [Fact]

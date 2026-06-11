@@ -18,8 +18,8 @@ namespace BazaarPlusPlus.Patches.CardArtReplacement;
 )]
 internal static class ItemVisualsSetupCardArtIdentityPatch
 {
-    [HarmonyPostfix]
-    private static void Postfix(ItemVisualsController __instance, Card card)
+    [HarmonyPrefix]
+    private static void Prefix(ItemVisualsController __instance, Card card)
     {
         CardArtInjector.TrackCard(__instance, card);
     }
