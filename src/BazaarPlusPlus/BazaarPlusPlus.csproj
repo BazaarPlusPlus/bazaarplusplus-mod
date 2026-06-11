@@ -285,7 +285,7 @@
     <Message Text="[BazaarPlusPlus] Building for Release" Importance="high" />
     <WriteLinesToFile
       File="$(TargetDir)$(TargetName).version"
-      Lines="$(Version).preview"
+      Lines="$(Version).prod"
       Overwrite="true"
     />
     <ItemGroup>
