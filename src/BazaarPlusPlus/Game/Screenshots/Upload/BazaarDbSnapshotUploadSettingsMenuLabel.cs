@@ -7,12 +7,12 @@ namespace BazaarPlusPlus.Game.Screenshots.Upload;
 internal static class BazaarDbSnapshotUploadSettingsMenuLabel
 {
     private static readonly LocalizedTextSet Labels = new(
-        "Upload screenshots to BazaarDB",
+        "BazaarDB upload",
         "BazaarDB 数据共建",
-        "Screenshots zu BazaarDB hochladen",
-        "Subir capturas a BazaarDB",
-        "스크린샷을 BazaarDB에 업로드",
-        "Carica gli screenshot su BazaarDB"
+        "BazaarDB-Upload",
+        "Subir a BazaarDB",
+        "BazaarDB 업로드",
+        "Carica su BazaarDB"
     );
 
     internal static string Resolve(string languageCode)
