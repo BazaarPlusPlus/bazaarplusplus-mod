@@ -13,4 +13,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/BazaarPlusPlus/BazaarPlusPlus.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../Shared/LocalizationTestBootstrap.cs" Link="LocalizationTestBootstrap.cs" />
+  </ItemGroup>
 </Project>

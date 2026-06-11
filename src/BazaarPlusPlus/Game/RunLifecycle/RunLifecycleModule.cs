@@ -74,14 +74,14 @@ internal sealed class RunLifecycleModule : IBppFeature
     {
         _runContext.CurrentServerRunId = null;
         _runContext.LastRunExitKind = RunExitKind.Completed;
-        SetInGameRun(false, "Run ended");
+        SetInGameRun(false, RunLifecycleReasons.RunEnded);
     }
 
     private void OnRunInterrupted()
     {
         _runContext.CurrentServerRunId = null;
         _runContext.LastRunExitKind = RunExitKind.Interrupted;
-        SetInGameRun(false, "Run interrupted");
+        SetInGameRun(false, RunLifecycleReasons.RunInterrupted);
     }
 
     private void SetInGameRun(bool inGameRun, string reason)

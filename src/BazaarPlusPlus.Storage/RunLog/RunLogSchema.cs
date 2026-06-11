@@ -37,6 +37,8 @@ public static class RunLogSchema
 
     public static string CaptureSourceEndOfRunAuto => "end_of_run_auto";
 
+    public static string GameModeRanked => "Ranked";
+
     public static string RunCheckpointsTableName => RunsTableName;
 
     public static string RunStatusTableName => RunsTableName;

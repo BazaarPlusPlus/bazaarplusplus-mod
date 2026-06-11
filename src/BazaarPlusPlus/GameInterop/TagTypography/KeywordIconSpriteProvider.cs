@@ -17,9 +17,20 @@ internal static class KeywordIconSpriteProvider
 {
     private static readonly Dictionary<string, Sprite> Cache = new(StringComparer.Ordinal);
     private static readonly HashSet<string> MissesThisPass = new(StringComparer.Ordinal);
-    private static TMP_SpriteAsset? _spriteAsset;
 
-    public static void BeginResolvePass() => MissesThisPass.Clear();
+    // Cached collection of all sprite assets discovered during the last full scan.
+    // Null means no full scan has been performed yet.
+    private static TMP_SpriteAsset[]? _discoveredAssets;
+
+    // Set to true at the start of each pass; cleared after a full scan runs within that pass.
+    // This ensures at most one expensive scan per BeginResolvePass call.
+    private static bool _freshScanAllowedThisPass = true;
+
+    public static void BeginResolvePass()
+    {
+        MissesThisPass.Clear();
+        _freshScanAllowedThisPass = true;
+    }
 
     public static Sprite? Resolve(string iconName)
     {
@@ -58,23 +69,55 @@ internal static class KeywordIconSpriteProvider
 
     private static TMP_SpriteAsset? ResolveSpriteAsset(string iconName)
     {
-        if (_spriteAsset != null && _spriteAsset.GetSpriteIndexFromName(iconName) >= 0)
-            return _spriteAsset;
+        // Fast path: search already-discovered assets without allocating.
+        if (_discoveredAssets != null)
+        {
+            foreach (var asset in _discoveredAssets)
+            {
+                if (asset != null && asset.GetSpriteIndexFromName(iconName) >= 0)
+                    return asset;
+            }
+
+            // Cached collection doesn't have it. Allow a fresh scan only once per pass so
+            // late-loaded assets (added after the last scan) can still be found.
+            if (!_freshScanAllowedThisPass)
+                return null;
+        }
+
+        // Full scan: collect all TMP sprite assets reachable from live TMP_Text components
+        // first (higher probability of being the right asset), then any standalone assets.
+        _freshScanAllowedThisPass = false;
+        _discoveredAssets = CollectAllSpriteAssets();
+
+        foreach (var asset in _discoveredAssets)
+        {
+            if (asset != null && asset.GetSpriteIndexFromName(iconName) >= 0)
+                return asset;
+        }
+
+        return null;
+    }
+
+    private static TMP_SpriteAsset[] CollectAllSpriteAssets()
+    {
+        // Use a set keyed by instance ID to avoid duplicates without LINQ.
+        var seen = new HashSet<int>();
+        var result = new List<TMP_SpriteAsset>();
 
         foreach (var text in Resources.FindObjectsOfTypeAll<TMP_Text>())
         {
             var asset = text != null ? text.spriteAsset : null;
-            if (asset != null && asset.GetSpriteIndexFromName(iconName) >= 0)
-                return _spriteAsset = asset;
+            if (asset != null && seen.Add(asset.GetInstanceID()))
+                result.Add(asset);
         }
 
         foreach (var asset in Resources.FindObjectsOfTypeAll<TMP_SpriteAsset>())
         {
-            if (asset != null && asset.GetSpriteIndexFromName(iconName) >= 0)
-                return _spriteAsset = asset;
+            if (asset != null && seen.Add(asset.GetInstanceID()))
+                result.Add(asset);
         }
 
-        return null;
+        return result.ToArray();
     }
 
     private static Sprite? ExtractSprite(TMP_SpriteAsset asset, string iconName)

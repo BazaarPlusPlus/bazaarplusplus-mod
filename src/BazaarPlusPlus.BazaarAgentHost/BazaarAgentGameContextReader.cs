@@ -136,13 +136,21 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 
         var sellableItems = BuildSellableItems(boardItems, chestItems, canSell);
 
+        // Compute occupied sockets once per build — placement hints, MoveItem emission,
+        // and SelectItem enumeration all read the same immutable-during-build containers.
+        var handContainer = (run?.Player?.Hand as CardContainer)?.Container;
+        var stashContainer = (run?.Player?.Stash as CardContainer)?.Container;
+        var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
+        var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
+
         // Selection set
         List<BazaarAgentCardSnapshot> selectionOptions = BuildSelectionOptions(
             runState,
             playerGold,
             selectionIsFree,
-            run,
-            canHandleOp(StateOps.SelectItem)
+            canHandleOp(StateOps.SelectItem),
+            occupiedHand,
+            occupiedStash
         );
 
         // Target-selection mode (upgrade/enchant): when AppState._iteractionFilter
@@ -167,6 +175,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             canMove,
             canSell,
             run,
+            occupiedHand,
+            occupiedStash,
             targeting.PedestalEligibleInstanceIds
         );
 
@@ -395,20 +405,14 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         RunState? runState,
         int playerGold,
         bool selectionIsFree,
-        Run? run,
-        bool canSelectItem
+        bool canSelectItem,
+        HashSet<int> occupiedHand,
+        HashSet<int> occupiedStash
     )
     {
         var result = new List<BazaarAgentCardSnapshot>();
         if (runState?.SelectionSet == null)
             return result;
-
-        var handContainer = (run?.Player?.Hand as CardContainer)?.Container;
-        var stashContainer = (run?.Player?.Stash as CardContainer)?.Container;
-
-        // Compute occupied sockets for placement hints
-        var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
-        var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
 
         int handCapacity = SocketedContainer.SocketCount;
         int stashCapacity = SocketedContainer.SocketCount;
@@ -532,6 +536,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         bool canMove,
         bool canSell,
         Run? run,
+        HashSet<int> occupiedHand,
+        HashSet<int> occupiedStash,
         HashSet<string> pedestalEligibleIds
     )
     {
@@ -623,28 +629,12 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         // 7. MoveItem — per-card per-placement (board + chest)
         if (canMove && canHandleOp(StateOps.MoveItem) && run?.Player != null)
         {
-            var handContainer = (run.Player.Hand as CardContainer)?.Container;
-            var stashContainer = (run.Player.Stash as CardContainer)?.Container;
             int cap = SocketedContainer.SocketCount;
 
-            var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
-            var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
-
-            EmitMoveActions(
-                actions,
-                boardItems,
-                handContainer,
-                stashContainer,
-                occupiedHand,
-                occupiedStash,
-                cap,
-                isOwnHand: true
-            );
+            EmitMoveActions(actions, boardItems, occupiedHand, occupiedStash, cap, isOwnHand: true);
             EmitMoveActions(
                 actions,
                 chestItems,
-                handContainer,
-                stashContainer,
                 occupiedHand,
                 occupiedStash,
                 cap,
@@ -661,12 +651,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             if (offer.Kind == BazaarAgentCardKind.Item && canHandleOp(StateOps.SelectItem))
             {
                 // Enumerate legal placements (same logic as in BuildSelectionOptions but authoritative)
-                int size = ParseSize(offer.Size);
-                var handContainer = (run?.Player?.Hand as CardContainer)?.Container;
-                var stashContainer = (run?.Player?.Stash as CardContainer)?.Container;
+                int size = BazaarAgentCardSize.Parse(offer.Size, fallback: 0);
                 int cap = SocketedContainer.SocketCount;
-                var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
-                var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
 
                 foreach (
                     var placement in BazaarAgentMoveTargetPlanner.Enumerate(size, cap, occupiedHand)
@@ -795,8 +781,6 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
     private static void EmitMoveActions(
         List<BazaarAgentDecisionOption> actions,
         IReadOnlyList<BazaarAgentCardSnapshot> cards,
-        SocketedContainer? handContainer,
-        SocketedContainer? stashContainer,
         ISet<int> occupiedHand,
         ISet<int> occupiedStash,
         int cap,
@@ -805,7 +789,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
     {
         foreach (var card in cards)
         {
-            int size = ParseSize(card.Size);
+            int size = BazaarAgentCardSize.Parse(card.Size, fallback: 0);
 
             // Hand placements
             var ownLeftSocket = isOwnHand ? ParseSocketIndex(card.SocketId) : -1;
@@ -888,17 +872,6 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             yield return c;
         foreach (var c in chest)
             yield return c;
-    }
-
-    private static int ParseSize(string? size)
-    {
-        return size switch
-        {
-            "Small" => 1,
-            "Medium" => 2,
-            "Large" => 3,
-            _ => 0,
-        };
     }
 
     private static int ParseSocketIndex(string? socketId)

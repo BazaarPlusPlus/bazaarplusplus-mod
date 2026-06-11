@@ -90,6 +90,10 @@
       Link="BppItemBoardSpan.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/Cards/CardSizeSpan.cs"
+      Link="CardSizeSpan.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardType.cs"
       Link="BppItemBoardType.cs"
     />

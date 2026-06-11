@@ -47,7 +47,7 @@ internal static class TooltipPreviewTargetResolver
             .GetValue<CardTooltipController>();
         if (primaryController == null)
         {
-            BppLog.Info("TooltipPreview", "ResolverSkipped reason=no-primary-controller");
+            BppLog.Debug("TooltipPreview", "ResolverSkipped reason=no-primary-controller");
             return false;
         }
 
@@ -57,7 +57,7 @@ internal static class TooltipPreviewTargetResolver
         );
         if (tooltipData?.CardInstance is not ItemCard itemCard)
         {
-            BppLog.Info(
+            BppLog.Debug(
                 "TooltipPreview",
                 $"ResolverSkipped reason=no-item-tooltip-data primaryCurrentCard={DescribeCard(primaryController.CurrentCard)} primaryTooltipCard={DescribeTooltipDataCard(primaryController.CurrentTooltipData)}"
             );
@@ -67,7 +67,7 @@ internal static class TooltipPreviewTargetResolver
         var cardController = TryResolveCardController(itemCard, primaryController.CurrentCard);
         if (cardController?.CardData is not ItemCard controllerItemCard)
         {
-            BppLog.Info(
+            BppLog.Debug(
                 "TooltipPreview",
                 $"ResolverSkipped reason=no-card-controller tooltipCard={DescribeCard(itemCard)} primaryCurrentCard={DescribeCard(primaryController.CurrentCard)}"
             );
@@ -76,7 +76,7 @@ internal static class TooltipPreviewTargetResolver
 
         if (!TooltipPreviewTargetSelection.AreSameCard(controllerItemCard, itemCard))
         {
-            BppLog.Info(
+            BppLog.Debug(
                 "TooltipPreview",
                 $"ResolverSkipped reason=controller-card-mismatch tooltipCard={DescribeCard(itemCard)} controllerCard={DescribeCard(controllerItemCard)} tooltipInstance={itemCard.InstanceId} controllerInstance={controllerItemCard.InstanceId}"
             );
@@ -84,7 +84,7 @@ internal static class TooltipPreviewTargetResolver
         }
 
         target = new TooltipRefreshTarget(cardController, controllerItemCard, tooltipData);
-        BppLog.Info(
+        BppLog.Debug(
             "TooltipPreview",
             $"ResolverMatched tooltipCard={DescribeCard(itemCard)} controllerCard={DescribeCard(controllerItemCard)} tooltipInstance={itemCard.InstanceId} controllerInstance={controllerItemCard.InstanceId} primaryCurrentCard={DescribeCard(primaryController.CurrentCard)}"
         );

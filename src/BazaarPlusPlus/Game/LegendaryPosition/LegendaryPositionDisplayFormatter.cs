@@ -12,6 +12,8 @@ internal static class LegendaryPositionDisplayFormatter
     public static void Install(IBppConfig config) =>
         _config = config ?? throw new ArgumentNullException(nameof(config));
 
+    public static void Reset() => _config = null;
+
     private static IBppConfig Config =>
         _config
         ?? throw new InvalidOperationException(

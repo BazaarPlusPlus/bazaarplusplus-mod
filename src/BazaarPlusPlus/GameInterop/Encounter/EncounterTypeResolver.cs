@@ -40,7 +40,7 @@ internal static class EncounterTypeResolver
     {
         try
         {
-            var staticData = BppStaticDataAccess.TryGet();
+            var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
             var template = BppStaticDataAccess.GetCardTemplate(staticData, templateId);
             return template?.GetType().Name ?? template?.Type.ToString();
         }

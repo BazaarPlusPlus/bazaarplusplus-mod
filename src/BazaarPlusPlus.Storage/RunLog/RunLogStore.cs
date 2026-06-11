@@ -4,22 +4,13 @@ using BazaarPlusPlus.Storage.Paths;
 using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 
 namespace BazaarPlusPlus.Storage.RunLog;
 
 public sealed class RunLogStore : SqliteStoreBase, IRunLogStore
 {
-    private static readonly JsonSerializerSettings SerializerSettings = new()
-    {
-        ContractResolver = new DefaultContractResolver
-        {
-            NamingStrategy = new SnakeCaseNamingStrategy(),
-        },
-        NullValueHandling = NullValueHandling.Ignore,
-        Formatting = Formatting.None,
-        DateFormatString = "yyyy-MM-dd'T'HH:mm:ss.fffK",
-    };
+    private static readonly JsonSerializerSettings SerializerSettings =
+        SerializerSettingsFactory.CreateSerializerSettings(includeStringEnumConverter: false);
 
     public RunLogStore(IPathProvider paths)
         : base(

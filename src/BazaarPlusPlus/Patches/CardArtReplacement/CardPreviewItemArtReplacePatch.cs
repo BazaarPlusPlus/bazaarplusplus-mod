@@ -2,9 +2,7 @@
 #pragma warning disable CS0436
 using System;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.CardArtReplacement;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
-using BazaarPlusPlus.GameInterop.CardArtReplacement;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.UI;
@@ -35,28 +33,12 @@ internal static class CardPreviewItemArtReplacePatch
             if (instance == null || instance.gameObject == null)
                 return;
 
-            var services = BppPatchHost.Services;
-            if (!PackageCardArtReplacementPolicy.IsEnabled(services.Config))
-                return;
-
-            var card = instance._cardData;
-            if (!CardArtInjector.IsPackageTemplate(card))
-                return;
-
-            var baseMaterial = instance._cardMaterial;
-            if (baseMaterial == null)
-                return;
-
-            var feature = CardArtReplacementFeature.Current;
             if (
-                feature == null
-                || !feature.TryGetPreviewMaterial(
-                    card.Id,
-                    baseMaterial,
-                    out var customMaterial,
-                    out _
+                !PackageCardArtPatchGate.TryGetReplacementPreviewMaterial(
+                    instance._cardData,
+                    instance._cardMaterial,
+                    out var customMaterial
                 )
-                || customMaterial == null
             )
                 return;
 

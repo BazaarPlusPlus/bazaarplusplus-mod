@@ -9,66 +9,6 @@ using Xunit;
 
 public class BazaarAgentReplayHttpRoutesTests
 {
-    private sealed class ServerFixture : IDisposable
-    {
-        public int Port { get; }
-        public BazaarAgentHttpServer Server { get; }
-        public BazaarAgentCommandQueue<BazaarAgentAction> Queue { get; }
-        public BazaarAgentCommandQueue<BazaarAgentReplayCommand> ReplayQueue { get; }
-
-        public ServerFixture(int replayTimeoutMs = 5000)
-        {
-            Port = PickFreePort();
-            Queue = new BazaarAgentCommandQueue<BazaarAgentAction>(5000);
-            ReplayQueue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(replayTimeoutMs);
-            Server = new BazaarAgentHttpServer(
-                Port,
-                () => null,
-                Queue,
-                ReplayQueue,
-                new TestLogger()
-            );
-            Server.Start();
-        }
-
-        public void Dispose()
-        {
-            try
-            {
-                Server.Dispose();
-            }
-            catch { }
-            try
-            {
-                Queue.Dispose();
-            }
-            catch { }
-            try
-            {
-                ReplayQueue.Dispose();
-            }
-            catch { }
-        }
-
-        private static int PickFreePort()
-        {
-            var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
-            listener.Start();
-            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
-        }
-    }
-
-    private sealed class TestLogger : IBazaarAgentLogger
-    {
-        public void Info(string message) { }
-
-        public void Warning(string message) { }
-
-        public void Error(string message, Exception? exception = null) { }
-    }
-
     private static HttpClient Http() => new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
     /// <summary>Pumps the replay queue on a background task like the controller tick would,

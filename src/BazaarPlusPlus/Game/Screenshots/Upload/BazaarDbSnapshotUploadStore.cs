@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Storage.RunLog;
 using BazaarPlusPlus.Storage.Sqlite;
@@ -124,6 +123,7 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
     public BazaarDbSnapshotUploadRecord? TryBuildSnapshot(
         string snapshotId,
         string playerAccountId,
+        string? playerName,
         CancellationToken cancellationToken
     )
     {
@@ -179,8 +179,6 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
             LastBuildFailureReason = "image_too_large_after_resize";
             return null;
         }
-
-        var playerName = TryResolvePlayerName();
 
         var capturedAtUtc = reader.GetString(reader.GetOrdinal("captured_at_utc"));
         return new BazaarDbSnapshotUploadRecord
@@ -279,18 +277,5 @@ internal sealed class BazaarDbSnapshotUploadStore : SqliteStoreBase
         command.Parameters.AddWithValue("$attemptedAtUtc", attemptedAtUtc.ToString("o"));
         command.Parameters.AddWithValue("$error", error ?? string.Empty);
         command.ExecuteNonQuery();
-    }
-
-    private static string? TryResolvePlayerName()
-    {
-        try
-        {
-            return BppClientCacheBridge.TryGetProfileDisplayUsername()
-                ?? BppClientCacheBridge.TryGetProfileUsername();
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

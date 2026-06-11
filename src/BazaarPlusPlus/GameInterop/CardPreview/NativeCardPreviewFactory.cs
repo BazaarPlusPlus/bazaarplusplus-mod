@@ -6,6 +6,7 @@ using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
@@ -35,7 +36,7 @@ internal sealed class NativeCardPreviewFactory
         if (!TryResolveTemplate(spec, out var template))
             return false;
 
-        span = SpanForSize(template.Size);
+        span = CardSizeSpan.Resolve(template.Size);
         return true;
     }
 
@@ -95,7 +96,7 @@ internal sealed class NativeCardPreviewFactory
         if (spec == null || spec.TemplateId == Guid.Empty)
             return false;
 
-        var staticData = BppStaticDataAccess.TryGet();
+        var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
         if (staticData == null)
         {
             BppLog.Debug(_logComponent, "Static data unavailable for native card preview.");
@@ -166,15 +167,6 @@ internal sealed class NativeCardPreviewFactory
             Attributes = attributes,
         };
     }
-
-    private static int SpanForSize(ECardSize size) =>
-        ResolveCardSize(size) switch
-        {
-            ECardSize.Small => 1,
-            ECardSize.Medium => 2,
-            ECardSize.Large => 3,
-            _ => 1,
-        };
 
     private static ECardSize ResolveCardSize(ECardSize size) =>
         size switch

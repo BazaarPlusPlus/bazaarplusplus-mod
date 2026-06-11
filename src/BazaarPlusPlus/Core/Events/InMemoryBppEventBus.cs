@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace BazaarPlusPlus.Core.Events;
 
@@ -102,7 +103,7 @@ internal sealed class InMemoryBppEventBus : IBppEventBus
     private sealed class Subscription : IDisposable
     {
         private readonly Action _dispose;
-        private bool _disposed;
+        private int _disposed;
 
         public Subscription(Action dispose)
         {
@@ -111,11 +112,10 @@ internal sealed class InMemoryBppEventBus : IBppEventBus
 
         public void Dispose()
         {
-            if (_disposed)
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
 
             _dispose();
-            _disposed = true;
         }
     }
 }

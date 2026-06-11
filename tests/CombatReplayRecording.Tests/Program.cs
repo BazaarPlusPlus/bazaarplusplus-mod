@@ -695,7 +695,7 @@ try
         ),
         "ListByRunId should surface battles whose run id was backfilled after persistence."
     );
-    var uploadStore = Activator.CreateInstance(uploadStoreType, dbPath, tempRoot);
+    var uploadStore = Activator.CreateInstance(uploadStoreType, dbPath, tempRoot, battleCatalog);
     Assert(uploadStore != null, "RunBundleUploadStore should be constructible.");
     var activeSnapshot = Invoke(
         uploadStoreType,

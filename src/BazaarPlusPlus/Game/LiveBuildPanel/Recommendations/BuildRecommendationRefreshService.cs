@@ -6,33 +6,27 @@ using System.Threading.Tasks;
 namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 
 /// <summary>
-/// Shared manual-refresh entry over the ten-win build corpus. Wraps the repository's synchronous
-/// remote refresh in a worker task so panel callers can await it off the Unity main thread. The
-/// token only prevents the task from starting (the underlying HTTP read is synchronous and not
-/// interruptible once issued); callers guard their own stale continuations.
+/// Shared manual-refresh entry over the ten-win build corpus. Awaits the repository's async
+/// remote refresh so panel callers stay off the Unity main thread while the download is in
+/// flight. The token only prevents the refresh from starting (the HTTP read is not interruptible
+/// once issued); callers guard their own stale continuations.
 /// </summary>
 internal sealed class BuildRecommendationRefreshService
 {
     public async Task<BuildRecommendationRefreshResult> RefreshAsync(
+        BuildRecommendationRepository repository,
         CancellationToken cancellationToken
     )
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            return await Task.Run(
-                    () =>
-                    {
-                        var succeeded =
-                            BuildRecommendationRepository.TryRefreshFinalBuildsFromRemote(
-                                out var error
-                            );
-                        return succeeded
-                            ? BuildRecommendationRefreshResult.Success()
-                            : BuildRecommendationRefreshResult.Failure(error);
-                    },
-                    cancellationToken
-                )
+            var (succeeded, error) = await repository
+                .TryRefreshFinalBuildsFromRemoteAsync()
                 .ConfigureAwait(false);
+            return succeeded
+                ? BuildRecommendationRefreshResult.Success()
+                : BuildRecommendationRefreshResult.Failure(error);
         }
         catch (OperationCanceledException)
         {

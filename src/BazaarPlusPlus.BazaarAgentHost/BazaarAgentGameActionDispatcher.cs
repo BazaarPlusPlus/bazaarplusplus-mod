@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using BazaarGameClient.Domain.Models.Cards;
@@ -137,56 +138,46 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
         }
     }
 
+    private static readonly Lazy<Type?> _clientCacheType = new(static () =>
+        AccessTools.TypeByName("TheBazaar.ClientCache")
+    );
+
+    private static readonly Lazy<FieldInfo?> _runConfigField = new(static () =>
+        _clientCacheType.Value?.GetField("RunConfig", BindingFlags.Static | BindingFlags.Public)
+    );
+
+    private static readonly ConcurrentDictionary<
+        (Type Type, string Name),
+        MethodInfo?
+    > _runConfigSetters = new();
+
     /// <summary>
-    /// Calls ClientCache.RunConfig.SetSelectedHero via reflection (ClientCache is not directly
+    /// Calls ClientCache.RunConfig.{methodName} via reflection (ClientCache is not directly
     /// reachable at compile time in the mod project — same pattern as BppClientCacheBridge).
     /// Returns null on success, or an error string on failure.
     /// </summary>
-    private static string? SetRunConfigSelectedHero(EHero hero)
+    private static string? InvokeRunConfigSetter(string methodName, object value)
     {
-        var clientCacheType = AccessTools.TypeByName("TheBazaar.ClientCache");
-        if (clientCacheType is null)
+        if (_clientCacheType.Value is null)
             return "ClientCache type not found";
-        var runConfigField = clientCacheType.GetField(
-            "RunConfig",
-            BindingFlags.Static | BindingFlags.Public
-        );
-        var runConfig = runConfigField?.GetValue(null);
+        var runConfig = _runConfigField.Value?.GetValue(null);
         if (runConfig is null)
             return "ClientCache.RunConfig not found";
-        var method = runConfig
-            .GetType()
-            .GetMethod("SetSelectedHero", BindingFlags.Instance | BindingFlags.Public);
+        var method = _runConfigSetters.GetOrAdd(
+            (runConfig.GetType(), methodName),
+            static key => key.Type.GetMethod(key.Name, BindingFlags.Instance | BindingFlags.Public)
+        );
         if (method is null)
-            return "RunConfigurationCache.SetSelectedHero not found";
-        method.Invoke(runConfig, new object[] { hero });
+            return $"RunConfigurationCache.{methodName} not found";
+        method.Invoke(runConfig, new[] { value });
         return null;
     }
 
-    /// <summary>
-    /// Calls ClientCache.RunConfig.SetSelectedPlaymode via reflection.
-    /// Returns null on success, or an error string on failure.
-    /// </summary>
-    private static string? SetRunConfigSelectedPlaymode(EPlayMode mode)
-    {
-        var clientCacheType = AccessTools.TypeByName("TheBazaar.ClientCache");
-        if (clientCacheType is null)
-            return "ClientCache type not found";
-        var runConfigField = clientCacheType.GetField(
-            "RunConfig",
-            BindingFlags.Static | BindingFlags.Public
-        );
-        var runConfig = runConfigField?.GetValue(null);
-        if (runConfig is null)
-            return "ClientCache.RunConfig not found";
-        var method = runConfig
-            .GetType()
-            .GetMethod("SetSelectedPlaymode", BindingFlags.Instance | BindingFlags.Public);
-        if (method is null)
-            return "RunConfigurationCache.SetSelectedPlaymode not found";
-        method.Invoke(runConfig, new object[] { mode });
-        return null;
-    }
+    private static string? SetRunConfigSelectedHero(EHero hero) =>
+        InvokeRunConfigSetter("SetSelectedHero", hero);
+
+    private static string? SetRunConfigSelectedPlaymode(EPlayMode mode) =>
+        InvokeRunConfigSetter("SetSelectedPlaymode", mode);
 
     private static T? ResolveCard<T>(string? instanceIdValue)
         where T : class
@@ -233,6 +224,8 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
         return list;
     }
 
+    private static readonly ConcurrentDictionary<Type, MethodInfo[]> _appStateMethods = new();
+
     /// <summary>
     /// Invokes <c>AppState.CurrentState.{methodName}</c> via reflection. Picks the first overload
     /// whose first N parameter types are compatible with the supplied arguments; trailing parameters
@@ -247,7 +240,10 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
         var appState = AppState.CurrentState;
         if (appState is null)
             return new(false, "AppState.CurrentState is null");
-        var methods = appState.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public);
+        var methods = _appStateMethods.GetOrAdd(
+            appState.GetType(),
+            static t => t.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+        );
         foreach (var m in methods)
         {
             if (m.Name != methodName)

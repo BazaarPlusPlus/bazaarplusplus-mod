@@ -13,26 +13,23 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 internal sealed class ReplayPersistenceOrchestrator : IDisposable
 {
     private readonly IBppServices _services;
-    private readonly PvpBattleCatalog _battleCatalog;
+    private readonly IPvpBattleCatalog _battleCatalog;
     private readonly CombatReplayPayloadStore _payloadStore;
     private readonly BattleReplaySyncStateStore? _syncStateStore;
     private readonly CombatReplayPersistenceQueue _persistenceQueue;
     private bool _disposed;
 
-    public ReplayPersistenceOrchestrator(IBppServices services)
+    public ReplayPersistenceOrchestrator(IBppServices services, IPvpBattleCatalog battleCatalog)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
+        _battleCatalog = battleCatalog ?? throw new ArgumentNullException(nameof(battleCatalog));
 
-        var runLogDatabasePath =
-            services.Paths.RunLogDatabasePath
-            ?? throw new InvalidOperationException("Run log database path is not initialized.");
         var combatReplayDirectoryPath =
             services.Paths.CombatReplayDirectoryPath
             ?? throw new InvalidOperationException(
                 "Combat replay directory path is not initialized."
             );
 
-        _battleCatalog = new PvpBattleCatalog(runLogDatabasePath);
         _payloadStore = new CombatReplayPayloadStore(combatReplayDirectoryPath);
         _syncStateStore = new BattleReplaySyncStateStore(services.Paths);
         _persistenceQueue = new CombatReplayPersistenceQueue(
@@ -44,7 +41,7 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
         CleanupOrphanedPayloads();
     }
 
-    public PvpBattleCatalog Catalog => _battleCatalog;
+    public IPvpBattleCatalog Catalog => _battleCatalog;
     public CombatReplayPayloadStore PayloadStore => _payloadStore;
     public bool HasPendingPersistence => _persistenceQueue.HasPendingPersistence;
 

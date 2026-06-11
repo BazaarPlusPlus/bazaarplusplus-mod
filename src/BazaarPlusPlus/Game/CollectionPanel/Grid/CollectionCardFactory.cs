@@ -38,7 +38,7 @@ internal sealed class CollectionCardFactory
         if (vm == null)
             return null;
 
-        var staticData = BppStaticDataAccess.TryGet();
+        var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
         if (staticData == null)
             return null;
 

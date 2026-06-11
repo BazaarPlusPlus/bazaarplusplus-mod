@@ -484,8 +484,8 @@ internal static class ChineseScriptConverter
         var converted = ConvertToTraditional(mainland);
         return mode switch
         {
-            BppChineseLocaleMode.Taiwan => ApplyTaiwanTerms(converted),
-            BppChineseLocaleMode.HongKong => ApplyHongKongTerms(converted),
+            BppChineseLocaleMode.Taiwan => ApplyTraditionalChineseTerms(converted),
+            BppChineseLocaleMode.HongKong => ApplyTraditionalChineseTerms(converted),
             _ => mainland,
         };
     }
@@ -513,13 +513,9 @@ internal static class ChineseScriptConverter
         return buffer.ToString();
     }
 
-    private static string ApplyTaiwanTerms(string text)
-    {
-        return text.Replace("數據庫", "資料庫", StringComparison.Ordinal)
-            .Replace("查看", "檢視", StringComparison.Ordinal);
-    }
-
-    private static string ApplyHongKongTerms(string text)
+    // Taiwan and HongKong term replacements are currently intentionally identical;
+    // split into separate methods here when regional vocabulary diverges.
+    private static string ApplyTraditionalChineseTerms(string text)
     {
         return text.Replace("數據庫", "資料庫", StringComparison.Ordinal)
             .Replace("查看", "檢視", StringComparison.Ordinal);

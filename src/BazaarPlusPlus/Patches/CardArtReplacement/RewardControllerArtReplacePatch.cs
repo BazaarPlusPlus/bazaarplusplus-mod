@@ -4,8 +4,6 @@ using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameClient.Domain.Models.Cards;
-using BazaarPlusPlus.Game.CardArtReplacement;
-using BazaarPlusPlus.GameInterop.CardArtReplacement;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using UnityEngine;
@@ -45,18 +43,7 @@ internal static class RewardControllerArtReplacePatch
             if (instance == null)
                 return;
 
-            var services = BppPatchHost.Services;
-            if (!PackageCardArtReplacementPolicy.IsEnabled(services.Config))
-                return;
-
-            if (!CardArtInjector.IsPackageCard(card))
-                return;
-
-            var feature = CardArtReplacementFeature.Current;
-            Texture2D? texture = null;
-            var hasTexture =
-                feature != null && feature.TryGetTexture(card.TemplateId, out texture, out _);
-            if (!hasTexture || texture == null)
+            if (!PackageCardArtPatchGate.TryGetReplacementTexture(card, out var texture))
                 return;
 
             if (InstancedMaterialField?.GetValue(instance) is not Material material)

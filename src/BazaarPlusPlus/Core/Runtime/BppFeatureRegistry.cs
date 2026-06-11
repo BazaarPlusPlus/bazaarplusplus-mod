@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace BazaarPlusPlus.Core.Runtime;
@@ -15,12 +16,38 @@ internal sealed class BppFeatureRegistry
     public void Start()
     {
         foreach (var feature in _features)
-            feature.Start();
+        {
+            try
+            {
+                feature.Start();
+            }
+            catch (Exception ex)
+            {
+                global::BazaarPlusPlus.Infrastructure.BppLog.Error(
+                    "FeatureRegistry",
+                    $"Feature failed to start: {feature.GetType().FullName}",
+                    ex
+                );
+            }
+        }
     }
 
     public void Stop()
     {
         for (var i = _features.Count - 1; i >= 0; i--)
-            _features[i].Stop();
+        {
+            try
+            {
+                _features[i].Stop();
+            }
+            catch (Exception ex)
+            {
+                global::BazaarPlusPlus.Infrastructure.BppLog.Error(
+                    "FeatureRegistry",
+                    $"Feature failed to stop: {_features[i].GetType().FullName}",
+                    ex
+                );
+            }
+        }
     }
 }

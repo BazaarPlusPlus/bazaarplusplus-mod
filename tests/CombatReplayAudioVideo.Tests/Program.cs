@@ -1,16 +1,14 @@
 using System.Reflection;
 
-// Behavioral unit tests for the three design-mandated pure-logic units of the
+// Behavioral unit tests for the two design-mandated pure-logic units of the
 // combat-replay audio/video pipeline, reached as internal types via reflection
 // (Type.GetType("Full.Name, BazaarPlusPlus")):
-//   1) AudioRingBuffer    -- lock-free SPSC correctness
-//   2) WavStreamWriter    -- byte-exact WAV header
-//   3) WallClockCfrPacer  -- wall-clock repeat/drop counting
+//   1) WavStreamWriter    -- byte-exact WAV header
+//   2) WallClockCfrPacer  -- wall-clock repeat/drop counting
 // Plus an optional ReplayVideoFramePool Rent/Return + cap micro-check, and the
 // ReplayVideoAudioMuxer zero-duration-output guard that protects the silent video
 // when a -shortest mux of an empty WAV exits 0 with an empty output.
 
-RingBufferTests.Run();
 WavHeaderTests.Run();
 CfrPacerTests.Run();
 FramePoolTests.Run();
@@ -22,351 +20,7 @@ AudioTapPlanTests.Run();
 Console.WriteLine("CombatReplayAudioVideo tests passed.");
 
 // ---------------------------------------------------------------------------
-// 1) AudioRingBuffer: lock-free single-producer/single-consumer ring buffer.
-// ---------------------------------------------------------------------------
-file static class RingBufferTests
-{
-    private static readonly Type RingType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Audio.AudioRingBuffer"
-    );
-
-    public static void Run()
-    {
-        BasicFifoRoundTrip();
-        WrapAroundPastCapacity();
-        OverflowDropsOldest();
-        ConcurrentProducerConsumer();
-    }
-
-    // FIFO ordering: push an ascending sequence in uneven chunks, drain it in
-    // differently-sized chunks, and assert the drained stream equals the input
-    // in order with no gaps or duplicates while it fits under capacity.
-    private static void BasicFifoRoundTrip()
-    {
-        var ring = New(1024);
-        TestReflection.Assert(
-            Capacity(ring) == 1024,
-            "capacity 1024 should round to a power of two unchanged."
-        );
-
-        const int total = 700; // < capacity, so nothing is ever dropped.
-        var source = new float[total];
-        for (var i = 0; i < total; i++)
-            source[i] = i;
-
-        // Produce in chunks of 37 (uneven, forces a mid-buffer offset).
-        var produced = 0;
-        var consumed = 0;
-        var dest = new float[total];
-        var readBuf = new float[64];
-        var next = 0f;
-
-        while (produced < total)
-        {
-            var chunk = Math.Min(37, total - produced);
-            Write(ring, source, produced, chunk);
-            produced += chunk;
-
-            // Drain opportunistically in 50-float reads so reads and writes interleave.
-            int n;
-            while ((n = Read(ring, readBuf, 0, 50)) > 0)
-            {
-                for (var i = 0; i < n; i++)
-                {
-                    TestReflection.Assert(
-                        readBuf[i] == next,
-                        $"FIFO order broke: expected {next}, got {readBuf[i]} at index {consumed}."
-                    );
-                    dest[consumed++] = readBuf[i];
-                    next++;
-                }
-            }
-        }
-
-        // Final drain.
-        int tail;
-        while ((tail = Read(ring, readBuf, 0, readBuf.Length)) > 0)
-        {
-            for (var i = 0; i < tail; i++)
-            {
-                TestReflection.Assert(readBuf[i] == next, $"FIFO tail order broke at {consumed}.");
-                dest[consumed++] = readBuf[i];
-                next++;
-            }
-        }
-
-        TestReflection.Assert(
-            consumed == total,
-            $"Should drain every produced float ({consumed} != {total})."
-        );
-        TestReflection.Assert(
-            TotalWritten(ring) == total && TotalRead(ring) == total,
-            "When produced <= capacity, TotalRead should equal TotalWritten with no drops."
-        );
-        for (var i = 0; i < total; i++)
-            TestReflection.Assert(dest[i] == i, $"Drained value {dest[i]} != source {i}.");
-    }
-
-    // Write across the physical wrap boundary (more than one lap) without
-    // overflowing the live window, and confirm ordering is preserved across the
-    // mask wrap.
-    private static void WrapAroundPastCapacity()
-    {
-        var ring = New(16); // small ring, exercises (pos & mask) wrap repeatedly.
-        var cap = Capacity(ring);
-        TestReflection.Assert(cap == 16, "16 should stay 16 (already a power of two).");
-
-        // Push and immediately drain small chunks far past the physical capacity so
-        // monotonic write/read cursors lap the backing array many times.
-        const int laps = 400;
-        var next = 0f;
-        var expect = 0f;
-        var rd = new float[8];
-        for (var i = 0; i < laps; i++)
-        {
-            var chunk = new float[5];
-            for (var k = 0; k < 5; k++)
-                chunk[k] = next++;
-            Write(ring, chunk, 0, 5);
-
-            int n;
-            while ((n = Read(ring, rd, 0, rd.Length)) > 0)
-            {
-                for (var j = 0; j < n; j++)
-                {
-                    TestReflection.Assert(
-                        rd[j] == expect,
-                        $"Wrap-around order broke: expected {expect}, got {rd[j]}."
-                    );
-                    expect++;
-                }
-            }
-        }
-
-        TestReflection.Assert(
-            expect == laps * 5,
-            "Wrap-around round trip should preserve every sample."
-        );
-        TestReflection.Assert(
-            TotalWritten(ring) == laps * 5 && TotalRead(ring) == laps * 5,
-            "Drained-as-you-go wrap test should not drop any samples."
-        );
-    }
-
-    // Overflow policy = overwrite-oldest. Fill past capacity without reading; the
-    // producer must not block or throw, a subsequent read must return the NEWEST
-    // samples (oldest dropped), survivors must be monotonic and originally-written
-    // values, and the read cursor must have advanced past the dropped region.
-    private static void OverflowDropsOldest()
-    {
-        var ring = New(16);
-        var cap = Capacity(ring);
-
-        // Many small writes that each fit but collectively overflow: the producer keeps
-        // advancing _writePos past the reader; the consumer's fast-forward drops the
-        // clobbered oldest on read (the documented overwrite-oldest path).
-        const int total = 100;
-        var next = 0f;
-        for (var i = 0; i < total; i += 4)
-        {
-            var chunk = new float[4];
-            for (var k = 0; k < 4; k++)
-                chunk[k] = next++;
-            Write(ring, chunk, 0, 4); // never throws, never blocks
-        }
-
-        var written = TotalWritten(ring);
-        TestReflection.Assert(
-            written == total,
-            $"Each write should publish its full count (TotalWritten {written} != {total})."
-        );
-        // Consumer-lazy overwrite-oldest: the producer NEVER advances the read cursor, so
-        // before the first read the logical write-ahead (TotalWritten - TotalRead) may
-        // exceed capacity; the consumer fast-forwards past the clobbered region when it
-        // reads. Only <= capacity slots physically survive, which the drain below proves.
-
-        // Drain survivors and assert they are the newest contiguous, monotonic tail.
-        var survivors = new List<float>();
-        var rd = new float[cap];
-        int n;
-        while ((n = Read(ring, rd, 0, rd.Length)) > 0)
-            for (var i = 0; i < n; i++)
-                survivors.Add(rd[i]);
-
-        TestReflection.Assert(
-            survivors.Count > 0 && survivors.Count <= cap,
-            "Survivors should be a non-empty window <= capacity."
-        );
-        // No torn values: every survivor is an originally-written value [0,total).
-        foreach (var v in survivors)
-            TestReflection.Assert(
-                v >= 0 && v < total && v == MathF.Floor(v),
-                $"Torn survivor value {v}."
-            );
-        // Monotonic & contiguous among survivors (oldest dropped, newest kept).
-        for (var i = 1; i < survivors.Count; i++)
-            TestReflection.Assert(
-                survivors[i] == survivors[i - 1] + 1,
-                $"Survivors must be a contiguous ascending tail; broke at {survivors[i]}."
-            );
-        TestReflection.Assert(
-            survivors[^1] == total - 1,
-            $"Overwrite-oldest must keep the newest sample; last survivor {survivors[^1]} != {total - 1}."
-        );
-        // After the drain the consumer's fast-forward must account for EVERY written
-        // float (skipped + read) and leave an empty live window.
-        TestReflection.Assert(
-            TotalRead(ring) == total,
-            $"Draining must account for every written float (TotalRead {TotalRead(ring)} != {total})."
-        );
-        TestReflection.Assert(
-            TotalWritten(ring) - TotalRead(ring) == 0,
-            "Draining must leave an empty live window."
-        );
-
-        // A single oversized write keeps only the last capacity floats and never throws.
-        var ring2 = New(16);
-        var big = new float[40];
-        for (var i = 0; i < big.Length; i++)
-            big[i] = 1000 + i;
-        Write(ring2, big, 0, big.Length); // oversized single write: must not throw
-        var got = new float[64];
-        var m = Read(ring2, got, 0, got.Length);
-        TestReflection.Assert(
-            m > 0 && m <= Capacity(ring2),
-            "Oversized write should leave at most capacity floats."
-        );
-        TestReflection.Assert(
-            got[m - 1] == 1000 + 39,
-            "Oversized single write must retain the newest sample at the tail."
-        );
-        for (var i = 1; i < m; i++)
-            TestReflection.Assert(
-                got[i] == got[i - 1] + 1,
-                "Oversized-write survivors must be a contiguous ascending tail."
-            );
-    }
-
-    // Real concurrency: one producer thread writes M frames of `channels` distinct
-    // increasing floats; one consumer thread drains. Assert no value is read twice
-    // and reads are strictly monotonic (no torn/duplicated samples under contention).
-    private static void ConcurrentProducerConsumer()
-    {
-        var ring = New(4096);
-        const int channels = 2;
-        const int frames = 100_000; // 200k floats total, fast.
-        long lastSeen = -1;
-        var torn = 0;
-        var nonMonotonic = 0;
-        var consumed = 0L;
-        var done = false;
-
-        var producer = new Thread(() =>
-        {
-            var frame = new float[channels];
-            long value = 0;
-            for (var f = 0; f < frames; f++)
-            {
-                for (var c = 0; c < channels; c++)
-                    frame[c] = value++;
-                // Keep the live window safely under capacity so this no-loss test never
-                // trips the overwrite-oldest path: back off if the consumer falls behind.
-                // (Real capture is lossy by design; this is test pacing only.)
-                while (TotalWritten(ring) - TotalRead(ring) > Capacity(ring) - 256)
-                    Thread.SpinWait(100);
-                Write(ring, frame, 0, channels);
-            }
-        })
-        {
-            IsBackground = true,
-            Name = "ring-producer",
-        };
-
-        var consumer = new Thread(() =>
-        {
-            var buf = new float[512];
-            while (!Volatile.Read(ref done) || TotalWritten(ring) > TotalRead(ring))
-            {
-                var n = Read(ring, buf, 0, buf.Length);
-                if (n == 0)
-                {
-                    Thread.SpinWait(50);
-                    continue;
-                }
-
-                for (var i = 0; i < n; i++)
-                {
-                    var v = (long)buf[i];
-                    if (v <= lastSeen)
-                    {
-                        if (v == lastSeen)
-                            torn++;
-                        else
-                            nonMonotonic++;
-                    }
-
-                    lastSeen = v;
-                    consumed++;
-                }
-            }
-        })
-        {
-            IsBackground = true,
-            Name = "ring-consumer",
-        };
-
-        consumer.Start();
-        producer.Start();
-        TestReflection.Assert(
-            producer.Join(TimeSpan.FromSeconds(15)),
-            "Producer thread should finish within timeout."
-        );
-        Volatile.Write(ref done, true);
-        TestReflection.Assert(
-            consumer.Join(TimeSpan.FromSeconds(15)),
-            "Consumer thread should finish within timeout."
-        );
-
-        TestReflection.Assert(torn == 0, $"No sample should be read twice (torn={torn}).");
-        TestReflection.Assert(
-            nonMonotonic == 0,
-            $"Reads must be strictly monotonic (out-of-order={nonMonotonic})."
-        );
-        TestReflection.Assert(
-            consumed == (long)frames * channels,
-            $"Bounded-rate SPSC drain should observe every produced sample exactly once ({consumed})."
-        );
-    }
-
-    private static object New(int capacityFloats) =>
-        Activator.CreateInstance(RingType, capacityFloats)
-        ?? throw new InvalidOperationException("AudioRingBuffer should be constructible.");
-
-    private static int Capacity(object ring) =>
-        (int)TestReflection.GetProp(RingType, ring, "Capacity")!;
-
-    private static long TotalWritten(object ring) =>
-        (long)TestReflection.GetProp(RingType, ring, "TotalWritten")!;
-
-    private static long TotalRead(object ring) =>
-        (long)TestReflection.GetProp(RingType, ring, "TotalRead")!;
-
-    private static void Write(object ring, float[] src, int offset, int count) =>
-        TestReflection.InvokeManagedWrite(RingType, ring, src, offset, count);
-
-    private static int Read(object ring, float[] dest, int offset, int max) =>
-        (int)
-            TestReflection.Invoke(
-                RingType,
-                ring,
-                "Read",
-                new[] { typeof(float[]), typeof(int), typeof(int) },
-                new object[] { dest, offset, max }
-            )!;
-}
-
-// ---------------------------------------------------------------------------
-// 2) WavStreamWriter.BuildHeader: byte-exact 44-byte IEEE-float WAV header.
+// 1) WavStreamWriter.BuildHeader: byte-exact 44-byte IEEE-float WAV header.
 // ---------------------------------------------------------------------------
 file static class WavHeaderTests
 {
@@ -465,7 +119,7 @@ file static class WavHeaderTests
 }
 
 // ---------------------------------------------------------------------------
-// 3) WallClockCfrPacer: wall-clock CFR repeat/drop counting via CfrTickResult.
+// 2) WallClockCfrPacer: wall-clock CFR repeat/drop counting via CfrTickResult.
 // ---------------------------------------------------------------------------
 file static class CfrPacerTests
 {
@@ -676,7 +330,7 @@ file static class CfrPacerTests
 }
 
 // ---------------------------------------------------------------------------
-// 4) ReplayVideoFramePool: optional Rent/Return + cap micro-check.
+// 3) ReplayVideoFramePool: optional Rent/Return + cap micro-check.
 // ---------------------------------------------------------------------------
 file static class FramePoolTests
 {
@@ -757,7 +411,7 @@ file static class FramePoolTests
 }
 
 // ---------------------------------------------------------------------------
-// 5) ReplayVideoAudioMuxer.IsLikelyZeroDurationOutput: the gate that stops a
+// 4) ReplayVideoAudioMuxer.IsLikelyZeroDurationOutput: the gate that stops a
 //    -shortest mux of an empty WAV (exit 0, ~hundred-byte stub) from deleting the
 //    good silent first-pass video. Reproduced sizes: a real 3s recording is
 //    multi-MB; the empty-output stub is ~261 bytes.
@@ -834,7 +488,7 @@ file static class ZeroDurationMuxGuardTests
 }
 
 // ---------------------------------------------------------------------------
-// 6) ReplayVideoAudioMuxer.BuildArguments: multi-WAV capture must mix the base
+// 5) ReplayVideoAudioMuxer.BuildArguments: multi-WAV capture must mix the base
 //    bus audio and SFX bus audio into one AAC input via amix.
 // ---------------------------------------------------------------------------
 file static class MuxerArgumentTests
@@ -913,7 +567,7 @@ file static class MuxerArgumentTests
 }
 
 // ---------------------------------------------------------------------------
-// 7) ReplayVideoAudioMuxer debug stem naming: successful runtime muxes delete
+// 6) ReplayVideoAudioMuxer debug stem naming: successful runtime muxes delete
 //    temp WAVs, so debug builds preserve stable sibling copies for listening
 //    to each captured bus before amix.
 // ---------------------------------------------------------------------------
@@ -974,7 +628,7 @@ file static class MuxerDebugStemTests
 }
 
 // ---------------------------------------------------------------------------
-// 8) ReplayVideoAudioTapPlan: a SINGLE all-inclusive stem tapped at the FMOD
+// 7) ReplayVideoAudioTapPlan: a SINGLE all-inclusive stem tapped at the FMOD
 //    CORE master. One stem captures every audible class (music, settlement, VO,
 //    and the Resonance-decoded 3D SFX) and avoids the amix double-count that two
 //    overlapping parent/child taps produced.
@@ -1084,28 +738,5 @@ file static class TestReflection
                 $"Method not found: {type.FullName}.{name}({paramTypes.Length} args)"
             );
         return method.Invoke(instance, args);
-    }
-
-    // AudioRingBuffer has two Write overloads; resolve the managed float[] one explicitly.
-    public static void InvokeManagedWrite(
-        Type type,
-        object instance,
-        float[] src,
-        int offset,
-        int count
-    )
-    {
-        var method =
-            type.GetMethod(
-                "Write",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
-                binder: null,
-                types: new[] { typeof(float[]), typeof(int), typeof(int) },
-                modifiers: null
-            )
-            ?? throw new InvalidOperationException(
-                "AudioRingBuffer.Write(float[],int,int) not found."
-            );
-        method.Invoke(instance, new object[] { src, offset, count });
     }
 }

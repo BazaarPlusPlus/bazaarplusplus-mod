@@ -23,8 +23,31 @@ internal static class BppHotkeyService
     private const string ForwardMouseButtonName = "forwardButton";
     private static IBppConfig? _config;
 
-    public static void Install(IBppConfig config) =>
+    public static void Install(IBppConfig config)
+    {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        ResetBindingPathCache();
+    }
+
+    public static void Reset()
+    {
+        _config = null;
+        ResetBindingPathCache();
+        foreach (var action in CachedActions.Values)
+        {
+            action.Disable();
+            action.Dispose();
+        }
+        CachedActions.Clear();
+        LoggedInvalidBindingPaths.Clear();
+        LoggedUnresolvedBindingPaths.Clear();
+        LoggedModifierDisagreements.Clear();
+    }
+
+    private static void ResetBindingPathCache()
+    {
+        CachedBindingPaths.Clear();
+    }
 
     private static IBppConfig Config =>
         _config
@@ -50,6 +73,11 @@ internal static class BppHotkeyService
             [BppHotkeyActionId.HoldEnchantPreview] = CtrlAliasPath,
             [BppHotkeyActionId.HoldUpgradePreview] = ShiftAliasPath,
         };
+
+    private static readonly Dictionary<
+        BppHotkeyActionId,
+        (string? Raw, string Resolved)
+    > CachedBindingPaths = new();
 
     private static readonly Dictionary<string, InputAction> CachedActions = new(
         StringComparer.OrdinalIgnoreCase
@@ -104,39 +132,49 @@ internal static class BppHotkeyService
         return action.WasPressedThisFrame();
     }
 
+    // normalizedPath must already be normalized (GetBindingPath output).
     private static bool IsPressed(
-        string bindingPath,
+        string normalizedPath,
         Keyboard? keyboard = null,
         Mouse? mouse = null
     )
     {
-        var normalized = NormalizeBindingPath(bindingPath);
-        if (string.IsNullOrWhiteSpace(normalized))
+        if (string.IsNullOrWhiteSpace(normalizedPath))
             return false;
 
-        if (string.Equals(normalized, CtrlAliasPath, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedPath, CtrlAliasPath, StringComparison.OrdinalIgnoreCase))
             return IsModifierPressed(
-                normalized,
+                normalizedPath,
                 () => KeyBindings.Modifiers.IsCtrlPressed(keyboard)
             );
 
-        if (string.Equals(normalized, ShiftAliasPath, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedPath, ShiftAliasPath, StringComparison.OrdinalIgnoreCase))
             return IsModifierPressed(
-                normalized,
+                normalizedPath,
                 () => KeyBindings.Modifiers.IsShiftPressed(keyboard)
             );
 
-        if (TryFindSupportedMouseButton(normalized, mouse, out var button))
+        if (TryFindSupportedMouseButton(normalizedPath, mouse, out var button))
             return button.isPressed;
 
-        return GetOrCreateAction(normalized).IsPressed();
+        return GetOrCreateAction(normalizedPath).IsPressed();
     }
 
     internal static string GetBindingPath(BppHotkeyActionId actionId)
     {
-        var configValue = GetConfigValue(actionId);
-        var normalized = NormalizeBindingPath(configValue);
-        return string.IsNullOrWhiteSpace(normalized) ? GetDefaultBindingPath(actionId) : normalized;
+        var raw = GetConfigValue(actionId);
+        if (
+            CachedBindingPaths.TryGetValue(actionId, out var cached)
+            && string.Equals(cached.Raw, raw, StringComparison.Ordinal)
+        )
+            return cached.Resolved;
+
+        var normalized = NormalizeBindingPath(raw);
+        var resolved = string.IsNullOrWhiteSpace(normalized)
+            ? GetDefaultBindingPath(actionId)
+            : normalized;
+        CachedBindingPaths[actionId] = (raw, resolved);
+        return resolved;
     }
 
     internal static string GetBindingDisplay(BppHotkeyActionId actionId)
@@ -251,18 +289,19 @@ internal static class BppHotkeyService
         }
     }
 
-    private static InputAction GetOrCreateAction(string bindingPath)
+    // normalizedPath must already be normalized; every caller passes a
+    // NormalizeBindingPath or GetBindingPath result.
+    private static InputAction GetOrCreateAction(string normalizedPath)
     {
-        var normalized = NormalizeBindingPath(bindingPath);
-        if (CachedActions.TryGetValue(normalized, out var existingAction))
+        if (CachedActions.TryGetValue(normalizedPath, out var existingAction))
             return existingAction;
 
         var action = new InputAction(type: InputActionType.Button);
-        foreach (var expandedPath in ExpandBindingPaths(normalized))
+        foreach (var expandedPath in ExpandBindingPaths(normalizedPath))
             action.AddBinding(expandedPath);
 
         action.Enable();
-        CachedActions[normalized] = action;
+        CachedActions[normalizedPath] = action;
         return action;
     }
 

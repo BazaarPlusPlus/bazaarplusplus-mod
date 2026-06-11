@@ -27,6 +27,8 @@ internal static class BppSettingsDockCatalog
             _definitions.Add(pair.Def);
     }
 
+    public static void Reset() => _definitions.Clear();
+
     internal static IReadOnlyList<BppSettingsDockDefinition> Definitions => _definitions;
 
     internal static PreviewVisibilityMode NextPreviewVisibilityMode(PreviewVisibilityMode mode) =>

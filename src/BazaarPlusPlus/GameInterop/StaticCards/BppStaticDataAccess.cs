@@ -14,18 +14,6 @@ namespace BazaarPlusPlus.GameInterop.StaticCards;
 /// </summary>
 internal static class BppStaticDataAccess
 {
-    public static object? TryGet()
-    {
-        if (!Data.IsManagerCreated())
-            return null;
-
-        object? staticData = Data.GetStatic();
-        if (staticData is Task<JsonGameDataManager> task)
-            return task.GetAwaiter().GetResult();
-
-        return staticData;
-    }
-
     public static TCardBase? GetCardTemplate(object? staticData, Guid templateId)
     {
         if (staticData is not JsonGameDataManager manager || templateId == Guid.Empty)
@@ -37,8 +25,8 @@ internal static class BppStaticDataAccess
     /// <summary>
     /// Non-blocking handle to the static data manager. Returns the manager as an opaque object
     /// only when it is fully materialised (created, and any task-returning <c>GetStatic()</c>
-    /// already completed); returns <c>null</c> otherwise. Unlike <see cref="TryGet"/> this never
-    /// blocks the main thread waiting on the static-data task.
+    /// already completed); returns <c>null</c> otherwise. Never blocks the main thread waiting
+    /// on the static-data task.
     /// </summary>
     public static object? TryGetReadyManagerObject()
     {
@@ -58,7 +46,7 @@ internal static class BppStaticDataAccess
     /// Intended to run on a worker thread: the game opens its own SQLite connection, deserializes
     /// on PLINQ workers, builds a fresh dictionary, and publishes it via an atomic reference
     /// assignment, so calling it off the main thread does not tear the shared map. <paramref
-    /// name="source"/> must come from <see cref="TryGetReadyManagerObject"/> or <see cref="TryGet"/>.
+    /// name="source"/> must come from <see cref="TryGetReadyManagerObject"/>.
     /// </summary>
     public static Dictionary<Guid, ITCard>? LoadCardMap(object? source) =>
         source is JsonGameDataManager manager ? manager.GetCardMap() : null;

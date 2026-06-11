@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using BazaarPlusPlus.Infrastructure;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
@@ -124,7 +125,7 @@ internal sealed class BazaarDbSnapshotImagePreparer
                     && bytes.Length <= BazaarDbSnapshotUploadLimits.MaxUploadImageBytes
                 )
                 {
-                    WriteAllBytesAtomically(cachedPngPath, bytes);
+                    AtomicFileWriter.Write(cachedPngPath, bytes);
                     return new BazaarDbSnapshotUploadImage
                     {
                         Bytes = bytes,
@@ -151,7 +152,7 @@ internal sealed class BazaarDbSnapshotImagePreparer
                         continue;
                     }
 
-                    WriteAllBytesAtomically(cachedJpegPath, bytes);
+                    AtomicFileWriter.Write(cachedJpegPath, bytes);
                     return new BazaarDbSnapshotUploadImage
                     {
                         Bytes = bytes,
@@ -218,27 +219,6 @@ internal sealed class BazaarDbSnapshotImagePreparer
                 continue;
 
             yield return target;
-        }
-    }
-
-    private static void WriteAllBytesAtomically(string path, byte[] bytes)
-    {
-        var directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-            Directory.CreateDirectory(directory);
-
-        var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            File.WriteAllBytes(tempPath, bytes);
-            if (File.Exists(path))
-                File.Delete(path);
-            File.Move(tempPath, path);
-        }
-        finally
-        {
-            if (File.Exists(tempPath))
-                File.Delete(tempPath);
         }
     }
 }

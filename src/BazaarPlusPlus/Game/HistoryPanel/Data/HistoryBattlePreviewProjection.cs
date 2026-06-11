@@ -358,7 +358,7 @@ internal static class HistoryBattlePreviewProjection
                 return _staticGameData;
         }
 
-        var staticData = BppStaticDataAccess.TryGet();
+        var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
         if (staticData == null)
             return null;
 

@@ -19,7 +19,7 @@ internal sealed class CollectionCatalog
     public bool TryGetCached(out CollectionCatalogBuildResult result)
     {
         result = EmptyResult(wasCacheHit: false);
-        var source = BppStaticDataAccess.TryGet();
+        var source = BppStaticDataAccess.TryGetReadyManagerObject();
         if (source == null || _cache == null)
             return false;
 

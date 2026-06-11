@@ -4,9 +4,9 @@ using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Tests;
 
-// This exe-runner drives production HistoryPanel formatters that read the localization facade L,
-// which throws until installed. Install a neutral English/Mainland source before the entry point
-// runs so the formatters take the same default path they did before the localization extraction.
+// These exe-runners drive production code that reads the localization facade L, which throws
+// until installed. Install a neutral English/Mainland source before the entry point runs so
+// the code under test takes the same default path it did before the localization extraction.
 internal static class LocalizationTestBootstrap
 {
     [ModuleInitializer]

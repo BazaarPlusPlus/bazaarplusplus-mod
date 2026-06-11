@@ -62,7 +62,7 @@ internal sealed partial class CollectionPanelView
 
         _closeButton = CreateButton(
             CollectionPanelText.Close(),
-            _close,
+            _commands.Close,
             Sizes.CloseButtonWidth,
             Sizes.ButtonStandardHeight
         );
@@ -77,13 +77,13 @@ internal sealed partial class CollectionPanelView
 
         _itemTabButton = CreateButton(
             CollectionPanelText.ItemsTab(),
-            () => _setActiveType(ECardType.Item),
+            () => _commands.SetActiveType(ECardType.Item),
             Sizes.RunsTabWidth,
             Sizes.ButtonStandardHeight
         );
         _skillTabButton = CreateButton(
             CollectionPanelText.SkillsTab(),
-            () => _setActiveType(ECardType.Skill),
+            () => _commands.SetActiveType(ECardType.Skill),
             Sizes.RunsTabWidth,
             Sizes.ButtonStandardHeight
         );
@@ -110,11 +110,11 @@ internal sealed partial class CollectionPanelView
 
         _sortQualityButton = CreateInlineSortButton(
             CollectionPanelText.SortQuality(),
-            () => _setSortPriority(CollectionSortPriority.Quality)
+            () => _commands.SetSortPriority(CollectionSortPriority.Quality)
         );
         _sortSizeButton = CreateInlineSortButton(
             CollectionPanelText.SortSize(),
-            () => _setSortPriority(CollectionSortPriority.Size)
+            () => _commands.SetSortPriority(CollectionSortPriority.Size)
         );
         sortGroup.Add(_sortQualityButton);
         _sortSizeButton.style.marginLeft = UiSpacing.Xs;
@@ -179,7 +179,7 @@ internal sealed partial class CollectionPanelView
             out _keywordFilterLabel,
             out var keywordHeaderRow
         );
-        _keywordMatchModeButton = CreateFacetMatchModeButton(_toggleKeywordMatchMode);
+        _keywordMatchModeButton = CreateFacetMatchModeButton(_commands.ToggleKeywordMatchMode);
         keywordHeaderRow.Add(_keywordMatchModeButton);
         _keywordChipRow.style.flexWrap = Wrap.Wrap;
         _keywordChipRow.style.justifyContent = Justify.FlexStart;
@@ -194,7 +194,7 @@ internal sealed partial class CollectionPanelView
             out _tagFilterLabel,
             out var tagHeaderRow
         );
-        _tagMatchModeButton = CreateFacetMatchModeButton(_toggleTagMatchMode);
+        _tagMatchModeButton = CreateFacetMatchModeButton(_commands.ToggleTagMatchMode);
         tagHeaderRow.Add(_tagMatchModeButton);
         _tagChipRow.style.flexWrap = Wrap.Wrap;
         _tagChipRow.style.justifyContent = Justify.FlexStart;
@@ -383,7 +383,7 @@ internal sealed partial class CollectionPanelView
     {
         var button = CreateButton(
             CollectionPanelText.PackagesToggle(),
-            _togglePackages,
+            _commands.TogglePackagesOnly,
             Sizes.RunsTabWidth,
             Sizes.ButtonStandardHeight
         );
@@ -398,7 +398,7 @@ internal sealed partial class CollectionPanelView
     {
         var button = CreateButton(
             string.Empty,
-            _toggleDayFilter,
+            _commands.ToggleRunDayFilter,
             Sizes.DayIconWidth,
             Sizes.ButtonStandardHeight
         );

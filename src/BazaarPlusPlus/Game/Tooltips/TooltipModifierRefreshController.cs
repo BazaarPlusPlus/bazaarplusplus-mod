@@ -40,7 +40,12 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             _hasResolvedInputs = true;
             _lastInputs = inputs;
 
-            var mode = TooltipPreviewModePolicy.Resolve(_config, _encounterState);
+            var mode = TooltipPreviewModePolicy.Resolve(
+                _config,
+                _encounterState,
+                inputs.HoldUpgrade,
+                inputs.HoldEnchant
+            );
             if (mode == _lastMode)
                 return;
 

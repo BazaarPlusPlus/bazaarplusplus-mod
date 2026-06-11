@@ -132,24 +132,36 @@ public sealed class QueuedRunLogStore : IRunLogStore, IDisposable
 
     private async Task ProcessLoopAsync()
     {
-        while (true)
+        try
         {
-            while (_pending.TryDequeue(out var write))
+            while (true)
             {
-                try
+                while (_pending.TryDequeue(out var write))
                 {
-                    write.Execute();
+                    try
+                    {
+                        write.Execute();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.Error("QueuedRunLogStore", $"Failed to {write.Description}.", ex);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger?.Error("QueuedRunLogStore", $"Failed to {write.Description}.", ex);
-                }
+
+                if (Volatile.Read(ref _stopRequested) == 1 && _pending.IsEmpty)
+                    return;
+
+                await _signal.WaitAsync().ConfigureAwait(false);
             }
-
-            if (Volatile.Read(ref _stopRequested) == 1 && _pending.IsEmpty)
-                return;
-
-            await _signal.WaitAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(
+                "QueuedRunLogStore",
+                "Queue worker terminated unexpectedly; queued run logging writes will no longer be processed.",
+                ex
+            );
+            throw;
         }
     }
 

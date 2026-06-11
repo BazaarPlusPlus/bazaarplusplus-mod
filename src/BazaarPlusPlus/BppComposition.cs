@@ -15,6 +15,7 @@ using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.LiveBuildPanel;
 using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.RunLogging.Upload;
@@ -48,9 +49,17 @@ internal sealed class BppComposition : IDisposable
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
     private ModOnlineClient? _onlineClientRef;
+    private PvpBattleCatalog? _pvpBattleCatalog;
 
     public IBppServices Services => _services;
     public RunLifecycleModule RunLifecycle => _runLifecycle;
+
+    public IPvpBattleCatalog PvpBattleCatalog =>
+        _pvpBattleCatalog ??= new PvpBattleCatalog(
+            _paths.RunLogDatabasePath
+                ?? throw new InvalidOperationException("Run log database path is not initialized.")
+        );
+
     public BppMountableRegistry Mountables => _mountables;
     public SettingsDockEntryRegistry SettingsDockRegistry => _settingsDockRegistry;
     public ModOnlineClient? OnlineClient => _onlineClientRef;
@@ -115,8 +124,12 @@ internal sealed class BppComposition : IDisposable
             )
         );
         _mountables.Register(new LiveBuildPanelMount());
-        _mountables.Register(new ComponentMount<RunLoggingController>((c, s) => c.Initialize(s)));
-        _mountables.Register(new ComponentMount<RunUploadController>((c, s) => c.Initialize(s)));
+        _mountables.Register(
+            new ComponentMount<RunLoggingController>((c, s) => c.Initialize(s, PvpBattleCatalog))
+        );
+        _mountables.Register(
+            new ComponentMount<RunUploadController>((c, s) => c.Initialize(s, PvpBattleCatalog))
+        );
         _mountables.Register(
             new ComponentMount<TooltipModifierRefreshController>(
                 (c, s) => c.Initialize(s.Config, s.EncounterState)

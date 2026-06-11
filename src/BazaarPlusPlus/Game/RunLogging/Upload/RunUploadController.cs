@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
@@ -14,6 +15,7 @@ namespace BazaarPlusPlus.Game.RunLogging.Upload;
 internal sealed class RunUploadController : MonoBehaviour
 {
     private IBppServices? _services;
+    private IPvpBattleCatalog? _battleCatalog;
     private RunBundleUploadService? _uploadService;
     private CancellationTokenSource? _shutdown;
     private StartupUploadAttemptGate? _startupGate;
@@ -28,9 +30,10 @@ internal sealed class RunUploadController : MonoBehaviour
 
     private void Awake() { }
 
-    public void Initialize(IBppServices services)
+    public void Initialize(IBppServices services, IPvpBattleCatalog battleCatalog)
     {
         _services = services;
+        _battleCatalog = battleCatalog;
         InitializeCore();
     }
 
@@ -60,7 +63,11 @@ internal sealed class RunUploadController : MonoBehaviour
             if (routes == null)
                 return;
 
-            var uploadStore = new RunBundleUploadStore(databasePath, replayRootPath);
+            var uploadStore = new RunBundleUploadStore(
+                databasePath,
+                replayRootPath,
+                _battleCatalog!
+            );
             _uploadService = new RunBundleUploadService(
                 uploadStore,
                 routes,

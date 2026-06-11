@@ -15,10 +15,25 @@ internal static class TooltipPreviewModePolicy
         IEncounterStateProbe? encounterState
     )
     {
-        ChoicePedestalSnapshot? choicePedestal = ShouldReadChoicePedestal(config)
+        return Resolve(
+            config,
+            encounterState,
+            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview),
+            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview)
+        );
+    }
+
+    internal static TooltipPreviewMode Resolve(
+        IBppConfig? config,
+        IEncounterStateProbe? encounterState,
+        bool holdUpgrade,
+        bool holdEnchant
+    )
+    {
+        var choicePedestal = ShouldReadChoicePedestal(config, holdUpgrade, holdEnchant)
             ? encounterState?.GetChoicePedestal()
             : null;
-        return Resolve(config, choicePedestal);
+        return Resolve(config, choicePedestal, holdUpgrade, holdEnchant);
     }
 
     internal static TooltipPreviewMode Resolve(
@@ -26,10 +41,25 @@ internal static class TooltipPreviewModePolicy
         ChoicePedestalSnapshot? choicePedestal
     )
     {
+        return Resolve(
+            config,
+            choicePedestal,
+            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview),
+            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview)
+        );
+    }
+
+    internal static TooltipPreviewMode Resolve(
+        IBppConfig? config,
+        ChoicePedestalSnapshot? choicePedestal,
+        bool holdUpgrade,
+        bool holdEnchant
+    )
+    {
         // Upgrade preview is hold-Shift only — it has no visibility mode of its own.
-        if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
+        if (holdUpgrade)
             return TooltipPreviewMode.Upgrade;
-        if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview))
+        if (holdEnchant)
             return TooltipPreviewMode.Enchant;
 
         var enchantMode = config?.EnchantPreviewModeConfig?.Value ?? DefaultMode;
@@ -57,9 +87,20 @@ internal static class TooltipPreviewModePolicy
 
     internal static bool ShouldReadChoicePedestal(IBppConfig? config)
     {
-        if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
-            return false;
-        if (BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview))
+        return ShouldReadChoicePedestal(
+            config,
+            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview),
+            BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview)
+        );
+    }
+
+    internal static bool ShouldReadChoicePedestal(
+        IBppConfig? config,
+        bool holdUpgrade,
+        bool holdEnchant
+    )
+    {
+        if (holdUpgrade || holdEnchant)
             return false;
         return (config?.EnchantPreviewModeConfig?.Value ?? DefaultMode)
             == PreviewVisibilityMode.AutoOnPedestalChoice;

@@ -13,4 +13,11 @@
   <ItemGroup>
     <ProjectReference Include="../../src/BazaarPlusPlus/BazaarPlusPlus.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="../Shared/ScreenshotUploadTestHelpers.cs"
+      Link="ScreenshotUploadTestHelpers.cs"
+    />
+  </ItemGroup>
 </Project>

@@ -1,12 +1,13 @@
 #nullable enable
 
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal static partial class HistoryPanelText
 {
-    private static string Resolve(LocalizedTextSet set) => L.Resolve(set);
+    private static string Resolve(LocalizedTextSet set) => LocalizedTextHelpers.Resolve(set);
 
     private static string FormatCount(int count, string noun)
     {
@@ -29,18 +30,12 @@ internal static partial class HistoryPanelText
         string? chineseHongKong
     )
     {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-        {
-            return ChineseScriptConverter.Convert(
-                chineseMainland,
-                chineseTaiwan,
-                chineseHongKong,
-                L.CurrentMode
-            );
-        }
-
-        return english;
+        return LocalizedTextHelpers.FormatSimple(
+            english,
+            chineseMainland,
+            chineseTaiwan,
+            chineseHongKong
+        );
     }
 
     private static string ResolveChinese(

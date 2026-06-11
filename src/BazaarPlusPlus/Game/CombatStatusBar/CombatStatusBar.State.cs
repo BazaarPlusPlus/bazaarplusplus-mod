@@ -39,6 +39,9 @@ internal sealed partial class CombatStatusBar
 {
     private static readonly float[] SpeedSteps = { 0.5f, 0.67f, 1f };
 
+    private static string? _cachedElapsedText;
+    private static long _cachedElapsedTicks;
+
     internal static bool IsCombatPlaybackActive { get; private set; }
     internal static bool IsCombatPaused { get; private set; }
     internal static float CombatSpeedMultiplier { get; private set; } = 1f;
@@ -151,8 +154,8 @@ internal sealed partial class CombatStatusBar
 
     internal static string GetDisplayedTimeText()
     {
-        return IsCombatPlaybackActive ? FormatElapsed(GetCombatLogicalElapsed())
-            : HasCompletedCombatPlayback ? FormatElapsed(LastCombatLogicalElapsed)
+        return IsCombatPlaybackActive ? FormatElapsedCached(GetCombatLogicalElapsed())
+            : HasCompletedCombatPlayback ? FormatElapsedCached(LastCombatLogicalElapsed)
             : "-:--:--";
     }
 
@@ -222,6 +225,17 @@ internal sealed partial class CombatStatusBar
             Background: interactable ? palette.Normal : disabledColor,
             Text: textColor
         );
+    }
+
+    private static string FormatElapsedCached(TimeSpan elapsed)
+    {
+        if (_cachedElapsedText == null || _cachedElapsedTicks != elapsed.Ticks)
+        {
+            _cachedElapsedTicks = elapsed.Ticks;
+            _cachedElapsedText = FormatElapsed(elapsed);
+        }
+
+        return _cachedElapsedText;
     }
 
     private static string FormatElapsed(TimeSpan elapsed)
