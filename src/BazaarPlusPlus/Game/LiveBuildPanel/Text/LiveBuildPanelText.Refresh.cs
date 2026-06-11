@@ -11,6 +11,12 @@ namespace BazaarPlusPlus.Game.LiveBuildPanel;
 
 internal static partial class LiveBuildPanelText
 {
+    private static readonly LocalizedTextSet CorpusCardTitleText = new(
+        "Ten-Win Build Data",
+        "十胜阵容数据",
+        "十勝陣容資料",
+        "十勝陣容資料"
+    );
     private static readonly LocalizedTextSet RefreshFinalBuildsText = new(
         "Pull Builds",
         "拉取阵容",
@@ -24,17 +30,11 @@ internal static partial class LiveBuildPanelText
         "正在拉取十勝陣容...",
         "正在拉取十勝陣容..."
     );
-    private static readonly LocalizedTextSet FinalBuildRefreshAlreadyRunningText = new(
-        "Build pull is already in progress.",
-        "阵容拉取进行中。",
-        "陣容拉取進行中。",
-        "陣容拉取進行中。"
-    );
-    private static readonly LocalizedTextSet FinalBuildRefreshSucceededText = new(
-        "Ten-win builds updated.",
-        "十胜阵容已更新。",
-        "十勝陣容已更新。",
-        "十勝陣容已更新。"
+    private static readonly LocalizedTextSet CorpusEmptyText = new(
+        "No build data yet. Pull to load.",
+        "尚未加载阵容数据，点击拉取。",
+        "尚未載入陣容資料，點擊拉取。",
+        "尚未載入陣容資料，點擊拉取。"
     );
     private static readonly LocalizedTextSet CorpusDataTimeLabelText = new(
         "data",
@@ -55,18 +55,33 @@ internal static partial class LiveBuildPanelText
         "位英雄"
     );
 
+    public static string CorpusCardTitle() => L.Resolve(CorpusCardTitleText);
+
     public static string RefreshFinalBuilds() => L.Resolve(RefreshFinalBuildsText);
 
     public static string Working() => L.Resolve(WorkingText);
 
     public static string RefreshingFinalBuilds() => L.Resolve(RefreshingFinalBuildsText);
 
-    public static string FinalBuildRefreshAlreadyRunning() =>
-        L.Resolve(FinalBuildRefreshAlreadyRunningText);
+    public static string CorpusEmpty() => L.Resolve(CorpusEmptyText);
 
-    public static string FinalBuildRefreshSucceeded() => L.Resolve(FinalBuildRefreshSucceededText);
+    // High-value fields only (data time + totals); the per-hero breakdown lives in
+    // CorpusSummaryTooltip so the corpus card body stays within its fixed two-line height.
+    public static string CorpusSummaryLine(TenWinCorpusSummary summary) =>
+        string.Join(" · ", CorpusSummaryParts(summary));
 
-    public static string FinalBuildRefreshDetail(TenWinCorpusSummary summary)
+    public static string CorpusSummaryTooltip(TenWinCorpusSummary summary)
+    {
+        var parts = CorpusSummaryParts(summary);
+        parts.AddRange(
+            summary
+                .HeroBuildCounts.Where(count => !string.IsNullOrWhiteSpace(count.Hero))
+                .Select(count => $"{count.Hero} {count.BuildCount}")
+        );
+        return string.Join(" · ", parts);
+    }
+
+    private static List<string> CorpusSummaryParts(TenWinCorpusSummary summary)
     {
         var parts = new List<string>();
         if (summary.GeneratedAtUtc.HasValue)
@@ -79,12 +94,7 @@ internal static partial class LiveBuildPanelText
 
         parts.Add($"{summary.BuildCount} {L.Resolve(CorpusBuildCountUnitText)}");
         parts.Add($"{summary.HeroCount} {L.Resolve(CorpusHeroCountUnitText)}");
-        parts.AddRange(
-            summary
-                .HeroBuildCounts.Where(count => !string.IsNullOrWhiteSpace(count.Hero))
-                .Select(count => $"{count.Hero} {count.BuildCount}")
-        );
-        return string.Join(" · ", parts);
+        return parts;
     }
 
     public static string FinalBuildRefreshFailed(string details) =>

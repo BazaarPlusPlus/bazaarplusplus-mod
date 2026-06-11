@@ -32,11 +32,11 @@ internal sealed class LiveBuildPanelSnapshot
 
     public bool FinalBuildRefreshButtonEnabled { get; init; } = true;
 
-    public string BuildRefreshStatusText { get; init; } = string.Empty;
+    public string CorpusStatusText { get; init; } = string.Empty;
 
-    public string BuildRefreshStatusDetailText { get; init; } = string.Empty;
+    public string CorpusStatusTooltip { get; init; } = string.Empty;
 
-    public LiveBuildRefreshSeverity BuildRefreshStatusSeverity { get; init; }
+    public LiveBuildRefreshSeverity CorpusStatusSeverity { get; init; }
 
     public IReadOnlyList<BPPSupporterSample> Supporters { get; init; } =
         Array.Empty<BPPSupporterSample>();

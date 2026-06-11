@@ -45,9 +45,10 @@ internal sealed class LiveBuildPanelView : IDisposable
     private Label? _title;
     private VisualElement? _subtitle;
     private Label? _candidateCount;
+    private Label? _corpusCardTitle;
     private Button? _finalBuildRefreshButton;
-    private Label? _buildRefreshStatus;
-    private Label? _buildRefreshDetailStatus;
+    private Label? _corpusStatus;
+    private Label? _resultCardTitle;
     private Label? _recommendationStatus;
     private Button? _previousButton;
     private Button? _nextButton;
@@ -128,28 +129,16 @@ internal sealed class LiveBuildPanelView : IDisposable
             snapshot.CandidateTemplateIds.Count
         );
         _candidateCount.tooltip = _candidateCount.text;
+        _corpusCardTitle!.text = LiveBuildPanelText.CorpusCardTitle();
         _finalBuildRefreshButton!.text = snapshot.FinalBuildRefreshButtonText;
         _finalBuildRefreshButton.tooltip = snapshot.FinalBuildRefreshButtonText;
         _finalBuildRefreshButton.SetEnabled(snapshot.FinalBuildRefreshButtonEnabled);
-        var hasBuildRefreshStatus = !string.IsNullOrWhiteSpace(snapshot.BuildRefreshStatusText);
-        _buildRefreshStatus!.text = StablePanelText.Compact(snapshot.BuildRefreshStatusText, 96);
-        _buildRefreshStatus.tooltip = snapshot.BuildRefreshStatusText;
-        _buildRefreshStatus.style.display = hasBuildRefreshStatus
-            ? DisplayStyle.Flex
-            : DisplayStyle.None;
-        _buildRefreshStatus.style.color = ResolveRefreshStatusColor(
-            snapshot.BuildRefreshStatusSeverity
-        );
-        _buildRefreshDetailStatus!.text = StablePanelText.Compact(
-            snapshot.BuildRefreshStatusDetailText,
-            260
-        );
-        _buildRefreshDetailStatus.tooltip = snapshot.BuildRefreshStatusDetailText;
-        _buildRefreshDetailStatus.style.display = string.IsNullOrWhiteSpace(
-            snapshot.BuildRefreshStatusDetailText
-        )
-            ? DisplayStyle.None
-            : DisplayStyle.Flex;
+        _corpusStatus!.text = StablePanelText.Compact(snapshot.CorpusStatusText, 96);
+        _corpusStatus.tooltip = string.IsNullOrWhiteSpace(snapshot.CorpusStatusTooltip)
+            ? snapshot.CorpusStatusText
+            : snapshot.CorpusStatusTooltip;
+        _corpusStatus.style.color = ResolveRefreshStatusColor(snapshot.CorpusStatusSeverity);
+        _resultCardTitle!.text = LiveBuildPanelText.ResultCardTitle();
         _recommendationStatus!.text = StablePanelText.Compact(snapshot.RecommendationStatus, 96);
         _recommendationStatus.tooltip = snapshot.RecommendationStatus;
         _previousButton!.text = LiveBuildPanelText.Previous();
@@ -350,38 +339,36 @@ internal sealed class LiveBuildPanelView : IDisposable
         _candidateCount.style.unityTextAlign = TextAnchor.MiddleCenter;
         rail.Add(_candidateCount);
 
-        var refreshStrip = new VisualElement();
-        refreshStrip.style.marginTop = 12f;
-        refreshStrip.style.height = Sizes.LiveBuildRefreshStripHeight;
-        refreshStrip.style.minHeight = Sizes.LiveBuildRefreshStripHeight;
-        refreshStrip.style.maxHeight = Sizes.LiveBuildRefreshStripHeight;
-        refreshStrip.style.flexDirection = FlexDirection.Row;
-        refreshStrip.style.alignItems = Align.Center;
-        refreshStrip.style.backgroundColor = Colors.HistoryStatusBackground;
-        refreshStrip.style.paddingLeft = 10f;
-        refreshStrip.style.paddingRight = 8f;
-        refreshStrip.style.paddingTop = 6f;
-        refreshStrip.style.paddingBottom = 6f;
-        refreshStrip.style.overflow = Overflow.Hidden;
-        rail.Add(refreshStrip);
+        // Corpus card: pull action + corpus state in one block. Fixed height on purpose — the
+        // body swaps copy in place (pending/failure/guidance/summary) instead of showing/hiding
+        // sibling boxes, so the rail never reflows on status changes. Refresh feedback stays in
+        // the rail (never a board-row empty text): row copy feeds geometry callbacks and would
+        // re-trigger preview redraws on every status change.
+        var corpusCard = new VisualElement();
+        corpusCard.style.marginTop = 12f;
+        corpusCard.style.height = Sizes.LiveBuildCorpusCardHeight;
+        corpusCard.style.minHeight = Sizes.LiveBuildCorpusCardHeight;
+        corpusCard.style.maxHeight = Sizes.LiveBuildCorpusCardHeight;
+        corpusCard.style.backgroundColor = Colors.HistoryStatusBackground;
+        corpusCard.style.paddingLeft = 12f;
+        corpusCard.style.paddingRight = 10f;
+        corpusCard.style.paddingTop = 10f;
+        corpusCard.style.paddingBottom = 10f;
+        corpusCard.style.overflow = Overflow.Hidden;
+        rail.Add(corpusCard);
 
-        var refreshTextColumn = new VisualElement();
-        refreshTextColumn.style.flexGrow = 1f;
-        refreshTextColumn.style.flexShrink = 1f;
-        refreshTextColumn.style.minWidth = 0f;
-        refreshTextColumn.style.minHeight = 0f;
-        refreshTextColumn.style.justifyContent = Justify.Center;
-        refreshTextColumn.style.overflow = Overflow.Hidden;
-        refreshStrip.Add(refreshTextColumn);
+        var corpusHeader = new VisualElement();
+        corpusHeader.style.flexDirection = FlexDirection.Row;
+        corpusHeader.style.alignItems = Align.Center;
+        corpusCard.Add(corpusHeader);
 
-        // Refresh feedback stays in the rail (never a board-row empty text): row copy feeds
-        // geometry callbacks and would re-trigger preview redraws on every status change.
-        _buildRefreshStatus = CreateLabel(14, FontStyle.Normal, Colors.HistoryStatusText);
-        _buildRefreshStatus.style.whiteSpace = WhiteSpace.Normal;
-        _buildRefreshStatus.style.maxHeight = Sizes.StatusHeight;
-        _buildRefreshStatus.style.overflow = Overflow.Hidden;
-        _buildRefreshStatus.style.display = DisplayStyle.None;
-        refreshTextColumn.Add(_buildRefreshStatus);
+        _corpusCardTitle = CreateLabel(15, FontStyle.Bold, Colors.HistorySectionTitleText);
+        _corpusCardTitle.style.flexGrow = 1f;
+        _corpusCardTitle.style.flexShrink = 1f;
+        _corpusCardTitle.style.minWidth = 0f;
+        _corpusCardTitle.style.whiteSpace = WhiteSpace.NoWrap;
+        _corpusCardTitle.style.overflow = Overflow.Hidden;
+        corpusHeader.Add(_corpusCardTitle);
 
         _finalBuildRefreshButton = CreateButton(
             LiveBuildPanelText.RefreshFinalBuilds(),
@@ -396,41 +383,43 @@ internal sealed class LiveBuildPanelView : IDisposable
         _finalBuildRefreshButton.style.maxHeight = Sizes.LiveBuildRefreshButtonHeight;
         _finalBuildRefreshButton.style.flexGrow = 0f;
         _finalBuildRefreshButton.style.flexShrink = 0f;
-        refreshStrip.Add(_finalBuildRefreshButton);
+        corpusHeader.Add(_finalBuildRefreshButton);
 
-        _buildRefreshDetailStatus = CreateLabel(
-            12,
-            FontStyle.Normal,
-            Colors.HistoryFooterSecondaryText
-        );
-        _buildRefreshDetailStatus.style.marginTop = 8f;
-        _buildRefreshDetailStatus.style.whiteSpace = WhiteSpace.Normal;
-        _buildRefreshDetailStatus.style.maxHeight = Sizes.LiveBuildRefreshDetailMaxHeight;
-        _buildRefreshDetailStatus.style.overflow = Overflow.Hidden;
-        _buildRefreshDetailStatus.style.backgroundColor = Colors.HistoryStatusBackground;
-        _buildRefreshDetailStatus.style.paddingLeft = 12f;
-        _buildRefreshDetailStatus.style.paddingRight = 12f;
-        _buildRefreshDetailStatus.style.paddingTop = 10f;
-        _buildRefreshDetailStatus.style.paddingBottom = 10f;
-        _buildRefreshDetailStatus.style.display = DisplayStyle.None;
-        rail.Add(_buildRefreshDetailStatus);
+        _corpusStatus = CreateLabel(13, FontStyle.Normal, Colors.HistoryStatusText);
+        _corpusStatus.style.marginTop = 8f;
+        _corpusStatus.style.whiteSpace = WhiteSpace.Normal;
+        _corpusStatus.style.maxHeight = Sizes.LiveBuildCorpusStatusMaxHeight;
+        _corpusStatus.style.overflow = Overflow.Hidden;
+        corpusCard.Add(_corpusStatus);
 
-        _recommendationStatus = CreateLabel(16, FontStyle.Normal, Colors.HistoryStatusText);
-        _recommendationStatus.style.marginTop = 12f;
+        // Result card: match status + recommendation paging, visually mirroring the corpus card
+        // so the rail reads as "data in, results out".
+        var resultCard = new VisualElement();
+        resultCard.style.marginTop = 12f;
+        resultCard.style.backgroundColor = Colors.HistoryStatusBackground;
+        resultCard.style.paddingLeft = 12f;
+        resultCard.style.paddingRight = 12f;
+        resultCard.style.paddingTop = 10f;
+        resultCard.style.paddingBottom = 10f;
+        resultCard.style.overflow = Overflow.Hidden;
+        rail.Add(resultCard);
+
+        _resultCardTitle = CreateLabel(15, FontStyle.Bold, Colors.HistorySectionTitleText);
+        _resultCardTitle.style.whiteSpace = WhiteSpace.NoWrap;
+        _resultCardTitle.style.overflow = Overflow.Hidden;
+        resultCard.Add(_resultCardTitle);
+
+        _recommendationStatus = CreateLabel(15, FontStyle.Normal, Colors.HistoryStatusText);
+        _recommendationStatus.style.marginTop = 8f;
         _recommendationStatus.style.whiteSpace = WhiteSpace.Normal;
         _recommendationStatus.style.maxHeight = Sizes.LiveBuildRecommendationStatusMaxHeight;
         _recommendationStatus.style.overflow = Overflow.Hidden;
-        _recommendationStatus.style.backgroundColor = Colors.HistoryStatusBackground;
-        _recommendationStatus.style.paddingLeft = 12f;
-        _recommendationStatus.style.paddingRight = 12f;
-        _recommendationStatus.style.paddingTop = 12f;
-        _recommendationStatus.style.paddingBottom = 12f;
-        rail.Add(_recommendationStatus);
+        resultCard.Add(_recommendationStatus);
 
         var nav = new VisualElement();
         nav.style.flexDirection = FlexDirection.Row;
-        nav.style.marginTop = 12f;
-        rail.Add(nav);
+        nav.style.marginTop = 10f;
+        resultCard.Add(nav);
 
         _previousButton = CreateButton(LiveBuildPanelText.Previous(), _previous);
         _previousButton.style.flexGrow = 1f;

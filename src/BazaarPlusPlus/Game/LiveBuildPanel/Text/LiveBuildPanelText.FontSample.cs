@@ -25,13 +25,16 @@ internal static partial class LiveBuildPanelText
         + EmptyBoard()
         + EmptyStash()
         + L.Resolve(TenWinLabelText)
+        + CorpusCardTitle()
+        + ResultCardTitle()
         + RefreshFinalBuilds()
         + Working()
         + RefreshingFinalBuilds()
-        + FinalBuildRefreshAlreadyRunning()
-        + FinalBuildRefreshSucceeded()
+        + CorpusEmpty()
+        // Success prefix glyph for the corpus summary line.
+        + "✓"
         // Fixed sample covering the corpus-summary labels/units plus every digit glyph.
-        + FinalBuildRefreshDetail(
+        + CorpusSummaryTooltip(
             new TenWinCorpusSummary(
                 new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
                 1234567890,

@@ -156,26 +156,28 @@ static void TestRefreshFinalBuildsTextsAreAtlasWarmed()
         "zh-CN pull-builds button copy should be 拉取阵容."
     );
 
+    var sampleSummary = new TenWinCorpusSummary(
+        new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
+        1234567890,
+        1234567890,
+        [
+            new TenWinHeroBuildCount("Vanessa", 1234567890),
+            new TenWinHeroBuildCount("Dooley", 987654321),
+        ]
+    );
     var sample = LiveBuildPanelText.FontAtlasSample();
     foreach (
         var text in new[]
         {
+            LiveBuildPanelText.CorpusCardTitle(),
+            LiveBuildPanelText.ResultCardTitle(),
             LiveBuildPanelText.RefreshFinalBuilds(),
             LiveBuildPanelText.Working(),
             LiveBuildPanelText.RefreshingFinalBuilds(),
-            LiveBuildPanelText.FinalBuildRefreshAlreadyRunning(),
-            LiveBuildPanelText.FinalBuildRefreshSucceeded(),
-            LiveBuildPanelText.FinalBuildRefreshDetail(
-                new TenWinCorpusSummary(
-                    new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
-                    1234567890,
-                    1234567890,
-                    [
-                        new TenWinHeroBuildCount("Vanessa", 1234567890),
-                        new TenWinHeroBuildCount("Dooley", 987654321),
-                    ]
-                )
-            ),
+            LiveBuildPanelText.CorpusEmpty(),
+            "✓",
+            LiveBuildPanelText.CorpusSummaryLine(sampleSummary),
+            LiveBuildPanelText.CorpusSummaryTooltip(sampleSummary),
             LiveBuildPanelText.FinalBuildRefreshFailed(LiveBuildPanelText.Unknown()),
         }
     )

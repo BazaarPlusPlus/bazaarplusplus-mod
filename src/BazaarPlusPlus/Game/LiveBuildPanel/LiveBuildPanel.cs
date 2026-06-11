@@ -45,9 +45,8 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private bool _isVisible;
     private int _recommendationIndex;
     private bool _buildRefreshInProgress;
-    private string _buildRefreshStatusText = string.Empty;
-    private string _buildRefreshStatusDetailText = string.Empty;
-    private LiveBuildRefreshSeverity _buildRefreshStatusSeverity;
+    private string _buildRefreshError = string.Empty;
+    private bool _buildRefreshSucceeded;
     private int _buildRefreshOperationVersion;
 
     public static bool IsVisible => _instance?._isVisible == true;
@@ -140,9 +139,12 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         _candidateState.Clear();
         _recommendationIndex = 0;
         // A refresh still in flight keeps its pending status visible; otherwise drop the previous
-        // session's one-shot success/failure feedback.
+        // session's one-shot success/failure feedback so the card reopens on the plain summary.
         if (!_buildRefreshInProgress)
-            SetBuildRefreshStatus(string.Empty, LiveBuildRefreshSeverity.Neutral);
+        {
+            _buildRefreshError = string.Empty;
+            _buildRefreshSucceeded = false;
+        }
         _liveSnapshot = _reader.Read();
         RefreshRecommendations();
         RefreshViewAndPreview();
@@ -218,24 +220,14 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 
     private void TryRefreshFinalBuilds()
     {
-        if (!_isVisible)
+        // The pull button is disabled while a refresh runs; the in-progress check only guards
+        // against re-entry races, the card already shows the pending status.
+        if (!_isVisible || _buildRefreshInProgress)
             return;
-
-        if (_buildRefreshInProgress)
-        {
-            SetBuildRefreshStatus(
-                LiveBuildPanelText.FinalBuildRefreshAlreadyRunning(),
-                LiveBuildRefreshSeverity.Pending
-            );
-            RefreshRailView();
-            return;
-        }
 
         _buildRefreshInProgress = true;
-        SetBuildRefreshStatus(
-            LiveBuildPanelText.RefreshingFinalBuilds(),
-            LiveBuildRefreshSeverity.Pending
-        );
+        _buildRefreshError = string.Empty;
+        _buildRefreshSucceeded = false;
         RefreshRailView();
         _ = RefreshFinalBuildsAsync(_buildRefreshOperationVersion);
     }
@@ -260,26 +252,22 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         _buildRefreshInProgress = false;
         if (result.Succeeded)
         {
-            var summary = _recommendations.GetCorpusSummary();
-            SetBuildRefreshStatus(
-                LiveBuildPanelText.FinalBuildRefreshSucceeded(),
-                LiveBuildRefreshSeverity.Success,
-                summary.HasValue
-                    ? LiveBuildPanelText.FinalBuildRefreshDetail(summary.Value)
-                    : string.Empty
-            );
+            // No standalone success copy: the card's summary line refreshes (new data time)
+            // and the success severity tints it for this session.
+            _buildRefreshError = string.Empty;
+            _buildRefreshSucceeded = true;
             BppLog.Info("LiveBuildPanel", "Manual ten-win builds refresh succeeded.");
         }
         else
         {
-            var error = string.IsNullOrWhiteSpace(result.Error)
+            _buildRefreshError = string.IsNullOrWhiteSpace(result.Error)
                 ? LiveBuildPanelText.Unknown()
                 : result.Error!;
-            SetBuildRefreshStatus(
-                LiveBuildPanelText.FinalBuildRefreshFailed(error),
-                LiveBuildRefreshSeverity.Failure
+            _buildRefreshSucceeded = false;
+            BppLog.Warn(
+                "LiveBuildPanel",
+                $"Manual ten-win builds refresh failed error={_buildRefreshError}."
             );
-            BppLog.Warn("LiveBuildPanel", $"Manual ten-win builds refresh failed error={error}.");
         }
 
         if (!_isVisible || _view == null)
@@ -295,20 +283,6 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         {
             RefreshRailView();
         }
-    }
-
-    private void SetBuildRefreshStatus(
-        string statusText,
-        LiveBuildRefreshSeverity severity,
-        string detailText = ""
-    )
-    {
-        _buildRefreshStatusText = statusText;
-        _buildRefreshStatusDetailText = detailText;
-        _buildRefreshStatusSeverity =
-            string.IsNullOrWhiteSpace(statusText) && string.IsNullOrWhiteSpace(detailText)
-                ? LiveBuildRefreshSeverity.Neutral
-                : severity;
     }
 
     // Status-only updates redraw the UITK tree without restarting the native preview coroutine:
@@ -381,6 +355,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
             _liveSnapshot.StashItems
         );
         var recommendation = _matches.Count > 0 ? _matches[_recommendationIndex] : null;
+        var corpusStatus = ResolveCorpusStatus();
         var finalBuild =
             recommendation?.Board
             ?? new BppItemBoard(
@@ -405,22 +380,48 @@ internal sealed class LiveBuildPanel : MonoBehaviour
                 ? LiveBuildPanelText.Working()
                 : LiveBuildPanelText.RefreshFinalBuilds(),
             FinalBuildRefreshButtonEnabled = !_buildRefreshInProgress,
-            BuildRefreshStatusText = _buildRefreshStatusText,
-            BuildRefreshStatusDetailText = ResolveBuildRefreshDetailText(),
-            BuildRefreshStatusSeverity = _buildRefreshStatusSeverity,
+            CorpusStatusText = corpusStatus.Text,
+            CorpusStatusTooltip = corpusStatus.Tooltip,
+            CorpusStatusSeverity = corpusStatus.Severity,
             Supporters = _supporters,
         };
     }
 
-    private string ResolveBuildRefreshDetailText()
+    // The corpus card body is one state-multiplexed line set: pending > failure > empty-corpus
+    // guidance > summary. Success has no standalone copy — the refreshed summary line itself is
+    // the evidence, tinted by the success severity until the next state change.
+    private (string Text, string Tooltip, LiveBuildRefreshSeverity Severity) ResolveCorpusStatus()
     {
-        if (!string.IsNullOrWhiteSpace(_buildRefreshStatusDetailText))
-            return _buildRefreshStatusDetailText;
+        if (_buildRefreshInProgress)
+            return (
+                LiveBuildPanelText.RefreshingFinalBuilds(),
+                string.Empty,
+                LiveBuildRefreshSeverity.Pending
+            );
 
         var summary = _recommendations.GetCorpusSummary();
-        return summary.HasValue
-            ? LiveBuildPanelText.FinalBuildRefreshDetail(summary.Value)
+        var tooltip = summary.HasValue
+            ? LiveBuildPanelText.CorpusSummaryTooltip(summary.Value)
             : string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(_buildRefreshError))
+            return (
+                LiveBuildPanelText.FinalBuildRefreshFailed(_buildRefreshError),
+                tooltip,
+                LiveBuildRefreshSeverity.Failure
+            );
+
+        if (!summary.HasValue)
+            return (
+                LiveBuildPanelText.CorpusEmpty(),
+                string.Empty,
+                LiveBuildRefreshSeverity.Neutral
+            );
+
+        var line = LiveBuildPanelText.CorpusSummaryLine(summary.Value);
+        return _buildRefreshSucceeded
+            ? ($"✓ {line}", tooltip, LiveBuildRefreshSeverity.Success)
+            : (line, tooltip, LiveBuildRefreshSeverity.Neutral);
     }
 
     private IEnumerable<BppItemBoard> BuildSelectableBoards()

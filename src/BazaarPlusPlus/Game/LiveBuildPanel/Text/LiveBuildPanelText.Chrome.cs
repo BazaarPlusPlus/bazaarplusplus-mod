@@ -42,6 +42,12 @@ internal static partial class LiveBuildPanelText
         "箱子物品",
         "箱子物品"
     );
+    private static readonly LocalizedTextSet ResultCardTitleText = new(
+        "Matches",
+        "匹配结果",
+        "匹配結果",
+        "匹配結果"
+    );
     private static readonly LocalizedTextSet CloseText = new("Close", "关闭", "關閉", "關閉");
     private static readonly LocalizedTextSet PrevText = new(
         "Previous",
@@ -62,6 +68,8 @@ internal static partial class LiveBuildPanelText
     public static string BoardRow() => L.Resolve(BoardRowText);
 
     public static string StashRow() => L.Resolve(StashRowText);
+
+    public static string ResultCardTitle() => L.Resolve(ResultCardTitleText);
 
     public static string Close() => L.Resolve(CloseText);
 
