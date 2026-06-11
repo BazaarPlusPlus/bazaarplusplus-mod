@@ -41,8 +41,6 @@ internal static class ItemVisualsArtReplacePatch
 
             if (__instance == null || __instance.gameObject == null)
                 return;
-            if (!__instance.gameObject.activeInHierarchy)
-                return;
 
             if (!CardArtInjector.TryResolveCard(__instance, out var card) || card == null)
                 return;
