@@ -17,7 +17,8 @@ calibrated: 2026-06-11
 
 ## Revision Log
 
-- **2026-06-11 red-team calibration.** Original draft included a third task patching `RewardController.Setup(string, Card)`. Ruled out: the sole call site is `AssetLoader.ConstructInstantiateReward` (`decompiled/TheBazaarRuntime/AssetLoader.cs:354-378`, awaited at `:370`), reached only through the `ECardType.EncounterStep` arm of `AssetLoader.InstantiateCardAsync` (`decompiled/TheBazaarRuntime/AssetLoader.cs:277-278`). Package cards are `ECardType.Item` templates and always route through `ConstructAndInstantiateCard` → `ItemController` → `ItemVisualsController` (`decompiled/TheBazaarRuntime/AssetLoader.cs:273-274`), which Tasks 1-2 cover. A `RewardController` patch would be dead code. Also added: test-csproj game-DLL references (Task 1 Step 0), a guarded static-data fallback, and cite corrections.
+- **2026-06-11 red-team calibration.** Original draft included a third task patching `RewardController.Setup(string, Card)`. Temporarily ruled out (see next entry). Also added: test-csproj game-DLL references (Task 1 Step 0), a guarded static-data fallback, and cite corrections.
+- **2026-06-11 in-game validation: RewardController task reinstated.** Tasks 1-2 shipped, but the user observed the package icon on the encounter-choice ("event") surface still showing native art. The earlier rule-out assumed `thisCard.TemplateId` always resolves to an `EncounterStep` template; that assumption is wrong. `DTOUtils.CreateCard` sets runtime `Card.Type` from the server DTO independently of the template, and attaches `card.Template` by `TemplateId` lookup (`decompiled/TheBazaarRuntime/TheBazaar/DTOUtils.cs:57-70`). The server presents a package choice card as a runtime `ECardType.EncounterStep` card whose `TemplateId` is the package item template — which is exactly why the native package artwork renders there: `ConstructInstantiateReward` loads `GetCardById(thisCard.TemplateId).ArtKey` (`decompiled/TheBazaarRuntime/AssetLoader.cs:362-370`). Live `GameData.db` confirms no encounter-type template shares a package `ArtKey`, so the observed native package art can only come from the package item template id. `BoardManager` asserts `EncounterStep` cards are rendered by `RewardController` (`decompiled/TheBazaarRuntime/BoardManager.cs:3114-3123`). Task 3 (reward patch) is therefore real coverage, not dead code; because `card.Template` is the tagged package `TCardItem`, the Task 1 identity fallback and the template-id-keyed texture catalog both hit with no extra mapping.
 
 ## Background
 
@@ -33,7 +34,8 @@ Runtime `Card.HiddenTags` is not guaranteed to contain static template hidden ta
 
 - Make enabled package-card art replacement behave consistently across:
   - CollectionPanel package previews.
-  - Live item visuals that flow through `ItemVisualsController` (board, shop, loot/choice screens, recap).
+  - Live item visuals that flow through `ItemVisualsController` (board, shop, recap).
+  - Encounter-choice / reward cards rendered by `RewardController` (runtime `ECardType.EncounterStep` cards whose `TemplateId` is a package item template).
 - Preserve `EHiddenTag.Package` as the only package identity source.
 - Avoid package-name / art-key substring matching.
 - Avoid changing the custom-art catalog format, embedded resource layout, or on-disk `CustomCardArt` directory behavior.
@@ -55,9 +57,11 @@ The current `ItemVisualsSetupCardArtIdentityPatch` tracks the card in a postfix 
 
 Board cards often have an `ItemController` parent that can provide `CardData` (`src/BazaarPlusPlus/GameInterop/CardArtReplacement/CardArtInjector.cs:49-54`; `CardData` is inherited from `CardController`, `decompiled/TheBazaarRuntime/CardController.cs:183`), but not every `ItemVisualsController` consumer is under `ItemController`. Recap visuals call `visualsController.Setup(CardData)` from `RecapItemVisualController` (`decompiled/TheBazaarRuntime/TheBazaar/RecapItemVisualController.cs:92-105`), which binds to the same patched `Setup(Card, BazaarCollectionLoadout = null)` overload — so the weak-table identity binding must happen in a prefix, before native setup starts.
 
-### Ruled out: RewardController is not a package surface
+### Cause 3: Package choice cards bypass ItemVisualsController via RewardController
 
-The original draft treated `RewardController.Setup(string artKey, Card card)` (`decompiled/TheBazaarRuntime/RewardController.cs:138-153`) as an uncovered normal-gameplay surface. Card instantiation dispatches on `ECardType` (`decompiled/TheBazaarRuntime/AssetLoader.cs:266-288`): `ECardType.Item` → `ConstructAndInstantiateCard` (the `ItemController`/`ItemVisualsController` path), and only `ECardType.EncounterStep` → `ConstructInstantiateReward` → `RewardController`. Package cards are `ECardType.Item`, so they never reach `RewardController`; loot/choice screens render them through the `ItemVisualsController` path covered by this fix. No `RewardController` patch ships. If in-game validation surfaces a package rendered with native art outside `ItemVisualsController`, root-cause that surface first rather than resurrecting the reward patch on spec.
+Card instantiation dispatches on **runtime** `Card.Type` (`decompiled/TheBazaarRuntime/AssetLoader.cs:266-288`), and `DTOUtils.CreateCard` sets that type from the server DTO independently of the template (`decompiled/TheBazaarRuntime/TheBazaar/DTOUtils.cs:57-61`). When the server presents a package as an encounter-choice / reward card, the runtime card is `ECardType.EncounterStep` with `TemplateId` pointing at the package item template, so it routes to `ConstructInstantiateReward` → `RewardController.Setup(string artKey, Card card)` (`decompiled/TheBazaarRuntime/AssetLoader.cs:354-378`), which loads the package's native art by `ArtKey` and writes it to `_MainTex` on its own material (`decompiled/TheBazaarRuntime/RewardController.cs:138-153`) — never touching `ItemVisualsController.SetCardFrameMaterial`.
+
+Confirmed in-game (icon on the encounter-choice surface stayed native after Tasks 1-2) and in live `GameData.db` (no encounter-type template shares a package `ArtKey`, so the native package art there can only come from the package item template id). Because `DTOUtils.PopulateTemplateAsync` attaches the package `TCardItem` as `card.Template` (`decompiled/TheBazaarRuntime/TheBazaar/DTOUtils.cs:64-71`), the Task 1 identity policy already classifies these cards as packages, and the texture catalog is keyed by the same `TemplateId` — only the material write is missing.
 
 ## Solution
 
@@ -80,6 +84,19 @@ Change `ItemVisualsSetupCardArtIdentityPatch` from postfix to prefix so `CardArt
 
 Keep `ItemVisualsArtReplacePatch` on `SetCardFrameMaterial`. After the identity resolver is fixed, this existing patch remains the correct material chokepoint because native setup creates the per-card material instance and assigns it to the illustration renderer before the postfix runs (`decompiled/TheBazaarRuntime/TheBazaar.Game.CardFrames/ItemVisualsController.cs:189-217`).
 
+### Reward / Encounter-Choice Path
+
+Add a Harmony postfix on `RewardController.Setup(string artKey, Card card)` (`async Task`; Harmony patches the kickoff stub) that rebinds `ref Task __result` to a wrapper which awaits native setup, then writes the custom package texture if:
+
+- the setting is enabled,
+- `card` resolves as a package through the centralized identity policy (its `Template` is the tagged package `TCardItem`),
+- `CardArtReplacementFeature.Current.TryGetTexture(card.TemplateId, ...)` succeeds,
+- native setup produced a reward `instancedMaterial` (private field, read via reflection).
+
+Write the texture to `_MainTex` explicitly, mirroring the native write (`decompiled/TheBazaarRuntime/RewardController.cs:149-151`) — this material's shader contract is proven by native code, so do not route through `CardArtInjector.Apply`'s `_BaseMap`/`mainTexture` heuristics. Do not gate on `activeInHierarchy`: the sole caller awaits the returned task **before** activating the object (`decompiled/TheBazaarRuntime/AssetLoader.cs:370-376`), so the apply runs while the reward is still inactive — which also means the swap completes before the card becomes visible. Do not add `ConfigureAwait(false)`; the continuation must stay on the Unity main thread.
+
+Known benign edge: on pooled reuse where the new card's native texture load fails, native `Setup` early-returns leaving the prior card's `instancedMaterial`; for a package card the patch then paints the custom package art over it, which is the desired visual anyway.
+
 ### What Not To Change
 
 - Do not broaden `CardPreviewItemArtReplacePatch` by removing `CollectionPanelOwnedMarker`. That patch currently relies on CollectionPanel's material cache and ownership marker (`src/BazaarPlusPlus/Patches/CollectionPanel/CollectionItemLoadArtPatch.cs:12-35`, `src/BazaarPlusPlus/Patches/CardArtReplacement/CardPreviewItemArtReplacePatch.cs:22-27`). Normal gameplay coverage comes from the live item path.
@@ -99,6 +116,8 @@ Keep `ItemVisualsArtReplacePatch` on `SetCardFrameMaterial`. After the identity 
   - Keep live item material replacement on `SetCardFrameMaterial`.
 - Modify `tests/CardArtReplacement.Tests/CardArtReplacementTests.cs`
   - Add focused tests for runtime hidden-tag identity and template hidden-tag fallback.
+- Create `src/BazaarPlusPlus/Patches/CardArtReplacement/RewardControllerArtReplacePatch.cs`
+  - Postfix `RewardController.Setup(string, Card)`; wrap the returned `Task`; write `_MainTex` on the reflected `instancedMaterial` after native setup completes.
 
 ## Implementation Tasks
 
@@ -109,7 +128,7 @@ Keep `ItemVisualsArtReplacePatch` on `SetCardFrameMaterial`. After the identity 
 - Modify: `tests/CardArtReplacement.Tests/CardArtReplacementTests.cs`
 - Modify: `src/BazaarPlusPlus/GameInterop/CardArtReplacement/CardArtInjector.cs`
 
-- [ ] **Step 0: Add game assembly references to the test project**
+- [x] **Step 0: Add game assembly references to the test project**
 
 In `CardArtReplacement.Tests.csproj`, add to the existing game-reference `ItemGroup`:
 
@@ -124,7 +143,7 @@ In `CardArtReplacement.Tests.csproj`, add to the existing game-reference `ItemGr
 
 `$(ManagedPath)` is already resolved by this csproj. Copy-local defaults put both DLLs in the test bin, which is required for the xunit host to construct `Card` at runtime (this is the first xunit project in the repo to load game DLLs at runtime — existing game-DLL test projects are exe-runners; treat a `FileNotFoundException`/`TypeLoadException` for game assemblies as the expected first failure mode to debug, not an assertion failure).
 
-- [ ] **Step 1: Add failing identity tests**
+- [x] **Step 1: Add failing identity tests**
 
 Add these tests to `CardArtReplacementTests`:
 
@@ -194,7 +213,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.GameInterop.CardArtReplacement;
 ```
 
-- [ ] **Step 2: Run the focused test and verify the new fallback test fails**
+- [x] **Step 2: Run the focused test and verify the new fallback test fails**
 
 Run:
 
@@ -204,7 +223,7 @@ dotnet test tests/CardArtReplacement.Tests/CardArtReplacement.Tests.csproj --fil
 
 Expected: `Package_identity_accepts_template_hidden_tag_when_runtime_tags_are_empty` fails before implementation.
 
-- [ ] **Step 3: Implement template-backed identity**
+- [x] **Step 3: Implement template-backed identity**
 
 In `CardArtInjector.cs`, add:
 
@@ -255,7 +274,7 @@ private static bool IsPackageTemplate(ITCard? card) =>
     PackageIdentity.IsPackage(card?.HiddenTags);
 ```
 
-- [ ] **Step 4: Run the focused tests and verify they pass**
+- [x] **Step 4: Run the focused tests and verify they pass**
 
 Run:
 
@@ -270,7 +289,7 @@ Expected: all three `Package_identity_*` tests pass.
 **Files:**
 - Modify: `src/BazaarPlusPlus/Patches/CardArtReplacement/ItemVisualsArtReplacePatch.cs`
 
-- [ ] **Step 1: Move tracking from postfix to prefix**
+- [x] **Step 1: Move tracking from postfix to prefix**
 
 Replace the current identity patch method:
 
@@ -294,7 +313,7 @@ private static void Prefix(ItemVisualsController __instance, Card card)
 
 This makes the weak-table binding available before native `Setup(Card, BazaarCollectionLoadout)` reaches the `SetCardFrameMaterial(...)` call, regardless of whether the intervening awaits complete synchronously.
 
-- [ ] **Step 2: Build the main plugin**
+- [x] **Step 2: Build the main plugin**
 
 Run:
 
@@ -304,7 +323,26 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj
 
 Expected: build succeeds with no Harmony signature errors.
 
-### Task 3: Run Focused And Full Verification
+### Task 3: Patch RewardController Setup
+
+**Files:**
+- Create: `src/BazaarPlusPlus/Patches/CardArtReplacement/RewardControllerArtReplacePatch.cs`
+
+- [ ] **Step 1: Add the reward replacement patch**
+
+Create `RewardControllerArtReplacePatch.cs` per the Reward / Encounter-Choice Path design: postfix on `Setup(string, Card)` with `ref Task __result`, async wrapper awaiting native setup, policy + `IsPackageCard` + `TryGetTexture` gates, reflected `instancedMaterial`, explicit `_MainTex` write, single compact `Warn` on exception.
+
+- [ ] **Step 2: Build the main plugin**
+
+Run:
+
+```bash
+dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj
+```
+
+Expected: build succeeds. If `RewardController.Setup` signature changed in the installed game, the build or Harmony runtime log will expose that drift; re-check `decompiled/TheBazaarRuntime/RewardController.cs:138-153` before changing the patch shape.
+
+### Task 4: Run Focused And Full Verification
 
 **Files:**
 - No source edits in this task unless a previous step fails.
@@ -355,9 +393,10 @@ Use this checklist in one game session:
 
 - `Package Swap` / `掉包快递` is enabled in BazaarPlusPlus settings.
 - CollectionPanel package tab still shows custom package art.
-- A normal live package item visual that uses `ItemVisualsController` (board, shop, loot/choice screen) shows custom package art.
-- Non-package items keep native art.
-- Turning the setting off prevents replacement on newly loaded item visuals.
+- A normal live package item visual that uses `ItemVisualsController` (board, shop) shows custom package art.
+- A package presented on the encounter-choice / reward surface (`RewardController` path) shows custom package art.
+- Non-package items and non-package encounter choices keep native art.
+- Turning the setting off prevents replacement on newly loaded item/reward visuals.
 - Live hover/tooltip preview of a package (CardPreviewItem path) is expected to keep native art — out of scope, not a failure.
 
 - [ ] **Step 6: Check BepInEx log**
@@ -369,7 +408,7 @@ Expected:
 - No repeated `CardArtReplacement` warning spam.
 - Startup still reports the custom card art catalog count.
 
-### Task 4: Review Diff
+### Task 5: Review Diff
 
 **Files:**
 - No source edits in this task.
@@ -390,7 +429,7 @@ Expected: no matches.
 Run:
 
 ```bash
-git diff -- docs/plans/package-card-art-live-game-replacement-fix.md docs/README.md src/BazaarPlusPlus/GameInterop/CardArtReplacement/CardArtInjector.cs src/BazaarPlusPlus/Patches/CardArtReplacement/ItemVisualsArtReplacePatch.cs tests/CardArtReplacement.Tests/CardArtReplacement.Tests.csproj tests/CardArtReplacement.Tests/CardArtReplacementTests.cs
+git diff -- docs/plans/package-card-art-live-game-replacement-fix.md docs/README.md src/BazaarPlusPlus/GameInterop/CardArtReplacement/CardArtInjector.cs src/BazaarPlusPlus/Patches/CardArtReplacement/ItemVisualsArtReplacePatch.cs src/BazaarPlusPlus/Patches/CardArtReplacement/RewardControllerArtReplacePatch.cs tests/CardArtReplacement.Tests/CardArtReplacement.Tests.csproj tests/CardArtReplacement.Tests/CardArtReplacementTests.cs
 ```
 
 Expected:
@@ -414,13 +453,17 @@ Expected:
 - **Risk: Broadening `CardPreviewItem` replacement affects store / collection skin UI.**
   Mitigation: do not broaden the marker-gated `CardPreviewItem` patch in this fix.
 
+- **Risk: `RewardController` private field name (`instancedMaterial`) drifts in a future game build.**
+  Mitigation: one small reflection lookup in a separate patch; if the field is absent the patch returns without touching native reward setup, and exceptions surface as a single compact `Warn`.
+
 - **Risk: A live material shader ignores `mainTexture`.**
   Mitigation: `CardArtInjector.Apply(Material, Texture2D)` first tries the game's `_BaseMap` shader property (`CardArtShaderVariables.EncounterBaseMap`, `decompiled/TheBazaarRuntime/TheBazaar.Utilities.Shaders/CardArtShaderVariables.cs:47`) and then sets `material.mainTexture` (`src/BazaarPlusPlus/GameInterop/CardArtReplacement/CardArtInjector.cs:76-89`).
 
 ## Acceptance Criteria
 
 - With `Package Swap` / `掉包快递` enabled, CollectionPanel package art remains replaced.
-- With the same setting enabled, package cards in normal gameplay item visuals (board, shop, loot/choice screens, recap) are replaced.
+- With the same setting enabled, package cards in normal gameplay item visuals (board, shop, recap) are replaced.
+- With the same setting enabled, package cards on the encounter-choice / reward surface (`RewardController`) are replaced.
 - Non-package cards are not replaced, even when their name or art key contains package-like text.
 - Live hover/tooltip previews through `CardPreviewItem` outside CollectionPanel intentionally keep native art (out of scope).
 - The implementation uses only `EHiddenTag.Package` through `PackageIdentity`.
