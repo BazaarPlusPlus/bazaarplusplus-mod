@@ -146,10 +146,6 @@ internal static class BazaarDbSnapshotClientTests
                     RunId = "run-1",
                     Status = "completed",
                     EndedAtUtc = "2026-06-03T12:30:00.000Z",
-                    Battles =
-                    [
-                        new BattleProjection { BattleId = "battle-nested", RunId = "run-1" },
-                    ],
                 },
                 BattleProjections =
                 [
@@ -161,7 +157,7 @@ internal static class BazaarDbSnapshotClientTests
 
         Assert(
             json["run_projection"]?["battles"] == null,
-            "RunProjection.Battles is not part of the V4 wire contract."
+            "Nested run_projection.battles is not part of the V4 wire contract."
         );
         Assert(
             json["battle_projections"] is JArray,

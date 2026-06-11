@@ -84,10 +84,6 @@ var summaryRevealDetectorType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.EndOfRunSummaryRevealDetector",
     throwOnError: true
 )!;
-var continueStateEvaluatorType = RequireType(
-    assembly,
-    "BazaarPlusPlus.Game.Screenshots.EndOfRunContinueStateEvaluator"
-);
 var summaryRevealStateType = assembly.GetType(
     "BazaarPlusPlus.Game.Screenshots.EndOfRunSummaryRevealState",
     throwOnError: true
@@ -212,41 +208,6 @@ Assert(
     "Summary reveal state enum should expose the expected states."
 );
 
-Assert(
-    InvokeShouldAllowContinue(
-        continueStateEvaluatorType,
-        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
-            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(),
-            transitionCount: 1
-        ),
-        suppressWhileCaptureInFlight: false
-    ),
-    "Continue should no longer depend on the game's end-of-run transition state once the time gate has opened."
-);
-Assert(
-    !InvokeShouldAllowContinue(
-        continueStateEvaluatorType,
-        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
-            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
-                new TheBazaar.UI.EndOfRun.FakeItemController(true)
-            )
-        ),
-        suppressWhileCaptureInFlight: true
-    ),
-    "Continue should stay disabled while an automatic screenshot is still suppressing input."
-);
-Assert(
-    InvokeShouldAllowContinue(
-        continueStateEvaluatorType,
-        new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
-            new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(
-                new TheBazaar.UI.EndOfRun.FakeItemController(true)
-            )
-        ),
-        suppressWhileCaptureInFlight: false
-    ),
-    "Mouse blocking should clear once reveal is complete and no transition is active."
-);
 Console.WriteLine("End-of-run screenshot gate checks passed.");
 
 static bool InvokeShouldCaptureOnContinue(
@@ -387,29 +348,6 @@ static string InvokeGetSummaryRevealState(
         ?? throw new InvalidOperationException("Reveal state enum name was null.");
 }
 
-static bool InvokeShouldAllowContinue(
-    Type type,
-    object screenController,
-    bool suppressWhileCaptureInFlight
-)
-{
-    var method = type.GetMethod("ShouldAllowContinue", BindingFlags.Public | BindingFlags.Static);
-    if (method == null)
-    {
-        throw new InvalidOperationException(
-            $"Method not found: {type.FullName}.ShouldAllowContinue"
-        );
-    }
-
-    return (bool)(method.Invoke(null, [screenController, suppressWhileCaptureInFlight]) ?? false);
-}
-
-static Type RequireType(Assembly assembly, string fullName)
-{
-    return assembly.GetType(fullName, throwOnError: true)
-        ?? throw new InvalidOperationException($"Type not found: {fullName}");
-}
-
 static void Assert(bool condition, string message)
 {
     if (!condition)
@@ -421,12 +359,10 @@ namespace TheBazaar.UI.EndOfRun
     public sealed class EndOfRunScreenController
     {
         private readonly object? _activeController;
-        private readonly int _transitionCount;
 
-        public EndOfRunScreenController(object? activeController, int transitionCount = 0)
+        public EndOfRunScreenController(object? activeController)
         {
             _activeController = activeController;
-            _transitionCount = transitionCount;
         }
     }
 
