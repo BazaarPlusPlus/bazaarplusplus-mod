@@ -1,0 +1,18 @@
+src/BazaarPlusPlus/BazaarPlusPlus.csproj
+  h_518331e5a07dc9 288
+Directory.Build.props
+  h_518331e5a07dc9 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e6eb050c6c876f6e826aa3bc7f7bea1c0a6e96a7",
+  "prompts": {},
+  "humans": {
+    "h_518331e5a07dc9": {
+      "author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
