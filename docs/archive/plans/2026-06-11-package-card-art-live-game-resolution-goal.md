@@ -1,7 +1,11 @@
 ---
-status: active
+status: implemented
+archived: 2026-06-12
 calibrated: 2026-06-11
+superseded-by: code
 ---
+
+> Status: IMPLEMENTED. The live-game package-card art resolution goal was met — both `ItemVisualsController` and `RewardController` paths apply custom package art (verified `src/BazaarPlusPlus/Patches/CardArtReplacement/`). Retained as the runtime-validation goal record.
 
 # Package Card Art Live Game Resolution Goal
 

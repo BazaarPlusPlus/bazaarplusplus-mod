@@ -1,7 +1,11 @@
 ---
-status: active
+status: implemented
+archived: 2026-06-12
 calibrated: 2026-06-11
+superseded-by: code
 ---
+
+> Status: IMPLEMENTED. Template-backed package identity, prefix identity binding, and `RewardControllerArtReplacePatch` all shipped (verified `CardArtInjector.IsPackageCard`, `ItemVisualsArtReplacePatch.cs` prefix, `RewardControllerArtReplacePatch.cs` present). Retained as the root-cause/decompiled-evidence record.
 
 # Package Card Art Live Game Replacement Fix Implementation Plan
 

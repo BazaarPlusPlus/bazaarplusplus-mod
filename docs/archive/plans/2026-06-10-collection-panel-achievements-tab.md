@@ -1,8 +1,11 @@
 ---
-status: proposed
+status: superseded
+archived: 2026-06-12
 calibrated: 2026-06-10
-note: "Plan for adding a CollectionPanel Achievements tab backed by BPP-owned card definitions. Implementation has not started."
+superseded-by: docs/plans/achievement-service-design.md, docs/plans/achievement-ui-local-mvp.md
 ---
+
+> Status: SUPERSEDED. This earlier proposal was red-teamed (its `CollectionSelectedCardDto`/left-rail/`placeholderArtKey` shapes were found fictional) and split into the active `achievement-service-design.md` + `achievement-ui-local-mvp.md`. Retained for history.
 
 # CollectionPanel Achievements Tab Plan
 

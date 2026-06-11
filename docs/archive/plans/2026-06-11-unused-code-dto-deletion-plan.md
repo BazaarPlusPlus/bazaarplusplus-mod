@@ -1,3 +1,11 @@
+---
+status: implemented
+archived: 2026-06-12
+superseded-by: code
+---
+
+> Status: IMPLEMENTED. All four deletions shipped — `ShopForecastLogPatch.cs`, `RunIdFactory.cs`, `EndOfRunContinueStateEvaluator.cs`, and `RunProjection.Battles` are all absent from current source (verified 2026-06-12). Retained as the deletion rationale record.
+
 # Unused Code and DTO Deletion Plan
 
 ## Goal

@@ -1,7 +1,11 @@
 ---
-status: active
+status: implemented
+archived: 2026-06-12
 calibrated: 2026-06-11
+superseded-by: code
 ---
+
+> Status: IMPLEMENTED. The `Package Swap` / `快递掉包` SettingsDock toggle (`Order => 4`), `PackageCardArtReplacementPolicy`, and gating shipped (verified `Game/CardArtReplacement/PackageCardArtReplacement*.cs`, `PackageCardArtPatchGate.cs`). Retained as the design record.
 
 # Package Card Art Settings Dock Toggle Implementation Plan
 
