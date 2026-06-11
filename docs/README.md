@@ -19,6 +19,7 @@ Only future work or items needing human confirmation belong in [plans/](plans/):
 - [plans/collection-panel-achievements-tab.md](plans/collection-panel-achievements-tab.md) — proposed CollectionPanel Achievements tab backed by BPP-owned card definitions.
 - [plans/achievement-service-design.md](plans/achievement-service-design.md) — proposed achievement catalog, server status API, parser, and storage design.
 - [plans/package-card-art-settings-dock-toggle.md](plans/package-card-art-settings-dock-toggle.md) — proposed SettingsDock toggle for package-card art replacement.
+- [plans/package-card-art-live-game-replacement-fix.md](plans/package-card-art-live-game-replacement-fix.md) — fix package-card custom art replacement outside CollectionPanel.
 - [plans/bazaardb-merchant-filter-comparison.md](plans/bazaardb-merchant-filter-comparison.md) — external BazaarDB comparison input; not code-verified.
 - [plans/reverse-engineering/offline-local-run-design.md](plans/reverse-engineering/offline-local-run-design.md) and [plans/reverse-engineering/predefined-match-and-random-system-design.md](plans/reverse-engineering/predefined-match-and-random-system-design.md) — unimplemented reverse-engineering proposals.
 
